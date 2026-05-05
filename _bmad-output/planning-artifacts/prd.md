@@ -224,233 +224,229 @@ The minimum bar across categories at each release:
 
 ## User Journeys
 
-Six journeys cover the substrate's surface. They are ordered for the reader's task — not for the architecture's tier ladder — starting with the universally legible Tier 1 wedge, paired immediately with the Tier 3 substrate-proof so the reader sees the same kernel on both ends, then daily-team texture, cross-team scaling, builder ecosystem, and finally a self-mirror — the evaluator deciding at minute 4 whether minute 5 happens.
+The substrate's promise is felt rather than read. Each journey below traces a specific user from pain to resolution, with the capabilities the kernel and reference Spirits must deliver explicitly named at the end. Six journeys cover the substrate's full surface: J1 anchors the Tier 1 wedge from the founder's own workflow; J4 and J3 cover production-incident response and team-normalcy; Reza covers single-org cross-team scale-out; Diego covers the third-party builder JTBD; J0 covers the unbought evaluator. Sequencing follows reader-task order — vocabulary first (J1), proof second (J4), normalcy third (J3), scale fourth (Reza), extension fifth (Diego), self-mirror last (J0). Long-form novelistic versions live in `maos-user-journeys.md` (sister doc); the PRD carries anchor scenes plus capability codas.
 
-Each journey opens with an anchor scene (the friction MAOS dissolves) and closes with a coda — the substrate capabilities exercised, the kernel invariants stressed, and the acceptance criteria implied. Long-form novelistic versions of the load-bearing scenes (Elena's full 90-minute incident, Marcus's full Tuesday hour-by-hour, Reza's full Friday afternoon) lift to a sister document `maos-user-journeys.md` for readers who want full texture; this section keeps the PRD readable in one sitting.
+The journeys honor the carry-forward signals from Step 2c — the wedge pain commitment, the Tier 3 reframe to OSS / single-org-Cortex, the audit-vs-legibility distinction, the eight kernel guarantees enumeration, and the halt-recall/halt-precision benchmark routing — and they exhibit the architecture decisions reached during this PRD workflow: ADR-012 typed-intent consent, ADR-013 `log.recall`, ADR-014 distillation audit-chain (I11), ADR-015 decision-context recording (I12), and the §9.5 distillation pattern.
 
-**Standing convention across all six journeys.** Humans delegate to Spirits via the `task.assign` IAC intent class, surfaced through one of three kernel-rendered surfaces — the conversational shell (`maos-shell`, v0.1), CLI subcommand (`maosctl spirit ask`, v0.1), or editor bridge (ACP via `maos-acp`, v1.0). Spirits are *not* autonomous-by-default. The manifest declares one of four postures (`assistive` / `cautious` / `autonomous-with-halt` / `proactive-observer`); three of the four require explicit human delegation to act. Even Mira on watch at 2 AM operates under a *standing task* Elena assigned at deployment — she did not decide to be on call. The substrate keeps humans in the assignment seat. **ADR-013** anchors the delegation surface design; **ADR-012** governs the typed-intent A2A consent that prevents confused-deputy escalation across asymmetric postures.
+### Journey 1 — Tier 1 wedge: The Founder's Loop (Lunarpulse runs Epic 7 from his daughter's bedtime to school drop-off)
 
-### Journey 1 — Tier 1 Wedge Demo: Priya at 11 PM
+**Persona.** Lunarpulse, founder. Heavy user of AI coding agents — BMAD framework for planning; Claude Code, Gemini CLI, opencode, and Kimi CLI rotating through implementation; `bmad-party-mode` when long-term direction needs cross-checking. Two kids, a marriage, a startup, and a workflow that ostensibly automates coding but in practice has chained him to the laptop because every `bmad-create-story` → `bmad-dev-story` → `bmad-code-review` cycle requires his approval, his next-prompt, his clarification, his "yes, fix that test." Each "wait" is 4–30 minutes. Each "approve" is one keystroke. The asymmetry is grotesque.
 
-**Persona.** Priya, senior backend engineer at a 200-person fintech; day job is payment-rails reliability. Tonight is portfolio time — the Tuesday-night fork of an OSS auth library she's been chipping at for six weeks. Kitchen lit by a kettle she boiled and forgot. Laptop balanced on a paperback because her usual cookbook has a coffee ring she doesn't want to deepen.
+**Opening scene.** Tuesday, 4:17 PM. Epic 7 has eight stories. He's two stories in. He has not had an unbroken hour of thought today. His daughter walked in at 3:45 wanting to show him a drawing; he held up a finger because Claude Code was waiting on his approval. He felt the asymmetry of that finger. He still feels it.
 
-**The friction.** Three coding agents in three terminals: Cursor on one screen, Claude Code in tmux, a custom prompt loop in the third because nothing on the market orchestrates three at once. 10:47 PM, Cursor rewrites a function Claude Code is mid-analysis on. The agents don't know about each other. Priya is the only synchronization point. She catches it at 11:14 PM after losing fifteen minutes to a phantom test failure caused by stale state in pane two. Three Tuesdays running. Tonight she stops, says something out loud to nobody, and types `curl install.maos.dev | sh`.
+**Inciting moment.** He spawns the **Orchestrator Spirit** — a `claude` process loaded with `orchestrator-bmad` and `maos-bridge` skills, posture `autonomous-with-halt`, halt policy preferring recall over precision. Capability scope: `fs.rw` on the project root, `fs.read` on skill search paths (`~/.maos/skills/`, `_bmad/skills/`), `mcp.tools.invoke` on tool servers, `iac.send` for delegating to Worker Spirits, `provider.stream` on his configured LLM, `log:recall:self` for raw-payload retrieval. From his terminal:
 
-**The delegation moment.** `maos init` finishes; the conversational shell opens. She types:
+> `@orchestrator run epic-7. workers: developer-local, developer-remote (laptop in office); reviewer-local. halt-recall over halt-precision. wake me when in doubt.`
 
-```
-priya@maos> @architect refactor src/auth/jwt.rs to use PASETO. Keep the API
-            surface stable. Tests must pass. Show me the diff before applying.
-```
+**Rising action.** The Orchestrator reads `_bmad-output/planning/epic-07/`, builds the dependency DAG, and emits its first delegation — a natural-language `task.assign` IAC frame routed by the kernel-internal IAC bus to a **local Developer Spirit** (another `claude` process with `developer` + `maos-bridge` skills loaded):
 
-Four seconds. *"Reading jwt.rs and the tests. I see three callers in src/middleware. Update those too or scope to jwt.rs only?"* Priya types `update callers; diff before any write`. Architect drops to `working` — peripheral indicator pulses bottom-right. Second pane: `@researcher confirm PASETO 4.0 compatibility with our wasmtime feature flags`. Two Spirits, both tasked, both scoped. The Reviewer Spirit, subscribed to the IAC bus by manifest, surfaces a notification she didn't ask for: *"I see overlap with last week's session. Halting on `lint.policy_drift`, confidence 0.62, threshold 0.7."*
+> `@developer-local task.assign skill=bmad-dev-story target=stories/7-1.md posture="use locally-installed claude-code; halt by writing HALT_REQUEST.md if any AC is ambiguous; existing project conventions"`
 
-**The halt.** Structured halt notification: *"Resolution options: provided_context | accepted_halt | authorized_override."* Priya types `provided_context: yesterday's lint policy still applies; treat overlap as expected`. Reviewer resumes. Three Spirits coordinate without Priya being the synchronization point.
+The Developer Spirit's behavior loads `bmad-dev-story` from `_bmad/skills/` into its context, reads the story doc, decides to use Bash to invoke `claude -p "..."` (Pattern A), watches for completion, emits progress frames. In parallel, Story 7-3 goes to a **remote Developer Spirit** on Lunarpulse's office laptop — the kernel's A2A adapter ferries the same-shape `task.assign` frame across mTLS, validates the ADR-012 typed-intent consent envelope (`intent: task.assign / development-task` is in the remote Host's allowlist), and the remote Spirit (an opencode session, Gemini provider) loads `bmad-dev-story` from its own filesystem mirror and executes. Different host, different CLI, different provider, same protocol.
 
-**Resolution.** 11:51 PM. Laptop closed. Three Spirits running overnight. Halts unresolved by deadline escalating to her morning queue. 7 AM digest: *"Architect: 2 PRs proposed. Researcher: compat confirmed. Reviewer: 1 halt awaiting your input. 2 hours attempted, 6 minutes approved actions, all logged."* One keystroke approval. The kettle is still on the counter where she left it.
+**Distillation in action.** When the local Developer reports `task.complete` for Story 7-1, the result payload is large — full diff (3,200 tokens), test output (800 tokens), reasoning trace (2,400 tokens). The kernel writes the full payload to the Transparency Log (I2). The Orchestrator's bridge logic invokes its distillation step: an LLM call summarizing the payload into ~150 tokens — *"Story 7-1: 7 file edits in src/auth/jwt.rs and 4 callers in src/middleware/. 23/23 tests pass. Cargo clippy clean. No new dependencies. Implementation aligns with ADR-007 (PASETO-over-JWT). Ready for review."* The digest is persisted to episodic memory (`fs.write` on private namespace) tagged `kind: digest` with `source_log_ref: [task-complete-frame-id]` and `distillation_depth: 1` — kernel validates per I11 and accepts. The digest joins the Orchestrator's active LLM context. Raw payload sits in the log, recallable via `log.recall` if a future decision needs it.
 
-**Coda.**
-- **Capabilities exercised.** `task.assign` IAC primitive (ADR-013); `maos-shell` conversational surface (v0.1); cross-Spirit IAC bus with subscription; epistemic halt at per-tag policy with confidence threshold (Layer-1); daily digest from Telemetry Stream broadcast.
-- **Postures revealed.** All three Spirits at `autonomous-with-halt` — Priya's chosen default. Reviewer shifts back to `cautious` after the halt because she wants more edge-case visibility; the posture change is logged via I10.
-- **Kernel invariants stressed.** I1 (capability mediation), I2 (log-before-deliver), I10 (lifecycle journaling).
-- **v0.1 ship/no-ship gate.** Halt-precision floor ≥0.65 measured against J1 (ramping toward Step 3's v1.0 published target of ≥0.80): in 100 controlled J1 runs with seeded ground truth, ≤35 of the Spirits' halts must be unwarranted (false halts). If precision is below floor at v0.1, J1 is not the wedge demo and the v0.1 narrative anchor falls back to J6 (the evaluator path) while halt-tuning continues.
-- **Wedge committed.** **W1: multi-agent orchestration with cross-session persistence.** The 60-second demo answer to "why install MAOS on Tuesday?" is *three coding agents that talk, halt when uncertain, and survive your laptop sleeping — none of which Cursor, Claude Code, or ChatGPT do today.* W2 (local-first / no-egress) and W3 (provider-agnostic) are sibling case studies, not the lead wedge.
+**Halt with non-blocking continuation.** At 6:23 PM the Orchestrator hits Story 7-5 — acceptance criterion reads "system handles concurrent users gracefully," undefined. Orchestrator halts (`tag: story.acceptance_criterion.ambiguous`). The halt frame is itself a `decision.*` type, so the kernel attaches `working_memory_digest_refs` per I12 — the auditor can later prove which digests the Orchestrator was reasoning over when it halted. Lunarpulse, mid-bedtime-routine, sees the halt notification on his phone:
 
-### Journey 2 — Tier 3 Substrate Proof: Elena at 2 AM, Mira and Nash close the loop
+> 🟡 **orchestrator-bmad halted on Story 7-5**
+> AC: "system handles concurrent users gracefully" — undefined. Three candidate operationalizations:
+> &nbsp;&nbsp;(a) Load test passes at ≤100 RPS
+> &nbsp;&nbsp;(b) Queue-and-degrade above threshold with user feedback
+> &nbsp;&nbsp;(c) Hard cap at 50 concurrent; return 429 above
+> Pick (a/b/c) or write your own. **I have 3 non-dependent stories I can proceed on while you decide.**
 
-**Persona.** Elena, VP of Engineering at a fintech processing 40,000 transactions/minute across three regions and 60+ microservices. She runs two Spirits in production-adjacent positions: **Mira** on a production-edge node, posture `autonomous-with-halt`, capability scope read-only on prod runtime + revert/scale/flag-toggle writes only; **Nash** in dev environment, posture `cautious`, capability scope full source RW + CI/CD orchestration. They are peers — neither owns the other. Elena drinks water at 2 AM, not coffee. She stopped making that mistake in her late twenties.
+He picks (b). The Orchestrator continues with Stories 7-3, 7-6, 7-7 in parallel via three Developer Spirits while the AC clarification is processed.
 
-**The friction.** 2:13 AM. Phone lights up. Before she's awake, Mira has been triaging for 9 minutes under her standing task Elena assigned at deployment: *"watch payment-service health, escalate anomalies to Nash with evidence."* Diagnosis: deployment of `billing-v3.2.1` at 01:41 introduced a connection-pool bypass in `BatchInvoiceProcessor.java`. Confidence: 0.82. Threshold for tag `diagnosis.root_cause`: 0.7. Mira does *not* halt; she acts inside her scope: prepares the evidence packet and escalates to Nash via cross-Host A2A.
+**User-input queuing.** Around 5:50 PM Lunarpulse had typed: `also remind the reviewer to check that we're not regressing the OAuth flow in PR-1213`. The Orchestrator's bridge enqueued this without interrupting in-flight Workers. At 6:08 PM, when Worker-1's `task.complete` landed and the Orchestrator was at a decision point, it dequeued the user input, folded it into the next Reviewer dispatch (`@reviewer-local /bmad-code-review review 7-1 — also verify OAuth flow in PR-1213 is not regressed`), and continued.
 
-**The typed-intent moment.** Mira composes the A2A frame to Nash. The IAC adapter requires her to declare an `intent` (per ADR-012). She selects `diagnosis-handoff:read-only-evidence`, drawn from the cross-posture vocabulary the two Spirits agreed at spawn. Nash's consent policy permits `diagnosis-handoff:read-only-evidence` from prod-edge peers but explicitly excludes `remote-write-request` and `code-mutation-directive`. **The frame lands. Nash receives a structured diagnosis, not an instruction.** Nash reads `BatchInvoiceProcessor.java`, confirms the bug, expands the search via pattern detection — finds two more dormant instances (`BatchRefundProcessor.java`, `DailyReconciliationJob.java`). Cross-environment query back to Mira: *"Are the dormant ones showing latency spikes in 72-hour telemetry?"* Mira queries, finds month-end spikes on `DailyReconciliationJob`. Time bomb.
+**Resolution.** He closes his laptop at 8:40 PM. The Orchestrator continues. He goes to a 9 PM dinner with his wife — first one in three weeks. He wakes at 6 AM, opens the morning digest:
 
-**The delegation moment (Elena's side).** 2:47 AM. Elena's phone:
+> **Epic 7 — overnight summary**
+> 7 of 8 stories merged. Story 7-5 paused at second halt (your guidance applied; one follow-up question pending). Retrospective draft attached. 22 IAC frames over 14 hours. 4 halts (3 resolved, 1 pending). 0 invariant violations. 0 capability scope breaches.
+
+He reads the retro on his phone, approves the merge train, takes his daughter to school, and answers the follow-up clarification on the train. Story 7-5 closes by 9:30 AM. He didn't sit at the laptop for it.
+
+**The substrate isn't a coding-agent multiplier. The substrate is the founder's evening back.**
+
+**Capabilities revealed (J1):**
+
+- **Reference Spirit set v0.5+:** Orchestrator + Developer + Reviewer (3 skill packages, no per-CLI Rust crates). Worker Spirits are agent CLI processes (Claude Code, opencode, gemini-cli, kimi-cli) with `maos-bridge` + persona skills loaded. ADR-014 (use existing protocols, no new IAC MCP server).
+- **Two-level `task.assign`** (ADR-013 — Human-Spirit interaction surfaces; ADR-012 typed-intent consent envelopes for cross-host A2A). Human → Orchestrator at epic granularity; Orchestrator → Worker at story granularity. Same primitive, different topology.
+- **Skills as named-and-loaded-on-demand.** Orchestrator names the skill in `task.assign`; Worker resolves and loads from its skill search path; kernel never hosts skills. Skills proliferate freely; Spirits stay small in number. Skills ≠ Spirits.
+- **Multi-protocol Spirit communication.** Same-host: kernel-internal IAC bus. Cross-host: A2A peer mesh with mTLS + ADR-012 typed-intent consent. Editor-hosted: ACP. Tool invocations: MCP. Orchestrator's delegation API is uniform across topologies.
+- **Distillation pattern operational** (architecture §9.5). Raw → Transparency Log → Spirit-side LLM distillation → digest in working memory + episodic. `log.recall` (ADR-013) for raw-payload retrieval on demand.
+- **I11 audit-chain enforcement** (ADR-014). Every persisted digest carries `source_log_ref` and `distillation_depth`; kernel rejects malformed writes.
+- **I12 decision-context recording** (ADR-015). Every `decision.*`-typed frame the Orchestrator emits carries `working_memory_digest_refs` so post-hoc audit can prove which summaries the agent reasoned over.
+- **User-input queuing** in the Orchestrator's persona logic. Human frames buffered; processed at safe sequence points.
+- **Per-tag epistemic policy** anchored to Orchestrator domain tags (`story.acceptance_criterion.ambiguous`, `test.persistent_failure`, `scope.expansion_detected`, `architecture.novel_decision_required`, `security.finding`). Halt-recall over halt-precision is user-configurable (the founder's choice).
+- **Mobile-friendly halt notifications** with structured frames (AC text + candidate resolutions + non-blocking story queue).
+- **Founder's morning digest** — kernel-rendered overnight summary.
+- **Capability scoping at story granularity** — Orchestrator computes per-story scope from planning artifacts; Worker Spirits get fs.rw bounded to their story's files, not project-wide.
+
+**Wedge committed.** This journey commits **W1″ — Orchestrator-led parallel multi-CLI execution with kernel-mediated audit-chain and decision-context recording** as the Tier 1 wedge. The original W1 (multi-agent orchestration + persistence) is the underlying capability. The 60-second demo answer to "what does MAOS do that Claude Code, Cursor, Aider, and a tmux session cannot?" — *"runs your full epic loop while you eat dinner, halts when it has questions, returns you a completed epic in the morning, and gives you an audit trail every regulator and skeptic can read."*
+
+### Journey 4 — Tier 3 sub-pattern: Elena's 2 AM 90-minute Mira-Nash incident
+
+**Persona.** Elena, VP Engineering at a fintech processing 40,000 transactions per minute across 3 regions and 60+ microservices. She runs two MAOS Spirits in production-adjacent positions: **Mira**, a diagnostic Spirit on a production-edge node (read-only on production runtime; write only for revert/scale/flag-toggle); **Nash**, an architect Spirit in the dev environment (full source repo access; CI/CD orchestration). They are peers across hosts; neither owns the other.
+
+**Opening scene.** 2:13 AM. Elena's phone lights up. PagerDuty alert: `payment-service` Kafka lag rising 340%. Before she's awake, the alert is also a MAOS notification — Mira has been triaging for 9 minutes already.
+
+**Rising action.** Mira's diagnosis at 02:22: deployment of `billing-v3.2.1` at 01:41 UTC introduced `BatchInvoiceProcessor.java` which creates a DB connection per message instead of using the pool. Confidence: 0.82 (above the diagnostic Spirit's halt threshold of 0.6 for `diagnosis.root_cause`). Mira escalates to Nash via cross-host A2A — the kernel's A2A adapter validates the ADR-012 typed-intent envelope: Mira declares `intent: diagnosis-handoff:read-only-evidence`, which Nash's consent policy permits from prod-edge peers; Nash's policy explicitly excludes `remote-write-request` and `code-mutation-directive`. The frame lands. Nash receives a structured diagnosis, not an instruction.
+
+Nash pulls `BatchInvoiceProcessor.java`, confirms instantly, then *expands the search*: pattern detection across the codebase finds two more dormant instances (`BatchRefundProcessor.java`, `DailyReconciliationJob.java`). Nash queries Mira: *"are the dormant ones showing latency increase in 72-hour telemetry?"* Cross-environment query, kernel-mediated, audit-trailed. Mira queries 72 hours of metrics. `DailyReconciliationJob` shows month-end spikes. Time bomb. Recommend: fix all three. Confidence 0.94.
+
+**Distillation in action — at the diagnostic edge.** Mira's incoming telemetry stream is high-volume. Per the §9.5 pattern, raw telemetry frames land in the Transparency Log; Mira's Spirit-side distillation step compresses 72 hours of cross-service metrics into ~200-token decision-relevant digests per service ("payment-service: lag 340% above baseline since 01:41; correlates with `billing-v3.2.1` deploy; connection pool 200/200 saturated; 47/50 threads blocked on `getConnection()`"). Each digest carries `source_log_ref` to the underlying telemetry frames and `distillation_depth: 1`. Mira's working memory holds the digests; raw is recallable via `log.recall` for any downstream decision.
+
+**Climax.** Elena wakes at 2:47 AM to one notification:
 
 > 🔴 **mira + nash: Coordinated response ready**
 > Issue: Kafka lag spike (detected 02:13, diagnosed, fixed)
-> Root cause: Connection-pool bypass in 3 batch processors
+> Root cause: Connection pool bypass in 3 batch processors
 > Proposed: Rollback (Mira) + Deploy PR #1247 (Nash, tested, ADR-112 attached)
-> Trail: Mira detected → Nash confirmed + dormant scan → Mira validated 72hr metrics → Nash produced PR + ADR + regression test
+> Trail: Mira detected → Nash confirmed + found dormant bugs → Mira confirmed via 72hr telemetry → Nash produced PR + ADR + regression test
 > [Approve] [Review PR first] [Rollback only]
 
-Elena reviews from bed. Approves. The PR includes a regression test that scans *all* batch processors for the bypass pattern. Sleep.
+The notification carries decision-context refs (I12) — Elena can see exactly which Mira digests Nash reasoned over and which Nash digests Mira used to validate the 72-hour telemetry query. She approves from her phone. Mira executes rollback. Nash's PR ships through CI/CD. Total elapsed: 2:13 to 3:43 AM. **90 minutes. Elena touched the system once.**
 
-**The reverse-delegation closing.** 3:43 AM, post-deploy validated by Mira. Elena types from her phone before going back to sleep:
+**Resolution.** Three weeks later, Mira sends Nash an unsolicited architecture note: *"0 new violations of ADR-112 in 23 deployments. Regression test caught 1 attempt at CI. New observation: 14% of batch processors exceed pool timeout during month-end — investigate batch sizing?"* Nash opens an investigation. The cycle continues.
 
-```
-elena@maos> @nash add a regression-test policy doc to the runbook for batch-processor
-            connection-pool patterns; coordinate with @mira on the failure-mode catalog;
-            halt by Friday with both ready for my review.
-```
+**Capabilities revealed (J4):**
 
-Reverse delegation. Substrate handled the acute moment; human reasserts the queue. **Total: 90 minutes. Elena touched the system once, then handed it back something to do.**
+- Asymmetric capability postures via manifest (sre-diagnostician vs principal-architect).
+- Cross-Host A2A with ADR-012 typed-intent consent envelopes — Mira's `diagnosis-handoff:read-only-evidence` is allowed; `code-mutation-directive` is blocked. Closes the confused-deputy class of attacks.
+- Cross-environment telemetry queries with audit trail.
+- Per-tag epistemic policy at both Spirits with confidence-gated halts.
+- Mobile-friendly approval surface.
+- ADR auto-drafting and CI-enforced pattern detection.
+- Distillation pattern at the production edge — high-volume telemetry compressed to decision-relevant digests; raw recallable via `log.recall`.
+- I12 decision-context recording across cross-host A2A — Elena can see which digests at each Spirit drove the coordinated response.
 
-**Coda.**
-- **Capabilities exercised.** Cross-Host A2A with mTLS + per-frame typed-intent consent (ADR-012); asymmetric capability postures via manifest; per-tag epistemic policy (`diagnosis.root_cause` halts at 0.7, `containment.action` at 0.5); mobile push approval surface; reverse delegation via `task.assign` from human-as-peer to multiple Spirits (ADR-013).
-- **Confused-deputy guarantee made testable.** Mira can pass *evidence* to Nash, not *commands*. ADR-012's typed-intent allowlist makes consent transactional, not channel-only. The acceptance criterion: a red-team Spirit cannot craft a `diagnosis-handoff` payload that causes Nash to take a write Mira couldn't perform directly.
-- **Kernel invariants stressed.** I1 (capability), I2 (log-before-deliver), **I8** (A2A bilateral consent — amended by ADR-012 from peer-identity to peer-identity-and-intent-class), I10 (lifecycle journaling).
-- **v1.5 ship/no-ship gate.** Halt-recall floor ≥0.75 on J2 simulated incident corpus (ramping toward Step 3's v1.0 published target of ≥0.85): in 100 simulated incident scenarios with seeded ground truth, Mira must halt on ≥75% of cases where she should. Halt-recall < 0.75 means the confidence-gated halt model is unverified and the prod-edge story does not ship at v1.5.
-- **Adversarial gate (mandatory).** No I8 violation in red-team replay. If a red-team can craft a `diagnosis-handoff` payload that causes Nash to take a write Mira couldn't, J2 is unshippable regardless of halt numbers.
+### Journey 3 — Tier 2 normalcy: Marcus's day-30 Tuesday morning standup
 
-### Journey 3 — Tier 2 Daily Texture: Marcus's Tuesday
+**Persona.** Marcus, tech lead / architect on an 8-person agile team at a fintech. The team has run MAOS for 30 days, peer A2A mesh, every member has their own Host with three Spirits. Marcus runs an Architect Spirit, Atlas. Lena (PO) runs a Story-Decomposer; Jun and Aisha (devs) run Coder Spirits; Sami (QA) runs a Test-Designer Spirit; Nina (UX) runs a Wireframe Spirit.
 
-**Persona.** Marcus, tech lead and architect on an 8-person agile team at a mid-size fintech. The team standardized on MAOS 30 days ago. Each member runs a Host with three Spirits per role — Marcus runs Architect (named Atlas), Story-Decomposer, Code-Reviewer; Lena (PO) runs Story-Decomposer + Spec-Author; Jun and Aisha (devs) run Coding Spirits + Reviewers; Sami (QA) runs Test-Designer; Nina (UX) runs Wireframe Spirit. Marcus's coffee is whatever's left in the office kitchen at 9:30 because he's usually the second to arrive. Eats lunch at his desk roughly 60% of weeks.
+**Opening scene.** 9:47 AM Tuesday. Marcus opens his laptop. Atlas is mid-thought from yesterday — *thinking-with* Jun's Coding Spirit across the room about the auth refactor. A pulsing peripheral indicator in Marcus's IDE shows the cross-Spirit conversation is active. He doesn't read it. He just knows it's there.
 
-**The end-of-day delegation.** 5:42 PM Monday, before he leaves the office Marcus types into his shell:
+**Rising action.** Atlas surfaces three things in Marcus's morning view: (1) overnight work — drafted ADR-047 about the new event-bus pattern, in *proposed* state; (2) what Atlas *almost* did — was going to refactor session middleware, halted because Jun's Spirit was touching adjacent code; (3) one genuine "I don't know enough" — epistemic halt on whether the new rate-limit policy applies to internal services. Atlas is waiting. Not guessing. Waiting.
 
-```
-marcus@maos> @atlas: tomorrow morning, propose ADR-047 on the new event-bus pattern based
-             on this week's spike in src/events/. Consult @jun-spirit on adjacent code via
-             `architecture-consult:scope-check` typed-intent. Halt by 9 AM with the proposal
-             and any conflicts surfaced. Do not modify any source files in src/auth/ — that
-             area is in active refactor by Aisha and Lena.
-```
+**Climax.** The standup at 10:00. Marcus doesn't read logs. He reads the team's narrative digest (per §9.5): *"Overnight, 8 agents ran. 47 IAC frames exchanged. 3 agents halted, 0 acted invisibly. 2 cross-agent consultations resolved without escalation. 1 architectural conflict surfaced for review (Lena's S7-04 vs current event-bus pattern, ADR-047)."* 60 seconds. Everyone nods. Standup moves on.
 
-Atlas accepts with `task.assign` acknowledgement; the standing task spans the overnight window. Marcus closes laptop, walks to train.
+The digest is itself a distillate — produced by a per-Host summarization step over the day's IAC frames. Per I11, the digest carries `source_log_ref` to the underlying frames; per I12, the digest's emit-frame records which agent-level digests fed into the standup summary. An auditor can replay any sentence in the digest back to raw evidence in seconds.
 
-**The morning surface.** 9:47 AM Tuesday. Marcus opens his laptop in the office. Atlas is mid-thought from overnight — *thinking-with* Jun's Coding Spirit across the room about adjacent code overlap. Pulsing peripheral indicator in his IDE shows the cross-Spirit conversation is active. He doesn't read it. He just knows it's there.
+**Resolution.** Day 30. The team has replaced Jira (story tracking → A2A mesh + manifest-declared roles), Confluence (architecture docs → ADR registry as Loom partition), and most Slack pings (consultations now happen agent-to-agent with full context, surfaced to humans only on halts). Each team member feels *amplified*, not surveilled. Nobody was puppeted. Nobody read each other's transparency logs without consent.
 
-**The narrative digest.** Atlas surfaces three things in his morning view: (1) overnight result on the standing task — ADR-047 drafted, sitting in `proposed` state; (2) what Atlas *almost* did — was going to refactor `src/middleware/session.rs` because the event-bus change suggested it, halted because Jun's Coding Spirit was touching adjacent code in `src/middleware/auth_middleware.rs` and the typed-intent allowlist did not permit cross-pair edits without explicit consent; (3) one genuine "I don't know enough" — `epistemic.halt` on whether the new rate-limit policy applies to internal services. Atlas is waiting. Not guessing.
+**Capabilities revealed (J3):**
 
-**The standup.** 10:00 AM. Marcus doesn't read logs. He reads the team's *narrative digest* generated by the Telemetry Stream broadcast: *"Overnight, 8 agents ran. 47 IAC frames exchanged. 3 agents halted, 0 acted invisibly. 2 cross-agent consultations resolved without escalation. 1 architectural conflict surfaced for review (Lena's S7-04 vs current event-bus pattern, ADR-047)."* 60 seconds. Everyone nods.
+- A2A peer mesh with mTLS + TOFU + ADR-012 typed-intent consent gates.
+- Role queries (`role: "architect"`) resolved locally per Host.
+- Per-Spirit consent policies (auto-share ADR drafts; not internal scratchpads).
+- Kernel-rendered narrative digest UX — distillation pattern made visible at the team boundary.
+- Transparency Log per-Host (no team-wide surveillance); cross-agent halt-on-conflict.
 
-**Resolution.** Day 30 versus day 1. The team replaced Jira (story tracking → A2A mesh + manifest-declared roles), Confluence (architecture docs → ADR registry as Loom partition), and most Slack pings (consultations now happen agent-to-agent with full context, surfaced to humans only on halts). Each teammate feels *amplified*, not surveilled. The transparency log is per-Host, not team-wide; each member can audit their own; there is no surveillance over each other.
+### Reza — Tier 3 candidate: Single-org cross-team Cortex
 
-**Coda.**
-- **Capabilities exercised.** A2A peer mesh with mTLS + TOFU + typed-intent consent (ADR-012); role queries (`role: "architect"`) resolved locally per Host; per-Spirit consent policies for cross-team interaction; kernel-rendered notification surface with peripheral indicators; daily narrative digest produced by Telemetry Stream broadcast.
-- **Audit ≠ legibility (Sally's distinction made operational).** The narrative digest is *legibility doing legibility's job* — Marcus is not an investigator, he's a tech lead with seven minutes before standup. The audit log is queryable underneath; the digest is the summary that lets him trust the audit log exists. Both invariants apply, distinct requirements; lands at Step 10 (NFRs) as a separate non-functional requirement.
-- **Kernel invariants stressed.** I3 (auto-response marking — every overnight action marked auto-response in the digest), I7 (telemetry as broadcast), I8 (consent gates as amended by ADR-012), I10 (lifecycle journaling).
-- **v1.0 ship/no-ship gate.** Day-30 transparency-log glanceability ≥70% (per Step 3 success criteria — ≥70% of team members report glancing at the transparency log during a typical work week on day 30). Daily-digest open rate ≥60% on Marcus-class users.
+**Persona.** Reza, head of platform engineering at a 400-person fintech. Three teams (security, support, data) run their own Spirits independently. They don't normally talk. Reza is the platform lead who gets paged when their Spirits collide on shared resources — and then writes the post-mortem.
 
-### Journey 4 — Tier 3 Cross-Team Cortex: Reza's Friday afternoon
+**Opening scene.** Friday 4:30 PM. A printed org chart sits on Reza's desk because he's the only person who knows which team owns which data domain. His "platform office hours" on Wednesdays are usually empty until someone needs something. He gets pulled into a Slack thread — the fraud team's Spirit and the support team's Spirit both want to write to the same customer-context store, and neither team knew the other existed. He has 90 minutes before the weekend.
 
-**Persona.** Reza, head of platform engineering at a 400-person fintech. The lonely job — he's the only person who knows which team owns which data domain. Keeps a printed org chart on his desk. Runs Wednesday "platform office hours" that nobody attends until they need something. Owns the kernel-mediated cross-team Cortex deployment that wires the fraud team's Spirits to the support team's Spirits without giving either team root on the other's Host. What happens to Reza personally if cross-team coordination fails: he gets paged. He writes the post-mortem. His weekend gets eaten.
+**Rising action.** Reza opens his platform-lead shell, types into a kernel-rendered Orchestrator session:
 
-**The friction.** 4:30 PM Friday. Reza pulled into a Slack thread: the fraud team's Spirit and the support team's Spirit both want to write to the same `customer-context` store. Neither team knew the other existed. Three weekend on-calls in a row have died on cross-team ambiguities like this. He's the one who would write the Sunday-night post-mortem.
+> `@fraud-spirit @support-spirit propose a shared customer-context schema; consult each other; halt for me at 5 PM with a recommendation.`
 
-**The cross-team delegation.** Reza types into his platform-lead shell:
+Two Spirits owned by two different teams, task-assigned by Reza-with-cross-team-authority, work it out via cross-host A2A using ADR-012 typed-intent consent. The fraud Spirit's `intent: schema-proposal:read-only-evidence` is in the support Spirit's allowlist; payload-shape consent prevents either Spirit from authoring the other's writes. Both Spirits load their team's data-residency patterns from Loom.
 
-```
-reza@maos> @fraud-spirit @support-spirit: propose a shared customer-context schema. Consult
-           each other via `cross-team:schema-proposal` typed-intent (consent policies
-           pre-shared). Halt for me at 5:15 PM with a recommendation. Do not write anything
-           to the customer-context store yet — proposal only.
-```
+**Distillation in action — multi-hop.** The fraud Spirit's proposal cites 14 prior schema decisions across the team's history. Each citation is itself a digest written months ago. Per ADR-014, when the fraud Spirit produces its consolidated proposal-digest, `source_log_ref` flattens transitively to point to the *original raw schema decisions* — not the intermediate digests. Reza, reading the proposal at 4:55 PM, can trace any claim back to raw evidence in one hop.
 
-Two Spirits owned by two different teams, task-assigned by Reza-with-cross-team-authority via the kernel-mediated Cortex layer. They work it out via A2A with the typed-intent consent from ADR-012 — fraud-spirit can `cross-team:schema-proposal` to support-spirit but cannot `customer-context:write` (that capability is scoped to support-spirit alone, and even support-spirit holds it under a write-prompt approval gate). Neither team's Host has root on the other.
+**Climax.** At 5:00 PM the Orchestrator halts with a unified recommendation: *"Shared schema with namespaced sub-objects per team. Customer-context.fraud / customer-context.support. Read-only across teams; writes scoped to the namespace owner. Migration path: 3 weeks. ADR draft attached."* Reza approves the schema, dispatches a follow-up task to a Coder Spirit to implement the migration, and closes his laptop at 5:08 PM.
 
-**The 5:15 halt.** Both Spirits halt on `schema.field-ownership-disagreement` — fraud-spirit wants `customer.risk_score` as a primary fraud-team field; support-spirit wants the same field as a primary support-team field for displaying to support agents. Confidence below threshold for either side to authoritatively own it. Halt routes to Reza's notification surface. Reza sees the structured disagreement. 3 minutes of reading. Decision: split into `customer.risk_score.fraud` (fraud-team owned, support-team read) and `customer.risk_score.consumer_facing` (support-team owned, fraud-team read). Both Spirits accept with `provided_context`. Schema proposed. Reza closes the Slack thread at 5:31 PM.
+**Resolution.** Three weeks later, the migration ships. Reza's Wednesday office hours stay empty for a different reason — the cross-team coordination problem the platform-lead role used to handle is now substrate work. Reza becomes a designer of policies, not a routing table.
 
-**Resolution.** No weekend page. No post-mortem. Reza's Wednesday office hours that week, two engineers show up to ask if they can wire their Spirits the same way. The cross-team Cortex starts being the platform team's unblock pattern, not their bottleneck. Reza's evenings get back.
+**Capabilities revealed (Reza):**
 
-**Coda.**
-- **Capabilities exercised.** Cross-team Cortex mediation with kernel-issued cross-team identities; typed-intent A2A consent (ADR-012) preventing privilege escalation across team boundaries; capability scoping on shared data stores; kernel-mediated halt routing to platform-lead with structured disagreement payloads.
-- **Kernel invariants stressed.** I1 (capability), I2 (log-before-deliver), I8 (typed-intent amended), I10 (lifecycle journaling).
-- **v2.0 Cortex demo target — candidate.** Reza-shaped single-org cross-team Cortex (3-region pilot, 8–12 Spirits across 2–3 teams). Alternative candidates carried to Step 8: OSS-on-MAOS (a project's own coordination on the substrate, recruitable in weeks), federated research consortium (climate / cancer genomics / clinical trials), or public-good consortium (disaster response, public health). **Final consortium target lock by v0.3** per Step 2c carry-forward. Reza is the v2.0 default unless a stronger recruitable candidate emerges.
+- Cross-team A2A with asymmetric consent envelopes (ADR-012) — payload-shape consent gives fraud and support Spirits a cleaner trust boundary than role-based ACLs alone.
+- Multi-hop distillation provenance per ADR-014 — schema-proposal-digests reference original schema decisions, not intermediate digests.
+- Loom-tier integration for team-specific pattern libraries (data-residency, schema conventions).
+- Kernel-rendered platform-lead Orchestrator surface (one-line task input; structured halt at 5 PM).
+- v2.0 Cortex demo target candidate — single-org cross-team is the achievable, design-partner-friendly version of the federated-research-consortium ambition. Final Cortex consortium target locked by v0.3 per Step 2c carry-forward.
 
-### Journey 5 — Cross-Cutting Builder: Diego ships a Spirit
+### Diego — Cross-cutting: The third-party Spirit author
 
-**Persona.** Diego, founder of a 3-person devtool startup, runs an open-source Terraform-cost-lint tool with 3,200 GitHub stars. Six months into runway anxiety. His tool currently can't compose with other agentic tools — adding agent-driven analysis means building a substrate from scratch he doesn't have the runway for.
+**Persona.** Diego runs an open-source code-review tool with ~3,000 GitHub stars. He wants to make it agentic but doesn't want to build a substrate. Reads the MAOS announcement post; the phrase *"a third party authors and ships a Spirit independently of the MAOS source tree"* catches his eye.
 
-**The 30-minute first build.** Diego reads the MAOS announcement. The phrase *"a third party authors and ships a Spirit binary independently of the MAOS source tree"* catches him. He runs `cargo generate maos-spirit terraform-cost-lint`. The template scaffolds a project. He drops his existing static-analysis crate into `src/lint.rs`. Manifest:
+**Opening scene.** Diego opens `spirit-development-and-sharing.md`. Skims to *"Build your first Spirit in 30 minutes."* Runs `cargo generate maos-spirit`, gets a templated project. Imports his existing static-analysis logic.
 
-```toml
-class = "terraform-cost-lint-pro"
-[capabilities.required]
-fs.read         = ["**/*.tf", "**/*.tfvars", "**/.terraform.lock.hcl"]
-provider.stream = ["anthropic.claude-*", "openai.gpt-*"]
-iac.send        = ["broadcast"]
+**Rising action.** Manifest:
+- `class = "code-reviewer-pro"`
+- `[capabilities.required]` — `fs.read` on `**/*.rs`, `provider.stream` on Anthropic models, `iac.send` on broadcast.
+- `[posture]` — assistive; prompt on writes, silent allow on reads.
+- `[output_shape]` — JSON schema for code-review findings (severity, file, line, suggestion).
+- `[epistemic_policy]` — halts on `claim.security_vulnerability` with confidence < 0.85; verbalize-only on style suggestions.
 
-[posture]
-default = "cautious"
+Diego runs `spirit-test` on a corpus of 50 known-buggy code examples. His Spirit catches 47 of 50 (recall 0.94). Halts on 3 of those (precision uncertain, but he ships it). Runs `maos-spirit publish --tier=public-untrusted`. His Spirit appears in the public registry signed with his Ed25519 key.
 
-[output_shape]
-findings = { severity, file, line, suggestion, estimated_cost_delta_usd }
+**Climax.** Within a week, 12 MAOS users install Diego's Spirit. Three file issues; one files a PR. The community vetting board reviews Diego's signing identity and capability surface — within 2 months, his Spirit is promoted to `public-vetted` tier via attestation. Diego's GitHub stars double in 4 months.
 
-[epistemic_policy]
-"claim.cost_regression" = { confidence_below = 0.85, action = "halt" }
-"suggestion.style"      = { action = "verbalize_only" }
-```
+**Resolution.** Diego writes a blog post: *"Why I deleted 4,000 lines of HTTP/SDK glue code by becoming a MAOS Spirit."* 200+ HN upvotes. Three other agentic-tool authors port their tools to Spirits within 6 months.
 
-He runs `spirit-test ./test-corpus/` on 50 known-cost-regression Terraform examples. Spirit catches 47 of 50 (recall 0.94). Halts on 3 of those (precision-on-halt-set 1.00, by intent — these are the genuinely ambiguous ones). Ships it: `maos-spirit publish --tier=public-untrusted`. The Spirit appears in the registry signed with his Ed25519 key.
+**Capabilities revealed (Diego):**
 
-**The trust-tier journey.** Week 1: 12 MAOS users install. Three issues filed; one PR merged. Week 6: vetting board reviews Diego's signing identity, capability surface, halt benchmarks. Tier promotion to `public-vetted` via attestation. Diego writes a blog post: *"Why I deleted 4,000 lines of HTTP/SDK glue code by becoming a MAOS Spirit."* 200+ HN upvotes. Three other agentic-tool authors port their tools to Spirits within six months.
+- `cargo generate maos-spirit` template scaffolding.
+- `spirit-test` mocking harness for unit-testing Spirit ABI without a kernel.
+- Manifest validation (output_shape, epistemic_policy, capability scopes) at publish time.
+- Public registry with Ed25519 signing, four trust tiers, vetting attestations.
+- Spirit-portable architecture — Diego's behavior code does not import HTTP libraries or LLM SDKs. *Spirit is behavior, not infrastructure.*
+- Halt-recall and halt-precision benchmarks publishable per Spirit.
 
-**Resolution.** Diego's runway extends. The startup's product is now a MAOS Spirit; the maintenance burden is *behavior*, not infrastructure. The kernel handles HTTP, LLM SDK calls, sandboxing, capability tokens, audit logging. Diego maintains the lint logic. His three-engineer team feels like a five-engineer team because the substrate eats the integration layer.
+### J0 — Cross-cutting: The evaluator
 
-**Coda.**
-- **Capabilities exercised.** `cargo generate maos-spirit` template; `spirit-test` mocking harness for unit-testing the Spirit ABI without a kernel; manifest validation at publish time (output_shape, epistemic_policy, capability scopes); public registry with Ed25519 signing; four trust tiers with strictest-of-floor enforcement; community vetting attestation flow.
-- **Spirit-portability invariant.** Diego's behavior code does not import HTTP libraries or LLM SDKs. "Spirit is behavior, not infrastructure" (architecture §5.1). Layer-1 capabilities provided by kernel.
-- **Halt-recall and halt-precision benchmarks** publishable per Spirit. Diego published 0.94 / 1.00 (recall / precision-on-halt-set).
-- **v1.0 ship/no-ship gate.** First non-Lunarpulse Spirit in the registry; ≥3 external Spirits within 6 months of v1.0 release.
-- **Open question carried to Step 8.** Commercial-gravity framing (3-person YC startup) vs. hobbyist framing (OSS-only author) for the canonical builder voice. Both ship as journey instances; question is which voice leads the marketing/recruitment narrative. **Lock by v0.5.**
+**Persona.** Anonymous developer, 4 minutes into `cargo install maos`, deciding whether minute 5 happens. Compared MAOS to Claude-Code-plus-bash. Skeptical.
 
-### Journey 6 — Adoption Threshold: The Evaluator at minute 4
+**Opening scene.** Install completes. Terminal prompt waits. They type `maos init` in a scratch directory. Five Worker Spirit slots and one Orchestrator slot are configured by default; pre-installed skills include the BMAD set. They type into the kernel-rendered shell:
 
-**Persona.** Anonymous. Could be a senior IC at a F500 evaluating whether to recommend MAOS to her team. Could be a graduate student looking for a substrate for a research project. Could be a CTO at a 30-person startup deciding whether to bet a quarter of engineering time. The persona type is *the person at minute three of `cargo install maos`* deciding whether minute four happens. Every reader of this PRD has been this person — for a different tool, on a different Tuesday.
+> `@hello-spirit say hi and tell me what you can do.`
 
-**The friction.** Five tabs open: GitHub README, Hacker News thread, MAOS docs site, Cursor session for note-taking, the actual install terminal. They have read the architecture doc's executive summary. They have skimmed Step 4 (this section). They are *actively skeptical*. They believe substrate claims rarely survive contact with their actual workflow. They are trying to decide whether to keep going.
+A `claude` process spawns inside a T2 sandbox, with `developer` + `maos-bridge` skills loaded. The Spirit responds in 4 seconds with a structured introduction: capabilities scoped, posture stated, expected halt-tags listed, link to the local Transparency Log.
 
-**The first interaction.** Install completes. Shell opens:
+**Rising action.** They try a bigger task: `@hello-spirit refactor src/main.rs to be more idiomatic`. The Spirit halts immediately on `task.acceptance_criterion.ambiguous` — *"'more idiomatic' is undefined; please specify the dimensions you care about."* They laugh, type a clarification, the Spirit proceeds. Four file edits, 9 IAC frames, all logged. They `maos audit query` to read their own Transparency Log. The audit trail is queryable from minute 6.
 
-```
-maos> Welcome. Type @hello-spirit hello to confirm install,
-      or :tutorial for a 3-minute walkthrough.
-```
+**Climax.** They uninstall: `cargo uninstall maos`. The kernel removes itself cleanly. The user's Transparency Log persists in `~/.maos/logs/` for review (configurable retention). They reinstall the next morning. They tell their tech-lead about it.
 
-They type `:tutorial`. The tutorial is a guided `task.assign` to a `tutorial-spirit` shipped with the kernel. It walks them through one delegation, one halt, one approval. Three minutes. At the end the tutorial-spirit halts on a question: *"Want to run the wedge demo (J1) on a sample repo, or load the air-gap demo on a sample CVE-style codebase?"*
+**Resolution.** First-time installer who didn't bounce — because the substrate set expectations honestly within 6 minutes (capability scope visible; halt visible; audit visible) and was reversible.
 
-**The first decision.** They pick the wedge demo. Sample repo loads — small Rust auth library bundled with the install package. They type `@architect refactor jwt.rs to use PASETO`. They watch three Spirits coordinate. They watch one halt. They resolve the halt. They see the digest. **Total elapsed: 11 minutes from install to "this is what they meant."**
+**Capabilities revealed (J0):**
 
-**Resolution.** The evaluator decides whether minute 12 happens. They might bounce — and that is a valid failure mode the substrate must not punish. They might install on their own machine. They might write the HN comment that recruits the next wave. The substrate's job at this journey is to be *uninstallable cleanly* (no system-state pollution; `maos uninstall` removes everything), *legible at minute 4* (the `:tutorial` walkthrough is in scope for v0.1), and *verifiable* (the bundled wedge demo on a sample repo runs in <90 seconds end-to-end).
+- Time-to-first-Spirit ≤ 5 minutes (pre-installed skills, default Spirit slots).
+- Honest capability disclosure on first interaction (the Spirit introduces what it *can* and *cannot* do).
+- Halt-on-ambiguity demo from minute 4 — sets the substrate's character before any commitment.
+- Audit-from-minute-1 (`maos audit query` works on the local Transparency Log).
+- Clean uninstall (kernel is reversible; user's data persists or is removed per their choice).
 
-**Coda.**
-- **Capabilities exercised.** Self-contained install (no system-state pollution; per-user state directory only); built-in `tutorial-spirit` shipped with v0.1 kernel; sample-repo wedge demo bundled with the install package; clean `maos uninstall` removing all state.
-- **Time-to-first-task-assign budget.** ≤10 minutes from `curl install.maos.dev | sh` to first successful `task.assign` resolved. CI gate by v0.5.
-- **Time-to-first-trust budget (per Step 3 success criteria).** Median <10 sessions before user shifts a Spirit from `cautious` to `assistive` posture for Tier 1.
-- **Evaluator-bounce-friendly invariant.** `maos uninstall` removes all state cleanly; CI test by v1.0.
-- **Kernel invariants stressed.** I9 (kernel statelessness — uninstall just removes the binary + the user state dir; no orphan global state), I10 (lifecycle journaling — every install/uninstall journaled).
+### Journey requirements summary
 
-### Cross-Journey Capability Matrix
+Six journeys collectively reveal the capability areas the kernel and reference Spirits must deliver:
 
-The journeys jointly stress the substrate's full surface. The matrix below maps capabilities → journeys → release phases, so Steps 9 (Functional Requirements) and 10 (Non-Functional Requirements) inherit a clean handoff.
-
-| Capability area | Journeys exercising | Release phase |
+| Capability area | Journeys | Phase |
 |---|---|---|
-| `task.assign` IAC primitive (ADR-013) + `maos-shell` conversational surface | J1, J3, J4, J6 | v0.1 |
-| `maosctl spirit ask` CLI subcommand | J6 (implicit fallback) | v0.1 |
-| ACP editor bridge (`maos-acp`) | J3 (Marcus's IDE), J5 (Diego's dev environment) | v1.0 |
-| Multi-Spirit Host with shared IAC bus + topic subscription | J1, J3, J4 | v0.1 (basic) → v1.0 (mesh) |
-| Episodic memory persistence across sessions | J1, J3 | v0.1 (private) → v1.0 (shared) |
-| Epistemic halt (Layer-1) with per-tag confidence threshold | J1, J2, J3, J4 | v0.5 (mechanism) → v1.0 (per-tag policy) |
-| Cross-Host A2A peer mesh with mTLS + typed-intent consent (ADR-012) | J2, J3, J4 | v1.0 |
-| Asymmetric capability postures (Mira read-only-plus-three-writes; Nash full RW) | J2 | v1.5 |
-| Mobile push approval surface | J2 | v1.0 (web push) → v2.0 (native client) |
-| Transparency Log + Approval Decision Log | J1, J2, J3, J4 | v0.5 (persistence) → v1.0 (queryable export) |
-| Daily narrative digest (Telemetry Stream broadcast) | J1, J3 | v0.5 → v1.0 |
-| Sandbox tiers (T0–T4) with capability scoping | J1, J5 | v0.1 (T0/T1) → v0.5 (T2/T3) → v1.0 (T4) |
-| Pluggable provider drivers | J1 (Anthropic), J2-sister (local) | v0.1 (Anthropic) → v0.5 (local/Ollama) → v2.0 (full multi-provider) |
-| Public Spirit registry + Ed25519 signing + four trust tiers | J5 | v1.0 |
-| `cargo generate maos-spirit` + `spirit-test` + Spirit dev SDK | J5 | v0.5 (SDK) → v1.0 (registry) |
-| Community vetting attestation flow | J5 | v2.0 |
-| Self-contained install + clean uninstall + built-in tutorial-spirit | J6 | v0.1 |
-| Cross-team Cortex with kernel-mediated identities | J4 | v2.0 |
+| Multi-Spirit Host with shared IAC bus | J1, J3, J4, Reza | v0.1 (basic) → v0.5 (multi-Spirit + A2A pulled forward per ADR-014) → v1.0 (full mesh) |
+| Episodic memory persistence across sessions | J1, J3, J4 | v0.1 (private tier) → v1.0 (shared tier) → v1.5 (collective tier via Loom) |
+| Epistemic halt as Layer-1 capability | J1, J4, J0, Diego | v0.5 (mechanism) → v1.0 (per-tag policy) |
+| Transparency Log + Approval Decision Log + `log.recall` | J1, J3, J4, J0 | v0.5 (persistence) → v0.5 (`log.recall` ABI per ADR-013) → v1.0 (queryable export) |
+| Distillation pattern + I11 audit-chain + I12 decision-context | J1, J3, J4, Reza | v0.5 (kernel enforcement) → v1.0 (benchmarks per §9.5 four-metric suite) |
+| Sandbox tiers (T0–T4) with capability scoping | All | v0.1 (T0/T1) → v0.5 (T2/T3) → v2.0 (T4 WASM) |
+| Pluggable provider drivers (Anthropic / OpenAI / local / Bedrock) | J1, J4 | v0.1 (Anthropic) → v0.5 (multi-provider via CLI-wrapped agents) → v2.0 (full multi-provider proxies) |
+| Cross-Host A2A peer mesh + ADR-012 typed-intent consent | J3, J4, Reza | v0.5 (pulled forward from v1.0) |
+| Mobile-friendly approval surface (phone push) | J1, J4 | v1.0 (HTTP push) → v2.0 (native push) |
+| Asymmetric capability postures (sre-diagnostician vs principal-architect vs platform-lead) | J4, Reza | v1.5 |
+| Loom collective tier with cross-Host pattern propagation | Reza | v1.5 (Loom-lite) → v2.0 (multi-instance) |
+| Public Spirit registry with Ed25519 signing + four trust tiers | Diego | v1.0 |
+| `cargo generate maos-spirit` + `spirit-test` + Spirit dev SDK | Diego | v0.5 (SDK) → v1.0 (registry) |
+| `maos audit query` CLI + cleanup | J0, J7-equivalent in NFRs | v0.5 (basic queries) → v1.0 (signed export) |
 
-### Carry-Forward Open Questions for Subsequent PRD Steps
+These map directly to Functional Requirements (Step 9) and Non-Functional Requirements (Step 10). The wedge pain commitment (W1″ — Orchestrator-led parallel multi-CLI execution with kernel-mediated audit-chain) is now load-bearing across J1 and Reza; Steps 8 (Scoping) and 9 (FRs) inherit it. Step 10 (NFRs) inherits the four-metric distillation ship-gate from §9.5 (digest-recall ≥ 0.90; faithfulness ≥ 0.98; hedge-preservation ≥ 0.95; traceability = 100%).
 
-The journey design surfaced decisions that route to later PRD steps rather than landing here. They are not forgotten — they are routed.
-
-| Open question | Origin | Lands at |
-|---|---|---|
-| Cortex consortium target lock by v0.3 — Reza-shaped single-org cross-team (J4 default), OSS-on-MAOS (substrate coordinating itself), federated research consortium, or public-good consortium | Step 4 party-mode synthesis | Step 8 (Scoping) |
-| Builder framing for canonical voice — commercial-gravity (YC founder) vs. hobbyist (OSS author); both ship as journey instances; which leads marketing | John (Step 4 party round) | Step 8 (Scoping) for v0.5 voice; Step 11 (Polish) for marketing copy |
-| J1 halt-precision floor as v0.1 ship gate — ≥0.65 phased, ramping toward Step 3's v1.0 published target ≥0.80 | Murat (Step 4 party round) | Step 8 (Scoping AC) and Step 10 (NFR benchmarks) |
-| J2 halt-recall floor as v1.5 ship gate — ≥0.75 phased, ramping toward Step 3's v1.0 published target ≥0.85 | Murat (Step 4 party round) | Step 10 (NFR benchmarks) |
-| Adversarial Spirit threat model — pushed out of Step 4 (no human protagonist) into Step 10 NFRs as STRIDE-style attack narratives traced to specific FRs | Mary (Step 4 party round) | Step 10 (NFRs) |
-| Side-by-side air-gap journey (Aisha CVE-on-air-gapped-firmware) — ships as v0.5+ case-study sidebar showcasing W2 (local-first / no-egress); not the lead wedge | Step 4 synthesis | Step 11 (Polish) and external case-study collateral |
-| Auditor journey (Sara `maosctl audit query`) — lifts from Step 4 to Step 10 NFRs as the audit-vs-legibility requirement made testable; "huh moment" of finding a halt-event from six weeks ago becomes an NFR acceptance scenario | Sally + Mary (Step 4 party round) | Step 10 (NFRs) |
-| Long-form sister doc `maos-user-journeys.md` — full novelistic versions for new-hire onboarding and engineering-spec grounding; PRD keeps anchor scenes only | Paige (Step 4 party round) | Step 11 (Polish) |
-| ADR-012 (typed-intent A2A consent) and ADR-013 (human-Spirit interaction surfaces) — committed to architecture-maos.md alongside ADR-001..ADR-011 | Winston (Step 4 party round, conceding Murat's confused-deputy finding) | Step 9 (Functional Requirements — `task.assign` and typed-intent surface) |
-| `maos-shell` crate as v0.1 component (~800–1,200 LOC) — kernel-rendered conversational REPL owning stdin/stdout, parsing `@spirit-name <message>`, emitting `task.assign` IAC frames | Step 4 synthesis (the user's "thick glass windows" question made the surface explicit) | Step 8 (Scoping — added to v0.1 crate inventory) |
+Open questions routed forward:
+- **Cortex consortium target for v2.0 demo** — Reza-style single-org cross-team is the leading candidate; OSS-on-MAOS (Debian / Wikimedia / Apache Foundation) and federated research consortium are alternatives. **Final lock by v0.3** per Step 2c.
+- **Adversarial-Spirit threat model** — Mary's stakeholder list for Step 10 NFR (STRIDE-style attack narratives with kernel defenses traced to FRs).
+- **Halt-recall vs halt-precision floors per Spirit class** — uniform across distillation-shipping Spirits per §9.5; per-Spirit floors for non-distillation Spirits (J4 Mira: halt-recall ≥ 0.7; J1 Orchestrator: halt-precision ≥ 0.85). Routes to Step 10.
 
 <!-- Content will be appended sequentially through the PRD workflow steps -->

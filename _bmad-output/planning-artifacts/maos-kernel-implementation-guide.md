@@ -42,7 +42,7 @@ Visual conventions:
 
 ## §1 The crate inventory
 
-The kernel is a **Cargo workspace** with 16 first-class crates plus 6 reference-Spirit crates. The structure mirrors the three-band hexagonal layout from architecture §4.0.2 — domain core innermost, kernel services in the middle, adapter ring outermost, plus the runtime, control plane, CLI, and binary.
+The kernel is a **Cargo workspace** with 15 first-class crates plus 6 reference-Spirit crates. The structure mirrors the three-band hexagonal layout from architecture §4.0.2 — domain core innermost, kernel services in the middle, adapter ring outermost, plus the runtime, control plane, CLI, and binary.
 
 ```
 maos/                                   # Cargo workspace root
@@ -52,7 +52,7 @@ maos/                                   # Cargo workspace root
     │
     ├── maos-domain/                    #  1. Domain core — pure types, no I/O
     │
-    ├── maos-spirit-abi/                #  2. ABI: traits + wire schemas + intent vocabulary
+    ├── maos-spirit-abi/                #  2. ABI: traits + wire schemas
     ├── maos-spirit-sdk/                #  3. SDK Spirit authors depend on
     │
     ├── maos-kernel-core/               #  4. Kernel services (the seven, sub-modules)
@@ -61,17 +61,16 @@ maos/                                   # Cargo workspace root
     ├── maos-providers/                 #  6. Provider drivers (feature-gated per provider)
     ├── maos-sandbox/                   #  7. Sandbox backends (feature-gated per OS)
     ├── maos-mcp/                       #  8. MCP client (stdio + SSE + StreamableHTTP)
-    ├── maos-acp/                       #  9. ACP server (stdio JSON-RPC) — v1.0+
-    ├── maos-shell/                     # 10. Conversational REPL (kernel-rendered, stdin/stdout) — v0.1, ADR-013
-    ├── maos-a2a/                       # 11. A2A peer (mTLS + TOFU + per-frame typed-intent consent, ADR-012)
-    ├── maos-persistence/               # 12. SQLite + Postgres (feature-gated)
-    ├── maos-secrets/                   # 13. Keyring + encrypted-file (feature-gated)
+    ├── maos-acp/                       #  9. ACP server (stdio JSON-RPC)
+    ├── maos-a2a/                       # 10. A2A peer (mTLS + TOFU + per-frame consent)
+    ├── maos-persistence/               # 11. SQLite + Postgres (feature-gated)
+    ├── maos-secrets/                   # 12. Keyring + encrypted-file (feature-gated)
     │
-    ├── maos-control-plane/             # 14. Operator surface (HTTP + Unix socket)
-    ├── maos-cli/                       # 15. `maosctl` (includes `spirit ask` subcommand for headless task.assign)
-    ├── maos-bin/                       # 16. Composition root — the `maos` binary
+    ├── maos-control-plane/             # 13. Operator surface (HTTP + Unix socket)
+    ├── maos-cli/                       # 14. `maosctl`
+    ├── maos-bin/                       # 15. Composition root — the `maos` binary
     │
-    └── reference-spirits/              # 17-22. The six factory-default Spirits
+    └── reference-spirits/              # 16-21. The six factory-default Spirits
         ├── spirit-architect/
         ├── spirit-butler/
         ├── spirit-researcher/
@@ -390,24 +389,11 @@ thiserror = "1"
 - `trait_def.rs` — the `Spirit` trait above.
 - `wire.rs` — message envelopes for the JSON-RPC dialect; one struct per method, serde-deriving JSON.
 - `handle.rs` — `SpiritHandle` is the Spirit→kernel API. In v0.1 it holds an `Arc<dyn KernelHandle>` so the kernel can implement it; the Spirit author sees only the trait methods.
-- `intents.rs` — the typed-intent IAC class taxonomy (per ADR-012 and ADR-013). See **IAC intent class taxonomy** below.
-
-**IAC intent class taxonomy.** Per ADR-012 (typed-intent A2A consent) and ADR-013 (human-Spirit interaction surfaces), every IAC frame on the bus carries a typed `intent` field drawn from a declared vocabulary. The kernel does not interpret intent semantics — it enforces structural presence and per-receiver consent allowlist membership. The `intents.rs` module defines the SDK starter vocabulary and the validation traits that ecosystem-specific Spirit packs extend. Notable starter intents:
-
-- **`task.assign`** (ADR-013) — the human-to-Spirit (or Spirit-to-Spirit) delegation primitive. Payload includes `goal`, `context`, `success_criteria`, `approval_policy`, optional `deadline`, `halt_authority`. Sender identity is a kernel-issued peer identity (`user:<name>@<host>`, `spirit:<id>`, or `external:<role>`). Receivers under any posture except `proactive-observer` are expected to declare consent for `task.assign` from at least the local user identity at spawn time.
-- **`task.progress`**, **`task.halt`**, **`task.complete`** — the response intents that flow back from a tasked Spirit to the assigner (and any subscribed listeners).
-- **`diagnosis-handoff:read-only-evidence`** (PRD Journey 2 — Mira → Nash) — cross-Host evidence transfer between asymmetric postures; explicitly excludes write authority. Receivers (e.g. Nash) decline `remote-write-request` and `code-mutation-directive` even from peers they otherwise consent to talk to.
-- **`architecture-consult:scope-check`** (PRD Journey 3 — Atlas ↔ Jun) — peer consultation between coding Spirits to surface adjacent-code conflicts before either acts.
-- **`cross-team:schema-proposal`** (PRD Journey 4 — Reza's Cortex) — Cortex-mediated cross-team coordination intent; consent policies pre-shared between Hosts at deployment.
-- **`loom:curated-pattern-delivery`** (Loom user-space) — curated patterns flowing from Loom-tier into subscribing Spirits; receivers run their own poison-detection policy on the payload (provenance, quorum, dissent — Loom's job, not the kernel's).
-
-Spirit packs may declare additional intent classes in their manifest. The kernel rejects frames whose declared intent is absent from the receiver's spawn-time consent allowlist. The kernel also rejects frames missing the `intent` field entirely — there is no untyped fallback path.
 
 **Test strategy:**
 
 - **Unit tests** for wire-schema serialization round-trips. Every method has a "test_serializes" and "test_deserializes" pair.
 - **Property tests** for ABI compatibility — manifests with random valid fields must validate; manifests with random invalid fields must not.
-- **Property tests** for intent-class allowlist mediation — random consent allowlists × random intent classes; the consent enforcement decision must match the spec table on every input pair (never accept when allowlist excludes; never reject when allowlist includes; never accept when intent field is missing).
 - **No integration tests** — that's the SDK's job.
 
 **Hot/cold path:**
@@ -415,6 +401,39 @@ Spirit packs may declare additional intent classes in their manifest. The kernel
 - The `Spirit` trait methods are called per-event; the wire serialization (subprocess form) is hot path.
 
 **v-phase status:** Full from v0.1. The wire surface for `subprocess` exists in the type definitions but isn't *used* until v1.0 ships subprocess Spirits.
+
+**ABI additions for the distillation pattern (ADR-013, ADR-014, ADR-015).** The `SpiritHandle` (Spirit→kernel API) gains two new methods plus a kernel-side hook:
+
+```rust
+#[async_trait::async_trait]
+pub trait KernelHandle: Send + Sync {
+    // ... existing methods (capability invocation, IAC send, fs.read, fs.write, memory.share, etc.)
+
+    // ADR-013: kernel-mediated Transparency Log recall, scoped to participant frames.
+    async fn log_recall(&self, filter: LogFilter, limit: usize, cursor: Option<Cursor>)
+        -> Result<LogRecallPage, Error>;
+    async fn log_fetch(&self, frame_id: FrameId) -> Result<FramePayload, Error>;
+}
+
+pub struct LogFilter {
+    pub since: Option<Timestamp>,
+    pub until: Option<Timestamp>,
+    pub kind: Option<FrameKind>,           // e.g., task_complete, halt, decision
+    pub peer: Option<PeerIdentity>,
+    pub addressed_to_role: Option<Role>,
+}
+
+pub struct LogRecallPage {
+    pub headers: Vec<FrameHeader>,         // payloads fetched on demand
+    pub next_cursor: Option<Cursor>,
+}
+```
+
+Headers carry `frame_id`, timestamps, sender, receiver, kind, and `source_log_ref` if the frame is itself a digest. Payloads are fetched on demand via `log_fetch` to keep Spirit context windows small.
+
+**ADR-014 / I11 enforcement is kernel-side.** When a Spirit calls existing `fs.write` (private tier) or `memory.share` (shared/collective tier) with a payload tagged `kind: digest`, the Capability Registry's enforcement layer validates that `source_log_ref` is non-empty and `distillation_depth` is present and monotonic. Rejection is a typed error `EDigestAuditChainMissing` — Spirit retries with the missing fields populated. No new ABI verb; the existing memory writes carry the new validation.
+
+**ADR-015 / I12 enforcement is kernel-side.** When a Spirit emits any frame typed `decision.*` (consent, halt, dispatch, task.assign, task.complete) via the IAC bus, the Capability Registry attaches `working_memory_digest_refs` populated from the Spirit's declared in-context digests (tracked by the registry as a side-effect of `log_recall` calls). The Spirit's behavior code sees nothing new; the kernel does the bookkeeping.
 
 ### §3.3 `maos-spirit-sdk` — what Spirit authors depend on
 
@@ -517,11 +536,14 @@ crates/maos-kernel-core/src/
 │   ├── mod.rs                        # IAC Bus
 │   ├── mailbox.rs                    # per-Spirit mpsc inbox
 │   ├── transparency_log.rs           # I2: log before deliver
+│   ├── log_recall.rs                 # ADR-013: kernel-mediated participant-scoped recall
 │   └── retract.rs                    # the retract primitive
 ├── capability_registry/
 │   ├── mod.rs                        # Capability Registry
 │   ├── token.rs                      # issuance, scoping, expiry, freeze
 │   ├── enforcement.rs                # output_shape, explanation_shape, epistemic_policy
+│   ├── digest_audit_chain.rs         # I11: validate source_log_ref + distillation_depth on memory writes
+│   ├── working_memory_refs.rs        # I12: track per-Spirit in-context digests; attach refs to decision frames
 │   ├── adapter_dispatch.rs           # routes to the adapter ring
 │   └── decision_log.rs               # Approval Decision Log
 └── telemetry/
@@ -566,9 +588,9 @@ uuid = { version = "1", features = ["v4"] }
 
 - **State:** `Arc<dyn PersistenceBackend>` (trait from this crate; implemented by `maos-persistence`), per-Spirit memory namespaces.
 - **Tasks:** none of its own. Operations run inline in the calling task; database I/O via the persistence backend's task pool.
-- **Hot path:** `read(tier, key)` and `write(tier, key, value)`. Cache hot keys in-memory (LRU bounded).
+- **Hot path:** `read(tier, key)` and `write(tier, key, value)`. Cache hot keys in-memory (LRU bounded). On `write`, if the payload is tagged `kind: digest`, defer to `capability_registry::digest_audit_chain::validate` (I11) before persisting; reject with `EDigestAuditChainMissing` if `source_log_ref` is missing/empty or `distillation_depth` is missing.
 - **Cold path:** compaction (fires asynchronously when transcript exceeds threshold).
-- **Trickiest piece:** the tool_use/tool_result pairing-integrity guard during compaction. Get this wrong and Spirits regress confusingly.
+- **Trickiest piece:** the tool_use/tool_result pairing-integrity guard during compaction. Get this wrong and Spirits regress confusingly. The I11 enforcement is structurally simple (field presence + non-emptiness + type check) and pattern-agnostic — it must NOT inspect digest content.
 
 #### Security Manager (`security/`)
 
@@ -588,19 +610,19 @@ uuid = { version = "1", features = ["v4"] }
 
 #### IAC Bus (`iac/`)
 
-- **State:** per-Spirit mailbox handles (`tokio::sync::mpsc::Sender<IacFrame>`), Transparency Log writer.
-- **Tasks:** one IAC dispatcher task per Host. Receives outbound frames, routes to recipient mailboxes, writes the Transparency Log entry **before** delivery (Invariant I2).
+- **State:** per-Spirit mailbox handles (`tokio::sync::mpsc::Sender<IacFrame>`), Transparency Log writer, per-Spirit recall-cursor cache.
+- **Tasks:** one IAC dispatcher task per Host. Receives outbound frames, routes to recipient mailboxes, writes the Transparency Log entry **before** delivery (Invariant I2). One recall service that handles `log_recall` / `log_fetch` requests (ADR-013).
 - **Hot path:** `iac/send` from any Spirit. Must be: log-before-deliver, FIFO per (sender, recipient), bounded-mailbox-backpressure on full.
-- **Cold path:** retract.
-- **Trickiest piece:** the log-before-deliver guarantee. If we deliver and then the log write fails, Invariant I2 is broken. Implement as: log first (sync write to a memory buffer; durable batched flush), then deliver. If the log write panics, kernel panics — better than silent log loss.
+- **Cold path:** retract; `log_recall` queries (themselves logged as `log.recall` IAC frames per ADR-013, producing the recall-of-recall chain).
+- **Trickiest piece:** the log-before-deliver guarantee. If we deliver and then the log write fails, Invariant I2 is broken. Implement as: log first (sync write to a memory buffer; durable batched flush), then deliver. If the log write panics, kernel panics — better than silent log loss. For `log_recall`, the participant-scoping filter must validate ADR-012 typed-intent consent envelopes for A2A frames (omit frames whose consent didn't permit participant-recall; elide payloads of header-only-recall frames).
 
 #### Capability Registry (`capability_registry/`)
 
-- **State:** `Arc<DashMap<TokenId, CapabilityToken>>` (sharded, lock-free reads), per-Spirit manifest scope handles, adapter dispatch table.
+- **State:** `Arc<DashMap<TokenId, CapabilityToken>>` (sharded, lock-free reads), per-Spirit manifest scope handles, adapter dispatch table, per-Spirit working-memory digest-ref set (I12 — populated as a side-effect of `log_recall` calls, evicted on context-window pressure or explicit Spirit clear).
 - **Tasks:** none of its own — operations run inline in the calling Spirit's task.
 - **Hot path:** *everything*. Token issuance, scope validation, posture lookup, approval classification, adapter dispatch. Performance attention concentrates here.
-- **Cold path:** Approval Decision Log writes (batched async).
-- **Trickiest piece:** the enforcement layer for `output_shape`, `explanation_shape`, and `epistemic_policy` predicates. Must be cheap on the success path (predicate matched → emit immediately) and clear on the failure path (predicate failed → typed error to Spirit).
+- **Cold path:** Approval Decision Log writes (batched async); I11 audit-chain validation on memory writes (`digest_audit_chain::validate` checks `source_log_ref` non-emptiness and `distillation_depth` presence on payloads tagged `kind: digest`); I12 decision-context attachment (on emit of any `decision.*`-typed frame, attach `working_memory_digest_refs` from the per-Spirit set).
+- **Trickiest piece:** the enforcement layer for `output_shape`, `explanation_shape`, and `epistemic_policy` predicates. Must be cheap on the success path (predicate matched → emit immediately) and clear on the failure path (predicate failed → typed error to Spirit). I11 / I12 enforcement is structural and cheap by design (no content inspection), but the I12 working-memory-refs tracking must be careful about eviction policy — too aggressive and decision-context becomes lossy; too retentive and the set grows unbounded. v0.1 default: track up to 256 refs per Spirit; LRU eviction; emit telemetry when eviction happens.
 
 #### Telemetry Stream (`telemetry/`)
 
@@ -847,61 +869,6 @@ vault           = ["dep:vaultrs"]                # v2.0+
 **Test strategy:** mock-keychain backend for unit tests; per-platform integration tests for real keychain access.
 
 **v-phase:** keyring at v0.1; encrypted-file at v0.5; Vault/cloud secret managers at v2.0.
-
-### §5.9 `maos-shell` — kernel-rendered conversational delegation surface
-
-**Purpose.** The canonical v0.1 human-Spirit delegation surface (per ADR-013). A Tokio-supervised actor that owns the user's stdin/stdout, parses `@spirit-name <message>` addressing, emits `task.assign` IAC frames into the bus, and streams `task.progress` / `task.halt` / `task.complete` frames back to the user. Renders peripheral indicators for backgrounded Spirits.
-
-**Public API surface:**
-
-```rust
-// crates/maos-shell/src/lib.rs
-
-pub struct ShellSession {
-    user_identity: PeerId,        // kernel-issued, e.g. "user:priya@local"
-    addressed_spirits: Vec<SpiritId>,
-    iac_handle: IacHandle,
-    notification_handle: NotificationHandle,
-}
-
-pub async fn run_shell(kernel: Arc<dyn KernelHandle>) -> Result<(), Error> {
-    // Read stdin line-by-line; on each line:
-    //   1. Parse @spirit-name(s) + message (or :command for shell built-ins)
-    //   2. Resolve SpiritIds via kernel.resolve_role(...)
-    //   3. Build TaskAssignFrame and emit via iac.send
-    //   4. Subscribe to task.progress / task.halt / task.complete frames
-    //   5. Render responses to stdout, halts to notification surface
-}
-```
-
-**Dependency budget:**
-
-```toml
-[dependencies]
-maos-domain      = { path = "../maos-domain" }
-maos-spirit-abi  = { path = "../maos-spirit-abi" }
-maos-kernel-core = { path = "../maos-kernel-core" }
-tokio            = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
-crossterm        = "0.27"
-serde            = { version = "1", features = ["derive"] }
-serde_json       = "1"
-thiserror        = "1"
-```
-
-**Internal modules:**
-
-- `parse.rs` — `@spirit-name <message>` lexer + parser. Multi-Spirit addressing (`@architect @reviewer ...`); special command prefixes (`:tutorial`, `:posture`, `:halts`, `:status`, `:uninstall`).
-- `session.rs` — `ShellSession` actor; stdin loop; frame multiplexing; identity binding (`user:<name>@<host>` resolved at session start by `maos-kernel-core`).
-- `render.rs` — stdout rendering for inline responses; peripheral indicator drawing (crossterm) for backgrounded Spirits; halt-resolution prompt UX.
-- `tutorial.rs` — bundled `tutorial-spirit` interaction handler (PRD Journey 6's `:tutorial` walkthrough — guides the evaluator through one delegation, one halt, one approval in <3 minutes).
-
-**Hot path:** stdin read → parse → IAC frame emit. Should be sub-millisecond; the bottleneck is downstream Spirit response time (LLM provider latency), not the shell itself.
-
-**Test strategy:** unit tests against mock IAC handle; integration tests run the shell against a real kernel + Architect Spirit on a sample repo (the bundled wedge demo from PRD Journey 6). End-to-end test: `:tutorial` walkthrough completes in <3 minutes against a stubbed provider; full Journey 1 wedge demo (`@architect refactor jwt.rs to use PASETO`) runs to first halt in <90 seconds against a stubbed provider.
-
-**v-phase:** v0.1 (~800–1,200 LOC for the v0.1 cut). The ACP variant (`maos-acp`, §5.5) is the v1.0 sibling for editor delegation; the CLI variant ships as a `maosctl spirit ask` subcommand alongside `maos-shell` at v0.1; the mobile push surface (PRD Journey 2's 2:47 AM phone notification) is deferred to v1.0 (web-push) and v2.0 (native client). All four surfaces share the same `task.assign` IAC intent class on the wire.
-
-**Rationale for v0.1 inclusion.** Without `maos-shell`, the v0.1 wedge demo (PRD Journey 1, Priya at 11 PM) cannot be reproduced — there is no surface for Priya to type `@architect refactor jwt.rs to use PASETO` against. Per ADR-013, the conversational shell is the canonical v0.1 delegation surface; everything else (ACP, mobile push, voice) layers atop the same `task.assign` primitive in later phases.
 
 ---
 

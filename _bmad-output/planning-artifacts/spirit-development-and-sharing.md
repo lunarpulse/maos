@@ -1259,7 +1259,115 @@ You ship eval results in the package. Consumers see them in the registry. Eval i
 
 ---
 
-## §13 Glossary
+## §13 Distillation-pattern Spirits and the Orchestrator class
+
+Some Spirits — Orchestrators running an epic loop, Mira at the production edge ingesting telemetry from many sub-services, a Cortex node aggregating peer reports across a federation, Loom curating signals across institutions — face a problem that no single-task Spirit has: they consume from many peers over a long time horizon, and naively appending peer results into the LLM's context will overflow the model's context window long before the work completes. The substrate's answer is the **distillation pattern**, anchored by kernel primitives (Transparency Log + I11 + I12 + `log.recall`) and composed by the Spirit author. This section is for you if you're authoring one of those aggregating Spirits.
+
+If you're writing a single-task worker (Coder, Reviewer, Researcher), this section is **not** for you — your Spirit's working memory is bounded by the task. Skip ahead to §14.
+
+### §13.1 The pattern
+
+```
+                ┌─────────────────────────────────────┐
+                │  HOT (active LLM context — bounded) │
+                │  - current decision state           │
+                │  - digested results from peers      │
+                │  - in-flight task frames            │
+                │  - recent LLM I/O                   │
+                │  - queued user input pending        │
+                └────────────┬────────────────────────┘
+                             │ append digestate
+                             ▲
+                  ┌──────────┴───────────┐
+                  │ distillation step    │
+                  │ (Spirit-side LLM     │
+                  │  summarizes raw      │
+                  │  result into the     │
+                  │  decision-relevant   │
+                  │  fragment)           │
+                  └──────────┬───────────┘
+                             ▲ recall raw on demand
+                ┌────────────┴────────────────────────┐
+                │  COLD (Transparency Log + memory)   │
+                │  - full Worker result payloads      │
+                │  - all IAC frames (I2)              │
+                │  - persisted digests with refs (I11)│
+                └─────────────────────────────────────┘
+```
+
+**Step by step:**
+
+1. A peer Spirit emits `task.complete` (or any other large payload) addressed to your aggregating Spirit. The kernel writes the full payload to the Transparency Log (Invariant I2) and routes it to your mailbox.
+2. Your Spirit's `on_frame` handler **does not** append the raw payload to its LLM context. Instead, it triggers a distillation step: a small LLM call (Spirit-chosen model, prompt, token budget) that summarizes the raw payload into a ~150-token decision-relevant digest.
+3. The digest is written to working memory (in-process Spirit state — no kernel involvement) tagged `kind: digest`. Optionally elevated to **episodic memory** (call existing `fs.write` on the private tier) for cross-session retention or **shared memory** (call `memory.share`) for inter-Spirit dissemination. Per Invariant I11, every persisted digest MUST carry `source_log_ref: [frame_id, ...]` and `distillation_depth: N`. The kernel rejects writes that lack these with `EDigestAuditChainMissing`.
+4. Your Spirit's active LLM context contains: digests + decisions + recent I/O + queued external input. Raw payloads are *not* in active context.
+5. When a downstream decision needs full evidence (e.g., the digest hedged a finding and you want to read the original Reviewer output), call `log.recall(filter)` to fetch frame headers, then `log.fetch(frame_id)` to materialize a payload (ADR-013). Recall queries are themselves logged.
+6. When you emit any `decision.*`-typed frame (`task.assign`, halt, dispatch, consent), the kernel attaches `working_memory_digest_refs` populated from your declared in-context digests (I12). You don't write this field — the kernel does.
+7. **Queue user-input frames.** Human-originated frames arriving during in-flight work should be buffered by your persona logic and processed at safe sequence points (between task completions, before new dispatches). Don't preempt in-flight delegations.
+
+### §13.2 Multi-hop distillation (Cortex-class)
+
+If your Spirit aggregates from peer Spirits that themselves aggregate (e.g., Loom curating institution-level digests), you're producing digest-of-digests. Per ADR-014, **`source_log_ref` flattens transitively at write time** — your hop-N digest references the *original raw frames*, not intermediate digests. The Spirit producing the higher-tier digest unions its inputs' refs and persists the unioned set. `distillation_depth` is monotonic; auditors and downstream Spirits walk a single hop from any digest back to raw evidence.
+
+Loom patterns may decide policy on max acceptable depth (e.g., halt-and-escalate at depth 3+). The kernel doesn't enforce a max; it just requires the field be present and monotonic.
+
+### §13.3 The four-metric benchmark suite (ship gate)
+
+If your Spirit ships distillation, you MUST meet four metrics across an appropriate corpus before publishing:
+
+| Metric | Floor | What you measure |
+|---|---|---|
+| **Digest-recall** (decision-equivalent recall) | ≥ 0.90 | Take a corpus of `(raw, ground-truth-decision)` pairs. Distill the raw. Hand a held-out replicator LLM the digest only. Measure whether it replicates the ground-truth decision. Pass if ≥ 90%. |
+| **Digest-faithfulness** (no-contradiction rate) | ≥ 0.98 unflagged | Judge-LLM (different model family from your distiller, to avoid shared blindspots) checks `(raw, digest)` pairs for contradictions. Sample 1-in-100 in production via async audit. Flag rate above 2% blocks ship. |
+| **Digest-hedge-preservation** | ≥ 0.95 | Corpus includes hedged statements ("possibly," "60% confident," "needs verification," "edge case"). Distill. Check whether the digest preserves the hedge or flattens it to certainty. The silent-killer metric — fight for it. |
+| **Digest-traceability** | 100% (kernel-enforced) | Every digest carries non-empty `source_log_ref` and `distillation_depth`. The kernel enforces I11; failures here are kernel bugs, not Spirit bugs. Should always be 100%. |
+
+**Corpus expectations:** at least 100 cases, hybrid:
+
+- **50 synthetic cases** with hand-authored payloads containing planted critical findings (security vulnerabilities, test-failure-misreports, hedged-but-critical observations, contradicted-prior-findings). Include at least 10 hedge-preservation cases and 10 contradiction cases. These are calibration cases with ground-truth decisions.
+- **50 real cases** drawn from your Spirit's actual usage history with retrospective labels.
+
+These thresholds are **uniform** across all distillation-shipping Spirits. The corpus per Spirit may differ (Mira uses telemetry; Orchestrator uses Worker `task.complete` payloads; Loom uses cross-institutional reports); the metrics and floors do not.
+
+**Blocking criteria — ship gate:**
+
+- Digest-recall < 0.85: do not ship. Hard floor.
+- Digest-recall 0.85–0.90: ship-with-warning, document as known limitation, mandatory raw-recall on any decision frame.
+- Digest-faithfulness unflagged-contradiction rate > 5%: do not ship.
+- Hedge-preservation < 0.90: do not ship.
+- Traceability < 100%: kernel bug, do not ship.
+
+### §13.4 Authoring an Orchestrator Spirit — recipe
+
+The Orchestrator class is the canonical reference Spirit for the distillation pattern. Recipe:
+
+1. **Posture.** `autonomous-with-halt`. The Orchestrator runs a multi-hour epic loop without per-step human intervention; it halts on epistemic-policy triggers.
+
+2. **Capability scope (manifest).** `fs.rw` on the project root; `fs.read` on skill search paths (`~/.maos/skills/`, `_bmad/skills/`, configured registries); `mcp.tools.invoke` on configured tool servers; `iac.send` for delegating tasks to Worker Spirits via local IAC bus or A2A; `provider.stream` for the distillation LLM and the Orchestrator's own reasoning; `log:recall:self` for raw-payload retrieval.
+
+3. **Epistemic policy.** Per-tag rules, halt-recall preferred over halt-precision (the founder's preference; configurable). Tags include `story.acceptance_criterion.ambiguous`, `test.persistent_failure` (threshold: 3 consecutive iterations), `scope.expansion_detected`, `architecture.novel_decision_required`, `security.finding`. Default action: `verbalize_only`.
+
+4. **Delegation primitive.** Emit `task.assign` IAC frames addressed by role (`@developer-spirit`, `@reviewer-spirit`) or specific instance ID. Frame names the skill explicitly (`skill: "bmad-dev-story"`, `target: "stories/7-1.md"`, `posture: "..."`). The kernel routes locally (kernel-internal IAC) or cross-host (A2A with ADR-012 typed-intent consent) per topology.
+
+5. **Distillation step.** On every Worker `task.complete` frame, run an LLM-mediated distillation into a ~150-token digest. Persist the digest to episodic memory with `source_log_ref` and `distillation_depth`. Append digest to active context. Make the next decision based on digests.
+
+6. **Recall on demand.** On any decision where the digest hedged a finding or where a downstream task needs full evidence, call `log.recall` to fetch raw frame headers and `log.fetch` to materialize payloads. Pull raw into context only for the duration of that decision.
+
+7. **User-input queue.** Buffer human-originated frames in the Spirit's persona logic. Process at safe sequence points (between task completions, before new dispatches). Don't preempt in-flight Workers.
+
+8. **Lifecycle hooks.** `on_swap_in` should restore the in-context digest set from episodic memory (so an Orchestrator can resume an epic across kernel restarts). `on_swap_out` should persist the digest set to episodic memory.
+
+The reference Orchestrator Spirit (`spirit-orchestrator-bmad`) ships in v1.0 alongside the existing six classes. Third-party orchestrators (scrum-flavored, kanban-flavored, continuous-deployment-flavored) replace it without kernel changes — they're just different persona skills + different epistemic policies.
+
+### §13.5 What this section is NOT
+
+- It is not a how-to for the distillation prompt itself. The prompt is your design choice; the architecture takes no position on it (per ADR-006). Iterate on your prompt with your benchmark suite as ground truth.
+- It is not a guarantee that the distillation pattern is required. Single-task Spirits with bounded contexts don't need it. The pattern shows its value at long-running, many-peer aggregation; below that threshold, the audit-chain overhead may not be worth the LLM-cost overhead.
+- It is not a place to bake LLM provider choice into the contract. Choose your distiller model per cost / latency / hedge-fidelity trade-off; document the choice in your eval results.
+
+---
+
+## §14 Glossary
 
 For first-time readers; defined the way I'd say them out loud. The architecture and design report each have their own glossaries; the entries below are specific to this development guide.
 
