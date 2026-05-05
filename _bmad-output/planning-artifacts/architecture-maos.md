@@ -175,6 +175,190 @@ The kernel is **one Rust+Tokio process** per Host. The choice of Rust and Tokio 
 
 A Spirit, by contrast, may be implemented in **any language** that can speak the Spirit Wire Protocol (a thin JSON-RPC-over-stdio dialect modeled on ACP and codex's app-server). Reference Spirits will be Rust crates running in-process for performance; LLM-driven Spirits run as kernel-supervised subprocesses with stdio JSON-RPC pipes. **Both paths are first-class**; choice is per-Spirit-class.
 
+### 4.0 Kernel Internal Architecture
+
+Before walking the seven services individually (§4.1–§4.7), this section commits to **how the kernel is organized internally**: the architectural style, the layout of code, and how subsystems connect. Without this, a reader sees seven services and has no model for how they relate.
+
+#### 4.0.1 Architectural style — hexagonal + actor + reactive (not Clean)
+
+**Static structure: hexagonal (ports & adapters).** The kernel has a clear domain (Spirit lifecycle, capability mediation, IAC routing, journal) that we deliberately separate from concrete I/O. Multiple adapter implementations exist per port — provider drivers per LLM vendor, sandbox backends per OS, transport adapters per protocol. Hexagonal lets us test the kernel core without real LLM calls, swap adapters per deployment, and keep the rustain-style `domain / adapters / infrastructure` layering the cohort survey already validated. **Not strict Clean Architecture:** Clean's inward-only call discipline doesn't fit a runtime where the IAC Bus must invoke into Spirit-implemented handlers. We take Clean's separation discipline without its call-direction rigidity.
+
+**Runtime hot path: actor model.** Each Spirit is an actor — mailbox-addressable, behavior-encapsulated, no shared mutable state with peers. This is codex's `AgentRegistry` + `Mailbox` pattern, adopted wholesale. It gives us four properties for free: backpressure via bounded mailboxes, no locks on the hot path (each actor owns its state), failure isolation via Tokio task supervision, and natural hot-swap (replace `behavior` while preserving `state` and `open_tokens`). The seven kernel services are *not* themselves actors — they're shared services that actors call into, with their own task pools.
+
+**Operational properties: reactive, by emergence.** Responsive, resilient, elastic, and message-driven fall out of the choices above — cooperative scheduler + bounded mailboxes (responsive); journal-based recovery + Tokio supervision (resilient); scale by adding Spirits or Hosts (elastic); IAC and capability invocations all async (message-driven). We don't invoke the Reactive Manifesto by name; the properties are present because the lower-level choices are correct. ADR-010 and ADR-011 record the hexagonal and actor-model commitments respectively.
+
+#### 4.0.2 The three-band layout
+
+```mermaid
+flowchart TB
+    subgraph Outer [Adapter Ring - blue]
+        PA[Provider drivers]
+        MA[MCP client]
+        SBA[Sandbox backends]
+        ACA[ACP server]
+        A2AD[A2A gateway]
+        FA[Filesystem adapter]
+        PS[Persistence: SQLite/Postgres]
+        KC[Secrets: OS keychain]
+    end
+
+    subgraph Mid [Kernel Services - yellow]
+        IO[I/O Subsystem]
+        SM[Security Manager]
+        CR[Capability Registry]
+        MM[Memory Manager]
+        IAC[IAC Bus]
+        TS[Telemetry Stream]
+        SCH[Spirit Scheduler]
+    end
+
+    subgraph Core [Domain Core - green]
+        SCB[SCB / Capability Token / Frame / Manifest / Invariants I1-I10]
+    end
+
+    subgraph Run [Runtime Hot Path - actors orbit, not nest]
+        S1((Spirit A))
+        S2((Spirit B))
+        S3((Spirit C))
+    end
+
+    Run -->|capability/request| CR
+    Run -->|iac/send| IAC
+    Run -->|memory/read| MM
+    CR -->|enforce manifest| Core
+    CR -->|prompt| SM
+    CR -->|invoke adapter| Outer
+    IAC -->|log before deliver| TS
+    IAC -->|deliver| Run
+    MM --> PS
+    SCH -->|spawn/swap/unload| Run
+    SCH -->|journal transitions| PS
+    SM --> KC
+    SM --> SBA
+    IO --> ACA
+    IO --> A2AD
+    IO --> MA
+    IO --> PA
+    TS -->|broadcast| Run
+    style Core fill:#dfd
+    style Mid fill:#fed
+    style Outer fill:#ddf
+    style Run fill:#fdf
+```
+
+Three bands ordered by purity:
+
+1. **Domain Core (green).** Pure data types, invariants, no I/O. The `SpiritControlBlock`, the `CapabilityToken`, the `IacFrame` schema, manifest types. Compiles without any async runtime, HTTP library, or database driver. Testable in isolation.
+2. **Kernel Services (yellow).** The seven services from §4.1–§4.7. Each is a Tokio task pool with its own internal state. Depends on the domain core and on traits the adapter ring implements.
+3. **Adapter Ring (blue).** Concrete implementations of ports defined by the kernel services. Provider drivers, MCP client, sandbox backends, persistence, secrets, ACP, A2A. Swappable per deployment.
+
+**Spirits orbit, they don't nest.** Spirits are not "in" the kernel in the layering sense — they sit alongside the kernel services and call into them via the Spirit ABI. The kernel orchestrates them but does not contain their behavior. This is what makes the three Spirit forms (rust-inproc / subprocess / wasm) work — they're all peers to the kernel, just bound differently (function pointer / JSON-RPC pipe / WIT call).
+
+#### 4.0.3 Service dependencies
+
+The seven services are not equal peers — they have a layering relationship:
+
+| Service | Depends on | Depended on by |
+|---|---|---|
+| **Spirit Scheduler** | Capability Registry (token revocation on unload), Memory Manager (archive on swap), Persistence (journal) | Control plane (load/swap/unload commands) |
+| **Memory Manager** | Persistence, Capability Registry (scope validation) | Spirit Scheduler (archive), all Spirits (memory.read/write) |
+| **Security Manager** | Sandbox backends, Secrets adapter, Approval rendering | Capability Registry (sandbox profile lookup) |
+| **I/O Subsystem** | Concrete transport adapters (HTTP, stdio, mTLS) | All inbound clients; outbound calls from Capability Registry |
+| **IAC Bus** | Telemetry Stream (logging), Persistence (Transparency Log), Spirit Scheduler (mailbox addresses) | All Spirits (iac.send), control plane (broadcasting) |
+| **Capability Registry** | Security Manager, I/O Subsystem, Memory Manager, Telemetry Stream | Every Spirit interaction with the world |
+| **Telemetry Stream** | nothing (pure broadcast) | Spirit Scheduler, IAC Bus, Capability Registry, all Spirits (subscriptions) |
+
+**The Capability Registry is the busiest service** — every external call funnels through it. Performance-engineering attention concentrates here. **The Telemetry Stream is the simplest** — pure broadcast, no state, no I/O. It's the kernel's lung.
+
+#### 4.0.4 Module layout (Rust workspace)
+
+The three bands map to a concrete crate structure. Compressed view; the full layout is in the kernel implementation guide (forthcoming).
+
+```
+maos/                                  # workspace root
+├── crates/
+│   ├── maos-domain/                   # ★ DOMAIN CORE — pure types, no I/O
+│   ├── maos-spirit-abi/               # the Spirit ABI (traits + wire schemas)
+│   ├── maos-spirit-sdk/               # SDK Spirit authors depend on
+│   ├── maos-kernel-core/              # ★ KERNEL SERVICES — seven submodules
+│   │   ├── scheduler/                 #   Spirit Scheduler + journal + budget
+│   │   ├── memory/                    #   tier dispatch + compaction + archive
+│   │   ├── security/                  #   sandbox + ApprovalManager + trust tier
+│   │   ├── io/                        #   inbound + outbound + streams
+│   │   ├── iac/                       #   mailbox + Transparency Log + retract
+│   │   ├── capability_registry/       #   tokens + enforcement + adapter dispatch
+│   │   └── telemetry/                 #   topics + filtered subscriptions
+│   ├── maos-spirit-runtime/           # ★ ACTORS — form-specific supervisors
+│   │   ├── inproc.rs                  #   trait dispatch
+│   │   ├── subprocess.rs              #   stdio JSON-RPC pump
+│   │   └── wasm.rs                    #   Wasmtime + WIT (v2.0)
+│   ├── maos-adapters/                 # ★ ADAPTER RING — one crate per port
+│   │   ├── providers/                 #   anthropic, openai, google, ...
+│   │   ├── sandbox/                   #   linux (bwrap+landlock+seccomp), macos (seatbelt), windows
+│   │   ├── mcp/                       #   stdio + SSE + StreamableHTTP
+│   │   ├── acp/                       #   stdio JSON-RPC server
+│   │   ├── a2a/                       #   mTLS + TOFU + per-frame consent
+│   │   ├── persistence/               #   sqlite + postgres
+│   │   └── secrets/                   #   keyring + encrypted-file fallback
+│   ├── maos-control-plane/            # operator surface (HTTP + Unix socket)
+│   ├── maos-cli/                      # `maosctl`
+│   ├── maos-bin/                      # ★ COMPOSITION ROOT — wires everything
+│   └── reference-spirits/             # the six factory-default Spirits
+└── wit/spirit.wit                     # WIT contract (v2.0)
+```
+
+Dependencies point inward (adapter ring → kernel services → domain core), with the explicit exception of kernel services calling into Spirit ABI traits — that's the inversion of control that makes Spirits hot-swappable. The composition root in `maos-bin/main.rs` is the only place that knows about all crates.
+
+#### 4.0.5 Connections to subsystems
+
+Three categories of connection. All three coexist in one Host process.
+
+**Inbound — clients reaching the kernel:**
+
+| Client | Transport | Adapter | Use case |
+|---|---|---|---|
+| `maosctl` (operator CLI) | Unix domain socket | `control-plane::unix_sock` | Load / swap / audit / publish |
+| Browser UI | HTTP + SSE | `control-plane::http` | "What's happening" view; approval-prompt UX |
+| Editor (Zed, VS Code) | stdio JSON-RPC (ACP) | `adapters::acp::server` | Editor-bridged Spirit invocation |
+| Other Hosts (A2A) | HTTPS + mTLS (Streamable HTTP) | `adapters::a2a::peer` | Cross-Host Spirit communication |
+| Mobile push (v2.0) | HTTPS back-channel | TBD | Approval prompts to phone |
+
+**Outbound — kernel reaching the world:**
+
+| Target | Transport | Adapter | Triggered by |
+|---|---|---|---|
+| LLM provider | HTTPS + SSE/Streamable | `adapters::providers::*` | `provider.stream` capability invocation |
+| MCP server (tool / Loom / registry) | stdio / SSE / Streamable HTTP | `adapters::mcp::client` | `mcp.call` capability invocation |
+| Spirit registry (per ADR-008) | MCP-Streamable-HTTP | `adapters::mcp::client` | `maosctl install` |
+| A2A peer | mTLS HTTPS | `adapters::a2a::peer` | `a2a.send` capability invocation |
+| OS keychain | platform native | `adapters::secrets::keyring` | Capability Registry just-in-time secret resolve |
+| Sandbox runtime | Landlock/seccomp/Seatbelt/Wasmtime | `adapters::sandbox::*` | `bash.exec` capability invocation |
+| OpenTelemetry collector (optional) | OTLP/HTTP | `kernel-core::telemetry::otlp_export` | Telemetry Stream subscription |
+
+**Internal — kernel ↔ Spirit:**
+
+| Form | Binding | Latency budget |
+|---|---|---|
+| `rust-inproc` | direct trait method calls | nanoseconds (function call overhead) |
+| `subprocess` | JSON-RPC over stdio | tens of microseconds (serialization + pipe) |
+| `wasm-component` (v2.0) | WIT-typed function calls | microseconds (component-model dispatch) |
+
+All three forms speak the same logical Spirit ABI; only the marshaling differs. ADR-007 commits to all three forms over the v0.1 → v1.0 → v2.0 timeline.
+
+#### 4.0.6 What's deliberately NOT in the kernel
+
+Equally important — the architecture commits to what the kernel *doesn't* contain:
+
+- **No LLM SDK code.** Provider drivers in the adapter ring wrap HTTP libraries. The kernel never imports `anthropic` or `openai`.
+- **No HTTP routing logic.** Control plane and A2A endpoints translate wire format to typed Spirit ABI calls; no domain logic lives in routing.
+- **No Spirit-class semantics.** The kernel never knows what "Researcher" means. It knows "this manifest declares these capabilities and these output predicates."
+- **No Loom logic.** Loom is user-space (ADR-006). The kernel speaks MCP to it like any other tool server.
+- **No model fine-tuning, eval suite execution, UI rendering.** Those are user-space concerns.
+
+This is Invariant I9 made concrete: the kernel is **mediator and supervisor**, not knowledge accumulator.
+
+The seven kernel services are detailed in §4.1–§4.7 below. Read them in order — each builds on the previous.
+
 ### 4.1 Spirit Scheduler
 
 **Responsibility:** Lifecycle management for all Spirits on this Host.
@@ -371,6 +555,7 @@ The v1.0 kernel-primitive set:
 - `subspirit.spawn` — controlled child-Spirit creation
 - `approval.request` — explicit human-in-the-loop checkpoint
 - `posture.propose` — runtime posture change request
+- `epistemic.halt` — declares "I cannot proceed confidently"; pauses the Spirit pending typed human resolution (§4.6.1)
 
 **Layer 2 — Domain capabilities** (`git.commit`, `ci.deploy`, `robotic.move_arm`, `clinical.order_lab_test`, `legal.file_motion`, …) are **not** kernel primitives. They flow through `mcp.call(server, tool, args)` against an appropriate MCP server. **A new Spirit class needing a new domain verb does not require a kernel change** — it requires (or assumes) an MCP server that exposes the verb. The kernel sees `mcp.call(github, commit, …)` exactly the same as `mcp.call(opentrons, run_protocol, …)`; the MCP server is where the domain knowledge lives.
 
@@ -399,6 +584,60 @@ The Registry is the **only** place where a tool is bound to a sandbox profile. T
 
 **Skill packs** (the `.opencode/skills/`, `.claude/skills/`, openclaw `.agents/skills/` convention) are first-class: a skill pack is just a manifest fragment that adds `mcp.call`, `prompt.template`, and `memory.read` capabilities to whichever Spirit activates it. Activation is a posture-modulating event, logged.
 
+#### 4.6.1 Epistemic halt — declaring "I cannot proceed confidently"
+
+A long-running failure mode in LLM-driven Spirits is *speculative output under insufficient evidence*: the Spirit hits a knowledge gap, doesn't recognize it as a gap, and produces plausible prose anyway (the well-known hallucination failure mode). The cohort survey shows partial mitigations — confidence scores in output, "Open Questions" sections, system-prompt instructions to flag uncertainty — but none of them make *"I cannot answer this confidently"* a **first-class outcome** that the kernel guarantees, logs, and surfaces typed.
+
+`epistemic.halt` is that primitive — but it is **only one of three levels** of epistemic response, and getting this hierarchy right is what prevents the well-known failure mode of *halting on every uncertain message and rendering the agent useless*.
+
+**The three levels of epistemic response.** Halt is the rarest of the three, and it is reserved for load-bearing claims where speculation would be costly. Most uncertainty belongs at the lower two levels:
+
+| Level | What happens | Where it lives | When it fires |
+|---|---|---|---|
+| **Verbalize** | The Spirit hedges in its own prose (*"I'm not sure, but..."*, *"evidence is mixed"*). The kernel never sees this as a structured event. | Spirit output text only | Default for almost everything; the cheap, friction-free path |
+| **Flag** | The output frame carries a structured `epistemic_marker`; the message is delivered; the conversation continues; the UI surfaces a "the agent is uncertain" indicator. | Frame metadata; logged to Transparency Log | Spirit decides per-claim; non-blocking |
+| **Halt** | Spirit transitions to `EpistemicHalt`; in-flight tokens freeze; the conversation blocks until human resolution. | Kernel state machine | Only on load-bearing claims that genuinely require resolution |
+
+**A Spirit configured well halts rarely.** A Researcher tagged correctly might emit fifty `verbalize_only` frames (conversational, observational, exploratory), a few `flag` frames (claims with non-trivial uncertainty), and one `halt` per session at most — when a load-bearing conclusion sits on contradictory or insufficient evidence. The halt is the alarm bell, not the doorbell.
+
+The remainder of this section describes Halt mechanically, since it is the only level requiring kernel coordination. Verbalize is just prose; Flag is structured frame metadata enforced by the existing `output_shape` predicate (no new mechanism). The Spirit's `[epistemic_policy]` (§5.1) maps frame tags to one of the three levels.
+
+**Mechanics.** A Spirit invokes `epistemic.halt(payload)`; the Capability Registry validates the payload shape; the kernel takes four actions atomically:
+
+1. **Logs** the halt to the Transparency Log as a typed `epistemic_halt` entry, with the structured payload, the tasks/frames in flight, and the Spirit's confidence at halt time.
+2. **Transitions** the Spirit to the `EpistemicHalt` lifecycle sub-state — distinct from `AwaitingApproval` (which gates Capability Tokens) and `Suspended` (which is a user-initiated pause). All in-flight Capability Tokens are *frozen*, not released — if the user provides resolution and the Spirit resumes, the tokens come back live (subject to expiry).
+3. **Surfaces** the halt to the user via the kernel-rendered notification surface as a structured "I cannot answer this confidently" outcome — explicitly marked as a halt, not as failure or output. The notification displays the payload's `summary`, `gap_kind`, optional `evidence_so_far` reference, and any suggested `query_strategies`.
+4. **Returns** a `halt_id` to the Spirit, which the Spirit retains for correlation when resolution arrives.
+
+**Halt payload schema** (the kernel-known shape; v1.0 closed):
+
+```jsonc
+{
+  "gap_kind": "evidence_conflict | evidence_insufficient | source_unreliable | beyond_capability | resource_unavailable",
+  "summary": "human-readable, 1–2 sentences",
+  "evidence_so_far": "optional reference: memory key, transcript range, or list of MCP-resource URIs",
+  "query_strategies": ["optional", "list", "of", "concrete next steps the Spirit would take if given resolution"],
+  "confidence_at_halt": 0.42  // optional float [0,1]
+}
+```
+
+**Resolution.** The user (or another Spirit acting through the control plane) responds via `epistemic/resolve(halt_id, resolution)` (§5.2 wire protocol). Three resolution kinds:
+
+- `provided_context` — additional evidence, sources, or instructions are attached. The Spirit's `epistemic/resolve` handler decides whether the new context closes the gap. If yes, the Spirit transitions back to `Running` with frozen tokens reactivated. If no, the Spirit may halt again (with a refined payload) or accept the halt.
+- `accepted_halt` — the user agrees the Spirit cannot proceed. The Spirit transitions to `Unloaded` (or to a clean checkpoint, depending on its `on_unload` hook). The original task is marked `abandoned` in the Transparency Log; downstream consumers can route the work elsewhere.
+- `authorized_override` — the user explicitly accepts the risk and tells the Spirit to proceed despite the gap. The Transparency Log records the override with the user's stated reason. The Spirit's subsequent output carries an `override_marker` (mandatory for `output_shape` predicates), so downstream consumers can see "this output proceeded past an acknowledged epistemic gap."
+
+**Manifest policy (`[epistemic_policy]`, §5.1).** Spirits declare a set of **per-tag rules** that map output frame tags (e.g., `claim.load_bearing`, `claim.exploratory`, `speculation`, `conversational`, `diagnosis.root_cause`) to one of the three actions: `verbalize_only`, `flag`, or `halt`. Each rule may also specify `on_confidence_below` (numeric threshold) and `on_evidence_conflict` (boolean). Frames not matching any rule fall through to `default_action`, which itself defaults to `verbalize_only` — the kernel fails *open*, never closed. The Capability Registry intercepts emits on the path to the IAC Bus and enforces the rule for the frame's tag; Spirits cannot opt out of their own declared policy mid-task. The result: the Spirit author tags carefully (which it would do anyway for `output_shape` purposes), and the kernel converts a chosen subset of those tags into halts. Conversational turns, observations, and explicit speculation flow freely; load-bearing claims with insufficient evidence halt. **The schema is in §5.1; concrete defaults for the Researcher and Diagnostic Engineer appear in §6.2 and §6.3.**
+
+**Why this is Layer 1, not user-space.** The pattern *could* be implemented in Spirit code as a typed IAC frame, with the Spirit voluntarily pausing itself. We chose Layer 1 because:
+
+- The user-space approach is opt-in; halt remains a Spirit choice. Layer 1 lets the manifest mandate halt under defined conditions, with kernel enforcement.
+- Audit guarantees: Layer 1 halts are logged before any user-facing surface renders the result, the same way IAC frames are (Invariant I2). User-space halts could be skipped or de-logged without the user noticing.
+- Notification UX: a typed halt is rendered consistently across TUI / editor / mobile push, the same way approval prompts are. User-space halts would render as Spirit-authored prose, indistinguishable from regular output.
+- Resolution lifecycle: kernel-tracked `halt_id` lets the user respond from a different surface (e.g., halt fires while user is in the editor, user resolves from the TUI an hour later). User-space halts would have to invent their own correlation.
+
+**When this matters.** The Researcher (§6.2) and Diagnostic Engineer (§6.3) are the canonical consumers — both routinely face evidence gaps where speculation is the worst answer. The Negotiator and Tutor case studies in the design report can also benefit. **The architecture commits to this primitive now, ahead of Rule of Three, because the user has flagged a known second use case is imminent — laying the groundwork while the kernel surface is still v1.0 stable is cheaper than retrofitting later.**
+
 ### 4.7 Telemetry Stream
 
 **Responsibility:** Be the perceptual organ.
@@ -420,7 +659,13 @@ The contract between kernel and Spirit. Stable across kernel versions within a m
 
 ### 5.1 Spirit Manifest schema
 
-A Spirit class is **fully declared** in a single file. Implementation code lives elsewhere (a Rust crate path or a subprocess command). Example shorthand:
+A Spirit class is **fully declared** in a single file. Implementation code lives elsewhere (a Rust crate path or a subprocess command).
+
+**A Spirit's implementation is *behavior*, not *infrastructure*.** This is a load-bearing design rule and worth stating before the manifest example below: a Spirit's code contains lifecycle hook handlers, IAC frame handlers, telemetry handlers, decision logic, the system-prompt template, and (optionally) the output/explanation/epistemic predicate callbacks. **It does not contain HTTP libraries, LLM provider SDKs, MCP client implementations, socket code, or filesystem code.** All of that work flows through Layer 1 capabilities (§4.6) which the kernel implements. The Spirit calls `capability/invoke(token, args)` and receives a stream of typed events; the kernel does the actual HTTP, the actual SDK calls, the actual sandboxed exec, the actual MCP wire protocol.
+
+**Why this matters in practice.** A Spirit binary therefore stays small (the Rust reference implementations target hundreds of KB to a few MB, not the multi-MB-with-bundled-Anthropic-SDK shape some readers might expect). Sharing a Spirit becomes cheap. Polyglot Spirit ecosystems become feasible — a TypeScript Spirit and a C# Spirit speak the same wire protocol because neither imports an HTTP library; both delegate to the kernel's adapters. And every provider call, every MCP invocation, every shell exec is uniformly audited via the Capability Registry — there is no "Spirit shortcut" path that bypasses the kernel by talking directly to an HTTP endpoint. **The Spirit author's job is to design behavior; the kernel's job is to be the substrate that behavior runs on.** This separation is what makes the v2.0 WASM-component Spirit form (§13) viable without redesigning the contract — a WASM Spirit imports the same kernel-provided capabilities and exports the same lifecycle hooks; only the binary form changes.
+
+Example shorthand:
 
 ```toml
 # spirits/butler.toml
@@ -516,6 +761,52 @@ schema = "spirits/butler.explanation.schema.json"
 # A default schema (`maos.explanation.default.schema.json`) is shipped with the kernel
 # and provides {evidence, rule, prior_preference} as a starting point. Override only
 # when the Spirit's domain demands richer or differently-shaped justification.
+
+[epistemic_policy]
+# Optional. Declares per-frame-tag epistemic responses. See §4.6.1 for the three-level taxonomy
+# (verbalize / flag / halt). Enforced by the Capability Registry between Spirit emit and IAC Bus
+# delivery. Frames not matching any rule fall through to `default_action`.
+
+# What to do when an authorized_override resolution arrives:
+#   "proceed_with_marker" — Spirit continues; downstream output carries an override_marker (default).
+#   "halt_again"          — Spirit halts a second time, forcing the user to confirm twice. Useful for
+#                            high-stakes Spirits (clinical, legal, wet-lab).
+on_override = "proceed_with_marker"
+
+# Pre-written query strategies the Spirit can attach to an automatic halt's payload —
+# saves the Spirit from regenerating the same "what would close this gap" suggestions every time.
+default_query_strategies = "spirits/butler.queries.md"
+
+# Frames whose tag does not match any rule below.
+#   "verbalize_only" — never halt, never flag (the Spirit's own prose carries any hedging).
+#   "flag"           — attach an epistemic_marker to the frame; deliver; log; UI surfaces uncertainty.
+#   "halt"           — invoke epistemic.halt; freeze tokens; block until resolution.
+default_action = "verbalize_only"
+
+# Per-tag rules. Order does not matter — each rule keys off `tag`.
+# Each rule MAY specify `on_confidence_below` (numeric) and/or `on_evidence_conflict`
+# (boolean), each producing one of the three actions when triggered. A rule with no
+# triggers but an explicit `action` sets the baseline behavior for that tag.
+
+[[epistemic_policy.rules]]
+tag = "claim.load_bearing"           # the Researcher's "this study found X"; Mira's diagnostic conclusion
+on_confidence_below = 0.7
+action = "halt"                       # serious — block on uncertainty
+on_evidence_conflict = "halt"
+
+[[epistemic_policy.rules]]
+tag = "claim.exploratory"            # "one possible interpretation is..."
+on_confidence_below = 0.3
+action = "flag"                       # mark uncertain, deliver, log
+on_evidence_conflict = "flag"
+
+[[epistemic_policy.rules]]
+tag = "speculation"                  # the Researcher's hypothesize-mode output; brainstorming
+action = "verbalize_only"             # never halt — speculation is uncertain by definition
+
+[[epistemic_policy.rules]]
+tag = "conversational"               # chat turns, status updates, general dialogue
+action = "verbalize_only"             # the model handles uncertainty in its own words; halting here would be hostile UX
 ```
 
 **What `output_shape` is for.** Some Spirit classes have output guarantees that are load-bearing for downstream consumers — Mira's confidence scoring (§6.3), the Researcher's "Open Questions + Confidence Map" close (§6.2), the Diagnostic Engineer's evidence packet on every escalation. Rather than relying on the system prompt alone (LLMs sometimes regress), the manifest declares a verifiable shape, and the kernel refuses to deliver tagged frames that fail it. A Spirit with no output guarantees omits the section entirely.
@@ -545,6 +836,7 @@ For subprocess Spirits, the kernel speaks a **JSON-RPC dialect over stdio** mode
 - `lifecycle/snapshot() → state` — produce a serializable state blob
 - `lifecycle/pause()` / `lifecycle/resume()`
 - `lifecycle/unload()`
+- `epistemic/resolve(halt_id, resolution)` — user (or control plane) responds to a prior `epistemic/halt`. `resolution` is one of `provided_context(payload)`, `accepted_halt`, or `authorized_override(reason)`. The Spirit's handler decides whether to resume (transition back to `Running` with tokens reactivated), halt again with a refined payload, or accept termination.
 
 **Spirit → Kernel:**
 - `capability/request(capability, scope) → token`
@@ -556,6 +848,7 @@ For subprocess Spirits, the kernel speaks a **JSON-RPC dialect over stdio** mode
 - `approval/request(class, intent, payload) → decision`
 - `posture/propose(new_posture)` — Spirit can request a posture change; kernel decides
 - `subspirit/spawn(manifest, scope) → SpiritId` — bounded by `max_subspirit_depth`
+- `epistemic/halt(payload) → halt_id` — declares an epistemic gap per §4.6.1; transitions Spirit to `EpistemicHalt`; freezes in-flight tokens; logs to Transparency Log; surfaces typed to user.
 
 **Kernel-internal (called by the kernel during frame delivery; not Spirit-callable):**
 - `output_shape/verify(spirit_id, frame) → ok | violation(predicate_id, reason)` — invoked by the Capability Registry after `iac/send` and before IAC Bus delivery, against the Spirit manifest's `[output_shape]` predicates. For subprocess Spirits with `kind = "callback"` predicates, the kernel calls back into the Spirit via this method.
@@ -639,6 +932,8 @@ This Spirit is **also the canonical caller of the `bmad-technical-research` skil
 
 **Output format invariant:** Every Researcher output ends with an `Open Questions` section and a `Confidence Map`. This is in the system prompt, but it's also enforced by a kernel-side post-process check (the Researcher Spirit's manifest declares an output-shape predicate; the Capability Registry refuses to emit "researcher output" tagged frames that fail it).
 
+**Epistemic halt as first-class outcome.** The Researcher is a canonical consumer of `epistemic.halt` (§4.6.1). Its manifest declares `[epistemic_policy]` with **per-tag rules**: `claim.load_bearing` halts on `confidence_below = 0.7` or evidence conflict; `claim.exploratory` flags (delivers with an `epistemic_marker`) at `confidence_below = 0.3`; `speculation` and `conversational` are `verbalize_only` — the Spirit hedges in its own prose, the conversation flows. The result: a Researcher session emits dozens of `verbalize_only` and `flag` frames as it surveys, but only halts when a *load-bearing conclusion* sits on contradictory or insufficient evidence. **Halts are alarms, not doorbells.** When a halt does fire, the user resolves with `provided_context` (more sources), `accepted_halt` (the question is genuinely unanswerable from available evidence), or `authorized_override` (proceed with explicit risk acknowledgment, output marked accordingly). This is the architectural mechanism that converts "hallucination" from a Spirit failure mode into a user-mediated, audit-trailed event — *without* turning every uncertain message into a hostile blocking experience.
+
 ### 6.3 Diagnostic Engineer (Mira-class)
 
 **Class:** `diagnostic-engineer`. **Identity:** Production-edge SRE; observes, hypothesizes, contains; never deploys permanent changes alone.
@@ -658,6 +953,8 @@ This Spirit is **also the canonical caller of the `bmad-technical-research` skil
 **Posture:** `sre-diagnostician` — silent on reads; `notify_and_log` on production mutations (revert, scale, flag); `prompt_with_diff` on emergency config patches; **`prompt` on every escalation message that goes to Nash** (because Nash will then act in dev). The escalation prompt shows the human the evidence packet before it's sent.
 
 **Failure mode to design against:** Mira sending too many escalations and overwhelming Nash. Mitigation: rate-limited escalation channel; auto-deduplication on identical hypothesis classes within configurable window; Loom-mediated cross-correlation in Cortex deployments.
+
+**Epistemic halt for ambiguous diagnostics.** Mira's `[epistemic_policy]` is sharper than the Researcher's, reflecting the higher stakes of production diagnosis. **Per-tag rules:** `diagnosis.root_cause` halts on `confidence_below = 0.6` or evidence conflict — when telemetry is consistent with multiple incompatible root-cause hypotheses, Mira does not pick the most plausible; she invokes `epistemic.halt(gap_kind: "evidence_conflict", evidence_so_far, query_strategies)` (§4.6.1). `diagnosis.observation` is `verbalize_only` — observations of metrics or thread dumps don't need confidence gating; the data is what it is. `containment.action` (proposed restarts, scaling moves, flag toggles) halts on `confidence_below = 0.5` — Mira would rather block on an uncertain containment plan than execute one and worsen the incident. The halt surfaces to the on-call human (Elena, Viktor, or the configured Approval Manager target) as a typed "ambiguous diagnostic" with the alternative hypotheses listed and concrete telemetry queries that would disambiguate. This converts "Mira guessed wrong, the rollback didn't help" into "Mira flagged ambiguity, the human picked which hypothesis to test first." The halt is correlated by `halt_id` so resolution can come from a different surface (phone, Slack-bridged ACP frame, etc.) without losing context.
 
 ### 6.4 Senior Architect (Nash-class)
 
@@ -1056,6 +1353,76 @@ I'm calling out six contested decisions explicitly. Each has a rationale and a "
 
 **What would force a revisit:** Discovery that Loom API latency on the kernel's hot path is unacceptable (would push toward embedded Loom); or a regulatory environment where the user wants kernel-level provenance over the collective KB.
 
+### ADR-007 — Three Spirit forms on a v0.1 → v1.0 → v2.0 timeline
+
+**Decision:** Spirit implementations ship in three forms, introduced over three kernel milestones. **`rust-inproc`** (an in-process Rust crate) is the only form in v0.1 and v0.5 — used by the six factory-default Spirits. **`subprocess`** (any-language binary speaking the Spirit Wire Protocol over stdio) arrives in v1.0 — the first form a third party can ship without contributing to MAOS itself. **`wasm-component`** (a WASM component conforming to the `maos:spirit@1.0` WIT contract) arrives in v2.0 — capability-isolated by construction; single portable artifact. All three forms share the same TOML manifest, the same lifecycle hooks, and the same Layer-1 capability surface; only the binding differs.
+
+**Alternatives considered:** Single form (Rust-only) — locks the ecosystem to Rust authors; rejected because the architecture's generality claim demands a polyglot Spirit ecosystem. All three forms from v0.1 — adds toolchain surface before v0.1 is provable; rejected because v0.5 must stay focused on six default Spirits + sandbox + approval UX, not Spirit-form proliferation. Subprocess only, skip WASM — loses capability isolation at the binary level and caps the ecosystem's trust ceiling; rejected because the public-untrusted trust tier (ADR-009) needs a binary form that's safe by construction, and that's WASM.
+
+**Rationale:** The three forms map cleanly to three distinct trust/distribution contexts. `rust-inproc` is the factory-default form for Spirits compiled into the kernel binary — implicit trust, highest performance, Rust-only. `subprocess` is the practical third-party form — any language with a JSON-RPC client, process-isolated, ships as per-platform binaries. `wasm-component` is the future ecosystem form — single portable artifact, capability-isolated by WIT, the substrate that makes a public registry of untrusted Spirits safe to install. Phasing them avoids scope creep at each milestone: v0.5 doesn't have to also debug subprocess hot-swap; v1.0 doesn't have to also integrate Wasmtime.
+
+**What would force a revisit:** WIT toolchain regressions making WASM Spirits impractical at v2.0 (would push WASM to v2.x or beyond). Evidence that subprocess overhead is unacceptable for hot-path Spirits like the Architect spawning many apply-patch sub-Spirits (would push toward broader rust-inproc usage). A fourth form emerging — for example, a kernel-supervised eBPF-style Spirit for low-overhead observability, or a deno-style sandboxed JS Spirit — would warrant a new ADR rather than extending this one.
+
+### ADR-008 — Spirit registry exposed as MCP server over Streamable HTTP
+
+**Decision:** The Spirit registry exposes its API as **an MCP server** running on **MCP-Streamable-HTTP** (the November-2025 transport, already required by the kernel's I/O subsystem). Endpoints are MCP tools: `registry.search`, `registry.manifest`, `registry.artifact`, `registry.verify`, `registry.publish`, `registry.deprecate`. The kernel pulls Spirits via the same code path it uses to fetch tool catalogs from MCP servers and to talk to Loom.
+
+**Alternatives considered:** Bespoke HTTP REST API — adds a separate transport, separate client code in the kernel, separate auth flow; rejected for operational redundancy. OCI registry (Docker-style) — excellent ecosystem precedent for signed artifacts and content-addressable storage but unfamiliar surface for non-DevOps Spirit authors; deferred (worth revisiting at v2.x once WASM Spirits make OCI's content-addressing more natural). Static file server (Cargo-style) — simpler operationally but loses server-side search and discovery; rejected because Spirit selection is a discovery-heavy workflow, not a "I know exactly which version I want" workflow.
+
+**Rationale:** The kernel already has an MCP-Streamable-HTTP client. Exposing the registry as an MCP server costs zero additional kernel code and gives Spirit authors a surface they understand without learning a second protocol. Operationally, a single TLS-terminating reverse proxy can front ACP-remote, MCP-remote tool servers, A2A peers, AND the Spirit registry — one trust boundary instead of four. The MCP tool surface also lets the registry evolve its endpoints additively (new MCP tools) without breaking older clients.
+
+**What would force a revisit:** OCI ecosystem maturity surpassing MCP for artifact distribution (the v2.x WASM Spirit milestone is when this becomes most attractive). MCP transport layer evolving to a simpler primitive that supersedes Streamable HTTP — the registry would migrate. Federation across registries (one consumer pulling from many independent registries with cross-cert) — the MCP surface accommodates this naturally but the registry-side schema would need extension.
+
+### ADR-009 — Trust tiers + sandbox-floor enforcement
+
+**Decision:** Spirits carry one of four trust tiers at load — **`local`**, **`org-internal`**, **`public-untrusted`**, **`public-vetted`**. The kernel applies the **strictest of (manifest's declared, tier's enforced)** for sandbox profile and posture preset. Public-untrusted Spirits are forced to T2 sandbox minimum and cautious posture regardless of what their manifest declares. Vetting is decentralized: a `public-vetted` tier requires a vetting attestation signed by an authority the user's Host trusts.
+
+**Alternatives considered:** Trust the manifest unconditionally — equivalent to the npm-style ecosystem where typo-squatted packages exfiltrate credentials; rejected because the worst-case bad-Spirit blast radius is unacceptable. Central review of every public Spirit (App Store model) — doesn't scale, gates ecosystem growth, concentrates power; rejected because the architecture's generality claim demands the substrate welcome Spirits we haven't imagined. Binary trusted/untrusted split — loses gradient; an org-internal Spirit reviewed by the team gets the same treatment as a random-internet Spirit; rejected because real ecosystems have intermediate trust contexts.
+
+**Rationale:** The strictest-of-floor rule bounds the worst case without bottlenecking the best case. A malicious manifest claiming `posture.preset = "autonomous"` with `sandbox.profile = "t0"` and `bash.exec` capability gets clamped to T2 + cautious if it carries the `public-untrusted` tier — the user must consciously approve every action, the malicious behavior surfaces in the Transparency Log instead of running silently. Decentralized vetting (anyone can be a vetting authority via attestation signing; users choose which to trust) avoids the central-gate failure mode while still letting reviewed Spirits earn looser sandbox/posture defaults. This is what makes a public Spirit registry safe to enable by default.
+
+**What would force a revisit:** Industry-wide artifact-signing standards (Sigstore transparency logs, in-toto attestations) maturing enough to absorb the trust-tier responsibility — the kernel might delegate tier classification to a standardized provenance layer. A regulatory environment requiring a fifth tier (e.g., "regulator-attested" for clinical or financial contexts where attestations carry legal weight). Discovery that the strictest-of-floor rule is too coarse — for example, if a `public-untrusted` Spirit needs T2 sandbox but `assistive` posture (not the forced `cautious`), we'd need finer-grained per-(tier, capability-class) policy. This is a real risk and worth watching.
+
+### ADR-010 — Hexagonal architecture for the kernel's static structure (not Clean)
+
+**Decision:** The kernel's static module organization follows the **hexagonal (ports & adapters)** pattern. Three concentric bands — pure domain core (types, invariants, no I/O), kernel services (the seven of §4.1–§4.7), and the adapter ring (concrete I/O implementations behind trait-defined ports). Dependencies point inward (adapter ring → kernel services → domain core), with the explicit exception of kernel services calling into the Spirit ABI traits the runtime ring implements — the inversion that makes Spirits hot-swappable. The composition root (`maos-bin/main.rs`) is the only place that knows about all crates.
+
+**Alternatives considered:** Strict Clean Architecture (Robert Martin) — Clean's inward-only call discipline doesn't fit a runtime kernel where the IAC Bus *must* invoke into Spirit-implemented handlers; Clean would force dependency-injection theatre that adds layers without value. Layered architecture (n-tier with strict horizontal layers) — easier to explain but loses the multi-adapter-per-port benefit hexagonal gives us. Onion architecture (similar to Clean but more lenient) — practically indistinguishable from hexagonal for our purposes; we picked the more recognizable name.
+
+**Rationale:** The cohort survey (rustain in particular) validated the `domain / adapters / infrastructure` layering hexagonal produces. The kernel needs multiple adapter implementations per port — provider drivers per LLM vendor, sandbox backends per OS, transport adapters per protocol — and hexagonal makes that natural. Testability is the second win: the kernel core compiles and tests without any HTTP library, LLM SDK, or sandbox runtime, because all I/O is behind trait ports. Operationally, this means we can swap the entire provider stack (e.g., for an air-gapped enterprise deployment with a custom on-prem LLM) without touching kernel-services code.
+
+**What would force a revisit:** Discovery that the trait-port indirection has measurable hot-path cost (would push toward direct concrete-type calls in select services). A regulatory regime requiring a single fixed configuration (would reduce the value of swappable adapters). The emergence of a more pragmatic architectural pattern that subsumes hexagonal — currently I see no candidate.
+
+### ADR-011 — Actor model on the runtime hot path
+
+**Decision:** Each Spirit is implemented as a **Tokio-supervised actor** with a bounded mailbox, encapsulated state, and message-passing as the only inter-Spirit communication mechanism. No shared mutable state between Spirits; no locks on the IAC hot path. This is codex's `AgentRegistry` + `Mailbox` pattern (validated in the cohort survey) adopted as MAOS's runtime model. The seven kernel services are **not** actors — they're shared services with their own task pools that actors call into via the Spirit ABI.
+
+**Alternatives considered:** Shared-memory threading with locks (classic threadpool + mutex pattern) — high cognitive overhead, lock-ordering bugs at scale, doesn't compose well with bounded mailboxes for backpressure; rejected. Event-loop with continuations (Node.js-style) — fits async but loses the natural fault-isolation of independent task supervision; rejected. CSP-style channels everywhere (Go-style) — close to actors in practice but loses the "actor identity" abstraction that maps cleanly to `SpiritId`; rejected. Pure async/await with global state — works for small kernels but breaks down once you have 30+ concurrent Spirits with cross-Spirit IAC; rejected.
+
+**Rationale:** Actors give us four properties for free that we'd otherwise have to build: backpressure via bounded mailboxes (a flooding peer can't blow up a recipient's heap), no locks on the hot path (each actor owns its state; cross-actor coordination is via messages), failure isolation (a panicking Spirit takes itself down via Tokio task supervision; the kernel survives), and natural hot-swap (replace the `behavior` while preserving `state` and `open_tokens` — the swap operation in §5.3). The codex precedent is strong evidence the pattern scales to real kernel workloads in Rust+Tokio. Performance is acceptable: mailbox dispatch is a `tokio::sync::mpsc` send; broadcast is `tokio::sync::broadcast`; both are zero-allocation on the hot path.
+
+**What would force a revisit:** Discovery that bounded mailbox backpressure causes deadlock-prone fan-in patterns we can't refactor (would push toward a different IPC primitive — perhaps async-channel-style multi-producer-multi-consumer). A new Rust async-runtime pattern that subsumes actors with better ergonomics (currently no credible candidate). Hard performance pressure showing actor-message overhead is the bottleneck for high-frequency Spirit classes (would push toward direct in-process function-call dispatch for select Spirit pairs, breaking the actor abstraction selectively).
+
+### ADR-012 — Payload-scope consent for A2A frames (typed-intent)
+
+**Decision:** A2A frames carry a typed `intent` field drawn from a Spirit-declared intent vocabulary. Consent under I8 is revised from `(peer-identity)` to `(peer-identity, intent-class)`. The kernel's IAC adapter rejects any frame whose declared intent is absent from the receiver's spawn-time consent policy. The kernel does not interpret intent semantics; it enforces structural presence and allowlist membership. **I8 is amended accordingly; I1 is unchanged.** A default intent vocabulary ships in the Spirit SDK as a starting point (`diagnosis-handoff:read-only-evidence`, `architecture-consult:scope-check`, `cross-team:schema-proposal`, `loom:curated-pattern-delivery`, etc.); ecosystem-specific intent classes are owned by the Spirit packs that declare them.
+
+**Alternatives considered:** Capability attenuation by sender-receiver intersection per frame — beautiful in theory but pulls the kernel into payload semantics, violates band separation between kernel-services and IAC adapter ring, and has no coherent answer when the payload is a plan rather than an invocation; rejected. Status quo + Spirit-author duty to verify incoming intent — makes I8 advisory and leaves the confused-deputy gap unacknowledged in the invariant set; rejected. Drop A2A entirely for cross-posture pairs — breaks PRD Journey 2 (Mira-Nash) and removes the substrate's headline cross-Host collaboration capability; rejected. Per-frame capability-passing tokens (sender attaches its capability scope to the frame; receiver intersects) — closer to pure capability theory but couples A2A to capability registry hot-path, doubling the token-issuance load on every cross-Host frame; rejected for performance and band-separation reasons.
+
+**Rationale:** The confused-deputy scenario in PRD Journey 2 (Mira on prod-edge with read-only-plus-three-writes escalating to Nash in dev with full RW) demonstrates that consent-to-channel is strictly weaker than consent-to-transaction when payloads can encode actions across asymmetric capability boundaries. "Mira and Nash consented to talk" satisfies I8-as-stated but violates the intent boundary if Mira's payload encodes a write Mira herself was forbidden from making. Typed-intent consent provides a structural mediation hook the kernel can enforce cheaply — one allowlist check per frame delivery — while leaving semantic vocabulary in user-space where it belongs. The metadata cost (one typed field per frame) is bounded; the kernel growth is one allowlist check per frame delivery. Spirit-authors still owe due diligence on payload contents — but the kernel now provides a real mediation hook instead of a channel-only check, and the invariant set acknowledges what it does and does not enforce. Acceptance criterion (paired with Journey 2): no I8 violation in red-team replay where an adversarial sender crafts a payload encoding an action the receiver could not be directly tasked to perform.
+
+**What would force a revisit:** An intent-class taxonomy emerging that the ecosystem treats as de-facto standard — consider whether the kernel should ship it as a default vocabulary expanded beyond the SDK starter set. A second confused-deputy class found that intent-typing does not cover (e.g., timing-channel exfiltration, data-derived implicit instruction encoding, prompt-injection through evidence text) — revisit whether capability attenuation (rejected alternative) is warranted after all. Loom or another tier accumulating intent vocabularies that need cross-Spirit interop — consider a registry adapter for shared vocabularies. Performance regression where intent allowlist checking on hot-path A2A becomes the bottleneck — currently bounded but worth measuring at v1.0 telemetry workloads.
+
+### ADR-013 — Human-Spirit interaction surfaces
+
+**Decision:** The kernel exposes three human delegation surfaces — conversational shell (`maos-shell`), CLI subcommand (`maosctl spirit ask`), and editor bridge (ACP via `maos-acp`) — all backed by a single `task.assign` IAC intent class on the Spirit Wire Protocol. **Humans appear on the IAC bus as peers with kernel-issued identities** (e.g., `user:priya@local`); the same typed-intent consent mechanism (ADR-012) governs human-to-Spirit task assignment as governs Spirit-to-Spirit A2A. **`maos-shell` ships in v0.1 as the canonical default surface; `maosctl spirit ask` ships alongside as the headless variant; ACP ships in v1.0 for editor integration.** Mobile push approval surface (PRD Journey 2's 2:47 AM phone notification) is a fourth surface variant, sharing the same primitive, deferred to v1.0 (web-push) and v2.0 (native client).
+
+**Alternatives considered:** Spirits own their own UIs (CLI/REPL/web shipped per-Spirit) — bloats Spirit binaries, breaks polyglot ecosystem, conflicts with "Spirit is behavior, not infrastructure" (§5.1); rejected. Web-only delegation surface (browser as canonical interface) — v0.1 has no kernel HTTP server; adds dependency before there's a v1.0 use case requiring it; rejected. Direct stdin/stdout to one Spirit at a time (no addressing layer) — cannot address multiple Spirits in parallel, breaks PRD Journey 1 wedge demo (Priya talks to three Spirits in parallel), no peripheral indicators for backgrounded work; rejected. ACP-only (push delegation into the editor as the only surface) — couples MAOS to editor adoption, eliminates headless CLI workflows, eliminates terminal-native users (a substantial overlap with the Tier 1 Priya persona); rejected. Treat humans as a separate first-class primitive (not as IAC peers) — clean conceptually but creates a special-case in the architecture, requires duplicate consent/audit machinery, and breaks the "everything is IAC frames" symmetry that ADR-012 just consolidated; rejected.
+
+**Rationale:** Surfacing delegation as a kernel-rendered conversational REPL keeps Spirits free of UI code — preserving the polyglot Spirit ecosystem and small Spirit binaries — while giving users a single mental model for talking to any Spirit (`@spirit-name <message>` semantics across all surfaces). ACP integration extends the same primitive to editors. The `task.assign` typed-intent primitive aligns human delegation with cross-Spirit IAC, so the audit trail, consent model, and capability scoping are uniform across all peers (human, Spirit, Loom, external system). Three surfaces sharing one primitive means new surfaces (mobile push, voice, web) become straightforward additions later without re-architecture. Human-as-IAC-peer also has a security benefit: the typed-intent consent (ADR-012) applies to humans tasking Spirits, which means a user can be policy-restricted from tasking certain Spirits even if they have shell access — important for cross-team Cortex deployments (PRD Journey 4) where Reza has cross-team task-assignment authority but the fraud team's developers do not. Without this ADR, the journeys' delegation moments rely on undocumented surfaces that read as "glass-window observation" — Spirits acting unbidden — when the actual interaction model is humans-as-peers-on-the-IAC-bus.
+
+**What would force a revisit:** Multi-modal interaction (voice, image-in, video) becomes load-bearing — consider a `task.assign-rich` intent variant or a separate IAC intent class for streaming inputs. Editor ecosystem fragments enough that ACP isn't sufficient — consider per-IDE adapters or a richer ACP+ protocol. A Spirit class emerges (e.g., truly proactive Butler at the limit of `proactive-observer` posture) for which the standing-task model is awkward — revisit posture taxonomy to add `unconditionally-autonomous` or similar. Mobile push notification surface (Elena's 2:47 AM phone approval in Journey 2) outgrows web-push and requires a native client — promote to first-class surface variant. The conversational shell becomes the dominant surface and editor bridge under-used — consider deprecating the ACP path and consolidating UX investment in `maos-shell`.
+
 ---
 
 ## 13. Phased Roadmap
@@ -1064,11 +1431,11 @@ This is rough; treat it as a sequence, not a calendar.
 
 | Phase | Scope | Validation milestone |
 |---|---|---|
-| **v0.1 — Bootstrap** | Kernel skeleton (Scheduler + Memory + Capability Registry + IAC mailbox), Spirit ABI v0.1, one reference Spirit (Architect, in-process Rust), one provider adapter (rig-core), local SQLite persistence, T0/T1 sandbox only. **No A2A. No Loom. No subprocess Spirits.** | The Architect Spirit can drive a real coding task on a local repo end-to-end with approval prompts. |
-| **v0.5 — The first realistic single-user Host** | Add Butler + Researcher + Observer. Add T2/T3 sandbox. Add subprocess Spirits with the wire protocol. Add the Approval Manager prompt UX. Add the Transparency Log. **Still no A2A. No Loom.** | A single user has a working Butler that surfaces calendar items pre-meeting; a Researcher that can run a `bmad-technical-research` workflow; an Observer that shows live what's happening. |
-| **v1.0 — Team-ready** | Add A2A peer mesh with mTLS + consent gates. Add the kernel-rendered notification surface. Ship six reference Spirits. T4 WASM tool sandbox. | Journey 10 Acts 1–7 are reproducible end-to-end with 8 Hosts on a real team. |
-| **v1.5 — Diagnostic-architect** | Add the Diagnostic Engineer Spirit class with its asymmetric capability gates. Add post-deploy feedback IAC topic. Add Loom-lite (single-instance Postgres-backed pattern library). | Journey 11 (Mira + Nash) is reproducible. |
-| **v2.0 — Enterprise & Cortex** | Enterprise Spirit with PDP integration. Multi-instance Loom with cross-region replication. Sentinel-validated canary auto-rollback. Pre-deployment scanning. SIEM telemetry export. | Journey 12 (Cortex) is reproducible at small scale (3-region pilot). |
+| **v0.1 — Bootstrap** | Kernel skeleton (Scheduler + Memory + Capability Registry + IAC mailbox), Spirit ABI v0.1, one reference Spirit (Architect, in-process Rust), one provider adapter (rig-core), local SQLite persistence, T0/T1 sandbox only. **No A2A. No Loom. In-process Spirits only — no subprocess yet.** | The Architect Spirit can drive a real coding task on a local repo end-to-end with approval prompts. |
+| **v0.5 — Realistic single-user Host** | Add Butler + Researcher + Observer (all in-process Rust). Add T2/T3 sandbox. Add the Approval Manager prompt UX. Add the Transparency Log. **Still in-process Spirits only — subprocess deferred to v1.0.** **No A2A. No Loom.** This phase deliberately keeps Spirit-form scope frozen so the focus stays on six default Spirits + sandbox + approval UX + transparency. | A single user has a working Butler that surfaces calendar items pre-meeting; a Researcher that can run a `bmad-technical-research` workflow; an Observer that shows live what's happening. |
+| **v1.0 — Team-ready (subprocess Spirits arrive)** | **Add subprocess Spirits with the Spirit Wire Protocol** — the first form a third party can ship without contributing to MAOS itself. Add A2A peer mesh with mTLS + consent gates. Add the kernel-rendered notification surface. Ship six reference Spirits in both forms (in-proc and subprocess where appropriate). T4 WASM **tool** sandbox (tools, not Spirits yet). | Journey 10 Acts 1–7 are reproducible end-to-end with 8 Hosts on a real team. A third party can author and distribute a Spirit binary independently of the MAOS source tree. |
+| **v1.5 — Diagnostic-architect pair** | Add the Diagnostic Engineer Spirit class with its asymmetric capability gates and per-tag epistemic policy (§5.1, §6.3). Add post-deploy feedback IAC topic. Add Loom-lite (single-instance Postgres-backed pattern library). | Journey 11 (Mira + Nash) is reproducible. |
+| **v2.0 — Enterprise & Cortex (WASM Spirits arrive)** | **Add WASM-component Spirits** — the third Spirit form, capability-isolated by construction, single portable artifact, the substrate for a third-party Spirit ecosystem. Ship the **Spirit registry** with versioning, signing/integrity, kernel/ABI-version compatibility resolution, and trust tiers. Ship the **WIT contract** for `maos:spirit@1.0`. Enterprise Spirit with PDP integration. Multi-instance Loom with cross-region replication. Sentinel-validated canary auto-rollback. Pre-deployment scanning. SIEM telemetry export. | Journey 12 (Cortex) is reproducible at small scale (3-region pilot). A third party can publish a WASM Spirit to a registry and have any MAOS Host pull, verify, and run it. |
 | **v2.x+ — Hardening** | Kernel snapshot/restore. Cross-Host Spirit migration. Performance work. Spirit class catalog beyond the original six. | The architecture is no longer the bottleneck. |
 
 Two principles guide phasing:
@@ -1161,4 +1528,4 @@ To save reviewer time later:
 
 ---
 
-*Winston signing off. Architecture is the practice of arranging trade-offs so future-you can change your mind without burning everything down. Six ADRs, 10 invariants, 14 open questions. That's a healthy ratio for a substrate this ambitious.*
+*Winston signing off. Architecture is the practice of arranging trade-offs so future-you can change your mind without burning everything down. Thirteen ADRs, 10 invariants, 10 open questions. ADR-012 (typed-intent A2A consent) and ADR-013 (human-Spirit interaction surfaces) joined the set during PRD Step 4 — the journeys forced two gaps to the surface, which is exactly what user journeys are supposed to do. That's a healthy ratio for a substrate this ambitious.*

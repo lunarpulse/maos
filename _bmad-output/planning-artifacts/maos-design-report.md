@@ -143,6 +143,60 @@ The Butler's loop is different — it's `on_idle → Anticipatory → notificati
 **We didn't accept:**
 - A "reasoning composer" abstraction that mixes patterns automatically. The architecture's general-purpose claim survives because we let the Spirit be an opaque thinker; if we tried to compose its thinking from primitives, every new agent class would force us to expand the primitives.
 
+### 1.5 Formal cognitive frameworks behind each pattern
+
+The four reasoning patterns above (anticipatory, exploratory, diagnostic, generative) are **operational labels** — they describe what the Spirit is doing, not the formal cognitive science underneath. For Spirit authors who want to ground a new class in established theory, this section names the frameworks that fit each pattern. **The kernel knows none of these names** — they live in system prompts and implementation crates. But naming them gives Spirit authors a vocabulary, an evaluation literature, and a community of prior art to draw from.
+
+This subsection is the response to a parallel reading of the design space (the Gemini report at `_bmad-output/planning-artifacts/report-gemini.md`), which arrives at the same architectural conclusions but adds formal cognitive-framework labels MAOS had not yet committed to.
+
+#### Anticipatory → Active Inference (Free Energy Principle)
+
+The Butler (architecture §6.1) and Tutor (design report ☼.2) both reason anticipatorily: maintain an internal model of the user's goals and likely needs, observe sensor-like inputs (calendar, inbox, idle telemetry), and act when prediction error rises. This is the reasoning shape captured by **Active Inference** — the Free Energy Principle as applied by Karl Friston and the active-inference community. The Spirit's working memory holds beliefs over hidden states (the user's goals); the `event/telemetry` wire calls (architecture §5.2) are sensory observations; the `on_idle` lifecycle hook (architecture §5.3) is when the Spirit minimizes free energy by either updating beliefs or planning actions.
+
+The Active Inference framework gives Spirit authors:
+- A precise mathematical objective (free-energy minimization) to optimize for, instead of ad-hoc heuristics.
+- A vocabulary for separating *perception* (belief update) from *action* (intervention) — both reduce free energy, the Spirit chooses which is cheaper.
+- A literature for handling uncertainty quantitatively (precision-weighted belief updates).
+- An efficiency claim: AIF agents reportedly need substantially less data to adapt than reinforcement-learning-style agents (cited in the Gemini report's §"능동적 추론" / Active Inference section).
+
+The Butler's `[epistemic_policy]` (architecture §5.1) interacts cleanly with AIF: when the Spirit's belief variance grows beyond threshold, the Spirit halts (via `epistemic.halt`, architecture §4.6.1) instead of acting on uncertain beliefs. This is *exactly* the AIF-prescribed behavior — minimize free energy by gathering more evidence rather than committing prematurely.
+
+**Where Spirit authors should look:** Friston, Active Inference: The Free Energy Principle in Mind, Brain, and Behavior (2022); the active-inference Python library; the spm12 toolbox.
+
+#### Anticipatory (decision side) → Bayesian / POMDP
+
+Anticipatory reasoning splits into *belief update* (handled by AIF perceptual side) and *act-now-or-wait?* (handled by Bayesian decision theory, often formalized as a Partially Observable Markov Decision Process). The Butler's question "should I notify the user?" is a POMDP: hidden state is the user's actual need; observations are partial (calendar entries, recent file activity); actions have costs (notification fatigue) and benefits (timely help); rewards arrive as user feedback (acknowledgment, retract, ignore).
+
+The Spirit's manifest captures the POMDP parameters declaratively:
+- `[capabilities].telemetry.subscribe` (architecture §5.1) — the observation space.
+- `[budget]` with `warn_at_pct` (architecture §5.1, post-edit) — the cost ceiling on actions.
+- `[explanation_shape]` (architecture §5.1) — the reward signal: the user reads the "because" line and decides whether to accept or retract; the Spirit learns from this in its `private` semantic memory.
+
+**Where Spirit authors should look:** Sutton & Barto, Reinforcement Learning (2nd ed.) Ch. 17 on POMDPs; pomdp.org for solver libraries.
+
+#### Diagnostic → Epistemic Verbalization (now mechanized in MAOS)
+
+Mira-class diagnostic reasoning (architecture §6.3, design report Chapter 1.2 "Diagnostic" subsection) requires the Spirit to **separate procedural reasoning from epistemic claims** — to know what it knows, distinguish that from what it's guessing, and surface the gap when evidence is insufficient. This is **Epistemic Verbalization** as a cognitive framework, drawn from dynamic epistemic logic and the meta-cognition literature.
+
+Until the recent architecture edit, MAOS supported this only via system prompts and the static `output_shape` predicate. **As of architecture §4.6.1 (Epistemic halt mechanics)**, MAOS now provides a kernel-level primitive for the dynamic case: when a Spirit detects evidence conflict or confidence below threshold, `epistemic.halt(payload)` is invoked, the Spirit transitions to the `EpistemicHalt` lifecycle sub-state, and the user resolves with `provided_context`, `accepted_halt`, or `authorized_override`.
+
+This is the architectural move that converts hallucination from a Spirit failure mode into a user-mediated, audit-trailed event. Spirit authors implementing diagnostic reasoning should treat `[epistemic_policy]` as mandatory, not optional: configuring `halt_on_evidence_conflict = true` and an appropriate `halt_on_confidence_below` threshold is the cheapest way to honor epistemic verbalization without re-implementing it in every system prompt.
+
+**Where Spirit authors should look:** van Ditmarsch et al., Dynamic Epistemic Logic (2007); the meta-cognition / metareasoning literature in cognitive science (e.g., Ackerman & Thompson on meta-reasoning).
+
+#### Generative → no single canonical framework, but two useful lenses
+
+Generative reasoning (Nash-class architecture, drafting ADRs, fix templates, code patches; architecture §6.4) is the least theoretically-mapped of the four patterns — there is no single "active inference for generation." Two useful lenses:
+
+- **Inductive Logic Programming (ILP) + LLM hybrid.** Used in the Researcher's hypothesize mode (architecture §6.2): combine ILP's structured rule discovery with LLM's pattern completion, then submit the joint output to a Critic Spirit for refinement. Cited in the Gemini report's §"제너레이터 에이전트" / Generator Agent.
+- **Iterative refinement via retriever-generator-critic loops.** A multi-Spirit pattern (Retriever spawns sub-Spirits to gather; Generator drafts; Critic scores and either approves or sends back with notes). Architecture supports this natively via `subspirit.spawn` (Layer-1 capability, architecture §4.6) and IAC mailbox round-trips. No new kernel work needed.
+
+**Where Spirit authors should look:** the BioDisco, AstroAgents, and RHG papers cited in the Gemini report (Works Cited #56); the agentic RAG literature.
+
+#### Cross-cuts: cognitive frameworks compose
+
+A real Spirit composes frameworks the same way it composes reasoning patterns. Mira's session in §1.3 of this report — Diagnostic → Exploratory → Diagnostic → Generative — uses Epistemic Verbalization for the diagnostic phases, AIF-style belief updates as new telemetry arrives, and ILP-flavored generation when proposing fixes. **The kernel never has to know any of this**; the Spirit's manifest, system prompt, and implementation crate together encode the framework choices. Naming them in this report is for the Spirit author's benefit, not the kernel's.
+
 ---
 
 ## Chapter 2 — Memory Architectures
@@ -1165,6 +1219,41 @@ For first-time readers; defined the way I'd say them out loud.
 **Transparency Log** — The kernel-managed append-only audit log of every IAC interaction, every approval decision, every capability use, every retract. Personal to the user; not visible to peers.
 
 **Working memory** — The active scratchpad — LLM context window, task state, open Capability Tokens. Per-Spirit. Lost on swap unless snapshotted.
+
+---
+
+## Appendix A — 12-Factor Alignment
+
+The [12-Factor App](https://12factor.net/) methodology defined a set of disciplines for building scalable, maintainable web applications. The Gemini report (`_bmad-output/planning-artifacts/report-gemini.md` §"클라우드 네이티브와 12-요소 에이전트 원칙") argues that the 12-factor methodology applies — almost line-for-line — to multi-agent systems. This appendix maps each of the twelve factors to its MAOS realization, and flags the two places where MAOS deliberately reinterprets the original.
+
+This is **descriptive**, not prescriptive: MAOS did not set out to be 12-factor-compliant; it became so by independent design. The mapping is useful as a sanity check for reviewers from web-app backgrounds — "yes, the discipline you know transfers."
+
+| # | 12-Factor principle | MAOS realization | Cross-reference |
+|---|---|---|---|
+| 1 | **Codebase** — One codebase tracked in version control, many deploys | Spirit class = one manifest + one implementation crate, versioned. Many Hosts can deploy the same Spirit class. | Architecture §5.1 (Spirit Manifest), §11 (Deployment Topologies) |
+| 2 | **Dependencies** — Explicitly declare and isolate | Spirit Manifest's `[capabilities.required]` and `[capabilities.optional]` are explicit, scope-bound, kernel-validated. Layer 1 vs Layer 2 boundary (architecture §4.6) prevents implicit-dependency drift. | Architecture §4.6, §5.1 |
+| 3 | **Config** — Store config in environment | MAOS goes further: secrets via OS keychain or pluggable provider, never in env or files. Configuration via `[capabilities].*` scoped tokens, not env vars. | Architecture §4.3.4 (Secrets) |
+| 4 | **Backing services** — Treat as attached resources | MCP servers are the canonical backing-service form. Provider drivers, sandbox backends, Loom — all interchangeable per environment. | Architecture §4.6 (Layer 2 capabilities), §9.3 (Loom) |
+| 5 | **Build, release, run** — Strictly separate | Manifest validation at build (kernel schema check), release at registry publish, run at `lifecycle/load`. Three distinct phases; the kernel refuses runs that skip validation. | Architecture §4.1 (Spirit Scheduler), §13 (Roadmap, v0.5 lifecycle pipeline) |
+| 6 | **Processes** — Stateless, share-nothing | **MAOS reinterprets.** Spirits are stateful (working memory, posture, open tokens), but persisted state lives outside the process (rollout JSONL, SQLite, Loom). Stateless-restart is a kernel guarantee (Invariant I10) even though the Spirit itself is logically stateful. **The discipline survives; the implementation differs.** | Architecture §3.2 (I10), §4.2 (Memory Manager) |
+| 7 | **Port binding** — Self-contained services | Hosts bind their own ports (HTTP for control plane, A2A peer port, MCP client connections). Hosts are self-contained — no external web server needed to run a Host. | Architecture §4.4 (I/O Subsystem), §11 (Deployment Topologies) |
+| 8 | **Concurrency** — Scale out via the process model | Two axes of horizontal scale: (a) more Spirits per Host (Spirit Scheduler), (b) more Hosts in A2A mesh. Both are kernel-supported; both compose. Cortex deployment (Journey 12) demonstrates the second axis at 28-Host scale. | Architecture §4.1 (Scheduler), §11.4 (Cortex Topology), §7.2 (A2A) |
+| 9 | **Disposability** — Fast startup, graceful shutdown | Kernel cold-start measured in seconds (read journal, instantiate manifests, no network calls until first capability request). Graceful shutdown via `lifecycle/unload` + transcript flush + token release. Crash recovery via journal rehydration. | Architecture §4.1 (Spirit Scheduler), §3.2 (I10) |
+| 10 | **Dev/prod parity** — Keep development, staging, production as similar as possible | Single-user laptop (§11.1) and Enterprise Cortex (§11.4) run **the same kernel binary** — only Spirit count, A2A configuration, and Loom presence differ. Sandbox tier T0 (laptop dev) and T3+T4 (production) are configuration, not code. | Architecture §11 (Deployment Topologies) |
+| 11 | **Logs** — Treat logs as event streams | Telemetry Stream **is** an event-stream substrate. Spirits subscribe with filters; Observer Spirit aggregates; daily-rotated `traces.jsonl` for offline analysis; OpenTelemetry export for Enterprise. | Architecture §4.7 (Telemetry Stream) |
+| 12 | **Admin processes** — Run admin tasks as one-off processes | `maosctl invoke <spirit>` for one-off Spirit invocation; `maosctl audit` for one-off log queries; `maosctl publish` for one-off Spirit-class registry pushes. Each is a fresh process against the same kernel. | Architecture §6.1 (Butler-as-Routing-Spirit recovery), §6.4 of Chapter 6 (Tooling — `maosctl`) |
+
+### The two places MAOS reinterprets the original
+
+**Factor 6 (Processes — Stateless).** The original 12-factor mandates stateless workers. MAOS Spirits are stateful by design — working memory, posture, open Capability Tokens are all in-process. The reinterpretation: *persisted state lives outside the process, even though the running process is stateful.* The kernel's journal-based recovery (Invariant I10) gives the same operational property — "any Spirit can be killed and restarted from durable state" — that pure statelessness provides for web workers. We pay the implementation cost of journal+rehydrate to get the design benefit of long-context Spirit reasoning.
+
+**Factor 12 (Admin Processes).** The original 12-factor envisions admin tasks as one-off scripts. MAOS reinterprets: many admin tasks are *first-class Spirit invocations* — `maosctl invoke researcher --prompt "analyze this"` is a Spirit lifecycle event, not a script. The discipline (admin tasks should be scoped, audit-trailed, capability-bounded) carries over; the implementation is "spawn a short-lived Spirit," not "run a script outside the kernel." This is what makes admin operations auditable in the Transparency Log without needing a separate audit channel.
+
+### What this mapping is not
+
+- **Not a marketing claim.** Saying "MAOS is 12-factor compliant" invites unhelpful arguments about whether Factor 6 *really* counts. The mapping is for reviewers' orientation, not for procurement.
+- **Not a constraint we'll defend forever.** If a future requirement (e.g., kernel-level shared working memory across Spirits, deferred to v2.0+ open question §14) breaks Factor 6's reinterpretation, we'll revisit. 12-factor is a starting discipline, not a prison.
+- **Not exhaustive.** The 12-factor methodology has been extended (15-factor, beyond-12-factor) for cloud-native and serverless contexts. We track the original twelve and acknowledge the extensions exist.
 
 ---
 
