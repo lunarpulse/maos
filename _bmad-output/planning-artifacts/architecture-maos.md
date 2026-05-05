@@ -293,7 +293,13 @@ Approval Classes (from openclaw, generalized):
 5. `control_plane` — spawn sub-Spirit, alter capability scope, modify posture
 6. `interactive` — IAC `notify-and-wait` requiring peer ACK
 
-A Spirit's posture maps each class to one of: `silent_allow`, `notify_and_log`, `prompt`, `prompt_with_diff`, `deny`. Three named posture presets ship by default — `cautious`, `assistive`, `autonomous` — and Journey-specific presets extend these:
+A Spirit's posture maps each class to one of **five behaviors**: `silent_allow`, `notify_and_log`, `prompt`, `prompt_with_diff`, `deny`. **This set is closed by design**: new Spirit classes do not extend it. Every Spirit ever added must compose its policy from these five — keeping the kernel-known surface small is what prevents posture-feature creep.
+
+The behaviors are interpreted **contextually per capability**: the "diff" in `prompt_with_diff` means *"a structured preview of what will change"*, and the rendering is the responsibility of the capability provider, not the kernel. For `fs.write`, the diff is a code patch; for `ci.deploy`, the diff is a rollout plan; for `mcp.call(opentrons, run_protocol, …)`, the diff is the predicted reagent consumption and runtime estimate; for `subspirit.spawn`, the diff is the child Spirit's manifest summary. **A new Spirit class chooses how its capabilities render diffs; it does not ask the kernel for a sixth behavior.**
+
+If a future use case genuinely cannot be expressed within these five, that's a major-version-bump signal — not a manifest extension.
+
+Three named posture presets ship by default — `cautious`, `assistive`, `autonomous` — and Journey-specific presets extend these:
 
 - **Journey 11 Mira posture (`sre-diagnostician`):** `readonly_*` = `silent_allow`, `mutating` = `notify_and_log`, `exec_capable` = `prompt_with_diff` (revert, scale, flag-toggle, emergency-config), `control_plane` = `prompt`.
 - **Journey 11 Nash posture (`principal-architect`):** `readonly_*` = `silent_allow`, `mutating` = `silent_allow` (within source repo), `exec_capable` = `prompt` (deploys gated), `control_plane` = `prompt`.
@@ -348,14 +354,32 @@ The IAC Bus also owns the **retract** primitive (Journey 10): a Spirit can issue
 
 **Responsibility:** Mediate every Spirit→world interaction.
 
-Backed by a typed enum of capabilities. Capability **providers** register themselves at Host start (in-process) or runtime (out-of-process):
+Capabilities split into **two layers**, and the distinction is load-bearing for the architecture's generality claim:
 
-- LLM providers (Anthropic, OpenAI, Google, …) → `provider.complete`, `provider.stream`
-- MCP servers → `mcp.call(server_id, tool, args)`
-- Shell sandbox backends → `bash.exec`
-- File system → `fs.read`, `fs.write`, `fs.glob`, `fs.grep`
-- Git/CI/CD adapters → `git.*`, `ci.deploy`, `ci.rollback`
-- Inter-Spirit → `iac.send`, `iac.subscribe`, `a2a.send`, `a2a.subscribe`
+**Layer 1 — Kernel-primitive capabilities** are the kernel's interface to the world. They are a **closed enum**, finite, versioned with the kernel, and **adding a new primitive requires a major-version bump (Spirit ABI break)**. This is intentional: keeping this enum closed is what prevents every new Spirit class from quietly accreting kernel features.
+
+The v1.0 kernel-primitive set:
+
+- `provider.complete`, `provider.stream` — LLM provider calls (any provider; specific provider is a token-scope parameter, not a new capability)
+- `mcp.call(server_id, tool, args)` — the universal escape hatch for domain capabilities (see Layer 2)
+- `bash.exec` — shell exec under a sandbox profile
+- `fs.read`, `fs.write`, `fs.glob`, `fs.grep` — filesystem
+- `iac.send`, `iac.subscribe` — same-Host inter-agent
+- `a2a.send`, `a2a.subscribe` — cross-Host inter-agent
+- `memory.read`, `memory.write` — three-tier memory access
+- `telemetry.subscribe` — broadcast event subscription
+- `subspirit.spawn` — controlled child-Spirit creation
+- `approval.request` — explicit human-in-the-loop checkpoint
+- `posture.propose` — runtime posture change request
+
+**Layer 2 — Domain capabilities** (`git.commit`, `ci.deploy`, `robotic.move_arm`, `clinical.order_lab_test`, `legal.file_motion`, …) are **not** kernel primitives. They flow through `mcp.call(server, tool, args)` against an appropriate MCP server. **A new Spirit class needing a new domain verb does not require a kernel change** — it requires (or assumes) an MCP server that exposes the verb. The kernel sees `mcp.call(github, commit, …)` exactly the same as `mcp.call(opentrons, run_protocol, …)`; the MCP server is where the domain knowledge lives.
+
+This boundary is the architecture's primary generality claim made mechanical: **the kernel is closed at Layer 1, open at Layer 2.** Future Spirits extend Layer 2 freely; Layer 1 grows only when MAOS itself does.
+
+Capability **providers** register themselves at Host start (in-process) or runtime (out-of-process). Examples by layer:
+
+- *Layer 1 providers:* LLM provider drivers (Anthropic, OpenAI, Google, …) bind to `provider.*`; sandbox backends bind to `bash.exec`; the I/O Subsystem binds to `iac.*` and `a2a.*`; the Memory Manager binds to `memory.*`.
+- *Layer 2 providers:* MCP servers bind to `mcp.call`. Anything domain-shaped — `git`, `ci`, `linear`, `opentrons`, `adr-registry`, `pattern-library` — is an MCP server.
 
 A Spirit Manifest declares the capabilities it requests:
 
@@ -453,13 +477,60 @@ allowed_hosts = ["api.anthropic.com", "*.googleapis.com"]
 tokens_per_hour = 100000
 spend_per_day_usd = 5.00
 parallel_tool_calls = 3
+# Warn the user (telemetry event + notification) at this fraction of any budget cap.
+warn_at_pct = 0.80
+# What the kernel does when a hard cap is hit:
+#   "stop"     — refuse new capability invocations; in-flight invocations complete; Spirit transitions to AwaitingApproval pending a budget extension.
+#   "throttle" — slow new invocations to a configurable rate; never refuse outright.
+#   "log_only" — emit telemetry, do nothing else (research / sandbox use only).
+on_breach = "stop"
 
 [hooks]
 # Lifecycle hooks (§5.3). Optional; unset means no-op.
 on_load    = ["spirit-butler::hooks::on_load"]
 on_idle    = ["spirit-butler::hooks::on_idle"]   # Butler's defining superpower
 on_swap_in = ["spirit-butler::hooks::on_swap_in"]
+
+[output_shape]
+# Optional. Predicates run after the Spirit emits a tagged frame, before delivery.
+# The kernel rejects frames that fail any declared predicate.
+# Three predicate kinds ship in v1.0; new kinds are a major-version concern.
+predicates = [
+  # JSON-schema validation against a frame whose body is JSON.
+  { kind = "json_schema", tags = ["butler.suggestion"], schema = "spirits/butler.suggestion.schema.json" },
+  # Required substring/regex in a frame whose body is markdown.
+  { kind = "regex_required", tags = ["butler.notification"], pattern = "\\[butler-(auto|drafted)\\]" },
+  # Custom callback for in-process Rust Spirits, or a wire-protocol method for subprocess Spirits.
+  { kind = "callback", tags = ["butler.daily_summary"], crate = "spirit-butler", fn = "verify_daily_summary" }
+]
+
+[explanation_shape]
+# Required for Spirits whose posture allows proactive (origin = "spirit-auto") action.
+# Every frame whose origin matches `required_for_origins` AND whose underlying
+# capability class is in `required_for_classes` MUST carry a structured explanation
+# satisfying `schema`. The kernel refuses delivery otherwise; the user-visible
+# notification surface renders the explanation as the action's "because" line.
+required_for_origins = ["spirit-auto"]
+required_for_classes = ["mutating", "interactive", "exec_capable"]
+schema = "spirits/butler.explanation.schema.json"
+# A default schema (`maos.explanation.default.schema.json`) is shipped with the kernel
+# and provides {evidence, rule, prior_preference} as a starting point. Override only
+# when the Spirit's domain demands richer or differently-shaped justification.
 ```
+
+**What `output_shape` is for.** Some Spirit classes have output guarantees that are load-bearing for downstream consumers — Mira's confidence scoring (§6.3), the Researcher's "Open Questions + Confidence Map" close (§6.2), the Diagnostic Engineer's evidence packet on every escalation. Rather than relying on the system prompt alone (LLMs sometimes regress), the manifest declares a verifiable shape, and the kernel refuses to deliver tagged frames that fail it. A Spirit with no output guarantees omits the section entirely.
+
+**Where the predicate runs.** The Capability Registry, on the path between `iac/send` and the IAC Bus. Failures are surfaced back to the Spirit as a typed error with the predicate's identity — the Spirit can re-emit a corrected frame. Failures are logged to the Transparency Log; persistent shape failures are a telemetry signal worth alerting on.
+
+**Generality.** Three predicate `kind`s in v1.0 (`json_schema`, `regex_required`, `callback`); `callback` is the escape hatch for arbitrarily complex predicates without expanding the kernel-known set. New predicate kinds are a major-version concern; the callback path is what keeps day-to-day Spirit authoring unblocked.
+
+**Budget semantics, briefly.** Every cap in `[budget]` is enforced by the Capability Registry: every `capability/invoke` call accounts against the relevant counter (tokens for `provider.*`, dollars for any priced provider, parallel-tool-calls slots, etc.). At `warn_at_pct` (default 80%) the Scheduler emits a `budget.warn` telemetry event and a kernel-rendered notification to the user. At 100% the configured `on_breach` policy takes effect; the default `stop` is the safe choice (refuse new invocations, complete what's in flight, pause the Spirit pending a human-approved budget extension). This prevents the well-known agent failure mode of an LLM falling into a loop and burning the user's monthly budget in twenty minutes — the lesson Paperclip's hard-stop cap encodes.
+
+**What `explanation_shape` is for.** Proactive Spirits — Butler, Tutor, anything with `origin: spirit-auto` actions — face a known UX failure: when an AI predicts well enough to act unprompted, users experience *self-threat* and *psychological reactance*, often disengaging from the system entirely. The mitigation is structured explainability: every proactive action carries a "because" payload that the kernel-rendered notification surface displays alongside the action itself. The user always sees *why*. This converts "the AI did something" into "the AI did something *because of these reasons*" — which is what makes proactive help feel like support rather than coercion.
+
+**Where the explanation runs.** Same path as `output_shape` — the Capability Registry validates explanation presence before frame delivery. A frame missing its required explanation is rejected with a typed error; the Spirit must re-emit. There is no "best-effort" mode. The default schema ships {`evidence`: list of observed facts, `rule`: the heuristic or policy invoked, `prior_preference`: optional reference to the user's past choice or stated preference}; Spirits override only when their domain needs more (Mira-class might add `confidence_score`; Wet-Lab Coordinator might add `predicted_consumption`).
+
+**Generality.** Same predicate-kinds as `output_shape` (JSON-schema today, callback escape hatch). Spirits whose posture never permits `silent_allow` or `notify_and_log` on the listed classes can omit `[explanation_shape]` entirely — there is no proactive surface to gate. New requirement-class triggers (e.g., extending `required_for_classes` to `readonly_search`) are a manifest-author choice; the matrix of (origins × classes) is itself fixed at the kernel boundary.
 
 ### 5.2 Spirit Wire Protocol
 
@@ -486,7 +557,12 @@ For subprocess Spirits, the kernel speaks a **JSON-RPC dialect over stdio** mode
 - `posture/propose(new_posture)` — Spirit can request a posture change; kernel decides
 - `subspirit/spawn(manifest, scope) → SpiritId` — bounded by `max_subspirit_depth`
 
+**Kernel-internal (called by the kernel during frame delivery; not Spirit-callable):**
+- `output_shape/verify(spirit_id, frame) → ok | violation(predicate_id, reason)` — invoked by the Capability Registry after `iac/send` and before IAC Bus delivery, against the Spirit manifest's `[output_shape]` predicates. For subprocess Spirits with `kind = "callback"` predicates, the kernel calls back into the Spirit via this method.
+
 The wire dialect re-uses MCP JSON shapes wherever possible (per the ACP design principle), reducing impedance with MCP-native tools.
+
+**Wire stability policy.** This method set is **stable across kernel minor versions within a major** — Spirits compiled against v1.x kernels run on v1.y kernels (y ≥ x). Adding a new method, removing a method, or changing a method's signature is **a major-version bump** (v1.x → v2.0) and an explicit ABI break. A Spirit's manifest declares `spirit_wire_protocol_version` so the kernel can refuse to load Spirits whose ABI requirements exceed what this kernel can satisfy. The kernel maintains **N–1 compatibility** within a major branch; older Spirit ABIs may be supported beyond that case-by-case but are not guaranteed.
 
 In-process (Rust) Spirits get the same surface as a typed trait — `Spirit` and `SpiritHandle` — so the wire protocol exists for cross-language reach, not for Rust-to-Rust dogma.
 
@@ -536,6 +612,14 @@ Six Spirits ship with v1.0. Each is a full manifest plus an implementation crate
 **Posture:** `assistive` — silent on reads, prompts on mutations, never on `exec_capable` (the Butler does not run code).
 
 **Failure mode to design against:** The Butler that nags. Mitigation: hard rate limit on user-facing notifications (`max_notifications_per_hour`), opt-in sources, transparency log so the user can audit "Butler suggested 12 things this week, I accepted 3" and tune.
+
+**SPOF and recovery (Butler-as-Routing-Spirit).** The default-loaded Butler also serves as the Host's *Routing Spirit* — the Spirit that interprets ambiguous user input ("schedule a thing with Marcus") and dispatches to the right specialist. This puts the Butler on the critical path; a misclassification or a crash impacts every subsequent interaction. The architecture mitigates the SPOF risk in three layers, in order of cost:
+
+1. **Crash recovery via the Scheduler journal (I10).** Butler crash → kernel reloads from the latest journal entry, working memory is reconstituted from the rollout, in-flight Capability Tokens are re-bound (subject to expiry). No user data lost; the only cost is the seconds it takes to rehydrate. This is the v1.0 default and sufficient for single-user deployments.
+2. **Direct-invoke fallback via control plane.** The user can always bypass the Butler and address a specialist directly: `maosctl invoke researcher --prompt "..."` or, in the TUI, an explicit `/researcher ...` slash command. Routing is a *convenience layer*, never the only path. This is the v1.0 ergonomic safety net.
+3. **Leader-election / multi-Butler high availability.** v2.0 / Cortex deployments may run two Butler instances with leader election (etcd-style or via a dedicated Loom-backed lock). The follower takes over within milliseconds on the leader's failure. **Not in scope for v1.0** — single-user deployments do not justify the operational complexity, and the journal-based recovery path is fast enough.
+
+The general principle: **routing is a Spirit, not a kernel feature.** The kernel always knows how to talk to every Spirit directly; the Butler exists because most users don't want to. Treating Butler as optional convenience rather than mandatory infrastructure is what keeps Butler's failure from being catastrophic.
 
 ### 6.2 Insightful Researcher
 
@@ -671,9 +755,12 @@ struct IACFrame {
 }
 ```
 
+**On `FrameKind` and orchestration semantics.** The five kinds (`request`, `response`, `notification`, `escalation`, `retract`) are for **routing and notification UX** — they tell the kernel how to deliver and how to render. **They are deliberately not an orchestration vocabulary.** Pattern-specific semantics — a market-based "bid" or "award", a Cortex "knowledge dividend" or "pre-deploy block", a tutoring "spaced-repetition tick" — live in `payload` (typed by `intent` + a payload schema convention), not in new `FrameKind` variants. This keeps the kind set closed across major versions; orchestration patterns evolve in user-space without forcing kernel changes.
+
 **Delivery guarantees:**
 - At-least-once within Host (broadcast is best-effort with subscriber bookkeeping).
-- Order preserved per-(sender, recipient) pair.
+- **Per-(sender, recipient) FIFO** — frames from one sender to one recipient are delivered in the order they were sent.
+- **Across-sender ordering is arrival-interleaved**, not deterministic. If three peers send to one recipient at roughly the same time, the recipient sees them interleaved by their actual delivery moment at the IAC Bus; there is no global serialization order across senders. Spirits that need cross-sender ordering must impose it themselves (e.g., via timestamps in `payload`, or a "session counter" carried in `intent`). This mirrors openclaw's "single-writer per session" pattern, which the Spirit author opts into when they need it — not a kernel-imposed cost on every recipient.
 - Frames over the configured `max_frame_size` are spilled to a temp file and replaced with a token in-channel — keeps the mailbox cheap.
 
 **Backpressure:** If a recipient's mailbox is full, the sender's `iac/send` blocks until space. The Spirit Scheduler records this as a `mailbox_pressure` telemetry event so the user can see queue buildup.
