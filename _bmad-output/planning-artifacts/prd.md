@@ -1,5 +1,6 @@
 ---
-stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-02b-vision', 'step-02c-executive-summary', 'step-03-success', 'step-04-journeys']
+stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-02b-vision', 'step-02c-executive-summary', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping']
+releaseMode: phased
 classification:
   projectType: 'developer_tool'
   secondaryTraits: ['cli_tool', 'api_backend', 'desktop_app']
@@ -29,8 +30,10 @@ projectName: 'maos'
 # Product Requirements Document — MAOS (Modular Agentic Operating System)
 
 **Author:** Lunarpulse
-**Date:** 2026-05-05
-**Status:** In progress (PRD workflow Steps 1, 2, 2b, 2c, 3, 4 complete; awaiting Step 5 — Domain Model)
+**Date:** 2026-05-05 (Step 8 phase-restructure: 2026-05-06)
+**Status:** In progress (PRD workflow Steps 1, 2, 2b, 2c, 3, 4, 5, 6, 7, 8 complete; awaiting Step 9 — Functional Requirements)
+
+> **📍 Canonical phasing source:** This PRD's Step 8 (Project Scoping & Phased Development) defines the canonical phase structure: v0.1 Foundational → v0.3 Butler → v0.5 Researcher + Observer → v0.8 Founder Loop wedge demo → v1.0 Team-ready → v1.5 Diagnostic-Architect → v2.0 (technical) → v2.5 (ecosystem-adoption). The companion architecture documents (`architecture-maos.md`, `spirit-development-and-sharing.md`, `maos-kernel-implementation-guide.md`) reflect an earlier phasing where v0.1 = Architect Spirit driving a coding task; those docs are scheduled for propagation to match this PRD's structure. Until propagation completes, **the PRD is the canonical source for phasing decisions**; the architecture docs remain canonical for everything else (ADRs, invariants, kernel internal architecture).
 
 ## Executive Summary
 
@@ -63,6 +66,7 @@ Trust tiers + sandbox-floor enforcement (deployment configurations rather than p
 - **Complexity:** **High.** Multi-language ecosystem (Rust kernel + polyglot Spirits via Wire Protocol). Real-time streaming constraints. Cross-process coordination across three Spirit forms (rust-inproc / subprocess / wasm-component, phased v0.1/v1.0/v2.0 per ADR-007). Hot-swap with token preservation. Cross-host A2A with mTLS+TOFU+per-frame consent. Multi-tenant Loom for v2.0 Cortex. Eleven Architecture Decision Records and ten kernel invariants commit the design.
 - **Project Context:** **Greenfield.** Pre-implementation, vision-locked architecture, no existing codebase. The architectural foundation already comprises ~430 KB of planning artifacts (architecture decisions doc, design report, Spirit dev guide, kernel implementation guide, three industrial user-journey vision documents, comparative research foundation, executive product brief).
 - **OSS character (project commitments):** Apache 2.0 + MIT dual-license; public RFC process for ABIs and protocols post-v0.1; reference implementation, not gatekeeping; standards ambition for the integrated protocol surface (ACP + MCP + A2A composed coherently).
+- **Substrate-positioning claim (v1.0 commitment, founder-blessed via Mary's hermes-comparison framing):** **MAOS at v1.0 can host a hermes-class Spirit as a tenant, with full audit, revocation, and substrate-uninstall guarantees that hermes-as-application cannot itself provide.** Hermes is one excellent improv actor with her own travel kit. MAOS is the theater she could perform in. The test of a theater is not how good a single play is — it's how many different plays can be staged on the same stage with the same safety guarantees. Empirical validation: v1.0 black-box external-author trial (Murat's ship gate — 5 external authors, 14-day no-DM-support window, ≥4/5 produce a working signed Spirit binary). If this claim survives that gate, the substrate has earned its theater. If not, we discover the real scope problem at v1.0 instead of v2.5.
 
 ## Carry-Forward Signals from Vision Discovery
 
@@ -224,11 +228,112 @@ The minimum bar across categories at each release:
 
 ## User Journeys
 
-The substrate's promise is felt rather than read. Each journey below traces a specific user from pain to resolution, with the capabilities the kernel and reference Spirits must deliver explicitly named at the end. Six journeys cover the substrate's full surface: J1 anchors the Tier 1 wedge from the founder's own workflow; J4 and J3 cover production-incident response and team-normalcy; Reza covers single-org cross-team scale-out; Diego covers the third-party builder JTBD; J0 covers the unbought evaluator. Sequencing follows reader-task order — vocabulary first (J1), proof second (J4), normalcy third (J3), scale fourth (Reza), extension fifth (Diego), self-mirror last (J0). Long-form novelistic versions live in `maos-user-journeys.md` (sister doc); the PRD carries anchor scenes plus capability codas.
+The substrate exposes three cognitive modes in increasing complexity: **anticipatory** (one Spirit watches and proactively notifies), **exploratory** (one Spirit fans out and converges on findings), and **compositional** (multiple Spirits coordinate under an Orchestrator with full distillation, audit-chain, and consent enforcement). The journey set is sequenced to teach those modes progressively, with each journey's capabilities a strict superset of the prior. **The wedge demo that announces the substrate is J1 Founder's Loop at v0.8 — readers who want the visceral demonstration first should jump there.** J-Butler at v0.3 and J-Researcher at v0.5 are the single-Spirit proof points that earn the founder-loop's compositional ambition; v0.1 ships the foundational kernel + placeholder Spirit only.
 
-The journeys honor the carry-forward signals from Step 2c — the wedge pain commitment, the Tier 3 reframe to OSS / single-org-Cortex, the audit-vs-legibility distinction, the eight kernel guarantees enumeration, and the halt-recall/halt-precision benchmark routing — and they exhibit the architecture decisions reached during this PRD workflow: ADR-012 typed-intent consent, ADR-013 `log.recall`, ADR-014 distillation audit-chain (I11), ADR-015 decision-context recording (I12), and the §9.5 distillation pattern.
+**Eight journeys, ordered by ship phase:** J0 Evaluator (cross-cutting; applies from v0.1 minimum-viable install onward); J-Butler (v0.3 anchor — anticipatory single-Spirit); J-Researcher (v0.5 anchor — exploratory single-Spirit); J1 Founder's Loop (v0.8 wedge demo — compositional multi-Spirit, the demo that announces the substrate); J3 Marcus Team Nexus (v1.0 — peer mesh); J6 Diego Spirit-author (v1.0 — third-party builder); J4 Mira-Nash 2 AM (v1.5 — diagnostic-architect pair); Reza single-org cross-team Cortex (v2.0/2.5).
 
-### Journey 1 — Tier 1 wedge: The Founder's Loop (Lunarpulse runs Epic 7 from his daughter's bedtime to school drop-off)
+Long-form novelistic versions live in `maos-user-journeys.md` (sister doc); the PRD carries anchor scenes plus capability codas. The journeys honor the carry-forward signals from Step 2c — the wedge pain commitment, the Tier 3 reframe to OSS / single-org-Cortex, the audit-vs-legibility distinction, the eight kernel guarantees enumeration, and the halt-recall/halt-precision benchmark routing — and they exhibit the architecture decisions reached during this PRD workflow: ADR-012 typed-intent consent, ADR-013 `log.recall`, ADR-014 distillation audit-chain (I11), ADR-015 decision-context recording (I12), ADR-016 token-budget, ADR-017 hot-swap wire format, ADR-018 intent provenance (I13), ADR-019 halt continuity (I14), ADR-020 hot-swap migration policy, ADR-021 CliWrapperSpirit output-shape, and the §9.5 distillation pattern.
+
+### Journey B — v0.3 anchor: Sandra's Butler reads the third 6 PM and reclaims dinner
+
+**Persona.** Sandra, designer at a 30-person SaaS company. Figma + Linear + Slack + Google Calendar. Time-zoned across her team (US/EU mix). Recently switched to remote-first work. Has a recurring 7 PM Tuesday-Thursday dinner with friends she keeps missing. Her partner is starting to take it personally.
+
+**Opening scene.** Tuesday, 5:48 PM. Sandra is mid-flow on a Profile Page wireframe. She's been heads-down since 9 AM. Last Tuesday she also worked late. Last Thursday she also worked late. She's missed dinner three times in two weeks. She has not yet noticed the pattern. The Butler Spirit has.
+
+**Inciting moment.** She installed the Butler Spirit two weeks ago and gave it narrow capability scope: read-only on Google Calendar, Slack status, and Figma activity. Posture: `assistive` (notify, but don't act unsupervised). She left it alone.
+
+At 5:48 PM the Butler's `on_idle` lifecycle hook fires (the kernel calls it whenever the Spirit has no pending IAC frames and the user's activity stream shows >12 minutes since last meaningful interaction). The Butler runs its anticipatory reasoning loop: Active-Inference-style belief update over the user's current goal-state, then candidate-action ranking by **expected free energy** (design report ¶158-160) — a sum of pragmatic value (probability of achieving the user's likely goals) and epistemic value (information gained about uncertain beliefs). Beliefs:
+- Calendar: 7 PM dinner, recurring T/Th. Last 4 occurrences: 2 attended late, 2 missed entirely. Pattern detected.
+- Slack: status set to "Heads down" since 1 PM. No reply to her partner's 4:15 PM message ("Are we still on for dinner?").
+- Figma: continuous active session for 4h 40m. Saved-state cadence consistent with deep-work mode.
+- Pattern model: predicted disengage time at current pace ≈ 7:28 PM. Probability the dinner gets missed: 0.78. Confidence: 0.85.
+
+The Butler computes a calendar-conflict-confidence scalar (its own definition — predicted-miss-probability × pattern-strength) and writes it via `working_memory.set_scalar("user.calendar_conflict.confidence", 0.85, derived_from=[calendar_obs, slack_obs, figma_obs])`. Per the Butler's `[epistemic_policy]` rule: `tag = user.calendar_conflict.confidence, on_value_above = 0.8 → action = verbalize_with_options` — the kernel reads the scalar, compares to threshold, fires the action. The kernel does NOT compute confidence; it only compares the Spirit-supplied scalar to the threshold. Halts are reserved for tags like `claim.security_vulnerability`. The Butler surfaces a single notification through the kernel-rendered telemetry surface:
+
+> 🤖 **Butler:**
+> Sandra — pattern noticed: you've worked past 7 PM the last 3 Tuesdays and missed dinner with friends. You're in deep-work mode; your typical disengage time today is ~7:28 PM. I see your partner's message at 4:15 unanswered. Three options:
+> &nbsp;&nbsp;(a) Snooze the wireframe for 75 min — I'll create a Linear note "Resume: Profile Page wireframe at 7:00"
+> &nbsp;&nbsp;(b) Reschedule the 7 PM dinner now (drafts a Slack message I can send with one tap)
+> &nbsp;&nbsp;(c) Keep working — I'll re-prompt at 6:30 PM
+> *Or: ignore me. I'll learn the pattern from your response.*
+
+**Climax.** Sandra reads the notification at 5:51 PM. She picks (a). The Butler's `on_idle` follow-up writes a Linear note via MCP, sets a calendar reminder for 6:55 PM, archives the suggestion-acceptance signal to its `notification_acceptance_log` (private memory, episodic tier — feeds future POMDP predictions). At 6:50 PM Butler's reminder fires. Sandra closes Figma at 6:53 PM. Arrives at dinner at 7:08 PM. Her partner notices.
+
+**Resolution.** Three weeks later the Butler observes that its **posterior uncertainty** over Sandra's preferred prompt-sensitivity has grown beyond threshold (she's been ignoring early-stage prep prompts in shallow-work mode but accepting them in deep-work mode — the underlying preference is bimodal but the Butler's policy is still treating it as unimodal). The Butler computes its belief variance using its own definition (Shannon entropy over the work-mode-conditioned acceptance distribution) and writes via `working_memory.set_scalar("self.belief_variance", 0.78, derived_from=[14-day notification log refs])`. Per its `[epistemic_policy]`: `tag = self.belief_variance, on_value_above = 0.7 → action = halt` — the kernel compares the Spirit-supplied scalar (0.78) to the threshold (0.7) and fires the halt. **The kernel does not compute variance, entropy, or any Spirit-specific cognitive measure (per ADR-022's load-bearing non-responsibility list); the Butler computes its own preferred uncertainty proxy and the kernel does universal arithmetic comparison only.** Per design report ¶162: halt-on-belief-variance is the upstream epistemic signal — the Spirit halts *before* outcomes degrade, not after; outcome metrics like notification-acceptance-rate stay as derived diagnostics that confirm the variance signal but do not themselves trigger halt. It halts:
+
+> 🟡 **Butler halted on `self.belief_variance`**
+> My posterior over your preferred sensitivity is bimodal: I suspect deep-work-Sandra wants my prompts and shallow-work-Sandra does not, but my current policy doesn't condition on work-mode. Acceptance-rate diagnostic confirms (0.42 in shallow-work, 0.81 in deep-work over last 14 days). Two options: (a) split the policy by work-mode-context and lower sensitivity for shallow-work mode; (b) keep the unimodal policy and accept the noise. Resolve with `provided_context: <preference>` or `accepted_halt`.
+
+Sandra confirms (a). The kernel updates the Butler's `[epistemic_policy]` per the `provided_context` resolution; the change is journaled (I10) with full reasoning chain. The Butler is self-tuning under human supervision — *upstream of* outcome degradation, not in response to it.
+
+**Capabilities revealed (J-Butler):**
+
+- **Single-Spirit operation** — no IAC bus, no A2A, no multi-Spirit coordination. Butler runs alone.
+- **`on_idle` lifecycle hook** as the substrate for anticipatory reasoning (Active Inference / POMDP shape per design report ¶154–¶168).
+- **Telemetry Stream** with narrow per-Spirit subscription (calendar, Slack, Figma — no other Spirit's activity).
+- **`[epistemic_policy]` per-tag rules** with `verbalize_with_options` / `flag` / `halt` actions and confidence + impact thresholds. Default action is `verbalize_only`; halt is the rare alarm, not the doorbell.
+- **MCP tool integrations**: Google Calendar (read), Slack (read + draft-but-don't-send), Linear (write — gated), Figma (read).
+- **Output_shape predicate**: notifications carry structured `{pattern, confidence, evidence, options[]}` payload — kernel rejects emit without these fields.
+- **Posture-shift command** — Sandra can say "Butler, be more cautious for the next hour"; kernel logs the shift; subsequent capability requests prompt that wouldn't have.
+- **Self-tuning via `epistemic.halt`** when notification-acceptance rate drops below threshold — the substrate makes the Spirit's own calibration auditable.
+- **Transparency Log** captures every notification, every user response, every `[epistemic_policy]` update.
+- **Eval metrics**: notification precision (% acted on; v0.3 floor ≥ 0.85), notification recall (% of relevant moments caught; v0.3 floor ≥ 0.7), user-correction rate, time-to-action savings.
+- **No distillation pattern needed** — Butler's per-event reasoning fits in working memory; episodic memory accumulates anonymized acceptance signals for POMDP refinement.
+
+**Ship phase:** **v0.3.** This journey is reproducible at v0.3 with: kernel skeleton + single-Spirit subprocess form + `on_idle` hook + Telemetry Stream + `[epistemic_policy]` enforcement + four MCP integrations + Transparency Log. **No multi-Spirit IAC bus required. No A2A required. No distillation pattern required.** Butler is the proof point for the substrate's anticipatory-reasoning surface.
+
+### Journey R — v0.5 anchor: Hannah surveys the LLM-as-judge literature in 2 hours
+
+**Persona.** Hannah, ML researcher at a 50-person AI safety lab. Her job: survey emerging research, propose hypotheses, hand off to senior researchers. Reads ~30 papers/week. Currently overwhelmed — the LLM-evaluation field is publishing 200+ relevant arXiv submissions per six-month window.
+
+**Opening scene.** Monday 9:00 AM. Her director: *"How is the field handling LLM-as-judge bias? I want to know by Wednesday."* Hannah has 2 hours of focused time before her 11 AM standup, then meetings until 4 PM. The deliverable: structured findings, a confidence map, and a recommendation for which threads warrant a senior researcher's deeper investigation.
+
+**Inciting moment.** She invokes her Researcher Spirit:
+
+> `@researcher survey LLM-as-judge bias methodology, last 12 months. Focus: detection, mitigation, positional bias. Output shape: findings + open questions + confidence map. Time budget: 90 minutes.`
+
+**Rising action.** The Researcher Spirit (loaded with `survey-mode` posture per design report ¶87–¶89) ingests the prompt. Per its manifest's `[capabilities.required]`: `web.search`, `arxiv.search`, `github.search`, `citation_graph.traverse`. Per `[capabilities.parallelism] = 8`: up to 8 concurrent tool dispatches. Cognitive style ("be exploratory, divergent, broad") lives in the system prompt; cognitive capacity (parallelism, recall depth) lives in the manifest.
+
+For 73 minutes the Researcher fans out. Adaptive-chunk-ratio summarization (openclaw pattern, design report ¶362) keeps each paper's digest under 4K tokens. Citation-graph traversal identifies four tight clusters of related work. The Spirit reads abstracts for 40 papers, full intros for 18, full methods for 8.
+
+At minute 73 the Researcher hits an `epistemic.halt`:
+
+> 🟡 **Researcher halted on `claim.methodology_strength`**
+> Two papers (Chen et al. 2025-Q3, Tanaka 2025-Q4) report contradictory findings on positional bias in pairwise judgment. Both have strong methodology by my scoring rubric (≥ 0.85). I lack grounds to rank them. Three resolutions:
+> &nbsp;&nbsp;(a) Surface both in findings + mark contradiction as Open Question (recommended)
+> &nbsp;&nbsp;(b) Apply tiebreak: citation count weight
+> &nbsp;&nbsp;(c) Skip both — only cite consensus papers
+
+Hannah picks (a). The halt resolution + reasoning is journaled (I10). The Spirit resumes.
+
+**Climax.** At 10:38 AM the Researcher delivers a structured output that the kernel's Capability Registry validated against the manifest's `[output_shape]` predicate (rejection on missing fields):
+
+- **Findings:** 14 ranked findings, each with citations and per-finding confidence scores
+- **Open Questions:** 6 open questions; the contradictory-finding pair flagged with both citations side-by-side
+- **Confidence Map:** color-coded heat map of finding-confidence × evidence-density. Two findings sit at low-confidence/high-impact — risky-to-cite-but-might-be-the-most-important-thing.
+- **Bibliography:** 38 papers with full citations + summary one-liners + arxiv URLs
+
+Hannah scans the output in 12 minutes. The Open Questions section is exactly the kind of "we don't know yet" pointers her director values most. She forwards the pair to a senior researcher as a deeper-investigation recommendation.
+
+**Resolution.** Hannah delivers her survey by Wednesday 9 AM. The senior researcher takes the Chen-vs-Tanaka contradictory-finding investigation; six weeks later the lab publishes an internal position paper grounded in the Researcher Spirit's first-pass survey. The Researcher's `confidence_map` becomes a recurring deliverable shape — the lab's "research dashboard" feeds it into a Notion view.
+
+**Capabilities revealed (J-Researcher):**
+
+- **Single-Spirit operation** — no multi-Spirit coordination needed for survey-mode work.
+- **Broad MCP capabilities**: web search, arXiv search, GitHub search, citation-graph traversal.
+- **High parallelism in tool dispatch** (manifest-declared `[capabilities.parallelism]`; v0.5 cap of 8 concurrent).
+- **Posture: `survey-mode`** (exploratory, reactive, divergent) with `hypothesize-mode` (generative; **ILP + LLM hybrid for novel-hypothesis generation** per design report ¶191 — ILP's structured rule discovery joined with LLM's pattern completion, output submitted to a Critic Spirit for refinement) declared in the manifest's posture-set but gated until v1.0. v0.5 ships survey-mode-only operation; the hypothesize-mode declaration signals to a sophisticated reader that the substrate's posture surface is genuinely heterogeneous and the ILP component is the architecturally distinctive claim.
+- **Output_shape predicate**: "findings + Open Questions + Confidence Map + Bibliography" close — kernel rejects emit without all four.
+- **Adaptive-chunk-ratio summarization** (openclaw pattern; default for Researcher and Architect classes).
+- **`[epistemic_policy]`** Spirit-detection-triggered halts: the Researcher computes its own contradiction-detection score, low-confidence-high-impact-product, and methodology-strength-tie indicator (using its own definitions); writes each as a tagged scalar; kernel fires halt when scalar crosses Spirit-author-declared threshold via universal-arithmetic comparison. **The kernel does not detect contradictions or compute confidence; the Researcher does, and the kernel only compares the Spirit-supplied scalar.**
+- **Time-budget enforcement** via manifest `[budget].time_cap`; soft warning at 80%; the kernel emits `BudgetWarning` IAC frame to the Spirit's mailbox.
+- **Transparency Log + log.recall**: full reasoning chain auditable. Hannah's director can replay any cited finding back to the Spirit's source-paper retrieval call.
+- **Distillation pattern** for very-large-corpus surveys (200+ candidate papers compressed to 38-paper bibliography) — first opt-in production use of §9.5 in a single-Spirit context. Five-metric gate applies (digest-recall ≥ 0.90, faithfulness ≥ 0.98, hedge-preservation ≥ 0.95, traceability = 100%, secret-leakage = 0%).
+- **Eval metrics**: synthesis accuracy, citation correctness (≥ 95% reachable URLs), novelty of hypotheses (when in hypothesize-mode; LLM-as-judge with rubric), open-question quality (rubric-judged).
+
+**Ship phase:** **v0.5.** This journey is reproducible at v0.5 with: kernel skeleton + Spirit subprocess form + broad MCP capability + parallelism + output_shape predicate + `[epistemic_policy]` + distillation pattern's first opt-in deployment. **No multi-Spirit IAC bus required. No A2A required.** Researcher proves the substrate's exploratory-reasoning surface and the distillation pattern in a bounded single-Spirit context before the founder loop composes them with multi-Spirit coordination at v0.8.
+
+### Journey 1 — v0.8 wedge demo: The Founder's Loop (Lunarpulse runs Epic 7 from his daughter's bedtime to school drop-off)
 
 **Persona.** Lunarpulse, founder. Heavy user of AI coding agents — BMAD framework for planning; Claude Code, Gemini CLI, opencode, and Kimi CLI rotating through implementation; `bmad-party-mode` when long-term direction needs cross-checking. Two kids, a marriage, a startup, and a workflow that ostensibly automates coding but in practice has chained him to the laptop because every `bmad-create-story` → `bmad-dev-story` → `bmad-code-review` cycle requires his approval, his next-prompt, his clarification, his "yes, fix that test." Each "wait" is 4–30 minutes. Each "approve" is one keystroke. The asymmetry is grotesque.
 
@@ -270,7 +375,7 @@ He reads the retro on his phone, approves the merge train, takes his daughter to
 
 **Capabilities revealed (J1):**
 
-- **Reference Spirit set v0.5+:** Orchestrator + Developer + Reviewer (3 skill packages, no per-CLI Rust crates). Worker Spirits are agent CLI processes (Claude Code, opencode, gemini-cli, kimi-cli) with `maos-bridge` + persona skills loaded. ADR-014 (use existing protocols, no new IAC MCP server).
+- **Reference Spirit set v0.8+:** Orchestrator + Developer-Worker + Reviewer-Worker (3 skill packages, no per-CLI Rust crates). Worker Spirits are agent CLI processes (Claude Code, opencode, gemini-cli, kimi-cli) with `maos-bridge` + persona skills loaded. ADR-014 (use existing protocols, no new IAC MCP server). Butler ships earlier at v0.3, Researcher + Observer at v0.5.
 - **Two-level `task.assign`** (ADR-013 — Human-Spirit interaction surfaces; ADR-012 typed-intent consent envelopes for cross-host A2A). Human → Orchestrator at epic granularity; Orchestrator → Worker at story granularity. Same primitive, different topology.
 - **Skills as named-and-loaded-on-demand.** Orchestrator names the skill in `task.assign`; Worker resolves and loads from its skill search path; kernel never hosts skills. Skills proliferate freely; Spirits stay small in number. Skills ≠ Spirits.
 - **Multi-protocol Spirit communication.** Same-host: kernel-internal IAC bus. Cross-host: A2A peer mesh with mTLS + ADR-012 typed-intent consent. Editor-hosted: ACP. Tool invocations: MCP. Orchestrator's delegation API is uniform across topologies.
@@ -284,6 +389,8 @@ He reads the retro on his phone, approves the merge train, takes his daughter to
 - **Capability scoping at story granularity** — Orchestrator computes per-story scope from planning artifacts; Worker Spirits get fs.rw bounded to their story's files, not project-wide.
 
 **Wedge committed.** This journey commits **W1″ — Orchestrator-led parallel multi-CLI execution with kernel-mediated audit-chain and decision-context recording** as the Tier 1 wedge. The original W1 (multi-agent orchestration + persistence) is the underlying capability. The 60-second demo answer to "what does MAOS do that Claude Code, Cursor, Aider, and a tmux session cannot?" — *"runs your full epic loop while you eat dinner, halts when it has questions, returns you a completed epic in the morning, and gives you an audit trail every regulator and skeptic can read."*
+
+**Ship phase:** **v0.8.** The founder's-loop wedge demo composes everything the v0.1/v0.3/v0.5 phases built: foundational kernel guarantees (v0.1), single-Spirit anticipatory reasoning (v0.3 Butler), single-Spirit exploratory reasoning + bounded distillation (v0.5 Researcher), and now multi-Spirit Orchestrator+Worker coordination + cross-host A2A + full distillation pattern. v0.8 is the first phase where the substrate's full architectural ambition is observable in one demo. The Butler and Researcher journeys at v0.3 / v0.5 are the proof points that justify the v0.8 ambition; this journey is the wedge demo that announces the substrate.
 
 ### Journey 4 — Tier 3 sub-pattern: Elena's 2 AM 90-minute Mira-Nash incident
 
@@ -315,7 +422,7 @@ The notification carries decision-context refs (I12) — Elena can see exactly w
 - Asymmetric capability postures via manifest (sre-diagnostician vs principal-architect).
 - Cross-Host A2A with ADR-012 typed-intent consent envelopes — Mira's `diagnosis-handoff:read-only-evidence` is allowed; `code-mutation-directive` is blocked. Closes the confused-deputy class of attacks.
 - Cross-environment telemetry queries with audit trail.
-- Per-tag epistemic policy at both Spirits with confidence-gated halts.
+- Per-tag epistemic policy at both Spirits with Spirit-detection-triggered halts (Mira and Nash each compute their own confidence/conflict scalars; kernel does universal-arithmetic comparison per ADR-022 — kernel does not interpret cognitive concepts).
 - Mobile-friendly approval surface.
 - ADR auto-drafting and CI-enforced pattern detection.
 - Distillation pattern at the production edge — high-volume telemetry compressed to decision-relevant digests; raw recallable via `log.recall`.
@@ -423,30 +530,901 @@ A `claude` process spawns inside a T2 sandbox, with `developer` + `maos-bridge` 
 
 ### Journey requirements summary
 
-Six journeys collectively reveal the capability areas the kernel and reference Spirits must deliver:
+Eight journeys collectively reveal the capability areas the kernel and reference Spirits must deliver, sequenced by ship phase:
 
 | Capability area | Journeys | Phase |
 |---|---|---|
-| Multi-Spirit Host with shared IAC bus | J1, J3, J4, Reza | v0.1 (basic) → v0.5 (multi-Spirit + A2A pulled forward per ADR-014) → v1.0 (full mesh) |
-| Episodic memory persistence across sessions | J1, J3, J4 | v0.1 (private tier) → v1.0 (shared tier) → v1.5 (collective tier via Loom) |
-| Epistemic halt as Layer-1 capability | J1, J4, J0, Diego | v0.5 (mechanism) → v1.0 (per-tag policy) |
-| Transparency Log + Approval Decision Log + `log.recall` | J1, J3, J4, J0 | v0.5 (persistence) → v0.5 (`log.recall` ABI per ADR-013) → v1.0 (queryable export) |
-| Distillation pattern + I11 audit-chain + I12 decision-context | J1, J3, J4, Reza | v0.5 (kernel enforcement) → v1.0 (benchmarks per §9.5 four-metric suite) |
-| Sandbox tiers (T0–T4) with capability scoping | All | v0.1 (T0/T1) → v0.5 (T2/T3) → v2.0 (T4 WASM) |
-| Pluggable provider drivers (Anthropic / OpenAI / local / Bedrock) | J1, J4 | v0.1 (Anthropic) → v0.5 (multi-provider via CLI-wrapped agents) → v2.0 (full multi-provider proxies) |
-| Cross-Host A2A peer mesh + ADR-012 typed-intent consent | J3, J4, Reza | v0.5 (pulled forward from v1.0) |
+| Single-Spirit subprocess form + Spirit ABI v0.1 | J0, J-Butler, J-Researcher | v0.1 (placeholder Spirit + foundational primitives) → v0.3 (Butler) → v0.5 (Researcher + Observer) |
+| `on_idle` lifecycle hook for anticipatory reasoning | J-Butler | v0.3 |
+| Telemetry Stream subscription (narrow per-Spirit) | J-Butler, J-Researcher (broad), Observer | v0.3 (basic narrow subscription) → v0.5 (broader; Observer broadcast subscriber) |
+| `[epistemic_policy]` per-tag rules with verbalize/flag/halt taxonomy | J-Butler, J-Researcher, J1, J4, J0, Diego | v0.3 (mechanism with confidence + impact thresholds) → v0.5 (per-Spirit-class policies) → v1.0 (community policies) |
+| Output_shape predicate enforcement (kernel rejects malformed emit) | J-Butler, J-Researcher | v0.3 (basic) → v0.5 (full per-class predicates) |
+| MCP tool integrations (Calendar / Slack / Linear / Figma / arXiv / GitHub / web-search / citation-graph) | J-Butler, J-Researcher | v0.3 (Butler set: Calendar/Slack/Linear/Figma) → v0.5 (Researcher set: web/arXiv/GitHub/citation-graph) → v1.0 (broader ecosystem) |
+| High parallelism in tool dispatch | J-Researcher | v0.5 (≥ 8 concurrent) |
+| Adaptive-chunk-ratio summarization (openclaw pattern) | J-Researcher, distillation-shipping Spirits | v0.5 |
+| Distillation pattern + I11 audit-chain + I12 decision-context + I13 intent_lineage | J-Researcher (single-Spirit opt-in), J1, J3, J4, Reza | v0.5 (single-Spirit opt-in) → v0.8 (multi-Spirit Orchestrator pattern, full §9.5 deployment) → v1.0 (five-metric gate on all distillation-shipping Spirits) |
+| Posture-shift command (runtime supervision knob) | J-Butler, J1, J4 | v0.3 (Butler "be more cautious for the next hour") → v0.5+ (broader) |
+| Self-tuning via `epistemic.halt` (Spirit's own calibration auditable) | J-Butler | v0.3 |
+| Multi-Spirit Host with shared IAC bus | J1, J3, J4, Reza | v0.8 (multi-Spirit IAC + Orchestrator pattern) → v1.0 (full peer mesh) |
+| Two-level `task.assign` typed-intent IAC primitive (ADR-013) | J1, J3, J4, Reza | v0.8 (introduced for Orchestrator+Worker) → v1.0 (full A2A peer mesh) |
+| Cross-Host A2A peer mesh + ADR-012 typed-intent consent | J1 (loopback only at v0.8), J3, J4, Reza | v0.8 (loopback-only profile per Winston) → v1.0 (cross-host with mTLS+TOFU) |
+| Episodic memory persistence across sessions | J-Butler, J-Researcher (private tier), J1, J3, J4 | v0.3 (private tier) → v1.0 (shared tier) → v1.5 (collective tier via Loom) |
+| Transparency Log + Approval Decision Log + `log.recall` | All journeys | v0.1 (basic Transparency Log) → v0.3 (replay) → v0.5 (`log.recall` ABI per ADR-013) → v1.0 (queryable export + sealed export) |
+| Sandbox tiers (T0–T4) with capability scoping | All | v0.1 (T0/T1) → v0.3 (T2 narrow) → v0.5 (T2/T3) → v2.0 (T4 WASM) |
+| Pluggable provider drivers (Anthropic / OpenAI / local / Bedrock) | J-Researcher, J1, J4 | v0.1 (Anthropic single) → v0.5 (multi-provider via CLI-wrapped agents) → v1.5 (MAOS-mediated provider proxies) → v2.0 (full multi-provider) |
 | Mobile-friendly approval surface (phone push) | J1, J4 | v1.0 (HTTP push) → v2.0 (native push) |
 | Asymmetric capability postures (sre-diagnostician vs principal-architect vs platform-lead) | J4, Reza | v1.5 |
 | Loom collective tier with cross-Host pattern propagation | Reza | v1.5 (Loom-lite) → v2.0 (multi-instance) |
-| Public Spirit registry with Ed25519 signing + four trust tiers | Diego | v1.0 |
-| `cargo generate maos-spirit` + `spirit-test` + Spirit dev SDK | Diego | v0.5 (SDK) → v1.0 (registry) |
-| `maos audit query` CLI + cleanup | J0, J7-equivalent in NFRs | v0.5 (basic queries) → v1.0 (signed export) |
+| Public Spirit registry with Ed25519 signing + four trust tiers | Diego, all third-party Spirits | v0.5 (basic) → v1.0 (full registry + vetting attestations) |
+| `cargo generate maos-spirit` + `spirit-test` + Spirit dev SDK | Diego, J-Butler/Researcher (Spirit-author paths) | v0.3 (SDK basic) → v0.5 (full) → v1.0 (registry integration) |
+| `maos audit query` CLI + cleanup + clean uninstall | J0, J7-equivalent in NFRs | v0.1 (clean uninstall — J0 requirement) → v0.5 (basic queries) → v1.0 (signed export) |
 
-These map directly to Functional Requirements (Step 9) and Non-Functional Requirements (Step 10). The wedge pain commitment (W1″ — Orchestrator-led parallel multi-CLI execution with kernel-mediated audit-chain) is now load-bearing across J1 and Reza; Steps 8 (Scoping) and 9 (FRs) inherit it. Step 10 (NFRs) inherits the four-metric distillation ship-gate from §9.5 (digest-recall ≥ 0.90; faithfulness ≥ 0.98; hedge-preservation ≥ 0.95; traceability = 100%).
+These map directly to Functional Requirements (Step 9) and Non-Functional Requirements (Step 10). The wedge pain commitment (W1″ — Orchestrator-led parallel multi-CLI execution with kernel-mediated audit-chain) is now load-bearing across J1 and Reza, *anchored at v0.8*. Step 10 (NFRs) inherits the five-metric distillation ship-gate from §9.5 (digest-recall ≥ 0.90; faithfulness ≥ 0.98; hedge-preservation ≥ 0.95; traceability = 100%; secret-leakage = 0%).
+
+**The phase-anchoring decision (per founder directive):** Butler ships at v0.3 and Researcher at v0.5 *before* the founder's-loop wedge demo at v0.8. v0.1 is foundational (kernel skeleton + placeholder Spirit + clean install/uninstall), proving the kernel's big-picture readiness without committing to multi-Spirit ambition. v0.3 and v0.5 deliver progressively richer single-Spirit value (Butler's anticipatory reasoning; Researcher's exploratory reasoning + bounded distillation) on top of the foundational kernel — neither requires multi-Spirit IAC, A2A, or the full distillation pattern. v0.8 then composes everything into the founder's-loop wedge demo with multi-CLI Orchestrator+Worker coordination.
 
 Open questions routed forward:
 - **Cortex consortium target for v2.0 demo** — Reza-style single-org cross-team is the leading candidate; OSS-on-MAOS (Debian / Wikimedia / Apache Foundation) and federated research consortium are alternatives. **Final lock by v0.3** per Step 2c.
 - **Adversarial-Spirit threat model** — Mary's stakeholder list for Step 10 NFR (STRIDE-style attack narratives with kernel defenses traced to FRs).
 - **Halt-recall vs halt-precision floors per Spirit class** — uniform across distillation-shipping Spirits per §9.5; per-Spirit floors for non-distillation Spirits (J4 Mira: halt-recall ≥ 0.7; J1 Orchestrator: halt-precision ≥ 0.85). Routes to Step 10.
+
+## Domain-Specific Requirements
+
+MAOS sits in the *agent infrastructure* sub-domain — a substrate layer that inherits concerns from three established domains (scientific computing, developer tooling, enterprise security) and synthesizes a fourth (the trust-mediation needs unique to autonomous-agent runtimes). The requirements below are domain-specific in the sense that a generic developer tool or generic enterprise system would not face them; they fall out of the substrate's claim to be *the trusted runtime under which third-party autonomous agents execute on behalf of humans*.
+
+### Compliance & Regulatory
+
+**Audit retention and integrity (universal across deployment tiers).** Every external call, every IAC frame, every approval decision, and every Spirit lifecycle transition lands in the Transparency Log + Approval Decision Log + lifecycle journal (Invariants I2, I4, I10). Default retention: 90 days private tier, configurable per-deployment; Merkle-root anchoring optional for tamper-evidence in regulated deployments. Logs are queryable via `maos audit query` (J0, J7-equivalent NFR) and exportable to JSONL / SIEM pipelines (v2.0 enterprise).
+
+**Right-to-explanation (EU AI Act adjacent; broader regulatory direction).** Every `decision.*`-typed frame carries `working_memory_digest_refs` per Invariant I12 (ADR-015). Combined with I11 (digest audit-chain to raw frames) and `log.recall` (ADR-013), every autonomous-agent decision can be reconstructed end-to-end: what raw evidence existed, what summary the agent reasoned over, what decision the agent emitted, who approved it. This is the substrate-level mechanism that lets MAOS deployments meet "explainable AI" regulatory expectations without bolting on after-the-fact tooling.
+
+**Reproducibility (scientific-computing inheritance).** Spirit binaries ship with Ed25519 signatures; manifests are content-hashed; eval results are publishable per-Spirit. Deterministic builds for reference Spirits; Cargo.lock pinning; SBOM generation on every release. The substrate's audit claims are reproducible — auditors with the same logs and Spirit packages can replay any decision sequence.
+
+**Data residency (fintech / healthcare-adjacent).** Capability scoping is per-region: a Spirit's manifest can declare `[capabilities.required].region_lock = "EU"` and the kernel refuses delivery of frames whose payloads are sourced outside the locked region. Provider drivers can be locked to specific endpoints (e.g., air-gapped Bedrock-private for the Aisha-CVE case). The kernel itself stores no PII (Invariant I9); residency enforcement happens at sandbox boundary + capability scope.
+
+**Right-to-be-forgotten (GDPR / similar).** Per-Spirit private memory is removable on operator command (`maos forget --spirit <id>`). The Transparency Log is not removable (it's the audit spine), but personally identifying payloads in the log can be redacted via `maos audit redact --frame <id> --reason <legal-hold>`; redactions are themselves logged. Subject-rights requests are operator-tooling concerns; the substrate provides the primitives.
+
+**License and OSS provenance.** MAOS ships under an OSI-approved license (Apache 2.0 working assumption; final lock by v0.3). Reference Spirits ship with permissive licenses. The Spirit registry enforces license declaration in every manifest. Public-tier Spirits without OSI-approved licenses are flagged at install.
+
+**Export control (Mary's gap).** OSS distribution does not exempt MAOS from EAR / ECCN classification. The substrate ships cryptographic modules (Ed25519, mTLS, secret encryption); ECCN classification work is part of the v1.0 release prep. Wassenaar-adjacent concerns when a Spirit-as-cyber-tool gets distributed are Spirit-author + registry-operator responsibility, surfaced via the existing trust-tier flag plus an export-classification field in the manifest.
+
+**Pluggable crypto provider trait (defense / FIPS readiness).** The kernel's cryptographic operations (signing, mTLS, secret encryption) are mediated by a `CryptoProvider` trait with a default implementation (`ring` / `rustls` / equivalent). Alternate implementations can be swapped at composition root for FIPS 140-3-validated module compatibility, NIAP evaluation eligibility, or air-gapped deployments using on-prem HSMs. **v1.0 architectural commitment**: the seam exists; specific FIPS modules are downstream distributor concern.
+
+**Compliance-as-attestation primitive (Mary's load-bearing addition).** A new first-class kernel object: `ComplianceClaim`. Ed25519-signed by an attesting third party, references an *execution-context fingerprint* — the precise tuple of (manifest hash + version + trust tier + sandbox tier + capability scope set + provider-endpoint pinning + crypto-provider identity) under which the claim applies. Examples: a HIPAA-attestation issued by an accredited assessor for `code-reviewer-pro v2.1, public-vetted, T2, scope X, on-prem Bedrock-private`; an SOC 2 Type II attestation against a specific reference-Spirit deployment configuration. The kernel verifies `ComplianceClaim` envelopes at admission time and refuses to load Spirits whose runtime context drifts from the attested context (typed error `EComplianceContextDrift`). This makes attestations falsifiable rather than marketing copy. **The attesting third party becomes a named substrate stakeholder**, alongside Spirit author / vetter / operator / auditor. v1.0 first-class object.
+
+**Vetter trust model commitment.** MAOS v1.0 ships with a documented vetter trust model — accreditation procedure, attestation revocation semantics, conflict resolution when two vetters disagree, and trust-graph scope per Host. Specific parameters (revocation TTL, accreditation criteria) are deferred to Step 10 NFRs; the *existence* of the model is a v1.0 ship gate.
+
+**Role-distinct query primitives (Mary's compliance-loop addition).** `maosctl audit query` is one of four complementary surfaces:
+
+| Surface | Stakeholder | Primitive |
+|---|---|---|
+| `audit query` | Internal auditor / SRE | Frame-by-frame log query with replay (covered by `log.recall`). |
+| `audit subject-access` | DPO / data subject | Subject-indexed query — "show me everything about data subject X across all Spirits and Hosts." Indexes on PII tags in IAC frames; respects redaction policy. |
+| `audit posture-delta` | CISO / security operations | Posture-drift query — "what capability scopes / sandbox tiers / consent policies have changed across Spirits in the last 30 days, and what was the approval chain." |
+| `audit sealed-export` | External regulator / certification body | Cryptographically sealed audit bundle — Ed25519-signed by the operator's audit key, third-party-verifiable; not raw log. Includes Merkle anchoring if enabled. |
+
+These are different primitives, not different views of one log. v1.0 ships all four.
+
+**Regulatory regime applicability (Mary's prioritization).** Two regimes change v1.0 *primitives*: **EU AI Act** (high-risk system classification, foundation model obligations — addressed by I12 + ComplianceClaim + audit-from-minute-1) and **NIS2** (digital infrastructure component the moment one deployment touches an essential-services operator — addressed by audit retention + sealed-export + cross-host A2A consent envelopes). PIPL / LGPD / PIPEDA / PDPA / Colorado AI Act / SB-1047 / state-level US AI regs change *configuration* of these primitives and are satisfiable by enterprise distributions tuning policy. SOC 2 / ISO 27001 / FedRAMP are certification programs handled by enterprise distros, not v1.0 substrate concerns.
+
+### Technical Constraints
+
+**Sandbox tiers (security domain).** T0 (no sandbox; trusted only — local-tier Spirits) → T1 (process isolation; UID separation) → T2 (Landlock+seccomp on Linux, Seatbelt on macOS, WinRT job objects on Windows; the default for public-untrusted Spirits per ADR-009) → T3 (containerized — Docker/Podman) → T4 (WASM component model; v2.0). Strictest-of-(manifest, trust tier) floor enforced (ADR-009).
+
+**Per-Spirit resource isolation (Winston's addition).** Each Spirit runs under a resource cgroup (Linux cgroups v2; equivalent constraint primitives on macOS/Windows) with kernel-enforced caps on CPU, memory, file descriptors, and process count. Sandbox tiers cover the *security* boundary; resource cgroups cover the *resource* boundary. A runaway Spirit gets throttled, not the host. Caps declared in manifest `[resources]` table; defaults per Spirit class.
+
+**Capability mediation (security domain).** Every external call (file op, network, exec, sub-Spirit spawn) goes through the Capability Registry (Invariant I1). Token-scoped, expiry-bounded, posture-bound. The kernel issues no implicit ambient authority; Spirits cannot escape capability scope via wrapped-CLI or skill invocation (sandbox boundary catches it at syscall level). Capability tokens are re-validated at use against current state, not cached past their state-change boundary (TOCTOU correctness as Step 10 NFR).
+
+**Secret handling (security domain).** Secrets pass through to OS keyring (Linux secret-service / macOS Keychain / Windows Credential Manager); no kernel storage (Invariant I9). v2.0 enterprise integration adds Vault / cloud-KMS via PDP. The kernel materializes secrets just-in-time at the capability boundary; in-memory lifetime bounded; never logged. **Pre-write secret-pattern redaction filter at the Transparency Log boundary** — corpus of API-key / capability-token / private-key patterns auto-redacted before frames land in the log; zero secrets in any logged frame, ever. This filter is the substrate's contribution to the §9.5 five-metric distillation gate's `digest-secret-leakage = 0%` requirement.
+
+**Performance envelope (Winston's correction — drop sub-millisecond).** Realistic v0.1 target on a typical Linux box: **p50 < 5ms, p99 < 50ms for routed-and-logged IAC frames; sustained throughput 5–10K frames/sec single-host before the log writer becomes the bottleneck.** Sub-millisecond is achievable only by violating the spirit of I2's "log-before-deliver" (delivering before durable commit). The log writer is the throughput-defining component; a per-Spirit fairness scheduler in front of the log handles fan-in pressure (Reza's 28-Spirit Cortex aggregate steady-state ~56 fps, burst ~560 fps — well within envelope, but FIFO is wrong shape). Absolute performance numbers are Step 10 NFR territory; this section commits the *architectural shape* (synchronous log + capability mediation + scope check + serde, with realistic floors).
+
+**Token-budget accounting (ADR-016, Winston's addition).** Context tokens are agent-infrastructure's analog of OS memory. The kernel's Capability Registry tracks per-Spirit `context_window_size` / `context_used` / `context_pressure_threshold`. Soft threshold (default 80%) emits a typed `ContextPressure` IAC frame; hard threshold (default 95%) emits `ContextLimit`; above 100% the kernel returns `EContextExhausted` on new tool calls. The Spirit's persona logic decides whether to distill, hand off, or halt. Token counts are Spirit-self-reported; the kernel does not estimate.
+
+**Provider rate-limit isolation (Winston's addition).** Per-(provider, credential) token bucket with kernel-mediated backpressure surfaced as a typed `RateLimited` IAC frame, not a stalled call — the LLM-substrate analog of `EAGAIN`. One Spirit hitting Anthropic's RPM limit must not block another Spirit on a different provider, or even the same provider with a different key. Bucket parameters declared in provider driver config.
+
+**Distillation as async with deadline (Winston's addition).** The §9.5 distillation step runs with a deadline; if exceeded, the parent Spirit gets a `DigestPending` reply with a continuation handle, not a blocked call. Parent decides whether to wait, proceed with stale digest, or kill. Shape: `gen_server:call`-with-timeout. Default deadline: 10 seconds; configurable per Spirit class.
+
+**Network partition behavior in cross-host A2A (Winston's addition).** v0.1 explicit: A2A in-flight frames during partition are NACKed after a configurable timeout (default 30s); the kernel does NOT auto-retry. Application layer (the Orchestrator or peer Spirit) decides retry/escalate/halt. Cortex-scale partition tolerance is v2.0+ work.
+
+**Logical clocks for Transparency Log ordering (Winston's addition).** Frame ordering uses logical clocks (Lamport or hybrid logical clock — final pick by v0.5); wall-clock is metadata only. Cross-host frame ordering is consistent under clock skew. Certificate validity windows remain wall-clock (X.509 conventions; we don't reinvent).
+
+**Context-window upper bound (Winston's addition).** I12 `working_memory_digest_refs` cardinality is kernel-enforced. Soft cap: 80% of model context window (emits `ContextPressure`). Hard cap: 95% (emits `ContextLimit`). Above 95%, the Spirit must distill, hand off, or halt — kernel refuses new tool calls.
+
+**Multi-protocol substrate (developer-tooling inheritance).** Kernel-internal IAC bus + A2A peer mesh + ACP server + MCP client (architecture §7; ADR-014 commits to using the existing four protocols rather than inventing a fifth). A2A frames carry typed-intent consent envelopes (ADR-012). MCP for tools and Loom; ACP for editor bridges; never conflate. **Four-protocol commitment (Winston's clause):** "MAOS will not add a fifth protocol unless (a) a use case is unsatisfiable by IAC + adapter, (b) a new ADR justifies it, and (c) demonstration that adding the protocol does not violate kernel-stays-small. Webhooks, gRPC, SSE, WebSocket — all are adapters into IAC, not peer protocols."
+
+**Hot-swap correctness with sub-clauses (Winston's addition; ADR-017).** Invariant I6 is extended with explicit sub-clauses: in-flight A2A frames at the predecessor are inherited by the successor under a drain-barrier (not dropped); in-flight distillation steps restart at the successor with the same `digest_refs` set; Orchestrator-class user-input queues live in the Spirit's snapshot and survive swap; I12 `working_memory_digest_refs` are inherited; the state-transfer wire format is CBOR + per-Spirit-class schema (ADR-017), and the kernel rejects swaps with incompatible schema versions (typed `ESwapSchemaMismatch`).
+
+**Memory tiering with kernel-enforced scope (Invariant I5).** Private (one Spirit instance) / shared (Host-wide) / collective (Loom-domain). Kernel rejects reads/writes outside declared scope. Distillation pattern (§9.5) operates within these tiers; digests can be elevated from working → episodic → shared with consent gates and audit-chain (I11) preserved.
+
+### Integration Requirements
+
+**Editor bridges (developer-tooling).** ACP server (NDJSON over stdio; convergent across Zed, opencode, hermes) for editor-hosted Spirits; v1.0 ships with Zed + VSCode tested. JetBrains via plugin-bridge in v1.5.
+
+**Agentic CLI ecosystem (the wedge).** Worker Spirits are unmodified agent CLI processes (Claude Code, opencode, gemini-cli, kimi-cli) with `maos-bridge` + persona skills loaded (ADR-014). v0.1 / v0.5 ships with claude-code as the gold-standard reference; opencode / gemini-cli / kimi-cli reach parity in v0.5–v1.0.
+
+**LLM provider drivers.** Pluggable per ADR-005. v0.1: Anthropic. v0.5: multi-provider via wrapped-CLI provider configs (no MAOS provider proxies yet). v1.5: MAOS-mediated provider proxies (intercept HTTP calls for substrate-layer audit). v2.0: full provider parity including local LLMs (Ollama / vLLM), air-gapped Bedrock-private, on-prem Bedrock, Vertex AI.
+
+**Tool ecosystem (developer-tooling).** MCP-Streamable-HTTP client (ADR-008) — can call any MCP-compliant tool server. Loom is itself MCP-Streamable-HTTP. Spirit registry is MCP-Streamable-HTTP. Tool-side WASM sandboxing (T4) at v1.0; tool-as-Spirit at v2.0.
+
+**Cross-host peer mesh (enterprise-security).** A2A peer mesh with mTLS + TOFU + per-frame ADR-012 typed-intent consent. v0.5 (pulled forward from v1.0 per Reza journey). Multi-Host certificate management is operator tooling; v2.0 adds optional org-internal CA support for Cortex-scale deployments.
+
+**Identity and policy (enterprise; v2.0+).** OIDC / SAML for human authentication into operator surfaces. PDP integration (OPA / Cedar / Vault) for the Enterprise Spirit class — v2.0. SSO assertions flow through to capability-token issuance. Pre-v2.0 deployments use OS-user identity.
+
+**Telemetry and observability (enterprise).** Per-Spirit telemetry stream (Invariant I7); broadcast subscriber model. v1.0 ships OpenTelemetry export adapter. v2.0 adds SIEM export (Splunk / ELK / Datadog). Transparency Log export distinct from telemetry — separate adapter, distinct retention policy.
+
+**Skill ecosystem (developer-tooling).** Filesystem-discovered skill packages; v1.0 ships filesystem-only; v2.0 optional skill registry (separate from Spirit registry). Skills are user-space; kernel hosts no skills. Worker Spirits load skills on-demand by name when the Orchestrator delegates.
+
+### Risk Mitigations (with v0.1 / v1.0 acceptance tests)
+
+Per Murat's audit: every mitigation gets at least one falsifiable test. Eleven risks below — eight original + three Murat-added; Loom-specific threat model is explicitly deferred to a v2.0 threat-model doc.
+
+**Risk 1 — Supply-chain compromise of Spirit registry.** Mitigations: Ed25519 signing on every Spirit version; trust tiers (ADR-009) with public-untrusted floored to T2 + cautious posture; community vetting attestations for promotion to public-vetted; SBOM publication; reproducible builds for reference Spirits; install-time signature verification mandatory. **Acceptance (v0.1):** every install is signature-verified; corpus of 10 unsigned and 10 forged-signature Spirits, all rejected. **Acceptance (v1.0):** vetter trust model documented (accreditation, revocation, conflict resolution); revocation latency median ≤ 60s, p99 ≤ 5min from CA revoke to peer rejection.
+
+**Risk 2 — Adversarial Spirit (compromised or malicious third party).** Mitigations: capability scoping at manifest declaration + sandbox floor at trust tier (ADR-009); typed-intent consent on cross-Spirit frames (ADR-012); epistemic-halt-on-uncertainty surfaces the agent to the human before catastrophic action; Transparency Log makes silent betrayal mechanically detectable post-hoc. **Acceptance (v1.0):** adversarial-Spirit red-team corpus of 50 Spirits attempting (a) widening intent post-consent, (b) chaining a small consent into a large action, (c) using one capability to forge another's preconditions, (d) abusing epistemic-halt as a side channel, (e) Transparency Log evasion via timing. **Pass condition:** ≥ 48/50 detected pre-action by typed-intent consent; remaining ≤ 2 detected post-hoc by Transparency Log within 24h; zero undetected at 30-day audit.
+
+**Risk 3 — Distillation audit-bypass (legibility attack).** Mitigations: I11 (digest must reference raw); I12 (decision frames record which digests the agent reasoned over); §9.5 five-metric ship gate (digest-recall ≥ 0.90, faithfulness ≥ 0.98, hedge-preservation ≥ 0.95, traceability = 100%, **secret-leakage = 0%**); judge-LLM async sampling in production; human spot-checks during v0.1 stabilization. **Acceptance (v0.1):** §9.5 five-metric gate passes on 100-case calibration corpus + 10⁵-case secret-leakage corpus.
+
+**Risk 4 — LLM hallucination silently entering production.** Mitigations: epistemic halt as Layer-1 kernel capability — Spirits halt structurally on insufficient/contradictory evidence; per-tag epistemic policy with confidence thresholds; user resolves via `provided_context` / `accepted_halt` / `authorized_override`. **Acceptance (v0.5):** halt-recall ≥ 0.7 and halt-precision ≥ 0.85 per Spirit class on the `bmad-eval` standard corpus; results published in registry.
+
+**Risk 5 — Cross-host trust at Cortex scale.** Mitigations: TOFU + mTLS for v1.0; org-internal CA + per-Host certificates for v2.0 Cortex-scale. **Acceptance (v1.0):** mTLS handshake replay-attack test (1000 captured handshakes replayed, 0 succeed); TOFU pin-mismatch on second connection blocks + logs + alerts (100% detection). **Acceptance (v2.0):** Cortex churn test — 100-host Cortex, 10% host turnover/week for 4 weeks, with 3 planted adversarial hosts; detection latency ≤ 1h median, blast radius ≤ 5 peers, recovery ≤ 24h with no human intervention beyond alert ack. TOFU-pin-conflict resolution: deterministic policy or escalation-to-operator (not silent split-brain).
+
+**Risk 6 — Kernel-itself trust dependency.** Mitigations: kernel is small (LOC ceiling testable), OSS (license check testable), replaceable (compatibility-promise-testable). **Acceptance (v0.1):** kernel ≤ 15 KLOC excluding tests; capability-registry fuzz coverage ≥ 80% line, ≥ 60% branch, zero crashes on 1M-iteration libFuzzer run; zero `unsafe` blocks in capability-validation path. **Acceptance (v1.0):** external pen-test report with zero P0/P1 findings open at ship; capability-token TOCTOU test passes (100% of capabilities re-validated at use against current state).
+
+**Risk 7 — Provider lock-in / concentration risk.** Mitigations: pluggable provider drivers (ADR-005); CLI-wrapper Spirits enable provider parallelism; v2.0 adds local-LLM and air-gapped provider parity. **Acceptance (v0.5):** ≥ 3 LLM providers tested in CI as drop-in replacements (Anthropic + OpenAI + local-LLM via Ollama).
+
+**Risk 8 — Data residency violation (multi-region deployments).** Mitigations: per-region capability scoping; provider endpoint locks; A2A consent envelopes can include region-policy fields. **Acceptance (v1.0):** corpus of 100 cross-region operations, 100% of operations attempting region escape rejected with typed `ERegionLockViolation`.
+
+**Risk 9 — LLM jailbreak via adversarial input (paste-into-context) [Murat-added].** Mitigations: input provenance tagging at IAC frame creation (every Worker-readable input frame carries a `source_class` field — `human-typed`, `tool-response`, `peer-spirit`, `web-fetched`, `file-read`); intent-vs-source mismatch detection (a Worker that emits `task.assign` with a higher-than-source-class intent triggers human-in-the-loop); epistemic halt on adversarial-intent indicators. **Acceptance (v1.0):** prompt-injection corpus of 100 known attack patterns (paste-into-system-prompt, indirect-injection-via-tool-output, role-confusion); ≥ 95 detected pre-action by intent-mismatch + halt; remaining ≤ 5 detected post-hoc by Transparency Log within 24h. Human-in-the-loop bypass-rate < 5% measured on 500 production interactions.
+
+**Risk 10 — Capability-token leak via logs / digests / distillates [Murat-added].** Mitigations: pre-write secret-pattern redaction filter at the Transparency Log boundary (universal to all logged frames); §9.5 fifth metric `digest-secret-leakage = 0%`; I12 privacy refinement (separate ADR — decision-context frame_ids are themselves opaque references; the kernel does NOT cross-reference them with capability tokens that the requesting Spirit lacks read access to). **Acceptance (v0.1):** 10⁵-case planted-secret corpus with API keys / capability tokens / private-key bytes; pre-write filter must catch 100%; any false negative is a P0 ship-blocker.
+
+**Risk 11 — Provider supply-chain compromise [Murat-added].** Mitigations: response cross-validation across providers for high-stakes decisions (Orchestrator may dispatch the same task to two Workers on different providers and compare digests for divergence); provider-driver integrity checks at MAOS startup (signature verification on the provider SDK package); telemetry stream emits provider-fingerprint per LLM call. **Acceptance (v1.5):** for Spirits configured with `cross_validation_required = true` (high-stakes class), divergence between provider responses triggers epistemic halt; corpus of 50 stress-tests with one provider returning corrupted output, halt fires in ≥ 48/50.
+
+**Loom poison-pattern attack — explicitly deferred.** Loom-tier supply-chain and poison-pattern threats are tracked in a separate v2.0 threat-model document (`loom-threat-model.md`, drafted at v1.5 alongside Loom-lite). v0.1 / v1.0 do not address Loom-tier threats because Loom is not yet load-bearing; deferred is not silent.
+
+### Cross-domain inheritance check
+
+| Inherited domain | What we cover | What we defer |
+|---|---|---|
+| **Scientific computing** (reproducibility, validation) | Reproducible builds, signed Spirits, eval results, Transparency Log replay, halt-as-explainability, ComplianceClaim attestation chain | Cross-Spirit-version replay (Spirit ABI N-1 compatibility — §14 #4) |
+| **Developer tooling** (SDK, framework, polyglot) | Spirit dev SDK, three Spirit forms, filesystem-discovered skills, Spirit registry, ACP/MCP/A2A, four-protocol commitment | Mobile-developer-experience surfaces (deferred to v2.0) |
+| **Enterprise security** (audit, trust tiers, sandboxing) | Audit retention, sandbox tiers, capability mediation, secret pass-through, mTLS A2A, vetting attestations, role-distinct query primitives, ComplianceClaim, pluggable crypto trait | OIDC/SAML, PDP integration, SIEM export, FIPS/NIAP modules (all v2.0+) |
+| **Agent infrastructure** (substrate-unique) | Epistemic halt as Layer-1, distillation audit-chain, decision-context recording, typed-intent consent, kernel statelessness, token-budget accounting (ADR-016), hot-swap state-transfer wire format (ADR-017), `ContextPressure`/`RateLimited`/`DigestPending`/`NetworkPartition` typed frames | Adversarial-Spirit threat model details (continues in Step 10), Loom threat model (separate v2.0 doc) |
+
+## Innovation & Novel Patterns
+
+### Detected Innovation Areas
+
+The substrate-not-product framing is the **thesis** the innovations below collectively prove — not itself an innovation. Postgres, SQLite, Linux, K8s all describe themselves as substrates; the framing is shared aspiration across serious OSS infrastructure. What makes MAOS' substrate claim mechanically defensible (rather than rhetorical) is the integration of seven load-bearing primitives — six runtime/protocol/audit, one governance — under one set of invariants enforced uniformly across the kernel. Each primitive carries explicit prior-art citation; novelty claims are scoped to "first agent runtime to..." rather than the broader "first..." that wouldn't survive a capability-systems reviewer.
+
+**1. Empty-kernel invariant operationalized (Invariant I9 made structural).** *The architectural keystone the other six depend on.* The kernel stores no patterns (Loom is user-space per ADR-006), no secrets (pass-through to OS keyring, never persisted), no skills (filesystem-discovered per Step 5, kernel hosts no registry), no Spirit memory beyond capability-token state, and no learned behaviors. **Novelty:** every prior agent runtime in the cohort survey accumulates state in the controller — prompts, memories, learned patterns, retrieval indexes. MAOS commits to *intentional kernel emptiness* and pushes all of that into Spirits and overlays. This is the reason ComplianceClaim is meaningful, Spirit portability is meaningful, and the substrate posture is mechanically defensible. **Prior art:** seL4's microkernel minimality discipline and the L4 family more broadly; Mach's externalized policy. **Differentiation:** seL4 minimizes the trusted computing base; MAOS minimizes the *stateful* computing base for a specific class of system (agent runtimes that would otherwise drift toward stateful controllers).
+
+**2. Epistemic halt as Layer-1 kernel capability.** When a Spirit's evidence is insufficient or contradictory, the kernel exposes a structured halt; the user resolves with `provided_context`, `accepted_halt`, or `authorized_override`. Per-tag epistemic policy (verbalize / flag / halt) keeps the halt rare without losing recall on critical signals. **Novelty:** first agent runtime to expose "I don't know" as a kernel-mediated outcome with a typed resolution surface and per-tag policy. Database `RAISE EXCEPTION`, OS `EAGAIN`/`EINTR`, and Erlang OTP supervisors are all let-it-crash variants — none are epistemic halt at the agent-runtime layer. **Prior art:** Anthropic prompt-level "ask the user" conventions; OpenAI's `function_call: null`; uncertainty-aware control-flow research (literature pass pending before final lock). **Differentiation:** prior runtimes collapse epistemic uncertainty into a refusal-string or a confidence-weighted continuation; MAOS makes it a kernel event with a structured resolution path bound to I3 (auto-response marking), I7 (telemetry broadcast), and the Approval Decision Log.
+
+**3. Substrate-level distillation pattern with kernel-enforced audit chain.** **Frame this as a theorem:** *given Invariants I11 (audit-chain) + I12 (decision-context recording), a legibility attack on a digest is mechanically detectable in O(1) per decision via digest-to-raw hash divergence and decision-context replay.* The five-metric ship gate (digest-recall ≥ 0.90, faithfulness ≥ 0.98, hedge-preservation ≥ 0.95, traceability = 100%, secret-leakage = 0%) makes the property verifiable at runtime. **Novelty:** first agent runtime to distinguish *legibility* (the digest the agent reasons over) from *audit* (the raw the auditor inspects), and the first to make both kernel-mediated. Components are borrowed (Postgres WAL since 1990s, content-addressed storage from Git/IPFS, structured-output gating from constrained decoding); the composition under I11+I12 with mechanical legibility-attack detection is the invention. **Prior art:** WAL+MVCC, in-toto attestation, accountable-systems literature (Weitzner et al. 2008). **Differentiation:** prior systems either show the agent the raw stream (legibility attack vector) or show it a summary with no kernel-enforced link to raw (unauditable). MAOS structurally rejects both failure modes.
+
+**4. ComplianceClaim as runtime-context attestation primitive.** Ed25519-signed envelope binding (manifest hash + version + trust tier + sandbox tier + capability scope + provider-endpoint pinning + crypto-provider identity) into a single attestable subject. Third parties sign; the kernel verifies at admission and refuses Spirits whose runtime context drifts from the attested context. **Novelty:** first agent runtime to import the attestation discipline from the supply-chain world into the agent-runtime world, where it has been conspicuously absent. **Prior art:** TPM/TEE remote attestation (TCG spec since 2003); SLSA, in-toto, Sigstore for supply-chain provenance; accountable-systems literature (Weitzner, Feigenbaum 2008). **Differentiation:** prior attestation primitives attest to *artifact* provenance (this binary was built from this source); ComplianceClaim attests to *runtime agentic context* (this agent, in this scope, on this provider, was certified for this use case). The kernel's runtime verification is what makes the claim falsifiable rather than marketing copy.
+
+**5. Typed-intent A2A consent (ADR-012).** Cross-Spirit consent is `(peer-identity, intent-class)`, not `(peer-identity)`. A read-only Spirit cannot pass a payload to a writeable Spirit that, when interpreted, causes a write the read-only Spirit was forbidden from. Extended in I13 (ADR-018) so digests carry `intent_lineage` and the consent envelope survives the §9.5 distillation boundary. **Novelty:** first agent runtime to operationalize capability-attenuated consent at the A2A boundary, treating Lampson's confused-deputy problem as a first-class concern rather than an emergent bug. **Prior art (cited explicitly):** Hardy's 1988 confused-deputy paper; the EROS/KeyKOS/Capn'Proto capability-systems lineage; the broader capability-theory tradition (capabilities-as-pure-pointer-tickets going back to the 1970s). **Differentiation:** the cohort survey treats inter-agent communication as channel-consent (talk-or-not), inheriting the confused-deputy problem the moment payloads can encode actions. MAOS recognizes that agent payloads are programs over the receiver's authority, and consent must be over the program's intent.
+
+**6. Skill-package overlay model for heterogeneous CLI Spirits (ADR-014/015).** Worker Spirits are unmodified agent CLI processes (Claude Code, opencode, gemini-cli, kimi-cli) with two skill packages loaded — a universal `maos-bridge` skill connecting via existing protocols (kernel-internal IAC / A2A / ACP / MCP per topology), and a persona skill defining the role. Skills are filesystem-discovered, loaded by name on the Orchestrator's instruction. **Novelty:** first agent runtime to make heterogeneous CLI Spirits a *first-class form*, exploiting the existing MCP capability of every target CLI without writing per-CLI Rust wrapper crates. The novel mechanism is the skill-package contract; the wrapping pattern itself is paperclip's. **Prior art (cited):** paperclip's CLI-as-subprocess-worker pattern; Unix philosophy (small composable tools sharing a substrate). **Differentiation:** paperclip's pattern was project-specific; MAOS generalizes via a kernel-mediated `task.assign` typed-intent IAC primitive that lets any MCP-capable CLI participate as a Worker Spirit by installing two skill packages. *Faithful application of Unix philosophy to LLM CLIs is a strength, not a weakness.*
+
+**7. Constitutional substrate evolution (governance category).** *Mary's contribution; an innovation category the runtime list missed.* The kernel commits in writing to which extension surfaces exist (Spirits, skills, ComplianceClaim issuers, the four committed protocols) and what it takes to add a new one. Vetter trust model + ComplianceClaim chain + the "no fifth protocol unless..." constitutional commitment + cohort-interop posture together constitute a governance primitive. **Novelty:** first agent runtime to publish substrate-evolution rules as part of the substrate contract. **Prior art (cited):** Linux de facto governance (Linus + LKML + stable-ABI rule); K8s KEPs + SIGs; IETF RFC process; W3C consortium model. **Differentiation:** the cohort survey's agent runtimes are products with roadmaps, not substrates with constitutions. MAOS' constitutional evolution rules are the thing that makes "substrate-not-product" credible long-term — without it, any feature that breaks a Spirit erodes the substrate posture.
+
+**Plus three architectural inventions worth surfacing at integration-coherence level:**
+
+- **Integration coherence as load-bearing.** The fourteen invariants (I1–I14) are enforced uniformly across capability mediation, IAC, transparency log, approval surface, hot-swap, sandbox, distillation, decision context, intent provenance, halt continuity. **The unfair advantage**: a hyperscaler can ship any individual invariant in a quarter, but cannot ship the integration coherence without redesigning their architecture against the invariant set. Test: can a reviewer point to any of the fourteen and find a subsystem that violates it? If no, the claim is real.
+- **Four-protocol no-invention commitment.** "We use kernel-internal IAC + A2A + ACP + MCP and invent zero new wire protocols. A fifth protocol requires (a) a use case unsatisfiable by IAC + adapter, (b) a new ADR, (c) demonstration that adding the protocol does not violate kernel-stays-small." **Architectural restraint as a feature** in a field that ships a new protocol per quarter.
+- **Hexagonal-actor dual decomposition (ADR-010 ⊥ ADR-011).** Static-structure-via-ports-and-adapters orthogonal to runtime-structure-via-supervised-actors. Probably not primitive-level novel — someone has done it — but worth surfacing as the structural backbone that lets the kernel scale across implementation choices without violating the invariant set.
+
+**Plus two internal mechanisms (less load-bearing for narrative; honest framing):**
+
+- **Token-budget accounting (ADR-016) — cloud-cost FinOps with kernel enforcement.** Not "OS memory analog." The kernel accounts for a resource it doesn't own (LLM tokens are priced and consumed by the provider, not the kernel). Closer to FinOps than to memory accounting. Novelty: first agent runtime to make context-token budget a kernel-mediated concern with typed `ContextPressure`/`ContextLimit`/`EContextExhausted` frames.
+- **Hot-swap CBOR + per-class versioned schema (ADR-017).** Not a novel wire format. Erlang OTP's `code_change/3` callback has done versioned state migration during hot code-load since the 1990s. CBOR is RFC 8949. Per-class schema versioning is every protobuf shop. The *novelty* is hot-swapping a Spirit (model + system-prompt + tool-set) mid-session with bounded state transfer, an agent-runtime concern Erlang never had.
+
+### Market Context & Competitive Landscape
+
+The agent-runtime landscape in 2026 splits into four classes (the original three "failed answers" plus an emerging substrate-shaped category at the tool-call and graph-orchestration layers):
+
+| Class | Examples | Substrate position relative to MAOS |
+|---|---|---|
+| **Vendor-monolithic** | Claude Code, Cursor, ChatGPT app, Copilot | Agent + runtime ship together; closed; no third-party agents; structural incentive against MAOS-compatibility |
+| **Cobble-it-yourself** | LangChain (legacy), AutoGen (legacy), prompt-driven shell scripts | Substrate is whatever you assembled; durable transparency log absent; no capability tokens; MAOS replaces this layer |
+| **Roll-your-own kernel** | openclaw, ironclaw, hermes, paperclip, rustain, codex | Excellent within scope; doesn't generalize; trust is project-promise; MAOS is the layer they could share |
+| **Substrate at adjacent layers** | Anthropic MCP (tool-call layer); LangGraph, AutoGen v2 (graph-orchestration layer) | Aspiring substrates above MAOS' kernel + trust layer; complementary, not competitive — MAOS is the layer beneath them |
+
+MAOS positions in the **kernel + trust** layer (this PRD's working competitive frame, retained from earlier steps): the trusted runtime under which third-party autonomous agents execute. The reference class is OSS infrastructure (Linux / Postgres / Kubernetes / Apache HTTPD); the bet is that "substrate-too-early" by commercial measure is "substrate-just-in-time" by ecosystem measure (per Step 2c). An alternate framing — "agent-ecosystem-trust-anchor" in the Mozilla-CA / IETF / W3C reference class — was raised by John in Step 6 party mode and **routed to Step 8 (Scoping) as an explicit alternative-framing carry-forward**. The choice between the two frames affects which innovation is the spear tip (substrate framing → empty-kernel + the integrated set; trust-anchor framing → ComplianceClaim alone). Final lock by v0.3 per Step 2c carry-forward.
+
+**Observable competitive validation signals:**
+
+- **2026 Q4 onward:** any cohort project (openclaw / ironclaw / hermes / paperclip / rustain / codex) integrating MAOS as their substrate or interoperating via ACP/MCP/A2A. First cohort interop is a v1.0 success criterion.
+- **2026 H2 (alternative early signal — John's contribution, retained):** first auditor or regulator references a MAOS Transparency Log frame (or ComplianceClaim) in a published finding. Sharper, earlier indicator under trust-anchor framing.
+- **2027:** vendor-monolithic competitors adding "MAOS-compatible" mode (export action history as MAOS Transparency Log frames; accept MAOS skill packages). Substrate-crystallization signal under the OSS-substrate framing.
+- **2028:** established certification body issuing first ComplianceClaim against a third-party Spirit running in MAOS T2 sandbox at public-vetted tier. Compliance-as-product validation.
+
+### Validation Approach
+
+Each innovation has falsifiable validation methods. Per Murat's Step 6 testability audit, every cell below is either rigorous (corpus-based with floors), structural (kernel-enforced, mechanically verifiable), or explicitly anecdotal-by-design (where N=1 partner adoption is the validation goal). Cells flagged "anecdotal" are program-risk; alternative synthetic protocols are provided where they exist.
+
+| Innovation | v0.1 validation | v1.0 validation | v2.0 validation |
+|---|---|---|---|
+| **1. Empty-kernel invariant** | Kernel LOC ceiling ≤ 15 KLOC excluding tests; capability-registry fuzz coverage ≥ 80% line / ≥ 60% branch with zero crashes on 1M-iteration libFuzzer; zero `unsafe` blocks in capability-validation path; **structural test:** every state-bearing field in kernel source documented and audited against I9 ("kernel stores no patterns"). | External pen-test report with zero P0/P1 findings open at ship; capability-token TOCTOU test passes (100% re-validation at use). | **FKCS — Frozen-Kernel Conformance Suite (Murat).** Tag commit `kernel-frozen-v2.0`; external Spirit authors (no kernel-repo commit history) implement Negotiator/Tutor/Wet-Lab against published ABI documentation only; floor ≥27/30 success per Spirit, ≥85/90 aggregate; diff oracle (third-party certifier) asserts `git diff kernel-frozen-v2.0..at-test-time` is empty for `kernel/` and `abi/`; negative-control "fourth Spirit" uses an undocumented kernel internal and MUST fail FKCS or the test has no teeth. |
+| **2. Epistemic halt** | Halt mechanism functional in Architect Spirit; resolution paths complete; **structural test:** halt frame schema validates; per-tag policy parser covers all five action types. | Halt-recall ≥ 0.7 and halt-precision ≥ 0.85 per Spirit class on `bmad-eval` standard corpus, published in registry. **Literature-pass deliverable:** Winston-led prior-art review of 2024–2026 uncertainty-aware-control-flow research before final novelty-claim lock. | Halt patterns adopted as a published standard; cohort projects citing the per-tag epistemic-policy schema. |
+| **3. Distillation pattern (frame as theorem)** | Five-metric gate passes on Orchestrator + 100-case calibration corpus + 10⁵-case secret-leakage corpus. **Structural property:** given I11+I12, legibility-attack detection is O(1) per decision via digest-to-raw hash divergence — verified by reference test suite. | Five-metric gate passes on all distillation-shipping reference Spirits; kernel I11+I12 enforcement validated by external pen-test (pen-tester quality bound: ≥3 pen-testers from different organizations). **Canary system (Murat):** quarterly 20% corpus rotation; production canaries 1000 unique synthetic secrets/month with cryptographic markers, cross-Spirit canaries 100/month; floor 0 canary leaks/month; ≥1 detected → distillation pipeline halts (real halt) until root-caused; discovery-latency floor ≤24h p95. | Multi-hop distillation chain audit (audit-Spirit walks digest → raw across Cortex hops); divergence detection automated; intent_lineage propagation verified per I13. |
+| **4. ComplianceClaim** | Envelope schema specified in architecture; admission-time verification implemented; **structural test:** `ComplianceClaim` parser validates well-formed envelopes (schema conformance test corpus). | **CCAC — ComplianceClaim Adversarial Corpus (Murat).** N=500 synthetic claims: 200 well-formed (≥199/200 admitted, FPR ≤ 0.5%); 200 malformed across 10 violation classes (≥196/200 rejected, ≥18/20 per class); 100 context-drift claims (100/100 rejected with drift-specific error code). Cross-validation across ≥3 reference Spirits, agreement within ±2% per metric. Reproducible CI gate, no pilot-partner dependency. | First third-party ComplianceClaim issued against a reference Spirit by an accredited assessor (anecdotal milestone, partner-dependent — pilot-partner version stays as v2.0 real-world signal); public registry of ComplianceClaims; ≥3 certification bodies issuing claims. |
+| **5. Typed-intent consent + I13 intent-lineage** | ADR-012 implemented; A2A frames carry typed `intent` field; receiver consent allowlist enforced. **Structural test:** I13 enforced — every digest write rejected without `intent_lineage`; consumer admission rejected when `intent_lineage ⊄ allowed-promotion-set(Y)`. | Adversarial-Spirit red-team corpus: 50 attacks (widening intent post-consent, chaining consents, capability forgery, halt-side-channel, log-evasion-via-timing). Floor: ≥48/50 detected pre-action by typed-intent consent; remaining ≤2 detected post-hoc within 24h; zero undetected at 30-day audit. **Plus I13 cross-innovation test (Murat):** 200 synthetic distillation traces, 80 mixed-intent, 40 consent-laundering attempts; floor 40/40 detected and rejected, 0 false rejections in 120 well-formed cases. | Typed-intent vocabulary published as community-evolved standard; cohort projects adopting the consent shape (sociological signal, not engineering metric). |
+| **6. Skill-package overlay (CLI-wrapper Spirits)** | Orchestrator + claude-code-Worker reference deployment runs Lunarpulse's Epic-7 BMAD loop end-to-end. **De-risk dependency:** ensure MAOS works on at least one fully-open CLI agent (codex-class) before betting on closed CLIs (John's pushback — vendor incentive to close hooks is a real risk). | Multi-CLI Worker parallelism (claude-code + opencode + gemini-cli + at least one open codex-class CLI) on same epic; provider parallelism is structural. **Plus ComplianceClaim × CLI-drift test (Murat):** 100 claims across `claude-code@1.4.x` patches → ≥99/100 valid; cross-minor bumps → 100/100 auto-rejected; drift detection ≤1 cycle on 100/100 synthetic upgrades. | Public skill registry (separate from Spirit registry) with ≥20 community-authored bridge skills; if vendor-closes-hooks scenario materializes, native Spirit Wire Protocol implementation per CLI is the v2.0 fallback (ADR-014 alternative path). |
+| **7. Constitutional substrate evolution (governance)** | Vetter trust model documented; "no fifth protocol unless..." commitment in architecture; bounded-extension governance rules published. | First externally-issued vetting attestation against a public-untrusted Spirit promotes it to public-vetted; revocation latency median ≤ 60s, p99 ≤ 5min; conflict-resolution semantics tested with 10 synthetic two-vetters-disagree scenarios. | Cohort-interop demonstration: ≥1 cohort project formally citing MAOS substrate-evolution rules in their own contribution model. |
+
+**I14 cross-innovation test (Murat — hot-swap × halt continuity):** 50 hot-swap scenarios with non-empty halt sets, mixed across drain-eligible and migration-required. Floor: 50/50 either drained before swap OR migrated cleanly with halt-protocol-compatibility verified; 0 dropped halts; 0 successor-confusion events (defined as: successor responds to halt with a resolution that doesn't match the halt's declared resolution schema). v0.5 ship gate when hot-swap and halt both ship.
+
+The most expensive validations are #4 v2.0 (pilot partner showing up) and #5 v2.0 (community-evolved-standard adoption — sociological). Both are tractable; both are deferred from earlier-phase ship gates per Murat's "kill the pilot dependency" reframe — CCAC at v1.0 makes ComplianceClaim's primitive ship-gate testable without external dependencies.
+
+### Risk Mitigation
+
+For each innovation, the failure mode and the fallback:
+
+| Innovation | Failure mode | Fallback |
+|---|---|---|
+| **1. Empty-kernel invariant** | Kernel state creep over time (a feature lands that requires kernel-side accumulated state) | Every kernel-state addition requires an ADR explicitly amending I9, with explicit rationale why the user-space alternative was rejected; reviews block silent state addition. The invariant is the load-bearing constraint — its erosion is treated as an architecture incident. |
+| **2. Epistemic halt** | Halt over-triggers (precision < 0.85 → users disable halt) or under-triggers (recall < 0.7 → hallucination still leaks) | Per-tag epistemic policy gives operators per-Spirit knobs; failure-bound v0.5 ship gate (halt-precision floor) blocks ship until over-triggering is fixed. If a Spirit class genuinely cannot meet the floor, it ships with `default_action = "verbalize_only"` and a documented limitation. |
+| **3. Distillation pattern** | Five-metric gate fails on real workloads (digest-recall < 0.85 in production despite passing in calibration); canary system detects production leaks | Mandatory raw-recall on any decision frame; ship-with-warning state for Spirits in 0.85–0.90 zone; canary detection halts the distillation pipeline; fallback to "all results in active context, accept context-window failures" pattern for distillation-failing Spirits while the gate is fixed. |
+| **4. ComplianceClaim** | No certification body adopts the envelope format; remains substrate-only with no third-party signers; or vendor-closes-hooks scenario invalidates the runtime-context fingerprinting | The internal audit / DPO / CISO surfaces (Mary's role-distinct queries from Step 5) still serve internal compliance even without external attestations; ComplianceClaim becomes optional but the binding primitive remains for self-attestation in regulated enterprises. CLI-drift mitigated by patch-level fingerprint with explicit invalidation-on-minor policy. |
+| **5. Typed-intent consent + I13** | Confused-deputy gap closed at consent layer leaks at Spirit-layer (a Spirit asks the human to widen intent; human rubber-stamps); intent_lineage propagation has implementation bugs | Human-in-the-loop bypass-rate < 5% becomes a v1.0 NFR ship gate; intent-vs-source mismatch detection (Step 5 Risk 9) layers underneath; epistemic halt on adversarial-intent indicators is the third layer; I13 enforcement is structurally verifiable (digest writes without `intent_lineage` rejected by kernel). |
+| **6. Skill-package overlay** | Target CLI's MCP/hook surface degrades or is removed (vendor-closes-hooks scenario — John's risk) | Per-CLI native Rust wrapper crate is the v2.0 fallback (ADR-014 alternative `(a)`); native Spirits implementing Spirit Wire Protocol directly remain the v2.0+ path for Spirit classes whose runtime needs to be MAOS-native. v0.5 de-risk: prove out the substrate on codex-class fully-open CLI alongside Claude Code. |
+| **7. Constitutional substrate evolution** | Substrate-evolution rules are violated (a kernel feature lands that breaks a Spirit without going through the documented ADR + revisit-trigger chain) | Treat as an architecture incident; require post-hoc ADR + Spirit-author migration support; document the rule violation in the Open Questions section; community-vetting board can flag breaches. The invariant is the substrate's governance promise — its erosion is treated like Linux's stable-ABI rule violations (rare, high-cost, repaired). |
+
+### Carry-Forward to Step 7 — Failure Semantics Gap (Mary)
+
+The Step 6 innovations cover *uncertainty* (epistemic halt) but NOT *failure* — Spirit crashes, partial-result recovery, cohort-state divergence after a network partition. Every prior OS substrate has a failure-semantics story (Erlang's let-it-crash, K8s reconciliation loop, Linux OOM killer); MAOS' is currently distributed across I10 (lifecycle journaling) and ADR-011 (Tokio actor supervision) without a unifying primitive named as innovation. **Carry forward to Step 7 (Project Type Analysis):** evaluate whether failure semantics warrants its own innovation slot or stays as a kernel-mechanism backbone. If the former, expect a new ADR + invariant pair; if the latter, document the integration of I10 + ADR-011 as the substrate's failure-semantics story.
+
+### Deferrals and Routing
+
+- **Trust-anchor competitive reframe (John):** routed to Step 8 (Scoping) as an alternative-framing carry-forward. Choosing OSS-substrate vs trust-anchor frame affects which innovation is the spear tip. Final lock by v0.3.
+- **Literature pass on epistemic halt prior art (Winston):** before final novelty-claim lock. If 2024–2026 academic work on uncertainty-aware control flow already operationalizes what MAOS does at the kernel level, soften the claim further; otherwise hold.
+- **Loom poison-pattern threat model:** explicitly deferred to v2.0 threat-model document (per Step 5 routing).
+- **Adversarial-Spirit threat model:** continues into Step 10 (NFRs) with STRIDE-style attack narratives.
+
+## Developer Tool Specific Requirements
+
+MAOS' primary classification is `developer_tool` (per Step 2). The substrate's customers are *Spirit authors, kernel implementers, and operators*. Secondary traits — `cli_tool` (`maosctl`), `api_backend` (ACP server, A2A peer, control-plane HTTP, MCP outbound), `desktop_app` (one Host process per machine) — surface as integration concerns, not primary product shape. This section pulls the developer-tool-specific commitments scattered across the architecture and implementation guides into a single PRD reference, plus the operational, testing, and documentation commitments needed to ship a substrate-class OSS developer tool credibly.
+
+### Project-Type Overview
+
+The Spirit-author-as-customer relationship is load-bearing. The substrate's value compounds when third-party Spirit authors can ship Spirit binaries independently of the MAOS source tree, in any language, signed, with capability scopes and trust tiers verified at install. Two adjacent customer relationships sit alongside:
+
+- **Kernel implementer** — the Rust developer building the `maos` binary itself. Audience for `maos-kernel-implementation-guide.md`.
+- **Operator** — the person running MAOS on a Host. Audience for `maosctl` and the deployment-topology docs.
+
+The three customers share Spirit ABI as the contract; they diverge on tooling needs.
+
+### Language Matrix
+
+Three Spirit forms over the v0.1 → v1.0 → v2.0 timeline (per ADR-007):
+
+| Form | Phase | Languages | Toolchain | Reference |
+|---|---|---|---|---|
+| `rust-inproc` | v0.1+ | Rust only. Spirit binary linked into kernel binary. | `cargo build` against `maos-spirit-sdk`. | `spirit-development-and-sharing.md` §4.1 |
+| `subprocess` (incl. CLI-wrapper Spirits per ADR-014/015) | v0.5+ | Any language with a Spirit Wire Protocol implementation. Reference SDKs: Rust (canonical), TypeScript (v0.5), Python (v1.0), Go (v1.5+). For CLI-wrapper Spirits: any agent CLI process loaded with `maos-bridge` + persona skills. | Spirit-author's preferred toolchain; `spirit-test` SDK harness. | `spirit-development-and-sharing.md` §4.2; ADR-014, ADR-015 |
+| `wasm-component` | v2.0+ | Any WASM Component Model language: Rust, C/C++, JS/TS (Jco), Python (componentize-py), Go (TinyGo). | `cargo component` or language-specific component-model toolchain. | `spirit-development-and-sharing.md` §4.3; ADR-007 |
+
+**Cross-form portability commitment.** Same crate, three feature flags, shared core: `cargo build --features=form-{rust-inproc,subprocess,wasm-component}` — author writes against `Spirit` once, form glue is feature-gated. *Capability scopes are not portable*: a Spirit calling `std::process::Command` builds under `subprocess` and `rust-inproc` but is rejected by the `wasm-component` build at compile time. Manifest declares `forms = ["subprocess", "rust-inproc"]` if WASM is impossible; the registry refuses WASM builds for that class. Don't promise three-form portability as default — promise *form-explicit* portability where the author opts into the forms they support, and `spirit-test` is the source of truth.
+
+Skill packages are markdown + frontmatter — language-agnostic by design. Bridge skills require no per-language compilation.
+
+### Installation Methods
+
+**Kernel (`maos` binary):**
+- v0.1: source build (`cargo install --path crates/maos-bin`); Linux + macOS only.
+- v0.5: pre-built binaries for Linux (amd64, arm64) and macOS (arm64) via GitHub Releases. SHA256 + Ed25519 signature verification mandatory.
+- v1.0: Homebrew tap, AUR (Arch), Debian/Ubuntu deb, RHEL/Fedora rpm. Container images on Docker Hub / GHCR. Windows binary at v1.5.
+- v2.0: official Linux distro packages (Debian/Ubuntu main, Fedora repo). One-line install script (`curl install.maos.dev | sh`) for the founder-loop demo.
+
+**Spirits:**
+- Reference Spirits ship with the `maos` binary.
+- Third-party Spirits install via `maosctl install <spirit-id>[@version]`. Per ADR-008: MCP-Streamable-HTTP call to the Spirit registry; Ed25519 signature verified; trust-tier floor enforced (ADR-009); ComplianceClaim verified at admission (ADR-015 / Step 5); manifest validated.
+- Custom Spirits load from local filesystem (`maosctl install --from-path ./my-spirit/`).
+
+**Skills:**
+- v0.1–v1.0: filesystem only; conventional locations (`~/.maos/skills/`, `_bmad/skills/`, `/usr/share/maos/skills/`).
+- v2.0: optional skill registry, separate from Spirit registry, content-addressed with Ed25519 signing.
+- BMAD skills (`bmad-create-story`, `bmad-dev-story`, `bmad-code-review`, etc.) work as-is — no MAOS-specific port required.
+
+**Agent CLIs (Worker Spirits):** brought in via existing distribution — `npm install`, `pip install`, `brew install`. MAOS does not redistribute or vendor agent CLIs.
+
+### Spirit Lifecycle — install, upgrade, yank, uninstall, revoke
+
+A first-class commitment: every install verb has a documented inverse and a kernel-side enforcement story. The substrate's install promise obligates the substrate's revoke promise (Mary's launch-day-embarrassment gap).
+
+| Verb | Trigger | Kernel behavior | Effect on running instances | Effect on claims/audit |
+|---|---|---|---|---|
+| **install** | `maosctl install <spirit-id>[@version]` | Pull from registry → verify signature → verify ComplianceClaim envelopes if present → enforce trust-tier sandbox floor → register Spirit class in local index | None (this is admission, not instantiation) | None |
+| **upgrade** | `maosctl upgrade <spirit-id>[@version]` | Pull new version → verify → if running instances exist, defer to `maosctl swap` (hot-swap with ADR-020 migration policy applied) | Hot-swap per ADR-017/020/I14; running instances migrate or drain | Outstanding ComplianceClaims re-verified against new runtime context (ADR-015); migrate forward if compatible, halt if drift detected |
+| **yank** | Registry author marks version withdrawn (publication event) | Kernel polls registry every 5 min for yank events; on yank, emits typed `SpiritYanked{spirit-id, version, reason}` to operator surface; **does NOT auto-stop running instances** | Instances continue running unless operator explicitly stops; operator notification is mandatory | Audit log records the yank event with timestamp and reason |
+| **uninstall** | `maosctl uninstall <spirit-id>[@version]` | Remove from local index; refuse if running instances exist (force flag required: `--force`); refuse if outstanding ComplianceClaims (review flag required: `--orphan-claims`) | Operator must stop instances first (or use `--force` with explicit confirmation) | Outstanding ComplianceClaims become orphaned and tagged as such in the Approval Decision Log; audit trail preserved (Spirit history not deleted) |
+| **revoke** | Operator-issued or registry-issued *trust event* (signed, dated, distributable offline) | Kernel honors revocation list (CRL-shaped artifact: `(spirit-id, version, revocation-key, reason, ts)` signed with operator or distributor key); on revocation, **immediately blocks new instantiation and emits typed `SpiritRevoked` to all running instances** | Running instances receive `SpiritRevoked` and follow declared policy: `terminate-immediately` (default for security) / `drain-then-terminate` (configurable per Spirit posture) / `quarantine` (running but no new tool calls) | Audit log records the revocation event with full chain |
+
+**Signed Revocation List (CRL artifact).** v1.0 ships with two distribution paths: (a) registry-pushed (kernel polls registry's `/revocations` MCP endpoint every 5 min); (b) offline-import (`maosctl revocations import <bundle.crl>` for air-gapped deployments). CRL signing follows the same Ed25519 chain as Spirit signing; operator can pin trusted revocation signers.
+
+**The yank vs revoke distinction.** Yank is a registry-side publication event (the registry will not serve this version to fresh consumers); revoke is a kernel-side trust event (the kernel will not run this version on this Host regardless of where it came from). They are different artifacts with different signing chains. The PRD commits to both.
+
+**Substrate Operations Checklist** (Mary's organizing line):
+
+| Concern | Owner | Target version | Artifact |
+|---|---|---|---|
+| Install/upgrade UX | core team | v0.1 | `maosctl install` + tests |
+| Yank notification | core team | v0.5 | Registry polling + operator notification |
+| Uninstall semantics | core team | v0.5 | `maosctl uninstall` with claim-check guards |
+| Signed revocation list | core team | v1.0 | CRL artifact spec + distribution paths |
+| Audit query / SIEM export | core team | v1.0 (basic), v2.0 (signed export) | `maosctl audit query` + sealed-export |
+| Telemetry opt-out | core team | v1.0 | Opt-in default + `PRIVACY.md` + per-field redaction layer |
+| LTS window | maintainer team | v1.0 announcement | `STABILITY.md` + LTS branch policy |
+| Namespace grammar | architecture | v0.5 | New ADR (flat vs scoped Spirit names) |
+
+### Namespace Grammar (Mary's gap)
+
+**Commitment:** by v0.5, an ADR locks the Spirit namespace grammar — flat names (`bmad-orchestrator`) vs scoped (`@bmad/orchestrator`, `org.bmad.orchestrator`). Without a grammar, the first publication race decides the namespace forever and trademark / squatting become permanent. Default working assumption: scoped (`@scope/name`) following npm/Cargo convention; final lock in the v0.5 ADR.
+
+### API Surface (Spirit ABI)
+
+Three logical surfaces backed by `maos-spirit-abi` (per `maos-kernel-implementation-guide.md` §3.2):
+
+**1. The `Spirit` trait — kernel calls into Spirit.** Lifecycle hooks: `on_load`, `on_start`, `on_frame`, `on_telemetry`, `on_idle`, `on_swap_in`, `snapshot`, `epistemic_resolve`, `on_pause`, `on_resume`, `on_unload`. Plus, per ADR-020, optional `migrate(predecessor_state)` for cross-major migration.
+
+**2. The `KernelHandle` trait — Spirit calls into kernel.** IAC (`iac.send`/`iac.receive`/`iac.broadcast` with ADR-012 typed-intent consent), Memory (`memory.read`/`memory.write` with I5/I11/I13 enforcement), Capabilities (`capability.invoke`), Provider (`provider.stream`), Log (`log.recall`/`log.fetch` per ADR-013), Halt (`epistemic.halt`), Approval (`approval.request`).
+
+**3. Manifest schema (TOML).** `[class]`, `[capabilities.required]`, `[posture]`, `[output_shape]`, `[explanation_shape]`, `[epistemic_policy]`, `[budget]`, `[skills.search_path]`, `[forms]` (cross-form portability declaration), `[hot_swap]` with `state_schema_uri` + `state_schema_version` (ADR-017), `[halt_protocol_compatibility]` (I14), `[intent_promotion_set]` (I13), `[migrates_from]` (ADR-020), `[swap_invariants]` (HSIS — Murat's gate). Full schema in `architecture-maos.md` §5.1.
+
+### ABI Stability Triple (Winston's commitment; matrix in `STABILITY.md`)
+
+Compatibility is `(kernel_version, abi_version, manifest_schema_version)` — a triple, not a pair. `abi_version` governs the `Spirit`/`KernelHandle` vtable + capability ID space; `manifest_schema_version` governs the TOML surface independently; `kernel_version` is product-facing.
+
+**Rule:** Spirit declares `abi`; kernel adapts down via `Compat` shim; **N-1 supported, N-2 hard refusal** with typed `EAbiTooOld`.
+
+**Deprecation timeline:** 2 minor releases of warning, 1 major to remove. Spirit-side `kernel.deprecation_warnings()` channel surfaces deprecations in `spirit-test`.
+
+**Live matrix:** lives in `STABILITY.md` (separate doc; grows over time without re-approving the PRD). PRD commits to the triple's existence and the N-1/N-2 rule.
+
+### CLI-Wrapper Spirit Specification (Winston's gap; ADR-021)
+
+CLI-wrapper Spirits (Path A migration) use the kernel-builtin `CliWrapperSpirit` class, configured with: CLI binary path; skill bundle (`maos-bridge` + persona skills); **`output_shape_version: "<semver>"`** (ADR-021 — kernel asserts on startup; refuses to start with typed `EOutputShapeAdapterMismatch` if observed != declared); posture declaration (stdio shape, control-channel mechanism, shutdown signal); capability scope mapping; output-shape adapter implementation (registered as `cli-wrapper-template:<cli-name>:<shape-version>` in the Spirit registry); crash semantics (kernel observes EOF on stdio + non-zero exit → `SpiritDied` event journaled; recovery policy declared in wrapper config: `respawn-with-context` / `respawn-fresh` / `escalate`).
+
+**Fail-loud rule:** wrappers cannot fall back to "best-effort parsing" on shape mismatch. Audit drift is the failure mode the substrate cannot tolerate.
+
+**Realistic 30-minute claim:** valid only when a wrapper template for the target CLI already exists in the registry. First-time-wrapping a net-new CLI class (kimi-cli, codex, future CLIs) is **half-day minimum** because the author is also authoring the output-shape adapter. The PRD distinguishes both numbers honestly.
+
+### Hot-Swap Migration Policy (Winston's decision tree; ADR-020)
+
+Four cells keyed on (schema-evolution × persistent-state):
+
+| Schema evolution | No persistent state | With persistent state |
+|---|---|---|
+| Same major, additive | Auto-migrate | Auto-migrate |
+| Same major, breaking | Forbidden (use major bump) | Forbidden (use major bump) |
+| Cross-major, no archives | Swap permitted; predecessor archives refused | N/A |
+| Cross-major, archives present | Migrator Spirit required | Migrator Spirit required |
+
+Manifest field `migrates_from = ["1.x", "2.x"]` declares which predecessor versions a Spirit can hot-swap from. Cross-major migration with persistent state requires a `migrate(predecessor_state) -> Result<successor_state, Error>` entry point. Kernel refuses load with `EMigratorMissing` if predecessor archive exists and no migrator is declared. **Predecessor's historical journal stays in cold storage**, addressed by `(class, version, instance_id)`; successor reads via capability but does not own (preserves I10 across version boundaries).
+
+### Code Examples
+
+Three canonical examples in the Spirit-development guide:
+
+1. **Minimal Rust in-process Spirit** (~40 lines + manifest) — the "30-minute first Spirit" tutorial in §4.1.
+2. **Subprocess Spirit in TypeScript** — Diego's `code-reviewer-pro` (Step 4 J6); demonstrates JSON-RPC over stdio Spirit Wire Protocol, output_shape enforcement, signing for `public-untrusted` registry submission.
+3. **Skill-package overlay** — `developer` + `maos-bridge` skills loaded into a `claude-code` process; demonstrates Pattern A (Bash-invoke external CLI) and Pattern B (direct slash-command).
+
+**Worked example — the founder's epic-7 loop.** End-to-end trace from `@orchestrator run epic-7` through `task.assign` IAC frame routing, Worker Spirit skill loading, distillation pattern execution, halt-on-AC-ambiguity resolution, and morning digest production.
+
+### Migration Guide
+
+Two paths:
+
+**Path A — agentic CLI tool already exists.** Install `maos-bridge` skill + persona skill; configure CLI to start with both loaded; declare `output_shape_version` (ADR-021); register with `maosctl spirit register --form=cli-wrapper`. **30 minutes for CLIs with published wrapper templates; half-day for net-new CLI classes** (output-shape adapter authoring).
+
+**Path B — third-party agentic framework or tool.** `cargo generate maos-spirit --form=subprocess --lang=<lang>`; implement `Spirit` trait or Wire Protocol equivalent; author manifest declaring capability scopes, posture, output_shape, epistemic_policy; run `spirit-test`; publish: `maos-spirit publish --tier=public-untrusted`; iterate to community-vetted via attestations (ADR-009). **Effort: weeks per port, mostly behavior-code authoring.**
+
+Diego's *"Why I deleted 4,000 lines of HTTP/SDK glue code by becoming a MAOS Spirit"* (Step 4 J6) is the canonical Path-B success narrative.
+
+### Numeric Ship-Gate Floors (Murat's audit)
+
+Every developer-tool quality claim gets a falsifiable numeric floor. Aspirational language ("substrate quality") is replaced with verifiable thresholds.
+
+| Gate | Floor | Phase | Owner |
+|---|---|---|---|
+| `spirit-test` fixture-corpus pass rate | ≥ 98% | v1.0 ship to public-untrusted | Spirit author |
+| `spirit-test` class regression-corpus pass rate | ≥ 95% | v1.0 (corpus sealed by registry) | Spirit author |
+| Manifest self-check (declared output_shape matches produced) | 100% | v0.1 | Spirit author / kernel |
+| Cross-form Semantic equivalence (rust-inproc ↔ subprocess) | ≥ 90% on 200-scenario class corpus | v1.0 | Cross-form harness |
+| Cross-form Semantic equivalence (any-rust ↔ wasm-component) | ≥ 75% (lower because wasm has different determinism) | v2.0 | Cross-form harness |
+| CLI-wrapper Behavioral-Distributional equivalence | Mann-Whitney U-test p > 0.05 over 30 runs per scenario | v1.0; separate registry label `conformance: behavioral-distributional` | Wrapper author |
+| ABI compatibility matrix coverage within current major | 100% (every minor pair, both directions) | v0.1 | Kernel team |
+| ABI N-1 major boundary | 100% incl. negative typed-error cases (`EAbiTooOld`) | v1.0 | Kernel team |
+| Manifest field test coverage | ≥ 3 cases per field (well-formed / malformed-rejected / edge-case) | v0.1, CI-enforced | Kernel team |
+| **Manifest parser fuzz** | 24h `cargo-fuzz`, zero crashes / OOMs / infinite loops | **v1.0 ship gate** (log4shell territory) | Kernel team |
+| Wire protocol cross-language byte-equal golden corpus | 100% per frame variant per SDK (Rust / TS / Python / Go) | v1.0 | Kernel + SDK teams |
+| Wire protocol schema-evolution coverage | 4 cases per frame variant (old→new additive; new→old additive-only; new→old with deprecated; new→old breaking → typed reject) | v1.0 | Kernel team |
+| Wire protocol adversarial-input fuzz | 24h fuzz, zero crashes | v1.0 ship gate | Kernel team |
+| **Hot-Swap Invariant Suite (HSIS)** — pass rate per Spirit class | **≥ 95%, zero invariant violations (CVSS-7 class)** | **v1.0 ship gate** | Spirit author + kernel |
+
+**HSIS specification.** For every Spirit class, run a 50-scenario corpus where a swap is injected at randomized lifecycle phases. Floor:
+1. Successor emits `on_swap_in` ack within 100ms of swap signal.
+2. Successor preserves declared invariant set (manifest `swap_invariants: [...]` field).
+3. Final task output passes ≥ 95% Semantic equivalence vs no-swap control.
+4. Total work-product divergence within manifest-declared `tolerance_band`.
+
+**Cross-language byte-equal golden corpus.** Every frame variant gets a `golden/<frame_name>.json` committed to repo; every language SDK serializes a constructed frame → byte-equal golden; deserializes golden → structurally-equal frame. Canonical encoding: sorted keys, no whitespace, UTF-8 NFC.
+
+### Typed Error Catalog (Paige's must-not-ship-without)
+
+The substrate's most-trafficked reference page must exist on day one. **PRD ship-gate commitment:** every typed error declared in `maos-spirit-abi` has a corresponding catalog page generated from a structured docstring; CI fails if a new error variant lacks the catalog metadata.
+
+**Catalog format (per error):**
+- Error name (`EDigestAuditChainMissing`)
+- One-line description
+- What caused it (typically: which kernel check failed, which precondition was violated)
+- How to recover (Spirit-author-side fix)
+- Code example of the trigger
+- Code example of the handler
+- Related errors (cross-references)
+- Stability: which kernel version introduced it; deprecation status if any
+
+**Stable URL pattern:** `https://docs.maos.dev/errors/<ERR_NAME>`. Versioned per kernel release; archived versions retained ≥ 2 minor releases back.
+
+**v1.0 covered errors (current named set, will grow):** `EDigestAuditChainMissing`, `EIntentPromotionDenied`, `EHaltContinuityViolation`, `EContextExhausted`, `EComplianceContextDrift`, `ESwapSchemaMismatch`, `ERegionLockViolation`, `EAbiTooOld`, `EMigratorMissing`, `EOutputShapeAdapterMismatch`, `SpiritYanked`, `SpiritRevoked`, `SpiritDied`, `EChannelClosed`. CI lint enforces the catalog metadata presence per variant.
+
+### Documentation Artifacts (Paige's missing-list)
+
+**Diátaxis honesty.** The current doc set is *Diátaxis-aware at the section level, Diátaxis-violating at the document level*. The PRD does not claim Diátaxis compliance; it commits to specific artifacts that move toward it.
+
+| Artifact | Form | v0.5 | v1.0 | v2.0 |
+|---|---|---|---|---|
+| **API reference site** at `https://docs.maos.dev/abi/<version>/` | `cargo doc` published to GitHub Pages on every release tag, with `abi/latest` alias; versioned, searchable (Algolia DocSearch or Pagefind), deep-linkable | ✓ basic | ✓ search + version dropdown + archived ≥ 2 minor back | ✓ multi-locale builds |
+| **Manifest schema reference (human-rendered)** | Rendering of the JSON Schema with examples; every field documented | ✓ | ✓ comprehensive | ✓ multi-locale |
+| **Typed error catalog** (per Paige; see above) | One page per error; CI-enforced metadata | ✓ initial set | ✓ all errors covered | ✓ multi-locale |
+| **Pattern cookbook** | Orchestrator pattern, distillation pattern, multi-CLI parallelism, halt-on-AC-ambiguity, plus future patterns | partial | ✓ initial canonical patterns | ✓ community contributions |
+| **Migration runbooks** (Path A / Path B + per-source-tool runbooks) | Preconditions / step list / verification / rollback / known failures | sketches | ✓ Path A + Path B fully run-bookable | ✓ per-tool runbooks (LangChain, Cursor, etc.) |
+| **Troubleshooting guide** | Symptom → cause → diagnostic command → fix; cross-references typed error catalog | partial | ✓ comprehensive | ✓ multi-locale |
+| **Deployment topology guide** | Solo / team / Cortex shapes; how-to flavor (vs architecture §11 reference flavor) | sketches | ✓ comprehensive | ✓ multi-locale |
+| **`LOCALES.md`** with glossary lock | Translation contribution flow; terms never translated (`Spirit`, `Worker`, `kernel`, ADR ids, error codes); review process; staleness policy | ✓ | ✓ | ✓ |
+| **Doc tooling pipeline** | mdBook + i18n / Docusaurus / VitePress with versioning — pick one | pick + commit | ✓ in production | ✓ |
+| **Three-door page** at `docs.maos.dev` | "I want to write a Spirit" / "I want to run MAOS" / "I want to understand MAOS" — reader-task-first navigation | ✓ | ✓ | ✓ |
+
+**Localization v1.0 targets:** Korean (shipped); Japanese (paperclip + Spirit-author overlap); Chinese-simplified (kimi-cli community leverage). Spanish/German/French defer to community pull.
+
+**Doc-quality coverage targets (v1.0):**
+- Every public ABI method has ≥ 1 doctested example (CI-enforced).
+- Every typed error has cause / recovery / example trigger / example handler (CI-enforced).
+- Doc site builds on every kernel PR; broken links + out-of-sync code samples block merge.
+- WCAG AA — color contrast, keyboard nav, screen reader on code blocks, alt text on every diagram including Mermaid renderings.
+
+### 30-Minute First Spirit Validation Gate (Paige's gate)
+
+The "Build your first Spirit in 30 minutes" tutorial (`spirit-development-and-sharing.md` §4.1) becomes a v1.0 ship gate, not aspirational copy.
+
+**Validation protocol:**
+- 5 Spirit authors, **none of whom are MAOS contributors**
+- Fresh machine (no Rust toolchain assumed; install commands part of the tutorial)
+- Recorded sessions (with consent) reviewed for friction points
+- **Floor: ≤ 45 minutes median, ≤ 90 minutes p95**
+- Tutorial revised iteratively until target met
+- Re-validation required after every breaking tutorial update (any change touching install, manifest, or first-Spirit code template)
+
+If the floor is not met by v1.0, **the substrate ships with a tightened tutorial scope** (e.g., "Build your first Spirit in 60 minutes") rather than ship the unverified 30-minute claim.
+
+### Onboarding and Governance Artifacts (Mary's gaps)
+
+| Artifact | Phase | Owner |
+|---|---|---|
+| `RFC_TEMPLATE.md` | v0.5 | Maintainer team |
+| `GOVERNANCE.md` (maintainers list, lazy-consensus on RFCs, tiebreak by maintainer vote) | v0.5 | Founder + initial maintainers |
+| `CODE_OF_CONDUCT.md` (Contributor Covenant baseline) | v0.5 | Maintainer team |
+| `PRIVACY.md` (telemetry schema, retention, jurisdiction, deletion path; GDPR Art. 17 compliance) | v1.0 (before telemetry endpoint ships) | Maintainer team |
+| `BREAKING.md` (every breaking change requires an entry with migration steps; CI grep-enforced) | v0.5 | Kernel team |
+| `STABILITY.md` (live (kernel, abi, manifest_schema) compatibility matrix; LTS branch policy) | v1.0 | Kernel team |
+| `LOCALES.md` (translation contribution flow + glossary lock) | v0.5 | Doc team |
+
+**`maosctl` accessibility (Mary's CLI-tool concern):**
+- Respect `NO_COLOR` environment variable
+- Respect `TERM=dumb` (no spinners, no Unicode box-drawing)
+- `--plain` flag for screen-reader-friendly output
+- Target: usable for blind operators in production-adjacent environments
+- v0.5 ship gate
+
+### LTS and Deprecation Policy (Mary's commitment numbers)
+
+**LTS commitment (Mary's "pick a number"):**
+- 2-year LTS on minor lines starting at v1.0
+- Security-only patches after year 1 of LTS
+- Two LTS lines maintained concurrently (current + previous)
+
+**Deprecation timeline (Winston's commitment):**
+- 2 minor releases of warning before removal
+- 1 major release to actually remove
+- Spirit-side `kernel.deprecation_warnings()` channel surfaces deprecations in `spirit-test`
+- All deprecations entered in `BREAKING.md` (CI grep-enforced)
+
+**Telemetry default and policy (Mary's three answers):**
+- **Opt-in default.** Operator must explicitly enable.
+- **Schema published** in `PRIVACY.md`: every field, every value type, redaction layer documented and source-published.
+- **Storage:** v1.0 in maintainer-controlled aggregator with documented retention (90 days); GDPR Art. 17 deletion path via signed request.
+
+### Implementation Considerations
+
+**Documentation generation.** Rust API docs auto-generated via `cargo doc` for `maos-spirit-abi` and `maos-spirit-sdk` crates, published to versioned URL per Documentation Artifacts table. Manifest schema as versioned JSON Schema (machine-checked).
+
+**Versioning and release.** Kernel SemVer with explicit ABI-stability promises per the triple (kernel_version, abi_version, manifest_schema_version). Spirit ABI machine-checked diff on every PR. Reference Spirits independent SemVer per Spirit. Skills SemVer per skill package. Release cadence: kernel monthly during v0.x; quarterly during v1.x; semi-annually during v2.x stable. LTS policy applies from v1.0.
+
+**Telemetry and feedback loops.** v0.5 ships OpenTelemetry spans for every IAC frame, every capability invocation, every halt. v1.0 adds an opt-in anonymous-telemetry endpoint per `PRIVACY.md`. Feedback mechanism: GitHub issues + RFC process per `RFC_TEMPLATE.md` and `GOVERNANCE.md`.
+
+**Skipped sections per CSV (visual_design / store_compliance).** MAOS has no first-party UI design system — operator surfaces are CLI + ACP-mediated editor banners + Transparency Log JSONL output. MAOS does not distribute through app stores — distribution is OSS package managers, GitHub Releases, and the Spirit registry.
+
+## Project Scoping & Phased Development
+
+### MVP Strategy & Philosophy
+
+**Approach: Substrate-MVP** — a hybrid of problem-solving + platform + integrity MVP. The substrate's value proves itself when:
+- The kernel boots, loads a Spirit, runs a trivial task end-to-end with audit trail intact (v0.1 foundational MVP)
+- A single-Spirit Butler running on the foundational kernel surfaces a useful anticipatory notification (v0.3 anticipatory MVP)
+- A single-Spirit Researcher delivers a structured survey with confidence map and open questions in bounded time (v0.5 exploratory MVP)
+- The founder can run his BMAD epic loop end-to-end with multi-CLI Workers and reclaim his evening (v0.8 founder-loop wedge MVP)
+- A team of 8 can adopt MAOS for daily work without surveillance overtones (v1.0 team MVP)
+
+**Phasing is invariant-preserving:** every phase ships a working subset of invariants; no phase ships a relaxed version of any invariant. v0.1 ships I1–I10 enforced at the foundational kernel layer; v0.3 adds I11/I12/I13 enforcement (digest audit-chain, decision-context, intent provenance) without requiring multi-Spirit; v0.5 adds I14 (halt continuity); v0.8 introduces multi-Spirit invariant interactions at scale.
+
+**Phased delivery (founder-directed restructure of original input documents):** The original architecture §13 phasing had v0.1 = "Bootstrap" with one Architect Spirit driving a coding task. Per founder directive, **v0.1 has been re-purposed as foundational kernel + placeholder Spirit** — proving the kernel's big-picture readiness before committing to specific Spirit ambition. **Butler and Researcher journeys are inserted at v0.3 and v0.5 as simpler single-Spirit value demonstrations** that exercise the kernel's anticipatory and exploratory cognitive surfaces without requiring multi-Spirit IAC, A2A peer mesh, or the full distillation pattern. **The founder's-loop wedge demo (J1) is pushed to v0.8** where the substrate composes the foundational kernel + single-Spirit cognitive primitives + multi-Spirit Orchestrator+Worker coordination + cross-host A2A + full §9.5 distillation pattern in one demo. v1.0 then ships team-readiness; v1.5 ships the diagnostic-architect pair; v2.0 ships WASM Spirit form + Cortex precursor (technical); v2.5 ships ecosystem-adoption (parallelizable from v1.5, decoupled from technical phase).
+
+This restructure addresses three concerns from Step 8 party mode:
+- **John's "v0.1 timeline 2x optimistic" concern** — by reducing v0.1 scope to foundational kernel + placeholder Spirit, the v0.1 milestone becomes shippable in ~6–8 weeks (Murat's testable threshold), not the 10–12-week aspirational claim.
+- **Mary's "operational invariants silently de-scoped" concern** — by adding intermediate v0.3 / v0.5 phases, operational artifacts (SECURITY.md, GOVERNANCE.md, RFC_TEMPLATE.md, doctest CI gate, clean uninstall, pre-write secret-redaction) have natural homes in early phases rather than being deferred to v1.0.
+- **Winston's "failure-semantics floor" concern** — by deferring multi-Spirit IAC/A2A to v0.8, the failure-semantics floor (ADR-022) ships at v0.8 alongside the multi-Spirit primitives that need it, not retrofitted into a v0.1 with insufficient distributed-system surface to test against.
+
+**Resource requirements (per phase):**
+
+| Phase | Effort | Team | Key skills added |
+|---|---|---|---|
+| v0.1 (foundational) | ~6–8 weeks | 1 founder | Rust + Tokio, kernel design, capability systems, Spirit ABI specification, single-Spirit subprocess |
+| v0.3 (Butler) | ~10–12 weeks total | 1 founder + advisor council formed | Active Inference / POMDP cognitive modeling, MCP integrations (Calendar/Slack/Linear/Figma), `on_idle` lifecycle hook, narrow Telemetry Stream subscription |
+| v0.5 (Researcher + Observer + foundational hardening) | ~14–16 weeks total | 2 implementers (founder + contributor #2) + 3-person advisor council | Broad MCP capabilities, parallelism in tool dispatch, output_shape predicate enforcement, T2/T3 sandbox, distillation pattern (single-Spirit opt-in), v0.5 onboarding artifacts |
+| v0.8 (Founder loop wedge demo) | ~22–24 weeks total | 2–3 implementers + community contributors | Multi-Spirit IAC bus, A2A loopback-only, Orchestrator+Worker coordination, ADR-022 failure-semantics floor, full distillation pattern, multi-CLI Worker parallelism |
+| v1.0 (Team-ready) | ~30–32 weeks total | 3–4 implementers + ≥1 community contributor + DevRel | Spirit registry, Ed25519 signing, ACP server, vetting attestations, ComplianceClaim, HSIS/CCAC/manifest-fuzz/wire-fuzz gates, 30-min validation gate, typed error catalog, 8 doc artifacts |
+| v1.5 (Diagnostic-architect pair) | ~38–40 weeks total | 4–5 implementers + ≥3 community contributors | Postgres + pgvector for Loom-lite, MAOS-mediated provider proxies, mobile push, JetBrains plugin, asymmetric postures |
+| v2.0 (technical) | 18-month total | 5+ implementers + active community + ≥1 ecosystem partner | WASM Component Model, PDP integration, multi-region Loom coordination, FKCS protocol |
+| v2.5 (ecosystem-adoption, parallelizable from v1.5) | 24–30 months | + DevRel + BD function | Certification body engagement, cohort interop, Cortex consortium recruitment |
+
+### Phase v0.1 — Foundational Kernel + Placeholder Spirit (~6–8 weeks)
+
+**Validation milestone:** Kernel boots; loads a placeholder `hello-spirit` (subprocess form, single Spirit instance); receives a trivial `task.assign` IAC frame from the user via `maosctl`; returns a response; clean install + clean uninstall both work. Audit trail captures every step. **No founder-loop ambition; no multi-Spirit; no A2A.** Foundational proof-of-life demonstrating the kernel's big-picture readiness.
+
+**Core User Journeys Supported (v0.1):** J0 evaluator (5-minute install + first Spirit + clean uninstall).
+
+**Must-Have Capabilities:**
+- **Kernel skeleton:** Scheduler + Memory + Capability Registry + IAC mailbox (basic — single-Spirit routing, no cross-Spirit fan-out; multi-Spirit IAC bus deferred to v0.8)
+- **Spirit ABI v0.1** — `Spirit` trait + `KernelHandle` trait + manifest schema (full schema per architecture §5.1); machine-checked frozen via CI ABI-diff
+- **Single-Spirit subprocess form** (Spirit Wire Protocol over JSON-RPC; one Spirit instance per kernel at v0.1; multi-Spirit deferred to v0.8)
+- **Local SQLite persistence**
+- **Sandbox tiers T0/T1** (T2 deferred to v0.3; T3 deferred to v0.5; pulled-forward attack surface eliminated)
+- **Anthropic provider driver** (single-provider; multi-provider deferred to v0.5)
+- **Transparency Log** (I2 — log-before-deliver) operational; basic queryable via `maosctl audit query`
+- **Capability tokens** (I1 — every external call mediated)
+- **Lifecycle journaling** (I10) operational
+- **One placeholder Spirit** (`hello-spirit`) — minimal reference Spirit demonstrating the ABI; not a working agent, just a proof of life
+- **`maosctl` basic** — `install`, `uninstall`, `audit query`, `spirit invoke`
+- **`maosctl` accessibility:** respect `NO_COLOR`, respect `TERM=dumb`, `--plain` flag for screen-reader-friendly output (Mary's gap closed at v0.1)
+- **Clean uninstall** (J0 evaluator requirement; Mary's hill-to-die-on item #2): `cargo uninstall maos` removes capability-token caches, sandbox tmpfs mounts, ACP socket files, no orphaned state
+- **`SECURITY.md`** with disclosure address (`security@maos.dev`), embargo window (90-day default), GPG key, advisory format committed (Mary's hill-to-die-on item #1)
+- **Doctest CI gate** — every public ABI method has ≥ 1 doctested example; CI broken-link blocking on the doc site (Mary's gap closed at v0.1)
+
+**Numeric ship-gate floors (v0.1 — Murat's audit applied):**
+- Kernel ≤ 10 KLOC excluding tests (lower than original 15 KLOC because v0.1 surface is reduced)
+- Capability-registry fuzz coverage ≥ 80% line / ≥ 60% branch with zero crashes on 1M-iteration libFuzzer run
+- Zero `unsafe` blocks in capability-validation path
+- ABI compatibility matrix within current major: 100% (every minor pair, both directions)
+- Manifest field test coverage: ≥ 3 cases per field
+- Manifest self-check 100% (declared output_shape matches produced)
+- Spirit-test fixture-corpus pass rate ≥ 98%
+- **Hard cap solo phase at 8 calendar weeks regardless of scope completion** (John's burnout-mitigation rule); if not at v0.1 by then, de-scope further
+
+**Out of v0.1 scope (deferred, not de-scoped):**
+- Butler Spirit (v0.3)
+- Researcher Spirit + Observer (v0.5)
+- Multi-Spirit IAC bus (v0.8)
+- A2A peer mesh (v0.8 loopback-only; v1.0 cross-host)
+- Distillation pattern enforcement (v0.5 single-Spirit opt-in; v0.8 multi-Spirit deployment)
+- ComplianceClaim (v1.0 first-class object; CCAC ship-gate at v1.0)
+- Hot-swap / migration policy (ADR-020) — kernel ships I6 mechanism but no in-flight hot-swap testing until v0.3 has ≥ 1 working Spirit
+- Spirit registry over MCP-Streamable-HTTP (v0.5 basic; v1.0 full)
+- All other multi-Spirit primitives, ACP server, WASM, Loom
+
+### Phase v0.3 — Butler Spirit (~10–12 weeks total)
+
+**Validation milestone:** J-Butler journey reproducible — Sandra's 7 PM scene runs end-to-end with the Butler Spirit, including the self-tuning halt three weeks later. Butler eval metrics published in registry: notification precision ≥ 0.85, notification recall ≥ 0.7, halt-precision ≥ 0.85.
+
+**Adds to v0.1:**
+- **Butler Spirit** — first reference Spirit with full cognitive surface (anticipatory reasoning per design report ¶83–¶85, ¶154–¶168)
+- **`on_idle` lifecycle hook** as substrate for anticipatory reasoning (Active Inference / POMDP shape)
+- **Telemetry Stream** (I7) operational; basic narrow per-Spirit subscription (Butler subscribes to Calendar/Slack/Figma topics)
+- **`[epistemic_policy]` per-tag rules** with `verbalize_with_options` / `verbalize_only` / `flag` / `halt` actions and confidence + impact thresholds
+- **Output_shape predicate** enforcement at the Capability Registry (kernel rejects Spirit emit on missing fields)
+- **MCP tool integrations**: Google Calendar (read), Slack (read + draft-but-don't-send), Linear (write — gated by approval), Figma (read)
+- **Posture-shift command** — runtime supervision knob; kernel logs the shift; subsequent capability requests prompt that wouldn't have
+- **Sandbox tier T2** (Landlock+seccomp on Linux narrow scope for Butler's MCP-only capability surface)
+- **Episodic memory** (private tier) for Butler's `notification_acceptance_log` — feeds POMDP refinement across sessions
+- **Hot-swap mechanism** functional (ADR-017 wire format); first real hot-swap test happens here when Butler v0.3.1 → v0.3.2
+- **Contributor #2 onboarding** — Spirit-author-facing documentation pulled forward from v1.0 to v0.3 per John's recruit-readiness gate ("Spirit ABI is stable enough that a second contributor can write a reference Spirit in <1 week without founder pairing")
+- **Advisor council** formed (3-person, advisory not voting; Mary's mitigation against solo-founder slippage)
+- **`RFC_TEMPLATE.md`** drafted (Mary's gap; pulled forward from v0.5 to v0.3)
+- **`GOVERNANCE.md`** drafted (lazy consensus on RFCs, tiebreak by maintainer vote; pulled forward to v0.3)
+
+**Numeric ship-gate floors (v0.3 — Murat-style):**
+- All v0.1 floors maintained
+- **Butler-specific behavior corpus**: 30-scenario calendar/comms; halt-recall ≥ 0.90 on calendar-conflict subset (15 scenarios); halt-precision ≥ 0.85 overall
+- **Notification precision ≥ 0.85** (% acted on); **notification recall ≥ 0.7** (% of relevant moments caught)
+- **Self-tuning halt corpus**: 10 synthetic acceptance-rate-decline scenarios; Butler halts in ≥ 9/10 within 14-day rolling window
+- **MCP integration tests**: 4 MCP servers × 5 representative ops × 3 outcomes (success / scope-violation / network-error) = 60 tests, 100% pass
+
+### Phase v0.5 — Researcher + Observer + foundational hardening (~14–16 weeks total)
+
+**Validation milestone:** J-Researcher journey reproducible — Hannah's 2-hour LLM-judge survey delivers structured findings + Open Questions + Confidence Map + Bibliography in ≤ 90 minutes; Researcher halts on contradictory findings; output passes output_shape predicate. Plus: Observer Spirit subscribes to multi-Spirit telemetry stream (read-only, no IAC writes) showing live activity for the Butler + Researcher pair.
+
+**Adds to v0.3:**
+- **Researcher Spirit** — second cognitive Spirit; survey-mode (exploratory, reactive, divergent per design report ¶87–¶89)
+- **Observer Spirit** — third reference Spirit; passive activity-stream subscriber; first multi-Spirit-aware Spirit. **Important architectural distinction:** Observer subscribes to the kernel's **Telemetry Stream** (broadcast topic-based, operational at v0.3 narrow / v0.5 broad), NOT the **IAC Bus** (directed mailbox-based, deferred to v0.8). Telemetry Stream is a separate kernel service from IAC Bus per architecture §4.5 / §4.7. Observer's read-only broadcast subscription does not require the multi-Spirit IAC Bus primitives; the "no IAC bus until v0.8" claim holds. Subscribes broadly per design report ¶842.
+- **Broad MCP capabilities** for Researcher: web.search, arxiv.search, github.search, citation_graph.traverse
+- **Parallelism in tool dispatch** — manifest `[capabilities.parallelism]` declared; v0.5 cap of 8 concurrent dispatches
+- **`hypothesize-mode` posture** declared in manifest (full ILP+LLM hybrid implementation deferred to v1.0; v0.5 ships the mode declaration + survey-mode-only operation)
+- **Adaptive-chunk-ratio summarization** (openclaw pattern; default for Researcher)
+- **Sandbox tier T3** (containerized — Docker/Podman) for Researcher's broader capability surface
+- **Per-Spirit resource isolation via cgroups v2** (Linux) — Winston's gap closed at v0.5; sandbox = "you can't escape", resource governance = "you can't starve peers"
+- **Distillation pattern (single-Spirit opt-in)** — Researcher's first opt-in deployment of §9.5; bounded context for very-large-corpus surveys (200+ candidate papers compressed to bibliography); five-metric gate applies (digest-recall ≥ 0.90, faithfulness ≥ 0.98, hedge-preservation ≥ 0.95, traceability = 100%, secret-leakage = 0%)
+- **`log.recall` capability** (ADR-013) — kernel-mediated participant-scoped Transparency Log retrieval
+- **I11 audit-chain enforcement** on memory writes (digest_audit_chain.rs in capability_registry/)
+- **I12 decision-context recording** on `decision.*` frame emit
+- **I13 intent_lineage propagation** in distillation pipelines
+- **Pre-write secret-redaction filter** at the Transparency Log boundary (Mary's §9.5 metric #5 commitment; v0.5 deployment)
+- **Multi-provider LLM drivers** tested in CI (≥ 3 providers: Anthropic + OpenAI + local-LLM via Ollama)
+- **Spirit registry basic** (MCP-Streamable-HTTP server, Ed25519 signing, install-time signature verification)
+- **`maosctl audit query` family** — `audit query`, `audit retract-history`, `audit policy-violations`
+- **Approval Manager prompt UX** (synchronous user-facing surface)
+- **Transparency Log persistence** with 90-day retention default (Step 5 commitment)
+- **ACP server** (editor bridge — Zed + VSCode tested)
+- **Onboarding artifacts at v0.5**: `CODE_OF_CONDUCT.md`, `BREAKING.md`, `LOCALES.md`, `TRADEMARK.md`, `PRIVACY.md` (before any telemetry endpoint), namespace grammar ADR locked
+- **Sustainability vehicle** committed (Open Collective minimum; Mary's gap closed at v0.5)
+- **Synthetic governance dry-run** — two maintainers walk a contrived RFC end-to-end, publish decision log as canonical example (Mary's gap closed at v0.5)
+- **Halt-recall ≥ 0.7 / halt-precision ≥ 0.85 per Spirit class** on `bmad-eval` standard corpus, published in registry
+
+**Numeric ship-gate floors (v0.5):**
+- All v0.3 floors maintained
+- **Researcher-specific corpus**: 25-scenario `bmad-technical-research`; ≥ 3 sources cited with ≥ 80% reachable URLs; halt fires on ≥ 9/10 scope-creep injections; output_shape predicate satisfied 100%
+- **Observer-specific corpus**: 20-scenario activity-stream; **missed-event rate ≤ 2%**, **causal-ordering correctness ≥ 99%** (read-only Spirit; halt-recall is wrong metric per Murat)
+- **Distillation five-metric gate** (single-Spirit Researcher context): all floors per §9.5 + 10⁵ secret-leakage corpus
+- **Multi-CLI partial parallelism**: 2 Workers (claude-code + opencode) on a coordinated task without context bleed (≤ 1/20 leak detected on 20-story corpus); preview of v0.8 multi-Spirit pattern
+- **Halt-recall ≥ 0.7 + halt-precision ≥ 0.85** per Spirit class
+
+### Phase v0.8 — Founder Loop Wedge Demo (~22–24 weeks total)
+
+**Validation milestone:** J1 Founder's Loop reproducible — Lunarpulse runs Epic-7 BMAD loop end-to-end with the Orchestrator + multi-CLI Worker pattern, halts on AC ambiguity at 6:23 PM, closes laptop at 8:40 PM, wakes to a completed digest at 6 AM. The wedge demo shippable. **This is the substrate's "moment of full ambition observable in one demo."**
+
+**Adds to v0.5:**
+- **Multi-Spirit IAC bus** — kernel-internal routing for Spirit↔Spirit communication on the same Host (per architecture §4.5)
+- **A2A peer mesh** — **loopback-only profile at v0.8** (Winston's bounded attack surface): `127.0.0.1`-bound, mTLS with self-signed certs, TOFU pinning, no cross-host traffic. Cross-host A2A deferred to v1.0.
+- **Two-level `task.assign` typed-intent IAC primitive** (ADR-013): human → Orchestrator at epic granularity; Orchestrator → Worker at story granularity
+- **ADR-012 typed-intent consent** on A2A frames (kernel rejects frames whose declared intent is absent from receiver's spawn-time consent policy)
+- **ADR-016 token-budget accounting** — `ContextPressure` / `ContextLimit` / `EContextExhausted` typed frames
+- **ADR-017 hot-swap state-transfer wire format** — CBOR + per-class versioned schema
+- **ADR-020 hot-swap migration policy** — `migrates_from` manifest field + `EMigratorMissing` enforcement
+- **ADR-021 CliWrapperSpirit output-shape adapter contract** — `output_shape_version` declaration + fail-loud rule
+- **ADR-022 failure-semantics floor (NEW)** — Winston's non-negotiable v0.3-architecture-locked, v0.8-implemented commitment:
+  1. Crash detection SLO ≤ 2s
+  2. In-flight `task.assign` NACK with `TaskOrphaned` IAC frame ≤ 5s
+  3. No auto-respawn at v0.8 (deferred to v1.0); kernel says "it's dead" fast and reliably
+  4. Journaled crash transition with exit-cause (signal, exit-code, stderr-tail)
+- **Orchestrator Spirit** — fourth reference Spirit; `class = "orchestrator-bmad"` per Step 4 J1; orchestrator persona skill + `maos-bridge` skill loaded into a Claude Code process
+- **Developer-Worker + Reviewer-Worker** — fifth/sixth reference Spirits as skill packages; Worker Spirits are agent CLI processes (Claude Code, opencode, gemini-cli, kimi-cli) with `maos-bridge` + persona skills loaded
+- **Full distillation pattern (§9.5)** — multi-Spirit deployment; Orchestrator's distillate-then-decide pattern operational
+- **Multi-CLI Worker parallelism** — 3+ Workers (claude-code + opencode + gemini-cli) on the same epic
+- **Halt-recall and halt-precision benchmarks per Spirit class** published in registry — uniform across Spirits + per-Spirit-class corpora
+- **Numeric ship-gate floors:**
+  - **A2A loopback v0.8 floors** (Murat's pull-forward testability): mTLS replay corpus 100/0; TOFU pin-mismatch 100/100 detected/rejected/logged; handshake-fault 20/0
+  - **Multi-Spirit IAC ADR-012 floors**: cross-Spirit consent corpus 30 scenarios (100% disallowed blocked, ≥ 95% allowed succeed, 0 envelope-type confusion); revocation propagation ≥ 29/30
+  - **Orchestrator Epic-corpus**: 5 epics, ≥ 4 complete without halt-storm; halt-precision ≥ 0.85
+  - **Planted-issue corpus**: 50 synthetic stories; Orchestrator surfaces ≥ 42/50 (84%); ≥ 45/50 on security-relevant subset
+  - **Ambiguous-AC corpus**: 10 stories; halt fires in ≥ 9/10 within 2 frames
+
+### Phase v1.0 — Team-Ready, Third-Party Spirits Ship (~30–32 weeks total)
+
+**Validation milestone:** J3 Team Nexus (8-Host team peer mesh) reproducible end-to-end on a real team in parallel with a 30-day synthetic-shadow run (zero substrate-invariant violations, zero unauthorized cross-Spirit data flow, halt-recall preserved within ±0.03 of v0.8 baseline). J6 Diego validated via black-box external-author trial (5 authors, 14-day no-DM-support window, ≥ 4/5 succeed). First cohort interop demonstration (any of openclaw / ironclaw / hermes / paperclip / rustain / codex).
+
+**Adds to v0.8:**
+- **Architect (Nash-class) + Reviewer reference Spirits** added; **6 reference Spirits total** (Butler / Researcher / Architect / Worker / Reviewer / Observer)
+- **Cross-host A2A peer mesh** with full mTLS + TOFU + ADR-012 typed-intent consent (lifted from loopback-only)
+- **Spirit registry v1.0 (full)**: `registry.search` / `manifest` / `artifact` / `publish` / `deprecate`; four trust tiers operational; strictest-of-(manifest, tier) enforcement
+- **Sandbox tier T4 WASM (tools, not Spirits yet)**
+- **ComplianceClaim envelope** + admission-time verification (first-class kernel object)
+- **Vetter trust model documented**: accreditation, revocation semantics, conflict resolution
+- **Audit sealed-export** (signed JSONL — regulator-ready)
+- **Numeric v1.0 ship gates** (full set):
+  - Spirit-test class regression-corpus pass ≥ 95%
+  - Cross-form Semantic equivalence (rust-inproc ↔ subprocess) ≥ 90% on 200-scenario class corpus
+  - ABI N-1 major boundary 100% incl. negative typed-error cases
+  - Manifest parser fuzz: 24h cargo-fuzz, zero crashes (P0 ship gate)
+  - Wire protocol cross-language byte-equal golden corpus (Rust + TS + Python SDKs)
+  - Wire protocol schema-evolution: 4 cases per frame variant
+  - Wire protocol adversarial-input fuzz: 24h, zero crashes
+  - **HSIS** ≥ 95% pass rate per Spirit class, zero invariant violations (6 class-specific corpora)
+  - Capability-token TOCTOU test: 100% re-validation
+  - Adversarial-Spirit red-team corpus: ≥ 48/50
+  - Intent-provenance test: 40/40 detected
+  - **CCAC**: N=500, FPR ≤ 0.5%, TPR ≥ 98%, per-class ≥ 18/20, context-drift 100% rejected
+  - Secret-leakage 0% on 10⁵-case corpus + production canary system (≤ 24h p95)
+- **30-Min First Spirit Validation Gate**: **N=12 stratified** (Murat's correction; not N=5), median ≤ 45 min, p95 ≤ 90 min, ≥ 10/12 succeed
+- **Black-box third-party trial** (Murat's silent-failure-catcher): 5 external authors via public CFP; 14-day no-DM-support window; ≥ 4/5 produce working signed Spirit binary that loads on fresh Host VM, runs ≥ 1000 frames, halt-recall ≥ 0.85 on class-appropriate subset; auditable via SBOM + signing chain re-loaded on clean VM by CI bot
+- **Documentation artifacts** (Paige's full set):
+  - API reference at `https://docs.maos.dev/abi/v1.0/` (versioned, searchable, archived ≥ 2 minor back)
+  - Manifest schema reference (human-rendered)
+  - **Typed error catalog** at `https://docs.maos.dev/errors/<ERR_NAME>` (CI-enforced metadata per error variant)
+  - Migration runbooks (Path A + Path B fully run-bookable)
+  - Troubleshooting guide
+  - Deployment topology guide
+  - Three-door page at `docs.maos.dev`
+  - WCAG AA compliance
+- **Localization**: Korean (shipped); Japanese + Chinese-simplified (v1.0 targets)
+- **Substrate Operations**: full lifecycle (`maosctl install/upgrade/yank/uninstall/revoke`); signed Revocation List (CRL) artifact; offline import path; auto-respawn-with-backoff for Spirits declaring `restart: on-failure`
+- **LTS commitment announced**: 2-year LTS on minor lines from v1.0; security-only patches after year 1; two LTS lines maintained concurrently
+- **`STABILITY.md`** with live (kernel, abi, manifest_schema) compatibility matrix and substrate-self compliance scope clause
+- **External pen-test report** with zero P0/P1 findings open at ship
+- **First cohort interop demonstration**
+
+### Phase v1.5 — Diagnostic-Architect Pair (~38–40 weeks total cumulative)
+
+**Validation milestone:** J4 Mira-Nash 90-min loop reproducible on 50-scenario synthetic prod-incident corpus; ≥ 45/50 close in ≤ 90 min; ≥ 48/50 uphold typed-intent consent envelope.
+
+**Adds to v1.0:**
+- **Diagnostic Engineer Spirit class (Mira)** with full asymmetric capability gates
+- **Per-tag epistemic policy** at production fidelity (`diagnosis.root_cause` halts at confidence_below=0.6 or evidence conflict; `diagnosis.observation` is verbalize_only; `containment.action` halts at confidence_below=0.5)
+- **Post-deploy feedback IAC topic**; Architect-class Spirits subscribe to Diagnostic-class post-deploy validation results
+- **Loom-lite**: single-instance Postgres-backed pattern library, exposed as MCP-Streamable-HTTP server
+- **`maos-persistence` Postgres support**
+- **MAOS-mediated provider proxies** (intercept HTTP calls to LLM providers for substrate-layer audit)
+- **Asymmetric postures** (sre-diagnostician vs principal-architect)
+- **Mobile-friendly approval surface** (HTTP push notifications)
+- **Five-metric gate passes on all distillation-shipping reference Spirits**
+- **JetBrains plugin-bridge** for ACP integration
+- **Skill ecosystem**: BMAD framework first-class supported (full skill set tested in CI)
+- **mTLS cert rotation chaos test** passes
+- **Revocation latency**: median ≤ 60s, p99 ≤ 5min from CA revoke to peer rejection
+- **ADR-023 capability-token TTL + bind-to-PID** (Winston's Risk 8 mitigation)
+
+### Phase v2.0 (technical) — WASM Spirits + Cortex Precursor (18-month total)
+
+**Validation milestone:** Cortex 3-region pilot at small scale (≥ 10 agents) with technical validation (NOT commercial-adoption gating); FKCS protocol passes (3 case-studied future Spirits implemented by external authors against published ABI documentation only; ≥ 27/30 success per Spirit, ≥ 85/90 aggregate; diff oracle confirms zero kernel changes).
+
+**Adds to v1.5:**
+- **WASM-component Spirit form** — third-party ecosystem capability-isolated by construction; single portable artifact; WIT contract `maos:spirit@1.0`
+- **Spirit registry v2.0**: vetting attestations; community-vetting authorities; OSS-style RFC process for Spirit ABI extensions; OCI-compatibility evaluation
+- **Enterprise Spirit class** with PDP (Policy Decision Point) integration (OPA / Cedar / Vault); SSO/OIDC identity assertions; encrypted-at-rest memory with org KMS; SIEM telemetry export
+- **Multi-instance Loom** with cross-region replication; consensus on cross-incident pattern propagation
+- **Sentinel-validated canary auto-rollback**; pre-deployment scanning against pattern library
+- **Native push notifications** (mobile)
+- **Optional skill registry** (separate from Spirit registry)
+- **Cortex churn test** passes: 100-host Cortex, 10% host turnover/week for 4 weeks, 3 planted adversarial hosts; detection latency ≤ 1h median, blast radius ≤ 5 peers, recovery ≤ 24h
+- **Cross-form Semantic equivalence** (any-rust ↔ wasm-component) ≥ 75%
+- **ADR-024 sandbox-escape detection** (Winston's Risk 9 mitigation)
+- **`loom-threat-model.md`** drafted (deferred from Step 5)
+
+### Phase v2.5 (ecosystem-adoption) — Parallelizable from v1.5 (24–30 months)
+
+**Validation milestone:** Cortex consortium target case study published (per v0.3 lock); first auditor or regulator references a MAOS Transparency Log frame or ComplianceClaim in a published finding (trust-anchor frame validation per Step 6 carry-forward).
+
+**Adds (parallel workstream from v1.5; staffed by DevRel + BD function, not engineering):**
+- **First third-party ComplianceClaim** issued against a reference Spirit by an accredited assessor (anecdotal milestone; pilot partner)
+- **Public registry of ComplianceClaims**; ≥ 3 certification bodies issuing claims
+- **Adoption signal**: ≥ 20 external Spirits in registry; ≥ 3 protocol citations from independent agent projects; ≥ 1 cohort project formally citing MAOS as substrate or interop reference
+- **Multi-locale doc site** (Korean + Japanese + Chinese-simplified shipped; community-contributed others tracked)
+- **Cortex consortium target case study** published (consortium target locked at v0.3 — Reza-class single-org cross-team is leading candidate per Step 6 / John's Step 8 confirmation)
+
+**Critical decoupling rationale (per John):** the technical phase (v2.0) cannot gate on third-party adoption. ≥ 20 external Spirits, ≥ 3 cohort citations, ≥ 3 certification bodies are *partnership and recruitment* metrics that depend on a DevRel/BD function the engineering team doesn't have. Bundling them into a single 18-month v2.0 means engineering sits idle waiting for cert bodies to sign MOUs. v2.5 ecosystem-adoption is parallelizable from v1.5 onward; technical v2.0 ships when technical is ready.
+
+### Risk Mitigation Strategy
+
+**Technical Risks:**
+
+| Risk | Mitigation | Phase |
+|---|---|---|
+| Kernel performance bottleneck under fan-in pressure (28-Spirit Cortex) | Per-Spirit fairness scheduler in front of log writer (not FIFO); v0.5 perf gates; v1.0 absolute SLOs in Step 10 | v0.5–v1.0 |
+| ABI stability erosion | Machine-checked ABI-diff CI on every PR; STABILITY.md live matrix; deprecation 2-minor-warning + 1-major-remove | v0.1+ |
+| Hot-swap silent state corruption | HSIS ship gate (≥ 95% pass, zero invariant violations); ADR-017 typed wire format; ADR-020 migration policy | v1.0 |
+| CLI-wrapper output-shape drift | ADR-021 fail-loud rule; `output_shape_version` declared; per-CLI adapter versioned | v0.8+ |
+| Provider rate-limit cascading | Per-(provider, credential) token bucket; typed `RateLimited` IAC frame | v0.5+ |
+| Distillation legibility-attack | Five-metric ship gate; canary system; cross-LLM judge sampling; CI-enforced I11/I12 | v0.5–v1.0 |
+| Loom poison-pattern (Cortex-scale) | Provenance-chain audit; explicit `loom-threat-model.md` | v1.5–v2.0 |
+| **Risk 8: Capability-token theft / TOCTOU** (Winston's add) | Short TTL (≤ 60s for high-privilege); bind tokens to Spirit-PID + boot-nonce; audit-log every check with origin-Spirit-ID; ADR-023 | **v1.5** |
+| **Risk 9: Sandbox-escape detection vs containment** (Winston's add) | Anomaly detector on top of Landlock/seccomp (syscall-pattern divergence, fd-table growth, unexpected outbound IAC); ADR-024 | **v2.0** |
+| **Hot-swap rollback** (sub-policy of ADR-020) | If successor health-check fails within N seconds of cutover, kernel auto-reverts to predecessor and emits `HotSwapAborted` | v1.0 |
+| **A2A trust establishment under churn** (Winston's #1 production risk) | "Spirit-restart invalidates prior pins" rule + re-pin protocol; ADR-022 failure-semantics floor closes the underlying gap | v0.8+ |
+
+**Market Risks:**
+
+| Risk | Mitigation | Phase |
+|---|---|---|
+| Vendor-monolithic competitors close hook/MCP surface (kills CLI-wrapper Spirit form) | De-risk by ensuring MAOS works on at least one fully-open CLI agent (codex-class) before betting on closed CLIs; per-CLI native Rust wrapper crate as v2.0 fallback | v0.8+ |
+| Substrate-too-early failure | Trust-anchor framing as alternative competitive frame (carried forward from Step 6 to v0.3 lock); 2026 H2 auditor-citation signal as early validation; OSS-substrate validation via cohort interop at v1.0 | v0.3 lock; v1.0 / 2026 H2 signals |
+| ComplianceClaim adoption slow | CCAC ship-gate at v1.0 makes envelope testable without partner dependency; pilot partner is v2.5 anecdotal-but-not-blocking | v1.0 / v2.5 |
+| Cortex consortium target undecided | Final lock by v0.3 (Reza-class single-org cross-team is leading candidate) | v0.3 lock |
+| Cohort projects don't standardize on MAOS contracts | Constitutional substrate evolution governance; ACP/MCP/A2A interop maintained as protocol commitments; first cohort interop is v1.0 success criterion | v1.0 |
+
+**Resource Risks:**
+
+| Risk | Mitigation | Phase |
+|---|---|---|
+| **Founder burnout in solo phase** (John's #1 timeline-killer; Mary's #7 silent-slip risk) | Hard cap solo phase at 8 calendar weeks for v0.1; **contributor #2 by v0.3 (not v0.5)**; advisor council formed at v0.3 (3-person); 30% schedule reserve declared upfront | v0.1–v0.3 |
+| v0.1 timeline overrun due to scope creep | v0.1 explicitly de-scoped to foundational-only (placeholder Spirit, no multi-Spirit, no A2A); all pull-forwards moved out to v0.8 where they belong | v0.1 |
+| Skill ecosystem doesn't grow | Lead by example: BMAD skills as canonical reference; skill-package authoring guide in spirit-development-and-sharing.md §13 | v1.0+ |
+| Community vetting bottleneck | Initial vetting authority is the founder + initial maintainers; vetter trust model documented at v1.0; community vetting authorities accredited starting v2.5 | v1.0–v2.5 |
+
+### Open Questions Resolved by v0.3 (split: Governance Lock + Architecture Lock per Winston)
+
+**v0.3 Governance Lock** (positioning / commercial / OSS-licensing — does not constrain code):
+1. **Cortex consortium target** for v2.5 demo — Reza-class single-org cross-team is the leading candidate per John's Step 8 confirmation.
+2. **OSS license** — Apache 2.0 (per John's Step 8 analysis: copyleft kills the trust-anchor frame; permissive enables ecosystem adoption; the moat is spec + trademark + ComplianceClaim, not license).
+3. **Trust-anchor vs OSS-substrate competitive frame** — both frames consistent with architecture through v0.3; lock is positioning. Recommendation: lead with OSS-substrate framing, route trust-anchor framing to ComplianceClaim narrative within it.
+
+**v0.3 Architecture Lock** (constrains kernel + ABI + Spirit lifecycle — Winston's separation):
+4. **Failure-semantics floor (ADR-022)** — Winston's non-negotiable v0.3 architecture lock; v0.8 implementation. Four-point minimum: crash detection ≤ 2s; `task.assign` NACK with `TaskOrphaned` ≤ 5s; no auto-respawn at v0.8; journaled crash transition with exit-cause.
+
+**v0.3 lock CI script** (Murat's mechanical checklist): `scripts/check_v0_3_lock.sh` runs four checks; no v0.3 tag without script in green. Checks: LICENSE matches ADR string; consortium-target ADR exists with status `accepted` and ≥ 2 maintainer sign-offs; ROADMAP.md has trust-anchor decision section with status `decided` linking to ADR; failure-semantics doc exists with at least one fully-specified route (no `TBD`).
+
+**v0.5 Revisit Window** (Mary's concern — license decision needs more community feedback than v0.3 allows):
+- v0.3 publishes a *defaults document* with explicit "revisitable until v0.5" clause for license and consortium target.
+- After v0.5, the locks become final and removal would be a major-version event.
+
+### Substrate Operations Checklist (full)
+
+| Concern | Owner | Target version | Artifact |
+|---|---|---|---|
+| Install / upgrade / clean uninstall UX | Core team | **v0.1** | `maosctl install`, `maosctl upgrade`, `maosctl uninstall` (clean) + tests |
+| `SECURITY.md` + disclosure pipeline + GPG key | Maintainer team | **v0.1** | `SECURITY.md` + `security@maos.dev` + advisory format committed (Mary's hill-to-die-on) |
+| Doctest CI gate | Kernel team | **v0.1** | Every public ABI method has ≥ 1 doctested example; CI broken-link blocking |
+| `maosctl` accessibility | Core team | **v0.1** | NO_COLOR / TERM=dumb / `--plain` flag |
+| Yank notification | Core team | v0.5 | Registry polling + operator notification |
+| Pre-write secret-redaction filter | Core team | **v0.5** | Mary's §9.5 metric #5 deployment |
+| Synthetic governance dry-run | Maintainer team | **v0.5** | Two-maintainer contrived-RFC walkthrough; published decision log |
+| `RFC_TEMPLATE.md` | Maintainer team | v0.3 (drafted) → v0.5 (locked) | RFC template + governance procedure |
+| `GOVERNANCE.md` | Founder + initial maintainers | v0.3 (drafted) → v0.5 (locked) | Maintainers list, lazy-consensus on RFCs, tiebreak by maintainer vote |
+| `CODE_OF_CONDUCT.md` | Maintainer team | v0.5 | Contributor Covenant baseline |
+| `BREAKING.md` | Kernel team | v0.5 | Every breaking change requires entry; CI grep-enforced |
+| `LOCALES.md` | Doc team | v0.5 | Translation contribution flow + glossary lock |
+| `TRADEMARK.md` | Maintainer team | v0.5 | Brand policy (Mary's gap closed at v0.5) |
+| Sustainability vehicle | Maintainer team | v0.5 | Open Collective minimum (Mary's gap closed) |
+| Namespace grammar ADR | Architecture | v0.5 | Flat vs scoped Spirit names (Mary's gap closed) |
+| Advisor council formed | Founder | v0.3 | 3 people, advisory not voting |
+| Contributor #2 onboarded | Founder + recruit | v0.3 | "Spirit ABI stable enough that contributor writes a reference Spirit in <1 week" |
+| Spirit-author docs pulled forward | Doc team | v0.3 | Documentation artifacts at v0.3-readiness for second-contributor onboarding |
+| Spirit registry basic | Core team | v0.5 | MCP-Streamable-HTTP server, Ed25519 signing |
+| Audit query / SIEM export | Core team | v0.5 (basic), v1.0 (signed export + multi-region) | `maosctl audit query` family + sealed-export |
+| Telemetry opt-out + `PRIVACY.md` | Core team | v0.5 (PRIVACY.md drafted before any endpoint), v1.0 (endpoint ships) | Opt-in default + per-field redaction layer |
+| LTS window | Maintainer team | v1.0 announcement | `STABILITY.md` + LTS branch policy |
+| Vetter accreditation | Maintainer team | v1.0 documented | Vetter trust model document |
+| ComplianceClaim issuance | Issuance Spirit class | v1.0 first-class object; v2.5 multiple issuers | `ComplianceClaim` envelope spec + first issuer pilot |
+| Doc tooling pipeline | Doc team | v0.5 (pick), v1.0 (in production) | mdBook + i18n / Docusaurus / VitePress with versioning |
+| Three-door doc page | Doc team | v0.5 | `docs.maos.dev` reader-task-first navigation |
+| Typed error catalog | Kernel team | v1.0 | Per-error pages with cause / recovery / examples; CI-enforced |
+| 30-Min First Spirit Validation Gate | Doc team + community | v1.0 | **N=12 stratified**, ≤ 45 min median, ≤ 90 min p95, ≥ 10/12 succeed |
+
+### Strategic Scope Commitments
+
+- **Phasing is invariant-preserving:** every phase ships a working subset of invariants; no phase relaxes any invariant.
+- **No silent de-scoping:** every requirement committed in Steps 4–7 is mapped to a phase. If a requirement is missing from this scoping, it is a documentation bug to be flagged, not a deferral.
+- **v0.1 is foundational, not founder-loop:** kernel skeleton + placeholder Spirit + clean install/uninstall + `SECURITY.md` + audit trail. **Founder loop is v0.8.**
+- **Butler at v0.3 + Researcher at v0.5 are simpler proof points** that exercise the kernel's anticipatory + exploratory cognitive surfaces without requiring multi-Spirit IAC, A2A, or full distillation. They prove the substrate progressively.
+- **Pull-forwards are gone from v0.1.** Subprocess Spirit form, multi-Spirit IAC bus, A2A peer mesh, T2 sandbox, distillation pattern, hot-swap migration all deferred to their natural phases (v0.3 / v0.5 / v0.8). v0.1 timeline becomes ~6–8 weeks (Murat's testable threshold).
+- **Reference Spirit count grows progressively:** 1 placeholder at v0.1 → 2 (Butler) at v0.3 → 4 (+ Researcher + Observer) at v0.5 → 7 (+ Orchestrator + 2 Workers) at v0.8 → 9 (+ Architect + Reviewer) at v1.0 → 10 (+ Mira) at v1.5 → 11 (+ Enterprise) at v2.0. Third-party Spirits proliferate via the registry, not by being added to MAOS source.
+- **Skills are user-space; never kernel.** Filesystem-based v0.5; optional registry v2.0.
+- **v2.0 splits into v2.0 (technical) + v2.5 (ecosystem-adoption).** Technical phase cannot gate on third-party adoption (per John's rule).
+- **Halt-recall preference is user-configurable** per Spirit per tag.
+- **Kernel-stays-small redefinition:** trusted core ≤ 20 KLOC through v2.0; integration adapters in separate crates with their own budgets; "small" = trusted core, not binary footprint.
+- **v0.3 split:** Governance Lock (positioning, license, consortium target, trust-anchor framing) + Architecture Lock (failure-semantics floor as ADR-022). Different review boards, different acceptance criteria.
+- **Founder burnout mitigation is non-negotiable:** hard cap solo phase at 8 weeks for v0.1; contributor #2 by v0.3; advisor council formed at v0.3; 30% schedule reserve declared upfront.
 
 <!-- Content will be appended sequentially through the PRD workflow steps -->

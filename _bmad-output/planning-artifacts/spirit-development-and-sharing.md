@@ -14,6 +14,10 @@ based_on_brief: 'Winston, 2026-05-05'
 
 > **A note from your writer.** This document is practical. The architecture says **what** we built; the design report explains **how we thought about it**; this guide tells you **how to ship a Spirit on it**. If you have an idea for an agent and a toolchain you like, you should be able to read this end-to-end in an afternoon and have a working Spirit by the next.
 
+> **Actor's framing (founder, 2026-05-06).** *"MAOS kernel and sub-modules are the grand theater. Spirits are actors in the play. The user is the director of the play."* If the kernel is the theater (stage, lighting, sound, audit-trail, exits), **your Spirit is an actor on it**. This guide teaches actor craft: how to take direction from the user (the director), how to perform within the manifest's declared scope (your character's blocking), how to invoke the skills you know (your scripts), how to signal back to the director when you need direction (`epistemic.halt`), and how to leave the stage cleanly at the end of the scene. The director may run the play autonomously while at dinner — your Spirit's posture (`autonomous-with-halt`) lets the director step away — or step in scene-by-scene to direct in detail (`assistive` posture; every action approved). **Your job as a Spirit author is to write actors who serve the director's intent and are pleasant to direct.** Theater provides the conditions; you write the performance.
+
+> **📍 Phasing reconciliation banner (2026-05-06).** Earlier sections of this guide reference an Architect-Spirit-first phasing where v0.1 was the founder's-loop wedge demo. **The PRD's Step 8 has restructured phasing** to ship simpler single-Spirit Spirits first: v0.1 Foundational (kernel + placeholder Spirit) → v0.3 Butler (anticipatory single-Spirit) → v0.5 Researcher + Observer (exploratory single-Spirit + first opt-in distillation) → v0.8 Founder Loop (multi-Spirit wedge demo) → v1.0+ as before. For Spirit-author guidance: **Butler and Researcher are the v0.3/v0.5 reference Spirits to study first**; the Worker + Orchestrator examples in this guide remain canonical for v0.8 and beyond. Doc propagation to align tutorial paths with the new ship-phase ordering is tracked as a follow-up. Skill-package authoring methodology (§13) and ABI usage (§5) remain canonical.
+
 ---
 
 ## How to read this document
@@ -1299,7 +1303,7 @@ If you're writing a single-task worker (Coder, Reviewer, Researcher), this secti
 
 1. A peer Spirit emits `task.complete` (or any other large payload) addressed to your aggregating Spirit. The kernel writes the full payload to the Transparency Log (Invariant I2) and routes it to your mailbox.
 2. Your Spirit's `on_frame` handler **does not** append the raw payload to its LLM context. Instead, it triggers a distillation step: a small LLM call (Spirit-chosen model, prompt, token budget) that summarizes the raw payload into a ~150-token decision-relevant digest.
-3. The digest is written to working memory (in-process Spirit state — no kernel involvement) tagged `kind: digest`. Optionally elevated to **episodic memory** (call existing `fs.write` on the private tier) for cross-session retention or **shared memory** (call `memory.share`) for inter-Spirit dissemination. Per Invariant I11, every persisted digest MUST carry `source_log_ref: [frame_id, ...]` and `distillation_depth: N`. The kernel rejects writes that lack these with `EDigestAuditChainMissing`.
+3. The digest is written to working memory (in-process Spirit state — no kernel involvement) tagged `kind: digest`. Optionally elevated to **episodic memory** (call existing `fs.write` on the private tier) for cross-session retention or **shared memory** (call `memory.share`) for inter-Spirit dissemination. Per Invariant I11, every persisted digest MUST carry `source_log_ref: [frame_id, ...]` and `distillation_depth: N`. Per Invariant I13 (ADR-018), every digest MUST also carry `intent_lineage: [intent_class, ...]` — the union of `intent` field values from all input frames it summarizes. The kernel rejects writes that lack `source_log_ref`, `distillation_depth`, or `intent_lineage` with `EDigestAuditChainMissing`. Consumers under intent `Y` admit the digest only if `intent_lineage ⊆ allowed-promotion-set(Y)` declared in their manifest (typed error `EIntentPromotionDenied` on rejection — closes consent-laundering through distillation).
 4. Your Spirit's active LLM context contains: digests + decisions + recent I/O + queued external input. Raw payloads are *not* in active context.
 5. When a downstream decision needs full evidence (e.g., the digest hedged a finding and you want to read the original Reviewer output), call `log.recall(filter)` to fetch frame headers, then `log.fetch(frame_id)` to materialize a payload (ADR-013). Recall queries are themselves logged.
 6. When you emit any `decision.*`-typed frame (`task.assign`, halt, dispatch, consent), the kernel attaches `working_memory_digest_refs` populated from your declared in-context digests (I12). You don't write this field — the kernel does.
@@ -1313,7 +1317,7 @@ Loom patterns may decide policy on max acceptable depth (e.g., halt-and-escalate
 
 ### §13.3 The four-metric benchmark suite (ship gate)
 
-If your Spirit ships distillation, you MUST meet four metrics across an appropriate corpus before publishing:
+If your Spirit ships distillation, you MUST meet five metrics across an appropriate corpus before publishing:
 
 | Metric | Floor | What you measure |
 |---|---|---|
@@ -1321,11 +1325,13 @@ If your Spirit ships distillation, you MUST meet four metrics across an appropri
 | **Digest-faithfulness** (no-contradiction rate) | ≥ 0.98 unflagged | Judge-LLM (different model family from your distiller, to avoid shared blindspots) checks `(raw, digest)` pairs for contradictions. Sample 1-in-100 in production via async audit. Flag rate above 2% blocks ship. |
 | **Digest-hedge-preservation** | ≥ 0.95 | Corpus includes hedged statements ("possibly," "60% confident," "needs verification," "edge case"). Distill. Check whether the digest preserves the hedge or flattens it to certainty. The silent-killer metric — fight for it. |
 | **Digest-traceability** | 100% (kernel-enforced) | Every digest carries non-empty `source_log_ref` and `distillation_depth`. The kernel enforces I11; failures here are kernel bugs, not Spirit bugs. Should always be 100%. |
+| **Digest-secret-leakage** | 0% (zero-tolerance) | Corpus includes 10⁵ synthetic frames with planted secrets (API keys, capability tokens, private-key bytes). Distill. Verify no digest contains any planted secret. The kernel's pre-write redaction filter catches secret patterns at the IAC boundary; this metric verifies that distillation also does not leak. **Any false negative is a P0 ship-blocker.** |
 
-**Corpus expectations:** at least 100 cases, hybrid:
+**Corpus expectations:** at least 100 calibration cases plus 10⁵ synthetic-secret cases, hybrid:
 
-- **50 synthetic cases** with hand-authored payloads containing planted critical findings (security vulnerabilities, test-failure-misreports, hedged-but-critical observations, contradicted-prior-findings). Include at least 10 hedge-preservation cases and 10 contradiction cases. These are calibration cases with ground-truth decisions.
+- **50 synthetic cases** with hand-authored payloads containing planted critical findings (security vulnerabilities, test-failure-misreports, hedged-but-critical observations, contradicted-prior-findings). Include at least 10 hedge-preservation cases, 10 contradiction cases, and 10 planted-secret cases. These are calibration cases with ground-truth decisions.
 - **50 real cases** drawn from your Spirit's actual usage history with retrospective labels.
+- **10⁵ synthetic-secret cases** for the secret-leakage metric — auto-generated payloads with embedded API keys / tokens / cryptographic-key patterns; the kernel's redaction filter is exercised in addition to your distiller.
 
 These thresholds are **uniform** across all distillation-shipping Spirits. The corpus per Spirit may differ (Mira uses telemetry; Orchestrator uses Worker `task.complete` payloads; Loom uses cross-institutional reports); the metrics and floors do not.
 
@@ -1336,6 +1342,7 @@ These thresholds are **uniform** across all distillation-shipping Spirits. The c
 - Digest-faithfulness unflagged-contradiction rate > 5%: do not ship.
 - Hedge-preservation < 0.90: do not ship.
 - Traceability < 100%: kernel bug, do not ship.
+- **Secret-leakage > 0%: do not ship. Zero-tolerance.** A single planted secret reaching a digest is a P0 — fix the redaction filter or the distiller prompt before ship.
 
 ### §13.4 Authoring an Orchestrator Spirit — recipe
 
@@ -1364,6 +1371,42 @@ The reference Orchestrator Spirit (`spirit-orchestrator-bmad`) ships in v1.0 alo
 - It is not a how-to for the distillation prompt itself. The prompt is your design choice; the architecture takes no position on it (per ADR-006). Iterate on your prompt with your benchmark suite as ground truth.
 - It is not a guarantee that the distillation pattern is required. Single-task Spirits with bounded contexts don't need it. The pattern shows its value at long-running, many-peer aggregation; below that threshold, the audit-chain overhead may not be worth the LLM-cost overhead.
 - It is not a place to bake LLM provider choice into the contract. Choose your distiller model per cost / latency / hedge-fidelity trade-off; document the choice in your eval results.
+
+### §13.6 Hermes-informed conventions for distillation Spirit-authors
+
+Three conventions distillation-shipping Spirit-authors SHOULD adopt, drawn from [hermes-agent's `trajectory_compressor.py`](https://github.com/NousResearch/hermes-agent/blob/main/trajectory_compressor.py) reference implementation and codified in architecture §9.5:
+
+1. **First-turn / last-turn anchoring.** Preserve the original task statement and the final output uncompressed in your digest. Compress only the middle. Hermes' compressor explicitly protects the first turns (system, human, first gpt, first tool) and the last N turns (final actions and conclusions). The v0.5 ship-gate measures task-preservation via cosine-similarity ≥ 0.95 between digest and original task statement; without first-turn anchoring, you fail this gate.
+
+2. **Target token budget.** Declare `target_max_tokens` per distillation invocation. Default `max(2048, 0.15 × original_tokens)`, overridable per Spirit class via manifest `[distillation].target_max_tokens`. Compression ratios outside `[0.05, 0.25]` indicate either a compressor that's dropping content or not compressing — both fail the v0.5 ship-gate.
+
+3. **Compressor model class.** Use a model class ≥ Sonnet-tier or 70B+ open-weights, with temperature ≤ 0.3. The v0.5 ship-gate's digest-recall floor (≥ 0.90 of hermes baseline on 100-trajectory corpus) effectively enforces this via outcome — if you compress with a 7B model, you fail.
+
+The kernel does not enforce any of these conventions (per ADR-006, kernel takes no position on prompt structure or model choice). They are Spirit-author craft. But the v0.5 ship-gate corpus benchmarks against hermes' implementation — if your distillation underperforms hermes by more than 10%, you ship hermes' compressor wrapped instead of inventing.
+
+### §13.7 Halt-and-resolve recipe (clarify_tool pattern)
+
+When your Spirit needs the director's input — ambiguous task, contradictory evidence, missing context, methodology dispute — emit `epistemic.halt` with structured options. This is the actor signaling back to the director: *"I need direction here."* The pattern, drawn from [hermes-agent's `clarify_tool.py`](https://github.com/NousResearch/hermes-agent/blob/main/tools/clarify_tool.py) but operationalized at the kernel level via MAOS' built-in halt mechanism:
+
+```
+spirit emits:
+  halt_type: epistemic.halt
+  tag: <[epistemic_policy] tag matched>
+  reason_summary: "<one-line description of what's ambiguous>"
+  options:
+    - id: a, label: "Snooze X for 75 min", action: <structured_action>
+    - id: b, label: "Reschedule X now", action: <structured_action>
+    - id: c, label: "Keep working", action: <structured_action>
+  resolution_paths: [provided_context, accepted_halt, authorized_override]
+```
+
+Director sees the halt notification, picks an option (or types `provided_context` to override). Kernel journals the resolution; Spirit resumes with the resolution payload in working memory. **The structure matters:** options must be concrete (not "tell me what to do"), the reason must be one-line scannable on a phone, and the resolution must produce forward progress (Murat's stall-detector test: post-halt resumption produces forward progress on ≥ 90% of correct halts; otherwise the halt was a stall regardless of how it was framed).
+
+The halt is the actor's most important interaction with the director. Treat it as performance, not as a function call.
+
+### §13.8 Skill package interop (agentskills.io stance)
+
+Skill package format is MAOS-native at v0.3/v0.5. Interop with external skill standards (agentskills.io and others) is a v1.0 decision; until then we focus on getting MAOS' native format right. A future ADR (TBD) will specify whether MAOS adopts agentskills.io as a bidirectional adapter (importable + exportable, with documented lossy round-trips), defines its own format and accepts ecosystem fragmentation, or stays silent until the wider ecosystem stabilizes. **Do not assume agentskills.io compatibility in v0.3/v0.5 Spirit-author work**; if your Spirit needs to interop with hermes-class skill packages, write the adapter as a Spirit-side skill and cite it in your manifest's `[skills.imports]` table.
 
 ---
 
