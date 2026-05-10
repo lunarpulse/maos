@@ -1,5 +1,15 @@
 ---
-stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-02b-vision', 'step-02c-executive-summary', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping', 'step-09-functional', 'step-10-nonfunctional', 'step-11-polish']
+stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-02b-vision', 'step-02c-executive-summary', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping', 'step-09-functional', 'step-10-nonfunctional', 'step-11-polish', 'step-v-validate-2026-05-10', 'step-e-edit-2026-05-10']
+lastEdited: '2026-05-10'
+editHistory:
+  - date: '2026-05-10'
+    workflow: 'bmad-edit-prd'
+    summary: 'Polish pass per validation report findings'
+    changes:
+      - 'L36: Resolved stale "📍 Canonical phasing source" warning — added "✅ Reconciled 2026-05-10" marker; named architecture-maos-minimal-opus.md as canonical architecture (replaces architecture-maos.md); documented division of canonical authority (PRD = phasing/requirements/journeys; minimal-opus = ADRs/invariants/kernel internals)'
+      - 'Inserted new "### Journey carveout map (FR trace policy for downstream consumers)" subsection at end of §User Journeys — Category A deferred-journey-traced FRs (FR23a/b, FR48, FR54, FR60, FR64) + Category B substrate-property FRs (FR47, FR50, FR62, FR65) + epic-breakdown operational guidance'
+      - 'NFR-Doc-4: Tightened from 1-line list to 5 named URL paths (docs.maos.dev/{manifest, cookbook, migrate, troubleshoot, deploy}) with per-deliverable minimum counts and explicit CI gate (broken-link, ≥10 cookbook patterns, 100% FR63 troubleshooting coverage)'
+      - 'NFR-Scale-3: Quantified "fairness scheduler" — named algorithm (Deficit Round Robin, operator-configurable weights via [scheduler.weights]) and added max-min P99 latency-ratio floor (≤3.0 under named adverse load: 1 noisy Spirit at 10× median + ≥4 normals for 60s)'
 releaseMode: phased
 classification:
   projectType: 'developer_tool'
@@ -33,7 +43,7 @@ projectName: 'maos'
 **Date:** 2026-05-05 (Step 8 phase-restructure: 2026-05-06)
 **Status:** Complete (PRD workflow Steps 1–12 complete; ready for downstream architecture / UX / epic-breakdown work)
 
-> **📍 Canonical phasing source:** This PRD's Step 8 (Project Scoping & Phased Development) defines the canonical phase structure: v0.1 Foundational → v0.3 Butler → v0.5 Researcher + Observer → v0.8 Founder Loop wedge demo → v1.0 Team-ready → v1.5 Diagnostic-Architect → v2.0 (technical) → v2.5 (ecosystem-adoption). The companion architecture documents (`architecture-maos.md`, `spirit-development-and-sharing.md`, `maos-kernel-implementation-guide.md`) reflect an earlier phasing where v0.1 = Architect Spirit driving a coding task; those docs are scheduled for propagation to match this PRD's structure. Until propagation completes, **the PRD is the canonical source for phasing decisions**; the architecture docs remain canonical for everything else (ADRs, invariants, kernel internal architecture).
+> **📍 Canonical phasing source — ✅ Reconciled 2026-05-10.** This PRD's Step 8 (Project Scoping & Phased Development) defines the canonical phase structure: v0.1 Foundational → v0.3 Butler → v0.5 Researcher + Observer → v0.8 Founder Loop wedge demo → v1.0 Team-ready → v1.5 Diagnostic-Architect → v2.0 (technical) → v2.5 (ecosystem-adoption). **Architecture canonical source:** `architecture-maos-minimal-opus.md` (post-adversarial-review optimal architecture; supersedes the earlier `architecture-maos.md` which reflected a v0.1 = Architect-Spirit-driving-a-coding-task phasing). The minimal-opus architecture aligns with this PRD's phase structure for the v0.1 → v1.5 horizon and explicitly defers J3 Marcus (v1.0) and Reza Cortex (v2.0/2.5) per its §10.7. **Division of canonical authority:** the PRD is canonical for phasing decisions, requirements (FR/NFR), success criteria, and journeys; `architecture-maos-minimal-opus.md` is canonical for ADRs, invariants (I1–I14), and kernel internal architecture. The companion guides `spirit-development-and-sharing.md` (Spirit-author SDK + registry) and `maos-kernel-implementation-guide.md` (kernel build steps) remain canonical within their named slices and are scheduled for the same minimal-opus reconciliation when next touched.
 
 ## Executive Summary
 
@@ -567,6 +577,35 @@ Open questions routed forward:
 - **Cortex consortium target for v2.0 demo** — Reza-style single-org cross-team is the leading candidate; OSS-on-MAOS (Debian / Wikimedia / Apache Foundation) and federated research consortium are alternatives. **Final lock by v0.3** per Step 2c.
 - **Adversarial-Spirit threat model** — Mary's stakeholder list for Step 10 NFR (STRIDE-style attack narratives with kernel defenses traced to FRs).
 - **Halt-recall vs halt-precision floors per Spirit class** — uniform across distillation-shipping Spirits per §9.5; per-Spirit floors for non-distillation Spirits (J4 Mira: halt-recall ≥ 0.7; J1 Orchestrator: halt-precision ≥ 0.85). Routes to Step 10.
+
+### Journey carveout map (FR trace policy for downstream consumers)
+
+Most FRs trace directly to a named user journey (per the Journey Requirements Summary table above). Two carveout categories exist for FRs whose trace is non-obvious — **downstream consumers (epic breakdown, story creation, sprint planning) MUST treat carveout FRs as legitimate, not as orphans.**
+
+**Category A — Deferred-journey-traced (intentional future-phase scope):** FRs anchored to journeys deliberately deferred from the `architecture-maos-minimal-opus.md` v0.1–v1.5 scope per its §10.7. These are NOT orphans; they are the substrate's commitment to the deferred journeys' enablement primitives.
+
+| FR | Trace target | Phase | Note |
+|---|---|---|---|
+| FR23a / FR23b | J3 Marcus Team Nexus + J4 Mira-Nash + Reza Cortex | v0.8 (loopback) → v1.0 (cross-host) | A2A peer mesh — enables team mesh + bilateral diagnostic-architect + cross-region Cortex |
+| FR48 | Reza Cortex (enterprise/regulated) | v0.5 | Pluggable cryptographic provider (FIPS / hardware-backed / post-quantum); enterprise-readiness substrate primitive |
+| FR54 | J3 Marcus Team Nexus + J6 Diego (hermes-tenant defense) | v1.0 | Gateway sub-modules (Telegram/Slack/Discord/Signal/email); operationalizes the v1.0 hermes-tenant positioning claim |
+| FR60 | Reza Cortex (air-gapped enterprise) + Aisha-CVE scenario | v1.5 | Air-gapped Spirit/skill artifact import; enterprise-readiness substrate primitive |
+| FR64 | Reza Cortex (enterprise multi-tenant cost accounting) | v1.0 | Per-Spirit cost attribution; "no enterprise deployment without per-tenant cost accounting" gate |
+
+**Category B — Substrate-property (architectural-invariant trace):** FRs that serve all journeys uniformly via the kernel's invariant guarantees rather than a single journey. These trace to architectural anchors (invariants I1–I14 + ADRs) per the FR-to-architecture traceability table in §Functional Requirements.
+
+| FR | Architectural anchor | Why all-journeys |
+|---|---|---|
+| FR47 | I1 (capability mediation) + ADR-005 (Inference Port closure) | Every Spirit's model call traverses the kernel — no journey is exempt from this audit boundary |
+| FR50 | I10 (lifecycle journaling) | Crash-survival applies whenever any Spirit dies; serves operational reliability across all journeys |
+| FR62 | Innovation #7 (Constitutional Substrate Evolution) | Audit-queryable governance artifacts (vetter-key admission, ABI-extension proposals, ComplianceClaim schema versions) underpin third-party trust for every Spirit author + every operator |
+| FR65 | Defends v1.0 hermes-tenant positioning + GDPR cascade (FR45) | Spirit uninstall proof-of-erasure; serves J0 clean-uninstall (Tier 1 success criterion) AND enterprise GDPR-style requirements |
+
+**Operational guidance for epic breakdown:**
+
+- **Default path:** every FR maps to ≥1 epic; epic phase = FR phase.
+- **Category A FRs:** epics exist but ship in the FR's named phase, NOT in v0.1. Story-level acceptance criteria reference the deferred journey's reproducibility milestone (e.g., FR23b acceptance includes "10-host Cortex zero-conversation-drop chaos test" because that's the v1.0 J3-reproducibility gate).
+- **Category B FRs:** epics anchor to the architectural invariant rather than a single journey; acceptance criteria reference invariant-property tests (e.g., FR47 acceptance = NFR-Test-2 surface-invariant test passes; ≥98/100 events recoverable from logs per NFR-Aud-1).
 
 ## Domain-Specific Requirements
 
@@ -1675,7 +1714,13 @@ The 13 categories below cover **~85 NFRs** anchoring the substrate's quality con
 - **NFR-Doc-1:** Every public ABI method has ≥ 1 doctested example; CI broken-link blocking on doc site **at v0.5 (when doc site lands)**; doctest CI gate at v0.1 [PHASE-SPLIT per John].
 - **NFR-Doc-2:** Typed error catalog at `https://docs.maos.dev/errors/<ERR_NAME>` covering all 14+ named typed errors. **CI-enforced metadata: each variant has 6 fields (code, severity, recovery-class, owner, kernel-or-spirit, since-version). CI runs `cargo run --bin error-metadata-check` which exits non-zero if any variant is missing any field; each field has its own assertion.** v1.0. [TIGHTENED per Murat]
 - **NFR-Doc-3:** API reference site at `https://docs.maos.dev/abi/<version>/`; versioned, searchable, deep-linkable, archived ≥ 2 minor versions back. v1.0.
-- **NFR-Doc-4:** Manifest schema reference (human-rendered); pattern cookbook; migration runbooks (Path A + Path B); troubleshooting guide; deployment topology guide. v1.0.
+- **NFR-Doc-4:** Five canonical doc deliverables published with concrete URL paths and CI-verifiable minima:
+  - **Manifest schema reference** at `https://docs.maos.dev/manifest/<version>/` — one entry per declared field rendered from the JSON schema; **floor: ≥1 example per field**.
+  - **Pattern cookbook** at `https://docs.maos.dev/cookbook/` covering lifecycle / IAC / capability / halt / hot-swap / cross-Spirit / distillation / memory / ecosystem / audit; **floor: ≥10 patterns**.
+  - **Migration runbooks** at `https://docs.maos.dev/migrate/` — Path A (in-major) + Path B (cross-major); each runbook has a rollback section.
+  - **Troubleshooting guide** at `https://docs.maos.dev/troubleshoot/` keyed by typed error code (per FR63 catalog); **floor: every typed error in the FR63 catalog has a troubleshooting entry**.
+  - **Deployment topology guide** at `https://docs.maos.dev/deploy/` covering single-host / team-mesh / cross-host / Cortex topologies.
+  - **CI gate:** each URL renders 200 (broken-link blocker per NFR-Doc-1); pattern-cookbook entry count ≥10; troubleshooting entries cover 100% of FR63 catalog. v1.0.
 - **NFR-Doc-5:** WCAG AA compliance for doc site. v1.0.
 - **NFR-Doc-6** [PHASE-MOVE per John]: Localization v1.0 = **Korean only** (shipped); Japanese + Chinese-simplified at v1.5. `LOCALES.md` with glossary lock — terms NEVER translated: Spirit, Worker, kernel, ADR identifiers, error codes.
 - **NFR-Doc-7** [PHASE-MOVE per John]: Doc tooling supports per-locale builds + fallback to English + language switcher with deep-link preservation + version dropdown. **RTL layout support deferred to v2.5** (no RTL locale targeted before v2.5). Pick mdBook + i18n / Docusaurus / VitePress by v0.5; v1.0 in production.
@@ -1703,7 +1748,7 @@ The 13 categories below cover **~85 NFRs** anchoring the substrate's quality con
 
 - **NFR-Scale-1:** Cortex 3-region pilot at v2.0 with ≥ 10 agents minimum; sustained operation for 30 days; zero substrate-invariant violations.
 - **NFR-Scale-2** [PHASE-SPLIT per John + cost-compression per Murat]: **25-host churn test at v2.0; 100-host churn at v2.5** (cost compression: 100→30 hosts at v2.0 same churn-events-per-week, full 100-host moves to v2.5).
-- **NFR-Scale-3:** Per-Spirit fairness scheduler in front of log writer (NOT FIFO). v0.5.
+- **NFR-Scale-3:** Per-Spirit fairness scheduler in front of log writer (NOT FIFO). **Algorithm: Deficit Round Robin (DRR) with per-Spirit weight=1 by default; operator-configurable weights via `[scheduler.weights]` in the operator policy file.** **Floor:** under uneven load (1 noisy Spirit at 10× the median write rate alongside ≥4 normal Spirits sustained for 60s), the max-min P99 latency ratio across Spirits ≤ 3.0 (no single healthy Spirit's writes blocked more than 3× the slowest healthy Spirit's P99). v0.5.
 - **NFR-Scale-4:** Provider rate-limit isolation — per-(provider, credential) token bucket; typed `RateLimited` IAC frame. v0.5.
 - **NFR-Scale-5:** Multi-host A2A peer mesh scales to 14-institution Cortex; v2.0 target with documented capacity envelope.
 
