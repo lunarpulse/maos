@@ -1,0 +1,90 @@
+# 13. Phased Roadmap
+
+Seven phases (v0.1, v0.3, v0.5, v0.7, v0.9, v1.0, v1.5), each with one observable validation milestone.
+
+**Phase numbering convention.** Phase numbers are spaced at 0.2 intervals through v0.7 / v0.9 as nominal labels (v0.2, v0.4, v0.6, v0.9 are reserved for unplanned interim releases and not currently scheduled); the v0.1 → v0.3 → v0.5 → v0.7 → v0.9 progression preserves consistent 0.2 spacing through the maturity-gates phase. v1.0 and v1.5 follow the major-release semver convention. Phase numbers are nominal milestone labels, not arithmetic intervals — adoption order is fixed by the dependency arrows in the table below, not by the numeric distance between adjacent labels.
+
+| Phase | Scope | Validation milestone |
+|---|---|---|
+| **v0.1 — Foundational** | Kernel skeleton (Scheduler + Memory + Capability Registry + IAC mailbox basic — single-Spirit routing, no cross-Spirit fan-out); Spirit ABI v0.1 (machine-checked frozen via CI ABI-diff); single-Spirit subprocess form (Spirit Wire Protocol over JSON-RPC; one Spirit instance per kernel); local SQLite persistence; sandbox tiers T0/T1; Anthropic provider driver; Transparency Log (I2 — log-before-deliver) operational; capability tokens (I1 — every external call mediated); lifecycle journaling (I10) operational; one placeholder Spirit (`hello-spirit`) — minimal reference Spirit demonstrating the ABI; `maosctl` basic (`install`, `uninstall`, `audit query`, `spirit invoke`); accessibility (`NO_COLOR`, `TERM=dumb`, `--plain`); clean uninstall; `SECURITY.md` with disclosure pipeline; doctest CI gate. | J0 evaluator path: install + first useful Spirit response within 5 minutes; clean uninstall removes all kernel state; audit-from-minute-1. |
+| **v0.3 — Butler** | Adds: Butler Spirit (first reference cognitive Spirit with full anticipatory reasoning surface); `on_idle` lifecycle hook; Telemetry Stream (I7) basic narrow per-Spirit subscription; `[epistemic_policy]` per-tag rules; output_shape predicate enforcement at Capability Registry; MCP tool integrations (Calendar / Slack / Linear / Figma); posture-shift command at runtime; sandbox tier T2 (Landlock+seccomp narrow); episodic memory (private tier); hot-swap mechanism (ADR-017 wire format) functional; contributor #2 onboarded; advisor council formed; `RFC_TEMPLATE.md` + `GOVERNANCE.md` drafted. | J-Butler journey reproducible — Sandra's 7 PM scene runs end-to-end including the self-tuning halt three weeks later. Notification precision ≥0.85, recall ≥0.7; halt-precision ≥0.85. **30-Min First Spirit Validation Gate (NFR-Onb-1) as v0.3 release criterion** (N=12 stratified, ≥10/12 succeed). |
+| **v0.5 — Researcher + Observer + foundational hardening** | Adds: Researcher Spirit (second cognitive Spirit; survey-mode); Observer Spirit (third reference Spirit; passive activity-stream subscriber via Telemetry Stream); broad MCP capabilities (web/arXiv/GitHub/citation-graph); parallelism in tool dispatch (≤8 concurrent); `hypothesize-mode` posture declared (full ILP+LLM hybrid implementation deferred to v1.0); adaptive-chunk-ratio summarization; sandbox tier T3 (containerized); per-Spirit resource isolation via cgroups v2; distillation pattern (single-Spirit opt-in deployment) with five-metric gate; `log.recall` capability; I11 audit-chain enforcement; I12 decision-context recording; I13 intent_lineage propagation; pre-write secret-redaction filter; multi-provider LLM drivers (≥3 providers tested in CI); Spirit registry basic (MCP-Streamable-HTTP server, Ed25519 signing, install-time signature verification); `maosctl audit query` family; Approval Manager prompt UX; Transparency Log persistence with 90-day retention; ACP server (Zed + VSCode tested); `CODE_OF_CONDUCT.md`, `BREAKING.md`, `LOCALES.md`, `TRADEMARK.md`, `PRIVACY.md`, namespace grammar ADR locked. | J-Researcher journey reproducible — Hannah's 2-hour LLM-judge survey delivers structured findings + Open Questions + Confidence Map + Bibliography in ≤90 minutes; Researcher halts on contradictory findings; output passes output_shape predicate. Observer subscribes to multi-Spirit Telemetry Stream showing live activity for the Butler + Researcher pair. |
+| **v0.7 — Maturity gates** | Adds: staged Diego N=8 expansion cohort per §10.6 (≥6/8 to first-useful in 45 min, SUS ≥68); §7.2.1 mTLS revocation latency floors enforced (median ≤60s, p99 ≤5min — zero-data-plane-error floor advisory until v1.0); §6.6 halt-precision/recall corpus expanded to N≥100 (precision floor enforced, recall floor advisory); App-E v0.7 row activated — judge in shadow mode (N≥50, ρ ≥0.45, κ ≥0.75, accuracy ≥70% on held-out set, judge scores logged but not gating). v0.7 deliverables depend on telemetry from v0.5 deployments. | Maturity-gate dry-run passes: Diego N=8 cohort completes; mTLS revocation under load measured at scale; halt corpus N=100 produced with κ ≥0.7 inter-rater. **No new journey reproducibility milestone — v0.7 is a measurement phase, not a feature phase.** |
+| **v0.9 — Founder Loop wedge demo** | Adds: Multi-Spirit IAC bus (kernel-internal Spirit↔Spirit routing on the same Host); A2A peer at the loopback profile (`127.0.0.1`-bound, mTLS with self-signed certs, TOFU pinning); two-level `task.assign` typed-intent IAC primitive; ADR-012 typed-intent consent enforcement on A2A frames; ADR-016 token-budget accounting; ADR-017 hot-swap state-transfer wire format operational; ADR-020 hot-swap migration policy; ADR-021 CliWrapperSpirit output-shape adapter contract; ADR-022 failure-semantics floor (crash detection ≤2s, `task.orphaned` NACK ≤5s, journaled crash transition with exit-cause); Orchestrator Spirit (skill-package overlay on Claude Code process); Developer-Worker + Reviewer-Worker skill packages; full distillation pattern (§9.5) operational multi-Spirit; multi-CLI Worker parallelism (3+ concurrent); halt-recall and halt-precision benchmarks per Spirit class published; cross-Spirit memory isolation corpus (Sec-14a same-Host, 200 scenarios) passed. | J1 Founder's Loop reproducible — Lunarpulse runs Epic-7 BMAD loop end-to-end with Orchestrator + multi-CLI Worker pattern; halts on AC ambiguity at 6:23 PM; closes laptop at 8:40 PM; wakes to a completed digest at 6 AM. **The substrate's "moment of full ambition observable in one demo."** |
+| **v1.0 — Team-pair-ready, third-party Spirits ship** | Adds: 5 reference Spirit classes complete (Butler / Researcher / Architect / Diagnostic Engineer / Observer); cross-host bilateral A2A peer mesh with full mTLS + TOFU + ADR-012 consent; Spirit registry v1.0 (`registry.search` / `manifest` / `artifact` / `publish` / `deprecate`; three trust tiers; strictest-of enforcement); ComplianceClaim envelope + admission-time verification (first-class kernel object); audit sealed-export (Ed25519-signed regulator-ready bundle); HSIS ≥95% pass rate per Spirit class with zero invariant violations; CCAC N=600 with per-class N=30 floor ≥27/30; black-box third-party trial N=12 stratified ≥10/12; manifest fuzz + wire fuzz tiered cadence (§5.2 ladder: T1 10-min per-commit + T2 4h nightly + T3 24h per-RC; ≥168h cumulative pre-GA floor); external pen-test report with zero P0/P1 findings; typed error catalog at `https://docs.maos.dev/errors/<ERR_NAME>`; GDPR right-to-be-forgotten; cascade erasure receipt; cost-attribution accuracy ≥98%; crypto-module pluggability; air-gapped deployment validation; 1-year LTS announced; documentation artifacts (API reference, manifest schema reference, typed error catalog, migration runbooks Path A + Path B, troubleshooting guide, deployment topology guide, three-door page, WCAG AA). | **J3 baseline at v1.0 = bilateral 2-Host substrate readiness only** (not the full 8-Host team mesh, which is deferred to v2.0 — see §10.7.1). J6 Diego validated via N=12 stratified black-box external-author trial. **A third party authors and ships a Spirit binary independently of the MAOS source tree.** Hermes-tenant claim cashed at v1.0. |
+| **v1.5 — Diagnostic-Architect bilateral pair** | Adds: Diagnostic Engineer Spirit class (Mira-class) with full asymmetric capability gates; per-tag epistemic policy at production fidelity; post-deploy feedback IAC topic (Architect-class subscribes to Diagnostic-class post-deploy validation); Loom-lite (single-instance Postgres-backed pattern library, exposed as MCP-Streamable-HTTP server); `maos-persistence` Postgres support; MAOS-mediated provider proxies (intercept HTTP calls to LLM providers for substrate-layer audit); asymmetric postures (sre-diagnostician vs principal-architect); mobile-friendly approval surface (HTTP push notifications); five-metric distillation gate passes on all distillation-shipping reference Spirits; JetBrains plugin-bridge for ACP integration; bilateral 2-host mTLS rotation chaos test passes per §7.2.1 (revocation latency median ≤60s, p99 ≤5min, zero data-plane errors); halt-protocol-version registry per Spirit class; **J4-extended halt-continuity corpus (≥30 hot-swap-during-incident scenarios + mutation/fuzzing infrastructure, adversarial agent-handoff timing, I14 fuzz-tier substrate per §3.2.1 cadence promotion)**. (Note: ADR-023 capability-token mechanism ships at v0.1 per its corrected Status; v1.5 only validates the mechanism at bilateral 2-host scale.) | J4 Mira-Nash 90-minute diagnostic-architect loop reproducible on 50-scenario synthetic prod-incident corpus; ≥45/50 close in ≤90 min; ≥48/50 uphold typed-intent consent envelope. **Terminal milestone of the substrate.** |
+
+Three principles guide phasing:
+
+- **Each phase has a single observable validation milestone.** "We have v0.5" means the milestone is met, not that the to-do list is empty.
+- **No phase ships without ADR review.** If a phase forces a revisit of any architectural ADR, the phase boundary moves.
+- **Phasing is invariant-preserving.** Every phase ships a working subset of the fourteen invariants; no phase ships a relaxed version of any invariant. v0.1 ships I1–I10 enforced at the foundational kernel layer; v0.5 adds I11/I12/I13 enforcement; v0.9 adds I14.
+
+**Resource requirements (per phase):**
+
+| Phase | Cumulative effort | Team | Key skills added |
+|---|---|---|---|
+| v0.1 | ~6–8 weeks | 1 founder | Rust + Tokio, kernel design, capability systems, Spirit ABI specification, single-Spirit subprocess |
+| v0.3 | ~12–14 weeks total | 1 founder + advisor council formed | Active Inference / POMDP cognitive modeling, MCP integrations, `on_idle` lifecycle hook, narrow Telemetry Stream subscription |
+| v0.5 | ~20–22 weeks total | 2 implementers (founder + contributor #2) + 3-person advisor council | Broad MCP capabilities, parallelism in tool dispatch, output_shape predicate enforcement, T2/T3 sandbox, distillation pattern, v0.5 onboarding artifacts |
+| v0.9 | ~26–28 weeks total | 2–3 implementers + community contributors | Multi-Spirit IAC bus, A2A loopback, Orchestrator+Worker coordination, ADR-022 failure-semantics floor, full distillation pattern, multi-CLI Worker parallelism |
+| v0.7 | ~30–34 weeks total (v0.5 + 4–6 weeks for maturity gates) | 2–3 implementers + advisor council | Diego N=8 cohort coordination, mTLS revocation latency instrumentation, halt corpus N=100 with κ ≥0.7 IAA labeling, App-E v0.7 judge in shadow mode |
+| v1.0 | ~42–46 weeks total† | 3–4 implementers + ≥1 community contributor + DevRel | Bilateral A2A cross-host, Spirit registry, Ed25519 signing, ACP server, ComplianceClaim, HSIS/CCAC/manifest-fuzz/wire-fuzz gates, 30-min validation gate, typed error catalog, 8 doc artifacts, §6.6 halt corpus N=150, §7.2.1 mTLS rotation chaos infrastructure |
+| v1.5 | ~50–54 weeks total† | 4–5 implementers + ≥3 community contributors | Postgres + pgvector for Loom-lite, MAOS-mediated provider proxies, mobile push, JetBrains plugin, asymmetric postures, J4-extended halt-continuity corpus + I14 fuzz harness |
+
+† **Remediation-delta footnote.** v1.0's `~42–46 weeks` and v1.5's `~50–54 weeks` are *cumulative* totals (start-of-project to end-of-phase), inclusive of all prior phases. The remediation pass added ~6–10 weeks to the **prior v1.0 estimate** (~36–40 weeks) for §6.6 halt corpus N=150 with κ ≥0.7 IAA labeling, §7.2.1 mTLS rotation chaos infrastructure, and the full Diego N=12 stratified cohort. v1.5 added ~6–8 weeks for the J4-extended halt-continuity corpus + mutation/fuzzing infrastructure. The deltas attach to the **prior estimate of the same phase**, not to the increment from the previous phase row.
+
+## 13.1 Spirit-form Measurement Gate (subprocess → inproc)
+
+ADR-002 commits to subprocess-only at v0.1, with rust-inproc gated (not deferred). This subsection defines the gate so future "should we unlock inproc?" conversations have a falsifiable answer instead of a vibe.
+
+**Harness.** `benches/iac_roundtrip.rs` using `criterion`. Three workloads:
+
+| Journey | Description | What it measures |
+|---|---|---|
+| **J1** (synthetic floor) | Echo Spirit; 256-byte CBOR payload; single producer, single consumer; pinned cores | Bus floor — serialize + framing + pipe + deserialize |
+| **J-Butler** | Realistic butler flow: 1 inbound → 2 outbound `mcp.call` fan-out → 1 aggregated response; payloads 1–4 KB | p50/p95/p99 round-trip under typical load |
+| **J-Researcher** | Long-running researcher: 50-frame burst, 16–64 KB payloads; includes one EpistemicHalt + Resume cycle | Tail latency + halt/resume cost |
+
+**Metrics emitted per journey:** `iac_rt_p50_us`, `iac_rt_p95_us`, `iac_rt_p99_us`, `iac_rt_max_us`, `cpu_user_pct`, `cpu_sys_pct`, `rss_max_mb`.
+
+**Per-journey latency budgets (subprocess, v0.1):**
+
+| Journey scope | Budget | Notes |
+|---|---|---|
+| J0 Butler conversational turn | end-to-end < 400ms P95; Spirit-IPC budget < 60ms | The user-perceived budget; IPC is one slice |
+| J1 Founder loop CliWrapperSpirit per-tool-call | IPC overhead < 25ms P95 | Tool calls compose; tight budget needed |
+| J4 Mira-Nash Observer colocation | < 10ms P95 | Colocation is the whole point — Observer subscribing to `scalar.tap` cannot lag the producer |
+| J6 Diego onboarding cold-start | < 500ms acceptable | Not latency-sensitive; correctness gate dominates |
+
+**Unlock thresholds (any one trips → ADR-required move to inproc for that path).** Each threshold is operationalized as a Prometheus alert rule with a 24-hour `for:` clause. Prometheus evaluates the expression at every `evaluation_interval` tick (project default: 1 minute, set in `prometheus.yml`); the `for: 24h` clause requires the boolean result to remain `true` at **every** tick across 24 hours — i.e., 1,440 consecutive 1-minute evaluations with no false reading. The `rate(...[5m])` window inside the expression is independent of evaluation cadence: each evaluation computes a per-second rate over the trailing 5 minutes. A single 1-minute evaluation where p95 ≤ 1500 µs **or** sustained rate ≤ 100 req/s (averaged over the trailing 5-minute `rate()` window; the `[5m]` is the averaging window, not the unit denominator) resets the `for` timer to zero and the alert re-arms.
+
+| Metric (J-Butler) | Subprocess budget | Trip threshold (operational) |
+|---|---|---|
+| `iac_rt_p95_us` | ≤ 800 µs | `histogram_quantile(0.95, sum by (le) (rate(iac_rt_duration_us_bucket[5m]))) > 1500` AND `sum(rate(iac_rt_duration_us_count[5m])) > 100`, both true for `for: 24h` |
+| `iac_rt_p99_us` | ≤ 2000 µs | Same shape with quantile=0.99 and threshold `> 5000`; same min-rate gate; same `for: 24h` |
+| `cpu_sys_pct` | ≤ 15% | `avg_over_time(node_cpu_seconds_total{mode="system"}[5m]) / avg_over_time(node_cpu_seconds_total[5m]) > 0.15`, true for `for: 24h` |
+
+The min-rate gate (`> 100 req/s` sustained over the trailing 5 minutes) suppresses idle-period noise — without it, an overnight quiet window with 1 spurious slow request would trip the p95. The 5-minute rate window plus the 24-hour `for:` clause means the kernel must be sustainedly slow — a single 1-minute evaluation in which either condition fails resets the `for` timer to zero. (See §4.7.1 for the histogram bucket boundaries that make `histogram_quantile(0.95, ...)` interpolate within explicit, not implementation-dependent, buckets at the 1500 µs SLO edge.)
+
+Reference alert rule (drop-in for Prometheus):
+
+```yaml
+- alert: IacRtP95Breach
+  expr: |
+    histogram_quantile(0.95, sum by (le) (rate(iac_rt_duration_us_bucket[5m]))) > 1500
+    and sum(rate(iac_rt_duration_us_count[5m])) > 100
+  for: 24h
+  labels: { severity: page, gate: release-block }
+```
+
+**J1 is the floor reference.** If J-Butler p95 > 4× J1 p95, the overhead is in our code, not the IPC. **Fix our code first.** Do not migrate to inproc to mask code-path overhead.
+
+**Three-condition unlock check** (ADR-002):
+1. Sustained 24h breach of one threshold above on a journey-required Spirit class.
+2. Confirmation that J-Butler p95 is not >4× J1 p95 (i.e., the breach is not fixable code).
+3. A follow-up ADR superseding ADR-002 is reviewed and merged. ADR-031 (Cross-Form Spirit Equivalence) resolves out of `speculative-vNext` at the same time.
+
+**Bench cadence.** Runs in CI nightly. Results land in `benches/results/{date}.json`. Gate review at the end of each phase milestone; explicit go/no-go on inproc-unlock recorded in the milestone retrospective.
+
+**Bench-results retention policy.** Daily results live 90 days hot in `benches/results/`. Beyond 90 days, results are aggregated to weekly summaries (`benches/results/weekly/{year}-W{wk}.json`) and the daily JSON files are pruned. Weekly summaries retained 1 year. Tagged-release benchmarks (`benches/results/release/{semver}.json`) are retained indefinitely under git LFS. Pruning runs in CI on the 1st of each month; the prune job opens a PR (not a force-merge) so an operator can audit what's leaving hot storage. Trend-tracking dashboards (Grafana) read from weekly summaries for >90-day windows; daily JSON for <90-day windows.
