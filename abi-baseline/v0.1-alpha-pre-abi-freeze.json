@@ -1,0 +1,20 @@
+{
+  "abi_version": 0,
+  "items": [
+    {
+      "kind": "const",
+      "name": "ABI_VERSION",
+      "signature": "# [doc = \" ABI version constant for the MAOS Spirit ABI.\"] # [doc = \" Bumped according to the ABI Stability Triple rules.\"] pub const ABI_VERSION : u32 = 0 ;"
+    },
+    {
+      "kind": "mod",
+      "name": "compliance",
+      "signature": "pub mod compliance"
+    },
+    {
+      "kind": "struct",
+      "name": "AbiVersion",
+      "signature": "# [doc = \" Placeholder ABI version type.\"] # [doc = \" Will be expanded in Story 1a.1 with the full ABI surface.\"] pub struct AbiVersion ;"
+    }
+  ]
+}

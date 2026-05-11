@@ -1,0 +1,14 @@
+# kloc.toml schema
+#
+# Root keys are crate names (matching Cargo.toml package.name).
+# Values are integer line-of-code ceilings for production Rust code.
+# Special keys prefixed with '_' are meta-configuration.
+#
+# _aggregate_alarm    — aggregate LOC at which a CI warning (non-blocking) is emitted.
+# _aggregate_hardfail — aggregate LOC at which the build hard-fails.
+#
+# Example:
+#   maos-kernel-core = 6000
+#   maos-cap-registry = 3000
+#   _aggregate_alarm = 16000
+#   _aggregate_hardfail = 20000

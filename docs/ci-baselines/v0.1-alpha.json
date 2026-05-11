@@ -1,0 +1,14 @@
+{
+  "_comment": "Placeholder — populated after the first green discipline.yml run on main",
+  "commit_sha": "TBD",
+  "workflow_run_id": 0,
+  "gate_results": {
+    "ac1": "pending",
+    "ac2": "pending",
+    "ac3": { "alarm": false, "hardfail": false },
+    "ac4": "pending",
+    "ac5": "pending"
+  },
+  "timestamp_utc": "TBD",
+  "runner_image_sha": "TBD"
+}

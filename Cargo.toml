@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = ["xtask", "crates/maos-spirit-abi", "crates/maos-kernel-core"]
+default-members = []
+
+[workspace.package]
+version = "0.1.0-alpha"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/lunarpulse/maos"
+rust-version = "1.88"

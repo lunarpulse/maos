@@ -45,8 +45,8 @@ development_status:
   # ------------------------------------------------------------------
   # Epic 0: Quality Substrate (founding sprint v0.1; maintenance thereafter)
   # ------------------------------------------------------------------
-  epic-0: backlog
-  0-1-workspace-ci-pipeline-build-discipline-gates: backlog
+  epic-0: in-progress
+  0-1-workspace-ci-pipeline-build-discipline-gates: done
   0-2-enforce-empty-kernel-invariants-via-structural-ci-lints: backlog
   0-3-content-addressed-corpora-infrastructure-coverage-matrix-ci-gate: backlog
   0-4-complianceclaim-schema-adversarial-review-calibration-seed-corpus: backlog

@@ -1,0 +1,17 @@
+# Per-crate KLOC budgets — production Rust code only.
+# Excludes: target/, tests/, benches/, examples/, fuzz/, spirits/, *.md, doctests.
+# Alarms and hard-fails are independent: a per-crate ceiling breach fails the build
+# even if the aggregate alarm has not fired.
+#
+# Ceilings are reviewed at each epic retrospective.
+
+maos-kernel-core = 6000
+maos-cap-registry = 3000
+maos-wire = 2000
+maos-journal = 2000
+maos-spirit-abi = 3000
+maos-spirit-sdk = 3000
+xtask = 3000
+
+_aggregate_alarm = 16000
+_aggregate_hardfail = 20000
