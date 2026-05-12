@@ -1,0 +1,33 @@
+# Persistent-state denylist for I9 structural-state lint.
+# These type identifiers trigger a violation when used as a struct field
+# outside the whitelisted holder paths, unless the struct carries #[i9_exempt].
+#
+# Adding entries is mechanical (catches more violations) and does NOT require review.
+# Removing entries loosens the gate and requires invariant-lock review per ADR-037.
+types = [
+    "HashMap",
+    "BTreeMap",
+    "HashSet",
+    "BTreeSet",
+    "Mutex",
+    "RwLock",
+    "RefCell",
+    "Cell",
+    "Arc",
+    "OnceCell",
+    "OnceLock",
+    "LazyLock",
+    "AtomicBool",
+    "AtomicI8",
+    "AtomicI16",
+    "AtomicI32",
+    "AtomicI64",
+    "AtomicIsize",
+    "AtomicPtr",
+    "AtomicU8",
+    "AtomicU16",
+    "AtomicU32",
+    "AtomicU64",
+    "AtomicUsize",
+    "Vec",
+]

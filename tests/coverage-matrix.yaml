@@ -1,1 +1,16 @@
-{}
+coverage:
+  I9:
+    gates:
+      - check-empty-kernel
+    corpora: []
+    phase: v0.1-alpha
+  NFR-Test-2:
+    gates:
+      - check-service-boundary
+    corpora: []
+    phase: v0.1-alpha-surface-diff-stub
+  NFR-Test-9:
+    gates:
+      - check-loom
+    corpora: []
+    phase: v0.1-alpha

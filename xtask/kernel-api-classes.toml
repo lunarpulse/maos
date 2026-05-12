@@ -1,0 +1,6 @@
+# Kernel API classification table for NFR-Test-2 service-boundary gate.
+# At v0.1-alpha this table is empty because `kernel::api::*` does not yet exist.
+# Story 1a.2 populates this when `pub mod api` lands in `maos-kernel-core`.
+# Adding classifications requires invariant-lock review per NFR-Test-2.
+
+[classes]

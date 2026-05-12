@@ -1,0 +1,6 @@
+# Loom-not-in-kernel blocklist — canonical orchestration symbols from architecture §3.2 I9.
+# At v0.1-alpha there are exactly four entries.
+#
+# Extending the blocklist tightens the gate and requires invariant-lock review per ADR-037.
+# Do NOT add LoomLite, Plan, Strategy, or Schedule at v0.1-alpha.
+blocklist = ["Loom", "Planner", "Goal", "Orchestrator"]

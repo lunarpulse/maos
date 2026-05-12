@@ -1,0 +1,8 @@
+# I9 sanctioned holder paths — persistent state is permitted ONLY inside these directories/files.
+# At v0.1-alpha there are exactly three entries.
+# Adding a fourth entry (or any entry under a new top-level key) requires invariant-lock review per ADR-037.
+paths = [
+    "crates/maos-kernel-core/src/journal/",
+    "crates/maos-kernel-core/src/iac/transparency_log.rs",
+    "crates/maos-kernel-core/src/capability/cap_tokens/",
+]

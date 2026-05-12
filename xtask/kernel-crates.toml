@@ -1,0 +1,3 @@
+# Crates scanned by check-loom for orchestration-symbol violations.
+# Initial entry is maos-kernel-core; Stories 1b.x / 4.x extend as services extract.
+crates = ["maos-kernel-core"]

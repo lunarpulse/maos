@@ -7,7 +7,10 @@
     "ac2": "pending",
     "ac3": { "alarm": false, "hardfail": false },
     "ac4": "pending",
-    "ac5": "pending"
+    "ac5": "pending",
+    "check_empty_kernel": "pending",
+    "check_loom": "pending",
+    "check_service_boundary": "pending"
   },
   "timestamp_utc": "TBD",
   "runner_image_sha": "TBD"

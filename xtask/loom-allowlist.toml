@@ -1,0 +1,4 @@
+# Loom-not-in-kernel allowlist — (file, identifier) pairs permitted in kernel crates.
+# At v0.1-alpha this list is empty by design.
+# Adding any entry requires the invariant-lock review process (ADR-037).
+allowed = []

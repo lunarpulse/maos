@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-# last_updated: 2026-05-11
+# last_updated: 2026-05-11  # Story 0-2 code review complete. 4 decisions resolved (D1 dismissed, D2-D4 promoted to patches), 11 patches applied, 3 deferred. All 55 tests green (47 unit + 8 integration). Status -> done.
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -47,7 +47,7 @@ development_status:
   # ------------------------------------------------------------------
   epic-0: in-progress
   0-1-workspace-ci-pipeline-build-discipline-gates: done
-  0-2-enforce-empty-kernel-invariants-via-structural-ci-lints: backlog
+  0-2-enforce-empty-kernel-invariants-via-structural-ci-lints: done
   0-3-content-addressed-corpora-infrastructure-coverage-matrix-ci-gate: backlog
   0-4-complianceclaim-schema-adversarial-review-calibration-seed-corpus: backlog
   0-5-parameterized-corpus-generators-secret-redaction-red-team-frameworks: backlog

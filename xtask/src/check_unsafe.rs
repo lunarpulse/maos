@@ -1,8 +1,10 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::Attribute;
+
+use crate::fs_walk;
 
 /// Allowlist for unsafe-code exceptions.
 /// At v0.1-alpha this list is empty by design.
@@ -66,7 +68,7 @@ fn check_unsafe(capability_path: &Path) -> Result<Report, String> {
 
     // Collect all .rs files under the capability subtree.
     let mut rs_files = Vec::new();
-    collect_rs_files(capability_path, &mut rs_files);
+    fs_walk::collect_rs_files(capability_path, &mut rs_files);
 
     // Identify crate roots: any directory under capability/ that contains a lib.rs.
     let mut crate_roots = Vec::new();
@@ -106,19 +108,6 @@ fn check_unsafe(capability_path: &Path) -> Result<Report, String> {
         violations,
         missing_forbid,
     })
-}
-
-fn collect_rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                collect_rs_files(&path, out);
-            } else if path.extension() == Some(std::ffi::OsStr::new("rs")) {
-                out.push(path);
-            }
-        }
-    }
 }
 
 fn has_forbid_unsafe_code(attrs: &[Attribute]) -> bool {
