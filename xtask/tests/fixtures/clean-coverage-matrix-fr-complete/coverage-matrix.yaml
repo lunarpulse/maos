@@ -1,0 +1,347 @@
+schema_version: 1
+current_phase: v0.1-alpha
+mode: warning
+phase_order:
+- v0.1-alpha
+- v0.1-alpha-surface-diff-stub
+- v0.1
+- v0.3
+- v0.5
+- v0.7
+- v0.8
+- v0.9
+- v1.0
+- v1.5
+- v2.0+
+coverage:
+  I9:
+    gates:
+    - check-empty-kernel
+    corpora: []
+    phase: v0.1-alpha
+    valid_until: '2027-05-12'
+  FR1:
+    gates: []
+    corpora: []
+    phase: v0.1
+    valid_until: '2027-05-12'
+  FR2:
+    gates: []
+    corpora: []
+    phase: v0.1
+    valid_until: '2027-05-12'
+  FR3:
+    gates: []
+    corpora: []
+    phase: v0.1
+    valid_until: '2027-05-12'
+  FR4:
+    gates: []
+    corpora: []
+    phase: v0.1
+    valid_until: '2027-05-12'
+  FR5:
+    gates: []
+    corpora: []
+    phase: v0.1
+    valid_until: '2027-05-12'
+  FR6:
+    gates: []
+    corpora: []
+    phase: v0.1
+    valid_until: '2027-05-12'
+  FR7:
+    gates: []
+    corpora: []
+    phase: v0.1
+    valid_until: '2027-05-12'
+  FR8:
+    gates: []
+    corpora: []
+    phase: v0.1
+    valid_until: '2027-05-12'
+  FR9:
+    gates: []
+    corpora: []
+    phase: v0.1
+    valid_until: '2027-05-12'
+  FR10:
+    gates: []
+    corpora: []
+    phase: v0.3
+    valid_until: '2027-05-12'
+  FR11:
+    gates: []
+    corpora: []
+    phase: v0.3
+    valid_until: '2027-05-12'
+  FR12:
+    gates: []
+    corpora: []
+    phase: v0.3
+    valid_until: '2027-05-12'
+  FR13:
+    gates: []
+    corpora: []
+    phase: v0.3
+    valid_until: '2027-05-12'
+  FR14:
+    gates: []
+    corpora: []
+    phase: v0.3
+    valid_until: '2027-05-12'
+  FR15:
+    gates: []
+    corpora: []
+    phase: v0.3
+    valid_until: '2027-05-12'
+  FR16:
+    gates: []
+    corpora: []
+    phase: v0.3
+    valid_until: '2027-05-12'
+  FR17:
+    gates: []
+    corpora: []
+    phase: v0.3
+    valid_until: '2027-05-12'
+  FR18:
+    gates: []
+    corpora: []
+    phase: v0.3
+    valid_until: '2027-05-12'
+  FR19:
+    gates: []
+    corpora: []
+    phase: v0.3
+    valid_until: '2027-05-12'
+  FR20:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR21:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR22:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR23:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR24:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR25:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR26:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR27:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR28:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR29:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR30:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR31:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR32:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR33:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR34:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR35:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR36:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR37:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR38:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR39:
+    gates: []
+    corpora: []
+    phase: v0.5
+    valid_until: '2027-05-12'
+  FR40:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR41:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR42:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR43:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR44:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR45:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR46:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR47:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR48:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR49:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR50:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR51:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR52:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR53:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR54:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR55:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR56:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR57:
+    gates: []
+    corpora: []
+    phase: v0.8
+    valid_until: '2027-05-12'
+  FR58:
+    gates: []
+    corpora: []
+    phase: v1.0
+    valid_until: '2027-05-12'
+  FR59:
+    gates: []
+    corpora: []
+    phase: v1.0
+    valid_until: '2027-05-12'
+  FR60:
+    gates: []
+    corpora: []
+    phase: v1.0
+    valid_until: '2027-05-12'
+  FR61:
+    gates: []
+    corpora: []
+    phase: v1.0
+    valid_until: '2027-05-12'
+  FR62:
+    gates: []
+    corpora: []
+    phase: v1.0
+    valid_until: '2027-05-12'
+  FR63:
+    gates: []
+    corpora: []
+    phase: v1.0
+    valid_until: '2027-05-12'
+  FR64:
+    gates: []
+    corpora: []
+    phase: v1.0
+    valid_until: '2027-05-12'
+  FR65:
+    gates: []
+    corpora: []
+    phase: v1.0
+    valid_until: '2027-05-12'

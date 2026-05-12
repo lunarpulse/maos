@@ -1,0 +1,7 @@
+[corpus."calibration-seed-v0.1-mismatched"]
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+schema_version = 1
+item_count = 100
+valid_until = "2027-05-12"
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+description = "Violation fixture: 30 items with mismatched expected_judgment"

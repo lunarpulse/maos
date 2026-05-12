@@ -1,0 +1,100 @@
+{"id": "calib-test-000", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-001", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-002", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-003", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-004", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-005", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-006", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-007", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-008", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-009", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-010", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-011", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-012", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-013", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-014", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-015", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-016", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-017", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-018", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-019", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-020", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-021", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-022", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-023", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-024", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-025", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-026", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-027", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-028", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-029", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-030", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-031", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-032", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-033", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-034", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-035", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-036", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-037", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-038", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-039", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-040", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-041", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-042", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-043", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-044", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-045", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-046", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-047", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-048", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-049", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-050", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-051", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-052", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-053", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-054", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-055", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-056", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-057", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-058", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-059", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-060", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-061", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-062", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-063", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-064", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-065", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-066", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-067", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-068", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-069", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test", "expected_judgment": "yes"}
+{"id": "calib-test-070", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-071", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-072", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-073", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-074", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-075", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-076", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-077", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-078", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-079", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-080", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-081", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-082", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-083", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-084", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-085", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-086", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-087", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-088", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-089", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-090", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-091", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-092", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-093", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-094", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-095", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-096", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-097", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-098", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}
+{"id": "calib-test-099", "category": "digest_recall", "bucket": "clearly-decidable", "prompt": "test", "baseline_response": "yes", "rationale": "test"}

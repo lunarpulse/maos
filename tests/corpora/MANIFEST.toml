@@ -6,4 +6,11 @@
 # Registration is operator-side ceremony (use --register to compute the hash,
 # then paste the TOML snippet after review).
 
-[corpus]
+[corpus."calibration-seed-v0.1"]
+sha256 = "33d6b79c6a74d48a07d20f256a926969f2459e1528dec43d81e03b5e10aad96d"
+schema_version = 1
+item_count = 100
+valid_until = "2027-05-12"
+prompt_version_hash = "597ddaa61f9f31ec37781c772d85e06bb1e8ffaae6e2e3d94412487969b26f0c"
+description = "v0.1-alpha calibration seed corpus N=100 — clearly-decidable bucket distributed across 5 digest-metric categories (digest_recall / digest_faithfulness / digest_hedge_preservation / digest_traceability / digest_secret_leakage) at 20 items per category per NFR-Aud-7 / NFR-Aud-8. Authored in Story 0.4. Offline-mode self-equality judge at v0.1-α (no live judge calls); Story 1b.4 wires the Inference Port judge."
+# judge_id omitted at v0.1-α — Story 1b.4 adds judge_id = "anthropic-claude-sonnet-4-6-T0-seed42"

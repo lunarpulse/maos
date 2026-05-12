@@ -1,0 +1,25 @@
+schema_version: 1
+current_phase: "v0.1-alpha"
+mode: "warning"
+phase_order:
+  - "v0.1-alpha"
+  - "v0.1"
+  - "v0.5"
+  - "v1.0"
+  - "v2.0+"
+coverage:
+  I9:
+    gates: [check-empty-kernel]
+    corpora: []
+    phase: "v0.1-alpha"
+    valid_until: "2027-05-12"
+  FR2:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  FR3:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"

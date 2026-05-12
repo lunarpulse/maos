@@ -98,3 +98,37 @@ fn clean_coverage_matrix_passes() {
         "expected PASSED in stdout, got:\n{stdout}"
     );
 }
+
+#[test]
+fn coverage_matrix_lint_fails_on_missing_fr() {
+    let output = xtask()
+        .args([
+            "coverage-matrix",
+            "--config",
+            "xtask/tests/fixtures/violation-coverage-matrix-missing-fr/coverage-matrix.yaml",
+            "--phase-config",
+            "xtask/tests/fixtures/violation-coverage-matrix-missing-fr/phase-config.toml",
+            "--manifest",
+            "xtask/tests/fixtures/violation-coverage-matrix-missing-fr/MANIFEST.toml",
+            "--gate-registry",
+            "xtask/tests/fixtures/violation-coverage-matrix-missing-fr/gate-registry.toml",
+        ])
+        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/.."))
+        .output()
+        .expect("xtask should run");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Warning mode still exits zero, but emits the lint error
+    assert!(
+        output.status.success(),
+        "expected success in warning mode, got failure. stderr:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("NFR-Meta-3 lint: complete-FR-coverage"),
+        "expected complete-FR-coverage lint in stderr, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("FR1 absent"),
+        "expected FR1 absent message, got:\n{stderr}"
+    );
+}

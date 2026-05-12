@@ -10,3 +10,11 @@
 
 - **W1 — `serde_yaml` 0.9.34 is explicitly deprecated.** Spec acknowledges this and defers migration. The crate works for the current contract; future concern.
 - **W2 — `calibrate.rs` `successes = n` hardcoded placeholder.** At v0.1-alpha with no real corpora this is intentional scaffolding. Story 0.4 must replace with actual pass/fail from `expected_judgment` comparison.
+
+## Closed deferred items
+
+- **W2 — `calibrate.rs` `successes = n` hardcoded placeholder.** Closed by Story 0.4 — calibrate now scans `tests/corpora/<corpus_name>.jsonl` and computes pass_rate from `expected_judgment` equality via OfflineMode judge. See Story 0.4 AC8. The literal string `successes = n;` no longer appears anywhere in `xtask/src/calibrate.rs`.
+
+## Deferred from: code review of 0-4-complianceclaim-schema-adversarial-review-calibration-seed-corpus (2026-05-12)
+
+- **DF4 — `Cargo.lock` bloat from `tempfile` dev-dependency.** Adding `tempfile = "3"` transitively pulled in `getrandom 0.4.2` and ~25 WASI/WebAssembly ecosystem crates (`wasip2`, `wasip3`, `wit-bindgen`, `wasm-metadata`, `wasmparser`, etc.), increasing audit surface and build times. Pre-existing dependency resolution concern; not caused by this story's code logic. Address in a future dependency-audit story.

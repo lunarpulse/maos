@@ -16,4 +16,5 @@ gates = [
     "coverage-matrix",
     "corpus-staleness",
     "rebaseline-check",
+    "calibrate",
 ]

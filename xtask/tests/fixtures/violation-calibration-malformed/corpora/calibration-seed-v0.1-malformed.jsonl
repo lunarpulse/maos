@@ -1,0 +1,10 @@
+{"id":"calib-test-000","category":"digest_recall","bucket":"clearly-decidable","prompt":"test","baseline_response":"yes","expected_judgment":"yes","rationale":"test"}
+{"id":"calib-test-001","category":"digest_recall","bucket":"clearly-decidable","prompt":"test","baseline_response":"yes","expected_judgment":"yes","rationale":"test"}
+{"id":"calib-test-002","category":"digest_recall","bucket":"clearly-decidable","prompt":"test","baseline_response":"yes","rationale":"test"}
+{"id":"calib-test-003","category":"digest_recall","bucket":"clearly-decidable","prompt":"test","baseline_response":"yes","expected_judgment":"yes","rationale":"test"}
+{"id":"calib-test-004","category":"digest_recall","bucket":"clearly-decidable","prompt":"test","baseline_response":"yes","rationale":"test"}
+{"id":"calib-test-005","category":"digest_recall","bucket":"clearly-decidable","prompt":"test","baseline_response":"yes","expected_judgment":"yes","rationale":"test"}
+{"id":"calib-test-006","category":"digest_recall","bucket":"clearly-decidable","prompt":"test","baseline_response":"yes","rationale":"test"}
+{"id":"calib-test-007","category":"digest_recall","bucket":"clearly-decidable","prompt":"test","baseline_response":"yes","rationale":"test"}
+{"id":"calib-test-008","category":"digest_recall","bucket":"clearly-decidable","prompt":"test","baseline_response":"yes","expected_judgment":"yes","rationale":"test"}
+{"id":"calib-test-009","category":"digest_recall","bucket":"clearly-decidable","prompt":"test","baseline_response":"yes","rationale":"test"}

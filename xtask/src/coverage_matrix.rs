@@ -96,6 +96,18 @@ fn check_coverage_matrix(config_path: &Path, phase_config_path: &Path, manifest_
         }
     }
 
+    // FR-completeness lint: check every FR1-FR65 exists in the coverage map.
+    // This is an internal extension of the coverage-matrix gate (not a separate gate-registry entry).
+    for n in 1..=65u32 {
+        let fr_key = format!("FR{}", n);
+        if !coverage.coverage.contains_key(&fr_key) {
+            violations.push(Violation {
+                id: "complete-FR-coverage".into(),
+                message: format!("NFR-Meta-3 lint: complete-FR-coverage — {} absent from coverage-matrix.yaml", fr_key),
+            });
+        }
+    }
+
     let passed = violations.is_empty();
     Ok(Report { passed, mode: coverage.mode.clone(), violations, out_of_scope_deferred: deferred, checked })
 }

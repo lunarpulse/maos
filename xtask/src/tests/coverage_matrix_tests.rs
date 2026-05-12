@@ -12,6 +12,21 @@ fn cleanup(dir: &Path) {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+fn fr_rows() -> String {
+    let mut rows = String::new();
+    for n in 1..=65 {
+        rows.push_str(&format!(
+            r#"  FR{n}:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+"#
+        ));
+    }
+    rows
+}
+
 fn make_yaml(dir: &Path, mode: &str, coverage: &str) -> PathBuf {
     let path = dir.join("coverage-matrix.yaml");
     std::fs::write(
@@ -25,8 +40,8 @@ phase_order:
   - "v0.1"
   - "v0.3"
 coverage:
-{}"#,
-            mode, coverage
+{}{}"#,
+            mode, coverage, fr_rows()
         ),
     )
     .unwrap();
@@ -67,7 +82,7 @@ fn empty_coverage_passes() {
 
     let report = check_coverage_matrix(&yaml, &phase, &manifest, &registry).unwrap();
     assert!(report.passed);
-    assert_eq!(report.checked, 0);
+    assert_eq!(report.checked, 65); // 65 FR rows from fr_rows()
     cleanup(&dir);
 }
 
@@ -113,8 +128,8 @@ fn deferred_row_goes_to_out_of_scope() {
 
     let report = check_coverage_matrix(&yaml, &phase, &manifest, &registry).unwrap();
     assert!(report.passed);
-    assert_eq!(report.out_of_scope_deferred.len(), 1);
-    assert_eq!(report.out_of_scope_deferred[0].id, "Future");
+    assert_eq!(report.out_of_scope_deferred.len(), 66); // 65 FR rows + 1 Future row
+    assert!(report.out_of_scope_deferred.iter().any(|d| d.id == "Future"));
     cleanup(&dir);
 }
 

@@ -70,5 +70,6 @@ The v0.1-alpha `discipline.yml` runs the following gates:
 | coverage-matrix | 0.3 | required |
 | corpus-staleness | 0.3 | required |
 | corpus-rebaseline | 0.3 | scheduled, not per-commit |
+| calibrate | 0.4 | per-commit, populated by Story 0.4 corpus |
 
 **Any green gate going red is a merge-block.**

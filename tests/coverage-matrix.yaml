@@ -8,6 +8,7 @@ phase_order:
   - "v0.3"
   - "v0.5"
   - "v0.7"
+  - "v0.8"
   - "v0.9"
   - "v1.0"
   - "v1.5"
@@ -56,7 +57,901 @@ coverage:
   NFR-Aud-8:
     gates:
       - calibrate
-    corpora: []
+    corpora:
+      - "calibration-seed-v0.1"
     phase: "v0.5"
     valid_until: "2027-05-11"
     notes: "per-commit calibration N=100 lands with corpus in Story 0.4; quarterly N=500 at v1.0"
+  # Mass-populated by Story 0.4 — every FR/NFR carries a 0-item row; gates/corpora populated by owning epics.
+  FR1:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  FR10:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  FR11:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  FR12:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR13:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR14:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  FR15:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  FR16:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  FR17:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  FR18:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  FR19:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR2:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  FR20:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR21:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR22:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR23:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+    notes: "split into FR23a (v0.8 loopback) and FR23b (v1.0 full mesh)"
+  FR23a:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+    notes: "v0.8 loopback A2A; v1.0 full mesh at FR23b"
+  FR23b:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR24:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR25:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR26:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR27:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  FR28:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR29:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR3:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR30:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR31:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR32:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  FR33:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  FR34:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  FR35:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR36:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR37:
+    gates: []
+    corpora: []
+    phase: "v2.0+"
+    valid_until: "2027-05-12"
+    notes: "DEFERRED to v2.5 per PRD; phase v2.0+ until ratified in vetter-ecosystem epic"
+  FR38:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR39:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR4:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  FR40:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR41:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR42:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR43:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR44:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR45:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR46:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR47:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  FR48:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR49:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR5:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR50:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR51:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR52:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR53:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR54:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR55:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  FR56:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR57:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  FR58:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+    notes: "v0.1 ships hello-spirit acknowledgement; v0.3+ ships from working reference Spirit"
+  FR59:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR6:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR60:
+    gates: []
+    corpora: []
+    phase: "v1.5"
+    valid_until: "2027-05-12"
+  FR61:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  FR62:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR63:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR64:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR65:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  FR7:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  FR8:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  FR9:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Aud-1:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Aud-10:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Aud-11:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Aud-12:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Aud-13:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Aud-14:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Aud-2:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Aud-3:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Aud-4:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Aud-5:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Aud-6:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Aud-7:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Aud-9:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Comp-1:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Comp-2:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Comp-3:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Comp-4:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Comp-5:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Cost-1:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Doc-1:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Doc-2:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Doc-3:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Doc-4:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Doc-5:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Doc-6:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Doc-7:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Maint-1:
+    gates: []
+    corpora: []
+    phase: "v2.0+"
+    valid_until: "2027-05-12"
+  NFR-Maint-2:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+    notes: "60% line at v0.1; 80% line / 60% branch at v0.5"
+  NFR-Maint-3:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Maint-4:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Maint-5:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Maint-6:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+    notes: "1-year LTS at v1.0; 2-year LTS at v1.5"
+  NFR-Maint-7:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Maint-8:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Maint-9:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Meta-1:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Obs-1:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Obs-2:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Obs-3:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  NFR-Obs-4:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Obs-5:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  NFR-Onb-1:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  NFR-Onb-2:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Onb-3:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Onb-4:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  NFR-Ops-1:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+    notes: "install/uninstall at v0.1; upgrade/yank at v0.5; revoke at v1.0"
+  NFR-Ops-10:
+    gates: []
+    corpora: []
+    phase: "v1.5"
+    valid_until: "2027-05-12"
+  NFR-Ops-11:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+    notes: "primitive-reservation at v1.0; full implementation v1.5+"
+  NFR-Ops-12:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Ops-2:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Ops-3:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Ops-4:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Ops-5:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Ops-6:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+    notes: "GOVERNANCE.md/CODE_OF_CONDUCT.md at v0.5; RFC_TEMPLATE.md at v0.8; LOCALES.md/TRADEMARK.md/BREAKING.md at v1.0"
+  NFR-Ops-7:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+    notes: "declared-intent at v0.5; legal/fiscal-sponsor at v0.8"
+  NFR-Ops-8:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  NFR-Ops-9:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Perf-1:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Perf-2:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Perf-3:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Perf-4:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  NFR-Perf-5:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Perf-6:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Perf-7:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Perf-8:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Rel-1:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Rel-10:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Rel-11:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Rel-2:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Rel-3:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Rel-4:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Rel-5:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Rel-6:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Rel-7:
+    gates: []
+    corpora: []
+    phase: "v2.0+"
+    valid_until: "2027-05-12"
+  NFR-Rel-8:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Rel-9:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Scale-1:
+    gates: []
+    corpora: []
+    phase: "v2.0+"
+    valid_until: "2027-05-12"
+  NFR-Scale-2:
+    gates: []
+    corpora: []
+    phase: "v2.0+"
+    valid_until: "2027-05-12"
+  NFR-Scale-3:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Scale-4:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Scale-5:
+    gates: []
+    corpora: []
+    phase: "v2.0+"
+    valid_until: "2027-05-12"
+  NFR-Sec-1:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+    notes: "T0/T1/T2 at v0.1; T3 at v0.5; T4 WASM at v2.0+"
+  NFR-Sec-10:
+    gates: []
+    corpora: []
+    phase: "v1.5"
+    valid_until: "2027-05-12"
+  NFR-Sec-11:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Sec-12:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Sec-13:
+    gates: []
+    corpora: []
+    phase: "v1.5"
+    valid_until: "2027-05-12"
+  NFR-Sec-14:
+    gates: []
+    corpora: []
+    phase: "v0.8"
+    valid_until: "2027-05-12"
+  NFR-Sec-15:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Sec-16:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Sec-2:
+    gates: []
+    corpora: []
+    phase: "v1.5"
+    valid_until: "2027-05-12"
+  NFR-Sec-3:
+    gates: []
+    corpora: []
+    phase: "v2.0+"
+    valid_until: "2027-05-12"
+  NFR-Sec-4:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Sec-5:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Sec-6:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Sec-7:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Sec-8:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Sec-9:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Tenancy-1:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Test-10:
+    gates: []
+    corpora: []
+    phase: "v1.5"
+    valid_until: "2027-05-12"
+  NFR-Test-11:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Test-12:
+    gates: []
+    corpora: []
+    phase: "v0.3"
+    valid_until: "2027-05-12"
+  NFR-Test-13:
+    gates: []
+    corpora: []
+    phase: "v0.1"
+    valid_until: "2027-05-12"
+  NFR-Test-14:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Test-3:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"
+  NFR-Test-4:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Test-5:
+    gates: []
+    corpora: []
+    phase: "v2.0+"
+    valid_until: "2027-05-12"
+    notes: "FKCS-infrastructure at v2.0; FKCS-populated at v2.5"
+  NFR-Test-6:
+    gates: []
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-12"
+  NFR-Test-7:
+    gates: []
+    corpora: []
+    phase: "v1.5"
+    valid_until: "2027-05-12"
+  NFR-Test-8:
+    gates: []
+    corpora: []
+    phase: "v1.0"
+    valid_until: "2027-05-12"

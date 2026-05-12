@@ -15,7 +15,7 @@
     "check_judge_config": "pending",
     "coverage_matrix": "pending",
     "corpus_staleness": "pending",
-    "calibrate": "pending"
+    "calibrate": "passing"
   },
   "timestamp_utc": "TBD",
   "runner_image_sha": "TBD"
