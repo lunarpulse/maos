@@ -1,0 +1,9 @@
+# Content-addressed corpus manifest — deliberate hash mismatch for integration tests.
+
+[corpus.bad]
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+schema_version = 1
+item_count = 3
+valid_until = "2027-05-11"
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+description = "Violation fixture: manifest hash does not match file content"

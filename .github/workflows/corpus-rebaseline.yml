@@ -1,0 +1,94 @@
+name: corpus-rebaseline
+
+on:
+  schedule:
+    # 14:00 UTC on the 1st of January, April, July, October.
+    # GitHub may delay scheduled runs under load — the quarterly cadence is
+    # "approximately quarterly," not millisecond-precise.
+    - cron: '0 14 1 */3 *'
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: 'PR number to post comment on (optional)'
+        required: false
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rebaseline-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run rebaseline-check
+        run: cargo run -p xtask -- rebaseline-check --json --out /tmp/rebaseline-report.json
+      - name: Upload rebaseline report
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebaseline-report
+          path: /tmp/rebaseline-report.json
+      - name: Post PR comment
+        if: ${{ github.event.inputs.pr-number != '' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const fs = require('fs');
+              let report;
+              try {
+                report = JSON.parse(fs.readFileSync('/tmp/rebaseline-report.json', 'utf8'));
+              } catch (e) {
+                console.error('Failed to read/parse rebaseline report:', e.message);
+                report = { passed: false, agreement_ratio: 0, threshold: 0.98, items_total: 0, items_agreed: 0 };
+              }
+              const icon = report.passed ? '✅' : '❌';
+
+              const body = `## MAOS Corpus Rebaseline Report
+
+              | Metric | Value |
+              |--------|-------|
+              | Passed | ${icon} ${report.passed} |
+              | Agreement Ratio | ${report.agreement_ratio.toFixed(4)} |
+              | Threshold | ${report.threshold} |
+              | Items Total | ${report.items_total} |
+              | Items Agreed | ${report.items_agreed} |
+
+              <!-- rebaseline-comment -->`;
+
+              const prNumber = parseInt('${{ github.event.inputs.pr-number }}', 10);
+              if (isNaN(prNumber)) {
+                console.error('Invalid pr-number:', '${{ github.event.inputs.pr-number }}');
+                return;
+              }
+
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+              });
+              const existing = comments.find(c => c.body.includes('<!-- rebaseline-comment -->'));
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  body,
+                });
+              }
+            } catch (e) {
+              console.error('Unexpected error in rebaseline PR comment step:', e);
+            }

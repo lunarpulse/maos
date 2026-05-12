@@ -65,5 +65,10 @@ The v0.1-alpha `discipline.yml` runs the following gates:
 | kloc-check | 0.1 | required |
 | abi-diff | 0.1 | required |
 | invariant-lock | 0.1 | required |
+| check-corpus | 0.3 | required |
+| check-judge-config | 0.3 | required |
+| coverage-matrix | 0.3 | required |
+| corpus-staleness | 0.3 | required |
+| corpus-rebaseline | 0.3 | scheduled, not per-commit |
 
 **Any green gate going red is a merge-block.**

@@ -10,7 +10,12 @@
     "ac5": "pending",
     "check_empty_kernel": "pending",
     "check_loom": "pending",
-    "check_service_boundary": "pending"
+    "check_service_boundary": "pending",
+    "check_corpus": "pending",
+    "check_judge_config": "pending",
+    "coverage_matrix": "pending",
+    "corpus_staleness": "pending",
+    "calibrate": "pending"
   },
   "timestamp_utc": "TBD",
   "runner_image_sha": "TBD"

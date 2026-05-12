@@ -1,0 +1,9 @@
+# Content-addressed corpus manifest — schema locked by Story 0.3.
+# See: implementation-artifacts/0-3-content-addressed-corpora-infrastructure-coverage-matrix-ci-gate.md
+#
+# Every committed JSONL corpus must have an entry here with a SHA-256 hash.
+# The manifest is authoritative: orphan JSONL files on disk are rejected.
+# Registration is operator-side ceremony (use --register to compute the hash,
+# then paste the TOML snippet after review).
+
+[corpus]

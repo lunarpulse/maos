@@ -1,0 +1,19 @@
+# Canonical gate registry for coverage-matrix cross-reference.
+# Extending this list is a widening — new gates are additive — but removing or
+# renaming a gate is a breaking change that requires invariant-lock review.
+
+gates = [
+    "reproducible-build",
+    "check-unsafe",
+    "kloc-check",
+    "abi-diff",
+    "invariant-lock",
+    "check-empty-kernel",
+    "check-loom",
+    "check-service-boundary",
+    "check-corpus",
+    "check-judge-config",
+    "coverage-matrix",
+    "corpus-staleness",
+    "rebaseline-check",
+]

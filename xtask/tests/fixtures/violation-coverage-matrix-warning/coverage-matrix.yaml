@@ -1,0 +1,20 @@
+schema_version: 1
+current_phase: "v0.1-alpha"
+mode: "warning"
+phase_order:
+  - "v0.1-alpha"
+  - "v0.1-alpha-surface-diff-stub"
+  - "v0.1"
+  - "v0.3"
+  - "v0.5"
+  - "v0.7"
+  - "v0.9"
+  - "v1.0"
+  - "v1.5"
+  - "v2.0+"
+coverage:
+  Uncovered:
+    gates: []
+    corpora: []
+    phase: "v0.1-alpha"
+    valid_until: "2027-05-11"

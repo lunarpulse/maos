@@ -1,0 +1,17 @@
+# Canonical identifiers that indicate a direct provider-API call in test code.
+# Any match in tests/**/*.rs or crates/*/tests/**/*.rs is rejected by
+# `cargo xtask check-judge-config`.
+#
+# Extending this list is a TIGHTENING — it adds new constraints — and therefore
+# requires the invariant-lock review process (same convention as Story 0.2's
+# loom-blocklist).
+
+direct_calls = [
+    "reqwest_post_completion",
+    "anthropic_messages",
+    "openai_chat_completions",
+    "openai_chat",
+    "ollama_chat",
+    "completions_create",
+    "messages_create",
+]

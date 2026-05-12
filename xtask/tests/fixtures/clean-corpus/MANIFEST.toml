@@ -1,0 +1,10 @@
+# Content-addressed corpus manifest — schema locked by Story 0.3.
+# See: implementation-artifacts/0-3-content-addressed-corpora-infrastructure-coverage-matrix-ci-gate.md
+
+[corpus.good]
+sha256 = "2ff5f31cdf97173b0668187caf2c562ba275117aae0023415a6184443f74b1e3"
+schema_version = 1
+item_count = 3
+valid_until = "2027-05-11"
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+description = "Clean fixture for integration tests"

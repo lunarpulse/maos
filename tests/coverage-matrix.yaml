@@ -1,16 +1,62 @@
+schema_version: 1
+current_phase: "v0.1-alpha"
+mode: "warning"
+phase_order:
+  - "v0.1-alpha"
+  - "v0.1-alpha-surface-diff-stub"
+  - "v0.1"
+  - "v0.3"
+  - "v0.5"
+  - "v0.7"
+  - "v0.9"
+  - "v1.0"
+  - "v1.5"
+  - "v2.0+"
 coverage:
   I9:
     gates:
       - check-empty-kernel
     corpora: []
-    phase: v0.1-alpha
+    phase: "v0.1-alpha"
+    valid_until: "2027-05-11"
   NFR-Test-2:
     gates:
       - check-service-boundary
     corpora: []
-    phase: v0.1-alpha-surface-diff-stub
+    phase: "v0.1-alpha-surface-diff-stub"
+    valid_until: "2027-05-11"
   NFR-Test-9:
     gates:
       - check-loom
     corpora: []
-    phase: v0.1-alpha
+    phase: "v0.1-alpha"
+    valid_until: "2027-05-11"
+  NFR-Test-1:
+    gates:
+      - check-corpus
+      - check-judge-config
+      - rebaseline-check
+    corpora: []
+    phase: "v0.1-alpha"
+    valid_until: "2027-05-11"
+    notes: "rebaseline-check is the scheduled-workflow gate; check-corpus + check-judge-config are per-commit"
+  NFR-Meta-2:
+    gates:
+      - corpus-staleness
+    corpora: []
+    phase: "v0.1-alpha"
+    valid_until: "2027-05-11"
+  NFR-Meta-3:
+    gates:
+      - coverage-matrix
+    corpora: []
+    phase: "v0.1-alpha"
+    valid_until: "2027-05-11"
+    notes: "warning-only at v0.1 per Story 0.4 AC6; hard at v0.3"
+  NFR-Aud-8:
+    gates:
+      - calibrate
+    corpora: []
+    phase: "v0.5"
+    valid_until: "2027-05-11"
+    notes: "per-commit calibration N=100 lands with corpus in Story 0.4; quarterly N=500 at v1.0"

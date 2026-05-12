@@ -196,9 +196,83 @@ jobs:
             --sha ${{ github.sha }} \
             --json
 
+  check-corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-corpus
+        run: cargo run -p xtask -- check-corpus --json
+
+  check-judge-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-judge-config
+        run: cargo run -p xtask -- check-judge-config --json
+
+  coverage-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run coverage-matrix
+        run: cargo run -p xtask -- coverage-matrix --json
+
+  corpus-staleness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run corpus-staleness
+        run: cargo run -p xtask -- corpus-staleness --json
+
+  calibrate-per-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check for calibration corpus
+        id: check-corpus
+        run: |
+          if [ -f tests/corpora/calibration-seed-v0.1.jsonl ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Run calibrate
+        if: steps.check-corpus.outputs.exists == 'true'
+        run: cargo run -p xtask -- calibrate --corpus calibration-seed-v0.1 --n 100 --p 0.95 --json
+
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, coverage-matrix, corpus-staleness, calibrate-per-commit]
     if: always()
     permissions:
       pull-requests: write
@@ -214,6 +288,11 @@ jobs:
           echo "kc=${{ needs.kloc-check.result }}" >> $GITHUB_OUTPUT
           echo "ad=${{ needs.abi-diff.result }}" >> $GITHUB_OUTPUT
           echo "il=${{ needs.invariant-lock.result }}" >> $GITHUB_OUTPUT
+          echo "cc=${{ needs.check-corpus.result }}" >> $GITHUB_OUTPUT
+          echo "cjc=${{ needs.check-judge-config.result }}" >> $GITHUB_OUTPUT
+          echo "cm=${{ needs.coverage-matrix.result }}" >> $GITHUB_OUTPUT
+          echo "cs=${{ needs.corpus-staleness.result }}" >> $GITHUB_OUTPUT
+          echo "cpc=${{ needs.calibrate-per-commit.result }}" >> $GITHUB_OUTPUT
       - name: Check for failures
         id: status
         run: |
@@ -234,6 +313,11 @@ jobs:
             const kc = '${{ needs.kloc-check.result }}';
             const ad = '${{ needs.abi-diff.result }}';
             const il = '${{ needs.invariant-lock.result }}';
+            const cc = '${{ needs.check-corpus.result }}';
+            const cjc = '${{ needs.check-judge-config.result }}';
+            const cm = '${{ needs.coverage-matrix.result }}';
+            const cs = '${{ needs.corpus-staleness.result }}';
+            const cpc = '${{ needs.calibrate-per-commit.result }}';  // conditionally skipped until Story 0.4
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
 
             const body = `## MAOS Discipline Gate Results
@@ -248,6 +332,11 @@ jobs:
             | kloc-check | ${icon(kc)} ${kc} |
             | abi-diff | ${icon(ad)} ${ad} |
             | invariant-lock | ${icon(il)} ${il} |
+            | check-corpus | ${icon(cc)} ${cc} |
+            | check-judge-config | ${icon(cjc)} ${cjc} |
+            | coverage-matrix | ${icon(cm)} ${cm} |
+            | corpus-staleness | ${icon(cs)} ${cs} |
+            | calibrate-per-commit | ${icon(cpc)} ${cpc} |
 
             <!-- discipline-gate-comment -->`;
 

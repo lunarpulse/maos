@@ -1,0 +1,10 @@
+# Judge configuration — deliberate temperature violation for integration tests.
+
+[judge.violator]
+model = "openai:gpt-4@2024-01-01"
+temperature = 0.5
+top_p = 1.0
+seed = 42
+retry_budget = 1
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+added_in_story = "0.3"

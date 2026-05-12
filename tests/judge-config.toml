@@ -1,0 +1,15 @@
+# Judge-LLM structural contract — schema locked by Story 0.3.
+# See: implementation-artifacts/0-3-content-addressed-corpora-infrastructure-coverage-matrix-ci-gate.md
+#
+# Every [judge.<name>] entry MUST satisfy all six constraints:
+# 1. model = "<provider:model_id@version>"
+# 2. temperature = 0.0 (exactly)
+# 3. top_p = 1.0 (exactly)
+# 4. seed = <u64> (must be present)
+# 5. retry_budget = 1 (exactly)
+# 6. prompt_version_hash = "<64-hex-lower>"
+#
+# At v0.1-alpha this table is empty. Story 1b.4 commits the first row
+# when the Inference Port lands.
+
+[judge]
