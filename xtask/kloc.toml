@@ -7,6 +7,7 @@
 
 maos-kernel-core = 6000
 maos-cap-registry = 3000
+maos-corpus-gen = 3000
 maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000

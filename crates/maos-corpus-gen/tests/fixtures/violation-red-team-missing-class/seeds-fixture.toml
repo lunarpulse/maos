@@ -1,0 +1,11 @@
+# Violation fixture: kernel_syscall_abuse class deliberately empty (0 seeds).
+# The coverage_report() MUST return floor_satisfied: false for this class.
+
+[[seeds]]
+id = "capability_confusion-seed-01"
+class = "capability_confusion"
+attack_summary = "Spoofed capability token with elevated quarantine scope"
+kernel_defense_mechanism = "Kernel validates capability scope against spirit registry"
+expected_detection_surface = "Capability registry audit log"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity"]
+canonical_assertion = "kernel rejects frame and journals event"

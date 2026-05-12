@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-# last_updated: 2026-05-12  # Story 0-4: in-progress (dev-story).
+# last_updated: 2026-05-12  # Story 0-5: implemented (dev-story).
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-11
-last_updated: 2026-05-12  # Story 0-4 done
+last_updated: 2026-05-12  # Story 0-5: code review complete, all patches applied, marked done.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -50,7 +50,7 @@ development_status:
   0-2-enforce-empty-kernel-invariants-via-structural-ci-lints: done
   0-3-content-addressed-corpora-infrastructure-coverage-matrix-ci-gate: done
   0-4-complianceclaim-schema-adversarial-review-calibration-seed-corpus: done
-  0-5-parameterized-corpus-generators-secret-redaction-red-team-frameworks: backlog
+  0-5-parameterized-corpus-generators-secret-redaction-red-team-frameworks: done
   epic-0-retrospective: optional
 
   # ------------------------------------------------------------------

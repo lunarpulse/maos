@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["xtask", "crates/maos-spirit-abi", "crates/maos-kernel-core"]
+members = ["xtask", "crates/maos-corpus-gen", "crates/maos-spirit-abi", "crates/maos-kernel-core"]
 default-members = []
 
 [workspace.package]

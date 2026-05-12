@@ -1,0 +1,655 @@
+# Red-Team Seed Corpus v0.1
+# 80 canonical attack scenarios across 8 §8.1 attack classes.
+# 10 seeds per class × 8× deterministic parameter expansion = ≥640 items.
+# SHA-pinned; any edit requires updating SEED_FILE_SHA256 + regenerating JSONL.
+# See: crates/maos-corpus-gen/src/red_team/mod.rs
+# Class identifiers (binding — do NOT rename):
+#   capability_confusion
+#   iac_frame_injection
+#   distillation_poisoning
+#   ledger_tampering
+#   cross_spirit_privilege_escalation
+#   resource_exhaustion
+#   side_channel_timing
+#   kernel_syscall_abuse
+
+[[seeds]]
+id = "capability_confusion-seed-01"
+class = "capability_confusion"
+attack_summary = "Spoofed capability token with elevated quarantine scope"
+kernel_defense_mechanism = "Kernel validates capability scope against spirit registry"
+expected_detection_surface = "Capability registry audit log + EAuditCapabilityScopeViolation event"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity", "TTL_boundary", "frame_ordering"]
+canonical_assertion = "kernel rejects frame with ECapabilityScopeViolation and journals EAuditCapabilityScopeViolation event"
+[[seeds]]
+id = "capability_confusion-seed-02"
+class = "capability_confusion"
+attack_summary = "Replay of expired capability token after spirit restart"
+kernel_defense_mechanism = "Kernel checks TTL monotonicity and rejects expired tokens"
+expected_detection_surface = "Capability registry audit log + EAuditCapabilityScopeViolation event"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity", "TTL_boundary", "frame_ordering"]
+canonical_assertion = "kernel rejects frame with ECapabilityScopeViolation and journals EAuditCapabilityScopeViolation event"
+[[seeds]]
+id = "capability_confusion-seed-03"
+class = "capability_confusion"
+attack_summary = "Capability token with forged TTL claiming infinite lifetime"
+kernel_defense_mechanism = "Kernel enforces max-TTL cap on all capability tokens"
+expected_detection_surface = "Capability registry audit log + EAuditCapabilityScopeViolation event"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity", "TTL_boundary", "frame_ordering"]
+canonical_assertion = "kernel rejects frame with ECapabilityScopeViolation and journals EAuditCapabilityScopeViolation event"
+[[seeds]]
+id = "capability_confusion-seed-04"
+class = "capability_confusion"
+attack_summary = "Cross-tenant capability token with wrong namespace prefix"
+kernel_defense_mechanism = "Kernel validates namespace prefix against tenant isolation map"
+expected_detection_surface = "Capability registry audit log + EAuditCapabilityScopeViolation event"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity", "TTL_boundary", "frame_ordering"]
+canonical_assertion = "kernel rejects frame with ECapabilityScopeViolation and journals EAuditCapabilityScopeViolation event"
+[[seeds]]
+id = "capability_confusion-seed-05"
+class = "capability_confusion"
+attack_summary = "Capability token with bit-flipped scope bits"
+kernel_defense_mechanism = "Kernel verifies scope bits against allowed-bitmask for spirit class"
+expected_detection_surface = "Capability registry audit log + EAuditCapabilityScopeViolation event"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity", "TTL_boundary", "frame_ordering"]
+canonical_assertion = "kernel rejects frame with ECapabilityScopeViolation and journals EAuditCapabilityScopeViolation event"
+[[seeds]]
+id = "capability_confusion-seed-06"
+class = "capability_confusion"
+attack_summary = "Token signed with revoked intermediate CA cert"
+kernel_defense_mechanism = "Kernel validates full certificate chain to root of trust"
+expected_detection_surface = "Capability registry audit log + EAuditCapabilityScopeViolation event"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity", "TTL_boundary", "frame_ordering"]
+canonical_assertion = "kernel rejects frame with ECapabilityScopeViolation and journals EAuditCapabilityScopeViolation event"
+[[seeds]]
+id = "capability_confusion-seed-07"
+class = "capability_confusion"
+attack_summary = "Token with privilege overflow in scope bitmap"
+kernel_defense_mechanism = "Kernel bounds-checks scope bitmap size before deserialization"
+expected_detection_surface = "Capability registry audit log + EAuditCapabilityScopeViolation event"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity", "TTL_boundary", "frame_ordering"]
+canonical_assertion = "kernel rejects frame with ECapabilityScopeViolation and journals EAuditCapabilityScopeViolation event"
+[[seeds]]
+id = "capability_confusion-seed-08"
+class = "capability_confusion"
+attack_summary = "Token claiming scope of departed co-tenant spirit"
+kernel_defense_mechanism = "Kernel cross-references spirit liveness before scope resolution"
+expected_detection_surface = "Capability registry audit log + EAuditCapabilityScopeViolation event"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity", "TTL_boundary", "frame_ordering"]
+canonical_assertion = "kernel rejects frame with ECapabilityScopeViolation and journals EAuditCapabilityScopeViolation event"
+[[seeds]]
+id = "capability_confusion-seed-09"
+class = "capability_confusion"
+attack_summary = "Token with colliding nonce attempting replay bypass"
+kernel_defense_mechanism = "Kernel maintains nonce-replay cache with bounded LRU eviction"
+expected_detection_surface = "Capability registry audit log + EAuditCapabilityScopeViolation event"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity", "TTL_boundary", "frame_ordering"]
+canonical_assertion = "kernel rejects frame with ECapabilityScopeViolation and journals EAuditCapabilityScopeViolation event"
+[[seeds]]
+id = "capability_confusion-seed-10"
+class = "capability_confusion"
+attack_summary = "Token where spirit role field truncated to overflow"
+kernel_defense_mechanism = "Kernel validates spirit role field length against ABI schema"
+expected_detection_surface = "Capability registry audit log + EAuditCapabilityScopeViolation event"
+parameter_axes = ["target_capability_class", "spoofed_caller_identity", "TTL_boundary", "frame_ordering"]
+canonical_assertion = "kernel rejects frame with ECapabilityScopeViolation and journals EAuditCapabilityScopeViolation event"
+[[seeds]]
+id = "iac_frame_injection-seed-01"
+class = "iac_frame_injection"
+attack_summary = "Injected frame with spoofed director sender identity"
+kernel_defense_mechanism = "Kernel verifies sender identity against active spirit registry"
+expected_detection_surface = "IAC frame audit log + EAuditFrameInjection event"
+parameter_axes = ["injection_point", "payload_type", "frame_size", "timing_context"]
+canonical_assertion = "kernel rejects frame with EIACFrameRejected and journals EAuditFrameInjection event"
+[[seeds]]
+id = "iac_frame_injection-seed-02"
+class = "iac_frame_injection"
+attack_summary = "Frame carrying off-by-one length claiming larger payload than actual"
+kernel_defense_mechanism = "Kernel validates frame length against declared payload size"
+expected_detection_surface = "IAC frame audit log + EAuditFrameInjection event"
+parameter_axes = ["injection_point", "payload_type", "frame_size", "timing_context"]
+canonical_assertion = "kernel rejects frame with EIACFrameRejected and journals EAuditFrameInjection event"
+[[seeds]]
+id = "iac_frame_injection-seed-03"
+class = "iac_frame_injection"
+attack_summary = "Frame with type field set to reserved value 0xFF"
+kernel_defense_mechanism = "Kernel rejects frames with reserved type values"
+expected_detection_surface = "IAC frame audit log + EAuditFrameInjection event"
+parameter_axes = ["injection_point", "payload_type", "frame_size", "timing_context"]
+canonical_assertion = "kernel rejects frame with EIACFrameRejected and journals EAuditFrameInjection event"
+[[seeds]]
+id = "iac_frame_injection-seed-04"
+class = "iac_frame_injection"
+attack_summary = "Frame with routing path length exceeding IAC_MAX_HOPS"
+kernel_defense_mechanism = "Kernel enforces IAC_MAX_HOPS and drops exceeded frames"
+expected_detection_surface = "IAC frame audit log + EAuditFrameInjection event"
+parameter_axes = ["injection_point", "payload_type", "frame_size", "timing_context"]
+canonical_assertion = "kernel rejects frame with EIACFrameRejected and journals EAuditFrameInjection event"
+[[seeds]]
+id = "iac_frame_injection-seed-05"
+class = "iac_frame_injection"
+attack_summary = "Frame whose HMAC fails to verify against sender's session key"
+kernel_defense_mechanism = "Kernel verifies HMAC with per-session key before dispatch"
+expected_detection_surface = "IAC frame audit log + EAuditFrameInjection event"
+parameter_axes = ["injection_point", "payload_type", "frame_size", "timing_context"]
+canonical_assertion = "kernel rejects frame with EIACFrameRejected and journals EAuditFrameInjection event"
+[[seeds]]
+id = "iac_frame_injection-seed-06"
+class = "iac_frame_injection"
+attack_summary = "Frame replay within TTL window with identical nonce"
+kernel_defense_mechanism = "Kernel checks nonce uniqueness within replay window"
+expected_detection_surface = "IAC frame audit log + EAuditFrameInjection event"
+parameter_axes = ["injection_point", "payload_type", "frame_size", "timing_context"]
+canonical_assertion = "kernel rejects frame with EIACFrameRejected and journals EAuditFrameInjection event"
+[[seeds]]
+id = "iac_frame_injection-seed-07"
+class = "iac_frame_injection"
+attack_summary = "Frame with version field claiming future IAC protocol version"
+kernel_defense_mechanism = "Kernel rejects frames claiming future protocol versions"
+expected_detection_surface = "IAC frame audit log + EAuditFrameInjection event"
+parameter_axes = ["injection_point", "payload_type", "frame_size", "timing_context"]
+canonical_assertion = "kernel rejects frame with EIACFrameRejected and journals EAuditFrameInjection event"
+[[seeds]]
+id = "iac_frame_injection-seed-08"
+class = "iac_frame_injection"
+attack_summary = "Frame where body offset points past frame boundary"
+kernel_defense_mechanism = "Kernel validates body offset is within frame boundary"
+expected_detection_surface = "IAC frame audit log + EAuditFrameInjection event"
+parameter_axes = ["injection_point", "payload_type", "frame_size", "timing_context"]
+canonical_assertion = "kernel rejects frame with EIACFrameRejected and journals EAuditFrameInjection event"
+[[seeds]]
+id = "iac_frame_injection-seed-09"
+class = "iac_frame_injection"
+attack_summary = "Frame with binary garbage in spirit-id field (null bytes)"
+kernel_defense_mechanism = "Kernel validates all string fields are valid UTF-8"
+expected_detection_surface = "IAC frame audit log + EAuditFrameInjection event"
+parameter_axes = ["injection_point", "payload_type", "frame_size", "timing_context"]
+canonical_assertion = "kernel rejects frame with EIACFrameRejected and journals EAuditFrameInjection event"
+[[seeds]]
+id = "iac_frame_injection-seed-10"
+class = "iac_frame_injection"
+attack_summary = "Frame with recursive routing loop in path header"
+kernel_defense_mechanism = "Kernel detects routing cycles via visited-node set"
+expected_detection_surface = "IAC frame audit log + EAuditFrameInjection event"
+parameter_axes = ["injection_point", "payload_type", "frame_size", "timing_context"]
+canonical_assertion = "kernel rejects frame with EIACFrameRejected and journals EAuditFrameInjection event"
+[[seeds]]
+id = "distillation_poisoning-seed-01"
+class = "distillation_poisoning"
+attack_summary = "Distillate carrying adversarial prompt injection payload"
+kernel_defense_mechanism = "Kernel strips prompt-injection markers before log storage"
+expected_detection_surface = "Distillation audit log + EDistillationIntegrityViolation event"
+parameter_axes = ["poisoning_vector", "distillate_size", "source_count", "confidence_skew"]
+canonical_assertion = "kernel rejects distillate and journals EDistillationIntegrityViolation event"
+[[seeds]]
+id = "distillation_poisoning-seed-02"
+class = "distillation_poisoning"
+attack_summary = "Distillate with embedded system-prompt override tokens"
+kernel_defense_mechanism = "Kernel validates distillate against invariant schema"
+expected_detection_surface = "Distillation audit log + EDistillationIntegrityViolation event"
+parameter_axes = ["poisoning_vector", "distillate_size", "source_count", "confidence_skew"]
+canonical_assertion = "kernel rejects distillate and journals EDistillationIntegrityViolation event"
+[[seeds]]
+id = "distillation_poisoning-seed-03"
+class = "distillation_poisoning"
+attack_summary = "Distillate whose checksum mismatches declared content hash"
+kernel_defense_mechanism = "Kernel recomputes content hash and rejects on mismatch"
+expected_detection_surface = "Distillation audit log + EDistillationIntegrityViolation event"
+parameter_axes = ["poisoning_vector", "distillate_size", "source_count", "confidence_skew"]
+canonical_assertion = "kernel rejects distillate and journals EDistillationIntegrityViolation event"
+[[seeds]]
+id = "distillation_poisoning-seed-04"
+class = "distillation_poisoning"
+attack_summary = "Distillate with manipulated confidence scores (out-of-range values)"
+kernel_defense_mechanism = "Kernel clamps all numeric fields to schema bounds"
+expected_detection_surface = "Distillation audit log + EDistillationIntegrityViolation event"
+parameter_axes = ["poisoning_vector", "distillate_size", "source_count", "confidence_skew"]
+canonical_assertion = "kernel rejects distillate and journals EDistillationIntegrityViolation event"
+[[seeds]]
+id = "distillation_poisoning-seed-05"
+class = "distillation_poisoning"
+attack_summary = "Distillate substituting truthy source citation for fabricated one"
+kernel_defense_mechanism = "Kernel verifies source citations against transparency log"
+expected_detection_surface = "Distillation audit log + EDistillationIntegrityViolation event"
+parameter_axes = ["poisoning_vector", "distillate_size", "source_count", "confidence_skew"]
+canonical_assertion = "kernel rejects distillate and journals EDistillationIntegrityViolation event"
+[[seeds]]
+id = "distillation_poisoning-seed-06"
+class = "distillation_poisoning"
+attack_summary = "Distillate with base64-encoded injection in metadata field"
+kernel_defense_mechanism = "Kernel decodes and re-encodes all binary fields (normalization)"
+expected_detection_surface = "Distillation audit log + EDistillationIntegrityViolation event"
+parameter_axes = ["poisoning_vector", "distillate_size", "source_count", "confidence_skew"]
+canonical_assertion = "kernel rejects distillate and journals EDistillationIntegrityViolation event"
+[[seeds]]
+id = "distillation_poisoning-seed-07"
+class = "distillation_poisoning"
+attack_summary = "Distillate whose token count exceeds declared budget by 10x"
+kernel_defense_mechanism = "Kernel enforces per-distillate token budget cap"
+expected_detection_surface = "Distillation audit log + EDistillationIntegrityViolation event"
+parameter_axes = ["poisoning_vector", "distillate_size", "source_count", "confidence_skew"]
+canonical_assertion = "kernel rejects distillate and journals EDistillationIntegrityViolation event"
+[[seeds]]
+id = "distillation_poisoning-seed-08"
+class = "distillation_poisoning"
+attack_summary = "Distillate with homoglyph attack in source attribution field"
+kernel_defense_mechanism = "Kernel normalizes Unicode before attribution comparison"
+expected_detection_surface = "Distillation audit log + EDistillationIntegrityViolation event"
+parameter_axes = ["poisoning_vector", "distillate_size", "source_count", "confidence_skew"]
+canonical_assertion = "kernel rejects distillate and journals EDistillationIntegrityViolation event"
+[[seeds]]
+id = "distillation_poisoning-seed-09"
+class = "distillation_poisoning"
+attack_summary = "Distillate with null-byte injection in text segment"
+kernel_defense_mechanism = "Kernel rejects any frame field containing null bytes"
+expected_detection_surface = "Distillation audit log + EDistillationIntegrityViolation event"
+parameter_axes = ["poisoning_vector", "distillate_size", "source_count", "confidence_skew"]
+canonical_assertion = "kernel rejects distillate and journals EDistillationIntegrityViolation event"
+[[seeds]]
+id = "distillation_poisoning-seed-10"
+class = "distillation_poisoning"
+attack_summary = "Distillate where all sources point to same untrusted origin"
+kernel_defense_mechanism = "Kernel cross-checks source diversity against minimum threshold"
+expected_detection_surface = "Distillation audit log + EDistillationIntegrityViolation event"
+parameter_axes = ["poisoning_vector", "distillate_size", "source_count", "confidence_skew"]
+canonical_assertion = "kernel rejects distillate and journals EDistillationIntegrityViolation event"
+[[seeds]]
+id = "ledger_tampering-seed-01"
+class = "ledger_tampering"
+attack_summary = "Attempt to rewrite sealed ledger entry via direct IAC frame"
+kernel_defense_mechanism = "Kernel enforces ledger append-only at storage boundary"
+expected_detection_surface = "Ledger audit log + ELedgerIntegrityViolation event"
+parameter_axes = ["tamper_target", "entry_type", "chain_position", "attack_timing"]
+canonical_assertion = "kernel rejects ledger mutation and journals ELedgerIntegrityViolation event"
+[[seeds]]
+id = "ledger_tampering-seed-02"
+class = "ledger_tampering"
+attack_summary = "Ledger entry with backdated timestamp before spirit creation"
+kernel_defense_mechanism = "Kernel validates timestamp monotonicity against spirit lifecycle"
+expected_detection_surface = "Ledger audit log + ELedgerIntegrityViolation event"
+parameter_axes = ["tamper_target", "entry_type", "chain_position", "attack_timing"]
+canonical_assertion = "kernel rejects ledger mutation and journals ELedgerIntegrityViolation event"
+[[seeds]]
+id = "ledger_tampering-seed-03"
+class = "ledger_tampering"
+attack_summary = "Ledger entry missing required predecessor hash"
+kernel_defense_mechanism = "Kernel verifies predecessor hash chains before append"
+expected_detection_surface = "Ledger audit log + ELedgerIntegrityViolation event"
+parameter_axes = ["tamper_target", "entry_type", "chain_position", "attack_timing"]
+canonical_assertion = "kernel rejects ledger mutation and journals ELedgerIntegrityViolation event"
+[[seeds]]
+id = "ledger_tampering-seed-04"
+class = "ledger_tampering"
+attack_summary = "Tampered ledger entry with incremented sequence number gap"
+kernel_defense_mechanism = "Kernel rejects entries with sequence number gaps"
+expected_detection_surface = "Ledger audit log + ELedgerIntegrityViolation event"
+parameter_axes = ["tamper_target", "entry_type", "chain_position", "attack_timing"]
+canonical_assertion = "kernel rejects ledger mutation and journals ELedgerIntegrityViolation event"
+[[seeds]]
+id = "ledger_tampering-seed-05"
+class = "ledger_tampering"
+attack_summary = "Ledger entry signed with expired spirit certificate"
+kernel_defense_mechanism = "Kernel validates certificate liveness at entry time"
+expected_detection_surface = "Ledger audit log + ELedgerIntegrityViolation event"
+parameter_axes = ["tamper_target", "entry_type", "chain_position", "attack_timing"]
+canonical_assertion = "kernel rejects ledger mutation and journals ELedgerIntegrityViolation event"
+[[seeds]]
+id = "ledger_tampering-seed-06"
+class = "ledger_tampering"
+attack_summary = "Concurrent fork attempt: two entries claiming same sequence slot"
+kernel_defense_mechanism = "Kernel serializes ledger writes with single-writer lock"
+expected_detection_surface = "Ledger audit log + ELedgerIntegrityViolation event"
+parameter_axes = ["tamper_target", "entry_type", "chain_position", "attack_timing"]
+canonical_assertion = "kernel rejects ledger mutation and journals ELedgerIntegrityViolation event"
+[[seeds]]
+id = "ledger_tampering-seed-07"
+class = "ledger_tampering"
+attack_summary = "Ledger entry with truncated audit chain (missing intermediate)"
+kernel_defense_mechanism = "Kernel walks full audit chain before sealing new entry"
+expected_detection_surface = "Ledger audit log + ELedgerIntegrityViolation event"
+parameter_axes = ["tamper_target", "entry_type", "chain_position", "attack_timing"]
+canonical_assertion = "kernel rejects ledger mutation and journals ELedgerIntegrityViolation event"
+[[seeds]]
+id = "ledger_tampering-seed-08"
+class = "ledger_tampering"
+attack_summary = "Ledger entry with bit-flip in sealed payload hash"
+kernel_defense_mechanism = "Kernel recomputes and verifies all entry hashes"
+expected_detection_surface = "Ledger audit log + ELedgerIntegrityViolation event"
+parameter_axes = ["tamper_target", "entry_type", "chain_position", "attack_timing"]
+canonical_assertion = "kernel rejects ledger mutation and journals ELedgerIntegrityViolation event"
+[[seeds]]
+id = "ledger_tampering-seed-09"
+class = "ledger_tampering"
+attack_summary = "Ledger entry claiming authorization from halted spirit"
+kernel_defense_mechanism = "Kernel checks spirit liveness before authorizing append"
+expected_detection_surface = "Ledger audit log + ELedgerIntegrityViolation event"
+parameter_axes = ["tamper_target", "entry_type", "chain_position", "attack_timing"]
+canonical_assertion = "kernel rejects ledger mutation and journals ELedgerIntegrityViolation event"
+[[seeds]]
+id = "ledger_tampering-seed-10"
+class = "ledger_tampering"
+attack_summary = "Ledger entry whose merkle path fails inclusion proof"
+kernel_defense_mechanism = "Kernel verifies merkle proof against sealed root hash"
+expected_detection_surface = "Ledger audit log + ELedgerIntegrityViolation event"
+parameter_axes = ["tamper_target", "entry_type", "chain_position", "attack_timing"]
+canonical_assertion = "kernel rejects ledger mutation and journals ELedgerIntegrityViolation event"
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-01"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A attempts to read Spirit B memory slot via direct pointer"
+kernel_defense_mechanism = "Kernel enforces per-spirit memory isolation via capability tokens"
+expected_detection_surface = "Spirit isolation audit log + ECrossSpiritPrivilegeViolation event"
+parameter_axes = ["target_spirit_role", "escalation_vector", "resource_class", "trust_tier"]
+canonical_assertion = "kernel rejects cross-spirit access and journals ECrossSpiritPrivilegeViolation event"
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-02"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A sends frame with B's spirit-id in principal field"
+kernel_defense_mechanism = "Kernel validates principal field against authenticated session"
+expected_detection_surface = "Spirit isolation audit log + ECrossSpiritPrivilegeViolation event"
+parameter_axes = ["target_spirit_role", "escalation_vector", "resource_class", "trust_tier"]
+canonical_assertion = "kernel rejects cross-spirit access and journals ECrossSpiritPrivilegeViolation event"
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-03"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A accesses shared resource without capability token"
+kernel_defense_mechanism = "Kernel gate-checks every resource access against capability registry"
+expected_detection_surface = "Spirit isolation audit log + ECrossSpiritPrivilegeViolation event"
+parameter_axes = ["target_spirit_role", "escalation_vector", "resource_class", "trust_tier"]
+canonical_assertion = "kernel rejects cross-spirit access and journals ECrossSpiritPrivilegeViolation event"
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-04"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A publishes message on B's exclusive publication channel"
+kernel_defense_mechanism = "Kernel enforces channel ACLs per spirit principal"
+expected_detection_surface = "Spirit isolation audit log + ECrossSpiritPrivilegeViolation event"
+parameter_axes = ["target_spirit_role", "escalation_vector", "resource_class", "trust_tier"]
+canonical_assertion = "kernel rejects cross-spirit access and journals ECrossSpiritPrivilegeViolation event"
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-05"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A claims to be child-of-B for inheritance escalation"
+kernel_defense_mechanism = "Kernel validates spirit ancestry against signed lineage chain"
+expected_detection_surface = "Spirit isolation audit log + ECrossSpiritPrivilegeViolation event"
+parameter_axes = ["target_spirit_role", "escalation_vector", "resource_class", "trust_tier"]
+canonical_assertion = "kernel rejects cross-spirit access and journals ECrossSpiritPrivilegeViolation event"
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-06"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A uses B's authenticated session key after B halted"
+kernel_defense_mechanism = "Kernel invalidates all session keys on spirit halt"
+expected_detection_surface = "Spirit isolation audit log + ECrossSpiritPrivilegeViolation event"
+parameter_axes = ["target_spirit_role", "escalation_vector", "resource_class", "trust_tier"]
+canonical_assertion = "kernel rejects cross-spirit access and journals ECrossSpiritPrivilegeViolation event"
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-07"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A subscribes to B's telemetry stream without authorization"
+kernel_defense_mechanism = "Kernel defends telemetry subscription with explicit ACL check"
+expected_detection_surface = "Spirit isolation audit log + ECrossSpiritPrivilegeViolation event"
+parameter_axes = ["target_spirit_role", "escalation_vector", "resource_class", "trust_tier"]
+canonical_assertion = "kernel rejects cross-spirit access and journals ECrossSpiritPrivilegeViolation event"
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-08"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A invokes B's lifecycle hook directly via IAC"
+kernel_defense_mechanism = "Kernel rejects cross-spirit lifecycle hook invocations"
+expected_detection_surface = "Spirit isolation audit log + ECrossSpiritPrivilegeViolation event"
+parameter_axes = ["target_spirit_role", "escalation_vector", "resource_class", "trust_tier"]
+canonical_assertion = "kernel rejects cross-spirit access and journals ECrossSpiritPrivilegeViolation event"
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-09"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A drains B's resource quota by claiming shared identity"
+kernel_defense_mechanism = "Kernel enforces per-principal resource quota accounting"
+expected_detection_surface = "Spirit isolation audit log + ECrossSpiritPrivilegeViolation event"
+parameter_axes = ["target_spirit_role", "escalation_vector", "resource_class", "trust_tier"]
+canonical_assertion = "kernel rejects cross-spirit access and journals ECrossSpiritPrivilegeViolation event"
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-10"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A's distillate references B's internal memory addresses"
+kernel_defense_mechanism = "Kernel scrubs internal addresses from inter-spirit messages"
+expected_detection_surface = "Spirit isolation audit log + ECrossSpiritPrivilegeViolation event"
+parameter_axes = ["target_spirit_role", "escalation_vector", "resource_class", "trust_tier"]
+canonical_assertion = "kernel rejects cross-spirit access and journals ECrossSpiritPrivilegeViolation event"
+[[seeds]]
+id = "resource_exhaustion-seed-01"
+class = "resource_exhaustion"
+attack_summary = "Spirit sends 1000 concurrent frames overwhelming dispatch queue"
+kernel_defense_mechanism = "Kernel enforces per-spirit concurrent dispatch cap"
+expected_detection_surface = "Resource cap audit log + EResourceCapExceeded event"
+parameter_axes = ["resource_type", "exhaustion_rate", "burst_pattern", "cooldown_behavior"]
+canonical_assertion = "kernel enforces resource cap and journals EResourceCapExceeded event"
+[[seeds]]
+id = "resource_exhaustion-seed-02"
+class = "resource_exhaustion"
+attack_summary = "Spirit allocates 1GB shared memory in rapid loop"
+kernel_defense_mechanism = "Kernel enforces per-spirit memory budget with hard limit"
+expected_detection_surface = "Resource cap audit log + EResourceCapExceeded event"
+parameter_axes = ["resource_type", "exhaustion_rate", "burst_pattern", "cooldown_behavior"]
+canonical_assertion = "kernel enforces resource cap and journals EResourceCapExceeded event"
+[[seeds]]
+id = "resource_exhaustion-seed-03"
+class = "resource_exhaustion"
+attack_summary = "Spirit submits distillate with recursive expansion bomb"
+kernel_defense_mechanism = "Kernel bounds distillate recursion depth before processing"
+expected_detection_surface = "Resource cap audit log + EResourceCapExceeded event"
+parameter_axes = ["resource_type", "exhaustion_rate", "burst_pattern", "cooldown_behavior"]
+canonical_assertion = "kernel enforces resource cap and journals EResourceCapExceeded event"
+[[seeds]]
+id = "resource_exhaustion-seed-04"
+class = "resource_exhaustion"
+attack_summary = "Spirit opens 10000 capability tokens exhausting token pool"
+kernel_defense_mechanism = "Kernel enforces per-spirit capability token ceiling"
+expected_detection_surface = "Resource cap audit log + EResourceCapExceeded event"
+parameter_axes = ["resource_type", "exhaustion_rate", "burst_pattern", "cooldown_behavior"]
+canonical_assertion = "kernel enforces resource cap and journals EResourceCapExceeded event"
+[[seeds]]
+id = "resource_exhaustion-seed-05"
+class = "resource_exhaustion"
+attack_summary = "Spirit spawns child spirits in infinite loop (fork bomb)"
+kernel_defense_mechanism = "Kernel rate-limits spirit spawn rate per principal"
+expected_detection_surface = "Resource cap audit log + EResourceCapExceeded event"
+parameter_axes = ["resource_type", "exhaustion_rate", "burst_pattern", "cooldown_behavior"]
+canonical_assertion = "kernel enforces resource cap and journals EResourceCapExceeded event"
+[[seeds]]
+id = "resource_exhaustion-seed-06"
+class = "resource_exhaustion"
+attack_summary = "Spirit writes log entries at 10kHz saturating I/O subsystem"
+kernel_defense_mechanism = "Kernel enforces per-spirit I/O write budget"
+expected_detection_surface = "Resource cap audit log + EResourceCapExceeded event"
+parameter_axes = ["resource_type", "exhaustion_rate", "burst_pattern", "cooldown_behavior"]
+canonical_assertion = "kernel enforces resource cap and journals EResourceCapExceeded event"
+[[seeds]]
+id = "resource_exhaustion-seed-07"
+class = "resource_exhaustion"
+attack_summary = "Spirit requests quota increase beyond per-tenant aggregate cap"
+kernel_defense_mechanism = "Kernel enforces per-tenant aggregate resource cap"
+expected_detection_surface = "Resource cap audit log + EResourceCapExceeded event"
+parameter_axes = ["resource_type", "exhaustion_rate", "burst_pattern", "cooldown_behavior"]
+canonical_assertion = "kernel enforces resource cap and journals EResourceCapExceeded event"
+[[seeds]]
+id = "resource_exhaustion-seed-08"
+class = "resource_exhaustion"
+attack_summary = "Spirit creates deeply nested JSON exhausting parser stack"
+kernel_defense_mechanism = "Kernel enforces max nesting depth on all parsed structures"
+expected_detection_surface = "Resource cap audit log + EResourceCapExceeded event"
+parameter_axes = ["resource_type", "exhaustion_rate", "burst_pattern", "cooldown_behavior"]
+canonical_assertion = "kernel enforces resource cap and journals EResourceCapExceeded event"
+[[seeds]]
+id = "resource_exhaustion-seed-09"
+class = "resource_exhaustion"
+attack_summary = "Spirit sends frames with maximum allowed size in tight loop"
+kernel_defense_mechanism = "Kernel enforces per-spirit bandwidth throttle"
+expected_detection_surface = "Resource cap audit log + EResourceCapExceeded event"
+parameter_axes = ["resource_type", "exhaustion_rate", "burst_pattern", "cooldown_behavior"]
+canonical_assertion = "kernel enforces resource cap and journals EResourceCapExceeded event"
+[[seeds]]
+id = "resource_exhaustion-seed-10"
+class = "resource_exhaustion"
+attack_summary = "Spirit holds capability tokens without releasing (leak over time)"
+kernel_defense_mechanism = "Kernel garbage-collects unreferenced capability tokens"
+expected_detection_surface = "Resource cap audit log + EResourceCapExceeded event"
+parameter_axes = ["resource_type", "exhaustion_rate", "burst_pattern", "cooldown_behavior"]
+canonical_assertion = "kernel enforces resource cap and journals EResourceCapExceeded event"
+[[seeds]]
+id = "side_channel_timing-seed-01"
+class = "side_channel_timing"
+attack_summary = "Attacker measures capability validation latency to infer token validity"
+kernel_defense_mechanism = "Kernel uses constant-time token validation regardless of validity"
+expected_detection_surface = "Timing anomaly audit log + ESideChannelAnomalyDetected event"
+parameter_axes = ["channel_type", "measurement_precision", "countermeasure", "noise_floor"]
+canonical_assertion = "kernel detects timing anomaly and journals ESideChannelAnomalyDetected event"
+[[seeds]]
+id = "side_channel_timing-seed-02"
+class = "side_channel_timing"
+attack_summary = "Attacker observes memory allocation time to leak allocation size"
+kernel_defense_mechanism = "Kernel rounds all allocation sizes to fixed buckets"
+expected_detection_surface = "Timing anomaly audit log + ESideChannelAnomalyDetected event"
+parameter_axes = ["channel_type", "measurement_precision", "countermeasure", "noise_floor"]
+canonical_assertion = "kernel detects timing anomaly and journals ESideChannelAnomalyDetected event"
+[[seeds]]
+id = "side_channel_timing-seed-03"
+class = "side_channel_timing"
+attack_summary = "Attacker times distillate processing to infer content length"
+kernel_defense_mechanism = "Kernel pads distillate processing time to constant budget"
+expected_detection_surface = "Timing anomaly audit log + ESideChannelAnomalyDetected event"
+parameter_axes = ["channel_type", "measurement_precision", "countermeasure", "noise_floor"]
+canonical_assertion = "kernel detects timing anomaly and journals ESideChannelAnomalyDetected event"
+[[seeds]]
+id = "side_channel_timing-seed-04"
+class = "side_channel_timing"
+attack_summary = "Attacker measures frame dispatch ordering to infer priorities"
+kernel_defense_mechanism = "Kernel randomizes dispatch order within priority class"
+expected_detection_surface = "Timing anomaly audit log + ESideChannelAnomalyDetected event"
+parameter_axes = ["channel_type", "measurement_precision", "countermeasure", "noise_floor"]
+canonical_assertion = "kernel detects timing anomaly and journals ESideChannelAnomalyDetected event"
+[[seeds]]
+id = "side_channel_timing-seed-05"
+class = "side_channel_timing"
+attack_summary = "Attacker observes lock acquisition time to infer contention"
+kernel_defense_mechanism = "Kernel uses try-lock with randomized backoff"
+expected_detection_surface = "Timing anomaly audit log + ESideChannelAnomalyDetected event"
+parameter_axes = ["channel_type", "measurement_precision", "countermeasure", "noise_floor"]
+canonical_assertion = "kernel detects timing anomaly and journals ESideChannelAnomalyDetected event"
+[[seeds]]
+id = "side_channel_timing-seed-06"
+class = "side_channel_timing"
+attack_summary = "Attacker measures hash comparison timing to brute-force prefix"
+kernel_defense_mechanism = "Kernel uses constant-time hash comparison (subtle crate)"
+expected_detection_surface = "Timing anomaly audit log + ESideChannelAnomalyDetected event"
+parameter_axes = ["channel_type", "measurement_precision", "countermeasure", "noise_floor"]
+canonical_assertion = "kernel detects timing anomaly and journals ESideChannelAnomalyDetected event"
+[[seeds]]
+id = "side_channel_timing-seed-07"
+class = "side_channel_timing"
+attack_summary = "Attacker times spirit startup to infer configuration size"
+kernel_defense_mechanism = "Kernel pads startup time to fixed quantum"
+expected_detection_surface = "Timing anomaly audit log + ESideChannelAnomalyDetected event"
+parameter_axes = ["channel_type", "measurement_precision", "countermeasure", "noise_floor"]
+canonical_assertion = "kernel detects timing anomaly and journals ESideChannelAnomalyDetected event"
+[[seeds]]
+id = "side_channel_timing-seed-08"
+class = "side_channel_timing"
+attack_summary = "Attacker observes journal append latency to infer write pressure"
+kernel_defense_mechanism = "Kernel batches journal writes with randomized flush intervals"
+expected_detection_surface = "Timing anomaly audit log + ESideChannelAnomalyDetected event"
+parameter_axes = ["channel_type", "measurement_precision", "countermeasure", "noise_floor"]
+canonical_assertion = "kernel detects timing anomaly and journals ESideChannelAnomalyDetected event"
+[[seeds]]
+id = "side_channel_timing-seed-09"
+class = "side_channel_timing"
+attack_summary = "Attacker measures certificate validation time to infer chain length"
+kernel_defense_mechanism = "Kernel pads certificate validation to fixed chain-length ceiling"
+expected_detection_surface = "Timing anomaly audit log + ESideChannelAnomalyDetected event"
+parameter_axes = ["channel_type", "measurement_precision", "countermeasure", "noise_floor"]
+canonical_assertion = "kernel detects timing anomaly and journals ESideChannelAnomalyDetected event"
+[[seeds]]
+id = "side_channel_timing-seed-10"
+class = "side_channel_timing"
+attack_summary = "Attacker times sandbox creation to infer container image size"
+kernel_defense_mechanism = "Kernel reports constant sandbox creation time via padding"
+expected_detection_surface = "Timing anomaly audit log + ESideChannelAnomalyDetected event"
+parameter_axes = ["channel_type", "measurement_precision", "countermeasure", "noise_floor"]
+canonical_assertion = "kernel detects timing anomaly and journals ESideChannelAnomalyDetected event"
+[[seeds]]
+id = "kernel_syscall_abuse-seed-01"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit issues raw ptrace syscall attempting to attach to kernel process"
+kernel_defense_mechanism = "Kernel seccomp filter rejects ptrace for spirit processes"
+expected_detection_surface = "Syscall audit log + ESyscallPolicyViolation event"
+parameter_axes = ["syscall_class", "attack_surface", "sandbox_tier", "bypass_method"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals ESyscallPolicyViolation event"
+[[seeds]]
+id = "kernel_syscall_abuse-seed-02"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit calls mprotect on kernel-owned memory region"
+kernel_defense_mechanism = "Kernel seccomp filter rejects mprotect on non-spirit pages"
+expected_detection_surface = "Syscall audit log + ESyscallPolicyViolation event"
+parameter_axes = ["syscall_class", "attack_surface", "sandbox_tier", "bypass_method"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals ESyscallPolicyViolation event"
+[[seeds]]
+id = "kernel_syscall_abuse-seed-03"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit invokes unshare(CLONE_NEWNS) attempting namespace escape"
+kernel_defense_mechanism = "Kernel denies namespace-manipulation syscalls for spirits"
+expected_detection_surface = "Syscall audit log + ESyscallPolicyViolation event"
+parameter_axes = ["syscall_class", "attack_surface", "sandbox_tier", "bypass_method"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals ESyscallPolicyViolation event"
+[[seeds]]
+id = "kernel_syscall_abuse-seed-04"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit opens /proc/kcore for reading"
+kernel_defense_mechanism = "Kernel masks /proc access in spirit mount namespace"
+expected_detection_surface = "Syscall audit log + ESyscallPolicyViolation event"
+parameter_axes = ["syscall_class", "attack_surface", "sandbox_tier", "bypass_method"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals ESyscallPolicyViolation event"
+[[seeds]]
+id = "kernel_syscall_abuse-seed-05"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit issues ioctl on kernel device node"
+kernel_defense_mechanism = "Kernel denies ioctl for non-whitelisted device nodes"
+expected_detection_surface = "Syscall audit log + ESyscallPolicyViolation event"
+parameter_axes = ["syscall_class", "attack_surface", "sandbox_tier", "bypass_method"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals ESyscallPolicyViolation event"
+[[seeds]]
+id = "kernel_syscall_abuse-seed-06"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit calls mount with bind-mount of kernel filesystem"
+kernel_defense_mechanism = "Kernel mount namespace prevents bind-mount attacks"
+expected_detection_surface = "Syscall audit log + ESyscallPolicyViolation event"
+parameter_axes = ["syscall_class", "attack_surface", "sandbox_tier", "bypass_method"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals ESyscallPolicyViolation event"
+[[seeds]]
+id = "kernel_syscall_abuse-seed-07"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit invokes kexec_load for kernel replacement"
+kernel_defense_mechanism = "Kernel seccomp filter blocks kexec syscall family"
+expected_detection_surface = "Syscall audit log + ESyscallPolicyViolation event"
+parameter_axes = ["syscall_class", "attack_surface", "sandbox_tier", "bypass_method"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals ESyscallPolicyViolation event"
+[[seeds]]
+id = "kernel_syscall_abuse-seed-08"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit issues setsockopt with raw socket options"
+kernel_defense_mechanism = "Kernel restricts socket options to safe subset"
+expected_detection_surface = "Syscall audit log + ESyscallPolicyViolation event"
+parameter_axes = ["syscall_class", "attack_surface", "sandbox_tier", "bypass_method"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals ESyscallPolicyViolation event"
+[[seeds]]
+id = "kernel_syscall_abuse-seed-09"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit calls chroot attempting filesystem escape"
+kernel_defense_mechanism = "Kernel pivot_root prevents chroot escape"
+expected_detection_surface = "Syscall audit log + ESyscallPolicyViolation event"
+parameter_axes = ["syscall_class", "attack_surface", "sandbox_tier", "bypass_method"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals ESyscallPolicyViolation event"
+[[seeds]]
+id = "kernel_syscall_abuse-seed-10"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit invokes personality() to disable ASLR"
+kernel_defense_mechanism = "Kernel personality syscall restricted to no-op values"
+expected_detection_surface = "Syscall audit log + ESyscallPolicyViolation event"
+parameter_axes = ["syscall_class", "attack_surface", "sandbox_tier", "bypass_method"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals ESyscallPolicyViolation event"

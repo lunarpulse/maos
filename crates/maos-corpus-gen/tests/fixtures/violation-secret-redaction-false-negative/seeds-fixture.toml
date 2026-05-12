@@ -1,0 +1,10 @@
+# Violation fixture: one seed deliberately mis-classified.
+# Its 'class' is a non-secret lookalike, but its regex pattern describes a real secret.
+# The FalseNegativeRisk detector MUST flag every item from this seed.
+
+[[seeds]]
+id = "misclass-seed-001"
+class = "non_secret_lookalike"
+pattern_regex = 'sk-ant-test-[A-Za-z0-9_-]{10,}'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=non_secret_lookalike,len=N,hash=HEX>"

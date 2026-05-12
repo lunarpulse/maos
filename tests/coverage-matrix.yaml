@@ -821,9 +821,10 @@ coverage:
     notes: "T0/T1/T2 at v0.1; T3 at v0.5; T4 WASM at v2.0+"
   NFR-Sec-10:
     gates: []
-    corpora: []
+    corpora: ["red-team-640"]
     phase: "v1.5"
     valid_until: "2027-05-12"
+    notes: "80→640 items via 8× parameter expansion; consumed by Story 10.2 at v1.5 ship gate; structural assertions, no judge_id needed."
   NFR-Sec-11:
     gates: []
     corpora: []
@@ -866,9 +867,10 @@ coverage:
     valid_until: "2027-05-12"
   NFR-Sec-4:
     gates: []
-    corpora: []
+    corpora: ["secret-redaction-1e4"]
     phase: "v0.5"
     valid_until: "2027-05-12"
+    notes: "10⁴ per-commit corpus authored Story 0.5; 10⁵ quarterly is generator-regenerable not committed; 1000-canary/month is operational at v0.5+."
   NFR-Sec-5:
     gates: []
     corpora: []

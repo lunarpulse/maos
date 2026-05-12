@@ -1,0 +1,75 @@
+# Clean smoke-scale fixture: 8 seeds (1 per class) producing 64 items.
+# validate_all() MUST return all Valid; coverage_report() per-class floor
+# MUST be satisfied (≥8 per class for this fixture).
+
+[[seeds]]
+id = "capability_confusion-seed-01"
+class = "capability_confusion"
+attack_summary = "Spoofed capability token with elevated quarantine scope"
+kernel_defense_mechanism = "Kernel validates capability scope against spirit registry"
+expected_detection_surface = "Capability registry audit log"
+parameter_axes = ["target_capability_class"]
+canonical_assertion = "kernel rejects frame and journals event"
+
+[[seeds]]
+id = "iac_frame_injection-seed-01"
+class = "iac_frame_injection"
+attack_summary = "Injected frame with spoofed director sender identity"
+kernel_defense_mechanism = "Kernel verifies sender identity against active spirit registry"
+expected_detection_surface = "IAC frame audit log"
+parameter_axes = ["injection_point"]
+canonical_assertion = "kernel rejects frame and journals EAuditFrameInjection event"
+
+[[seeds]]
+id = "distillation_poisoning-seed-01"
+class = "distillation_poisoning"
+attack_summary = "Distillate carrying adversarial prompt injection payload"
+kernel_defense_mechanism = "Kernel strips prompt-injection markers before log storage"
+expected_detection_surface = "Distillation audit log"
+parameter_axes = ["poisoning_vector"]
+canonical_assertion = "kernel rejects distillate and journals event"
+
+[[seeds]]
+id = "ledger_tampering-seed-01"
+class = "ledger_tampering"
+attack_summary = "Attempt to rewrite sealed ledger entry via direct IAC frame"
+kernel_defense_mechanism = "Kernel enforces ledger append-only at storage boundary"
+expected_detection_surface = "Ledger audit log"
+parameter_axes = ["tamper_target"]
+canonical_assertion = "kernel rejects ledger mutation and journals event"
+
+[[seeds]]
+id = "cross_spirit_privilege_escalation-seed-01"
+class = "cross_spirit_privilege_escalation"
+attack_summary = "Spirit A attempts to read Spirit B memory slot via direct pointer"
+kernel_defense_mechanism = "Kernel enforces per-spirit memory isolation via capability tokens"
+expected_detection_surface = "Spirit isolation audit log"
+parameter_axes = ["target_spirit_role"]
+canonical_assertion = "kernel rejects cross-spirit access and journals event"
+
+[[seeds]]
+id = "resource_exhaustion-seed-01"
+class = "resource_exhaustion"
+attack_summary = "Spirit sends 1000 concurrent frames overwhelming dispatch queue"
+kernel_defense_mechanism = "Kernel enforces per-spirit concurrent dispatch cap"
+expected_detection_surface = "Resource cap audit log"
+parameter_axes = ["resource_type"]
+canonical_assertion = "kernel enforces resource cap and journals event"
+
+[[seeds]]
+id = "side_channel_timing-seed-01"
+class = "side_channel_timing"
+attack_summary = "Attacker measures capability validation latency to infer token validity"
+kernel_defense_mechanism = "Kernel uses constant-time token validation regardless of validity"
+expected_detection_surface = "Timing anomaly audit log"
+parameter_axes = ["channel_type"]
+canonical_assertion = "kernel detects timing anomaly and journals event"
+
+[[seeds]]
+id = "kernel_syscall_abuse-seed-01"
+class = "kernel_syscall_abuse"
+attack_summary = "Spirit issues raw ptrace syscall attempting to attach to kernel process"
+kernel_defense_mechanism = "Kernel seccomp filter rejects ptrace for spirit processes"
+expected_detection_surface = "Syscall audit log"
+parameter_axes = ["syscall_class"]
+canonical_assertion = "kernel blocks syscall via seccomp and journals event"

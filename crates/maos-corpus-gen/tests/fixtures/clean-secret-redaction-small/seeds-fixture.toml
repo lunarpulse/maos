@@ -1,0 +1,157 @@
+# Clean smoke-scale fixture: 22 seeds (2 per class × 11 classes) producing 200 items.
+# validate_all() MUST return all Valid; coverage_report() floor_satisfied MUST
+# be true for all classes (proportional floor).
+
+[[seeds]]
+id = "api_key_anthropic-seed-001"
+class = "api_key_anthropic"
+pattern_regex = 'sk-ant-(api\d{2}|TEST)-[A-Za-z0-9_-]{10,}'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=api_key_anthropic,len=N,hash=HEX>"
+
+[[seeds]]
+id = "api_key_anthropic-seed-002"
+class = "api_key_anthropic"
+pattern_regex = 'sk-ant-api03-[A-Za-z0-9_-]{10,}'
+false_positive_negative_anchors = ["sk-ant-not-a-real-key"]
+example_redacted_form = "<REDACTED:type=api_key_anthropic,len=N,hash=HEX>"
+
+[[seeds]]
+id = "api_key_openai-seed-001"
+class = "api_key_openai"
+pattern_regex = 'sk-test-[A-Za-z0-9_-]{10,}'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=api_key_openai,len=N,hash=HEX>"
+
+[[seeds]]
+id = "api_key_openai-seed-002"
+class = "api_key_openai"
+pattern_regex = 'sk-proj-[A-Za-z0-9_-]{10,}'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=api_key_openai,len=N,hash=HEX>"
+
+[[seeds]]
+id = "oauth_token-seed-001"
+class = "oauth_token"
+pattern_regex = 'xoxb-[A-Za-z0-9_-]{10,}'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=oauth_token,len=N,hash=HEX>"
+
+[[seeds]]
+id = "oauth_token-seed-002"
+class = "oauth_token"
+pattern_regex = 'ghp_[A-Za-z0-9]{10,}'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=oauth_token,len=N,hash=HEX>"
+
+[[seeds]]
+id = "private_key_pem-seed-001"
+class = "private_key_pem"
+pattern_regex = '-----BEGIN TEST PRIVATE KEY-----'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=private_key_pem,len=N,hash=HEX>"
+
+[[seeds]]
+id = "private_key_pem-seed-002"
+class = "private_key_pem"
+pattern_regex = '-----BEGIN RSA PRIVATE KEY-----'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=private_key_pem,len=N,hash=HEX>"
+
+[[seeds]]
+id = "database_url-seed-001"
+class = "database_url"
+pattern_regex = 'postgres://[^:@]+:[^@]+@'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=database_url,len=N,hash=HEX>"
+
+[[seeds]]
+id = "database_url-seed-002"
+class = "database_url"
+pattern_regex = 'mysql://[^:@]+:[^@]+@'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=database_url,len=N,hash=HEX>"
+
+[[seeds]]
+id = "jwt-seed-001"
+class = "jwt"
+pattern_regex = 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=jwt,len=N,hash=HEX>"
+
+[[seeds]]
+id = "jwt-seed-002"
+class = "jwt"
+pattern_regex = 'eyJhbGci[^.]*\.[^.]*\..*'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=jwt,len=N,hash=HEX>"
+
+[[seeds]]
+id = "aws_credentials-seed-001"
+class = "aws_credentials"
+pattern_regex = 'AKIA-TEST-[A-Z0-9]{10,}'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=aws_credentials,len=N,hash=HEX>"
+
+[[seeds]]
+id = "aws_credentials-seed-002"
+class = "aws_credentials"
+pattern_regex = 'AWS_SECRET_ACCESS_KEY='
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=aws_credentials,len=N,hash=HEX>"
+
+[[seeds]]
+id = "gcp_service_account-seed-001"
+class = "gcp_service_account"
+pattern_regex = '"type"\s*:\s*"service_account"'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=gcp_service_account,len=N,hash=HEX>"
+
+[[seeds]]
+id = "gcp_service_account-seed-002"
+class = "gcp_service_account"
+pattern_regex = 'gcp-sa-[A-Za-z0-9_-]{10,}'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=gcp_service_account,len=N,hash=HEX>"
+
+[[seeds]]
+id = "azure_credentials-seed-001"
+class = "azure_credentials"
+pattern_regex = 'AccountKey='
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=azure_credentials,len=N,hash=HEX>"
+
+[[seeds]]
+id = "azure_credentials-seed-002"
+class = "azure_credentials"
+pattern_regex = 'sig='
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=azure_credentials,len=N,hash=HEX>"
+
+[[seeds]]
+id = "ssh_key_block-seed-001"
+class = "ssh_key_block"
+pattern_regex = '-----BEGIN OPENSSH TEST PRIVATE KEY-----'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=ssh_key_block,len=N,hash=HEX>"
+
+[[seeds]]
+id = "ssh_key_block-seed-002"
+class = "ssh_key_block"
+pattern_regex = '-----BEGIN OPENSSH PRIVATE KEY-----'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=ssh_key_block,len=N,hash=HEX>"
+
+[[seeds]]
+id = "gpg_armored_block-seed-001"
+class = "gpg_armored_block"
+pattern_regex = '-----BEGIN PGP TEST PRIVATE KEY BLOCK-----'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=gpg_armored_block,len=N,hash=HEX>"
+
+[[seeds]]
+id = "gpg_armored_block-seed-002"
+class = "gpg_armored_block"
+pattern_regex = '-----BEGIN PGP PRIVATE KEY BLOCK-----'
+false_positive_negative_anchors = []
+example_redacted_form = "<REDACTED:type=gpg_armored_block,len=N,hash=HEX>"
