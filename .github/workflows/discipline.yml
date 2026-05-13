@@ -38,6 +38,7 @@ jobs:
         run: cargo build --locked --all-targets --workspace
       - name: Capture second-pass artifact hashes
         run: |
+          mkdir -p /tmp/build-artifacts-2
           find target/debug/deps/ -name '*.rlib' -exec sha256sum {} \; | sort > /tmp/build-artifacts-2/rlibs.sha256
           if [ -f target/debug/maos-bin ]; then
             sha256sum target/debug/maos-bin > /tmp/build-artifacts-2/bin.sha256
@@ -196,12 +197,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # --pr-number is still passed (reviewer-count check needs it).
+          # --pr-number is included only on pull_request events (clap rejects empty
+          # integer on push: main, where there is no associated PR). The reviewer-
+          # count check still runs on PRs as designed; on push: main it is skipped.
           # --sha and --write-journal are deliberately omitted: this is the
           # per-push validation gate, not the merge-time persister.
+          pr_arg=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pr_arg="--pr-number ${{ github.event.pull_request.number }}"
+          fi
           cargo run -p xtask -- invariant-lock \
             --changed-files /tmp/changed-files.txt \
-            --pr-number ${{ github.event.pull_request.number }} \
+            $pr_arg \
             --json
 
   check-corpus:
@@ -356,6 +363,7 @@ jobs:
             echo "overall=success" >> $GITHUB_OUTPUT
           fi
       - name: Post/update PR comment
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
