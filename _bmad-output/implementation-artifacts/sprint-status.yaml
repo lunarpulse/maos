@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-last_updated: 2026-05-13  # Epic 1a retrospective complete; sprint-status flipped.
+last_updated: 2026-05-13  # Story 1b.1 done (code review complete, all 17 patches applied).
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-05-13  # Epic 1a retrospective complete; sprint-status flippe
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-11
-last_updated: 2026-05-13  # Epic 1a retrospective complete; epic-1a and epic-1a-retrospective both flipped to done.
+last_updated: 2026-05-13  # Story 1b.1 created (ready-for-dev); epic-1b flipped to in-progress.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -69,8 +69,8 @@ development_status:
   # ------------------------------------------------------------------
   # Epic 1b: Evaluator Path + Audit Spine + Capability Mediation Baseline (v0.1-beta)
   # ------------------------------------------------------------------
-  epic-1b: backlog
-  1b-1-three-audit-logs-transparency-approval-decision-lifecycle-journal: backlog
+  epic-1b: in-progress
+  1b-1-three-audit-logs-transparency-approval-decision-lifecycle-journal: done
   1b-2-capability-registry-decomposition-runtime-cap-tokens-cap-policy-cap-audit-cap-quota: backlog
   1b-3-sandbox-tier-t0-t1-t2-enforcement-per-spirit-resource-caps: backlog
   1b-4-freeze-the-complianceclaim-schema-and-wire-the-inference-port-iac-telemetry: backlog

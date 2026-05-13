@@ -15,6 +15,8 @@ pub use crate::security::SecurityManagerAdapter;
 pub use crate::security::RingCryptoProvider;  // NEW — Story 1a.3 default crypto provider
 pub use crate::memory::MemoryManagerAdapter;
 pub use crate::iac::IacBusAdapter;
+pub use crate::iac::TransparencyLogAdapter;   // NEW — Story 1b.1 Transparency Log audit-spine
+pub use crate::journal::JournalAdapter;       // NEW — Story 1b.1 Lifecycle Journal per I10
 pub use crate::capability::CapabilityRegistryAdapter;
 pub use crate::io::IoSubsystemAdapter;
 pub use crate::telemetry::TelemetryStreamAdapter;

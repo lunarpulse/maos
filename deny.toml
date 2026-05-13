@@ -36,7 +36,12 @@ wildcards = "allow"
 highlight = "all"
 allow = []
 deny = []
-skip = []
+skip = [
+    # Story 1b.1 — rusqlite bundled pulls in duplicate crate versions via
+    # libsqlite3-sys transitive deps. Acceptable for bundled SQLite feature.
+    { name = "getrandom" },
+    { name = "hashbrown" },
+]
 skip-tree = []
 
 [sources]

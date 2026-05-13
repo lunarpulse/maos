@@ -39,7 +39,7 @@ enum Commands {
     /// AC7 — NFR-Test-9 Loom-not-in-kernel structural grep.
     CheckLoom { #[arg(long)] path: Option<String>, #[arg(long, default_value = "xtask/kernel-crates.toml")] crates: String, #[arg(long, default_value = "xtask/loom-blocklist.toml")] blocklist: String, #[arg(long, default_value = "xtask/loom-allowlist.toml")] allowlist: String, #[arg(long)] json: bool },
     /// AC8 — NFR-Test-2 service-boundary surface-diff stub.
-    CheckServiceBoundary { #[arg(long)] path: Option<String>, #[arg(long, default_value = "docs/ci-baselines/kernel-surface-v0.1-alpha.json")] baseline: String, #[arg(long, default_value = "xtask/kernel-api-classes.toml")] classes: String, #[arg(long)] json: bool },
+    CheckServiceBoundary { #[arg(long)] path: Option<String>, #[arg(long, default_value = "docs/ci-baselines/kernel-surface-v0.1-beta.json")] baseline: String, #[arg(long, default_value = "xtask/kernel-api-classes.toml")] classes: String, #[arg(long)] json: bool },
     /// AC9 — NFR-Ops-4 + FR61 SECURITY.md section gate.
     CheckSecurityMd { #[arg(long)] json: bool },
     /// AC5 — Invariant lock gate for constitutional amendments.

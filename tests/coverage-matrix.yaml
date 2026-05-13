@@ -35,6 +35,40 @@ coverage:
     corpora: []
     phase: v0.1-alpha
     valid_until: '2027-05-11'
+  I2:
+    gates:
+      - audit_spine_integration
+    corpora: []
+    enforcement_cadence: runtime
+    phase: v0.1
+    valid_until: '2027-05-12'
+    notes: |
+      Story 1b.1 promotes I2 from design-aspiration to mechanically-enforced.
+      LogBeforeDeliver constructor restricted via #[doc(hidden)] pub.
+      Panic-on-write-failure path verified by integration tests.
+  I4:
+    gates:
+      - approval_log_is_distinct_table
+      - audit_spine_integration
+    corpora: []
+    enforcement_cadence: runtime
+    phase: v0.1
+    valid_until: '2027-05-12'
+    notes: |
+      Story 1b.1 lands the Approval Decision Log as a DISTINCT SQLite table
+      from the Transparency Log per §7.4. Table independence verified by
+      PRAGMA foreign_key_list introspection.
+  I10:
+    gates:
+      - journal_survives_cold_restart
+      - audit_spine_integration
+    corpora: []
+    enforcement_cadence: runtime
+    phase: v0.1
+    valid_until: '2027-05-12'
+    notes: |
+      Story 1b.1 lands the Lifecycle Journal with fsync-per-transition;
+      crash-recovery rehydration via JournalAdapter::recover_in_flight.
   NFR-Test-2:
     gates:
     - check-service-boundary
@@ -267,10 +301,16 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   FR4:
-    gates: []
+    gates:
+      - audit_spine_integration
+      - iac_transparency_log_tests
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
+    notes: |
+      Story 1b.1 lands the Transparency Log row with capability_token + spirit_pid +
+      boot_nonce + timestamp + intent. The 1000-call FR4 fixture (100% mediation)
+      lands Story 1b.5b.
   FR40:
     gates: []
     corpora: []
@@ -446,10 +486,16 @@ coverage:
     valid_until: '2027-05-12'
     notes: ABI surface frozen via abi-diff gate; manifest schema types live in maos-spirit-abi
   FR9:
-    gates: []
+    gates:
+      - journal_survives_cold_restart
+      - audit_spine_integration
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
+    notes: |
+      Story 1b.1 lands the Lifecycle Journal write surface
+      (JournalAdapter::append_transition); load/start/pause/resume/unload
+      verbs land their journal touchpoints in Stories 1b.5c and 5.1.
   NFR-Aud-1:
     gates: []
     corpora: []
@@ -648,15 +694,23 @@ coverage:
     phase: v0.3
     valid_until: '2027-05-12'
   NFR-Obs-4:
-    gates: []
+    gates:
+      - audit_spine_integration
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: |
+      Story 1b.1 lands the Transparency Log per-Host SQLite append-only surface.
+      Full v0.5 SIEM-export ergonomics and audit-redact tooling land in Stories 9.1 + 9.3.
   NFR-Obs-5:
-    gates: []
+    gates:
+      - approval_log_is_distinct_table
     corpora: []
     phase: v0.3
     valid_until: '2027-05-12'
+    notes: |
+      Story 1b.1 lands the Approval Decision Log as a distinct SQLite table.
+      Full v0.3 surface lands in Story 3.3 and Story 1b.3.
   NFR-Onb-1:
     gates: []
     corpora: []
@@ -835,10 +889,16 @@ coverage:
     phase: v2.0+
     valid_until: '2027-05-12'
   NFR-Rel-8:
-    gates: []
+    gates:
+      - journal_append_p99_measurement
     corpora: []
+    bench:
+      - journal_fsync_p99
     phase: v0.1
     valid_until: '2027-05-12'
+    notes: |
+      Story 1b.1 ships the criterion bench for ring-buffer flush P99 < 1ms.
+      Raw file + sync_data chosen over SQLite WAL for deterministic latency.
   NFR-Rel-9:
     gates: []
     corpora: []

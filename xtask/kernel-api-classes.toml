@@ -52,3 +52,30 @@
 "maos_kernel_core::capability::maos_domain::ports::CapabilityRegistryPort"       = "universal-arithmetic"
 "maos_kernel_core::io::maos_domain::ports::IoSubsystemPort"                      = "data-movement"
 "maos_kernel_core::telemetry::maos_domain::ports::TelemetryStreamPort"           = "data-movement"
+
+# Story 1b.1 — TransparencyLogAdapter + JournalAdapter (supervision class per §4.0.7)
+# These read/write kernel-managed audit logs — the audit-spine runtime body.
+
+# api/* re-exports for new adapters
+"maos_kernel_core::api::crate::iac::TransparencyLogAdapter"       = "supervision"
+"maos_kernel_core::api::crate::journal::JournalAdapter"           = "supervision"
+
+# Direct module-path entries
+"maos_kernel_core::iac::transparency_log::TransparencyLogAdapter" = "supervision"
+"maos_kernel_core::journal::JournalAdapter"                       = "supervision"
+
+# Supporting types in iac/transparency_log.rs — supervision (audit log helpers)
+"maos_kernel_core::iac::transparency_log::FrameKind"              = "supervision"
+"maos_kernel_core::iac::transparency_log::FrameFilter"            = "supervision"
+"maos_kernel_core::iac::transparency_log::TransparencyLogEntry"   = "supervision"
+"maos_kernel_core::iac::transparency_log::AuditError"             = "supervision"
+
+# Supporting types in iac/redaction.rs — data-movement (redaction is a payload transform)
+"maos_kernel_core::iac::redaction::RedactionPolicy"               = "data-movement"
+"maos_kernel_core::iac::redaction::CorpusBackedRedactionPolicy"   = "data-movement"
+
+# Supporting type in iac/mailbox_stub.rs — data-movement (delivery routing)
+"maos_kernel_core::iac::mailbox_stub::MailboxStub"                = "data-movement"
+
+# Journal error type — supervision (audit log error)
+"maos_kernel_core::journal::JournalError"                         = "supervision"

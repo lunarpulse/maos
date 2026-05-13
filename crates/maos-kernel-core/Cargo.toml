@@ -9,6 +9,17 @@ description = "MAOS kernel core — capability mediation, IAC bus, journal"
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
+# Story 1b.1 — SQLite audit spine (Transparency Log + Approval Decision Log).
+# Bundled feature statically links libsqlite3-sys; no system libsqlite3 dep.
+# Eliminates per-host library-version drift risk (relevant to NFR-Onb-2).
+rusqlite = { version = "0.31", features = ["bundled"] }
+# Story 1b.1 — ULID frame IDs for Transparency Log rows.
+# Zero new dep alternative: (boot_nonce ^ monotonic_counter) [u8; 16] newtype.
+# ULID chosen for log greppability and sortability.
+ulid = "1.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
 # Story 1a.3 — default CryptoProvider adapter (FR48 / NFR-Sec-15 / §8.6).
 # `ring` 0.17 is the canonical Rust crypto-primitives crate; pulled
 # in by rustls, quinn, webpki, tokio-rustls in the Rust ecosystem.
@@ -20,3 +31,11 @@ ring = "0.17"
 # the dep introduction. At v0.1-α no rustls API is actually exercised;
 # the dep is the future-story slot.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+
+[dev-dependencies]
+tempfile = "3"
+criterion = "0.5"
+
+[[bench]]
+name = "journal_fsync_p99"
+harness = false

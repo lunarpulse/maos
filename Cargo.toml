@@ -4,6 +4,7 @@ members = [
     "xtask",
     "crates/maos-a2a",
     "crates/maos-acp",
+    "crates/maos-audit",
     "crates/maos-bin",
     "crates/maos-cli",
     "crates/maos-compliance",
