@@ -66,13 +66,18 @@ jobs:
             echo "NFR-Test-2 / reproducible-build violation: nightly feature referenced at listed locations"
             violations=1
           fi
-          # Check for cargo +nightly references.
-          if grep -rn 'cargo +nightly' . --include='*.md' --include='*.yml' --include='*.yaml' --include='*.sh' --include='*.toml'; then
+          # Check for cargo +nightly references in code/config/scripts only.
+          # Markdown documentation is allowed to *describe* the forbidden pattern
+          # (e.g., Story 0.1's spec text names the gate's enforcement targets).
+          # Per Story 0.1 AC1 the canonical scope is `**/*.rs` + `**/Cargo.toml`;
+          # extending to .yml/.yaml/.sh covers CI scripts where real misuse could
+          # land. .md is deliberately excluded.
+          if grep -rn 'cargo +nightly' . --include='*.yml' --include='*.yaml' --include='*.sh' --include='*.toml'; then
             echo "NFR-Test-2 / reproducible-build violation: cargo +nightly referenced at listed locations"
             violations=1
           fi
-          # Check for RUSTC_BOOTSTRAP.
-          if grep -rn 'RUSTC_BOOTSTRAP' . --include='*.rs' --include='*.toml' --include='*.yml' --include='*.yaml' --include='*.sh' --include='*.md'; then
+          # Check for RUSTC_BOOTSTRAP. Same scope rationale as above.
+          if grep -rn 'RUSTC_BOOTSTRAP' . --include='*.rs' --include='*.toml' --include='*.yml' --include='*.yaml' --include='*.sh'; then
             echo "NFR-Test-2 / reproducible-build violation: RUSTC_BOOTSTRAP referenced at listed locations"
             violations=1
           fi
@@ -112,8 +117,12 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Install tokei
         run: |
-          curl -sL https://github.com/XAMPPRocky/tokei/releases/download/v${TOKEI_VERSION}/tokei-x86_64-unknown-linux-musl.tar.gz | tar xz -C /tmp
-          sudo mv /tmp/tokei /usr/local/bin/
+          # tokei v14.0.0 ships no pre-built release assets (the previous
+          # curl-from-release-tarball path now 404s). cargo install builds from
+          # source (~30s); subsequent runs hit the Swatinem/rust-cache layer
+          # and skip the build. --locked pins to the registry-published
+          # Cargo.lock for reproducibility.
+          cargo install --locked --version ${TOKEI_VERSION} tokei
       - name: Run kloc-check
         run: cargo run -p xtask -- kloc-check --json
 
