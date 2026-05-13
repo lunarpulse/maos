@@ -168,6 +168,15 @@ fn check_service_boundary(
             "v0_1_layout": "services-as-modules-under-maos-kernel-core",
             "supervised_services": SUPERVISED_SERVICES,
             "supervisor": SUPERVISOR,
+            "service_classifications": {
+                "scheduler": "supervision",
+                "security": "supervision",
+                "memory": "data-movement",
+                "iac": "data-movement",
+                "capability": "universal-arithmetic",
+                "io": "data-movement",
+                "telemetry": "data-movement",
+            },
         }),
     })
 }

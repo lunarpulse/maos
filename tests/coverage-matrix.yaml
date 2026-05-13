@@ -14,6 +14,21 @@ phase_order:
 - v1.5
 - v2.0+
 coverage:
+  ADR-010:
+    gates:
+    - check-service-boundary
+    corpora: []
+    phase: v0.1-alpha
+    valid_until: '2027-05-12'
+    notes: 1a.2 declares maos-domain::ports::* (7 traits) + maos-kernel-core::api::* (7 adapter shells); xtask check-service-boundary stub-mode classifies every surface item; domain core compiles without async runtime per ADR-010 binding-v0.1 gate
+  ADR-011:
+    gates:
+    - reproducible-build
+    - kloc-check
+    corpora: []
+    phase: v0.1-alpha
+    valid_until: '2027-05-12'
+    notes: 1a.2 wires maos-bin composition root with #[tokio::main(flavor=multi_thread)] + CancellationToken root + select! shutdown; per-Spirit Tokio task supervision deferred to Story 1b.1 (supervisor task spawns there)
   I9:
     gates:
     - check-empty-kernel

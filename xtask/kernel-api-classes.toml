@@ -1,6 +1,50 @@
 # Kernel API classification table for NFR-Test-2 service-boundary gate.
-# At v0.1-alpha this table is empty because `kernel::api::*` does not yet exist.
 # Story 1a.2 populates this when `pub mod api` lands in `maos-kernel-core`.
 # Adding classifications requires invariant-lock review per NFR-Test-2.
+#
+# Class taxonomy (per architecture §4.0.7):
+#   - universal-arithmetic: ADR-022 four-predicate kernel surface (the
+#     ONLY surface where the kernel computes numeric comparisons; halts
+#     wire here).
+#   - data-movement: moves frames/tokens/payloads between holders without
+#     semantic interpretation (memory ports, iac frame routing, io
+#     transports, telemetry broadcast).
+#   - supervision: lifecycle/control over a child task or actor; reads/writes
+#     a kernel-managed audit log (scheduler, security manager).
+#
+# Empty value field = "other" (default; produces a violation). Any new
+# `kernel::api::*` re-export added in a future story MUST add a row here.
 
 [classes]
+
+# api/* re-exports — surface aggregator (the canonical walk path).
+# Adapter types themselves carry the same class as their port traits.
+"maos_kernel_core::api::crate::capability::CapabilityRegistryAdapter"    = "universal-arithmetic"
+"maos_kernel_core::api::crate::iac::IacBusAdapter"                       = "data-movement"
+"maos_kernel_core::api::crate::io::IoSubsystemAdapter"                   = "data-movement"
+"maos_kernel_core::api::crate::memory::MemoryManagerAdapter"             = "data-movement"
+"maos_kernel_core::api::crate::scheduler::SpiritSchedulerAdapter"        = "supervision"
+"maos_kernel_core::api::crate::security::SecurityManagerAdapter"         = "supervision"
+"maos_kernel_core::api::crate::telemetry::TelemetryStreamAdapter"        = "data-movement"
+
+# Direct module-path exports (xtask walk produces both api::* and module::*
+# entries because the syn walker visits both the re-export and the
+# original declaration site). Same classification as the api::* row.
+"maos_kernel_core::scheduler::SpiritSchedulerAdapter"           = "supervision"
+"maos_kernel_core::security::SecurityManagerAdapter"            = "supervision"
+"maos_kernel_core::memory::MemoryManagerAdapter"                = "data-movement"
+"maos_kernel_core::iac::IacBusAdapter"                          = "data-movement"
+"maos_kernel_core::capability::CapabilityRegistryAdapter"       = "universal-arithmetic"
+"maos_kernel_core::io::IoSubsystemAdapter"                      = "data-movement"
+"maos_kernel_core::telemetry::TelemetryStreamAdapter"           = "data-movement"
+
+# Port-trait re-exports propagated through `pub use maos_domain::ports::…`.
+# These appear as `use` items in the syn walk (per check_service_boundary
+# lines 232–235); classify with the port's primary class.
+"maos_kernel_core::scheduler::maos_domain::ports::SpiritSchedulerPort"           = "supervision"
+"maos_kernel_core::security::maos_domain::ports::SecurityManagerPort"            = "supervision"
+"maos_kernel_core::memory::maos_domain::ports::MemoryManagerPort"                = "data-movement"
+"maos_kernel_core::iac::maos_domain::ports::IacBusPort"                          = "data-movement"
+"maos_kernel_core::capability::maos_domain::ports::CapabilityRegistryPort"       = "universal-arithmetic"
+"maos_kernel_core::io::maos_domain::ports::IoSubsystemPort"                      = "data-movement"
+"maos_kernel_core::telemetry::maos_domain::ports::TelemetryStreamPort"           = "data-movement"

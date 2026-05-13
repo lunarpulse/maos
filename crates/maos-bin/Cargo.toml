@@ -12,3 +12,7 @@ name = "maos-bin"
 path = "src/main.rs"
 
 [dependencies]
+maos-domain = { path = "../maos-domain" }
+maos-kernel-core = { path = "../maos-kernel-core" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+tokio-util = { version = "0.7", features = ["rt"] }

@@ -50,3 +50,9 @@
 - **DW1 — `ComplianceClaimEnvelope` fields lack size validation.** No constructor validation for `signature: [u8; 64]`, `claim_bytes` emptiness, etc. At v0.1-α the type is structural only; serde/builder validation lands in Story 1b.4 when the freeze ships.
 - **DW2 — `invariant-lock` gate not verified end-to-end.** Requires `gh` CLI which is not available in the dev environment. The 14-invariant clean fixture was verified as present per Epic 0 retro Step 6. The gate execution itself must be verified before the PR merges.
 - **DW3 — `kloc.toml` references non-existent crates (`maos-cap-registry`, `maos-wire`, `maos-journal`).** These are pre-existing entries from the architecture that predate Story 1a.1. The `kloc-check` gate handles missing crates gracefully. Address in a future architecture-alignment story.
+
+## Deferred from: code review of 1a-2-wire-the-five-service-kernel-skeleton-with-a-multi-threaded-tokio-composition-root (2026-05-13)
+
+- **Surface walk `api::crate::*` path artifact** — the syn walker resolves `pub use crate::...` literally in `api.rs`, embedding `crate::` in the path string (e.g., `maos_kernel_core::api::crate::scheduler::SpiritSchedulerAdapter`). Classification table matches these paths. If the walker is fixed later, 7 TOML entries and the baseline JSON will need updating. Pre-existing walker behavior, not caused by this diff.
+- **`LogBeforeDeliver::new()` is `pub` at v0.1-α** — the typestate guarantee on `IacBusPort` return types is advisory. I2's TODO notes `pub(crate)` restriction planned for Story 1b.2. Pre-existing design limitation.
+- **`SandboxTier(pub u8)` has no value constraint** — raw u8 newtype accepts any value (0–255); T0-T2 enforcement with validation lands in Story 1b.3 per explicit scope deferral in story spec.

@@ -28,6 +28,13 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InvariantI9;
 
+/// Typed-empty newtype for sandbox tier classification.
+///
+/// At v0.1-α this is a placeholder; Story 1b.3 lands T0–T2
+/// enforcement with per-Spirit resource caps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+pub struct SandboxTier(pub u8);
+
 /// Typestate marker for kernel-cached data — instances of this type
 /// document that they live only in the I9 whitelist holders.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

@@ -1,5 +1,111 @@
 {
   "crate_name": "maos-kernel-core",
   "abi_baseline_version": "v0.1-alpha",
-  "items": []
+  "items": [
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::CapabilityRegistryAdapter",
+      "signature_hash": "ec9c76f84312db0391b2d752961328479f997fa7638db33d44aac8519efa3998"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::iac::IacBusAdapter",
+      "signature_hash": "462dac6c11c344194bc1e31939b49879339aed0faea24ebd7c7cd27992c78200"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::io::IoSubsystemAdapter",
+      "signature_hash": "c38ee3c03ffa0cdbbcdb6c30473bab0820d092d9a7fb2399bfd85d5ae0c73f84"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::memory::MemoryManagerAdapter",
+      "signature_hash": "de6191a63245cf56aacbdcf1046dff3a4f517d4372e7efb2e99625a035712c47"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::SpiritSchedulerAdapter",
+      "signature_hash": "c37dcc42e04791296df45eea15034bb02521274319ae0e15542bb2ff16b1dd20"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::SecurityManagerAdapter",
+      "signature_hash": "64ccec7a7c52ba4a5bb6634f3e77a6cd6d4dff442cdf8ca933b9ebb1bebd8042"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::telemetry::TelemetryStreamAdapter",
+      "signature_hash": "d527b6aaacbcd693005a6be1c19453953b22857ca41edeaf2d6ddcdb2d8ad6b1"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::capability::CapabilityRegistryAdapter",
+      "signature_hash": "8ae7a3fcb072975428bea5ab9b3e4eecab0678f822cb8bf715cae7ada2f45b52"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::iac::IacBusAdapter",
+      "signature_hash": "59ffef5ca0d9e11812ed0405610275db4b0f23047186beb37de9a2f3919dc013"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::io::IoSubsystemAdapter",
+      "signature_hash": "38602532d7d94f03a63b3beec18eb03a4c83dd09abd60d5e769996eb2c6152aa"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::memory::MemoryManagerAdapter",
+      "signature_hash": "f7af5394b7ca4dd41c4cf6ed408907068ed6560550a7ceac4f4fac3240ab79e9"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::scheduler::SpiritSchedulerAdapter",
+      "signature_hash": "01478401fc4b408d538e784331a6328c01e557d1048edc40b8e90cebf32be631"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::security::SecurityManagerAdapter",
+      "signature_hash": "74b399a223638ad2e49858d28ff71d72f98c0d3b2259763fb6973914dabfe80b"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::telemetry::TelemetryStreamAdapter",
+      "signature_hash": "8826d9df3c7ee51f5fcc548c20905cd095c59260265384a5646364e5474b78e0"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::maos_domain::ports::CapabilityRegistryPort",
+      "signature_hash": "015b201ec2516ef08ae8a61f6ca929de25f4810636d202efa926e1805afef573"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::iac::maos_domain::ports::IacBusPort",
+      "signature_hash": "8ebddd67ed06dca7db0de2a3d99533803a84905c13df6730409ab0d7d0bec352"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::io::maos_domain::ports::IoSubsystemPort",
+      "signature_hash": "611d2e6ac378f3d05ebc172b55a36099a229778561243cbc7d255cb0b045fe76"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::memory::maos_domain::ports::MemoryManagerPort",
+      "signature_hash": "7eb744620740514bca7f8dfb78a7639f1a4dcfbdb4d41de35943d04e1e86ba8b"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::maos_domain::ports::SpiritSchedulerPort",
+      "signature_hash": "a3f16ba06e4e33bb402d7e31c9ded087ef32d9de7ca926fc1a3a1ce2f9712c1c"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::maos_domain::ports::SecurityManagerPort",
+      "signature_hash": "339da2d266a257e560a8591e53959d08ec3913048a6f1da94c5477c0b722b7dc"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::telemetry::maos_domain::ports::TelemetryStreamPort",
+      "signature_hash": "88b6c1fb997484cd68e39aa0708bb6e3317e6cd61c5f3e2eb33f3e2d7680a056"
+    }
+  ]
 }

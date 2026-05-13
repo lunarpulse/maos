@@ -1,7 +1,27 @@
 #![forbid(unsafe_code)]
 
-/// Capability subsystem — token mediation, policy, audit, quota.
-///
-/// At v0.1-alpha this is a placeholder module structure.
-/// Story 1b.2 decomposes this into the full capability registry.
-pub mod capability;
+//! `maos-kernel-core` — the MAOS kernel composition surface.
+//!
+//! Per architecture §4.0.2 the kernel is organized as:
+//!   - One supervisor: `scheduler` (Spirit Scheduler)
+//!   - Four supervised services: `security`, `memory`, `iac`, `capability`
+//!   - Two internal modules: `io`, `telemetry`
+//!
+//! At v0.1-α every module is an **empty hexagonal adapter shell** — port
+//! traits live in `maos-domain::ports`; this crate declares the adapter
+//! types that will (post v0.1-α) implement those ports. No runtime state,
+//! no impl blocks, no async primitives. See architecture §4.0.8 four-property
+//! test and §4.0.1 hexagonal/actor split.
+//!
+//! Story 1b.x lands runtime logic into these shells. Story 1a.3 ships
+//! `CryptoProvider`. Story 1a.4 ships `maosctl`. Story 2.2 upgrades
+//! `xtask check-service-boundary` from stub to P1–P4 enforcement.
+
+pub mod api;        // surface-classification anchor for NFR-Test-2
+pub mod scheduler;  // supervisor — Spirit Scheduler (architecture §4.1)
+pub mod security;   // supervised service — Security Manager (§4.3)
+pub mod memory;     // supervised service — Memory Manager (§4.2)
+pub mod iac;        // supervised service — IAC Bus (§4.5)
+pub mod capability; // supervised service — Capability Registry (§4.6)
+pub mod io;         // internal module at v0.1 — I/O Subsystem (§4.4)
+pub mod telemetry;  // internal module at v0.1 — Telemetry Stream (§4.7)
