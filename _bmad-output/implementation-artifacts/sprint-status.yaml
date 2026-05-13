@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-last_updated: 2026-05-13  # Story 1a.4 code review complete; status set to done.
+last_updated: 2026-05-13  # Epic 1a retrospective complete; sprint-status flipped.
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-05-13  # Story 1a.4 code review complete; status set to done.
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-11
-last_updated: 2026-05-13  # Story 1a.4 contexted; status set to ready-for-dev.
+last_updated: 2026-05-13  # Epic 1a retrospective complete; epic-1a and epic-1a-retrospective both flipped to done.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -56,12 +56,15 @@ development_status:
   # ------------------------------------------------------------------
   # Epic 1a: Workspace Bootstrap + ABI Freeze + Kernel Skeleton (v0.1-alpha)
   # ------------------------------------------------------------------
-  epic-1a: in-progress
+  epic-1a: done
   1a-1-initialize-17-crate-cargo-workspace-frozen-abi-types-starter-template: done
   1a-2-wire-the-five-service-kernel-skeleton-with-a-multi-threaded-tokio-composition-root: done
   1a-3-cryptoprovider-trait-xtask-service-boundary-stub-implementation: done
   1a-4-ship-the-maosctl-cli-scaffold-with-security-md-and-accessibility-defaults: done
-  epic-1a-retrospective: optional
+  epic-1a-retrospective: done
+  # Post-retro bridge story (D7 from epic-1a-retro-2026-05-13.md). Blocks Story 1b.4.
+  # Does NOT re-open epic-1a's done flag — bridge stories are tracked independently.
+  1a-5-migrate-abi-diff-to-cargo-public-api: done
 
   # ------------------------------------------------------------------
   # Epic 1b: Evaluator Path + Audit Spine + Capability Mediation Baseline (v0.1-beta)

@@ -8,7 +8,7 @@
 - `maos-spirit-abi` frozen with `src/compliance.rs` (ComplianceClaim schema types) — `#![no_std]`, wire-stable.
 - `maos-kernel-core` skeleton: five services (scheduler / memory / security / iac / capability) + two internal modules (io / telemetry) as empty shells with hexagonal port boundaries declared (ADR-010).
 - `maos-bin` composition root with `#[tokio::main(flavor = "multi_thread")]` (ADR-011: single multi-threaded Tokio runtime).
-- `maosctl` skeleton (`install`, `start`, `stop`, `unload` stubs).
+- `maosctl` skeleton — six v0.1 subcommand stubs (`install`, `start`, `stop`, `unload`, `run`, `audit`). `audit` is forward scaffolding for Story 1b.5b's `audit query`; `run` is forward scaffolding for Stories 1b.5a + 1b.5c. Every stub at v0.1-α emits a deterministic "not yet implemented" diagnostic and exits with code 2. See Story 1a.4 AC1 for the binding declaration.
 - SECURITY.md (`security@maos.dev` GPG key, 90-day embargo, advisory-publication channel, supported-versions matrix — NFR-Ops-4).
 - `cargo xtask check-service-boundary` STUB (boundary types defined; full P1–P4 enforcement in E2 once Spirit ABI exists).
 - `CryptoProvider` trait definition + default `ring`/`rustls` implementation (FR48 architectural commitment).

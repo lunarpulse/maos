@@ -6,3 +6,6 @@ graphify-out
 .agents
 target
 archives
+xtask/tests/fixtures/abi-diff/*/baseline/Cargo.lock
+xtask/tests/fixtures/abi-diff/*/modified/Cargo.lock
+xtask/tests/fixtures/abi-diff/*/modified-removed/Cargo.lock

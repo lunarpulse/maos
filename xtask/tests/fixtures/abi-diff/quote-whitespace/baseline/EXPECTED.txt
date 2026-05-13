@@ -1,0 +1,3 @@
+pub mod quote_whitespace_test
+pub struct quote_whitespace_test::Foo
+pub quote_whitespace_test::Foo::x: i32

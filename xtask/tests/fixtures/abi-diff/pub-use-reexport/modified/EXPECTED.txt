@@ -1,0 +1,2 @@
+pub mod pub_use_reexport_test
+pub fn pub_use_reexport_test::bar() -> i32

@@ -1,0 +1,3 @@
+pub mod inline_mod_items_test
+pub mod inline_mod_items_test::foo
+pub fn inline_mod_items_test::foo::bar() -> i32

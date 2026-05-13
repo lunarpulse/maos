@@ -75,3 +75,7 @@
 - **check_security_md follows symlinks without verifying regular file** — `std::fs::read_to_string` follows symlinks. An out-of-repo symlink could pass the gate. CI runs on fresh checkouts where this is not a concern. `xtask/src/check_security_md.rs:32`
 - **e.exit() in lib.rs makes parse-error paths untestable** — `e.exit()` calls `std::process::exit()`. Spec worked example explicitly shows this pattern. Alternative would be testable but deviates from spec intent. `crates/maos-cli/src/lib.rs:28`
 - **Unnecessary .collect() allocation in main.rs binary entry point** — `std::env::args_os().collect()` allocates a `Vec<OsString>`. Could change `run()` signature but changes public API for negligible v0.1-α benefit. `crates/maos-cli/src/main.rs:8`
+
+## Deferred from: code review of 1a-5-migrate-abi-diff-to-cargo-public-api (2026-05-13)
+
+- **Migration doc 175 lines vs AC4 "~200–400 lines"** — RESOLVED 2026-05-13. Expanded to 237 lines with nightly policy consensus, gate modes documentation, and fixture architecture section. Now within AC4 range.

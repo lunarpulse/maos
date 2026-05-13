@@ -1,0 +1,2 @@
+pub mod generic_bound_reorder_test
+pub fn generic_bound_reorder_test::f<T: core::cmp::Eq + 'static>(x: T) -> bool
