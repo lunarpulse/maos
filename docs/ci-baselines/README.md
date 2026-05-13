@@ -51,6 +51,24 @@ artifacts required by the `invariant-lock` gate (Story 0.1 AC5 / ADR-037):
    the PR description. The merge is blocked until both approvals are granted
    (operator-side ceremony, not enforceable by xtask logic).
 
+## Dependency-introduction checklist for PRs adding deps
+
+Any PR that adds an entry to a `[dependencies]`, `[dev-dependencies]`, or
+`[build-dependencies]` table — directly or by promoting a transitive — must
+include in its dev record (per `docs/dev-discipline/dep-introduction.md`):
+
+1. **Blast-radius count:** Concrete number of new entries in `Cargo.lock` (use
+   `git diff HEAD -- Cargo.lock | grep -c '^+name = '`). "Small" / "minimal" is
+   not a count.
+2. **Notable transitive names:** List unfamiliar transitive deps; for any not
+   already vetted in the workspace, paste `cargo tree -p <crate> -i <new-dep>`.
+3. **Justification:** One sentence on what this dep does that we cannot do at
+   acceptable cost ourselves.
+4. **`cargo deny check`:** Documented as passing against the new dep tree.
+
+Origin: Epic 0 retrospective Action Item A2 (2026-05-13). Addresses DF4
+(`tempfile` adding ~25 WASI crates undetected pre-merge).
+
 ## Founding-sprint baseline gates
 
 The v0.1-alpha `discipline.yml` runs the following gates:
@@ -71,5 +89,7 @@ The v0.1-alpha `discipline.yml` runs the following gates:
 | corpus-staleness | 0.3 | required |
 | corpus-rebaseline | 0.3 | scheduled, not per-commit |
 | calibrate | 0.4 | per-commit, populated by Story 0.4 corpus |
+| determinism-tests | 0.5 / E0-retro | advisory at v0.1-α (per DF6); blocking when NFR-Sec-4 ships |
 
-**Any green gate going red is a merge-block.**
+**Any green gate going red is a merge-block** — except gates explicitly marked
+"advisory," which surface warnings without flipping overall workflow status.

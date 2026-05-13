@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-# last_updated: 2026-05-12  # Story 0-5: implemented (dev-story).
+# last_updated: 2026-05-13  # Story 1a.1 created; epic-1a transitions to in-progress.
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-11
-last_updated: 2026-05-12  # Story 0-5: code review complete, all patches applied, marked done.
+last_updated: 2026-05-13  # Epic 0 retrospective complete (epic-0-retro-2026-05-13.md); epic-0 marked done.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -45,13 +45,13 @@ development_status:
   # ------------------------------------------------------------------
   # Epic 0: Quality Substrate (founding sprint v0.1; maintenance thereafter)
   # ------------------------------------------------------------------
-  epic-0: in-progress
+  epic-0: done
   0-1-workspace-ci-pipeline-build-discipline-gates: done
   0-2-enforce-empty-kernel-invariants-via-structural-ci-lints: done
   0-3-content-addressed-corpora-infrastructure-coverage-matrix-ci-gate: done
   0-4-complianceclaim-schema-adversarial-review-calibration-seed-corpus: done
   0-5-parameterized-corpus-generators-secret-redaction-red-team-frameworks: done
-  epic-0-retrospective: optional
+  epic-0-retrospective: done
 
   # ------------------------------------------------------------------
   # Epic 1a: Workspace Bootstrap + ABI Freeze + Kernel Skeleton (v0.1-alpha)

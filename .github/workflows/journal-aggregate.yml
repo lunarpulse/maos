@@ -1,0 +1,120 @@
+name: journal-aggregate
+
+# DF16 (Option c) — operator-triggered journal aggregation. See:
+#   docs/dev-discipline/df16-journal-merge-queue-design.md
+#
+# This workflow is manually triggered by an operator (typically the architect
+# or a maintainer with the relevant context). It downloads every
+# journal-entry-<sha> artifact uploaded by .github/workflows/journal-append.yml
+# since the last aggregation, sorts them by merge time, concatenates into a
+# single aggregated journal file, and uploads the result as an artifact for
+# the operator to download and commit through normal PR review.
+#
+# Key design choice: this workflow does NOT push the aggregated journal back
+# to the repo. The operator downloads the artifact, places it at
+# docs/invariants/journal.jsonl, opens a PR, and the PR goes through normal
+# review (≥2 reviewers, all gates green). This preserves ADR-037's spirit by
+# routing every change to the journal through the same gate as everything
+# else — no CI-side bypass, no commit-back token.
+#
+# Cadence: ad-hoc at v0.1-α. Suggested cadence once journal entries accumulate:
+# quarterly (aligns with NFR-Test-1 corpus rebaseline cadence) or
+# trigger-on-need (when an audit consumer requests the up-to-date journal).
+
+on:
+  workflow_dispatch:
+    inputs:
+      since-iso-date:
+        description: |
+          ISO date (YYYY-MM-DD) to start aggregating from. Entries with
+          artifact creation timestamps before this date are skipped. Leave
+          empty to aggregate all available entries (the full 90-day artifact
+          retention window from journal-append.yml).
+        required: false
+        default: ""
+      max-artifacts:
+        description: |
+          Maximum number of journal-entry artifacts to aggregate in this run.
+          Default 1000. Increase only if a quarterly cadence has accumulated
+          more entries than this (unlikely for a healthy MAOS repo).
+        required: false
+        default: "1000"
+
+permissions:
+  actions: read       # to list and download artifacts
+  contents: read
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: List journal-entry artifacts
+        id: list
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Fetch up to ${MAX} artifacts named journal-entry-*. Sort by
+          # creation timestamp ascending (oldest first → SHA-merge order).
+          MAX="${{ inputs.max-artifacts || '1000' }}"
+          SINCE="${{ inputs.since-iso-date }}"
+
+          # GitHub CLI doesn't have a native artifact-list-by-name filter; we
+          # use the REST API via gh api.
+          gh api -H "Accept: application/vnd.github+json" \
+            "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --paginate \
+            | jq --arg max "$MAX" --arg since "$SINCE" '
+                [.artifacts[]
+                 | select(.name | startswith("journal-entry-"))
+                 | select(.expired == false)
+                 | if $since != "" then select(.created_at >= ($since + "T00:00:00Z")) else . end]
+                | sort_by(.created_at)
+                | .[0 : ($max | tonumber)]
+              ' > /tmp/artifacts.json
+          count=$(jq 'length' /tmp/artifacts.json)
+          echo "Found $count journal-entry artifacts to aggregate."
+          echo "count=$count" >> $GITHUB_OUTPUT
+
+      - name: Download and concatenate entries
+        if: steps.list.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/aggregate
+          : > /tmp/aggregate/journal.jsonl
+
+          jq -r '.[] | "\(.id)\t\(.name)\t\(.created_at)"' /tmp/artifacts.json | \
+          while IFS=$'\t' read -r artifact_id artifact_name created_at; do
+            echo "Aggregating $artifact_name (created $created_at)..."
+            gh api -H "Accept: application/vnd.github+json" \
+              "repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
+              > "/tmp/aggregate/${artifact_id}.zip"
+            unzip -p "/tmp/aggregate/${artifact_id}.zip" >> /tmp/aggregate/journal.jsonl
+            rm -f "/tmp/aggregate/${artifact_id}.zip"
+          done
+
+          echo "---"
+          echo "Aggregated $(wc -l < /tmp/aggregate/journal.jsonl) lines."
+          echo "First line:"
+          head -1 /tmp/aggregate/journal.jsonl || true
+          echo "Last line:"
+          tail -1 /tmp/aggregate/journal.jsonl || true
+
+      - name: Upload aggregated journal
+        if: steps.list.outputs.count != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: journal-aggregated-${{ github.run_id }}
+          path: /tmp/aggregate/journal.jsonl
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.list.outputs.count }}" = "0" ]; then
+            echo "::notice::No journal-entry artifacts found; nothing to aggregate."
+          else
+            echo "::notice::Aggregated ${{ steps.list.outputs.count }} entries. Download the journal-aggregated-${{ github.run_id }} artifact and open a PR placing it at docs/invariants/journal.jsonl for review."
+          fi

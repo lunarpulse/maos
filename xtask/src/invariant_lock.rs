@@ -12,15 +12,34 @@ pub struct LockReport {
     pub insufficient_reviews: bool,
     pub regression_detected: Vec<String>,
     pub review_count: usize,
+    /// Set when the PR body matches the GitHub revert idiom. Populated by
+    /// detect_revert when --pr-body is provided. Used by the journal writer
+    /// to emit a paired "reverted" entry referencing the original PR/SHA.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revert_of: Option<RevertReference>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RevertReference {
+    /// PR number being reverted, parsed from "Reverts #<n>" if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_number: Option<u64>,
+    /// SHA being reverted, parsed from "This reverts commit <sha>." if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha: Option<String>,
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     changed_files: Option<&str>,
     pr_number: Option<u64>,
     sha: Option<&str>,
+    write_journal: bool,
+    journal_output: &str,
+    pr_body: Option<&str>,
     json: bool,
 ) -> Result<(), String> {
-    let report = invariant_lock(changed_files, pr_number, sha)?;
+    let report = invariant_lock(changed_files, pr_number, pr_body)?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&report).unwrap());
@@ -47,6 +66,21 @@ pub fn run(
         }
     }
 
+    // Journal persistence: opt-in via --write-journal. Per DF16 resolution
+    // (Option c, 2026-05-13), the merge-queue workflow writes to a tmpfile
+    // path and uploads as a CI artifact; the in-repo journal is rebuilt
+    // offline. Without --write-journal the function is validate-only.
+    if report.passed && write_journal && sha.is_some() && pr_number.is_some() {
+        append_journal(
+            std::path::Path::new(journal_output),
+            &report.touched_invariants,
+            pr_number.unwrap(),
+            report.review_count,
+            sha.unwrap(),
+            report.revert_of.as_ref(),
+        )?;
+    }
+
     if !report.passed {
         return Err("invariant-lock failed".into());
     }
@@ -64,7 +98,7 @@ fn workspace_root() -> std::path::PathBuf {
 fn invariant_lock(
     changed_files: Option<&str>,
     pr_number: Option<u64>,
-    sha: Option<&str>,
+    pr_body_path: Option<&str>,
 ) -> Result<LockReport, String> {
     let root = workspace_root();
     let lock_path = root.join("xtask/invariants/lock.toml");
@@ -105,6 +139,7 @@ fn invariant_lock(
             insufficient_reviews: false,
             regression_detected: vec![],
             review_count: 0,
+            revert_of: None,
         });
     }
 
@@ -146,10 +181,13 @@ fn invariant_lock(
         && !insufficient_reviews
         && regression_detected.is_empty();
 
-    // Append to journal if merge-gating context.
-    if passed && sha.is_some() && pr_number.is_some() {
-        append_journal(&root, &touched_invariants, pr_number.unwrap(), review_count, sha.unwrap())?;
-    }
+    // Revert detection: parse PR body for GitHub revert idiom.
+    // The journal-append code path (in run(), gated on --write-journal) consumes
+    // this to emit a paired "reverted" entry.
+    let revert_of = match pr_body_path {
+        Some(path) => detect_revert(path)?,
+        None => None,
+    };
 
     Ok(LockReport {
         passed,
@@ -159,6 +197,7 @@ fn invariant_lock(
         insufficient_reviews,
         regression_detected,
         review_count,
+        revert_of,
     })
 }
 
@@ -301,33 +340,113 @@ fn parse_cadence(src: &str) -> Result<BTreeMap<String, String>, String> {
 }
 
 fn append_journal(
-    root: &std::path::Path,
+    output_path: &std::path::Path,
     invariant_ids: &[String],
     pr_number: u64,
     review_count: usize,
     sha: &str,
+    revert_of: Option<&RevertReference>,
 ) -> Result<(), String> {
-    let entry = serde_json::json!({
-        "ts": std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| format!("system time precedes epoch: {e}"))?
+        .as_secs();
+
+    let primary_entry = serde_json::json!({
+        "ts": ts,
         "invariant_ids": invariant_ids,
         "pr_number": pr_number,
         "reviewers": review_count,
         "sha": sha,
     });
-    let line = format!("{entry}\n");
+    let mut output = format!("{primary_entry}\n");
+
+    // Revert semantic (DF16 decision 2026-05-13): when the merging PR reverts a
+    // prior invariant-touching PR, emit a paired "reverted" entry referencing
+    // the original. The pair is human-auditable; the journal remains
+    // self-consistent on revert.
+    if let Some(revert) = revert_of {
+        let mut reverted_entry = serde_json::json!({
+            "ts": ts,
+            "reverted_by_sha": sha,
+            "reverted_by_pr": pr_number,
+        });
+        if let Some(orig_pr) = revert.pr_number {
+            reverted_entry["pr_number"] = serde_json::json!(orig_pr);
+        }
+        if let Some(orig_sha) = &revert.sha {
+            reverted_entry["sha"] = serde_json::json!(orig_sha);
+        }
+        output.push_str(&format!("{reverted_entry}\n"));
+    }
+
+    // Ensure parent directory exists; the journal-output flag may target
+    // /tmp/<dir>/... which the workflow has not necessarily pre-created.
+    if let Some(parent) = output_path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("cannot create journal output parent {}: {e}", parent.display()))?;
+        }
+    }
+
     fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(root.join("docs/invariants/journal.jsonl"))
+        .open(output_path)
         .and_then(|mut f| {
             use std::io::Write;
-            f.write_all(line.as_bytes())
+            f.write_all(output.as_bytes())
         })
-        .map_err(|e| format!("journal append failed: {e}"))?;
+        .map_err(|e| format!("journal append failed at {}: {e}", output_path.display()))?;
     Ok(())
+}
+
+/// Detect the GitHub revert idiom from a PR body. Returns Some(RevertReference)
+/// when the body matches any of the canonical patterns.
+///
+/// Canonical patterns recognized:
+/// - `Reverts #<N>` (anywhere in the body) — captures `pr_number`
+/// - `This reverts commit <sha>` (40-char hex; case-insensitive) — captures `sha`
+/// - Both patterns may co-occur; both fields are populated.
+///
+/// Returns None when no pattern matches or the body file cannot be read
+/// (we treat unreadable body as "not a revert" — the gate's revert handling
+/// is best-effort enrichment, not a hard requirement).
+fn detect_revert(pr_body_path: &str) -> Result<Option<RevertReference>, String> {
+    let body = match fs::read_to_string(pr_body_path) {
+        Ok(s) => s,
+        Err(_) => return Ok(None),
+    };
+
+    let mut pr_number: Option<u64> = None;
+    let mut sha: Option<String> = None;
+
+    for line in body.lines() {
+        let trimmed = line.trim();
+        // "Reverts #<N>" — case-sensitive on "Reverts", number must be u64.
+        if let Some(rest) = trimmed.strip_prefix("Reverts #") {
+            let num: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            if let Ok(n) = num.parse::<u64>() {
+                pr_number = Some(n);
+            }
+        }
+        // "This reverts commit <sha>." — 40-char hex (GitHub's full SHA).
+        if let Some(rest) = trimmed.strip_prefix("This reverts commit ") {
+            let hex: String = rest
+                .chars()
+                .take_while(|c| c.is_ascii_hexdigit())
+                .collect();
+            if hex.len() == 40 {
+                sha = Some(hex);
+            }
+        }
+    }
+
+    if pr_number.is_some() || sha.is_some() {
+        Ok(Some(RevertReference { pr_number, sha }))
+    } else {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]

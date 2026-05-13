@@ -40,7 +40,25 @@ enum Commands {
     /// AC8 — NFR-Test-2 service-boundary surface-diff stub.
     CheckServiceBoundary { #[arg(long)] path: Option<String>, #[arg(long, default_value = "docs/ci-baselines/kernel-surface-v0.1-alpha.json")] baseline: String, #[arg(long, default_value = "xtask/kernel-api-classes.toml")] classes: String, #[arg(long)] json: bool },
     /// AC5 — Invariant lock gate for constitutional amendments.
-    InvariantLock { #[arg(long)] changed_files: Option<String>, #[arg(long)] pr_number: Option<u64>, #[arg(long)] sha: Option<String>, #[arg(long)] json: bool },
+    ///
+    /// `--write-journal` opts the run into persisting a journal entry; without
+    /// this flag the gate validates only. `--journal-output` sets the file the
+    /// entry is written to (default: `docs/invariants/journal.jsonl`). For
+    /// Option (c) journal persistence (DF16), the merge-queue workflow sets
+    /// `--journal-output /tmp/journal-entry.jsonl` and uploads the file as a
+    /// CI artifact; the in-repo journal is rebuilt offline by the operator.
+    /// `--pr-body` points at a file containing the PR body for revert detection;
+    /// if the body matches the GitHub revert idiom, a paired "reverted" entry
+    /// is appended after the primary entry.
+    InvariantLock {
+        #[arg(long)] changed_files: Option<String>,
+        #[arg(long)] pr_number: Option<u64>,
+        #[arg(long)] sha: Option<String>,
+        #[arg(long)] write_journal: bool,
+        #[arg(long, default_value = "docs/invariants/journal.jsonl")] journal_output: String,
+        #[arg(long)] pr_body: Option<String>,
+        #[arg(long)] json: bool,
+    },
     /// AC1 — SHA-256-pinned JSONL corpus verification (NFR-Test-1).
     CheckCorpus { #[arg(long, default_value = "tests/corpora/MANIFEST.toml")] manifest: String, #[arg(long, default_value = "tests/corpora")] corpora_dir: String, #[arg(long)] register: Option<String>, #[arg(long)] json: bool },
     /// AC2 — Pinned-judge-LLM structural contract (NFR-Test-1).
@@ -64,7 +82,7 @@ fn main() {
         Commands::CheckServiceBoundary { path, baseline, classes, json } => check_service_boundary::run(path.as_deref(), &baseline, &classes, json),
         Commands::KlocCheck { config, json } => kloc_check::run(&config, json),
         Commands::AbiDiff { base, json } => abi_diff::run(&base, json),
-        Commands::InvariantLock { changed_files, pr_number, sha, json } => invariant_lock::run(changed_files.as_deref(), pr_number, sha.as_deref(), json),
+        Commands::InvariantLock { changed_files, pr_number, sha, write_journal, journal_output, pr_body, json } => invariant_lock::run(changed_files.as_deref(), pr_number, sha.as_deref(), write_journal, &journal_output, pr_body.as_deref(), json),
         Commands::CheckCorpus { manifest, corpora_dir, register, json } => check_corpus::run(&manifest, &corpora_dir, register.as_deref(), json),
         Commands::CheckJudgeConfig { config, identifiers, json } => check_judge_config::run(&config, &identifiers, json),
         Commands::CoverageMatrix { config, phase_config, manifest, gate_registry, json } => coverage_matrix::run(&config, &phase_config, &manifest, &gate_registry, json),

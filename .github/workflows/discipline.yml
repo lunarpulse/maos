@@ -170,6 +170,12 @@ jobs:
       - name: Run check-service-boundary
         run: cargo run -p xtask -- check-service-boundary --json
 
+  # Per-push invariant-lock validation. Journal persistence is a separate
+  # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
+  # job validates the tri-requirement (diff + corpus-delta + phase-commitment)
+  # plus the reviewer count and regression check, but does NOT call
+  # --write-journal. The flag is the explicit separation between "validate"
+  # and "persist" introduced when DF16 was resolved.
   invariant-lock:
     runs-on: ubuntu-latest
     permissions:
@@ -186,14 +192,16 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Detect changed files
         run: git diff --name-only HEAD~1 > /tmp/changed-files.txt
-      - name: Run invariant-lock
+      - name: Run invariant-lock (validate-only; journal persistence is in journal-append.yml)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # --pr-number is still passed (reviewer-count check needs it).
+          # --sha and --write-journal are deliberately omitted: this is the
+          # per-push validation gate, not the merge-time persister.
           cargo run -p xtask -- invariant-lock \
             --changed-files /tmp/changed-files.txt \
             --pr-number ${{ github.event.pull_request.number }} \
-            --sha ${{ github.sha }} \
             --json
 
   check-corpus:
@@ -270,9 +278,41 @@ jobs:
         if: steps.check-corpus.outputs.exists == 'true'
         run: cargo run -p xtask -- calibrate --corpus calibration-seed-v0.1 --n 100 --p 0.95 --json
 
+  # Determinism integration tests for maos-corpus-gen — non-blocking at v0.1-α per DF6
+  # (deferred-work.md). Promotes to blocking when NFR-Sec-4 redaction filter ships (v0.5).
+  # The job always reports success at the GitHub Actions level; the underlying test
+  # outcome is surfaced via the `test_result` job output so the aggregate comment can
+  # show "advisory ⚠️" without flipping the overall workflow status to failure.
+  determinism-tests:
+    runs-on: ubuntu-latest
+    outputs:
+      test_result: ${{ steps.surface.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run determinism integration tests (advisory at v0.1-α per DF6)
+        id: dtests
+        continue-on-error: true
+        run: cargo test -p maos-corpus-gen --test determinism_integration
+      - name: Surface advisory outcome
+        id: surface
+        run: |
+          if [ "${{ steps.dtests.outcome }}" = "failure" ]; then
+            echo "::warning::DF6: determinism integration tests failed — advisory at v0.1-α; promotes to blocking when NFR-Sec-4 ships"
+            echo "result=failure" >> $GITHUB_OUTPUT
+          else
+            echo "Determinism integration tests passed."
+            echo "result=success" >> $GITHUB_OUTPUT
+          fi
+
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, coverage-matrix, corpus-staleness, calibrate-per-commit]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests]
     if: always()
     permissions:
       pull-requests: write
@@ -318,7 +358,9 @@ jobs:
             const cm = '${{ needs.coverage-matrix.result }}';
             const cs = '${{ needs.corpus-staleness.result }}';
             const cpc = '${{ needs.calibrate-per-commit.result }}';  // conditionally skipped until Story 0.4
+            const dt = '${{ needs.determinism-tests.outputs.test_result }}';  // advisory at v0.1-α per DF6
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
+            const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
 
             const body = `## MAOS Discipline Gate Results
 
@@ -337,6 +379,9 @@ jobs:
             | coverage-matrix | ${icon(cm)} ${cm} |
             | corpus-staleness | ${icon(cs)} ${cs} |
             | calibrate-per-commit | ${icon(cpc)} ${cpc} |
+            | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
+
+            ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).
 
             <!-- discipline-gate-comment -->`;
 

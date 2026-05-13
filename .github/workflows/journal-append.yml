@@ -1,0 +1,134 @@
+name: journal-append
+
+# DF16 (Option c) — per-merge journal artifact. See:
+#   docs/dev-discipline/df16-journal-merge-queue-design.md
+#
+# This workflow runs on merge_group (when a PR is queued for merge) AND on
+# push: main (post-merge belt-and-suspenders). It computes the invariant-lock
+# journal entry for the merging commit and uploads it as a CI artifact named
+# by the merged SHA. The in-repo docs/invariants/journal.jsonl is NOT written
+# from this workflow — it is rebuilt offline by an operator-triggered
+# aggregator workflow (.github/workflows/journal-aggregate.yml), which
+# downloads the artifact set and produces a reviewable journal commit.
+#
+# This design avoids any commit-back from CI, which would require a GitHub App
+# token with branch-protection bypass — an ADR-037 sensitivity zone we chose
+# to avoid.
+
+on:
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  emit-journal-entry:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need enough history for `git diff HEAD~1` to resolve the merging
+          # commit's changed-file set.
+          fetch-depth: 2
+
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+
+      # Determine the SHA being merged. On merge_group, that's
+      # merge_group.head_sha; on push: main, it's github.sha.
+      - name: Resolve merge SHA
+        id: sha
+        run: |
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            echo "merge_sha=${{ github.event.merge_group.head_sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "merge_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      # Resolve the PR number — best-effort. On merge_group, GitHub does not
+      # populate a direct PR number on the event payload; we parse the merge
+      # commit message for "(#NNNN)" trailer (the GitHub merge-commit idiom).
+      # If parsing fails, pr_number stays empty and the journal entry omits it
+      # (the SHA is sufficient for audit traceability).
+      - name: Resolve PR number from merge commit message
+        id: pr
+        run: |
+          msg=$(git log -1 --pretty=%s ${{ steps.sha.outputs.merge_sha }})
+          # Extract trailing (#NNNN) — GitHub's default merge-commit format.
+          pr=$(echo "$msg" | grep -oE '\(#[0-9]+\)' | tail -1 | tr -d '(#)' )
+          if [ -n "$pr" ]; then
+            echo "pr_number=$pr" >> $GITHUB_OUTPUT
+          fi
+
+      # Resolve the PR body for revert detection — best-effort. Use the gh CLI
+      # to fetch the PR body if a number is available; otherwise skip.
+      - name: Fetch PR body for revert detection
+        if: steps.pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr view ${{ steps.pr.outputs.pr_number }} --json body --jq .body > /tmp/pr-body.txt || echo "" > /tmp/pr-body.txt
+
+      - name: Compute changed files
+        run: |
+          git diff --name-only HEAD~1 > /tmp/changed-files.txt
+          echo "Changed files:"
+          cat /tmp/changed-files.txt
+
+      - name: Run invariant-lock with --write-journal
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/journal-output
+          pr_arg=""
+          if [ -n "${{ steps.pr.outputs.pr_number }}" ]; then
+            pr_arg="--pr-number ${{ steps.pr.outputs.pr_number }}"
+          fi
+          body_arg=""
+          if [ -f /tmp/pr-body.txt ]; then
+            body_arg="--pr-body /tmp/pr-body.txt"
+          fi
+          cargo run -p xtask -- invariant-lock \
+            --changed-files /tmp/changed-files.txt \
+            --sha ${{ steps.sha.outputs.merge_sha }} \
+            $pr_arg \
+            $body_arg \
+            --write-journal \
+            --journal-output /tmp/journal-output/entry.jsonl \
+            --json > /tmp/journal-output/report.json
+          echo "---"
+          echo "Journal entry (if any):"
+          cat /tmp/journal-output/entry.jsonl 2>/dev/null || echo "(no journal entry — no invariants touched, or gate did not pass)"
+
+      # Only upload if there's actually a journal entry. Most merges touch zero
+      # invariants and produce no entry; we don't want to upload empty
+      # artifacts that pollute the artifact set the aggregator later scans.
+      - name: Upload journal entry artifact
+        if: hashFiles('/tmp/journal-output/entry.jsonl') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: journal-entry-${{ steps.sha.outputs.merge_sha }}
+          path: /tmp/journal-output/entry.jsonl
+          retention-days: 90
+          # The artifact set is the authoritative log until the operator
+          # aggregates them back into docs/invariants/journal.jsonl. 90 days
+          # gives ample time for quarterly aggregation cadence (NFR-Test-1).
+
+      # Surface the report regardless, so audit trails can show that the gate
+      # ran even when no entry was produced.
+      - name: Upload run report artifact
+        if: always() && hashFiles('/tmp/journal-output/report.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: journal-report-${{ steps.sha.outputs.merge_sha }}
+          path: /tmp/journal-output/report.json
+          retention-days: 30
