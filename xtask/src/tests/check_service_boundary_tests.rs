@@ -89,6 +89,42 @@ fn json_round_trip() {
     assert_eq!(parsed.violations.len(), 1);
 }
 
+#[test]
+fn p1_stub_reports_v0_1_layout_for_all_services() {
+    let payload = p1_p4_status_payload(Path::new("."));
+    let map = payload.as_object().expect("expected object");
+    // All supervised services + supervisor
+    let expected_count = SUPERVISED_SERVICES.len() + 1;
+    assert_eq!(map.len(), expected_count);
+    for svc in SUPERVISED_SERVICES.iter().copied().chain(std::iter::once(SUPERVISOR)) {
+        assert_eq!(
+            map[svc]["p1"], "v0.1-alpha-services-as-modules-stub",
+            "{svc} P1 should report v0.1-α layout stub"
+        );
+    }
+}
+
+#[test]
+fn p2_stub_reports_v0_1_layout_for_all_services() {
+    let payload = p1_p4_status_payload(Path::new("."));
+    let map = payload.as_object().expect("expected object");
+    for svc in SUPERVISED_SERVICES.iter().copied().chain(std::iter::once(SUPERVISOR)) {
+        assert_eq!(map[svc]["p2"], "v0.1-alpha-services-as-modules-stub");
+    }
+}
+
+#[test]
+fn p3_stub_distinguishes_supervisor_from_supervised() {
+    let payload = p1_p4_status_payload(Path::new("."));
+    let map = payload.as_object().expect("expected object");
+    // Supervised services: P3 is "not-applicable" (no crates/iac/proto/ at v0.1-α)
+    for svc in SUPERVISED_SERVICES {
+        assert_eq!(map[*svc]["p3"], "v0.1-alpha-not-applicable");
+    }
+    // Supervisor: P3 is "supervisor-exception" per §4.0.8
+    assert_eq!(map[SUPERVISOR]["p3"], "v0.1-alpha-supervisor-exception");
+}
+
 struct P4Visitor<'a> {
     violations: &'a mut Vec<Violation>,
 }

@@ -85,8 +85,10 @@ coverage:
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
-    notes: 1a.1 ships maos-bin crate; cargo install --path crates/maos-bin succeeds
-      via reproducible-build gate; full install workflow in v0.5+
+    notes: 1a.1 ships maos-bin; 1a.4 ships maosctl via `cargo install --path
+      crates/maos-cli --locked`; `maosctl --version` reports the workspace
+      version; full install workflow (Spirit registry fetch + signature
+      verify) lands at v0.5+
   FR10:
     gates: []
     corpora: []
@@ -142,7 +144,9 @@ coverage:
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
-    notes: 1a.1 commits maos-cli crate stub; maosctl uninstall lands in Story 1a.4
+    notes: 1a.4 ships `maosctl unload` and `maosctl install` stubs (real
+      uninstall body lands at Story 1b.5b); cargo-test verifies the help-tree
+      surface; no behavior gate at v0.1-α
   FR20:
     gates: []
     corpora: []
@@ -310,10 +314,20 @@ coverage:
     notes: InferencePort trait skeleton lands in Story 1b.4 alongside ComplianceClaim
       freeze; type-stub in maos-domain at v0.1-α
   FR48:
-    gates: []
+    gates:
+      - check-service-boundary
+      - reproducible-build
     corpora: []
-    phase: v0.5
+    phase: v0.1-alpha
     valid_until: '2027-05-12'
+    notes: |
+      1a.3 declares CryptoProvider port in maos-domain::ports::crypto
+      (sync, data-movement classification) + default RingCryptoProvider
+      adapter in maos-kernel-core::security::crypto backed by ring 0.17;
+      maos-bin/src/main.rs constructs Arc<dyn CryptoProvider> = Arc::new(
+      RingCryptoProvider) demonstrating the FR48 swap-at-composition-root
+      pattern; FIPS / HSM / post-quantum substitution lands at v1.0
+      (NFR-Sec-15) without recompiling any Spirit binary.
   FR49:
     gates: []
     corpora: []
@@ -387,10 +401,15 @@ coverage:
     phase: v1.5
     valid_until: '2027-05-12'
   FR61:
-    gates: []
+    gates:
+    - check-security-md
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
+    notes: 1a.4 ships SECURITY.md with four NFR-Ops-4 binding sections
+      (disclosure contact, 90-day embargo, supported-versions, advisory
+      channel); check-security-md gate parses headers and fails on
+      malformation; CNA registration deferred to v0.5
   FR62:
     gates: []
     corpora: []
@@ -416,7 +435,9 @@ coverage:
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
-    notes: type-codification only at v0.1-α; runtime opt-in surface lands at v0.5
+    notes: 1a.4 declares `maosctl --telemetry=on|off` CLI flag (default
+      `off` per opt-in commitment); runtime telemetry surface (collector +
+      schema + redaction layer) lands at v0.5
   FR8:
     gates:
     - abi-diff
@@ -689,15 +710,22 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Ops-4:
-    gates: []
+    gates:
+    - check-security-md
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
+    notes: 1a.4 ships SECURITY.md ship-gate via check-security-md xtask;
+      CNA registration through MITRE moves to v0.5 per the phase-split
   NFR-Ops-5:
     gates: []
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
+    notes: 1a.4 ships maosctl accessibility — `--plain` flag, `NO_COLOR`
+      env, `TERM=dumb` env unified via `ColorChoice::resolve`; 8 dedicated
+      unit tests in `maos-cli::accessibility::tests` (hermetic MockEnv);
+      verified by `cargo test -p maos-cli` in the workspace test run
   NFR-Ops-6:
     gates: []
     corpora: []

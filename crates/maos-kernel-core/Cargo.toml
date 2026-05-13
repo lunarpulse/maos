@@ -9,3 +9,14 @@ description = "MAOS kernel core — capability mediation, IAC bus, journal"
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
+# Story 1a.3 — default CryptoProvider adapter (FR48 / NFR-Sec-15 / §8.6).
+# `ring` 0.17 is the canonical Rust crypto-primitives crate; pulled
+# in by rustls, quinn, webpki, tokio-rustls in the Rust ecosystem.
+# Pinned via the workspace's `Cargo.lock` to a specific patch version
+# at PR-open time.
+ring = "0.17"
+# rustls 0.23 with explicit `ring` provider — types are declared so
+# the v0.5+ mTLS A2A peer mesh (Story 6.3) can land without re-doing
+# the dep introduction. At v0.1-α no rustls API is actually exercised;
+# the dep is the future-story slot.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

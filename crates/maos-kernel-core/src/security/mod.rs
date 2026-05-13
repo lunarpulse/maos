@@ -6,7 +6,10 @@
 //! mediation. At v0.1-α this is an empty hexagonal adapter shell;
 //! Story 1b.3 lands the T0/T1/T2 tier enforcement.
 
+pub mod crypto;  // NEW — Story 1a.3 default CryptoProvider adapter (§8.6 / FR48 / NFR-Sec-15)
+
 pub use maos_domain::ports::SecurityManagerPort;
+pub use crypto::RingCryptoProvider;  // NEW — re-export the default adapter alongside the port-trait
 
 /// Adapter shell — Story 1b.3 implements `SecurityManagerPort` for this
 /// type with sandbox tier enforcement and approval mediation.

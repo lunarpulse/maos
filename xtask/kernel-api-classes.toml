@@ -38,6 +38,10 @@
 "maos_kernel_core::io::IoSubsystemAdapter"                      = "data-movement"
 "maos_kernel_core::telemetry::TelemetryStreamAdapter"           = "data-movement"
 
+# Story 1a.3 — CryptoProvider port + RingCryptoProvider adapter.
+"maos_kernel_core::security::crypto::RingCryptoProvider"              = "data-movement"
+"maos_kernel_core::api::crate::security::RingCryptoProvider"          = "data-movement"
+
 # Port-trait re-exports propagated through `pub use maos_domain::ports::…`.
 # These appear as `use` items in the syn walk (per check_service_boundary
 # lines 232–235); classify with the port's primary class.

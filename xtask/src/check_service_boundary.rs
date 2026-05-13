@@ -177,6 +177,7 @@ fn check_service_boundary(
                 "io": "data-movement",
                 "telemetry": "data-movement",
             },
+            "p1_p4_per_service": p1_p4_status_payload(crate_path.parent().unwrap_or(Path::new("."))),
         }),
     })
 }
@@ -388,6 +389,70 @@ pub fn check_p4_supervised_exit(
     // v0.1-alpha: no-op because services are modules inside maos-kernel-core.
     // Story 2.2 wires the populated SERVICES list.
     Ok(Vec::new())
+}
+
+/// Per-service per-property status row in the P1–P4 stub payload.
+///
+/// At v0.1-α every status is one of:
+///   - `"v0.1-alpha-services-as-modules-stub"` — the property is
+///     conceptually applicable but the v0.5+ filesystem layout
+///     (`crates/services/<name>/`) does not yet exist; the stub
+///     records this without inventing a fake pass.
+///   - `"v0.1-alpha-not-applicable"` — the property does not apply to
+///     this service at v0.1-α (e.g., P3 requires `crates/iac/proto/`
+///     which doesn't exist).
+///   - `"v0.1-alpha-supervisor-exception"` — for P3 against the
+///     supervisor, per §4.0.8 supervisor exception.
+fn p1_status_for(_workspace_root: &Path, _service: &str) -> &'static str {
+    // P1: own crate at `crates/services/<name>/Cargo.toml`.
+    // At v0.1-α, services live as modules under maos-kernel-core/src/.
+    // Full enforcement deferred to Story 2.2; stub records the layout fact.
+    "v0.1-alpha-services-as-modules-stub"
+}
+
+fn p2_status_for(_workspace_root: &Path, _service: &str) -> &'static str {
+    // P2: own bin target at `crates/services/<name>/src/bin/<name>.rs`.
+    // At v0.1-α, the single maos-bin binary supervises the four services
+    // via composition root; per-service bin targets do not yet exist.
+    // Full enforcement deferred to Story 2.2.
+    "v0.1-alpha-services-as-modules-stub"
+}
+
+fn p3_status_for(_workspace_root: &Path, service: &str) -> &'static str {
+    // P3: IAC proto crate `crates/iac/proto/src/<name>.rs`.
+    // At v0.1-α, `crates/iac/proto/` does not exist (typed IAC bus
+    // contract crate lands at v0.5+; Story 6.1 wires the proto
+    // serialization).
+    if service == SUPERVISOR {
+        // Spirit Scheduler is the supervisor; P3 (proto module) is
+        // exempt per §4.0.8 supervisor exception.
+        "v0.1-alpha-supervisor-exception"
+    } else {
+        "v0.1-alpha-not-applicable"
+    }
+}
+
+/// Aggregate the per-service per-property statuses into a JSON map
+/// suitable for embedding in the `p1_p4_status` payload.
+fn p1_p4_status_payload(workspace_root: &Path) -> serde_json::Value {
+    let mut per_service = serde_json::Map::new();
+    let all_services: Vec<&str> = SUPERVISED_SERVICES
+        .iter()
+        .copied()
+        .chain(std::iter::once(SUPERVISOR))
+        .collect();
+    for svc in &all_services {
+        per_service.insert(
+            (*svc).to_string(),
+            serde_json::json!({
+                "p1": p1_status_for(workspace_root, svc),
+                "p2": p2_status_for(workspace_root, svc),
+                "p3": p3_status_for(workspace_root, svc),
+                "p4": "v0.1-alpha-empty-services-slice-no-op",
+            }),
+        );
+    }
+    serde_json::Value::Object(per_service)
 }
 
 #[cfg(test)]

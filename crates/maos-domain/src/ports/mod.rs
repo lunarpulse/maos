@@ -1,6 +1,7 @@
 //! Hexagonal port traits per ADR-010.
 //!
-//! One trait per supervisor / supervised service / internal module.
+//! One trait per supervisor / supervised service / internal module,
+//! plus the `crypto` port per FR48 / NFR-Sec-15 / §8.6.
 //! Adapter implementations live in `maos-kernel-core::<service>::<Service>Adapter`.
 //!
 //! # Sync-only trait method signatures
@@ -36,6 +37,8 @@ pub mod capability;
 pub mod io_subsystem;
 pub mod telemetry;
 
+pub mod crypto;  // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 / §8.6
+
 pub use scheduler::SpiritSchedulerPort;
 pub use security::SecurityManagerPort;
 pub use memory::MemoryManagerPort;
@@ -43,3 +46,4 @@ pub use iac_bus::IacBusPort;
 pub use capability::CapabilityRegistryPort;
 pub use io_subsystem::IoSubsystemPort;
 pub use telemetry::TelemetryStreamPort;
+pub use crypto::{CryptoProvider, CryptoError};  // NEW

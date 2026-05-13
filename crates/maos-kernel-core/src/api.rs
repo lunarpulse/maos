@@ -12,6 +12,7 @@
 
 pub use crate::scheduler::SpiritSchedulerAdapter;
 pub use crate::security::SecurityManagerAdapter;
+pub use crate::security::RingCryptoProvider;  // NEW — Story 1a.3 default crypto provider
 pub use crate::memory::MemoryManagerAdapter;
 pub use crate::iac::IacBusAdapter;
 pub use crate::capability::CapabilityRegistryAdapter;

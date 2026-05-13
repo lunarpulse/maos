@@ -34,6 +34,11 @@
     },
     {
       "kind": "struct",
+      "path": "maos_kernel_core::security::crypto::RingCryptoProvider",
+      "signature_hash": "7c51f98677bbd87336cb56caf54027b5aa1cfc13b4faf09239641f912b794f6c"
+    },
+    {
+      "kind": "struct",
       "path": "maos_kernel_core::telemetry::TelemetryStreamAdapter",
       "signature_hash": "d527b6aaacbcd693005a6be1c19453953b22857ca41edeaf2d6ddcdb2d8ad6b1"
     },
@@ -61,6 +66,11 @@
       "kind": "use",
       "path": "maos_kernel_core::api::crate::scheduler::SpiritSchedulerAdapter",
       "signature_hash": "01478401fc4b408d538e784331a6328c01e557d1048edc40b8e90cebf32be631"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::security::RingCryptoProvider",
+      "signature_hash": "88254a543ac68f28f3f78ceb9943fa101b67040999400a3ef3ec064a28cfa833"
     },
     {
       "kind": "use",
@@ -96,6 +106,11 @@
       "kind": "use",
       "path": "maos_kernel_core::scheduler::maos_domain::ports::SpiritSchedulerPort",
       "signature_hash": "a3f16ba06e4e33bb402d7e31c9ded087ef32d9de7ca926fc1a3a1ce2f9712c1c"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::crypto::RingCryptoProvider",
+      "signature_hash": "9d895a41a6a632edea35c381753515e3e79410b6bd41272470d0a9df4cad04b1"
     },
     {
       "kind": "use",

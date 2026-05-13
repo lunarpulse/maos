@@ -17,4 +17,5 @@ gates = [
     "corpus-staleness",
     "rebaseline-check",
     "calibrate",
+    "check-security-md",
 ]

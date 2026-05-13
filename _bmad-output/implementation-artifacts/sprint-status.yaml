@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-# last_updated: 2026-05-13  # Story 1a.2 code review complete; status set to done.
+# last_updated: 2026-05-13  # Story 1a.4 contexted; status set to ready-for-dev.
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-11
-last_updated: 2026-05-13  # Story 1a.2 code review complete; all findings resolved; status set to done.
+last_updated: 2026-05-13  # Story 1a.4 contexted; status set to ready-for-dev.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -59,7 +59,7 @@ development_status:
   epic-1a: in-progress
   1a-1-initialize-17-crate-cargo-workspace-frozen-abi-types-starter-template: done
   1a-2-wire-the-five-service-kernel-skeleton-with-a-multi-threaded-tokio-composition-root: done
-  1a-3-cryptoprovider-trait-xtask-service-boundary-stub-implementation: backlog
+  1a-3-cryptoprovider-trait-xtask-service-boundary-stub-implementation: done
   1a-4-ship-the-maosctl-cli-scaffold-with-security-md-and-accessibility-defaults: backlog
   epic-1a-retrospective: optional
 

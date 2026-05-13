@@ -26,6 +26,7 @@ allow = [
     "Unicode-DFS-2016",
     "Unicode-3.0",
     "MPL-2.0",
+    "OpenSSL",  # Story 1a.3 — ring 0.17 (Rust crypto primitives; de-facto standard)
 ]
 confidence-threshold = 0.8
 

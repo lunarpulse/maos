@@ -56,3 +56,13 @@
 - **Surface walk `api::crate::*` path artifact** — the syn walker resolves `pub use crate::...` literally in `api.rs`, embedding `crate::` in the path string (e.g., `maos_kernel_core::api::crate::scheduler::SpiritSchedulerAdapter`). Classification table matches these paths. If the walker is fixed later, 7 TOML entries and the baseline JSON will need updating. Pre-existing walker behavior, not caused by this diff.
 - **`LogBeforeDeliver::new()` is `pub` at v0.1-α** — the typestate guarantee on `IacBusPort` return types is advisory. I2's TODO notes `pub(crate)` restriction planned for Story 1b.2. Pre-existing design limitation.
 - **`SandboxTier(pub u8)` has no value constraint** — raw u8 newtype accepts any value (0–255); T0-T2 enforcement with validation lands in Story 1b.3 per explicit scope deferral in story spec.
+
+## Deferred from: code review of 1a-3-cryptoprovider-trait-xtask-service-boundary-stub-implementation (2026-05-13)
+
+- **No `unseal_for_import` — seal-only half-API** — The `CryptoProvider` trait declares `seal_for_export` but no corresponding `unseal_for_import`. Intentional: unseal lands in Story 7.3 (ComplianceClaim envelope verify). Not a bug; the trait surface is complete for v0.1-α scope.
+- **`sign_capability_token` `&[u8]` seed with no compile-time size hint** — The Ed25519 seed's 32-byte requirement is runtime-enforced via `from_seed_unchecked`. A `[u8; 32]` fixed-array parameter would give compile-time guidance but breaks the trait's `&[u8]` convention used by all other methods. Future newtype wrapper possible at Story 1b.2.
+- **P1–P3 stub functions take unused parameters** — `p1_status_for`, `p2_status_for`, `p3_status_for` accept `_workspace_root` and `_service` params but return static strings. Parameters exist for the Story 2.2 enforcement upgrade; noise at v0.1-α.
+- **`CryptoError::MalformedKey(&'static str)` can't carry dynamic diagnostics** — Error variant uses `&'static str`, preventing dynamic messages like "key was 31 bytes, expected 32". Coarse taxonomy per spec at v0.1-α; refinements land at Story 7.3.
+- **No early guard on `signature_bytes` length in `verify_signature`** — ring handles wrong-length signatures internally via `Unspecified`. An early `signature_bytes.len() != 64` guard would improve error clarity but adds no correctness.
+- **No AES-GCM plaintext size limit documentation** — AES-GCM has a practical limit of ~64 GB per (key, nonce) pair. No runtime guard or doc note. Caller responsibility at v0.1-α.
+- **Empty plaintext → 16-byte ciphertext may surprise callers** — `seal_for_export` on empty input produces a 16-byte AES-GCM tag with no ciphertext. Standard AES-GCM behavior but could confuse downstream consumers.

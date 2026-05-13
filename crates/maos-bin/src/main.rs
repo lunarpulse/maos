@@ -18,6 +18,9 @@
 //!   `tokio::signal::ctrl_c`), (b) SIGTERM (Unix; `tokio::signal::unix`),
 //!   (c) root-token cancellation. Any arm triggers root-token cancel,
 //!   then the program awaits all spawned tasks to drain.
+//! - **Crypto provider:** `Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider)`
+//!   per FR48 / NFR-Sec-15. Default `ring`/`rustls` adapter at v0.1-α;
+//!   FIPS / HSM / post-quantum providers swap by changing this one line.
 //!
 //! At v0.1-α the seven adapter shells are constructed but their port-trait
 //! implementations are deferred (Story 1b.x). The composition root demonstrates
@@ -28,20 +31,24 @@
 //! - Does NOT load any Spirit (Story 5.1 lifecycle verbs deferred).
 //! - Does NOT open any control-plane port (Story 1a.4 ships maosctl).
 //! - Does NOT initialize the Transparency Log (Story 1b.1 audit spine).
-//! - Does NOT verify any signed binary (Story 1a.3 CryptoProvider deferred).
+//! - Does NOT verify any actual signed binary at runtime (Story 1b.1 wires
+//!   `CryptoProvider::verify_signature` into the journal-replay path; this
+//!   story only DECLARES the seam).
 //!
 //! Running `maos-bin` at v0.1-α prints a startup banner, blocks on the
 //! shutdown selector, and exits cleanly on Ctrl+C. This validates the
 //! runtime topology only.
 
+use std::sync::Arc;
 use std::thread::available_parallelism;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
 
+use maos_domain::ports::crypto::CryptoProvider;
 use maos_kernel_core::api::{
     CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter,
-    MemoryManagerAdapter, SecurityManagerAdapter, SpiritSchedulerAdapter,
-    TelemetryStreamAdapter,
+    MemoryManagerAdapter, RingCryptoProvider, SecurityManagerAdapter,
+    SpiritSchedulerAdapter, TelemetryStreamAdapter,
 };
 
 fn worker_thread_count() -> usize {
@@ -73,6 +80,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _capability = CapabilityRegistryAdapter::default();
     let _io = IoSubsystemAdapter::default();
     let _telemetry = TelemetryStreamAdapter::default();
+
+    // ─────────────────────────────────────────────────────────────
+    // Story 1a.3 — FR48 / NFR-Sec-15 crypto-provider seam.
+    //
+    // Construct the default `ring`/`rustls`-backed CryptoProvider.
+    // This is the FR48 architectural-commitment SWAP POINT — a v1.0+
+    // FIPS-validated, HSM-backed, or post-quantum provider lands by
+    // changing the line below (e.g.,
+    //   `Arc::new(FipsCryptoProvider::from_module_id("CMVP-XXXX"))`).
+    // No other crate recompiles; no Spirit binary needs to be rebuilt.
+    //
+    // At v0.1-α the binding is held in an unused `_crypto` slot
+    // alongside the seven adapter shells — Story 1b.1 (audit-spine
+    // verify), Story 1b.2 (cap_tokens token sign), and Story 7.3
+    // (ComplianceClaim envelope verify) wire actual call sites.
+    let _crypto: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);
+    eprintln!("maos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)");
+    // `_crypto` is unused at v0.1-α; consumed by Story 1b.1 (audit-spine verify),
+    // Story 1b.2 (cap_tokens token sign), Story 7.3 (ComplianceClaim envelope verify).
+    // ─────────────────────────────────────────────────────────────
 
     // Root cancellation token. Every long-lived coordination task gets a
     // child token via `cancel.child_token()`. Cancelling the root cancels

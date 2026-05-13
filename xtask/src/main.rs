@@ -5,6 +5,7 @@ mod check_unsafe;
 mod check_empty_kernel;
 mod check_loom;
 mod check_service_boundary;
+mod check_security_md;
 mod fs_walk;
 mod kloc_check;
 mod abi_diff;
@@ -39,6 +40,8 @@ enum Commands {
     CheckLoom { #[arg(long)] path: Option<String>, #[arg(long, default_value = "xtask/kernel-crates.toml")] crates: String, #[arg(long, default_value = "xtask/loom-blocklist.toml")] blocklist: String, #[arg(long, default_value = "xtask/loom-allowlist.toml")] allowlist: String, #[arg(long)] json: bool },
     /// AC8 — NFR-Test-2 service-boundary surface-diff stub.
     CheckServiceBoundary { #[arg(long)] path: Option<String>, #[arg(long, default_value = "docs/ci-baselines/kernel-surface-v0.1-alpha.json")] baseline: String, #[arg(long, default_value = "xtask/kernel-api-classes.toml")] classes: String, #[arg(long)] json: bool },
+    /// AC9 — NFR-Ops-4 + FR61 SECURITY.md section gate.
+    CheckSecurityMd { #[arg(long)] json: bool },
     /// AC5 — Invariant lock gate for constitutional amendments.
     ///
     /// `--write-journal` opts the run into persisting a journal entry; without
@@ -80,6 +83,27 @@ fn main() {
         Commands::CheckEmptyKernel { path, whitelist, denylist, exemptions, json } => check_empty_kernel::run(&path, &whitelist, &denylist, &exemptions, json),
         Commands::CheckLoom { path, crates, blocklist, allowlist, json } => check_loom::run(path.as_deref(), &crates, &blocklist, &allowlist, json),
         Commands::CheckServiceBoundary { path, baseline, classes, json } => check_service_boundary::run(path.as_deref(), &baseline, &classes, json),
+        Commands::CheckSecurityMd { json } => {
+            let workspace_root = std::env::current_dir().expect("failed to get current dir");
+            let report = check_security_md::check_security_md(&workspace_root);
+            if json {
+                let payload = serde_json::json!({
+                    "passed": report.passed,
+                    "present_sections": report.present_sections,
+                    "missing_sections": report.missing_sections,
+                });
+                println!("{}", payload);
+            } else if report.passed {
+                eprintln!("check-security-md: PASS ({} sections found)", report.present_sections.len());
+            } else {
+                eprintln!("check-security-md: FAIL — missing sections: {:?}", report.missing_sections);
+            }
+            if report.passed {
+                Ok(())
+            } else {
+                Err("SECURITY.md missing required sections".into())
+            }
+        }
         Commands::KlocCheck { config, json } => kloc_check::run(&config, json),
         Commands::AbiDiff { base, json } => abi_diff::run(&base, json),
         Commands::InvariantLock { changed_files, pr_number, sha, write_journal, journal_output, pr_body, json } => invariant_lock::run(changed_files.as_deref(), pr_number, sha.as_deref(), write_journal, &journal_output, pr_body.as_deref(), json),

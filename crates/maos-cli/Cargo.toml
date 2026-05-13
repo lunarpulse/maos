@@ -7,4 +7,7 @@ repository.workspace = true
 rust-version.workspace = true
 description = "MAOS CLI — maosctl command-line interface (Story 1a.4)"
 
-[dependencies]
+[[bin]]
+name = "maosctl"
+path = "src/main.rs"
+
