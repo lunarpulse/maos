@@ -10,6 +10,7 @@ env:
   CARGO_TERM_COLOR: always
   TOKEI_VERSION: "14.0.0"
   CARGO_DENY_VERSION: "0.19.4"
+  CARGO_PUBLIC_API_VERSION: "0.51.0"
 
 jobs:
   reproducible-build:
@@ -67,17 +68,18 @@ jobs:
             violations=1
           fi
           # Check for cargo +nightly references in code/config/scripts only.
-          # Markdown documentation is allowed to *describe* the forbidden pattern
-          # (e.g., Story 0.1's spec text names the gate's enforcement targets).
-          # Per Story 0.1 AC1 the canonical scope is `**/*.rs` + `**/Cargo.toml`;
-          # extending to .yml/.yaml/.sh covers CI scripts where real misuse could
-          # land. .md is deliberately excluded.
-          if grep -rn 'cargo +nightly' . --include='*.yml' --include='*.yaml' --include='*.sh' --include='*.toml'; then
+          # Excludes:
+          #   - .md   (docs may describe the forbidden pattern as spec text)
+          #   - .github/  (this very grep step defines the pattern as a string
+          #                literal; a recursive scan over .yml would self-match)
+          # A workflow that actually invoked `cargo +nightly` would fail at run
+          # time on a stable runner regardless, so the .github exclusion is safe.
+          if grep -rn --exclude-dir=.github 'cargo +nightly' . --include='*.yml' --include='*.yaml' --include='*.sh' --include='*.toml'; then
             echo "NFR-Test-2 / reproducible-build violation: cargo +nightly referenced at listed locations"
             violations=1
           fi
           # Check for RUSTC_BOOTSTRAP. Same scope rationale as above.
-          if grep -rn 'RUSTC_BOOTSTRAP' . --include='*.rs' --include='*.toml' --include='*.yml' --include='*.yaml' --include='*.sh'; then
+          if grep -rn --exclude-dir=.github 'RUSTC_BOOTSTRAP' . --include='*.rs' --include='*.toml' --include='*.yml' --include='*.yaml' --include='*.sh'; then
             echo "NFR-Test-2 / reproducible-build violation: RUSTC_BOOTSTRAP referenced at listed locations"
             violations=1
           fi
@@ -138,6 +140,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Install nightly toolchain for cargo-public-api
+        run: rustup toolchain install nightly --profile minimal
+      - name: Install cargo-public-api
+        run: |
+          cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
       - name: Run abi-diff
         run: cargo run -p xtask -- abi-diff --base abi-baseline/v0.1-alpha-pre-abi-freeze.json --json
 
