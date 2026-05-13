@@ -66,3 +66,12 @@
 - **No early guard on `signature_bytes` length in `verify_signature`** — ring handles wrong-length signatures internally via `Unspecified`. An early `signature_bytes.len() != 64` guard would improve error clarity but adds no correctness.
 - **No AES-GCM plaintext size limit documentation** — AES-GCM has a practical limit of ~64 GB per (key, nonce) pair. No runtime guard or doc note. Caller responsibility at v0.1-α.
 - **Empty plaintext → 16-byte ciphertext may surprise callers** — `seal_for_export` on empty input produces a 16-byte AES-GCM tag with no ciphertext. Standard AES-GCM behavior but could confuse downstream consumers.
+
+## Deferred from: code review of 1a-4-ship-the-maosctl-cli-scaffold-with-security-md-and-accessibility-defaults (2026-05-13)
+
+- **ColorChoice resolved but unused in stub dispatch (_color param)** — `accessibility::ColorChoice::resolve()` is called in `lib.rs` but the result is passed as `_color: ColorChoice` to `dispatch()` which discards it. By design for v0.1-α stubs; will be consumed when real output lands. `crates/maos-cli/src/subcommands.rs:10`
+- **check_security_md swallows all I/O errors as "file missing"** — `std::fs::read_to_string` errors (permission denied, disk failure) are indistinguishable from file-not-found. In CI, failing the gate on any read error is reasonable behavior. `xtask/src/check_security_md.rs:33-40`
+- **TERM="dumb " trailing whitespace falls through to Auto** — Exact `OsString` comparison fails on whitespace-padded values from shell profile typos. Spec worked example uses exact comparison; resilience to typos is a v0.5+ concern. `crates/maos-cli/src/accessibility.rs:58-61`
+- **check_security_md follows symlinks without verifying regular file** — `std::fs::read_to_string` follows symlinks. An out-of-repo symlink could pass the gate. CI runs on fresh checkouts where this is not a concern. `xtask/src/check_security_md.rs:32`
+- **e.exit() in lib.rs makes parse-error paths untestable** — `e.exit()` calls `std::process::exit()`. Spec worked example explicitly shows this pattern. Alternative would be testable but deviates from spec intent. `crates/maos-cli/src/lib.rs:28`
+- **Unnecessary .collect() allocation in main.rs binary entry point** — `std::env::args_os().collect()` allocates a `Vec<OsString>`. Could change `run()` signature but changes public API for negligible v0.1-α benefit. `crates/maos-cli/src/main.rs:8`

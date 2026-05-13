@@ -11,3 +11,9 @@ description = "MAOS CLI — maosctl command-line interface (Story 1a.4)"
 name = "maosctl"
 path = "src/main.rs"
 
+[lib]
+name = "maos_cli"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
