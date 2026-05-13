@@ -1,0 +1,3 @@
+// Stub: WIT interface definition for the Spirit ABI.
+// WIT bindings ship at v1.0+ if WASM-component form ever exits the
+// speculative-vNext zone of ADR-007. See ADR-002 for the Spirit-form decision.

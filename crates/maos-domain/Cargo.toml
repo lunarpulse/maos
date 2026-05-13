@@ -1,0 +1,12 @@
+[package]
+name = "maos-domain"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS domain core — pure types, invariants, and pure functions (ADR-010)"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"

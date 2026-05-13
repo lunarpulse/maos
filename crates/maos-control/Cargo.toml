@@ -1,0 +1,10 @@
+[package]
+name = "maos-control"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS control — maosctl orchestration and Host management primitives"
+
+[dependencies]

@@ -17,4 +17,7 @@ Each baseline is a JSON file produced by the `cargo xtask abi-diff` command. The
 
 ## Baselines
 
-- `v0.1-alpha-pre-abi-freeze.json` — initial snapshot from Story 0.1's placeholder ABI surface.
+- `v0.1-alpha-pre-abi-freeze.json` — regenerated at Story 1a.1 to include the binding-v0.1
+  ComplianceClaim schema types (`compliance.rs`: 6 structs + 5 enums + 1 const + 1 mod = 15 items).
+  ABI_VERSION remains `0`; the regeneration is NOT an ABI bump per the 1a.1
+  story contract (Story 1b.4 owns the freeze + bump to `1`).

@@ -2,6 +2,7 @@
 Status: binding-v0.1
 Gate: structural-state lint blocks new persistent fields outside {Journal, TransparencyLog, CapabilityRegistry::tokens}
 Decided: 2026-04-15
+Accepted-in-PR: <PR_NUMBER>
 Revisits: §3.2 invariant I9; §9.3
 ---
 

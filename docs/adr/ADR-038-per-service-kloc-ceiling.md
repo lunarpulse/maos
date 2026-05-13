@@ -2,6 +2,7 @@
 Status: binding-v0.1
 Gate: xtask/kloc.toml enforced by tokei in CI; aggregate ≤20 KLOC, alarm at 16
 Decided: 2026-04-15
+Accepted-in-PR: <PR_NUMBER>
 Revisits: §4.0.4
 ---
 

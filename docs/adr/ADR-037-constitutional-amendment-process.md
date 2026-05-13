@@ -2,6 +2,7 @@
 Status: binding-v0.1
 Gate: invariant-lock CI gate runs on every PR touching I1–I14
 Decided: 2026-04-15
+Accepted-in-PR: <PR_NUMBER>
 Revisits: §3.2, §8.7
 ---
 

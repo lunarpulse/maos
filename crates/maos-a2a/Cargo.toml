@@ -1,0 +1,10 @@
+[package]
+name = "maos-a2a"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS A2A — Agent-to-Agent cross-Host bilateral communication (ADR-012)"
+
+[dependencies]

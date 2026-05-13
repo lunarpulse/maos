@@ -1,0 +1,10 @@
+[package]
+name = "maos-persistence"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS persistence — storage adapters for journal, transparency log, and memory tiers"
+
+[dependencies]

@@ -1,0 +1,10 @@
+[package]
+name = "maos-secrets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS secrets — OS keyring and secret-provider adapters (NFR-Sec-16)"
+
+[dependencies]

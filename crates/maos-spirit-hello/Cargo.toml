@@ -1,0 +1,10 @@
+[package]
+name = "maos-spirit-hello"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS hello-spirit — reference Spirit acknowledgement (FR58)"
+
+[dependencies]

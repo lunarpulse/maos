@@ -14,5 +14,19 @@ maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
 xtask = 3000
 
+# Story 1a.1 — 13 new crate stubs
+maos-domain = 3000
+maos-spirit-hello = 1000
+maos-providers = 2000
+maos-mcp = 1000
+maos-acp = 1000
+maos-a2a = 1500
+maos-persistence = 2000
+maos-secrets = 1000
+maos-compliance = 2000
+maos-control = 1500
+maos-cli = 2000
+maos-bin = 1000
+
 _aggregate_alarm = 16000
 _aggregate_hardfail = 20000
