@@ -107,3 +107,53 @@
 
 # Journal error type — supervision (audit log error)
 "maos_kernel_core::journal::JournalError"                         = "supervision"
+
+# Story 1b.3 — Sandbox enforcement + per-Spirit resource caps
+# manifest sub-module
+"maos_kernel_core::security::manifest::SandboxConfig"             = "supervision"
+"maos_kernel_core::security::manifest::ResourceCaps"              = "data-movement"
+"maos_kernel_core::security::manifest::ResolvedCaps"              = "data-movement"
+"maos_kernel_core::security::manifest::ManifestError"             = "supervision"
+"maos_kernel_core::security::manifest::resolve_caps"              = "data-movement"
+
+# sandbox sub-module
+"maos_kernel_core::security::sandbox::SandboxSpec"                = "supervision"
+"maos_kernel_core::security::sandbox::SandboxedChild"             = "supervision"
+"maos_kernel_core::security::sandbox::SpawnError"                 = "supervision"
+"maos_kernel_core::security::sandbox::SandboxViolation"           = "supervision"
+"maos_kernel_core::security::sandbox::classify_exit"              = "supervision"
+"maos_kernel_core::security::sandbox::spawn_sandboxed"            = "supervision"
+"maos_kernel_core::security::sandbox::linux::spawn_sandboxed"     = "supervision"
+"maos_kernel_core::security::sandbox::unsupported::spawn_sandboxed" = "supervision"
+
+# api re-exports (via security::pub use → api::SecurityManagerAdapter chain)
+"maos_kernel_core::api::crate::security::SandboxConfig"           = "supervision"
+"maos_kernel_core::api::crate::security::ResourceCaps"            = "data-movement"
+"maos_kernel_core::api::crate::security::ResolvedCaps"            = "data-movement"
+"maos_kernel_core::api::crate::security::ManifestError"           = "supervision"
+"maos_kernel_core::api::crate::security::resolve_caps"            = "data-movement"
+"maos_kernel_core::api::crate::security::SandboxSpec"             = "supervision"
+"maos_kernel_core::api::crate::security::SandboxedChild"         = "supervision"
+"maos_kernel_core::api::crate::security::SpawnError"              = "supervision"
+"maos_kernel_core::api::crate::security::SandboxViolation"        = "supervision"
+"maos_kernel_core::api::crate::security::classify_exit"          = "supervision"
+"maos_kernel_core::api::crate::security::spawn_sandboxed"         = "supervision"
+
+# Story 1b.2 follow-on — VerifyOutcome (cap_audit)
+"maos_kernel_core::capability::cap_audit::VerifyOutcome"          = "data-movement"
+
+# Story 1b.3 — ManifestCapabilityScope (cap_policy)
+"maos_kernel_core::capability::cap_policy::ManifestCapabilityScope" = "universal-arithmetic"
+
+# Story 1b.3 — init_monotonic_base (cap_tokens)
+"maos_kernel_core::capability::cap_tokens::init_monotonic_base"   = "universal-arithmetic"
+"maos_kernel_core::capability::cap_tokens::monotonic_now_ns"      = "universal-arithmetic"
+"maos_kernel_core::capability::cap_tokens::body::scope_hash"      = "universal-arithmetic"
+
+# Story 1b.3 — SecurityError + platform sandbox stubs
+"maos_kernel_core::security::SecurityError"                       = "supervision"
+"maos_kernel_core::security::sandbox::macos::spawn_sandboxed"     = "supervision"
+"maos_kernel_core::security::sandbox::windows::spawn_sandboxed"   = "supervision"
+
+# Story 1b.3 — OperatorPolicyConfig (cap_policy)
+"maos_kernel_core::capability::cap_policy::OperatorPolicyConfig"  = "universal-arithmetic"

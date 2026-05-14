@@ -19,9 +19,12 @@
 //!     timestamp: 1_700_000_000,
 //!     lifecycle_event: LifecycleEvent::Load,
 //!     spirit_id: "spirit-nash".into(),
+//!     effective_sandbox_tier: None,
 //! };
 //! assert!(matches!(entry.lifecycle_event, LifecycleEvent::Load));
 //! ```
+
+use crate::invariants::i9::SandboxTier;
 
 /// I10 marker type — Every Spirit lifecycle transition is journaled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,6 +59,10 @@ pub struct JournalEntry {
     pub lifecycle_event: LifecycleEvent,
     /// Spirit identifier affected.
     pub spirit_id: String,
+    /// Effective sandbox tier at admission (Story 1b.3).
+    /// `serde(default)` keeps old NDJSON journal lines parseable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective_sandbox_tier: Option<SandboxTier>,
 }
 
 #[cfg(test)]
@@ -68,7 +75,33 @@ mod tests {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Halt,
             spirit_id: "s".into(),
+            effective_sandbox_tier: None,
         };
         assert!(matches!(e.lifecycle_event, LifecycleEvent::Halt));
+    }
+
+    #[test]
+    fn journal_entry_backward_compat_deser() {
+        // Old NDJSON line without effective_sandbox_tier must still parse
+        let old = r#"{"timestamp":42,"lifecycle_event":"Load","spirit_id":"legacy"}"#;
+        let entry: JournalEntry = serde_json::from_str(old).unwrap();
+        assert_eq!(entry.timestamp, 42);
+        assert_eq!(entry.lifecycle_event, LifecycleEvent::Load);
+        assert_eq!(entry.spirit_id, "legacy");
+        assert_eq!(entry.effective_sandbox_tier, None);
+    }
+
+    #[test]
+    fn journal_entry_with_tier_roundtrips() {
+        let entry = JournalEntry {
+            timestamp: 99,
+            lifecycle_event: LifecycleEvent::Load,
+            spirit_id: "test".into(),
+            effective_sandbox_tier: Some(SandboxTier::T2),
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("T2"));
+        let back: JournalEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.effective_sandbox_tier, Some(SandboxTier::T2));
     }
 }

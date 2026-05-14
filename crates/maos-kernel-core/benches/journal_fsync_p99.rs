@@ -23,6 +23,7 @@ fn bench_journal_fsync(c: &mut Criterion) {
                 timestamp: counter,
                 lifecycle_event: LifecycleEvent::Start,
                 spirit_id: format!("spirit-{counter}"),
+                effective_sandbox_tier: None,
             };
             journal.append_transition(entry);
         });

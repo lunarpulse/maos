@@ -22,6 +22,7 @@ fn journal_append_p99_measurement() {
             timestamp: i as u64,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: format!("spirit-{i}"),
+            effective_sandbox_tier: None,
         };
         let start = Instant::now();
         journal.append_transition(entry);

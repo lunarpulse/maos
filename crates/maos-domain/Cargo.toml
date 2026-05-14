@@ -10,3 +10,6 @@ description = "MAOS domain core — pure types, invariants, and pure functions (
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
+
+[dev-dependencies]
+serde_json = "1.0"

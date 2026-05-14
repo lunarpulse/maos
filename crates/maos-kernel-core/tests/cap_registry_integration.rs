@@ -29,7 +29,7 @@ fn make_adapter() -> CapabilityRegistryAdapter {
     }
     let (audit_tx, _audit_rx) = cap_audit::channel();
     let quota = cap_quota::CapQuotaTracker::new();
-    CapabilityRegistryAdapter::new(crypto, signing_key, 0xDEAD_BEEF, policy, audit_tx, quota)
+    CapabilityRegistryAdapter::new(crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx, quota)
 }
 
 #[test]

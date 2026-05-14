@@ -67,6 +67,7 @@ fn audit_spine_end_to_end() {
             timestamp: i as u64,
             lifecycle_event: events[i % events.len()],
             spirit_id: format!("spirit-{}", i % 10),
+            effective_sandbox_tier: None,
         });
     }
 
@@ -114,16 +115,19 @@ fn journal_cold_restart_rehydration() {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-alpha".into(),
+            effective_sandbox_tier: None,
         });
         journal.append_transition(JournalEntry {
             timestamp: 2,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: "spirit-alpha".into(),
+            effective_sandbox_tier: None,
         });
         journal.append_transition(JournalEntry {
             timestamp: 3,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-beta".into(),
+            effective_sandbox_tier: None,
         });
     }
 
@@ -143,6 +147,7 @@ fn journal_cold_restart_rehydration() {
         timestamp: 4,
         lifecycle_event: LifecycleEvent::Unload,
         spirit_id: "spirit-alpha".into(),
+        effective_sandbox_tier: None,
     });
     let last = journal.last_event("spirit-alpha").unwrap();
     assert_eq!(last, LifecycleEvent::Unload);

@@ -67,7 +67,7 @@ impl CapabilityRegistryAdapter {
         crypto: Arc<dyn CryptoProvider>,
         signing_key: cap_tokens::Ed25519SigningKey,
         boot_nonce: u64,
-        policy: PolicyTable,
+        policy: Arc<PolicyTable>,
         audit: Sender,
         quota: CapQuotaTracker,
     ) -> Self {
@@ -79,7 +79,7 @@ impl CapabilityRegistryAdapter {
         ));
         Self {
             tokens,
-            policy: Arc::new(policy),
+            policy,
             audit,
             quota: Arc::new(quota),
         }
@@ -234,7 +234,7 @@ mod tests {
             crypto,
             signing_key,
             0xDEAD_BEEF,
-            policy,
+            Arc::new(policy),
             audit_tx,
             quota,
         )

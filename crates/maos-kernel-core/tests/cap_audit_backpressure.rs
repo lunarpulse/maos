@@ -54,7 +54,7 @@ fn make_adapter_with_writer() -> (CapabilityRegistryAdapter, tokio::task::JoinHa
     let tlog = Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF));
     let writer = cap_audit::CapAuditWriter::spawn(audit_rx, tlog);
 
-    let adapter = CapabilityRegistryAdapter::new(crypto, signing_key, 0xDEAD_BEEF, policy, audit_tx, quota);
+    let adapter = CapabilityRegistryAdapter::new(crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx, quota);
     (adapter, writer)
 }
 

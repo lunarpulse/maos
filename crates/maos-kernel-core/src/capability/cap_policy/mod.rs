@@ -26,6 +26,8 @@ pub struct OperatorPolicyConfig {
     pub global_sandbox_floor: SandboxTier,
     /// Per-capability approval class overrides.
     pub per_capability_approval: HashMap<String, decision::ApprovalClass>,
+    /// Resource cap floor from operator policy (Story 1b.3).
+    pub resource_cap_floor: Option<crate::security::manifest::ResourceCaps>,
 }
 
 /// Manifest capability scope per Spirit.
@@ -61,6 +63,11 @@ impl PolicyTable {
         Self {
             inner: Arc::new(ArcSwap::from_pointee(PolicyTableInner::default())),
         }
+    }
+
+    /// Access the inner ArcSwap (for SecurityManagerAdapter admission).
+    pub fn inner(&self) -> &Arc<ArcSwap<PolicyTableInner>> {
+        &self.inner
     }
 
     pub fn evaluate(
@@ -118,12 +125,12 @@ impl PolicyTable {
             .manifest_scopes
             .get(&spirit_pid)
             .map(|m| m.declared_tier)
-            .unwrap_or(SandboxTier(0));
+            .unwrap_or(SandboxTier::DEFAULT_FLOOR);
         let trust = inner
             .trust_tier_floor
             .get(&trust_tier)
             .copied()
-            .unwrap_or(SandboxTier(0));
+            .unwrap_or(SandboxTier::DEFAULT_FLOOR);
         let operator = inner
             .operator_policy
             .spirit_tier_floor

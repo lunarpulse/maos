@@ -99,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         seed
     };
     let signing_key = maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new(signing_key_bytes);
-    let policy = maos_kernel_core::capability::cap_policy::PolicyTable::new();
+    let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
     let (audit_tx, audit_rx) = maos_kernel_core::capability::cap_audit::channel();
     let quota = maos_kernel_core::capability::cap_quota::CapQuotaTracker::new();
     let boot_nonce: u64 = {
@@ -111,10 +111,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         crypto,
         signing_key,
         boot_nonce,
-        policy,
-        audit_tx,
+        Arc::clone(&policy),
+        audit_tx.clone(),
         quota,
     );
+    let _security = SecurityManagerAdapter::new(Arc::clone(&policy));
     eprintln!("maos: capability registry initialized (Story 1b.2)");
 
     // Spawn the audit writer task (Story 1b.2).

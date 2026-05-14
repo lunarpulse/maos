@@ -37,6 +37,19 @@ parking_lot = "0.12"
 subtle = "2.6"
 tokio = { version = "1", features = ["sync", "rt"] }
 maos-attrs = { path = "../maos-attrs" }
+toml = "0.8"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+landlock = "0.4"
+seccompiler = "0.4"
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+win32job = "2"
+windows = { version = "0.58", features = ["Win32_Security", "Win32_System_Threading", "Win32_Foundation"] }
 
 [dev-dependencies]
 tempfile = "3"

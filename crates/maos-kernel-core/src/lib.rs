@@ -1,6 +1,10 @@
-#![forbid(unsafe_code)]
-
 //! `maos-kernel-core` — the MAOS kernel composition surface.
+//!
+//! Story 1b.3: crate-level `#![forbid(unsafe_code)]` removed.
+//! Every existing module retains its own inner `#![forbid(unsafe_code)]`.
+//! The `security/sandbox/` subtree is the sole deliberate `unsafe` zone
+//! (OS sandboxing: `pre_exec`, Landlock, seccomp, setrlimit, FFI).
+//! See Dev Notes → The `unsafe` decision in Story 1b.3.
 //!
 //! Per architecture §4.0.2 the kernel is organized as:
 //!   - One supervisor: `scheduler` (Spirit Scheduler)

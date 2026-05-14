@@ -209,11 +209,13 @@ mod tests {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-alpha".into(),
+            effective_sandbox_tier: None,
         });
         journal.append_transition(JournalEntry {
             timestamp: 2,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: "spirit-alpha".into(),
+            effective_sandbox_tier: None,
         });
 
         let last = journal.last_event("spirit-alpha").unwrap();
@@ -230,16 +232,19 @@ mod tests {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-alpha".into(),
+            effective_sandbox_tier: None,
         });
         journal.append_transition(JournalEntry {
             timestamp: 2,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: "spirit-alpha".into(),
+            effective_sandbox_tier: None,
         });
         journal.append_transition(JournalEntry {
             timestamp: 3,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-beta".into(),
+            effective_sandbox_tier: None,
         });
 
         let recovered = journal.recover_in_flight();
@@ -264,16 +269,19 @@ mod tests {
                 timestamp: 1,
                 lifecycle_event: LifecycleEvent::Load,
                 spirit_id: "spirit-alpha".into(),
+            effective_sandbox_tier: None,
             });
             journal.append_transition(JournalEntry {
                 timestamp: 2,
                 lifecycle_event: LifecycleEvent::Start,
                 spirit_id: "spirit-alpha".into(),
+            effective_sandbox_tier: None,
             });
             journal.append_transition(JournalEntry {
                 timestamp: 3,
                 lifecycle_event: LifecycleEvent::Load,
                 spirit_id: "spirit-beta".into(),
+            effective_sandbox_tier: None,
             });
             // Adapter drops; BufWriter flushes; file fsynced
         }
@@ -298,6 +306,7 @@ mod tests {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Halt,
             spirit_id: "spirit-gamma".into(),
+            effective_sandbox_tier: None,
         });
         let last = journal.last_lifecycle_event("spirit-gamma").unwrap();
         assert_eq!(last, LifecycleEvent::Halt);

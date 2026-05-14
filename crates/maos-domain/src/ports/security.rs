@@ -1,8 +1,7 @@
 //! Security Manager port trait per architecture §4.3.
 //!
 //! Enforces sandbox tiers, secret isolation, and approval-class
-//! mediation. At v0.1-α this trait declares the supervision surface;
-//! Story 1b.3 lands the T0/T1/T2 tier enforcement.
+//! mediation. Story 1b.3 lands the T0/T1/T2 tier enforcement.
 
 use crate::invariants::i4::ApprovalDecision;
 use crate::invariants::i9::SandboxTier;
@@ -19,6 +18,12 @@ pub trait SecurityManagerPort {
     /// this is a structural placeholder; Story 1b.3 lands T0–T2
     /// enforcement with per-Spirit resource caps.
     fn sandbox_tier_floor(&self, spirit_id: &str) -> SandboxTier;
+
+    /// Class: supervision
+    ///
+    /// Returns the effective sandbox tier for a given Spirit pid,
+    /// or `None` if the Spirit is not known.
+    fn effective_sandbox_tier(&self, spirit_pid: u32) -> Option<SandboxTier>;
 
     /// Class: supervision
     ///

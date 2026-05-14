@@ -33,7 +33,7 @@ fn make_adapter() -> (CapabilityRegistryAdapter, tokio::sync::mpsc::Receiver<cap
     let (audit_tx, audit_rx) = cap_audit::channel();
     let quota = cap_quota::CapQuotaTracker::new();
     let adapter = CapabilityRegistryAdapter::new(
-        crypto, signing_key, 0xDEAD_BEEF, policy, audit_tx.clone(), quota,
+        crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx.clone(), quota,
     );
     (adapter, audit_rx)
 }

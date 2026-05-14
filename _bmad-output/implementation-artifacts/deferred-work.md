@@ -88,3 +88,12 @@
 - **DF21 — `_payload` parameter discarded in `record_invocation`.** Reduces audit fidelity but not a correctness bug. Track for v0.3 when IAC Bus ships.
 - **DF22 — `set_revoked` returns `Result<bool, ()>` where `Err(())` is never returned.** Cosmetic API cleanup.
 - **DF23 — `capability_token_bytes` in Invocation is JSON-serialized instead of raw token bytes.** Audit-format decision; may need reconciliation for FR4 join query at 1b.5b.
+
+## Closed deferred items (Story 1b.3 code review)
+
+- **DF18 — `Default for SandboxTier` returns T0 (most permissive).** Closed by Story 1b.3 — `SandboxTier::default()` now returns `T2` (most restrictive enforceable tier). Resolves the fail-open default identified in Story 1a.2 code review.
+- **1a.2 — `SandboxTier(pub u8)` has no value constraint.** Closed by Story 1b.3 — added `try_from_u8`, `try_from_manifest_str`, associated constants T0–T4, `DEFAULT_FLOOR`, and `SandboxTierError` validation. The three `unwrap_or(SandboxTier(0))` fail-open fallbacks in `cap_policy/mod.rs` are fixed to `DEFAULT_FLOOR`.
+
+## Deferred from: code review of 1b-3-sandbox-tier-t0-t1-t2-enforcement-per-spirit-resource-caps (2026-05-14)
+
+- **`SandboxTierError(pub u8)` misrepresents non-numeric string errors.** When `try_from_manifest_str("foo")` fails, the error carries `u8::MAX` (255) instead of the original string. Developer UX issue only; not a correctness bug. Deferred to a future cleanup story.
