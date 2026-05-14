@@ -1,0 +1,7 @@
+[package]
+name = "fr47-violation-fixture"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anthropic = "0.1"

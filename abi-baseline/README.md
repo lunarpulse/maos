@@ -58,3 +58,7 @@ cargo xtask abi-diff --base abi-baseline/v1-pre-bump.txt
   1 const + 2 mods + fields/variants). `ABI_VERSION` remains `0`; this
   regeneration is NOT an ABI bump per the 1a.5 story contract. Story 1b.4
   owns the freeze + bump to `1`.
+- `v1-pre-bump.txt` — regenerated at Story 1b.4. The ComplianceClaim schema
+  freeze: serde derives added, `Uuid` newtype constructors added, `ABI_VERSION`
+  bumped `0` → `1`. 74 lines; zero removed, only added. This is the
+  **sanctioned ABI break** for Epic 1b.

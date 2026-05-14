@@ -1,15 +1,38 @@
-//! Binding-v0.1 ComplianceClaim schema types.
+//! Binding-v0.1 ComplianceClaim schema types — **FROZEN**.
 //!
 //! These types are committed under the joint Mary+Winston adversarial
 //! review at `_bmad-output/planning-artifacts/compliance-claim-schema-review.md`.
-//! Story 1b.4 freezes the envelope shape and bumps `ABI_VERSION` to 1;
-//! serde derives + `Uuid` wiring lands at that freeze, NOT in this story.
+//! Story 1b.4 froze the schema, added serde derives, resolved the `Uuid`
+//! newtype decision, and bumped `ABI_VERSION` to `1`. This freeze is the
+//! **one sanctioned ABI break** in Epic 1b.
 //!
-//! All field names are stable from v0.1-α onward — renaming any field is
-//! an ABI break per §8.5 (review report §5 self-test row #2).
+//! # §8.5 ABI-break rule (review report §5 self-test)
+//!
+//! The following changes **DO** bump `ABI_VERSION` (mechanical enforcement
+//! via the `abi-diff` gate, now baselined at `v1-pre-bump.txt`):
+//!
+//! | # | Change | ABI Break? |
+//! |---|---|---|
+//! | 1 | Add required field without `#[serde(default)]` | **YES** |
+//! | 2 | Rename any field | **YES** |
+//! | 3 | Remove any field | **YES** |
+//! | 4 | Change any field's type | **YES** |
+//! | 5 | Reorder `Verdict` / `PrincipleRef` / `EvidenceKind` variants without updating explicit `#[repr(u8)]` discriminants | **YES** |
+//! | 6 | Remove an enum variant from `Verdict` / `PrincipleRef` / `EvidenceKind` | **YES** |
+//!
+//! The following changes **DO NOT** bump `ABI_VERSION`:
+//!
+//! | # | Change | ABI Break? |
+//! |---|---|---|
+//! | 7 | Add optional field with `#[serde(default, skip_serializing_if = "Option::is_none")]` | **NO** |
+//! | 8 | Add enum variant at the end with explicit `#[repr(u8)]` discriminant and `#[serde(other)]` fallback on the enum | **NO** |
+//!
+//! The abi-diff gate (`--deny removed --deny changed`, baselined at
+//! `v1-pre-bump.txt`) is the mechanical half of this rule; this doc-block
+//! is the canonical human-readable reference.
 
 extern crate alloc;
-use alloc::{collections::BTreeSet, string::String, vec::Vec};
+use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
 
 /// Ed25519-signed compliance claim envelope.
 ///
@@ -30,13 +53,51 @@ pub struct ComplianceClaimEnvelope {
     pub signing_alg: SigningAlg,
 }
 
+impl serde::Serialize for ComplianceClaimEnvelope {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("ComplianceClaimEnvelope", 4)?;
+        state.serialize_field("signature", &self.signature[..])?;
+        state.serialize_field("attester_pubkey", &self.attester_pubkey[..])?;
+        state.serialize_field("claim_bytes", &self.claim_bytes)?;
+        state.serialize_field("signing_alg", &self.signing_alg)?;
+        state.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ComplianceClaimEnvelope {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        struct Helper {
+            signature: Vec<u8>,
+            attester_pubkey: Vec<u8>,
+            claim_bytes: Vec<u8>,
+            signing_alg: SigningAlg,
+        }
+        let helper = Helper::deserialize(deserializer)?;
+        let signature = helper.signature.try_into().map_err(|v: Vec<u8>| {
+            serde::de::Error::custom(format!("expected 64-byte signature, got {} bytes", v.len()))
+        })?;
+        let attester_pubkey = helper.attester_pubkey.try_into().map_err(|v: Vec<u8>| {
+            serde::de::Error::custom(format!("expected 32-byte pubkey, got {} bytes", v.len()))
+        })?;
+        Ok(ComplianceClaimEnvelope {
+            signature,
+            attester_pubkey,
+            claim_bytes: helper.claim_bytes,
+            signing_alg: helper.signing_alg,
+        })
+    }
+}
+
 /// Signing algorithm identifier.
 ///
 /// Additive enum: adding a variant at the end with explicit `#[repr(u8)]`
 /// discriminant is NOT an ABI break. Removing or reordering variants IS
 /// an ABI break per §8.5.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
+#[serde(rename_all = "snake_case")]
 pub enum SigningAlg {
     /// Ed25519 signature algorithm.
     Ed25519 = 0,
@@ -47,7 +108,7 @@ pub enum SigningAlg {
 /// The canonical encoding for hash purposes is:
 /// `fingerprint_hash = sha256(cbor_canonical(ser(&self)))`
 /// using RFC 8949 canonical CBOR.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ExecutionContextFingerprint {
     /// SHA-256 of the Spirit's manifest.toml after canonicalization.
     pub manifest_hash: [u8; 32],
@@ -67,8 +128,9 @@ pub struct ExecutionContextFingerprint {
 }
 
 /// Trust tier — operator-visible metadata classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
+#[serde(rename_all = "snake_case")]
 pub enum TrustTier {
     /// Operator-authored or personally vetted.
     Local = 0,
@@ -81,8 +143,9 @@ pub enum TrustTier {
 }
 
 /// Sandbox tier — OS-native sandbox primitive classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
+#[serde(rename_all = "snake_case")]
 pub enum SandboxTier {
     /// Trusted — no additional sandbox.
     T0 = 0,
@@ -97,34 +160,34 @@ pub enum SandboxTier {
 }
 
 /// Capability identifier — sorted, canonical, hash-stable.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub struct CapabilityId(pub String);
 
 /// Provider endpoint pin per ADR-005 pluggable provider drivers.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ProviderEndpointPin {
     /// Provider identifier (e.g., "anthropic", "openai", "ollama").
     pub provider_id: String,
     /// Base URL of the provider's inference endpoint.
     pub endpoint_url: String,
     /// Optional model identifier pin (model-version pinning ships at v1.0 per NFR-Sec-15).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_id: Option<String>,
 }
 
 /// Crypto provider identifier per §8.6 pluggable crypto trait.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub struct CryptoProviderId(pub String);
 
 /// The inner claim payload — what `claim_bytes` CBOR-encodes.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Claim {
     /// UUID v4 unique claim identifier.
-    /// At v0.1-α this is a zero-cost newtype around `[u8; 16]`;
-    /// Story 1b.4 swaps in the real `uuid::Uuid` when serde derives ship.
     pub claim_id: Uuid,
     /// Unix timestamp (milliseconds) when the claim was issued.
     pub issued_at_unix_ms: u64,
     /// Optional expiry timestamp. None = no automatic expiry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_at_unix_ms: Option<u64>,
     /// Principles the claim attests compliance with.
     pub principle_refs: Vec<PrincipleRef>,
@@ -134,22 +197,36 @@ pub struct Claim {
     pub verdict: Verdict,
 }
 
-/// Zero-cost newtype wrapper around `[u8; 16]` at v0.1-α.
-/// Replaced with `uuid::Uuid` in Story 1b.4.
+/// Zero-cost newtype wrapper around `[u8; 16]` — **frozen decision**.
 ///
-/// The inner array is `pub(crate)` — private constructor is a deliberate
-/// ABI stability guarantee. External crates cannot construct a `Uuid`
-/// directly; only `maos-spirit-abi` internals and tests may do so.
-/// Story 1b.4 swaps this for `uuid::Uuid` when serde derives ship.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Uuid(pub(crate) [u8; 16]);
+/// The review report §1.3 names the type `Uuid`; it does NOT mandate the
+/// `uuid` crate. Keeping the newtype: zero new deps, identical 16-byte wire
+/// shape, less abi-diff churn. The `uuid` crate's serde impl emits a *string*
+/// in human-readable formats and *bytes* in binary formats — using the newtype
+/// guarantees `[u8;16]` in all codecs without qualification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+pub struct Uuid([u8; 16]);
+
+impl Uuid {
+    /// Construct a `Uuid` from its raw 16-byte representation.
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
+    /// Return the underlying 16-byte array.
+    pub const fn as_bytes(&self) -> &[u8; 16] {
+        &self.0
+    }
+}
 
 /// Principles the claim attests compliance with.
 ///
 /// Additive enum with explicit discriminants. Adding a variant at the
-/// end is NOT an ABI break; removing or reordering IS.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// end with `#[serde(other)]` fallback is NOT an ABI break; removing or
+/// reordering IS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
+#[serde(rename_all = "snake_case")]
 pub enum PrincipleRef {
     /// HIPAA §164.308 compliance.
     Hipaa164308 = 0,
@@ -160,11 +237,13 @@ pub enum PrincipleRef {
     /// EU AI Act Article 14 compliance.
     EuAiActArt14 = 3,
     /// Unknown or future principle — fallback.
+    #[serde(other)]
     UnknownPrinciple = 255,
 }
 
 /// Evidence supporting a compliance claim.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EvidenceKind {
     /// Replay of a calibration corpus whose SHA-256 is attested.
     CorpusReplay {
@@ -194,8 +273,9 @@ pub enum EvidenceKind {
 ///
 /// Explicit discriminants on every variant — reordering without updating
 /// discriminants is an ABI break per §8.5 self-test row #5.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
+#[serde(rename_all = "snake_case")]
 pub enum Verdict {
     /// Claim is valid; Spirit may be admitted under attested context.
     Admit = 0,
@@ -211,6 +291,7 @@ pub enum Verdict {
     /// Rejected: claim has expired.
     RejectExpiredClaim = 4,
     /// Unknown or future verdict — fallback.
+    #[serde(other)]
     UnknownVerdict = 255,
 }
 
@@ -246,15 +327,6 @@ mod tests {
         assert_eq!(SandboxTier::T3 as u8, 3);
         assert_eq!(SandboxTier::T4 as u8, 4);
 
-        // Verdict carries payload variants, so `as u8` is invalid for the
-        // whole enum. The `#[repr(u8)]` attribute with explicit discriminants
-        // guarantees the layout; we rely on the compiler for stability.
-        //
-        // NOTE: `AdmitWithCaveats { caveats: Vec<String> } = 1` cannot be
-        // mechanically verified via `as u8` in stable Rust (payload variants
-        // don't support discriminant casting — see rust-lang/rust#89520).
-        // The explicit discriminant in the enum definition IS the guarantee;
-        // a future const-assertion pattern may close this gap.
         assert_eq!(PrincipleRef::EuAiActArt14 as u8, 3);
         assert_eq!(PrincipleRef::UnknownPrinciple as u8, 255);
     }
@@ -288,5 +360,12 @@ mod tests {
         assert!(matches!(e2, EvidenceKind::PenTestReportRef { .. }));
         assert!(matches!(e3, EvidenceKind::ManualReview { .. }));
         assert!(matches!(e4, EvidenceKind::CrossSpiritAgreement { .. }));
+    }
+
+    #[test]
+    fn uuid_constructor_pair() {
+        let bytes = [0xABu8; 16];
+        let uuid = Uuid::from_bytes(bytes);
+        assert_eq!(uuid.as_bytes(), &bytes);
     }
 }

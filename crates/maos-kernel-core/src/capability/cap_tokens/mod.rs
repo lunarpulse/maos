@@ -239,6 +239,14 @@ impl CapTokensShardRing {
         Ok(())
     }
 
+    /// Look up the scope for a given token ID without verifying validity.
+    /// Returns `None` if the token is unknown.
+    pub fn get_scope(&self, token_id: &TokenId) -> Option<Scope> {
+        let shard_idx = shard::hash_token_id(token_id);
+        let shard = &self.shards[shard_idx];
+        shard.get(token_id).map(|s| s.scope)
+    }
+
     /// Revoke a single token. Slow-path (write-lock).
     pub fn revoke(&self, token_id: TokenId, reason: RevokeReason) -> Result<(), CapError> {
         let shard_idx = shard::hash_token_id(&token_id);

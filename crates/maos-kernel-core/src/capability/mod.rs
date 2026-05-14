@@ -121,6 +121,11 @@ impl CapabilityRegistryAdapter {
             .issue(spirit_pid, scope, ttl_secs, posture_hash, intent_class)
     }
 
+    /// Look up the scope for a token ID without full verification.
+    pub fn get_token_scope(&self, token_id: &TokenId) -> Option<Scope> {
+        self.tokens.get_scope(token_id)
+    }
+
     /// Verify and audit a capability token.
     pub fn verify_and_audit(
         &self,

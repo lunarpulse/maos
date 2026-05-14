@@ -1,0 +1,22 @@
+# FR47 vendor LLM SDK denylist.
+# Any workspace crate depending on a crate in this list fails the build.
+# The list is additive — new vendor SDKs are added as they appear.
+# Rationale: Spirits must obtain inference exclusively through the kernel
+# Inference Port (FR47). Provider drivers in `maos-providers` speak the
+# provider REST API directly over HTTP; no vendor SDK crate is needed.
+
+vendor-sdk-denylist = [
+    "anthropic",
+    "anthropic-sdk",
+    "clust",
+    "openai",
+    "openai-api-rs",
+    "async-openai",
+    "ollama-rs",
+    "google-generative-ai",
+    "gemini-rs",
+    "aws-sdk-bedrockruntime",
+    "azure_ai_inference",
+    "azure_ai_projects",
+    "azure_ai_openai",
+]

@@ -27,6 +27,7 @@ allow = [
     "Unicode-3.0",
     "MPL-2.0",
     "OpenSSL",  # Story 1a.3 — ring 0.17 (Rust crypto primitives; de-facto standard)
+    "CDLA-Permissive-2.0",  # Story 1b.4 — webpki-roots via ureq (root CA certificates bundle)
 ]
 confidence-threshold = 0.8
 

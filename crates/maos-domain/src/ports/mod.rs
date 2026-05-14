@@ -36,6 +36,7 @@ pub mod iac_bus;
 pub mod capability;
 pub mod io_subsystem;
 pub mod telemetry;
+pub mod inference;
 
 pub mod crypto;  // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 / §8.6
 
@@ -46,4 +47,5 @@ pub use iac_bus::IacBusPort;
 pub use capability::CapabilityRegistryPort;
 pub use io_subsystem::IoSubsystemPort;
 pub use telemetry::TelemetryStreamPort;
+pub use inference::InferencePort;
 pub use crypto::{CryptoProvider, CryptoError};  // NEW

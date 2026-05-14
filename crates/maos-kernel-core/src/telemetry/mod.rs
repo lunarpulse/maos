@@ -6,6 +6,8 @@
 //! empty hexagonal adapter shell; Story 4.4 lands the `scalar.tap`
 //! stream and pre-halt scalar drift watchdog.
 
+pub mod iac_rt;
+
 pub use maos_domain::ports::TelemetryStreamPort;
 
 /// Adapter shell — Story 4.4 implements `TelemetryStreamPort` for this

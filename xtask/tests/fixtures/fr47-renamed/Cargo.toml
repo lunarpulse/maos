@@ -1,0 +1,7 @@
+[package]
+name = "fr47-renamed-fixture"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+my-llm = { package = "anthropic", version = "0.1" }

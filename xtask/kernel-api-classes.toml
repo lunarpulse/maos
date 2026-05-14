@@ -157,3 +157,33 @@
 
 # Story 1b.3 — OperatorPolicyConfig (cap_policy)
 "maos_kernel_core::capability::cap_policy::OperatorPolicyConfig"  = "universal-arithmetic"
+
+# Story 1b.4 — ComplianceClaim structural validator (AC1)
+"maos_kernel_core::compliance::validate_envelope"                 = "data-movement"
+"maos_kernel_core::compliance::ValidatedClaim"                    = "data-movement"
+"maos_kernel_core::compliance::ComplianceValidationError"         = "data-movement"
+
+# Story 1b.4 — Inference Port adapter + domain types (AC3)
+"maos_kernel_core::inference::InferencePortAdapter"               = "data-movement"
+"maos_kernel_core::inference::InferencePortAdapter::new"          = "data-movement"
+"maos_kernel_core::inference::InferencePortAdapter::complete"     = "data-movement"
+
+# Story 1b.4 — I/O Subsystem real adapter (AC3)
+"maos_kernel_core::io::IoSubsystemAdapter::new"                   = "data-movement"
+
+# Story 1b.4 — IAC telemetry metrics (AC4)
+"maos_kernel_core::telemetry::iac_rt::IacRtMetrics"               = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new"          = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::IacRtMetrics::record_iac_rt" = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::IacRtMetrics::record_iac_error" = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::IacRtMetrics::inflight"     = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::IacRtMetrics::render_prometheus" = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::Service"                    = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::Outcome"                    = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::ErrorKind"                  = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::InflightGuard"              = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::IAC_RT_BUCKETS_US"          = "data-movement"
+
+# Story 1b.4 — maos-domain port-trait re-exports (InferencePort)
+"maos_kernel_core::inference::maos_domain::ports::InferencePort"  = "data-movement"
+"maos_kernel_core::security::maos_domain::ports::CryptoProvider"  = "data-movement"

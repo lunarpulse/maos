@@ -8,3 +8,7 @@ rust-version.workspace = true
 description = "MAOS providers — pluggable LLM provider drivers (ADR-005)"
 
 [dependencies]
+maos-domain = { path = "../maos-domain" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"

@@ -1,0 +1,9 @@
+# FR47 vendor LLM SDK allowlist.
+# At v0.1-β this list is intentionally EMPTY.
+# No workspace crate — including maos-providers — needs a vendor SDK crate,
+# because provider drivers speak the REST API directly over HTTP (ADR-005).
+# If a future driver genuinely needs a vendor SDK, that is an allowlist entry
+# scoped to maos-providers only, gated by review.
+
+allowed = [
+]

@@ -9,6 +9,9 @@ description = "MAOS kernel core — capability mediation, IAC bus, journal"
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+maos-providers = { path = "../maos-providers" }
+ciborium = "0.2"
 # Story 1b.1 — SQLite audit spine (Transparency Log + Approval Decision Log).
 # Bundled feature statically links libsqlite3-sys; no system libsqlite3 dep.
 # Eliminates per-host library-version drift risk (relevant to NFR-Onb-2).
@@ -20,6 +23,7 @@ ulid = "1.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
+ureq = { version = "2", features = ["tls"] }
 # Story 1a.3 — default CryptoProvider adapter (FR48 / NFR-Sec-15 / §8.6).
 # `ring` 0.17 is the canonical Rust crypto-primitives crate; pulled
 # in by rustls, quinn, webpki, tokio-rustls in the Rust ecosystem.

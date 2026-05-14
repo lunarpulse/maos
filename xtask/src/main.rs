@@ -4,6 +4,7 @@ use std::process;
 mod check_unsafe;
 mod check_empty_kernel;
 mod check_loom;
+mod check_fr47;
 mod check_service_boundary;
 mod check_security_md;
 mod fs_walk;
@@ -40,6 +41,8 @@ enum Commands {
     CheckLoom { #[arg(long)] path: Option<String>, #[arg(long, default_value = "xtask/kernel-crates.toml")] crates: String, #[arg(long, default_value = "xtask/loom-blocklist.toml")] blocklist: String, #[arg(long, default_value = "xtask/loom-allowlist.toml")] allowlist: String, #[arg(long)] json: bool },
     /// AC8 — NFR-Test-2 service-boundary surface-diff stub.
     CheckServiceBoundary { #[arg(long)] path: Option<String>, #[arg(long, default_value = "docs/ci-baselines/kernel-surface-v0.1-beta.json")] baseline: String, #[arg(long, default_value = "xtask/kernel-api-classes.toml")] classes: String, #[arg(long)] json: bool },
+    /// AC2 — FR47 enforcement: vendor LLM SDK dependency scan.
+    CheckFr47 { #[arg(long)] path: Option<String>, #[arg(long, default_value = "xtask/fr47-vendor-sdk-denylist.toml")] denylist: String, #[arg(long, default_value = "xtask/fr47-allowlist.toml")] allowlist: String, #[arg(long)] json: bool },
     /// AC9 — NFR-Ops-4 + FR61 SECURITY.md section gate.
     CheckSecurityMd { #[arg(long)] json: bool },
     /// AC5 — Invariant lock gate for constitutional amendments.
@@ -82,6 +85,7 @@ fn main() {
         Commands::CheckUnsafe { path, json } => check_unsafe::run(&path, json),
         Commands::CheckEmptyKernel { path, whitelist, denylist, exemptions, json } => check_empty_kernel::run(&path, &whitelist, &denylist, &exemptions, json),
         Commands::CheckLoom { path, crates, blocklist, allowlist, json } => check_loom::run(path.as_deref(), &crates, &blocklist, &allowlist, json),
+        Commands::CheckFr47 { path, denylist, allowlist, json } => check_fr47::run(path.as_deref(), &denylist, &allowlist, json),
         Commands::CheckServiceBoundary { path, baseline, classes, json } => check_service_boundary::run(path.as_deref(), &baseline, &classes, json),
         Commands::CheckSecurityMd { json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");

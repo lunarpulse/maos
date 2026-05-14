@@ -151,7 +151,7 @@ jobs:
         run: |
           cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
       - name: Run abi-diff
-        run: cargo run -p xtask -- abi-diff --base abi-baseline/v0.1-alpha-pre-abi-freeze.txt --json
+        run: cargo run -p xtask -- abi-diff --base abi-baseline/v1-pre-bump.txt --json
 
   check-empty-kernel:
     runs-on: ubuntu-latest
@@ -178,6 +178,19 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-loom
         run: cargo run -p xtask -- check-loom --json
+
+  check-fr47:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-fr47
+        run: cargo run -p xtask -- check-fr47 --json
 
   check-service-boundary:
     runs-on: ubuntu-latest
@@ -405,7 +418,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47]
     if: always()
     permissions:
       pull-requests: write
@@ -431,6 +444,7 @@ jobs:
           echo "cm=${{ needs.coverage-matrix.result }}" >> $GITHUB_OUTPUT
           echo "cs=${{ needs.corpus-staleness.result }}" >> $GITHUB_OUTPUT
           echo "cpc=${{ needs.calibrate-per-commit.result }}" >> $GITHUB_OUTPUT
+          echo "cf47=${{ needs.check-fr47.result }}" >> $GITHUB_OUTPUT
       - name: Check for failures
         id: status
         run: |
@@ -462,6 +476,7 @@ jobs:
             const cm = '${{ needs.coverage-matrix.result }}';
             const cs = '${{ needs.corpus-staleness.result }}';
             const cpc = '${{ needs.calibrate-per-commit.result }}';  // conditionally skipped until Story 0.4
+            const cf47 = '${{ needs.check-fr47.result }}';
             const dt = '${{ needs.determinism-tests.outputs.test_result }}';  // advisory at v0.1-α per DF6
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
             const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
@@ -488,6 +503,7 @@ jobs:
             | coverage-matrix | ${icon(cm)} ${cm} |
             | corpus-staleness | ${icon(cs)} ${cs} |
             | calibrate-per-commit | ${icon(cpc)} ${cpc} |
+            | check-fr47 | ${icon(cf47)} ${cf47} |
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 
             ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).
