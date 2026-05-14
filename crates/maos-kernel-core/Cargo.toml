@@ -36,6 +36,7 @@ dashmap = "6.1"
 parking_lot = "0.12"
 subtle = "2.6"
 tokio = { version = "1", features = ["sync", "rt"] }
+maos-attrs = { path = "../maos-attrs" }
 
 [dev-dependencies]
 tempfile = "3"

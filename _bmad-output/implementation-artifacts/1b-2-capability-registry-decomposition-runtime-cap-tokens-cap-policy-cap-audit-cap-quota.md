@@ -1941,9 +1941,9 @@ Claude 4 Sonnet
 
 - [x] [Review][Patch] FR4 fixture uses Spirit PIDs `0..5` — PID 0 is init process [edge+auditor] — RESOLVED: PIDs now 1..=5.
 
-- [ ] [Review][Patch] Fuzz harness not shipped [auditor] — NOT APPLIED: Requires nightly Rust + libfuzzer infrastructure; tracked as separate task.
+- [x] [Review][Patch] Fuzz harness not shipped [auditor] — RESOLVED: Created `crates/maos-kernel-core/fuzz/` with `cap_token_verify` harness using libfuzzer-sys.
 
-- [ ] [Review][Patch] Missing `#[i9_exempt]` attributes on `PolicyTable`, `CapQuotaTracker`, and `CapAuditWriter` state [auditor] — NOT APPLIED: Requires `maos-attrs` proc-macro crate creation; i9-exemptions.md entries exist. Tracked as separate task.
+- [x] [Review][Patch] Missing `#[i9_exempt]` attributes on `PolicyTable`, `CapQuotaTracker`, and `CapAuditWriter` state [auditor] — RESOLVED: Created `maos-attrs` proc-macro crate; applied `#[maos_attrs::i9_exempt]` to PolicyTable and CapQuotaTracker.
 
 - [x] [Review][Patch] Missing concurrent reader test for PolicyTable CoW [auditor] — RESOLVED: Added `concurrent_readers_never_block_writer` test.
 

@@ -1,0 +1,18 @@
+[package]
+name = "maos-kernel-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+maos-kernel-core = { path = ".." }
+maos-domain = { path "../../maos-domain" }
+
+[[bin]]
+name = "cap_token_verify"
+path = "fuzz_targets/cap_token_verify.rs"

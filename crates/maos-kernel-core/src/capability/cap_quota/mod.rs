@@ -34,6 +34,7 @@ pub enum QuotaState {
 
 /// Per-Spirit budget tracker.
 #[derive(Debug)]
+#[maos_attrs::i9_exempt(reason = "per-Spirit budget counter; structural-state caching per I9")]
 pub struct CapQuotaTracker {
     inner: Arc<DashMap<u32, AtomicU64>>,
     /// Per-Spirit budgets.

@@ -18,6 +18,7 @@ use decision::{Capability, Intent, PolicyDecision, TrustTier};
 
 /// Operator policy configuration.
 #[derive(Debug, Clone, Default)]
+#[maos_attrs::i9_exempt(reason = "operator policy config; part of PolicyTableInner CoW snapshot")]
 pub struct OperatorPolicyConfig {
     /// Per-Spirit sandbox tier floor from operator policy.
     pub spirit_tier_floor: HashMap<u32, SandboxTier>,
@@ -29,6 +30,7 @@ pub struct OperatorPolicyConfig {
 
 /// Manifest capability scope per Spirit.
 #[derive(Debug, Clone, Default)]
+#[maos_attrs::i9_exempt(reason = "manifest scope; part of PolicyTableInner CoW snapshot")]
 pub struct ManifestCapabilityScope {
     pub scopes: Vec<Scope>,
     pub declared_tier: SandboxTier,
@@ -37,6 +39,7 @@ pub struct ManifestCapabilityScope {
 
 /// Inner policy table — the actual data.
 #[derive(Debug, Clone, Default)]
+#[maos_attrs::i9_exempt(reason = "inner policy data behind ArcSwap; structural-state caching per I9")]
 pub struct PolicyTableInner {
     pub manifest_scopes: HashMap<u32, ManifestCapabilityScope>,
     pub trust_tier_floor: HashMap<decision::TrustTier, SandboxTier>,
@@ -48,6 +51,7 @@ pub struct PolicyTableInner {
 /// Readers take a single atomic load (free); writers swap the entire
 /// `Arc<PolicyTableInner>` at runtime.
 #[derive(Debug)]
+#[maos_attrs::i9_exempt(reason = "operator policy table; structural-state caching per I9")]
 pub struct PolicyTable {
     inner: Arc<ArcSwap<PolicyTableInner>>,
 }

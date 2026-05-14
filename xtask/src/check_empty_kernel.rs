@@ -234,8 +234,10 @@ impl<'a> Visit<'_> for EmptyKernelVisitor<'a> {
 
 fn has_i9_exempt(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|attr| {
-        if attr.path().is_ident("i9_exempt") {
-            // Check for reason = "..." inside the attribute.
+        let segments = &attr.path().segments;
+        let is_i9_exempt = attr.path().is_ident("i9_exempt")
+            || segments.last().map(|s| s.ident == "i9_exempt").unwrap_or(false);
+        if is_i9_exempt {
             if let Ok(meta) = attr.meta.require_list() {
                 let tokens = meta.tokens.to_string();
                 return tokens.contains("reason");

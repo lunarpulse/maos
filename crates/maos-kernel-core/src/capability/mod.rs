@@ -42,6 +42,7 @@ fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
 
 /// Composite adapter — holds the four ADR-030 sub-modules and the
 /// `CryptoProvider` trait object.
+#[maos_attrs::i9_exempt(reason = "capability registry composite; holds exempt sub-module Arcs")]
 pub struct CapabilityRegistryAdapter {
     tokens: Arc<CapTokensShardRing>,
     policy: Arc<PolicyTable>,
