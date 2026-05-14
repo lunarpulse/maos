@@ -58,6 +58,17 @@ coverage:
       Story 1b.1 lands the Approval Decision Log as a DISTINCT SQLite table
       from the Transparency Log per §7.4. Table independence verified by
       PRAGMA foreign_key_list introspection.
+  I1:
+    gates:
+      - cap_registry_integration
+    corpora: []
+    enforcement_cadence: runtime
+    phase: v0.1
+    valid_until: '2027-05-12'
+    notes: |
+      Story 1a.1 freezes the InvariantI1 marker type. Story 1b.2 lands the runtime
+      enforcement: CapabilityRegistryAdapter composite with cap_tokens (issue/verify),
+      cap_policy (evaluate), cap_audit (MPSC writer), cap_quota (budget tracker).
   I10:
     gates:
       - journal_survives_cold_restart
@@ -304,13 +315,15 @@ coverage:
     gates:
       - audit_spine_integration
       - iac_transparency_log_tests
+      - fr4_1000_call_fixture
+      - cap_registry_integration
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
     notes: |
       Story 1b.1 lands the Transparency Log row with capability_token + spirit_pid +
-      boot_nonce + timestamp + intent. The 1000-call FR4 fixture (100% mediation)
-      lands Story 1b.5b.
+      boot_nonce + timestamp + intent. Story 1b.2 lands the cap-tokens runtime
+      (issue/verify/revoke) and the FR4 1000-call fixture.
   FR40:
     gates: []
     corpora: []
@@ -664,10 +677,14 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Maint-8:
-    gates: []
+    gates:
+      - cap_registry_integration
     corpora: []
-    phase: v1.0
+    phase: v0.1
     valid_until: '2027-05-12'
+    notes: |
+      Story 1b.2 lands TOCTOU re-validation at every verify call; tested by
+      cap_registry_integration (integration_toctu_rejects_stale_posture).
   NFR-Maint-9:
     gates: []
     corpora: []
@@ -814,10 +831,16 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Perf-3:
-    gates: []
+    gates:
+      - cap_token_verify_assertion
     corpora: []
+    bench:
+      - cap_token_verify_p99
     phase: v0.1
     valid_until: '2027-05-12'
+    notes: |
+      Story 1b.2 lands the lock-free shard-ring verify path with P99 <5us (ADR-030)
+      and the strict NFR-Perf-3 <100us assertion test.
   NFR-Perf-4:
     gates: []
     corpora: []

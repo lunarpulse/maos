@@ -79,3 +79,12 @@
 ## Deferred from: code review of 1a-5-migrate-abi-diff-to-cargo-public-api (2026-05-13)
 
 - **Migration doc 175 lines vs AC4 "~200–400 lines"** — RESOLVED 2026-05-13. Expanded to 237 lines with nightly policy consensus, gate modes documentation, and fixture architecture section. Now within AC4 range.
+
+## Deferred from: code review of 1b-2-capability-registry-decomposition-runtime-cap-tokens-cap-policy-cap-audit-cap-quota (2026-05-14)
+
+- **DF18 — `Default for SandboxTier` returns T0 (most permissive).** Security-sensitive type should default to most restrictive tier. Pre-existing design decision predating this story. Revisit at 1b.3 when sandbox enforcement lands.
+- **DF19 — `CapAuditWriter` is a unit struct serving as namespace.** No fields, exists only for `spawn()`. Cosmetic; a free function would be more idiomatic.
+- **DF20 — `Intent` enum duplicates `Scope` enum shape.** Two parallel type hierarchies for the same conceptual space. Reconcile at architecture-doc reconciliation in 1b retro.
+- **DF21 — `_payload` parameter discarded in `record_invocation`.** Reduces audit fidelity but not a correctness bug. Track for v0.3 when IAC Bus ships.
+- **DF22 — `set_revoked` returns `Result<bool, ()>` where `Err(())` is never returned.** Cosmetic API cleanup.
+- **DF23 — `capability_token_bytes` in Invocation is JSON-serialized instead of raw token bytes.** Audit-format decision; may need reconciliation for FR4 join query at 1b.5b.

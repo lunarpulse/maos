@@ -284,6 +284,45 @@ jobs:
       - name: Run audit-spine-smoke
         run: bash tests/integration/audit_spine_smoke.sh
 
+  cap-token-verify-bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run cap-token-verify bench (fail-on-regress mode)
+        run: cargo bench -p maos-kernel-core --bench cap_token_verify_p99 -- --test
+
+  cap-registry-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run cap-registry-smoke
+        run: bash tests/integration/cap_registry_smoke.sh
+
+  fr4-1000-call-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run FR4 1000-call mediation fixture
+        run: cargo test -p maos-kernel-core --test fr4_1000_call_fixture
+
   coverage-matrix:
     runs-on: ubuntu-latest
     steps:
@@ -366,7 +405,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests]
     if: always()
     permissions:
       pull-requests: write
@@ -386,6 +425,9 @@ jobs:
           echo "cjc=${{ needs.check-judge-config.result }}" >> $GITHUB_OUTPUT
           echo "csm=${{ needs.check-security-md.result }}" >> $GITHUB_OUTPUT
           echo "ass=${{ needs.audit-spine-smoke.result }}" >> $GITHUB_OUTPUT
+          echo "ctvb=${{ needs.cap-token-verify-bench.result }}" >> $GITHUB_OUTPUT
+          echo "crs=${{ needs.cap-registry-smoke.result }}" >> $GITHUB_OUTPUT
+          echo "fr4=${{ needs.fr4-1000-call-fixture.result }}" >> $GITHUB_OUTPUT
           echo "cm=${{ needs.coverage-matrix.result }}" >> $GITHUB_OUTPUT
           echo "cs=${{ needs.corpus-staleness.result }}" >> $GITHUB_OUTPUT
           echo "cpc=${{ needs.calibrate-per-commit.result }}" >> $GITHUB_OUTPUT
@@ -414,6 +456,9 @@ jobs:
             const cjc = '${{ needs.check-judge-config.result }}';
             const csm = '${{ needs.check-security-md.result }}';
             const ass = '${{ needs.audit-spine-smoke.result }}';
+            const ctvb = '${{ needs.cap-token-verify-bench.result }}';
+            const crs = '${{ needs.cap-registry-smoke.result }}';
+            const fr4 = '${{ needs.fr4-1000-call-fixture.result }}';
             const cm = '${{ needs.coverage-matrix.result }}';
             const cs = '${{ needs.corpus-staleness.result }}';
             const cpc = '${{ needs.calibrate-per-commit.result }}';  // conditionally skipped until Story 0.4
@@ -437,6 +482,9 @@ jobs:
             | check-judge-config | ${icon(cjc)} ${cjc} |
             | check-security-md | ${icon(csm)} ${csm} |
             | audit-spine-smoke | ${icon(ass)} ${ass} |
+            | cap-token-verify-bench | ${icon(ctvb)} ${ctvb} |
+            | cap-registry-smoke | ${icon(crs)} ${crs} |
+            | fr4-1000-call-fixture | ${icon(fr4)} ${fr4} |
             | coverage-matrix | ${icon(cm)} ${cm} |
             | corpus-staleness | ${icon(cs)} ${cs} |
             | calibrate-per-commit | ${icon(cpc)} ${cpc} |

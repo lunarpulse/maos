@@ -91,7 +91,7 @@ impl CryptoProvider for RingCryptoProvider {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use ring::signature::KeyPair;
 
@@ -101,7 +101,7 @@ mod tests {
     /// Story 1b.2's `cap_tokens` unit tests will use this to verify the
     /// trait-object substitution pattern without a real `ring` keypair.
     #[derive(Debug, Clone, Copy, Default)]
-    pub(crate) struct MockCryptoProvider;
+    pub struct MockCryptoProvider;
 
     impl CryptoProvider for MockCryptoProvider {
         fn verify_signature(
@@ -133,8 +133,12 @@ mod tests {
             _signing_key: &[u8],
             token_bytes: &[u8],
         ) -> Result<Vec<u8>, CryptoError> {
-            // Mock policy: signature == reversed token bytes.
-            Ok(token_bytes.iter().rev().copied().collect())
+            // Mock policy: deterministic 64-byte signature.
+            let mut sig = [0u8; 64];
+            for (i, b) in token_bytes.iter().enumerate() {
+                sig[i % 64] ^= *b;
+            }
+            Ok(sig.to_vec())
         }
     }
 

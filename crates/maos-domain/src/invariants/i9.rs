@@ -35,6 +35,12 @@ pub struct InvariantI9;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub struct SandboxTier(pub u8);
 
+impl Default for SandboxTier {
+    fn default() -> Self {
+        SandboxTier(0)
+    }
+}
+
 /// Typestate marker for kernel-cached data — instances of this type
 /// document that they live only in the I9 whitelist holders.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

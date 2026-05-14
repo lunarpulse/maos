@@ -31,11 +31,21 @@ ring = "0.17"
 # the dep introduction. At v0.1-α no rustls API is actually exercised;
 # the dep is the future-story slot.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+arc-swap = "1.7"
+dashmap = "6.1"
+parking_lot = "0.12"
+subtle = "2.6"
+tokio = { version = "1", features = ["sync", "rt"] }
 
 [dev-dependencies]
 tempfile = "3"
 criterion = "0.5"
+tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread"] }
 
 [[bench]]
 name = "journal_fsync_p99"
+harness = false
+
+[[bench]]
+name = "cap_token_verify_p99"
 harness = false

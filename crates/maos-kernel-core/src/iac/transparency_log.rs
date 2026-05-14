@@ -417,6 +417,7 @@ impl TransparencyLogAdapter {
                         0 => FrameOrigin::HumanAuthored,
                         1 => FrameOrigin::SpiritAuto,
                         2 => FrameOrigin::SpiritDraftedHumanApproved,
+                        3 => FrameOrigin::Kernel,
                         _ => FrameOrigin::HumanAuthored,
                     },
                 })

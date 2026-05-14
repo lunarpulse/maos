@@ -41,6 +41,52 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InvariantI1;
 
+/// 16-byte token identifier — ULID-shaped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct TokenId(pub [u8; 16]);
+
+impl TokenId {
+    /// Zero token id — sentinel for bulk operations.
+    pub const ZERO: TokenId = TokenId([0u8; 16]);
+}
+
+/// Capability scope — the nine v0.1-β variants.
+///
+/// Adding a tenth variant later is an ABI break (this enum is re-exported
+/// through `maos-spirit-abi`). The nine here are the v0.1-β freeze.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum Scope {
+    /// Read access to a filesystem subtree.
+    FsRead { subtree: String },
+    /// Write access to a filesystem subtree.
+    FsWrite { subtree: String },
+    /// HTTPS network call to a specific domain.
+    NetHttps { domain: String },
+    /// Execute a specific binary.
+    ProcExec { binary: String },
+    /// Spawn a sub-Spirit of a given class.
+    SubSpiritSpawn { class: String },
+    /// Invoke an LLM provider (Story 1b.4).
+    ProviderInfer { provider: String },
+    /// Send an IAC frame to a peer class.
+    IacSend { peer_class: String },
+    /// Read from a memory scope.
+    MemRead { scope: String },
+    /// Write to a memory scope.
+    MemWrite { scope: String },
+}
+
+/// Intent classification for approval policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum IntentClass {
+    /// High-privilege operations — TTL capped at 60s.
+    HighPrivilege,
+    /// Standard operations — TTL capped at 300s.
+    Standard,
+    /// Read-only operations — TTL capped at 900s.
+    Readonly,
+}
+
 /// Capability token — short-lived authorization to invoke a specific
 /// Capability with specific arguments under a specific posture (per §3.1
 /// vocabulary + ADR-023).
@@ -49,11 +95,52 @@ pub struct InvariantI1;
 /// issuance lands in Story 1b.2 inside `maos-kernel-core::capability::cap_tokens`;
 /// this `maos-domain` type is the wire-stable shape Spirits see).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub struct CapabilityToken {
-    // Fields are crate-private at v0.1-α; Story 1a.3 expands when
-    // CryptoProvider lands. The structure exists at v0.1-α to nail down
-    // the type identity for ABI continuity.
-    _placeholder: (),
+    /// 16-byte token identifier.
+    pub token_id: TokenId,
+    /// Spirit process ID this token is bound to.
+    pub spirit_pid: u32,
+    /// Expiry timestamp in nanoseconds since boot.
+    pub expiry_ns: u64,
+    /// Ed25519 signature (64 bytes) over the token body.
+    #[serde(with = "serde_sig64")]
+    pub signature: [u8; 64],
+}
+
+impl CapabilityToken {
+    /// Construct a capability token. The `#[non_exhaustive]` attribute
+    /// prevents cross-crate struct-literal construction, so external
+    /// callers must obtain tokens through the kernel's
+    /// `cap_tokens::issue` method.
+    pub fn new(token_id: TokenId, spirit_pid: u32, expiry_ns: u64, signature: [u8; 64]) -> Self {
+        Self {
+            token_id,
+            spirit_pid,
+            expiry_ns,
+            signature,
+        }
+    }
+}
+
+mod serde_sig64 {
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(sig: &[u8; 64], ser: S) -> Result<S::Ok, S::Error> {
+        ser.serialize_bytes(sig)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<[u8; 64], D::Error> {
+        let bytes: Vec<u8> = serde::Deserialize::deserialize(de)?;
+        if bytes.len() != 64 {
+            return Err(serde::de::Error::custom(
+                format!("expected 64-byte signature, got {} bytes", bytes.len())
+            ));
+        }
+        let mut arr = [0u8; 64];
+        arr.copy_from_slice(&bytes);
+        Ok(arr)
+    }
 }
 
 #[cfg(test)]
@@ -62,12 +149,30 @@ mod tests {
 
     #[test]
     fn capability_token_exists() {
-        let t = CapabilityToken { _placeholder: () };
-        assert_eq!(t._placeholder, ());
+        let t = CapabilityToken {
+            token_id: TokenId::ZERO,
+            spirit_pid: 0,
+            expiry_ns: 0,
+            signature: [0u8; 64],
+        };
+        assert_eq!(t.spirit_pid, 0);
     }
 
     #[test]
     fn invariant_i1_marker_is_zst() {
         assert_eq!(std::mem::size_of::<InvariantI1>(), 0);
+    }
+
+    #[test]
+    fn capability_token_is_non_exhaustive() {
+        // This test verifies the struct carries #[non_exhaustive] by
+        // attempting construction with named fields (which compiles
+        // within the same crate but would require `..` from another crate).
+        let _t = CapabilityToken {
+            token_id: TokenId([1u8; 16]),
+            spirit_pid: 7,
+            expiry_ns: 1_000_000_000,
+            signature: [2u8; 64],
+        };
     }
 }

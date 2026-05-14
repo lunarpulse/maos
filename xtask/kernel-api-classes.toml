@@ -77,5 +77,33 @@
 # Supporting type in iac/mailbox_stub.rs — data-movement (delivery routing)
 "maos_kernel_core::iac::mailbox_stub::MailboxStub"                = "data-movement"
 
+# Story 1b.2 — Capability Registry decomposition runtime body
+# cap_tokens sub-module
+"maos_kernel_core::capability::cap_tokens::CapTokensShardRing"    = "universal-arithmetic"
+"maos_kernel_core::capability::cap_tokens::CapShard"              = "universal-arithmetic"
+"maos_kernel_core::capability::cap_tokens::TokenId"               = "universal-arithmetic"
+"maos_kernel_core::capability::cap_tokens::TokenState"            = "universal-arithmetic"
+"maos_kernel_core::capability::cap_tokens::Ed25519SigningKey"     = "universal-arithmetic"
+"maos_kernel_core::capability::cap_tokens::CapTokenBody"          = "universal-arithmetic"
+"maos_kernel_core::capability::cap_tokens::RevokeReason"          = "universal-arithmetic"
+
+# cap_policy sub-module
+"maos_kernel_core::capability::cap_policy::PolicyTable"           = "universal-arithmetic"
+"maos_kernel_core::capability::cap_policy::PolicyTableInner"      = "universal-arithmetic"
+"maos_kernel_core::capability::cap_policy::decision::PolicyDecision" = "universal-arithmetic"
+"maos_kernel_core::capability::cap_policy::decision::ApprovalClass"  = "universal-arithmetic"
+"maos_kernel_core::capability::cap_policy::decision::Intent"         = "universal-arithmetic"
+"maos_kernel_core::capability::cap_policy::decision::TrustTier"      = "universal-arithmetic"
+"maos_kernel_core::capability::cap_policy::decision::Capability"     = "universal-arithmetic"
+
+# cap_audit sub-module
+"maos_kernel_core::capability::cap_audit::CapAuditEvent"          = "data-movement"
+"maos_kernel_core::capability::cap_audit::Sender"                 = "data-movement"
+"maos_kernel_core::capability::cap_audit::CapAuditWriter"         = "supervision"
+
+# cap_quota sub-module
+"maos_kernel_core::capability::cap_quota::CapQuotaTracker"        = "universal-arithmetic"
+"maos_kernel_core::capability::cap_quota::QuotaState"             = "universal-arithmetic"
+
 # Journal error type — supervision (audit log error)
 "maos_kernel_core::journal::JournalError"                         = "supervision"

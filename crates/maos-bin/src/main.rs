@@ -77,28 +77,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _security = SecurityManagerAdapter::default();
     let _memory = MemoryManagerAdapter::default();
     let _iac = IacBusAdapter::default();
-    let _capability = CapabilityRegistryAdapter::default();
     let _io = IoSubsystemAdapter::default();
     let _telemetry = TelemetryStreamAdapter::default();
 
     // ─────────────────────────────────────────────────────────────
     // Story 1a.3 — FR48 / NFR-Sec-15 crypto-provider seam.
+    // Story 1b.2 — Capability Registry composite construction.
     //
     // Construct the default `ring`/`rustls`-backed CryptoProvider.
-    // This is the FR48 architectural-commitment SWAP POINT — a v1.0+
-    // FIPS-validated, HSM-backed, or post-quantum provider lands by
-    // changing the line below (e.g.,
-    //   `Arc::new(FipsCryptoProvider::from_module_id("CMVP-XXXX"))`).
-    // No other crate recompiles; no Spirit binary needs to be rebuilt.
-    //
-    // At v0.1-α the binding is held in an unused `_crypto` slot
-    // alongside the seven adapter shells — Story 1b.1 (audit-spine
-    // verify), Story 1b.2 (cap_tokens token sign), and Story 7.3
-    // (ComplianceClaim envelope verify) wire actual call sites.
-    let _crypto: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);
+    // This is the FR48 architectural-commitment SWAP POINT.
+    let crypto: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);
     eprintln!("maos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)");
-    // `_crypto` is unused at v0.1-α; consumed by Story 1b.1 (audit-spine verify),
-    // Story 1b.2 (cap_tokens token sign), Story 7.3 (ComplianceClaim envelope verify).
+
+    // Construct the Capability Registry with all four sub-modules.
+    // FIXME(1b.3): signing key MUST come from OS keyring / maos-secrets.
+    // v0.1-β scaffold: deterministic key for testing ONLY. A random key
+    // is used to prevent trivial forgery from published source.
+    let signing_key_bytes: [u8; 32] = {
+        let mut seed = [0u8; 32];
+        getrandom::fill(&mut seed).expect("failed to generate signing key");
+        seed
+    };
+    let signing_key = maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new(signing_key_bytes);
+    let policy = maos_kernel_core::capability::cap_policy::PolicyTable::new();
+    let (audit_tx, audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+    let quota = maos_kernel_core::capability::cap_quota::CapQuotaTracker::new();
+    let boot_nonce: u64 = {
+        let mut buf = [0u8; 8];
+        getrandom::fill(&mut buf).expect("failed to generate boot nonce");
+        u64::from_ne_bytes(buf)
+    };
+    let _capability = CapabilityRegistryAdapter::new(
+        crypto,
+        signing_key,
+        boot_nonce,
+        policy,
+        audit_tx,
+        quota,
+    );
+    eprintln!("maos: capability registry initialized (Story 1b.2)");
+
+    // Spawn the audit writer task (Story 1b.2).
+    // At v0.1-β the transparency log is in-memory for the scaffold;
+    // Story 1b.1 lands the persistent SQLite adapter.
+    let _audit_writer = maos_kernel_core::capability::cap_audit::CapAuditWriter::spawn(
+        audit_rx,
+        Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(boot_nonce)),
+    );
     // ─────────────────────────────────────────────────────────────
 
     // Root cancellation token. Every long-lived coordination task gets a

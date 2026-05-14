@@ -3,6 +3,66 @@
   "abi_baseline_version": "v0.1-beta",
   "items": [
     {
+      "kind": "const",
+      "path": "maos_kernel_core::capability::cap_audit::AUDIT_CHANNEL_DEPTH",
+      "signature_hash": "55b9cfe8480a631b3d35ea669cd675c1513217b3a069db09b8edc6ef9ea47c76"
+    },
+    {
+      "kind": "const",
+      "path": "maos_kernel_core::capability::cap_quota::EXHAUSTED_THRESHOLD",
+      "signature_hash": "4107e093f8f09845592efdefceb32c14b229616c36461e06dfe845a0e23ed532"
+    },
+    {
+      "kind": "const",
+      "path": "maos_kernel_core::capability::cap_quota::LIMIT_THRESHOLD",
+      "signature_hash": "cbc8f8416769a9a2dc8d503387744d169da02731a31f1448f1b2a99fdae96494"
+    },
+    {
+      "kind": "const",
+      "path": "maos_kernel_core::capability::cap_quota::PRESSURE_THRESHOLD",
+      "signature_hash": "5ba0203166813ffb4a9ec56f470c06717c48e0f53399ad4aae27782fbaa446dd"
+    },
+    {
+      "kind": "const",
+      "path": "maos_kernel_core::capability::cap_tokens::shard::SHARD_COUNT",
+      "signature_hash": "7d315a3f07b5fc2a4dd51d742e5396cc109ee316bb78aa868349f091ca81ab8a"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::capability::cap_audit::CapAuditEvent",
+      "signature_hash": "7ddb73bc3d27ac603b361b27a49e8ce14b1f109497e8b1f7565063cd5d7495b9"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::capability::cap_policy::decision::ApprovalClass",
+      "signature_hash": "f066a0c58093b6d08023e2218b7b006a439d3a95b4bcd6d72d92ff57821df8ad"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::capability::cap_policy::decision::Intent",
+      "signature_hash": "c79e246484170a1c1480a35633978fbe519e1573276d5a3ef547b5800e9b5e02"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::capability::cap_policy::decision::PolicyDecision",
+      "signature_hash": "fe933cc6ff73a782507244ebfc79bddc8f6dcc07d54cc7fb68771875cb8fd890"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::capability::cap_policy::decision::TrustTier",
+      "signature_hash": "dc353adfdac60eb3dfe263dc980d68a340d467afe97f451e9d4ff6788e718bb5"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::capability::cap_quota::QuotaState",
+      "signature_hash": "10cd957fd6ed28b46a9245f49edd7129ec66c9ac012cd0854cc57ae125d0fdf4"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::capability::cap_tokens::RevokeReason",
+      "signature_hash": "d0841812d85350e4d5653c25eb220299852bbc8a9b224993ee95f612660ed15e"
+    },
+    {
       "kind": "enum",
       "path": "maos_kernel_core::iac::transparency_log::AuditError",
       "signature_hash": "df790d34660e428cbf432fe28db46f7393c04716fc937d36af182819dfa999ef"
@@ -18,9 +78,114 @@
       "signature_hash": "cbe5f97e8d0f75828d1a60986bd97d7bfac55ddd34a5d63fdd83756dc3e1257d"
     },
     {
+      "kind": "fn",
+      "path": "maos_kernel_core::capability::cap_audit::audit_drop_count",
+      "signature_hash": "bc4fff30ae5cdff1c546650d3bbfecc33eccff7905eec87949529b0598fcbe71"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::capability::cap_audit::channel",
+      "signature_hash": "201aa026d80e3435662ccdcb6629e197a195aed9b86b3d90e47a8b59a164760a"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::capability::cap_audit::record_drop",
+      "signature_hash": "0b33e06031e1f4f41d2e2bd71590918aca2c4edef013971d64cb44773e4a7157"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::capability::cap_policy::strictest_of",
+      "signature_hash": "2fc61904e5ba82c1ffdc0da621943b57320000d7e748f6f47ece967d15336978"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::capability::cap_tokens::body::scope_hash",
+      "signature_hash": "d4cca695e95227dd64446dcf9af348bb390a0173e5d7997f4b8e554815b59e03"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::capability::cap_tokens::init_monotonic_base",
+      "signature_hash": "fc69b7d166dbe0fa89bc04f2799808df21abe1350526719b5f152e3ffc6c568c"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::capability::cap_tokens::monotonic_now_ns",
+      "signature_hash": "cc8ae0e583e323ab4de29317f4ea33f11be76c3df51288af6b1295b694132d36"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::capability::cap_tokens::shard::hash_token_id",
+      "signature_hash": "99a13ab5706506d53dae897b45f17a9bea1d8944587d1068ad0b56b58a82122b"
+    },
+    {
       "kind": "struct",
       "path": "maos_kernel_core::capability::CapabilityRegistryAdapter",
-      "signature_hash": "ec9c76f84312db0391b2d752961328479f997fa7638db33d44aac8519efa3998"
+      "signature_hash": "1a65a77702cae3ad96991520513c2c651fce744591b1e8a9908c4f6a9b9b0728"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_audit::writer_task::CapAuditWriter",
+      "signature_hash": "68cc0970c4b0d20a483ce91fe0d82b982ac1f5f66cd361abde93151b08f9e3dd"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_policy::ManifestCapabilityScope",
+      "signature_hash": "97a2ffad31b8151f5659469955876fbc253cd6483b5ae6271315d06ed556a82b"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_policy::OperatorPolicyConfig",
+      "signature_hash": "5a4cdfa160747e8eb6a13cf5adb12f2b4f2fa83cf0918885b954b2a7bd7114ab"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_policy::PolicyTable",
+      "signature_hash": "405785f25c196e66086c188cf8f29891475336d15df54447bb78fdb48542880e"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_policy::PolicyTableInner",
+      "signature_hash": "da9c307281d4000320f39e85746de7613a90e33f7b964e7c28a9f77b5d68da1f"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_policy::decision::Capability",
+      "signature_hash": "b1f74cf59e0300a7359ad5714be13fc3b68ccb9a36f9addcb9ef05a2c5de8ac7"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_quota::CapQuotaTracker",
+      "signature_hash": "f7e2f55304ab7116e3ab2fc3e973a6832c46eb9123ec580ee3b3093b134dc3c4"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_tokens::CapTokensShardRing",
+      "signature_hash": "ca38bbb39a3dd9d4c9a2330ad9996ff06df220987febfced01eb76bf98977928"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_tokens::body::CapTokenBody",
+      "signature_hash": "f39972bfa7629c5b098ece62011c16e91e2344fe7b4e6c025b4d23a7514f509f"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_tokens::key::Ed25519SigningKey",
+      "signature_hash": "ad31cb358d759d523b58b81d87d83389b4f72b15b6db4f695e498831eaf1f245"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_tokens::shard::CapShard",
+      "signature_hash": "ef95d4e2a45ce1b65c0ca5c2f34721608a640e81a81683d41d0123314d7c362c"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_tokens::shard::TokenState",
+      "signature_hash": "2570bde8dc309919aacf548217d4502f61220c61959b41daeca8bf0d61b0600c"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::capability::cap_tokens::shard::TokenStateSnapshot",
+      "signature_hash": "3b644a8a3f817e7118e74f0921a15a564af80c4795b06ae3252ee1271a37469b"
     },
     {
       "kind": "struct",
@@ -60,7 +225,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::journal::JournalAdapter",
-      "signature_hash": "309b89ec57b20bd0c3e38b3e033ae08bdeb71e98ff0ad986a0b83e1856d048e3"
+      "signature_hash": "8d842d122ca705bd688e1f28d2a60c40b7e4775e2ee6ab107c0103c0abd73e7d"
     },
     {
       "kind": "struct",
@@ -84,6 +249,11 @@
     },
     {
       "kind": "struct",
+      "path": "maos_kernel_core::security::crypto::tests::MockCryptoProvider",
+      "signature_hash": "7fa59eb6f9eb229312cbd24b88b9010073903537fff9eaa39018cb2489aaf460"
+    },
+    {
+      "kind": "struct",
       "path": "maos_kernel_core::telemetry::TelemetryStreamAdapter",
       "signature_hash": "d527b6aaacbcd693005a6be1c19453953b22857ca41edeaf2d6ddcdb2d8ad6b1"
     },
@@ -91,6 +261,11 @@
       "kind": "trait",
       "path": "maos_kernel_core::iac::redaction::RedactionPolicy",
       "signature_hash": "397c9c314f2d33a093f7c61719405e8ae65eb5a68eb2dfa5e9aeb221544d6bd3"
+    },
+    {
+      "kind": "type",
+      "path": "maos_kernel_core::capability::cap_audit::Sender",
+      "signature_hash": "02a17ddb9a115080f38e81ae3d23ea39840b585549ddb475c1a48cdc9de4172c"
     },
     {
       "kind": "use",
@@ -141,6 +316,46 @@
       "kind": "use",
       "path": "maos_kernel_core::api::crate::telemetry::TelemetryStreamAdapter",
       "signature_hash": "8826d9df3c7ee51f5fcc548c20905cd095c59260265384a5646364e5474b78e0"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::cap_audit::writer_task::CapAuditWriter",
+      "signature_hash": "9f1a8f421607a60198f0aababf98135318dcb97ec7be6a02cb2011d4d5da1b22"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::cap_tokens::body::CapTokenBody",
+      "signature_hash": "4faf75f3370ff0f9d65af161c8aa5a86b6fd0f2b86c7238ecae14d3054577683"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::cap_tokens::body::scope_hash",
+      "signature_hash": "4faf75f3370ff0f9d65af161c8aa5a86b6fd0f2b86c7238ecae14d3054577683"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::cap_tokens::key::Ed25519SigningKey",
+      "signature_hash": "3f5116e03ef4afe49f3ae2b6cc87a2d5276747926529ac611c4c30caafacc729"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::cap_tokens::shard::CapShard",
+      "signature_hash": "d21e1fd2c344d422fd9b477118f8f13ab663a89c565d67cead019a6ff238012c"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::cap_tokens::shard::SHARD_COUNT",
+      "signature_hash": "d21e1fd2c344d422fd9b477118f8f13ab663a89c565d67cead019a6ff238012c"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::cap_tokens::shard::TokenState",
+      "signature_hash": "d21e1fd2c344d422fd9b477118f8f13ab663a89c565d67cead019a6ff238012c"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::cap_tokens::shard::TokenStateSnapshot",
+      "signature_hash": "d21e1fd2c344d422fd9b477118f8f13ab663a89c565d67cead019a6ff238012c"
     },
     {
       "kind": "use",

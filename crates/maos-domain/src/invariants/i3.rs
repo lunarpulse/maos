@@ -35,6 +35,8 @@ pub enum FrameOrigin {
     SpiritAuto = 1,
     /// Spirit drafted; human approved the draft (one-click or explicit).
     SpiritDraftedHumanApproved = 2,
+    /// Kernel-generated frame (audit log, capability mediation).
+    Kernel = 3,
 }
 
 #[cfg(test)]

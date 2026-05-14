@@ -103,7 +103,7 @@ pub trait CryptoProvider: Send + Sync {
 /// taxonomy is deliberately coarse at v0.1-α; refinements per
 /// distributor (FIPS module error codes, HSM hardware faults)
 /// land in Story 7.3's ComplianceClaim verify path.
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum CryptoError {
     /// Signature did not match the message under the public key.
     #[error("signature verification failed")]
