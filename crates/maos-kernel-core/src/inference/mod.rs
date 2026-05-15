@@ -206,7 +206,7 @@ mod tests {
         let telemetry = Arc::new(IacRtMetrics::new());
         let provider: Arc<dyn Provider> = Arc::new(MockProvider);
 
-        InferencePortAdapter::new(provider, "mock".into(), capabilities, transparency_log, telemetry)
+        InferencePortAdapter::new(provider, "anthropic".into(), capabilities, transparency_log, telemetry)
     }
 
     fn make_token(adapter: &InferencePortAdapter, spirit_pid: u32, scope: Scope) -> CapabilityToken {
