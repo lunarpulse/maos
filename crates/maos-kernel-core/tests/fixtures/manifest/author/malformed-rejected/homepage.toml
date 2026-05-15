@@ -1,0 +1,3 @@
+# expect: ManifestError::Validation (bad URL scheme)
+name = "MAOS"
+homepage = "ftp://example.org"

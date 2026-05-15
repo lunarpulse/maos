@@ -1,0 +1,2 @@
+# expect: ManifestError::CapOutOfRange (must be > 0)
+cpu_max_pct = 0

@@ -362,10 +362,78 @@ pub fn default_transparency_log_path() -> std::path::PathBuf {
         .or_else(|| {
             std::env::var("HOME")
                 .ok()
+                .filter(|h| !h.is_empty())
                 .map(|h| PathBuf::from(h).join(".local").join("share"))
         })
         .unwrap_or_else(|| PathBuf::from("/var/lib"));
     data_home.join("maos").join("audit").join("transparency.sqlite")
+}
+
+/// Resolve the default Lifecycle Journal NDJSON path.
+///
+/// Shared by `maos-bin` (write side — lifecycle verbs in the
+/// `MAOS_ONE_SHOT={start, stop, unload}` one-shot path, Story 1b.5c)
+/// and any reader (e.g. operator inspection, Story 5.x supervisor).
+/// Extracted here rather than duplicated across crates to prevent
+/// silent path-drift data loss — the same discipline established by
+/// [`default_transparency_log_path`] (Story 1b.5b D2).
+///
+/// Precedence (highest → lowest):
+///   1. `MAOS_JOURNAL_PATH` env var (explicit override; used by tests
+///      and ops). Empty-string is rejected — callers exit 2 with a
+///      diagnostic (same shape as [`default_transparency_log_path`]).
+///   2. `$XDG_DATA_HOME/maos/journal/lifecycle.ndjson`
+///   3. `$HOME/.local/share/maos/journal/lifecycle.ndjson`
+///   4. `/var/lib/maos/journal/lifecycle.ndjson` (last-resort fallback)
+///
+/// File suffix is `.ndjson` to match the Journal's NDJSON-on-disk
+/// storage choice (Story 1b.1 / `journal/mod.rs` §"Storage choice").
+pub fn default_journal_path() -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Ok(p) = std::env::var("MAOS_JOURNAL_PATH") {
+        if p.is_empty() {
+            eprintln!("maos: MAOS_JOURNAL_PATH is set but empty — unset it or provide a path");
+            std::process::exit(2);
+        }
+        return PathBuf::from(p);
+    }
+    let data_home = std::env::var("XDG_DATA_HOME")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .filter(|h| !h.is_empty())
+                .map(|h| PathBuf::from(h).join(".local").join("share"))
+        })
+        .unwrap_or_else(|| PathBuf::from("/var/lib"));
+    data_home.join("maos").join("journal").join("lifecycle.ndjson")
+}
+
+/// Pure-function form of the precedence cascade — env values are passed in
+/// explicitly. Used by the inline tests on [`default_journal_path`] to drive
+/// every branch without mutating the process environment (forbidden under
+/// `#![forbid(unsafe_code)]` since Rust's env-mutation API became `unsafe`).
+#[cfg(test)]
+fn resolve_journal_path_from_env_internal(
+    maos_journal_path: Option<&str>,
+    xdg_data_home: Option<&str>,
+    home: Option<&str>,
+) -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Some(p) = maos_journal_path {
+        if p.is_empty() {
+            panic!("empty MAOS_JOURNAL_PATH");
+        }
+        return PathBuf::from(p);
+    }
+    let data_home = xdg_data_home
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| home.filter(|h| !h.is_empty()).map(|h| PathBuf::from(h).join(".local").join("share")))
+        .unwrap_or_else(|| PathBuf::from("/var/lib"));
+    data_home.join("maos").join("journal").join("lifecycle.ndjson")
 }
 
 fn truncate(s: &str, n: usize) -> &str {
@@ -609,5 +677,71 @@ mod tests {
         let s = String::from_utf8(buf).unwrap();
         assert!(s.contains("<missing>"));
         assert_eq!(esc_count, 0);
+    }
+
+    // ── default_journal_path tests (Story 1b.5c, Task 1) ────────────────
+    //
+    // The resolver reads `MAOS_JOURNAL_PATH`, `XDG_DATA_HOME`, `HOME` from
+    // the process environment. We can't mutate process env safely here —
+    // the crate `#![forbid(unsafe_code)]` rules out the (now `unsafe`)
+    // `std::env::set_var` / `remove_var` API. Instead we exercise the
+    // resolver's precedence by spawning a subprocess via `cargo test`'s
+    // injected binary harness — but that requires a binary crate, which
+    // `maos-audit` is not.
+    //
+    // Pragmatic path: split the resolution logic into an env-injected
+    // pure function and drive it from the three #[test]s. The exported
+    // `default_journal_path` is a thin wrapper that reads process env
+    // and delegates. This is the same discipline 1b.5b would have used
+    // had `default_transparency_log_path` been tested inline.
+
+    #[test]
+    fn default_journal_path_respects_env_override() {
+        let p = super::resolve_journal_path_from_env_internal(
+            Some("/tmp/maos-test-journal.ndjson"),
+            None,
+            None,
+        );
+        assert_eq!(p, std::path::PathBuf::from("/tmp/maos-test-journal.ndjson"));
+    }
+
+    #[test]
+    fn default_journal_path_falls_through_to_xdg() {
+        let p = super::resolve_journal_path_from_env_internal(
+            None,
+            Some("/tmp/xdgtest"),
+            None,
+        );
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/tmp/xdgtest/maos/journal/lifecycle.ndjson")
+        );
+    }
+
+    #[test]
+    fn default_journal_path_falls_through_to_home_when_xdg_unset() {
+        let p = super::resolve_journal_path_from_env_internal(
+            None,
+            None,
+            Some("/tmp/hometest"),
+        );
+        assert_eq!(
+            p,
+            std::path::PathBuf::from(
+                "/tmp/hometest/.local/share/maos/journal/lifecycle.ndjson"
+            )
+        );
+    }
+
+    #[test]
+    fn default_journal_path_last_resort_var_lib() {
+        // Both XDG and HOME unset → /var/lib fallback (the production
+        // path Story 5.x supervisors land on if XDG_DATA_HOME and HOME
+        // are both absent in the systemd unit's environment).
+        let p = super::resolve_journal_path_from_env_internal(None, None, None);
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/var/lib/maos/journal/lifecycle.ndjson")
+        );
     }
 }

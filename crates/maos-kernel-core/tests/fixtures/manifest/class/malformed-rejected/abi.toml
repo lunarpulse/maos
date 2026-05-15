@@ -1,0 +1,2 @@
+# expect: ManifestError::Validation (v0.1-β only accepts "1.0")
+abi = "2.0"

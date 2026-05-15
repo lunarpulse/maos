@@ -40,11 +40,18 @@ pub enum TelemetryMode {
 pub enum Subcommand {
     /// Install a Spirit (Story 1b.5b lands the real body).
     Install(InstallArgs),
-    /// Start a Spirit (Story 5.1 lifecycle verbs).
+    /// Start a Spirit — writes one `LifecycleEvent::Start` Lifecycle Journal
+    /// entry and exits (v0.1-β, Story 1b.5c). Supervised lifecycle with
+    /// process spawn + mailbox lands at Epic 5 (Story 5.1).
     Start(StartArgs),
-    /// Stop a Spirit (Story 5.1 lifecycle verbs).
+    /// Stop a Spirit — writes one `LifecycleEvent::Halt` Lifecycle Journal
+    /// entry and exits (v0.1-β, Story 1b.5c). The supervisor that consumes
+    /// the journal to actually signal a running Spirit ships at Epic 5
+    /// (Story 5.1).
     Stop(StopArgs),
-    /// Unload a Spirit (Story 5.1 lifecycle verbs).
+    /// Unload a Spirit — writes one `LifecycleEvent::Unload` Lifecycle
+    /// Journal entry and exits (v0.1-β, Story 1b.5c). Graceful shutdown
+    /// with mailbox drain lands at Epic 5 (Story 5.1).
     Unload(UnloadArgs),
     /// Run a one-shot Spirit invocation (Story 1b.5a / 1b.5b).
     Run(RunArgs),

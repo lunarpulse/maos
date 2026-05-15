@@ -1,0 +1,1 @@
+required_fields = ["introduction", "capability_scope", "halt_tags", "transparency_log"]

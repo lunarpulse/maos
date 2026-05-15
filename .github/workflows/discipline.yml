@@ -356,6 +356,61 @@ jobs:
       - name: Run audit-query FR4 smoke
         run: bash tests/integration/audit_query_fr4_smoke.sh
 
+  maosctl-smoke:
+    # Story 1b.5c AC1 — end-to-end `maosctl` lifecycle smoke. Drives all
+    # five v0.1 verbs (install/run/start/stop/unload) against the
+    # reference `hello-spirit` and asserts each side-effect mechanically
+    # (FR58 JSON on run; one Lifecycle Journal NDJSON line per lifecycle
+    # verb; exit 2 + zero journal mutation on unknown-spirit).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Install jq (smoke harness dependency)
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Run maosctl lifecycle smoke
+        run: bash tests/integration/maosctl_smoke.sh
+
+  manifest-field-coverage:
+    # Story 1b.5c AC3 — NFR-Test-13 manifest-field coverage gate. Walks
+    # the fixture tree under `crates/maos-kernel-core/tests/fixtures/manifest/`
+    # and asserts ≥3 cases per (section, field) tuple in the live
+    # MANIFEST_FIELDS allowlist; orphan fixtures fail the build.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run NFR-Test-13 manifest-field coverage gate
+        run: cargo test -p maos-kernel-core --test manifest_field_coverage --locked
+
+  v01-evaluator-path:
+    # Story 1b.5c AC4 — composite v0.1 release-tag gate. Runs the full
+    # 1b.5a + 1b.5b + 1b.5c evaluator path in one sequential bash
+    # script. Blocks the v0.1 release tag per the AC text.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Install jq (smoke harness dependency)
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Run v0.1 evaluator path composite script
+        run: bash tests/integration/v01_evaluator_path.sh
+
   hello-spirit-tests:
     runs-on: ubuntu-latest
     steps:
@@ -477,7 +532,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47]
     if: always()
     permissions:
       pull-requests: write
@@ -501,6 +556,9 @@ jobs:
           echo "crs=${{ needs.cap-registry-smoke.result }}" >> $GITHUB_OUTPUT
           echo "fr4=${{ needs.fr4-1000-call-fixture.result }}" >> $GITHUB_OUTPUT
           echo "aqfs=${{ needs.audit-query-fr4-smoke.result }}" >> $GITHUB_OUTPUT
+          echo "ms=${{ needs.maosctl-smoke.result }}" >> $GITHUB_OUTPUT
+          echo "mfc=${{ needs.manifest-field-coverage.result }}" >> $GITHUB_OUTPUT
+          echo "v01=${{ needs.v01-evaluator-path.result }}" >> $GITHUB_OUTPUT
           echo "hst=${{ needs.hello-spirit-tests.result }}" >> $GITHUB_OUTPUT
           echo "hsb=${{ needs.hello-spirit-bench.result }}" >> $GITHUB_OUTPUT
           echo "onb=${{ needs.onb-nfr2-timing.result }}" >> $GITHUB_OUTPUT
@@ -537,6 +595,9 @@ jobs:
             const crs = '${{ needs.cap-registry-smoke.result }}';
             const fr4 = '${{ needs.fr4-1000-call-fixture.result }}';
             const aqfs = '${{ needs.audit-query-fr4-smoke.result }}';
+            const ms = '${{ needs.maosctl-smoke.result }}';
+            const mfc = '${{ needs.manifest-field-coverage.result }}';
+            const v01 = '${{ needs.v01-evaluator-path.result }}';
             const hst = '${{ needs.hello-spirit-tests.result }}';
             const hsb = '${{ needs.hello-spirit-bench.result }}';
             const onb = '${{ needs.onb-nfr2-timing.result }}';
@@ -568,6 +629,9 @@ jobs:
             | cap-registry-smoke | ${icon(crs)} ${crs} |
             | fr4-1000-call-fixture | ${icon(fr4)} ${fr4} |
             | audit-query-fr4-smoke | ${icon(aqfs)} ${aqfs} |
+            | maosctl-smoke | ${icon(ms)} ${ms} |
+            | manifest-field-coverage | ${icon(mfc)} ${mfc} |
+            | v01-evaluator-path | ${icon(v01)} ${v01} |
             | hello-spirit-tests | ${icon(hst)} ${hst} |
             | hello-spirit-bench | ${icon(hsb)} ${hsb} |
             | onb-nfr2-timing | ${icon(onb)} ${onb} |

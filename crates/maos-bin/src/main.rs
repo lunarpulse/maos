@@ -186,8 +186,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ─────────────────────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────────
-    // Story 1b.5a — One-shot mode: MAOS_ONE_SHOT=hello-spirit
+    // Story 1b.5c — Lifecycle one-shot verbs (start/stop/unload).
+    //
+    // Per Decision Register D2 the discriminator is fused into the
+    // existing `MAOS_ONE_SHOT` env-var rather than introducing a parallel
+    // `MAOS_LIFECYCLE_VERB`. This keeps the composition-root branch count
+    // at one. The lifecycle verbs at v0.1-β do NOT spawn supervised
+    // children, do NOT touch the Inference Port, and do NOT need the
+    // cap-audit drain (the 1b.5b drain stays only in the `hello-spirit`
+    // arm). They write exactly one Lifecycle Journal entry and exit.
     if let Ok(mode) = std::env::var("MAOS_ONE_SHOT") {
+        // Lifecycle verbs are handled first — they're cheap and exit
+        // without engaging the Inference Port / capability registry.
+        if let Some(event) = match mode.as_str() {
+            "start" => Some(maos_domain::invariants::i10::LifecycleEvent::Start),
+            "stop" => Some(maos_domain::invariants::i10::LifecycleEvent::Halt),
+            "unload" => Some(maos_domain::invariants::i10::LifecycleEvent::Unload),
+            _ => None,
+        } {
+            // Initialize the monotonic clock so journal timestamps are
+            // comparable to the kernel-side `Load` transitions emitted
+            // by `SecurityManagerAdapter::admit_spirit`.
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let journal_path = maos_audit::default_journal_path();
+            if let Some(parent) = journal_path.parent() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    eprintln!(
+                        "maos: failed to create journal parent directory {}: {e}",
+                        parent.display()
+                    );
+                    return Err(format!("journal parent create failed: {e}").into());
+                }
+            }
+            let adapter = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+                .map_err(|e| {
+                    format!("failed to open Lifecycle Journal at {}: {e}", journal_path.display())
+                })?;
+            let spirit_id = std::env::var("MAOS_SPIRIT_ID")
+                .unwrap_or_else(|_| "hello-spirit".into());
+            adapter.append_transition(maos_domain::invariants::i10::JournalEntry {
+                timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+                lifecycle_event: event,
+                spirit_id: spirit_id.clone(),
+                effective_sandbox_tier: None,
+            });
+            // Adapter's `Drop` impl signals the drain thread and fsyncs
+            // (journal/mod.rs:195-203). No cap-audit drain required.
+            drop(adapter);
+
+            // Diagnostic copy mirrors the AC1 table verbatim.
+            let diag = match mode.as_str() {
+                "start" => "started",
+                "stop" => "stopped",
+                "unload" => "unloaded",
+                _ => unreachable!(),
+            };
+            eprintln!(
+                "maos: {diag} {spirit_id} (journal: {})",
+                journal_path.display()
+            );
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!("maos: unknown MAOS_ONE_SHOT mode '{mode}' — only 'hello-spirit' is supported");
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());

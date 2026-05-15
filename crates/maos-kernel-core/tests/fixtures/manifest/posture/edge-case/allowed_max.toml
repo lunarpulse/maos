@@ -1,0 +1,2 @@
+default = "autonomous-with-halt"
+allowed_max = "autonomous"

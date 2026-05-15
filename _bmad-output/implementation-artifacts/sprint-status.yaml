@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-last_updated: 2026-05-15  # Story 1b.5b implementation landed — review.
+last_updated: 2026-05-15  # Story 1b.5c shipped — ready for code review.
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-05-15  # Story 1b.5b implementation landed — review.
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-11
-last_updated: 2026-05-15  # Story 1b.5b code review complete — done.
+last_updated: 2026-05-15  # Story 1b.5c code review complete — all patches applied.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -76,7 +76,7 @@ development_status:
   1b-4-freeze-the-complianceclaim-schema-and-wire-the-inference-port-iac-telemetry: done
   1b-5a-ship-hello-spirit-reference-binary-and-hit-nfr-onb-2-5-minute-evaluator-path: done
   1b-5b-maosctl-audit-query-fr4-100-mediation-mechanical-verification: done
-  1b-5c-maosctl-v0-1-lifecycle-subcommands-accessibility-flags: backlog
+  1b-5c-maosctl-v0-1-lifecycle-subcommands-accessibility-flags: done
   epic-1b-retrospective: optional
 
   # ------------------------------------------------------------------

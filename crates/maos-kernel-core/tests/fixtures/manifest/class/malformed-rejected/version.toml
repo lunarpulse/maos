@@ -1,0 +1,2 @@
+# expect: ManifestError::Validation (not semver)
+version = "0.1"

@@ -1,0 +1,2 @@
+# expect: ManifestError::Toml (wrong case — must be uppercase)
+tier = "t2"

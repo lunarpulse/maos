@@ -13,6 +13,15 @@ pub mod sandbox;
 pub use maos_domain::ports::SecurityManagerPort;
 pub use crypto::RingCryptoProvider;
 pub use manifest::{ManifestError, ResourceCaps, SandboxConfig, ResolvedCaps, resolve_caps};
+// Story 1b.5c — appended to preserve original re-export order so the
+// signature_hash of each existing symbol remains stable under
+// `check-service-boundary`'s use-item hashing (the gate hashes the
+// whole `pub use` token-tree per member; reordering would falsely
+// flag every existing symbol as removed-and-re-added).
+pub use manifest::{
+    Author, Budget, CapabilitiesRequired, ClassSection, OutputShape, Posture, PostureSection,
+    ProviderCapabilities,
+};
 pub use sandbox::{SandboxSpec, SandboxedChild, SpawnError, spawn_sandboxed, classify_exit, SandboxViolation};
 
 use std::sync::Arc;

@@ -11,9 +11,9 @@ use crate::cli::{AuditFormat, AuditQuery, InstallArgs, RunArgs, Subcommand};
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
     match cmd {
         Subcommand::Install(args) => install(args, color),
-        Subcommand::Start(_) => stub("start", "Story 5.1"),
-        Subcommand::Stop(_) => stub("stop", "Story 5.1"),
-        Subcommand::Unload(_) => stub("unload", "Story 5.1"),
+        Subcommand::Start(args) => lifecycle_verb("start", args.spirit.as_deref(), color),
+        Subcommand::Stop(args) => lifecycle_verb("stop", args.spirit.as_deref(), color),
+        Subcommand::Unload(args) => lifecycle_verb("unload", args.spirit.as_deref(), color),
         Subcommand::Run(args) => run(args, color),
         Subcommand::Audit(args) => audit_dispatch(&args.query, color),
     }
@@ -69,6 +69,19 @@ fn install(args: &InstallArgs, _color: ColorChoice) -> ExitCode {
         }
     };
 
+    // Decision Register D4 (Story 1b.5c): unit-test and integration-smoke
+    // affordance. `MAOS_INSTALL_DRY_RUN=1` short-circuits the cargo build
+    // so the accessibility cascade test in `tests/accessibility_test.rs`
+    // can assert zero ANSI bytes without paying the ~30s build cost, and
+    // the integration smokes (`maosctl_smoke.sh`, `v01_evaluator_path.sh`)
+    // keep under 60s. The real cargo build path is exercised by the
+    // release binary build step at the top of each integration script
+    // (which compiles `maos-spirit-hello` transitively).
+    if std::env::var_os("MAOS_INSTALL_DRY_RUN").is_some() {
+        eprintln!("maosctl: {spirit_crate} compiled successfully");
+        return ExitCode::SUCCESS;
+    }
+
     let mut cmd = std::process::Command::new("cargo");
     cmd.args(["build", "-p", spirit_crate, "--locked"]);
 
@@ -83,6 +96,63 @@ fn install(args: &InstallArgs, _color: ColorChoice) -> ExitCode {
         }
         Err(e) => {
             eprintln!("maosctl: failed to execute cargo build: {e}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+/// v0.1-β lifecycle dispatch: shell out to `maos-bin` with
+/// `MAOS_ONE_SHOT=<verb>` per Decision Register D2.
+///
+/// At v0.1-β each verb writes exactly one Lifecycle Journal entry and
+/// exits. No supervisor, no mailbox, no `task.orphaned` emission — those
+/// land in Epic 5 (Story 5.1) with a real supervised lifecycle. The
+/// journal entry IS the observable v0.1 side-effect.
+///
+/// Decision Register D3: the shape is `spirit: Option<&str>` — all
+/// three v0.1-β `*Args` structs are identical, but Epic 5 will
+/// differentiate them (Stop will gain `--grace-period`, etc.), so the
+/// distinct struct types in `cli.rs` are preserved.
+///
+/// Spirit-name validation is delegated to [`resolve_spirit_pid`]; the
+/// returned `u32` is discarded — only the `Err(_)` branch is
+/// load-bearing for lifecycle verbs (journal entries are keyed by
+/// `spirit_id: String`, not `spirit_pid: u32`).
+fn lifecycle_verb(verb: &str, spirit: Option<&str>, color: ColorChoice) -> ExitCode {
+    let name = match spirit {
+        Some(s) => s,
+        None => {
+            eprintln!(
+                "maosctl: {verb} requires a spirit argument, e.g. 'maosctl {verb} hello-spirit'"
+            );
+            return ExitCode::from(2);
+        }
+    };
+
+    if let Err(diag) = resolve_spirit_pid(name) {
+        eprintln!("maosctl: {verb} — {diag}");
+        return ExitCode::from(2);
+    }
+
+    let bin = maos_bin_path();
+    let mut cmd = std::process::Command::new(&bin);
+    cmd.env("MAOS_ONE_SHOT", verb);
+    cmd.env("MAOS_SPIRIT_ID", name);
+
+    // Forward NO_COLOR / --plain through to the child for accessibility
+    // (NFR-Ops-5). Mirror the existing `run` dispatch shape.
+    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+        cmd.env("NO_COLOR", "1");
+    }
+
+    match cmd.status() {
+        Ok(s) if s.success() => ExitCode::SUCCESS,
+        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+        Err(e) => {
+            eprintln!(
+                "maosctl: failed to execute maos-bin at '{}': {e}",
+                bin.display()
+            );
             ExitCode::from(2)
         }
     }
@@ -206,12 +276,6 @@ fn default_transparency_log_path() -> PathBuf {
     maos_audit::default_transparency_log_path()
 }
 
-fn stub(name: &str, future_story: &str) -> ExitCode {
-    eprintln!(
-        "maosctl: {name} not yet implemented at v0.1-α — landing at {future_story}"
-    );
-    ExitCode::from(2)
-}
 
 #[cfg(test)]
 mod tests {
@@ -333,6 +397,54 @@ mod tests {
             err.contains("only 'hello-spirit' is available at v0.1-β"),
             "diagnostic must name the v0.1-β scope: got {err}"
         );
+    }
+
+    // ── Lifecycle verb parsing tests (Story 1b.5c, AC1) ──────────────────
+
+    #[test]
+    fn dispatch_start_parses_hello_spirit_globally_with_plain() {
+        let cli = Cli::try_parse_from(["maosctl", "--plain", "start", "hello-spirit"]).unwrap();
+        assert!(cli.plain, "global --plain flag must round-trip");
+        match &cli.command {
+            Subcommand::Start(args) => {
+                assert_eq!(args.spirit.as_deref(), Some("hello-spirit"));
+            }
+            _ => panic!("expected Start subcommand"),
+        }
+    }
+
+    #[test]
+    fn dispatch_stop_unload_parse_with_no_args() {
+        // The CLI parses even without a spirit name; the dispatch helper
+        // surfaces the missing-arg diagnostic at runtime (verified via
+        // integration smoke). This unit test pins the clap surface.
+        let cli = Cli::try_parse_from(["maosctl", "stop"]).unwrap();
+        match &cli.command {
+            Subcommand::Stop(args) => assert!(args.spirit.is_none()),
+            _ => panic!("expected Stop subcommand"),
+        }
+        let cli = Cli::try_parse_from(["maosctl", "unload"]).unwrap();
+        match &cli.command {
+            Subcommand::Unload(args) => assert!(args.spirit.is_none()),
+            _ => panic!("expected Unload subcommand"),
+        }
+    }
+
+    #[test]
+    fn lifecycle_verb_rejects_unknown_spirit_with_exit_two() {
+        // Drive the helper directly — `resolve_spirit_pid` rejects unknown
+        // names with the exact v0.1-β diagnostic, and the helper translates
+        // that to exit 2 BEFORE spawning the child.
+        let color = ColorChoice::Auto;
+        let code = lifecycle_verb("start", Some("orchestrator"), color);
+        assert_ne!(code, ExitCode::SUCCESS);
+    }
+
+    #[test]
+    fn lifecycle_verb_rejects_missing_spirit_with_exit_two() {
+        let color = ColorChoice::Auto;
+        let code = lifecycle_verb("stop", None, color);
+        assert_ne!(code, ExitCode::SUCCESS);
     }
 }
 

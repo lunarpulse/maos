@@ -187,3 +187,26 @@
 # Story 1b.4 — maos-domain port-trait re-exports (InferencePort)
 "maos_kernel_core::inference::maos_domain::ports::InferencePort"  = "data-movement"
 "maos_kernel_core::security::maos_domain::ports::CryptoProvider"  = "data-movement"
+
+# Story 1b.5c — six new manifest section parsers (NFR-Test-13 coverage).
+# Each section is admission-time configuration parsed once and dropped;
+# the classifications mirror the §4.0.7 taxonomy applied to the
+# Story 1b.3 manifest types above.
+"maos_kernel_core::security::manifest::ClassSection"              = "supervision"
+"maos_kernel_core::security::manifest::CapabilitiesRequired"      = "universal-arithmetic"
+"maos_kernel_core::security::manifest::ProviderCapabilities"      = "universal-arithmetic"
+"maos_kernel_core::security::manifest::PostureSection"            = "supervision"
+"maos_kernel_core::security::manifest::Posture"                   = "supervision"
+"maos_kernel_core::security::manifest::OutputShape"               = "data-movement"
+"maos_kernel_core::security::manifest::Budget"                    = "data-movement"
+"maos_kernel_core::security::manifest::Author"                    = "data-movement"
+
+# api/* re-exports (via security::pub use → api::SecurityManagerAdapter chain)
+"maos_kernel_core::api::crate::security::ClassSection"            = "supervision"
+"maos_kernel_core::api::crate::security::CapabilitiesRequired"    = "universal-arithmetic"
+"maos_kernel_core::api::crate::security::ProviderCapabilities"    = "universal-arithmetic"
+"maos_kernel_core::api::crate::security::PostureSection"          = "supervision"
+"maos_kernel_core::api::crate::security::Posture"                 = "supervision"
+"maos_kernel_core::api::crate::security::OutputShape"             = "data-movement"
+"maos_kernel_core::api::crate::security::Budget"                  = "data-movement"
+"maos_kernel_core::api::crate::security::Author"                  = "data-movement"

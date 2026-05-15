@@ -1,0 +1,3 @@
+# expect: ManifestError::Validation (must be > 0)
+context_window_size = 4096
+time_cap_seconds = 0

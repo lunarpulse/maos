@@ -1,0 +1,3 @@
+# expect: ManifestError::Validation (allowed_max < default)
+default = "autonomous"
+allowed_max = "cautious"

@@ -1,0 +1,2 @@
+# expect: ManifestError::Validation (unknown trust_tier)
+trust_tier = "premium"

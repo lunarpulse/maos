@@ -1060,8 +1060,8 @@ coverage:
     phase: v0.3
     valid_until: '2027-05-12'
   NFR-Test-13:
-    gates: []
-    corpora: []
+    gates: [manifest-field-coverage]
+    corpora: [crates/maos-kernel-core/tests/fixtures/manifest]
     phase: v0.1
     valid_until: '2027-05-12'
   NFR-Test-14:

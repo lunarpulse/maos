@@ -1,0 +1,2 @@
+default = "cautious"
+allowed_max = "autonomous-with-halt"

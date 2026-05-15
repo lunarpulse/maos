@@ -50,3 +50,25 @@ atomically via CoW swap.
 **Reason:** composite adapter holding `Arc` references to the four ADR-030 sub-modules
 (tokens, policy, quota) and the audit channel sender. Each sub-module is independently
 exempted; the composite holds only shared references, no additional persistent state.
+
+### `ClassSection` / `RawClassSection` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** manifest data structs (Story 1b.5c) — parsed once from a TOML file at
+Spirit admission and dropped immediately after `admit_spirit` consumes the validated
+shape. The `forms: Vec<String>` field triggers the I9 walker's non-primitive-Vec
+heuristic, but no instance survives past the admission stack frame. Coverage gated
+by NFR-Test-13's `manifest_field_coverage` walker.
+
+### `ProviderCapabilities` / `RawProviderCapabilities` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** manifest data structs (Story 1b.5c) — declared `provider.complete` capability
+list parsed from the `[capabilities.required]` manifest section. Same parsed-then-dropped
+lifecycle as `ClassSection`. The `complete: Vec<String>` field is the AC3 NFR-Test-13
+gated enumeration of allowed Inference Port providers; no kernel persistence.
+
+### `OutputShape` / `RawOutputShape` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** manifest data struct (Story 1b.5c) — declared FR58 `required_fields` list
+parsed from the `[output_shape]` manifest section. Parsed-then-dropped at admission;
+the orchestrator verifies the Spirit's response shape against this list and discards
+the struct after validation. No kernel persistence.

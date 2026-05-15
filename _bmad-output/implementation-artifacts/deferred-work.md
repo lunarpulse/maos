@@ -108,3 +108,9 @@
 - **Non-one-shot server exit path does not drain `audit_writer` — rows silently lost.** In server (non-one-shot) mode, SIGINT/SIGTERM triggers immediate return without awaiting the audit writer. Last N audit entries are permanently lost. Pre-existing gap in the server-mode exit path, not introduced by this story's one-shot drain fix.
 - **No test for bare `maosctl audit query --format plain` (without `--spirit`).** The bare-plain path has zero coverage in integration tests. Works correctly but untested.
 - **`to_plain` silent integer truncation: negative SQLite values cast to unsigned via `as`.** `row.get::<_, i64>(1)? as u64` silently wraps negative SQLite INTEGER values to two's-complement garbage. No CHECK constraints on the SQLite schema prevent negative values. Pre-existing pattern from Story 1b.1's original `query` function.
+
+## Deferred from: code review of 1b-5c-maosctl-v0-1-lifecycle-subcommands-accessibility-flags (2026-05-15)
+
+- **`resolve_spirit_pid` PID unused in lifecycle verbs** — by design at v0.1-β; journal keys by `spirit_id: String`, not `spirit_pid: u32`. Pre-existing pattern from 1b.5b. No action needed until Epic 5 introduces real process control.
+- **Orphan-fixture detection misses `.toml` files in non-standard category subdirectories** — `find_orphan_fixtures` only walks `well-formed/`, `malformed-rejected/`, `edge-case/`. Files in unrecognized subdirs pass silently. Pre-existing design limitation of the NFR-Test-13 walker.
+- **Corrupted last journal line makes journal permanently unopenable** — `JournalAdapter::open` fails on first unparseable NDJSON line (parse-and-reject, not skip-and-continue). Pre-existing in Story 1b.1's journal design (`journal/mod.rs:110-121`). A truncated tail from SIGKILL mid-write blocks all future opens.

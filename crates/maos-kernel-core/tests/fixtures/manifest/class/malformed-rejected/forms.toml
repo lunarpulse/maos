@@ -1,0 +1,2 @@
+# expect: ManifestError::Validation (unknown form)
+forms = ["wasm"]

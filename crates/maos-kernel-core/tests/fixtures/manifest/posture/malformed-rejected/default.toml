@@ -1,0 +1,3 @@
+# expect: ManifestError::Toml (unknown variant)
+default = "feral"
+allowed_max = "assistive"

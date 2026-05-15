@@ -18,4 +18,5 @@ gates = [
     "rebaseline-check",
     "calibrate",
     "check-security-md",
+    "manifest-field-coverage",
 ]

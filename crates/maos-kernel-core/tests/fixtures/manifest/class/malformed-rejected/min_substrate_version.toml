@@ -1,0 +1,2 @@
+# expect: ManifestError::Validation (not semver)
+min_substrate_version = "not-a-version"
