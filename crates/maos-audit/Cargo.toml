@@ -16,3 +16,12 @@ maos-domain = { path = "../maos-domain" }
 
 [dev-dependencies]
 tempfile = "3"
+
+# Story 1b.5b — fixture generator binary. Synthetic FR4 NDJSON producer that
+# never touches `maos-kernel-core`; uses only existing deps (`serde_json`)
+# plus a hand-rolled LCG for determinism. Lives under `src/bin/` so it does
+# NOT enter the library dependency graph — `cargo tree -p maos-audit` is
+# unaffected.
+[[bin]]
+name = "gen_fixture"
+path = "src/bin/gen_fixture.rs"

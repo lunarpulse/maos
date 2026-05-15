@@ -336,6 +336,26 @@ jobs:
       - name: Run FR4 1000-call mediation fixture
         run: cargo test -p maos-kernel-core --test fr4_1000_call_fixture
 
+  audit-query-fr4-smoke:
+    # Story 1b.5b AC4 — end-to-end `maosctl audit query` mechanical
+    # verification path. Seeds the on-disk Transparency Log via the
+    # one-shot hello-Spirit binary, then asserts the FR4 NDJSON schema
+    # via jq. Complementary to `fr4-1000-call-fixture` (kernel-side
+    # mediation) — this gate exercises the read-side surface.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Install jq (smoke harness dependency)
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Run audit-query FR4 smoke
+        run: bash tests/integration/audit_query_fr4_smoke.sh
+
   hello-spirit-tests:
     runs-on: ubuntu-latest
     steps:
@@ -457,7 +477,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47]
     if: always()
     permissions:
       pull-requests: write
@@ -480,6 +500,7 @@ jobs:
           echo "ctvb=${{ needs.cap-token-verify-bench.result }}" >> $GITHUB_OUTPUT
           echo "crs=${{ needs.cap-registry-smoke.result }}" >> $GITHUB_OUTPUT
           echo "fr4=${{ needs.fr4-1000-call-fixture.result }}" >> $GITHUB_OUTPUT
+          echo "aqfs=${{ needs.audit-query-fr4-smoke.result }}" >> $GITHUB_OUTPUT
           echo "hst=${{ needs.hello-spirit-tests.result }}" >> $GITHUB_OUTPUT
           echo "hsb=${{ needs.hello-spirit-bench.result }}" >> $GITHUB_OUTPUT
           echo "onb=${{ needs.onb-nfr2-timing.result }}" >> $GITHUB_OUTPUT
@@ -515,6 +536,7 @@ jobs:
             const ctvb = '${{ needs.cap-token-verify-bench.result }}';
             const crs = '${{ needs.cap-registry-smoke.result }}';
             const fr4 = '${{ needs.fr4-1000-call-fixture.result }}';
+            const aqfs = '${{ needs.audit-query-fr4-smoke.result }}';
             const hst = '${{ needs.hello-spirit-tests.result }}';
             const hsb = '${{ needs.hello-spirit-bench.result }}';
             const onb = '${{ needs.onb-nfr2-timing.result }}';
@@ -545,6 +567,7 @@ jobs:
             | cap-token-verify-bench | ${icon(ctvb)} ${ctvb} |
             | cap-registry-smoke | ${icon(crs)} ${crs} |
             | fr4-1000-call-fixture | ${icon(fr4)} ${fr4} |
+            | audit-query-fr4-smoke | ${icon(aqfs)} ${aqfs} |
             | hello-spirit-tests | ${icon(hst)} ${hst} |
             | hello-spirit-bench | ${icon(hsb)} ${hsb} |
             | onb-nfr2-timing | ${icon(onb)} ${onb} |

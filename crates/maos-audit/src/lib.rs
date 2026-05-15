@@ -29,6 +29,37 @@ pub enum AuditError {
     Encode(#[from] serde_json::Error),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+    /// FR4 schema-projection rejected an entry. Surface side stops emitting
+    /// on the first violation (AC2: fail fast; no silent pass on partial coverage).
+    #[error("FR4 schema violation at line {line}: missing field '{missing_field}'")]
+    Fr4SchemaViolation {
+        line: usize,
+        missing_field: &'static str,
+    },
+}
+
+/// FR4-projection error returned by [`project_to_fr4`]. Lifted into
+/// [`AuditError::Fr4SchemaViolation`] by [`to_fr4_ndjson`].
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum Fr4SchemaError {
+    /// `capability_token` was `NULL` — mandatory under FR4's 100% mediation rule.
+    #[error("missing capability_token")]
+    MissingCapabilityToken,
+    /// `kind` discriminator decoded to `unknown(N)` — projection refuses to
+    /// emit a row whose call_type the read side does not understand.
+    #[error("unknown call_type '{0}'")]
+    UnknownCallType(String),
+}
+
+impl Fr4SchemaError {
+    /// Stable, short string naming the missing field (used in diagnostics
+    /// and in [`AuditError::Fr4SchemaViolation::missing_field`]).
+    pub fn missing_field(&self) -> &'static str {
+        match self {
+            Fr4SchemaError::MissingCapabilityToken => "capability_token",
+            Fr4SchemaError::UnknownCallType(_) => "call_type",
+        }
+    }
 }
 
 /// One audit entry from the Transparency Log. Mirrors the kernel-side
@@ -109,7 +140,8 @@ pub fn query(
     }
     sql.push_str(" ORDER BY timestamp_ns ASC, frame_id ASC");
     if let Some(limit) = filter.limit {
-        sql.push_str(&format!(" LIMIT {limit}"));
+        params.push(Box::new(limit as i64));
+        sql.push_str(" LIMIT ?");
     }
 
     let mut stmt = conn.prepare(&sql).map_err(AuditError::Read)?;
@@ -139,6 +171,10 @@ pub fn query(
 }
 
 /// Write entries to an NDJSON stream. One JSON object per line.
+///
+/// This is the raw audit-entry surface preserved for Story 9.1 (subject-access /
+/// posture-delta / sealed-export). For the FR4 mechanical-verification surface
+/// see [`to_fr4_ndjson`].
 pub fn to_ndjson<W: Write>(
     entries: impl IntoIterator<Item = AuditEntry>,
     mut out: W,
@@ -148,6 +184,196 @@ pub fn to_ndjson<W: Write>(
         writeln!(out, "{line}")?;
     }
     Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// FR4 projection (Story 1b.5b, AC1)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// FR4 NDJSON projection of a Transparency-Log row.
+///
+/// Per AC1, every entry surfaced by `maosctl audit query --spirit <name>` must
+/// carry exactly these six keys and all five **mandatory** fields
+/// (`capability_token`, `spirit_pid`, `boot_nonce`, `call_type`, `timestamp_ns`)
+/// must be non-null. A missing or null mandatory field is a schema violation
+/// that fails the command with exit code 2 — see [`to_fr4_ndjson`].
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct Fr4Entry {
+    /// 32-char hex of the 16-byte frame_id (always present — PRIMARY KEY in schema).
+    pub call_id: String,
+    /// 64-char hex of the 32-byte Ed25519 capability token.
+    /// Mandatory — `None` upstream becomes [`Fr4SchemaError::MissingCapabilityToken`].
+    pub capability_token: String,
+    /// Spirit process ID at the time of the call. Mandatory.
+    pub spirit_pid: u32,
+    /// Boot nonce of the kernel that wrote this row. Mandatory.
+    pub boot_nonce: u64,
+    /// Dot-separated kind string (e.g. `"capability.invocation"`,
+    /// `"inference.call"`). Mandatory; `unknown(N)` is rejected.
+    pub call_type: String,
+    /// Wall-clock timestamp in nanoseconds. Mandatory.
+    pub timestamp_ns: u64,
+}
+
+/// Project a raw [`AuditEntry`] to the FR4 schema. Returns
+/// [`Fr4SchemaError::MissingCapabilityToken`] when the source row has
+/// `capability_token = NULL`, and [`Fr4SchemaError::UnknownCallType`] when
+/// `kind` decoded to `unknown(N)`.
+pub fn project_to_fr4(entry: &AuditEntry) -> Result<Fr4Entry, Fr4SchemaError> {
+    let capability_token = entry
+        .capability_token_hex
+        .clone()
+        .ok_or(Fr4SchemaError::MissingCapabilityToken)?;
+    if entry.kind.starts_with("unknown(") {
+        return Err(Fr4SchemaError::UnknownCallType(entry.kind.clone()));
+    }
+    Ok(Fr4Entry {
+        call_id: entry.frame_id_hex.clone(),
+        capability_token,
+        spirit_pid: entry.spirit_pid,
+        boot_nonce: entry.boot_nonce,
+        call_type: entry.kind.clone(),
+        timestamp_ns: entry.timestamp_ns,
+    })
+}
+
+/// Write entries as FR4 NDJSON — one [`Fr4Entry`] per line.
+///
+/// Per AC1 + AC2, stops at the first projection failure and returns
+/// [`AuditError::Fr4SchemaViolation`] naming the offending 1-indexed line and
+/// the missing field. Output is buffered internally so no partial NDJSON lines
+/// reach the writer on violation — the dispatcher must surface the error and
+/// exit non-zero.
+pub fn to_fr4_ndjson<W: Write>(
+    entries: impl IntoIterator<Item = AuditEntry>,
+    mut out: W,
+) -> Result<(), AuditError> {
+    let mut buf = Vec::new();
+    for (idx, entry) in entries.into_iter().enumerate() {
+        let projected = project_to_fr4(&entry).map_err(|e| AuditError::Fr4SchemaViolation {
+            line: idx + 1,
+            missing_field: e.missing_field(),
+        })?;
+        let line = serde_json::to_string(&projected)?;
+        writeln!(buf, "{line}")?;
+    }
+    out.write_all(&buf)?;
+    Ok(())
+}
+
+/// Write entries as human-readable tabular text. Never emits ANSI escapes
+/// (no `colored` crate, no `\x1b` bytes). Used by `maosctl audit query
+/// --format plain` and engaged automatically when the NFR-Ops-5 cascade
+/// disables color (`--plain` / `NO_COLOR=1` / `TERM=dumb`).
+///
+/// Rows missing a `capability_token` are rendered as `<missing>` in the
+/// token column rather than skipped — the operator sees the gap directly.
+pub fn to_plain<W: Write>(
+    entries: impl IntoIterator<Item = AuditEntry>,
+    mut out: W,
+) -> Result<(), AuditError> {
+    writeln!(
+        out,
+        "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}  {}",
+        "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns", "capability_token",
+    )?;
+    for entry in entries {
+        let token = entry
+            .capability_token_hex
+            .as_deref()
+            .unwrap_or("<missing>");
+        writeln!(
+            out,
+            "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}",
+            truncate(&entry.frame_id_hex, 32),
+            entry.boot_nonce,
+            entry.spirit_pid,
+            truncate(&entry.kind, 22),
+            entry.timestamp_ns,
+            token,
+        )?;
+    }
+    Ok(())
+}
+
+/// Write entries as FR4-validated human-readable tabular text. Same as
+/// [`to_plain`] but validates the FR4 mandatory-field contract first and
+/// aborts with [`AuditError::Fr4SchemaViolation`] on the first violation.
+/// Used when `--spirit` is active and `--format plain` is selected so that
+/// both formats enforce the same exit-code-2 contract per AC1.
+pub fn to_fr4_plain<W: Write>(
+    entries: impl IntoIterator<Item = AuditEntry>,
+    mut out: W,
+) -> Result<(), AuditError> {
+    let projected: Vec<Fr4Entry> = entries
+        .into_iter()
+        .enumerate()
+        .map(|(idx, entry)| {
+            project_to_fr4(&entry).map_err(|e| AuditError::Fr4SchemaViolation {
+                line: idx + 1,
+                missing_field: e.missing_field(),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    writeln!(
+        out,
+        "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}",
+        "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns",
+    )?;
+    for entry in &projected {
+        writeln!(
+            out,
+            "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}",
+            truncate(&entry.call_id, 32),
+            entry.boot_nonce,
+            entry.spirit_pid,
+            truncate(&entry.call_type, 22),
+            entry.timestamp_ns,
+        )?;
+    }
+    Ok(())
+}
+
+/// Resolve the default Transparency Log SQLite path.
+///
+/// Shared by `maos-bin` (write side) and `maos-cli` (read side) so both
+/// binaries always agree on the same location. Extracted here rather than
+/// duplicated across crates to prevent silent path-drift data loss.
+///
+/// Precedence (highest → lowest):
+///   1. `MAOS_AUDIT_DB` env var (explicit override; used by tests and ops).
+///      Empty-string is rejected — callers should exit with a diagnostic.
+///   2. `$XDG_DATA_HOME/maos/audit/transparency.sqlite`
+///   3. `$HOME/.local/share/maos/audit/transparency.sqlite`
+///   4. `/var/lib/maos/audit/transparency.sqlite` (last-resort fallback)
+pub fn default_transparency_log_path() -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Ok(p) = std::env::var("MAOS_AUDIT_DB") {
+        if p.is_empty() {
+            eprintln!("maos: MAOS_AUDIT_DB is set but empty — unset it or provide a path");
+            std::process::exit(2);
+        }
+        return PathBuf::from(p);
+    }
+    let data_home = std::env::var("XDG_DATA_HOME")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .map(|h| PathBuf::from(h).join(".local").join("share"))
+        })
+        .unwrap_or_else(|| PathBuf::from("/var/lib"));
+    data_home.join("maos").join("audit").join("transparency.sqlite")
+}
+
+fn truncate(s: &str, n: usize) -> &str {
+    let mut end = n.min(s.len());
+    while !s.is_char_boundary(end) && end > 0 {
+        end -= 1;
+    }
+    &s[..end]
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
@@ -278,5 +504,110 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(output.trim()).unwrap();
         assert_eq!(parsed["spirit_pid"], 7);
         assert_eq!(parsed["intent"], "delegate");
+    }
+
+    // ── FR4 projection + writer tests (Story 1b.5b, AC1) ────────────────
+
+    fn sample_entry() -> AuditEntry {
+        AuditEntry {
+            frame_id_hex: "aa".repeat(16),
+            timestamp_ns: 1_700_000_000_000_000_000,
+            spirit_pid: 7,
+            boot_nonce: 0xCAFE_F00D_DEAD_BEEF,
+            capability_token_hex: Some("bb".repeat(32)),
+            kind: "inference.call".into(),
+            intent: "claude-3-haiku".into(),
+        }
+    }
+
+    #[test]
+    fn project_to_fr4_keeps_five_mandatory_fields() {
+        let projected = project_to_fr4(&sample_entry()).unwrap();
+        assert_eq!(projected.call_id.len(), 32);
+        assert_eq!(projected.capability_token.len(), 64);
+        assert_eq!(projected.spirit_pid, 7);
+        assert_eq!(projected.boot_nonce, 0xCAFE_F00D_DEAD_BEEF);
+        assert_eq!(projected.call_type, "inference.call");
+        assert_eq!(projected.timestamp_ns, 1_700_000_000_000_000_000);
+    }
+
+    #[test]
+    fn project_to_fr4_rejects_null_capability_token() {
+        let mut entry = sample_entry();
+        entry.capability_token_hex = None;
+        let err = project_to_fr4(&entry).unwrap_err();
+        assert_eq!(err, Fr4SchemaError::MissingCapabilityToken);
+        assert_eq!(err.missing_field(), "capability_token");
+    }
+
+    #[test]
+    fn project_to_fr4_rejects_unknown_call_type() {
+        let mut entry = sample_entry();
+        entry.kind = "unknown(42)".into();
+        let err = project_to_fr4(&entry).unwrap_err();
+        assert!(matches!(err, Fr4SchemaError::UnknownCallType(_)));
+        assert_eq!(err.missing_field(), "call_type");
+    }
+
+    #[test]
+    fn to_fr4_ndjson_emits_exact_schema_keys() {
+        let mut buf = Vec::new();
+        to_fr4_ndjson(vec![sample_entry()], &mut buf).unwrap();
+        let line = String::from_utf8(buf).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(line.trim()).unwrap();
+        let obj = parsed.as_object().expect("object");
+        // Exactly the six keys, no extras (intent, payload_redacted excluded).
+        let mut keys: Vec<&str> = obj.keys().map(|s| s.as_str()).collect();
+        keys.sort();
+        assert_eq!(
+            keys,
+            vec!["boot_nonce", "call_id", "call_type", "capability_token", "spirit_pid", "timestamp_ns"]
+        );
+    }
+
+    #[test]
+    fn to_fr4_ndjson_stops_on_first_violation_with_line_number() {
+        let mut good = sample_entry();
+        good.frame_id_hex = "11".repeat(16);
+        let mut bad = sample_entry();
+        bad.frame_id_hex = "22".repeat(16);
+        bad.capability_token_hex = None;
+        let mut buf = Vec::new();
+        let err = to_fr4_ndjson(vec![good, bad], &mut buf).unwrap_err();
+        match err {
+            AuditError::Fr4SchemaViolation { line, missing_field } => {
+                assert_eq!(line, 2);
+                assert_eq!(missing_field, "capability_token");
+            }
+            _ => panic!("expected Fr4SchemaViolation"),
+        }
+        // Buffer is flushed only on success, so no lines are emitted on violation.
+        let written = String::from_utf8(buf).unwrap();
+        let lines: Vec<&str> = written.lines().collect();
+        assert_eq!(lines.len(), 0, "no partial output on FR4 schema violation");
+    }
+
+    #[test]
+    fn to_plain_emits_zero_ansi_bytes() {
+        let mut buf = Vec::new();
+        to_plain(vec![sample_entry()], &mut buf).unwrap();
+        let esc_count = buf.iter().filter(|b| **b == 0x1b).count();
+        assert_eq!(esc_count, 0, "to_plain emitted ANSI escape bytes");
+        // Header + 1 data row.
+        let s = String::from_utf8(buf).unwrap();
+        assert_eq!(s.lines().count(), 2);
+        assert!(s.contains("call_id"));
+    }
+
+    #[test]
+    fn to_plain_renders_missing_capability_token_inline() {
+        let mut entry = sample_entry();
+        entry.capability_token_hex = None;
+        let mut buf = Vec::new();
+        to_plain(vec![entry], &mut buf).unwrap();
+        let esc_count = buf.iter().filter(|b| **b == 0x1b).count();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("<missing>"));
+        assert_eq!(esc_count, 0);
     }
 }

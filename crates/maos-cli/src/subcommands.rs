@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::accessibility::ColorChoice;
-use crate::cli::{Subcommand, AuditQuery, RunArgs, InstallArgs};
+use crate::cli::{AuditFormat, AuditQuery, InstallArgs, RunArgs, Subcommand};
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
     match cmd {
@@ -15,7 +15,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Stop(_) => stub("stop", "Story 5.1"),
         Subcommand::Unload(_) => stub("unload", "Story 5.1"),
         Subcommand::Run(args) => run(args, color),
-        Subcommand::Audit(args) => audit_dispatch(&args.query),
+        Subcommand::Audit(args) => audit_dispatch(&args.query, color),
     }
 }
 
@@ -109,15 +109,43 @@ fn maos_bin_path() -> PathBuf {
     PathBuf::from("maos-bin")
 }
 
-fn audit_dispatch(query_kind: &Option<AuditQuery>) -> ExitCode {
+fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCode {
     match query_kind {
-        None | Some(AuditQuery::Query) => audit_query(),
+        // Bare `maosctl audit` — defaults to ndjson over all entries.
+        None => audit_query(None, AuditFormat::Ndjson, color),
+        Some(AuditQuery::Query { spirit, format }) => {
+            audit_query(spirit.as_deref(), *format, color)
+        }
     }
 }
 
-fn audit_query() -> ExitCode {
+/// Resolve a Spirit name to its `spirit_pid` for filtering. At v0.1-β only
+/// `hello-spirit` is resolvable (maps to `0` per Story 1b.5a's one-shot path).
+/// Other names exit non-zero with a clear diagnostic — full Spirit registry
+/// lookup is Epic 5.
+fn resolve_spirit_pid(name: &str) -> Result<u32, String> {
+    match name {
+        "hello-spirit" => Ok(0),
+        other => Err(format!(
+            "unknown spirit, only 'hello-spirit' is available at v0.1-β (got '{other}')"
+        )),
+    }
+}
+
+fn audit_query(spirit: Option<&str>, format: AuditFormat, _color: ColorChoice) -> ExitCode {
     let db_path = default_transparency_log_path();
-    let filter = maos_audit::AuditFilter::default();
+
+    let mut filter = maos_audit::AuditFilter::default();
+    if let Some(name) = spirit {
+        match resolve_spirit_pid(name) {
+            Ok(pid) => filter.spirit_pid = Some(pid),
+            Err(diag) => {
+                eprintln!("maosctl: audit query — {diag}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
     let entries = match maos_audit::query(&db_path, filter) {
         Ok(e) => e,
         Err(maos_audit::AuditError::Open(_)) => {
@@ -133,32 +161,49 @@ fn audit_query() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+
     let stdout = std::io::stdout();
     let lock = stdout.lock();
-    if let Err(e) = maos_audit::to_ndjson(entries, lock) {
-        eprintln!("maosctl: audit query — output error: {e}");
-        return ExitCode::from(2);
+    // FR4 projection engages only when the operator scopes the query to a
+    // Spirit (`--spirit <name>`). Bare `maosctl audit query` keeps the
+    // legacy raw `AuditEntry` NDJSON surface (Story 1b.1 / `to_ndjson`) so
+    // existing tooling (e.g. `tests/integration/audit_spine_smoke.sh`)
+    // observing `frame_id`/`intent` continues to work. AC1 mandates the
+    // FR4 six-key schema for the `--spirit` form specifically; the bare
+    // form remains Story 9.1's territory.
+    //
+    // `_color` is currently advisory — both formats already emit zero ANSI
+    // bytes unconditionally. Wired through for future colored ndjson keys
+    // (Story 9.1) and to document the contract.
+    let fr4_mode = spirit.is_some();
+    let write_result = match (fr4_mode, format) {
+        (true, AuditFormat::Ndjson) => maos_audit::to_fr4_ndjson(entries, lock),
+        (true, AuditFormat::Plain) => maos_audit::to_fr4_plain(entries, lock),
+        (false, AuditFormat::Ndjson) => maos_audit::to_ndjson(entries, lock),
+        (false, AuditFormat::Plain) => maos_audit::to_plain(entries, lock),
+    };
+    match write_result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(maos_audit::AuditError::Fr4SchemaViolation { line, missing_field }) => {
+            eprintln!(
+                "maosctl: audit query — FR4 schema violation at line {line}: missing field '{missing_field}'"
+            );
+            ExitCode::from(2)
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit query — output error: {e}");
+            ExitCode::from(2)
+        }
     }
-    ExitCode::SUCCESS
 }
 
 /// Resolve the default Transparency Log SQLite path.
-/// XDG-compliant: `$XDG_DATA_HOME/maos/audit/transparency.sqlite`
-/// Override via `MAOS_AUDIT_DB` environment variable.
+///
+/// Delegates to [`maos_audit::default_transparency_log_path`] — the single
+/// source of truth shared by `maos-bin` (write side) and `maos-cli` (read
+/// side) to prevent path-drift data loss.
 fn default_transparency_log_path() -> PathBuf {
-    if let Ok(p) = std::env::var("MAOS_AUDIT_DB") {
-        return PathBuf::from(p);
-    }
-    // Hand-rolled XDG resolution (avoids dirs-next dep blast).
-    let data_home = std::env::var("XDG_DATA_HOME")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".local").join("share"))
-        })
-        .unwrap_or_else(|| PathBuf::from("/var/lib"));
-    data_home.join("maos").join("audit").join("transparency.sqlite")
+    maos_audit::default_transparency_log_path()
 }
 
 fn stub(name: &str, future_story: &str) -> ExitCode {
@@ -218,6 +263,76 @@ mod tests {
         let result = install(&args, color);
         // Non-zero exit code expected
         assert_ne!(result, ExitCode::SUCCESS);
+    }
+
+    // ── FR4 audit query dispatch parsing tests (Story 1b.5b) ─────────
+
+    #[test]
+    fn audit_query_accepts_spirit_and_format_flags() {
+        use crate::cli::{AuditQuery, AuditFormat};
+        let cli = Cli::try_parse_from([
+            "maosctl", "audit", "query", "--spirit", "hello-spirit", "--format", "ndjson",
+        ])
+        .expect("audit query --spirit / --format must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::Query { spirit, format }) => {
+                    assert_eq!(spirit.as_deref(), Some("hello-spirit"));
+                    assert_eq!(*format, AuditFormat::Ndjson);
+                }
+                _ => panic!("expected AuditQuery::Query struct variant"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_query_accepts_plain_format() {
+        use crate::cli::{AuditQuery, AuditFormat};
+        let cli = Cli::try_parse_from([
+            "maosctl", "audit", "query", "--spirit", "hello-spirit", "--format", "plain",
+        ])
+        .expect("audit query --format plain must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::Query { spirit: _, format }) => {
+                    assert_eq!(*format, AuditFormat::Plain);
+                }
+                _ => panic!("expected AuditQuery::Query struct variant"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_query_defaults_format_to_ndjson() {
+        use crate::cli::{AuditQuery, AuditFormat};
+        let cli = Cli::try_parse_from(["maosctl", "audit", "query"])
+            .expect("audit query with no flags must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::Query { spirit, format }) => {
+                    assert!(spirit.is_none(), "no --spirit means None");
+                    assert_eq!(*format, AuditFormat::Ndjson, "default format is ndjson");
+                }
+                _ => panic!("expected AuditQuery::Query struct variant"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn resolve_spirit_pid_maps_hello_spirit_to_zero() {
+        assert_eq!(resolve_spirit_pid("hello-spirit").unwrap(), 0);
+    }
+
+    #[test]
+    fn resolve_spirit_pid_rejects_other_names_with_clear_diagnostic() {
+        let err = resolve_spirit_pid("orchestrator").unwrap_err();
+        assert!(
+            err.contains("only 'hello-spirit' is available at v0.1-β"),
+            "diagnostic must name the v0.1-β scope: got {err}"
+        );
     }
 }
 

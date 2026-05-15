@@ -19,3 +19,9 @@ path = "src/lib.rs"
 clap = { version = "4.5", features = ["derive"] }
 maos-audit = { path = "../maos-audit" }
 serde_json = "1"
+
+[dev-dependencies]
+# Story 1b.5b — accessibility ANSI test. Both crates are already in the
+# workspace via `maos-audit`, so `Cargo.lock` does NOT grow.
+rusqlite = { version = "0.31", features = ["bundled"] }
+tempfile = "3"

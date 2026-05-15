@@ -46,9 +46,10 @@ pub enum Subcommand {
     Stop(StopArgs),
     /// Unload a Spirit (Story 5.1 lifecycle verbs).
     Unload(UnloadArgs),
-    /// Run a one-shot Spirit invocation (Story 1b.5b).
+    /// Run a one-shot Spirit invocation (Story 1b.5a / 1b.5b).
     Run(RunArgs),
-    /// Audit-trail subcommands (Story 1b.5b query subcommand; FR42–44 sealed-export at v1.0).
+    /// Audit-trail subcommands. `query` is the FR4 mechanical-verification surface
+    /// (Story 1b.5b); FR42–44 sealed-export lands at v1.0 (Story 9.1).
     Audit(AuditArgs),
 }
 
@@ -88,5 +89,34 @@ pub struct AuditArgs {
 #[derive(clap::Subcommand, Debug)]
 pub enum AuditQuery {
     /// Tail the local Transparency Log (Story 1b.5b).
-    Query,
+    ///
+    /// Per AC1, `--spirit <name>` filters to one Spirit and projects each row
+    /// to the FR4 NDJSON schema (call_id, capability_token, spirit_pid,
+    /// boot_nonce, call_type, timestamp_ns). `--format plain` produces
+    /// human-readable tabular text. Both formats emit zero ANSI bytes
+    /// when `NO_COLOR`, `TERM=dumb`, or `--plain` is set (NFR-Ops-5).
+    Query {
+        /// Filter by Spirit name. At v0.1-β only `hello-spirit` is resolvable
+        /// (maps to `spirit_pid = 0` per Story 1b.5a's one-shot path).
+        /// The full Spirit registry / scheduler lookup is Epic 5.
+        #[arg(long)]
+        spirit: Option<String>,
+
+        /// Output format. `ndjson` (default) emits the FR4 schema, one JSON
+        /// object per line. `plain` emits a human-readable tabular form.
+        #[arg(long, value_enum, default_value_t = AuditFormat::Ndjson)]
+        format: AuditFormat,
+    },
+}
+
+/// Output format for `maosctl audit query`.
+///
+/// Both formats are accessibility-clean: zero ANSI escape bytes when the
+/// NFR-Ops-5 cascade (`--plain` / `NO_COLOR=1` / `TERM=dumb`) is engaged.
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AuditFormat {
+    /// FR4 NDJSON: one JSON object per line; AC1 mandatory-field schema.
+    Ndjson,
+    /// Human-readable tabular text; never emits ANSI escapes.
+    Plain,
 }

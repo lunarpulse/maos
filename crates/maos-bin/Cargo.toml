@@ -12,6 +12,7 @@ name = "maos-bin"
 path = "src/main.rs"
 
 [dependencies]
+maos-audit = { path = "../maos-audit" }
 maos-domain = { path = "../maos-domain" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-providers = { path = "../maos-providers" }

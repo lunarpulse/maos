@@ -909,6 +909,7 @@ name = "maos-bin"
 version = "0.1.0-alpha"
 dependencies = [
  "getrandom 0.3.4",
+ "maos-audit",
  "maos-domain",
  "maos-kernel-core",
  "maos-providers",
@@ -924,7 +925,9 @@ version = "0.1.0-alpha"
 dependencies = [
  "clap",
  "maos-audit",
+ "rusqlite",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

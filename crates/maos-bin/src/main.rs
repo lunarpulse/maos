@@ -51,6 +51,15 @@ fn worker_thread_count() -> usize {
         .unwrap_or(1)
 }
 
+/// Resolve the on-disk Transparency Log SQLite path.
+///
+/// Delegates to [`maos_audit::default_transparency_log_path`] — the single
+/// source of truth shared by `maos-bin` (write side) and `maos-cli` (read
+/// side) to prevent path-drift data loss.
+fn default_transparency_log_path() -> std::path::PathBuf {
+    maos_audit::default_transparency_log_path()
+}
+
 /// Fallback provider when Anthropic is unconfigured (no API key).
 struct UnconfiguredProvider;
 
@@ -114,10 +123,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("maos: capability registry initialized (Story 1b.2)");
 
     // Transparency Log — shared across services (Story 1b.1).
-    let transparency_log = Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(boot_nonce));
+    //
+    // Story 1b.5b: switched from `open_in_memory` to on-disk SQLite at the
+    // XDG-resolved path so `maosctl audit query` can read back the rows the
+    // one-shot path just wrote. The path resolves identically to the
+    // CLI-side `default_transparency_log_path()` (see
+    // crates/maos-cli/src/subcommands.rs:148-162). Server mode (non-one-shot)
+    // benefits from the same change — a single line covers both paths; no
+    // branch on `MAOS_ONE_SHOT` is needed for storage selection.
+    let audit_db_path = default_transparency_log_path();
+    if let Some(parent) = audit_db_path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            eprintln!(
+                "maos: failed to create audit DB parent directory {}: {e}",
+                parent.display()
+            );
+            return Err(format!("audit-db parent create failed: {e}").into());
+        }
+    }
+    let transparency_log = Arc::new(
+        maos_kernel_core::iac::TransparencyLogAdapter::open(&audit_db_path, boot_nonce)
+            .map_err(|e| format!("failed to open audit DB at {}: {e}", audit_db_path.display()))?,
+    );
+    eprintln!(
+        "maos: Transparency Log opened on-disk at {}",
+        audit_db_path.display()
+    );
 
-    // Spawn the audit writer task (Story 1b.2).
-    let _audit_writer = maos_kernel_core::capability::cap_audit::CapAuditWriter::spawn(
+    // Spawn the audit writer task (Story 1b.2). Held by name so the one-shot
+    // exit path (Story 1b.5b) can drain the cap-audit channel deterministically
+    // before process exit — `drop(audit_tx); drop(...senders); audit_writer.await.ok();`.
+    let audit_writer = maos_kernel_core::capability::cap_audit::CapAuditWriter::spawn(
         audit_rx,
         Arc::clone(&transparency_log),
     );
@@ -196,6 +232,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let json = serde_json::to_string(&resp)
             .map_err(|e| format!("JSON serialization error: {e}"))?;
         println!("{json}");
+
+        // Story 1b.5b — drain the cap-audit channel deterministically before
+        // exit. `audit_tx` is cloned into `CapabilityRegistryAdapter::new`
+        // (line ~110) so dropping the local `audit_tx` is not enough — the
+        // adapter holds the surviving sender. Drop all owners in sequence so
+        // the writer task sees channel-close and the inference.call row is
+        // guaranteed to reach SQLite. Without this, the row is intermittently
+        // lost (the writer is `tokio::spawn`-ed and the runtime drops mid-flush
+        // on process exit).
+        drop(audit_tx);
+        drop(inference);
+        drop(capability);
+        // `transparency_log` is moved into the writer task's closure (Arc), so
+        // awaiting the writer drains the queue and releases its Arc clone.
+        if let Err(e) = audit_writer.await {
+            eprintln!("maos: audit writer task failed during drain: {e}");
+        }
 
         eprintln!("maos: one-shot complete — exiting cleanly");
         return Ok(());

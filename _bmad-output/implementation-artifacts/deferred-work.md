@@ -102,3 +102,9 @@
 
 - **Exit code truncation via `as u8` cast in subcommands.rs.** `ExitCode::from(s.code().unwrap_or(2) as u8)` — Unix exit codes are 0-255 so safe on POSIX, but `as u8` truncates any value >255 to 0 on Windows. Pre-existing pattern not introduced by this story.
 - **Timing script uses 1-second granularity for 300s NFR gate.** `date +%s` gives integer seconds; sub-second regression detection impossible. Acceptable for a 300s budget but provides coarse signal. Pre-existing design choice in `tests/integration/onb_nfr2_timing.sh`.
+
+## Deferred from: code review of 1b-5b-maosctl-audit-query-fr4-100-mediation-mechanical-verification (2026-05-15)
+
+- **Non-one-shot server exit path does not drain `audit_writer` — rows silently lost.** In server (non-one-shot) mode, SIGINT/SIGTERM triggers immediate return without awaiting the audit writer. Last N audit entries are permanently lost. Pre-existing gap in the server-mode exit path, not introduced by this story's one-shot drain fix.
+- **No test for bare `maosctl audit query --format plain` (without `--spirit`).** The bare-plain path has zero coverage in integration tests. Works correctly but untested.
+- **`to_plain` silent integer truncation: negative SQLite values cast to unsigned via `as`.** `row.get::<_, i64>(1)? as u64` silently wraps negative SQLite INTEGER values to two's-complement garbage. No CHECK constraints on the SQLite schema prevent negative values. Pre-existing pattern from Story 1b.1's original `query` function.
