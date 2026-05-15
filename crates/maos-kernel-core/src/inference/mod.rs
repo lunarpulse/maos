@@ -16,6 +16,7 @@ use maos_domain::ports::inference::{
 };
 
 use crate::capability::CapabilityRegistryAdapter;
+use crate::capability::TokenIssuer;
 use crate::iac::{FrameKind, TransparencyLogAdapter};
 use crate::telemetry::iac_rt::{IacRtMetrics, Outcome, Service};
 
@@ -54,6 +55,13 @@ impl InferencePortAdapter {
             transparency_log,
             telemetry,
         }
+    }
+
+    /// Access the capability registry as a `TokenIssuer` (for bench/test
+    /// setup that needs to issue tokens). Returns the narrow trait so
+    /// callers cannot access the full registry surface.
+    pub fn capability_registry(&self) -> &dyn TokenIssuer {
+        &*self.capabilities
     }
 
     /// Verify the capability token authorizes `Scope::ProviderInfer`.

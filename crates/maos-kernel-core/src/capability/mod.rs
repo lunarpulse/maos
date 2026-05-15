@@ -13,6 +13,7 @@ pub mod cap_audit;
 pub mod cap_quota;
 
 pub use maos_domain::ports::CapabilityRegistryPort;
+pub use maos_domain::ports::capability::TokenIssuer;
 
 use std::sync::Arc;
 
@@ -145,6 +146,23 @@ impl CapabilityRegistryAdapter {
         }
 
         result
+    }
+}
+
+impl TokenIssuer for CapabilityRegistryAdapter {
+    fn issue_with_mediation(
+        &self,
+        spirit_pid: u32,
+        scope: Scope,
+        ttl_secs: u32,
+        posture_hash: [u8; 32],
+        intent_class: IntentClass,
+    ) -> Result<CapabilityToken, CapError> {
+        CapabilityRegistryAdapter::issue_with_mediation(self, spirit_pid, scope, ttl_secs, posture_hash, intent_class)
+    }
+
+    fn get_token_scope(&self, token_id: &TokenId) -> Option<Scope> {
+        CapabilityRegistryAdapter::get_token_scope(self, token_id)
     }
 }
 

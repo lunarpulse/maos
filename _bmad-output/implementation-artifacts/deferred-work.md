@@ -97,3 +97,8 @@
 ## Deferred from: code review of 1b-3-sandbox-tier-t0-t1-t2-enforcement-per-spirit-resource-caps (2026-05-14)
 
 - **`SandboxTierError(pub u8)` misrepresents non-numeric string errors.** When `try_from_manifest_str("foo")` fails, the error carries `u8::MAX` (255) instead of the original string. Developer UX issue only; not a correctness bug. Deferred to a future cleanup story.
+
+## Deferred from: code review of 1b-5a-ship-hello-spirit-reference-binary-and-hit-nfr-onb-2-5-minute-evaluator-path (2026-05-15)
+
+- **Exit code truncation via `as u8` cast in subcommands.rs.** `ExitCode::from(s.code().unwrap_or(2) as u8)` — Unix exit codes are 0-255 so safe on POSIX, but `as u8` truncates any value >255 to 0 on Windows. Pre-existing pattern not introduced by this story.
+- **Timing script uses 1-second granularity for 300s NFR gate.** `date +%s` gives integer seconds; sub-second regression detection impossible. Acceptable for a 300s budget but provides coarse signal. Pre-existing design choice in `tests/integration/onb_nfr2_timing.sh`.

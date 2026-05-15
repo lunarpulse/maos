@@ -912,6 +912,8 @@ dependencies = [
  "maos-domain",
  "maos-kernel-core",
  "maos-providers",
+ "maos-spirit-hello",
+ "serde_json",
  "tokio",
  "tokio-util",
 ]
@@ -969,6 +971,7 @@ dependencies = [
  "maos-domain",
  "maos-providers",
  "maos-spirit-abi",
+ "maos-spirit-hello",
  "parking_lot",
  "ring",
  "rusqlite",
@@ -1019,6 +1022,15 @@ dependencies = [
 [[package]]
 name = "maos-spirit-hello"
 version = "0.1.0-alpha"
+dependencies = [
+ "maos-domain",
+ "maos-kernel-core",
+ "maos-spirit-abi",
+ "maos-spirit-sdk",
+ "serde",
+ "serde_json",
+ "toml",
+]
 
 [[package]]
 name = "maos-spirit-sdk"

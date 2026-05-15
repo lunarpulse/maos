@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-last_updated: 2026-05-14  # Story 1b.4 code review passed — done.
+last_updated: 2026-05-15  # Story 1b.5a code review passed — done.
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-05-14  # Story 1b.4 code review passed — done.
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-11
-last_updated: 2026-05-14  # Story 1b.4 code review passed — done.
+last_updated: 2026-05-15  # Story 1b.5a code review passed — done.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -74,7 +74,7 @@ development_status:
   1b-2-capability-registry-decomposition-runtime-cap-tokens-cap-policy-cap-audit-cap-quota: done
   1b-3-sandbox-tier-t0-t1-t2-enforcement-per-spirit-resource-caps: done
   1b-4-freeze-the-complianceclaim-schema-and-wire-the-inference-port-iac-telemetry: done
-  1b-5a-ship-hello-spirit-reference-binary-and-hit-nfr-onb-2-5-minute-evaluator-path: backlog
+  1b-5a-ship-hello-spirit-reference-binary-and-hit-nfr-onb-2-5-minute-evaluator-path: done
   1b-5b-maosctl-audit-query-fr4-100-mediation-mechanical-verification: backlog
   1b-5c-maosctl-v0-1-lifecycle-subcommands-accessibility-flags: backlog
   epic-1b-retrospective: optional

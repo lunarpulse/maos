@@ -59,6 +59,7 @@ windows = { version = "0.58", features = ["Win32_Security", "Win32_System_Thread
 tempfile = "3"
 criterion = "0.5"
 tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread"] }
+maos-spirit-hello = { path = "../maos-spirit-hello" }
 
 [[bench]]
 name = "journal_fsync_p99"
@@ -66,4 +67,8 @@ harness = false
 
 [[bench]]
 name = "cap_token_verify_p99"
+harness = false
+
+[[bench]]
+name = "hello_spirit_p95"
 harness = false

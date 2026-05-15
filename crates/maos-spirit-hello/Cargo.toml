@@ -8,3 +8,12 @@ rust-version.workspace = true
 description = "MAOS hello-spirit — reference Spirit acknowledgement (FR58)"
 
 [dependencies]
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+maos-spirit-sdk = { path = "../maos-spirit-sdk" }
+maos-domain = { path = "../maos-domain" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+maos-kernel-core = { path = "../maos-kernel-core" }
+toml = "0.8"

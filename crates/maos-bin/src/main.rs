@@ -24,12 +24,17 @@
 //!
 //! Story 1b.4 wires the real I/O Subsystem, Anthropic provider, Inference
 //! Port adapter, and IAC telemetry registry.
+//!
+//! Story 1b.5a adds the one-shot mode: set `MAOS_ONE_SHOT=hello-spirit`
+//! to run the reference Spirit once and print JSON to stdout.
 
 use std::sync::Arc;
 use std::thread::available_parallelism;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
 
+use maos_domain::invariants::i1::IntentClass;
+use maos_domain::invariants::i1::Scope;
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_kernel_core::api::{
     CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter,
@@ -134,7 +139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::new(UnconfiguredProvider)
         }
     };
-    let _inference = InferencePortAdapter::new(
+    let inference = InferencePortAdapter::new(
         anthropic_provider,
         "anthropic".into(),
         Arc::clone(&capability),
@@ -142,6 +147,59 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&telemetry),
     );
     eprintln!("maos: Inference Port initialized (Story 1b.4)");
+    // ─────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────────────────────
+    // Story 1b.5a — One-shot mode: MAOS_ONE_SHOT=hello-spirit
+    if let Ok(mode) = std::env::var("MAOS_ONE_SHOT") {
+        if mode != "hello-spirit" {
+            eprintln!("maos: unknown MAOS_ONE_SHOT mode '{mode}' — only 'hello-spirit' is supported");
+            return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
+        }
+
+        // Pre-populate the policy table with hello-Spirit's declared capabilities
+        {
+            let mut inner = maos_kernel_core::capability::cap_policy::PolicyTableInner::default();
+            inner.manifest_scopes.insert(
+                0,
+                maos_kernel_core::capability::cap_policy::ManifestCapabilityScope {
+                    scopes: vec![Scope::ProviderInfer {
+                        provider: "anthropic".into(),
+                    }],
+                    declared_tier: maos_domain::invariants::i9::SandboxTier(0),
+                    trust_tier: maos_kernel_core::capability::cap_policy::decision::TrustTier::Verified,
+                },
+            );
+            policy.update(inner);
+        }
+
+        // Initialize monotonic counter for token issuance
+        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+        // Issue a valid capability token for the in-process hello-Spirit
+        let token = capability.issue_with_mediation(
+            0,
+            Scope::ProviderInfer {
+                provider: "anthropic".into(),
+            },
+            60,
+            [0u8; 32],
+            IntentClass::Standard,
+        ).map_err(|e| format!("failed to issue capability token: {e}"))?;
+
+        eprintln!("maos: one-shot mode — executing hello-Spirit");
+
+        // Call hello-Spirit (sync call on async runtime — fine for one-shot)
+        let resp = maos_spirit_hello::run(&inference, token)
+            .map_err(|e| format!("hello-Spirit error: {e}"))?;
+
+        let json = serde_json::to_string(&resp)
+            .map_err(|e| format!("JSON serialization error: {e}"))?;
+        println!("{json}");
+
+        eprintln!("maos: one-shot complete — exiting cleanly");
+        return Ok(());
+    }
     // ─────────────────────────────────────────────────────────────
 
     let cancel = CancellationToken::new();

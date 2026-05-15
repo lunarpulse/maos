@@ -165,7 +165,7 @@
     {
       "kind": "fn",
       "path": "maos_kernel_core::compliance::validate_envelope",
-      "signature_hash": "a32e7a734f4d1d2b7db57aeeefe2d115094acf242b538b3ad8d79417ef56efc8"
+      "signature_hash": "92fb4c62c71fa3ea08f0970573024bf1cafc43d5adb3a855b21340cfb6bac98e"
     },
     {
       "kind": "fn",
@@ -310,7 +310,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::inference::InferencePortAdapter",
-      "signature_hash": "36fb80ef39d5c5f5de448e94f57735446ba20e39cb1603ea9cc754e30bb625e1"
+      "signature_hash": "a0ba7a291bad65add0a141b99b9c17b5d3dcd6e7181ed837c70e6fbcec2dfe39"
     },
     {
       "kind": "struct",

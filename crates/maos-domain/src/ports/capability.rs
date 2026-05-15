@@ -11,6 +11,24 @@ use crate::invariants::i1::{CapabilityToken, IntentClass, Scope, TokenId};
 use crate::invariants::i9::SandboxTier;
 use thiserror::Error;
 
+/// Narrow read-only trait for issuing tokens — returned by
+/// `InferencePortAdapter::capability_registry()` so callers outside
+/// the kernel cannot access the full registry surface.
+pub trait TokenIssuer {
+    /// Issue a capability token with full mediation: quota → policy → tokens.
+    fn issue_with_mediation(
+        &self,
+        spirit_pid: u32,
+        scope: Scope,
+        ttl_secs: u32,
+        posture_hash: [u8; 32],
+        intent_class: IntentClass,
+    ) -> Result<CapabilityToken, CapError>;
+
+    /// Look up the scope for a token ID without full verification.
+    fn get_token_scope(&self, token_id: &TokenId) -> Option<Scope>;
+}
+
 /// Capability Registry — mediates every external call, evaluates ADR-022
 /// universal-arithmetic predicates against per-Spirit tagged scalars.
 ///
