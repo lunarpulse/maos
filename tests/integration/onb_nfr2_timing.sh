@@ -23,8 +23,12 @@ echo "--- Cleaning build artifacts (simulating fresh clone) ---"
 cargo clean
 
 # Step 2: Build maos-bin in release mode
+# Use `-p maos-bin` instead of `--bin maos-bin` because the workspace
+# manifest declares `default-members = []` — bare `--bin` resolution
+# from the workspace root would panic with "manifest is virtual,
+# workspace has no members" (exit 101).
 echo "--- Building maos-bin (release, locked) ---"
-cargo build --release --bin maos-bin --locked
+cargo build -p maos-bin --release --locked
 
 # Step 3: One-shot execution
 echo "--- Running hello-Spirit one-shot ---"

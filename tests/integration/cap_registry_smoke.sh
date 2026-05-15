@@ -3,14 +3,22 @@ set -euo pipefail
 
 # Capability Registry smoke test — v0.1-β
 # Verifies that maos-bin starts, capability registry initializes,
-# and exits cleanly within the timeout.
+# and exits cleanly within the run-window timeout.
+
+# Build first so the 5s run-window does NOT include compile time.
+# On CI with a cold Swatinem cache, `cargo run` would otherwise eat
+# the whole timeout in compilation and exit 124 before the binary
+# ever launched.
+echo "=== cap_registry_smoke: building maos-bin ==="
+cargo build -p maos-bin --quiet
 
 echo "=== cap_registry_smoke: starting maos-bin ==="
 
-# maos-bin must start and exit (via SIGINT) within 5 seconds.
-# We send it SIGINT after 3 seconds to trigger graceful shutdown.
-timeout 5s bash -c '
-    cargo run -p maos-bin --quiet &
+# maos-bin must start, initialize, accept SIGINT, and exit cleanly
+# within 8 seconds. We send SIGINT after 3 seconds to trigger
+# graceful shutdown.
+timeout 8s bash -c '
+    ./target/debug/maos-bin &
     MAOS_PID=$!
     sleep 3
     kill -INT $MAOS_PID 2>/dev/null || true
