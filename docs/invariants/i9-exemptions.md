@@ -72,3 +72,36 @@ gated enumeration of allowed Inference Port providers; no kernel persistence.
 parsed from the `[output_shape]` manifest section. Parsed-then-dropped at admission;
 the orchestrator verifies the Spirit's response shape against this list and discards
 the struct after validation. No kernel persistence.
+
+### `InferencePortAdapter` — `crates/maos-kernel-core/src/inference/mod.rs`
+
+**Reason:** Inference Port runtime adapter (Story 1b.4) — composite holding `Arc<dyn Provider>`,
+`Arc<CapabilityRegistryAdapter>`, `Arc<TransparencyLogAdapter>`, and `Arc<IacRtMetrics>`.
+All four are shared references to independently-exempt sub-services; the adapter holds
+no additional persistent state. Sanctioned per Epic 1b Owns ("Inference Port implementation
+(Anthropic provider at v0.1; ADR-005)"). Wired at composition root in `maos-bin/src/main.rs`.
+
+### `SecurityManagerAdapter` — `crates/maos-kernel-core/src/security/mod.rs`
+
+**Reason:** Security Manager runtime adapter (Story 1b.3) — promoted from ZST in v0.1-α
+to hold `Arc<PolicyTable>`. The `PolicyTable` is independently exempted (operator policy
+table per I9 structural-state caching). The adapter is a thin trait-implementation
+wrapper over the policy table; no additional persistent state. Composed at the
+composition root with the same `Arc<PolicyTable>` shared by `CapabilityRegistryAdapter`.
+
+### `SandboxSpec` — `crates/maos-kernel-core/src/security/sandbox/mod.rs`
+
+**Reason:** manifest-derived spawn parameter (Story 1b.3) — fully-resolved sandbox
+specification produced at admission and consumed by `spawn_sandboxed`. The `Vec<Scope>`
+field carries the declared capability scopes for the spawn call. Parsed-then-dropped:
+constructed per-Spirit at admission, consumed during the spawn syscall, dropped immediately
+after the child process is launched. No kernel persistence.
+
+### `HistogramSeries` / `CounterSeries` / `IacRtMetrics` — `crates/maos-kernel-core/src/telemetry/iac_rt.rs`
+
+**Reason:** IAC round-trip telemetry registry (Story 1b.4) — sanctioned per Epic 1b Owns
+("Telemetry IAC round-trip metrics (binding from v0.1)"). The `AtomicU64` buckets/counters
+and `Vec<(Service, Outcome, ...)>` fan-out tables are the metric accumulator state required
+by the Prometheus-compatible `iac_rt_duration_us` histogram, `iac_rt_inflight` gauge, and
+`iac_rt_errors_total` counter (NFR-Obs-4 / NFR-Perf-3 baselines). Bounded by the fixed
+service × outcome cardinality declared in `IAC_RT_BUCKETS_US`; no per-Spirit growth.

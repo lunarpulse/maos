@@ -28,6 +28,7 @@ use maos_providers::provider::ProviderError;
 /// Holds references to the capability registry (for authorization),
 /// the transparency log (for audit), the telemetry registry (for SLO
 /// metrics), and the provider driver (for the actual LLM call).
+#[maos_attrs::i9_exempt(reason = "inference port adapter; holds Arc references to co-services — not independently-mutable state (sanctioned persistent location per Epic 1b Owns)")]
 pub struct InferencePortAdapter {
     provider: Arc<dyn Provider>,
     provider_id: String,

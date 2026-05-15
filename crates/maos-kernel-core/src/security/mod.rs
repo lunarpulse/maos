@@ -50,6 +50,7 @@ pub enum SecurityError {
 /// enforcement and approval mediation.
 ///
 /// Promoted from ZST (v0.1-α) to hold `Arc<PolicyTable>` (Story 1b.3).
+#[maos_attrs::i9_exempt(reason = "security manager adapter; holds Arc<PolicyTable> for runtime policy enforcement — structural-state caching per I9")]
 #[derive(Debug, Clone)]
 pub struct SecurityManagerAdapter {
     policy: Arc<PolicyTable>,

@@ -310,7 +310,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::inference::InferencePortAdapter",
-      "signature_hash": "a0ba7a291bad65add0a141b99b9c17b5d3dcd6e7181ed837c70e6fbcec2dfe39"
+      "signature_hash": "bb7564dc4cb8cbc801a8701edfc6b55dd0037119a7ddd5af2450e0fedde28bf0"
     },
     {
       "kind": "struct",
@@ -335,7 +335,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::security::SecurityManagerAdapter",
-      "signature_hash": "751dfd8e90ccbaa8d4d3fd782405b281f5b0ef5f7c5bdd93f0ce826329197927"
+      "signature_hash": "749af0de3a9f0887e61eb3785364b55b4c8e79dcc6e0476ca0d88d7f621b9aa1"
     },
     {
       "kind": "struct",
@@ -365,7 +365,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::security::sandbox::SandboxSpec",
-      "signature_hash": "f74c8df1636b8cc48edf028b0a72958c5f1536da6abffaabf1a12a4d1153980e"
+      "signature_hash": "9289357cf74ab3999ee0a0ddef446981ac868f18cf5adc629daac4bddf6f0ca7"
     },
     {
       "kind": "struct",
@@ -385,7 +385,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::telemetry::iac_rt::IacRtMetrics",
-      "signature_hash": "9b51c600d225057b0d2f8b487fcfed26e894575e93a466590f1b064e176b1bb0"
+      "signature_hash": "6b25112cca4dabcd024fced1f34cddb30b14b2d3c9d4c8cd469167c6f4ec33f8"
     },
     {
       "kind": "struct",
@@ -496,6 +496,11 @@
       "kind": "use",
       "path": "maos_kernel_core::capability::maos_domain::ports::CapabilityRegistryPort",
       "signature_hash": "015b201ec2516ef08ae8a61f6ca929de25f4810636d202efa926e1805afef573"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::maos_domain::ports::capability::TokenIssuer",
+      "signature_hash": "4dac31b19f722b7ed07f1a7909e8411ca0fbd6ea3775b03ba9597ff045f1203e"
     },
     {
       "kind": "use",

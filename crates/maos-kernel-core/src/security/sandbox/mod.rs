@@ -22,6 +22,7 @@ use maos_domain::invariants::i9::SandboxTier;
 use crate::security::manifest::ResolvedCaps;
 
 /// Fully-resolved sandbox specification for spawning.
+#[maos_attrs::i9_exempt(reason = "manifest-derived spawn parameter; created per-Spirit admission and dropped after spawn — not kernel-persistent state")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SandboxSpec {
     pub tier: SandboxTier,

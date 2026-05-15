@@ -83,6 +83,7 @@ impl ErrorKind {
 }
 
 /// One histogram series keyed by (service, outcome).
+#[maos_attrs::i9_exempt(reason = "IAC telemetry accumulator; AtomicU64 buckets are the sanctioned metric state (IAC round-trip telemetry binding per Epic 1b Owns)")]
 struct HistogramSeries {
     buckets: Vec<AtomicU64>,
     sum: AtomicU64,
@@ -115,6 +116,7 @@ impl HistogramSeries {
 }
 
 /// One counter series keyed by (service, kind).
+#[maos_attrs::i9_exempt(reason = "IAC telemetry accumulator; AtomicU64 counter is the sanctioned metric state (IAC round-trip telemetry binding per Epic 1b Owns)")]
 struct CounterSeries {
     value: AtomicU64,
 }
@@ -132,6 +134,7 @@ impl CounterSeries {
 }
 
 /// In-memory metrics registry for IAC round-trip telemetry.
+#[maos_attrs::i9_exempt(reason = "IAC round-trip telemetry registry (sanctioned persistent location per Epic 1b Owns); Vec<Atomic> are metric accumulators, not mutable kernel state")]
 pub struct IacRtMetrics {
     histograms: Vec<(Service, Outcome, HistogramSeries)>,
     inflight: Vec<(Service, AtomicI64)>,

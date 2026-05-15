@@ -188,6 +188,10 @@
 "maos_kernel_core::inference::maos_domain::ports::InferencePort"  = "data-movement"
 "maos_kernel_core::security::maos_domain::ports::CryptoProvider"  = "data-movement"
 
+# Story 1b.5a review — TokenIssuer trait re-exported from capability module
+# (narrow trait surface replacing full capability_registry() getter)
+"maos_kernel_core::capability::maos_domain::ports::capability::TokenIssuer" = "data-movement"
+
 # Story 1b.5c — six new manifest section parsers (NFR-Test-13 coverage).
 # Each section is admission-time configuration parsed once and dropped;
 # the classifications mirror the §4.0.7 taxonomy applied to the
