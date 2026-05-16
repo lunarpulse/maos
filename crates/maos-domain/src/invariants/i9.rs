@@ -33,10 +33,43 @@ pub struct InvariantI9;
 #[error("invalid sandbox tier value: {0} (valid range: 0..=4)")]
 pub struct SandboxTierError(pub u8);
 
-/// Typed-empty newtype for sandbox tier classification.
+/// Typed-empty newtype for sandbox tier classification — **operational form**.
 ///
 /// Story 1b.3 hardened: associated constants, validating constructors,
 /// fail-closed Default (T2, the most restrictive enforceable tier).
+///
+/// # Relationship to [`maos_spirit_abi::compliance::SandboxTier`]
+///
+/// This newtype is the **kernel-internal operational form** used by:
+/// - admission (`security::manifest::resolve_caps`)
+/// - capability policy (`cap_policy::strictest_of`)
+/// - lifecycle journal (`invariants::i10`)
+/// - cap-audit decision records
+///
+/// The ABI counterpart `maos_spirit_abi::compliance::SandboxTier` is a
+/// `#[repr(u8)]` enum (T0..=T4) used **only** as the wire-format for the
+/// frozen `ComplianceClaim` envelope (per ABI_VERSION=1, Story 1b.4).
+///
+/// **Wire format differs by design:**
+/// - This newtype's custom `Serialize` emits `"T0".."T4"` (capital, matches manifest input).
+/// - The ABI enum's `#[serde(rename_all = "snake_case")]` emits `"t0".."t4"` (snake_case).
+///
+/// Conversion is one-line:
+/// ```
+/// use maos_domain::invariants::i9::SandboxTier;
+/// use maos_spirit_abi::compliance::SandboxTier as WireTier;
+///
+/// // ABI wire → operational
+/// let op: SandboxTier = WireTier::T2.into();
+/// assert_eq!(op, SandboxTier::T2);
+///
+/// // Operational → ABI wire (Option because the newtype can hold values outside 0..=4)
+/// assert_eq!(op.to_abi(), Some(WireTier::T2));
+/// ```
+///
+/// Story 2.1's lifecycle hook signatures must use the ABI enum (hooks live
+/// in `maos-spirit-abi` which cannot import `maos-domain`); kernel
+/// admission and policy code uses this newtype.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SandboxTier(pub u8);
 
@@ -87,6 +120,41 @@ impl Default for SandboxTier {
     /// enforceable tier (T2), not the least restrictive (T0).
     fn default() -> Self {
         Self::DEFAULT_FLOOR
+    }
+}
+
+// Story 1b.6 (D9 reconciliation): explicit conversions between the
+// operational newtype and the ABI wire enum. See type-level docs above
+// for the rationale (no_std boundary + frozen ABI_VERSION=1 wire format
+// preclude a single canonical type).
+
+impl From<maos_spirit_abi::compliance::SandboxTier> for SandboxTier {
+    /// ABI wire enum → operational newtype. Total: every ABI variant
+    /// (T0..=T4) maps to a valid newtype value.
+    fn from(abi: maos_spirit_abi::compliance::SandboxTier) -> Self {
+        // Both share T0..=T4 = 0..=4 numeric values per the ABI enum's
+        // `#[repr(u8)]` and matching const definitions on this newtype.
+        SandboxTier(abi as u8)
+    }
+}
+
+impl SandboxTier {
+    /// Convert to the ABI wire-format enum.
+    ///
+    /// Returns `None` if this newtype holds a value outside the ABI
+    /// enum's range (`0..=4`). The newtype permits T5+ as a forward-
+    /// scaffolding affordance; ABI emission requires the operator to
+    /// pin to a wire-stable variant.
+    pub fn to_abi(&self) -> Option<maos_spirit_abi::compliance::SandboxTier> {
+        use maos_spirit_abi::compliance::SandboxTier as AbiTier;
+        match self.0 {
+            0 => Some(AbiTier::T0),
+            1 => Some(AbiTier::T1),
+            2 => Some(AbiTier::T2),
+            3 => Some(AbiTier::T3),
+            4 => Some(AbiTier::T4),
+            _ => None,
+        }
     }
 }
 
@@ -196,5 +264,27 @@ mod tests {
     fn display_format() {
         assert_eq!(SandboxTier::T0.to_string(), "T0");
         assert_eq!(SandboxTier::T2.to_string(), "T2");
+    }
+
+    // Story 1b.6 (D9 reconciliation): cross-boundary conversion tests.
+    #[test]
+    fn abi_to_operational_round_trip() {
+        use maos_spirit_abi::compliance::SandboxTier as Wire;
+        for (wire, op) in [
+            (Wire::T0, SandboxTier::T0),
+            (Wire::T1, SandboxTier::T1),
+            (Wire::T2, SandboxTier::T2),
+            (Wire::T3, SandboxTier::T3),
+            (Wire::T4, SandboxTier::T4),
+        ] {
+            assert_eq!(SandboxTier::from(wire), op);
+            assert_eq!(op.to_abi(), Some(wire));
+        }
+    }
+
+    #[test]
+    fn to_abi_rejects_out_of_range() {
+        assert_eq!(SandboxTier(5).to_abi(), None);
+        assert_eq!(SandboxTier(255).to_abi(), None);
     }
 }

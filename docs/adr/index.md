@@ -19,8 +19,9 @@ Committed ADRs for the MAOS project.
 | [ADR-032](ADR-032-spirit-wire-protocol-bytes-on-wire.md) | Spirit Wire Protocol bytes-on-wire | binding-v0.1 | byte-equal golden corpus per frame variant per SDK |
 | [ADR-037](ADR-037-constitutional-amendment-process.md) | Constitutional amendment process | binding-v0.1 | invariant-lock CI gate |
 | [ADR-038](ADR-038-per-service-kloc-ceiling.md) | Per-service KLOC ceiling | binding-v0.1 | xtask/kloc.toml enforced by tokei |
+| [ADR-039](ADR-039-per-module-unsafe-code-policy.md) | Per-module `#![forbid(unsafe_code)]` policy | binding-v0.1 | `xtask check-unsafe` + `xtask/unsafe-allowlist.toml` |
 
-> All 14 `binding-v0.1` ADRs are committed in this directory as of Story 1a.1.
+> 14 `binding-v0.1` ADRs as of Story 1a.1; **15 as of Story 1b.6** (ADR-039 — per-module unsafe policy, accepts the 1b.3 relaxation).
 > The `speculative-vNext` and post-v0.1 ADRs (ADR-008, 009, 014 [runtime], 015,
 > 016–021, 024, 025, 027–029, 031, 033–036, 040) are tracked in
 > `architecture-maos-minimal-opus/12-architecture-decision-records.md` and land

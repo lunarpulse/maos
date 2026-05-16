@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-last_updated: 2026-05-16  # Epic 1b retrospective complete — bridge commits b610ac2 + 95faf94 close CI gates.
+last_updated: 2026-05-16  # Story 1b.6 closes D9/D10/Doc3 from Epic 1b retro — Epic 2 prep complete.
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-05-16  # Epic 1b retrospective complete — bridge commits b6
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-11
-last_updated: 2026-05-16  # Epic 1b retrospective complete — bridge commits b610ac2 + 95faf94 close CI gates.
+last_updated: 2026-05-16  # Story 1b.6 closes D9/D10/Doc3 from Epic 1b retro — Epic 2 prep complete.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -78,6 +78,10 @@ development_status:
   1b-5b-maosctl-audit-query-fr4-100-mediation-mechanical-verification: done
   1b-5c-maosctl-v0-1-lifecycle-subcommands-accessibility-flags: done
   epic-1b-retrospective: done
+  # Post-retro bridge story closing D9 + D10 + Doc3 from epic-1b-retro-2026-05-16.md.
+  # Blocks Story 2.1. Does NOT re-open epic-1b's done flag — bridge stories
+  # are tracked independently (same pattern as 1a-5 was for D7 → 1b.4).
+  1b-6-epic-2-prep-d9-d10-doc3: done
 
   # ------------------------------------------------------------------
   # Epic 2: Spirit ABI + Developer SDK + Boundary Contracts (v0.1 -> v0.3)

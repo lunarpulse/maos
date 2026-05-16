@@ -22,27 +22,43 @@ The two styles do not conflict. Hexagonal owns the static dependency graph; acto
 
 ```
 maos/
-├── crates/
+├── crates/                             # 18 library + binary crates (+ xtask = 19 workspace members)
 │   ├── maos-domain/                    # v0.1 ✅  Pure types, invariants I1-I14, pure functions
+│   │                                   #          std crate; depends on maos-spirit-abi for D9 SandboxTier conversion (1b.6)
 │   ├── maos-spirit-abi/                # v0.1 ✅  Wire-stable types ONLY. #![no_std].
 │   │   └── src/compliance.rs           #          ComplianceClaim schema (per §8.5, App-E).
-│   │                                   #          Bumping = bumping ABI_VERSION.
+│   │                                   #          Bumping = bumping ABI_VERSION (frozen at 1 since 1b.4).
 │   ├── maos-kernel-core/               # v0.1 ✅  Five services + two internal modules.
 │   │   ├── scheduler/                  #          Spirit Scheduler + journal + budget
 │   │   ├── memory/                     #          Memory Manager + namespace enforcement
 │   │   ├── security/                   #          Security Manager + sandbox + approval (compilation boundary)
 │   │   ├── io/                         #          I/O module (HTTP, stdio, mTLS, ACP) — internal at v0.1
-│   │   ├── iac/                        #          IAC Bus (mailbox, broadcast, retract)
-│   │   ├── capability/                 #          Capability Registry (decomposed):
-│   │   │   ├── cap-tokens/             #            Hot path: token issue/verify, lock-free
+│   │   ├── iac/                        #          IAC Bus (mailbox, broadcast, retract) + Transparency Log (write side)
+│   │   ├── capability/                 #          Capability Registry (decomposed per ADR-030):
+│   │   │   ├── cap-tokens/             #            Hot path: token issue/verify, lock-free (I9 whitelist)
 │   │   │   ├── cap-policy/             #            Consent rules + intent allowlist
-│   │   │   ├── cap-audit/              #            Audit/lineage writer (slow path)
+│   │   │   ├── cap-audit/              #            Audit/lineage writer (slow path, bounded mpsc)
 │   │   │   └── cap-quota/              #            Budget tracking + ContextPressure
 │   │   ├── compliance/                 #          ComplianceClaim structural validator (~200 LOC, v0.1)
 │   │   ├── pipeline/                   #          Emit pipeline (IACFrame + ComplianceClaim co-located)
-│   │   ├── telemetry/                  #          Telemetry module + scalar.tap — internal at v0.1
+│   │   ├── telemetry/                  #          Telemetry module + scalar.tap + IAC RT metrics (1b.4)
+│   │   ├── inference/                  #          Inference Port adapter (1b.4)
+│   │   ├── journal/                    #          Lifecycle Journal — raw NDJSON, fsync per entry (I9 whitelist, 1b.1)
 │   │   └── hot_swap/                   #          Hot-Swap Coordinator
-│   ├── maos-spirit-sdk/                # v0.1 ✅  Spirit-author helpers; #[spirit] proc-macro
+│   ├── maos-audit/                     # v0.1 ✅  Read-side SQLite query adapter (added 1b.1).
+│   │                                   #          Holds the maosctl audit query path with READ_ONLY SQLite
+│   │                                   #          connection; preserves the 1a.4 rule that maos-cli must NOT
+│   │                                   #          depend on maos-kernel-core. Story 9.1 extends with
+│   │                                   #          subject-access / posture-delta / sealed-export.
+│   ├── maos-attrs/                     # v0.1 ✅  Proc-macro crate (added 1b.3, Story 1b.6 retro).
+│   │                                   #          Hosts #[i9_exempt(reason = "...")] — must live outside
+│   │                                   #          maos-kernel-core because Rust proc-macro crates cannot
+│   │                                   #          live inside the crate they annotate. Future expansion:
+│   │                                   #          additional kernel-discipline attributes.
+│   ├── maos-corpus-gen/                # v0.1 ✅  Deterministic corpus generators (Epic 0 — secret-redaction
+│   │                                   #          10⁴ + red-team ≥640). CorpusGenerator trait + SHA-pinned
+│   │                                   #          seed format. Future: pub mod ccac; (Story 7.3, v1.0).
+│   ├── maos-spirit-sdk/                # v0.1 ✅  Spirit-author helpers; #[spirit] proc-macro (Story 2.1)
 │   ├── maos-spirit-hello/              # v0.1 ✅  Reference Spirit; validates SDK end-to-end
 │   ├── maos-providers/                 # v0.1 ✅  Anthropic at v0.1; ≥3 providers in CI by v0.5
 │   ├── maos-mcp/                       # v0.5    MCP client
@@ -54,6 +70,9 @@ maos/
 │   ├── maos-control/                   # v0.5    Control-plane HTTP API
 │   ├── maos-cli/                       # v0.1    maosctl
 │   └── maos-bin/                       # v0.1 ✅  Composition root
+├── xtask/                              # v0.1 ✅  Workspace member — discipline gates
+│                                       #          (check-empty-kernel, check-service-boundary, abi-diff,
+│                                       #           invariant-lock, manifest-field-coverage, etc.)
 ├── spirits/                            # Reference Spirit crates (in-process)
 ├── schemas/                            # JSON Schema + CBOR schemas
 │   ├── trace-shape.schema.json
@@ -63,7 +82,9 @@ maos/
 └── fuzz/                               # Fuzz harnesses (manifest, wire, replay)
 ```
 
-Dependencies point inward (adapter ring → kernel services → domain core), with the explicit exception of kernel services calling into Spirit ABI traits — that is the inversion of control that makes Spirits hot-swappable. The composition root in `maos-bin/main.rs` is the only place that knows about all crates.
+Dependencies point inward (adapter ring → kernel services → domain core), with **two explicit exceptions**: (1) kernel services calling into Spirit ABI traits — the inversion of control that makes Spirits hot-swappable; (2) `maos-domain` depends on `maos-spirit-abi` to host the D9-reconciled `From<ABI SandboxTier> for operational SandboxTier` impl + `to_abi()` method (the no_std boundary + frozen ABI_VERSION=1 wire format make a single canonical type infeasible — see Story 1b.6 dev record). The composition root in `maos-bin/main.rs` is the only place that knows about all crates.
+
+**Workspace member count (post Story 1b.6):** 18 library/binary crates + xtask = **19 workspace members**. Added since the original §4.0.2 description: `maos-audit` (Story 1b.1 — read-side audit query adapter), `maos-attrs` (Story 1b.3 — `#[i9_exempt]` proc-macro), `maos-corpus-gen` (Epic 0 — deterministic corpus generators). `default-members = []` in the workspace root forces every cargo invocation to be `-p`-explicit (Story 1b.6 retro action A7).
 
 ### 4.0.3 Service dependency map
 

@@ -10,6 +10,11 @@ description = "MAOS domain core — pure types, invariants, and pure functions (
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
+# Story 1b.6 (D9 reconciliation): cross-boundary conversion between
+# `maos_domain::invariants::i9::SandboxTier` (operational newtype) and
+# `maos_spirit_abi::compliance::SandboxTier` (ABI wire enum). Dep direction
+# is std → no_std (safe; does not pollute the ABI crate's no_std discipline).
+maos-spirit-abi = { path = "../maos-spirit-abi" }
 
 [dev-dependencies]
 serde_json = "1.0"
