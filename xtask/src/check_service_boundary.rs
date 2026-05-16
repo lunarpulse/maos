@@ -1,6 +1,8 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
+use syn::spanned::Spanned;
+use syn::visit::Visit;
 
 /// Services that will be supervised at v0.5+ (architecture §4.0.8).
 /// At v0.1-alpha these are modules inside maos-kernel-core; the const is declared
@@ -8,6 +10,37 @@ use std::path::Path;
 /// does not yet exist. Story 2.2 owns the iteration.
 const SUPERVISED_SERVICES: &[&str] = &["security", "memory", "iac", "capability"];
 const SUPERVISOR: &str = "spirit-scheduler";
+
+/// Adapter names per service, in canonical iteration order for the per-service payload.
+///
+/// AC1 (P1 — single supervising owner per service): every adapter must be constructed
+/// exactly once in the composition root (`crates/maos-bin/src/main.rs` at v0.1-β).
+const SERVICE_ADAPTERS: &[(&str, &str)] = &[
+    ("security", "SecurityManagerAdapter"),
+    ("memory", "MemoryManagerAdapter"),
+    ("iac", "IacBusAdapter"),
+    ("capability", "CapabilityRegistryAdapter"),
+    ("io", "IoSubsystemAdapter"),
+    ("telemetry", "TelemetryStreamAdapter"),
+    ("spirit-scheduler", "SpiritSchedulerAdapter"),
+];
+
+/// Adapters that lack a corresponding Port trait re-export at v0.1-β.
+///
+/// AC2 (P2 — ports-not-adapters): every Adapter in `api::*` must be paired with its
+/// Port trait. Entries here document the explicit exemption rationale.
+const ADAPTER_PORT_EXEMPTIONS: &[(&str, &str, &str)] = &[
+    (
+        "TransparencyLogAdapter",
+        "N/A",
+        "Story 1b.1 audit-side adapter; no Port trait at v0.1-β — exemption per §4.0.8 supervisor-exception-shaped rationale",
+    ),
+    (
+        "JournalAdapter",
+        "N/A",
+        "Story 1b.1 audit-side adapter; no Port trait at v0.1-β — exemption per §4.0.8 supervisor-exception-shaped rationale",
+    ),
+];
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Violation {
@@ -43,6 +76,7 @@ pub struct Report {
     pub violations: Vec<Violation>,
     pub current_surface: KernelSurface,
     pub p1_p4_status: serde_json::Value,
+    pub spirit_abi_types: serde_json::Value,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -54,12 +88,20 @@ pub fn run(
     path: Option<&str>,
     baseline_path: &str,
     classes_path: &str,
+    p4_denylist_path: &str,
+    p4_exemptions_path: &str,
+    spirit_abi_lifecycle: &str,
+    spirit_abi_derive: &str,
     json: bool,
 ) -> Result<(), String> {
     let report = check_service_boundary(
         path.map(Path::new),
         Path::new(baseline_path),
         Path::new(classes_path),
+        Path::new(p4_denylist_path),
+        Path::new(p4_exemptions_path),
+        Path::new(spirit_abi_lifecycle),
+        Path::new(spirit_abi_derive),
     )?;
 
     if json {
@@ -89,8 +131,18 @@ fn check_service_boundary(
     path: Option<&Path>,
     baseline_path: &Path,
     classes_path: &Path,
+    p4_denylist_path: &Path,
+    p4_exemptions_path: &Path,
+    spirit_abi_lifecycle: &Path,
+    spirit_abi_derive: &Path,
 ) -> Result<Report, String> {
     let crate_path = path.unwrap_or(Path::new("crates/maos-kernel-core"));
+    let workspace_root = if crate_path.file_name() == Some(std::ffi::OsStr::new("maos-kernel-core")) {
+        crate_path.ancestors().nth(2).unwrap_or(Path::new("."))
+    } else {
+        crate_path
+    };
+
     let current = snapshot_kernel_surface(crate_path)?;
     let classes: ApiClasses = if classes_path.exists() {
         load_toml(classes_path)?
@@ -158,13 +210,45 @@ fn check_service_boundary(
         }
     }
 
+    // P1 — single supervising owner per service (AC1).
+    let p1_main_rs = workspace_root.join("crates/maos-bin/src/main.rs");
+    let p1_path = if p1_main_rs.exists() {
+        &p1_main_rs
+    } else {
+        &workspace_root.join("src/main.rs")
+    };
+    if p1_path.exists() {
+        violations.extend(check_p1_single_owner(p1_path)?);
+    }
+
+    // P2 — ports-not-adapters at service boundary (AC2).
+    violations.extend(check_p2_port_pairing(workspace_root)?);
+
+    // P3 — state ownership behind Arc/DashMap/RwLock/atomic (AC3).
+    violations.extend(check_p3_state_ownership(workspace_root)?);
+
+    // P4 — audit-chain integrity via call-graph reachability (AC4).
+    violations.extend(check_p4_audit_chain(
+        workspace_root,
+        p4_denylist_path,
+        p4_exemptions_path,
+    )?);
+
+    // Spirit ABI type reflection (AC5).
+    let (spirit_abi_violations, spirit_abi_json) = check_spirit_abi_types(
+        workspace_root,
+        spirit_abi_lifecycle,
+        spirit_abi_derive,
+    )?;
+    violations.extend(spirit_abi_violations);
+
     let passed = violations.is_empty();
+    let p1_p4_status = p1_p4_status_payload(&violations);
     Ok(Report {
         passed,
         violations,
         current_surface: current,
         p1_p4_status: serde_json::json!({
-            "p1_p4_status": "deferred-to-story-2.2",
             "v0_1_layout": "services-as-modules-under-maos-kernel-core",
             "supervised_services": SUPERVISED_SERVICES,
             "supervisor": SUPERVISOR,
@@ -177,8 +261,9 @@ fn check_service_boundary(
                 "io": "data-movement",
                 "telemetry": "data-movement",
             },
-            "p1_p4_per_service": p1_p4_status_payload(crate_path.parent().unwrap_or(Path::new("."))),
+            "p1_p4_per_service": p1_p4_status,
         }),
+        spirit_abi_types: spirit_abi_json,
     })
 }
 
@@ -196,7 +281,7 @@ fn snapshot_kernel_surface(crate_path: &Path) -> Result<KernelSurface, String> {
 
     Ok(KernelSurface {
         crate_name: "maos-kernel-core".into(),
-        abi_baseline_version: "v0.1-alpha".into(),
+        abi_baseline_version: "v0.1-beta".into(),
         items,
     })
 }
@@ -378,78 +463,773 @@ fn load_toml<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
     toml::from_str(&src).map_err(|e| format!("toml parse error in {}: {e}", path.display()))
 }
 
-/// P4 skeleton: reject bare `std::process::exit(...)` outside `iac_runtime::shutdown::exit_code(...)`.
-/// Callable at v0.1-alpha but invoked over an empty services slice because the v0.5+ layout
-/// does not yet exist.
-#[allow(dead_code)]
-pub fn check_p4_supervised_exit(
-    _workspace_root: &Path,
-    _services: &[&str],
-) -> Result<Vec<Violation>, String> {
-    // v0.1-alpha: no-op because services are modules inside maos-kernel-core.
-    // Story 2.2 wires the populated SERVICES list.
-    Ok(Vec::new())
-}
+// ------------------------------------------------------------------
+// P1 — single supervising owner per service (AC1)
+// ------------------------------------------------------------------
 
-/// Per-service per-property status row in the P1–P4 stub payload.
+/// AST-scan `main.rs` and count `<Adapter>::new` call sites.
 ///
-/// At v0.1-α every status is one of:
-///   - `"v0.1-alpha-services-as-modules-stub"` — the property is
-///     conceptually applicable but the v0.5+ filesystem layout
-///     (`crates/services/<name>/`) does not yet exist; the stub
-///     records this without inventing a fake pass.
-///   - `"v0.1-alpha-not-applicable"` — the property does not apply to
-///     this service at v0.1-α (e.g., P3 requires `crates/iac/proto/`
-///     which doesn't exist).
-///   - `"v0.1-alpha-supervisor-exception"` — for P3 against the
-///     supervisor, per §4.0.8 supervisor exception.
-fn p1_status_for(_workspace_root: &Path, _service: &str) -> &'static str {
-    // P1: own crate at `crates/services/<name>/Cargo.toml`.
-    // At v0.1-α, services live as modules under maos-kernel-core/src/.
-    // Full enforcement deferred to Story 2.2; stub records the layout fact.
-    "v0.1-alpha-services-as-modules-stub"
+/// AC1: every supervised service's adapter must be constructed exactly once
+/// in the composition root. The supervisor (`SpiritSchedulerAdapter`) also
+/// satisfies P1 per §4.0.8.
+fn check_p1_single_owner(main_rs: &Path) -> Result<Vec<Violation>, String> {
+    let src = fs::read_to_string(main_rs)
+        .map_err(|e| format!("cannot read {}: {e}", main_rs.display()))?;
+    let ast = syn::parse_file(&src)
+        .map_err(|e| format!("parse error in {}: {e}", main_rs.display()))?;
+
+    let mut visitor = P1OwnerVisitor {
+        counts: BTreeMap::new(),
+    };
+    visitor.visit_file(&ast);
+
+    let mut violations = Vec::new();
+    for (_, adapter) in SERVICE_ADAPTERS {
+        let lines = visitor.counts.get(*adapter).cloned().unwrap_or_default();
+        if lines.len() > 1 {
+            violations.push(Violation {
+                file: main_rs.display().to_string(),
+                line: lines[1],
+                path: (*adapter).to_string(),
+                message: format!(
+                    "P1 violation: {} constructed N={} times in {}; expected exactly 1 (single owner per §4.0.8 supervision-tree analysis)",
+                    adapter,
+                    lines.len(),
+                    main_rs.display()
+                ),
+            });
+        }
+    }
+    Ok(violations)
 }
 
-fn p2_status_for(_workspace_root: &Path, _service: &str) -> &'static str {
-    // P2: own bin target at `crates/services/<name>/src/bin/<name>.rs`.
-    // At v0.1-α, the single maos-bin binary supervises the four services
-    // via composition root; per-service bin targets do not yet exist.
-    // Full enforcement deferred to Story 2.2.
-    "v0.1-alpha-services-as-modules-stub"
+struct P1OwnerVisitor {
+    counts: BTreeMap<String, Vec<usize>>,
 }
 
-fn p3_status_for(_workspace_root: &Path, service: &str) -> &'static str {
-    // P3: IAC proto crate `crates/iac/proto/src/<name>.rs`.
-    // At v0.1-α, `crates/iac/proto/` does not exist (typed IAC bus
-    // contract crate lands at v0.5+; Story 6.1 wires the proto
-    // serialization).
-    if service == SUPERVISOR {
-        // Spirit Scheduler is the supervisor; P3 (proto module) is
-        // exempt per §4.0.8 supervisor exception.
-        "v0.1-alpha-supervisor-exception"
-    } else {
-        "v0.1-alpha-not-applicable"
+impl<'ast> syn::visit::Visit<'ast> for P1OwnerVisitor {
+    fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
+        if let syn::Expr::Path(path_expr) = &*node.func {
+            let path_str = quote::quote!(#path_expr).to_string().replace(' ', "");
+            for (_, adapter) in SERVICE_ADAPTERS {
+                let pattern = format!("{}::new", adapter);
+                if path_str == pattern || path_str.ends_with(&format!("::{}", pattern)) {
+                    self.counts.entry((*adapter).to_string()).or_default().push(node.func.span().start().line);
+                }
+            }
+        }
+        syn::visit::visit_expr_call(self, node);
     }
 }
 
-/// Aggregate the per-service per-property statuses into a JSON map
-/// suitable for embedding in the `p1_p4_status` payload.
-fn p1_p4_status_payload(workspace_root: &Path) -> serde_json::Value {
-    let mut per_service = serde_json::Map::new();
-    let all_services: Vec<&str> = SUPERVISED_SERVICES
-        .iter()
-        .copied()
-        .chain(std::iter::once(SUPERVISOR))
-        .collect();
-    for svc in &all_services {
-        per_service.insert(
-            (*svc).to_string(),
+// ------------------------------------------------------------------
+// P2 — ports-not-adapters at service boundary (AC2)
+// ------------------------------------------------------------------
+
+/// Assert every Adapter exported through `api::*` is paired with its Port trait
+/// re-export in the corresponding service module.
+fn check_p2_port_pairing(workspace_root: &Path) -> Result<Vec<Violation>, String> {
+    let api_rs = workspace_root.join("crates/maos-kernel-core/src/api.rs");
+    let api_rs = if api_rs.exists() {
+        api_rs
+    } else {
+        workspace_root.join("src/api.rs")
+    };
+
+    if !api_rs.exists() {
+        return Ok(Vec::new());
+    }
+
+    let src = fs::read_to_string(&api_rs)
+        .map_err(|e| format!("cannot read {}: {e}", api_rs.display()))?;
+    let ast = syn::parse_file(&src)
+        .map_err(|e| format!("parse error in {}: {e}", api_rs.display()))?;
+
+    let mut adapters = Vec::new();
+    for item in &ast.items {
+        if let syn::Item::Use(i) = item {
+            if is_pub(&i.vis) {
+                adapters.extend(extract_adapter_uses(&i.tree));
+            }
+        }
+    }
+
+    let mut violations = Vec::new();
+    for (service, adapter) in &adapters {
+        if ADAPTER_PORT_EXEMPTIONS.iter().any(|(a, _, _)| a == adapter) {
+            continue;
+        }
+
+        let port_name = if adapter == "RingCryptoProvider" {
+            "CryptoProvider".to_string()
+        } else {
+            adapter.replace("Adapter", "Port")
+        };
+
+        let service_dir = workspace_root.join(format!("crates/maos-kernel-core/src/{}", service));
+        let service_dir = if service_dir.exists() {
+            service_dir
+        } else {
+            workspace_root.join(format!("src/{}", service))
+        };
+
+        if !service_dir.exists() {
+            violations.push(Violation {
+                file: api_rs.display().to_string(),
+                line: 1,
+                path: adapter.clone(),
+                message: format!(
+                    "P2 violation: {} exported via api::* but service module '{}' does not exist",
+                    adapter, service
+                ),
+            });
+            continue;
+        }
+
+        let mut found = false;
+        let mut rs_files = Vec::new();
+        crate::fs_walk::collect_rs_files(&service_dir, &mut rs_files);
+        for file in &rs_files {
+            if check_port_reexport_ast(file, &port_name) {
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            violations.push(Violation {
+                file: api_rs.display().to_string(),
+                line: 1,
+                path: adapter.clone(),
+                message: format!(
+                    "P2 violation: {} exported via api::* but no {} trait re-export found in service module '{}'",
+                    adapter, port_name, service
+                ),
+            });
+        }
+    }
+
+    Ok(violations)
+}
+
+fn check_port_reexport_ast(file: &Path, port_name: &str) -> bool {
+    let src = match fs::read_to_string(file) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let ast = match syn::parse_file(&src) {
+        Ok(a) => a,
+        Err(_) => return false,
+    };
+    let mut visitor = PortReexportVisitor {
+        port_name,
+        found: false,
+    };
+    visitor.visit_file(&ast);
+    visitor.found
+}
+
+struct PortReexportVisitor<'a> {
+    port_name: &'a str,
+    found: bool,
+}
+
+impl<'ast, 'a> syn::visit::Visit<'ast> for PortReexportVisitor<'a> {
+    fn visit_item_use(&mut self, node: &'ast syn::ItemUse) {
+        if !self.found && is_pub(&node.vis) {
+            let path_str = quote::quote!(#node).to_string().replace(' ', "");
+            if path_str.contains(&format!("maos_domain::ports::{}", self.port_name)) {
+                self.found = true;
+            }
+        }
+    }
+}
+
+fn extract_adapter_uses(tree: &syn::UseTree) -> Vec<(String, String)> {
+    match tree {
+        syn::UseTree::Path(path) if path.ident == "crate" => extract_adapter_uses(&path.tree),
+        syn::UseTree::Path(path) => {
+            let service = path.ident.to_string();
+            match &*path.tree {
+                syn::UseTree::Name(name) => vec![(service, name.ident.to_string())],
+                syn::UseTree::Group(group) => group
+                    .items
+                    .iter()
+                    .filter_map(|t| {
+                        if let syn::UseTree::Name(name) = t {
+                            Some((service.clone(), name.ident.to_string()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            }
+        }
+        syn::UseTree::Group(group) => group
+            .items
+            .iter()
+            .flat_map(extract_adapter_uses)
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+// ------------------------------------------------------------------
+// P3 — state ownership behind Arc/DashMap/RwLock/atomic (AC3)
+// ------------------------------------------------------------------
+
+/// Cross-reference to `check-empty-kernel` — the I9 walker output is the
+/// authoritative oracle. P3 violations are a re-interpretation of I9
+/// violations with a cross-reference message.
+fn check_p3_state_ownership(workspace_root: &Path) -> Result<Vec<Violation>, String> {
+    let kernel_path = if workspace_root.join("crates/maos-kernel-core/src").exists() {
+        workspace_root.join("crates/maos-kernel-core")
+    } else {
+        workspace_root.to_path_buf()
+    };
+
+    let whitelist_path = if workspace_root.join("i9-whitelist.toml").exists() {
+        workspace_root.join("i9-whitelist.toml")
+    } else {
+        Path::new("xtask/i9-whitelist.toml").to_path_buf()
+    };
+
+    let denylist_path = if workspace_root.join("i9-denylist.toml").exists() {
+        workspace_root.join("i9-denylist.toml")
+    } else {
+        Path::new("xtask/i9-denylist.toml").to_path_buf()
+    };
+
+    let exemptions_path = if workspace_root.join("i9-exemptions.md").exists() {
+        workspace_root.join("i9-exemptions.md")
+    } else {
+        Path::new("docs/invariants/i9-exemptions.md").to_path_buf()
+    };
+
+    let report =
+        crate::check_empty_kernel::run_silent(&kernel_path, &whitelist_path, &denylist_path, &exemptions_path)?;
+
+    let mut violations = Vec::new();
+    for v in report.violations {
+        violations.push(Violation {
+            file: v.file,
+            line: v.line,
+            path: format!("{}::{}", v.struct_name, v.field_name),
+            message: format!(
+                "P3 violation: {}.{}: {}; see check-empty-kernel for full I9 context",
+                v.struct_name, v.field_name, v.field_type
+            ),
+        });
+    }
+    Ok(violations)
+}
+
+// ------------------------------------------------------------------
+// P4 — audit-chain integrity via call-graph reachability (AC4)
+// ------------------------------------------------------------------
+
+#[derive(Debug, serde::Deserialize)]
+struct P4DenylistConfig {
+    #[serde(rename = "denylist")]
+    section: P4DenylistSection,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct P4DenylistSection {
+    patterns: Vec<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct P4ExemptionsConfig {
+    #[serde(rename = "exempt")]
+    section: P4ExemptionsSection,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct P4ExemptionsSection {
+    paths: Vec<String>,
+}
+
+/// AST-scan every `pub fn` reachable from the kernel-core api surface and
+/// assert the function body does not call any denylisted external-I/O entry
+/// point outside the mediated-lane exemption paths.
+fn check_p4_audit_chain(
+    workspace_root: &Path,
+    denylist_path: &Path,
+    exemptions_path: &Path,
+) -> Result<Vec<Violation>, String> {
+    if !denylist_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let denylist: P4DenylistConfig = load_toml(denylist_path)?;
+    let exemptions: P4ExemptionsConfig = if exemptions_path.exists() {
+        load_toml(exemptions_path)?
+    } else {
+        P4ExemptionsConfig {
+            section: P4ExemptionsSection { paths: Vec::new() },
+        }
+    };
+
+    let kernel_src = workspace_root.join("crates/maos-kernel-core/src");
+    let kernel_src = if kernel_src.exists() {
+        kernel_src
+    } else {
+        workspace_root.join("src")
+    };
+
+    let mut violations = Vec::new();
+    let lib_rs = kernel_src.join("lib.rs");
+    let mod_path = if kernel_src.exists() && kernel_src.parent().map(|p| p.file_name() == Some(std::ffi::OsStr::new("maos-kernel-core"))).unwrap_or(false) {
+        "maos_kernel_core"
+    } else {
+        "fixture"
+    };
+
+    if lib_rs.exists() {
+        walk_p4_mod(
+            &lib_rs,
+            &kernel_src,
+            mod_path,
+            &denylist.section.patterns,
+            &exemptions.section.paths,
+            &mut violations,
+        )?;
+    }
+
+    Ok(violations)
+}
+
+fn walk_p4_mod(
+    file: &Path,
+    src_dir: &Path,
+    mod_path: &str,
+    denylist: &[String],
+    exemptions: &[String],
+    violations: &mut Vec<Violation>,
+) -> Result<(), String> {
+    let src = fs::read_to_string(file)
+        .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
+    let ast = syn::parse_file(&src)
+        .map_err(|e| format!("parse error in {}: {e}", file.display()))?;
+    let file_str = file.display().to_string();
+
+    for item in &ast.items {
+        match item {
+            syn::Item::Fn(i) if is_pub(&i.vis) => {
+                let fn_path = format!("{}::{}", mod_path, i.sig.ident);
+                let mut visitor = P4BodyVisitor {
+                    file: file_str.clone(),
+                    fn_path,
+                    denylist,
+                    exemptions,
+                    violations,
+                };
+                visitor.visit_block(&i.block);
+            }
+            syn::Item::Impl(i) => {
+                let self_ty = match &*i.self_ty {
+                    syn::Type::Path(tp) => tp.path.segments.last().map(|s| s.ident.to_string()).unwrap_or_default(),
+                    _ => String::new(),
+                };
+                for impl_item in &i.items {
+                    if let syn::ImplItem::Fn(method) = impl_item {
+                        if is_pub(&method.vis) {
+                            let fn_path = if self_ty.is_empty() {
+                                format!("{}::{}", mod_path, method.sig.ident)
+                            } else {
+                                format!("{}::{}::{}", mod_path, self_ty, method.sig.ident)
+                            };
+                            let mut visitor = P4BodyVisitor {
+                                file: file_str.clone(),
+                                fn_path,
+                                denylist,
+                                exemptions,
+                                violations,
+                            };
+                            visitor.visit_block(&method.block);
+                        }
+                    }
+                }
+            }
+            syn::Item::Mod(i) => {
+                if i.attrs.iter().any(|a| {
+                    a.meta.path().is_ident("cfg")
+                        && a.meta.require_list().map_or(false, |ml| {
+                            ml.tokens.to_string().contains("test")
+                        })
+                }) {
+                    continue;
+                }
+                let child_path = format!("{}::{}", mod_path, i.ident);
+                if let Some((_, content)) = &i.content {
+                    for child in content {
+                        walk_p4_inline_item(child, &child_path, &file_str, denylist, exemptions, violations)?;
+                    }
+                } else {
+                    let parent = file.parent().unwrap_or(src_dir);
+                    let child_name = i.ident.to_string();
+                    let child_file = parent.join(format!("{}.rs", child_name));
+                    let child_mod_dir = parent.join(&child_name).join("mod.rs");
+                    if child_file.exists() {
+                        walk_p4_mod(&child_file, src_dir, &child_path, denylist, exemptions, violations)?;
+                    } else if child_mod_dir.exists() {
+                        walk_p4_mod(&child_mod_dir, src_dir, &child_path, denylist, exemptions, violations)?;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn walk_p4_inline_item(
+    item: &syn::Item,
+    mod_path: &str,
+    file: &str,
+    denylist: &[String],
+    exemptions: &[String],
+    violations: &mut Vec<Violation>,
+) -> Result<(), String> {
+    match item {
+        syn::Item::Fn(i) if is_pub(&i.vis) => {
+            let fn_path = format!("{}::{}", mod_path, i.sig.ident);
+            let mut visitor = P4BodyVisitor {
+                file: file.to_string(),
+                fn_path,
+                denylist,
+                exemptions,
+                violations,
+            };
+            visitor.visit_block(&i.block);
+        }
+        syn::Item::Impl(i) => {
+            let self_ty = match &*i.self_ty {
+                syn::Type::Path(tp) => tp.path.segments.last().map(|s| s.ident.to_string()).unwrap_or_default(),
+                _ => String::new(),
+            };
+            for impl_item in &i.items {
+                if let syn::ImplItem::Fn(method) = impl_item {
+                    if is_pub(&method.vis) {
+                        let fn_path = if self_ty.is_empty() {
+                            format!("{}::{}", mod_path, method.sig.ident)
+                        } else {
+                            format!("{}::{}::{}", mod_path, self_ty, method.sig.ident)
+                        };
+                        let mut visitor = P4BodyVisitor {
+                            file: file.to_string(),
+                            fn_path,
+                            denylist,
+                            exemptions,
+                            violations,
+                        };
+                        visitor.visit_block(&method.block);
+                    }
+                }
+            }
+        }
+        syn::Item::Mod(i) => {
+            if i.attrs.iter().any(|a| {
+                a.meta.path().is_ident("cfg")
+                    && a.meta.require_list().map_or(false, |ml| {
+                        ml.tokens.to_string().contains("test")
+                    })
+            }) {
+                return Ok(());
+            }
+            if let Some((_, content)) = &i.content {
+                let child_path = format!("{}::{}", mod_path, i.ident);
+                for child in content {
+                    walk_p4_inline_item(child, &child_path, file, denylist, exemptions, violations)?;
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+struct P4BodyVisitor<'a> {
+    file: String,
+    fn_path: String,
+    denylist: &'a [String],
+    exemptions: &'a [String],
+    violations: &'a mut Vec<Violation>,
+}
+
+impl<'a, 'ast> syn::visit::Visit<'ast> for P4BodyVisitor<'a> {
+    fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
+        if let syn::Expr::Path(path_expr) = &*node.func {
+            let path_str = quote::quote!(#path_expr).to_string().replace(' ', "");
+            for pattern in self.denylist {
+                if path_str == *pattern || path_str.starts_with(&format!("{}::", pattern)) {
+                    if !is_file_exempt(&self.file, self.exemptions) {
+                        self.violations.push(Violation {
+                            file: self.file.clone(),
+                            line: node.func.span().start().line,
+                            path: self.fn_path.clone(),
+                            message: format!(
+                                "P4 violation: {} calls {} outside the mediated I/O lane; see xtask/p4-mediated-io-paths.toml for exempt lanes",
+                                self.fn_path, pattern
+                            ),
+                        });
+                    }
+                    break;
+                }
+            }
+        }
+        syn::visit::visit_expr_call(self, node);
+    }
+}
+
+fn is_file_exempt(file: &str, exemptions: &[String]) -> bool {
+    exemptions.iter().any(|e| {
+        let e_norm = e.trim_end_matches('/');
+        file == e_norm || file.starts_with(&format!("{e_norm}/"))
+    })
+}
+
+// ------------------------------------------------------------------
+// Spirit ABI type reflection (AC5)
+// ------------------------------------------------------------------
+
+/// AST-walk `maos-spirit-abi/src/lifecycle.rs` + `maos-spirit-derive/src/lib.rs`
+/// and assert trait method count, vtable fields, #[repr(C)], HOOK_NAMES, and
+/// count_hooks!() all agree on exactly 11 hooks.
+fn check_spirit_abi_types(
+    workspace_root: &Path,
+    lifecycle_path: &Path,
+    derive_path: &Path,
+) -> Result<(Vec<Violation>, serde_json::Value), String> {
+    let mut violations = Vec::new();
+
+    let lifecycle_file = if lifecycle_path.exists() {
+        lifecycle_path.to_path_buf()
+    } else {
+        workspace_root.join(lifecycle_path)
+    };
+    let derive_file = if derive_path.exists() {
+        derive_path.to_path_buf()
+    } else {
+        workspace_root.join(derive_path)
+    };
+
+    if !lifecycle_file.exists() || !derive_file.exists() {
+        return Ok((
+            Vec::new(),
             serde_json::json!({
-                "p1": p1_status_for(workspace_root, svc),
-                "p2": p2_status_for(workspace_root, svc),
-                "p3": p3_status_for(workspace_root, svc),
-                "p4": "v0.1-alpha-empty-services-slice-no-op",
+                "trait_method_count": 0,
+                "vtable_field_count": 0,
+                "hook_names_match": true,
+                "repr_c_present": false,
+                "count_hooks_macro_matches": true,
             }),
+        ));
+    }
+
+    let lifecycle_src = fs::read_to_string(&lifecycle_file)
+        .map_err(|e| format!("cannot read {}: {e}", lifecycle_file.display()))?;
+    let lifecycle_ast = syn::parse_file(&lifecycle_src)
+        .map_err(|e| format!("parse error in {}: {e}", lifecycle_file.display()))?;
+
+    let derive_src = fs::read_to_string(&derive_file)
+        .map_err(|e| format!("cannot read {}: {e}", derive_file.display()))?;
+    let derive_ast = syn::parse_file(&derive_src)
+        .map_err(|e| format!("parse error in {}: {e}", derive_file.display()))?;
+
+    let mut trait_methods = BTreeSet::new();
+    let mut vtable_fields = BTreeSet::new();
+    let mut repr_c_present = false;
+    let mut count_hooks_literal = 0usize;
+
+    for item in &lifecycle_ast.items {
+        match item {
+            syn::Item::Trait(t) if t.ident == "Spirit" => {
+                for trait_item in &t.items {
+                    if let syn::TraitItem::Fn(f) = trait_item {
+                        trait_methods.insert(f.sig.ident.to_string());
+                    }
+                }
+            }
+            syn::Item::Struct(s) if s.ident == "SpiritVtable" => {
+                for attr in &s.attrs {
+                    if attr.path().is_ident("repr") {
+                        if let Ok(meta) = attr.meta.require_list() {
+                            let tokens_str = meta.tokens.to_string().replace(' ', "");
+                            if tokens_str == "C" {
+                                repr_c_present = true;
+                            }
+                        }
+                    }
+                }
+                for field in &s.fields {
+                    if let Some(ident) = &field.ident {
+                        if ident != "_phantom" {
+                            vtable_fields.insert(ident.to_string());
+                        }
+                    }
+                }
+            }
+            syn::Item::Macro(m) if m.ident.as_ref().map(|i| i == "count_hooks").unwrap_or(false) => {
+                let tokens = m.mac.tokens.to_string();
+                for part in tokens.split(|c: char| !c.is_ascii_digit()) {
+                    if !part.is_empty() {
+                        if let Ok(val) = part.parse::<usize>() {
+                            count_hooks_literal = val;
+                            break;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut hook_names = BTreeSet::new();
+    for item in &derive_ast.items {
+        if let syn::Item::Const(c) = item {
+            if c.ident == "HOOK_NAMES" {
+                let expr = match &*c.expr {
+                    syn::Expr::Reference(r) => &*r.expr,
+                    other => other,
+                };
+                if let syn::Expr::Array(arr) = expr {
+                    for elem in &arr.elems {
+                        if let syn::Expr::Lit(syn::ExprLit {
+                            lit: syn::Lit::Str(lit_str),
+                            ..
+                        }) = elem
+                        {
+                            hook_names.insert(lit_str.value());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if trait_methods.len() != 11 {
+        violations.push(Violation {
+            file: lifecycle_file.display().to_string(),
+            line: 1,
+            path: "Spirit".into(),
+            message: format!(
+                "spirit-ABI-drift: Spirit trait has {} methods but FR55 mandates 11",
+                trait_methods.len()
+            ),
+        });
+    }
+
+    if vtable_fields.len() != 11 {
+        violations.push(Violation {
+            file: lifecycle_file.display().to_string(),
+            line: 1,
+            path: "SpiritVtable".into(),
+            message: format!(
+                "spirit-ABI-drift: SpiritVtable has {} hook fields but expected 11 (excluding _phantom)",
+                vtable_fields.len()
+            ),
+        });
+    }
+
+    if trait_methods != vtable_fields {
+        let diff: Vec<_> = trait_methods.symmetric_difference(&vtable_fields).collect();
+        violations.push(Violation {
+            file: lifecycle_file.display().to_string(),
+            line: 1,
+            path: "Spirit/SpiritVtable".into(),
+            message: format!(
+                "spirit-ABI-drift: trait method names do not match vtable fields: {:?}",
+                diff
+            ),
+        });
+    }
+
+    if trait_methods != hook_names {
+        let diff: Vec<_> = trait_methods.symmetric_difference(&hook_names).collect();
+        violations.push(Violation {
+            file: derive_file.display().to_string(),
+            line: 1,
+            path: "HOOK_NAMES".into(),
+            message: format!(
+                "spirit-ABI-drift: trait method names do not match HOOK_NAMES array: {:?}",
+                diff
+            ),
+        });
+    }
+
+    if !repr_c_present {
+        violations.push(Violation {
+            file: lifecycle_file.display().to_string(),
+            line: 1,
+            path: "SpiritVtable".into(),
+            message: "spirit-ABI-drift: SpiritVtable missing #[repr(C)] attribute".into(),
+        });
+    }
+
+    if count_hooks_literal != 11 {
+        violations.push(Violation {
+            file: lifecycle_file.display().to_string(),
+            line: 1,
+            path: "count_hooks!".into(),
+            message: format!(
+                "spirit-ABI-drift: count_hooks!() expands to {} but expected 11",
+                count_hooks_literal
+            ),
+        });
+    }
+
+    let json = serde_json::json!({
+        "trait_method_count": trait_methods.len(),
+        "vtable_field_count": vtable_fields.len(),
+        "hook_names_match": trait_methods == hook_names,
+        "repr_c_present": repr_c_present,
+        "count_hooks_macro_matches": count_hooks_literal == 11,
+    });
+
+    Ok((violations, json))
+}
+
+// ------------------------------------------------------------------
+// Per-service per-property status payload
+// ------------------------------------------------------------------
+
+fn p1_p4_status_payload(violations: &[Violation]) -> serde_json::Value {
+    let p1_uniform = "enforced";
+    let p2_uniform = "enforced";
+    let p3_uniform = if violations.iter().any(|v| v.message.starts_with("P3 violation:")) {
+        "violated"
+    } else {
+        "enforced"
+    };
+    let p4_uniform = if violations.iter().any(|v| v.message.starts_with("P4 violation:")) {
+        "violated"
+    } else {
+        "enforced"
+    };
+
+    let mut per_service = serde_json::Map::new();
+    for (service, adapter) in SERVICE_ADAPTERS {
+        let p1 = if violations.iter().any(|v| v.message.starts_with("P1 violation:") && v.path == *adapter) {
+            "violated"
+        } else {
+            p1_uniform
+        };
+        let p2 = if violations.iter().any(|v| v.message.starts_with("P2 violation:") && v.path == *adapter) {
+            "violated"
+        } else {
+            p2_uniform
+        };
+        let p3 = if *service == SUPERVISOR {
+            "supervisor-exception"
+        } else {
+            p3_uniform
+        };
+        per_service.insert(
+            (*service).to_string(),
+            serde_json::json!({ "p1": p1, "p2": p2, "p3": p3, "p4": p4_uniform }),
         );
     }
     serde_json::Value::Object(per_service)

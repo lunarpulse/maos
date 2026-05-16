@@ -1,0 +1,25 @@
+# P4 denylist — call expressions that perform external I/O outside the
+# Capability Registry mediation lane. Every `pub fn` reachable from
+# `maos_kernel_core::api::*` is AST-scanned for these patterns. Hits
+# outside `crates/maos-kernel-core/src/capability/` fail CI.
+#
+# Story 2.2 AC4 — see `xtask/src/check_service_boundary.rs::check_p4_audit_chain`.
+
+[denylist]
+patterns = [
+  "std::process::Command::new",
+  "std::process::Command::spawn",
+  "std::fs::read",
+  "std::fs::read_to_string",
+  "std::fs::write",
+  "std::fs::OpenOptions",
+  "tokio::net::TcpStream::connect",
+  "tokio::net::TcpListener::bind",
+  "tokio::process::Command::new",
+  "tokio::fs::read",
+  "tokio::fs::write",
+  "reqwest::get",
+  "reqwest::Client::new",
+  "rusqlite::Connection::open",
+  "rusqlite::Connection::open_with_flags",
+]

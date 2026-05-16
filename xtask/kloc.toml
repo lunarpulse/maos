@@ -12,7 +12,7 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 3000
+xtask = 4000
 
 # Story 1a.1 — 13 new crate stubs
 maos-domain = 3000

@@ -204,6 +204,8 @@ pub fn run(workspace_root: &Path) -> anyhow::Result<()> {
 
 The five services + two internal modules are detailed in §4.1–§4.7 below. **§4.1, §4.2, §4.3, §4.5, §4.6 describe services with their own task pools and explicit trust boundaries. §4.4 (I/O Subsystem) and §4.7 (Telemetry Stream) describe internal kernel modules** — they live inside `maos-kernel-core` rather than as separate services at v0.1. Read them in order — each builds on the previous.
 
+**v0.1-β interpretation note (Story 2.2):** The §4.0.8 four-property test is mechanically enforced at v0.1-β against the current `crates/maos-kernel-core/src/{security,memory,iac,capability,scheduler,io,telemetry}/` module layout rather than the eventual `crates/services/<name>/` layout. P1 = supervision-tree AST scan of `crates/maos-bin/src/main.rs`'s adapter-constructor call sites; P2 = `maos_kernel_core::api::*` Adapter exports paired with `maos_domain::ports::*Port` re-exports (exemptions in `xtask/src/check_service_boundary.rs::ADAPTER_PORT_EXEMPTIONS`); P3 = cross-reference to `cargo xtask check-empty-kernel` (the I9 walker output is authoritative); P4 = AST scan against `xtask/p4-external-io-denylist.toml` with `xtask/p4-mediated-io-paths.toml` as the mediated-lane allowlist. Spirit-ABI type reflection lives alongside: vtable + trait + `HOOK_NAMES` + `count_hooks!()` consistency check via AST scan of `crates/maos-spirit-abi/src/lifecycle.rs` + `crates/maos-spirit-derive/src/lib.rs`. The v0.5+ `crates/services/<name>/` extraction remains the promotion path: add the module's name to `SERVICES`, satisfy P1–P4 in the new location, re-run the enforcer.
+
 ## 4.1 Spirit Scheduler
 
 **Responsibility:** Lifecycle management for all Spirits on this Host.

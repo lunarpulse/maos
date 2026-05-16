@@ -84,8 +84,14 @@ coverage:
     gates:
     - check-service-boundary
     corpora: []
-    phase: v0.1-alpha-surface-diff-stub
-    valid_until: '2027-05-11'
+    phase: v0.1
+    valid_until: '2027-05-12'
+    notes: |
+      1a.2 surface-diff stub; 1a.3 per-service P1-P4 status payload skeleton;
+      2.2 lands P1-P4 full enforcement at v0.1-β module layout (supervision-tree
+      analysis, port-pairing, I9 cross-reference, audit-chain reachability) +
+      Spirit ABI type reflection. v0.5 static-analyzer-for-predicates upgrade
+      is the deferred follow-on.
   NFR-Test-9:
     gates:
     - check-loom
@@ -170,10 +176,16 @@ coverage:
     phase: v0.3
     valid_until: '2027-05-12'
   FR17:
-    gates: []
-    corpora: []
+    gates:
+    - check-service-boundary
+    corpora:
+    - spirit-boundary-v0.1
     phase: v0.3
     valid_until: '2027-05-12'
+    notes: |
+      2.2 ships 8 capability_declaration cases in spirit-boundary-v0.1 corpus +
+      structural P1-P4 enforcement; Butler-class digest Spirit (Story 8.1) is
+      the v0.3+ behavior gate
   FR18:
     gates: []
     corpora: []
@@ -417,10 +429,15 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   FR55:
-    gates: []
+    gates:
+    - check-service-boundary
     corpora: []
     phase: v0.3
     valid_until: '2027-05-12'
+    notes: |
+      2.1 ships 11-hook signatures + SpiritVtable<T> #[repr(C)] layout;
+      2.2 enforces vtable + trait + HOOK_NAMES + count_hooks!() consistency
+      via check_spirit_abi_types AST scan
   FR56:
     gates: []
     corpora: []
@@ -432,12 +449,16 @@ coverage:
     phase: v0.8
     valid_until: '2027-05-12'
   FR58:
-    gates: []
-    corpora: []
+    gates:
+    - check-service-boundary
+    corpora:
+    - spirit-boundary-v0.1
     phase: v0.1
     valid_until: '2027-05-12'
-    notes: v0.1 ships hello-spirit acknowledgement; v0.3+ ships from working reference
-      Spirit
+    notes: |
+      2.2 ships 16 compliance_emit + output_shape cases in spirit-boundary-v0.1
+      corpus exercising envelope shape + OutputShapePredicate; v0.1 hello-spirit
+      acknowledgement is the existing 1b.5a behavior gate
   FR59:
     gates: []
     corpora: []

@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-last_updated: 2026-05-16  # Story 2.1 file created (ready-for-dev); epic-2 flipped to in-progress.
+last_updated: 2026-05-16  # Story 2.2 review complete, marked done.
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-05-16  # Story 2.1 file created (ready-for-dev); epic-2 flipp
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-11
-last_updated: 2026-05-16  # Story 2.1 code review completed, all patches applied, status → done.
+last_updated: 2026-05-16  # Story 2.2 review complete, marked done.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -88,7 +88,7 @@ development_status:
   # ------------------------------------------------------------------
   epic-2: in-progress
   2-1-ship-the-full-spirit-abi-with-spirit-proc-macro-and-11-lifecycle-hooks: done
-  2-2-xtask-check-service-boundary-p1-p4-full-implementation-spirit-boundary-invariant-cases: backlog
+  2-2-xtask-check-service-boundary-p1-p4-full-implementation-spirit-boundary-invariant-cases: done
   2-3-thin-cargo-generate-template-local-runner-nfr-onb-1-v0-3-prerequisite: backlog
   2-4-seed-the-spirit-test-sdk-with-lcas-framework-and-cross-spirit-isolation-hooks: backlog
   epic-2-retrospective: optional

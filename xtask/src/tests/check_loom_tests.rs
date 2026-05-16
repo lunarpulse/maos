@@ -2,8 +2,9 @@ use super::*;
 
 #[test]
 fn blocklist_has_exactly_four_entries() {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let blocklist: Blocklist =
-        load_toml(Path::new("xtask/loom-blocklist.toml")).expect("blocklist must parse");
+        load_toml(&std::path::Path::new(manifest_dir).parent().unwrap().join("xtask/loom-blocklist.toml")).expect("blocklist must parse");
     assert_eq!(
         blocklist.blocklist.len(),
         4,

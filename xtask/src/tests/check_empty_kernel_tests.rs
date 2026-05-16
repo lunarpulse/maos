@@ -4,8 +4,9 @@ use super::*;
 fn whitelist_has_exactly_three_paths() {
     // This test asserts the whitelist size at v0.1-alpha.
     // It will be run against the committed whitelist file.
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let whitelist: Whitelist =
-        load_toml(Path::new("xtask/i9-whitelist.toml")).expect("whitelist must parse");
+        load_toml(&std::path::Path::new(manifest_dir).parent().unwrap().join("xtask/i9-whitelist.toml")).expect("whitelist must parse");
     assert_eq!(
         whitelist.paths.len(),
         3,

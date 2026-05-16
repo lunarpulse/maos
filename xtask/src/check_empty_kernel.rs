@@ -64,7 +64,7 @@ pub fn run(
     exemptions_path: &str,
     json: bool,
 ) -> Result<(), String> {
-    let report = check_empty_kernel(
+    let report = run_silent(
         Path::new(path),
         Path::new(whitelist_path),
         Path::new(denylist_path),
@@ -93,7 +93,7 @@ pub fn run(
     Ok(())
 }
 
-fn check_empty_kernel(
+pub(crate) fn run_silent(
     kernel_path: &Path,
     whitelist_path: &Path,
     denylist_path: &Path,

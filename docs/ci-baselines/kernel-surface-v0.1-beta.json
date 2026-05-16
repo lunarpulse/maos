@@ -195,7 +195,7 @@
     {
       "kind": "fn",
       "path": "maos_kernel_core::security::manifest::capabilities_required_to_scopes",
-      "signature_hash": "b769c5359e95b2a2cafbb807f11a11caaaa1357ccf67b09d8819ec485d11fa60"
+      "signature_hash": "2bc7ca314e104728f624a71cfc6579b74af6a4e6f996251dad547b17c67cfddd"
     },
     {
       "kind": "fn",
@@ -726,6 +726,11 @@
       "kind": "use",
       "path": "maos_kernel_core::security::manifest::resolve_caps",
       "signature_hash": "b6012e1f7a1884f0a2fd2cc2b93deb6910028c3cace8e4f278662f32bbd4b8f8"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::maos_domain::ports::CryptoProvider",
+      "signature_hash": "95427e73577e645465e958a272c3f347a93a378ef7cb877252ff02818380b961"
     },
     {
       "kind": "use",

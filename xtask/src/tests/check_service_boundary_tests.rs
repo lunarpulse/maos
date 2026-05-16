@@ -82,6 +82,7 @@ fn json_round_trip() {
             }],
         },
         p1_p4_status: serde_json::json!({"status": "ok"}),
+        spirit_abi_types: serde_json::json!({}),
     };
     let json = serde_json::to_string(&report).unwrap();
     let parsed: Report = serde_json::from_str(&json).unwrap();
@@ -90,39 +91,42 @@ fn json_round_trip() {
 }
 
 #[test]
-fn p1_stub_reports_v0_1_layout_for_all_services() {
-    let payload = p1_p4_status_payload(Path::new("."));
+fn p1_reports_enforced_when_no_main_rs() {
+    let payload = p1_p4_status_payload(&[]);
     let map = payload.as_object().expect("expected object");
-    // All supervised services + supervisor
-    let expected_count = SUPERVISED_SERVICES.len() + 1;
-    assert_eq!(map.len(), expected_count);
-    for svc in SUPERVISED_SERVICES.iter().copied().chain(std::iter::once(SUPERVISOR)) {
+    assert_eq!(map.len(), SERVICE_ADAPTERS.len());
+    for (svc, _) in SERVICE_ADAPTERS {
         assert_eq!(
-            map[svc]["p1"], "v0.1-alpha-services-as-modules-stub",
-            "{svc} P1 should report v0.1-α layout stub"
+            map[*svc]["p1"], "enforced",
+            "{svc} P1 should be enforced when no violations"
         );
     }
 }
 
 #[test]
-fn p2_stub_reports_v0_1_layout_for_all_services() {
-    let payload = p1_p4_status_payload(Path::new("."));
+fn p2_reports_enforced_when_no_api_rs() {
+    let payload = p1_p4_status_payload(&[]);
     let map = payload.as_object().expect("expected object");
-    for svc in SUPERVISED_SERVICES.iter().copied().chain(std::iter::once(SUPERVISOR)) {
-        assert_eq!(map[svc]["p2"], "v0.1-alpha-services-as-modules-stub");
+    for (svc, _) in SERVICE_ADAPTERS {
+        assert_eq!(
+            map[*svc]["p2"], "enforced",
+            "{svc} P2 should be enforced when no violations"
+        );
     }
 }
 
 #[test]
-fn p3_stub_distinguishes_supervisor_from_supervised() {
-    let payload = p1_p4_status_payload(Path::new("."));
+fn p3_reports_supervisor_exception_and_enforced_when_no_kernel() {
+    let payload = p1_p4_status_payload(&[]);
     let map = payload.as_object().expect("expected object");
-    // Supervised services: P3 is "not-applicable" (no crates/iac/proto/ at v0.1-α)
-    for svc in SUPERVISED_SERVICES {
-        assert_eq!(map[*svc]["p3"], "v0.1-alpha-not-applicable");
+    for (svc, _) in SERVICE_ADAPTERS {
+        let expected = if *svc == SUPERVISOR {
+            "supervisor-exception"
+        } else {
+            "enforced"
+        };
+        assert_eq!(map[*svc]["p3"], expected, "{svc} P3 should be {expected} when no violations");
     }
-    // Supervisor: P3 is "supervisor-exception" per §4.0.8
-    assert_eq!(map[SUPERVISOR]["p3"], "v0.1-alpha-supervisor-exception");
 }
 
 struct P4Visitor<'a> {

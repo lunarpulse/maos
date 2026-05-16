@@ -1,0 +1,14 @@
+# P4 mediated-I/O exemption paths — workspace-relative directories and files
+# that LEGITIMATELY hold direct external-I/O code as the kernel's mediated
+# I/O zone. Paths with trailing `/` match the entire subtree.
+#
+# Story 2.2 AC4 — see `xtask/src/check_service_boundary.rs::check_p4_audit_chain`.
+
+[exempt]
+paths = [
+  "crates/maos-kernel-core/src/capability/",
+  "crates/maos-kernel-core/src/io/",
+  "crates/maos-kernel-core/src/security/sandbox/",
+  "crates/maos-kernel-core/src/journal/",
+  "crates/maos-kernel-core/src/iac/transparency_log.rs",
+]

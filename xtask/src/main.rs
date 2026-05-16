@@ -39,8 +39,17 @@ enum Commands {
     CheckEmptyKernel { #[arg(long, default_value = "crates/maos-kernel-core")] path: String, #[arg(long, default_value = "xtask/i9-whitelist.toml")] whitelist: String, #[arg(long, default_value = "xtask/i9-denylist.toml")] denylist: String, #[arg(long, default_value = "docs/invariants/i9-exemptions.md")] exemptions: String, #[arg(long)] json: bool },
     /// AC7 — NFR-Test-9 Loom-not-in-kernel structural grep.
     CheckLoom { #[arg(long)] path: Option<String>, #[arg(long, default_value = "xtask/kernel-crates.toml")] crates: String, #[arg(long, default_value = "xtask/loom-blocklist.toml")] blocklist: String, #[arg(long, default_value = "xtask/loom-allowlist.toml")] allowlist: String, #[arg(long)] json: bool },
-    /// AC8 — NFR-Test-2 service-boundary surface-diff stub.
-    CheckServiceBoundary { #[arg(long)] path: Option<String>, #[arg(long, default_value = "docs/ci-baselines/kernel-surface-v0.1-beta.json")] baseline: String, #[arg(long, default_value = "xtask/kernel-api-classes.toml")] classes: String, #[arg(long)] json: bool },
+    /// AC8 — NFR-Test-2 service-boundary P1–P4 + Spirit-ABI reflection.
+    CheckServiceBoundary {
+        #[arg(long)] path: Option<String>,
+        #[arg(long, default_value = "docs/ci-baselines/kernel-surface-v0.1-beta.json")] baseline: String,
+        #[arg(long, default_value = "xtask/kernel-api-classes.toml")] classes: String,
+        #[arg(long, default_value = "xtask/p4-external-io-denylist.toml")] p4_denylist: String,
+        #[arg(long, default_value = "xtask/p4-mediated-io-paths.toml")] p4_exemptions: String,
+        #[arg(long, default_value = "crates/maos-spirit-abi/src/lifecycle.rs")] spirit_abi_lifecycle: String,
+        #[arg(long, default_value = "crates/maos-spirit-derive/src/lib.rs")] spirit_abi_derive: String,
+        #[arg(long)] json: bool
+    },
     /// AC2 — FR47 enforcement: vendor LLM SDK dependency scan.
     CheckFr47 { #[arg(long)] path: Option<String>, #[arg(long, default_value = "xtask/fr47-vendor-sdk-denylist.toml")] denylist: String, #[arg(long, default_value = "xtask/fr47-allowlist.toml")] allowlist: String, #[arg(long)] json: bool },
     /// AC9 — NFR-Ops-4 + FR61 SECURITY.md section gate.
@@ -86,7 +95,7 @@ fn main() {
         Commands::CheckEmptyKernel { path, whitelist, denylist, exemptions, json } => check_empty_kernel::run(&path, &whitelist, &denylist, &exemptions, json),
         Commands::CheckLoom { path, crates, blocklist, allowlist, json } => check_loom::run(path.as_deref(), &crates, &blocklist, &allowlist, json),
         Commands::CheckFr47 { path, denylist, allowlist, json } => check_fr47::run(path.as_deref(), &denylist, &allowlist, json),
-        Commands::CheckServiceBoundary { path, baseline, classes, json } => check_service_boundary::run(path.as_deref(), &baseline, &classes, json),
+        Commands::CheckServiceBoundary { path, baseline, classes, p4_denylist, p4_exemptions, spirit_abi_lifecycle, spirit_abi_derive, json } => check_service_boundary::run(path.as_deref(), &baseline, &classes, &p4_denylist, &p4_exemptions, &spirit_abi_lifecycle, &spirit_abi_derive, json),
         Commands::CheckSecurityMd { json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             let report = check_security_md::check_security_md(&workspace_root);
