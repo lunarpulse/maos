@@ -1,0 +1,16 @@
+[package]
+name = "maos-spirit-derive"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS Spirit proc-macro attributes — #[spirit] derives the Spirit trait + vtable boilerplate"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full", "parsing"] }

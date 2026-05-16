@@ -174,22 +174,25 @@ Subprocess Spirits speak a JSON-RPC-shaped protocol over stdio with CBOR payload
 
 The hooks below are the part that makes hot-swap possible. The Spirit may handle any subset; unhandled hooks are no-ops.
 
-| Hook | Fires when | What the Spirit does |
-|---|---|---|
-| `on_load` | Manifest read, capability tokens issued, Spirit loaded into memory | Initialize state, open persistent connections, load skills |
-| `on_start` | First IAC frame routed to this Spirit | Begin operating |
-| `on_frame(frame)` | An IAC frame addressed to this Spirit lands | Decide and emit response frame(s) |
-| `on_telemetry(event)` | A subscribed telemetry topic emits | Update working state, possibly emit derived frames |
-| `on_idle` | No work for ≥30s (configurable) | Proactive opportunity (Butler!); else no-op |
-| `on_swap_out` | Kernel about to swap this Spirit out | Final state blob; in-flight tokens enumerated |
-| `on_swap_in(predecessor_state)` | This Spirit is the successor in a hot-swap | Inherit state; rebind in-flight tokens |
-| `snapshot()` → state | Kernel requests a hot-swap snapshot | Produce CBOR-encoded state per `[hot_swap].state_schema_version` |
-| `migrate(predecessor_state)` → successor_state | Cross-major migration; predecessor's class is in this class's `migrates_from` list | Translate predecessor's schema to this class's schema |
-| `epistemic_resolve(halt_id, resolution)` | User responded to a halt | Process resolution; transition back to `Running` or accept halt |
-| `on_pause` | Operator paused this Spirit | Drop in-flight non-critical work; preserve halt state |
-| `on_resume` | Operator resumed | Resume |
-| `on_unload` | Graceful shutdown | Persist final state; close connections |
-| `on_consolidate` | Spirit-author-defined cadence for memory-curation passes | Compact private memory; produce digests |
+The FR55 contract commits to 11 hooks at Epic 2. The remaining 3 (`on_swap_out`, `snapshot`, `migrate`) ship in Story 5.2 (hot-swap state transfer), and `epistemic_resolve` ships in Story 4.1 (halt-protocol resolution).
+
+| Hook | Fires when | What the Spirit does | Implemented at |
+|---|---|---|---|
+| `on_load` | Manifest read, capability tokens issued, Spirit loaded into memory | Initialize state, open persistent connections, load skills | Story 2.1 (signature), Story 5.1 (runtime) |
+| `on_start` | First IAC frame routed to this Spirit | Begin operating | Story 2.1 (signature), Story 5.1 (runtime) |
+| `on_frame(frame)` | An IAC frame addressed to this Spirit lands | Decide and emit response frame(s) | Story 2.1 (signature), Story 5.1 (runtime) |
+| `on_telemetry_event(event)` | A subscribed telemetry topic emits | Update working state, possibly emit derived frames | Story 2.1 (signature), Story 5.1 (runtime) |
+| `on_schedule` | A scheduled invocation fires | Run periodic task | Story 2.1 (signature), Story 5.1 (runtime) |
+| `on_idle` | No work for ≥30s (configurable) | Proactive opportunity (Butler!); else no-op | Story 2.1 (signature), Story 5.1 (runtime) |
+| `on_swap_out` | Kernel about to swap this Spirit out | Final state blob; in-flight tokens enumerated | Story 5.2 |
+| `on_swap_in(predecessor_state)` | This Spirit is the successor in a hot-swap | Inherit state; rebind in-flight tokens | Story 2.1 (signature), Story 5.2 (state transfer) |
+| `snapshot()` → state | Kernel requests a hot-swap snapshot | Produce CBOR-encoded state per `[hot_swap].state_schema_version` | Story 5.2 |
+| `migrate(predecessor_state)` → successor_state | Cross-major migration; predecessor's class is in this class's `migrates_from` list | Translate predecessor's schema to this class's schema | Story 5.2 |
+| `epistemic_resolve(halt_id, resolution)` | User responded to a halt | Process resolution; transition back to `Running` or accept halt | Story 4.1 |
+| `on_pause` | Operator paused this Spirit | Drop in-flight non-critical work; preserve halt state | Story 2.1 (signature), Story 5.1 (runtime) |
+| `on_resume` | Operator resumed | Resume | Story 2.1 (signature), Story 5.1 (runtime) |
+| `on_unload` | Graceful shutdown | Persist final state; close connections | Story 2.1 (signature), Story 5.1 (runtime) |
+| `on_consolidate` | Spirit-author-defined cadence for memory-curation passes | Compact private memory; produce digests | Story 2.1 (signature), Story 5.1 (runtime) |
 
 ## 5.4 Posture
 

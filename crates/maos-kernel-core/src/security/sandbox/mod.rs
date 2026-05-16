@@ -29,6 +29,10 @@ pub struct SandboxSpec {
     pub resolved_caps: ResolvedCaps,
     pub declared_scopes: Vec<Scope>,
     pub spirit_id: String,
+    /// Output shape predicate scaffolding for Story 7.3 fail-loud enforcement.
+    /// Defaults to `None`; populated when admission receives a parsed manifest
+    /// with the `[output_shape]` section.
+    pub output_shape_predicate: Option<crate::security::manifest::OutputShapePredicate>,
 }
 
 impl SandboxSpec {
@@ -39,6 +43,7 @@ impl SandboxSpec {
             resolved_caps: ResolvedCaps::default(),
             declared_scopes: vec![],
             spirit_id: String::new(),
+            output_shape_predicate: None,
         }
     }
 }

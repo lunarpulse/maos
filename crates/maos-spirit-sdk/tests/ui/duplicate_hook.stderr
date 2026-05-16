@@ -1,0 +1,5 @@
+error: duplicate hook declaration: `on_idle`
+ --> tests/ui/duplicate_hook.rs:8:8
+  |
+8 |     fn on_idle(&self) {}
+  |        ^^^^^^^

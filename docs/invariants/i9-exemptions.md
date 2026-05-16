@@ -73,6 +73,13 @@ parsed from the `[output_shape]` manifest section. Parsed-then-dropped at admiss
 the orchestrator verifies the Spirit's response shape against this list and discards
 the struct after validation. No kernel persistence.
 
+### `OutputShapePredicate` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** manifest-derived predicate (Story 2.1) — constructed from `OutputShape` at
+admission and held in `SandboxSpec`. Dropped after spawn together with the spec;
+the `fields: Vec<String>` is a structural copy of the manifest's `required_fields`.
+No kernel persistence beyond the admission stack frame.
+
 ### `InferencePortAdapter` — `crates/maos-kernel-core/src/inference/mod.rs`
 
 **Reason:** Inference Port runtime adapter (Story 1b.4) — composite holding `Arc<dyn Provider>`,

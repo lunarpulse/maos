@@ -9,6 +9,7 @@ use maos_kernel_core::capability::cap_tokens;
 use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::security::{
     SecurityManagerAdapter, SandboxConfig, ResourceCaps, SecurityError,
+    CapabilitiesRequired, OutputShape,
 };
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::invariants::i10::LifecycleEvent;
@@ -29,6 +30,25 @@ fn make_adapter_with_trust_floors() -> (SecurityManagerAdapter, JournalAdapter, 
     (adapter, journal, tmpdir)
 }
 
+fn empty_caps_required() -> CapabilitiesRequired {
+    CapabilitiesRequired {
+        provider: maos_kernel_core::security::ProviderCapabilities {
+            complete: vec![],
+        },
+    }
+}
+
+fn hello_spirit_output_shape() -> OutputShape {
+    OutputShape {
+        required_fields: vec![
+            "introduction".into(),
+            "capability_scope".into(),
+            "halt_tags".into(),
+            "transparency_log".into(),
+        ],
+    }
+}
+
 #[test]
 fn strictest_of_manifest_trust_operator() {
     let (adapter, journal, _tmpdir) = make_adapter_with_trust_floors();
@@ -45,6 +65,8 @@ fn strictest_of_manifest_trust_operator() {
         42, "spirit-42",
         &SandboxConfig { tier: SandboxTier::T0 },
         &ResourceCaps::default(),
+        &empty_caps_required(),
+        None,
         &journal,
     ).unwrap();
 
@@ -69,6 +91,8 @@ fn t3_effective_tier_rejected() {
         99, "spirit-99",
         &SandboxConfig { tier: SandboxTier::T0 },
         &ResourceCaps::default(),
+        &empty_caps_required(),
+        None,
         &journal,
     ).unwrap_err();
 
@@ -96,6 +120,8 @@ fn t1_effective_tier_rejected() {
         55, "spirit-55",
         &SandboxConfig { tier: SandboxTier::T1 },
         &ResourceCaps::default(),
+        &empty_caps_required(),
+        None,
         &journal,
     ).unwrap_err();
 
@@ -121,6 +147,8 @@ fn effective_tier_is_journaled() {
         7, "spirit-seven",
         &SandboxConfig { tier: SandboxTier::T2 },
         &ResourceCaps::default(),
+        &empty_caps_required(),
+        None,
         &journal,
     ).unwrap();
 

@@ -8,8 +8,10 @@ use std::process::Command;
 
 #[test]
 fn one_shot_hello_spirit_produces_valid_json() {
+    let workspace_root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
     let output = Command::new(env!("CARGO_BIN_EXE_maos-bin"))
         .env("MAOS_ONE_SHOT", "hello-spirit")
+        .current_dir(workspace_root)
         .output()
         .expect("failed to execute maos-bin");
 

@@ -1,5 +1,5 @@
 # generated: 2026-05-11
-last_updated: 2026-05-16  # Story 1b.6 closes D9/D10/Doc3 from Epic 1b retro — Epic 2 prep complete.
+last_updated: 2026-05-16  # Story 2.1 file created (ready-for-dev); epic-2 flipped to in-progress.
 # project: maos
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-05-16  # Story 1b.6 closes D9/D10/Doc3 from Epic 1b retro —
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-11
-last_updated: 2026-05-16  # Story 1b.6 closes D9/D10/Doc3 from Epic 1b retro — Epic 2 prep complete.
+last_updated: 2026-05-16  # Story 2.1 code review completed, all patches applied, status → done.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -86,8 +86,8 @@ development_status:
   # ------------------------------------------------------------------
   # Epic 2: Spirit ABI + Developer SDK + Boundary Contracts (v0.1 -> v0.3)
   # ------------------------------------------------------------------
-  epic-2: backlog
-  2-1-ship-the-full-spirit-abi-with-spirit-proc-macro-and-11-lifecycle-hooks: backlog
+  epic-2: in-progress
+  2-1-ship-the-full-spirit-abi-with-spirit-proc-macro-and-11-lifecycle-hooks: done
   2-2-xtask-check-service-boundary-p1-p4-full-implementation-spirit-boundary-invariant-cases: backlog
   2-3-thin-cargo-generate-template-local-runner-nfr-onb-1-v0-3-prerequisite: backlog
   2-4-seed-the-spirit-test-sdk-with-lcas-framework-and-cross-spirit-isolation-hooks: backlog

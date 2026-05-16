@@ -19,6 +19,7 @@ fn setrlimit_nofile_enforced() {
         },
         declared_scopes: vec![],
         spirit_id: "test-fd-cap".into(),
+        output_shape_predicate: None,
     };
     let mut cmd = Command::new("/bin/sh");
     cmd.arg("-c").arg(r#"for i in $(seq 1 32); do exec 3>/dev/null; done 2>/dev/null; echo done"#);
@@ -38,6 +39,7 @@ fn memory_cap_smoke() {
         },
         declared_scopes: vec![],
         spirit_id: "test-mem-cap".into(),
+        output_shape_predicate: None,
     };
     let mut cmd = Command::new("/bin/true");
     let mut child = spawn_sandboxed(&spec, &mut cmd).unwrap();

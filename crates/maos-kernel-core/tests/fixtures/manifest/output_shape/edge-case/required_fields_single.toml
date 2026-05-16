@@ -1,0 +1,2 @@
+# edge case: single field — minimal valid output_shape
+required_fields = ["result"]

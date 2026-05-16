@@ -214,3 +214,21 @@
 "maos_kernel_core::api::crate::security::OutputShape"             = "data-movement"
 "maos_kernel_core::api::crate::security::Budget"                  = "data-movement"
 "maos_kernel_core::api::crate::security::Author"                  = "data-movement"
+
+# Story 2.1 — OutputShapePredicate + OutputShapeViolation (data-movement: predicate validation)
+"maos_kernel_core::security::manifest::OutputShapePredicate"       = "data-movement"
+"maos_kernel_core::security::manifest::OutputShapeViolation"       = "data-movement"
+
+# Story 2.1 — capabilities_required_to_scopes (supervision: admission-time scope conversion)
+"maos_kernel_core::security::manifest::capabilities_required_to_scopes" = "supervision"
+
+# Story 2.1 — drift channel types (supervision: drift detection channel surface)
+"maos_kernel_core::security::drift::DriftEvent"                    = "supervision"
+"maos_kernel_core::security::drift::make_drift_channel"            = "supervision"
+
+# Story 2.1 — api re-exports for new types (same classes as originals)
+"maos_kernel_core::api::crate::security::OutputShapePredicate"     = "data-movement"
+"maos_kernel_core::api::crate::security::OutputShapeViolation"     = "data-movement"
+"maos_kernel_core::api::crate::security::capabilities_required_to_scopes" = "supervision"
+"maos_kernel_core::api::crate::security::DriftEvent"               = "supervision"
+"maos_kernel_core::api::crate::security::make_drift_channel"       = "supervision"

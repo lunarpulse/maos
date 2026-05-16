@@ -320,6 +320,31 @@ impl RawCapabilitiesRequired {
     }
 }
 
+/// Convert a `CapabilitiesRequired` manifest declaration to a `Vec<Scope>`.
+///
+/// v0.1-β only produces `Scope::ProviderInfer` — the provider prefix is
+/// extracted before the first `.` in each entry (e.g., `"anthropic.claude-3-haiku-20240307"`
+/// → `ProviderInfer { provider: "anthropic" }`). Other scope classes
+/// (fs, net, iac, mem) return a clearly-commented TODO and are not
+/// produced — they ship in Epic 7.
+pub fn capabilities_required_to_scopes(caps: &CapabilitiesRequired) -> Vec<maos_domain::invariants::i1::Scope> {
+    caps.provider
+        .complete
+        .iter()
+        .map(|entry| {
+            let provider = entry.split('.').next().unwrap_or(entry);
+            if provider.is_empty() {
+                return maos_domain::invariants::i1::Scope::ProviderInfer {
+                    provider: entry.clone(),
+                };
+            }
+            maos_domain::invariants::i1::Scope::ProviderInfer {
+                provider: provider.to_string(),
+            }
+        })
+        .collect()
+}
+
 // ------------------------------------------------------------------
 // [posture] section (Story 1b.5c, AC3)
 // ------------------------------------------------------------------
@@ -415,10 +440,88 @@ impl RawOutputShape {
                 &format!("len {} > 32", self.required_fields.len()),
             )));
         }
+        // Story 2.1 (AC3): reject field names containing whitespace.
+        for name in &self.required_fields {
+            if name.contains(|c: char| c.is_whitespace()) {
+                return Err(ManifestError::Toml(validation_msg(
+                    "output_shape.required_fields",
+                    &format!("whitespace in field name '{}'", name),
+                )));
+            }
+        }
+        // Story 2.1 (AC3): reject duplicate field names.
+        {
+            let mut seen = std::collections::HashSet::new();
+            for name in &self.required_fields {
+                if !seen.insert(name.as_str()) {
+                    return Err(ManifestError::Toml(validation_msg(
+                        "output_shape.required_fields",
+                        &format!("duplicate field name '{}'", name),
+                    )));
+                }
+            }
+        }
         Ok(OutputShape {
             required_fields: self.required_fields,
         })
     }
+}
+
+// ------------------------------------------------------------------
+// OutputShapePredicate — Story 2.1 (AC3)
+// ------------------------------------------------------------------
+
+/// Structural predicate built from `[output_shape] required_fields`.
+///
+/// Scaffolding for Story 7.3 fail-loud enforcement: the predicate is
+/// constructed at admission and held by the kernel; the emit-side
+/// enforcement (`check()` on every frame emit) lands at E7.
+#[maos_attrs::i9_exempt(reason = "manifest-derived predicate; constructed at admission and held in SandboxSpec — dropped after spawn, no kernel persistence")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputShapePredicate {
+    fields: Vec<String>,
+}
+
+impl OutputShapePredicate {
+    /// Construct the predicate from an already-validated `OutputShape`.
+    pub fn from(output_shape: &OutputShape) -> Self {
+        Self {
+            fields: output_shape.required_fields.clone(),
+        }
+    }
+
+    /// Check whether `value` satisfies the predicate.
+    ///
+    /// Returns `Ok(())` iff every `required_fields` entry is present
+    /// as a top-level key with a non-null value. Errors on the first
+    /// missing or null field in declaration order.
+    pub fn check(&self, value: &serde_json::Value) -> Result<(), OutputShapeViolation> {
+        for field in &self.fields {
+            match value.get(field) {
+                None => {
+                    return Err(OutputShapeViolation::MissingField {
+                        name: field.clone(),
+                    });
+                }
+                Some(serde_json::Value::Null) => {
+                    return Err(OutputShapeViolation::NullField {
+                        name: field.clone(),
+                    });
+                }
+                Some(_) => {} // present and non-null — ok
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Violation of the `[output_shape]` predicate at frame-emit time.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum OutputShapeViolation {
+    #[error("missing required field '{name}'")]
+    MissingField { name: String },
+    #[error("required field '{name}' is null")]
+    NullField { name: String },
 }
 
 // ------------------------------------------------------------------
@@ -801,6 +904,88 @@ allowed_max = "autonomous""#;
         let s = r#"required_fields = ["x"]"#;
         let o = OutputShape::from_toml_str(s).unwrap();
         assert_eq!(o.required_fields, vec!["x"]);
+    }
+
+    // ---- OutputShape whitespace + duplicate Story 2.1 (AC3) ----
+
+    #[test]
+    fn output_shape_rejects_whitespace_in_field_name() {
+        let s = r#"required_fields = ["with space"]"#;
+        let err = OutputShape::from_toml_str(s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("whitespace in field name")),
+            "expected whitespace rejection, got: {err}"
+        );
+    }
+
+    #[test]
+    fn output_shape_rejects_duplicate_field_name() {
+        let s = r#"required_fields = ["a", "b", "a"]"#;
+        let err = OutputShape::from_toml_str(s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("duplicate field name")),
+            "expected duplicate rejection, got: {err}"
+        );
+    }
+
+    // ---- OutputShapePredicate Story 2.1 (AC3) ----
+
+    use serde_json::json;
+
+    #[test]
+    fn predicate_hits_on_hello_spirit_four_fields() {
+        let shape = OutputShape {
+            required_fields: vec![
+                "introduction".into(),
+                "capability_scope".into(),
+                "halt_tags".into(),
+                "transparency_log".into(),
+            ],
+        };
+        let pred = OutputShapePredicate::from(&shape);
+        let value = json!({
+            "introduction": "Hello",
+            "capability_scope": "provider:anthropic",
+            "halt_tags": ["a"],
+            "transparency_log": "hash",
+            "extra": "ignored",
+        });
+        assert!(pred.check(&value).is_ok());
+    }
+
+    #[test]
+    fn predicate_misses_first_field() {
+        let shape = OutputShape { required_fields: vec!["a".into(), "b".into()] };
+        let pred = OutputShapePredicate::from(&shape);
+        let value = json!({"b": 1});
+        let err = pred.check(&value).unwrap_err();
+        assert!(matches!(err, OutputShapeViolation::MissingField { name } if name == "a"));
+    }
+
+    #[test]
+    fn predicate_misses_second_field() {
+        let shape = OutputShape { required_fields: vec!["a".into(), "b".into()] };
+        let pred = OutputShapePredicate::from(&shape);
+        let value = json!({"a": 1});
+        let err = pred.check(&value).unwrap_err();
+        assert!(matches!(err, OutputShapeViolation::MissingField { name } if name == "b"));
+    }
+
+    #[test]
+    fn predicate_rejects_null_field() {
+        let shape = OutputShape { required_fields: vec!["a".into()] };
+        let pred = OutputShapePredicate::from(&shape);
+        let value = json!({"a": null});
+        let err = pred.check(&value).unwrap_err();
+        assert!(matches!(err, OutputShapeViolation::NullField { name } if name == "a"));
+    }
+
+    #[test]
+    fn predicate_accepts_empty_object_for_empty_required_fields() {
+        // Empty predicate trivially satisfied.
+        let shape = OutputShape { required_fields: vec![] };
+        let pred = OutputShapePredicate::from(&shape);
+        assert!(pred.check(&json!({})).is_ok());
     }
 
     // ---- Budget ----

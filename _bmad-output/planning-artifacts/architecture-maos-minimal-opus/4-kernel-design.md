@@ -22,7 +22,7 @@ The two styles do not conflict. Hexagonal owns the static dependency graph; acto
 
 ```
 maos/
-├── crates/                             # 18 library + binary crates (+ xtask = 19 workspace members)
+├── crates/                             # 19 library + binary crates (+ xtask = 20 workspace members)
 │   ├── maos-domain/                    # v0.1 ✅  Pure types, invariants I1-I14, pure functions
 │   │                                   #          std crate; depends on maos-spirit-abi for D9 SandboxTier conversion (1b.6)
 │   ├── maos-spirit-abi/                # v0.1 ✅  Wire-stable types ONLY. #![no_std].
@@ -55,6 +55,14 @@ maos/
 │   │                                   #          maos-kernel-core because Rust proc-macro crates cannot
 │   │                                   #          live inside the crate they annotate. Future expansion:
 │   │                                   #          additional kernel-discipline attributes.
+│   ├── maos-spirit-derive/              # v0.1 ✅  Proc-macro crate (added 2.1). Hosts #[spirit] attribute.
+│   │                                   #          Must live outside maos-spirit-sdk because Rust proc-macro
+│   │                                   #          crates cannot live inside the crate they annotate
+│   │                                   #          (serde/serde_derive precedent). Re-exported as
+│   │                                   #          maos_spirit_sdk::spirit for Spirit-author ergonomics.
+│   │                                   #          Dep direction: maos-spirit-sdk → maos-spirit-derive.
+│   │                                   #          Exception to inward-flow rationale is explicit —
+│   │                                   #          proc-macro constraint, parallel to maos-attrs.
 │   ├── maos-corpus-gen/                # v0.1 ✅  Deterministic corpus generators (Epic 0 — secret-redaction
 │   │                                   #          10⁴ + red-team ≥640). CorpusGenerator trait + SHA-pinned
 │   │                                   #          seed format. Future: pub mod ccac; (Story 7.3, v1.0).

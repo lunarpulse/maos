@@ -8,3 +8,15 @@ rust-version.workspace = true
 description = "MAOS Spirit SDK — reference SDK for Spirit authors (ADR-002)"
 
 [dependencies]
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+maos-spirit-derive = { path = "../maos-spirit-derive" }
+tokio-util = { version = "0.7", features = ["rt"], optional = true }
+
+[features]
+default = ["std"]
+std = ["dep:tokio-util"]
+mock = ["maos-spirit-abi/mock"]
+
+[dev-dependencies]
+maos-spirit-abi = { path = "../maos-spirit-abi", features = ["mock"] }
+trybuild = "1"

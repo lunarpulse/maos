@@ -20,6 +20,7 @@ members = [
     "crates/maos-spirit-hello",
     "crates/maos-spirit-sdk",
     "crates/maos-attrs",
+    "crates/maos-spirit-derive",
 ]
 default-members = []
 

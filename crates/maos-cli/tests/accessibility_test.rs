@@ -79,6 +79,8 @@ fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Outpu
     if let Ok(path) = std::env::var("PATH") {
         cmd.env("PATH", path);
     }
+    let workspace_root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+    cmd.current_dir(&workspace_root);
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
     cmd.env("XDG_DATA_HOME", &xdg);

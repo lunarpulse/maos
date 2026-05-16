@@ -5,10 +5,15 @@
 //! Enforces sandbox tiers, secret isolation, and approval-class
 //! mediation. Story 1b.3 lands T0/T1/T2 tier enforcement and
 //! per-Spirit resource caps.
+//!
+//! Story 2.1 adds capability-declaration → policy-table wiring
+//! (replacing the hardcoded injection in `maos-bin::main`),
+//! `OutputShapePredicate` scaffold, and a `DriftEvent` channel.
 
 pub mod crypto;
 pub mod manifest;
 pub mod sandbox;
+pub mod drift;
 
 pub use maos_domain::ports::SecurityManagerPort;
 pub use crypto::RingCryptoProvider;
@@ -22,16 +27,21 @@ pub use manifest::{
     Author, Budget, CapabilitiesRequired, ClassSection, OutputShape, Posture, PostureSection,
     ProviderCapabilities,
 };
+// Story 2.1 — appended to preserve re-export order (same discipline).
+pub use manifest::{OutputShapePredicate, OutputShapeViolation, capabilities_required_to_scopes};
 pub use sandbox::{SandboxSpec, SandboxedChild, SpawnError, spawn_sandboxed, classify_exit, SandboxViolation};
+pub use drift::{DriftEvent, make_drift_channel};
 
 use std::sync::Arc;
 
+use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
 use maos_domain::ports::scheduler::SpiritSchedulerPort;
+use tokio::sync::mpsc;
 
 use crate::capability::cap_audit::{self, CapAuditEvent};
-use crate::capability::cap_policy::{PolicyTable, decision::TrustTier};
+use crate::capability::cap_policy::{PolicyTable, ManifestCapabilityScope, decision::TrustTier};
 
 /// Security error raised during admission or enforcement.
 #[derive(Debug, thiserror::Error)]
@@ -50,15 +60,30 @@ pub enum SecurityError {
 /// enforcement and approval mediation.
 ///
 /// Promoted from ZST (v0.1-α) to hold `Arc<PolicyTable>` (Story 1b.3).
+/// Story 2.1 adds an optional drift-event sender.
 #[maos_attrs::i9_exempt(reason = "security manager adapter; holds Arc<PolicyTable> for runtime policy enforcement — structural-state caching per I9")]
 #[derive(Debug, Clone)]
 pub struct SecurityManagerAdapter {
     policy: Arc<PolicyTable>,
+    /// Drift-event channel sender (Story 2.1 AC4).
+    /// The runtime detector that emits events ships in Story 9.x.
+    drift_sender: Option<mpsc::Sender<DriftEvent>>,
 }
 
 impl SecurityManagerAdapter {
     pub fn new(policy: Arc<PolicyTable>) -> Self {
-        Self { policy }
+        Self {
+            policy,
+            drift_sender: None,
+        }
+    }
+
+    /// Set the drift-event sender (Story 2.1 AC4).
+    ///
+    /// The sender is consumed by the runtime drift detector at Story 9.x.
+    pub fn with_drift_sender(mut self, sender: mpsc::Sender<DriftEvent>) -> Self {
+        self.drift_sender = Some(sender);
+        self
     }
 
     /// Access the underlying policy table (for tests and composition root).
@@ -66,22 +91,52 @@ impl SecurityManagerAdapter {
         &self.policy
     }
 
-    /// Admit a Spirit: compute effective tier, reject T3+, journal Load.
+    /// Admit a Spirit: compute effective tier, reject T3+, journal Load,
+    /// wire manifest-scoped capabilities into the policy table.
+    ///
+    /// Story 2.1: added `caps_required` parameter for capability-declaration
+    /// → policy-table wiring (replaces hardcoded injection in `maos-bin`).
     pub fn admit_spirit(
         &self,
         spirit_pid: u32,
         spirit_id: &str,
         _manifest: &SandboxConfig,
         caps: &ResourceCaps,
+        caps_required: &CapabilitiesRequired,
+        output_shape: Option<&OutputShape>,
         journal: &dyn SpiritSchedulerPort,
     ) -> Result<SandboxSpec, SecurityError> {
+        {
+            let declared_scopes = capabilities_required_to_scopes(caps_required);
+            let inner = self.policy.inner().load_full();
+
+            let trust_tier = inner
+                .manifest_scopes
+                .get(&spirit_pid)
+                .map(|m| m.trust_tier)
+                .unwrap_or(TrustTier::Verified);
+
+            let effective = self.policy.effective_sandbox_tier(spirit_pid, trust_tier, &inner);
+
+            let mut new_inner = (*inner).clone();
+            new_inner.manifest_scopes.insert(
+                spirit_pid,
+                ManifestCapabilityScope {
+                    scopes: declared_scopes,
+                    declared_tier: effective,
+                    trust_tier,
+                },
+            );
+            self.policy.update(new_inner);
+        }
+
         let inner = self.policy.inner().load_full();
 
         let trust_tier = inner
             .manifest_scopes
             .get(&spirit_pid)
             .map(|m| m.trust_tier)
-            .unwrap_or(TrustTier::PublicUntrusted);
+            .unwrap_or(TrustTier::Verified);
 
         let effective = self.policy.effective_sandbox_tier(spirit_pid, trust_tier, &inner);
 
@@ -110,6 +165,9 @@ impl SecurityManagerAdapter {
             .map(|m| m.scopes.clone())
             .unwrap_or_default();
 
+        // Build OutputShapePredicate from manifest (Story 2.1 AC3).
+        let predicate = output_shape.map(OutputShapePredicate::from);
+
         // Journal the Load transition with effective tier (monotonic clock).
         journal.journal_lifecycle(JournalEntry {
             timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
@@ -123,6 +181,7 @@ impl SecurityManagerAdapter {
             resolved_caps,
             declared_scopes,
             spirit_id: spirit_id.into(),
+            output_shape_predicate: predicate,
         })
     }
 
@@ -165,7 +224,7 @@ impl SecurityManagerPort for SecurityManagerAdapter {
             .manifest_scopes
             .get(&spirit_pid)
             .map(|m| m.trust_tier)
-            .unwrap_or(TrustTier::PublicUntrusted);
+            .unwrap_or(TrustTier::Verified);
         Some(self.policy.effective_sandbox_tier(spirit_pid, trust_tier, &inner))
     }
 

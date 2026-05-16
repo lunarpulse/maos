@@ -254,24 +254,86 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
 
-        // Pre-populate the policy table with hello-Spirit's declared capabilities
+        // Story 2.1 AC4 — parse manifest and admit via SecurityManagerAdapter
+        // instead of hardcoding capability scopes. The adapter reads the
+        // manifest's [capabilities.required] section and registers scopes
+        // in the policy table.
         {
-            let mut inner = maos_kernel_core::capability::cap_policy::PolicyTableInner::default();
-            inner.manifest_scopes.insert(
+            // Initialize monotonic counter for journal timestamps and token issuance.
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let manifest_path = std::path::Path::new("spirits/hello-spirit/manifest.toml");
+            let manifest_toml = std::fs::read_to_string(manifest_path)
+                .map_err(|e| format!("failed to read spirit manifest at {}: {e}", manifest_path.display()))?;
+
+            // Parse full TOML document, then extract individual sections.
+            let manifest_root: toml::Value = toml::from_str(&manifest_toml)
+                .map_err(|e| format!("manifest TOML parse error: {e}"))?;
+
+            fn extract_section(root: &toml::Value, section: &str) -> Result<String, Box<dyn std::error::Error>> {
+                let value = root
+                    .get(section)
+                    .ok_or_else(|| format!("missing manifest section [{section}]"))?;
+                let serialized = toml::to_string(value)
+                    .map_err(|e| format!("failed to serialize [{section}] section: {e}"))?;
+                Ok(serialized)
+            }
+
+            // Parse each manifest section individually.
+            let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
+                &extract_section(&manifest_root, "sandbox")?,
+            )?;
+            let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
+                &extract_section(&manifest_root, "resources")?,
+            )?;
+            let caps_required = {
+                let caps_required_val = manifest_root
+                    .get("capabilities")
+                    .and_then(|c| c.get("required"));
+                let caps_required_toml = match caps_required_val {
+                    Some(v) => toml::to_string(v)
+                        .map_err(|e| format!("failed to serialize [capabilities.required]: {e}"))?,
+                    None => return Err(format!("missing manifest section [capabilities.required]").into()),
+                };
+                maos_kernel_core::security::CapabilitiesRequired::from_toml_str(&caps_required_toml)?
+            };
+            let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
+                &extract_section(&manifest_root, "output_shape")?,
+            )?;
+
+            // Open the Lifecycle Journal for admission (the Load event).
+            let journal_path = maos_audit::default_journal_path();
+            if let Some(parent) = journal_path.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("journal parent create failed: {e}"))?;
+            }
+            let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+                .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
+
+            // Construct SecurityManagerAdapter with drift channel (Story 2.1 AC4).
+            // Drift channel: receiver declared first so it outlives the
+            // sender (held by security). Rust drops in reverse declaration
+            // order — security drops first, then _drift_rx.
+            let (drift_tx, _drift_rx) = maos_kernel_core::security::make_drift_channel();
+            let security = maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
+                .with_drift_sender(drift_tx);
+
+            // Admit hello-spirit through the canonical admission path.
+            let _spec = security.admit_spirit(
                 0,
-                maos_kernel_core::capability::cap_policy::ManifestCapabilityScope {
-                    scopes: vec![Scope::ProviderInfer {
-                        provider: "anthropic".into(),
-                    }],
-                    declared_tier: maos_domain::invariants::i9::SandboxTier(0),
-                    trust_tier: maos_kernel_core::capability::cap_policy::decision::TrustTier::Verified,
-                },
-            );
-            policy.update(inner);
+                "hello-spirit",
+                &sandbox_cfg,
+                &resource_caps,
+                &caps_required,
+                Some(&output_shape),
+                &journal,
+            )?;
+
+            // Drop the journal adapter (fsync + drain).
+            drop(journal);
         }
 
         // Initialize monotonic counter for token issuance
-        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
 
         // Issue a valid capability token for the in-process hello-Spirit
         let token = capability.issue_with_mediation(

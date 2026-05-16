@@ -33,6 +33,7 @@ fn make_spec(tier: SandboxTier) -> SandboxSpec {
         resolved_caps: Default::default(),
         declared_scopes: vec![],
         spirit_id: format!("test-spirit-{}", tier.0),
+        output_shape_predicate: None,
     }
 }
 

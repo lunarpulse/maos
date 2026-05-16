@@ -1,8 +1,28 @@
 #![forbid(unsafe_code)]
 
-//! \`maos-spirit-sdk\` — reference SDK for Spirit authors (ADR-002).
+//! `maos-spirit-sdk` — reference SDK for Spirit authors (ADR-002).
 //!
-//! At v0.1-α this is a placeholder; substantive implementation lands in
-//! future stories per the architecture phased roadmap.
+//! Re-exports the proc-macro attribute `#[spirit]` from `maos-spirit-derive`
+//! (the `serde`/`serde_derive` precedent: the user-facing crate re-exports
+//! the macro from a sibling proc-macro-only crate).
 //!
-//! See architecture §4.0.2 for the canonical 17-crate workspace layout.
+//! Facade pattern: `use maos_spirit_sdk::*;` gives the Spirit author the
+//! full ABI surface, the proc-macro, and (with `std` feature) the Tokio
+//! cancellation adapter.
+
+pub use maos_spirit_derive::spirit;
+
+// Re-export the full ABI surface so Spirit authors get everything from one import.
+pub use maos_spirit_abi::{
+    cancellation::{CancellationSignal, NeverCancel},
+    compliance,
+    ctx::{CapabilityHandle, Ctx, MailboxHandle},
+    lifecycle::{
+        ConsolidatePayload, FramePayload, HookBudgetKey, SchedulePayload, Spirit,
+        SpiritVtable, SwapInPayload, TelemetryEventPayload,
+    },
+    ABI_VERSION,
+};
+
+#[cfg(feature = "std")]
+pub mod cancellation;
