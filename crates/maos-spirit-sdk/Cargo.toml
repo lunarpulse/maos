@@ -16,6 +16,7 @@ tokio-util = { version = "0.7", features = ["rt"], optional = true }
 default = ["std"]
 std = ["dep:tokio-util"]
 mock = ["maos-spirit-abi/mock"]
+local_runner = ["std", "mock"]
 
 [dev-dependencies]
 maos-spirit-abi = { path = "../maos-spirit-abi", features = ["mock"] }

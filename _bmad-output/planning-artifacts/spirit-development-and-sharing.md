@@ -20,6 +20,8 @@ based_on_brief: 'Winston, 2026-05-05'
 >
 > **Spirit-author reading order:** **Butler (v0.3) is the first reference Spirit to study** for anticipatory single-Spirit patterns + on_idle hook + epistemic_policy mechanics. **Researcher (v0.5) is the second** for exploratory patterns + parallelism + first opt-in §9.5 distillation. **Worker + Orchestrator examples** in this guide become directly applicable at v0.8 and beyond — the multi-Spirit pattern this guide's later sections assume only ships at v0.8. **Subprocess form is v1.0+** (the first form a third-party author can publish independently); **rust-inproc** is available v0.1+ but is for kernel-bundled reference Spirits, not third-party publishing. Skill-package authoring methodology (§13) and ABI usage (§5) are canonical and stable across phases.
 
+> **🛠️ v0.3 prerequisite shipped — Story 2.3 (2026-05-16).** The `cargo generate maos-spirit` template + local runner cited throughout this document (§3 — "Build your first Spirit in 30 minutes," §10.6 Diego J6 onboarding) lands at v0.3 PREREQUISITE (NOT v1.0 as earlier drafts implied). Template path: `templates/spirit-rust/`. Local runner: `maos_spirit_sdk::local_runner::LocalRunner` (gated behind `local_runner` cargo feature). Example: `examples/example-spirit/`. The full NFR-Onb-1 30-Min First Spirit Validation Gate (N=12 stratified) runs at Story 7.5b against the Butler reference Spirit from Story 8.1 — Story 2.3 ships the SUBSTRATE, not the gate.
+
 ---
 
 ## How to read this document

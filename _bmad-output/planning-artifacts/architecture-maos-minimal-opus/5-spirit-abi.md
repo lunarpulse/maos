@@ -206,3 +206,5 @@ Posture is the Spirit's autonomy stance. Posture is mutable; class is not. The u
 | `autonomous` | Proceed without prompts; rare; explicit user grant; halt mechanism still active |
 
 The manifest's `[posture].allowed_max` sets a ceiling beyond which the Spirit cannot self-shift. The operator may override the ceiling per deployment.
+
+> **v0.3 prerequisite — Spirit-author scaffolding (Story 2.3):** Spirit authors at v0.3 prerequisite scaffold a new Rust Spirit via `cargo generate --git https://github.com/lunarpulse/maos templates/spirit-rust --name my-spirit`. The generated crate uses the `#[spirit]` proc-macro from Story 2.1, declares a TOML manifest mirroring the hello-spirit shape, and ships a test driven by `maos_spirit_sdk::local_runner::LocalRunner` (no kernel instance required). The baked output is committed at `examples/example-spirit/` and CI-enforced via `example-spirit-tests` + `example-spirit-drift`. Per-language templates (TS / Python / Go) land in Story 7.1; the NFR-Onb-1 30-Min First Spirit Validation Gate executes at Story 7.5b against Butler from Story 8.1.

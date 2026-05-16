@@ -19,4 +19,7 @@ gates = [
     "calibrate",
     "check-security-md",
     "manifest-field-coverage",
+    "example-spirit-regen",
+    "example-spirit-tests",
+    "example-spirit-drift",
 ]

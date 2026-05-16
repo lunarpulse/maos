@@ -287,15 +287,26 @@ coverage:
     phase: v0.3
     valid_until: '2027-05-12'
   FR33:
-    gates: []
+    gates: [example-spirit-tests, example-spirit-drift]
     corpora: []
     phase: v0.3
     valid_until: '2027-05-12'
+    notes: |
+      Story 2.3 ships thin cargo-generate template at `templates/spirit-rust/`
+      + baked example at `examples/example-spirit/` + xtask drift detector.
+      Rust-only at v0.3 prerequisite. Full per-language templates (TypeScript /
+      Python / Go) deferred to Story 7.1 at v0.5+.
   FR34:
-    gates: []
+    gates: [example-spirit-tests]
     corpora: []
     phase: v0.3
     valid_until: '2027-05-12'
+    notes: |
+      Story 2.3 ships the local_runner SDK seed (lifecycle hook fire via
+      SpiritVtable + Ctx::mock() + in-memory mock IAC bus forward-anchor
+      types) at `crates/maos-spirit-sdk/src/local_runner.rs`. Full spirit-test
+      SDK with assertion macros + halt resolution + manifest self-check +
+      class-specific regression corpus is Story 2.4 seed → Story 7.1 full.
   FR35:
     gates: []
     corpora: []
@@ -750,10 +761,16 @@ coverage:
       Story 1b.1 lands the Approval Decision Log as a distinct SQLite table.
       Full v0.3 surface lands in Story 3.3 and Story 1b.3.
   NFR-Onb-1:
-    gates: []
+    gates: [example-spirit-tests, example-spirit-drift]
     corpora: []
     phase: v0.3
     valid_until: '2027-05-12'
+    notes: |
+      Story 2.3 ships PREREQUISITES (cargo-generate template + local_runner
+      SDK + ≥1 example Spirit with passing CI). Full N=12 stratified
+      30-Min First Spirit Validation Gate executes at Story 7.5b against
+      the Butler reference Spirit shipped by Story 8.1 (per dependency-dag.md
+      line 25).
   NFR-Onb-2:
     gates: []
     corpora: []

@@ -38,7 +38,7 @@ use maos_domain::invariants::i1::Scope;
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_kernel_core::api::{
     CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter,
-    MemoryManagerAdapter, RingCryptoProvider, SecurityManagerAdapter,
+    MemoryManagerAdapter, RingCryptoProvider,
     SpiritSchedulerAdapter, TelemetryStreamAdapter,
 };
 use maos_kernel_core::inference::InferencePortAdapter;
@@ -83,7 +83,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Construct the seven adapter shells.
     let _scheduler = SpiritSchedulerAdapter::default();
-    let _security = SecurityManagerAdapter::default();
     let _memory = MemoryManagerAdapter::default();
     let _iac = IacBusAdapter::default();
     let io = IoSubsystemAdapter::new();
@@ -119,7 +118,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         audit_tx.clone(),
         quota,
     ));
-    let _security = SecurityManagerAdapter::new(Arc::clone(&policy));
     eprintln!("maos: capability registry initialized (Story 1b.2)");
 
     // Transparency Log — shared across services (Story 1b.1).

@@ -29,6 +29,8 @@ pub use manifest::{
 };
 // Story 2.1 — appended to preserve re-export order (same discipline).
 pub use manifest::{OutputShapePredicate, OutputShapeViolation, capabilities_required_to_scopes};
+// Story 2.3 — appended for P2 port-pair completeness (RingCryptoProvider adapter → CryptoProvider Port).
+pub use maos_domain::ports::CryptoProvider;
 pub use sandbox::{SandboxSpec, SandboxedChild, SpawnError, spawn_sandboxed, classify_exit, SandboxViolation};
 pub use drift::{DriftEvent, make_drift_channel};
 

@@ -1,0 +1,19 @@
+[package]
+name = "{{crate_name}}"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "A MAOS Spirit scaffolded from templates/spirit-rust (Story 2.3 v0.3 prerequisite)."
+
+[dependencies]
+# At v0.3 prerequisite, maos-spirit-sdk is not yet on crates.io. Spirit
+# authors run this template from a local clone or `--git` checkout. The
+# example-spirit baked output in this workspace uses a path dep; published
+# templates will pin to a crates.io version once Story 7.1 ships.
+maos-spirit-sdk = { git = "https://github.com/lunarpulse/maos", branch = "main", features = ["local_runner"] }
+# The #[spirit] proc-macro expands to code referencing maos_spirit_abi — the
+# user crate must declare it as a direct dependency (same pattern as hello-spirit).
+maos-spirit-abi = { git = "https://github.com/lunarpulse/maos", branch = "main" }
+
+[dev-dependencies]
+maos-spirit-sdk = { git = "https://github.com/lunarpulse/maos", branch = "main", features = ["local_runner", "mock"] }

@@ -22,7 +22,7 @@ The two styles do not conflict. Hexagonal owns the static dependency graph; acto
 
 ```
 maos/
-├── crates/                             # 19 library + binary crates (+ xtask = 20 workspace members)
+├── crates/                             # 19 library + binary crates (+ xtask + examples/example-spirit = 21 workspace members)
 │   ├── maos-domain/                    # v0.1 ✅  Pure types, invariants I1-I14, pure functions
 │   │                                   #          std crate; depends on maos-spirit-abi for D9 SandboxTier conversion (1b.6)
 │   ├── maos-spirit-abi/                # v0.1 ✅  Wire-stable types ONLY. #![no_std].
@@ -82,6 +82,13 @@ maos/
 │                                       #          (check-empty-kernel, check-service-boundary, abi-diff,
 │                                       #           invariant-lock, manifest-field-coverage, etc.)
 ├── spirits/                            # Reference Spirit crates (in-process)
+├── templates/                          # Spirit-author scaffolding (Story 2.3)
+│   └── spirit-rust/                    # Thin cargo-generate template (Rust-only at v0.3;
+│                                       # per-language TS/Python/Go at Story 7.1 v0.5+).
+│                                       # Excluded from workspace via [workspace] exclude.
+├── examples/                           # Workspace-member example Spirits (NOT kernel substrate)
+│   └── example-spirit/                 # Baked output of templates/spirit-rust (Story 2.3).
+│                                       # Drift-detected via `xtask example-spirit-regen --check`.
 ├── schemas/                            # JSON Schema + CBOR schemas
 │   ├── trace-shape.schema.json
 │   ├── halt-registry/<spirit-class>.toml
@@ -93,6 +100,8 @@ maos/
 Dependencies point inward (adapter ring → kernel services → domain core), with **two explicit exceptions**: (1) kernel services calling into Spirit ABI traits — the inversion of control that makes Spirits hot-swappable; (2) `maos-domain` depends on `maos-spirit-abi` to host the D9-reconciled `From<ABI SandboxTier> for operational SandboxTier` impl + `to_abi()` method (the no_std boundary + frozen ABI_VERSION=1 wire format make a single canonical type infeasible — see Story 1b.6 dev record). The composition root in `maos-bin/main.rs` is the only place that knows about all crates.
 
 **Workspace member count (post Story 1b.6):** 18 library/binary crates + xtask = **19 workspace members**. Added since the original §4.0.2 description: `maos-audit` (Story 1b.1 — read-side audit query adapter), `maos-attrs` (Story 1b.3 — `#[i9_exempt]` proc-macro), `maos-corpus-gen` (Epic 0 — deterministic corpus generators). `default-members = []` in the workspace root forces every cargo invocation to be `-p`-explicit (Story 1b.6 retro action A7).
+
+**Workspace member count (post Story 2.3):** 19 library/binary crates + xtask + `examples/example-spirit` = **21 workspace members**. The `examples/example-spirit` crate is workspace-managed (member of `[workspace] members`) so the discipline suite's `example-spirit-tests` + `example-spirit-drift` jobs continuously prove `templates/spirit-rust/` generates compiling code as the SDK + ABI evolve. The `templates/` directory is excluded via `[workspace] exclude = ["templates"]` (templates contain `{{ placeholder }}` syntax that is not valid Rust). `examples/*` is the new convention for workspace-managed proof artifacts that are NOT part of the kernel substrate; future reference Spirits (Butler at Story 8.1, Researcher at Story 8.2, etc.) MAY land at `examples/*` or `crates/maos-spirit-*` per their story's design.
 
 ### 4.0.3 Service dependency map
 

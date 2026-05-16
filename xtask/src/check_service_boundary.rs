@@ -561,6 +561,9 @@ fn check_p2_port_pairing(workspace_root: &Path) -> Result<Vec<Violation>, String
         }
 
         let port_name = if adapter == "RingCryptoProvider" {
+            // Story 2.3: CryptoProvider re-export now present in security/mod.rs, but
+            // this name-mapping workaround is still needed because RingCryptoProvider
+            // (the adapter struct) does not follow the *Adapter/*Port naming convention.
             "CryptoProvider".to_string()
         } else {
             adapter.replace("Adapter", "Port")

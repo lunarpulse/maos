@@ -26,3 +26,6 @@ pub use maos_spirit_abi::{
 
 #[cfg(feature = "std")]
 pub mod cancellation;
+
+#[cfg(feature = "local_runner")]
+pub mod local_runner;

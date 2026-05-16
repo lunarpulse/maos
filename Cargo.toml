@@ -21,8 +21,10 @@ members = [
     "crates/maos-spirit-sdk",
     "crates/maos-attrs",
     "crates/maos-spirit-derive",
+    "examples/example-spirit",
 ]
 default-members = []
+exclude = ["templates"]
 
 [workspace.package]
 version = "0.1.0-alpha"

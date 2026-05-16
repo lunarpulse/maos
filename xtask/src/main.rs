@@ -18,6 +18,7 @@ mod coverage_matrix;
 mod corpus_staleness;
 mod calibrate;
 mod rebaseline_check;
+mod example_spirit_regen;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -86,6 +87,8 @@ enum Commands {
     Calibrate { #[arg(long)] corpus: String, #[arg(long)] n: u64, #[arg(long)] p: f64, #[arg(long, default_value = "tests/corpora/MANIFEST.toml")] manifest: String, #[arg(long, default_value = "tests/corpora")] corpora_dir: String, #[arg(long)] synthetic_pass_rate: Option<f64>, #[arg(long)] json: bool },
     /// AC3 — Quarterly rebaseline check (NFR-Test-1).
     RebaselineCheck { #[arg(long, default_value = "tests/corpora/MANIFEST.toml")] manifest: String, #[arg(long, default_value = "tests/corpora")] corpora_dir: String, #[arg(long, default_value = "tests/judge-config.toml")] judge_config: String, #[arg(long, default_value = "0.98")] threshold: f64, #[arg(long)] out: Option<String>, #[arg(long)] json: bool },
+    /// Story 2.3 — Template-to-example drift detector and regenerator.
+    ExampleSpiritRegen { #[arg(long)] check: bool, #[arg(long)] json: bool },
 }
 
 fn main() {
@@ -126,6 +129,10 @@ fn main() {
         Commands::CorpusStaleness { config, manifest, warn_window_days, json } => corpus_staleness::run(&config, &manifest, warn_window_days, json),
         Commands::Calibrate { corpus, n, p, manifest, corpora_dir, synthetic_pass_rate, json } => calibrate::run(&corpus, n, p, &manifest, &corpora_dir, synthetic_pass_rate, json),
         Commands::RebaselineCheck { manifest, corpora_dir, judge_config, threshold, out, json } => rebaseline_check::run(&manifest, &corpora_dir, &judge_config, threshold, out.as_deref(), json),
+        Commands::ExampleSpiritRegen { check, json } => {
+            let workspace_root = std::env::current_dir().expect("failed to get current dir");
+            example_spirit_regen::run(&workspace_root, check, json)
+        }
     };
     if let Err(e) = result { eprintln!("{e}"); process::exit(1); }
 }
