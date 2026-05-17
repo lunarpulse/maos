@@ -10,6 +10,7 @@ members = [
     "crates/maos-compliance",
     "crates/maos-control",
     "crates/maos-corpus-gen",
+    "crates/maos-director-surface",
     "crates/maos-domain",
     "crates/maos-kernel-core",
     "crates/maos-mcp",

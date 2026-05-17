@@ -168,3 +168,16 @@
 - **No explicit WAL checkpoint between writer drain and `query_frames` read** — SQLite multi-connection WAL semantics should handle this correctly; explicit checkpoint would be belt-and-suspenders.
 - **`kill -0` PID-reuse race in 10s polling window** — `tests/integration/server_exit_drain.sh:84,101,107`. Theoretically possible in PID-namespace-constrained CI runner. Extremely unlikely in practice.
 - **One-shot drain verification checks count >=1, not completeness** — `tests/integration/server_exit_drain.sh:44-50`. A partial drain (1 of N rows flushed) passes identically to a complete drain. Enhancement, not blocking.
+
+## Deferred from: code review of 3-1-route-task-assign-frames-over-the-iac-bus-with-notification-surface-dispatch (2026-05-17)
+
+- **F15 — `Vec<FrameAddress>` instead of spec-mandated `SmallVec<[FrameAddress; 1]>`.** Dev documented choice to avoid adding `smallvec` workspace dep at v0.3. Allocation cost acceptable for 1:N routing. Intentional deviation.
+- **F16 — `FrameKind` duplicated in `maos-spirit-abi` instead of re-export from `transparency_log.rs`.** Circular dep between spirit-abi and kernel-core; newtype avoids coupling. Manual conversion match in `IacBusAdapter::deliver_typed`.
+- **F17 — Canonical types in `maos-domain::frame` instead of `maos-kernel-core::iac::frame`.** Circular dep resolution; kernel-core re-exports from domain. Dev record documents the move.
+- **F21 — `mpsc_senders` keyed by `(String, FrameKind)` instead of `(SpiritId, FrameKind)`.** SpiritId newtype flattened at routing boundary. Type-safety erosion tracked for cleanup.
+- **F22 — `IacBusPort` gains undocumented associated type `MailboxHandle`.** Rust 1.94 lacks associated type defaults; both implementors must specify concrete type. Spec prescribed only two new methods.
+- **F24 — `pending_frames` DashMap entries never removed on gauge=0.** Cardinality bounded by Spirit_count × 6. Cleanup with deregister path in Story 6.1.
+- **F25 — `TerminalChannel` silently swallows write errors.** Best-effort stderr by design; matches maos-cli accessibility pattern.
+- **F26 — `NotificationDispatcher::dispatch` always returns `Ok`.** Per-channel isolation by design. Story 3.3 adds halt surface that may need Err propagation.
+- **F27 — `ApprovalManager::decision_counter` wraps at `u64::MAX`.** 2^64 approvals before collision; practically impossible.
+- **F29 — `check-unsafe` and `discipline.yml` CI runs pending.** AC10 not fully verified at review time. Needs workflow dispatch.

@@ -1,0 +1,20 @@
+[package]
+name = "maos-director-surface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "maos_director_surface"
+
+[dependencies]
+maos-domain = { path = "../maos-domain" }
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tokio = { version = "1", features = ["sync", "rt"] }
+# kernel-core NOT a dep — avoids circular dep since kernel-core's
+# approval.rs references NotificationDispatcher from this crate.
+# All shared types live in maos-domain::notification.

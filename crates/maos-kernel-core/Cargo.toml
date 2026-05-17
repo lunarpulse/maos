@@ -11,6 +11,7 @@ description = "MAOS kernel core — capability mediation, IAC bus, journal"
 maos-domain = { path = "../maos-domain" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-providers = { path = "../maos-providers" }
+maos-director-surface = { path = "../maos-director-surface" }
 ciborium = "0.2"
 # Story 1b.1 — SQLite audit spine (Transparency Log + Approval Decision Log).
 # Bundled feature statically links libsqlite3-sys; no system libsqlite3 dep.
@@ -61,6 +62,7 @@ criterion = "0.5"
 tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread"] }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 sha2 = "0.10"
+smallvec = "1"
 
 [[bench]]
 name = "journal_fsync_p99"

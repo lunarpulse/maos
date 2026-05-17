@@ -1,4 +1,4 @@
-last_updated: '2026-05-17'
+last_updated: '2026-05-17'  # Story 3-1 code review complete — 18 patches applied, async deliver cascade
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -29,7 +29,7 @@ development_status:
   1b-5c-maosctl-v0-1-lifecycle-subcommands-accessibility-flags: done
   epic-1b-retrospective: done
   1b-6-epic-2-prep-d9-d10-doc3: done
-  epic-2: in-progress
+  epic-2: done
   2-1-ship-the-full-spirit-abi-with-spirit-proc-macro-and-11-lifecycle-hooks: done
   2-2-xtask-check-service-boundary-p1-p4-full-implementation-spirit-boundary-invariant-cases: done
   2-3-thin-cargo-generate-template-local-runner-nfr-onb-1-v0-3-prerequisite: done
@@ -42,8 +42,8 @@ development_status:
   # stories are tracked independently (same pattern as 1a-5 and 1b-6).
   # Blocks Story 3.1. File: 2-5-epic-3-prep-iac-addendum-d11-drain.md.
   2-5-epic-3-prep-iac-addendum-d11-drain: done
-  epic-3: backlog
-  3-1-route-task-assign-frames-over-the-iac-bus-with-notification-surface-dispatch: backlog
+  epic-3: in-progress
+  3-1-route-task-assign-frames-over-the-iac-bus-with-notification-surface-dispatch: done
   3-2-manage-director-posture-with-a-halt-policy-schema-and-bounded-shift-propagation: backlog
   3-3-directors-halt-resolution-ux-decision-audit-i12: backlog
   3-4-buffer-orchestrator-instructions-and-honor-director-pause-resume-revoke-p99-2s: backlog

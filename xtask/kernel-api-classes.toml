@@ -232,3 +232,54 @@
 "maos_kernel_core::api::crate::security::capabilities_required_to_scopes" = "supervision"
 "maos_kernel_core::api::crate::security::DriftEvent"               = "supervision"
 "maos_kernel_core::api::crate::security::make_drift_channel"       = "supervision"
+
+# ── Story 3.1 — IAC Bus frame types (re-exports from domain via frame.rs) ──
+# All data-movement: frame routing / payload shape types.
+"maos_kernel_core::iac::frame::maos_domain::frame::IacFrame"             = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::FrameAddress"         = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::FramePayload"         = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::TaskAssignPayload"    = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::PosturePreferences"   = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::PostureHint"          = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::TaskCompletePayload"  = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::DecisionDispatchPayload" = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::EpistemicHaltPayload" = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::TelemetryEventPayload" = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::ConsentRequestPayload" = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::RetractPayload"       = "data-movement"
+"maos_kernel_core::iac::frame::maos_domain::frame::ConsentEnvelope"      = "data-movement"
+
+# ── Story 3.1 — IAC channels ──
+"maos_kernel_core::iac::channels::*"                        = "data-movement"
+"maos_kernel_core::iac::channels::ChannelClass"             = "data-movement"
+"maos_kernel_core::iac::channels::CHANNEL_CLASSES"          = "data-movement"
+"maos_kernel_core::iac::channels::channel_class_for"        = "data-movement"
+
+# ── Story 3.1 — IAC mailbox ──
+"maos_kernel_core::iac::mailbox::*"                         = "data-movement"
+"maos_kernel_core::iac::mailbox::Mailbox"                  = "data-movement"
+"maos_kernel_core::iac::mailbox::Mailbox::new"             = "data-movement"
+"maos_kernel_core::iac::mailbox::Mailbox::deliver"         = "data-movement"
+"maos_kernel_core::iac::mailbox::Mailbox::register_spirit" = "data-movement"
+"maos_kernel_core::iac::mailbox::Mailbox::subscribe_telemetry" = "data-movement"
+"maos_kernel_core::iac::mailbox::SpiritMailboxHandle"      = "data-movement"
+
+# ── Story 3.1 — IAC frame re-exports ──
+"maos_kernel_core::iac::frame::*"                           = "data-movement"
+
+# ── Story 3.1 — IacBusAdapter reclassified (was ZST, now holds Mailbox+TL) ──
+# Note: IacBusAdapter signature hash changed from ZST → struct with fields.
+# This is an additive change per AC10 (the adapter gained body); the
+# zero-size placeholder was never semantically useful. Documented in dev record.
+"maos_kernel_core::iac::IacBusAdapter::new"                = "data-movement"
+"maos_kernel_core::iac::IacBusAdapter::mailbox"            = "data-movement"
+"maos_kernel_core::iac::IacBusAdapter::transparency_log"   = "data-movement"
+
+# ── Story 3.1 — Security / Approval Manager ──
+"maos_kernel_core::security::approval::ApprovalManager"    = "supervision"
+"maos_kernel_core::security::approval::ApprovalManager::new" = "supervision"
+"maos_kernel_core::security::approval::ApprovalManager::prompt" = "supervision"
+
+# ── Story 3.1 — IacRtMetrics extended (new methods) ──
+"maos_kernel_core::telemetry::iac_rt::IacRtMetrics::inc_pending"   = "data-movement"
+"maos_kernel_core::telemetry::iac_rt::IacRtMetrics::dec_pending"   = "data-movement"

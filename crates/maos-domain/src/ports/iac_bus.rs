@@ -4,14 +4,25 @@
 //! declares the data-movement surface; Story 6.1 lands the full IAC
 //! Bus with retract primitive and DRR fairness scheduler.
 
+use crate::frame::IacFrame;
+use crate::iac_bus_types::IacBusError;
 use crate::invariants::i2::LogBeforeDeliver;
 use crate::invariants::i3::FrameOrigin;
+use maos_spirit_abi::identity::SpiritId;
 
 /// IAC Bus — inter-agent communication frame routing.
 ///
 /// Per §4.5: "Every IAC frame is logged before delivery (I2) and
 /// carries an origin stamp (I3)."
+///
+/// # Associated types (Story 3.1)
+///
+/// `MailboxHandle` has a default of `()` so existing implementors
+/// (tests, mocks) don't break. The kernel adapter overrides it.
 pub trait IacBusPort {
+    /// Handle returned by `register_spirit`.
+    type MailboxHandle: std::fmt::Debug;
+
     /// Class: data-movement
     ///
     /// Enqueue a single frame onto the IAC Bus for delivery to its
@@ -24,4 +35,24 @@ pub trait IacBusPort {
     /// Broadcast a frame to all subscribed Spirits on the given topic.
     /// Used for telemetry and global halt signals.
     fn broadcast_frame(&self, frame_bytes: &[u8], origin: FrameOrigin) -> LogBeforeDeliver<()>;
+
+    /// Class: data-movement
+    ///
+    /// Deliver a typed `IacFrame` through the I2 log-before-deliver
+    /// pipeline. Story 3.1 wires the Mailbox; Story 6.1 adds DRR
+    /// fairness scheduling.
+    async fn deliver(
+        &self,
+        frame: IacFrame,
+    ) -> Result<LogBeforeDeliver<()>, IacBusError>;
+
+    /// Class: data-movement
+    ///
+    /// Register a Spirit on the IAC Bus, creating per-kind bounded
+    /// channels with §7.1.1 capacity floors. Story 3.1 wires the
+    /// real Mailbox; Story 6.1 adds persistence.
+    fn register_spirit(
+        &self,
+        spirit_id: &SpiritId,
+    ) -> Result<Self::MailboxHandle, IacBusError>;
 }

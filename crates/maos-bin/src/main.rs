@@ -42,8 +42,13 @@ use maos_kernel_core::api::{
     SpiritSchedulerAdapter, TelemetryStreamAdapter,
 };
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
+use maos_kernel_core::iac::Mailbox;
 use maos_kernel_core::inference::InferencePortAdapter;
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
+use maos_kernel_core::security::approval::ApprovalManager;
+use maos_director_surface::notification::{
+    NotificationDispatcher, TerminalChannel,
+};
 use maos_providers::AnthropicProvider;
 
 fn worker_thread_count() -> usize {
@@ -85,10 +90,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Construct the seven adapter shells.
     let _scheduler = SpiritSchedulerAdapter::default();
     let _memory = MemoryManagerAdapter::default();
-    let _iac = IacBusAdapter::default();
+
+    let telemetry = Arc::new(IacRtMetrics::new());
+
+    // Story 3.1 — Mailbox replaces the v0.1-β stub.
+    let mailbox = Arc::new(Mailbox::new(Arc::clone(&telemetry)));
+
+    // Story 3.1 — NotificationDispatcher with TerminalChannel.
+    let mut dispatcher = NotificationDispatcher::new();
+    if std::env::var_os("MAOS_NOTIFY_DISABLE").is_none() {
+        dispatcher.register(Box::new(TerminalChannel::new(Arc::new(std::sync::Mutex::new(
+            std::io::stderr(),
+        )))));
+    }
+
     let io = IoSubsystemAdapter::new();
     let _telemetry = TelemetryStreamAdapter::default();
-    let telemetry = Arc::new(IacRtMetrics::new());
 
     // ─────────────────────────────────────────────────────────────
     // Story 1a.3 — FR48 / NFR-Sec-15 crypto-provider seam.
@@ -148,6 +165,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "maos: Transparency Log opened on-disk at {}",
         audit_db_path.display()
     );
+
+    // Story 3.1 — wire IacBusAdapter with real Mailbox + Transparency Log.
+    let iac = Arc::new(IacBusAdapter::new(
+        Arc::clone(&mailbox),
+        Arc::clone(&transparency_log),
+    ));
+    eprintln!("maos: IAC Bus wired (Mailbox + Transparency Log, Story 3.1)");
+
+    // Story 3.1 — Approval Manager (v0.3-β auto-allow).
+    let _approval = ApprovalManager::new(Arc::clone(&transparency_log));
+    eprintln!("maos: Approval Manager initialized (v0.3-β auto-allow)");
 
     // Spawn the audit writer task (Story 1b.2). Held by name so the one-shot
     // exit path (Story 1b.5b) can drain the cap-audit channel deterministically
@@ -397,6 +425,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     drop(audit_tx);
     drop(inference);
     drop(capability);
+    // Story 3.1 — drop the IAC adapter (drops Arc<Mailbox>), then the
+    // dispatcher (no async tasks at v0.3-β, but slot future-proofs).
+    drop(iac);
+    drop(mailbox);
+    drop(dispatcher);
 
     match tokio::time::timeout(
         std::time::Duration::from_secs(10),

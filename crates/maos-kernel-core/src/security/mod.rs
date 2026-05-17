@@ -14,6 +14,7 @@ pub mod crypto;
 pub mod manifest;
 pub mod sandbox;
 pub mod drift;
+pub mod approval;
 
 pub use maos_domain::ports::SecurityManagerPort;
 pub use crypto::RingCryptoProvider;

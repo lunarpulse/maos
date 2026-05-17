@@ -13,6 +13,9 @@
 use std::fmt::Write;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 
+use dashmap::DashMap;
+use maos_spirit_abi::identity::FrameKind;
+
 /// Histogram buckets for `iac_rt_duration_us` (microseconds).
 /// Exponential, base √2, anchored on the 1500µs SLO from §13.1.
 /// 17 explicit boundaries + implicit +Inf = 18 buckets total.
@@ -84,6 +87,7 @@ impl ErrorKind {
 
 /// One histogram series keyed by (service, outcome).
 #[maos_attrs::i9_exempt(reason = "IAC telemetry accumulator; AtomicU64 buckets are the sanctioned metric state (IAC round-trip telemetry binding per Epic 1b Owns)")]
+#[derive(Debug)]
 struct HistogramSeries {
     buckets: Vec<AtomicU64>,
     sum: AtomicU64,
@@ -117,6 +121,7 @@ impl HistogramSeries {
 
 /// One counter series keyed by (service, kind).
 #[maos_attrs::i9_exempt(reason = "IAC telemetry accumulator; AtomicU64 counter is the sanctioned metric state (IAC round-trip telemetry binding per Epic 1b Owns)")]
+#[derive(Debug)]
 struct CounterSeries {
     value: AtomicU64,
 }
@@ -135,10 +140,14 @@ impl CounterSeries {
 
 /// In-memory metrics registry for IAC round-trip telemetry.
 #[maos_attrs::i9_exempt(reason = "IAC round-trip telemetry registry (sanctioned persistent location per Epic 1b Owns); Vec<Atomic> are metric accumulators, not mutable kernel state")]
+#[derive(Debug)]
 pub struct IacRtMetrics {
     histograms: Vec<(Service, Outcome, HistogramSeries)>,
     inflight: Vec<(Service, AtomicI64)>,
     errors: Vec<(Service, ErrorKind, CounterSeries)>,
+    /// Per-Spirit/per-kind pending frame gauge (AC8, Story 3.1).
+    /// Incremented on `Mailbox::deliver`, decremented on receiver drain.
+    pending_frames: DashMap<(String, FrameKind), AtomicU64>,
 }
 
 impl IacRtMetrics {
@@ -168,6 +177,7 @@ impl IacRtMetrics {
             histograms,
             inflight,
             errors,
+            pending_frames: DashMap::new(),
         }
     }
 
@@ -262,7 +272,45 @@ impl IacRtMetrics {
             );
         }
 
+        // Pending-frames gauge (AC8)
+        for entry in &self.pending_frames {
+            let (spirit_id, kind) = entry.key();
+            let val = entry.value().load(Ordering::Relaxed);
+            let _ = writeln!(
+                &mut out,
+                "iac_pending_frames_total{{spirit_id=\"{}\",kind=\"{:?}\"}} {}",
+                spirit_id,
+                kind,
+                val
+            );
+        }
+
         out
+    }
+
+    /// Increment the pending-frames gauge for a Spirit+kind pair.
+    pub fn inc_pending(&self, spirit_id: &str, kind: FrameKind) {
+        let key = (spirit_id.to_string(), kind);
+        let entry = self
+            .pending_frames
+            .entry(key)
+            .or_insert_with(|| AtomicU64::new(0));
+        entry.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Decrement the pending-frames gauge for a Spirit+kind pair.
+    /// Saturating to avoid underflow on mismatched inc/dec calls.
+    pub fn dec_pending(&self, spirit_id: &str, kind: FrameKind) {
+        let key = (spirit_id.to_string(), kind);
+        if let Some(entry) = self.pending_frames.get(&key) {
+            let mut current = entry.load(Ordering::Relaxed);
+            while current > 0 {
+                match entry.compare_exchange_weak(current, current - 1, Ordering::Relaxed, Ordering::Relaxed) {
+                    Ok(_) => break,
+                    Err(actual) => current = actual,
+                }
+            }
+        }
     }
 }
 
@@ -360,5 +408,69 @@ mod tests {
         assert!(rendered.contains("iac_rt_duration_us_bucket{service=\"security\",outcome=\"ok\",le=\"75\"} 1"));
         // 1501us -> bucket le="2200"
         assert!(rendered.contains("iac_rt_duration_us_bucket{service=\"security\",outcome=\"ok\",le=\"2200\"} 1"));
+    }
+
+    #[test]
+    fn pending_frames_gauge_increment_decrement_round_trip() {
+        let metrics = IacRtMetrics::new();
+        let spirit = "test-spirit";
+        let kind = FrameKind::TaskAssign;
+
+        metrics.inc_pending(spirit, kind);
+        metrics.inc_pending(spirit, kind);
+        metrics.inc_pending(spirit, kind);
+
+        let rendered = metrics.render_prometheus();
+        assert!(rendered.contains(&format!(
+            "iac_pending_frames_total{{spirit_id=\"{spirit}\",kind=\"{kind:?}\"}} 3"
+        )));
+
+        metrics.dec_pending(spirit, kind);
+        metrics.dec_pending(spirit, kind);
+
+        let rendered = metrics.render_prometheus();
+        assert!(rendered.contains(&format!(
+            "iac_pending_frames_total{{spirit_id=\"{spirit}\",kind=\"{kind:?}\"}} 1"
+        )));
+
+        metrics.dec_pending(spirit, kind);
+
+        let rendered = metrics.render_prometheus();
+        assert!(rendered.contains(&format!(
+            "iac_pending_frames_total{{spirit_id=\"{spirit}\",kind=\"{kind:?}\"}} 0"
+        )));
+    }
+
+    #[test]
+    fn pending_frames_gauge_saturates_at_zero() {
+        let metrics = IacRtMetrics::new();
+        let spirit = "ghost";
+        let kind = FrameKind::TaskAssign;
+
+        metrics.dec_pending(spirit, kind);
+
+        let rendered = metrics.render_prometheus();
+        if rendered.contains("iac_pending_frames_total") {
+            assert!(rendered.contains(&format!(
+                "iac_pending_frames_total{{spirit_id=\"{spirit}\",kind=\"{kind:?}\"}} 0"
+            )));
+        }
+    }
+
+    #[test]
+    fn pending_frames_no_increment_on_error_path() {
+        let metrics = IacRtMetrics::new();
+        let spirit = "err-spirit";
+        let kind = FrameKind::EpistemicHalt;
+
+        metrics.inc_pending(spirit, kind);
+        metrics.dec_pending(spirit, kind);
+
+        let rendered = metrics.render_prometheus();
+        if rendered.contains(&format!("spirit_id=\"{spirit}\"")) {
+            assert!(rendered.contains(&format!(
+                "iac_pending_frames_total{{spirit_id=\"{spirit}\",kind=\"{kind:?}\"}} 0"
+            )));
+        }
     }
 }

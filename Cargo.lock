@@ -924,6 +924,7 @@ version = "0.1.0-alpha"
 dependencies = [
  "getrandom 0.3.4",
  "maos-audit",
+ "maos-director-surface",
  "maos-domain",
  "maos-kernel-core",
  "maos-providers",
@@ -967,12 +968,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "maos-director-surface"
+version = "0.1.0-alpha"
+dependencies = [
+ "maos-domain",
+ "maos-spirit-abi",
+ "serde",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "maos-domain"
 version = "0.1.0-alpha"
 dependencies = [
  "maos-spirit-abi",
  "serde",
  "serde_json",
+ "smallvec",
  "thiserror 2.0.18",
 ]
 
@@ -987,6 +1000,7 @@ dependencies = [
  "landlock",
  "libc",
  "maos-attrs",
+ "maos-director-surface",
  "maos-domain",
  "maos-providers",
  "maos-spirit-abi",
@@ -999,6 +1013,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "smallvec",
  "subtle",
  "tempfile",
  "thiserror 2.0.18",
@@ -1579,6 +1594,9 @@ name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "stable_deref_trait"

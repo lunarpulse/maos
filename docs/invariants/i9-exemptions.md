@@ -112,3 +112,29 @@ and `Vec<(Service, Outcome, ...)>` fan-out tables are the metric accumulator sta
 by the Prometheus-compatible `iac_rt_duration_us` histogram, `iac_rt_inflight` gauge, and
 `iac_rt_errors_total` counter (NFR-Obs-4 / NFR-Perf-3 baselines). Bounded by the fixed
 service × outcome cardinality declared in `IAC_RT_BUCKETS_US`; no per-Spirit growth.
+
+### `Mailbox` — `crates/maos-kernel-core/src/iac/mailbox.rs`
+
+**Reason:** per-Spirit mailbox router (Story 3.1). The `DashMap<(String, FrameKind), mpsc::Sender<IacFrame>>`
+holds transient per-process channel senders keyed by Spirit identity. No persistence across
+restarts; channels live as long as the Mailbox. The `broadcast_sender` for telemetry events
+is similarly transient. Bounded by active Spirit count × 6 frame kinds.
+
+### `SpiritMailboxHandle` — `crates/maos-kernel-core/src/iac/mailbox.rs`
+
+**Reason:** per-Spirit receiver handle (Story 3.1). The `Vec<(FrameKind, mpsc::Receiver<IacFrame>)>`
+holds the six per-kind MPSC receivers a Spirit's drain loop polls. Transient per-Spirit state;
+dropped with the Spirit. The `metrics: Arc<IacRtMetrics>` is a shared reference to the
+already-exempt metrics registry.
+
+### `IacBusAdapter` — `crates/maos-kernel-core/src/iac/mod.rs`
+
+**Reason:** IAC Bus port adapter (Story 3.1). Holds `Arc<Mailbox>` and `Arc<TransparencyLogAdapter>`
+— both are I9-sanctioned locations. The adapter is the trait-implementation bridge between
+the domain port and the kernel runtime; no additional persistent state.
+
+### `ApprovalManager` — `crates/maos-kernel-core/src/security/approval.rs`
+
+**Reason:** Approval Manager adapter (Story 3.1). Holds `Arc<TransparencyLogAdapter>` (already I9-exempt)
+and an `AtomicU64` decision counter for auto-incrementing decision IDs. The counter is transient
+per-process state reset on restart; no persistence needed beyond the Approval Decision Log rows.

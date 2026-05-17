@@ -470,6 +470,7 @@ impl TransparencyLogAdapter {
 /// `MailboxStub`; Story 6.1 replaces the stub with the real DRR fairness
 /// scheduler + mailbox semantics.
 impl IacBusPort for TransparencyLogAdapter {
+    type MailboxHandle = ();
     fn enqueue_frame(&self, frame_bytes: &[u8], origin: FrameOrigin) -> LogBeforeDeliver<()> {
         // 1. Pre-write redaction filter
         let redacted = self.redaction.redact(frame_bytes);
@@ -500,6 +501,22 @@ impl IacBusPort for TransparencyLogAdapter {
         );
         self.mailbox.record_delivery(&redacted);
         token
+    }
+
+    async fn deliver(
+        &self,
+        frame: maos_domain::frame::IacFrame,
+    ) -> Result<LogBeforeDeliver<()>, maos_domain::iac_bus_types::IacBusError> {
+        let payload_bytes = serde_json::to_vec(&frame.payload)
+            .map_err(|e| maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string()))?;
+        Ok(self.enqueue_frame(&payload_bytes, frame.auto_marker))
+    }
+
+    fn register_spirit(
+        &self,
+        _spirit_id: &maos_spirit_abi::identity::SpiritId,
+    ) -> Result<(), maos_domain::iac_bus_types::IacBusError> {
+        Ok(())
     }
 }
 

@@ -26,6 +26,7 @@ pub mod compliance;
 pub mod cancellation;
 pub mod lifecycle;
 pub mod ctx;
+pub mod identity;
 
 /// ABI version constant for the MAOS Spirit ABI.
 /// Bumped according to the ABI Stability Triple rules (§8.5).
