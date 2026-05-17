@@ -103,6 +103,8 @@ Dependencies point inward (adapter ring → kernel services → domain core), wi
 
 **Workspace member count (post Story 2.3):** 19 library/binary crates + xtask + `examples/example-spirit` = **21 workspace members**. The `examples/example-spirit` crate is workspace-managed (member of `[workspace] members`) so the discipline suite's `example-spirit-tests` + `example-spirit-drift` jobs continuously prove `templates/spirit-rust/` generates compiling code as the SDK + ABI evolve. The `templates/` directory is excluded via `[workspace] exclude = ["templates"]` (templates contain `{{ placeholder }}` syntax that is not valid Rust). `examples/*` is the new convention for workspace-managed proof artifacts that are NOT part of the kernel substrate; future reference Spirits (Butler at Story 8.1, Researcher at Story 8.2, etc.) MAY land at `examples/*` or `crates/maos-spirit-*` per their story's design.
 
+**`spirit_test` feature on `maos-spirit-sdk` (post Story 2.4):** The crate gains an opt-in `spirit_test` cargo feature (depends on `local_runner` + `std` + `mock`) gating a new `crates/maos-spirit-sdk/src/spirit_test/` module that ships the SDK seed (assertion macros + IAC frame I/O capture + halt resolution simulator + manifest self-check + class-specific regression corpus skeleton + cross-Spirit isolation framework hooks). Workspace member count stays at **21** — the new module is feature-gated inside the existing crate, not a new workspace member.
+
 ### 4.0.3 Service dependency map
 
 | Service | Depends on (kernel side) | Used by (kernel side) |

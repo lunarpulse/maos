@@ -465,6 +465,45 @@ jobs:
       - name: Run example-spirit drift check (template vs. baked output sync)
         run: cargo run -p xtask -- example-spirit-regen --check --json
 
+  spirit-test-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run spirit_test SDK seed smoke tests (Story 2.4 v0.3 prerequisite)
+        run: cargo test -p maos-spirit-sdk --features spirit_test --test spirit_test_smoke --locked
+
+  lcas-corpus-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run LCAS corpus smoke tests (Story 2.4 NFR-Test-6 substrate)
+        run: cargo test -p maos-spirit-sdk --features spirit_test --test lcas_smoke --locked
+
+  isolation-framework-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run cross-Spirit isolation framework smoke tests (Story 2.4 NFR-Sec-14 substrate)
+        run: cargo test -p maos-spirit-sdk --features spirit_test --test isolation_smoke --locked
+
   onb-nfr2-timing:
     runs-on: ubuntu-latest
     steps:
@@ -560,7 +599,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, example-spirit-tests, example-spirit-drift]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests]
     if: always()
     permissions:
       pull-requests: write
@@ -592,6 +631,9 @@ jobs:
           echo "onb=${{ needs.onb-nfr2-timing.result }}" >> $GITHUB_OUTPUT
           echo "est=${{ needs.example-spirit-tests.result }}" >> $GITHUB_OUTPUT
           echo "esd=${{ needs.example-spirit-drift.result }}" >> $GITHUB_OUTPUT
+          echo "stt=${{ needs.spirit-test-tests.result }}" >> $GITHUB_OUTPUT
+          echo "lct=${{ needs.lcas-corpus-tests.result }}" >> $GITHUB_OUTPUT
+          echo "ift=${{ needs.isolation-framework-tests.result }}" >> $GITHUB_OUTPUT
           echo "cm=${{ needs.coverage-matrix.result }}" >> $GITHUB_OUTPUT
           echo "cs=${{ needs.corpus-staleness.result }}" >> $GITHUB_OUTPUT
           echo "cpc=${{ needs.calibrate-per-commit.result }}" >> $GITHUB_OUTPUT
@@ -633,6 +675,9 @@ jobs:
             const onb = '${{ needs.onb-nfr2-timing.result }}';
             const est = '${{ needs.example-spirit-tests.result }}';
             const esd = '${{ needs.example-spirit-drift.result }}';
+            const stt = '${{ needs.spirit-test-tests.result }}';
+            const lct = '${{ needs.lcas-corpus-tests.result }}';
+            const ift = '${{ needs.isolation-framework-tests.result }}';
             const cm = '${{ needs.coverage-matrix.result }}';
             const cs = '${{ needs.corpus-staleness.result }}';
             const cpc = '${{ needs.calibrate-per-commit.result }}';  // conditionally skipped until Story 0.4
@@ -669,6 +714,9 @@ jobs:
             | onb-nfr2-timing | ${icon(onb)} ${onb} |
             | example-spirit-tests | ${icon(est)} ${est} |
             | example-spirit-drift | ${icon(esd)} ${esd} |
+            | spirit-test-tests | ${icon(stt)} ${stt} |
+            | lcas-corpus-tests | ${icon(lct)} ${lct} |
+            | isolation-framework-tests | ${icon(ift)} ${ift} |
             | coverage-matrix | ${icon(cm)} ${cm} |
             | corpus-staleness | ${icon(cs)} ${cs} |
             | calibrate-per-commit | ${icon(cpc)} ${cpc} |

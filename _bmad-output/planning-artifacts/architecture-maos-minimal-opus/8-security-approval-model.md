@@ -46,6 +46,8 @@ The substrate does **not** design against:
 
 **Cross-Spirit memory isolation corpus.** 200-scenario adversarial corpus where Spirit-A actively attempts to enumerate, read, side-channel, or timing-attack Spirit-B's substrate state. Categories: namespace enumeration, working-memory read-across, decision-frame observation, halt-signal observation, transparency-log cross-read, working-memory-digest cross-read, capability-token forgery cross-Spirit, sandbox-escape lateral. Split into Sec-14a (same-Host attack vectors) and Sec-14b (cross-Host bilateral attack vectors). Floor: 200/200 isolation maintained; any leak = P0 ship-blocker.
 
+**v0.3 framework hooks (Story 2.4):** The `maos-spirit-sdk` crate's `spirit_test` feature ships the cross-Spirit isolation framework HOOKS — `IsolationHookPoint` 4-point trait (`before_spirit_a_attempt` / `after_spirit_a_attempt` / `before_spirit_b_observe` / `after_spirit_b_observe`), `CrossSpiritIsolationFixture` 2-Spirit harness, 8-category `IsolationAttackCategory` enum matching the 8 categories above. The 200-scenario corpus authoring + execution (Sec-14a n=100 + Sec-14b n=100 per ADR-040) is Story 4.5 at v0.8; the framework hooks are the substrate Story 4.5 plugs the corpus INTO.
+
 ## 8.2 Sandboxing — re-cap of §4.3.1
 
 OS-native primitives per Spirit form and trust tier. For v1.0:

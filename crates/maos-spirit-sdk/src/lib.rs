@@ -29,3 +29,6 @@ pub mod cancellation;
 
 #[cfg(feature = "local_runner")]
 pub mod local_runner;
+
+#[cfg(feature = "spirit_test")]
+pub mod spirit_test;

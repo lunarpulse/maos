@@ -297,16 +297,20 @@ coverage:
       Rust-only at v0.3 prerequisite. Full per-language templates (TypeScript /
       Python / Go) deferred to Story 7.1 at v0.5+.
   FR34:
-    gates: [example-spirit-tests]
-    corpora: []
+    gates: [example-spirit-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests]
+    corpora: [lcas-v0.3]
     phase: v0.3
     valid_until: '2027-05-12'
     notes: |
       Story 2.3 ships the local_runner SDK seed (lifecycle hook fire via
       SpiritVtable + Ctx::mock() + in-memory mock IAC bus forward-anchor
-      types) at `crates/maos-spirit-sdk/src/local_runner.rs`. Full spirit-test
-      SDK with assertion macros + halt resolution + manifest self-check +
-      class-specific regression corpus is Story 2.4 seed → Story 7.1 full.
+      types) at `crates/maos-spirit-sdk/src/local_runner.rs`. Story 2.4
+      extends the seed with the spirit_test SDK harness (assertion macros +
+      IAC frame I/O capture + halt resolution simulator + manifest self-check +
+      class-specific regression corpus skeleton + cross-Spirit isolation
+      framework hooks) at `crates/maos-spirit-sdk/src/spirit_test/`. Full
+      per-language SDK with assertion macros + judge-LLM agreement layer +
+      registry publish path is Story 7.1 at v0.5+.
   FR35:
     gates: []
     corpora: []
@@ -1020,10 +1024,18 @@ coverage:
     phase: v1.5
     valid_until: '2027-05-12'
   NFR-Sec-14:
-    gates: []
+    gates: [isolation-framework-tests]
     corpora: []
     phase: v0.8
-    valid_until: '2027-05-12'
+    valid_until: '2027-05-16'
+    notes: |
+      Story 2.4 ships the cross-Spirit memory isolation framework HOOKS
+      (IsolationHookPoint 4-point trait + CrossSpiritIsolationFixture
+      2-Spirit harness + 8-category IsolationAttackCategory enum +
+      DefaultIsolationHook reference impl). The 200-scenario adversarial
+      corpus (Sec-14a n=100 same-Host + Sec-14b n=100 cross-Host per
+      ADR-040) is Story 4.5 at v0.8 — the hooks Story 2.4 ships are what
+      Story 4.5 plugs the corpus INTO.
   NFR-Sec-15:
     gates: []
     corpora: []
@@ -1112,6 +1124,14 @@ coverage:
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: |
+      Story 2.4 ships the spirit-test SDK seed (5 assertion macros + IAC
+      frame I/O capture + halt resolution simulator + manifest self-check +
+      class-specific regression corpus skeleton + cross-Spirit isolation
+      framework hooks) at `crates/maos-spirit-sdk/src/spirit_test/`. The
+      SDK seed counts toward the ≥80% coverage floor measured at Story 7.5b
+      (NFR-Onb-1 N=12 stratified gate) + Story 10.2 (third-party trial N=12
+      at v1.5 per NFR-Test-8).
   NFR-Test-4:
     gates: []
     corpora: []
@@ -1124,10 +1144,18 @@ coverage:
     valid_until: '2027-05-12'
     notes: FKCS-infrastructure at v2.0; FKCS-populated at v2.5
   NFR-Test-6:
-    gates: []
-    corpora: []
+    gates: [lcas-corpus-tests]
+    corpora: [lcas-v0.3]
     phase: v0.5
-    valid_until: '2027-05-12'
+    valid_until: '2027-05-16'
+    notes: |
+      Story 2.4 ships the LCAS clearly-decidable 70-item bucket at
+      `tests/corpora/lcas-v0.3.jsonl`; genuinely-ambiguous (n=70) + adversarially-
+      misleading (n=70) buckets land at Story 8.x at v0.8 (require A2A
+      scenarios from E6 to be valid per Epic 2 line 22 + Epic 8 line 23).
+      Full N=210 ship-gate execution at v0.5 per PRD line 80. Gate-verified
+      by structural assertion at v0.3 (gold_label matches Spirit's halt/continue
+      decision); judge-LLM agreement layer is Story 7.1 + Story 8.x at v0.5+.
   NFR-Test-7:
     gates: []
     corpora: []

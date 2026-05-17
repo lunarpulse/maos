@@ -147,3 +147,10 @@
 - **RingCryptoProvider special-case bypasses exemption mechanism** — Inline `if adapter == "RingCryptoProvider"` at line 1581 instead of using `ADAPTER_PORT_EXEMPTIONS`. Works correctly but undocumented in the exemption table. `xtask/src/check_service_boundary.rs:1581-1585`
 - **P4 denylist misses partial-import call paths** — `use std::fs; fs::read(...)` produces path `fs::read` which doesn't match denylist entry `std::fs::read`. Inherent AST-only limitation requiring type resolution to fix. `xtask/src/check_service_boundary.rs:866-887`
 - **P4 exempt path matching platform-dependent** — String comparison using forward-slash exemption paths vs `Path::display()` OS-native output. v0.1-β targets Linux; future Windows support needs `Path::starts_with`. `xtask/src/check_service_boundary.rs:890-894`
+
+## Deferred from: code review of 2-4-seed-the-spirit-test-sdk-with-lcas-framework-and-cross-spirit-isolation-hooks (2026-05-17)
+
+- **`Abort` variant silently discarded despite being public API** — All 4 hook calls in `isolation.rs` use `let _ =` discarding the `IsolationHookOutcome`. `Abort` is a forward-anchor for Story 4.5; at v0.3 all hooks are non-fatal recording surfaces by design. `crates/maos-spirit-sdk/src/spirit_test/isolation.rs`
+- **`expected_isolation_maintained` field never consulted** — `run_attack_case` hardcodes `isolation_maintained: true` without reading the case's `expected_isolation_maintained`. Forward-anchor for Story 4.5 corpus. `crates/maos-spirit-sdk/src/spirit_test/isolation.rs:453, 600-605`
+- **Inconsistent string-field validation** — `sandbox.tier` validated against T0-T4 allow-list but `class.trust_tier`, `posture.default`, `posture.allowed_max` accept any string. By design at v0.3; manifest self-check is explicitly minimal. `crates/maos-spirit-sdk/src/spirit_test/manifest.rs`
+- **No warning for out-of-range numeric fields** — `cpu_max_pct > 100` and `context_window_size = 0` accepted silently. By design at v0.3. `crates/maos-spirit-sdk/src/spirit_test/manifest.rs:101-104`

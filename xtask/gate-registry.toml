@@ -22,4 +22,7 @@ gates = [
     "example-spirit-regen",
     "example-spirit-tests",
     "example-spirit-drift",
+    "spirit-test-tests",
+    "lcas-corpus-tests",
+    "isolation-framework-tests",
 ]

@@ -11,13 +11,19 @@ description = "MAOS Spirit SDK — reference SDK for Spirit authors (ADR-002)"
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-spirit-derive = { path = "../maos-spirit-derive" }
 tokio-util = { version = "0.7", features = ["rt"], optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+toml = { version = "0.8", optional = true }
 
 [features]
 default = ["std"]
 std = ["dep:tokio-util"]
 mock = ["maos-spirit-abi/mock"]
 local_runner = ["std", "mock"]
+spirit_test = ["local_runner", "std", "mock", "dep:serde", "dep:toml"]
 
 [dev-dependencies]
 maos-spirit-abi = { path = "../maos-spirit-abi", features = ["mock"] }
 trybuild = "1"
+sha2 = "0.10"
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
