@@ -154,3 +154,17 @@
 - **`expected_isolation_maintained` field never consulted** — `run_attack_case` hardcodes `isolation_maintained: true` without reading the case's `expected_isolation_maintained`. Forward-anchor for Story 4.5 corpus. `crates/maos-spirit-sdk/src/spirit_test/isolation.rs:453, 600-605`
 - **Inconsistent string-field validation** — `sandbox.tier` validated against T0-T4 allow-list but `class.trust_tier`, `posture.default`, `posture.allowed_max` accept any string. By design at v0.3; manifest self-check is explicitly minimal. `crates/maos-spirit-sdk/src/spirit_test/manifest.rs`
 - **No warning for out-of-range numeric fields** — `cpu_max_pct > 100` and `context_window_size = 0` accepted silently. By design at v0.3. `crates/maos-spirit-sdk/src/spirit_test/manifest.rs:101-104`
+
+## Deferred from: code review of 2-5-epic-3-prep-iac-addendum-d11-drain (2026-05-17)
+
+- **One-shot drain arm omits `query_frames` verification** — Pre-existing pattern at `crates/maos-bin/src/main.rs:357-372`. Server arm (added in this story) now queries rows for exit message; one-shot arm still just awaits the writer. Not in scope for this bridge story.
+- **Hardcoded `FrameKind` enum discriminants (7, 9) in SQL queries** — `tests/integration/server_exit_drain.sh:36,41` uses `WHERE kind = 7` and `WHERE kind = 9`. If enum variants reorder, tests silently check wrong kinds. Pre-existing pattern from Story 1b.5b.
+- **`parse_workspace_members_count` last-match-wins with no proximity constraint** — `xtask/src/check_workspace_count.rs:131-149`. Returns last `**N workspace members**` match on a line. Current doc has one match; risk only with future restructuring.
+- **Parser requires zero whitespace between `**` and digits** — `xtask/src/check_workspace_count.rs:138-140`. `** 21` (space before number) fails to parse. Convention is `**21`; constraint undocumented.
+- **CI `server-exit-drain` installs unpinned sqlite3** — `.github/workflows/discipline.yml:309`. Runner image upgrade could change SQLite behavior.
+- **`query_frames` has no boot-nonce filter** — `crates/maos-bin/src/main.rs:405-412`. Counts all historical CapabilityInvocation rows on persistent DB, not current-boot rows. Design limitation requiring transparency_log schema change.
+- **Sentinel `contains()` scans all lines including fenced code blocks** — `xtask/src/check_workspace_count.rs:93-133`. A sentinel quoted inside a markdown code block would count as an extra match. Low risk at current doc size.
+- **`contains("workspace member")` matches substrings, no word-boundary check** — `xtask/src/check_workspace_count.rs:163-165`. Matches "non-workspace members" etc. Current doc doesn't trigger.
+- **No explicit WAL checkpoint between writer drain and `query_frames` read** — SQLite multi-connection WAL semantics should handle this correctly; explicit checkpoint would be belt-and-suspenders.
+- **`kill -0` PID-reuse race in 10s polling window** — `tests/integration/server_exit_drain.sh:84,101,107`. Theoretically possible in PID-namespace-constrained CI runner. Extremely unlikely in practice.
+- **One-shot drain verification checks count >=1, not completeness** — `tests/integration/server_exit_drain.sh:44-50`. A partial drain (1 of N rows flushed) passes identically to a complete drain. Enhancement, not blocking.

@@ -25,4 +25,6 @@ gates = [
     "spirit-test-tests",
     "lcas-corpus-tests",
     "isolation-framework-tests",
+    "server-exit-drain",
+    "check-workspace-count",
 ]

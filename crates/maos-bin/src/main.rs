@@ -41,6 +41,7 @@ use maos_kernel_core::api::{
     MemoryManagerAdapter, RingCryptoProvider,
     SpiritSchedulerAdapter, TelemetryStreamAdapter,
 };
+use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
 use maos_kernel_core::inference::InferencePortAdapter;
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 use maos_providers::AnthropicProvider;
@@ -386,7 +387,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("maos: shutdown reason = {shutdown_reason}; cancelling root token");
     cancel.cancel();
 
-    eprintln!("maos: drained 0 child tasks; exiting cleanly");
+    // Story 2.5 (A7 / D11) — drain the cap-audit channel deterministically
+    // on graceful shutdown, replicating the one-shot arm's drain pattern
+    // (lines 357–372). `audit_tx` is cloned into `CapabilityRegistryAdapter`
+    // at construction (line ~118) so dropping the local `audit_tx` is not
+    // enough — the adapter's clone must also be released. Drop all owners
+    // in the same sequence as the one-shot path so the writer task sees
+    // channel-close and every in-flight row reaches SQLite.
+    drop(audit_tx);
+    drop(inference);
+    drop(capability);
+
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        audit_writer,
+    )
+    .await
+    {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => eprintln!("maos: audit writer task returned error during drain: {e}"),
+        Err(_) => eprintln!("maos: audit writer drain timed out after 10s"),
+    }
+
+    let cap_audit_rows = match transparency_log.query_frames(FrameFilter {
+        kind: Some(FrameKind::CapabilityInvocation),
+        ..Default::default()
+    }) {
+        Ok(rows) => rows.len(),
+        Err(e) => {
+            eprintln!("maos: failed to query cap-audit rows after drain: {e}");
+            0
+        }
+    };
+    eprintln!("maos: drained {cap_audit_rows} cap-audit row(s); exiting cleanly");
     Ok(())
 }
 

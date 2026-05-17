@@ -22,6 +22,27 @@ The IAC Bus on a single Host uses `tokio::sync::mpsc` and `tokio::sync::broadcas
 
 Every frame is logged before delivery (I2). The kernel writes the Transparency Log entry first, then routes to the recipient mailbox; the IAC Bus does not deliver frames the log refused to record.
 
+### 7.1.1 Per-frame-kind channel class
+
+Each `kind` selects a Tokio channel class, cardinality, and backpressure policy. The assignments below are the normative contract Story 3.1's ACs reference verbatim. Channel primitives are modeled on codex's `Mailbox` (see `codex core/src/agent/mailbox.rs` — appendix-a-cohort-prior-art-map.md).
+
+| `kind` | Channel class | Cardinality | Capacity floor | Drop policy on full |
+|---|---|---|---|---|
+| `task.assign` | `mpsc` | 1:1 (Director → Spirit) | 64 | Backpressure (await capacity); no drop |
+| `task.complete` | `mpsc` | 1:1 (Spirit → Director) | 64 | Backpressure; no drop |
+| `decision.dispatch` | `mpsc` | 1:N (sequential per recipient) | 128 | Backpressure; no drop |
+| `epistemic.halt` | `mpsc` | 1:1 (Spirit → kernel) | 16 | **Never drop** — halt frames are I14-critical; queue overflow signals broader failure |
+| `telemetry.event` | `broadcast` | 1:N (Spirit → subscribers) | 256 | **Drop oldest** (broadcast lag tolerated; not audit-critical) |
+| `consent.request` | `mpsc` | 1:1 (Spirit → Director) | 32 | Backpressure |
+| `retract` | `mpsc` | 1:1 (sender → recipient) | 32 | Backpressure |
+
+### 7.1.2 Backpressure hook points (Spirit Scheduler integration)
+
+- Bounded-channel `send().await` blocks the calling task; Spirit Scheduler observes via per-Spirit pending-frame metric (`iac_pending_frames_total{spirit_id, kind}`) exported through `IacRtMetrics` (Story 1b.4).
+- Hot-path budget: `send().await` may not exceed 1ms P99 in steady state; sustained exceedance is a Spirit Scheduler signal to throttle the sender (Story 5.1 wires the throttle).
+- `retract` frames bypass capacity check for `decision.dispatch` queues only — retraction must be able to overtake the dispatch it cancels (per ADR-022).
+- Cross-Host equivalents (A2A) inherit the same channel-class assignments at the `tokio::mpsc` bridge; backpressure is signaled across mTLS via flow-control window (out of scope for this addendum).
+
 ## 7.2 Cross-Host: bilateral A2A
 
 Cross-Host communication uses A2A over mTLS+TOFU between two pre-paired Hosts. This is the topology the Diagnostic Engineer + Senior Architect bilateral pair runs on.

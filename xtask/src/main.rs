@@ -19,6 +19,7 @@ mod corpus_staleness;
 mod calibrate;
 mod rebaseline_check;
 mod example_spirit_regen;
+mod check_workspace_count;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -89,6 +90,8 @@ enum Commands {
     RebaselineCheck { #[arg(long, default_value = "tests/corpora/MANIFEST.toml")] manifest: String, #[arg(long, default_value = "tests/corpora")] corpora_dir: String, #[arg(long, default_value = "tests/judge-config.toml")] judge_config: String, #[arg(long, default_value = "0.98")] threshold: f64, #[arg(long)] out: Option<String>, #[arg(long)] json: bool },
     /// Story 2.3 — Template-to-example drift detector and regenerator.
     ExampleSpiritRegen { #[arg(long)] check: bool, #[arg(long)] json: bool },
+    /// Story 2.5 AC3 — workspace-member-count guard (Cargo.toml vs architecture doc).
+    CheckWorkspaceCount { #[arg(long, default_value = "Cargo.toml")] cargo_toml: String, #[arg(long, default_value = "_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md")] kernel_design: String, #[arg(long)] json: bool },
 }
 
 fn main() {
@@ -132,6 +135,9 @@ fn main() {
         Commands::ExampleSpiritRegen { check, json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             example_spirit_regen::run(&workspace_root, check, json)
+        }
+        Commands::CheckWorkspaceCount { cargo_toml, kernel_design, json } => {
+            check_workspace_count::run(&cargo_toml, &kernel_design, json)
         }
     };
     if let Err(e) = result { eprintln!("{e}"); process::exit(1); }

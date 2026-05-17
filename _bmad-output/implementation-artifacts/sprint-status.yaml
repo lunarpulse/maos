@@ -1,50 +1,10 @@
-# generated: 2026-05-11
-last_updated: 2026-05-17  # Story 2.4 code review complete, status → done.
-# project: maos
-# project_key: NOKEY
-# tracking_system: file-system
-# story_location: _bmad-output/implementation-artifacts
-
-# STATUS DEFINITIONS:
-# ==================
-# Epic Status:
-#   - backlog: Epic not yet started
-#   - in-progress: Epic actively being worked on
-#   - done: All stories in epic completed
-#
-# Epic Status Transitions:
-#   - backlog → in-progress: Automatically when first story is created (via create-story)
-#   - in-progress → done: Manually when all stories reach 'done' status
-#
-# Story Status:
-#   - backlog: Story only exists in epic file
-#   - ready-for-dev: Story file created in stories folder
-#   - in-progress: Developer actively working on implementation
-#   - review: Ready for code review (via Dev's code-review workflow)
-#   - done: Story completed
-#
-# Retrospective Status:
-#   - optional: Can be completed but not required
-#   - done: Retrospective has been completed
-#
-# WORKFLOW NOTES:
-# ===============
-# - Epic transitions to 'in-progress' automatically when first story is created
-# - Stories can be worked in parallel if team capacity allows
-# - Developer typically creates next story after previous one is 'done' to incorporate learnings
-# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
-
+last_updated: '2026-05-17'
 generated: 2026-05-11
-last_updated: 2026-05-17  # Story 2.4 code review complete, status → done.
 project: maos
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
-
 development_status:
-  # ------------------------------------------------------------------
-  # Epic 0: Quality Substrate (founding sprint v0.1; maintenance thereafter)
-  # ------------------------------------------------------------------
   epic-0: done
   0-1-workspace-ci-pipeline-build-discipline-gates: done
   0-2-enforce-empty-kernel-invariants-via-structural-ci-lints: done
@@ -52,23 +12,13 @@ development_status:
   0-4-complianceclaim-schema-adversarial-review-calibration-seed-corpus: done
   0-5-parameterized-corpus-generators-secret-redaction-red-team-frameworks: done
   epic-0-retrospective: done
-
-  # ------------------------------------------------------------------
-  # Epic 1a: Workspace Bootstrap + ABI Freeze + Kernel Skeleton (v0.1-alpha)
-  # ------------------------------------------------------------------
   epic-1a: done
   1a-1-initialize-17-crate-cargo-workspace-frozen-abi-types-starter-template: done
   1a-2-wire-the-five-service-kernel-skeleton-with-a-multi-threaded-tokio-composition-root: done
   1a-3-cryptoprovider-trait-xtask-service-boundary-stub-implementation: done
   1a-4-ship-the-maosctl-cli-scaffold-with-security-md-and-accessibility-defaults: done
   epic-1a-retrospective: done
-  # Post-retro bridge story (D7 from epic-1a-retro-2026-05-13.md). Blocks Story 1b.4.
-  # Does NOT re-open epic-1a's done flag — bridge stories are tracked independently.
   1a-5-migrate-abi-diff-to-cargo-public-api: done
-
-  # ------------------------------------------------------------------
-  # Epic 1b: Evaluator Path + Audit Spine + Capability Mediation Baseline (v0.1-beta)
-  # ------------------------------------------------------------------
   epic-1b: done
   1b-1-three-audit-logs-transparency-approval-decision-lifecycle-journal: done
   1b-2-capability-registry-decomposition-runtime-cap-tokens-cap-policy-cap-audit-cap-quota: done
@@ -78,34 +28,26 @@ development_status:
   1b-5b-maosctl-audit-query-fr4-100-mediation-mechanical-verification: done
   1b-5c-maosctl-v0-1-lifecycle-subcommands-accessibility-flags: done
   epic-1b-retrospective: done
-  # Post-retro bridge story closing D9 + D10 + Doc3 from epic-1b-retro-2026-05-16.md.
-  # Blocks Story 2.1. Does NOT re-open epic-1b's done flag — bridge stories
-  # are tracked independently (same pattern as 1a-5 was for D7 → 1b.4).
   1b-6-epic-2-prep-d9-d10-doc3: done
-
-  # ------------------------------------------------------------------
-  # Epic 2: Spirit ABI + Developer SDK + Boundary Contracts (v0.1 -> v0.3)
-  # ------------------------------------------------------------------
   epic-2: in-progress
   2-1-ship-the-full-spirit-abi-with-spirit-proc-macro-and-11-lifecycle-hooks: done
   2-2-xtask-check-service-boundary-p1-p4-full-implementation-spirit-boundary-invariant-cases: done
   2-3-thin-cargo-generate-template-local-runner-nfr-onb-1-v0-3-prerequisite: done
   2-4-seed-the-spirit-test-sdk-with-lcas-framework-and-cross-spirit-isolation-hooks: done
-  epic-2-retrospective: optional
-
-  # ------------------------------------------------------------------
-  # Epic 3: Director's Surface — IAC Bus, Task Assignment & Posture Control (v0.3 -> v0.8)
-  # ------------------------------------------------------------------
+  epic-2-retrospective: done
+  # Post-retro bridge story closes A4 (review-checklist amendment), A5 (IAC bus
+  # Mailbox addendum §7.1.1–§7.1.2), A6 (dev-record Review Findings template),
+  # A7 (D11 server-exit drain), A8 (xtask check-workspace-count guard) from
+  # epic-2-retro-2026-05-17.md. Does NOT re-open epic-2's done flag — bridge
+  # stories are tracked independently (same pattern as 1a-5 and 1b-6).
+  # Blocks Story 3.1. File: 2-5-epic-3-prep-iac-addendum-d11-drain.md.
+  2-5-epic-3-prep-iac-addendum-d11-drain: done
   epic-3: backlog
   3-1-route-task-assign-frames-over-the-iac-bus-with-notification-surface-dispatch: backlog
   3-2-manage-director-posture-with-a-halt-policy-schema-and-bounded-shift-propagation: backlog
   3-3-directors-halt-resolution-ux-decision-audit-i12: backlog
   3-4-buffer-orchestrator-instructions-and-honor-director-pause-resume-revoke-p99-2s: backlog
   epic-3-retrospective: optional
-
-  # ------------------------------------------------------------------
-  # Epic 4: Halt Protocol + Memory Substrate + Cognition Primitives (v0.3 -> v1.0) — SINGLE HALT OWNER
-  # ------------------------------------------------------------------
   epic-4: backlog
   4-1-halt-protocol-mechanism-three-resolution-kinds-halt-receipt-99-9-single-halt-owner: backlog
   4-2-implement-the-tagged-scalar-slot-with-four-universal-arithmetic-predicates: backlog
@@ -113,10 +55,6 @@ development_status:
   4-4-enforce-the-i11-audit-chain-on-distillates-with-log-recall-and-the-five-metric-gate: backlog
   4-5-author-the-cross-spirit-isolation-200-corpus-and-enforce-i14-halt-continuity-in-hot-swap: backlog
   epic-4-retrospective: optional
-
-  # ------------------------------------------------------------------
-  # Epic 5: Spirit Lifecycle, Hot-Swap, Crash Supervision & Multi-Provider (v0.3 -> v1.0)
-  # ------------------------------------------------------------------
   epic-5: backlog
   5-1-ship-full-lifecycle-verbs-and-11-triggers-with-priority-weighted-scheduling: backlog
   5-2-implement-hot-swap-state-transfer-and-cross-major-migration-against-hsis-95: backlog
@@ -128,10 +66,6 @@ development_status:
   5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers: backlog
   5-5e-section-13-1-rust-inproc-measurement-gate-subprocess-vs-in-process-latency-decision: backlog
   epic-5-retrospective: optional
-
-  # ------------------------------------------------------------------
-  # Epic 6: Multi-Spirit Coordination — Full IAC Bus, A2A Peer Mesh & Worker Patterns (v0.5 -> v1.5)
-  # ------------------------------------------------------------------
   epic-6: backlog
   6-1-ship-the-full-iac-bus-with-retract-primitive-and-drr-fairness-scheduler: backlog
   6-2-dispatch-orchestrator-distillates-with-intent-lineage-and-cliwrapperspirit-worker-pattern: backlog
@@ -139,10 +73,6 @@ development_status:
   6-4-wire-scheduled-invocations-with-consentrupture-and-provider-rate-limit-isolation: backlog
   6-5-gateway-sub-modules-adr-029-telegram-slack-discord-signal-email: backlog
   epic-6-retrospective: optional
-
-  # ------------------------------------------------------------------
-  # Epic 7: Spirit Ecosystem — Authoring SDK, Registry, Signing, ComplianceClaim Envelope & Trust Tiers (v0.5 -> v1.0)
-  # ------------------------------------------------------------------
   epic-7: backlog
   7-1-full-cargo-generate-per-language-full-spirit-test-sdk-with-assertion-macros: backlog
   7-2-ship-end-to-end-registry-publish-install-yank-and-air-gapped-import: backlog
@@ -151,10 +81,6 @@ development_status:
   7-5a-publish-and-enforce-v1-0-abi-stability-commitments: backlog
   7-5b-execute-nfr-onb-1-30-minute-first-spirit-validation-gate-at-v0-3: backlog
   epic-7-retrospective: optional
-
-  # ------------------------------------------------------------------
-  # Epic 8: Reference Spirits — Butler -> Researcher/Observer -> Orchestrator+Workers+Architect+Reviewer -> Mira+Nash (v0.3 -> v1.5)
-  # ------------------------------------------------------------------
   epic-8: backlog
   8-1-butler-v0-3-on-idle-anticipatory-reasoning-morning-digest-spirit-side: backlog
   8-2-ship-the-researcher-reference-spirit-with-distillation-pattern-and-log-recall-walker: backlog
@@ -162,10 +88,6 @@ development_status:
   8-4-ship-the-founder-loop-wedge-spirits-orchestrator-workers-architect-reviewer: backlog
   8-5-ship-the-mira-nash-diagnostic-architect-bilateral-pair-with-safety-critical-corpus: backlog
   epic-8-retrospective: optional
-
-  # ------------------------------------------------------------------
-  # Epic 9: Audit & Compliance Surfaces + Operator Productionization (v0.5 -> v1.0)
-  # ------------------------------------------------------------------
   epic-9: backlog
   9-1-ship-maosctl-audit-subcommands-query-subject-access-posture-delta-sealed-export: backlog
   9-2-execute-gdpr-article-17-cascade-with-deterministic-replay-and-proof-of-erasure: backlog
@@ -173,10 +95,6 @@ development_status:
   9-4-productionize-the-operator-surface-distribution-backup-dr-air-gap-region-pinning: backlog
   9-5-publish-five-canonical-docs-with-wcag-aa-korean-i18n-and-onboarding-artifacts: backlog
   epic-9-retrospective: optional
-
-  # ------------------------------------------------------------------
-  # Epic 10: v1.0 Ship Gate + v1.5 Collective Tier (v1.0 -> v1.5)
-  # ------------------------------------------------------------------
   epic-10: backlog
   10-1-execute-the-v1-0-release-gate-pen-test-ccac-cross-validation-hsis-verification: backlog
   10-2-run-the-third-party-trial-n-12-and-adversarial-red-team-gate-at-v1-0: backlog

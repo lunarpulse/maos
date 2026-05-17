@@ -192,6 +192,19 @@ jobs:
       - name: Run check-fr47
         run: cargo run -p xtask -- check-fr47 --json
 
+  check-workspace-count:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-workspace-count
+        run: cargo run -p xtask -- check-workspace-count --json
+
   check-service-boundary:
     runs-on: ubuntu-latest
     steps:
@@ -283,6 +296,27 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-security-md
         run: cargo run -p xtask -- check-security-md --json
+
+  server-exit-drain:
+    # Story 2.5 AC1 — verifies cap-audit drain on SIGTERM in both one-shot
+    # and long-running server paths. The drain block is identical in both
+    # arms of main.rs, so row persistence is tested via the one-shot path
+    # (which generates cap-audit rows deterministicly), and the server
+    # path is structurally validated for drain-block reachability.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Install sqlite3 (test harness dependency)
+        run: sudo apt-get update && sudo apt-get install -y sqlite3
+      - name: Run server-exit-drain
+        run: bash tests/integration/server_exit_drain.sh
 
   audit-spine-smoke:
     runs-on: ubuntu-latest
@@ -599,7 +633,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests]
     if: always()
     permissions:
       pull-requests: write
@@ -618,6 +652,7 @@ jobs:
           echo "cc=${{ needs.check-corpus.result }}" >> $GITHUB_OUTPUT
           echo "cjc=${{ needs.check-judge-config.result }}" >> $GITHUB_OUTPUT
           echo "csm=${{ needs.check-security-md.result }}" >> $GITHUB_OUTPUT
+          echo "sed=${{ needs.server-exit-drain.result }}" >> $GITHUB_OUTPUT
           echo "ass=${{ needs.audit-spine-smoke.result }}" >> $GITHUB_OUTPUT
           echo "ctvb=${{ needs.cap-token-verify-bench.result }}" >> $GITHUB_OUTPUT
           echo "crs=${{ needs.cap-registry-smoke.result }}" >> $GITHUB_OUTPUT
@@ -638,6 +673,7 @@ jobs:
           echo "cs=${{ needs.corpus-staleness.result }}" >> $GITHUB_OUTPUT
           echo "cpc=${{ needs.calibrate-per-commit.result }}" >> $GITHUB_OUTPUT
           echo "cf47=${{ needs.check-fr47.result }}" >> $GITHUB_OUTPUT
+          echo "cwc=${{ needs.check-workspace-count.result }}" >> $GITHUB_OUTPUT
       - name: Check for failures
         id: status
         run: |
@@ -662,6 +698,7 @@ jobs:
             const cc = '${{ needs.check-corpus.result }}';
             const cjc = '${{ needs.check-judge-config.result }}';
             const csm = '${{ needs.check-security-md.result }}';
+            const sed = '${{ needs.server-exit-drain.result }}';
             const ass = '${{ needs.audit-spine-smoke.result }}';
             const ctvb = '${{ needs.cap-token-verify-bench.result }}';
             const crs = '${{ needs.cap-registry-smoke.result }}';
@@ -682,6 +719,7 @@ jobs:
             const cs = '${{ needs.corpus-staleness.result }}';
             const cpc = '${{ needs.calibrate-per-commit.result }}';  // conditionally skipped until Story 0.4
             const cf47 = '${{ needs.check-fr47.result }}';
+            const cwc = '${{ needs.check-workspace-count.result }}';
             const dt = '${{ needs.determinism-tests.outputs.test_result }}';  // advisory at v0.1-α per DF6
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
             const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
@@ -701,6 +739,7 @@ jobs:
             | check-corpus | ${icon(cc)} ${cc} |
             | check-judge-config | ${icon(cjc)} ${cjc} |
             | check-security-md | ${icon(csm)} ${csm} |
+            | server-exit-drain | ${icon(sed)} ${sed} |
             | audit-spine-smoke | ${icon(ass)} ${ass} |
             | cap-token-verify-bench | ${icon(ctvb)} ${ctvb} |
             | cap-registry-smoke | ${icon(crs)} ${crs} |
@@ -721,6 +760,7 @@ jobs:
             | corpus-staleness | ${icon(cs)} ${cs} |
             | calibrate-per-commit | ${icon(cpc)} ${cpc} |
             | check-fr47 | ${icon(cf47)} ${cf47} |
+            | check-workspace-count | ${icon(cwc)} ${cwc} |
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 
             ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).
