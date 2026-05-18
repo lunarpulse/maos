@@ -58,6 +58,8 @@ pub enum Subcommand {
     /// Audit-trail subcommands. `query` is the FR4 mechanical-verification surface
     /// (Story 1b.5b); FR42–44 sealed-export lands at v1.0 (Story 9.1).
     Audit(AuditArgs),
+    /// Shift the runtime posture of a Spirit (Story 3.2).
+    Posture(PostureArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -126,4 +128,21 @@ pub enum AuditFormat {
     Ndjson,
     /// Human-readable tabular text; never emits ANSI escapes.
     Plain,
+}
+
+#[derive(clap::Args, Debug)]
+pub struct PostureArgs {
+    /// Spirit ID to shift.
+    pub spirit: String,
+    /// New runtime posture: cautious | assistive | autonomous-with-halt
+    #[arg(long, value_enum)]
+    pub shift: PostureChoice,
+}
+
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PostureChoice {
+    Cautious,
+    Assistive,
+    #[clap(name = "autonomous-with-halt")]
+    AutonomousWithHalt,
 }

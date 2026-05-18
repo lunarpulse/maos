@@ -15,6 +15,7 @@ pub mod manifest;
 pub mod sandbox;
 pub mod drift;
 pub mod approval;
+pub mod posture;
 
 pub use maos_domain::ports::SecurityManagerPort;
 pub use crypto::RingCryptoProvider;
@@ -34,6 +35,9 @@ pub use manifest::{OutputShapePredicate, OutputShapeViolation, capabilities_requ
 pub use maos_domain::ports::CryptoProvider;
 pub use sandbox::{SandboxSpec, SandboxedChild, SpawnError, spawn_sandboxed, classify_exit, SandboxViolation};
 pub use drift::{DriftEvent, make_drift_channel};
+// Story 3.2 — appended to preserve re-export order.
+pub use manifest::{EpistemicAction, EpistemicPolicyRule, EpistemicPolicySection};
+pub use posture::{PostureError, PostureState};
 
 use std::sync::Arc;
 
@@ -108,6 +112,8 @@ impl SecurityManagerAdapter {
         caps_required: &CapabilitiesRequired,
         output_shape: Option<&OutputShape>,
         journal: &dyn SpiritSchedulerPort,
+        posture_section: &PostureSection,
+        epistemic_policy: Option<&EpistemicPolicySection>,
     ) -> Result<SandboxSpec, SecurityError> {
         {
             let declared_scopes = capabilities_required_to_scopes(caps_required);
@@ -128,6 +134,16 @@ impl SecurityManagerAdapter {
                     scopes: declared_scopes,
                     declared_tier: effective,
                     trust_tier,
+                },
+            );
+            new_inner.spirit_postures.insert(
+                spirit_pid,
+                crate::security::posture::PostureState {
+                    current: posture_section.default,
+                    allowed_max: posture_section.allowed_max,
+                    epistemic_policy: epistemic_policy
+                        .cloned()
+                        .unwrap_or_else(EpistemicPolicySection::default_open_fail),
                 },
             );
             self.policy.update(new_inner);

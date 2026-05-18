@@ -48,6 +48,8 @@ pub enum LifecycleEvent {
     Unload = 5,
     /// Spirit halted (epistemic or operator trigger).
     Halt = 6,
+    /// Story 3.2 — director-initiated runtime posture shift.
+    PostureShift = 7,
 }
 
 /// A single journal entry — immutable record of a lifecycle transition.

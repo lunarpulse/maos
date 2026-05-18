@@ -46,6 +46,9 @@ pub struct PolicyTableInner {
     pub manifest_scopes: HashMap<u32, ManifestCapabilityScope>,
     pub trust_tier_floor: HashMap<decision::TrustTier, SandboxTier>,
     pub operator_policy: OperatorPolicyConfig,
+    /// Story 3.2 — per-Spirit runtime posture state. Updated atomically
+    /// via CoW swap (same shape as manifest_scopes).
+    pub spirit_postures: HashMap<u32, crate::security::posture::PostureState>,
 }
 
 /// Policy table — read-mostly copy-on-write.
@@ -144,11 +147,109 @@ impl PolicyTable {
     pub fn update(&self, new_policy: PolicyTableInner) {
         self.inner.store(Arc::new(new_policy));
     }
+
+    /// Atomically shift a Spirit's posture under the ceiling constraint
+    /// (Story 3.2, AC4).
+    pub fn shift_posture(
+        &self,
+        spirit_pid: u32,
+        new_posture: crate::security::manifest::Posture,
+    ) -> Result<[u8; 32], crate::security::posture::PostureError> {
+        use crate::security::manifest::Posture;
+        use crate::security::posture::PostureError;
+
+        let inner = self.inner.load_full();
+
+        // Reject non-runtime postures
+        if new_posture == Posture::Autonomous {
+            return Err(PostureError::NonRuntimePosture(Posture::Autonomous));
+        }
+
+        // Validate spirit exists
+        let state = inner
+            .spirit_postures
+            .get(&spirit_pid)
+            .ok_or(PostureError::UnknownSpirit(spirit_pid))?;
+
+        // Validate ceiling
+        if new_posture > state.allowed_max {
+            return Err(PostureError::AboveCeiling {
+                requested: new_posture,
+                allowed: state.allowed_max,
+            });
+        }
+
+        // CoW swap
+        let mut new_inner = (*inner).clone();
+        if let Some(s) = new_inner.spirit_postures.get_mut(&spirit_pid) {
+            s.current = new_posture;
+        }
+        let new_hash = new_inner
+            .spirit_postures
+            .get(&spirit_pid)
+            .map(|s| s.posture_hash())
+            .unwrap_or([0u8; 32]);
+        self.update(new_inner);
+
+        Ok(new_hash)
+    }
+
+    /// Posture-aware evaluation (Story 3.2, AC5).
+    pub fn evaluate_with_posture(
+        &self,
+        spirit_pid: u32,
+        base_class: maos_domain::notification::ApprovalClass,
+    ) -> PolicyDecision {
+        let inner = self.inner.load_full();
+
+        // Step 1: Fail-closed — unknown spirit
+        let state = match inner.spirit_postures.get(&spirit_pid) {
+            Some(s) => s,
+            None => return PolicyDecision::Deny,
+        };
+
+        // Step 2: ControlPlane always requires approval
+        if base_class == maos_domain::notification::ApprovalClass::ControlPlane {
+            return PolicyDecision::RequireApproval {
+                class: domain_class_to_decision(base_class),
+            };
+        }
+
+        // Step 3: Posture × class matrix lookup
+        let requires = crate::security::posture::posture_requires_approval(state.current, base_class);
+        let matrix_decision = if requires {
+            PolicyDecision::RequireApproval {
+                class: domain_class_to_decision(base_class),
+            }
+        } else {
+            PolicyDecision::Allow
+        };
+
+        // Step 4: Operator policy overrides take precedence (existing evaluate semantics)
+        let scope_key = format!("{:?}", std::mem::discriminant(&base_class));
+        if let Some(class) = inner.operator_policy.per_capability_approval.get(&scope_key) {
+            return PolicyDecision::RequireApproval { class: *class };
+        }
+
+        matrix_decision
+    }
 }
 
 /// Strictest of three sandbox tiers.
 pub fn strictest_of(a: SandboxTier, b: SandboxTier, c: SandboxTier) -> SandboxTier {
     SandboxTier(a.0.max(b.0).max(c.0))
+}
+
+/// Map domain ApprovalClass → kernel decision::ApprovalClass.
+fn domain_class_to_decision(c: maos_domain::notification::ApprovalClass) -> decision::ApprovalClass {
+    match c {
+        maos_domain::notification::ApprovalClass::ReadonlyScoped => decision::ApprovalClass::ReadonlyScoped,
+        maos_domain::notification::ApprovalClass::ReadonlySearch => decision::ApprovalClass::ReadonlySearch,
+        maos_domain::notification::ApprovalClass::Mutating => decision::ApprovalClass::Mutating,
+        maos_domain::notification::ApprovalClass::ExecCapable => decision::ApprovalClass::ExecCapable,
+        maos_domain::notification::ApprovalClass::ControlPlane => decision::ApprovalClass::ControlPlane,
+        maos_domain::notification::ApprovalClass::Interactive => decision::ApprovalClass::Interactive,
+    }
 }
 
 #[cfg(test)]
@@ -242,5 +343,51 @@ mod tests {
 
         writer.join().unwrap();
         reader.join().unwrap();
+    }
+
+    #[test]
+    fn evaluate_with_posture_returns_deny_for_unknown_spirit() {
+        use crate::security::posture::PostureState;
+        use crate::security::manifest::{EpistemicAction, EpistemicPolicySection, Posture};
+
+        let table = PolicyTable::new();
+        let decision = table.evaluate_with_posture(
+            999,
+            maos_domain::notification::ApprovalClass::Mutating,
+        );
+        assert!(matches!(decision, PolicyDecision::Deny));
+    }
+
+    #[test]
+    fn evaluate_with_posture_operator_override_takes_precedence() {
+        use crate::security::posture::PostureState;
+        use crate::security::manifest::{EpistemicAction, EpistemicPolicySection, Posture};
+
+        let table = PolicyTable::new();
+        let mut inner = PolicyTableInner::default();
+        inner.spirit_postures.insert(
+            0,
+            PostureState {
+                current: Posture::AutonomousWithHalt,
+                allowed_max: Posture::AutonomousWithHalt,
+                epistemic_policy: EpistemicPolicySection {
+                    rules: vec![],
+                    default_action: EpistemicAction::VerbalizeOnly,
+                },
+            },
+        );
+        // AutonomousWithHalt + Mutating = Allow per matrix, but operator
+        // override forces RequireApproval
+        inner.operator_policy.per_capability_approval.insert(
+            format!("{:?}", std::mem::discriminant(&maos_domain::notification::ApprovalClass::Mutating)),
+            decision::ApprovalClass::Mutating,
+        );
+        table.update(inner);
+
+        let decision = table.evaluate_with_posture(0, maos_domain::notification::ApprovalClass::Mutating);
+        assert!(
+            matches!(decision, PolicyDecision::RequireApproval { .. }),
+            "operator override must take precedence over matrix Allow"
+        );
     }
 }

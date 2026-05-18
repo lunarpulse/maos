@@ -1,0 +1,5 @@
+[[rules]]
+tag = "claim.security_vulnerability"
+action = "halt"
+on_confidence_below = 0.85
+on_evidence_conflict = true

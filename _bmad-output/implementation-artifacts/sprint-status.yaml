@@ -1,4 +1,4 @@
-last_updated: '2026-05-17'  # Story 3-1 code review complete — 18 patches applied, async deliver cascade
+last_updated: '2026-05-18'  # Story 3-2 done after code review
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -44,7 +44,7 @@ development_status:
   2-5-epic-3-prep-iac-addendum-d11-drain: done
   epic-3: in-progress
   3-1-route-task-assign-frames-over-the-iac-bus-with-notification-surface-dispatch: done
-  3-2-manage-director-posture-with-a-halt-policy-schema-and-bounded-shift-propagation: backlog
+  3-2-manage-director-posture-with-a-halt-policy-schema-and-bounded-shift-propagation: done
   3-3-directors-halt-resolution-ux-decision-audit-i12: backlog
   3-4-buffer-orchestrator-instructions-and-honor-director-pause-resume-revoke-p99-2s: backlog
   epic-3-retrospective: optional

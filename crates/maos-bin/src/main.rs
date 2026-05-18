@@ -276,6 +276,151 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
 
+        if mode == "posture-shift" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let spirit_id = std::env::var("MAOS_SPIRIT_ID")
+                .map_err(|_| "MAOS_SPIRIT_ID is required for posture-shift")?;
+            let posture_str = std::env::var("MAOS_POSTURE")
+                .map_err(|_| "MAOS_POSTURE is required for posture-shift")?;
+
+            let new_posture = match posture_str.as_str() {
+                "cautious" => maos_kernel_core::security::manifest::Posture::Cautious,
+                "assistive" => maos_kernel_core::security::manifest::Posture::Assistive,
+                "autonomous-with-halt" => {
+                    maos_kernel_core::security::manifest::Posture::AutonomousWithHalt
+                }
+                other => {
+                    return Err(format!(
+                        "unknown posture '{other}' — expected cautious|assistive|autonomous-with-halt"
+                    )
+                    .into());
+                }
+            };
+
+            // Parse manifest and admit the Spirit to seed PolicyTable state
+            let manifest_path_str = format!("spirits/{spirit_id}/manifest.toml");
+            let manifest_path = std::path::Path::new(&manifest_path_str);
+            let manifest_toml = std::fs::read_to_string(manifest_path).map_err(|e| {
+                format!("failed to read spirit manifest at {}: {e}", manifest_path.display())
+            })?;
+            let manifest_root: toml::Value = toml::from_str(&manifest_toml)
+                .map_err(|e| format!("manifest TOML parse error: {e}"))?;
+
+            fn extract_section(
+                root: &toml::Value,
+                section: &str,
+            ) -> Result<String, Box<dyn std::error::Error>> {
+                let value = root
+                    .get(section)
+                    .ok_or_else(|| format!("missing manifest section [{section}]"))?;
+                let serialized = toml::to_string(value)
+                    .map_err(|e| format!("failed to serialize [{section}] section: {e}"))?;
+                Ok(serialized)
+            }
+
+            let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
+                &extract_section(&manifest_root, "sandbox")?,
+            )?;
+            let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
+                &extract_section(&manifest_root, "resources")?,
+            )?;
+            let caps_required = {
+                let caps_required_val = manifest_root.get("capabilities").and_then(|c| c.get("required"));
+                let caps_required_toml = match caps_required_val {
+                    Some(v) => toml::to_string(v)
+                        .map_err(|e| format!("failed to serialize [capabilities.required]: {e}"))?,
+                    None => return Err("missing [capabilities.required]".into()),
+                };
+                maos_kernel_core::security::CapabilitiesRequired::from_toml_str(&caps_required_toml)?
+            };
+            let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
+                &extract_section(&manifest_root, "output_shape")?,
+            )?;
+            let posture_section =
+                maos_kernel_core::security::manifest::PostureSection::from_toml_str(
+                    &extract_section(&manifest_root, "posture")?,
+                )
+                .map_err(|e| format!("posture parse: {e}"))?;
+            let epistemic_policy = manifest_root
+                .get("epistemic_policy")
+                .map(|v| {
+                    let s = toml::to_string(v)
+                        .map_err(|e| format!("epistemic_policy serialize: {e}"))?;
+                    maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
+                        .map_err(|e| format!("epistemic_policy parse: {e}"))
+                })
+                .transpose()?;
+
+            // Open journal for Load event
+            let journal_path = maos_audit::default_journal_path();
+            if let Some(parent) = journal_path.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("journal parent create failed: {e}"))?;
+            }
+            let journal =
+                maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+                    .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
+
+            let security =
+                maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy));
+            let _spec = security.admit_spirit(
+                0,
+                &spirit_id,
+                &sandbox_cfg,
+                &resource_caps,
+                &caps_required,
+                Some(&output_shape),
+                &journal,
+                &posture_section,
+                epistemic_policy.as_ref(),
+            )?;
+
+            // Perform the posture shift
+            let new_hash = policy
+                .shift_posture(0, new_posture)
+                .map_err(|e| format!("posture shift failed: {e}"))?;
+
+            // Journal to Lifecycle Journal
+            let journal_entry_path = maos_audit::default_journal_path();
+            let journal_adapter =
+                maos_kernel_core::journal::JournalAdapter::open(&journal_entry_path)
+                    .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
+            journal_adapter.append_transition(
+                maos_domain::invariants::i10::JournalEntry {
+                    timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+                    lifecycle_event: maos_domain::invariants::i10::LifecycleEvent::PostureShift,
+                    spirit_id: spirit_id.clone(),
+                    effective_sandbox_tier: None,
+                },
+            );
+            drop(journal_adapter);
+
+            // Journal to Approval Decision Log
+            maos_kernel_core::security::posture::journal_posture_shift(
+                &transparency_log,
+                "director",
+                &spirit_id,
+                posture_section.default,
+                new_posture,
+            )
+            .map_err(|e| format!("approval log write failed: {e}"))?;
+
+            drop(journal);
+
+            // Drain: drop senders in order, await audit writer
+            drop(audit_tx);
+            drop(inference);
+            drop(capability);
+            if let Err(e) = audit_writer.await {
+                eprintln!("maos: audit writer task failed during drain: {e}");
+            }
+
+            let _ = new_hash;
+            eprintln!("maos: posture shift {} → {:?} (journal: {})", spirit_id, new_posture, journal_entry_path.display());
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!("maos: unknown MAOS_ONE_SHOT mode '{mode}' — only 'hello-spirit' is supported");
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
@@ -346,6 +491,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_drift_sender(drift_tx);
 
             // Admit hello-spirit through the canonical admission path.
+            let posture_section =
+                maos_kernel_core::security::manifest::PostureSection::from_toml_str(
+                    &extract_section(&manifest_root, "posture")?,
+                )
+                .map_err(|e| format!("posture parse: {e}"))?;
+            let epistemic_policy = manifest_root
+                .get("epistemic_policy")
+                .map(|v| {
+                    let s = toml::to_string(v)
+                        .map_err(|e| format!("epistemic_policy serialize: {e}"))?;
+                    maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
+                        .map_err(|e| format!("epistemic_policy parse: {e}"))
+                })
+                .transpose()?;
+
             let _spec = security.admit_spirit(
                 0,
                 "hello-spirit",
@@ -354,6 +514,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &caps_required,
                 Some(&output_shape),
                 &journal,
+                &posture_section,
+                epistemic_policy.as_ref(),
             )?;
 
             // Drop the journal adapter (fsync + drain).

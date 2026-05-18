@@ -49,6 +49,8 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
     ("sandbox", "tier"),
     ("author", "name"),
     ("author", "homepage"),
+    ("epistemic_policy", "rules"),
+    ("epistemic_policy", "default_action"),
 ];
 
 const CATEGORIES: &[&str] = &["well-formed", "malformed-rejected", "edge-case"];

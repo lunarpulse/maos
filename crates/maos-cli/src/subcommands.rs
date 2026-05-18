@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::accessibility::ColorChoice;
-use crate::cli::{AuditFormat, AuditQuery, InstallArgs, RunArgs, Subcommand};
+use crate::cli::{AuditFormat, AuditQuery, InstallArgs, PostureArgs, PostureChoice, RunArgs, Subcommand};
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
     match cmd {
@@ -16,6 +16,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Unload(args) => lifecycle_verb("unload", args.spirit.as_deref(), color),
         Subcommand::Run(args) => run(args, color),
         Subcommand::Audit(args) => audit_dispatch(&args.query, color),
+        Subcommand::Posture(args) => dispatch_posture(args, color),
     }
 }
 
@@ -153,6 +154,38 @@ fn lifecycle_verb(verb: &str, spirit: Option<&str>, color: ColorChoice) -> ExitC
                 "maosctl: failed to execute maos-bin at '{}': {e}",
                 bin.display()
             );
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn dispatch_posture(args: &PostureArgs, color: ColorChoice) -> ExitCode {
+    if let Err(diag) = resolve_spirit_pid(&args.spirit) {
+        eprintln!("maosctl: posture — {diag}");
+        return ExitCode::from(2);
+    }
+
+    let posture_env = match args.shift {
+        PostureChoice::Cautious => "cautious",
+        PostureChoice::Assistive => "assistive",
+        PostureChoice::AutonomousWithHalt => "autonomous-with-halt",
+    };
+
+    let bin = maos_bin_path();
+    let mut cmd = std::process::Command::new(&bin);
+    cmd.env("MAOS_ONE_SHOT", "posture-shift");
+    cmd.env("MAOS_SPIRIT_ID", &args.spirit);
+    cmd.env("MAOS_POSTURE", posture_env);
+
+    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+        cmd.env("NO_COLOR", "1");
+    }
+
+    match cmd.status() {
+        Ok(s) if s.success() => ExitCode::SUCCESS,
+        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+        Err(e) => {
+            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
             ExitCode::from(2)
         }
     }

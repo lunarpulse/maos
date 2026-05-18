@@ -11,7 +11,7 @@
 //! |---|---|---|
 //! | `FrameAddress.host_id: None` | y | Story 6.3 (A2A cross-Host) |
 //! | `EpistemicHaltPayload` body | stub | Story 3.3 |
-//! | `PosturePreferences` extension | placeholder | Story 3.2 |
+//! | `PosturePreferences` extension | done (Story 3.2) | Story 3.2 |
 //! | `RetractPayload` body | stub | Story 6.1 |
 //! | `ConsentEnvelope` | `None` | Story 6.3 (ADR-012) |
 
@@ -66,22 +66,50 @@ pub struct TaskAssignPayload {
 
 /// v0.3 placeholder — Story 3.2 populates the body.
 ///
-/// Story 3.2 will extend this struct with halt-policy preferences
+/// Story 3.2 extends this struct with halt-policy preferences
 /// per FR19 + ADR-013 — additive-only; serde defaults preserve 3.1-era
 /// wire compatibility.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PosturePreferences {
     #[serde(default)]
     pub preferred_posture: Option<PostureHint>,
+
+    /// Story 3.2 — per-tag halt-policy override; missing tag means inherit
+    /// the Spirit's manifest-declared policy unchanged. Each override declares
+    /// a recall-vs-precision tilt in [-1.0, +1.0]: negative biases for higher
+    /// halt-precision (tighten threshold, fewer false halts); positive biases
+    /// for higher halt-recall (loosen threshold, fewer missed halts).
+    /// Range-validated by `EpistemicPolicySection::apply_director_preferences`.
+    #[serde(default)]
+    pub halt_policy_overrides: Vec<HaltPolicyOverride>,
 }
 
 impl Default for PosturePreferences {
     fn default() -> Self {
         Self {
             preferred_posture: None,
+            halt_policy_overrides: Vec::new(),
         }
     }
 }
+
+/// Story 3.2 — per-tag halt-policy override with recall-vs-precision tilt.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HaltPolicyOverride {
+    pub tag: String,
+    /// Tilt in [-1.0, +1.0]; clamped at apply time. NaN rejected at apply time.
+    pub recall_vs_precision: f32,
+}
+
+impl PartialEq for HaltPolicyOverride {
+    fn eq(&self, other: &Self) -> bool {
+        self.tag == other.tag
+            && self.recall_vs_precision.total_cmp(&other.recall_vs_precision)
+                == std::cmp::Ordering::Equal
+    }
+}
+
+impl Eq for HaltPolicyOverride {}
 
 /// Posture hint for the director's task assignment.
 ///
@@ -170,15 +198,56 @@ mod tests {
     }
 
     #[test]
-    fn posture_preferences_default_is_empty() {
+    fn posture_preferences_3_1_shape_backward_compat() {
+        // A 3.1-emitted frame with only preferred_posture deserializes
+        // successfully; halt_policy_overrides defaults to empty.
+        let json = r#"{"preferred_posture":null}"#;
+        let prefs: PosturePreferences = serde_json::from_str(json).unwrap();
+        assert!(prefs.preferred_posture.is_none());
+        assert!(prefs.halt_policy_overrides.is_empty());
+    }
+
+    #[test]
+    fn posture_preferences_3_2_shape_round_trip() {
+        let overrides = vec![HaltPolicyOverride {
+            tag: "x".into(),
+            recall_vs_precision: 0.3,
+        }];
+        let prefs = PosturePreferences {
+            preferred_posture: Some(PostureHint::Cautious),
+            halt_policy_overrides: overrides,
+        };
+        let json = serde_json::to_string(&prefs).unwrap();
+        let back: PosturePreferences = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.preferred_posture, Some(PostureHint::Cautious));
+        assert_eq!(back.halt_policy_overrides.len(), 1);
+        assert_eq!(back.halt_policy_overrides[0].tag, "x");
+        assert_eq!(back.halt_policy_overrides[0].recall_vs_precision, 0.3);
+    }
+
+    #[test]
+    fn halt_policy_override_valid_f32_parses_at_serde_layer() {
+        // serde_json does not admit NaN/Inf for f32 by default — these are
+        // rejected at JSON parse time. NaN validation lives at
+        // `apply_director_preferences` which explicitly rejects NaN.
+        // This test confirms valid f32 values round-trip through serde.
+        let json = r#"{"tag":"x","recall_vs_precision":0.5}"#;
+        let parsed: HaltPolicyOverride = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.recall_vs_precision, 0.5);
+    }
+
+    #[test]
+    fn posture_preferences_default_has_empty_overrides() {
         let default = PosturePreferences::default();
         assert!(default.preferred_posture.is_none());
+        assert!(default.halt_policy_overrides.is_empty());
     }
 
     #[test]
     fn posture_preferences_serde_round_trip() {
         let prefs = PosturePreferences {
             preferred_posture: Some(PostureHint::Assistive),
+            halt_policy_overrides: Vec::new(),
         };
         let json = serde_json::to_string(&prefs).unwrap();
         let back: PosturePreferences = serde_json::from_str(&json).unwrap();

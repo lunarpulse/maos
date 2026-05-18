@@ -1,0 +1,11 @@
+[[rules]]
+tag = "claim.exploratory"
+action = "verbalize_only"
+[[rules]]
+tag = "claim.style_suggestion"
+action = "flag"
+on_confidence_below = 0.0
+[[rules]]
+tag = "diagnosis.root_cause"
+action = "halt"
+on_confidence_below = 1.0

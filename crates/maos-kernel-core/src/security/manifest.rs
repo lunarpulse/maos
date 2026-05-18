@@ -359,6 +359,8 @@ pub enum Posture {
     Cautious,
     Assistive,
     AutonomousWithHalt,
+    /// Story 3.2: not a runtime shift target; use cautious /
+    /// assistive / autonomous-with-halt via `maosctl posture --shift`.
     Autonomous,
 }
 
@@ -572,6 +574,127 @@ impl RawBudget {
         Ok(Budget {
             context_window_size: self.context_window_size,
             time_cap_seconds: self.time_cap_seconds,
+        })
+    }
+}
+
+// ------------------------------------------------------------------
+// [epistemic_policy] section (Story 3.2, AC1)
+// ------------------------------------------------------------------
+
+/// Halt action for a tag in `[epistemic_policy]` per architecture §4.6.1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EpistemicAction {
+    VerbalizeOnly,
+    Flag,
+    Halt,
+}
+
+/// A single per-tag rule in `[epistemic_policy]` per architecture §4.6.1.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EpistemicPolicyRule {
+    pub tag: String,
+    pub action: EpistemicAction,
+    pub on_confidence_below: Option<f32>,
+    pub on_evidence_conflict: Option<bool>,
+}
+
+/// The `[epistemic_policy]` manifest section — per-tag halt policy rules
+/// plus a default action that defaults to `VerbalizeOnly` (fail-open).
+#[maos_attrs::i9_exempt(reason = "manifest data; parsed-then-dropped at admission, no kernel persistence")]
+#[derive(Debug, Clone, PartialEq)]
+pub struct EpistemicPolicySection {
+    pub rules: Vec<EpistemicPolicyRule>,
+    pub default_action: EpistemicAction,
+}
+
+impl EpistemicPolicySection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawEpistemicPolicySection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        raw.validate()
+    }
+
+    pub fn default_open_fail() -> Self {
+        Self {
+            rules: vec![],
+            default_action: EpistemicAction::VerbalizeOnly,
+        }
+    }
+}
+
+#[maos_attrs::i9_exempt(reason = "manifest data; parsed-then-dropped at admission, no kernel persistence")]
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawEpistemicPolicySection {
+    #[serde(default)]
+    rules: Vec<RawEpistemicPolicyRule>,
+    #[serde(default = "default_epistemic_action")]
+    default_action: EpistemicAction,
+}
+
+fn default_epistemic_action() -> EpistemicAction {
+    EpistemicAction::VerbalizeOnly
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawEpistemicPolicyRule {
+    tag: String,
+    action: EpistemicAction,
+    on_confidence_below: Option<f32>,
+    on_evidence_conflict: Option<bool>,
+}
+
+impl RawEpistemicPolicySection {
+    fn validate(self) -> Result<EpistemicPolicySection, ManifestError> {
+        let rules: Vec<EpistemicPolicyRule> = self
+            .rules
+            .into_iter()
+            .map(|r| {
+                if r.tag.is_empty() {
+                    return Err(ManifestError::Toml(validation_msg(
+                        "epistemic_policy.rules",
+                        "tag must be non-empty",
+                    )));
+                }
+                if r.tag.contains(|c: char| c.is_whitespace()) {
+                    return Err(ManifestError::Toml(validation_msg(
+                        "epistemic_policy.rules",
+                        &format!("whitespace in tag '{}'", r.tag),
+                    )));
+                }
+                if let Some(v) = r.on_confidence_below {
+                    if !(0.0..=1.0).contains(&v) {
+                        return Err(ManifestError::Toml(validation_msg(
+                            "epistemic_policy.on_confidence_below",
+                            "must be in [0.0, 1.0]",
+                        )));
+                    }
+                }
+                Ok(EpistemicPolicyRule {
+                    tag: r.tag,
+                    action: r.action,
+                    on_confidence_below: r.on_confidence_below,
+                    on_evidence_conflict: r.on_evidence_conflict,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut seen = std::collections::HashSet::new();
+        for rule in &rules {
+            if !seen.insert(&rule.tag) {
+                return Err(ManifestError::Toml(validation_msg(
+                    "epistemic_policy.rules",
+                    &format!("duplicate tag '{}'", rule.tag),
+                )));
+            }
+        }
+
+        Ok(EpistemicPolicySection {
+            rules,
+            default_action: self.default_action,
         })
     }
 }
@@ -1017,6 +1140,132 @@ allowed_max = "autonomous""#;
         let s = "context_window_size = 4096\ntime_cap_seconds = 86401";
         let err = Budget::from_toml_str(s).unwrap_err();
         assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("budget.time_cap_seconds")));
+    }
+
+    // ---- EpistemicPolicySection (Story 3.2, AC1) ----
+
+    #[test]
+    fn epistemic_policy_well_formed_parses() {
+        let s = r#"default_action = "verbalize_only"
+
+[[rules]]
+tag = "claim.security_vulnerability"
+action = "halt"
+on_confidence_below = 0.85
+on_evidence_conflict = true"#;
+        let p = EpistemicPolicySection::from_toml_str(s).unwrap();
+        assert_eq!(p.rules.len(), 1);
+        assert_eq!(p.rules[0].tag, "claim.security_vulnerability");
+        assert_eq!(p.rules[0].action, EpistemicAction::Halt);
+        assert_eq!(p.rules[0].on_confidence_below, Some(0.85));
+        assert_eq!(p.rules[0].on_evidence_conflict, Some(true));
+        assert_eq!(p.default_action, EpistemicAction::VerbalizeOnly);
+    }
+
+    #[test]
+    fn epistemic_policy_rejects_threshold_above_one() {
+        let s = r#"[[rules]]
+tag = "x"
+action = "halt"
+on_confidence_below = 1.5"#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("epistemic_policy.on_confidence_below")));
+    }
+
+    #[test]
+    fn epistemic_policy_rejects_threshold_below_zero() {
+        let s = r#"[[rules]]
+tag = "x"
+action = "halt"
+on_confidence_below = -0.1"#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("epistemic_policy.on_confidence_below")));
+    }
+
+    #[test]
+    fn epistemic_policy_rejects_duplicate_tag() {
+        let s = r#"[[rules]]
+tag = "a"
+action = "verbalize_only"
+[[rules]]
+tag = "a"
+action = "flag""#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("duplicate tag")));
+    }
+
+    #[test]
+    fn epistemic_policy_rejects_empty_tag() {
+        let s = r#"[[rules]]
+tag = ""
+action = "halt""#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("tag must be non-empty")));
+    }
+
+    #[test]
+    fn epistemic_policy_default_action_defaults_to_verbalize_only_when_omitted() {
+        let s = r#"[[rules]]
+tag = "x"
+action = "flag""#;
+        let p = EpistemicPolicySection::from_toml_str(s).unwrap();
+        assert_eq!(p.default_action, EpistemicAction::VerbalizeOnly);
+    }
+
+    #[test]
+    fn epistemic_policy_rejects_whitespace_in_tag() {
+        let s = r#"[[rules]]
+tag = "with space"
+action = "halt""#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("whitespace in tag")));
+    }
+
+    #[test]
+    fn epistemic_policy_edge_case_multi_rule_no_qualifiers() {
+        let s = r#"[[rules]]
+tag = "a"
+action = "verbalize_only"
+[[rules]]
+tag = "b"
+action = "flag"
+on_confidence_below = 0.0
+[[rules]]
+tag = "c"
+action = "halt"
+on_confidence_below = 1.0"#;
+        let p = EpistemicPolicySection::from_toml_str(s).unwrap();
+        assert_eq!(p.rules.len(), 3);
+        assert_eq!(p.rules[1].on_confidence_below, Some(0.0));
+        assert_eq!(p.rules[2].on_confidence_below, Some(1.0));
+    }
+
+    #[test]
+    fn epistemic_policy_malformed_fixture_rules_is_rejected() {
+        let s = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/manifest/epistemic_policy/malformed-rejected/rules.toml"),
+        )
+        .unwrap();
+        let err = EpistemicPolicySection::from_toml_str(&s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(_)),
+            "malformed fixture must fail parse: {err}"
+        );
+    }
+
+    #[test]
+    fn epistemic_policy_malformed_fixture_default_action_is_rejected() {
+        let s = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/manifest/epistemic_policy/malformed-rejected/default_action.toml"),
+        )
+        .unwrap();
+        let err = EpistemicPolicySection::from_toml_str(&s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(_)),
+            "malformed fixture must fail parse: {err}"
+        );
     }
 
     // ---- Author ----

@@ -32,3 +32,6 @@ tier = "T0"
 [author]
 name = "MAOS Project"
 homepage = "https://github.com/lunarpulse/maos"
+
+[epistemic_policy]
+default_action = "verbalize_only"

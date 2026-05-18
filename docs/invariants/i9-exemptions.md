@@ -138,3 +138,23 @@ the domain port and the kernel runtime; no additional persistent state.
 **Reason:** Approval Manager adapter (Story 3.1). Holds `Arc<TransparencyLogAdapter>` (already I9-exempt)
 and an `AtomicU64` decision counter for auto-incrementing decision IDs. The counter is transient
 per-process state reset on restart; no persistence needed beyond the Approval Decision Log rows.
+
+### `PostureState` — `crates/maos-kernel-core/src/security/posture.rs`
+
+**Reason:** Per-Spirit runtime posture + halt-policy state held inside
+PolicyTableInner. Updated atomically via CoW swap (same shape as
+manifest_scopes). Bounded by Spirit lifetime, keyed by spirit_pid, no
+parameter drift — structural caching per I9.
+
+### `EpistemicPolicySection` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** manifest data struct (Story 3.2) — parsed once from a TOML file at
+Spirit admission and stored inside `PostureState` (already I9-exempt). When
+used standalone, parsed-then-dropped at admission (mirrors `OutputShape`).
+Coverage gated by NFR-Test-13's `manifest_field_coverage` walker.
+
+### `RawEpistemicPolicySection` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** manifest data struct (Story 3.2) — raw deserialization target for
+`EpistemicPolicySection`. Parsed-then-consumed by `validate()`; the validated
+form is stored inside `PostureState`. No kernel persistence of the raw form.

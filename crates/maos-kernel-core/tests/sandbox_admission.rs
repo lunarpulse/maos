@@ -10,6 +10,7 @@ use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::security::{
     SecurityManagerAdapter, SandboxConfig, ResourceCaps, SecurityError,
     CapabilitiesRequired, OutputShape,
+    PostureSection, EpistemicPolicySection,
 };
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::invariants::i10::LifecycleEvent;
@@ -49,6 +50,15 @@ fn hello_spirit_output_shape() -> OutputShape {
     }
 }
 
+fn default_posture_section() -> PostureSection {
+    PostureSection::from_toml_str(r#"default = "assistive"
+allowed_max = "assistive""#).unwrap()
+}
+
+fn default_epistemic_policy() -> EpistemicPolicySection {
+    EpistemicPolicySection::default_open_fail()
+}
+
 #[test]
 fn strictest_of_manifest_trust_operator() {
     let (adapter, journal, _tmpdir) = make_adapter_with_trust_floors();
@@ -68,6 +78,8 @@ fn strictest_of_manifest_trust_operator() {
         &empty_caps_required(),
         None,
         &journal,
+        &default_posture_section(),
+        Some(&default_epistemic_policy()),
     ).unwrap();
 
     assert_eq!(spec.tier, SandboxTier::T2, "PublicUntrusted must force T0→T2");
@@ -94,6 +106,8 @@ fn t3_effective_tier_rejected() {
         &empty_caps_required(),
         None,
         &journal,
+        &default_posture_section(),
+        Some(&default_epistemic_policy()),
     ).unwrap_err();
 
     assert!(
@@ -123,6 +137,8 @@ fn t1_effective_tier_rejected() {
         &empty_caps_required(),
         None,
         &journal,
+        &default_posture_section(),
+        Some(&default_epistemic_policy()),
     ).unwrap_err();
 
     assert!(
@@ -150,6 +166,8 @@ fn effective_tier_is_journaled() {
         &empty_caps_required(),
         None,
         &journal,
+        &default_posture_section(),
+        Some(&default_epistemic_policy()),
     ).unwrap();
 
     assert_eq!(spec.tier, SandboxTier::T2);

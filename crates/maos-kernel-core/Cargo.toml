@@ -43,6 +43,7 @@ subtle = "2.6"
 tokio = { version = "1", features = ["sync", "rt"] }
 maos-attrs = { path = "../maos-attrs" }
 toml = "0.8"
+sha2 = "0.10"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 landlock = "0.4"
@@ -61,7 +62,6 @@ tempfile = "3"
 criterion = "0.5"
 tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread"] }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
-sha2 = "0.10"
 smallvec = "1"
 
 [[bench]]
