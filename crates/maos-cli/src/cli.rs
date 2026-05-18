@@ -60,6 +60,13 @@ pub enum Subcommand {
     Audit(AuditArgs),
     /// Shift the runtime posture of a Spirit (Story 3.2).
     Posture(PostureArgs),
+    /// Inspect or resolve a Spirit halt (Story 3.3).
+    ///
+    /// At v0.3-β `list` reads the Transparency Log for recent halts;
+    /// `resolve` writes the director's resolution to the Approval Decision
+    /// Log via `journal_halt_resolution`. The live pending-halt set + halt
+    /// receipt lands at Story 4.1's `invoke_halt` mechanism.
+    Halt(HaltArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -145,4 +152,54 @@ pub enum PostureChoice {
     Assistive,
     #[clap(name = "autonomous-with-halt")]
     AutonomousWithHalt,
+}
+
+/// Story 3.3 — halt inspection / resolution.
+#[derive(clap::Args, Debug)]
+pub struct HaltArgs {
+    #[command(subcommand)]
+    pub op: HaltOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum HaltOp {
+    /// List recent halts from the Transparency Log.
+    List {
+        /// Filter to halts emitted by a specific Spirit.
+        #[arg(long)]
+        spirit: Option<String>,
+        /// Maximum number of halts to show (default: 20).
+        #[arg(long, default_value_t = 20)]
+        limit: u32,
+    },
+    /// Resolve a halt by ID with one of three documented kinds.
+    Resolve {
+        /// HaltId returned by `maosctl halt list`.
+        halt_id: String,
+        /// Spirit owning the halt (required — Story 4.1 will derive
+        /// from halt_id, but at 3.3 the operator supplies it).
+        #[arg(long)]
+        spirit: String,
+        /// Resolution kind.
+        #[arg(long, value_enum)]
+        kind: ResolutionKindChoice,
+        /// Required when `--kind provided_context`: the missing context
+        /// to append to Spirit working memory.
+        #[arg(long, required_if_eq("kind", "provided-context"))]
+        text: Option<String>,
+        /// Required when `--kind authorized_override`: operator-policy
+        /// reference authorizing the override.
+        #[arg(long, required_if_eq("kind", "authorized-override"))]
+        operator_policy: Option<String>,
+    },
+}
+
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ResolutionKindChoice {
+    #[clap(name = "provided-context")]
+    ProvidedContext,
+    #[clap(name = "accepted-halt")]
+    AcceptedHalt,
+    #[clap(name = "authorized-override")]
+    AuthorizedOverride,
 }

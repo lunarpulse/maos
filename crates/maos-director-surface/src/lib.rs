@@ -23,3 +23,4 @@
 //! Eligible for promotion at v0.5+ if surface contention justifies extraction.
 
 pub mod notification;
+pub mod halt_ui;

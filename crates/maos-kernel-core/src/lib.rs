@@ -32,3 +32,4 @@ pub mod compliance; // supervised internal — ComplianceClaim structural valida
 pub mod io;         // internal module at v0.1 — I/O Subsystem (§4.4)
 pub mod telemetry;  // internal module at v0.1 — Telemetry Stream (§4.7)
 pub mod inference;  // internal module at v0.1 — Inference Port adapter (Story 1b.4)
+pub mod halt;       // Story 3.3 — HaltResolver trait + resolution journaling (Story 4.1 fills mechanism)

@@ -158,3 +158,13 @@ Coverage gated by NFR-Test-13's `manifest_field_coverage` walker.
 **Reason:** manifest data struct (Story 3.2) — raw deserialization target for
 `EpistemicPolicySection`. Parsed-then-consumed by `validate()`; the validated
 form is stored inside `PostureState`. No kernel persistence of the raw form.
+
+### `MockHaltResolver` — `crates/maos-kernel-core/src/halt/resolver.rs`
+
+**Reason:** test double (Story 3.3) — captures `resolve()` calls in a
+`Mutex<Vec<(HaltId, Resolution)>>` for unit-test assertion. Production
+code never constructs this struct; at v0.3-β the composition root wires
+it as bootstrap scaffolding, but Story 4.1 will swap it for the production
+`KernelHaltResolver` that holds halt-state in an already-I9-exempt location.
+Parallel to the existing `CaptureChannel` exemption at
+`crates/maos-kernel-core/tests/approval_prompt_e2e.rs`.

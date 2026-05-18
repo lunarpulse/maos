@@ -421,6 +421,123 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
 
+        // Story 3.3 AC7 — halt-list: read Transparency Log for recent halt frames.
+        if mode == "halt-list" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let limit: usize = std::env::var("MAOS_HALT_LIMIT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(20);
+            let spirit_filter = std::env::var("MAOS_HALT_SPIRIT").ok();
+
+            let mut filter = FrameFilter {
+                kind: Some(FrameKind::EpistemicHalt),
+                limit: Some(limit),
+                ..Default::default()
+            };
+
+            // If spirit filter specified, resolve to pid (v0.3-β: only hello-spirit → 0)
+            if let Some(ref s) = spirit_filter {
+                if s == "hello-spirit" {
+                    filter.spirit_pid = Some(0);
+                } else {
+                    return Err(format!("unknown spirit '{s}' — only 'hello-spirit' is available at v0.3-β").into());
+                }
+            }
+
+            let entries = transparency_log.query_frames(filter)
+                .map_err(|e| format!("halt-list query failed: {e}"))?;
+
+            for entry in &entries {
+                let id_prefix: String = entry.frame_id.iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<Vec<_>>()
+                    .join("");
+                let id_display: String = id_prefix.chars().take(8).collect();
+                let json_line = match serde_json::to_string(&serde_json::json!({
+                    "frame_id": id_display,
+                    "timestamp_ns": entry.timestamp_ns,
+                    "kind": format!("{:?}", entry.kind),
+                    "intent": entry.intent,
+                })) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("maos: serialization error for frame: {e}");
+                        continue;
+                    }
+                };
+                println!("{json_line}");
+            }
+
+            eprintln!("maos: halt-list — {} halts shown", entries.len());
+            return Ok(());
+        }
+
+        // Story 3.3 AC7 — halt-resolve: write resolution to Approval Decision Log.
+        if mode == "halt-resolve" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let halt_id_str = std::env::var("MAOS_HALT_ID")
+                .map_err(|_| "MAOS_HALT_ID is required for halt-resolve")?;
+            let spirit_id = std::env::var("MAOS_HALT_SPIRIT")
+                .map_err(|_| "MAOS_HALT_SPIRIT is required for halt-resolve")?;
+            let kind_str = std::env::var("MAOS_HALT_KIND")
+                .map_err(|_| "MAOS_HALT_KIND is required for halt-resolve")?;
+
+            // Validate spirit (v0.3-β: only hello-spirit)
+            if spirit_id != "hello-spirit" {
+                return Err(format!("unknown spirit '{spirit_id}' — only 'hello-spirit' is available at v0.3-β").into());
+            }
+
+            let halt_id = maos_domain::halt::HaltId::new(&halt_id_str)
+                .map_err(|e| format!("invalid halt_id: {e}"))?;
+
+            let resolution = match kind_str.as_str() {
+                "provided_context" => {
+                    let text = std::env::var("MAOS_HALT_TEXT")
+                        .map_err(|_| "MAOS_HALT_TEXT is required for provided_context")?;
+                    maos_domain::halt::Resolution::provided_context(&text)
+                        .map_err(|e| format!("invalid resolution: {e}"))?
+                }
+                "accepted_halt" => maos_domain::halt::Resolution::AcceptedHalt,
+                "authorized_override" => {
+                    let policy_ref = std::env::var("MAOS_HALT_OPERATOR_POLICY")
+                        .map_err(|_| "MAOS_HALT_OPERATOR_POLICY is required for authorized_override")?;
+                    maos_domain::halt::Resolution::authorized_override(&policy_ref)
+                        .map_err(|e| format!("invalid resolution: {e}"))?
+                }
+                other => {
+                    return Err(format!(
+                        "unknown halt kind '{other}' — expected provided_context|accepted_halt|authorized_override"
+                    ).into());
+                }
+            };
+
+            // v0.3-β BOOTSTRAP: use MockHaltResolver. Story 4.1 will swap this for
+            // the production KernelHaltResolver that ties into invoke_halt's state.
+            let mock_resolver = Arc::new(maos_kernel_core::halt::MockHaltResolver::new());
+            let halt_flow = maos_director_surface::halt_ui::HaltFlow::new(
+                mock_resolver,
+                Arc::new(dispatcher),
+                Arc::clone(&transparency_log) as Arc<dyn maos_domain::halt::HaltJournal>,
+            );
+
+            halt_flow.submit_resolution(halt_id.clone(), resolution.clone(), &spirit_id)
+                .map_err(|e| format!("halt resolution failed: {e}"))?;
+
+            // Drain: drop senders in order, await audit writer
+            drop(audit_tx);
+            drop(inference);
+            drop(capability);
+            if let Err(e) = audit_writer.await {
+                eprintln!("maos: audit writer task failed during drain: {e}");
+            }
+
+            eprintln!("maos: halt resolved {} ({})", halt_id.as_str(), resolution.kind_label());
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!("maos: unknown MAOS_ONE_SHOT mode '{mode}' — only 'hello-spirit' is supported");
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());

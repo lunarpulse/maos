@@ -38,6 +38,11 @@ pub enum NotificationEvent {
         capability: String,
         reasoning: Option<String>,
     },
+    /// Story 3.3 — halt surfaced to the director for resolution.
+    /// halt_id is read from `payload.halt_id` — single source of truth.
+    Halt {
+        payload: crate::frame::EpistemicHaltPayload,
+    },
 }
 
 /// Maps to architecture §4.3.3's 6-class taxonomy.

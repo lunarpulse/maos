@@ -283,3 +283,17 @@
 # ── Story 3.1 — IacRtMetrics extended (new methods) ──
 "maos_kernel_core::telemetry::iac_rt::IacRtMetrics::inc_pending"   = "data-movement"
 "maos_kernel_core::telemetry::iac_rt::IacRtMetrics::dec_pending"   = "data-movement"
+
+# ── Story 3.3 — Halt mechanism scaffold ──
+"maos_kernel_core::halt::journal_halt_resolution"                      = "supervision"
+"maos_kernel_core::halt::resolver::MockHaltResolver"                   = "supervision"
+"maos_kernel_core::halt::resolver::MockHaltResolver::new"              = "supervision"
+"maos_kernel_core::halt::resolver::MockHaltResolver::calls"            = "supervision"
+"maos_kernel_core::halt::resolver::MockHaltResolver::call_count"       = "supervision"
+"maos_kernel_core::halt::resolver::FailingHaltResolver"                = "supervision"
+"maos_kernel_core::halt::maos_domain::halt::HaltResolver"              = "supervision"
+"maos_kernel_core::halt::maos_domain::halt::ResolveError"             = "supervision"
+
+# ── Story 3.3 — I12 decision-audit logger ──
+"maos_kernel_core::iac::decision_logger::decorate_decision_frame"      = "data-movement"
+"maos_kernel_core::iac::decision_logger::frame_carries_i12_refs"       = "data-movement"

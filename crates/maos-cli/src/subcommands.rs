@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::accessibility::ColorChoice;
-use crate::cli::{AuditFormat, AuditQuery, InstallArgs, PostureArgs, PostureChoice, RunArgs, Subcommand};
+use crate::cli::{AuditFormat, AuditQuery, HaltArgs, HaltOp, InstallArgs, PostureArgs, PostureChoice, ResolutionKindChoice, RunArgs, Subcommand};
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
     match cmd {
@@ -17,6 +17,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Run(args) => run(args, color),
         Subcommand::Audit(args) => audit_dispatch(&args.query, color),
         Subcommand::Posture(args) => dispatch_posture(args, color),
+        Subcommand::Halt(args) => dispatch_halt(args, color),
     }
 }
 
@@ -187,6 +188,88 @@ fn dispatch_posture(args: &PostureArgs, color: ColorChoice) -> ExitCode {
         Err(e) => {
             eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
             ExitCode::from(2)
+        }
+    }
+}
+
+fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
+    match &args.op {
+        HaltOp::List { spirit, limit } => {
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "halt-list");
+            cmd.env("MAOS_HALT_LIMIT", limit.to_string());
+            if let Some(s) = spirit {
+                if let Err(diag) = resolve_spirit_pid(s) {
+                    eprintln!("maosctl: halt list — {diag}");
+                    return ExitCode::from(2);
+                }
+                cmd.env("MAOS_HALT_SPIRIT", s);
+            }
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+            match cmd.status() {
+                Ok(s) if s.success() => ExitCode::SUCCESS,
+                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+                Err(e) => {
+                    eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+                    ExitCode::from(2)
+                }
+            }
+        }
+        HaltOp::Resolve {
+            halt_id,
+            spirit,
+            kind,
+            text,
+            operator_policy,
+        } => {
+            if let Err(diag) = resolve_spirit_pid(spirit) {
+                eprintln!("maosctl: halt resolve — {diag}");
+                return ExitCode::from(2);
+            }
+            // Defensive check (clap's required_if_eq handles most cases)
+            match kind {
+                ResolutionKindChoice::ProvidedContext if text.is_none() => {
+                    eprintln!("maosctl: halt resolve --kind provided-context requires --text");
+                    return ExitCode::from(2);
+                }
+                ResolutionKindChoice::AuthorizedOverride if operator_policy.is_none() => {
+                    eprintln!("maosctl: halt resolve --kind authorized-override requires --operator-policy");
+                    return ExitCode::from(2);
+                }
+                _ => {}
+            }
+
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "halt-resolve");
+            cmd.env("MAOS_HALT_ID", halt_id);
+            cmd.env("MAOS_HALT_SPIRIT", spirit);
+            let kind_str = match kind {
+                ResolutionKindChoice::ProvidedContext => "provided_context",
+                ResolutionKindChoice::AcceptedHalt => "accepted_halt",
+                ResolutionKindChoice::AuthorizedOverride => "authorized_override",
+            };
+            cmd.env("MAOS_HALT_KIND", kind_str);
+            if let Some(t) = text {
+                cmd.env("MAOS_HALT_TEXT", t);
+            }
+            if let Some(op) = operator_policy {
+                cmd.env("MAOS_HALT_OPERATOR_POLICY", op);
+            }
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+            match cmd.status() {
+                Ok(s) if s.success() => ExitCode::SUCCESS,
+                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+                Err(e) => {
+                    eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+                    ExitCode::from(2)
+                }
+            }
         }
     }
 }

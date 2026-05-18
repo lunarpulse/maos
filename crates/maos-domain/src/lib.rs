@@ -18,3 +18,4 @@ pub mod ports;
 pub mod frame;
 pub mod iac_bus_types;
 pub mod notification;
+pub mod halt;

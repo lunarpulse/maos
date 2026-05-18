@@ -17,6 +17,7 @@ pub mod mailbox_stub;
 pub mod frame;
 pub mod channels;
 pub mod mailbox;
+pub mod decision_logger;
 
 pub use maos_domain::ports::IacBusPort;
 
@@ -36,10 +37,11 @@ pub use mailbox::*;
 /// `Arc<TransparencyLogAdapter>` for the I2 log-before-deliver
 /// guarantee.
 #[maos_attrs::i9_exempt(reason = "IAC Bus adapter; holds Arc<Mailbox> + Arc<TransparencyLogAdapter> — both are I9-sanctioned locations")]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct IacBusAdapter {
     mailbox: std::sync::Arc<Mailbox>,
     transparency_log: std::sync::Arc<TransparencyLogAdapter>,
+    digest_provider: std::sync::Arc<dyn Fn(&maos_spirit_abi::identity::SpiritId) -> maos_domain::invariants::i12::WorkingMemoryDigestRefs + Send + Sync>,
 }
 
 impl IacBusAdapter {
@@ -51,7 +53,19 @@ impl IacBusAdapter {
         Self {
             mailbox,
             transparency_log,
+            digest_provider: std::sync::Arc::new(|_| maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()),
         }
+    }
+
+    /// Set the digest provider closure (composition root wiring point).
+    /// Story 4.3 will replace the default empty-refs closure with a
+    /// Memory Manager query.
+    pub fn with_digest_provider<F>(mut self, provider: F) -> Self
+    where
+        F: Fn(&maos_spirit_abi::identity::SpiritId) -> maos_domain::invariants::i12::WorkingMemoryDigestRefs + Send + Sync + 'static,
+    {
+        self.digest_provider = std::sync::Arc::new(provider);
+        self
     }
 
     /// Access the underlying mailbox (for composition root wiring).
@@ -101,6 +115,11 @@ impl IacBusAdapter {
         &self,
         frame: maos_domain::frame::IacFrame,
     ) -> Result<maos_domain::invariants::i2::LogBeforeDeliver<()>, maos_domain::iac_bus_types::IacBusError> {
+        // 0. I12 decorate decision frames BEFORE serialization (Story 3.3 AC5)
+        // so the logged payload already carries working_memory_digest_refs.
+        // digest_provider is injected from the composition root.
+        let frame = decision_logger::decorate_decision_frame(frame, |sid| (self.digest_provider)(sid));
+
         // 1. Serialize payload for log write
         let payload_bytes = serde_json::to_vec(&frame.payload)
             .map_err(|e| maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string()))?;
@@ -160,6 +179,143 @@ impl Default for IacBusAdapter {
             transparency_log: std::sync::Arc::new(
                 TransparencyLogAdapter::open_in_memory(0),
             ),
+            digest_provider: std::sync::Arc::new(|_| maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod decision_audit_tests {
+    use super::*;
+    use std::sync::Arc;
+    use maos_domain::frame::{
+        DecisionDispatchPayload, FrameAddress, FramePayload, IacFrame,
+        TaskAssignPayload, PosturePreferences,
+    };
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i12::WorkingMemoryDigestRefs;
+    use maos_spirit_abi::identity::{FrameKind as DomainFrameKind, SpiritId};
+    use smallvec::smallvec;
+
+    fn make_decision_frame(decision_id: u64) -> IacFrame {
+        IacFrame {
+            frame_id: [0u8; 16],
+            timestamp_ns: decision_id,
+            logical_clock: decision_id,
+            from: FrameAddress {
+                spirit_id: SpiritId::from(format!("spirit-{decision_id}")),
+                host_id: None,
+                role: None,
+            },
+            to: smallvec![],
+            kind: DomainFrameKind::DecisionDispatch,
+            intent: IntentClass::Standard,
+            payload: FramePayload::DecisionDispatch(DecisionDispatchPayload {
+                decision_id,
+                approved: true,
+                working_memory_digest_refs: WorkingMemoryDigestRefs::default(),
+            }),
+            auto_marker: FrameOrigin::HumanAuthored,
+            consent_envelope: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn i12_10_decision_frames_100_percent_carry_refs() {
+        let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(
+            crate::telemetry::iac_rt::IacRtMetrics::new(),
+        )));
+        let adapter = IacBusAdapter::new(mailbox, log.clone());
+
+        // Register a target spirit so deliver_typed can route
+        adapter.register_spirit_typed(&SpiritId::from("target")).ok();
+
+        // Construct and deliver 10 decision frames
+        for id in 0..10 {
+            let frame = make_decision_frame(id as u64);
+            let _ = adapter.deliver_typed(frame).await;
+        }
+
+        // Query the Transparency Log for decision-dispatch frames
+        let entries = log
+            .query_frames(FrameFilter {
+                kind: Some(FrameKind::DecisionDispatch),
+                ..Default::default()
+            })
+            .unwrap();
+
+        assert_eq!(entries.len(), 10, "expected 10 decision frames in transparency log");
+
+        // Deserialize each logged payload (FramePayload tagged enum) and verify refs
+        for (i, entry) in entries.iter().enumerate() {
+            let payload: FramePayload = serde_json::from_slice(&entry.payload_redacted)
+                .unwrap_or_else(|e| panic!("frame {} deserialization failed: {e}", i));
+            match payload {
+                FramePayload::DecisionDispatch(p) => {
+                    assert!(
+                        p.working_memory_digest_refs.as_slice().is_empty(),
+                        "frame {}: at v0.3-β refs should be empty; structural presence satisfied",
+                        i
+                    );
+                    assert_eq!(p.decision_id, i as u64);
+                }
+                _ => panic!("frame {}: expected DecisionDispatch, got other payload", i),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn i12_non_decision_frames_not_decorated() {
+        let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(
+            crate::telemetry::iac_rt::IacRtMetrics::new(),
+        )));
+        let adapter = IacBusAdapter::new(mailbox, log.clone());
+
+        adapter.register_spirit_typed(&SpiritId::from("target")).ok();
+
+        let task_frame = IacFrame {
+            frame_id: [1u8; 16],
+            timestamp_ns: 1,
+            logical_clock: 1,
+            from: FrameAddress {
+                spirit_id: SpiritId::from("sender"),
+                host_id: None,
+                role: None,
+            },
+            to: smallvec![],
+            kind: DomainFrameKind::TaskAssign,
+            intent: IntentClass::Standard,
+            payload: FramePayload::TaskAssign(TaskAssignPayload {
+                goal: "test task".into(),
+                scope: vec![],
+                success_criteria: "done".into(),
+                posture_preferences: PosturePreferences::default(),
+            }),
+            auto_marker: FrameOrigin::HumanAuthored,
+            consent_envelope: None,
+        };
+
+        let _ = adapter.deliver_typed(task_frame).await;
+
+        let entries = log
+            .query_frames(FrameFilter {
+                kind: Some(FrameKind::TaskAssign),
+                ..Default::default()
+            })
+            .unwrap();
+
+        assert_eq!(entries.len(), 1, "expected 1 task-assign frame");
+
+        let payload: FramePayload = serde_json::from_slice(&entries[0].payload_redacted).unwrap();
+        match payload {
+            FramePayload::TaskAssign(_) => {
+                // TaskAssign payload should NOT have working_memory_digest_refs
+                // (the decorator only attaches to DecisionDispatch frames)
+            }
+            other => panic!("expected TaskAssign, got {:?}", std::mem::discriminant(&other)),
         }
     }
 }

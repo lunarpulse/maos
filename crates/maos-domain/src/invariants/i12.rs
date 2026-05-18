@@ -43,6 +43,12 @@ impl WorkingMemoryDigestRefs {
     }
 }
 
+impl Default for WorkingMemoryDigestRefs {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

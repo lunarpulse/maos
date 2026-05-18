@@ -129,17 +129,95 @@ pub struct TaskCompletePayload {
     pub result: String,
 }
 
-/// TODO(Story 3.3): `working_memory_digest_refs` (I12) field filled.
+/// Story 3.3 — FR18 + NFR-Aud-5 right-to-explanation.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct DecisionDispatchPayload {
     pub decision_id: u64,
     pub approved: bool,
+    /// I12 — `working_memory_digest_refs` populated by the kernel-side
+    /// decision logger (`crates/maos-kernel-core/src/iac/decision_logger.rs`)
+    /// BEFORE the frame is enqueued onto the Mailbox.
+    /// Pre-3.3 wire payloads default to the empty refs set.
+    #[serde(default)]
+    pub working_memory_digest_refs: crate::invariants::i12::WorkingMemoryDigestRefs,
 }
 
-/// TODO(Story 3.3): shape pinned by Story 3.3.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// Story 3.3 — structured halt payload per architecture §4.6.1.
+///
+/// Pre-3.3 wire payloads carrying only `halt_id` deserialize with
+/// the new fields defaulted (per `#[serde(default)]`), preserving
+/// Story 3.1's additive-only contract.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EpistemicHaltPayload {
     pub halt_id: String,
+    /// The `[epistemic_policy]` tag that fired (e.g.
+    /// `"claim.security_vulnerability"`). Cross-references the
+    /// `EpistemicPolicyRule.tag` parsed in Story 3.2 AC1.
+    #[serde(default)]
+    pub tag: String,
+    /// The observed scalar value the predicate compared against.
+    /// f32 to match Story 4.2's `working_memory.set_scalar` shape.
+    /// `PartialEq` derived — bit-equal comparison; NaN payloads are
+    /// rejected at construction by `HaltPayload::new`.
+    #[serde(default)]
+    pub value: f32,
+    /// The configured threshold from `on_confidence_below`
+    /// (or `None` when the rule fired on `on_evidence_conflict`).
+    #[serde(default)]
+    pub threshold: Option<f32>,
+    /// Stable identifier of the rule that fired — Spirit-supplied
+    /// (mirrors `EpistemicPolicyRule.tag` namespacing).
+    #[serde(default)]
+    pub policy_id: String,
+    /// Provenance chain — the `derived_from` Spirit-supplied marker
+    /// passed to `working_memory.set_scalar`. Free-form string at v0.3;
+    /// Story 4.4 (`log.recall` + I11 chain) wires the typed lineage.
+    #[serde(default)]
+    pub derived_from: String,
+}
+
+impl EpistemicHaltPayload {
+    /// Construct a structured payload — rejects `f32::NAN` for `value`
+    /// or `threshold` so resolved halts cannot poison the audit log
+    /// with non-comparable scalars.
+    pub fn new(
+        halt_id: String,
+        tag: String,
+        value: f32,
+        threshold: Option<f32>,
+        policy_id: String,
+        derived_from: String,
+    ) -> Result<Self, HaltPayloadError> {
+        if halt_id.is_empty() {
+            return Err(HaltPayloadError::EmptyHaltId);
+        }
+        if value.is_nan() {
+            return Err(HaltPayloadError::NanValue);
+        }
+        if let Some(t) = threshold {
+            if t.is_nan() {
+                return Err(HaltPayloadError::NanThreshold);
+            }
+        }
+        Ok(Self {
+            halt_id,
+            tag,
+            value,
+            threshold,
+            policy_id,
+            derived_from,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum HaltPayloadError {
+    #[error("halt payload value is NaN; predicate scalars must be comparable")]
+    NanValue,
+    #[error("halt payload threshold is NaN; predicate thresholds must be comparable")]
+    NanThreshold,
+    #[error("halt_id must be non-empty")]
+    EmptyHaltId,
 }
 
 /// TODO(NFR-Obs-3 v0.3): shape pinned by NFR-Obs-3.
@@ -172,6 +250,7 @@ pub struct ConsentEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::invariants::i12::WorkingMemoryDigestRefs;
     use smallvec::smallvec;
 
     fn make_address() -> FrameAddress {
@@ -309,6 +388,7 @@ mod tests {
         let payload = FramePayload::DecisionDispatch(DecisionDispatchPayload {
             decision_id: 42,
             approved: true,
+            working_memory_digest_refs: WorkingMemoryDigestRefs::default(),
         });
         let mut frame = make_frame(payload);
         frame.kind = FrameKind::DecisionDispatch;
@@ -325,17 +405,69 @@ mod tests {
 
     #[test]
     fn iac_frame_epistemic_halt_serde_round_trip() {
-        let payload = FramePayload::EpistemicHalt(EpistemicHaltPayload {
-            halt_id: "halt-001".into(),
-        });
+        let payload = FramePayload::EpistemicHalt(EpistemicHaltPayload::new(
+            "halt-001".into(),
+            "claim.security".into(),
+            0.3,
+            Some(0.5),
+            "pol-1".into(),
+            "derived".into(),
+        ).unwrap());
         let mut frame = make_frame(payload);
         frame.kind = FrameKind::EpistemicHalt;
         let json = serde_json::to_string(&frame).unwrap();
         let back: IacFrame = serde_json::from_str(&json).unwrap();
         match back.payload {
-            FramePayload::EpistemicHalt(p) => assert_eq!(p.halt_id, "halt-001"),
+            FramePayload::EpistemicHalt(p) => {
+                assert_eq!(p.halt_id, "halt-001");
+                assert_eq!(p.tag, "claim.security");
+                assert_eq!(p.value, 0.3);
+                assert_eq!(p.threshold, Some(0.5));
+                assert_eq!(p.policy_id, "pol-1");
+                assert_eq!(p.derived_from, "derived");
+            }
             _ => panic!("expected EpistemicHalt"),
         }
+    }
+
+    #[test]
+    fn epistemic_halt_payload_rejects_nan_value() {
+        let result = EpistemicHaltPayload::new(
+            "h".into(), "t".into(), f32::NAN, None, "p".into(), "d".into(),
+        );
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), HaltPayloadError::NanValue));
+    }
+
+    #[test]
+    fn epistemic_halt_payload_rejects_nan_threshold() {
+        let result = EpistemicHaltPayload::new(
+            "h".into(), "t".into(), 0.0, Some(f32::NAN), "p".into(), "d".into(),
+        );
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), HaltPayloadError::NanThreshold));
+    }
+
+    #[test]
+    fn epistemic_halt_payload_rejects_empty_halt_id() {
+        let result = EpistemicHaltPayload::new(
+            "".into(), "t".into(), 0.0, None, "p".into(), "d".into(),
+        );
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), HaltPayloadError::EmptyHaltId));
+    }
+
+    #[test]
+    fn epistemic_halt_payload_3_1_shape_backward_compat() {
+        // A 3.1-era payload with only halt_id deserializes with new fields defaulted.
+        let json = r#"{"halt_id":"x"}"#;
+        let payload: EpistemicHaltPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.halt_id, "x");
+        assert_eq!(payload.tag, "");
+        assert_eq!(payload.value, 0.0);
+        assert_eq!(payload.threshold, None);
+        assert_eq!(payload.policy_id, "");
+        assert_eq!(payload.derived_from, "");
     }
 
     #[test]
@@ -370,6 +502,31 @@ mod tests {
             FramePayload::ConsentRequest(p) => assert_eq!(p.capability, "fs.write"),
             _ => panic!("expected ConsentRequest"),
         }
+    }
+
+    #[test]
+    fn decision_dispatch_3_1_shape_backward_compat() {
+        // A 3.1-era payload with only decision_id + approved deserializes
+        // with working_memory_digest_refs defaulted to empty.
+        let json = r#"{"decision_id":42,"approved":true}"#;
+        let payload: DecisionDispatchPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.decision_id, 42);
+        assert!(payload.approved);
+        assert!(payload.working_memory_digest_refs.as_slice().is_empty());
+    }
+
+    #[test]
+    fn decision_dispatch_3_3_shape_round_trip() {
+        let payload = DecisionDispatchPayload {
+            decision_id: 99,
+            approved: false,
+            working_memory_digest_refs: WorkingMemoryDigestRefs::new(vec!["f1".into(), "f2".into()]),
+        };
+        let json = serde_json::to_string(&payload).unwrap();
+        let back: DecisionDispatchPayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.decision_id, 99);
+        assert!(!back.approved);
+        assert_eq!(back.working_memory_digest_refs.as_slice(), &["f1", "f2"]);
     }
 
     #[test]

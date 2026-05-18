@@ -177,6 +177,30 @@ impl NotificationChannel for TerminalChannel {
                     );
                 }
             }
+            NotificationEvent::Halt { payload } => {
+                let id_prefix: String = payload.halt_id.chars().take(8).collect();
+                if self.use_color {
+                    let _ = writeln!(
+                        w,
+                        "\x1b[1;31m[maos]\x1b[0m Halt {} tag={} value={} threshold={} policy={}",
+                        id_prefix,
+                        payload.tag,
+                        payload.value,
+                        payload.threshold.map(|t| t.to_string()).unwrap_or_else(|| "none".into()),
+                        payload.policy_id,
+                    );
+                } else {
+                    let _ = writeln!(
+                        w,
+                        "[maos] Halt {} tag={} value={} threshold={} policy={}",
+                        id_prefix,
+                        payload.tag,
+                        payload.value,
+                        payload.threshold.map(|t| t.to_string()).unwrap_or_else(|| "none".into()),
+                        payload.policy_id,
+                    );
+                }
+            }
             _ => {
                 let _ = writeln!(w, "[maos] Unknown notification event (future story)");
             }
@@ -315,6 +339,52 @@ mod tests {
 
         let out = captured_output(&w);
         assert!(out.contains("err-isolation"));
+    }
+
+    #[test]
+    fn terminal_channel_renders_halt_event() {
+        let w = capture_writer();
+        let ch = TerminalChannel::new(w.clone()).with_color(false);
+        let payload = maos_domain::frame::EpistemicHaltPayload::new(
+            "halt-abc123".into(),
+            "claim.security".into(),
+            0.42,
+            Some(0.75),
+            "pol-1".into(),
+            "derived_from_x".into(),
+        )
+        .unwrap();
+        let event = NotificationEvent::Halt {
+            payload,
+        };
+        ch.dispatch(&event, NotificationLevel::Immediate).unwrap();
+        let out = captured_output(&w);
+        assert!(out.contains("halt-abc"));
+        assert!(out.contains("tag=claim.security"));
+        assert!(out.contains("value=0.42"));
+        assert!(out.contains("threshold=0.75"));
+        assert!(out.contains("policy=pol-1"));
+    }
+
+    #[test]
+    fn terminal_channel_halt_event_emits_zero_ansi_under_no_color() {
+        let w = capture_writer();
+        let ch = TerminalChannel::new(w.clone()).with_color(false);
+        let payload = maos_domain::frame::EpistemicHaltPayload::new(
+            "halt-001".into(),
+            "t".into(),
+            0.0,
+            None,
+            "p".into(),
+            "d".into(),
+        )
+        .unwrap();
+        let event = NotificationEvent::Halt {
+            payload,
+        };
+        ch.dispatch(&event, NotificationLevel::Immediate).unwrap();
+        let out = captured_output(&w);
+        assert!(!out.contains('\x1b'));
     }
 
     /// Architecture §4.3.3 specifies exactly six approval classes in
