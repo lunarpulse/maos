@@ -1,4 +1,4 @@
-last_updated: '2026-05-18'  # Story 3-4 review complete → done
+last_updated: '2026-05-18'  # Epic 3 retrospective complete → done
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -42,12 +42,16 @@ development_status:
   # stories are tracked independently (same pattern as 1a-5 and 1b-6).
   # Blocks Story 3.1. File: 2-5-epic-3-prep-iac-addendum-d11-drain.md.
   2-5-epic-3-prep-iac-addendum-d11-drain: done
-  epic-3: in-progress
+  epic-3: done
   3-1-route-task-assign-frames-over-the-iac-bus-with-notification-surface-dispatch: done
   3-2-manage-director-posture-with-a-halt-policy-schema-and-bounded-shift-propagation: done
   3-3-directors-halt-resolution-ux-decision-audit-i12: done
   3-4-buffer-orchestrator-instructions-and-honor-director-pause-resume-revoke-p99-2s: done
-  epic-3-retrospective: optional
+  # Retro at _bmad-output/implementation-artifacts/epic-3-retro-2026-05-18.md.
+  # Action items A1/A2/A3/A5/A6 land inside Story 4.1 spec (no bridge story
+  # required). A4 = bmad-create-story template amendment. A7 = opportunistic
+  # benchmark. epic_update_required: false — Epic 4 plan stands.
+  epic-3-retrospective: done
   epic-4: backlog
   4-1-halt-protocol-mechanism-three-resolution-kinds-halt-receipt-99-9-single-halt-owner: backlog
   4-2-implement-the-tagged-scalar-slot-with-four-universal-arithmetic-predicates: backlog
