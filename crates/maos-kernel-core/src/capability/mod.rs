@@ -232,6 +232,13 @@ impl CapabilityRegistryPort for CapabilityRegistryAdapter {
     }
 }
 
+impl CapabilityRegistryAdapter {
+    #[cfg(any(test, feature = "test-introspection"))]
+    pub fn list_active_tokens(&self) -> Vec<TokenId> {
+        self.tokens.list_active()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

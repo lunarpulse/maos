@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::accessibility::ColorChoice;
-use crate::cli::{AuditFormat, AuditQuery, HaltArgs, HaltOp, InstallArgs, PostureArgs, PostureChoice, ResolutionKindChoice, RunArgs, Subcommand};
+use crate::cli::{AuditFormat, AuditQuery, HaltArgs, HaltOp, InstallArgs, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs, RevokeTokenArgs, RunArgs, Subcommand};
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
     match cmd {
@@ -18,6 +18,10 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Audit(args) => audit_dispatch(&args.query, color),
         Subcommand::Posture(args) => dispatch_posture(args, color),
         Subcommand::Halt(args) => dispatch_halt(args, color),
+        Subcommand::Orchestrator(args) => dispatch_orchestrator(args, color),
+        Subcommand::Pause(args) => dispatch_pause(args, color),
+        Subcommand::Resume(args) => dispatch_resume(args, color),
+        Subcommand::RevokeToken(args) => dispatch_revoke_token(args, color),
     }
 }
 
@@ -270,6 +274,143 @@ fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
                     ExitCode::from(2)
                 }
             }
+        }
+    }
+}
+
+fn dispatch_pause(args: &PauseArgs, color: ColorChoice) -> ExitCode {
+    if let Err(diag) = resolve_spirit_pid(&args.spirit) {
+        eprintln!("maosctl: pause — {diag}");
+        return ExitCode::from(2);
+    }
+
+    let bin = maos_bin_path();
+    let mut cmd = std::process::Command::new(&bin);
+    cmd.env("MAOS_ONE_SHOT", "pause");
+    cmd.env("MAOS_SPIRIT_ID", &args.spirit);
+
+    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+        cmd.env("NO_COLOR", "1");
+    }
+
+    match cmd.status() {
+        Ok(s) if s.success() => ExitCode::SUCCESS,
+        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+        Err(e) => {
+            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn dispatch_resume(args: &ResumeArgs, color: ColorChoice) -> ExitCode {
+    if let Err(diag) = resolve_spirit_pid(&args.spirit) {
+        eprintln!("maosctl: resume — {diag}");
+        return ExitCode::from(2);
+    }
+
+    let bin = maos_bin_path();
+    let mut cmd = std::process::Command::new(&bin);
+    cmd.env("MAOS_ONE_SHOT", "resume");
+    cmd.env("MAOS_SPIRIT_ID", &args.spirit);
+
+    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+        cmd.env("NO_COLOR", "1");
+    }
+
+    match cmd.status() {
+        Ok(s) if s.success() => ExitCode::SUCCESS,
+        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+        Err(e) => {
+            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCode {
+    match &args.op {
+        OrchestratorOp::Queue { spirit, instruction } => {
+            if let Err(diag) = resolve_spirit_pid(spirit) {
+                eprintln!("maosctl: orchestrator queue — {diag}");
+                return ExitCode::from(2);
+            }
+            if instruction.trim().is_empty() {
+                eprintln!("maosctl: orchestrator queue — instruction must be non-empty");
+                return ExitCode::from(2);
+            }
+
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "orchestrator-queue");
+            cmd.env("MAOS_ORCHESTRATOR_SPIRIT", spirit);
+            cmd.env("MAOS_ORCHESTRATOR_INSTRUCTION", instruction);
+
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+
+            match cmd.status() {
+                Ok(s) if s.success() => ExitCode::SUCCESS,
+                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+                Err(e) => {
+                    eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+                    ExitCode::from(2)
+                }
+            }
+        }
+        OrchestratorOp::Status { spirit } => {
+            if let Err(diag) = resolve_spirit_pid(spirit) {
+                eprintln!("maosctl: orchestrator status — {diag}");
+                return ExitCode::from(2);
+            }
+
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "orchestrator-status");
+            cmd.env("MAOS_ORCHESTRATOR_SPIRIT", spirit);
+
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+
+            match cmd.status() {
+                Ok(s) if s.success() => ExitCode::SUCCESS,
+                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+                Err(e) => {
+                    eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+                    ExitCode::from(2)
+                }
+            }
+        }
+    }
+}
+
+fn dispatch_revoke_token(args: &RevokeTokenArgs, color: ColorChoice) -> ExitCode {
+    // Validate hex format BEFORE shelling out
+    if args.token_id.len() != 32 || !args.token_id.chars().all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c)) {
+        eprintln!("maosctl: revoke-token — invalid token_id '{}' (expected 32-char lowercase hex)", args.token_id);
+        return ExitCode::from(2);
+    }
+
+    let bin = maos_bin_path();
+    let mut cmd = std::process::Command::new(&bin);
+    cmd.env("MAOS_ONE_SHOT", "revoke-token");
+    cmd.env("MAOS_REVOKE_TOKEN_ID", &args.token_id);
+    if let Some(ref reason) = args.reason {
+        cmd.env("MAOS_REVOKE_REASON", reason);
+    }
+
+    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+        cmd.env("NO_COLOR", "1");
+    }
+
+    match cmd.status() {
+        Ok(s) if s.success() => ExitCode::SUCCESS,
+        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+        Err(e) => {
+            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+            ExitCode::from(2)
         }
     }
 }

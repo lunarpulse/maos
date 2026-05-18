@@ -168,3 +168,19 @@ it as bootstrap scaffolding, but Story 4.1 will swap it for the production
 `KernelHaltResolver` that holds halt-state in an already-I9-exempt location.
 Parallel to the existing `CaptureChannel` exemption at
 `crates/maos-kernel-core/tests/approval_prompt_e2e.rs`.
+
+### `OrchestratorBuffer` — `crates/maos-kernel-core/src/orchestrator/buffer.rs`
+
+**Reason:** orchestrator instruction buffer (Story 3.4) — transient per-process
+`Mutex<VecDeque<OrchestratorInstruction>>` for the FR20 checkpoint/resume primitive.
+Bounded by a fixed capacity floor of 32 instructions per Spirit. Transient per-process
+state dropped on restart; parallel to the Mailbox's routing state
+(`DashMap<(String, FrameKind), mpsc::Sender<IacFrame>>`). No cross-Host replication,
+no structural inference — raw FIFO forwarding.
+
+### `OrchestratorBufferRegistry` — `crates/maos-kernel-core/src/orchestrator/registry.rs`
+
+**Reason:** orchestrator per-Spirit registry (Story 3.4) — `DashMap<String, Arc<OrchestratorBuffer>>`
+mapping Spirit names to their bounded instruction buffers. Transient per-process state;
+parallel to `Mailbox::mpsc_senders` registration. Bounded by active Orchestrator-class
+Spirit count; no persistence across restarts.

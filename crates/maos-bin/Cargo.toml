@@ -17,6 +17,7 @@ maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-providers = { path = "../maos-providers" }
+maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
 tokio-util = { version = "0.7", features = ["rt"] }

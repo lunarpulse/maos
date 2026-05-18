@@ -928,6 +928,7 @@ dependencies = [
  "maos-domain",
  "maos-kernel-core",
  "maos-providers",
+ "maos-spirit-abi",
  "maos-spirit-hello",
  "serde_json",
  "tokio",

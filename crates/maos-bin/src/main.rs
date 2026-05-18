@@ -35,6 +35,9 @@ use tokio_util::sync::CancellationToken;
 
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i1::Scope;
+use maos_domain::ports::CapabilityRegistryPort;
+use maos_domain::orchestrator::OrchestratorInstruction;
+use maos_domain::orchestrator::OrchestratorInstructionId;
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_kernel_core::api::{
     CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter,
@@ -137,6 +140,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         quota,
     ));
     eprintln!("maos: capability registry initialized (Story 1b.2)");
+
+    // Story 3.4 — Orchestrator buffer registry (shared Arc for one-shot arms).
+    let orchestrator_registry = Arc::new(
+        maos_kernel_core::orchestrator::OrchestratorBufferRegistry::new(),
+    );
+    eprintln!("maos: orchestrator buffer registry initialized (Story 3.4)");
 
     // Transparency Log — shared across services (Story 1b.1).
     //
@@ -538,6 +547,215 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
 
+        // Story 3.4 AC2 — orchestrator-queue: enqueue an instruction
+        // onto the per-Spirit Orchestrator buffer.
+        if mode == "orchestrator-queue" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let spirit_id = std::env::var("MAOS_ORCHESTRATOR_SPIRIT")
+                .map_err(|_| "MAOS_ORCHESTRATOR_SPIRIT is required for orchestrator-queue")?;
+            let instruction_text = std::env::var("MAOS_ORCHESTRATOR_INSTRUCTION")
+                .map_err(|_| "MAOS_ORCHESTRATOR_INSTRUCTION is required for orchestrator-queue")?;
+
+            // Validate spirit (v0.3-β: only hello-spirit)
+            if spirit_id != "hello-spirit" {
+                return Err(format!(
+                    "unknown spirit '{spirit_id}' — only 'hello-spirit' is available at v0.3-β"
+                ).into());
+            }
+
+            // Mint a per-process monotonic instruction ID
+            static INSTRUCTION_COUNTER: std::sync::atomic::AtomicU64 =
+                std::sync::atomic::AtomicU64::new(1);
+            let id = OrchestratorInstructionId(
+                INSTRUCTION_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            );
+            let instruction = OrchestratorInstruction::new(
+                id,
+                &instruction_text,
+                maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+            )
+            .map_err(|e| format!("invalid orchestrator instruction: {e}"))?;
+
+            // Get-or-create the per-Spirit buffer
+            let buffer = orchestrator_registry.get_or_create(&maos_spirit_abi::identity::SpiritId::from(spirit_id.as_str()));
+            buffer.enqueue(instruction.clone())
+                .map_err(|e| format!("orchestrator queue error: {e}"))?;
+
+            // Journal to Approval Decision Log
+            maos_kernel_core::orchestrator::journal_orchestrator_queue(
+                &transparency_log,
+                "director",
+                &spirit_id,
+                &instruction,
+            )
+            .map_err(|e| format!("approval log write failed: {e}"))?;
+
+            // Drain
+            drop(audit_tx);
+            drop(inference);
+            drop(capability);
+            if let Err(e) = audit_writer.await {
+                eprintln!("maos: audit writer task failed during drain: {e}");
+            }
+
+            eprintln!(
+                "maos: queued orchestrator instruction id={} for {}",
+                instruction.id.0,
+                spirit_id,
+            );
+            return Ok(());
+        }
+
+        // Story 3.4 AC2 — orchestrator-status: show pending count for a Spirit.
+        if mode == "orchestrator-status" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let spirit_id = std::env::var("MAOS_ORCHESTRATOR_SPIRIT")
+                .map_err(|_| "MAOS_ORCHESTRATOR_SPIRIT is required for orchestrator-status")?;
+
+            // Validate spirit (v0.3-β: only hello-spirit)
+            if spirit_id != "hello-spirit" {
+                return Err(format!(
+                    "unknown spirit '{spirit_id}' — only 'hello-spirit' is available at v0.3-β"
+                ).into());
+            }
+
+            let sid = maos_spirit_abi::identity::SpiritId::from(spirit_id.as_str());
+            let (count, capacity) = match orchestrator_registry.get(&sid) {
+                Some(buf) => (buf.pending_count(), buf.capacity()),
+                None => (0, 32),
+            };
+
+            eprintln!(
+                "maos: orchestrator status {spirit_id}: {count}/{capacity} pending instructions"
+            );
+
+            // No drain needed — read-only path, no audit rows written.
+            return Ok(());
+        }
+
+        // Story 3.4 AC3 — pause: write Lifecycle Journal entry + Approval Decision row.
+        if mode == "pause" || mode == "resume" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let spirit_id = std::env::var("MAOS_SPIRIT_ID")
+                .map_err(|_| format!("MAOS_SPIRIT_ID is required for {mode}"))?;
+            if spirit_id != "hello-spirit" {
+                return Err(format!(
+                    "unknown spirit '{spirit_id}' — only 'hello-spirit' is available at v0.3-β"
+                ).into());
+            }
+
+            // 1. Write Lifecycle Journal entry (Pause or Resume)
+            let event = if mode == "pause" {
+                maos_domain::invariants::i10::LifecycleEvent::Pause
+            } else {
+                maos_domain::invariants::i10::LifecycleEvent::Resume
+            };
+            let journal_path = maos_audit::default_journal_path();
+            if let Some(parent) = journal_path.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("journal parent create failed: {e}"))?;
+            }
+            let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+                .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
+            journal.append_transition(maos_domain::invariants::i10::JournalEntry {
+                timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+                lifecycle_event: event,
+                spirit_id: spirit_id.clone(),
+                effective_sandbox_tier: None,
+            });
+            drop(journal);
+
+            // 2. Journal to Approval Decision Log (director-action audit, FR42)
+            maos_kernel_core::orchestrator::journal_director_lifecycle_action(
+                &transparency_log,
+                "director",
+                &spirit_id,
+                mode.as_str(),
+            )
+            .map_err(|e| format!("approval log write failed: {e}"))?;
+
+            // 3. FR51 c — on resume, recall buffered Orchestrator instructions
+            if mode == "resume" {
+                let sid = maos_spirit_abi::identity::SpiritId::from(spirit_id.as_str());
+                if let Some(buffer) = orchestrator_registry.get(&sid) {
+                    let pending = buffer.recall_all_pending();
+                    eprintln!(
+                        "maos: resume {spirit_id} — recalled {} pending Orchestrator instructions",
+                        pending.len()
+                    );
+                    for instr in pending {
+                        if let Err(e) = buffer.enqueue(instr) {
+                            eprintln!("maos: resume re-enqueue failed: {e}");
+                        }
+                    }
+                }
+            }
+
+            // 4. Drain
+            drop(audit_tx);
+            drop(inference);
+            drop(capability);
+            if let Err(e) = audit_writer.await {
+                eprintln!("maos: audit writer task failed during drain: {e}");
+            }
+
+            eprintln!(
+                "maos: {mode} {spirit_id} (journal: {})",
+                journal_path.display()
+            );
+            return Ok(());
+        }
+
+        // Story 3.4 AC4 — revoke-token: revoke a capability token via the
+        // existing CapabilityRegistryAdapter::revoke path, then journal.
+        if mode == "revoke-token" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let token_id_hex = std::env::var("MAOS_REVOKE_TOKEN_ID")
+                .map_err(|_| "MAOS_REVOKE_TOKEN_ID is required for revoke-token")?;
+            let reason_text = std::env::var("MAOS_REVOKE_REASON").ok();
+
+            // Parse 32-char hex into [u8; 16]
+            let token_bytes = parse_token_id_hex(&token_id_hex)
+                .map_err(|e| format!("invalid token_id '{token_id_hex}': {e}"))?;
+            let token_id = maos_domain::invariants::i1::TokenId(token_bytes);
+
+            // Revoke through the canonical CapabilityRegistryAdapter::revoke path.
+            match capability.revoke(token_id) {
+                Ok(()) => {}
+                Err(maos_domain::ports::capability::CapError::UnknownToken) => {
+                    return Err(format!(
+                        "token {token_id_hex} not found (already revoked or never issued)"
+                    ).into());
+                }
+                Err(e) => {
+                    return Err(format!("revoke failed: {e}").into());
+                }
+            }
+
+            // Journal to Approval Decision Log per FR42 (director identity + reason).
+            maos_kernel_core::orchestrator::journal_token_revocation(
+                &transparency_log,
+                "director",
+                &token_id_hex,
+                reason_text.as_deref(),
+            )
+            .map_err(|e| format!("approval log write failed: {e}"))?;
+
+            drop(audit_tx);
+            drop(inference);
+            drop(capability);
+            if let Err(e) = audit_writer.await {
+                eprintln!("maos: audit writer task failed during drain: {e}");
+            }
+
+            eprintln!("maos: revoked token {token_id_hex}");
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!("maos: unknown MAOS_ONE_SHOT mode '{mode}' — only 'hello-spirit' is supported");
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
@@ -652,6 +870,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             IntentClass::Standard,
         ).map_err(|e| format!("failed to issue capability token: {e}"))?;
 
+        // Print token_id for downstream test observability (Story 3.4 AC4).
+        let token_id_hex: String = token.token_id.0.iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        eprintln!("maos: issued token {token_id_hex}");
         eprintln!("maos: one-shot mode — executing hello-Spirit");
 
         // Call hello-Spirit (sync call on async runtime — fine for one-shot)
@@ -733,6 +956,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     eprintln!("maos: drained {cap_audit_rows} cap-audit row(s); exiting cleanly");
     Ok(())
+}
+
+/// Parse a 32-char lowercase hex string into a 16-byte TokenId.
+/// Rejects invalid lengths and non-hex characters.
+fn parse_token_id_hex(s: &str) -> Result<[u8; 16], String> {
+    if s.len() != 32 {
+        return Err(format!("expected 32 hex chars, got {}", s.len()));
+    }
+    if !s.chars().all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c)) {
+        return Err("non-hex characters in token_id".into());
+    }
+    let mut bytes = [0u8; 16];
+    for i in 0..16 {
+        let byte_str = &s[i * 2..i * 2 + 2];
+        bytes[i] = u8::from_str_radix(byte_str, 16)
+            .map_err(|e| format!("hex decode error at byte {i}: {e}"))?;
+    }
+    Ok(bytes)
 }
 
 #[cfg(unix)]

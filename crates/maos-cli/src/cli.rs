@@ -67,6 +67,26 @@ pub enum Subcommand {
     /// Log via `journal_halt_resolution`. The live pending-halt set + halt
     /// receipt lands at Story 4.1's `invoke_halt` mechanism.
     Halt(HaltArgs),
+    /// Inspect or enqueue Orchestrator instructions (Story 3.4).
+    ///
+    /// At v0.3-β `status` reads the per-Spirit `OrchestratorBuffer` for
+    /// pending counts; `queue` enqueues a natural-language instruction.
+    /// The Orchestrator-class Spirit (Story 8.4 founder-loop) consumes
+    /// queued instructions at safe sequence points between task completions
+    /// via `OrchestratorBuffer::dequeue_at_safe_point`.
+    Orchestrator(OrchestratorArgs),
+    /// Pause a Spirit — interrupts in-flight autonomous actions, preserves
+    /// state across pause/resume, recalls Orchestrator-buffered actions on
+    /// resume (Story 3.4). P99 ≤2s interruption (FR51 a).
+    Pause(PauseArgs),
+    /// Resume a paused Spirit — restores from preserved state, replays
+    /// Orchestrator-buffered pending actions per FR20 (Story 3.4, FR51 c).
+    Resume(ResumeArgs),
+    /// Revoke a capability token — in-flight operations using the token
+    /// fail-safe with bounded time (Story 3.4, FR51 d). Revocation is
+    /// journaled to the Approval Decision Log with director identity +
+    /// reason per FR42.
+    RevokeToken(RevokeTokenArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -202,4 +222,56 @@ pub enum ResolutionKindChoice {
     AcceptedHalt,
     #[clap(name = "authorized-override")]
     AuthorizedOverride,
+}
+
+/// Story 3.4 — Orchestrator instruction buffer subcommand.
+#[derive(clap::Args, Debug)]
+pub struct OrchestratorArgs {
+    #[command(subcommand)]
+    pub op: OrchestratorOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum OrchestratorOp {
+    /// Enqueue an instruction onto the per-Spirit Orchestrator buffer.
+    Queue {
+        /// Spirit ID to enqueue against (v0.3-β: only `hello-spirit`).
+        #[arg(long)]
+        spirit: String,
+        /// Natural-language instruction (free-form at v0.3-β; typed
+        /// structuring lands at Story 8.4).
+        instruction: String,
+    },
+    /// Show pending instruction count for a Spirit (read-only).
+    Status {
+        #[arg(long)]
+        spirit: String,
+    },
+}
+
+/// Story 3.4 — pause a Spirit.
+#[derive(clap::Args, Debug)]
+pub struct PauseArgs {
+    /// Spirit ID to pause (v0.3-β: only `hello-spirit`).
+    pub spirit: String,
+}
+
+/// Story 3.4 — resume a Spirit.
+#[derive(clap::Args, Debug)]
+pub struct ResumeArgs {
+    /// Spirit ID to resume.
+    pub spirit: String,
+}
+
+/// Story 3.4 — revoke a capability token.
+#[derive(clap::Args, Debug)]
+pub struct RevokeTokenArgs {
+    /// TokenId as 32-char lowercase hex (the wire format `CapabilityToken::token_id`
+    /// renders to via `format!("{:032x}", ...)` — same shape as
+    /// `cap_tokens/body.rs` golden tests).
+    pub token_id: String,
+    /// Optional director-supplied reason (free-form). Stored verbatim
+    /// in the Approval Decision Log `reasoning` column per FR42.
+    #[arg(long)]
+    pub reason: Option<String>,
 }

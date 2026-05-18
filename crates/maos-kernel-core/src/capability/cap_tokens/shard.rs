@@ -71,6 +71,17 @@ impl CapShard {
         guard.retain(|_, state| state.expiry_ns > now_ns);
         before - guard.len()
     }
+
+    /// Debug introspection: list active (non-revoked) token IDs in this shard.
+    #[cfg(any(test, feature = "test-introspection"))]
+    pub fn list_active(&self) -> Vec<TokenId> {
+        let guard = self.inner.read();
+        guard
+            .iter()
+            .filter(|(_, state)| !state.revoked.load(Ordering::Acquire))
+            .map(|(id, _)| *id)
+            .collect()
+    }
 }
 
 /// Snapshot of `TokenState` — cloneable, lock-free.

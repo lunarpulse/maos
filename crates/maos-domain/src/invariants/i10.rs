@@ -50,6 +50,9 @@ pub enum LifecycleEvent {
     Halt = 6,
     /// Story 3.2 — director-initiated runtime posture shift.
     PostureShift = 7,
+    /// Story 3.4 — director-initiated resume from paused state.
+    /// Preserves existing discriminator values for wire stability.
+    Resume = 8,
 }
 
 /// A single journal entry — immutable record of a lifecycle transition.

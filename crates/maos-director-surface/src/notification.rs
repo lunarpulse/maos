@@ -201,6 +201,26 @@ impl NotificationChannel for TerminalChannel {
                     );
                 }
             }
+            NotificationEvent::AnomalyFlagged {
+                observer,
+                subject,
+                summary,
+                confidence,
+            } => {
+                let pct = (confidence * 100.0) as u32;
+                let short_summary: String = summary.chars().take(80).collect();
+                if self.use_color {
+                    let _ = writeln!(
+                        w,
+                        "\x1b[1;35m[maos]\x1b[0m Anomaly \x1b[1m{observer}\x1b[0m → {subject}: {pct}% — {short_summary}",
+                    );
+                } else {
+                    let _ = writeln!(
+                        w,
+                        "[maos] Anomaly {observer} → {subject}: {pct}% — {short_summary}",
+                    );
+                }
+            }
             _ => {
                 let _ = writeln!(w, "[maos] Unknown notification event (future story)");
             }
@@ -407,5 +427,40 @@ mod tests {
                 assert_ne!(classes[i], classes[j]);
             }
         }
+    }
+
+    #[test]
+    fn terminal_channel_renders_anomaly_event() {
+        let w = capture_writer();
+        let ch = TerminalChannel::new(w.clone()).with_color(false);
+        let event = NotificationEvent::anomaly_flagged(
+            "observer-1",
+            "subject-1",
+            "resource exhaustion detected on worker pool",
+            0.85,
+        )
+        .unwrap();
+        ch.dispatch(&event, NotificationLevel::Immediate).unwrap();
+        let out = captured_output(&w);
+        assert!(out.contains("observer-1"), "output: {out}");
+        assert!(out.contains("subject-1"), "output: {out}");
+        assert!(out.contains("85%"), "expected 85% confidence, output: {out}");
+        assert!(out.contains("resource exhaustion detected on worker pool"), "output: {out}");
+    }
+
+    #[test]
+    fn terminal_channel_anomaly_event_emits_zero_ansi_under_no_color() {
+        let w = capture_writer();
+        let ch = TerminalChannel::new(w.clone()).with_color(false);
+        let event = NotificationEvent::anomaly_flagged(
+            "obs",
+            "sub",
+            "test anomaly",
+            0.5,
+        )
+        .unwrap();
+        ch.dispatch(&event, NotificationLevel::Immediate).unwrap();
+        let out = captured_output(&w);
+        assert!(!out.contains('\x1b'), "NO_COLOR output contained ANSI escapes");
     }
 }

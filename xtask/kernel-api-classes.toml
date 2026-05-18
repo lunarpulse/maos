@@ -297,3 +297,22 @@
 # ── Story 3.3 — I12 decision-audit logger ──
 "maos_kernel_core::iac::decision_logger::decorate_decision_frame"      = "data-movement"
 "maos_kernel_core::iac::decision_logger::frame_carries_i12_refs"       = "data-movement"
+
+# ── Story 3.4 — Orchestrator instruction buffer ──
+"maos_kernel_core::orchestrator::OrchestratorBuffer"                    = "supervision"
+"maos_kernel_core::orchestrator::OrchestratorBufferError"               = "supervision"
+"maos_kernel_core::orchestrator::OrchestratorBufferRegistry"            = "supervision"
+"maos_kernel_core::orchestrator::journal_orchestrator_queue"            = "supervision"
+"maos_kernel_core::orchestrator::journal_director_lifecycle_action"     = "supervision"
+"maos_kernel_core::orchestrator::journal_token_revocation"              = "supervision"
+"maos_kernel_core::orchestrator::buffer::OrchestratorBuffer"            = "supervision"
+"maos_kernel_core::orchestrator::buffer::OrchestratorBufferError"       = "supervision"
+"maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry"  = "supervision"
+
+# ── Story 3.4 — Log-composition primitives (FR17) ──
+"maos_audit::log_composition::ComposedLogEntry"                         = "supervision"
+"maos_audit::log_composition::LogSource"                                 = "supervision"
+"maos_audit::log_composition::ComposedPayload"                           = "supervision"
+"maos_audit::log_composition::LogRange"                                  = "supervision"
+"maos_audit::log_composition::ranged_recall"                             = "supervision"
+"maos_audit::log_composition::ranged_count"                              = "supervision"

@@ -280,6 +280,17 @@ impl CapTokensShardRing {
         }
         count
     }
+
+    /// Debug introspection: list all active (non-revoked) token IDs
+    /// across all shards. Gated behind test cfg.
+    #[cfg(any(test, feature = "test-introspection"))]
+    pub fn list_active(&self) -> Vec<TokenId> {
+        let mut ids = Vec::new();
+        for shard in self.shards.iter() {
+            ids.extend(shard.list_active());
+        }
+        ids
+    }
 }
 
 #[cfg(test)]

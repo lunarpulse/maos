@@ -13,6 +13,8 @@
 //! Story 9.1 extends this crate with subject-access, posture-delta, and
 //! sealed-export functions.
 
+pub mod log_composition;
+
 use std::io::Write;
 use std::path::Path;
 

@@ -1,4 +1,4 @@
-last_updated: '2026-05-18'  # Story 3-3 review complete → done
+last_updated: '2026-05-18'  # Story 3-4 review complete → done
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -46,7 +46,7 @@ development_status:
   3-1-route-task-assign-frames-over-the-iac-bus-with-notification-surface-dispatch: done
   3-2-manage-director-posture-with-a-halt-policy-schema-and-bounded-shift-propagation: done
   3-3-directors-halt-resolution-ux-decision-audit-i12: done
-  3-4-buffer-orchestrator-instructions-and-honor-director-pause-resume-revoke-p99-2s: backlog
+  3-4-buffer-orchestrator-instructions-and-honor-director-pause-resume-revoke-p99-2s: done
   epic-3-retrospective: optional
   epic-4: backlog
   4-1-halt-protocol-mechanism-three-resolution-kinds-halt-receipt-99-9-single-halt-owner: backlog
