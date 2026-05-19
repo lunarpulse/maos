@@ -17,6 +17,7 @@ use maos_domain::ports::inference::{
 
 use crate::capability::CapabilityRegistryAdapter;
 use crate::capability::TokenIssuer;
+use crate::capability::WorkingMemoryStore;
 use crate::iac::{FrameKind, TransparencyLogAdapter};
 use crate::telemetry::iac_rt::{IacRtMetrics, Outcome, Service};
 
@@ -195,6 +196,7 @@ mod tests {
         }
         let (audit_tx, _audit_rx) = crate::capability::cap_audit::channel();
         let quota = CapQuotaTracker::new();
+        let working_memory = Arc::new(WorkingMemoryStore::new());
         let capabilities = Arc::new(CapabilityRegistryAdapter::new(
             crypto,
             signing_key,
@@ -202,6 +204,7 @@ mod tests {
             policy,
             audit_tx,
             quota,
+            working_memory,
         ));
         let transparency_log = Arc::new(TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF));
         let telemetry = Arc::new(IacRtMetrics::new());

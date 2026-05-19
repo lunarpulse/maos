@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use maos_kernel_core::capability::{
-    CapabilityRegistryAdapter, CapabilityRegistryPort, cap_audit, cap_policy, cap_quota, cap_tokens,
+    CapabilityRegistryAdapter, CapabilityRegistryPort, WorkingMemoryStore, cap_audit, cap_policy, cap_quota, cap_tokens,
 };
 use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::invariants::i9::SandboxTier;
@@ -54,7 +54,7 @@ fn make_adapter_with_writer() -> (CapabilityRegistryAdapter, tokio::task::JoinHa
     let tlog = Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF));
     let writer = cap_audit::CapAuditWriter::spawn(audit_rx, tlog);
 
-    let adapter = CapabilityRegistryAdapter::new(crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx, quota);
+    let adapter = CapabilityRegistryAdapter::new(crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx, quota, Arc::new(WorkingMemoryStore::new()));
     (adapter, writer)
 }
 

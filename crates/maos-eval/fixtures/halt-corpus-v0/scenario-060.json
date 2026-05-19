@@ -1,0 +1,31 @@
+{
+  "scenario_id": "halt-060",
+  "tag": "synthetic-v0",
+  "spirit_class": "hello-spirit",
+  "epistemic_policy_rules": [
+    {
+      "tag": "uncertainty",
+      "rule": "on_value_outside",
+      "threshold": 0.0,
+      "lower": 0.1,
+      "upper": 0.9
+    }
+  ],
+  "scalar_writes": [
+    {
+      "tag": "uncertainty",
+      "value": 0.3,
+      "derived_from": "frame:tn060"
+    }
+  ],
+  "expected_halt_invocation": false,
+  "expected_halt_payload": {
+    "tag": "uncertainty",
+    "value": 0.3,
+    "threshold": 0.0,
+    "policy_id": "synthetic-v0-rule-060",
+    "derived_from": "frame:tn060"
+  },
+  "expected_resolution": "none",
+  "ground_truth_class": "true_negative"
+}

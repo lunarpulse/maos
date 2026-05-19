@@ -26,6 +26,12 @@ pub struct PolicyRule {
     pub tag: String,
     pub rule: String,
     pub threshold: f64,
+    /// Story 4.2 — optional lower/upper bounds for `on_value_within`
+    /// and `on_value_outside` predicates.
+    #[serde(default)]
+    pub lower: Option<f64>,
+    #[serde(default)]
+    pub upper: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

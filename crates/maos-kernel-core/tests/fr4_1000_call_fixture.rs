@@ -32,8 +32,9 @@ fn make_adapter() -> (CapabilityRegistryAdapter, tokio::sync::mpsc::Receiver<cap
     }
     let (audit_tx, audit_rx) = cap_audit::channel();
     let quota = cap_quota::CapQuotaTracker::new();
+    let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
     let adapter = CapabilityRegistryAdapter::new(
-        crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx.clone(), quota,
+        crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx.clone(), quota, working_memory,
     );
     (adapter, audit_rx)
 }

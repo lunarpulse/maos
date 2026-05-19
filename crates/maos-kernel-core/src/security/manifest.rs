@@ -598,6 +598,67 @@ pub struct EpistemicPolicyRule {
     pub action: EpistemicAction,
     pub on_confidence_below: Option<f32>,
     pub on_evidence_conflict: Option<bool>,
+    /// Story 4.2 — universal-arithmetic predicate. When only
+    /// `on_confidence_below` is set, this field is auto-desugared to
+    /// `Some(ScalarPredicate::Below { threshold })` during `validate()`.
+    /// `on_evidence_conflict` remains a non-scalar boolean guard.
+    pub predicate: Option<ScalarPredicate>,
+}
+
+impl EpistemicPolicyRule {
+    /// Construct a rule with `predicate: None` — for manual constructions
+    /// (e.g., in tests). The `predicate` field is auto-filled from the
+    /// four `on_value_*` TOML fields during `from_toml_str` parsing.
+    pub fn new(
+        tag: String,
+        action: EpistemicAction,
+        on_confidence_below: Option<f32>,
+        on_evidence_conflict: Option<bool>,
+    ) -> Self {
+        Self {
+            tag,
+            action,
+            on_confidence_below,
+            on_evidence_conflict,
+            predicate: None,
+        }
+    }
+}
+
+/// Story 4.2 — one of the four universal-arithmetic ADR-022 predicates.
+///
+/// The kernel dispatches to `CapabilityRegistryPort::on_value_above` /
+/// `on_value_below` / `on_value_within` / `on_value_outside` based on
+/// this variant. Constructed during manifest `validate()` from the
+/// `on_value_*` TOML fields.
+#[doc = "Construct via [`ScalarPredicate`] derive(Deserialize); struct literals bypass NaN / range checks."]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScalarPredicate {
+    /// `on_value_above = { threshold = 0.8 }` — fires when `value > threshold`.
+    Above {
+        #[doc = "Construct via [`ScalarPredicate`] derive(Deserialize); struct literals bypass NaN / range checks."]
+        threshold: f32,
+    },
+    /// `on_value_below = { threshold = 0.2 }` — fires when `value < threshold`.
+    Below {
+        #[doc = "Construct via [`ScalarPredicate`] derive(Deserialize); struct literals bypass NaN / range checks."]
+        threshold: f32,
+    },
+    /// `on_value_within = { lower = 0.4, upper = 0.6 }` — fires when `lower <= value <= upper`.
+    Within {
+        #[doc = "Construct via [`ScalarPredicate`] derive(Deserialize); struct literals bypass NaN / range checks."]
+        lower: f32,
+        #[doc = "Construct via [`ScalarPredicate`] derive(Deserialize); struct literals bypass NaN / range checks."]
+        upper: f32,
+    },
+    /// `on_value_outside = { lower = 0.3, upper = 0.7 }` — fires when `value < lower || value > upper`.
+    Outside {
+        #[doc = "Construct via [`ScalarPredicate`] derive(Deserialize); struct literals bypass NaN / range checks."]
+        lower: f32,
+        #[doc = "Construct via [`ScalarPredicate`] derive(Deserialize); struct literals bypass NaN / range checks."]
+        upper: f32,
+    },
 }
 
 /// The `[epistemic_policy]` manifest section — per-tag halt policy rules
@@ -645,6 +706,28 @@ struct RawEpistemicPolicyRule {
     action: EpistemicAction,
     on_confidence_below: Option<f32>,
     on_evidence_conflict: Option<bool>,
+    /// Story 4.2 — flattened optional predicate forms.
+    on_value_above: Option<RawScalarPredicate>,
+    on_value_below: Option<RawScalarPredicate>,
+    on_value_within: Option<RawScalarPredicateWithin>,
+    on_value_outside: Option<RawScalarPredicateWithin>,
+}
+
+/// Raw deserialization target for single-threshold predicate forms
+/// (`on_value_above`, `on_value_below`).
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawScalarPredicate {
+    threshold: f32,
+}
+
+/// Raw deserialization target for two-bound predicate forms
+/// (`on_value_within`, `on_value_outside`).
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawScalarPredicateWithin {
+    lower: f32,
+    upper: f32,
 }
 
 impl RawEpistemicPolicySection {
@@ -665,6 +748,30 @@ impl RawEpistemicPolicySection {
                         &format!("whitespace in tag '{}'", r.tag),
                     )));
                 }
+
+                // Story 4.2 — collapse the four optional on_value_* fields
+                // into a single Option<ScalarPredicate>.
+                let predicate = collapse_predicate_fields(
+                    &r.tag,
+                    r.on_value_above,
+                    r.on_value_below,
+                    r.on_value_within,
+                    r.on_value_outside,
+                )?;
+
+                // Reject rules carrying BOTH on_confidence_below and any
+                // of the four predicate forms.
+                if r.on_confidence_below.is_some() && predicate.is_some() {
+                    return Err(ManifestError::Toml(validation_msg(
+                        "epistemic_policy.rules",
+                        &format!(
+                            "rule '{}' carries both on_confidence_below and on_value_* — choose one",
+                            r.tag
+                        ),
+                    )));
+                }
+
+                let on_confidence_below = r.on_confidence_below;
                 if let Some(v) = r.on_confidence_below {
                     if !(0.0..=1.0).contains(&v) {
                         return Err(ManifestError::Toml(validation_msg(
@@ -673,11 +780,24 @@ impl RawEpistemicPolicySection {
                         )));
                     }
                 }
+
+                // When only on_confidence_below is set, auto-desugar to
+                // predicate: Some(ScalarPredicate::Below { threshold })
+                // (Story 3.2 backward compatibility).
+                let predicate = if predicate.is_some() {
+                    predicate
+                } else if let Some(t) = r.on_confidence_below {
+                    Some(ScalarPredicate::Below { threshold: t })
+                } else {
+                    None
+                };
+
                 Ok(EpistemicPolicyRule {
                     tag: r.tag,
                     action: r.action,
                     on_confidence_below: r.on_confidence_below,
                     on_evidence_conflict: r.on_evidence_conflict,
+                    predicate,
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -697,6 +817,95 @@ impl RawEpistemicPolicySection {
             default_action: self.default_action,
         })
     }
+}
+
+/// Story 4.2 — collapse the four optional `on_value_*` raw fields into
+/// exactly-one-or-none `Option<ScalarPredicate>`.
+fn collapse_predicate_fields(
+    tag: &str,
+    above: Option<RawScalarPredicate>,
+    below: Option<RawScalarPredicate>,
+    within: Option<RawScalarPredicateWithin>,
+    outside: Option<RawScalarPredicateWithin>,
+) -> Result<Option<ScalarPredicate>, ManifestError> {
+    let count = above.is_some() as u8
+        + below.is_some() as u8
+        + within.is_some() as u8
+        + outside.is_some() as u8;
+    if count > 1 {
+        return Err(ManifestError::Toml(validation_msg(
+            "epistemic_policy.rules",
+            &format!(
+                "rule '{}' carries multiple predicate forms — choose exactly one",
+                tag
+            ),
+        )));
+    }
+    if let Some(raw) = above {
+        if raw.threshold.is_nan() {
+            return Err(ManifestError::Toml(validation_msg(
+                "epistemic_policy.on_value_above.threshold",
+                "threshold must not be NaN",
+            )));
+        }
+        return Ok(Some(ScalarPredicate::Above {
+            threshold: raw.threshold,
+        }));
+    }
+    if let Some(raw) = below {
+        if raw.threshold.is_nan() {
+            return Err(ManifestError::Toml(validation_msg(
+                "epistemic_policy.on_value_below.threshold",
+                "threshold must not be NaN",
+            )));
+        }
+        return Ok(Some(ScalarPredicate::Below {
+            threshold: raw.threshold,
+        }));
+    }
+    if let Some(raw) = within {
+        if raw.lower.is_nan() || raw.upper.is_nan() {
+            return Err(ManifestError::Toml(validation_msg(
+                "epistemic_policy.on_value_within",
+                "lower/upper must not be NaN",
+            )));
+        }
+        if raw.lower > raw.upper {
+            return Err(ManifestError::Toml(validation_msg(
+                "epistemic_policy.on_value_within",
+                &format!(
+                    "lower ({}) > upper ({})",
+                    raw.lower, raw.upper
+                ),
+            )));
+        }
+        return Ok(Some(ScalarPredicate::Within {
+            lower: raw.lower,
+            upper: raw.upper,
+        }));
+    }
+    if let Some(raw) = outside {
+        if raw.lower.is_nan() || raw.upper.is_nan() {
+            return Err(ManifestError::Toml(validation_msg(
+                "epistemic_policy.on_value_outside",
+                "lower/upper must not be NaN",
+            )));
+        }
+        if raw.lower > raw.upper {
+            return Err(ManifestError::Toml(validation_msg(
+                "epistemic_policy.on_value_outside",
+                &format!(
+                    "lower ({}) > upper ({})",
+                    raw.lower, raw.upper
+                ),
+            )));
+        }
+        return Ok(Some(ScalarPredicate::Outside {
+            lower: raw.lower,
+            upper: raw.upper,
+        }));
+    }
+    Ok(None)
 }
 
 // ------------------------------------------------------------------
@@ -1266,6 +1475,141 @@ on_confidence_below = 1.0"#;
             matches!(err, ManifestError::Toml(_)),
             "malformed fixture must fail parse: {err}"
         );
+    }
+
+    // ---- Story 4.2 — ScalarPredicate form tests (Task 1.4) ----
+
+    #[test]
+    fn predicate_on_value_above_well_formed_parses() {
+        let s = r#"[[rules]]
+tag = "uncertainty"
+action = "halt"
+on_value_above = { threshold = 0.8 }"#;
+        let p = EpistemicPolicySection::from_toml_str(s).unwrap();
+        assert_eq!(p.rules.len(), 1);
+        assert!(matches!(
+            p.rules[0].predicate,
+            Some(ScalarPredicate::Above { threshold }) if (threshold - 0.8).abs() < 0.001
+        ));
+    }
+
+    #[test]
+    fn predicate_on_value_below_well_formed_parses() {
+        let s = r#"[[rules]]
+tag = "uncertainty"
+action = "halt"
+on_value_below = { threshold = 0.2 }"#;
+        let p = EpistemicPolicySection::from_toml_str(s).unwrap();
+        assert!(matches!(
+            p.rules[0].predicate,
+            Some(ScalarPredicate::Below { threshold }) if (threshold - 0.2).abs() < 0.001
+        ));
+    }
+
+    #[test]
+    fn predicate_on_value_within_well_formed_parses() {
+        let s = r#"[[rules]]
+tag = "uncertainty"
+action = "halt"
+on_value_within = { lower = 0.4, upper = 0.6 }"#;
+        let p = EpistemicPolicySection::from_toml_str(s).unwrap();
+        assert!(matches!(
+            p.rules[0].predicate,
+            Some(ScalarPredicate::Within { lower, upper })
+                if (lower - 0.4).abs() < 0.001 && (upper - 0.6).abs() < 0.001
+        ));
+    }
+
+    #[test]
+    fn predicate_on_value_outside_well_formed_parses() {
+        let s = r#"[[rules]]
+tag = "uncertainty"
+action = "halt"
+on_value_outside = { lower = 0.3, upper = 0.7 }"#;
+        let p = EpistemicPolicySection::from_toml_str(s).unwrap();
+        assert!(matches!(
+            p.rules[0].predicate,
+            Some(ScalarPredicate::Outside { lower, upper })
+                if (lower - 0.3).abs() < 0.001 && (upper - 0.7).abs() < 0.001
+        ));
+    }
+
+    #[test]
+    fn predicate_rejects_nan_threshold_in_above() {
+        let s = r#"[[rules]]
+tag = "x"
+action = "halt"
+on_value_above = { threshold = nan }"#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("NaN")));
+    }
+
+    #[test]
+    fn predicate_rejects_inverted_bounds_within() {
+        let s = r#"[[rules]]
+tag = "x"
+action = "halt"
+on_value_within = { lower = 0.7, upper = 0.3 }"#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("lower") && msg.contains("upper")));
+    }
+
+    #[test]
+    fn predicate_rejects_both_forms_set() {
+        let s = r#"[[rules]]
+tag = "x"
+action = "halt"
+on_value_above = { threshold = 0.5 }
+on_value_below = { threshold = 0.3 }"#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("multiple predicate forms")));
+    }
+
+    #[test]
+    fn predicate_rejects_both_confidence_below_and_on_value() {
+        let s = r#"[[rules]]
+tag = "x"
+action = "halt"
+on_confidence_below = 0.5
+on_value_above = { threshold = 0.8 }"#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("both on_confidence_below and on_value_*")));
+    }
+
+    #[test]
+    fn predicate_on_confidence_below_desugars_to_below_predicate() {
+        // Story 3.2 backward compat — on_confidence_below alone desugars to
+        // predicate: Some(ScalarPredicate::Below { threshold })
+        let s = r#"[[rules]]
+tag = "x"
+action = "halt"
+on_confidence_below = 0.75"#;
+        let p = EpistemicPolicySection::from_toml_str(s).unwrap();
+        assert_eq!(p.rules[0].on_confidence_below, Some(0.75));
+        assert!(matches!(
+            p.rules[0].predicate,
+            Some(ScalarPredicate::Below { threshold }) if (threshold - 0.75).abs() < 0.001
+        ));
+    }
+
+    #[test]
+    fn predicate_3_2_shape_backward_compat_unchanged() {
+        // Pre-4.2 manifest (only on_confidence_below + on_evidence_conflict)
+        // MUST deserialize unchanged.
+        let s = r#"default_action = "verbalize_only"
+
+[[rules]]
+tag = "claim.security_vulnerability"
+action = "halt"
+on_confidence_below = 0.85
+on_evidence_conflict = true"#;
+        let p = EpistemicPolicySection::from_toml_str(s).unwrap();
+        assert_eq!(p.rules.len(), 1);
+        assert_eq!(p.rules[0].tag, "claim.security_vulnerability");
+        assert_eq!(p.rules[0].action, EpistemicAction::Halt);
+        assert_eq!(p.rules[0].on_confidence_below, Some(0.85));
+        assert_eq!(p.rules[0].on_evidence_conflict, Some(true));
+        assert!(p.rules[0].predicate.is_some());
     }
 
     // ---- Author ----

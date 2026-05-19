@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 //! AC6 — halt-recall ≥0.7, halt-precision ≥0.85, predicate-firing recall ≥0.85
-//! against the N=50 synthetic-v0 corpus at fixtures/halt-corpus-v0/.
+//! against the N=62 synthetic-v0 corpus at fixtures/halt-corpus-v0/.
 //!
 //! Test surface:
 //! - `maos_eval::HaltCorpus::load_from`
@@ -25,6 +25,20 @@ fn simulate_predicate(scenario: &maos_eval::HaltScenario) -> bool {
                             return true;
                         }
                     }
+                    "on_value_within" => {
+                        let lower = rule.lower.unwrap_or(0.0);
+                        let upper = rule.upper.unwrap_or(1.0);
+                        if lower <= write.value && write.value <= upper {
+                            return true;
+                        }
+                    }
+                    "on_value_outside" => {
+                        let lower = rule.lower.unwrap_or(0.0);
+                        let upper = rule.upper.unwrap_or(1.0);
+                        if write.value < lower || write.value > upper {
+                            return true;
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -38,7 +52,7 @@ fn test_halt_recall_floor() {
     let corpus = HaltCorpus::load_from(
         std::path::Path::new("fixtures/halt-corpus-v0/"),
     ).expect("halt-corpus-v0 must exist");
-    assert_eq!(corpus.len(), 50, "corpus size lock — 50 synthetic scenarios authoritative");
+    assert_eq!(corpus.len(), 62, "corpus size lock — 62 synthetic scenarios authoritative (50 base + 12 Story 4.2 within/outside)");
     assert!(
         corpus.scenarios.iter().all(|s| s.tag == "synthetic-v0"),
         "every scenario MUST carry tag=synthetic-v0 to distinguish from E8 reference"

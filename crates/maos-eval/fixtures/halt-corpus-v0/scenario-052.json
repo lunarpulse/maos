@@ -1,0 +1,31 @@
+{
+  "scenario_id": "halt-052",
+  "tag": "synthetic-v0",
+  "spirit_class": "hello-spirit",
+  "epistemic_policy_rules": [
+    {
+      "tag": "calibration",
+      "rule": "on_value_within",
+      "threshold": 0.0,
+      "lower": 0.8,
+      "upper": 0.95
+    }
+  ],
+  "scalar_writes": [
+    {
+      "tag": "calibration",
+      "value": 0.9,
+      "derived_from": "frame:tp052"
+    }
+  ],
+  "expected_halt_invocation": true,
+  "expected_halt_payload": {
+    "tag": "calibration",
+    "value": 0.9,
+    "threshold": 0.0,
+    "policy_id": "synthetic-v0-rule-052",
+    "derived_from": "frame:tp052"
+  },
+  "expected_resolution": "accepted_halt",
+  "ground_truth_class": "true_positive"
+}

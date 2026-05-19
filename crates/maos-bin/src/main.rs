@@ -131,6 +131,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         getrandom::fill(&mut buf).expect("failed to generate boot nonce");
         u64::from_ne_bytes(buf)
     };
+    let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
     let capability = Arc::new(CapabilityRegistryAdapter::new(
         crypto,
         signing_key,
@@ -138,6 +139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&policy),
         audit_tx.clone(),
         quota,
+        working_memory,
     ));
     eprintln!("maos: capability registry initialized (Story 1b.2)");
 

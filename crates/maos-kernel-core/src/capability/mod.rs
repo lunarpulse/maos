@@ -11,9 +11,12 @@ pub mod cap_tokens;
 pub mod cap_policy;
 pub mod cap_audit;
 pub mod cap_quota;
+pub mod working_memory;
 
 pub use maos_domain::ports::CapabilityRegistryPort;
 pub use maos_domain::ports::capability::TokenIssuer;
+pub use working_memory::{WorkingMemorySlot, SetScalarError};
+pub use working_memory::store::WorkingMemoryStore;
 
 use std::sync::Arc;
 
@@ -42,13 +45,16 @@ fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
 }
 
 /// Composite adapter — holds the four ADR-030 sub-modules and the
-/// `CryptoProvider` trait object.
+/// `CryptoProvider` trait object. Story 4.2 adds the `working_memory`
+/// sub-module as a 5th field (ADR-022 tagged-scalar slot).
 #[maos_attrs::i9_exempt(reason = "capability registry composite; holds exempt sub-module Arcs")]
 pub struct CapabilityRegistryAdapter {
     tokens: Arc<CapTokensShardRing>,
     policy: Arc<PolicyTable>,
     audit: Sender,
     quota: Arc<CapQuotaTracker>,
+    /// Story 4.2 — per-Spirit tagged-scalar slot store.
+    working_memory: Arc<WorkingMemoryStore>,
 }
 
 impl std::fmt::Debug for CapabilityRegistryAdapter {
@@ -58,12 +64,14 @@ impl std::fmt::Debug for CapabilityRegistryAdapter {
             .field("policy", &"Arc<PolicyTable>")
             .field("audit", &"Sender")
             .field("quota", &"Arc<CapQuotaTracker>")
+            .field("working_memory", &"Arc<WorkingMemoryStore>")
             .finish()
     }
 }
 
 impl CapabilityRegistryAdapter {
     /// Construct the composite adapter. Called from the composition root.
+    /// Story 4.2 adds the `working_memory` parameter as a 5th field.
     pub fn new(
         crypto: Arc<dyn CryptoProvider>,
         signing_key: cap_tokens::Ed25519SigningKey,
@@ -71,6 +79,7 @@ impl CapabilityRegistryAdapter {
         policy: Arc<PolicyTable>,
         audit: Sender,
         quota: CapQuotaTracker,
+        working_memory: Arc<WorkingMemoryStore>,
     ) -> Self {
         let tokens = Arc::new(CapTokensShardRing::new(
             crypto,
@@ -83,6 +92,7 @@ impl CapabilityRegistryAdapter {
             policy,
             audit,
             quota: Arc::new(quota),
+            working_memory,
         }
     }
 
@@ -125,6 +135,26 @@ impl CapabilityRegistryAdapter {
     /// Look up the scope for a token ID without full verification.
     pub fn get_token_scope(&self, token_id: &TokenId) -> Option<Scope> {
         self.tokens.get_scope(token_id)
+    }
+
+    /// Story 4.2 — write a tagged scalar to the per-Spirit slot store
+    /// and return a `ScalarTapEvent` for telemetry publication.
+/// Story 4.2 — write a tagged scalar to the per-Spirit slot store
+    /// and return a `ScalarTapEvent` for telemetry publication.
+    pub fn set_scalar(
+        &self,
+        spirit_pid: u32,
+        spirit_id: &str,
+        tag: &str,
+        value: f64,
+        derived_from: &str,
+    ) -> Result<maos_domain::invariants::i7::ScalarTapEvent, SetScalarError> {
+        self.working_memory.set_scalar(spirit_pid, spirit_id, tag, value, derived_from)
+    }
+
+    /// Expose the working-memory store for read-back in integration tests.
+    pub fn working_memory(&self) -> &WorkingMemoryStore {
+        &self.working_memory
     }
 
     /// Verify and audit a capability token.
@@ -260,6 +290,7 @@ mod tests {
         }
         let (audit_tx, _audit_rx) = cap_audit::channel();
         let quota = CapQuotaTracker::new();
+        let working_memory = Arc::new(WorkingMemoryStore::new());
         CapabilityRegistryAdapter::new(
             crypto,
             signing_key,
@@ -267,6 +298,7 @@ mod tests {
             Arc::new(policy),
             audit_tx,
             quota,
+            working_memory,
         )
     }
 

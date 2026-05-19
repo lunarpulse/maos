@@ -36,7 +36,7 @@ pub use maos_domain::ports::CryptoProvider;
 pub use sandbox::{SandboxSpec, SandboxedChild, SpawnError, spawn_sandboxed, classify_exit, SandboxViolation};
 pub use drift::{DriftEvent, make_drift_channel};
 // Story 3.2 — appended to preserve re-export order.
-pub use manifest::{EpistemicAction, EpistemicPolicyRule, EpistemicPolicySection};
+pub use manifest::{EpistemicAction, EpistemicPolicyRule, EpistemicPolicySection, ScalarPredicate};
 pub use posture::{PostureError, PostureState};
 
 use std::sync::Arc;

@@ -297,6 +297,7 @@ mod tests {
                 action: EpistemicAction::Halt,
                 on_confidence_below: Some(0.5),
                 on_evidence_conflict: None,
+            predicate: None,
             }],
             default_action: EpistemicAction::VerbalizeOnly,
         };
@@ -306,6 +307,7 @@ mod tests {
                 action: EpistemicAction::Halt,
                 on_confidence_below: Some(0.8),
                 on_evidence_conflict: None,
+            predicate: None,
             }],
             default_action: EpistemicAction::VerbalizeOnly,
         };
@@ -338,12 +340,14 @@ mod tests {
                     action: EpistemicAction::Flag,
                     on_confidence_below: None,
                     on_evidence_conflict: None,
+                predicate: None,
                 },
                 EpistemicPolicyRule {
                     tag: "a".into(),
                     action: EpistemicAction::Halt,
                     on_confidence_below: Some(0.7),
                     on_evidence_conflict: Some(true),
+                predicate: None,
                 },
             ],
             default_action: EpistemicAction::VerbalizeOnly,
@@ -355,12 +359,14 @@ mod tests {
                     action: EpistemicAction::Halt,
                     on_confidence_below: Some(0.7),
                     on_evidence_conflict: Some(true),
+                predicate: None,
                 },
                 EpistemicPolicyRule {
                     tag: "b".into(),
                     action: EpistemicAction::Flag,
                     on_confidence_below: None,
                     on_evidence_conflict: None,
+                predicate: None,
                 },
             ],
             default_action: EpistemicAction::VerbalizeOnly,
@@ -378,6 +384,7 @@ mod tests {
                 action: EpistemicAction::Halt,
                 on_confidence_below: Some(0.5),
                 on_evidence_conflict: None,
+            predicate: None,
             }],
             default_action: EpistemicAction::VerbalizeOnly,
         };
@@ -399,6 +406,7 @@ mod tests {
                 action: EpistemicAction::Halt,
                 on_confidence_below: Some(0.5),
                 on_evidence_conflict: None,
+            predicate: None,
             }],
             default_action: EpistemicAction::VerbalizeOnly,
         };
@@ -418,6 +426,7 @@ mod tests {
                 action: EpistemicAction::Flag,
                 on_confidence_below: Some(0.3),
                 on_evidence_conflict: None,
+            predicate: None,
             }],
             default_action: EpistemicAction::VerbalizeOnly,
         };
@@ -436,6 +445,7 @@ mod tests {
                 action: EpistemicAction::Halt,
                 on_confidence_below: Some(0.8),
                 on_evidence_conflict: None,
+            predicate: None,
             }],
             default_action: EpistemicAction::VerbalizeOnly,
         };
@@ -456,6 +466,7 @@ mod tests {
                 action: EpistemicAction::Halt,
                 on_confidence_below: Some(0.5),
                 on_evidence_conflict: None,
+            predicate: None,
             }],
             default_action: EpistemicAction::VerbalizeOnly,
         };
@@ -478,6 +489,7 @@ mod tests {
                 action: EpistemicAction::Halt,
                 on_confidence_below: Some(0.5),
                 on_evidence_conflict: None,
+            predicate: None,
             }],
             default_action: EpistemicAction::VerbalizeOnly,
         };
@@ -500,6 +512,7 @@ mod tests {
                 action: EpistemicAction::Halt,
                 on_confidence_below: None,
                 on_evidence_conflict: None,
+            predicate: None,
             }],
             default_action: EpistemicAction::VerbalizeOnly,
         };

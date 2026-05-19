@@ -25,7 +25,7 @@
 pub struct InvariantI7;
 
 /// Telemetry topic identifier — namespaced broadcast channel.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TelemetryTopic(String);
 
 impl TelemetryTopic {

@@ -199,3 +199,19 @@ Spirit termination.
 `output_shape` consumption (Story 4.2). `DashMap<HaltId, Mutex<VecDeque<OutputMarker>>>`
 stores transient kernel-side markers; parallel to OrchestratorBuffer. Drained on
 resolution; no persistence across restarts.
+
+### `WorkingMemoryStore` — `crates/maos-kernel-core/src/capability/working_memory/store.rs`
+
+**Reason:** capability registry tagged-scalar slot (Story 4.2) — per-Spirit
+working memory state for ADR-022 universal-arithmetic predicate evaluation.
+`RwLock<HashMap<(u32, String), WorkingMemorySlot>>` is scoped per-Spirit-per-tag;
+bounded by active Spirit count × declared tags count. Parallel to
+capability-token ledger; no pattern-learning, no persistence across restarts.
+
+### `TelemetryStreamAdapter` — `crates/maos-kernel-core/src/telemetry/mod.rs`
+
+**Reason:** telemetry stream adapter (Story 4.2) — per-process broadcast channel
+state for ADR-035 `scalar.tap` telemetry. `Arc<DashMap<TelemetryTopic, broadcast::Sender<ScalarTapEvent>>>`
+holds transient per-process channel registration state; bounded by declared
+scalar tag count (O(dozens)). No persistence across restarts; parallel to
+`IacRtMetrics` exemption (Epic 1b).

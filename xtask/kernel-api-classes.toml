@@ -316,3 +316,41 @@
 "maos_audit::log_composition::LogRange"                                  = "supervision"
 "maos_audit::log_composition::ranged_recall"                             = "supervision"
 "maos_audit::log_composition::ranged_count"                              = "supervision"
+
+# ── Story 4.2 — Working Memory scalar slot + predicate runtime ──
+# All public items classify per §4.0.7 taxonomy:
+#   universal-arithmetic — four-predicate ADR-022 surface
+#   data-movement — telemetry broadcast / publish / subscribe
+
+# working_memory sub-module
+"maos_kernel_core::capability::working_memory::WorkingMemorySlot"       = "universal-arithmetic"
+"maos_kernel_core::capability::working_memory::SetScalarError"          = "universal-arithmetic"
+"maos_kernel_core::capability::working_memory::store::WorkingMemoryStore" = "universal-arithmetic"
+"maos_kernel_core::capability::working_memory::store::WorkingMemoryStore::new" = "universal-arithmetic"
+"maos_kernel_core::capability::working_memory::store::WorkingMemoryStore::set_scalar" = "universal-arithmetic"
+"maos_kernel_core::capability::working_memory::store::WorkingMemoryStore::get_scalar" = "universal-arithmetic"
+
+# policy_runtime sub-module
+"maos_kernel_core::capability::working_memory::policy_runtime::evaluate_after_set_scalar" = "universal-arithmetic"
+"maos_kernel_core::capability::working_memory::policy_runtime::PolicyEvaluationOutcome"   = "universal-arithmetic"
+"maos_kernel_core::capability::working_memory::policy_runtime::PolicyRuntimeError"        = "universal-arithmetic"
+
+# capability re-exports
+"maos_kernel_core::capability::WorkingMemorySlot"                       = "universal-arithmetic"
+"maos_kernel_core::capability::SetScalarError"                          = "universal-arithmetic"
+"maos_kernel_core::capability::WorkingMemoryStore"                      = "universal-arithmetic"
+
+# manifest ScalarPredicate
+"maos_kernel_core::security::manifest::ScalarPredicate"                 = "universal-arithmetic"
+
+# telemetry adapter (data-movement per §4.7 telemetry broadcast)
+"maos_kernel_core::telemetry::TelemetryStreamAdapter::new"              = "data-movement"
+"maos_kernel_core::telemetry::TelemetryStreamAdapter::publish_event"    = "data-movement"
+"maos_kernel_core::telemetry::TelemetryStreamAdapter::subscribe_topic"  = "data-movement"
+"maos_kernel_core::telemetry::TelemetryStreamAdapter::subscribe"        = "data-movement"
+
+# api/* re-exports (mirror convention at lines 22-28)
+"maos_kernel_core::api::crate::capability::WorkingMemorySlot"           = "universal-arithmetic"
+"maos_kernel_core::api::crate::capability::SetScalarError"              = "universal-arithmetic"
+"maos_kernel_core::api::crate::capability::WorkingMemoryStore"          = "universal-arithmetic"
+"maos_kernel_core::api::crate::security::ScalarPredicate"               = "universal-arithmetic"

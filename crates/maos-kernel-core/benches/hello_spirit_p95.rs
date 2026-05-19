@@ -114,6 +114,7 @@ fn make_test_adapter() -> InferencePortAdapter {
 
     let (audit_tx, _audit_rx) = cap_audit::channel();
     let quota = maos_kernel_core::capability::cap_quota::CapQuotaTracker::new();
+    let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
     let capabilities = Arc::new(CapabilityRegistryAdapter::new(
         crypto,
         signing_key,
@@ -121,6 +122,7 @@ fn make_test_adapter() -> InferencePortAdapter {
         policy,
         audit_tx,
         quota,
+        working_memory,
     ));
 
     let transparency_log = Arc::new(TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF));

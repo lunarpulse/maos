@@ -20,3 +20,8 @@ pub use crate::journal::JournalAdapter;       // NEW — Story 1b.1 Lifecycle Jo
 pub use crate::capability::CapabilityRegistryAdapter;
 pub use crate::io::IoSubsystemAdapter;
 pub use crate::telemetry::TelemetryStreamAdapter;
+// Story 4.2 — Working Memory scalar slot + predicate exports
+pub use crate::capability::WorkingMemorySlot;
+pub use crate::capability::SetScalarError;
+pub use crate::capability::WorkingMemoryStore;
+pub use crate::security::manifest::ScalarPredicate;
