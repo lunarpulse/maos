@@ -52,6 +52,9 @@ impl WorkingMemoryStore {
         if value.is_nan() {
             return Err(SetScalarError::NanValue);
         }
+        if value.is_infinite() {
+            return Err(SetScalarError::OverflowingPersistence);
+        }
         if derived_from.is_empty() {
             return Err(SetScalarError::EmptyDerivedFrom);
         }
@@ -66,7 +69,7 @@ impl WorkingMemoryStore {
         )?;
 
         {
-            let mut map = self.slots.write().expect("WorkingMemoryStore lock poisoned");
+            let mut map = self.slots.write().unwrap_or_else(|e| e.into_inner());
             map.insert((spirit_pid, tag.to_string()), slot);
         }
 
@@ -81,9 +84,9 @@ impl WorkingMemoryStore {
     /// Read-back a scalar value + timestamp for `(spirit_pid, tag)`.
     /// Returns `None` when no write has been recorded for this tag.
     pub fn get_scalar(&self, spirit_pid: u32, tag: &str) -> Option<(f64, u64)> {
-        let map = self.slots.read().expect("WorkingMemoryStore lock poisoned");
+        let map = self.slots.read().unwrap_or_else(|e| e.into_inner());
         map.get(&(spirit_pid, tag.to_string()))
-            .map(|slot| (slot.value, slot.timestamp_ns))
+            .map(|slot| (slot.value, slot.timestamp_ms))
     }
 }
 

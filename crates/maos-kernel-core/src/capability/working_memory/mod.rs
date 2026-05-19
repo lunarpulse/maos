@@ -16,6 +16,7 @@
 
 pub mod store;
 pub mod policy_runtime;
+pub mod orchestrator;
 
 use maos_domain::invariants::i7::ScalarTapEvent;
 
@@ -33,7 +34,7 @@ pub struct WorkingMemorySlot {
     #[doc = "Construct via [`WorkingMemorySlot::new`] to enforce validation; struct literals bypass NaN / empty-string checks."]
     pub derived_from: String,
     #[doc = "Construct via [`WorkingMemorySlot::new`] to enforce validation; struct literals bypass NaN / empty-string checks."]
-    pub timestamp_ns: u64,
+    pub timestamp_ms: u64,
 }
 
 impl WorkingMemorySlot {
@@ -41,13 +42,16 @@ impl WorkingMemorySlot {
         tag: String,
         value: f64,
         derived_from: String,
-        timestamp_ns: u64,
+        timestamp_ms: u64,
     ) -> Result<Self, SetScalarError> {
         if tag.is_empty() {
             return Err(SetScalarError::EmptyTag);
         }
         if value.is_nan() {
             return Err(SetScalarError::NanValue);
+        }
+        if value.is_infinite() {
+            return Err(SetScalarError::OverflowingPersistence);
         }
         if derived_from.is_empty() {
             return Err(SetScalarError::EmptyDerivedFrom);
@@ -56,7 +60,7 @@ impl WorkingMemorySlot {
             tag,
             value,
             derived_from,
-            timestamp_ns,
+            timestamp_ms,
         })
     }
 }
@@ -126,5 +130,25 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, SetScalarError::EmptyDerivedFrom));
+    }
+
+    #[test]
+    fn working_memory_slot_rejects_infinite_value() {
+        let err = WorkingMemorySlot::new(
+            "t".into(),
+            f64::INFINITY,
+            "d".into(),
+            0,
+        )
+        .unwrap_err();
+        assert!(matches!(err, SetScalarError::OverflowingPersistence));
+        let err = WorkingMemorySlot::new(
+            "t".into(),
+            f64::NEG_INFINITY,
+            "d".into(),
+            0,
+        )
+        .unwrap_err();
+        assert!(matches!(err, SetScalarError::OverflowingPersistence));
     }
 }

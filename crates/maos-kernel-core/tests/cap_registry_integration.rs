@@ -3,6 +3,7 @@
 //! Covers issue/verify/revoke/expire/TOCTOU/cross-Spirit isolation.
 
 use std::sync::Arc;
+use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 
 use maos_kernel_core::capability::{
     CapabilityRegistryAdapter, CapabilityRegistryPort, cap_audit, cap_policy, cap_quota, cap_tokens,
@@ -30,7 +31,8 @@ fn make_adapter() -> CapabilityRegistryAdapter {
     let (audit_tx, _audit_rx) = cap_audit::channel();
     let quota = cap_quota::CapQuotaTracker::new();
     let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
-    CapabilityRegistryAdapter::new(crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx, quota, working_memory)
+    let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default());
+    CapabilityRegistryAdapter::new(crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx, quota, working_memory, telemetry)
 }
 
 #[test]

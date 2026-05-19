@@ -34,7 +34,7 @@ fn make_adapter(
     let quota = CapQuotaTracker::new();
     let working_memory = Arc::new(WorkingMemoryStore::new());
     CapabilityRegistryAdapter::new(
-        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory,
+        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory, telemetry,
     )
 }
 
@@ -51,16 +51,13 @@ async fn subscriber_receives_scalar_tap_event() {
 
     let mut rx = telemetry.subscribe(&topic).unwrap();
 
-    // Call set_scalar from a separate task
+    // Call set_scalar from a separate task — the adapter now publishes
+    // automatically to the telemetry stream (production path).
     let adapter_clone = adapter; // move adapter
-    let telemetry_clone = Arc::clone(&telemetry);
-    let topic_clone = topic.clone();
     let write_task = tokio::spawn(async move {
-        let event = adapter_clone
+        adapter_clone
             .set_scalar(1, "spirit-1", "uncertainty", 0.75, "frame-001")
             .unwrap();
-        // Publish the event to the telemetry stream
-        telemetry_clone.publish_event(&topic_clone, event);
     });
 
     // Wait for the subscriber to receive the event (bound 100ms)
@@ -80,15 +77,24 @@ async fn subscriber_receives_scalar_tap_event() {
 }
 
 #[tokio::test]
-async fn subscribe_twice_returns_false() {
+async fn subscribe_twice_same_spirit_returns_false() {
     let telemetry = Arc::new(TelemetryStreamAdapter::new(2048));
     let topic = TelemetryTopic::new("scalar.tap.uncertainty");
 
     let first = telemetry.subscribe_topic("observer-1", &topic);
     assert!(first);
 
-    let second = telemetry.subscribe_topic("observer-2", &topic);
-    assert!(!second, "re-subscribe to same topic should return false");
+    let second = telemetry.subscribe_topic("observer-1", &topic);
+    assert!(!second, "re-subscribe by same spirit should return false");
+}
+
+#[tokio::test]
+async fn subscribe_different_spirit_same_topic_returns_true() {
+    let telemetry = Arc::new(TelemetryStreamAdapter::new(2048));
+    let topic = TelemetryTopic::new("scalar.tap.uncertainty");
+
+    assert!(telemetry.subscribe_topic("observer-1", &topic));
+    assert!(telemetry.subscribe_topic("observer-2", &topic), "different spirit subscribing to same topic should return true");
 }
 
 #[tokio::test]

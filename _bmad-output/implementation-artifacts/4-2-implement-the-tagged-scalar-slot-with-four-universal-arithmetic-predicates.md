@@ -332,6 +332,43 @@ _No debug log entries._
 - `_bmad-output/implementation-artifacts/deferred-work.md` — mark DF3 closed
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — 4-2 → in-progress → review
 
+### Review Findings
+
+**decision-needed**
+- [x] [Review][Decision → Patch] TelemetryStreamAdapter Clone/Copy removal — Team consensus: per spec + long-term correctness. Re-add `Clone`; `Copy` removal is unavoidable (Arc<DashMap> cannot be Copy). Document exception in dev record and abi-baseline.
+
+**patch**
+- [x] [Review][Patch] CapabilityRegistryAdapter::set_scalar omits telemetry publish [capability/mod.rs:1135-1144]
+- [x] [Review][Patch] WorkingMemoryOrchestrator atomic entry point missing [N/A — Task 3.5]
+- [x] [Review][Patch] Composition root omits TelemetryStreamAdapter construction [maos-bin/src/main.rs]
+- [x] [Review][Patch] timestamp_ns field stores milliseconds not nanoseconds [store.rs]
+- [x] [Review][Patch] Telemetry broadcast send failures silently discarded without metrics [telemetry/mod.rs]
+- [x] [Review][Patch] Integration test omits Journal, payload-tag, and VerbalizeOnly assertions [scalar_predicate_to_halt_integration.rs]
+- [x] [Review][Patch] simulate_predicate silently defaults missing bounds [halt_recall_floor.rs:990-998]
+- [x] [Review][Patch] A3 constructor convention violated in tests [policy_runtime.rs, posture.rs]
+- [x] [Review][Patch] Corpus README FP count exceeds stated floor [halt-corpus-v0/README.md]
+- [x] [Review][Patch] Malformed API classifier paths embed crate:: syntax [xtask/kernel-api-classes.toml]
+- [x] [Review][Patch] Duplicate misaligned doc comment in capability/mod.rs [capability/mod.rs]
+- [x] [Review][Patch] scalar_tap_subscriber tests manual publish not production path [scalar_tap_subscriber.rs]
+- [x] [Review][Patch] RwLock guard poison causes panic on poisoned lock [store.rs:64-67, 79-81]
+- [x] [Review][Patch] Zero capacity argument panics in broadcast constructor [telemetry/mod.rs:86-91]
+- [x] [Review][Patch] Infinite value not rejected by set_scalar [working_memory/mod.rs:22-24]
+- [x] [Review][Patch] NaN value silently skips predicate rules in evaluator [policy_runtime.rs:73]
+- [x] [Review][Patch] NaN threshold in programmatic ScalarPredicate silently disables rule [policy_runtime.rs:93-106]
+- [x] [Review][Patch] TestPort re-implements predicate logic instead of production [policy_runtime.rs:1462-1473]
+- [x] [Review][Patch] Non-firing test cases missing for three predicates [policy_runtime.rs inline tests, scalar_policy_runtime_test.rs]
+- [x] [Review][Patch] Telemetry inline tests never assert event receipt [telemetry/mod.rs inline tests]
+- [x] [Review][Patch] SetScalarError::OverflowingPersistence is untested dead code [working_memory/mod.rs:1249]
+- [x] [Review][Patch] Manifest inline tests incomplete NaN/bounds coverage [manifest.rs:2167-2299]
+- [x] [Review][Patch] scalar_tap_subscriber contradicts per-Spirit subscribe contract [scalar_tap_subscriber.rs:3472]
+- [x] [Review][Patch] set_scalar_flag_action test lacks negative side-effect assertions [scalar_predicate_to_halt_integration.rs]
+
+**dismissed**
+- Cargo.toml dev-dependency formatting regression — formatting only, non-functional.
+- Review findings table pre-filled by author — process/meta, not code quality.
+- make_adapter() copy-pasted across 5 integration test files — acceptable DRY trade-off for self-contained integration tests.
+- telemetry inline publish_without_subscriber has no observable assertion — over-testing; no-panic coverage is sufficient.
+
 <!-- One row per review Patch / Defer / Decision finding.
      Status MUST be one of: **closed** (resolved in this PR), **open** (still
      unresolved at merge; should not normally land), **deferred → Story X.Y**
@@ -342,4 +379,28 @@ _No debug log entries._
 
 | Finding | Severity | Status | Resolution |
 |---|---|---|---|
-| _No review findings._ |  |  |  |
+| TelemetryStreamAdapter Clone/Copy removal — ABI break or acceptable placeholder→real transition? | HIGH | closed | Team decision: manual Clone impl (resets drop_count), document Copy removal as ZST→real transition |
+| CapabilityRegistryAdapter::set_scalar omits telemetry publish | HIGH | closed | patch |
+| WorkingMemoryOrchestrator atomic entry point missing | HIGH | closed | patch |
+| Composition root omits TelemetryStreamAdapter construction | HIGH | closed | patch |
+| timestamp_ns stores milliseconds not nanoseconds | MEDIUM | closed | patch |
+| Telemetry broadcast send failures silently discarded | MEDIUM | closed | patch |
+| Integration test omits Journal/payload-tag/VerbalizeOnly assertions | MEDIUM | closed | patch |
+| simulate_predicate silently defaults missing bounds | MEDIUM | closed | patch |
+| A3 constructor convention violated in tests | LOW | closed | patch |
+| Corpus README FP count exceeds stated floor | LOW | closed | patch |
+| Malformed API classifier paths embed crate:: syntax | MEDIUM | closed | patch |
+| Duplicate misaligned doc comment in capability/mod.rs | LOW | closed | patch |
+| scalar_tap_subscriber tests manual publish not production path | MEDIUM | closed | patch |
+| RwLock guard poison causes panic on poisoned lock | MEDIUM | closed | patch |
+| Zero capacity argument panics in broadcast constructor | LOW | closed | patch |
+| Infinite value not rejected by set_scalar | MEDIUM | closed | patch |
+| NaN value silently skips predicate rules in evaluator | LOW | closed | patch |
+| NaN threshold in programmatic ScalarPredicate silently disables rule | LOW | closed | patch |
+| TestPort re-implements predicate logic instead of production | LOW | closed | patch |
+| Non-firing test cases missing for three predicates | LOW | closed | patch |
+| Telemetry inline tests never assert event receipt | LOW | closed | patch |
+| SetScalarError::OverflowingPersistence is untested dead code | LOW | closed | patch |
+| Manifest inline tests incomplete NaN/bounds coverage | LOW | closed | patch |
+| scalar_tap_subscriber contradicts per-Spirit subscribe contract | MEDIUM | closed | patch |
+| set_scalar_flag_action test lacks negative side-effect assertions | LOW | closed | patch |

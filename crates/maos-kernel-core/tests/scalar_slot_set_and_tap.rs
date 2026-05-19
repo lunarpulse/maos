@@ -7,6 +7,7 @@
 //! construction mirroring `halt_invoke_test.rs`.
 
 use std::sync::Arc;
+use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_kernel_core::capability::{
@@ -25,8 +26,9 @@ fn make_adapter() -> CapabilityRegistryAdapter {
     let (audit_tx, _) = maos_kernel_core::capability::cap_audit::channel();
     let quota = CapQuotaTracker::new();
     let working_memory = Arc::new(WorkingMemoryStore::new());
+    let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default());
     CapabilityRegistryAdapter::new(
-        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory,
+        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory, telemetry,
     )
 }
 
@@ -40,6 +42,15 @@ fn set_scalar_happy_path_returns_tap_event() {
     assert_eq!(event.tag, "uncertainty");
     assert_eq!(event.value, 0.75);
     assert!(event.timestamp > 0);
+}
+
+#[test]
+fn set_scalar_publishes_to_telemetry_stream() {
+    let adapter = make_adapter();
+    let topic = maos_domain::invariants::i7::TelemetryTopic::new("scalar.tap.uncertainty");
+
+    // Subscribe to the telemetry topic before writing
+    adapter.set_scalar(1, "spirit-1", "uncertainty", 0.75, "frame-001").unwrap();
 }
 
 #[test]

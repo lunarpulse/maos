@@ -29,6 +29,8 @@ use cap_audit::Sender;
 use cap_policy::PolicyTable;
 use cap_quota::CapQuotaTracker;
 use cap_tokens::CapTokensShardRing;
+use crate::telemetry::TelemetryStreamAdapter;
+use maos_domain::ports::TelemetryStreamPort;
 
 fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
     match scope {
@@ -55,6 +57,8 @@ pub struct CapabilityRegistryAdapter {
     quota: Arc<CapQuotaTracker>,
     /// Story 4.2 — per-Spirit tagged-scalar slot store.
     working_memory: Arc<WorkingMemoryStore>,
+    /// Story 4.2 — telemetry stream for scalar.tap broadcast.
+    telemetry: Arc<TelemetryStreamAdapter>,
 }
 
 impl std::fmt::Debug for CapabilityRegistryAdapter {
@@ -80,6 +84,7 @@ impl CapabilityRegistryAdapter {
         audit: Sender,
         quota: CapQuotaTracker,
         working_memory: Arc<WorkingMemoryStore>,
+        telemetry: Arc<TelemetryStreamAdapter>,
     ) -> Self {
         let tokens = Arc::new(CapTokensShardRing::new(
             crypto,
@@ -93,6 +98,7 @@ impl CapabilityRegistryAdapter {
             audit,
             quota: Arc::new(quota),
             working_memory,
+            telemetry,
         }
     }
 
@@ -138,9 +144,7 @@ impl CapabilityRegistryAdapter {
     }
 
     /// Story 4.2 — write a tagged scalar to the per-Spirit slot store
-    /// and return a `ScalarTapEvent` for telemetry publication.
-/// Story 4.2 — write a tagged scalar to the per-Spirit slot store
-    /// and return a `ScalarTapEvent` for telemetry publication.
+    /// and publish a `ScalarTapEvent` to the telemetry stream.
     pub fn set_scalar(
         &self,
         spirit_pid: u32,
@@ -149,7 +153,10 @@ impl CapabilityRegistryAdapter {
         value: f64,
         derived_from: &str,
     ) -> Result<maos_domain::invariants::i7::ScalarTapEvent, SetScalarError> {
-        self.working_memory.set_scalar(spirit_pid, spirit_id, tag, value, derived_from)
+        let event = self.working_memory.set_scalar(spirit_pid, spirit_id, tag, value, derived_from)?;
+        let topic = maos_domain::invariants::i7::TelemetryTopic::new(&format!("scalar.tap.{}", tag));
+        self.telemetry.publish_event(&topic, event.clone());
+        Ok(event)
     }
 
     /// Expose the working-memory store for read-back in integration tests.
@@ -291,6 +298,7 @@ mod tests {
         let (audit_tx, _audit_rx) = cap_audit::channel();
         let quota = CapQuotaTracker::new();
         let working_memory = Arc::new(WorkingMemoryStore::new());
+        let telemetry = Arc::new(TelemetryStreamAdapter::default());
         CapabilityRegistryAdapter::new(
             crypto,
             signing_key,
@@ -299,6 +307,7 @@ mod tests {
             audit_tx,
             quota,
             working_memory,
+            telemetry,
         )
     }
 

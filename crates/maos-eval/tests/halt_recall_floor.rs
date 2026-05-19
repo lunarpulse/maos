@@ -26,15 +26,15 @@ fn simulate_predicate(scenario: &maos_eval::HaltScenario) -> bool {
                         }
                     }
                     "on_value_within" => {
-                        let lower = rule.lower.unwrap_or(0.0);
-                        let upper = rule.upper.unwrap_or(1.0);
+                        let lower = rule.lower.expect("within rule must have lower bound");
+                        let upper = rule.upper.expect("within rule must have upper bound");
                         if lower <= write.value && write.value <= upper {
                             return true;
                         }
                     }
                     "on_value_outside" => {
-                        let lower = rule.lower.unwrap_or(0.0);
-                        let upper = rule.upper.unwrap_or(1.0);
+                        let lower = rule.lower.expect("outside rule must have lower bound");
+                        let upper = rule.upper.expect("outside rule must have upper bound");
                         if write.value < lower || write.value > upper {
                             return true;
                         }

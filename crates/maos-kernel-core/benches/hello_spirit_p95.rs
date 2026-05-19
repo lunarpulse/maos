@@ -28,6 +28,7 @@ use maos_kernel_core::capability::CapabilityRegistryAdapter;
 use maos_kernel_core::iac::TransparencyLogAdapter;
 use maos_kernel_core::inference::InferencePortAdapter;
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
+use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 
 use maos_providers::provider::{Provider, ProviderError};
 
@@ -115,6 +116,7 @@ fn make_test_adapter() -> InferencePortAdapter {
     let (audit_tx, _audit_rx) = cap_audit::channel();
     let quota = maos_kernel_core::capability::cap_quota::CapQuotaTracker::new();
     let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
+    let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default());
     let capabilities = Arc::new(CapabilityRegistryAdapter::new(
         crypto,
         signing_key,
@@ -123,6 +125,7 @@ fn make_test_adapter() -> InferencePortAdapter {
         audit_tx,
         quota,
         working_memory,
+        telemetry,
     ));
 
     let transparency_log = Arc::new(TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF));

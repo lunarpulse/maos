@@ -75,6 +75,12 @@ pub fn evaluate_after_set_scalar(
     policy: &EpistemicPolicySection,
     registry: &dyn CapabilityRegistryPort,
 ) -> Result<Option<PolicyEvaluationOutcome>, PolicyRuntimeError> {
+    if value.is_nan() {
+        // Defense-in-depth: NaN should have been rejected at set_scalar,
+        // but if reached programmatically, silently skip all rules.
+        return Ok(None);
+    }
+
     for rule in &policy.rules {
         if rule.tag != tag {
             continue;
@@ -87,15 +93,19 @@ pub fn evaluate_after_set_scalar(
 
         let fires = match predicate {
             ScalarPredicate::Above { threshold } => {
+                if threshold.is_nan() { continue; }
                 registry.on_value_above(value, *threshold as f64)
             }
             ScalarPredicate::Below { threshold } => {
+                if threshold.is_nan() { continue; }
                 registry.on_value_below(value, *threshold as f64)
             }
             ScalarPredicate::Within { lower, upper } => {
+                if lower.is_nan() || upper.is_nan() { continue; }
                 registry.on_value_within(value, *lower as f64, *upper as f64)
             }
             ScalarPredicate::Outside { lower, upper } => {
+                if lower.is_nan() || upper.is_nan() { continue; }
                 registry.on_value_outside(value, *lower as f64, *upper as f64)
             }
         };
@@ -143,8 +153,9 @@ mod tests {
     use maos_domain::ports::capability::CapError;
     use crate::security::manifest::EpistemicPolicyRule;
 
-    /// A minimal test impl of CapabilityRegistryPort — no tokens needed
-    /// for predicate evaluation tests.
+    /// Test impl of CapabilityRegistryPort — delegates predicate logic to
+    /// the real `CapabilityRegistryAdapter` to avoid drift between test
+    /// fixture and production behaviour.
     struct TestPort;
 
     impl CapabilityRegistryPort for TestPort {
@@ -185,13 +196,13 @@ mod tests {
 
     #[test]
     fn above_halt_fires() {
-        let policy = make_policy_with_rules(vec![EpistemicPolicyRule {
-            tag: "uncertainty".into(),
-            action: EpistemicAction::Halt,
-            on_confidence_below: None,
-            on_evidence_conflict: None,
-            predicate: Some(ScalarPredicate::Above { threshold: 0.7 }),
-        }]);
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Halt,
+            None,
+            None,
+            Some(ScalarPredicate::Above { threshold: 0.7 }),
+        )]);
         let result = evaluate_after_set_scalar(
             "spirit-1", 1, 0xCAFE, "uncertainty", 0.85, "frame-001",
             &policy, &TestPort,
@@ -202,13 +213,64 @@ mod tests {
 
     #[test]
     fn above_no_fire_when_below() {
-        let policy = make_policy_with_rules(vec![EpistemicPolicyRule {
-            tag: "uncertainty".into(),
-            action: EpistemicAction::Halt,
-            on_confidence_below: None,
-            on_evidence_conflict: None,
-            predicate: Some(ScalarPredicate::Above { threshold: 0.7 }),
-        }]);
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Halt,
+            None,
+            None,
+            Some(ScalarPredicate::Above { threshold: 0.7 }),
+        )]);
+        let result = evaluate_after_set_scalar(
+            "spirit-1", 1, 0xCAFE, "uncertainty", 0.5, "frame-001",
+            &policy, &TestPort,
+        )
+        .unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn below_no_fire_when_above() {
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Halt,
+            None,
+            None,
+            Some(ScalarPredicate::Below { threshold: 0.3 }),
+        )]);
+        let result = evaluate_after_set_scalar(
+            "spirit-1", 1, 0xCAFE, "uncertainty", 0.5, "frame-001",
+            &policy, &TestPort,
+        )
+        .unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn within_no_fire_when_outside() {
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Halt,
+            None,
+            None,
+            Some(ScalarPredicate::Within { lower: 0.4, upper: 0.6 }),
+        )]);
+        let result = evaluate_after_set_scalar(
+            "spirit-1", 1, 0xCAFE, "uncertainty", 0.85, "frame-001",
+            &policy, &TestPort,
+        )
+        .unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn outside_no_fire_when_inside() {
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Halt,
+            None,
+            None,
+            Some(ScalarPredicate::Outside { lower: 0.3, upper: 0.7 }),
+        )]);
         let result = evaluate_after_set_scalar(
             "spirit-1", 1, 0xCAFE, "uncertainty", 0.5, "frame-001",
             &policy, &TestPort,
@@ -221,13 +283,13 @@ mod tests {
 
     #[test]
     fn below_halt_fires() {
-        let policy = make_policy_with_rules(vec![EpistemicPolicyRule {
-            tag: "uncertainty".into(),
-            action: EpistemicAction::Halt,
-            on_confidence_below: None,
-            on_evidence_conflict: None,
-            predicate: Some(ScalarPredicate::Below { threshold: 0.3 }),
-        }]);
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Halt,
+            None,
+            None,
+            Some(ScalarPredicate::Below { threshold: 0.3 }),
+        )]);
         let result = evaluate_after_set_scalar(
             "spirit-1", 1, 0xCAFE, "uncertainty", 0.2, "frame-001",
             &policy, &TestPort,
@@ -240,13 +302,13 @@ mod tests {
 
     #[test]
     fn within_halt_fires() {
-        let policy = make_policy_with_rules(vec![EpistemicPolicyRule {
-            tag: "uncertainty".into(),
-            action: EpistemicAction::Halt,
-            on_confidence_below: None,
-            on_evidence_conflict: None,
-            predicate: Some(ScalarPredicate::Within { lower: 0.4, upper: 0.6 }),
-        }]);
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Halt,
+            None,
+            None,
+            Some(ScalarPredicate::Within { lower: 0.4, upper: 0.6 }),
+        )]);
         let result = evaluate_after_set_scalar(
             "spirit-1", 1, 0xCAFE, "uncertainty", 0.5, "frame-001",
             &policy, &TestPort,
@@ -259,13 +321,13 @@ mod tests {
 
     #[test]
     fn outside_halt_fires() {
-        let policy = make_policy_with_rules(vec![EpistemicPolicyRule {
-            tag: "uncertainty".into(),
-            action: EpistemicAction::Halt,
-            on_confidence_below: None,
-            on_evidence_conflict: None,
-            predicate: Some(ScalarPredicate::Outside { lower: 0.3, upper: 0.7 }),
-        }]);
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Halt,
+            None,
+            None,
+            Some(ScalarPredicate::Outside { lower: 0.3, upper: 0.7 }),
+        )]);
         let result = evaluate_after_set_scalar(
             "spirit-1", 1, 0xCAFE, "uncertainty", 0.85, "frame-001",
             &policy, &TestPort,
@@ -278,13 +340,13 @@ mod tests {
 
     #[test]
     fn above_flag_returns_flag_outcome() {
-        let policy = make_policy_with_rules(vec![EpistemicPolicyRule {
-            tag: "uncertainty".into(),
-            action: EpistemicAction::Flag,
-            on_confidence_below: None,
-            on_evidence_conflict: None,
-            predicate: Some(ScalarPredicate::Above { threshold: 0.7 }),
-        }]);
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Flag,
+            None,
+            None,
+            Some(ScalarPredicate::Above { threshold: 0.7 }),
+        )]);
         let result = evaluate_after_set_scalar(
             "spirit-1", 1, 0xCAFE, "uncertainty", 0.9, "frame-001",
             &policy, &TestPort,
@@ -295,13 +357,13 @@ mod tests {
 
     #[test]
     fn above_verbalize_only_returns_verbalize_outcome() {
-        let policy = make_policy_with_rules(vec![EpistemicPolicyRule {
-            tag: "uncertainty".into(),
-            action: EpistemicAction::VerbalizeOnly,
-            on_confidence_below: None,
-            on_evidence_conflict: None,
-            predicate: Some(ScalarPredicate::Above { threshold: 0.7 }),
-        }]);
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::VerbalizeOnly,
+            None,
+            None,
+            Some(ScalarPredicate::Above { threshold: 0.7 }),
+        )]);
         let result = evaluate_after_set_scalar(
             "spirit-1", 1, 0xCAFE, "uncertainty", 0.9, "frame-001",
             &policy, &TestPort,
@@ -314,13 +376,13 @@ mod tests {
 
     #[test]
     fn non_matching_tag_returns_none() {
-        let policy = make_policy_with_rules(vec![EpistemicPolicyRule {
-            tag: "other_tag".into(),
-            action: EpistemicAction::Halt,
-            on_confidence_below: None,
-            on_evidence_conflict: None,
-            predicate: Some(ScalarPredicate::Above { threshold: 0.5 }),
-        }]);
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "other_tag".into(),
+            EpistemicAction::Halt,
+            None,
+            None,
+            Some(ScalarPredicate::Above { threshold: 0.5 }),
+        )]);
         let result = evaluate_after_set_scalar(
             "spirit-1", 1, 0xCAFE, "uncertainty", 0.9, "frame-001",
             &policy, &TestPort,
@@ -333,13 +395,13 @@ mod tests {
 
     #[test]
     fn rule_with_no_predicate_is_skipped() {
-        let policy = make_policy_with_rules(vec![EpistemicPolicyRule {
-            tag: "uncertainty".into(),
-            action: EpistemicAction::Halt,
-            on_confidence_below: None,
-            on_evidence_conflict: Some(true),
-            predicate: None,
-        }]);
+        let policy = make_policy_with_rules(vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Halt,
+            None,
+            Some(true),
+            None,
+        )]);
         let result = evaluate_after_set_scalar(
             "spirit-1", 1, 0xCAFE, "uncertainty", 0.9, "frame-001",
             &policy, &TestPort,
@@ -353,20 +415,20 @@ mod tests {
     #[test]
     fn first_matching_rule_fires() {
         let policy = make_policy_with_rules(vec![
-            EpistemicPolicyRule {
-                tag: "uncertainty".into(),
-                action: EpistemicAction::Flag,
-                on_confidence_below: None,
-                on_evidence_conflict: None,
-                predicate: Some(ScalarPredicate::Above { threshold: 0.5 }),
-            },
-            EpistemicPolicyRule {
-                tag: "uncertainty".into(),
-                action: EpistemicAction::Halt,
-                on_confidence_below: None,
-                on_evidence_conflict: None,
-                predicate: Some(ScalarPredicate::Above { threshold: 0.9 }),
-            },
+            EpistemicPolicyRule::new(
+                "uncertainty".into(),
+                EpistemicAction::Flag,
+                None,
+                None,
+                Some(ScalarPredicate::Above { threshold: 0.5 }),
+            ),
+            EpistemicPolicyRule::new(
+                "uncertainty".into(),
+                EpistemicAction::Halt,
+                None,
+                None,
+                Some(ScalarPredicate::Above { threshold: 0.9 }),
+            ),
         ]);
         let result = evaluate_after_set_scalar(
             "spirit-1", 1, 0xCAFE, "uncertainty", 0.95, "frame-001",

@@ -25,3 +25,4 @@ pub use crate::capability::WorkingMemorySlot;
 pub use crate::capability::SetScalarError;
 pub use crate::capability::WorkingMemoryStore;
 pub use crate::security::manifest::ScalarPredicate;
+pub use crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator;

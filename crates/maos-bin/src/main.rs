@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let io = IoSubsystemAdapter::new();
-    let _telemetry = TelemetryStreamAdapter::default();
+    let telemetry_stream = Arc::new(TelemetryStreamAdapter::default());
 
     // ─────────────────────────────────────────────────────────────
     // Story 1a.3 — FR48 / NFR-Sec-15 crypto-provider seam.
@@ -140,8 +140,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         audit_tx.clone(),
         quota,
         working_memory,
+        Arc::clone(&telemetry_stream),
     ));
     eprintln!("maos: capability registry initialized (Story 1b.2)");
+
+    // Story 4.2 — HaltRegistry + WorkingMemoryOrchestrator for scalar-write pipeline.
+    let _halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
+    let _orchestrator = Arc::new(maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
+        Arc::clone(&capability),
+        Arc::clone(&_halt_registry),
+    ));
 
     // Story 3.4 — Orchestrator buffer registry (shared Arc for one-shot arms).
     let orchestrator_registry = Arc::new(

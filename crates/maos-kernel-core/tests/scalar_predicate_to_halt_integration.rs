@@ -8,6 +8,7 @@
 //! tmpdir journal, real HaltRegistry).
 
 use std::sync::Arc;
+use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
@@ -36,21 +37,22 @@ fn make_adapter() -> CapabilityRegistryAdapter {
     let (audit_tx, _) = maos_kernel_core::capability::cap_audit::channel();
     let quota = CapQuotaTracker::new();
     let working_memory = Arc::new(WorkingMemoryStore::new());
+    let telemetry = Arc::new(TelemetryStreamAdapter::default());
     CapabilityRegistryAdapter::new(
-        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory,
+        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory, telemetry,
     )
 }
 
 fn make_policy() -> EpistemicPolicySection {
     EpistemicPolicySection {
         rules: vec![
-            EpistemicPolicyRule {
-                tag: "uncertainty".into(),
-                action: EpistemicAction::Halt,
-                on_confidence_below: None,
-                on_evidence_conflict: None,
-                predicate: Some(ScalarPredicate::Above { threshold: 0.7 }),
-            },
+            EpistemicPolicyRule::new(
+                "uncertainty".into(),
+                EpistemicAction::Halt,
+                None,
+                None,
+                Some(ScalarPredicate::Above { threshold: 0.7 }),
+            ),
         ],
         default_action: EpistemicAction::VerbalizeOnly,
     }
@@ -103,7 +105,7 @@ fn set_scalar_to_halt_end_to_end() {
     assert_eq!(receipt.boot_nonce, boot_nonce);
     assert_ne!(receipt.frame_id, [0u8; 16]);
 
-    // Verify Transparency Log has the EpistemicHalt row
+    // Verify Transparency Log has the EpistemicHalt row with correct tag
     let entries = tl
         .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
             kind: Some(FrameKind::EpistemicHalt),
@@ -118,6 +120,10 @@ fn set_scalar_to_halt_end_to_end() {
     let pending = registry.pending_halt_ids();
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].as_str(), receipt.halt_id.as_str());
+
+    // Verify Lifecycle Journal has the Halt entry
+    assert_eq!(journal.last_event("spirit-1"), Some(LifecycleEvent::Halt),
+        "expected LifecycleEvent::Halt in journal");
 }
 
 #[test]
@@ -139,18 +145,24 @@ fn set_scalar_no_halt_when_predicate_does_not_fire() {
 fn set_scalar_flag_action_does_not_halt() {
     let flag_policy = EpistemicPolicySection {
         rules: vec![
-            EpistemicPolicyRule {
-                tag: "uncertainty".into(),
-                action: EpistemicAction::Flag,
-                on_confidence_below: None,
-                on_evidence_conflict: None,
-                predicate: Some(ScalarPredicate::Above { threshold: 0.5 }),
-            },
+            EpistemicPolicyRule::new(
+                "uncertainty".into(),
+                EpistemicAction::Flag,
+                None,
+                None,
+                Some(ScalarPredicate::Above { threshold: 0.5 }),
+            ),
         ],
         default_action: EpistemicAction::VerbalizeOnly,
     };
 
     let adapter = make_adapter();
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xCAFE));
+    let journal_dir = tempfile::tempdir().unwrap();
+    let journal_path = journal_dir.path().join("journal.sqlite");
+    let journal = JournalAdapter::open(&journal_path).unwrap();
+    let registry = HaltRegistry::new();
+
     let outcome = evaluate_after_set_scalar(
         "spirit-1", 1, 0xCAFE,
         "uncertainty", 0.9, "frame-001",
@@ -162,6 +174,61 @@ fn set_scalar_flag_action_does_not_halt() {
         matches!(outcome, Some(PolicyEvaluationOutcome::Flag(_))),
         "expected Flag outcome"
     );
+
+    // Negative side-effect assertions: Flag must NOT produce TL rows, journal entries, or registry state
+    let tl_entries = tl.query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+        kind: Some(FrameKind::EpistemicHalt),
+        ..Default::default()
+    }).unwrap();
+    assert_eq!(tl_entries.len(), 0, "Flag action must not write to Transparency Log");
+    assert_eq!(registry.pending_halt_ids().len(), 0, "Flag action must not insert into HaltRegistry");
+    assert_ne!(journal.last_event("spirit-1"), Some(LifecycleEvent::Halt),
+        "Flag action must not write Halt to journal");
+}
+
+#[test]
+fn set_scalar_verbalize_only_action_does_not_halt() {
+    let verbalize_policy = EpistemicPolicySection {
+        rules: vec![
+            EpistemicPolicyRule::new(
+                "uncertainty".into(),
+                EpistemicAction::VerbalizeOnly,
+                None,
+                None,
+                Some(ScalarPredicate::Above { threshold: 0.5 }),
+            ),
+        ],
+        default_action: EpistemicAction::VerbalizeOnly,
+    };
+
+    let adapter = make_adapter();
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xCAFE));
+    let journal_dir = tempfile::tempdir().unwrap();
+    let journal_path = journal_dir.path().join("journal.sqlite");
+    let journal = JournalAdapter::open(&journal_path).unwrap();
+    let registry = HaltRegistry::new();
+
+    let outcome = evaluate_after_set_scalar(
+        "spirit-1", 1, 0xCAFE,
+        "uncertainty", 0.9, "frame-001",
+        &verbalize_policy, &adapter as &dyn CapabilityRegistryPort,
+    )
+    .unwrap();
+
+    assert!(
+        matches!(outcome, Some(PolicyEvaluationOutcome::VerbalizeOnly)),
+        "expected VerbalizeOnly outcome"
+    );
+
+    // Negative side-effect assertions
+    let tl_entries = tl.query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+        kind: Some(FrameKind::EpistemicHalt),
+        ..Default::default()
+    }).unwrap();
+    assert_eq!(tl_entries.len(), 0, "VerbalizeOnly action must not write to Transparency Log");
+    assert_eq!(registry.pending_halt_ids().len(), 0, "VerbalizeOnly action must not insert into HaltRegistry");
+    assert_ne!(journal.last_event("spirit-1"), Some(LifecycleEvent::Halt),
+        "VerbalizeOnly action must not write Halt to journal");
 }
 
 #[test]

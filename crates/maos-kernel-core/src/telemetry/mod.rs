@@ -35,7 +35,20 @@ use maos_domain::invariants::i7::{ScalarTapEvent, TelemetryTopic};
 #[derive(Debug)]
 pub struct TelemetryStreamAdapter {
     topics: Arc<DashMap<TelemetryTopic, tokio::sync::broadcast::Sender<ScalarTapEvent>>>,
+    subscribers: Arc<DashMap<(String, TelemetryTopic), ()>>,
     capacity: usize,
+    drop_count: std::sync::atomic::AtomicUsize,
+}
+
+impl Clone for TelemetryStreamAdapter {
+    fn clone(&self) -> Self {
+        Self {
+            topics: Arc::clone(&self.topics),
+            subscribers: Arc::clone(&self.subscribers),
+            capacity: self.capacity,
+            drop_count: std::sync::atomic::AtomicUsize::new(0),
+        }
+    }
 }
 
 impl Default for TelemetryStreamAdapter {
@@ -49,9 +62,12 @@ impl TelemetryStreamAdapter {
     /// Capacity defaults to 2048 — sized for Mira-class diagnostic
     /// Spirit scalar drift fanout.
     pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "broadcast capacity must be > 0");
         Self {
             topics: Arc::new(DashMap::new()),
+            subscribers: Arc::new(DashMap::new()),
             capacity,
+            drop_count: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 }
@@ -59,19 +75,32 @@ impl TelemetryStreamAdapter {
 impl TelemetryStreamPort for TelemetryStreamAdapter {
     fn publish_event(&self, topic: &TelemetryTopic, event: ScalarTapEvent) {
         if let Some(sender) = self.topics.get(topic) {
-            let _ = sender.send(event);
+            if sender.send(event).is_err() {
+                self.drop_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+        } else {
+            // No topic channel exists — count as dropped
+            self.drop_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
-        // If no subscribers, the event is silently dropped — Tokio
-        // broadcast returns Err(SendError) when there are no receivers.
     }
 
-    fn subscribe_topic(&self, _spirit_id: &str, topic: &TelemetryTopic) -> bool {
+    fn subscribe_topic(&self, spirit_id: &str, topic: &TelemetryTopic) -> bool {
         use dashmap::mapref::entry::Entry;
+
+        // Ensure broadcast channel exists for this topic
         match self.topics.entry(topic.clone()) {
-            Entry::Occupied(_) => false,
             Entry::Vacant(entry) => {
                 let (tx, _rx) = tokio::sync::broadcast::channel(self.capacity);
                 entry.insert(tx);
+            }
+            Entry::Occupied(_) => {}
+        }
+
+        // Track per-spirit subscription
+        match self.subscribers.entry((spirit_id.to_string(), topic.clone())) {
+            Entry::Occupied(_) => false,
+            Entry::Vacant(entry) => {
+                entry.insert(());
                 true
             }
         }
@@ -108,7 +137,15 @@ mod tests {
         let adapter = TelemetryStreamAdapter::new(2048);
         let topic = TelemetryTopic::new("scalar.tap.uncertainty");
         adapter.subscribe_topic("spirit-1", &topic);
-        assert!(!adapter.subscribe_topic("spirit-2", &topic));
+        assert!(!adapter.subscribe_topic("spirit-1", &topic), "re-subscribe by same spirit should return false");
+    }
+
+    #[test]
+    fn subscribe_topic_different_spirit_returns_true() {
+        let adapter = TelemetryStreamAdapter::new(2048);
+        let topic = TelemetryTopic::new("scalar.tap.uncertainty");
+        assert!(adapter.subscribe_topic("spirit-1", &topic));
+        assert!(adapter.subscribe_topic("spirit-2", &topic), "different spirit subscribing to same topic should return true");
     }
 
     #[test]
@@ -116,15 +153,33 @@ mod tests {
         let adapter = TelemetryStreamAdapter::new(2048);
         // No subscribers — send should be silently dropped
         let topic = TelemetryTopic::new("scalar.tap.uncertainty");
-        adapter.subscribe_topic("spirit-1", &topic);
-        // We have a sender but no receiver — publish_event sends to
-        // broadcast channel; the send returns Ok but no one receives.
         adapter.publish_event(&topic, ScalarTapEvent {
             spirit_id: "s1".into(),
             tag: "uncertainty".into(),
             value: 0.75,
             timestamp: 1,
         });
+        assert_eq!(adapter.drop_count.load(std::sync::atomic::Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn publish_with_subscriber_receives_event() {
+        let adapter = TelemetryStreamAdapter::new(2048);
+        let topic = TelemetryTopic::new("scalar.tap.uncertainty");
+        adapter.subscribe_topic("spirit-1", &topic);
+        let mut rx = adapter.subscribe(&topic).unwrap();
+
+        adapter.publish_event(&topic, ScalarTapEvent {
+            spirit_id: "s1".into(),
+            tag: "uncertainty".into(),
+            value: 0.75,
+            timestamp: 1,
+        });
+
+        let received = rx.try_recv().expect("subscriber should receive the event");
+        assert_eq!(received.spirit_id, "s1");
+        assert_eq!(received.tag, "uncertainty");
+        assert_eq!(received.value, 0.75);
     }
 
     #[test]

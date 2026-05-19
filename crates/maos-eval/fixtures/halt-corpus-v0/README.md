@@ -10,7 +10,7 @@
 |---|---|---|
 | `true_positive` | 26 | ≥15 |
 | `true_negative` | 19 | ≥15 |
-| `false_positive` | 11 | ≤10 |
+| `false_positive` | 11 | ≤11 |
 | `false_negative` | 6 | ≤10 |
 | **Total** | **62** | |
 

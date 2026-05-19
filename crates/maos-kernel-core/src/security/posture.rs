@@ -292,23 +292,23 @@ mod tests {
     #[test]
     fn posture_hash_changes_when_threshold_changes() {
         let policy1 = EpistemicPolicySection {
-            rules: vec![EpistemicPolicyRule {
-                tag: "x".into(),
-                action: EpistemicAction::Halt,
-                on_confidence_below: Some(0.5),
-                on_evidence_conflict: None,
-            predicate: None,
-            }],
+            rules: vec![EpistemicPolicyRule::new(
+                "x".into(),
+                EpistemicAction::Halt,
+                Some(0.5),
+                None,
+                None,
+            )],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let policy2 = EpistemicPolicySection {
-            rules: vec![EpistemicPolicyRule {
-                tag: "x".into(),
-                action: EpistemicAction::Halt,
-                on_confidence_below: Some(0.8),
-                on_evidence_conflict: None,
-            predicate: None,
-            }],
+            rules: vec![EpistemicPolicyRule::new(
+                "x".into(),
+                EpistemicAction::Halt,
+                Some(0.8),
+                None,
+                None,
+            )],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let s1 = make_state_with_policy(Posture::Assistive, Posture::AutonomousWithHalt, policy1);
@@ -335,39 +335,39 @@ mod tests {
     fn posture_hash_stable_under_rule_reordering() {
         let policy1 = EpistemicPolicySection {
             rules: vec![
-                EpistemicPolicyRule {
-                    tag: "b".into(),
-                    action: EpistemicAction::Flag,
-                    on_confidence_below: None,
-                    on_evidence_conflict: None,
-                predicate: None,
-                },
-                EpistemicPolicyRule {
-                    tag: "a".into(),
-                    action: EpistemicAction::Halt,
-                    on_confidence_below: Some(0.7),
-                    on_evidence_conflict: Some(true),
-                predicate: None,
-                },
+                EpistemicPolicyRule::new(
+                    "b".into(),
+                    EpistemicAction::Flag,
+                    None,
+                    None,
+                    None,
+                ),
+                EpistemicPolicyRule::new(
+                    "a".into(),
+                    EpistemicAction::Halt,
+                    Some(0.7),
+                    Some(true),
+                    None,
+                ),
             ],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let policy2 = EpistemicPolicySection {
             rules: vec![
-                EpistemicPolicyRule {
-                    tag: "a".into(),
-                    action: EpistemicAction::Halt,
-                    on_confidence_below: Some(0.7),
-                    on_evidence_conflict: Some(true),
-                predicate: None,
-                },
-                EpistemicPolicyRule {
-                    tag: "b".into(),
-                    action: EpistemicAction::Flag,
-                    on_confidence_below: None,
-                    on_evidence_conflict: None,
-                predicate: None,
-                },
+                EpistemicPolicyRule::new(
+                    "a".into(),
+                    EpistemicAction::Halt,
+                    Some(0.7),
+                    Some(true),
+                    None,
+                ),
+                EpistemicPolicyRule::new(
+                    "b".into(),
+                    EpistemicAction::Flag,
+                    None,
+                    None,
+                    None,
+                ),
             ],
             default_action: EpistemicAction::VerbalizeOnly,
         };
@@ -379,13 +379,13 @@ mod tests {
     #[test]
     fn apply_director_preferences_clamps_tilt() {
         let policy = EpistemicPolicySection {
-            rules: vec![EpistemicPolicyRule {
-                tag: "x".into(),
-                action: EpistemicAction::Halt,
-                on_confidence_below: Some(0.5),
-                on_evidence_conflict: None,
-            predicate: None,
-            }],
+            rules: vec![EpistemicPolicyRule::new(
+                "x".into(),
+                EpistemicAction::Halt,
+                Some(0.5),
+                None,
+                None,
+            )],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         // tilt > 1.0 should be clamped to 1.0
@@ -401,13 +401,13 @@ mod tests {
     #[test]
     fn apply_director_preferences_rejects_nan() {
         let policy = EpistemicPolicySection {
-            rules: vec![EpistemicPolicyRule {
-                tag: "x".into(),
-                action: EpistemicAction::Halt,
-                on_confidence_below: Some(0.5),
-                on_evidence_conflict: None,
-            predicate: None,
-            }],
+            rules: vec![EpistemicPolicyRule::new(
+                "x".into(),
+                EpistemicAction::Halt,
+                Some(0.5),
+                None,
+                None,
+            )],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let overrides = vec![HaltPolicyOverride {
@@ -421,13 +421,13 @@ mod tests {
     #[test]
     fn apply_director_preferences_idempotent() {
         let policy = EpistemicPolicySection {
-            rules: vec![EpistemicPolicyRule {
-                tag: "x".into(),
-                action: EpistemicAction::Flag,
-                on_confidence_below: Some(0.3),
-                on_evidence_conflict: None,
-            predicate: None,
-            }],
+            rules: vec![EpistemicPolicyRule::new(
+                "x".into(),
+                EpistemicAction::Flag,
+                Some(0.3),
+                None,
+                None,
+            )],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let result =
@@ -440,13 +440,13 @@ mod tests {
     #[test]
     fn apply_director_preferences_negative_tilt_lowers_threshold() {
         let policy = EpistemicPolicySection {
-            rules: vec![EpistemicPolicyRule {
-                tag: "x".into(),
-                action: EpistemicAction::Halt,
-                on_confidence_below: Some(0.8),
-                on_evidence_conflict: None,
-            predicate: None,
-            }],
+            rules: vec![EpistemicPolicyRule::new(
+                "x".into(),
+                EpistemicAction::Halt,
+                Some(0.8),
+                None,
+                None,
+            )],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let overrides = vec![HaltPolicyOverride {
@@ -461,13 +461,13 @@ mod tests {
     #[test]
     fn apply_director_preferences_rejects_unknown_tag() {
         let policy = EpistemicPolicySection {
-            rules: vec![EpistemicPolicyRule {
-                tag: "a".into(),
-                action: EpistemicAction::Halt,
-                on_confidence_below: Some(0.5),
-                on_evidence_conflict: None,
-            predicate: None,
-            }],
+            rules: vec![EpistemicPolicyRule::new(
+                "a".into(),
+                EpistemicAction::Halt,
+                Some(0.5),
+                None,
+                None,
+            )],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let overrides = vec![HaltPolicyOverride {
@@ -484,13 +484,13 @@ mod tests {
     #[test]
     fn apply_director_preferences_rejects_duplicate_override_tag() {
         let policy = EpistemicPolicySection {
-            rules: vec![EpistemicPolicyRule {
-                tag: "x".into(),
-                action: EpistemicAction::Halt,
-                on_confidence_below: Some(0.5),
-                on_evidence_conflict: None,
-            predicate: None,
-            }],
+            rules: vec![EpistemicPolicyRule::new(
+                "x".into(),
+                EpistemicAction::Halt,
+                Some(0.5),
+                None,
+                None,
+            )],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let overrides = vec![
@@ -507,13 +507,13 @@ mod tests {
     #[test]
     fn apply_director_preferences_rejects_override_for_rule_without_threshold() {
         let policy = EpistemicPolicySection {
-            rules: vec![EpistemicPolicyRule {
-                tag: "x".into(),
-                action: EpistemicAction::Halt,
-                on_confidence_below: None,
-                on_evidence_conflict: None,
-            predicate: None,
-            }],
+            rules: vec![EpistemicPolicyRule::new(
+                "x".into(),
+                EpistemicAction::Halt,
+                None,
+                None,
+                None,
+            )],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let overrides = vec![HaltPolicyOverride {

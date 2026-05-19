@@ -19,13 +19,13 @@
 
 # api/* re-exports — surface aggregator (the canonical walk path).
 # Adapter types themselves carry the same class as their port traits.
-"maos_kernel_core::api::crate::capability::CapabilityRegistryAdapter"    = "universal-arithmetic"
-"maos_kernel_core::api::crate::iac::IacBusAdapter"                       = "data-movement"
-"maos_kernel_core::api::crate::io::IoSubsystemAdapter"                   = "data-movement"
-"maos_kernel_core::api::crate::memory::MemoryManagerAdapter"             = "data-movement"
-"maos_kernel_core::api::crate::scheduler::SpiritSchedulerAdapter"        = "supervision"
-"maos_kernel_core::api::crate::security::SecurityManagerAdapter"         = "supervision"
-"maos_kernel_core::api::crate::telemetry::TelemetryStreamAdapter"        = "data-movement"
+"maos_kernel_core::api::capability::CapabilityRegistryAdapter"    = "universal-arithmetic"
+"maos_kernel_core::api::iac::IacBusAdapter"                       = "data-movement"
+"maos_kernel_core::api::io::IoSubsystemAdapter"                   = "data-movement"
+"maos_kernel_core::api::memory::MemoryManagerAdapter"             = "data-movement"
+"maos_kernel_core::api::scheduler::SpiritSchedulerAdapter"        = "supervision"
+"maos_kernel_core::api::security::SecurityManagerAdapter"         = "supervision"
+"maos_kernel_core::api::telemetry::TelemetryStreamAdapter"        = "data-movement"
 
 # Direct module-path exports (xtask walk produces both api::* and module::*
 # entries because the syn walker visits both the re-export and the
@@ -40,7 +40,7 @@
 
 # Story 1a.3 — CryptoProvider port + RingCryptoProvider adapter.
 "maos_kernel_core::security::crypto::RingCryptoProvider"              = "data-movement"
-"maos_kernel_core::api::crate::security::RingCryptoProvider"          = "data-movement"
+"maos_kernel_core::api::security::RingCryptoProvider"          = "data-movement"
 
 # Port-trait re-exports propagated through `pub use maos_domain::ports::…`.
 # These appear as `use` items in the syn walk (per check_service_boundary
@@ -57,8 +57,8 @@
 # These read/write kernel-managed audit logs — the audit-spine runtime body.
 
 # api/* re-exports for new adapters
-"maos_kernel_core::api::crate::iac::TransparencyLogAdapter"       = "supervision"
-"maos_kernel_core::api::crate::journal::JournalAdapter"           = "supervision"
+"maos_kernel_core::api::iac::TransparencyLogAdapter"       = "supervision"
+"maos_kernel_core::api::journal::JournalAdapter"           = "supervision"
 
 # Direct module-path entries
 "maos_kernel_core::iac::transparency_log::TransparencyLogAdapter" = "supervision"
@@ -206,14 +206,14 @@
 "maos_kernel_core::security::manifest::Author"                    = "data-movement"
 
 # api/* re-exports (via security::pub use → api::SecurityManagerAdapter chain)
-"maos_kernel_core::api::crate::security::ClassSection"            = "supervision"
-"maos_kernel_core::api::crate::security::CapabilitiesRequired"    = "universal-arithmetic"
-"maos_kernel_core::api::crate::security::ProviderCapabilities"    = "universal-arithmetic"
-"maos_kernel_core::api::crate::security::PostureSection"          = "supervision"
-"maos_kernel_core::api::crate::security::Posture"                 = "supervision"
-"maos_kernel_core::api::crate::security::OutputShape"             = "data-movement"
-"maos_kernel_core::api::crate::security::Budget"                  = "data-movement"
-"maos_kernel_core::api::crate::security::Author"                  = "data-movement"
+"maos_kernel_core::api::security::ClassSection"            = "supervision"
+"maos_kernel_core::api::security::CapabilitiesRequired"    = "universal-arithmetic"
+"maos_kernel_core::api::security::ProviderCapabilities"    = "universal-arithmetic"
+"maos_kernel_core::api::security::PostureSection"          = "supervision"
+"maos_kernel_core::api::security::Posture"                 = "supervision"
+"maos_kernel_core::api::security::OutputShape"             = "data-movement"
+"maos_kernel_core::api::security::Budget"                  = "data-movement"
+"maos_kernel_core::api::security::Author"                  = "data-movement"
 
 # Story 2.1 — OutputShapePredicate + OutputShapeViolation (data-movement: predicate validation)
 "maos_kernel_core::security::manifest::OutputShapePredicate"       = "data-movement"
@@ -227,11 +227,11 @@
 "maos_kernel_core::security::drift::make_drift_channel"            = "supervision"
 
 # Story 2.1 — api re-exports for new types (same classes as originals)
-"maos_kernel_core::api::crate::security::OutputShapePredicate"     = "data-movement"
-"maos_kernel_core::api::crate::security::OutputShapeViolation"     = "data-movement"
-"maos_kernel_core::api::crate::security::capabilities_required_to_scopes" = "supervision"
-"maos_kernel_core::api::crate::security::DriftEvent"               = "supervision"
-"maos_kernel_core::api::crate::security::make_drift_channel"       = "supervision"
+"maos_kernel_core::api::security::OutputShapePredicate"     = "data-movement"
+"maos_kernel_core::api::security::OutputShapeViolation"     = "data-movement"
+"maos_kernel_core::api::security::capabilities_required_to_scopes" = "supervision"
+"maos_kernel_core::api::security::DriftEvent"               = "supervision"
+"maos_kernel_core::api::security::make_drift_channel"       = "supervision"
 
 # ── Story 3.1 — IAC Bus frame types (re-exports from domain via frame.rs) ──
 # All data-movement: frame routing / payload shape types.
@@ -350,7 +350,7 @@
 "maos_kernel_core::telemetry::TelemetryStreamAdapter::subscribe"        = "data-movement"
 
 # api/* re-exports (mirror convention at lines 22-28)
-"maos_kernel_core::api::crate::capability::WorkingMemorySlot"           = "universal-arithmetic"
-"maos_kernel_core::api::crate::capability::SetScalarError"              = "universal-arithmetic"
-"maos_kernel_core::api::crate::capability::WorkingMemoryStore"          = "universal-arithmetic"
-"maos_kernel_core::api::crate::security::ScalarPredicate"               = "universal-arithmetic"
+"maos_kernel_core::api::capability::WorkingMemorySlot"           = "universal-arithmetic"
+"maos_kernel_core::api::capability::SetScalarError"              = "universal-arithmetic"
+"maos_kernel_core::api::capability::WorkingMemoryStore"          = "universal-arithmetic"
+"maos_kernel_core::api::security::ScalarPredicate"               = "universal-arithmetic"

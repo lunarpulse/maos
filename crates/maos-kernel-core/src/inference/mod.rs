@@ -197,6 +197,7 @@ mod tests {
         let (audit_tx, _audit_rx) = crate::capability::cap_audit::channel();
         let quota = CapQuotaTracker::new();
         let working_memory = Arc::new(WorkingMemoryStore::new());
+        let telemetry = Arc::new(crate::telemetry::TelemetryStreamAdapter::default());
         let capabilities = Arc::new(CapabilityRegistryAdapter::new(
             crypto,
             signing_key,
@@ -205,6 +206,7 @@ mod tests {
             audit_tx,
             quota,
             working_memory,
+            telemetry,
         ));
         let transparency_log = Arc::new(TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF));
         let telemetry = Arc::new(IacRtMetrics::new());

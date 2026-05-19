@@ -9,6 +9,7 @@
 //! regression A3 closed in Story 4.1).
 
 use std::sync::Arc;
+use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_domain::ports::CapabilityRegistryPort;
@@ -36,8 +37,9 @@ fn make_adapter() -> CapabilityRegistryAdapter {
     let (audit_tx, _) = maos_kernel_core::capability::cap_audit::channel();
     let quota = CapQuotaTracker::new();
     let working_memory = Arc::new(WorkingMemoryStore::new());
+    let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default());
     CapabilityRegistryAdapter::new(
-        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory,
+        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory, telemetry,
     )
 }
 

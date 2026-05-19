@@ -614,13 +614,14 @@ impl EpistemicPolicyRule {
         action: EpistemicAction,
         on_confidence_below: Option<f32>,
         on_evidence_conflict: Option<bool>,
+        predicate: Option<ScalarPredicate>,
     ) -> Self {
         Self {
             tag,
             action,
             on_confidence_below,
             on_evidence_conflict,
-            predicate: None,
+            predicate,
         }
     }
 }
@@ -1550,6 +1551,36 @@ on_value_above = { threshold = nan }"#;
 tag = "x"
 action = "halt"
 on_value_within = { lower = 0.7, upper = 0.3 }"#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("lower") && msg.contains("upper")));
+    }
+
+    #[test]
+    fn predicate_rejects_nan_threshold_in_below() {
+        let s = r#"[[rules]]
+tag = "x"
+action = "halt"
+on_value_below = { threshold = nan }"#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("NaN")));
+    }
+
+    #[test]
+    fn predicate_rejects_nan_threshold_in_outside() {
+        let s = r#"[[rules]]
+tag = "x"
+action = "halt"
+on_value_outside = { lower = nan, upper = 0.5 }"#;
+        let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
+        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("NaN")));
+    }
+
+    #[test]
+    fn predicate_rejects_inverted_bounds_outside() {
+        let s = r#"[[rules]]
+tag = "x"
+action = "halt"
+on_value_outside = { lower = 0.7, upper = 0.3 }"#;
         let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
         assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("lower") && msg.contains("upper")));
     }

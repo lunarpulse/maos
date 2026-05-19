@@ -5,6 +5,7 @@
 //! task with an in-memory TransparencyLog to exercise the full audit path.
 
 use std::sync::Arc;
+use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 use std::time::Instant;
 
 use maos_kernel_core::capability::{
@@ -54,7 +55,8 @@ fn make_adapter_with_writer() -> (CapabilityRegistryAdapter, tokio::task::JoinHa
     let tlog = Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF));
     let writer = cap_audit::CapAuditWriter::spawn(audit_rx, tlog);
 
-    let adapter = CapabilityRegistryAdapter::new(crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx, quota, Arc::new(WorkingMemoryStore::new()));
+    let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default());
+    let adapter = CapabilityRegistryAdapter::new(crypto, signing_key, 0xDEAD_BEEF, Arc::new(policy), audit_tx, quota, Arc::new(WorkingMemoryStore::new()), telemetry);
     (adapter, writer)
 }
 
