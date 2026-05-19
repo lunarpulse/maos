@@ -20,6 +20,13 @@ use maos_kernel_core::halt::{
 use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::iac::Mailbox;
 use maos_kernel_core::journal::JournalAdapter;
+use maos_kernel_core::memory::{MemoryManagerAdapter, private::PrivateMemoryStore, shared::SharedMemoryStore, principal::PrincipalNamespaceIndex};
+use maos_kernel_core::capability::CapabilityRegistryAdapter;
+use maos_kernel_core::capability::cap_tokens::Ed25519SigningKey;
+use maos_kernel_core::security::RingCryptoProvider;
+use maos_domain::ports::crypto::CryptoProvider;
+use maos_kernel_core::capability::cap_policy::PolicyTable;
+use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 
 fn make_journal() -> (JournalAdapter, tempfile::TempDir) {
     let tmpdir = tempfile::TempDir::new().unwrap();
@@ -101,6 +108,39 @@ fn invoke_halt_then_resolve_via_mock_records_call() {
 
 // --- AC2: KernelHaltResolver three resolution kinds ---
 
+fn make_memory_adapter(
+    tl: Arc<TransparencyLogAdapter>,
+) -> (Arc<MemoryManagerAdapter>, Arc<tempfile::TempDir>) {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let memory_root = tmp.path().join("memory");
+    let db_path = tmp.path().join("test.db");
+
+    let private = Arc::new(PrivateMemoryStore::new(memory_root, 4 * 1024));
+    let shared = Arc::new(SharedMemoryStore::open(&db_path).unwrap());
+    let principal_index = Arc::new(PrincipalNamespaceIndex::open(&db_path).unwrap());
+    let adapter = Arc::new(MemoryManagerAdapter::new(private, shared, principal_index, tl));
+    (adapter, Arc::new(tmp))
+}
+
+fn make_capability() -> Arc<CapabilityRegistryAdapter> {
+    let crypto: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);
+    let signing_key = Ed25519SigningKey::new([0u8; 32]);
+    let policy = Arc::new(PolicyTable::new());
+    let (audit_tx, _audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+    let quota = maos_kernel_core::capability::cap_quota::CapQuotaTracker::new();
+    let telemetry_stream = Arc::new(TelemetryStreamAdapter::default());
+    Arc::new(CapabilityRegistryAdapter::new(
+        crypto,
+        signing_key,
+        0xBEEF,
+        policy,
+        audit_tx,
+        quota,
+        Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+        telemetry_stream,
+    ))
+}
+
 fn setup_kernel_resolver() -> (
     Arc<TransparencyLogAdapter>,
     Arc<HaltRegistry>,
@@ -109,25 +149,36 @@ fn setup_kernel_resolver() -> (
     Arc<Mailbox>,
     JournalAdapter,
     tempfile::TempDir,
+    Arc<MemoryManagerAdapter>,
+    Arc<CapabilityRegistryAdapter>,
+    Arc<tempfile::TempDir>,
 ) {
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xBEEF));
     let registry = Arc::new(HaltRegistry::new());
     let output_markers = Arc::new(OutputMarkerRegistry::new());
     let mailbox = Arc::new(Mailbox::new(Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new())));
+    let (memory, mem_tmp) = make_memory_adapter(Arc::clone(&tl));
+    let capability = make_capability();
+    let orchestrator = Arc::new(maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
+        Arc::clone(&capability),
+        Arc::clone(&registry),
+    ));
     let resolver = Arc::new(KernelHaltResolver::new(
         Arc::clone(&registry),
         Arc::clone(&tl),
         Arc::clone(&output_markers),
         Arc::clone(&mailbox),
         0xBEEF,
+        Arc::clone(&memory),
+        orchestrator,
     ));
     let (journal, tmpdir) = make_journal();
-    (tl, registry, resolver, output_markers, mailbox, journal, tmpdir)
+    (tl, registry, resolver, output_markers, mailbox, journal, tmpdir, memory, capability, mem_tmp)
 }
 
 #[test]
 fn kernel_resolver_provided_context_marks_resumed_and_clears_registry() {
-    let (tl, registry, resolver, output_markers, _mailbox, journal, _tmpdir) = setup_kernel_resolver();
+    let (tl, registry, resolver, output_markers, _mailbox, journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
 
     let payload = EpistemicHaltPayload::new(
         "halt-pc".into(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
@@ -146,7 +197,7 @@ fn kernel_resolver_provided_context_marks_resumed_and_clears_registry() {
 
 #[test]
 fn kernel_resolver_accepted_halt_emits_task_orphaned_and_marks_terminated() {
-    let (tl, registry, resolver, output_markers, _mailbox, journal, _tmpdir) = setup_kernel_resolver();
+    let (tl, registry, resolver, output_markers, _mailbox, journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
 
     let payload = EpistemicHaltPayload::new(
         "halt-ah".into(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
@@ -175,7 +226,7 @@ fn kernel_resolver_accepted_halt_emits_task_orphaned_and_marks_terminated() {
 
 #[test]
 fn kernel_resolver_authorized_override_enqueues_output_marker_and_marks_overridden() {
-    let (tl, registry, resolver, output_markers, _mailbox, journal, _tmpdir) = setup_kernel_resolver();
+    let (tl, registry, resolver, output_markers, _mailbox, journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
 
     let payload = EpistemicHaltPayload::new(
         "halt-ao".into(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
@@ -198,7 +249,7 @@ fn kernel_resolver_authorized_override_enqueues_output_marker_and_marks_overridd
 
 #[test]
 fn kernel_resolver_unknown_halt_returns_error() {
-    let (_tl, _registry, resolver, _output_markers, _mailbox, _journal, _tmpdir) = setup_kernel_resolver();
+    let (_tl, _registry, resolver, _output_markers, _mailbox, _journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
 
     let hid = HaltId::new("halt-unknown").unwrap();
     let err = resolver.resolve(&hid, Resolution::AcceptedHalt).unwrap_err();
@@ -207,7 +258,7 @@ fn kernel_resolver_unknown_halt_returns_error() {
 
 #[test]
 fn kernel_resolver_double_resolve_returns_already_resolved() {
-    let (tl, registry, resolver, _output_markers, _mailbox, journal, _tmpdir) = setup_kernel_resolver();
+    let (tl, registry, resolver, _output_markers, _mailbox, journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
 
     let payload = EpistemicHaltPayload::new(
         "halt-dr".into(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
@@ -223,7 +274,7 @@ fn kernel_resolver_double_resolve_returns_already_resolved() {
 #[test]
 fn kernel_resolver_is_send_and_sync() {
     fn _assert_send_sync<T: Send + Sync>(_: T) {}
-    let (_tl, registry, _resolver, _output_markers, _mailbox, _journal, _tmpdir) = setup_kernel_resolver();
+    let (_tl, registry, _resolver, _output_markers, _mailbox, _journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
     _assert_send_sync(registry);
 }
 
@@ -258,7 +309,7 @@ fn invoke_halt_empty_halt_id_returns_registry_insert_failed() {
 
 #[test]
 fn kernel_resolver_transitions_registry_state_for_all_three_resolution_kinds() {
-    let (tl, registry, resolver, _output_markers, _mailbox, journal, _tmpdir) = setup_kernel_resolver();
+    let (tl, registry, resolver, _output_markers, _mailbox, journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
 
     // Setup three halts
     for id in &["halt-a", "halt-b", "halt-c"] {

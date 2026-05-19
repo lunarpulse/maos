@@ -20,3 +20,5 @@ pub mod iac_bus_types;
 pub mod notification;
 pub mod halt;
 pub mod orchestrator;
+pub mod memory;          // NEW — Story 4.3 memory tier types
+pub mod self_telemetry;  // NEW — Story 4.3 self-telemetry types

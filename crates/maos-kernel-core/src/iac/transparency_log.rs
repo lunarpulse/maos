@@ -48,6 +48,9 @@ pub enum FrameKind {
     SandboxBlock = 8,
     /// Inference Port call (Story 1b.4).
     InferenceCall = 9,
+    /// Decision / distillation outcome (Story 4.3 proxy; Story 4.4
+    /// refines with explicit `Distillate` variant).
+    Decision = 10,
 }
 
 impl FrameKind {
@@ -64,6 +67,7 @@ impl FrameKind {
             7 => Some(Self::CapabilityInvocation),
             8 => Some(Self::SandboxBlock),
             9 => Some(Self::InferenceCall),
+            10 => Some(Self::Decision),
             _ => None,
         }
     }
@@ -629,6 +633,41 @@ mod tests {
         }).unwrap();
         assert_eq!(entries.len(), 3);
         assert!(entries.iter().all(|e| e.spirit_pid == 7));
+    }
+
+    #[test]
+    fn query_filter_by_since_ns_excludes_older_frames() {
+        let log = TransparencyLogAdapter::open_in_memory(0x1);
+        let _t1 = log.insert_frame_event(
+            FrameKind::TaskComplete,
+            1,
+            None,
+            "old",
+            b"old-payload",
+            FrameOrigin::SpiritAuto,
+        );
+        // Small sleep to ensure timestamps differ (wall-clock granularity).
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let _t2 = log.insert_frame_event(
+            FrameKind::TaskComplete,
+            1,
+            None,
+            "new",
+            b"new-payload",
+            FrameOrigin::SpiritAuto,
+        );
+
+        let all = log.query_frames(FrameFilter::default()).unwrap();
+        assert_eq!(all.len(), 2);
+
+        // Filter with since_ns after the first frame's timestamp — only the second should match.
+        let since = all[0].timestamp_ns + 1;
+        let filtered = log.query_frames(FrameFilter {
+            since_ns: Some(since),
+            ..Default::default()
+        }).unwrap();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].intent, "new");
     }
 
     #[test]

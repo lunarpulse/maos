@@ -413,6 +413,37 @@ pub fn default_journal_path() -> std::path::PathBuf {
     data_home.join("maos").join("journal").join("lifecycle.ndjson")
 }
 
+/// Resolve the default Memory Root directory.
+///
+/// Shared by `maos-bin` (write side) and any reader (e.g. operator
+/// inspection). Precedence (highest → lowest):
+///   1. `MAOS_MEMORY_ROOT` env var
+///   2. `$XDG_DATA_HOME/maos/memory`
+///   3. `$HOME/.local/share/maos/memory`
+///   4. `/var/lib/maos/memory` (last-resort fallback)
+pub fn default_memory_root() -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Ok(p) = std::env::var("MAOS_MEMORY_ROOT") {
+        if !p.is_empty() {
+            return PathBuf::from(p);
+        }
+        // Empty env var treated as unset — fall through to next precedence.
+        eprintln!("maos: MAOS_MEMORY_ROOT is set but empty — falling through to default path");
+    }
+    let data_home = std::env::var("XDG_DATA_HOME")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .filter(|h| !h.is_empty())
+                .map(|h| PathBuf::from(h).join(".local").join("share"))
+        })
+        .unwrap_or_else(|| PathBuf::from("/var/lib"));
+    data_home.join("maos").join("memory")
+}
+
 /// Pure-function form of the precedence cascade — env values are passed in
 /// explicitly. Used by the inline tests on [`default_journal_path`] to drive
 /// every branch without mutating the process environment (forbidden under
@@ -436,6 +467,31 @@ fn resolve_journal_path_from_env_internal(
         .or_else(|| home.filter(|h| !h.is_empty()).map(|h| PathBuf::from(h).join(".local").join("share")))
         .unwrap_or_else(|| PathBuf::from("/var/lib"));
     data_home.join("maos").join("journal").join("lifecycle.ndjson")
+}
+
+/// Pure-function form of the memory-root precedence cascade for testing.
+#[cfg(test)]
+fn resolve_memory_root_from_env_internal(
+    maos_memory_root: Option<&str>,
+    xdg_data_home: Option<&str>,
+    home: Option<&str>,
+) -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Some(p) = maos_memory_root {
+        if p.is_empty() {
+            panic!("empty MAOS_MEMORY_ROOT");
+        }
+        return PathBuf::from(p);
+    }
+    let data_home = xdg_data_home
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            home.filter(|h| !h.is_empty())
+                .map(|h| PathBuf::from(h).join(".local").join("share"))
+        })
+        .unwrap_or_else(|| PathBuf::from("/var/lib"));
+    data_home.join("maos").join("memory")
 }
 
 fn truncate(s: &str, n: usize) -> &str {
@@ -744,6 +800,50 @@ mod tests {
         assert_eq!(
             p,
             std::path::PathBuf::from("/var/lib/maos/journal/lifecycle.ndjson")
+        );
+    }
+
+    // ── default_memory_root tests (Story 4.3) ────────────────────────
+
+    #[test]
+    fn default_memory_root_respects_env_override() {
+        let p = super::resolve_memory_root_from_env_internal(
+            Some("/tmp/maos-test-memory"),
+            None,
+            None,
+        );
+        assert_eq!(p, std::path::PathBuf::from("/tmp/maos-test-memory"));
+    }
+
+    #[test]
+    fn default_memory_root_falls_through_to_xdg() {
+        let p = super::resolve_memory_root_from_env_internal(
+            None,
+            Some("/tmp/xdgtest"),
+            None,
+        );
+        assert_eq!(p, std::path::PathBuf::from("/tmp/xdgtest/maos/memory"));
+    }
+
+    #[test]
+    fn default_memory_root_falls_through_to_home_when_xdg_unset() {
+        let p = super::resolve_memory_root_from_env_internal(
+            None,
+            None,
+            Some("/tmp/hometest"),
+        );
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/tmp/hometest/.local/share/maos/memory")
+        );
+    }
+
+    #[test]
+    fn default_memory_root_last_resort_var_lib() {
+        let p = super::resolve_memory_root_from_env_internal(None, None, None);
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/var/lib/maos/memory")
         );
     }
 }

@@ -12,6 +12,6 @@ serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 smallvec = { version = "1", features = ["serde"] }
+serde_json = "1.0"
 
 [dev-dependencies]
-serde_json = "1.0"

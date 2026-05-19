@@ -50,10 +50,11 @@ impl TokenId {
     pub const ZERO: TokenId = TokenId([0u8; 16]);
 }
 
-/// Capability scope — the nine v0.1-β variants.
+/// Capability scope — the ten v0.3-β variants (Story 4.3 adds
+/// `SelfTelemetryRead` as an ABI-additive amendment per FR56).
 ///
-/// Adding a tenth variant later is an ABI break (this enum is re-exported
-/// through `maos-spirit-abi`). The nine here are the v0.1-β freeze.
+/// This enum is re-exported through `maos-spirit-abi`; adding an
+/// eleventh variant requires `#[non_exhaustive]` or a version-bump.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Scope {
     /// Read access to a filesystem subtree.
@@ -74,6 +75,9 @@ pub enum Scope {
     MemRead { scope: String },
     /// Write to a memory scope.
     MemWrite { scope: String },
+    /// Story 4.3 — Self-telemetry read (FR56).  Spirit reads its own
+    /// performance telemetry without per-read operator admission.
+    SelfTelemetryRead,
 }
 
 /// Intent classification for approval policy.

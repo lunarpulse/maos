@@ -20,10 +20,14 @@ use maos_domain::halt::{
     HaltId, HaltResolver, HaltState, OutputMarker, Resolution, ResolveError,
 };
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
+use maos_domain::ports::MemoryManagerPort;
 use crate::halt::HaltRegistry;
 use crate::halt::output_markers::OutputMarkerRegistry;
 use crate::iac::transparency_log::{TransparencyLogAdapter, FrameKind};
 use crate::iac::Mailbox;
+use crate::memory::MemoryManagerAdapter;
+use crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator;
 
 /// Captures every `resolve` call for unit-test assertion. Story 3.3
 /// uses this from `halt_ui` tests to verify the submission path
@@ -90,6 +94,11 @@ pub struct KernelHaltResolver {
     #[allow(dead_code)]
     mailbox: Arc<Mailbox>,
     boot_nonce: u64,
+    /// Story 4.3 — Memory Manager for `ProvidedContext` working-memory writes.
+    memory: Arc<MemoryManagerAdapter>,
+    /// Story 4.3 — WorkingMemoryOrchestrator for marker-scalar publication
+    /// (inherits Story 4.2's set+tap pipeline).
+    orchestrator: Arc<WorkingMemoryOrchestrator>,
 }
 
 impl KernelHaltResolver {
@@ -99,6 +108,8 @@ impl KernelHaltResolver {
         output_markers: Arc<OutputMarkerRegistry>,
         mailbox: Arc<Mailbox>,
         boot_nonce: u64,
+        memory: Arc<MemoryManagerAdapter>,
+        orchestrator: Arc<WorkingMemoryOrchestrator>,
     ) -> Self {
         Self {
             registry,
@@ -106,6 +117,8 @@ impl KernelHaltResolver {
             output_markers,
             mailbox,
             boot_nonce,
+            memory,
+            orchestrator,
         }
     }
 }
@@ -118,6 +131,10 @@ impl HaltResolver for KernelHaltResolver {
             Resolution::AcceptedHalt => HaltState::Terminated,
             Resolution::AuthorizedOverride { .. } => HaltState::Overridden,
         };
+
+        // Story 4.3 — metadata is cleaned up by resolve(), so look it up first.
+        let pending_opt = self.registry.lookup_pending_metadata(halt_id);
+
         let pre = self.registry.resolve(halt_id, terminal).map_err(|e| match e {
             crate::halt::ResolveStateError::NotPending(s) => ResolveError::UnknownHalt(s),
             crate::halt::ResolveStateError::AlreadyTerminal(s) => ResolveError::AlreadyResolved(s),
@@ -130,12 +147,41 @@ impl HaltResolver for KernelHaltResolver {
         // 2. Per-variant side-effects (kernel-side, not Spirit-side)
         match &resolution {
             Resolution::ProvidedContext { text } => {
-                // Story 4.3 (Principal Memory Namespace) wires the actual
-                // working-memory write at memory.write. v0.3-β here only
-                // marks the resolution kind; the supplied context is
-                // already in the Approval Decision Log row written by
-                // HaltFlow's journal call (3.3 AC4).
-                let _ = text;
+                // Story 4.3 — wire the actual working-memory write.
+                // 1. Recover the halt's originating spirit_pid from the registry.
+                let pending = pending_opt
+                    .ok_or_else(|| ResolveError::UnknownHalt(halt_id.as_str().into()))?;
+
+                // 2. Write the supplied context to the Spirit's private tier.
+                self.memory
+                    .write(
+                        pending.spirit_pid,
+                        MemoryTier::Private,
+                        &MemoryNamespace::Default,
+                        &format!("halt_context::{}", halt_id.as_str()),
+                        MemoryValue::Text(text.clone()),
+                    )
+                    .map_err(|e| {
+                        ResolveError::Internal(format!("memory.write failed: {e}"))
+                    })?;
+
+                // 3. Publish a marker scalar via the WorkingMemoryOrchestrator
+                //    so the Spirit's epistemic_policy can detect that a halt
+                //    was resolved with context (Story 4.3).
+                //    The marker scalar is informational — no halt trigger.
+                self.orchestrator
+                    .publish_scalar_marker(
+                        pending.spirit_pid,
+                        &pending.spirit_id,
+                        "halt.context_provided",
+                        1.0,
+                        halt_id.as_str(),
+                    )
+                    .map_err(|e| {
+                        ResolveError::Internal(format!(
+                            "scalar marker publish failed: {e}"
+                        ))
+                    })?;
             }
             Resolution::AcceptedHalt => {
                 // FR12 — emit task.orphaned via Transparency Log

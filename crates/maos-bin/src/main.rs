@@ -60,15 +60,6 @@ fn worker_thread_count() -> usize {
         .unwrap_or(1)
 }
 
-/// Resolve the on-disk Transparency Log SQLite path.
-///
-/// Delegates to [`maos_audit::default_transparency_log_path`] — the single
-/// source of truth shared by `maos-bin` (write side) and `maos-cli` (read
-/// side) to prevent path-drift data loss.
-fn default_transparency_log_path() -> std::path::PathBuf {
-    maos_audit::default_transparency_log_path()
-}
-
 /// Fallback provider when Anthropic is unconfigured (no API key).
 struct UnconfiguredProvider;
 
@@ -92,7 +83,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Construct the seven adapter shells.
     let _scheduler = SpiritSchedulerAdapter::default();
-    let _memory = MemoryManagerAdapter::default();
+
+    // Story 4.3 — construct real MemoryManagerAdapter with Private + Shared + Principal stores.
+    // Resolve paths first so both memory and TL share the same DB location.
+    let audit_db_path = maos_audit::default_transparency_log_path();
+    if let Some(parent) = audit_db_path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            eprintln!(
+                "maos: failed to create audit DB parent directory {}: {e}",
+                parent.display()
+            );
+            return Err(format!("audit-db parent create failed: {e}").into());
+        }
+    }
+
+    let memory_root = maos_audit::default_memory_root();
+    if let Err(e) = std::fs::create_dir_all(&memory_root) {
+        eprintln!(
+            "maos: failed to create memory root directory {}: {e}",
+            memory_root.display()
+        );
+        return Err(format!("memory-root create failed: {e}").into());
+    }
+
+    let private_store = Arc::new(
+        maos_kernel_core::memory::private::PrivateMemoryStore::new(memory_root, 4 * 1024),
+    );
+    let shared_store = Arc::new(
+        maos_kernel_core::memory::shared::SharedMemoryStore::open(&audit_db_path)
+            .map_err(|e| format!("failed to open shared memory store: {e}"))?,
+    );
+    let principal_index = Arc::new(
+        maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&audit_db_path)
+            .map_err(|e| format!("failed to open principal index: {e}"))?,
+    );
+
+    // Memory Manager adapter is assembled below after TL init (needs TL for forget-receipt audit).
+
 
     let telemetry = Arc::new(IacRtMetrics::new());
 
@@ -145,10 +172,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("maos: capability registry initialized (Story 1b.2)");
 
     // Story 4.2 — HaltRegistry + WorkingMemoryOrchestrator for scalar-write pipeline.
-    let _halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
-    let _orchestrator = Arc::new(maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
+    let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
+    let orchestrator = Arc::new(maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
         Arc::clone(&capability),
-        Arc::clone(&_halt_registry),
+        Arc::clone(&halt_registry),
     ));
 
     // Story 3.4 — Orchestrator buffer registry (shared Arc for one-shot arms).
@@ -158,24 +185,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("maos: orchestrator buffer registry initialized (Story 3.4)");
 
     // Transparency Log — shared across services (Story 1b.1).
-    //
-    // Story 1b.5b: switched from `open_in_memory` to on-disk SQLite at the
-    // XDG-resolved path so `maosctl audit query` can read back the rows the
-    // one-shot path just wrote. The path resolves identically to the
-    // CLI-side `default_transparency_log_path()` (see
-    // crates/maos-cli/src/subcommands.rs:148-162). Server mode (non-one-shot)
-    // benefits from the same change — a single line covers both paths; no
-    // branch on `MAOS_ONE_SHOT` is needed for storage selection.
-    let audit_db_path = default_transparency_log_path();
-    if let Some(parent) = audit_db_path.parent() {
-        if let Err(e) = std::fs::create_dir_all(parent) {
-            eprintln!(
-                "maos: failed to create audit DB parent directory {}: {e}",
-                parent.display()
-            );
-            return Err(format!("audit-db parent create failed: {e}").into());
-        }
-    }
+    // The audit_db_path is resolved above (line ~108) so memory stores and TL
+    // share the same DB file location.
     let transparency_log = Arc::new(
         maos_kernel_core::iac::TransparencyLogAdapter::open(&audit_db_path, boot_nonce)
             .map_err(|e| format!("failed to open audit DB at {}: {e}", audit_db_path.display()))?,
@@ -184,6 +195,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "maos: Transparency Log opened on-disk at {}",
         audit_db_path.display()
     );
+
+    // Story 4.3 — assemble the full MemoryManagerAdapter.
+    let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
+        private_store,
+        shared_store,
+        principal_index,
+        Arc::clone(&transparency_log),
+    ));
+
+    // Story 4.3 — SelfTelemetryAggregator (FR56).
+    let self_telemetry = Arc::new(maos_kernel_core::memory::self_telemetry::SelfTelemetryAggregator::new(
+        Arc::clone(&telemetry),
+        Arc::clone(&halt_registry),
+        Arc::clone(&transparency_log),
+    ));
+    eprintln!("maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)");
 
     // Story 3.1 — wire IacBusAdapter with real Mailbox + Transparency Log.
     let iac = Arc::new(IacBusAdapter::new(
@@ -536,7 +563,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Story 4.1 — production KernelHaltResolver replaces the v0.3-β MockHaltResolver bootstrap.
             // Composition root owns the shared HaltRegistry + OutputMarkerRegistry so all
             // invoke_halt callers and the resolver agree on a single source of truth.
-            let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
             let output_markers = Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new());
             let kernel_resolver = Arc::new(maos_kernel_core::halt::KernelHaltResolver::new(
                 Arc::clone(&halt_registry),
@@ -544,6 +570,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Arc::clone(&output_markers),
                 Arc::clone(&mailbox),
                 boot_nonce,
+                Arc::clone(&memory),
+                Arc::clone(&orchestrator),
             ));
             let halt_flow = maos_director_surface::halt_ui::HaltFlow::new(
                 kernel_resolver,

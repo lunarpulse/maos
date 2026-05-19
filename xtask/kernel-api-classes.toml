@@ -354,3 +354,65 @@
 "maos_kernel_core::api::capability::SetScalarError"              = "universal-arithmetic"
 "maos_kernel_core::api::capability::WorkingMemoryStore"          = "universal-arithmetic"
 "maos_kernel_core::api::security::ScalarPredicate"               = "universal-arithmetic"
+
+# ── Story 4.3 — Memory Manager three tiers + Principal Namespace + Self-Telemetry ──
+# All public items classify per §4.0.7 taxonomy:
+#   data-movement — memory read/write/scan, self-telemetry reads
+#   supervision — forget cascade (journal + delete) per §4.0.7 supervision class
+
+# memory adapter core
+"maos_kernel_core::memory::MemoryManagerAdapter::new"                 = "data-movement"
+"maos_kernel_core::memory::MemoryManagerAdapter::write"               = "data-movement"
+"maos_kernel_core::memory::MemoryManagerAdapter::read"                = "data-movement"
+"maos_kernel_core::memory::MemoryManagerAdapter::scan"                = "data-movement"
+"maos_kernel_core::memory::MemoryManagerAdapter::subject_access"      = "data-movement"
+"maos_kernel_core::memory::MemoryManagerAdapter::forget"              = "supervision"
+"maos_kernel_core::memory::MemoryManagerAdapter::export_redactable"   = "data-movement"
+
+# sub-module stores (data-movement per §4.0.7)
+"maos_kernel_core::memory::private::PrivateMemoryStore"               = "data-movement"
+"maos_kernel_core::memory::shared::SharedMemoryStore"                 = "data-movement"
+"maos_kernel_core::memory::principal::PrincipalNamespaceIndex"        = "data-movement"
+
+# self-telemetry aggregator
+"maos_kernel_core::memory::self_telemetry::SelfTelemetryAggregator::new"            = "data-movement"
+"maos_kernel_core::memory::self_telemetry::SelfTelemetryAggregator::self_telemetry" = "data-movement"
+
+# SpiritMemoryView reborrow
+"maos_kernel_core::memory::for_spirit::SpiritMemoryView"              = "data-movement"
+
+# HaltRegistry metadata accessor
+"maos_kernel_core::halt::HaltRegistry::lookup_pending_metadata"        = "data-movement"
+
+# api re-exports
+"maos_kernel_core::api::MemoryManagerAdapter"                         = "data-movement"
+"maos_kernel_core::api::PrivateMemoryStore"                           = "data-movement"
+"maos_kernel_core::api::SharedMemoryStore"                            = "data-movement"
+"maos_kernel_core::api::PrincipalNamespaceIndex"                      = "data-movement"
+"maos_kernel_core::api::SelfTelemetryAggregator"                      = "data-movement"
+"maos_kernel_core::api::SpiritMemoryView"                             = "data-movement"
+"maos_kernel_core::api::WorkingMemoryOrchestrator"                    = "universal-arithmetic"
+
+# api::crate::* re-exports for items added via `pub use crate::...` in api.rs
+"maos_kernel_core::api::crate::memory::principal::PrincipalNamespaceIndex" = "data-movement"
+"maos_kernel_core::api::crate::capability::SetScalarError"             = "universal-arithmetic"
+"maos_kernel_core::api::crate::capability::WorkingMemoryStore"         = "universal-arithmetic"
+
+# Supporting type exposed via cap_policy/mod.rs public interface
+"maos_kernel_core::security::manifest::EpistemicPolicySection"        = "supervision"
+
+# Halt lifecycle helper (exposed via halt::termination module)
+"maos_kernel_core::halt::termination::terminate_spirit"               = "supervision"
+
+# Story 4.3 — public halt invocation helper
+"maos_kernel_core::halt::invoke_halt"                                 = "supervision"
+
+# api::crate::* re-export for SpiritMemoryView
+"maos_kernel_core::api::crate::memory::for_spirit::SpiritMemoryView"  = "data-movement"
+
+# Story 4.3 — remaining public symbols
+"maos_kernel_core::api::crate::memory::private::PrivateMemoryStore"     = "data-movement"
+"maos_kernel_core::api::crate::memory::self_telemetry::SelfTelemetryAggregator" = "data-movement"
+"maos_kernel_core::api::crate::memory::shared::SharedMemoryStore"      = "data-movement"
+"maos_kernel_core::memory::self_telemetry::SelfTelemetryAggregator"    = "data-movement"
+"maos_kernel_core::halt::PendingHaltMetadata"                          = "data-movement"

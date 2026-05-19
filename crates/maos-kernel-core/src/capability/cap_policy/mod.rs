@@ -79,6 +79,17 @@ impl PolicyTable {
         capability: &Capability,
         intent: &Intent,
     ) -> PolicyDecision {
+        // Story 4.3 — FR56 self-telemetry always-allow rule.
+        // Self-telemetry is a positive always-allow — the Spirit reads
+        // its own data without per-read operator admission.  The rule is
+        // enumerable so operators can audit the policy table and see the
+        // self-telemetry cap-class explicitly (NFR-Aud-1).
+        if matches!(capability.scope, maos_domain::invariants::i1::Scope::SelfTelemetryRead)
+            || matches!(intent, Intent::SelfTelemetryRead)
+        {
+            return PolicyDecision::Allow;
+        }
+
         let inner = self.inner.load_full();
 
         // Fail-closed: unknown Spirits are denied.

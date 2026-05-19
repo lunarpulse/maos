@@ -31,6 +31,7 @@ use maos_domain::halt::{
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i4::ApprovalDecision;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::frame::EpistemicHaltPayload;
 use crate::iac::transparency_log::{TransparencyLogAdapter, FrameKind};
 use crate::journal::JournalAdapter;
 
@@ -100,6 +101,21 @@ impl HaltJournal for TransparencyLogAdapter {
 #[derive(Debug, Default)]
 pub struct HaltRegistry {
     pending: RwLock<HashMap<HaltId, HaltState>>,
+    /// Story 4.3 — per-halt metadata for resolution-side lookups.
+    metadata: RwLock<HashMap<HaltId, PendingHaltMetadata>>,
+}
+
+/// Story 4.3 — metadata stored alongside a pending halt so the
+/// `ProvidedContext` resolution arm can recover the originating
+/// `spirit_pid` and `spirit_id` without rescanning the Transparency Log.
+#[doc = "Construct via `KernelHaltResolver::resolve`; struct literals bypass non-empty checks."]
+#[derive(Debug, Clone, PartialEq)]
+pub struct PendingHaltMetadata {
+    pub spirit_pid: u32,
+    pub spirit_id: String,
+    pub payload: EpistemicHaltPayload,
+    /// Timestamp when the halt was fired (ns since UNIX_EPOCH).
+    pub fired_ns: u64,
 }
 
 impl HaltRegistry {
@@ -110,6 +126,26 @@ impl HaltRegistry {
     /// Insert a fresh halt entering `PendingResolution`. Called by
     /// `invoke_halt` after the TL + Journal rows commit; idempotency on
     /// duplicate `halt_id` is `Err(InvokeHaltError::DuplicateHaltId)`.
+    ///
+    /// Story 4.3: also accepts metadata for resolution-side lookups.
+    pub fn insert_pending_with_metadata(
+        &self,
+        halt_id: HaltId,
+        state: HaltState,
+        metadata: PendingHaltMetadata,
+    ) -> Result<(), InvokeHaltError> {
+        let mut map = self.pending.write().expect("HaltRegistry lock poisoned");
+        if map.contains_key(&halt_id) {
+            return Err(InvokeHaltError::DuplicateHaltId(halt_id.as_str().to_string()));
+        }
+        map.insert(halt_id.clone(), state);
+        drop(map);
+        let mut meta = self.metadata.write().expect("HaltRegistry metadata lock poisoned");
+        meta.insert(halt_id, metadata);
+        Ok(())
+    }
+
+    /// Legacy insert — for callers that don't have metadata (v0.3-β compat).
     pub fn insert_pending(&self, halt_id: HaltId, state: HaltState) -> Result<(), InvokeHaltError> {
         let mut map = self.pending.write().expect("HaltRegistry lock poisoned");
         if map.contains_key(&halt_id) {
@@ -117,6 +153,15 @@ impl HaltRegistry {
         }
         map.insert(halt_id, state);
         Ok(())
+    }
+
+    /// Story 4.3 — Lookup pending-halt metadata for the
+    /// `ProvidedContext` resolution arm.  Returns `None` if the
+    /// halt_id was inserted via the legacy `insert_pending` path
+    /// without metadata.
+    pub fn lookup_pending_metadata(&self, halt_id: &HaltId) -> Option<PendingHaltMetadata> {
+        let meta = self.metadata.read().expect("HaltRegistry metadata lock poisoned");
+        meta.get(halt_id).cloned()
     }
 
     /// Lookup + atomic transition. Used by `KernelHaltResolver::resolve`
@@ -128,6 +173,11 @@ impl HaltRegistry {
         match map.get(halt_id) {
             Some(HaltState::PendingResolution) => {
                 let prev = map.insert(halt_id.clone(), terminal).unwrap();
+                drop(map);
+                // Story 4.3 — clean up metadata once the halt reaches a
+                // terminal state so the map doesn't grow unbounded.
+                let mut meta = self.metadata.write().expect("HaltRegistry metadata lock poisoned");
+                meta.remove(halt_id);
                 Ok(prev)
             }
             Some(_) => Err(ResolveStateError::AlreadyTerminal(halt_id.as_str().to_string())),
@@ -164,6 +214,12 @@ impl HaltRegistry {
                 drained.push((k.clone(), v));
             }
         }
+        drop(map);
+        // Clean up metadata for drained halts.
+        let mut meta = self.metadata.write().expect("HaltRegistry metadata lock poisoned");
+        for (k, _) in &drained {
+            meta.remove(k);
+        }
         drained
     }
 
@@ -171,6 +227,29 @@ impl HaltRegistry {
     /// Story 5.3 refines with real spirit_pid filtering.
     pub fn drain_for_spirit(&self, _spirit_pid: u32) -> Vec<(HaltId, HaltState)> {
         self.drain_all()
+    }
+
+    /// Story 4.3 — Return halt metadata entries for the given `spirit_pid`
+    /// whose `fired_ns` is >= `since_ns`.
+    /// Includes both pending and terminal halts whose metadata is still
+    /// resident.  Returns an empty vector if no metadata matches.
+    pub fn halt_metadata_for_spirit(
+        &self,
+        spirit_pid: u32,
+        since_ns: u64,
+    ) -> Vec<(HaltId, PendingHaltMetadata)> {
+        let meta = self.metadata.read().expect("HaltRegistry metadata lock poisoned");
+        meta.iter()
+            .filter(|(_, m)| m.spirit_pid == spirit_pid && m.fired_ns >= since_ns)
+            .map(|(id, m)| (id.clone(), m.clone()))
+            .collect()
+    }
+
+    /// Story 4.3 — Read-only lookup of the current `HaltState` for a given
+    /// `halt_id`. Returns `None` if the halt_id is not in the registry.
+    pub fn lookup_state(&self, halt_id: &HaltId) -> Option<HaltState> {
+        let map = self.pending.read().expect("HaltRegistry lock poisoned");
+        map.get(halt_id).cloned()
     }
 }
 
@@ -241,8 +320,17 @@ pub fn invoke_halt(
         effective_sandbox_tier: None,
     });
 
-    // Step 3: Insert into pending registry
-    registry.insert_pending(halt_id.clone(), HaltState::PendingResolution)?;
+    // Step 3: Insert into pending registry with metadata (Story 4.3).
+    registry.insert_pending_with_metadata(
+        halt_id.clone(),
+        HaltState::PendingResolution,
+        PendingHaltMetadata {
+            spirit_pid,
+            spirit_id: spirit_id.to_string(),
+            payload: payload.clone(),
+            fired_ns: timestamp_ns,
+        },
+    )?;
 
     Ok(HaltReceipt::new(halt_id, timestamp_ns, spirit_pid, boot_nonce, frame_id))
 }

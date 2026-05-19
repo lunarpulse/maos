@@ -43,6 +43,7 @@ fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
         Scope::IacSend { peer_class } => cap_policy::decision::Intent::IacSend { peer_class: peer_class.clone() },
         Scope::MemRead { scope: s } => cap_policy::decision::Intent::MemRead { scope: s.clone() },
         Scope::MemWrite { scope: s } => cap_policy::decision::Intent::MemWrite { scope: s.clone() },
+        Scope::SelfTelemetryRead => cap_policy::decision::Intent::SelfTelemetryRead,
     }
 }
 

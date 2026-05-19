@@ -53,6 +53,8 @@ pub enum Intent {
     MemRead { scope: String },
     /// Memory write.
     MemWrite { scope: String },
+    /// Self-telemetry read (FR56) — Story 4.3.
+    SelfTelemetryRead,
 }
 
 /// Trust tier classification.

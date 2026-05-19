@@ -44,6 +44,8 @@ tokio = { version = "1", features = ["sync", "rt"] }
 maos-attrs = { path = "../maos-attrs" }
 toml = "0.8"
 sha2 = "0.10"
+# Story 4.3 — optional cross-Spirit isolation framework (spirit_test feature).
+maos-spirit-sdk = { path = "../maos-spirit-sdk", optional = true, features = ["spirit_test"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 landlock = "0.4"
@@ -56,6 +58,11 @@ libc = "0.2"
 [target.'cfg(target_os = "windows")'.dependencies]
 win32job = "2"
 windows = { version = "0.58", features = ["Win32_Security", "Win32_System_Threading", "Win32_Foundation"] }
+
+[features]
+default = []
+# Story 4.3 — cross-Spirit isolation framework hooks for Story 4.5 corpus.
+spirit_test = ["maos-spirit-sdk"]
 
 [dev-dependencies]
 tempfile = "3"

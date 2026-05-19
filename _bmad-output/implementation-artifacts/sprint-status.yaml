@@ -1,4 +1,4 @@
-last_updated: '2026-05-19'  # Story 4.2 → review
+last_updated: '2026-05-19'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -35,27 +35,17 @@ development_status:
   2-3-thin-cargo-generate-template-local-runner-nfr-onb-1-v0-3-prerequisite: done
   2-4-seed-the-spirit-test-sdk-with-lcas-framework-and-cross-spirit-isolation-hooks: done
   epic-2-retrospective: done
-  # Post-retro bridge story closes A4 (review-checklist amendment), A5 (IAC bus
-  # Mailbox addendum §7.1.1–§7.1.2), A6 (dev-record Review Findings template),
-  # A7 (D11 server-exit drain), A8 (xtask check-workspace-count guard) from
-  # epic-2-retro-2026-05-17.md. Does NOT re-open epic-2's done flag — bridge
-  # stories are tracked independently (same pattern as 1a-5 and 1b-6).
-  # Blocks Story 3.1. File: 2-5-epic-3-prep-iac-addendum-d11-drain.md.
   2-5-epic-3-prep-iac-addendum-d11-drain: done
   epic-3: done
   3-1-route-task-assign-frames-over-the-iac-bus-with-notification-surface-dispatch: done
   3-2-manage-director-posture-with-a-halt-policy-schema-and-bounded-shift-propagation: done
   3-3-directors-halt-resolution-ux-decision-audit-i12: done
   3-4-buffer-orchestrator-instructions-and-honor-director-pause-resume-revoke-p99-2s: done
-  # Retro at _bmad-output/implementation-artifacts/epic-3-retro-2026-05-18.md.
-  # Action items A1/A2/A3/A5/A6 land inside Story 4.1 spec (no bridge story
-  # required). A4 = bmad-create-story template amendment. A7 = opportunistic
-  # benchmark. epic_update_required: false — Epic 4 plan stands.
   epic-3-retrospective: done
   epic-4: in-progress
   4-1-halt-protocol-mechanism-three-resolution-kinds-halt-receipt-99-9-single-halt-owner: done
   4-2-implement-the-tagged-scalar-slot-with-four-universal-arithmetic-predicates: done
-  4-3-provide-three-memory-tiers-with-principal-namespace-and-spirit-self-telemetry: backlog
+  4-3-provide-three-memory-tiers-with-principal-namespace-and-spirit-self-telemetry: done
   4-4-enforce-the-i11-audit-chain-on-distillates-with-log-recall-and-the-five-metric-gate: backlog
   4-5-author-the-cross-spirit-isolation-200-corpus-and-enforce-i14-halt-continuity-in-hot-swap: backlog
   epic-4-retrospective: optional

@@ -115,11 +115,16 @@ pub trait HaltResolver: Send + Sync + 'static {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum ResolveError {
     #[error("unknown halt_id: {0}")]
     UnknownHalt(String),
     #[error("halt {0} already resolved")]
     AlreadyResolved(String),
+    /// Story 4.3 — internal error during halt resolution (e.g. memory-write
+    /// failure in `ProvidedContext` arm).  Carries diagnostic-only context.
+    #[error("internal resolution error: {0}")]
+    Internal(String),
 }
 
 /// Journal trait for halt resolution audit writes (Story 3.3, AC4).

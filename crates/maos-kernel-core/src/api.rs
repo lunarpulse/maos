@@ -26,3 +26,10 @@ pub use crate::capability::SetScalarError;
 pub use crate::capability::WorkingMemoryStore;
 pub use crate::security::manifest::ScalarPredicate;
 pub use crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator;
+
+// Story 4.3 — Memory Manager three tiers + Principal Namespace + Self-Telemetry
+pub use crate::memory::private::PrivateMemoryStore;
+pub use crate::memory::shared::SharedMemoryStore;
+pub use crate::memory::principal::PrincipalNamespaceIndex;
+pub use crate::memory::self_telemetry::SelfTelemetryAggregator;
+pub use crate::memory::for_spirit::SpiritMemoryView;

@@ -93,4 +93,24 @@ impl WorkingMemoryOrchestrator {
             _ => Ok(None),
         }
     }
+
+    /// Story 4.3 — Publish a marker scalar without policy evaluation.
+    ///
+    /// Used by the `ProvidedContext` halt-resolution arm to emit the
+    /// `halt.context_provided` marker so the Spirit's epistemic_policy
+    /// can detect that a halt was resolved with context.  The marker is
+    /// informational — no halt trigger — so policy evaluation is skipped.
+    pub fn publish_scalar_marker(
+        &self,
+        spirit_pid: u32,
+        spirit_id: &str,
+        tag: &str,
+        value: f64,
+        derived_from: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.capability.set_scalar(
+            spirit_pid, spirit_id, tag, value, derived_from,
+        )?;
+        Ok(())
+    }
 }

@@ -215,3 +215,41 @@ state for ADR-035 `scalar.tap` telemetry. `Arc<DashMap<TelemetryTopic, broadcast
 holds transient per-process channel registration state; bounded by declared
 scalar tag count (O(dozens)). No persistence across restarts; parallel to
 `IacRtMetrics` exemption (Epic 1b).
+
+### `PrivateMemoryStore` — `crates/maos-kernel-core/src/memory/private.rs`
+
+**Reason:** memory manager private tier (Story 4.3) — per-Spirit-keyed in-memory
+map (`RwLock<HashMap<(u32, MemoryNamespace, String), MemoryValue>>`) + per-Spirit-namespaced
+filesystem area for ADR-026 + I5 isolation. Bounded by principal forget-cascade
+and per-Spirit memory budget; no cross-Spirit aggregation, no pattern-learning.
+
+### `SharedMemoryStore` — `crates/maos-kernel-core/src/memory/shared.rs`
+
+**Reason:** memory manager shared tier (Story 4.3) — Host-wide SQLite-backed
+key-value store with namespace prefix per writer for cross-Spirit coordination.
+`writer_spirit_pid` is kernel-set, not Spirit-supplied. Bounded by Spirit lifetime
++ namespace ownership; SQLite table is keyed by `(writer_spirit_pid, namespace, key)`.
+No content interpretation per §4.0.7.
+
+### `PrincipalNamespaceIndex` — `crates/maos-kernel-core/src/memory/principal.rs`
+
+**Reason:** principal namespace index (Story 4.3) — kernel-side address-only index
+of `principal:<principal_id>:<schema>` writes for ADR-026 subject-access query +
+GDPR Art. 17 forget cascade. Bounded by principal forget cascade; SQLite table
+carries NO content (only addressing tuples per §4.0.7). No content interpretation.
+
+### `SelfTelemetryAggregator` — `crates/maos-kernel-core/src/memory/self_telemetry.rs`
+
+**Reason:** self-telemetry aggregator (Story 4.3) — read-only composer over existing
+kernel state (IacRtMetrics, HaltRegistry, TransparencyLogAdapter). Does NOT retain
+its own state across calls; the `Arc` fields are references to existing kernel-level
+state. FR56 surface for Spirit-side calibration without per-read operator admission.
+
+### `MemoryManagerAdapter` — `crates/maos-kernel-core/src/memory/mod.rs`
+
+**Reason:** memory manager adapter (Story 4.3) — composite dispatcher holding `Arc`
+references to the three tier stores (PrivateMemoryStore, SharedMemoryStore,
+PrincipalNamespaceIndex) and TransparencyLogAdapter. Does NOT retain mutable state
+across calls; delegates to the already-exempt sub-modules. The `next_frame_counter`
+is a monotonic ULID counter for audit-frame IDs, not learned state. Bounded by
+per-Spirit budget + principal forget-cascade per §4.0.7.
