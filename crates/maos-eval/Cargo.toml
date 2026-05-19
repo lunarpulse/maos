@@ -1,0 +1,20 @@
+[package]
+name = "maos-eval"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS evaluation harness — corpora + measurement gates (halt-recall, halt-precision, receipt-rate)"
+
+[dependencies]
+maos-domain = { path = "../maos-domain" }
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+walkdir = "2"
+
+[dev-dependencies]
+maos-kernel-core = { path = "../maos-kernel-core" }
+tempfile = "3"

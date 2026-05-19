@@ -149,29 +149,35 @@ pub struct DecisionDispatchPayload {
 /// Story 3.1's additive-only contract.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EpistemicHaltPayload {
+    #[doc = "Construct via [`EpistemicHaltPayload::new`] to enforce validation; struct literals bypass NaN / empty / range checks."]
     pub halt_id: String,
     /// The `[epistemic_policy]` tag that fired (e.g.
     /// `"claim.security_vulnerability"`). Cross-references the
     /// `EpistemicPolicyRule.tag` parsed in Story 3.2 AC1.
+    #[doc = "Construct via [`EpistemicHaltPayload::new`] to enforce validation; struct literals bypass NaN / empty / range checks."]
     #[serde(default)]
     pub tag: String,
     /// The observed scalar value the predicate compared against.
     /// f32 to match Story 4.2's `working_memory.set_scalar` shape.
     /// `PartialEq` derived — bit-equal comparison; NaN payloads are
     /// rejected at construction by `HaltPayload::new`.
+    #[doc = "Construct via [`EpistemicHaltPayload::new`] to enforce validation; struct literals bypass NaN / empty / range checks."]
     #[serde(default)]
     pub value: f32,
     /// The configured threshold from `on_confidence_below`
     /// (or `None` when the rule fired on `on_evidence_conflict`).
+    #[doc = "Construct via [`EpistemicHaltPayload::new`] to enforce validation; struct literals bypass NaN / empty / range checks."]
     #[serde(default)]
     pub threshold: Option<f32>,
     /// Stable identifier of the rule that fired — Spirit-supplied
     /// (mirrors `EpistemicPolicyRule.tag` namespacing).
+    #[doc = "Construct via [`EpistemicHaltPayload::new`] to enforce validation; struct literals bypass NaN / empty / range checks."]
     #[serde(default)]
     pub policy_id: String,
     /// Provenance chain — the `derived_from` Spirit-supplied marker
     /// passed to `working_memory.set_scalar`. Free-form string at v0.3;
     /// Story 4.4 (`log.recall` + I11 chain) wires the typed lineage.
+    #[doc = "Construct via [`EpistemicHaltPayload::new`] to enforce validation; struct literals bypass NaN / empty / range checks."]
     #[serde(default)]
     pub derived_from: String,
 }

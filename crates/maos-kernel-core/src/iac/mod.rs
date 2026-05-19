@@ -26,6 +26,7 @@ pub use transparency_log::{
 };
 pub use redaction::{RedactionPolicy, CorpusBackedRedactionPolicy};
 pub use mailbox_stub::MailboxStub;
+pub use mailbox::Mailbox;
 pub use frame::*;
 pub use channels::*;
 pub use mailbox::*;

@@ -184,3 +184,18 @@ no structural inference — raw FIFO forwarding.
 mapping Spirit names to their bounded instruction buffers. Transient per-process state;
 parallel to `Mailbox::mpsc_senders` registration. Bounded by active Orchestrator-class
 Spirit count; no persistence across restarts.
+
+### `HaltRegistry` — `crates/maos-kernel-core/src/halt/mod.rs`
+
+**Reason:** halt mechanism (Story 4.1) — per-process pending-resolution state for
+SINGLE-HALT-OWNER protocol. `RwLock<HashMap<HaltId, HaltState>>` stores transient
+halt lifecycle entries; bounded by in-flight Spirit count × per-Spirit halt-set size.
+Parallel to capability-token ledger; no persistence or pattern-learning. Drained on
+Spirit termination.
+
+### `OutputMarkerRegistry` — `crates/maos-kernel-core/src/halt/output_markers.rs`
+
+**Reason:** halt mechanism (Story 4.1) — per-process override markers awaiting
+`output_shape` consumption (Story 4.2). `DashMap<HaltId, Mutex<VecDeque<OutputMarker>>>`
+stores transient kernel-side markers; parallel to OrchestratorBuffer. Drained on
+resolution; no persistence across restarts.

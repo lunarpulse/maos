@@ -1,4 +1,4 @@
-last_updated: '2026-05-18'  # Epic 3 retrospective complete → done
+last_updated: '2026-05-19'  # Story 4.1 → done; post code-review patches applied
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -52,8 +52,8 @@ development_status:
   # required). A4 = bmad-create-story template amendment. A7 = opportunistic
   # benchmark. epic_update_required: false — Epic 4 plan stands.
   epic-3-retrospective: done
-  epic-4: backlog
-  4-1-halt-protocol-mechanism-three-resolution-kinds-halt-receipt-99-9-single-halt-owner: backlog
+  epic-4: in-progress
+  4-1-halt-protocol-mechanism-three-resolution-kinds-halt-receipt-99-9-single-halt-owner: done
   4-2-implement-the-tagged-scalar-slot-with-four-universal-arithmetic-predicates: backlog
   4-3-provide-three-memory-tiers-with-principal-namespace-and-spirit-self-telemetry: backlog
   4-4-enforce-the-i11-audit-chain-on-distillates-with-log-recall-and-the-five-metric-gate: backlog

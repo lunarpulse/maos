@@ -523,11 +523,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            // v0.3-β BOOTSTRAP: use MockHaltResolver. Story 4.1 will swap this for
-            // the production KernelHaltResolver that ties into invoke_halt's state.
-            let mock_resolver = Arc::new(maos_kernel_core::halt::MockHaltResolver::new());
+            // Story 4.1 — production KernelHaltResolver replaces the v0.3-β MockHaltResolver bootstrap.
+            // Composition root owns the shared HaltRegistry + OutputMarkerRegistry so all
+            // invoke_halt callers and the resolver agree on a single source of truth.
+            let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
+            let output_markers = Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new());
+            let kernel_resolver = Arc::new(maos_kernel_core::halt::KernelHaltResolver::new(
+                Arc::clone(&halt_registry),
+                Arc::clone(&transparency_log),
+                Arc::clone(&output_markers),
+                Arc::clone(&mailbox),
+                boot_nonce,
+            ));
             let halt_flow = maos_director_surface::halt_ui::HaltFlow::new(
-                mock_resolver,
+                kernel_resolver,
                 Arc::new(dispatcher),
                 Arc::clone(&transparency_log) as Arc<dyn maos_domain::halt::HaltJournal>,
             );

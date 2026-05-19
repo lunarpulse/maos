@@ -1,0 +1,12 @@
+{
+  "expected_receipt_ids": [
+    "halt-crash2-033"
+  ],
+  "expected_receipts": 1,
+  "kind": "unplanned_crash",
+  "pending_halts": [
+    "halt-crash2-033"
+  ],
+  "scenario_id": "term-0684",
+  "spirit_id": "spirit-3"
+}

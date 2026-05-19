@@ -11,6 +11,10 @@ description = "MAOS workspace automation — CI gates, linting, checks"
 name = "xtask"
 path = "src/main.rs"
 
+[lib]
+name = "xtask"
+path = "src/lib.rs"
+
 [dev-dependencies]
 
 [dependencies]

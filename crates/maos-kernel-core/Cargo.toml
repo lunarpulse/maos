@@ -62,6 +62,7 @@ tempfile = "3"
 criterion = "0.5"
 tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread"] }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
+maos-eval = { path = "../maos-eval" }
 smallvec = "1"
 
 [[bench]]

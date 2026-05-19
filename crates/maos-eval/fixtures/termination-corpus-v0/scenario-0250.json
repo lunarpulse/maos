@@ -1,0 +1,30 @@
+{
+  "expected_receipt_ids": [
+    "halt-p10-49-0",
+    "halt-p10-49-1",
+    "halt-p10-49-2",
+    "halt-p10-49-3",
+    "halt-p10-49-4",
+    "halt-p10-49-5",
+    "halt-p10-49-6",
+    "halt-p10-49-7",
+    "halt-p10-49-8",
+    "halt-p10-49-9"
+  ],
+  "expected_receipts": 10,
+  "kind": "planned_unload",
+  "pending_halts": [
+    "halt-p10-49-0",
+    "halt-p10-49-1",
+    "halt-p10-49-2",
+    "halt-p10-49-3",
+    "halt-p10-49-4",
+    "halt-p10-49-5",
+    "halt-p10-49-6",
+    "halt-p10-49-7",
+    "halt-p10-49-8",
+    "halt-p10-49-9"
+  ],
+  "scenario_id": "term-0250",
+  "spirit_id": "spirit-9"
+}

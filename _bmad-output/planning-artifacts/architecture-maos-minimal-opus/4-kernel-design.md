@@ -102,7 +102,7 @@ Dependencies point inward (adapter ring → kernel services → domain core), wi
 
 **Workspace member count (post Story 1b.6):** 18 library/binary crates + xtask = **19 workspace members**. Added since the original §4.0.2 description: `maos-audit` (Story 1b.1 — read-side audit query adapter), `maos-attrs` (Story 1b.3 — `#[i9_exempt]` proc-macro), `maos-corpus-gen` (Epic 0 — deterministic corpus generators). `default-members = []` in the workspace root forces every cargo invocation to be `-p`-explicit (Story 1b.6 retro action A7).
 
-**Workspace member count (post Story 3.1):**<!-- workspace-count-authoritative --> 20 library/binary crates + xtask + `examples/example-spirit` = **22 workspace members**. Story 3.1 added `maos-director-surface` (kernel-adjacent notification dispatcher crate) as the 22nd member.
+**Workspace member count (post Story 4.1):**<!-- workspace-count-authoritative --> 21 library/binary crates + xtask + `examples/example-spirit` = **23 workspace members**. Story 4.1 added `maos-eval` (evaluation harness: corpora + measurement gates) as the 23rd member.
 
 **`spirit_test` feature on `maos-spirit-sdk` (post Story 2.4):** The crate gains an opt-in `spirit_test` cargo feature (depends on `local_runner` + `std` + `mock`) gating a new `crates/maos-spirit-sdk/src/spirit_test/` module that ships the SDK seed (assertion macros + IAC frame I/O capture + halt resolution simulator + manifest self-check + class-specific regression corpus skeleton + cross-Spirit isolation framework hooks). Workspace member count stays at **21** — the new module is feature-gated inside the existing crate, not a new workspace member.
 
@@ -217,6 +217,29 @@ pub fn run(workspace_root: &Path) -> anyhow::Result<()> {
 The five services + two internal modules are detailed in §4.1–§4.7 below. **§4.1, §4.2, §4.3, §4.5, §4.6 describe services with their own task pools and explicit trust boundaries. §4.4 (I/O Subsystem) and §4.7 (Telemetry Stream) describe internal kernel modules** — they live inside `maos-kernel-core` rather than as separate services at v0.1. Read them in order — each builds on the previous.
 
 **v0.1-β interpretation note (Story 2.2):** The §4.0.8 four-property test is mechanically enforced at v0.1-β against the current `crates/maos-kernel-core/src/{security,memory,iac,capability,scheduler,io,telemetry}/` module layout rather than the eventual `crates/services/<name>/` layout. P1 = supervision-tree AST scan of `crates/maos-bin/src/main.rs`'s adapter-constructor call sites; P2 = `maos_kernel_core::api::*` Adapter exports paired with `maos_domain::ports::*Port` re-exports (exemptions in `xtask/src/check_service_boundary.rs::ADAPTER_PORT_EXEMPTIONS`); P3 = cross-reference to `cargo xtask check-empty-kernel` (the I9 walker output is authoritative); P4 = AST scan against `xtask/p4-external-io-denylist.toml` with `xtask/p4-mediated-io-paths.toml` as the mediated-lane allowlist. Spirit-ABI type reflection lives alongside: vtable + trait + `HOOK_NAMES` + `count_hooks!()` consistency check via AST scan of `crates/maos-spirit-abi/src/lifecycle.rs` + `crates/maos-spirit-derive/src/lib.rs`. The v0.5+ `crates/services/<name>/` extraction remains the promotion path: add the module's name to `SERVICES`, satisfy P1–P4 in the new location, re-run the enforcer.
+
+### 4.0.9 Crate dependency triangle rule (added Story 4.1 — A5 decision)
+
+The substrate's three load-bearing crates form a triangle:
+
+- `crates/maos-domain` — pure types, invariants, pure functions. No async runtime.
+- `crates/maos-kernel-core` — kernel-side machinery (services, journals, IAC bus, capability registry, halt mechanism). Depends on `maos-domain` + `maos-director-surface` + `maos-spirit-abi` + `maos-providers`.
+- `crates/maos-director-surface` — director-side UX flows (notification dispatcher, halt UI, posture shift CLI). Depends on `maos-domain` only.
+
+The cycle that re-emerges in any kernel-machinery story (halt, lifecycle, IAC, capability):
+`kernel-core → director-surface → <trait the kernel uses>` would close on itself if the trait lived in `kernel-core`.
+
+**Rule:** trait definitions go to the lowest crate in the dependency graph that all consumers can reach.
+
+- Halt trait `HaltResolver` → `maos-domain::halt` (consumers: `kernel-core::halt::KernelHaltResolver` and `director-surface::halt_ui::HaltFlow`).
+- Halt journal trait `HaltJournal` → `maos-domain::halt` (consumers: `kernel-core::iac::transparency_log::TransparencyLogAdapter::impl` and `director-surface::halt_ui::HaltFlow`).
+- (Future) Lifecycle trait `LifecycleResolver` (Story 5.1) → `maos-domain::lifecycle`.
+
+**Test-double placement:** test doubles (`MockHaltResolver`, `FailingHaltResolver`) live in `kernel-core` because the kernel-side machinery (TL + Journal + Registry) is what their tests exercise. They are NOT under `#[cfg(test)]` because integration tests under `crates/*/tests/` consume them — but they MUST NOT appear in `target/release/maos` symbol table (Story 4.1 A2 ships `xtask check-mock-not-in-release` to enforce).
+
+**Director-surface seam:** `director-surface` SHOULD NOT depend on `kernel-core` for test types. When test-only types would otherwise cycle, define a local test double inside `director-surface/tests/` (see `crates/maos-director-surface/src/halt_ui.rs::tests::TestResolver` for the established pattern, intentional per Story 3.3 review §What Was Challenging §5).
+
+**Story 5.1 application:** the supervised lifecycle (Story 5.1) will introduce `LifecycleResolver` or equivalent — the spec author MUST place the trait at `maos-domain::lifecycle`, NOT at `kernel-core::lifecycle::resolver`. This addendum is the load-bearing reference.
 
 ## 4.1 Spirit Scheduler
 

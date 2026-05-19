@@ -1,0 +1,10 @@
+{
+  "expected_receipt_ids": [
+    "term-uc-0536"
+  ],
+  "expected_receipts": 1,
+  "kind": "unplanned_crash",
+  "pending_halts": [],
+  "scenario_id": "term-0536",
+  "spirit_id": "spirit-5"
+}

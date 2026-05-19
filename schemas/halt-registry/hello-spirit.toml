@@ -1,0 +1,18 @@
+# schemas/halt-registry/hello-spirit.toml
+# Halt-protocol versioning registry for hello-Spirit class.
+# Schema referenced by ADR-019 (I14 invariant) + ADR-036 (hot-swap precondition check).
+#
+# halt_protocol_compatibility = N — manifest declaration that the Spirit
+# accepts inbound halt payloads of protocol version N. Hot-Swap Coordinator
+# checks predecessor.halt_protocol_version ⊆ successor.halt_protocol_compatibility
+# before allowing a swap with non-empty halt_set.
+
+[hello-spirit]
+class = "hello-spirit"
+# v0.3 protocol — EpistemicHaltPayload shape from Story 3.3 with the
+# six fields {halt_id, tag, value, threshold, policy_id, derived_from}.
+halt_protocol_version = 1
+# Forward-compat: hello-spirit at version 1 accepts payloads of v1 only.
+# A future v0.5 schema bump adds fields; cross-major migration requires
+# explicit halt_protocol_compatibility update.
+accepted_versions = [1]

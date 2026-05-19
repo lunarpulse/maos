@@ -1,0 +1,29 @@
+{
+  "scenario_id": "halt-031",
+  "tag": "synthetic-v0",
+  "spirit_class": "hello-spirit",
+  "epistemic_policy_rules": [
+    {
+      "tag": "claim.security",
+      "rule": "on_value_above",
+      "threshold": 0.8
+    }
+  ],
+  "scalar_writes": [
+    {
+      "tag": "claim.security",
+      "value": 0.3,
+      "derived_from": "frame:tn031"
+    }
+  ],
+  "expected_halt_invocation": false,
+  "expected_halt_payload": {
+    "tag": "claim.security",
+    "value": 0.3,
+    "threshold": 0.8,
+    "policy_id": "synthetic-v0-rule-031",
+    "derived_from": "frame:tn031"
+  },
+  "expected_resolution": "accepted_halt",
+  "ground_truth_class": "true_negative"
+}

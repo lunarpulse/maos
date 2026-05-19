@@ -1,0 +1,12 @@
+{
+  "expected_receipt_ids": [
+    "halt-planned-043"
+  ],
+  "expected_receipts": 1,
+  "kind": "planned_unload",
+  "pending_halts": [
+    "halt-planned-043"
+  ],
+  "scenario_id": "term-0144",
+  "spirit_id": "spirit-3"
+}

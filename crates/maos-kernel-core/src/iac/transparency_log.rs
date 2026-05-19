@@ -162,6 +162,7 @@ struct TransparencyLogInner {
     conn: Connection,
     next_frame_id_counter: u64,
     boot_nonce: u64,
+    last_frame_id: [u8; 16],
 }
 
 impl std::fmt::Debug for TransparencyLogInner {
@@ -174,6 +175,10 @@ impl std::fmt::Debug for TransparencyLogInner {
 }
 
 impl TransparencyLogAdapter {
+    /// Return the frame_id of the most recently inserted frame event.
+    pub fn last_frame_id(&self) -> [u8; 16] {
+        self.inner.lock().expect("TransparencyLogAdapter inner poisoned").last_frame_id
+    }
     /// Open the per-Host SQLite file. Initializes both tables if not present.
     /// Panics if the file is opened with a schema version this kernel does
     /// not understand (forward-compat is Story 9.4's concern).
@@ -201,6 +206,7 @@ impl TransparencyLogAdapter {
                 conn,
                 next_frame_id_counter: 0,
                 boot_nonce,
+                last_frame_id: [0u8; 16],
             }),
             redaction,
             mailbox: MailboxStub::new(),
@@ -230,6 +236,7 @@ impl TransparencyLogAdapter {
                 conn,
                 next_frame_id_counter: 0,
                 boot_nonce,
+                last_frame_id: [0u8; 16],
             }),
             redaction,
             mailbox: MailboxStub::new(),
@@ -273,6 +280,8 @@ impl TransparencyLogAdapter {
         let mut inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
         let frame_id = Self::next_frame_id(&mut inner);
         let timestamp_ns = wall_clock_now_ns();
+
+        inner.last_frame_id = frame_id;
 
         let result = inner.conn.execute(
             "INSERT INTO transparency_log

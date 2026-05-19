@@ -71,3 +71,35 @@ The 14 invariants do not all enforce at v0.1. Each phase promotes a subset from 
 - **v1.5** promotes I14 (halt continuity across hot-swap) from `runtime` to `fuzz` — the bilateral 2-host topology and the planned **J4-extended halt-continuity corpus** (v1.5 deliverable, see §13) expose halt-continuity to adversarial agent-handoff timing that single-host enforcement cannot probe. The J4-extended corpus is a fuzz-tier seed (≥30 hot-swap-during-incident scenarios with mutation infrastructure built around them, not 150 hand-labeled scenarios — fuzz needs adversarial breadth, not statistical N). v1.5 is also where existing enforcement gets its terminal validation surface (J4 50-scenario incident corpus, Loom-lite chaos test, §7.2.1 mTLS rotation chaos test).
 
 I3 stays at `CI` indefinitely because it is a structural lint over IAC frame origin stamps — there is no `runtime` upgrade path that adds value. I9 stays at `CI` for the same reason — the structural-state lint is the load-bearing check; there is no runtime guard against "did the kernel learn a pattern" that would not be redundant.
+
+## 3.2.2 `frame.rs` pub-field convention (added Story 4.1 — A3 decision)
+
+The canonical IAC frame payload types in `crates/maos-domain/src/frame.rs`
+(plus the halt + notification types in `crates/maos-domain/src/halt.rs` +
+`crates/maos-domain/src/notification.rs`) use `pub` fields per the
+crate-wide convention. Validation (NaN rejection, empty-string rejection,
+range-check) lives in named constructors (`::new`, `::anomaly_flagged`,
+`::provided_context`, etc.); struct-literal construction bypasses validation.
+
+**Decision (option b per Epic 3 retro A3):** accept the convention.
+Every public field on a validation-via-constructor pattern type MUST
+carry `#[doc = "Construct via [`::new`] to enforce validation; struct
+literals bypass NaN / empty / range checks."]`. The convention is
+pattern-consistent with the rest of `frame.rs` and avoids the API-surface
+inflation of option (a) (`pub(crate)` fields + getters + Builder).
+
+**Failure mode the convention preserves:** call sites that bypass the
+constructor (e.g., `EpistemicHaltPayload { value: f32::NAN, ... }`) get
+the bypass behavior; the doc-attr is the load-bearing signal to authors.
+Test coverage for the constructors' validation rejection MUST exist
+(see `crates/maos-domain/src/frame.rs::tests` for the existing pattern).
+
+**Why not option (a) (seal with getters + Builder):** would force every
+external constructor through the validated path but inflates the API
+surface (`tag()` + `value()` + `threshold()` + `policy_id()` +
+`derived_from()` getters per type), diverges from the rest of `frame.rs`'s
+pub-field shape, and complicates serde derivation. Pattern uniformity
+weighs higher than absolute validation enforcement at this scope.
+
+**ABI impact:** purely additive (doc-attrs on existing pub fields).
+`cargo-public-api` diff is empty.

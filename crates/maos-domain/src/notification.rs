@@ -50,13 +50,17 @@ pub enum NotificationEvent {
     AnomalyFlagged {
         /// SpiritId of the Observer that flagged the anomaly (string at
         /// v0.3-β; Story 8.3 may promote to typed SpiritId).
+        #[doc = "Construct via [`NotificationEvent::anomaly_flagged`] to enforce validation; struct literals bypass NaN / empty / range checks."]
         observer: String,
         /// SpiritId of the Spirit the anomaly was observed on.
+        #[doc = "Construct via [`NotificationEvent::anomaly_flagged`] to enforce validation; struct literals bypass NaN / empty / range checks."]
         subject: String,
         /// Free-form human-readable anomaly summary.
+        #[doc = "Construct via [`NotificationEvent::anomaly_flagged`] to enforce validation; struct literals bypass NaN / empty / range checks."]
         summary: String,
         /// Observer-supplied confidence in [0.0, 1.0]. Rendered as a percentage.
         /// f32 to match Story 4.2's tagged-scalar shape; NaN rejected at construction.
+        #[doc = "Construct via [`NotificationEvent::anomaly_flagged`] to enforce validation; struct literals bypass NaN / empty / range checks."]
         confidence: f32,
     },
 }

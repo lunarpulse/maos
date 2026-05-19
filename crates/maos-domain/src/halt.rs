@@ -142,6 +142,185 @@ pub enum HaltJournalError {
     WriteFailed(String),
 }
 
+// ----- Story 4.1 domain extensions (additive — preserve all existing items) -----
+
+/// Termination kind — typed enum for the 4 termination paths.
+/// Replaces the raw `&str` at `terminate_spirit`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TerminationKind {
+    /// Director-initiated unload (FR51-class)
+    PlannedUnload,
+    /// `accepted_halt` resolution
+    HaltAccepted,
+    /// SIGKILL / process death (Story 5.3's domain; scaffolded here)
+    UnplannedCrash,
+    /// `[epistemic_policy]` rejected the halt; receipt still produced
+    HaltRejection,
+}
+
+impl TerminationKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::PlannedUnload => "planned_unload",
+            Self::HaltAccepted => "halt_accepted",
+            Self::UnplannedCrash => "unplanned_crash",
+            Self::HaltRejection => "halt_rejection",
+        }
+    }
+}
+
+/// The substrate's halt-receipt — proof a halt invocation reached the
+/// audit chain. Returned by `invoke_halt` on every successful call;
+/// returned by `terminate_spirit` on every termination path (planned,
+/// unplanned, crash). The receipt-production rate ≥99.9% (AC4) is
+/// measured by counting receipt presence in the 1000-termination
+/// corpus.
+///
+/// Fields populated post-resolution (terminal_state, resolution_kind,
+/// resolution_timestamp_ns) are `None` for receipts returned at
+/// invocation time; the resolver writes them when `KernelHaltResolver::resolve`
+/// completes.
+///
+/// Construct via `HaltReceipt::new` to enforce non-NaN + non-empty
+/// validation; struct-literal construction bypasses validation per
+/// the `frame.rs` pub-field convention (see ADR-041 / A3).
+#[doc = "Construct via `HaltReceipt::new` to enforce validation; struct literals bypass checks."]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct HaltReceipt {
+    pub halt_id: HaltId,
+    pub timestamp_ns: u64,
+    pub spirit_pid: u32,
+    pub boot_nonce: u64,
+    pub frame_id: [u8; 16],
+    /// Filled by `KernelHaltResolver::resolve`; `None` at invocation time.
+    pub terminal_state: Option<HaltState>,
+    /// Filled by `KernelHaltResolver::resolve`; `None` at invocation time.
+    pub resolution_kind: Option<String>,
+    /// Filled by `KernelHaltResolver::resolve`; `None` at invocation time.
+    pub resolution_timestamp_ns: Option<u64>,
+}
+
+impl HaltReceipt {
+    /// Construct an invocation-time receipt — pre-resolution fields are
+    /// `None`. The resolver fills them post-resolution via `with_resolution`.
+    pub fn new(
+        halt_id: HaltId,
+        timestamp_ns: u64,
+        spirit_pid: u32,
+        boot_nonce: u64,
+        frame_id: [u8; 16],
+    ) -> Self {
+        Self {
+            halt_id,
+            timestamp_ns,
+            spirit_pid,
+            boot_nonce,
+            frame_id,
+            terminal_state: None,
+            resolution_kind: None,
+            resolution_timestamp_ns: None,
+        }
+    }
+
+    /// Fluent builder for the post-resolution fields. Used by
+    /// `KernelHaltResolver::resolve` to attach terminal state.
+    pub fn with_resolution(
+        mut self,
+        terminal_state: HaltState,
+        resolution_kind: &str,
+        resolution_timestamp_ns: u64,
+    ) -> Self {
+        self.terminal_state = Some(terminal_state);
+        self.resolution_kind = Some(resolution_kind.to_string());
+        self.resolution_timestamp_ns = Some(resolution_timestamp_ns);
+        self
+    }
+}
+
+/// Lifecycle states a halt traverses. `PendingResolution` is the only
+/// quiescent state — every halt either advances to one of the three
+/// terminal states (`Resumed`, `Terminated`, `Overridden`) or remains
+/// pending until the Spirit terminates (in which case the kernel
+/// terminates the halt with `terminate_for_spirit_exit`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum HaltState {
+    /// Initial state on `invoke_halt`; awaits director resolution.
+    PendingResolution,
+    /// Terminal — `provided_context` resolution path. Spirit resumed.
+    Resumed,
+    /// Terminal — `accepted_halt` resolution path. Spirit terminated;
+    /// `task.orphaned` IAC frame emitted per FR12.
+    Terminated,
+    /// Terminal — `authorized_override` resolution path. Spirit continued
+    /// with `OutputMarker::Override` appended to subsequent output queue.
+    Overridden,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum InvokeHaltError {
+    #[error("halt_id {0} already pending in registry")]
+    DuplicateHaltId(String),
+    #[error("transparency log write failed: {0}")]
+    TransparencyLogWriteFailed(String),
+    #[error("lifecycle journal write failed: {0}")]
+    JournalWriteFailed(String),
+    #[error("registry insert failed: {0}")]
+    RegistryInsertFailed(String),
+}
+
+/// I14 — Hot-swap halt-continuity typed error per ADR-019.
+/// `validate_halt_set` returns this when the successor's
+/// `halt_protocol_compatibility = N` does NOT match the predecessor's
+/// halt-protocol version. Story 5.2 owns the integration; Story 4.1
+/// owns the typed-error path + unit test.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum HaltContinuityError {
+    #[error("halt-continuity violation: schema mismatch — predecessor v{predecessor} vs successor v{successor}; orphaned halts: {orphan_count}")]
+    EHaltContinuityViolation {
+        predecessor: u32,
+        successor: u32,
+        orphan_count: usize,
+    },
+    #[error("successor manifest missing required field `halt_protocol_compatibility`")]
+    MissingHaltProtocolCompatibility,
+}
+
+#[doc = "Output marker appended to a Spirit's output queue after `authorized_override`. Story 4.2's `output_shape` predicates consume this marker; this story only emits it. Construct via `OutputMarker::override_for(halt_id)` to enforce non-empty validation."]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct OutputMarker {
+    pub kind: OutputMarkerKind,
+    pub halt_id: HaltId,
+    pub operator_policy_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum OutputMarkerKind {
+    Override,
+}
+
+impl OutputMarker {
+    pub fn override_for(
+        halt_id: HaltId,
+        operator_policy_ref: String,
+    ) -> Result<Self, OutputMarkerError> {
+        if operator_policy_ref.trim().is_empty() {
+            return Err(OutputMarkerError::EmptyPolicyRef);
+        }
+        Ok(Self {
+            kind: OutputMarkerKind::Override,
+            halt_id,
+            operator_policy_ref: Some(operator_policy_ref),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum OutputMarkerError {
+    #[error("operator_policy_ref must be non-empty for Override marker")]
+    EmptyPolicyRef,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248,5 +427,113 @@ mod tests {
         assert_eq!(r, back);
         let expected = r#"{"AuthorizedOverride":{"operator_policy_ref":"policy://x"}}"#;
         assert_eq!(json, expected);
+    }
+
+    // --- Story 4.1 — HaltReceipt + OutputMarker constructor tests ---
+
+    #[test]
+    fn halt_receipt_new_constructs_invocation_time_receipt() {
+        let hid = HaltId::new("halt-001").unwrap();
+        let receipt = HaltReceipt::new(hid.clone(), 42, 7, 0xCAFE, [0xAB; 16]);
+        assert_eq!(receipt.halt_id, hid);
+        assert_eq!(receipt.timestamp_ns, 42);
+        assert_eq!(receipt.spirit_pid, 7);
+        assert_eq!(receipt.boot_nonce, 0xCAFE);
+        assert_eq!(receipt.frame_id, [0xAB; 16]);
+        assert!(receipt.terminal_state.is_none());
+        assert!(receipt.resolution_kind.is_none());
+        assert!(receipt.resolution_timestamp_ns.is_none());
+    }
+
+    #[test]
+    fn halt_receipt_with_resolution_fills_post_resolution_fields() {
+        let hid = HaltId::new("halt-002").unwrap();
+        let receipt = HaltReceipt::new(hid, 100, 1, 0, [0u8; 16]);
+        let resolved = receipt.with_resolution(HaltState::Resumed, "provided_context", 200);
+        assert_eq!(resolved.terminal_state, Some(HaltState::Resumed));
+        assert_eq!(resolved.resolution_kind.as_deref(), Some("provided_context"));
+        assert_eq!(resolved.resolution_timestamp_ns, Some(200));
+    }
+
+    #[test]
+    fn halt_receipt_serde_round_trip() {
+        let hid = HaltId::new("halt-serde").unwrap();
+        let receipt = HaltReceipt::new(hid, 1, 2, 3, [0xFF; 16])
+            .with_resolution(HaltState::Terminated, "accepted_halt", 1000);
+        let json = serde_json::to_string(&receipt).unwrap();
+        let back: HaltReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.halt_id.as_str(), "halt-serde");
+        assert_eq!(back.terminal_state, Some(HaltState::Terminated));
+        assert_eq!(back.resolution_kind.as_deref(), Some("accepted_halt"));
+    }
+
+    #[test]
+    fn halt_state_serde_round_trip() {
+        for state in [HaltState::PendingResolution, HaltState::Resumed, HaltState::Terminated, HaltState::Overridden] {
+            let json = serde_json::to_string(&state).unwrap();
+            let back: HaltState = serde_json::from_str(&json).unwrap();
+            assert_eq!(state, back);
+        }
+    }
+
+    #[test]
+    fn output_marker_override_for_constructs_valid_marker() {
+        let hid = HaltId::new("halt-mark").unwrap();
+        let marker = OutputMarker::override_for(hid.clone(), "policy://test".into()).unwrap();
+        assert_eq!(marker.kind, OutputMarkerKind::Override);
+        assert_eq!(marker.halt_id, hid);
+        assert_eq!(marker.operator_policy_ref.as_deref(), Some("policy://test"));
+    }
+
+    #[test]
+    fn output_marker_override_for_rejects_empty_policy_ref() {
+        let hid = HaltId::new("halt-mark").unwrap();
+        let err = OutputMarker::override_for(hid, "".into()).unwrap_err();
+        assert!(matches!(err, OutputMarkerError::EmptyPolicyRef));
+    }
+
+    #[test]
+    fn output_marker_override_for_rejects_whitespace_only_policy_ref() {
+        let hid = HaltId::new("halt-mark").unwrap();
+        let err = OutputMarker::override_for(hid, "   ".into()).unwrap_err();
+        assert!(matches!(err, OutputMarkerError::EmptyPolicyRef));
+    }
+
+    #[test]
+    fn output_marker_serde_round_trip() {
+        let hid = HaltId::new("halt-mark").unwrap();
+        let marker = OutputMarker::override_for(hid, "policy://test".into()).unwrap();
+        let json = serde_json::to_string(&marker).unwrap();
+        let back: OutputMarker = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.kind, OutputMarkerKind::Override);
+        assert_eq!(back.halt_id.as_str(), "halt-mark");
+        assert_eq!(back.operator_policy_ref.as_deref(), Some("policy://test"));
+    }
+
+    #[test]
+    fn invoke_halt_error_display() {
+        let e = InvokeHaltError::DuplicateHaltId("dup".into());
+        assert!(e.to_string().contains("dup"));
+        let e = InvokeHaltError::TransparencyLogWriteFailed("tl".into());
+        assert!(e.to_string().contains("tl"));
+        let e = InvokeHaltError::JournalWriteFailed("jw".into());
+        assert!(e.to_string().contains("jw"));
+        let e = InvokeHaltError::RegistryInsertFailed("ri".into());
+        assert!(e.to_string().contains("ri"));
+    }
+
+    #[test]
+    fn halt_continuity_error_display() {
+        let e = HaltContinuityError::EHaltContinuityViolation {
+            predecessor: 1,
+            successor: 3,
+            orphan_count: 2,
+        };
+        let s = e.to_string();
+        assert!(s.contains("v1"));
+        assert!(s.contains("v3"));
+        assert!(s.contains("2"));
+        let e = HaltContinuityError::MissingHaltProtocolCompatibility;
+        assert!(e.to_string().contains("halt_protocol_compatibility"));
     }
 }

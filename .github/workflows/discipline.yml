@@ -205,6 +205,23 @@ jobs:
       - name: Run check-workspace-count
         run: cargo run -p xtask -- check-workspace-count --json
 
+  check-mock-not-in-release:
+    runs-on: ubuntu-latest
+    needs: reproducible-build
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build maos-bin in release mode
+        run: cargo build --release -p maos-bin --locked
+      - name: Run check-mock-not-in-release
+        run: cargo run -p xtask --release -- check-mock-not-in-release --binary target/release/maos --json
+
   check-service-boundary:
     runs-on: ubuntu-latest
     steps:

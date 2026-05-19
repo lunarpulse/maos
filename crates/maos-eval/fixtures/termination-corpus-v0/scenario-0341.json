@@ -1,0 +1,12 @@
+{
+  "expected_receipt_ids": [
+    "halt-accepted-0090"
+  ],
+  "expected_receipts": 1,
+  "kind": "halt_accepted",
+  "pending_halts": [
+    "halt-accepted-0090"
+  ],
+  "scenario_id": "term-0341",
+  "spirit_id": "spirit-0"
+}
