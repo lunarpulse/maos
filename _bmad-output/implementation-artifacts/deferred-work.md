@@ -37,3 +37,36 @@
 
 - `LogRecallAdapter` lacks optional `Arc<RedactionPolicy>` — Spec AC1 says "optionally"; not required at v0.3-β since redaction is handled at TL write time, not recall time. v0.5+ may add re-validation at fetch time.
 - Dead fixture field `intent_lineage_expected` — Forward-shaped for v0.5+ live judge-LLM integration; not validated at v0.3-β because the harness is calibration-mode (corpus-author-annotated, not live-evaluated).
+
+## Deferred from: Story 4.5 — author-the-cross-spirit-isolation-200-corpus-and-enforce-i14-halt-continuity-in-hot-swap
+
+- **Sec-14b cross-Host adversarial runtime** — Story 4.5 ships Sec-14b structurally
+  (kernel rejects cross-Host with `IacBusError::CrossHostUnsupported`). The transition
+  to "kernel rejects forged peer attempt" (mTLS replay, certificate-pin attack, A2A
+  frame injection under load) is owned by Story 6.3 (A2A bilateral mTLS) at v0.5+.
+  The corpus is structurally ready — Story 6.3 wires the runtime check WITHOUT corpus
+  regeneration.
+
+- **Tier-T3 container-based sandbox-escape scenarios** — Story 4.5's corpus marks T3
+  scenarios with `tier_target: "T3"`; v0.3-β runner skips them and counts the skipped
+  as deferred-to-5-5a. Story 5.5a wires Tier-T3 container isolation via Docker/Podman
+  and unlocks the T3 scenario execution path.
+
+- **`HaltRegistry::drain_for_spirit` per-pid filtering** — already deferred from Story 4.1;
+  restated here. The `validate_swap_halt_continuity` wrapper compensates structurally
+  via snapshot-before-and-after-drain size diff. Story 5.3 refines.
+
+- **`handauthored-v1` corpus tier** — v0.3-β ships `scripted-v0` per Epic 2 retro A2 closure.
+  v1.0 expands to ≥10 hand-authored scenarios per category (≥80 hand-authored across the
+  8 categories per split = ≥160 hand-authored across the full corpus). Story 10.2
+  (third-party adversarial red-team gate) owns the expansion. The IAA gate also
+  strengthens from solo-attestation to ≥2-attestor per category.
+
+- **Shared `CorpusLoader<T>` refactor** — Story 4.1's deferred entry restated; the THIRD
+  copy of the loader pattern lands in Story 4.5's `isolation_corpus.rs`. Refactor when
+  bandwidth allows; not blocking.
+
+- **`check-service-boundary` baseline staleness** — The `kernel-surface-v0.1-beta.json`
+  baseline predates many Stories 3.x–4.x public symbols, causing both "removed" and
+  "new" NFR-Test-2 violations that are unrelated to Story 4.5. Baseline regeneration
+  is a cross-cutting maintenance task, not Story 4.5 scope.

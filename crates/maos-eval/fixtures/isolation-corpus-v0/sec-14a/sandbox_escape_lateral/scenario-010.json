@@ -1,0 +1,28 @@
+{
+  "attack_payload": {
+    "attempted_surface": "sandbox::tier_admission",
+    "escape_vector": "namespace_leak"
+  },
+  "attack_surface": "sandbox_escape_lateral::10",
+  "category": "sandbox_escape_lateral",
+  "expected_outcome": {
+    "expected_kernel_response": "CapabilityDenied",
+    "isolation_maintained": true,
+    "leak_signal_must_be_absent": [
+      "peer_namespace_keys",
+      "peer_scalar_values"
+    ]
+  },
+  "preconditions": {
+    "seed_data": [],
+    "spirit_a_pid": 110,
+    "spirit_a_principal_id": "principal-a-010@test.maos",
+    "spirit_b_pid": 210,
+    "spirit_b_principal_id": "principal-b-010@test.maos"
+  },
+  "scenario_id": "sec-14a/sandbox_escape_lateral/scenario-010",
+  "spirit_a_role": "attacker",
+  "spirit_b_role": "victim",
+  "split": "sec-14a",
+  "tier_tag": "scripted-v0"
+}

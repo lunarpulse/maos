@@ -1,0 +1,13 @@
+{
+  "authoring_methodology": "scripted-generation-with-per-category-reviewer-attestation",
+  "category_floor_per_split": 12,
+  "corpus_tag": "scripted-v0",
+  "corpus_version": "v0",
+  "generator_seed": 353109157,
+  "rationale": "Hand-authoring 200 adversarial scenarios at solo-project bandwidth is operationally infeasible (Epic 2 retro A2 acknowledged the same trade-off for the LCAS corpus). The chosen methodology is templated scripted generation per category with per-attack-surface payload variation, AND per-category reviewer attestation that the threat model is well-covered, AND per-scenario expected_kernel_response match against the typed-error contract at HEAD. The methodology mirrors Story 4.4's iaa-attestation.json IAA gate pattern.",
+  "scripted_generator_path": "xtask/src/gen_isolation_corpus.rs",
+  "sec_14a_count": 100,
+  "sec_14b_count": 100,
+  "total_scenarios": 200,
+  "v1_0_promotion_plan": "v1.0 requires ≥2 attestors per category AND hand-authored expansion of ≥10 scenarios per category to a true handauthored-v1 tier marker (Story 10.2 third-party adversarial red-team gate)."
+}

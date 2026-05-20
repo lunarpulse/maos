@@ -1,0 +1,29 @@
+{
+  "attack_payload": {
+    "attempted_surface": "MemoryManagerAdapter::read",
+    "peer_key": "scenario-014-wm-key",
+    "peer_namespace": "principal:4/working"
+  },
+  "attack_surface": "working_memory_read_across::1",
+  "category": "working_memory_read_across",
+  "expected_outcome": {
+    "expected_kernel_response": "I5Violation",
+    "isolation_maintained": true,
+    "leak_signal_must_be_absent": [
+      "peer_namespace_keys",
+      "peer_scalar_values"
+    ]
+  },
+  "preconditions": {
+    "seed_data": [],
+    "spirit_a_pid": 101,
+    "spirit_a_principal_id": "principal-a-001@test.maos",
+    "spirit_b_pid": 201,
+    "spirit_b_principal_id": "principal-b-001@test.maos"
+  },
+  "scenario_id": "sec-14a/working_memory_read_across/scenario-001",
+  "spirit_a_role": "attacker",
+  "spirit_b_role": "victim",
+  "split": "sec-14a",
+  "tier_tag": "scripted-v0"
+}

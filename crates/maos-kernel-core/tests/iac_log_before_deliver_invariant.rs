@@ -11,6 +11,7 @@ use std::sync::Arc;
 use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, TaskAssignPayload};
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::invariants::i13::IntentLineage;
 use maos_kernel_core::iac::mailbox::Mailbox;
 use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
@@ -48,6 +49,7 @@ async fn i2_log_before_deliver_invariant_delivery_panics_before_receiver_sees_fr
         }),
         auto_marker: FrameOrigin::HumanAuthored,
         consent_envelope: None,
+        intent_lineage: IntentLineage::default(),
     };
 
     // Deliver through the mailbox directly (without the adapter's log step)
@@ -111,6 +113,7 @@ async fn log_before_deliver_adapter_panics_on_broken_log() {
         }),
         auto_marker: FrameOrigin::HumanAuthored,
         consent_envelope: None,
+        intent_lineage: IntentLineage::default(),
     };
 
     // Deliver through the adapter (log-write + mailbox route)

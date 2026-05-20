@@ -439,3 +439,31 @@
 "maos_kernel_core::api::DistillateWriter"                                = "supervision"
 "maos_kernel_core::api::crate::iac::log_recall::LogRecallAdapter"        = "data-movement"
 "maos_kernel_core::api::crate::iac::distillate::DistillateWriter"        = "supervision"
+
+# Story 4.5 — cross-Spirit isolation 200-corpus + I14 hot-swap wrapper + IAC-bus intent-lineage
+
+# maos-eval isolation corpus types
+"maos_eval::isolation_corpus::IsolationCorpus"                           = "data-movement"
+"maos_eval::isolation_corpus::IsolationCorpusScenario"                   = "data-movement"
+"maos_eval::isolation_corpus::IsolationAttackCategory"                   = "data-movement"
+
+# maos-kernel-core isolation runner
+"maos_kernel_core::isolation::runner::IsolationCorpusRunner"             = "supervision"
+"maos_kernel_core::isolation::runner::IsolationCorpusRunner::new"        = "supervision"
+"maos_kernel_core::isolation::runner::IsolationCorpusRunner::run_all"    = "supervision"
+
+# I14 hot-swap wrapper
+"maos_kernel_core::halt::validate_swap_halt_continuity"                  = "supervision"
+"maos_kernel_core::halt::SwapVerdict"                                    = "data-movement"
+
+# IAC bus spirit_test hook
+"maos_kernel_core::iac::IacBusAdapter::with_isolation_hook"              = "data-movement"
+
+# HaltRegistry spirit_test hook (Story 4.5 add-on)
+"maos_kernel_core::halt::HaltRegistry::with_isolation_hook"              = "data-movement"
+
+# IsolationCorpusRunner error type
+"maos_kernel_core::isolation::runner::IsolationCorpusError"              = "supervision"
+"maos_kernel_core::isolation::runner::ScenarioOutcome"                   = "data-movement"
+"maos_kernel_core::isolation::runner::IsolationCorpusReport"             = "data-movement"
+

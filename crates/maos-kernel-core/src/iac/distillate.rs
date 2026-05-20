@@ -47,6 +47,9 @@ pub struct DistillateWriter {
     transparency_log: Arc<TransparencyLogAdapter>,
     #[allow(dead_code)]
     memory: Arc<MemoryManagerAdapter>,
+    /// Story 4.5 — AC5 isolation hook for corpus runner observation.
+    #[cfg(feature = "spirit_test")]
+    isolation_hook: Option<std::sync::Arc<parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>>>,
 }
 
 impl DistillateWriter {
@@ -58,6 +61,39 @@ impl DistillateWriter {
         Self {
             transparency_log,
             memory,
+            #[cfg(feature = "spirit_test")]
+            isolation_hook: None,
+        }
+    }
+
+    /// Story 4.5 — attach an isolation hook for cross-Spirit corpus observation.
+    #[cfg(feature = "spirit_test")]
+    pub fn with_isolation_hook(
+        mut self,
+        hook: std::sync::Arc<parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>>,
+    ) -> Self {
+        self.isolation_hook = Some(hook);
+        self
+    }
+
+    /// Story 4.5 — fire isolation hooks for cross-Spirit observation.
+    #[cfg(feature = "spirit_test")]
+    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, _outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
+        if let Some(ref hook) = self.isolation_hook {
+            let mut h = hook.lock();
+            let _ = h.before_spirit_a_attempt(case_id);
+            let attempt = maos_spirit_sdk::spirit_test::AttemptResult {
+                hooks_fired_during_attempt: vec![case_id.into()],
+                frames_emitted: 1,
+            };
+            let _ = h.after_spirit_a_attempt(case_id, &attempt);
+            let _ = h.before_spirit_b_observe(case_id);
+            let observation = maos_spirit_sdk::spirit_test::ObservationResult {
+                hooks_fired_during_observation: vec![],
+                frames_emitted: 0,
+                leaked_bytes: None,
+            };
+            let _ = h.after_spirit_b_observe(case_id, &observation);
         }
     }
 
@@ -323,6 +359,9 @@ impl DistillationPort for DistillateWriter {
         digest_frame_id: [u8; 16],
         consumer_allowed_promotion_set: &AllowedPromotionSet,
     ) -> Result<(), DistillationError> {
+        #[cfg(feature = "spirit_test")]
+        self.fire_isolation_hooks("distillate.admit_for_consumer:unknown", "DistillateWriter::admit_for_consumer", maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue);
+
         // Query TL for the digest frame.
         let entries = self
             .transparency_log

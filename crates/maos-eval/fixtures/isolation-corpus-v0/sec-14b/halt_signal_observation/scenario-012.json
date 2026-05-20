@@ -1,0 +1,32 @@
+{
+  "attack_payload": {
+    "attempted_surface": "LogRecallAdapter::recall",
+    "filter_kind": "EpistemicHalt",
+    "target_spirit_pid": 251
+  },
+  "attack_surface": "halt_signal_observation::12",
+  "category": "halt_signal_observation",
+  "expected_outcome": {
+    "expected_kernel_response": "ScopeViolation",
+    "isolation_maintained": true,
+    "leak_signal_must_be_absent": [
+      "peer_namespace_keys",
+      "peer_scalar_values"
+    ]
+  },
+  "expected_swap_verdict": {
+    "variant": "SafeDrained"
+  },
+  "preconditions": {
+    "seed_data": [],
+    "spirit_a_pid": 112,
+    "spirit_a_principal_id": "principal-a-012@test.maos",
+    "spirit_b_pid": 212,
+    "spirit_b_principal_id": "principal-b-012@test.maos"
+  },
+  "scenario_id": "sec-14b/halt_signal_observation/scenario-012",
+  "spirit_a_role": "attacker",
+  "spirit_b_role": "victim",
+  "split": "sec-14b",
+  "tier_tag": "scripted-v0"
+}

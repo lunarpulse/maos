@@ -11,6 +11,9 @@ description = "MAOS binary — the maos Host executable (Story 1a.2)"
 name = "maos-bin"
 path = "src/main.rs"
 
+[features]
+spirit_test = ["maos-kernel-core/spirit_test", "maos-spirit-sdk/spirit_test"]
+
 [dependencies]
 maos-audit = { path = "../maos-audit" }
 maos-director-surface = { path = "../maos-director-surface" }
@@ -19,8 +22,10 @@ maos-kernel-core = { path = "../maos-kernel-core" }
 maos-providers = { path = "../maos-providers" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
+maos-spirit-sdk = { path = "../maos-spirit-sdk" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 getrandom = "0.3"
 serde_json = "1.0"
 toml = "0.8"
+parking_lot = "0.12"

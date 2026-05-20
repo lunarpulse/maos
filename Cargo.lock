@@ -930,6 +930,8 @@ dependencies = [
  "maos-providers",
  "maos-spirit-abi",
  "maos-spirit-hello",
+ "maos-spirit-sdk",
+ "parking_lot",
  "serde_json",
  "tokio",
  "tokio-util",

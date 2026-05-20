@@ -48,6 +48,22 @@ The substrate does **not** design against:
 
 **v0.3 framework hooks (Story 2.4):** The `maos-spirit-sdk` crate's `spirit_test` feature ships the cross-Spirit isolation framework HOOKS — `IsolationHookPoint` 4-point trait (`before_spirit_a_attempt` / `after_spirit_a_attempt` / `before_spirit_b_observe` / `after_spirit_b_observe`), `CrossSpiritIsolationFixture` 2-Spirit harness, 8-category `IsolationAttackCategory` enum matching the 8 categories above. The 200-scenario corpus authoring + execution (Sec-14a n=100 + Sec-14b n=100 per ADR-040) is Story 4.5 at v0.8; the framework hooks are the substrate Story 4.5 plugs the corpus INTO.
 
+### 8.1.1 200-corpus authoring methodology — Story 4.5 closure
+
+At v0.3-β the corpus ships as `scripted-v0`: deterministic seed-driven generation
+(seed `0x150C04A5`) with per-category reviewer attestation via
+`category-attestation.json`. The methodology mirrors Story 4.4's `iaa-attestation.json`
+IAA gate pattern and closes Epic 2 retro A2 ("hand-authoring vs scripted+attestation").
+Operational rationale: hand-authoring 200 adversarial scenarios at solo-project
+bandwidth is infeasible; per-category attestation provides discipline-of-review
+without volume-of-authoring cost. Every scenario's `expected_kernel_response` is
+matched against the kernel's typed-error contract at HEAD.
+
+v1.0 promotion plan (`handauthored-v1`): ≥2 attestors per category, ≥10 hand-authored
+scenarios per category (≥80 per split, ≥160 total). Owned by Story 10.2
+(third-party adversarial red-team gate). The IAA gate strengthens from
+solo-attestation to ≥2-attestor per category at the same time.
+
 ## 8.2 Sandboxing — re-cap of §4.3.1
 
 OS-native primitives per Spirit form and trust tier. For v1.0:

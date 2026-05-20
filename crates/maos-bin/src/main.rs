@@ -229,6 +229,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     eprintln!("maos: IAC Bus wired (Mailbox + Transparency Log, Story 3.1)");
 
+    // Story 4.5 — spirit_test-only hook wiring for cross-Spirit isolation
+    // corpus observation. Production builds carry ZERO runtime cost.
+    // The hooked adapters are constructed here for composition-root parity
+    // but are NOT wired into the production supervisor tree; integration
+    // tests construct their own hooked adapters as needed.
+    #[cfg(feature = "spirit_test")]
+    {
+        let _isolation_hook = std::sync::Arc::new(parking_lot::Mutex::new(
+            maos_spirit_sdk::spirit_test::DefaultIsolationHook::default(),
+        ));
+        let _halt_registry_with_hook = std::sync::Arc::new(
+            maos_kernel_core::halt::HaltRegistry::new()
+                .with_isolation_hook(_isolation_hook.clone()),
+        );
+        let _distillate_writer_with_hook =
+            maos_kernel_core::iac::distillate::DistillateWriter::new(
+                Arc::clone(&transparency_log),
+                Arc::clone(&memory),
+            )
+            .with_isolation_hook(_isolation_hook.clone());
+        eprintln!("maos: Story 4.5 isolation hooks wired (spirit_test only)");
+    }
+
     // Story 3.1 — Approval Manager (v0.3-β auto-allow).
     let _approval = ApprovalManager::new(Arc::clone(&transparency_log));
     eprintln!("maos: Approval Manager initialized (v0.3-β auto-allow)");

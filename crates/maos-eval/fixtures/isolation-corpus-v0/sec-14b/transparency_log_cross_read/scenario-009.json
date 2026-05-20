@@ -1,0 +1,29 @@
+{
+  "attack_payload": {
+    "attempted_surface": "TransparencyLogAdapter::query_frames",
+    "frame_kind_filter": "TaskAssign",
+    "target_spirit_pid": 261
+  },
+  "attack_surface": "transparency_log_cross_read::9",
+  "category": "transparency_log_cross_read",
+  "expected_outcome": {
+    "expected_kernel_response": "ScopeViolation",
+    "isolation_maintained": true,
+    "leak_signal_must_be_absent": [
+      "peer_namespace_keys",
+      "peer_scalar_values"
+    ]
+  },
+  "preconditions": {
+    "seed_data": [],
+    "spirit_a_pid": 109,
+    "spirit_a_principal_id": "principal-a-009@test.maos",
+    "spirit_b_pid": 209,
+    "spirit_b_principal_id": "principal-b-009@test.maos"
+  },
+  "scenario_id": "sec-14b/transparency_log_cross_read/scenario-009",
+  "spirit_a_role": "attacker",
+  "spirit_b_role": "victim",
+  "split": "sec-14b",
+  "tier_tag": "scripted-v0"
+}

@@ -1,0 +1,29 @@
+{
+  "attack_payload": {
+    "attempted_surface": "cap_tokens::verify_token",
+    "forged_spirit_pid": 289,
+    "token_bytes_hex": "aabbccdd"
+  },
+  "attack_surface": "capability_token_forgery_cross_spirit::11",
+  "category": "capability_token_forgery_cross_spirit",
+  "expected_outcome": {
+    "expected_kernel_response": "TokenSignatureInvalid",
+    "isolation_maintained": true,
+    "leak_signal_must_be_absent": [
+      "peer_namespace_keys",
+      "peer_scalar_values"
+    ]
+  },
+  "preconditions": {
+    "seed_data": [],
+    "spirit_a_pid": 111,
+    "spirit_a_principal_id": "principal-a-011@test.maos",
+    "spirit_b_pid": 211,
+    "spirit_b_principal_id": "principal-b-011@test.maos"
+  },
+  "scenario_id": "sec-14b/capability_token_forgery_cross_spirit/scenario-011",
+  "spirit_a_role": "attacker",
+  "spirit_b_role": "victim",
+  "split": "sec-14b",
+  "tier_tag": "scripted-v0"
+}

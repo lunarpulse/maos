@@ -130,3 +130,23 @@ Surfaces: TUI, editor (ACP), browser, mobile push (HTTP push at v1.0; native pus
 ### 7.3.1 Log recall surface — Story 4.4 wiring
 
 Story 4.4 introduces `log.recall(filter, limit, cursor)` and `log.fetch(frame_id)` as participant-scoped read primitives over the Transparency Log. `LogRecallAdapter` implements `LogRecallPort` with emitter-side scoping at v0.3-β (`WHERE spirit_pid = ?1`, covered by `idx_tlog_spirit_pid`). Cursor pagination uses keyset-comparison `(timestamp_ns, frame_id) > (?cursor_ts, ?cursor_id)` pushed to SQL with `LIMIT limit+1` to detect `next_cursor`. `MAX_LIMIT = 1024` is silently clamped at the adapter. `fetch` performs a primary-key lookup (`WHERE frame_id = ?1`) and validates emitter-scope before returning payload; cross-Spirit fetches return `ScopeViolation`. Every `recall` / `fetch` emits a `FrameKind::CapabilityInvocation` audit row (FR4 mediation). A2A consent envelope honoring is structurally a no-op at v0.3-β (`ConsentEnvelope == None` on every TL row) with a scaffold-comment block documenting the v0.5 binding contract from §7.1 + Story 6.3. Recipient-side participant-scoping and the `transparency_log_recipients` companion table are deferred to v0.5+ (Story 8.2 or 9.1).
+
+
+### 7.3.2 Cross-Spirit IAC frame intent-lineage — Story 4.5 wiring
+
+Story 4.5 extends `IacFrame` with an `intent_lineage: IntentLineage` field (additive,
+`#[serde(default)]`, backward-compatible). The field is auto-populated by
+`IacBusAdapter::deliver_typed` for `FrameOrigin::HumanAuthored` cross-Spirit frames
+(single-class lineage derived from `frame.intent`). Spirit-emitted cross-Spirit frames
+with empty lineage are rejected with `EIntentLineageBroken`, closing the
+consent-laundering-across-re-emission vector.
+
+Same-Spirit frames and broadcast frames (empty `to`) bypass the check per ADR-018
+("exploded header overhead for frames that never cross consent boundaries").
+The complementary I13 distillate-side lineage (`DistillationReceipt::intent_lineage`)
+lives on a separate type and closes a separate attack vector; the two lineages do
+not collide.
+
+v0.3-β enforcement: additive only; existing test fixtures deserialize via serde-default.
+v0.5+ Story 6.3 wires A2A consent-envelope runtime integration, at which point the
+lineage check and the envelope check compose (lineage first, envelope second).

@@ -1,0 +1,31 @@
+{
+  "attack_payload": {
+    "attempted_surface": "DistillateWriter::admit_for_consumer",
+    "digest_frame_id_hex": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0045",
+    "forged_allowlist": [
+      "standard"
+    ]
+  },
+  "attack_surface": "working_memory_digest_cross_read::4",
+  "category": "working_memory_digest_cross_read",
+  "expected_outcome": {
+    "expected_kernel_response": "IntentPromotionDenied",
+    "isolation_maintained": true,
+    "leak_signal_must_be_absent": [
+      "peer_namespace_keys",
+      "peer_scalar_values"
+    ]
+  },
+  "preconditions": {
+    "seed_data": [],
+    "spirit_a_pid": 104,
+    "spirit_a_principal_id": "principal-a-004@test.maos",
+    "spirit_b_pid": 204,
+    "spirit_b_principal_id": "principal-b-004@test.maos"
+  },
+  "scenario_id": "sec-14b/working_memory_digest_cross_read/scenario-004",
+  "spirit_a_role": "attacker",
+  "spirit_b_role": "victim",
+  "split": "sec-14b",
+  "tier_tag": "scripted-v0"
+}

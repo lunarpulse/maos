@@ -17,6 +17,7 @@
 
 use crate::invariants::i1::{IntentClass, Scope};
 use crate::invariants::i3::FrameOrigin;
+use crate::invariants::i13::IntentLineage;
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
 use smallvec::SmallVec;
 
@@ -33,6 +34,20 @@ pub struct IacFrame {
     pub payload: FramePayload,
     pub auto_marker: FrameOrigin,
     pub consent_envelope: Option<ConsentEnvelope>,
+    /// Story 4.5 — NFR-Aud-14 intent-lineage propagation. The unbroken
+    /// chain back to the originating principal intent for cross-Spirit
+    /// frames. Defaults to empty (serde-default) for ABI-additivity —
+    /// existing test fixtures and the v0.3-β wire-frame writers still
+    /// deserialize correctly. Cross-Spirit emission paths through
+    /// `IacBusAdapter::deliver_typed` enforce non-empty lineage via
+    /// `EIntentLineageBroken` rejection per AC4. The complementary
+    /// I13 distillate-side lineage (`DistillationReceipt::intent_lineage`)
+    /// is a SEPARATE field on a SEPARATE type — distillates are kernel-side
+    /// audit annotations, not IAC frames, so the two lineages do NOT collide
+    /// and live in different invariants (I13 distillate / I14-adjacent IAC).
+    #[doc = "Construct via [`IacFrame::new`] (or the IAC adapter's typed-deliver path) to enforce non-empty lineage validation on cross-Spirit emissions; struct literals bypass the kernel-side EIntentLineageBroken check by allowing empty lineage to slip through to the bus — the bus rejects but at higher cost. NFR-Aud-14 binding-v0.8."]
+    #[serde(default)]
+    pub intent_lineage: IntentLineage,
 }
 
 /// Reusable identity + role for frame addressing per architecture §7.1.
@@ -279,6 +294,7 @@ mod tests {
             payload,
             auto_marker: FrameOrigin::HumanAuthored,
             consent_envelope: None,
+            intent_lineage: IntentLineage::default(),
         }
     }
 
@@ -548,5 +564,44 @@ mod tests {
             FramePayload::Retract(p) => assert_eq!(p.original_frame_id, [0xAB; 16]),
             _ => panic!("expected Retract"),
         }
+    }
+
+    #[test]
+    fn iac_frame_intent_lineage_serde_round_trip_non_empty() {
+        use crate::invariants::i8::A2AIntent;
+
+        let payload = FramePayload::TaskAssign(TaskAssignPayload {
+            goal: "test".into(),
+            scope: vec![],
+            success_criteria: "done".into(),
+            posture_preferences: PosturePreferences::default(),
+        });
+        let mut frame = make_frame(payload);
+        frame.kind = FrameKind::TaskAssign;
+        frame.intent_lineage =
+            IntentLineage::new(vec![A2AIntent::new("standard")]);
+        let json = serde_json::to_string(&frame).unwrap();
+        let back: IacFrame = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.intent_lineage.as_slice().len(), 1);
+        assert_eq!(back.intent_lineage.as_slice()[0].as_str(), "standard");
+    }
+
+    #[test]
+    fn iac_frame_intent_lineage_serde_default_backward_compat() {
+        // JSON without the intent_lineage field must deserialize to empty lineage
+        let json = r#"{
+            "frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "timestamp_ns":0,
+            "logical_clock":0,
+            "from":{"spirit_id":"test-spirit","host_id":null,"role":null},
+            "to":[{"spirit_id":"test-spirit","host_id":null,"role":null}],
+            "kind":"TaskAssign",
+            "intent":"Standard",
+            "payload":{"TaskAssign":{"goal":"test","scope":[],"success_criteria":"done","posture_preferences":{"preferred_posture":null}}},
+            "auto_marker":"HumanAuthored",
+            "consent_envelope":null
+        }"#;
+        let frame: IacFrame = serde_json::from_str(json).unwrap();
+        assert!(frame.intent_lineage.is_empty());
     }
 }

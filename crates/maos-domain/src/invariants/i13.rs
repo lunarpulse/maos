@@ -43,6 +43,17 @@ impl IntentLineage {
     pub fn as_slice(&self) -> &[crate::invariants::i8::A2AIntent] {
         &self.0
     }
+
+    /// Returns true if the lineage is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl Default for IntentLineage {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
 }
 
 /// Consumer-side allowlist: which intents may be promoted into this
@@ -90,5 +101,16 @@ mod tests {
         assert!(allowed.allows(&lineage));
         let bad = IntentLineage::new(vec![A2AIntent::new("delegate")]);
         assert!(!allowed.allows(&bad));
+    }
+
+    #[test]
+    fn intent_lineage_default_is_empty() {
+        assert!(IntentLineage::default().is_empty());
+    }
+
+    #[test]
+    fn intent_lineage_is_empty_returns_true_for_empty_lineage() {
+        let lineage = IntentLineage::new(vec![]);
+        assert!(lineage.is_empty());
     }
 }

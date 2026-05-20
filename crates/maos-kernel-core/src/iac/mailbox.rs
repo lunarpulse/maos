@@ -276,6 +276,7 @@ mod tests {
             }),
             auto_marker: FrameOrigin::HumanAuthored,
             consent_envelope: None,
+            intent_lineage: maos_domain::invariants::i13::IntentLineage::default(),
         }
     }
 

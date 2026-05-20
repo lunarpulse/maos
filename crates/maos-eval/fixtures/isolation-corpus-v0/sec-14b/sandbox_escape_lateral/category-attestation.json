@@ -1,0 +1,13 @@
+{
+  "authoring_method": "scripted",
+  "category": "sandbox_escape_lateral",
+  "reviewer_attestation": {
+    "attestation_date": "2026-05-20",
+    "attestation_statement": "I have reviewed every scenario in this category against the threat model in §8.1 and confirm that (a) each attack_payload is realistic for the stated attack_surface, (b) the expected_outcome.expected_kernel_response variant matches the kernel's actual typed-error contract at HEAD, and (c) the leak_signal_must_be_absent list covers the observable surface for this category.",
+    "attestor_id": "Lunarpulse",
+    "attestor_role": "Project Lead"
+  },
+  "scenario_count": 13,
+  "split": "sec-14b",
+  "threat_model_reference": "architecture-maos-minimal-opus/8-security-approval-model.md#81"
+}

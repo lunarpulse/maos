@@ -1,0 +1,29 @@
+{
+  "attack_payload": {
+    "attempted_surface": "MemoryManagerAdapter::read",
+    "peer_key": "scenario-011-namespace-key",
+    "peer_namespace": "principal:11/memory"
+  },
+  "attack_surface": "namespace_enumeration::11",
+  "category": "namespace_enumeration",
+  "expected_outcome": {
+    "expected_kernel_response": "I5Violation",
+    "isolation_maintained": true,
+    "leak_signal_must_be_absent": [
+      "peer_namespace_keys",
+      "peer_scalar_values"
+    ]
+  },
+  "preconditions": {
+    "seed_data": [],
+    "spirit_a_pid": 111,
+    "spirit_a_principal_id": "principal-a-011@test.maos",
+    "spirit_b_pid": 211,
+    "spirit_b_principal_id": "principal-b-011@test.maos"
+  },
+  "scenario_id": "sec-14a/namespace_enumeration/scenario-011",
+  "spirit_a_role": "attacker",
+  "spirit_b_role": "victim",
+  "split": "sec-14a",
+  "tier_tag": "scripted-v0"
+}

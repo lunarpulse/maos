@@ -25,6 +25,6 @@ pub use manifest::{ManifestSelfCheckReport, ManifestSelfCheckViolation, manifest
 pub use regression::{RegressionCorpus, RegressionCase, SpiritClass};
 pub use isolation::{
     CrossSpiritIsolationFixture, IsolationAttackCategory, IsolationAttackCase,
-    IsolationHookPoint, IsolationOutcome, DefaultIsolationHook,
+    IsolationHookPoint, IsolationHookOutcome, IsolationOutcome, DefaultIsolationHook,
     HookCallRecord, AttemptResult, ObservationResult,
 };

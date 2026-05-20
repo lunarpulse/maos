@@ -253,3 +253,14 @@ PrincipalNamespaceIndex) and TransparencyLogAdapter. Does NOT retain mutable sta
 across calls; delegates to the already-exempt sub-modules. The `next_frame_counter`
 is a monotonic ULID counter for audit-frame IDs, not learned state. Bounded by
 per-Spirit budget + principal forget-cascade per §4.0.7.
+
+### `IsolationCorpusReport` — `crates/maos-kernel-core/src/isolation/runner.rs`
+
+**Reason:** isolation corpus runner report (Story 4.5) — transient value type produced
+by the test-only `IsolationCorpusRunner::run_all`. The `BTreeMap<String, usize>`
+fields (`per_category`, `per_split`) hold per-run scenario counters, not persistent
+kernel state. The runner itself is a stateless composer over `Arc` references to
+existing exempt holders (TransparencyLogAdapter, MemoryManagerAdapter,
+LogRecallAdapter, HaltRegistry). Same exemption shape as `SelfTelemetryAggregator`
+(Story 4.3) and `LogRecallAdapter` (Story 4.4). No parameter drift; no learned
+state; counters are discarded after each `run_all` call.

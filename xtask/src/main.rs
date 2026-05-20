@@ -21,6 +21,7 @@ mod rebaseline_check;
 mod example_spirit_regen;
 mod check_workspace_count;
 mod gen_termination_corpus;
+mod gen_isolation_corpus;
 pub mod check_mock_not_in_release;
 
 #[derive(Parser)]
@@ -96,6 +97,8 @@ enum Commands {
     CheckWorkspaceCount { #[arg(long, default_value = "Cargo.toml")] cargo_toml: String, #[arg(long, default_value = "_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md")] kernel_design: String, #[arg(long)] json: bool },
     /// Story 4.1 AC4 — deterministic 1000-scenario termination-corpus generator.
     GenTerminationCorpus { #[arg(long, default_value = "crates/maos-eval/fixtures/termination-corpus-v0")] out_dir: String },
+    /// Story 4.5 — deterministic 200-scenario cross-spirit isolation-corpus generator.
+    GenIsolationCorpus { #[arg(long, default_value = "crates/maos-eval/fixtures/isolation-corpus-v0")] out_dir: String },
     /// Story 4.1 A2 — check release binary for forbidden test-double symbols.
     CheckMockNotInRelease { #[arg(long, default_value = "target/release/maos")] binary: String, #[arg(long)] build_first: bool, #[arg(long)] json: bool },
 }
@@ -147,6 +150,9 @@ fn main() {
         }
         Commands::GenTerminationCorpus { out_dir } => {
             gen_termination_corpus::run(&out_dir)
+        }
+        Commands::GenIsolationCorpus { out_dir } => {
+            gen_isolation_corpus::run(&out_dir)
         }
         Commands::CheckMockNotInRelease { binary, build_first, json } => {
             check_mock_not_in_release::run(&binary, build_first, json)

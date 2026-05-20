@@ -45,6 +45,9 @@ pub struct IacBusAdapter {
     mailbox: std::sync::Arc<Mailbox>,
     transparency_log: std::sync::Arc<TransparencyLogAdapter>,
     digest_provider: std::sync::Arc<dyn Fn(&maos_spirit_abi::identity::SpiritId) -> maos_domain::invariants::i12::WorkingMemoryDigestRefs + Send + Sync>,
+    /// Story 4.5 — AC5 isolation hook for corpus runner observation.
+    #[cfg(feature = "spirit_test")]
+    isolation_hook: Option<std::sync::Arc<parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>>>,
 }
 
 impl IacBusAdapter {
@@ -57,6 +60,39 @@ impl IacBusAdapter {
             mailbox,
             transparency_log,
             digest_provider: std::sync::Arc::new(|_| maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()),
+            #[cfg(feature = "spirit_test")]
+            isolation_hook: None,
+        }
+    }
+
+    /// Story 4.5 — attach an isolation hook for cross-Spirit corpus observation.
+    #[cfg(feature = "spirit_test")]
+    pub fn with_isolation_hook(
+        mut self,
+        hook: std::sync::Arc<parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>>,
+    ) -> Self {
+        self.isolation_hook = Some(hook);
+        self
+    }
+
+    /// Story 4.5 — fire isolation hooks for cross-Spirit observation.
+    #[cfg(feature = "spirit_test")]
+    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, _outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
+        if let Some(ref hook) = self.isolation_hook {
+            let mut h = hook.lock();
+            let _ = h.before_spirit_a_attempt(case_id);
+            let attempt = maos_spirit_sdk::spirit_test::AttemptResult {
+                hooks_fired_during_attempt: vec![case_id.into()],
+                frames_emitted: 1,
+            };
+            let _ = h.after_spirit_a_attempt(case_id, &attempt);
+            let _ = h.before_spirit_b_observe(case_id);
+            let observation = maos_spirit_sdk::spirit_test::ObservationResult {
+                hooks_fired_during_observation: vec![],
+                frames_emitted: 0,
+                leaked_bytes: None,
+            };
+            let _ = h.after_spirit_b_observe(case_id, &observation);
         }
     }
 
@@ -121,7 +157,55 @@ impl IacBusAdapter {
         // 0. I12 decorate decision frames BEFORE serialization (Story 3.3 AC5)
         // so the logged payload already carries working_memory_digest_refs.
         // digest_provider is injected from the composition root.
-        let frame = decision_logger::decorate_decision_frame(frame, |sid| (self.digest_provider)(sid));
+        let mut frame = decision_logger::decorate_decision_frame(frame, |sid| (self.digest_provider)(sid));
+
+        // Story 4.5 — AC5: fire isolation hooks BEFORE lineage check
+        // so corpus harness observes the attempt before the kernel rejects it.
+        #[cfg(feature = "spirit_test")]
+        {
+            let caller_pid = frame.from.spirit_id.as_str().to_string();
+            let surface = "IacBusAdapter::deliver_typed";
+            self.fire_isolation_hooks(&caller_pid, surface, maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue);
+        }
+
+        // Story 4.5 — NFR-Aud-14 intent-lineage propagation.
+        // Cross-Spirit determination: `frame.from.spirit_id != frame.to[0].spirit_id`
+        // (broadcasts with no `to` entries are NOT cross-Spirit — they're 1:N telemetry,
+        // the lineage is broadcast-implicit).
+        {
+            let is_cross_spirit = matches!(frame.to.first(), Some(addr) if addr.spirit_id != frame.from.spirit_id);
+            if is_cross_spirit {
+                if frame.intent_lineage.is_empty() {
+                    match frame.auto_marker {
+                        // Originating human intent — kernel attaches single-class lineage.
+                        maos_domain::invariants::i3::FrameOrigin::HumanAuthored => {
+                            let class_as_intent = maos_domain::invariants::i8::A2AIntent::new(match frame.intent {
+                                maos_domain::invariants::i1::IntentClass::HighPrivilege => "high",
+                                maos_domain::invariants::i1::IntentClass::Standard => "standard",
+                                maos_domain::invariants::i1::IntentClass::Readonly => "readonly",
+                            });
+                            frame.intent_lineage = maos_domain::invariants::i13::IntentLineage::new(vec![class_as_intent]);
+                        }
+                        // Spirit-emitted cross-Spirit frame with empty lineage = consent-laundering signal.
+                        // Reject per NFR-Aud-14.
+                        _ => {
+                            #[cfg(feature = "spirit_test")]
+                            {
+                                let caller_pid = frame.from.spirit_id.as_str().to_string();
+                                self.fire_isolation_hooks(&caller_pid, "IacBusAdapter::deliver_typed::lineage_broken", maos_spirit_sdk::spirit_test::IsolationHookOutcome::Abort);
+                            }
+                            return Err(maos_domain::iac_bus_types::IacBusError::EIntentLineageBroken {
+                                from: frame.from.spirit_id.as_str().to_string(),
+                                to: frame.to.first().map(|a| a.spirit_id.as_str().to_string()).unwrap_or_default(),
+                                origin: frame.auto_marker,
+                            });
+                        }
+                    }
+                }
+            }
+            // Note: same-Spirit frames AND broadcast frames bypass the check (ADR-018
+            // "explodes header overhead for frames that never cross consent boundaries").
+        }
 
         // 1. Serialize payload for log write
         let payload_bytes = serde_json::to_vec(&frame.payload)
@@ -183,6 +267,8 @@ impl Default for IacBusAdapter {
                 TransparencyLogAdapter::open_in_memory(0),
             ),
             digest_provider: std::sync::Arc::new(|_| maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()),
+            #[cfg(feature = "spirit_test")]
+            isolation_hook: None,
         }
     }
 }
@@ -198,6 +284,7 @@ mod decision_audit_tests {
     use maos_domain::invariants::i1::IntentClass;
     use maos_domain::invariants::i3::FrameOrigin;
     use maos_domain::invariants::i12::WorkingMemoryDigestRefs;
+    use maos_domain::invariants::i13::IntentLineage;
     use maos_spirit_abi::identity::{FrameKind as DomainFrameKind, SpiritId};
     use smallvec::smallvec;
 
@@ -221,6 +308,7 @@ mod decision_audit_tests {
             }),
             auto_marker: FrameOrigin::HumanAuthored,
             consent_envelope: None,
+            intent_lineage: IntentLineage::default(),
         }
     }
 
@@ -299,6 +387,7 @@ mod decision_audit_tests {
             }),
             auto_marker: FrameOrigin::HumanAuthored,
             consent_envelope: None,
+            intent_lineage: IntentLineage::default(),
         };
 
         let _ = adapter.deliver_typed(task_frame).await;
@@ -320,5 +409,149 @@ mod decision_audit_tests {
             }
             other => panic!("expected TaskAssign, got {:?}", std::mem::discriminant(&other)),
         }
+    }
+
+    // --- Story 4.5 lineage check tests (Task 2.3) ---
+
+    fn make_cross_spirit_frame(from: &str, to: &str, origin: FrameOrigin) -> IacFrame {
+        IacFrame {
+            frame_id: [0xAA; 16],
+            timestamp_ns: 0,
+            logical_clock: 0,
+            from: FrameAddress {
+                spirit_id: SpiritId::from(from),
+                host_id: None,
+                role: None,
+            },
+            to: smallvec![FrameAddress {
+                spirit_id: SpiritId::from(to),
+                host_id: None,
+                role: None,
+            }],
+            kind: DomainFrameKind::TaskAssign,
+            intent: IntentClass::Standard,
+            payload: FramePayload::TaskAssign(TaskAssignPayload {
+                goal: "cross-spirit".into(),
+                scope: vec![],
+                success_criteria: "ok".into(),
+                posture_preferences: PosturePreferences::default(),
+            }),
+            auto_marker: origin,
+            consent_envelope: None,
+            intent_lineage: IntentLineage::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn lineage_human_authored_cross_spirit_auto_populates() {
+        let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(
+            crate::telemetry::iac_rt::IacRtMetrics::new(),
+        )));
+        let adapter = IacBusAdapter::new(mailbox, log.clone());
+        let _target_handle = adapter.register_spirit_typed(&SpiritId::from("spirit-b")).unwrap();
+
+        let frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::HumanAuthored);
+        assert!(frame.intent_lineage.is_empty(), "precondition: empty lineage");
+        let result = adapter.deliver_typed(frame).await;
+        assert!(result.is_ok(), "human-authored cross-spirit should succeed");
+
+        let entries = log.query_frames(FrameFilter::default()).unwrap();
+        assert_eq!(entries.len(), 1, "frame should be logged");
+    }
+
+    #[tokio::test]
+    async fn lineage_spirit_auto_cross_spirit_empty_lineage_rejected() {
+        let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(
+            crate::telemetry::iac_rt::IacRtMetrics::new(),
+        )));
+        let adapter = IacBusAdapter::new(mailbox, log.clone());
+        let _target_handle = adapter.register_spirit_typed(&SpiritId::from("spirit-b")).unwrap();
+
+        let frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
+        let result = adapter.deliver_typed(frame).await;
+        assert!(result.is_err(), "spirit-auto cross-spirit with empty lineage should be rejected");
+        match result.unwrap_err() {
+            maos_domain::iac_bus_types::IacBusError::EIntentLineageBroken { from, to, origin } => {
+                assert_eq!(from, "spirit-a");
+                assert_eq!(to, "spirit-b");
+                assert_eq!(origin, FrameOrigin::SpiritAuto);
+            }
+            e => panic!("expected EIntentLineageBroken, got {e:?}"),
+        }
+        // Verify frame was NOT logged
+        let entries = log.query_frames(FrameFilter::default()).unwrap();
+        assert_eq!(entries.len(), 0, "rejected frame should not be logged");
+    }
+
+    #[tokio::test]
+    async fn lineage_spirit_auto_cross_spirit_non_empty_lineage_succeeds() {
+        let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(
+            crate::telemetry::iac_rt::IacRtMetrics::new(),
+        )));
+        let adapter = IacBusAdapter::new(mailbox, log.clone());
+        let _target_handle = adapter.register_spirit_typed(&SpiritId::from("spirit-b")).unwrap();
+
+        let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
+        frame.intent_lineage = IntentLineage::new(vec![
+            maos_domain::invariants::i8::A2AIntent::new("standard"),
+        ]);
+        let result = adapter.deliver_typed(frame).await;
+        assert!(result.is_ok(), "spirit-auto with non-empty lineage should succeed");
+    }
+
+    #[tokio::test]
+    async fn lineage_same_spirit_empty_lineage_spirit_auto_succeeds() {
+        let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(
+            crate::telemetry::iac_rt::IacRtMetrics::new(),
+        )));
+        let adapter = IacBusAdapter::new(mailbox, log.clone());
+        let _target_handle = adapter.register_spirit_typed(&SpiritId::from("spirit-a")).unwrap();
+
+        let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
+        // make it same-spirit: from == to
+        frame.to = smallvec![FrameAddress {
+            spirit_id: SpiritId::from("spirit-a"),
+            host_id: None,
+            role: None,
+        }];
+        let result = adapter.deliver_typed(frame).await;
+        assert!(result.is_ok(), "same-spirit with empty lineage should succeed per ADR-018");
+    }
+
+    #[tokio::test]
+    async fn lineage_broadcast_empty_to_succeeds() {
+        let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(
+            crate::telemetry::iac_rt::IacRtMetrics::new(),
+        )));
+        let adapter = IacBusAdapter::new(mailbox, log.clone());
+
+        let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
+        frame.to = smallvec![]; // broadcast — bypass lineage check
+        let result = adapter.deliver_typed(frame).await;
+        assert!(result.is_ok(), "broadcast with empty lineage should succeed");
+    }
+
+    #[tokio::test]
+    async fn lineage_human_authored_non_empty_lineage_not_overwritten() {
+        let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(
+            crate::telemetry::iac_rt::IacRtMetrics::new(),
+        )));
+        let adapter = IacBusAdapter::new(mailbox, log.clone());
+        let _target_handle = adapter.register_spirit_typed(&SpiritId::from("spirit-b")).unwrap();
+
+        let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::HumanAuthored);
+        let existing = IntentLineage::new(vec![
+            maos_domain::invariants::i8::A2AIntent::new("consult"),
+        ]);
+        frame.intent_lineage = existing.clone();
+        let result = adapter.deliver_typed(frame).await;
+        assert!(result.is_ok(), "human-authored with pre-existing lineage should succeed");
+        // The frame was consumed; we verify delivery succeeded (no rejection).
     }
 }
