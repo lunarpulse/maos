@@ -33,3 +33,7 @@ pub use crate::memory::shared::SharedMemoryStore;
 pub use crate::memory::principal::PrincipalNamespaceIndex;
 pub use crate::memory::self_telemetry::SelfTelemetryAggregator;
 pub use crate::memory::for_spirit::SpiritMemoryView;
+
+// Story 4.4 — Log-recall + Distillate audit chain
+pub use crate::iac::log_recall::LogRecallAdapter;
+pub use crate::iac::distillate::DistillateWriter;

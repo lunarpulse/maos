@@ -616,6 +616,20 @@ jobs:
         if: steps.check-corpus.outputs.exists == 'true'
         run: cargo run -p xtask -- calibrate --corpus calibration-seed-v0.1 --n 100 --p 0.95 --json
 
+  # Story 4.4 — NFR-Aud-7 five-metric distillation gate
+  nfr-aud-7-distillate-five-metrics-floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run distillate five-metrics floor test
+        run: cargo test -p maos-eval --test distillate_five_metrics_floor
+
   # Determinism integration tests for maos-corpus-gen — non-blocking at v0.1-α per DF6
   # (deferred-work.md). Promotes to blocking when NFR-Sec-4 redaction filter ships (v0.5).
   # The job always reports success at the GitHub Actions level; the underlying test

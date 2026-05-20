@@ -416,3 +416,26 @@
 "maos_kernel_core::api::crate::memory::shared::SharedMemoryStore"      = "data-movement"
 "maos_kernel_core::memory::self_telemetry::SelfTelemetryAggregator"    = "data-movement"
 "maos_kernel_core::halt::PendingHaltMetadata"                          = "data-movement"
+
+# ── Story 4.4 — log.recall + distillate audit chain + five-metric gate ──
+
+# LogRecallAdapter
+"maos_kernel_core::iac::log_recall::LogRecallAdapter"                    = "data-movement"
+"maos_kernel_core::iac::log_recall::LogRecallAdapter::new"               = "data-movement"
+"maos_kernel_core::iac::log_recall::LogRecallAdapter::recall"            = "data-movement"
+"maos_kernel_core::iac::log_recall::LogRecallAdapter::fetch"             = "data-movement"
+
+# DistillateWriter
+"maos_kernel_core::iac::distillate::DistillateWriter"                    = "supervision"
+"maos_kernel_core::iac::distillate::DistillateWriter::new"               = "supervision"
+"maos_kernel_core::iac::distillate::DistillateWriter::write_distillate"  = "supervision"
+"maos_kernel_core::iac::distillate::DistillateWriter::admit_for_consumer" = "data-movement"
+
+# FrameKind::Distillate variant
+"maos_kernel_core::iac::transparency_log::FrameKind::Distillate"         = "data-movement"
+
+# api re-exports
+"maos_kernel_core::api::LogRecallAdapter"                                = "data-movement"
+"maos_kernel_core::api::DistillateWriter"                                = "supervision"
+"maos_kernel_core::api::crate::iac::log_recall::LogRecallAdapter"        = "data-movement"
+"maos_kernel_core::api::crate::iac::distillate::DistillateWriter"        = "supervision"

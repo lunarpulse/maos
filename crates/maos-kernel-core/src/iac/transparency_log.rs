@@ -25,7 +25,7 @@ use maos_domain::invariants::i2::LogBeforeDeliver;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i4::ApprovalDecision;
 use maos_domain::ports::IacBusPort;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 
 use super::mailbox_stub::MailboxStub;
 use super::redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
@@ -51,6 +51,13 @@ pub enum FrameKind {
     /// Decision / distillation outcome (Story 4.3 proxy; Story 4.4
     /// refines with explicit `Distillate` variant).
     Decision = 10,
+    /// Story 4.4 — Distillation digest with kernel-enforced I11 audit chain.
+    /// Payload (in `transparency_log.payload_redacted`) is the JSON-serialized
+    /// `DistillationReceipt`. Use `DistillateWriter::write_distillate` as the
+    /// canonical producer; direct `insert_frame_event(FrameKind::Distillate, ...)`
+    /// from other code paths is forbidden by convention (the I11 enforcement
+    /// MUST flow through the writer).
+    Distillate = 11,
 }
 
 impl FrameKind {
@@ -68,6 +75,7 @@ impl FrameKind {
             8 => Some(Self::SandboxBlock),
             9 => Some(Self::InferenceCall),
             10 => Some(Self::Decision),
+            11 => Some(Self::Distillate),
             _ => None,
         }
     }
@@ -97,6 +105,10 @@ pub struct FrameFilter {
     pub since_ns: Option<u64>,
     pub until_ns: Option<u64>,
     pub limit: Option<usize>,
+    /// Keyset-pagination cursor — exclusive lower bound on `(timestamp_ns, frame_id)`.
+    /// When both are `Some`, the query adds `WHERE (timestamp_ns, frame_id) > (?cursor_ts, ?cursor_id)`.
+    pub cursor_timestamp_ns: Option<u64>,
+    pub cursor_frame_id: Option<[u8; 16]>,
 }
 
 /// Typed audit-spine error. Coarse-grained at v0.1-β per the dep-introduction
@@ -388,6 +400,11 @@ impl TransparencyLogAdapter {
             where_clauses.push("timestamp_ns <= ?".to_string());
             params.push(Box::new(until as i64));
         }
+        if let (Some(cursor_ts), Some(cursor_fid)) = (filter.cursor_timestamp_ns, filter.cursor_frame_id) {
+            where_clauses.push("(timestamp_ns, frame_id) > (? , ?)".to_string());
+            params.push(Box::new(cursor_ts as i64));
+            params.push(Box::new(cursor_fid.to_vec()));
+        }
 
         if !where_clauses.is_empty() {
             sql.push_str(" WHERE ");
@@ -442,6 +459,64 @@ impl TransparencyLogAdapter {
             entries.push(row.map_err(AuditError::SqliteRead)?);
         }
         Ok(entries)
+    }
+
+    /// Read-side: look up a single frame by its primary key.
+    /// Returns `None` if the frame_id is not found.
+    pub fn query_frame_by_id(
+        &self,
+        frame_id: [u8; 16],
+    ) -> Result<Option<TransparencyLogEntry>, AuditError> {
+        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let mut stmt = inner
+            .conn
+            .prepare(
+                "SELECT frame_id, timestamp_ns, spirit_pid, boot_nonce,
+                        capability_token, kind, intent, payload_redacted, origin
+                 FROM transparency_log
+                 WHERE frame_id = ?1
+                 LIMIT 1",
+            )
+            .map_err(AuditError::SqliteRead)?;
+
+        let row = stmt
+            .query_row(rusqlite::params![&frame_id[..]], |row| {
+                let frame_id_blob: Vec<u8> = row.get(0)?;
+                let mut fid = [0u8; 16];
+                if frame_id_blob.len() == 16 {
+                    fid.copy_from_slice(&frame_id_blob);
+                }
+                let cap_blob: Option<Vec<u8>> = row.get(4)?;
+                let mut cap_token = None;
+                if let Some(ref blob) = cap_blob {
+                    if blob.len() == 32 {
+                        let mut arr = [0u8; 32];
+                        arr.copy_from_slice(blob);
+                        cap_token = Some(arr);
+                    }
+                }
+                Ok(TransparencyLogEntry {
+                    frame_id: fid,
+                    timestamp_ns: row.get::<_, i64>(1)? as u64,
+                    spirit_pid: row.get::<_, i64>(2)? as u32,
+                    boot_nonce: row.get::<_, i64>(3)? as u64,
+                    capability_token: cap_token,
+                    kind: FrameKind::from_i64(row.get::<_, i64>(5)?)
+                        .unwrap_or(FrameKind::TaskAssign),
+                    intent: row.get(6)?,
+                    payload_redacted: row.get(7)?,
+                    origin: match row.get::<_, i64>(8)? {
+                        0 => FrameOrigin::HumanAuthored,
+                        1 => FrameOrigin::SpiritAuto,
+                        2 => FrameOrigin::SpiritDraftedHumanApproved,
+                        3 => FrameOrigin::Kernel,
+                        _ => FrameOrigin::HumanAuthored,
+                    },
+                })
+            })
+            .optional()
+            .map_err(AuditError::SqliteRead)?;
+        Ok(row)
     }
 
     /// Read-side: query approval decisions.

@@ -32,3 +32,8 @@
 - `HaltCorpus` and `TerminationCorpus` loaders are structural copy-paste — refactor to shared `CorpusLoader<T>` when bandwidth allows.
 - Termination corpus mechanically generated via `xtask/src/gen_termination_corpus.rs`, not hand-authored — deferred to Story 4.5 per spec contract (HSIS 100 scenarios).
 - Test PID collision risk (`seed % 1000`) — harmless now since `drain_for_spirit` drains all, but will break silently when Story 5.3 adds per-Spirit filtering.
+
+## Deferred from: code review of 4-4-enforce-the-i11-audit-chain-on-distillates-with-log-recall-and-the-five-metric-gate (2026-05-19)
+
+- `LogRecallAdapter` lacks optional `Arc<RedactionPolicy>` — Spec AC1 says "optionally"; not required at v0.3-β since redaction is handled at TL write time, not recall time. v0.5+ may add re-validation at fetch time.
+- Dead fixture field `intent_lineage_expected` — Forward-shaped for v0.5+ live judge-LLM integration; not validated at v0.3-β because the harness is calibration-mode (corpus-author-annotated, not live-evaluated).

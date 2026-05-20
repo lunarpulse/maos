@@ -44,6 +44,15 @@ fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
         Scope::MemRead { scope: s } => cap_policy::decision::Intent::MemRead { scope: s.clone() },
         Scope::MemWrite { scope: s } => cap_policy::decision::Intent::MemWrite { scope: s.clone() },
         Scope::SelfTelemetryRead => cap_policy::decision::Intent::SelfTelemetryRead,
+        Scope::LogRecall => cap_policy::decision::Intent::LogRecall,
+        Scope::LogFetch => cap_policy::decision::Intent::LogFetch,
+        Scope::DistillateWrite => cap_policy::decision::Intent::DistillateWrite,
+        _ => {
+            panic!(
+                "scope_to_intent: unmapped Scope variant {:?} — add an explicit arm before calling this function",
+                scope
+            )
+        }
     }
 }
 

@@ -159,12 +159,13 @@ impl SelfTelemetryPort for SelfTelemetryAggregator {
             (sc, fc)
         };
 
-        // 4. Distillation outcomes (v0.3-β proxy from Decision frames).
+        // 4. Distillation outcomes (v0.4 onwards: precise FrameKind::Distillate filter;
+        // the v0.3-β Decision proxy is gone).
         let distillation_outcomes: Vec<DistillationOutcomeEntry> = {
             let filter = FrameFilter {
                 spirit_pid: Some(spirit_pid),
                 since_ns: Some(window_start_ns),
-                kind: Some(FrameKind::Decision),
+                kind: Some(FrameKind::Distillate),
                 ..Default::default()
             };
 

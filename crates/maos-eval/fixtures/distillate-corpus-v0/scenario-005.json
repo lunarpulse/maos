@@ -1,0 +1,31 @@
+{
+  "scenario_id": "scenario-005",
+  "tag": "synthetic-v0",
+  "spirit_class": "researcher",
+  "source_raw_frames": [
+    {
+      "frame_id_hex": "00000000000000000000000000000000",
+      "intent": "verify",
+      "payload_summary": "Raw frame 1"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000001",
+      "intent": "consult",
+      "payload_summary": "Raw frame 2"
+    }
+  ],
+  "digest_payload": "[HEDGE CASE 5] The analysis suggests a likely outcome, though uncertainty remains regarding the tail risks. The model indicates moderate confidence in the primary findings.",
+  "source_log_ref": [
+    "00000000000000000000000000000000",
+    "00000000000000000000000000000001"
+  ],
+  "distillation_depth": 1,
+  "intent_lineage_expected": [
+    "consult",
+    "verify"
+  ],
+  "expected_recall": 0.955,
+  "expected_faithfulness": 0.992,
+  "expected_hedge_preservation": 0.988,
+  "planted_secrets": []
+}

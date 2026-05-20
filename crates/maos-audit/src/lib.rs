@@ -263,6 +263,66 @@ pub fn to_fr4_ndjson<W: Write>(
     Ok(())
 }
 
+/// Truncate a string display to `max_len` characters.
+/// Respects Unicode character boundaries — never splits a multi-byte code point.
+fn truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let mut end = max_len;
+        while end > 0 && !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        s[..end].to_string()
+    }
+}
+
+/// Hex-encode a byte slice.
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Convert a kind integer to a human-readable dot-case string.
+/// Stable format used by `maosctl audit query --format plain`.
+fn kind_to_string(kind: i64) -> String {
+    match kind {
+        0 => "task.assign",
+        1 => "task.complete",
+        2 => "decision.dispatch",
+        3 => "epistemic.halt",
+        4 => "telemetry.event",
+        5 => "consent.request",
+        6 => "retract",
+        7 => "capability.invocation",
+        8 => "sandbox.block",
+        9 => "inference.call",
+        10 => "decision",
+        11 => "distillate",
+        _ => "unknown",
+    }
+    .to_string()
+}
+
+/// Convert a kind string to its integer discriminator.
+/// Accepts both dot-case (`"task.assign"`) and PascalCase (`"TaskAssign"`) for backward compat.
+fn kind_from_string(s: &str) -> Option<i64> {
+    match s {
+        "task.assign" | "TaskAssign" => Some(0),
+        "task.complete" | "TaskComplete" => Some(1),
+        "decision.dispatch" | "DecisionDispatch" => Some(2),
+        "epistemic.halt" | "EpistemicHalt" => Some(3),
+        "telemetry.event" | "TelemetryEvent" => Some(4),
+        "consent.request" | "ConsentRequest" => Some(5),
+        "retract" | "Retract" => Some(6),
+        "capability.invocation" | "CapabilityInvocation" => Some(7),
+        "sandbox.block" | "SandboxBlock" => Some(8),
+        "inference.call" | "InferenceCall" => Some(9),
+        "decision" | "Decision" => Some(10),
+        "distillate" | "Distillate" => Some(11),
+        _ => None,
+    }
+}
+
 /// Write entries as human-readable tabular text. Never emits ANSI escapes
 /// (no `colored` crate, no `\x1b` bytes). Used by `maosctl audit query
 /// --format plain` and engaged automatically when the NFR-Ops-5 cascade
@@ -444,6 +504,43 @@ pub fn default_memory_root() -> std::path::PathBuf {
     data_home.join("maos").join("memory")
 }
 
+/// Resolve the default Distillate Corpus root directory.
+///
+/// Forward-shaped helper for v0.5+ when the corpus may live in operator-supplied
+/// data directories outside the repo. Precedence (highest → lowest):
+///   1. `MAOS_DISTILLATE_CORPUS_ROOT` env var
+///   2. `$XDG_DATA_HOME/maos/distillate-corpus`
+///   3. `$HOME/.local/share/maos/distillate-corpus`
+///   4. `/var/lib/maos/distillate-corpus` (last-resort fallback)
+///
+/// # Note
+///
+/// The kernel does NOT consume this function itself; the harness in
+/// `maos-eval/tests/` reads from a relative fixture path
+/// (`fixtures/distillate-corpus-v0/`) consistent with the existing
+/// `halt-corpus-v0` test pattern. This function exists for v0.5+.
+pub fn default_distillate_corpus_root() -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Ok(p) = std::env::var("MAOS_DISTILLATE_CORPUS_ROOT") {
+        if !p.is_empty() {
+            return PathBuf::from(p);
+        }
+        eprintln!("maos: MAOS_DISTILLATE_CORPUS_ROOT is set but empty — falling through to default path");
+    }
+    let data_home = std::env::var("XDG_DATA_HOME")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .filter(|h| !h.is_empty())
+                .map(|h| PathBuf::from(h).join(".local").join("share"))
+        })
+        .unwrap_or_else(|| PathBuf::from("/var/lib"));
+    data_home.join("maos").join("distillate-corpus")
+}
+
 /// Pure-function form of the precedence cascade — env values are passed in
 /// explicitly. Used by the inline tests on [`default_journal_path`] to drive
 /// every branch without mutating the process environment (forbidden under
@@ -494,48 +591,29 @@ fn resolve_memory_root_from_env_internal(
     data_home.join("maos").join("memory")
 }
 
-fn truncate(s: &str, n: usize) -> &str {
-    let mut end = n.min(s.len());
-    while !s.is_char_boundary(end) && end > 0 {
-        end -= 1;
+/// Pure-function form of the distillate-corpus-root precedence cascade for testing.
+#[cfg(test)]
+fn resolve_distillate_corpus_root_from_env_internal(
+    maos_corpus_root: Option<&str>,
+    xdg_data_home: Option<&str>,
+    home: Option<&str>,
+) -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Some(p) = maos_corpus_root {
+        if p.is_empty() {
+            panic!("empty MAOS_DISTILLATE_CORPUS_ROOT");
+        }
+        return PathBuf::from(p);
     }
-    &s[..end]
-}
-
-fn hex_encode(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
-}
-
-fn kind_to_string(disc: i64) -> String {
-    match disc {
-        0 => "task.assign".into(),
-        1 => "task.complete".into(),
-        2 => "decision.dispatch".into(),
-        3 => "epistemic.halt".into(),
-        4 => "telemetry.event".into(),
-        5 => "consent.request".into(),
-        6 => "retract".into(),
-        7 => "capability.invocation".into(),
-        8 => "sandbox.block".into(),
-        9 => "inference.call".into(),
-        _ => format!("unknown({disc})"),
-    }
-}
-
-fn kind_from_string(s: &str) -> Option<i64> {
-    match s {
-        "task.assign" => Some(0),
-        "task.complete" => Some(1),
-        "decision.dispatch" => Some(2),
-        "epistemic.halt" => Some(3),
-        "telemetry.event" => Some(4),
-        "consent.request" => Some(5),
-        "retract" => Some(6),
-        "capability.invocation" => Some(7),
-        "sandbox.block" => Some(8),
-        "inference.call" => Some(9),
-        _ => None,
-    }
+    let data_home = xdg_data_home
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            home.filter(|h| !h.is_empty())
+                .map(|h| PathBuf::from(h).join(".local").join("share"))
+        })
+        .unwrap_or_else(|| PathBuf::from("/var/lib"));
+    data_home.join("maos").join("distillate-corpus")
 }
 
 #[cfg(test)]
@@ -844,6 +922,50 @@ mod tests {
         assert_eq!(
             p,
             std::path::PathBuf::from("/var/lib/maos/memory")
+        );
+    }
+
+    // ── default_distillate_corpus_root tests (Story 4.4) ────────────────────
+
+    #[test]
+    fn default_distillate_corpus_root_respects_env_override() {
+        let p = super::resolve_distillate_corpus_root_from_env_internal(
+            Some("/tmp/maos-test-distillate-corpus"),
+            None,
+            None,
+        );
+        assert_eq!(p, std::path::PathBuf::from("/tmp/maos-test-distillate-corpus"));
+    }
+
+    #[test]
+    fn default_distillate_corpus_root_falls_through_to_xdg() {
+        let p = super::resolve_distillate_corpus_root_from_env_internal(
+            None,
+            Some("/tmp/xdgtest"),
+            None,
+        );
+        assert_eq!(p, std::path::PathBuf::from("/tmp/xdgtest/maos/distillate-corpus"));
+    }
+
+    #[test]
+    fn default_distillate_corpus_root_falls_through_to_home_when_xdg_unset() {
+        let p = super::resolve_distillate_corpus_root_from_env_internal(
+            None,
+            None,
+            Some("/tmp/hometest"),
+        );
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/tmp/hometest/.local/share/maos/distillate-corpus")
+        );
+    }
+
+    #[test]
+    fn default_distillate_corpus_root_last_resort_var_lib() {
+        let p = super::resolve_distillate_corpus_root_from_env_internal(None, None, None);
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/var/lib/maos/distillate-corpus")
         );
     }
 }

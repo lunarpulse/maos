@@ -1,0 +1,50 @@
+{
+  "scenario_id": "scenario-054",
+  "tag": "synthetic-v0",
+  "spirit_class": "researcher",
+  "source_raw_frames": [
+    {
+      "frame_id_hex": "00000000000000000000000000000000",
+      "intent": "verify",
+      "payload_summary": "Raw frame 1"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000001",
+      "intent": "coordinate",
+      "payload_summary": "Raw frame 2"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000002",
+      "intent": "inform",
+      "payload_summary": "Raw frame 3"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000003",
+      "intent": "coordinate",
+      "payload_summary": "Raw frame 4"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000004",
+      "intent": "coordinate",
+      "payload_summary": "Raw frame 5"
+    }
+  ],
+  "digest_payload": "[TYPICAL CASE 54] Standard analysis yields consistent reproducible results. All quality metrics demonstrably exceed acceptance thresholds. Derived conclusions align with ground truth verified values.",
+  "source_log_ref": [
+    "00000000000000000000000000000000",
+    "00000000000000000000000000000001",
+    "00000000000000000000000000000002",
+    "00000000000000000000000000000003",
+    "00000000000000000000000000000004"
+  ],
+  "distillation_depth": 1,
+  "intent_lineage_expected": [
+    "coordinate",
+    "inform",
+    "verify"
+  ],
+  "expected_recall": 0.979,
+  "expected_faithfulness": 0.999,
+  "expected_hedge_preservation": 0.977,
+  "planted_secrets": []
+}

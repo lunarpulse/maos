@@ -212,6 +212,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     eprintln!("maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)");
 
+    // Story 4.4 — LogRecallAdapter + DistillateWriter (log-recall + I11 audit chain).
+    let log_recall_adapter = Arc::new(maos_kernel_core::iac::log_recall::LogRecallAdapter::new(
+        Arc::clone(&transparency_log),
+    ));
+    let distillate_writer = Arc::new(maos_kernel_core::iac::distillate::DistillateWriter::new(
+        Arc::clone(&transparency_log),
+        Arc::clone(&memory),
+    ));
+    eprintln!("maos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)");
+
     // Story 3.1 — wire IacBusAdapter with real Mailbox + Transparency Log.
     let iac = Arc::new(IacBusAdapter::new(
         Arc::clone(&mailbox),

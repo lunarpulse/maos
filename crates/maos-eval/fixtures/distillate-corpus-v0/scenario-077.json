@@ -1,0 +1,31 @@
+{
+  "scenario_id": "scenario-077",
+  "tag": "synthetic-v0",
+  "spirit_class": "researcher",
+  "source_raw_frames": [
+    {
+      "frame_id_hex": "00000000000000000000000000000000",
+      "intent": "consult",
+      "payload_summary": "Raw frame 1"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000001",
+      "intent": "coordinate",
+      "payload_summary": "Raw frame 2"
+    }
+  ],
+  "digest_payload": "[TYPICAL CASE 77] Standard analysis yields consistent reproducible results. All quality metrics demonstrably exceed acceptance thresholds. Derived conclusions align with ground truth verified values.",
+  "source_log_ref": [
+    "00000000000000000000000000000000",
+    "00000000000000000000000000000001"
+  ],
+  "distillation_depth": 1,
+  "intent_lineage_expected": [
+    "consult",
+    "coordinate"
+  ],
+  "expected_recall": 0.953,
+  "expected_faithfulness": 0.999,
+  "expected_hedge_preservation": 0.979,
+  "planted_secrets": []
+}

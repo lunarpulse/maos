@@ -18,6 +18,8 @@ pub mod frame;
 pub mod channels;
 pub mod mailbox;
 pub mod decision_logger;
+pub mod log_recall;    // NEW — Story 4.4 LogRecallAdapter
+pub mod distillate;    // NEW — Story 4.4 DistillateWriter
 
 pub use maos_domain::ports::IacBusPort;
 

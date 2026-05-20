@@ -55,6 +55,12 @@ pub enum Intent {
     MemWrite { scope: String },
     /// Self-telemetry read (FR56) — Story 4.3.
     SelfTelemetryRead,
+    /// Log recall (participant-scoped) — Story 4.4.
+    LogRecall,
+    /// Log fetch (single-frame payload) — Story 4.4.
+    LogFetch,
+    /// Distillate write (I11 audit chain) — Story 4.4.
+    DistillateWrite,
 }
 
 /// Trust tier classification.

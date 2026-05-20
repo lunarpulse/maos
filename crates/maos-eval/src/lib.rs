@@ -16,9 +16,11 @@
 
 pub mod halt_corpus;
 pub mod termination_corpus;
+pub mod distillate_corpus;  // NEW — Story 4.4 five-metric distillation gate
 
 pub use halt_corpus::{HaltCorpus, HaltScenario, HaltScenarioOutcome};
 pub use termination_corpus::{TerminationCorpus, TerminationScenario, TerminationKind};
+pub use distillate_corpus::{DistillateCorpus, DistillateScenario, IaaAttestation};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CorpusError {

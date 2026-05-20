@@ -1,0 +1,31 @@
+{
+  "scenario_id": "scenario-017",
+  "tag": "synthetic-v0",
+  "spirit_class": "researcher",
+  "source_raw_frames": [
+    {
+      "frame_id_hex": "00000000000000000000000000000000",
+      "intent": "verify",
+      "payload_summary": "Raw frame 1"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000001",
+      "intent": "inform",
+      "payload_summary": "Raw frame 2"
+    }
+  ],
+  "digest_payload": "[CONTRADICTION CASE 17] The data clearly shows elevated risk, however the data also clearly shows risk containment. The evidence is conclusive that threshold was exceeded, yet simultaneously conclusive it was not.",
+  "source_log_ref": [
+    "00000000000000000000000000000000",
+    "00000000000000000000000000000001"
+  ],
+  "distillation_depth": 1,
+  "intent_lineage_expected": [
+    "inform",
+    "verify"
+  ],
+  "expected_recall": 0.884,
+  "expected_faithfulness": 0.941,
+  "expected_hedge_preservation": 0.957,
+  "planted_secrets": []
+}

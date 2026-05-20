@@ -14,7 +14,7 @@ use arc_swap::ArcSwap;
 use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i9::SandboxTier;
 
-use decision::{Capability, Intent, PolicyDecision, TrustTier};
+use decision::{ApprovalClass, Capability, Intent, PolicyDecision, TrustTier};
 
 /// Operator policy configuration.
 #[derive(Debug, Clone, Default)]
@@ -111,6 +111,23 @@ impl PolicyTable {
         let effective = self.effective_sandbox_tier(spirit_pid, manifest.trust_tier, &inner);
         if effective.0 >= 3 {
             return PolicyDecision::Deny;
+        }
+
+        // Story 4.4 — default approval-class rules for new capabilities.
+        // LogRecall / LogFetch → AutonomousWithHalt (normal admission under halt protocol).
+        // DistillateWrite → Assistive (prompt-on-write per architecture §F.4).
+        use maos_domain::invariants::i1::Scope;
+        match &capability.scope {
+            Scope::DistillateWrite => {
+                return PolicyDecision::RequireApproval {
+                    class: ApprovalClass::Interactive,
+                };
+            }
+            Scope::LogRecall | Scope::LogFetch => {
+                // Normal admission — halt protocol is enforced at the caller layer.
+                // Falls through to Allow below.
+            }
+            _ => {}
         }
 
         // Approval-class lookup from operator policy (by scope discriminant

@@ -56,6 +56,7 @@ impl TokenId {
 /// This enum is re-exported through `maos-spirit-abi`; adding an
 /// eleventh variant requires `#[non_exhaustive]` or a version-bump.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum Scope {
     /// Read access to a filesystem subtree.
     FsRead { subtree: String },
@@ -78,6 +79,12 @@ pub enum Scope {
     /// Story 4.3 — Self-telemetry read (FR56).  Spirit reads its own
     /// performance telemetry without per-read operator admission.
     SelfTelemetryRead,
+    /// Story 4.4 — Participant-scoped log recall (emitter-side at v0.3-β).
+    LogRecall,
+    /// Story 4.4 — Single-frame payload fetch (lazy-load, A2A consent aware).
+    LogFetch,
+    /// Story 4.4 — Distillate write with kernel-enforced I11 audit chain.
+    DistillateWrite,
 }
 
 /// Intent classification for approval policy.

@@ -22,3 +22,5 @@ pub mod halt;
 pub mod orchestrator;
 pub mod memory;          // NEW — Story 4.3 memory tier types
 pub mod self_telemetry;  // NEW — Story 4.3 self-telemetry types
+pub mod log_recall;      // NEW — Story 4.4 log-recall domain types
+pub mod distillation;    // NEW — Story 4.4 distillation domain types
