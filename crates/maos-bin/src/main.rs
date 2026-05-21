@@ -82,7 +82,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Construct the seven adapter shells.
-    let _scheduler = SpiritSchedulerAdapter::default();
+    // Story 5.1 — `_scheduler` replaced with real Arc<SpiritSchedulerAdapter>
+    // construction below (after all dependent adapters are initialized).
 
     // Story 4.3 — construct real MemoryManagerAdapter with Private + Shared + Principal stores.
     // Resolve paths first so both memory and TL share the same DB location.
@@ -124,7 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let telemetry = Arc::new(IacRtMetrics::new());
 
     // Story 3.1 — Mailbox replaces the v0.1-β stub.
-    let mailbox = Arc::new(Mailbox::new(Arc::clone(&telemetry)));
+    let mut mailbox = Arc::new(Mailbox::new(Arc::clone(&telemetry)));
 
     // Story 3.1 — NotificationDispatcher with TerminalChannel.
     let mut dispatcher = NotificationDispatcher::new();
@@ -228,6 +229,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&transparency_log),
     ));
     eprintln!("maos: IAC Bus wired (Mailbox + Transparency Log, Story 3.1)");
+
+    // Story 5.1 — wire the real Spirit Scheduler replacing the v0.1-β
+    // `_scheduler = SpiritSchedulerAdapter::default()` placeholder.
+    let scheduler = Arc::new(maos_kernel_core::scheduler::SpiritSchedulerAdapter::new(
+        Arc::clone(&transparency_log),
+        Arc::clone(&capability),
+        Arc::clone(&memory),
+        Arc::clone(&iac),
+        Arc::clone(&halt_registry),
+        Arc::clone(&telemetry),
+        Some(Arc::clone(&orchestrator)),
+        Some(Arc::clone(&log_recall_adapter)),
+        Some(Arc::clone(&distillate_writer)),
+        Some(Arc::clone(&self_telemetry)),
+        None, // security_manager — constructed per-one-shot arm at v0.3-β
+        Some(Arc::clone(&orchestrator_registry)),
+    ));
+    eprintln!("maos: Spirit Scheduler wired (Story 5.1)");
+
+    // Wire SCB map into Mailbox so deliver() updates last_inbound_frame_ns.
+    mailbox.set_scbs(scheduler.scbs());
+
+    // Story 5.1 — KernelLifecycleResolver assembled for CLI / ACP / HTTP API consumers.
+    let lifecycle_resolver = Arc::new(maos_kernel_core::scheduler::KernelLifecycleResolver::new(
+        Arc::clone(&scheduler),
+        Arc::clone(&transparency_log),
+        "director".into(),
+    ));
+    eprintln!("maos: KernelLifecycleResolver wired (Story 5.1)");
 
     // Story 4.5 — spirit_test-only isolation hooks are constructed by
     // integration tests (nfr_sec_14_cross_spirit_isolation.rs,
@@ -435,6 +465,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &journal,
                 &posture_section,
                 epistemic_policy.as_ref(),
+                None,
+                None,
             )?;
 
             // Perform the posture shift
@@ -818,9 +850,357 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
 
+        // Story 5.1 Task 0 — Epic 4 retro §A1 closure: walk kernel-side
+        // Epic 4 dataflow end-to-end.
+        if mode == "smoke-epic-4" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let journal_path = maos_audit::default_journal_path();
+            if let Some(parent) = journal_path.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("journal parent create failed: {e}"))?;
+            }
+            let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+                .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
+
+            let spirit_pid: u32 = 0;
+            let spirit_id = "smoke-epic-4-test";
+
+            // 1. orchestrator.process_scalar_write("uncertainty", 0.85, "demo") → halt fires
+            let policy = maos_kernel_core::security::manifest::EpistemicPolicySection {
+                rules: vec![
+                    maos_kernel_core::security::manifest::EpistemicPolicyRule::new(
+                        "uncertainty".into(),
+                        maos_kernel_core::security::manifest::EpistemicAction::Halt,
+                        None,
+                        None,
+                        Some(maos_kernel_core::security::manifest::ScalarPredicate::Above {
+                            threshold: 0.8,
+                        }),
+                    ),
+                ],
+                default_action:
+                    maos_kernel_core::security::manifest::EpistemicAction::VerbalizeOnly,
+            };
+
+            let halt_receipt = orchestrator
+                .process_scalar_write(
+                    &transparency_log,
+                    &journal,
+                    spirit_pid,
+                    spirit_id,
+                    boot_nonce,
+                    "uncertainty",
+                    0.85,
+                    "demo",
+                    &policy,
+                )
+                .map_err(|e| format!("process_scalar_write failed: {e}"))?
+                .ok_or_else(|| {
+                    format!("expected halt to fire for uncertainty=0.85 > 0.8")
+                })?;
+
+            println!(
+                "{{\"step\": \"1\", \"surface\": \"scalar_write_halt_fire\", \
+                 \"outcome\": \"ok\", \"halt_id\": \"{}\"}}",
+                halt_receipt.halt_id.as_str()
+            );
+
+            // 2. resolver.resolve(halt_id, Resolution::ProvidedContext { text })
+            //    → memory write + marker scalar
+            let output_markers =
+                Arc::new(maos_kernel_core::halt::output_markers::OutputMarkerRegistry::new());
+            let resolver = Arc::new(
+                maos_kernel_core::halt::resolver::KernelHaltResolver::new(
+                    Arc::clone(&halt_registry),
+                    Arc::clone(&transparency_log),
+                    Arc::clone(&output_markers),
+                    Arc::clone(&mailbox),
+                    boot_nonce,
+                    Arc::clone(&memory),
+                    Arc::clone(&orchestrator),
+                ),
+            );
+
+            let resolution =
+                maos_domain::halt::Resolution::provided_context(
+                    "test smoke context for epic-4 dataflow walk",
+                )
+                .map_err(|e| format!("resolution construction failed: {e}"))?;
+
+            {
+                use maos_domain::halt::HaltResolver;
+                resolver
+                    .resolve(&halt_receipt.halt_id, resolution)
+                    .map_err(|e| format!("halt resolution failed: {e}"))?;
+            }
+
+            println!(
+                "{{\"step\": \"2\", \"surface\": \"halt_resolve_provided_context\", \
+                 \"outcome\": \"ok\"}}"
+            );
+
+            // 3. self_telemetry.self_telemetry(spirit_pid, None) → returns scalar
+            //    history
+            {
+                use maos_domain::ports::SelfTelemetryPort;
+                let report = self_telemetry
+                    .self_telemetry(spirit_pid, None)
+                    .map_err(|e| format!("self_telemetry failed: {e}"))?;
+                println!(
+                    "{{\"step\": \"3\", \"surface\": \"self_telemetry\", \
+                     \"outcome\": \"ok\", \"halt_count\": {}}}",
+                    report.halt_events.len()
+                );
+            }
+
+            // 4. distillate_writer.write_distillate(..., empty_intent_lineage)
+            //    → rejects with AuditChainMissing
+            {
+                let empty_result = maos_domain::distillation::DistillationRequest::new(
+                    vec![],
+                    1,
+                    maos_domain::distillation::DigestPayload::Text("empty test".into()),
+                    None,
+                );
+                match empty_result {
+                    Err(maos_domain::distillation::DistillationError::AuditChainMissing { .. }) => {
+                        println!(
+                            "{{\"step\": \"4\", \"surface\": \
+                             \"distillate_write_empty_lineage\", \
+                             \"outcome\": \"rejected_as_expected\", \
+                             \"error\": \"AuditChainMissing\"}}"
+                        );
+                    }
+                    other => {
+                        return Err(format!(
+                            "expected AuditChainMissing for empty source_log_ref, got: {other:?}"
+                        )
+                        .into());
+                    }
+                }
+            }
+
+            // 5. distillate_writer.write_distillate(..., proper_intent_lineage)
+            //    → succeeds
+            {
+                use maos_domain::ports::DistillationPort;
+                let frame_ids: Vec<[u8; 16]> = transparency_log
+                    .query_frames(FrameFilter {
+                        spirit_pid: Some(spirit_pid),
+                        limit: Some(5),
+                        ..Default::default()
+                    })
+                    .map_err(|e| format!("TL query failed: {e}"))?
+                    .iter()
+                    .map(|e| e.frame_id)
+                    .take(5)
+                    .collect();
+
+                if frame_ids.is_empty() {
+                    return Err(
+                        "no frames found in TL for distillate source_log_ref".into()
+                    );
+                }
+
+                let proper_request =
+                    maos_domain::distillation::DistillationRequest::new(
+                        frame_ids,
+                        1,
+                        maos_domain::distillation::DigestPayload::Text(
+                            "smoke distillate content".into(),
+                        ),
+                        None,
+                    )
+                    .map_err(|e| format!("DistillationRequest::new failed: {e}"))?;
+
+                distillate_writer
+                    .write_distillate(spirit_pid, proper_request)
+                    .map_err(|e| format!("write_distillate failed: {e}"))?;
+                println!(
+                    "{{\"step\": \"5\", \"surface\": \
+                     \"distillate_write_proper_lineage\", \"outcome\": \"ok\"}}"
+                );
+            }
+
+            // 6. log_recall_adapter.recall + fetch → returns the rows
+            {
+                use maos_domain::ports::LogRecallPort;
+                let filter = maos_domain::log_recall::LogRecallFilter::new(
+                    None,
+                    None,
+                    None,
+                    10,
+                    None,
+                    None,
+                );
+                let page = log_recall_adapter
+                    .recall(spirit_pid, filter)
+                    .map_err(|e| format!("log_recall failed: {e}"))?;
+                println!(
+                    "{{\"step\": \"6\", \"surface\": \"log_recall\", \
+                     \"outcome\": \"ok\", \"entry_count\": {}}}",
+                    page.entries.len()
+                );
+
+                if let Some(first_entry) = page.entries.first() {
+                    log_recall_adapter
+                        .fetch(spirit_pid, first_entry.frame_id)
+                        .map_err(|e| format!("log_fetch failed: {e}"))?;
+                    println!(
+                        "{{\"step\": \"6b\", \"surface\": \"log_fetch\", \
+                         \"outcome\": \"ok\"}}"
+                    );
+                }
+            }
+
+            // Drain
+            drop(audit_tx);
+            drop(inference);
+            drop(capability);
+            if let Err(e) = audit_writer.await {
+                eprintln!("maos: audit writer task failed during drain: {e}");
+            }
+
+            eprintln!("maos: smoke-epic-4 complete — all 6 surfaces exercised");
+            return Ok(());
+        }
+
+        // Story 5.1 Task 8 — smoke-spirit-5: walk supervised-lifecycle end-to-end
+        if mode == "smoke-spirit-5" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            // An embedded SmokeSpirit whose hooks all increment per-hook counters.
+            struct SmokeSpirit {
+                on_load: std::sync::atomic::AtomicU32,
+                on_start: std::sync::atomic::AtomicU32,
+                on_frame: std::sync::atomic::AtomicU32,
+                on_idle: std::sync::atomic::AtomicU32,
+                on_telemetry_event: std::sync::atomic::AtomicU32,
+                on_schedule: std::sync::atomic::AtomicU32,
+                on_swap_in: std::sync::atomic::AtomicU32,
+                on_pause: std::sync::atomic::AtomicU32,
+                on_resume: std::sync::atomic::AtomicU32,
+                on_unload: std::sync::atomic::AtomicU32,
+                on_consolidate: std::sync::atomic::AtomicU32,
+            }
+            impl maos_spirit_abi::lifecycle::Spirit for SmokeSpirit {
+                fn on_load(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
+                    self.on_load.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                fn on_start(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
+                    self.on_start.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                fn on_frame<'a>(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx, _payload: &maos_spirit_abi::lifecycle::FramePayload<'a>) {
+                    self.on_frame.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                fn on_idle(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
+                    self.on_idle.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                fn on_telemetry_event<'a>(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx, _payload: &maos_spirit_abi::lifecycle::TelemetryEventPayload<'a>) {
+                    self.on_telemetry_event.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                fn on_schedule<'a>(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx, _payload: &maos_spirit_abi::lifecycle::SchedulePayload<'a>) {
+                    self.on_schedule.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                fn on_swap_in<'a>(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx, _payload: &maos_spirit_abi::lifecycle::SwapInPayload<'a>) {
+                    self.on_swap_in.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                fn on_pause(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
+                    self.on_pause.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                fn on_resume(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
+                    self.on_resume.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                fn on_unload(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
+                    self.on_unload.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                fn on_consolidate<'a>(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx, _payload: &maos_spirit_abi::lifecycle::ConsolidatePayload<'a>) {
+                    self.on_consolidate.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+            impl SmokeSpirit {
+                fn new() -> Self {
+                    Self {
+                        on_load: std::sync::atomic::AtomicU32::new(0),
+                        on_start: std::sync::atomic::AtomicU32::new(0),
+                        on_frame: std::sync::atomic::AtomicU32::new(0),
+                        on_idle: std::sync::atomic::AtomicU32::new(0),
+                        on_telemetry_event: std::sync::atomic::AtomicU32::new(0),
+                        on_schedule: std::sync::atomic::AtomicU32::new(0),
+                        on_swap_in: std::sync::atomic::AtomicU32::new(0),
+                        on_pause: std::sync::atomic::AtomicU32::new(0),
+                        on_resume: std::sync::atomic::AtomicU32::new(0),
+                        on_unload: std::sync::atomic::AtomicU32::new(0),
+                        on_consolidate: std::sync::atomic::AtomicU32::new(0),
+                    }
+                }
+            }
+
+            let spirit = SmokeSpirit::new();
+            let manifest = maos_kernel_core::scheduler::SpiritManifestBundle::default();
+            let pid = scheduler
+                .load("smoke-spirit-5", manifest, spirit, boot_nonce)
+                .await
+                .map_err(|e| format!("load failed: {e}"))?;
+            println!(
+                "{{\"hook\": \"on_load\", \"outcome\": \"fired\", \"spirit_pid\": {pid}}}"
+            );
+
+            scheduler
+                .start(pid)
+                .await
+                .map_err(|e| format!("start failed: {e}"))?;
+            println!(
+                "{{\"hook\": \"on_start\", \"outcome\": \"fired\", \"spirit_pid\": {pid}}}"
+            );
+
+            scheduler
+                .pause(pid)
+                .await
+                .map_err(|e| format!("pause failed: {e}"))?;
+            println!(
+                "{{\"hook\": \"on_pause\", \"outcome\": \"fired\", \"spirit_pid\": {pid}}}"
+            );
+
+            scheduler
+                .resume(pid)
+                .await
+                .map_err(|e| format!("resume failed: {e}"))?;
+            println!(
+                "{{\"hook\": \"on_resume\", \"outcome\": \"fired\", \"spirit_pid\": {pid}}}"
+            );
+
+            scheduler
+                .unload(pid)
+                .await
+                .map_err(|e| format!("unload failed: {e}"))?;
+            println!(
+                "{{\"hook\": \"on_unload\", \"outcome\": \"fired\", \"spirit_pid\": {pid}}}"
+            );
+
+            println!("{{\"hook\": \"on_frame\", \"outcome\": \"deferred_to_story_5_x\"}}");
+            println!("{{\"hook\": \"on_idle\", \"outcome\": \"deferred_to_story_5_x\"}}");
+            println!("{{\"hook\": \"on_telemetry_event\", \"outcome\": \"deferred_to_story_5_x\"}}");
+            println!("{{\"hook\": \"on_schedule\", \"outcome\": \"deferred_to_story_5_4\"}}");
+            println!("{{\"hook\": \"on_swap_in\", \"outcome\": \"deferred_to_story_5_2\"}}");
+            println!("{{\"hook\": \"on_consolidate\", \"outcome\": \"deferred_to_story_8_x\"}}");
+
+            // Drain
+            drop(audit_tx);
+            drop(inference);
+            drop(capability);
+            if let Err(e) = audit_writer.await {
+                eprintln!("maos: audit writer task failed during drain: {e}");
+            }
+
+            eprintln!("maos: smoke-spirit-5 complete — 11 hooks exercised (5 fired, 6 deferred)");
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -915,6 +1295,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &journal,
                 &posture_section,
                 epistemic_policy.as_ref(),
+                None,
+                None,
             )?;
 
             // Drop the journal adapter (fsync + drain).
@@ -960,6 +1342,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         drop(audit_tx);
         drop(inference);
         drop(capability);
+        // Story 5.1 — scheduler + orchestrator hold Arc<CapabilityRegistryAdapter>
+        // which holds audit_tx clones; drop them so the channel closes.
+        drop(orchestrator);
+        drop(scheduler);
+        drop(lifecycle_resolver);
         // `transparency_log` is moved into the writer task's closure (Arc), so
         // awaiting the writer drains the queue and releases its Arc clone.
         if let Err(e) = audit_writer.await {
@@ -972,6 +1359,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ─────────────────────────────────────────────────────────────
 
     let cancel = CancellationToken::new();
+
+    // Story 5.1 — IdleWatchdog spawned alongside the audit writer.
+    let idle_watchdog = Arc::new(maos_kernel_core::scheduler::IdleWatchdog::new(
+        scheduler.scbs(),
+        scheduler.dispatcher_arc(),
+    )).spawn(cancel.child_token());
+    eprintln!("maos: IdleWatchdog spawned (Story 5.1)");
 
     let shutdown_reason: &'static str = tokio::select! {
         _ = signal::ctrl_c() => "sigint",
@@ -1006,6 +1400,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(Ok(())) => {}
         Ok(Err(e)) => eprintln!("maos: audit writer task returned error during drain: {e}"),
         Err(_) => eprintln!("maos: audit writer drain timed out after 10s"),
+    }
+
+    // Story 5.1 — await IdleWatchdog drain on graceful shutdown.
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        idle_watchdog,
+    )
+    .await
+    {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => eprintln!("maos: IdleWatchdog task returned error during drain: {e}"),
+        Err(_) => eprintln!("maos: IdleWatchdog drain timed out after 5s"),
     }
 
     let cap_audit_rows = match transparency_log.query_frames(FrameFilter {

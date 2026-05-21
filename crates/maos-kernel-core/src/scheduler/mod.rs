@@ -8,19 +8,23 @@
 //! (independently restartable) but is exempt from P3 (boundary manifest
 //! in the standard shape — its boundary is the union of its children's).
 //!
-//! At v0.1-α this is an empty hexagonal adapter shell. The supervisor
-//! itself lives in the `maos-bin` composition root (`#[tokio::main]`);
-//! this module exposes the adapter type its port-trait surface will use
-//! when Story 1b.1 lands lifecycle journal mechanics.
-//!
-//! See `maos_domain::ports::SpiritSchedulerPort` for the hexagonal port
-//! contract (declared in `maos-domain` per ADR-010 to keep the domain
-//! core async-runtime-free).
+//! Story 5.1 lands the real `SpiritSchedulerAdapter` body replacing the
+//! v0.1-β zero-size placeholder. The `LifecycleResolver` trait per
+//! architecture §4.0.9 lives in `maos-domain::lifecycle`, not here.
 
 pub use maos_domain::ports::SpiritSchedulerPort;
 
-/// Adapter shell — Story 1b.1 implements `SpiritSchedulerPort` for this
-/// type with the supervisor's journal + supervised-services restart logic.
-/// At v0.1-α this is a zero-size placeholder; no fields, no methods.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct SpiritSchedulerAdapter;
+pub mod control_block;
+pub mod scheduler_loop;
+pub mod hook_dispatch;
+pub mod kernel_ctx;
+pub mod idle_watchdog;
+pub mod verb_resolver;
+pub mod resource_ceiling;
+
+pub use control_block::{SpiritControlBlock, SpiritManifestBundle, AnySpiritObj, make_spirit_obj};
+pub use scheduler_loop::{SpiritSchedulerAdapter, pick_next_spirit_from_slice, SCHEDULER_QUANTUM};
+pub use hook_dispatch::{HookDispatcher, HookOutcome};
+pub use kernel_ctx::KernelCtx;
+pub use idle_watchdog::IdleWatchdog;
+pub use verb_resolver::KernelLifecycleResolver;

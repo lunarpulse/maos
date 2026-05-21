@@ -1,0 +1,4 @@
+# well-formed: default scheduling parameters
+priority_weight = 100
+yield_every_polls = 64
+idle_window_ms = 30000

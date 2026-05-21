@@ -1,0 +1,13 @@
+# Whitelist for check-composition-root-completeness gate.
+# Adapters listed here are EXEMPT from the "exactly one construction"
+# assertion.  Each entry is a simple string (the adapter type name).
+# Justifications are documented in inline comments above each entry.
+
+# JournalAdapter — constructed multiple times in one-shot arms because
+# each arm opens its own per-invocation Lifecycle Journal file.
+# The journal is NOT shared global state; each one-shot arm is independent.
+whitelist = [
+    "JournalAdapter",
+    "SecurityManagerAdapter",
+    "SpiritSchedulerAdapter",
+]

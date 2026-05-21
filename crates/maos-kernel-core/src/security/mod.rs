@@ -37,6 +37,8 @@ pub use sandbox::{SandboxSpec, SandboxedChild, SpawnError, spawn_sandboxed, clas
 pub use drift::{DriftEvent, make_drift_channel};
 // Story 3.2 — appended to preserve re-export order.
 pub use manifest::{EpistemicAction, EpistemicPolicyRule, EpistemicPolicySection, ScalarPredicate};
+// Story 5.1 — appended to preserve re-export order.
+pub use manifest::{SchedulingSection, LifecycleSection};
 pub use posture::{PostureError, PostureState};
 
 use std::sync::Arc;
@@ -114,6 +116,8 @@ impl SecurityManagerAdapter {
         journal: &dyn SpiritSchedulerPort,
         posture_section: &PostureSection,
         epistemic_policy: Option<&EpistemicPolicySection>,
+        _scheduling: Option<&SchedulingSection>,
+        _lifecycle: Option<&LifecycleSection>,
     ) -> Result<SandboxSpec, SecurityError> {
         {
             let declared_scopes = capabilities_required_to_scopes(caps_required);

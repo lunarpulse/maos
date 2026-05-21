@@ -222,6 +222,32 @@ jobs:
       - name: Run check-mock-not-in-release
         run: cargo run -p xtask --release -- check-mock-not-in-release --binary target/release/maos --json
 
+  check-pub-field-constructors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-pub-field-constructors
+        run: cargo run -p xtask -- check-pub-field-constructors --json
+
+  check-composition-root-completeness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-composition-root-completeness
+        run: cargo run -p xtask -- check-composition-root-completeness --json
+
   check-service-boundary:
     runs-on: ubuntu-latest
     steps:
@@ -678,7 +704,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness]
     if: always()
     permissions:
       pull-requests: write
@@ -719,6 +745,8 @@ jobs:
           echo "cpc=${{ needs.calibrate-per-commit.result }}" >> $GITHUB_OUTPUT
           echo "cf47=${{ needs.check-fr47.result }}" >> $GITHUB_OUTPUT
           echo "cwc=${{ needs.check-workspace-count.result }}" >> $GITHUB_OUTPUT
+          echo "cpfc=${{ needs.check-pub-field-constructors.result }}" >> $GITHUB_OUTPUT
+          echo "ccrc=${{ needs.check-composition-root-completeness.result }}" >> $GITHUB_OUTPUT
       - name: Check for failures
         id: status
         run: |
@@ -765,6 +793,8 @@ jobs:
             const cpc = '${{ needs.calibrate-per-commit.result }}';  // conditionally skipped until Story 0.4
             const cf47 = '${{ needs.check-fr47.result }}';
             const cwc = '${{ needs.check-workspace-count.result }}';
+            const cpfc = '${{ needs.check-pub-field-constructors.result }}';
+            const ccrc = '${{ needs.check-composition-root-completeness.result }}';
             const dt = '${{ needs.determinism-tests.outputs.test_result }}';  // advisory at v0.1-α per DF6
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
             const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
@@ -806,6 +836,8 @@ jobs:
             | calibrate-per-commit | ${icon(cpc)} ${cpc} |
             | check-fr47 | ${icon(cf47)} ${cf47} |
             | check-workspace-count | ${icon(cwc)} ${cwc} |
+            | check-pub-field-constructors | ${icon(cpfc)} ${cpfc} |
+            | check-composition-root-completeness | ${icon(ccrc)} ${ccrc} |
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 
             ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).

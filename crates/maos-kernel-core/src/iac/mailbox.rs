@@ -16,7 +16,9 @@
 //! The `DashMap<(String, FrameKind), mpsc::Sender<IacFrame>>` is transient
 //! per-process state, not persistent — no I9 exemption needed.
 
-use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex, RwLock};
 
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc};
@@ -29,6 +31,7 @@ use maos_domain::ports::IacBusPort;
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 
 use super::channels::{channel_class_for, ChannelClass};
+use crate::scheduler::control_block::SpiritControlBlock;
 use crate::telemetry::iac_rt::IacRtMetrics;
 
 /// Per-Host Mailbox — the same-Host IAC router.
@@ -38,6 +41,7 @@ pub struct Mailbox {
     mpsc_senders: DashMap<(String, FrameKind), mpsc::Sender<IacFrame>>,
     broadcast_sender: broadcast::Sender<IacFrame>,
     metrics: Arc<IacRtMetrics>,
+    scbs: Mutex<Option<Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>>>,
 }
 
 impl Mailbox {
@@ -47,6 +51,20 @@ impl Mailbox {
             mpsc_senders: DashMap::new(),
             broadcast_sender,
             metrics,
+            scbs: Mutex::new(None),
+        }
+    }
+
+    pub fn new_with_scbs(
+        metrics: Arc<IacRtMetrics>,
+        scbs: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
+    ) -> Self {
+        let (broadcast_sender, _) = broadcast::channel(256);
+        Self {
+            mpsc_senders: DashMap::new(),
+            broadcast_sender,
+            metrics,
+            scbs: Mutex::new(Some(scbs)),
         }
     }
 
@@ -108,12 +126,26 @@ impl Mailbox {
         }
 
         // Phase 2: Send to all validated recipients (backpressure via send().await)
+        let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
         for addr in &frame.to {
             let spirit_id = addr.spirit_id.as_str().to_string();
             let sender = self
                 .mpsc_senders
                 .get(&(spirit_id.clone(), kind))
                 .expect("validated in phase 1");
+
+            // Update last_inbound_frame_ns for the recipient SCB.
+            if let Ok(guard) = self.scbs.lock() {
+                if let Some(ref scbs) = *guard {
+                    if let Ok(scbs) = scbs.read() {
+                        for (_, scb) in scbs.iter() {
+                            if scb.spirit_id == spirit_id {
+                                scb.last_inbound_frame_ns.store(now_ns, Ordering::Relaxed);
+                            }
+                        }
+                    }
+                }
+            }
 
             match sender.send(frame.clone()).await {
                 Ok(()) => {
@@ -137,6 +169,12 @@ impl Mailbox {
 
     pub fn metrics(&self) -> &Arc<IacRtMetrics> {
         &self.metrics
+    }
+
+    pub fn set_scbs(&self, scbs: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>) {
+        if let Ok(mut guard) = self.scbs.lock() {
+            *guard = Some(scbs);
+        }
     }
 }
 

@@ -1,0 +1,4 @@
+# malformed: priority_weight out of valid range [1, 255]
+priority_weight = 0
+yield_every_polls = 64
+idle_window_ms = 30000

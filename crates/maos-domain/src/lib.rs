@@ -17,6 +17,7 @@ pub use invariants::*;
 pub mod ports;
 pub mod frame;
 pub mod iac_bus_types;
+pub mod lifecycle;       // NEW — Story 5.1 lifecycle types + LifecycleResolver trait
 pub mod notification;
 pub mod halt;
 pub mod orchestrator;

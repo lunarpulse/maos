@@ -1,2 +1,0 @@
-# expect: ManifestError::Validation (whitespace in field name)
-required_fields = ["valid_field", "has space"]

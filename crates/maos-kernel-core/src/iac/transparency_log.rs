@@ -58,6 +58,10 @@ pub enum FrameKind {
     /// from other code paths is forbidden by convention (the I11 enforcement
     /// MUST flow through the writer).
     Distillate = 11,
+    /// Story 5.1 — BudgetWarning IAC frame (80% of time_cap_seconds per NFR-Perf-6).
+    BudgetWarning = 12,
+    /// Story 5.1 — BudgetExceeded IAC frame (100% of time_cap_seconds).
+    BudgetExceeded = 13,
 }
 
 impl FrameKind {
@@ -76,6 +80,8 @@ impl FrameKind {
             9 => Some(Self::InferenceCall),
             10 => Some(Self::Decision),
             11 => Some(Self::Distillate),
+            12 => Some(Self::BudgetWarning),
+            13 => Some(Self::BudgetExceeded),
             _ => None,
         }
     }

@@ -9,7 +9,7 @@ description = "MAOS kernel core — capability mediation, IAC bus, journal"
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
-maos-spirit-abi = { path = "../maos-spirit-abi" }
+maos-spirit-abi = { path = "../maos-spirit-abi", features = ["mock"] }
 maos-providers = { path = "../maos-providers" }
 maos-director-surface = { path = "../maos-director-surface" }
 ciborium = "0.2"
@@ -40,7 +40,8 @@ arc-swap = "1.7"
 dashmap = "6.1"
 parking_lot = "0.12"
 subtle = "2.6"
-tokio = { version = "1", features = ["sync", "rt"] }
+tokio = { version = "1", features = ["sync", "rt", "time", "macros", "rt-multi-thread"] }
+tokio-util = "0.7"
 maos-attrs = { path = "../maos-attrs" }
 toml = "0.8"
 sha2 = "0.10"

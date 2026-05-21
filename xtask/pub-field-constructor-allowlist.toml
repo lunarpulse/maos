@@ -1,0 +1,23 @@
+# Allowlist for check-pub-field-constructors gate.
+# Each entry is a (type_name, field_name) tuple that is EXEMPT from the
+# "pub field with Construct-via-::new doc MUST have a matching ::new impl"
+# assertion.
+#
+# These entries represent pre-existing drift from Stories 4.1–4.5
+# (Epic 4 retro §A4).  New entries MUST include an ADR-style justification
+# and a target story for resolution.
+
+[[allow]]
+type_name = "EpistemicHaltPayload"
+field_name = "halt_id"
+reason = "Pre-existing drift from Story 4.1 — field carries #[doc = 'Construct via ...::new'] but no ::new impl exists. Deferred to Story 5.3 (halt-invoke pipeline hardening)."
+
+[[allow]]
+type_name = "LogRecallCursor"
+field_name = "last_timestamp_ns"
+reason = "Pre-existing drift from Story 4.4 — field carries #[doc = 'Construct via ...::new'] but no ::new impl exists. Deferred to Story 5.4 (operator HTTP API / log-recall surface hardening)."
+
+[[allow]]
+type_name = "LogRecallCursor"
+field_name = "last_frame_id"
+reason = "Pre-existing drift from Story 4.4 — field carries #[doc = 'Construct via ...::new'] but no ::new impl exists. Deferred to Story 5.4 (operator HTTP API / log-recall surface hardening)."

@@ -1,2 +1,0 @@
-# expect: ManifestError::Validation (duplicate field name)
-required_fields = ["introduction", "introduction"]

@@ -114,6 +114,8 @@ impl LogRecallAdapter {
             FrameKind::InferenceCall => DomainFrameKindLabel::InferenceCall,
             FrameKind::Decision => DomainFrameKindLabel::Decision,
             FrameKind::Distillate => DomainFrameKindLabel::Distillate,
+            FrameKind::BudgetWarning => DomainFrameKindLabel::BudgetWarning,
+            FrameKind::BudgetExceeded => DomainFrameKindLabel::BudgetExceeded,
         }
     }
 
@@ -132,6 +134,8 @@ impl LogRecallAdapter {
             DomainFrameKindLabel::InferenceCall => FrameKind::InferenceCall,
             DomainFrameKindLabel::Decision => FrameKind::Decision,
             DomainFrameKindLabel::Distillate => FrameKind::Distillate,
+            DomainFrameKindLabel::BudgetWarning => FrameKind::BudgetWarning,
+            DomainFrameKindLabel::BudgetExceeded => FrameKind::BudgetExceeded,
         }
     }
 

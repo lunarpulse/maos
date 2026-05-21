@@ -1,0 +1,2 @@
+# edge case: empty enabled_hooks means all hooks allowed
+enabled_hooks = []

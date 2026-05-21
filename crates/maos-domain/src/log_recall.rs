@@ -52,6 +52,8 @@ pub enum FrameKindLabel {
     InferenceCall,
     Decision,
     Distillate,
+    BudgetWarning,
+    BudgetExceeded,
 }
 
 impl LogRecallFilter {

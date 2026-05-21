@@ -910,6 +910,181 @@ fn collapse_predicate_fields(
 }
 
 // ------------------------------------------------------------------
+// [scheduling] section (Story 5.1, AC3)
+// ------------------------------------------------------------------
+
+/// The `[scheduling]` manifest section — priority-weighted cooperative
+/// scheduling parameters. All fields carry `#[serde(default)]` so
+/// manifests omitting the section inherit the defaults below.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchedulingSection {
+    /// Priority weight for DRR dispatch [1, 255]; default 100.
+    pub priority_weight: u8,
+    /// Poll yield cap for cooperative dispatch; [1, 4096]; default 64.
+    pub yield_every_polls: u32,
+    /// Mailbox quiescence threshold for on_idle trigger; [100, 3600000] ms; default 30000.
+    pub idle_window_ms: u32,
+}
+
+impl Default for SchedulingSection {
+    fn default() -> Self {
+        Self {
+            priority_weight: 100,
+            yield_every_polls: 64,
+            idle_window_ms: 30000,
+        }
+    }
+}
+
+impl SchedulingSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawSchedulingSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        raw.validate()
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSchedulingSection {
+    #[serde(default = "default_priority_weight")]
+    priority_weight: u8,
+    #[serde(default = "default_yield_every_polls")]
+    yield_every_polls: u32,
+    #[serde(default = "default_idle_window_ms")]
+    idle_window_ms: u32,
+}
+
+fn default_priority_weight() -> u8 {
+    100
+}
+fn default_yield_every_polls() -> u32 {
+    64
+}
+fn default_idle_window_ms() -> u32 {
+    30000
+}
+
+impl RawSchedulingSection {
+    fn validate(self) -> Result<SchedulingSection, ManifestError> {
+        if self.priority_weight < 1 || self.priority_weight > 255 {
+            return Err(ManifestError::Toml(validation_msg(
+                "scheduling.priority_weight",
+                &format!(
+                    "must be in [1, 255], got {}",
+                    self.priority_weight
+                ),
+            )));
+        }
+        if self.yield_every_polls < 1 || self.yield_every_polls > 4096 {
+            return Err(ManifestError::Toml(validation_msg(
+                "scheduling.yield_every_polls",
+                &format!(
+                    "must be in [1, 4096], got {}",
+                    self.yield_every_polls
+                ),
+            )));
+        }
+        if self.idle_window_ms < 100 || self.idle_window_ms > 3_600_000 {
+            return Err(ManifestError::Toml(validation_msg(
+                "scheduling.idle_window_ms",
+                &format!(
+                    "must be in [100, 3600000], got {}",
+                    self.idle_window_ms
+                ),
+            )));
+        }
+        Ok(SchedulingSection {
+            priority_weight: self.priority_weight,
+            yield_every_polls: self.yield_every_polls,
+            idle_window_ms: self.idle_window_ms,
+        })
+    }
+}
+
+// ------------------------------------------------------------------
+// [lifecycle] section (Story 5.1, AC2)
+// ------------------------------------------------------------------
+
+/// Valid lifecycle hook names per the Spirit ABI (Story 2.1).
+const VALID_HOOK_NAMES: &[&str] = &[
+    "on_load",
+    "on_start",
+    "on_frame",
+    "on_idle",
+    "on_telemetry_event",
+    "on_schedule",
+    "on_swap_in",
+    "on_pause",
+    "on_resume",
+    "on_unload",
+    "on_consolidate",
+];
+
+/// The `[lifecycle]` manifest section — declared hook subset.
+///
+/// Empty `enabled_hooks` means "all hooks allowed" (matches
+/// `kernel_invocation_allowed(&[], _) → true`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LifecycleSection {
+    pub enabled_hooks: Vec<String>,
+}
+
+impl Default for LifecycleSection {
+    fn default() -> Self {
+        Self {
+            enabled_hooks: vec![],
+        }
+    }
+}
+
+impl LifecycleSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawLifecycleSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        raw.validate()
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawLifecycleSection {
+    #[serde(default)]
+    enabled_hooks: Vec<String>,
+}
+
+impl RawLifecycleSection {
+    fn validate(self) -> Result<LifecycleSection, ManifestError> {
+        // Check all hook names are valid
+        for hook in &self.enabled_hooks {
+            if !VALID_HOOK_NAMES.contains(&hook.as_str()) {
+                return Err(ManifestError::Toml(validation_msg(
+                    "lifecycle.enabled_hooks",
+                    &format!(
+                        "unknown hook name '{}'; valid hooks: {}",
+                        hook,
+                        VALID_HOOK_NAMES.join(", ")
+                    ),
+                )));
+            }
+        }
+        // Check for duplicates
+        let mut seen = std::collections::HashSet::new();
+        for hook in &self.enabled_hooks {
+            if !seen.insert(hook) {
+                return Err(ManifestError::Toml(validation_msg(
+                    "lifecycle.enabled_hooks",
+                    &format!("duplicate hook name '{}'", hook),
+                )));
+            }
+        }
+        Ok(LifecycleSection {
+            enabled_hooks: self.enabled_hooks,
+        })
+    }
+}
+
+// ------------------------------------------------------------------
 // [author] section (Story 1b.5c, AC3)
 // ------------------------------------------------------------------
 
@@ -1674,5 +1849,145 @@ homepage = "https://example.org""#;
 homepage = "ftp://example.org""#;
         let err = Author::from_toml_str(s).unwrap_err();
         assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("author.homepage")));
+    }
+
+    // ---- SchedulingSection (Story 5.1) ----
+
+    #[test]
+    fn scheduling_well_formed() {
+        let s = SchedulingSection::from_toml_str(
+            "priority_weight = 200\nyield_every_polls = 128\nidle_window_ms = 60000",
+        )
+        .unwrap();
+        assert_eq!(s.priority_weight, 200);
+        assert_eq!(s.yield_every_polls, 128);
+        assert_eq!(s.idle_window_ms, 60000);
+    }
+
+    #[test]
+    fn scheduling_malformed_priority_rejected() {
+        let err = SchedulingSection::from_toml_str("priority_weight = 0").unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("scheduling.priority_weight")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn scheduling_malformed_priority_too_high() {
+        // 256 overflows u8; TOML deser rejects it, not validate().
+        let err = SchedulingSection::from_toml_str("priority_weight = 256").unwrap_err();
+        assert!(matches!(&err, ManifestError::Toml(_)), "got: {err:?}");
+    }
+
+    #[test]
+    fn scheduling_malformed_yield_too_low() {
+        let err = SchedulingSection::from_toml_str("yield_every_polls = 0").unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("scheduling.yield_every_polls")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn scheduling_malformed_yield_too_high() {
+        let err = SchedulingSection::from_toml_str("yield_every_polls = 4097").unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("scheduling.yield_every_polls")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn scheduling_malformed_idle_window_too_low() {
+        let err = SchedulingSection::from_toml_str("idle_window_ms = 50").unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("scheduling.idle_window_ms")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn scheduling_malformed_idle_window_too_high() {
+        let err =
+            SchedulingSection::from_toml_str("idle_window_ms = 4000000").unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("scheduling.idle_window_ms")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn scheduling_edge_empty_defaults() {
+        let s = SchedulingSection::from_toml_str("").unwrap();
+        assert_eq!(s.priority_weight, 100);
+        assert_eq!(s.yield_every_polls, 64);
+        assert_eq!(s.idle_window_ms, 30000);
+    }
+
+    #[test]
+    fn scheduling_default_trait() {
+        let s = SchedulingSection::default();
+        assert_eq!(s.priority_weight, 100);
+        assert_eq!(s.yield_every_polls, 64);
+        assert_eq!(s.idle_window_ms, 30000);
+    }
+
+    // ---- LifecycleSection (Story 5.1) ----
+
+    #[test]
+    fn lifecycle_well_formed() {
+        let s = LifecycleSection::from_toml_str(
+            r#"enabled_hooks = ["on_load", "on_start", "on_idle"]"#,
+        )
+        .unwrap();
+        assert_eq!(s.enabled_hooks.len(), 3);
+        assert!(s.enabled_hooks.contains(&"on_load".into()));
+    }
+
+    #[test]
+    fn lifecycle_malformed_unknown_hook_rejected() {
+        let err = LifecycleSection::from_toml_str(
+            r#"enabled_hooks = ["on_load", "on_missing"]"#,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("on_missing")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn lifecycle_malformed_duplicate_rejected() {
+        let err = LifecycleSection::from_toml_str(
+            r#"enabled_hooks = ["on_load", "on_load"]"#,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("duplicate")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn lifecycle_edge_empty_means_all_allowed() {
+        let s = LifecycleSection::from_toml_str("").unwrap();
+        assert!(s.enabled_hooks.is_empty());
+        // kernel_invocation_allowed(&[], _) → true
+        assert!(maos_spirit_abi::lifecycle::kernel_invocation_allowed(
+            &[],
+            "on_load"
+        ));
+    }
+
+    #[test]
+    fn lifecycle_edge_all_11_hooks() {
+        let hooks_toml = r#"enabled_hooks = [
+            "on_load", "on_start", "on_frame", "on_idle",
+            "on_telemetry_event", "on_schedule", "on_swap_in",
+            "on_pause", "on_resume", "on_unload", "on_consolidate"
+        ]"#;
+        let s = LifecycleSection::from_toml_str(hooks_toml).unwrap();
+        assert_eq!(s.enabled_hooks.len(), 11);
     }
 }

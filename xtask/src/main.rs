@@ -23,6 +23,8 @@ mod check_workspace_count;
 mod gen_termination_corpus;
 mod gen_isolation_corpus;
 pub mod check_mock_not_in_release;
+mod check_pub_field_constructors;
+mod check_composition_root_completeness;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -101,6 +103,15 @@ enum Commands {
     GenIsolationCorpus { #[arg(long, default_value = "crates/maos-eval/fixtures/isolation-corpus-v0")] out_dir: String },
     /// Story 4.1 A2 — check release binary for forbidden test-double symbols.
     CheckMockNotInRelease { #[arg(long, default_value = "target/release/maos")] binary: String, #[arg(long)] build_first: bool, #[arg(long)] json: bool },
+    /// Epic 4 retro §A4 — pub fields with `Construct via ::new` doc-attr MUST have a matching `::new` impl.
+    CheckPubFieldConstructors { #[arg(long)] json: bool },
+    /// Epic 4 retro §A5 — every `*Adapter` re-exported from `api.rs` MUST be constructed exactly once in `main.rs`.
+    CheckCompositionRootCompleteness {
+        #[arg(long, default_value = "crates/maos-kernel-core/src/api.rs")] api_rs: String,
+        #[arg(long, default_value = "crates/maos-bin/src/main.rs")] main_rs: String,
+        #[arg(long, default_value = "xtask/composition-root-whitelist.toml")] whitelist: String,
+        #[arg(long)] json: bool,
+    },
 }
 
 fn main() {
@@ -156,6 +167,12 @@ fn main() {
         }
         Commands::CheckMockNotInRelease { binary, build_first, json } => {
             check_mock_not_in_release::run(&binary, build_first, json)
+        }
+        Commands::CheckPubFieldConstructors { json } => {
+            check_pub_field_constructors::run(json)
+        }
+        Commands::CheckCompositionRootCompleteness { api_rs, main_rs, whitelist, json } => {
+            check_composition_root_completeness::run(&api_rs, &main_rs, &whitelist, json)
         }
     };
     if let Err(e) = result { eprintln!("{e}"); process::exit(1); }

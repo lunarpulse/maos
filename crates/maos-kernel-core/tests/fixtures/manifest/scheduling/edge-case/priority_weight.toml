@@ -1,0 +1,4 @@
+# edge case: maximum valid priority_weight
+priority_weight = 255
+yield_every_polls = 1
+idle_window_ms = 100

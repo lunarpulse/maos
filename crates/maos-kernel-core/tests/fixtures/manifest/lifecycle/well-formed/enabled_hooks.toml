@@ -1,0 +1,2 @@
+# well-formed: explicit subset of hooks
+enabled_hooks = ["on_load", "on_start", "on_pause", "on_resume", "on_unload"]
