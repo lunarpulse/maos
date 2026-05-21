@@ -10,15 +10,17 @@
 use std::path::Path;
 
 use maos_eval::isolation_corpus::{IsolationCorpus, IsolationAttackCategory};
+use maos_eval::isolation_corpus::serde_variant::to_snake_case;
 use maos_kernel_core::isolation::IsolationCorpusRunner;
 
 #[test]
 fn nfr_sec_14_200_scenarios_zero_leaks() {
     let corpus_path = Path::new("../maos-eval/fixtures/isolation-corpus-v0/");
-    if !corpus_path.exists() {
-        eprintln!("Skipping: corpus directory not found at {}", corpus_path.display());
-        return;
-    }
+    assert!(
+        corpus_path.exists(),
+        "NFR-Sec-14 P0 ship-block: isolation corpus fixture not found at {} — CI must fail-loud",
+        corpus_path.display()
+    );
 
     let corpus = IsolationCorpus::load_from(corpus_path)
         .expect("isolation-corpus-v0 must exist and be valid");
@@ -38,23 +40,10 @@ fn nfr_sec_14_200_scenarios_zero_leaks() {
 
     // Category-level coverage assertion: aggregate ≥25 per category
     for category in IsolationAttackCategory::all() {
-        let cat_str = category_to_string(category);
+        let cat_str = to_snake_case(category);
         let count = report.per_category.get(cat_str).copied().unwrap_or(0);
         assert!(count >= 25,
             "category {:?} below 25-scenario aggregate floor: got {}",
             category, count);
-    }
-}
-
-fn category_to_string(cat: &IsolationAttackCategory) -> &'static str {
-    match cat {
-        IsolationAttackCategory::NamespaceEnumeration => "namespace_enumeration",
-        IsolationAttackCategory::WorkingMemoryReadAcross => "working_memory_read_across",
-        IsolationAttackCategory::DecisionFrameObservation => "decision_frame_observation",
-        IsolationAttackCategory::HaltSignalObservation => "halt_signal_observation",
-        IsolationAttackCategory::TransparencyLogCrossRead => "transparency_log_cross_read",
-        IsolationAttackCategory::WorkingMemoryDigestCrossRead => "working_memory_digest_cross_read",
-        IsolationAttackCategory::CapabilityTokenForgeryCrossSpirit => "capability_token_forgery_cross_spirit",
-        IsolationAttackCategory::SandboxEscapeLateral => "sandbox_escape_lateral",
     }
 }

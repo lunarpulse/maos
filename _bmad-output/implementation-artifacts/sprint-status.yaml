@@ -1,4 +1,4 @@
-last_updated: '2026-05-20'
+last_updated: '2026-05-20T15:00:00Z'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -48,7 +48,7 @@ development_status:
   4-3-provide-three-memory-tiers-with-principal-namespace-and-spirit-self-telemetry: done
   4-4-enforce-the-i11-audit-chain-on-distillates-with-log-recall-and-the-five-metric-gate: done
   4-5-author-the-cross-spirit-isolation-200-corpus-and-enforce-i14-halt-continuity-in-hot-swap: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
   epic-5: backlog
   5-1-ship-full-lifecycle-verbs-and-11-triggers-with-priority-weighted-scheduling: backlog
   5-2-implement-hot-swap-state-transfer-and-cross-major-migration-against-hsis-95: backlog

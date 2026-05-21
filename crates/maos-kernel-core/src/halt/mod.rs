@@ -123,10 +123,14 @@ pub struct PendingHaltMetadata {
 
 impl std::fmt::Debug for HaltRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HaltRegistry")
-            .field("pending", &self.pending)
-            .field("metadata", &self.metadata)
-            .finish_non_exhaustive()
+        let mut d = f.debug_struct("HaltRegistry");
+        d.field("pending", &self.pending)
+         .field("metadata", &self.metadata);
+        #[cfg(feature = "spirit_test")]
+        {
+            d.field("isolation_hook", &self.isolation_hook);
+        }
+        d.finish()
     }
 }
 
@@ -147,7 +151,7 @@ impl HaltRegistry {
 
     /// Story 4.5 — fire isolation hooks for cross-Spirit observation.
     #[cfg(feature = "spirit_test")]
-    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, _outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
+    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
         if let Some(ref hook) = self.isolation_hook {
             let mut h = hook.lock();
             let _ = h.before_spirit_a_attempt(case_id);
@@ -323,7 +327,7 @@ pub fn validate_swap_halt_continuity(
     let before_count = registry.pending_halt_ids().len();
 
     // 2. Attempt drain for predecessor
-    let drained = registry.drain_for_spirit(predecessor_spirit_pid);
+    let _drained = registry.drain_for_spirit(predecessor_spirit_pid);
 
     // 3. Snapshot AFTER drain
     let after_count = registry.pending_halt_ids().len();
@@ -352,7 +356,7 @@ pub fn validate_swap_halt_continuity(
 }
 
 /// Verdict from `validate_swap_halt_continuity`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SwapVerdict {
     /// All predecessor halts drained before swap; swap is safe regardless of schema.
     SafeDrained {
@@ -490,6 +494,13 @@ pub fn validate_halt_set(
 
 #[cfg(test)]
 mod swap_continuity_tests {
+    // v0.3-β limitation: these tests use `insert_pending` (direct registry
+    // mutation) instead of `invoke_halt` (the production path through
+    // TransparencyLogAdapter + JournalAdapter) because `invoke_halt` requires
+    // a full TL journal setup that is disproportionate for unit-level
+    // drain/migrate verdict testing.  The v0.3-β hot-swap integration test
+    // (`hot_swap_halt_continuity_corpus_integration.rs`) uses `invoke_halt`
+    // for the end-to-end corpus-driven path per spec AC3.
     use super::*;
     use maos_domain::halt::HaltId;
 

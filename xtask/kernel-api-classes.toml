@@ -462,6 +462,9 @@
 # HaltRegistry spirit_test hook (Story 4.5 add-on)
 "maos_kernel_core::halt::HaltRegistry::with_isolation_hook"              = "data-movement"
 
+# DistillateWriter spirit_test hook (Story 4.5 add-on)
+"maos_kernel_core::iac::distillate::DistillateWriter::with_isolation_hook" = "data-movement"
+
 # IsolationCorpusRunner error type
 "maos_kernel_core::isolation::runner::IsolationCorpusError"              = "supervision"
 "maos_kernel_core::isolation::runner::ScenarioOutcome"                   = "data-movement"

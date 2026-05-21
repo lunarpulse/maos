@@ -642,7 +642,7 @@ jobs:
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run cross-spirit isolation 200-corpus test
-        run: cargo test -p maos-kernel-core --test nfr_sec_14_cross_spirit_isolation
+        run: cargo test -p maos-kernel-core --test nfr_sec_14_cross_spirit_isolation -- --include-ignored
 
   # Determinism integration tests for maos-corpus-gen — non-blocking at v0.1-α per DF6
   # (deferred-work.md). Promotes to blocking when NFR-Sec-4 redaction filter ships (v0.5).

@@ -19,10 +19,11 @@ use maos_kernel_core::halt::HaltRegistry;
 #[test]
 fn halt_signal_observation_corpus_exercises_swap_continuity_wrapper() {
     let corpus_path = Path::new("../maos-eval/fixtures/isolation-corpus-v0/");
-    if !corpus_path.exists() {
-        eprintln!("Skipping: corpus directory not found at {}", corpus_path.display());
-        return;
-    }
+    assert!(
+        corpus_path.exists(),
+        "I14 corpus integration: isolation corpus fixture not found at {} — CI must fail-loud",
+        corpus_path.display()
+    );
 
     let corpus = IsolationCorpus::load_from(corpus_path)
         .expect("isolation-corpus-v0 must exist and be valid");
@@ -60,9 +61,15 @@ fn halt_signal_observation_corpus_exercises_swap_continuity_wrapper() {
             }
             "SafeMigrated" | "Violation" => {
                 // v0.3-β: wrapper always returns SafeDrained because
-                // drain_for_spirit drains globally. These variants are
-                // structurally tested in halt/mod.rs inline tests.
-                // The corpus still carries them for v0.5+ transition.
+                // drain_for_spirit drains globally. The corpus still
+                // carries these variants for v0.5+ transition. Assert
+                // the wrapper produces the known-safe verdict and that
+                // no cross-Spirit halt-state leaked.
+                assert!(
+                    matches!(verdict, SwapVerdict::SafeDrained { .. }),
+                    "scenario {}: v0.3-β wrapper must return SafeDrained; got {:?}",
+                    scenario.scenario_id, verdict
+                );
             }
             other => panic!("unexpected expected_swap_verdict variant: {}", other),
         }

@@ -1,0 +1,177 @@
+pub mod maos_spirit_abi
+pub mod maos_spirit_abi::cancellation
+pub struct maos_spirit_abi::cancellation::CancellationFuture<'a>
+impl<'a> core::future::future::Future for maos_spirit_abi::cancellation::CancellationFuture<'a>
+pub type maos_spirit_abi::cancellation::CancellationFuture<'a>::Output = ()
+pub fn maos_spirit_abi::cancellation::CancellationFuture<'a>::poll(self: core::pin::Pin<&mut Self>, _cx: &mut core::task::wake::Context<'_>) -> core::task::poll::Poll<()>
+pub struct maos_spirit_abi::cancellation::NeverCancel
+impl maos_spirit_abi::cancellation::CancellationSignal for maos_spirit_abi::cancellation::NeverCancel
+pub fn maos_spirit_abi::cancellation::NeverCancel::cancelled(&self) -> maos_spirit_abi::cancellation::CancellationFuture<'_> where Self: core::marker::Sized
+pub fn maos_spirit_abi::cancellation::NeverCancel::is_cancelled(&self) -> bool
+pub trait maos_spirit_abi::cancellation::CancellationSignal
+pub fn maos_spirit_abi::cancellation::CancellationSignal::cancelled(&self) -> maos_spirit_abi::cancellation::CancellationFuture<'_> where Self: core::marker::Sized
+pub fn maos_spirit_abi::cancellation::CancellationSignal::is_cancelled(&self) -> bool
+impl maos_spirit_abi::cancellation::CancellationSignal for maos_spirit_abi::cancellation::NeverCancel
+pub fn maos_spirit_abi::cancellation::NeverCancel::cancelled(&self) -> maos_spirit_abi::cancellation::CancellationFuture<'_> where Self: core::marker::Sized
+pub fn maos_spirit_abi::cancellation::NeverCancel::is_cancelled(&self) -> bool
+pub mod maos_spirit_abi::compliance
+pub enum maos_spirit_abi::compliance::EvidenceKind
+pub maos_spirit_abi::compliance::EvidenceKind::CorpusReplay
+pub maos_spirit_abi::compliance::EvidenceKind::CorpusReplay::corpus_sha256: [u8; 32]
+pub maos_spirit_abi::compliance::EvidenceKind::CrossSpiritAgreement
+pub maos_spirit_abi::compliance::EvidenceKind::CrossSpiritAgreement::agreement_rate: f64
+pub maos_spirit_abi::compliance::EvidenceKind::CrossSpiritAgreement::participants: alloc::vec::Vec<alloc::string::String>
+pub maos_spirit_abi::compliance::EvidenceKind::ManualReview
+pub maos_spirit_abi::compliance::EvidenceKind::ManualReview::reviewer_id: alloc::string::String
+pub maos_spirit_abi::compliance::EvidenceKind::PenTestReportRef
+pub maos_spirit_abi::compliance::EvidenceKind::PenTestReportRef::url: alloc::string::String
+#[repr(u8)] pub enum maos_spirit_abi::compliance::PrincipleRef
+pub maos_spirit_abi::compliance::PrincipleRef::EuAiActArt14 = 3
+pub maos_spirit_abi::compliance::PrincipleRef::Hipaa164308 = 0
+pub maos_spirit_abi::compliance::PrincipleRef::Iso27001 = 2
+pub maos_spirit_abi::compliance::PrincipleRef::Soc2TypeIi = 1
+pub maos_spirit_abi::compliance::PrincipleRef::UnknownPrinciple = 255
+#[repr(u8)] pub enum maos_spirit_abi::compliance::SandboxTier
+pub maos_spirit_abi::compliance::SandboxTier::T0 = 0
+pub maos_spirit_abi::compliance::SandboxTier::T1 = 1
+pub maos_spirit_abi::compliance::SandboxTier::T2 = 2
+pub maos_spirit_abi::compliance::SandboxTier::T3 = 3
+pub maos_spirit_abi::compliance::SandboxTier::T4 = 4
+#[repr(u8)] pub enum maos_spirit_abi::compliance::SigningAlg
+pub maos_spirit_abi::compliance::SigningAlg::Ed25519 = 0
+#[repr(u8)] pub enum maos_spirit_abi::compliance::TrustTier
+pub maos_spirit_abi::compliance::TrustTier::Local = 0
+pub maos_spirit_abi::compliance::TrustTier::OrgInternal = 1
+pub maos_spirit_abi::compliance::TrustTier::PublicUntrusted = 3
+pub maos_spirit_abi::compliance::TrustTier::PublicVetted = 2
+#[repr(u8)] pub enum maos_spirit_abi::compliance::Verdict
+pub maos_spirit_abi::compliance::Verdict::Admit = 0
+pub maos_spirit_abi::compliance::Verdict::AdmitWithCaveats
+pub maos_spirit_abi::compliance::Verdict::AdmitWithCaveats::caveats: alloc::vec::Vec<alloc::string::String>
+pub maos_spirit_abi::compliance::Verdict::RejectContextDrift = 2
+pub maos_spirit_abi::compliance::Verdict::RejectExpiredClaim = 4
+pub maos_spirit_abi::compliance::Verdict::RejectMalformedClaim = 3
+pub maos_spirit_abi::compliance::Verdict::UnknownVerdict = 255
+pub struct maos_spirit_abi::compliance::CapabilityId(pub alloc::string::String)
+pub struct maos_spirit_abi::compliance::Claim
+pub maos_spirit_abi::compliance::Claim::claim_id: maos_spirit_abi::compliance::Uuid
+pub maos_spirit_abi::compliance::Claim::evidence: alloc::vec::Vec<maos_spirit_abi::compliance::EvidenceKind>
+pub maos_spirit_abi::compliance::Claim::expires_at_unix_ms: core::option::Option<u64>
+pub maos_spirit_abi::compliance::Claim::issued_at_unix_ms: u64
+pub maos_spirit_abi::compliance::Claim::principle_refs: alloc::vec::Vec<maos_spirit_abi::compliance::PrincipleRef>
+pub maos_spirit_abi::compliance::Claim::verdict: maos_spirit_abi::compliance::Verdict
+pub struct maos_spirit_abi::compliance::ComplianceClaimEnvelope
+pub maos_spirit_abi::compliance::ComplianceClaimEnvelope::attester_pubkey: [u8; 32]
+pub maos_spirit_abi::compliance::ComplianceClaimEnvelope::claim_bytes: alloc::vec::Vec<u8>
+pub maos_spirit_abi::compliance::ComplianceClaimEnvelope::signature: [u8; 64]
+pub maos_spirit_abi::compliance::ComplianceClaimEnvelope::signing_alg: maos_spirit_abi::compliance::SigningAlg
+impl serde_core::ser::Serialize for maos_spirit_abi::compliance::ComplianceClaimEnvelope
+pub fn maos_spirit_abi::compliance::ComplianceClaimEnvelope::serialize<S: serde_core::ser::Serializer>(&self, serializer: S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+impl<'de> serde_core::de::Deserialize<'de> for maos_spirit_abi::compliance::ComplianceClaimEnvelope
+pub fn maos_spirit_abi::compliance::ComplianceClaimEnvelope::deserialize<D: serde_core::de::Deserializer<'de>>(deserializer: D) -> core::result::Result<Self, <D as serde_core::de::Deserializer>::Error>
+pub struct maos_spirit_abi::compliance::CryptoProviderId(pub alloc::string::String)
+pub struct maos_spirit_abi::compliance::ExecutionContextFingerprint
+pub maos_spirit_abi::compliance::ExecutionContextFingerprint::capability_scope: alloc::collections::btree::set::BTreeSet<maos_spirit_abi::compliance::CapabilityId>
+pub maos_spirit_abi::compliance::ExecutionContextFingerprint::crypto_provider: maos_spirit_abi::compliance::CryptoProviderId
+pub maos_spirit_abi::compliance::ExecutionContextFingerprint::manifest_hash: [u8; 32]
+pub maos_spirit_abi::compliance::ExecutionContextFingerprint::provider_endpoint: maos_spirit_abi::compliance::ProviderEndpointPin
+pub maos_spirit_abi::compliance::ExecutionContextFingerprint::sandbox_tier: maos_spirit_abi::compliance::SandboxTier
+pub maos_spirit_abi::compliance::ExecutionContextFingerprint::spirit_version: alloc::string::String
+pub maos_spirit_abi::compliance::ExecutionContextFingerprint::trust_tier: maos_spirit_abi::compliance::TrustTier
+pub struct maos_spirit_abi::compliance::ProviderEndpointPin
+pub maos_spirit_abi::compliance::ProviderEndpointPin::endpoint_url: alloc::string::String
+pub maos_spirit_abi::compliance::ProviderEndpointPin::model_id: core::option::Option<alloc::string::String>
+pub maos_spirit_abi::compliance::ProviderEndpointPin::provider_id: alloc::string::String
+pub struct maos_spirit_abi::compliance::Uuid(_)
+impl maos_spirit_abi::compliance::Uuid
+pub const fn maos_spirit_abi::compliance::Uuid::as_bytes(&self) -> &[u8; 16]
+pub const fn maos_spirit_abi::compliance::Uuid::from_bytes(bytes: [u8; 16]) -> Self
+pub mod maos_spirit_abi::ctx
+pub struct maos_spirit_abi::ctx::CapabilityHandle(pub u64)
+pub struct maos_spirit_abi::ctx::Ctx
+impl maos_spirit_abi::ctx::Ctx
+pub fn maos_spirit_abi::ctx::Ctx::cancellation(&self) -> &dyn maos_spirit_abi::cancellation::CancellationSignal
+pub fn maos_spirit_abi::ctx::Ctx::capability(&self) -> maos_spirit_abi::ctx::CapabilityHandle
+pub fn maos_spirit_abi::ctx::Ctx::mailbox(&self) -> maos_spirit_abi::ctx::MailboxHandle
+impl core::fmt::Debug for maos_spirit_abi::ctx::Ctx
+pub fn maos_spirit_abi::ctx::Ctx::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct maos_spirit_abi::ctx::MailboxHandle(pub u64)
+pub mod maos_spirit_abi::identity
+#[repr(u8)] pub enum maos_spirit_abi::identity::FrameKind
+pub maos_spirit_abi::identity::FrameKind::CapabilityInvocation = 7
+pub maos_spirit_abi::identity::FrameKind::ConsentRequest = 5
+pub maos_spirit_abi::identity::FrameKind::DecisionDispatch = 2
+pub maos_spirit_abi::identity::FrameKind::EpistemicHalt = 3
+pub maos_spirit_abi::identity::FrameKind::InferenceCall = 9
+pub maos_spirit_abi::identity::FrameKind::Retract = 6
+pub maos_spirit_abi::identity::FrameKind::SandboxBlock = 8
+pub maos_spirit_abi::identity::FrameKind::TaskAssign = 0
+pub maos_spirit_abi::identity::FrameKind::TaskComplete = 1
+pub maos_spirit_abi::identity::FrameKind::TelemetryEvent = 4
+impl maos_spirit_abi::identity::FrameKind
+pub fn maos_spirit_abi::identity::FrameKind::from_u8(v: u8) -> core::option::Option<Self>
+pub enum maos_spirit_abi::identity::SpiritRole
+pub maos_spirit_abi::identity::SpiritRole::Director
+pub maos_spirit_abi::identity::SpiritRole::Observer
+pub maos_spirit_abi::identity::SpiritRole::Orchestrator
+pub maos_spirit_abi::identity::SpiritRole::Worker
+pub struct maos_spirit_abi::identity::HostId(pub alloc::string::String)
+impl maos_spirit_abi::identity::HostId
+pub fn maos_spirit_abi::identity::HostId::as_str(&self) -> &str
+pub struct maos_spirit_abi::identity::SpiritId(pub alloc::string::String)
+impl maos_spirit_abi::identity::SpiritId
+pub fn maos_spirit_abi::identity::SpiritId::as_str(&self) -> &str
+impl core::convert::From<&str> for maos_spirit_abi::identity::SpiritId
+pub fn maos_spirit_abi::identity::SpiritId::from(s: &str) -> Self
+impl core::convert::From<alloc::string::String> for maos_spirit_abi::identity::SpiritId
+pub fn maos_spirit_abi::identity::SpiritId::from(s: alloc::string::String) -> Self
+pub mod maos_spirit_abi::lifecycle
+pub enum maos_spirit_abi::lifecycle::HookBudgetKey
+pub maos_spirit_abi::lifecycle::HookBudgetKey::ContextWindow
+pub maos_spirit_abi::lifecycle::HookBudgetKey::CpuMaxPct
+pub maos_spirit_abi::lifecycle::HookBudgetKey::FdMax
+pub maos_spirit_abi::lifecycle::HookBudgetKey::MemoryMaxMb
+pub maos_spirit_abi::lifecycle::HookBudgetKey::TimeCapSeconds
+pub struct maos_spirit_abi::lifecycle::ConsolidatePayload<'a>
+pub maos_spirit_abi::lifecycle::ConsolidatePayload::batch_data: &'a [u8]
+pub maos_spirit_abi::lifecycle::ConsolidatePayload::batch_len: usize
+pub struct maos_spirit_abi::lifecycle::FramePayload<'a>
+pub maos_spirit_abi::lifecycle::FramePayload::frame_data: &'a [u8]
+pub maos_spirit_abi::lifecycle::FramePayload::frame_len: usize
+pub struct maos_spirit_abi::lifecycle::SchedulePayload<'a>
+pub maos_spirit_abi::lifecycle::SchedulePayload::schedule_data: &'a [u8]
+pub maos_spirit_abi::lifecycle::SchedulePayload::schedule_len: usize
+#[repr(C)] pub struct maos_spirit_abi::lifecycle::SpiritVtable<T: maos_spirit_abi::lifecycle::Spirit + 'static>
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_consolidate: for<'a> fn(&T, &mut maos_spirit_abi::ctx::Ctx, &maos_spirit_abi::lifecycle::ConsolidatePayload<'a>)
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_frame: for<'a> fn(&T, &mut maos_spirit_abi::ctx::Ctx, &maos_spirit_abi::lifecycle::FramePayload<'a>)
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_idle: fn(&T, &mut maos_spirit_abi::ctx::Ctx)
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_load: fn(&T, &mut maos_spirit_abi::ctx::Ctx)
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_pause: fn(&T, &mut maos_spirit_abi::ctx::Ctx)
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_resume: fn(&T, &mut maos_spirit_abi::ctx::Ctx)
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_schedule: for<'a> fn(&T, &mut maos_spirit_abi::ctx::Ctx, &maos_spirit_abi::lifecycle::SchedulePayload<'a>)
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_start: fn(&T, &mut maos_spirit_abi::ctx::Ctx)
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_swap_in: for<'a> fn(&T, &mut maos_spirit_abi::ctx::Ctx, &maos_spirit_abi::lifecycle::SwapInPayload<'a>)
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_telemetry_event: for<'a> fn(&T, &mut maos_spirit_abi::ctx::Ctx, &maos_spirit_abi::lifecycle::TelemetryEventPayload<'a>)
+pub maos_spirit_abi::lifecycle::SpiritVtable::on_unload: fn(&T, &mut maos_spirit_abi::ctx::Ctx)
+impl<T: maos_spirit_abi::lifecycle::Spirit + 'static> maos_spirit_abi::lifecycle::SpiritVtable<T>
+pub fn maos_spirit_abi::lifecycle::SpiritVtable<T>::from_spirit() -> Self
+pub struct maos_spirit_abi::lifecycle::SwapInPayload<'a>
+pub maos_spirit_abi::lifecycle::SwapInPayload::predecessor_state: &'a [u8]
+pub maos_spirit_abi::lifecycle::SwapInPayload::state_len: usize
+pub struct maos_spirit_abi::lifecycle::TelemetryEventPayload<'a>
+pub maos_spirit_abi::lifecycle::TelemetryEventPayload::event_data: &'a [u8]
+pub maos_spirit_abi::lifecycle::TelemetryEventPayload::event_len: usize
+pub trait maos_spirit_abi::lifecycle::Spirit
+pub fn maos_spirit_abi::lifecycle::Spirit::on_consolidate<'a>(&self, ctx: &mut maos_spirit_abi::ctx::Ctx, payload: &maos_spirit_abi::lifecycle::ConsolidatePayload<'a>)
+pub fn maos_spirit_abi::lifecycle::Spirit::on_frame<'a>(&self, ctx: &mut maos_spirit_abi::ctx::Ctx, payload: &maos_spirit_abi::lifecycle::FramePayload<'a>)
+pub fn maos_spirit_abi::lifecycle::Spirit::on_idle(&self, ctx: &mut maos_spirit_abi::ctx::Ctx)
+pub fn maos_spirit_abi::lifecycle::Spirit::on_load(&self, ctx: &mut maos_spirit_abi::ctx::Ctx)
+pub fn maos_spirit_abi::lifecycle::Spirit::on_pause(&self, ctx: &mut maos_spirit_abi::ctx::Ctx)
+pub fn maos_spirit_abi::lifecycle::Spirit::on_resume(&self, ctx: &mut maos_spirit_abi::ctx::Ctx)
+pub fn maos_spirit_abi::lifecycle::Spirit::on_schedule<'a>(&self, ctx: &mut maos_spirit_abi::ctx::Ctx, payload: &maos_spirit_abi::lifecycle::SchedulePayload<'a>)
+pub fn maos_spirit_abi::lifecycle::Spirit::on_start(&self, ctx: &mut maos_spirit_abi::ctx::Ctx)
+pub fn maos_spirit_abi::lifecycle::Spirit::on_swap_in<'a>(&self, ctx: &mut maos_spirit_abi::ctx::Ctx, payload: &maos_spirit_abi::lifecycle::SwapInPayload<'a>)
+pub fn maos_spirit_abi::lifecycle::Spirit::on_telemetry_event<'a>(&self, ctx: &mut maos_spirit_abi::ctx::Ctx, payload: &maos_spirit_abi::lifecycle::TelemetryEventPayload<'a>)
+pub fn maos_spirit_abi::lifecycle::Spirit::on_unload(&self, ctx: &mut maos_spirit_abi::ctx::Ctx)
+pub fn maos_spirit_abi::lifecycle::kernel_invocation_allowed(enabled_hooks: &[&str], hook_name: &str) -> bool
+pub const maos_spirit_abi::ABI_VERSION: u32

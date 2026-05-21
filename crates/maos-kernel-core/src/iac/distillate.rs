@@ -78,7 +78,7 @@ impl DistillateWriter {
 
     /// Story 4.5 — fire isolation hooks for cross-Spirit observation.
     #[cfg(feature = "spirit_test")]
-    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, _outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
+    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
         if let Some(ref hook) = self.isolation_hook {
             let mut h = hook.lock();
             let _ = h.before_spirit_a_attempt(case_id);

@@ -77,7 +77,7 @@ impl IacBusAdapter {
 
     /// Story 4.5 — fire isolation hooks for cross-Spirit observation.
     #[cfg(feature = "spirit_test")]
-    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, _outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
+    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
         if let Some(ref hook) = self.isolation_hook {
             let mut h = hook.lock();
             let _ = h.before_spirit_a_attempt(case_id);
@@ -173,7 +173,7 @@ impl IacBusAdapter {
         // (broadcasts with no `to` entries are NOT cross-Spirit — they're 1:N telemetry,
         // the lineage is broadcast-implicit).
         {
-            let is_cross_spirit = matches!(frame.to.first(), Some(addr) if addr.spirit_id != frame.from.spirit_id);
+            let is_cross_spirit = frame.to.iter().any(|addr| addr.spirit_id != frame.from.spirit_id);
             if is_cross_spirit {
                 if frame.intent_lineage.is_empty() {
                     match frame.auto_marker {
@@ -186,9 +186,25 @@ impl IacBusAdapter {
                             });
                             frame.intent_lineage = maos_domain::invariants::i13::IntentLineage::new(vec![class_as_intent]);
                         }
+                        // Spirit-drafted but human-approved: treat as human-originated —
+                        // a human reviewed and approved the draft, so auto-populate lineage.
+                        maos_domain::invariants::i3::FrameOrigin::SpiritDraftedHumanApproved => {
+                            let class_as_intent = maos_domain::invariants::i8::A2AIntent::new(match frame.intent {
+                                maos_domain::invariants::i1::IntentClass::HighPrivilege => "high",
+                                maos_domain::invariants::i1::IntentClass::Standard => "standard",
+                                maos_domain::invariants::i1::IntentClass::Readonly => "readonly",
+                            });
+                            frame.intent_lineage = maos_domain::invariants::i13::IntentLineage::new(vec![class_as_intent]);
+                        }
+                        // Kernel-generated frames (audit telemetry, capability mediation, etc.)
+                        // are internal infrastructure — accept with empty lineage.
+                        maos_domain::invariants::i3::FrameOrigin::Kernel => {
+                            // Kernel frames carry implicit provenance through the frame_id
+                            // chain; empty lineage is acceptable per NFR-Aud-14 carve-out.
+                        }
                         // Spirit-emitted cross-Spirit frame with empty lineage = consent-laundering signal.
                         // Reject per NFR-Aud-14.
-                        _ => {
+                        maos_domain::invariants::i3::FrameOrigin::SpiritAuto => {
                             #[cfg(feature = "spirit_test")]
                             {
                                 let caller_pid = frame.from.spirit_id.as_str().to_string();

@@ -166,7 +166,7 @@ impl IsolationCorpus {
 }
 
 /// Loader helpers — snake_case conversion without extra dependency.
-mod serde_variant {
+pub mod serde_variant {
     use super::IsolationAttackCategory;
 
     pub fn to_snake_case(cat: &IsolationAttackCategory) -> &'static str {
@@ -232,7 +232,13 @@ impl IsolationCorpus {
 
             let entries: Vec<_> = std::fs::read_dir(&split_dir)
                 .map_err(|e| CorpusError::Io(e))?
-                .filter_map(|e| e.ok())
+                .filter_map(|e| match e {
+                    Ok(entry) => Some(entry),
+                    Err(err) => {
+                        eprintln!("isolation-corpus loader: read_dir entry error in {}: {err}", split_dir.display());
+                        None
+                    }
+                })
                 .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
                 .collect();
 
@@ -259,7 +265,13 @@ impl IsolationCorpus {
                 // Load scenario JSONs
                 let mut scenario_files: Vec<_> = std::fs::read_dir(&cat_dir)
                     .map_err(|e| CorpusError::Io(e))?
-                    .filter_map(|e| e.ok())
+                    .filter_map(|e| match e {
+                        Ok(entry) => Some(entry),
+                        Err(err) => {
+                            eprintln!("isolation-corpus loader: read_dir entry error in {}: {err}", cat_dir.display());
+                            None
+                        }
+                    })
                     .filter(|e| {
                         e.file_name()
                             .to_str()
