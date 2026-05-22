@@ -149,6 +149,70 @@ impl IacBusAdapter {
         )
     }
 
+    // ── Story 5.3 — FR50 disposition helpers ────────────────────
+
+    /// Emit a `task.nacked` TL row for a dead-Spirit's in-flight task.
+    pub fn emit_task_complete_nack(
+        &self,
+        task: &maos_domain::ports::task::TaskAssignmentRecord,
+    ) {
+        let payload = serde_json::json!({
+            "task_id": task.task_id,
+            "originator_spirit_id": task.originator_spirit_id,
+            "capability_token": task.capability_token,
+        });
+        let _ = self.transparency_log.insert_frame_event(
+            transparency_log::FrameKind::TaskComplete,
+            0,
+            None,
+            "task.nacked",
+            payload.to_string().as_bytes(),
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+    }
+
+    /// Emit a `task.escalated` TL row for a dead-Spirit's in-flight task.
+    pub fn emit_task_complete_escalated(
+        &self,
+        task: &maos_domain::ports::task::TaskAssignmentRecord,
+    ) {
+        let payload = serde_json::json!({
+            "task_id": task.task_id,
+            "originator_spirit_id": task.originator_spirit_id,
+            "capability_token": task.capability_token,
+        });
+        let _ = self.transparency_log.insert_frame_event(
+            transparency_log::FrameKind::TaskComplete,
+            0,
+            None,
+            "task.escalated",
+            payload.to_string().as_bytes(),
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+    }
+
+    /// Emit a `task.reassigned` TL row and enqueue a reassign frame to the target replica.
+    pub fn reassign_task_to(
+        &self,
+        task: &maos_domain::ports::task::TaskAssignmentRecord,
+        replica_spirit_id: &str,
+    ) {
+        let payload = serde_json::json!({
+            "task_id": task.task_id,
+            "originator_spirit_id": task.originator_spirit_id,
+            "capability_token": task.capability_token,
+            "replica_spirit_id": replica_spirit_id,
+        });
+        let _ = self.transparency_log.insert_frame_event(
+            transparency_log::FrameKind::TaskComplete,
+            0,
+            None,
+            "task.reassigned",
+            payload.to_string().as_bytes(),
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+    }
+
     /// Typed deliver (Story 3.1).
     pub(crate) async fn deliver_typed(
         &self,

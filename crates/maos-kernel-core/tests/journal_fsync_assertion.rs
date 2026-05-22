@@ -15,7 +15,7 @@
 
 use std::time::Instant;
 
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_kernel_core::journal::JournalAdapter;
 
 const BUDGET_NS: u128 = 1_500_000; // 1.5ms in nanoseconds
@@ -29,24 +29,24 @@ fn journal_append_p99_measurement() {
 
     let warmup = 500;
     for i in 0..warmup {
-        let entry = JournalEntry {
+        let entry = JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: i as u64,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: format!("warmup-{i}"),
             effective_sandbox_tier: None,
-        };
+        });
         journal.append_transition(entry);
     }
 
     let n = 10_000;
     let mut samples = Vec::with_capacity(n);
     for i in 0..n {
-        let entry = JournalEntry {
+        let entry = JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: (warmup + i) as u64,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: format!("spirit-{i}"),
             effective_sandbox_tier: None,
-        };
+        });
         let start = Instant::now();
         journal.append_transition(entry);
         samples.push(start.elapsed().as_nanos());

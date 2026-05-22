@@ -83,7 +83,23 @@ fn swap_continuity_with_seeded_halts_returns_safe_drained_nonzero() {
 
     let registry = HaltRegistry::new();
     let hid = HaltId::new("test-halt-swap-001").unwrap();
-    registry.insert_pending(hid, HaltState::PendingResolution).unwrap();
+    registry.insert_pending_with_metadata(
+        hid,
+        HaltState::PendingResolution,
+        maos_kernel_core::halt::PendingHaltMetadata {
+            spirit_pid: 200,
+            spirit_id: "test-spirit-200".into(),
+            payload: maos_domain::frame::EpistemicHaltPayload {
+                halt_id: "test-halt-swap-001".into(),
+                tag: "test".into(),
+                value: 0.0,
+                threshold: None,
+                policy_id: "test-policy".into(),
+                derived_from: "test".into(),
+            },
+            fired_ns: 0,
+        },
+    ).unwrap();
 
     let verdict = validate_swap_halt_continuity(
         &registry,

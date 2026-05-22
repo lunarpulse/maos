@@ -74,3 +74,12 @@
   baseline predates many Stories 3.x–4.x public symbols, causing both "removed" and
   "new" NFR-Test-2 violations that are unrelated to Story 4.5. Baseline regeneration
   is a cross-cutting maintenance task, not Story 4.5 scope.
+
+## Deferred from: code review of story 5-3 (2026-05-22)
+
+- **Legacy halts silently orphaned** — Halts inserted via legacy `insert_pending` never match per-PID filter in `drain_for_spirit` and accumulate unboundedly. v0.3-β trusts lifecycle to drain but bypasses legacy entries.
+- **Blocking `std::sync::RwLock` in async context** — Crash handler (`crash_detector.rs`) spawns async but uses synchronous locks throughout. Existing project-wide convention; same pattern in scheduler, halt, hot_swap modules. Could cause tokio worker starvation under contention.
+- **`.expect()` on locks in crash recovery path** — Lock poison treated as unrecoverable in crash handler. If `spirits` RwLock is poisoned (e.g., a prior panic in scheduler), no crash can be handled again. Same `.expect()` pattern used throughout kernel.
+- **`recover_in_flight_with_tasks` holds writer Mutex during full file parse** — No fsync occurs during cold-restart journal parsing. Acceptable for cold-restart-only path (infrequent), but could block background flush for seconds on large journal files.
+- **`scb.transition()` result discarded in crash handler** — Transition to `Unloaded` uses CAS; race-lost is benign (mostly harmless). Follows existing pattern.
+- **`terminate_spirit` drains halts during unload — conflicts with concurrent resolution** — Director's concurrent `resolve()` may receive `NotPending` if `drain_for_spirit` removes halt first. Follows established drain-then-resolve ordering.

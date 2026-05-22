@@ -39,13 +39,15 @@ pub use drift::{DriftEvent, make_drift_channel};
 pub use manifest::{EpistemicAction, EpistemicPolicyRule, EpistemicPolicySection, ScalarPredicate};
 // Story 5.1 — appended to preserve re-export order.
 pub use manifest::{SchedulingSection, LifecycleSection};
+// Story 5.3 — appended to preserve re-export order.
+pub use manifest::{OnCrashSection, SupervisionSection};
 pub use posture::{PostureError, PostureState};
 
 use std::sync::Arc;
 
 use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i9::SandboxTier;
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::ports::scheduler::SpiritSchedulerPort;
 use tokio::sync::mpsc;
 
@@ -118,6 +120,8 @@ impl SecurityManagerAdapter {
         epistemic_policy: Option<&EpistemicPolicySection>,
         _scheduling: Option<&SchedulingSection>,
         _lifecycle: Option<&LifecycleSection>,
+        _on_crash: Option<&OnCrashSection>,
+        _supervision: Option<&SupervisionSection>,
     ) -> Result<SandboxSpec, SecurityError> {
         {
             let declared_scopes = capabilities_required_to_scopes(caps_required);
@@ -192,12 +196,12 @@ impl SecurityManagerAdapter {
         let predicate = output_shape.map(OutputShapePredicate::from);
 
         // Journal the Load transition with effective tier (monotonic clock).
-        journal.journal_lifecycle(JournalEntry {
+        journal.journal_lifecycle(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: spirit_id.into(),
             effective_sandbox_tier: Some(effective),
-        });
+        }));
 
         Ok(SandboxSpec {
             tier: effective,

@@ -20,7 +20,7 @@ use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::journal::JournalAdapter;
 use crate::scheduler::control_block::SpiritControlBlock;
 use maos_domain::invariants::i3::FrameOrigin;
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 
 use super::post_swap_monitor::PostSwapInvariantViolation;
 
@@ -114,12 +114,12 @@ impl HotSwapSaga {
         };
 
         // Journal the abort.
-        journal.append_transition(JournalEntry {
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: timestamp_ns,
             lifecycle_event: LifecycleEvent::HotSwapAborted,
             spirit_id: spirit_id.clone(),
             effective_sandbox_tier: None,
-        });
+        }));
 
         // Emit IAC transparency log frame.
         let payload = serde_json::json!({

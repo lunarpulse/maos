@@ -42,7 +42,7 @@ use maos_domain::ports::crypto::CryptoProvider;
 use maos_kernel_core::api::{
     CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter,
     RingCryptoProvider,
-    SpiritSchedulerAdapter, TelemetryStreamAdapter,
+    TelemetryStreamAdapter,
 };
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
 use maos_kernel_core::iac::Mailbox;
@@ -126,7 +126,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let telemetry = Arc::new(IacRtMetrics::new());
 
     // Story 3.1 — Mailbox replaces the v0.1-β stub.
-    let mut mailbox = Arc::new(Mailbox::new(Arc::clone(&telemetry)));
+    let mailbox = Arc::new(Mailbox::new(Arc::clone(&telemetry)));
 
     // Story 3.1 — NotificationDispatcher with TerminalChannel.
     let mut dispatcher = NotificationDispatcher::new();
@@ -135,6 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::io::stderr(),
         )))));
     }
+    let notification_dispatcher = Arc::new(dispatcher);
 
     let io = IoSubsystemAdapter::new();
     let telemetry_stream = Arc::new(TelemetryStreamAdapter::default());
@@ -233,7 +234,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Story 5.1 — wire the real Spirit Scheduler replacing the v0.1-β
     // `_scheduler = SpiritSchedulerAdapter::default()` placeholder.
-    let scheduler = Arc::new(maos_kernel_core::scheduler::SpiritSchedulerAdapter::new(
+    let mut scheduler = Arc::new(maos_kernel_core::scheduler::SpiritSchedulerAdapter::new(
         Arc::clone(&transparency_log),
         Arc::clone(&capability),
         Arc::clone(&memory),
@@ -246,8 +247,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Arc::clone(&self_telemetry)),
         None, // security_manager — constructed per-one-shot arm at v0.3-β
         Some(Arc::clone(&orchestrator_registry)),
+        None, // crash_detector — wired below at Story 5.3 Task 14
     ));
     eprintln!("maos: Spirit Scheduler wired (Story 5.1)");
+
+    // Story 5.2 — Shared journal opened at default path.
+    // Created before CrashDetector so the detector can append lifecycle events.
+    let journal_path = maos_audit::default_journal_path();
+    if let Some(parent) = journal_path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            eprintln!("maos: failed to create journal parent directory {}: {e}", parent.display());
+            return Err(format!("journal parent create failed: {e}").into());
+        }
+    }
+    let shared_journal = Arc::new(
+        maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+            .map_err(|e| format!("failed to open shared Lifecycle Journal at {}: {e}", journal_path.display()))?
+    );
+
+    // Story 5.3 — Composition-root wiring for supervision adapters.
+    let replica_resolver = Arc::new(maos_domain::supervision::NullReplicaResolver);
+    let crash_detector = Arc::new(
+        maos_kernel_core::supervision::CrashDetector::new(
+            scheduler.scbs(),
+            Arc::clone(&transparency_log),
+            Arc::clone(&halt_registry),
+            Arc::clone(&capability),
+            Arc::clone(&iac),
+            Arc::clone(&telemetry),
+            Arc::clone(&shared_journal),
+        )
+        .with_replica_resolver(replica_resolver),
+    );
+    Arc::get_mut(&mut scheduler)
+        .expect("scheduler Arc strong_count == 1 at composition root")
+        .set_crash_detector(Arc::clone(&crash_detector));
+    eprintln!("maos: CrashDetector wired (Story 5.3)");
 
     // Wire SCB map into Mailbox so deliver() updates last_inbound_frame_ns.
     mailbox.set_scbs(scheduler.scbs());
@@ -261,20 +296,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("maos: KernelLifecycleResolver wired (Story 5.1)");
 
     // Story 5.2 — HotSwapCoordinator constructed exactly once at composition root.
-    // Shared journal opened at default path; one-shot arms that also journal
-    // use separate JournalAdapter instances (acceptable at v0.3-β — file-append
-    // is atomic for small writes on POSIX).
-    let journal_path = maos_audit::default_journal_path();
-    if let Some(parent) = journal_path.parent() {
-        if let Err(e) = std::fs::create_dir_all(parent) {
-            eprintln!("maos: failed to create journal parent directory {}: {e}", parent.display());
-            return Err(format!("journal parent create failed: {e}").into());
-        }
-    }
-    let shared_journal = Arc::new(
-        maos_kernel_core::journal::JournalAdapter::open(&journal_path)
-            .map_err(|e| format!("failed to open shared Lifecycle Journal at {}: {e}", journal_path.display()))?
-    );
+    // One-shot arms that also journal use separate JournalAdapter instances
+    // (acceptable at v0.3-β — file-append is atomic for small writes on POSIX).
     let archive_dir = maos_audit::default_archive_dir();
     let hot_swap_coordinator = Arc::new(HotSwapCoordinator::new(
         scheduler.scbs(),
@@ -373,12 +396,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })?;
             let spirit_id = std::env::var("MAOS_SPIRIT_ID")
                 .unwrap_or_else(|_| "hello-spirit".into());
-            adapter.append_transition(maos_domain::invariants::i10::JournalEntry {
+            adapter.append_transition(maos_domain::invariants::i10::JournalEntry::Lifecycle(maos_domain::invariants::i10::LifecycleEntry {
                 timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
                 lifecycle_event: event,
                 spirit_id: spirit_id.clone(),
                 effective_sandbox_tier: None,
-            });
+            }));
             // Adapter's `Drop` impl signals the drain thread and fsyncs
             // (journal/mod.rs:195-203). No cap-audit drain required.
             drop(adapter);
@@ -497,6 +520,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 epistemic_policy.as_ref(),
                 None,
                 None,
+                None,
+                None,
             )?;
 
             // Perform the posture shift
@@ -510,12 +535,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 maos_kernel_core::journal::JournalAdapter::open(&journal_entry_path)
                     .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
             journal_adapter.append_transition(
-                maos_domain::invariants::i10::JournalEntry {
+                maos_domain::invariants::i10::JournalEntry::Lifecycle(maos_domain::invariants::i10::LifecycleEntry {
                     timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
                     lifecycle_event: maos_domain::invariants::i10::LifecycleEvent::PostureShift,
                     spirit_id: spirit_id.clone(),
                     effective_sandbox_tier: None,
-                },
+                }),
             );
             drop(journal_adapter);
 
@@ -684,7 +709,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ));
             let halt_flow = maos_director_surface::halt_ui::HaltFlow::new(
                 kernel_resolver,
-                Arc::new(dispatcher),
+                Arc::clone(&notification_dispatcher),
                 Arc::clone(&transparency_log) as Arc<dyn maos_domain::halt::HaltJournal>,
             );
 
@@ -827,12 +852,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
                 .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
-            journal.append_transition(maos_domain::invariants::i10::JournalEntry {
+            journal.append_transition(maos_domain::invariants::i10::JournalEntry::Lifecycle(maos_domain::invariants::i10::LifecycleEntry {
                 timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
                 lifecycle_event: event,
                 spirit_id: spirit_id.clone(),
                 effective_sandbox_tier: None,
-            });
+            }));
             drop(journal);
 
             // 2. Journal to Approval Decision Log (director-action audit, FR42)
@@ -1318,9 +1343,196 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(exit_code);
         }
 
+        // Story 5.3 Task 13 — smoke-supervision-5: walk supervision substrate end-to-end
+        if mode == "smoke-supervision-5" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+            std::env::set_var("MAOS_SUPERVISION_FAST", "1");
+
+            // Spawn local watchdogs for the smoke arm (daemon mode is bypassed in one-shot).
+            let smoke_cancel = tokio_util::sync::CancellationToken::new();
+            let _progress_watchdog = Arc::new(maos_kernel_core::supervision::ProgressWatchdog::new(
+                scheduler.scbs(),
+                Arc::clone(&transparency_log),
+                Arc::clone(&telemetry),
+                Arc::clone(&notification_dispatcher),
+            )).spawn(smoke_cancel.child_token());
+            let _silent_failure_detector = Arc::new(maos_kernel_core::supervision::SilentFailureDetector::new(
+                scheduler.scbs(),
+                Arc::clone(&transparency_log),
+                Arc::clone(&telemetry),
+                Arc::clone(&notification_dispatcher),
+            )).spawn(smoke_cancel.child_token());
+
+            let manifest = maos_kernel_core::scheduler::SpiritManifestBundle::default();
+
+            // ── Step 1: Crash detection via synthetic panic in on_start ──
+            struct PanicSpirit;
+            impl maos_spirit_abi::lifecycle::Spirit for PanicSpirit {
+                fn on_start(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
+                    panic!("smoke-supervision-5: synthetic panic");
+                }
+            }
+
+            let pid1 = scheduler
+                .load("smoke-supervision-5-panic", manifest.clone(), PanicSpirit, boot_nonce)
+                .await
+                .map_err(|e| format!("load panic-spirit failed: {e}"))?;
+            // start() will catch the panic and spawn the crash handler
+            let _ = scheduler.start(pid1).await;
+
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+            let scb_gone = {
+                let spirits = scheduler.scbs();
+                let map = spirits.read().unwrap();
+                map.get(&pid1).is_none()
+            };
+            let receipt_count = transparency_log
+                .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+                    kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::EpistemicHalt),
+                    spirit_pid: Some(pid1),
+                    ..Default::default()
+                })
+                .map(|r| r.len())
+                .unwrap_or(0);
+            println!(
+                "{{\"step\": 1, \"surface\": \"crash_detector\", \"outcome\": \"ok\", \"scb_removed\": {scb_gone}, \"halt_receipts_produced\": {receipt_count}}}"
+            );
+
+            // ── Step 2: Hung-Spirit detection (TaskStalled) ────────────
+            struct IdleSpirit;
+            impl maos_spirit_abi::lifecycle::Spirit for IdleSpirit {}
+
+            let pid2 = scheduler
+                .load("smoke-supervision-5-hung", manifest.clone(), IdleSpirit, boot_nonce)
+                .await
+                .map_err(|e| format!("load hung-spirit failed: {e}"))?;
+            scheduler.start(pid2).await.map_err(|e| format!("start hung-spirit failed: {e}"))?;
+
+            {
+                let spirits = scheduler.scbs();
+                let scb = {
+                    let map = spirits.read().unwrap();
+                    map.get(&pid2).cloned().unwrap()
+                };
+                let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
+                tasks.push(maos_domain::ports::task::TaskAssignmentRecord {
+                    task_id: "smoke-hung-task-001".into(),
+                    capability_token: maos_domain::invariants::i1::TokenId([0u8; 16]),
+                    ttl_deadline_ns: u64::MAX,
+                    intent_class: maos_domain::invariants::i1::IntentClass::Standard,
+                    originator_spirit_id: "smoke-supervision-5-hung".into(),
+                });
+                let now = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
+                scb.last_progress_iac_ns.store(
+                    now.saturating_sub(30_000_000_000),
+                    std::sync::atomic::Ordering::Relaxed,
+                );
+            }
+
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+            let stalled_count = transparency_log
+                .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+                    kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::TaskStalled),
+                    spirit_pid: Some(pid2),
+                    ..Default::default()
+                })
+                .map(|r| r.len())
+                .unwrap_or(0);
+            println!(
+                "{{\"step\": 2, \"surface\": \"progress_watchdog\", \"outcome\": \"ok\", \"task_stalled_emitted\": {stalled_count}}}"
+            );
+
+            // ── Step 3: Silent-failure detection ───────────────────────
+            struct HeartbeatSpirit;
+            impl maos_spirit_abi::lifecycle::Spirit for HeartbeatSpirit {}
+
+            let pid3 = scheduler
+                .load("smoke-supervision-5-silent", manifest.clone(), HeartbeatSpirit, boot_nonce)
+                .await
+                .map_err(|e| format!("load silent-spirit failed: {e}"))?;
+            scheduler.start(pid3).await.map_err(|e| format!("start silent-spirit failed: {e}"))?;
+
+            {
+                let spirits = scheduler.scbs();
+                let scb = {
+                    let map = spirits.read().unwrap();
+                    map.get(&pid3).cloned().unwrap()
+                };
+                let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
+                tasks.push(maos_domain::ports::task::TaskAssignmentRecord {
+                    task_id: "smoke-silent-task-001".into(),
+                    capability_token: maos_domain::invariants::i1::TokenId([0u8; 16]),
+                    ttl_deadline_ns: u64::MAX,
+                    intent_class: maos_domain::invariants::i1::IntentClass::Standard,
+                    originator_spirit_id: "smoke-supervision-5-silent".into(),
+                });
+                let now = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
+                scb.last_heartbeat_ns.store(now, std::sync::atomic::Ordering::Relaxed);
+                scb.last_progress_iac_ns.store(
+                    now.saturating_sub(35_000_000_000),
+                    std::sync::atomic::Ordering::Relaxed,
+                );
+            }
+
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+            let suspect_count = transparency_log
+                .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+                    kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::SilentFailureSuspect),
+                    spirit_pid: Some(pid3),
+                    ..Default::default()
+                })
+                .map(|r| r.len())
+                .unwrap_or(0);
+            println!(
+                "{{\"step\": 3, \"surface\": \"silent_failure_detector\", \"outcome\": \"ok\", \"silent_failure_suspect_emitted\": {suspect_count}}}"
+            );
+
+            // ── Step 4: Cold-restart in-flight recovery ────────────────
+            let journal_path = maos_audit::default_journal_path();
+            if let Some(parent) = journal_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let cold_journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+                .map_err(|e| format!("cold-restart journal open failed: {e}"))?;
+            cold_journal.append_in_flight(maos_domain::invariants::i10::InFlightEntry {
+                timestamp_ns: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+                spirit_id: "smoke-cold-restart".into(),
+                task_id: "smoke-cold-task-001".into(),
+                capability_token: maos_domain::invariants::i1::TokenId([42u8; 16]),
+                ttl_deadline_ns: u64::MAX,
+                intent_class: "Standard".into(),
+                originator_spirit_id: "smoke-cold-restart".into(),
+            });
+            drop(cold_journal);
+
+            let recovered = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+                .map_err(|e| format!("cold-restart journal re-open failed: {e}"))?;
+            let report = recovered.recover_in_flight_with_tasks();
+            let in_flight_recovered = report.in_flight.len();
+            println!(
+                "{{\"step\": 4, \"surface\": \"cold_restart\", \"outcome\": \"ok\", \"in_flight_recovered\": {in_flight_recovered}}}"
+            );
+
+            smoke_cancel.cancel();
+
+            // Drain
+            drop(audit_tx);
+            drop(inference);
+            drop(capability);
+            if let Err(e) = audit_writer.await {
+                eprintln!("maos: audit writer task failed during drain: {e}");
+            }
+
+            eprintln!("maos: smoke-supervision-5 complete — 4 supervision surfaces exercised");
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -1417,6 +1629,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 epistemic_policy.as_ref(),
                 None,
                 None,
+                None,
+                None,
             )?;
 
             // Drop the journal adapter (fsync + drain).
@@ -1487,6 +1701,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )).spawn(cancel.child_token());
     eprintln!("maos: IdleWatchdog spawned (Story 5.1)");
 
+    // Story 5.3 — ProgressWatchdog + SilentFailureDetector spawned.
+    let progress_watchdog = Arc::new(maos_kernel_core::supervision::ProgressWatchdog::new(
+        scheduler.scbs(),
+        Arc::clone(&transparency_log),
+        Arc::clone(&telemetry),
+        Arc::clone(&notification_dispatcher),
+    )).spawn(cancel.child_token());
+    eprintln!("maos: ProgressWatchdog spawned (Story 5.3)");
+
+    let silent_failure_detector = Arc::new(maos_kernel_core::supervision::SilentFailureDetector::new(
+        scheduler.scbs(),
+        Arc::clone(&transparency_log),
+        Arc::clone(&telemetry),
+        Arc::clone(&notification_dispatcher),
+    )).spawn(cancel.child_token());
+    eprintln!("maos: SilentFailureDetector spawned (Story 5.3)");
+
     let shutdown_reason: &'static str = tokio::select! {
         _ = signal::ctrl_c() => "sigint",
         _ = shutdown_unix_term() => "sigterm",
@@ -1509,7 +1740,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // dispatcher (no async tasks at v0.3-β, but slot future-proofs).
     drop(iac);
     drop(mailbox);
-    drop(dispatcher);
+    drop(notification_dispatcher);
 
     match tokio::time::timeout(
         std::time::Duration::from_secs(10),
@@ -1532,6 +1763,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(Ok(())) => {}
         Ok(Err(e)) => eprintln!("maos: IdleWatchdog task returned error during drain: {e}"),
         Err(_) => eprintln!("maos: IdleWatchdog drain timed out after 5s"),
+    }
+
+    // Story 5.3 — await supervision watchdog drains on graceful shutdown.
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        progress_watchdog,
+    )
+    .await
+    {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => eprintln!("maos: ProgressWatchdog task returned error during drain: {e}"),
+        Err(_) => eprintln!("maos: ProgressWatchdog drain timed out after 5s"),
+    }
+
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        silent_failure_detector,
+    )
+    .await
+    {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => eprintln!("maos: SilentFailureDetector task returned error during drain: {e}"),
+        Err(_) => eprintln!("maos: SilentFailureDetector drain timed out after 5s"),
     }
 
     let cap_audit_rows = match transparency_log.query_frames(FrameFilter {

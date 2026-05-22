@@ -65,4 +65,17 @@ fn kernel_ctx_default_builder_has_none() {
     assert!(kctx.distillate_writer.is_none());
     assert!(kctx.self_telemetry.is_none());
     assert!(kctx.working_memory_orchestrator.is_none());
+    assert_eq!(kctx.spirit_pid, 0);
+    assert!(kctx.spirits.is_none());
+}
+
+#[test]
+fn kernel_ctx_heartbeat_err_when_not_wired() {
+    let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
+    let kctx = KernelCtx::new(&mut ctx);
+    let err = kctx.heartbeat().unwrap_err();
+    match err {
+        maos_domain::supervision::SupervisionError::HeartbeatNotWired(_) => {}
+        other => panic!("expected HeartbeatNotWired, got {other:?}"),
+    }
 }

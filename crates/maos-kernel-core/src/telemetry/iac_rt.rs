@@ -53,6 +53,7 @@ pub enum Outcome {
     Ok,
     Err,
     Timeout,
+    CrashHandled,
 }
 
 impl Outcome {
@@ -61,6 +62,7 @@ impl Outcome {
             Outcome::Ok => "ok",
             Outcome::Err => "err",
             Outcome::Timeout => "timeout",
+            Outcome::CrashHandled => "crash_handled",
         }
     }
 }
@@ -165,7 +167,7 @@ impl IacRtMetrics {
             Service::SpiritScheduler,
         ] {
             inflight.push((svc, AtomicI64::new(0)));
-            for out in [Outcome::Ok, Outcome::Err, Outcome::Timeout] {
+            for out in [Outcome::Ok, Outcome::Err, Outcome::Timeout, Outcome::CrashHandled] {
                 histograms.push((svc, out, HistogramSeries::new()));
             }
             for kind in [ErrorKind::Transport, ErrorKind::Decode, ErrorKind::Timeout, ErrorKind::App] {

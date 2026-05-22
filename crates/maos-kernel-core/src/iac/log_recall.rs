@@ -117,6 +117,8 @@ impl LogRecallAdapter {
             FrameKind::BudgetWarning => DomainFrameKindLabel::BudgetWarning,
             FrameKind::BudgetExceeded => DomainFrameKindLabel::BudgetExceeded,
             FrameKind::HotSwapAborted => DomainFrameKindLabel::HotSwapAborted,
+            FrameKind::TaskStalled => DomainFrameKindLabel::TaskStalled,
+            FrameKind::SilentFailureSuspect => DomainFrameKindLabel::SilentFailureSuspect,
         }
     }
 
@@ -138,6 +140,8 @@ impl LogRecallAdapter {
             DomainFrameKindLabel::BudgetWarning => FrameKind::BudgetWarning,
             DomainFrameKindLabel::BudgetExceeded => FrameKind::BudgetExceeded,
             DomainFrameKindLabel::HotSwapAborted => FrameKind::HotSwapAborted,
+            DomainFrameKindLabel::TaskStalled => FrameKind::TaskStalled,
+            DomainFrameKindLabel::SilentFailureSuspect => FrameKind::SilentFailureSuspect,
         }
     }
 

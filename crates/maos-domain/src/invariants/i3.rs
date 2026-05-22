@@ -39,6 +39,13 @@ pub enum FrameOrigin {
     Kernel = 3,
 }
 
+impl FrameOrigin {
+    /// Story 5.3 — returns true for Spirit-originated frames (auto or drafted).
+    pub fn is_spirit_origin(&self) -> bool {
+        matches!(self, FrameOrigin::SpiritAuto | FrameOrigin::SpiritDraftedHumanApproved)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -109,7 +109,7 @@ impl TestKernel {
         let scheduler = Arc::new(SpiritSchedulerAdapter::new(
             tl.clone(), capability.clone(), memory.clone(), iac.clone(),
             halt_registry.clone(), telemetry.clone(),
-            None, None, None, None, None, None,
+            None, None, None, None, None, None, None,
         ));
 
         let journal_path = tmp.path().join("journal.ndjson");

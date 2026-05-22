@@ -6,7 +6,7 @@
 //!   cargo bench --bench journal_fsync_p99 -- --test  (fail-on-regress mode)
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_kernel_core::journal::JournalAdapter;
 
 fn bench_journal_fsync(c: &mut Criterion) {
@@ -19,12 +19,12 @@ fn bench_journal_fsync(c: &mut Criterion) {
         let mut counter: u64 = 0;
         b.iter(|| {
             counter += 1;
-            let entry = JournalEntry {
+            let entry = JournalEntry::Lifecycle(LifecycleEntry {
                 timestamp: counter,
                 lifecycle_event: LifecycleEvent::Start,
                 spirit_id: format!("spirit-{counter}"),
                 effective_sandbox_tier: None,
-            };
+            });
             journal.append_transition(entry);
         });
         // Keep tmpdir alive until bench iteration completes

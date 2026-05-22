@@ -17,6 +17,8 @@ use maos_domain::invariants::i3::FrameOrigin;
 use crate::scheduler::control_block::SpiritControlBlock;
 use crate::scheduler::kernel_ctx::KernelCtx;
 use crate::telemetry::iac_rt::IacRtMetrics;
+use std::collections::BTreeMap;
+use std::sync::RwLock;
 
 /// Outcome of a hook fire.
 #[derive(Debug, Clone, PartialEq)]
@@ -45,6 +47,8 @@ pub struct HookDispatcher {
     log_recall: Option<Arc<crate::iac::log_recall::LogRecallAdapter>>,
     distillate_writer: Option<Arc<crate::iac::distillate::DistillateWriter>>,
     self_telemetry: Option<Arc<crate::memory::self_telemetry::SelfTelemetryAggregator>>,
+    /// Story 5.3 — shared SCB map for wiring KernelCtx::heartbeat
+    spirits: Option<Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>>,
     /// Injectable time cap for testing (default = 30s).
     pub time_cap_seconds: u64,
 }
@@ -65,6 +69,7 @@ impl HookDispatcher {
             log_recall: None,
             distillate_writer: None,
             self_telemetry: None,
+            spirits: None,
             time_cap_seconds: Self::DEFAULT_TIME_CAP_SECONDS,
         }
     }
@@ -120,8 +125,17 @@ impl HookDispatcher {
         self
     }
 
-    fn build_kernel_ctx<'a>(&self, ctx: &'a mut maos_spirit_abi::ctx::Ctx) -> KernelCtx<'a> {
-        let mut kctx = KernelCtx::new(ctx);
+    pub fn with_spirits(
+        mut self,
+        spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
+    ) -> Self {
+        self.spirits = Some(spirits);
+        self
+    }
+
+    fn build_kernel_ctx<'a>(&self, ctx: &'a mut maos_spirit_abi::ctx::Ctx, spirit_pid: u32) -> KernelCtx<'a> {
+        let mut kctx = KernelCtx::new(ctx)
+            .with_spirit_pid(spirit_pid);
         if let Some(ref m) = self.memory_manager {
             kctx = kctx.with_memory_manager(Arc::clone(m));
         }
@@ -145,6 +159,9 @@ impl HookDispatcher {
         }
         if let Some(ref s) = self.self_telemetry {
             kctx = kctx.with_self_telemetry(Arc::clone(s));
+        }
+        if let Some(ref spirits) = self.spirits {
+            kctx = kctx.with_spirits(Arc::clone(spirits));
         }
         kctx
     }
@@ -305,11 +322,17 @@ impl HookDispatcher {
         let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
         let spirit_obj = Arc::clone(&scb.spirit_obj);
 
+        let spirit_pid = scb.pid;
+        let spirits = self.spirits.clone();
         let snapshot_future = timeout(
             Duration::from_secs(cap_seconds),
             tokio::task::spawn_blocking(move || {
                 let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
-                let mut kernel_ctx = KernelCtx::new(&mut ctx);
+                let mut kernel_ctx = KernelCtx::new(&mut ctx)
+                    .with_spirit_pid(spirit_pid);
+                if let Some(ref s) = spirits {
+                    kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
+                }
                 spirit_obj.snapshot(&mut kernel_ctx)
             }),
         );
@@ -367,11 +390,17 @@ impl HookDispatcher {
         let spirit_obj = Arc::clone(&scb.spirit_obj);
         let predecessor_state = predecessor_state.to_vec();
 
+        let spirit_pid = scb.pid;
+        let spirits = self.spirits.clone();
         let migrate_future = timeout(
             Duration::from_secs(cap_seconds),
             tokio::task::spawn_blocking(move || {
                 let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
-                let mut kernel_ctx = KernelCtx::new(&mut ctx);
+                let mut kernel_ctx = KernelCtx::new(&mut ctx)
+                    .with_spirit_pid(spirit_pid);
+                if let Some(ref s) = spirits {
+                    kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
+                }
                 spirit_obj.migrate(&mut kernel_ctx, &predecessor_state)
             }),
         );
@@ -448,11 +477,17 @@ impl HookDispatcher {
         let spirit_obj = Arc::clone(&scb.spirit_obj);
         let payload = payload.to_vec(); // clone for 'static closure
 
+        let spirit_pid = scb.pid;
+        let spirits = self.spirits.clone();
         let hook_future = timeout(
             Duration::from_secs(cap_seconds),
             tokio::task::spawn_blocking(move || {
                 let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
-                let mut kernel_ctx = KernelCtx::new(&mut ctx);
+                let mut kernel_ctx = KernelCtx::new(&mut ctx)
+                    .with_spirit_pid(spirit_pid);
+                if let Some(ref s) = spirits {
+                    kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
+                }
                 fire_fn(&spirit_obj, &mut kernel_ctx, &payload);
             }),
         );

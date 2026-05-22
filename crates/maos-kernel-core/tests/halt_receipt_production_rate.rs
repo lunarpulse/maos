@@ -24,16 +24,32 @@ fn test_halt_receipt_production_rate() {
     let mut receipts_produced = 0usize;
     let mut expected_total = 0usize;
 
-    for scenario in &corpus.scenarios {
+    for (scenario_index, scenario) in corpus.scenarios.iter().enumerate() {
         let seed = scenario.scenario_id.as_bytes().iter().fold(0u64, |a, b| a.wrapping_add(*b as u64));
         let tl = TransparencyLogAdapter::open_in_memory(seed);
         let registry = HaltRegistry::new();
 
-        // Pre-seed the registry with the scenario's pending halts
+        // Story 5.3 — collision-free pid allocator + metadata-based per-PID drain
+        let spirit_pid = (scenario_index as u64 + 1_000_000) as u32;
+
+        // Pre-seed the registry with the scenario's pending halts (with metadata)
         for halt_id in &scenario.pending_halts {
-            registry.insert_pending(
+            registry.insert_pending_with_metadata(
                 maos_domain::halt::HaltId::new(halt_id.clone()).unwrap(),
                 maos_domain::halt::HaltState::PendingResolution,
+                maos_kernel_core::halt::PendingHaltMetadata {
+                    spirit_pid,
+                    spirit_id: scenario.spirit_id.clone(),
+                    payload: maos_domain::frame::EpistemicHaltPayload {
+                        halt_id: halt_id.clone(),
+                        tag: "test".into(),
+                        value: 0.0,
+                        threshold: None,
+                        policy_id: "".into(),
+                        derived_from: "".into(),
+                    },
+                    fired_ns: 0,
+                },
             ).unwrap();
         }
         expected_total += scenario.expected_receipts;
@@ -45,7 +61,6 @@ fn test_halt_receipt_production_rate() {
             maos_eval::TerminationKind::UnplannedCrash => maos_domain::halt::TerminationKind::UnplannedCrash,
             maos_eval::TerminationKind::HaltRejection => maos_domain::halt::TerminationKind::HaltRejection,
         };
-        let spirit_pid = (seed % 1000) as u32;
         let receipts = terminate_spirit(&tl, &registry, spirit_pid, &scenario.spirit_id, kind, seed);
 
         // Count receipts: for scenarios with pending halts, each halt should

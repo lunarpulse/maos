@@ -24,7 +24,7 @@ use std::time::Instant;
 use maos_domain::halt::{HaltContinuityError, HaltId};
 use maos_domain::hot_swap::{HotSwapError, HotSwapResult, PostSwapInvariantViolation};
 use maos_domain::invariants::i3::FrameOrigin;
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 
 use crate::halt::{validate_swap_halt_continuity, validate_halt_set, SwapVerdict, HaltRegistry};
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
@@ -326,12 +326,12 @@ impl HotSwapCoordinator {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos() as u64;
-        self.journal.append_transition(JournalEntry {
+        self.journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: timestamp_ns,
             lifecycle_event: LifecycleEvent::HotSwap,
             spirit_id: spirit_id.to_string(),
             effective_sandbox_tier: None,
-        });
+        }));
 
         // Step 11: Spawn PostSwapMonitor (30s window).
         saga.advance_to(SagaPhase::Committed);
@@ -489,12 +489,12 @@ impl HotSwapCoordinator {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos() as u64;
-        self.journal.append_transition(JournalEntry {
+        self.journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: timestamp_ns,
             lifecycle_event: LifecycleEvent::HotSwapAutoReverted,
             spirit_id: format!("pid-{spirit_pid}"),
             effective_sandbox_tier: None,
-        });
+        }));
 
         // 4. Emit HotSwapAborted IAC frame.
         let payload = serde_json::json!({

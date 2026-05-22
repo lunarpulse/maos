@@ -7,9 +7,12 @@
 //!
 //! Architecture §4.1 + Story 5.1 Task 7.
 
-use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, RwLock};
 
 use maos_spirit_abi::ctx::Ctx;
+use maos_domain::supervision::SupervisionError;
 
 /// Wraps the ABI `Ctx` with `Arc` handles to all Epic-4 adapters,
 /// routing Spirit-author-facing convenience calls into the kernel.
@@ -26,6 +29,10 @@ pub struct KernelCtx<'a> {
     pub distillate_writer: Option<Arc<crate::iac::distillate::DistillateWriter>>,
     pub self_telemetry: Option<Arc<crate::memory::self_telemetry::SelfTelemetryAggregator>>,
     pub transparency_log: Option<Arc<crate::iac::transparency_log::TransparencyLogAdapter>>,
+    /// Story 5.3 — spirit PID for SCB lookups (heartbeat, etc.)
+    pub spirit_pid: u32,
+    /// Story 5.3 — shared SCB map for heartbeat updates
+    pub spirits: Option<Arc<RwLock<BTreeMap<u32, Arc<crate::scheduler::control_block::SpiritControlBlock>>>>>,
 }
 
 impl<'a> KernelCtx<'a> {
@@ -41,6 +48,8 @@ impl<'a> KernelCtx<'a> {
             distillate_writer: None,
             self_telemetry: None,
             transparency_log: None,
+            spirit_pid: 0,
+            spirits: None,
         }
     }
 
@@ -101,7 +110,40 @@ impl<'a> KernelCtx<'a> {
         self
     }
 
+    pub fn with_spirit_pid(mut self, pid: u32) -> Self {
+        self.spirit_pid = pid;
+        self
+    }
+
+    pub fn with_spirits(
+        mut self,
+        spirits: Arc<RwLock<BTreeMap<u32, Arc<crate::scheduler::control_block::SpiritControlBlock>>>>,
+    ) -> Self {
+        self.spirits = Some(spirits);
+        self
+    }
+
     pub fn memory(&self) -> Option<&crate::memory::MemoryManagerAdapter> {
         self.memory_manager.as_deref()
+    }
+
+    /// Story 5.3 — heartbeat marker.
+    ///
+    /// Updates the calling SCB's `last_heartbeat_ns` to `monotonic_now_ns()`.
+    /// The SilentFailureDetector consumes this signal.
+    pub fn heartbeat(&self) -> Result<(), SupervisionError> {
+        let spirits = self
+            .spirits
+            .as_ref()
+            .ok_or_else(|| SupervisionError::HeartbeatNotWired("spirits map not set".into()))?;
+        let map = spirits
+            .read()
+            .map_err(|_| SupervisionError::LockPoisoned("spirits RwLock poisoned".into()))?;
+        let scb = map
+            .get(&self.spirit_pid)
+            .ok_or(SupervisionError::ScbNotFound(self.spirit_pid))?;
+        let now = crate::capability::cap_tokens::monotonic_now_ns();
+        scb.last_heartbeat_ns.store(now, Ordering::Relaxed);
+        Ok(())
     }
 }

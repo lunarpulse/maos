@@ -556,3 +556,44 @@ HaltContinuityError maps to `HotSwapError::HaltContinuityViolation`.
 `crates/maos-eval/fixtures/hsis-corpus-v0/` hosts 6 classes × 50 = 300
 scenarios. Per-class pass threshold ≥95% (NFR-Rel-3), zero CVSS-7 violations.
 Measured by `crates/maos-eval/tests/hsis_runner.rs`.
+
+## §4.1.3 Spirit Scheduler — supervision body (Story 5.3)
+
+The supervision module at `crates/maos-kernel-core/src/supervision/` implements crash detection, hung-Spirit detection, silent-failure detection, cold-restart recovery, and FR50 dead-Spirit task disposition. It is part of the Spirit Scheduler supervisor per §4.0.2 line 47 and follows the same sub-module precedent as `hot_swap/` (Story 5.2).
+
+### CrashDetector (NFR-Rel-1, FR12)
+
+`CrashDetector::handle_crash` executes a 7-step protocol:
+1. Acquire SCB from the shared `spirits` map
+2. Mark SCB state atomically to `Unloaded`
+3. Revoke all capability tokens for the PID
+4. Produce halt-receipts via `terminate_spirit` (per-PID `drain_for_spirit`)
+5. Emit `task.orphaned` IAC frames for each in-flight task
+6. Apply FR50 disposition (`Nack | ReassignToReplica | EscalateToOperator`)
+7. Remove SCB and journal `LifecycleEvent::Crash`
+
+The rust-inproc panic seam wires through `HookOutcome::Panicked` → `tokio::spawn(handle_crash)` fire-and-forget before the lifecycle verb returns its error. The subprocess form (forward-shaped) wires through the `SubprocessSupervisor` trait; `OsProcessChildSupervisor` lands at Story 5.5x.
+
+### ProgressWatchdog (NFR-Rel-2)
+
+Polls every 1s (100ms under `MAOS_SUPERVISION_FAST=1`). For each `Running` Spirit with in-flight tasks, compares `last_progress_iac_ns` against `progress_threshold_ms` (default 30s). On stall, emits `FrameKind::TaskStalled` with 60s multi-fire suppression. `last_progress_iac_ns` is updated by the kernel-side mailbox on every spirit-origin IAC frame.
+
+### SilentFailureDetector (NFR-Rel-4)
+
+Polls on the same cadence. Detects Spirits where `last_heartbeat_ns > last_progress_iac_ns + silent_failure_threshold_ms` while holding in-flight tasks. Emits `FrameKind::SilentFailureSuspect`. `KernelCtx::heartbeat()` updates `last_heartbeat_ns`; SDK ergonomics land at Story 7.x.
+
+### Cold-restart (NFR-Rel-10)
+
+`graceful_drain` iterates `scheduler.unload` per Spirit with a deadline. `hard_kill_drain` fsyncs the journal. `JournalEntry::InFlight` persists task assignments for post-restart recovery. `recover_in_flight_with_tasks` re-scans the journal and returns both lifecycle events and in-flight records.
+
+### FR50 disposition
+
+`OnCrashAction` is parsed from the `[on_crash]` manifest section (`nack | reassign-to-replica | escalate-to-operator`). `NullReplicaResolver` is the v0.3-β default (always `None`); multi-instance hosting lands at Story 6.1 + 8.4.
+
+### Halt-receipt unification (NFR-Rel-11)
+
+Planned termination (`scheduler.unload`) and unplanned termination (`CrashDetector::handle_crash`) both route through `terminate_spirit`, producing `FrameKind::EpistemicHalt` rows. The unified pipeline is measured by `halt_receipt_production_rate.rs` (1100 scenarios: 1000 planned + 100 crash).
+
+### smoke-supervision-5 observability arm
+
+`MAOS_ONE_SHOT=smoke-supervision-5` walks all four supervision surfaces end-to-end in one command, printing JSON lines per step with magnitude assertions (≥1 halt receipt, ≥1 task stalled, ≥1 silent failure suspect, ≥1 in-flight recovery).

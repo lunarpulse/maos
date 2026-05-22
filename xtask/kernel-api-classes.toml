@@ -470,3 +470,44 @@
 "maos_kernel_core::isolation::runner::ScenarioOutcome"                   = "data-movement"
 "maos_kernel_core::isolation::runner::IsolationCorpusReport"             = "data-movement"
 
+# ── Story 5.3 — Supervision module (crash detection, watchdogs, cold restart) ──
+"maos_kernel_core::supervision::CrashDetector"                            = "supervision"
+"maos_kernel_core::supervision::ProgressWatchdog"                         = "supervision"
+"maos_kernel_core::supervision::SilentFailureDetector"                    = "supervision"
+"maos_kernel_core::supervision::crash_detector::CrashDetector"            = "supervision"
+"maos_kernel_core::supervision::progress_watchdog::ProgressWatchdog"      = "supervision"
+"maos_kernel_core::supervision::silent_failure_detector::SilentFailureDetector" = "supervision"
+"maos_kernel_core::supervision::cold_restart::graceful_drain"             = "supervision"
+"maos_kernel_core::supervision::cold_restart::hard_kill_drain"            = "supervision"
+"maos_kernel_core::supervision::cold_restart::DrainReport"                = "supervision"
+"maos_kernel_core::supervision::cold_restart::DrainError"                 = "supervision"
+"maos_kernel_core::supervision::disposition::enforce_disposition"         = "supervision"
+"maos_kernel_core::supervision::test_double::SimulatedChildSupervisor"    = "supervision"
+
+# Story 5.3 — FrameKind variants (data-movement: event frames)
+"maos_kernel_core::iac::transparency_log::FrameKind::TaskStalled"         = "data-movement"
+"maos_kernel_core::iac::transparency_log::FrameKind::SilentFailureSuspect" = "data-movement"
+
+# Story 5.3 — LifecycleEvent variants (supervision: lifecycle audit)
+"maos_domain::invariants::i10::LifecycleEvent::Crash"                     = "supervision"
+"maos_domain::invariants::i10::LifecycleEvent::Stalled"                   = "supervision"
+"maos_domain::invariants::i10::LifecycleEvent::SilentFailureSuspect"      = "supervision"
+
+# Story 5.3 — domain supervision types (data-movement: trait + payload types)
+"maos_domain::supervision::SubprocessSupervisor"                          = "data-movement"
+"maos_domain::supervision::ReplicaResolver"                               = "data-movement"
+"maos_domain::supervision::CrashCause"                                    = "data-movement"
+"maos_domain::supervision::FaultCause"                                    = "data-movement"
+"maos_domain::supervision::OnCrashAction"                                 = "data-movement"
+"maos_domain::supervision::ChildExitStatus"                               = "data-movement"
+"maos_domain::supervision::ChildHandle"                                   = "data-movement"
+"maos_domain::supervision::SupervisionError"                              = "data-movement"
+"maos_domain::supervision::DispositionOutcome"                            = "data-movement"
+"maos_domain::supervision::HandleCrashReport"                             = "data-movement"
+"maos_domain::supervision::HandleCrashError"                              = "data-movement"
+"maos_domain::ports::task::TaskAssignmentRecord"                          = "data-movement"
+
+# Story 5.3 — manifest section types (supervision: admission-time config)
+"maos_kernel_core::security::manifest::OnCrashSection"                    = "supervision"
+"maos_kernel_core::security::manifest::SupervisionSection"                = "supervision"
+

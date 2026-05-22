@@ -30,7 +30,7 @@ use maos_domain::halt::{
 };
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i4::ApprovalDecision;
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::frame::EpistemicHaltPayload;
 use crate::iac::transparency_log::{TransparencyLogAdapter, FrameKind};
 use crate::journal::JournalAdapter;
@@ -272,10 +272,63 @@ impl HaltRegistry {
         drained
     }
 
-    /// Drain for a specific spirit. v0.3-β drains all;
-    /// Story 5.3 refines with real spirit_pid filtering.
-    pub fn drain_for_spirit(&self, _spirit_pid: u32) -> Vec<(HaltId, HaltState)> {
-        self.drain_all()
+    /// Drain pending halts that belong to a specific `spirit_pid`.
+    ///
+    /// Uses the metadata map (Story 4.3) to identify ownership.
+    /// Halts inserted via the legacy `insert_pending` path (no metadata)
+    /// are NOT matched by this filter — they remain in the registry.
+    pub fn drain_for_spirit(&self, spirit_pid: u32) -> Vec<(HaltId, HaltState)> {
+        let meta = self.metadata.read().expect("HaltRegistry metadata lock poisoned");
+        let owned: Vec<HaltId> = meta
+            .iter()
+            .filter(|(_, m)| m.spirit_pid == spirit_pid)
+            .map(|(id, _)| id.clone())
+            .collect();
+        drop(meta);
+        let mut map = self.pending.write().expect("HaltRegistry lock poisoned");
+        // Transition to terminal before drain so concurrent resolve() sees AlreadyTerminal
+        for id in &owned {
+            if let Some(state) = map.get_mut(id) {
+                if matches!(state, HaltState::PendingResolution) {
+                    *state = HaltState::Terminated;
+                }
+            }
+        }
+        let mut drained = Vec::with_capacity(owned.len());
+        for id in &owned {
+            if let Some(state) = map.remove(id) {
+                drained.push((id.clone(), state));
+            }
+        }
+        drop(map);
+        let mut meta = self.metadata.write().expect("HaltRegistry metadata lock poisoned");
+        for (id, _) in &drained {
+            meta.remove(id);
+        }
+        drained
+    }
+
+    /// Dry-run variant — returns the halts that *would* be drained for
+    /// `spirit_pid` without mutating the registry.
+    ///
+    /// Used by `validate_swap_halt_continuity_dry_run` (Story 5.2 review
+    /// patch closure) to preview drain impact before committing a swap.
+    pub fn drain_for_spirit_dry_run(&self, spirit_pid: u32) -> Vec<(HaltId, HaltState)> {
+        let meta = self.metadata.read().expect("HaltRegistry metadata lock poisoned");
+        let owned: Vec<HaltId> = meta
+            .iter()
+            .filter(|(_, m)| m.spirit_pid == spirit_pid)
+            .map(|(id, _)| id.clone())
+            .collect();
+        drop(meta);
+        let map = self.pending.read().expect("HaltRegistry lock poisoned");
+        let mut preview = Vec::with_capacity(owned.len());
+        for id in &owned {
+            if let Some(state) = map.get(id) {
+                preview.push((id.clone(), state.clone()));
+            }
+        }
+        preview
     }
 
     /// Story 4.3 — Return halt metadata entries for the given `spirit_pid`
@@ -430,12 +483,12 @@ pub fn invoke_halt(
     let frame_id = tl.last_frame_id();
 
     // Step 2: Write Lifecycle Journal entry (LifecycleEvent::Halt = 6)
-    journal.append_transition(JournalEntry {
+    journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
         timestamp: timestamp_ns,
         lifecycle_event: LifecycleEvent::Halt,
         spirit_id: spirit_id.to_string(),
         effective_sandbox_tier: None,
-    });
+    }));
 
     // Step 3: Insert into pending registry with metadata (Story 4.3).
     registry.insert_pending_with_metadata(
@@ -523,15 +576,31 @@ mod swap_continuity_tests {
     #[test]
     fn drain_completes_returns_safe_drained() {
         let registry = make_registry();
-        // Insert a pending halt then drain it
+        // Insert a pending halt WITH metadata (Story 5.3 per-PID filter)
         let hid = HaltId::new("test-halt-001").unwrap();
-        registry.insert_pending(hid.clone(), HaltState::PendingResolution);
+        registry.insert_pending_with_metadata(
+            hid.clone(),
+            HaltState::PendingResolution,
+            PendingHaltMetadata {
+                spirit_pid: 1,
+                spirit_id: "spirit-001".into(),
+                payload: maos_domain::frame::EpistemicHaltPayload {
+                    halt_id: "test-halt-001".into(),
+                    tag: "test".into(),
+                    value: 0.0,
+                    threshold: None,
+                    policy_id: "".into(),
+                    derived_from: "".into(),
+                },
+                fired_ns: 0,
+            },
+        ).unwrap();
         assert_eq!(registry.pending_halt_ids().len(), 1);
 
         let verdict = validate_swap_halt_continuity(
             &registry, 1, 1, Some(&[1]),
         ).unwrap();
-        // drain_for_spirit drains all at v0.3-β, so after drain is empty
+        // per-PID drain clears the halt for spirit_pid=1
         assert_eq!(verdict, SwapVerdict::SafeDrained { drained_count: 1 });
     }
 
@@ -590,5 +659,114 @@ mod swap_continuity_tests {
         let hid = HaltId::new("test-halt-006").unwrap();
         let result = validate_halt_set(&[hid], 1, Some(&[2]));
         assert!(result.is_err(), "migration should reject for mismatched version");
+    }
+
+    // ---- Story 5.3 — drain_for_spirit per-PID filter tests ----
+
+    fn make_meta(spirit_pid: u32, spirit_id: &str, halt_id: &str) -> PendingHaltMetadata {
+        PendingHaltMetadata {
+            spirit_pid,
+            spirit_id: spirit_id.into(),
+            payload: maos_domain::frame::EpistemicHaltPayload {
+                halt_id: halt_id.into(),
+                tag: "test".into(),
+                value: 0.0,
+                threshold: None,
+                policy_id: "".into(),
+                derived_from: "".into(),
+            },
+            fired_ns: 0,
+        }
+    }
+
+    #[test]
+    fn drain_for_spirit_empty_returns_empty() {
+        let registry = make_registry();
+        let drained = registry.drain_for_spirit(42);
+        assert!(drained.is_empty());
+    }
+
+    #[test]
+    fn drain_for_spirit_finds_only_owned_halts() {
+        let registry = make_registry();
+        let h1 = HaltId::new("owned-001").unwrap();
+        let h2 = HaltId::new("other-001").unwrap();
+        registry.insert_pending_with_metadata(
+            h1.clone(), HaltState::PendingResolution, make_meta(1, "spirit-1", "owned-001"),
+        ).unwrap();
+        registry.insert_pending_with_metadata(
+            h2.clone(), HaltState::PendingResolution, make_meta(2, "spirit-2", "other-001"),
+        ).unwrap();
+
+        let drained = registry.drain_for_spirit(1);
+        assert_eq!(drained.len(), 1);
+        assert_eq!(drained[0].0, h1);
+        // spirit-2's halt remains
+        assert_eq!(registry.pending_halt_ids().len(), 1);
+        assert!(registry.lookup_state(&h2).is_some());
+    }
+
+    #[test]
+    fn drain_for_spirit_leaves_legacy_no_meta_untouched() {
+        let registry = make_registry();
+        let h1 = HaltId::new("legacy-001").unwrap();
+        registry.insert_pending(h1.clone(), HaltState::PendingResolution).unwrap();
+
+        let drained = registry.drain_for_spirit(1);
+        assert!(drained.is_empty());
+        assert_eq!(registry.pending_halt_ids().len(), 1);
+    }
+
+    #[test]
+    fn drain_for_spirit_idempotent_second_call_empty() {
+        let registry = make_registry();
+        let h1 = HaltId::new("owned-002").unwrap();
+        registry.insert_pending_with_metadata(
+            h1.clone(), HaltState::PendingResolution, make_meta(1, "spirit-1", "owned-002"),
+        ).unwrap();
+
+        let first = registry.drain_for_spirit(1);
+        assert_eq!(first.len(), 1);
+
+        let second = registry.drain_for_spirit(1);
+        assert!(second.is_empty());
+    }
+
+    #[test]
+    fn drain_for_spirit_dry_run_does_not_mutate() {
+        let registry = make_registry();
+        let h1 = HaltId::new("dry-001").unwrap();
+        registry.insert_pending_with_metadata(
+            h1.clone(), HaltState::PendingResolution, make_meta(7, "spirit-7", "dry-001"),
+        ).unwrap();
+
+        let preview = registry.drain_for_spirit_dry_run(7);
+        assert_eq!(preview.len(), 1);
+        assert_eq!(preview[0].0, h1);
+
+        // Registry untouched
+        assert_eq!(registry.pending_halt_ids().len(), 1);
+        assert!(registry.lookup_pending_metadata(&h1).is_some());
+    }
+
+    #[test]
+    fn drain_for_spirit_multi_spirit_filtering_correct() {
+        let registry = make_registry();
+        for pid in 10..=14 {
+            let hid = HaltId::new(&format!("multi-{pid}")).unwrap();
+            registry.insert_pending_with_metadata(
+                hid, HaltState::PendingResolution, make_meta(pid, &format!("spirit-{pid}"), &format!("multi-{pid}")),
+            ).unwrap();
+        }
+
+        let drained_12 = registry.drain_for_spirit(12);
+        assert_eq!(drained_12.len(), 1);
+        assert_eq!(drained_12[0].0, HaltId::new("multi-12").unwrap());
+
+        let remaining: Vec<_> = registry.pending_halt_ids();
+        assert_eq!(remaining.len(), 4);
+        for pid in [10, 11, 13, 14] {
+            assert!(registry.lookup_state(&HaltId::new(&format!("multi-{pid}")).unwrap()).is_some());
+        }
     }
 }

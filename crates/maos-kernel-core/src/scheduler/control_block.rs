@@ -12,7 +12,12 @@ use maos_domain::lifecycle::{LifecycleError, SpiritLifecycleState};
 use maos_spirit_abi::lifecycle::Spirit;
 use crate::scheduler::kernel_ctx::KernelCtx;
 
-use crate::security::manifest::{ClassSection, LifecycleSection, SchedulingSection};
+use std::sync::Mutex;
+
+use crate::security::manifest::{ClassSection, LifecycleSection, OnCrashSection, SchedulingSection, SupervisionSection};
+use maos_domain::ports::task::TaskAssignmentRecord;
+use maos_domain::supervision::OnCrashAction;
+use maos_domain::invariants::i9::SandboxTier;
 
 /// Kernel-side mirror of `maos_domain::lifecycle::SpiritLifecycleState`
 /// encoded as a `repr(u8)` for atomic CAS transitions.
@@ -187,6 +192,8 @@ pub struct SpiritManifestBundle {
     pub hot_swap: Option<crate::security::manifest::HotSwapManifestSection>,
     pub migrates_from: Option<crate::security::manifest::MigratesFromSection>,
     pub halt_protocol_compatibility: Option<crate::security::manifest::HaltProtocolCompatibilitySection>,
+    pub on_crash: Option<OnCrashSection>,
+    pub supervision: Option<SupervisionSection>,
 }
 
 impl Default for SpiritManifestBundle {
@@ -198,6 +205,8 @@ impl Default for SpiritManifestBundle {
             hot_swap: None,
             migrates_from: None,
             halt_protocol_compatibility: None,
+            on_crash: None,
+            supervision: None,
         }
     }
 }
@@ -220,8 +229,22 @@ pub struct SpiritControlBlock {
     pub last_inbound_frame_ns: AtomicU64,
     /// Timestamp (ns) of last on_idle fire — mutated by IdleWatchdog.
     pub last_idle_fire_ns: AtomicU64,
+    /// Story 5.3 — timestamp (ns) of last outbound progress IAC frame.
+    pub last_progress_iac_ns: AtomicU64,
+    /// Story 5.3 — timestamp (ns) of last heartbeat marker.
+    pub last_heartbeat_ns: AtomicU64,
+    /// Story 5.3 — timestamp (ns) of last `TaskStalled` emit (multi-fire avoidance).
+    pub last_stall_emit_ns: AtomicU64,
+    /// Story 5.3 — timestamp (ns) of last `SilentFailureSuspect` emit (multi-fire avoidance).
+    pub last_silent_failure_emit_ns: AtomicU64,
+    /// Story 5.3 — FR50 dead-Spirit task disposition policy.
+    pub on_crash_action: OnCrashAction,
+    /// Story 5.3 — per-SCB in-flight task ledger.
+    pub task_assignments_in_flight: Mutex<Vec<TaskAssignmentRecord>>,
     /// Kernel boot nonce for token validation.
     pub boot_nonce: u64,
+    /// Story 5.3 — effective sandbox tier at admission / load time.
+    pub sandbox_tier: SandboxTier,
 }
 
 impl std::fmt::Debug for SpiritControlBlock {
@@ -249,6 +272,11 @@ impl SpiritControlBlock {
         boot_nonce: u64,
     ) -> Self {
         let priority_weight = manifest.scheduling.priority_weight;
+        let on_crash_action = manifest
+            .on_crash
+            .as_ref()
+            .map(|s| s.action.clone())
+            .unwrap_or_default();
         Self {
             pid,
             spirit_id,
@@ -259,7 +287,14 @@ impl SpiritControlBlock {
             deficit_counter: AtomicU32::new(0),
             last_inbound_frame_ns: AtomicU64::new(0),
             last_idle_fire_ns: AtomicU64::new(0),
+            last_progress_iac_ns: AtomicU64::new(crate::capability::cap_tokens::monotonic_now_ns()),
+            last_heartbeat_ns: AtomicU64::new(crate::capability::cap_tokens::monotonic_now_ns()),
+            last_stall_emit_ns: AtomicU64::new(0),
+            last_silent_failure_emit_ns: AtomicU64::new(0),
+            on_crash_action,
+            task_assignments_in_flight: Mutex::new(Vec::new()),
             boot_nonce,
+            sandbox_tier: SandboxTier::default(),
         }
     }
 
@@ -456,5 +491,72 @@ mod tests {
         let r2 = scb.try_transition(ScbLifecycleState::Loaded, ScbLifecycleState::Running);
         assert!(r2.is_err());
         assert!(matches!(r2.unwrap_err(), StateTransitionError::RaceLost { .. }));
+    }
+
+    // ---- Story 5.3 — SCB extension tests ----
+
+    #[test]
+    fn scb_default_supervision_fields() {
+        let scb = make_scb(ScbLifecycleState::Loaded);
+        let now = crate::capability::cap_tokens::monotonic_now_ns();
+        assert!(scb.last_progress_iac_ns.load(Ordering::Relaxed) > 0);
+        assert!(scb.last_heartbeat_ns.load(Ordering::Relaxed) > 0);
+        assert!(scb.last_progress_iac_ns.load(Ordering::Relaxed) <= now);
+        assert!(scb.last_heartbeat_ns.load(Ordering::Relaxed) <= now);
+        assert_eq!(scb.last_stall_emit_ns.load(Ordering::Relaxed), 0);
+        assert_eq!(scb.last_silent_failure_emit_ns.load(Ordering::Relaxed), 0);
+        assert_eq!(scb.on_crash_action, OnCrashAction::Nack);
+        assert!(scb.task_assignments_in_flight.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn scb_on_crash_action_from_manifest() {
+        let mut bundle = SpiritManifestBundle::default();
+        bundle.on_crash = Some(OnCrashSection {
+            action: OnCrashAction::EscalateToOperator,
+        });
+        let spirit_obj = make_spirit_obj(TestSpirit);
+        let scb = SpiritControlBlock::new(
+            42,
+            "test-spirit".into(),
+            bundle,
+            spirit_obj,
+            0xCAFE,
+        );
+        assert_eq!(scb.on_crash_action, OnCrashAction::EscalateToOperator);
+    }
+
+    #[test]
+    fn scb_task_assignments_push_and_drain() {
+        let scb = make_scb(ScbLifecycleState::Running);
+        {
+            let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
+            tasks.push(TaskAssignmentRecord {
+                task_id: "task-1".into(),
+                capability_token: maos_domain::invariants::i1::TokenId([0u8; 16]),
+                ttl_deadline_ns: 1_000_000,
+                intent_class: maos_domain::invariants::i1::IntentClass::Standard,
+                originator_spirit_id: "origin-1".into(),
+            });
+        }
+        {
+            let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
+            assert_eq!(tasks.len(), 1);
+            let drained: Vec<_> = tasks.drain(..).collect();
+            assert_eq!(drained.len(), 1);
+        }
+        assert!(scb.task_assignments_in_flight.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn scb_last_stall_emit_cas() {
+        let scb = make_scb(ScbLifecycleState::Running);
+        let old = scb.last_stall_emit_ns.load(Ordering::Relaxed);
+        let new = 12345u64;
+        let cas = scb.last_stall_emit_ns.compare_exchange(
+            old, new, Ordering::AcqRel, Ordering::Relaxed,
+        );
+        assert!(cas.is_ok());
+        assert_eq!(scb.last_stall_emit_ns.load(Ordering::Relaxed), new);
     }
 }

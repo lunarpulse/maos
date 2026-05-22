@@ -11,9 +11,11 @@ use std::sync::{Arc, RwLock};
 
 use maos_domain::lifecycle::{LifecycleError, SpiritLifecycleState};
 use maos_domain::ports::scheduler::SpiritSchedulerPort;
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 
+use crate::halt::terminate_spirit;
 use crate::iac::transparency_log::TransparencyLogAdapter;
+use maos_domain::halt::TerminationKind;
 use maos_domain::invariants::i3::FrameOrigin;
 use crate::scheduler::control_block::{
     make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle,
@@ -74,6 +76,7 @@ pub struct SpiritSchedulerAdapter {
     _halt_registry: Arc<crate::halt::HaltRegistry>,
     security_manager: Option<Arc<crate::security::SecurityManagerAdapter>>,
     orchestrator_registry: Option<Arc<crate::orchestrator::OrchestratorBufferRegistry>>,
+    crash_detector: Option<Arc<crate::supervision::CrashDetector>>,
 }
 
 impl SpiritSchedulerAdapter {
@@ -92,12 +95,15 @@ impl SpiritSchedulerAdapter {
         self_telemetry: Option<Arc<crate::memory::self_telemetry::SelfTelemetryAggregator>>,
         security_manager: Option<Arc<crate::security::SecurityManagerAdapter>>,
         orchestrator_registry: Option<Arc<crate::orchestrator::OrchestratorBufferRegistry>>,
+        crash_detector: Option<Arc<crate::supervision::CrashDetector>>,
     ) -> Self {
+        let spirits = Arc::new(RwLock::new(BTreeMap::new()));
         let mut dispatcher = HookDispatcher::new(Arc::clone(&tl), Arc::clone(&telemetry))
             .with_memory_manager(Arc::clone(&memory))
             .with_capability(Arc::clone(&capability))
             .with_iac(Arc::clone(&iac))
-            .with_halt_registry(Arc::clone(&halt_registry));
+            .with_halt_registry(Arc::clone(&halt_registry))
+            .with_spirits(Arc::clone(&spirits));
         if let Some(ref o) = working_memory_orchestrator {
             dispatcher = dispatcher.with_working_memory_orchestrator(Arc::clone(o));
         }
@@ -111,7 +117,7 @@ impl SpiritSchedulerAdapter {
             dispatcher = dispatcher.with_self_telemetry(Arc::clone(s));
         }
         Self {
-            spirits: Arc::new(RwLock::new(BTreeMap::new())),
+            spirits,
             dispatcher: Arc::new(dispatcher),
             tl,
             capability,
@@ -120,6 +126,7 @@ impl SpiritSchedulerAdapter {
             _halt_registry: halt_registry,
             security_manager,
             orchestrator_registry,
+            crash_detector,
         }
     }
 
@@ -129,6 +136,11 @@ impl SpiritSchedulerAdapter {
 
     pub fn dispatcher_ref(&self) -> &HookDispatcher {
         self.dispatcher.as_ref()
+    }
+
+    /// Story 5.3 — late-bind the CrashDetector after composition-root construction.
+    pub fn set_crash_detector(&mut self, cd: Arc<crate::supervision::CrashDetector>) {
+        self.crash_detector = Some(cd);
     }
 
     /// Shared dispatcher for the IdleWatchdog.
@@ -191,6 +203,8 @@ impl SpiritSchedulerAdapter {
                     None,
                     Some(&manifest.scheduling),
                     Some(&manifest.lifecycle),
+                    manifest.on_crash.as_ref(),
+                    manifest.supervision.as_ref(),
                 )
                 .map_err(|e| LifecycleError::Admission(e.to_string()))?;
         } else {
@@ -236,7 +250,7 @@ impl SpiritSchedulerAdapter {
 
         // Fire on_load synchronously (rust-inproc)
         let outcome = self.dispatcher.fire_on_load(&scb).await;
-        self.check_hook_outcome("on_load", outcome)?;
+        self.check_hook_outcome("on_load", pid, outcome)?;
 
         Ok(pid)
     }
@@ -260,7 +274,7 @@ impl SpiritSchedulerAdapter {
         );
 
         let outcome = self.dispatcher.fire_on_start(&scb).await;
-        self.check_hook_outcome("on_start", outcome)?;
+        self.check_hook_outcome("on_start", spirit_pid, outcome)?;
 
         Ok(())
     }
@@ -284,7 +298,7 @@ impl SpiritSchedulerAdapter {
         );
 
         let outcome = self.dispatcher.fire_on_pause(&scb).await;
-        self.check_hook_outcome("on_pause", outcome)?;
+        self.check_hook_outcome("on_pause", spirit_pid, outcome)?;
 
         Ok(())
     }
@@ -325,7 +339,7 @@ impl SpiritSchedulerAdapter {
         }
 
         let outcome = self.dispatcher.fire_on_resume(&scb).await;
-        self.check_hook_outcome("on_resume", outcome)?;
+        self.check_hook_outcome("on_resume", spirit_pid, outcome)?;
 
         Ok(())
     }
@@ -358,11 +372,20 @@ impl SpiritSchedulerAdapter {
         );
 
         let outcome = self.dispatcher.fire_on_unload(&scb).await;
-        self.check_hook_outcome("on_unload", outcome)?;
+        self.check_hook_outcome("on_unload", spirit_pid, outcome)?;
+
+        // Story 5.3 — produce halt-receipts for planned unload (NFR-Rel-11)
+        let _receipts = terminate_spirit(
+            &self.tl,
+            &self._halt_registry,
+            spirit_pid,
+            &scb.spirit_id,
+            TerminationKind::PlannedUnload,
+            scb.boot_nonce,
+        );
 
         let _ = self.capability.revoke_all_for_pid(spirit_pid);
-        // Story 5.3 will refine drain_for_spirit to per-PID semantics.
-        // v0.3-β: global drain is acceptable because only one Spirit runs in smoke tests.
+        // Story 5.3 — per-PID drain (closes Story 4.1 deferred §1)
         let _ = self._halt_registry.drain_for_spirit(spirit_pid);
 
         {
@@ -404,6 +427,7 @@ impl SpiritSchedulerAdapter {
     fn check_hook_outcome(
         &self,
         hook_name: &'static str,
+        spirit_pid: u32,
         outcome: HookOutcome,
     ) -> Result<(), LifecycleError> {
         match outcome {
@@ -419,6 +443,23 @@ impl SpiritSchedulerAdapter {
                 })
             }
             HookOutcome::Panicked { panic_payload_preview } => {
+                // Story 5.3 — fire-and-forget crash handler BEFORE propagating error
+                if let Some(ref cd) = self.crash_detector {
+                    let cd_clone = Arc::clone(cd);
+                    let hook_name_clone = hook_name.to_string();
+                    let payload_clone = panic_payload_preview.clone();
+                    let _ = tokio::spawn(async move {
+                        let _ = cd_clone.handle_crash(
+                            spirit_pid,
+                            maos_domain::supervision::CrashCause::Fault(
+                                maos_domain::supervision::FaultCause::Panic {
+                                    hook_name: hook_name_clone,
+                                    payload_preview: payload_clone,
+                                }
+                            ),
+                        ).await;
+                    });
+                }
                 Err(LifecycleError::Internal(format!(
                     "hook {hook_name} panicked: {panic_payload_preview}"
                 )))
@@ -429,9 +470,15 @@ impl SpiritSchedulerAdapter {
 
 impl SpiritSchedulerPort for SpiritSchedulerAdapter {
     fn journal_lifecycle(&self, entry: JournalEntry) {
+        let (lifecycle_event, spirit_id) = match &entry {
+            JournalEntry::Lifecycle(le) => (le.lifecycle_event, le.spirit_id.as_str()),
+            JournalEntry::InFlight(_) => return,
+            #[allow(unreachable_patterns)]
+            _ => return,
+        };
         let payload = serde_json::json!({
-            "lifecycle_event": format!("{:?}", entry.lifecycle_event),
-            "spirit_id": entry.spirit_id,
+            "lifecycle_event": format!("{:?}", lifecycle_event),
+            "spirit_id": spirit_id,
         });
         let _ = self.tl.insert_frame_event(
             crate::iac::transparency_log::FrameKind::CapabilityInvocation,

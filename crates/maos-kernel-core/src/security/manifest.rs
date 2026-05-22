@@ -1085,6 +1085,136 @@ impl RawLifecycleSection {
 }
 
 // ------------------------------------------------------------------
+// [on_crash] section (Story 5.3, AC5)
+// ------------------------------------------------------------------
+
+/// The `[on_crash]` manifest section — dead-Spirit task disposition policy.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct OnCrashSection {
+    pub action: maos_domain::supervision::OnCrashAction,
+}
+
+impl OnCrashSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawOnCrashSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        raw.validate()
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawOnCrashSection {
+    #[serde(default)]
+    action: String,
+}
+
+impl RawOnCrashSection {
+    fn validate(self) -> Result<OnCrashSection, ManifestError> {
+        let action = match self.action.as_str() {
+            "" | "nack" => maos_domain::supervision::OnCrashAction::Nack,
+            "reassign-to-replica" => maos_domain::supervision::OnCrashAction::ReassignToReplica,
+            "escalate-to-operator" => maos_domain::supervision::OnCrashAction::EscalateToOperator,
+            other => {
+                return Err(ManifestError::Toml(validation_msg(
+                    "on_crash.action",
+                    &format!("unknown value '{}'", other),
+                )));
+            }
+        };
+        Ok(OnCrashSection { action })
+    }
+}
+
+// ------------------------------------------------------------------
+// [supervision] section (Story 5.3, AC2 + AC3)
+// ------------------------------------------------------------------
+
+/// The `[supervision]` manifest section — watchdog tuning parameters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SupervisionSection {
+    pub heartbeat_interval_ms: u32,
+    pub progress_threshold_ms: u32,
+    pub silent_failure_threshold_ms: u32,
+}
+
+impl Default for SupervisionSection {
+    fn default() -> Self {
+        Self {
+            heartbeat_interval_ms: 5000,
+            progress_threshold_ms: 30000,
+            silent_failure_threshold_ms: 30000,
+        }
+    }
+}
+
+impl SupervisionSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawSupervisionSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        raw.validate()
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSupervisionSection {
+    #[serde(default = "default_heartbeat_interval_ms")]
+    heartbeat_interval_ms: u32,
+    #[serde(default = "default_progress_threshold_ms")]
+    progress_threshold_ms: u32,
+    #[serde(default = "default_silent_failure_threshold_ms")]
+    silent_failure_threshold_ms: u32,
+}
+
+fn default_heartbeat_interval_ms() -> u32 {
+    5000
+}
+fn default_progress_threshold_ms() -> u32 {
+    30000
+}
+fn default_silent_failure_threshold_ms() -> u32 {
+    30000
+}
+
+impl RawSupervisionSection {
+    fn validate(self) -> Result<SupervisionSection, ManifestError> {
+        if self.heartbeat_interval_ms < 1000 || self.heartbeat_interval_ms > 60000 {
+            return Err(ManifestError::Toml(validation_msg(
+                "supervision.heartbeat_interval_ms",
+                &format!(
+                    "must be in [1000, 60000], got {}",
+                    self.heartbeat_interval_ms
+                ),
+            )));
+        }
+        if self.progress_threshold_ms < 5000 || self.progress_threshold_ms > 300000 {
+            return Err(ManifestError::Toml(validation_msg(
+                "supervision.progress_threshold_ms",
+                &format!(
+                    "must be in [5000, 300000], got {}",
+                    self.progress_threshold_ms
+                ),
+            )));
+        }
+        if self.silent_failure_threshold_ms < 5000 || self.silent_failure_threshold_ms > 300000 {
+            return Err(ManifestError::Toml(validation_msg(
+                "supervision.silent_failure_threshold_ms",
+                &format!(
+                    "must be in [5000, 300000], got {}",
+                    self.silent_failure_threshold_ms
+                ),
+            )));
+        }
+        Ok(SupervisionSection {
+            heartbeat_interval_ms: self.heartbeat_interval_ms,
+            progress_threshold_ms: self.progress_threshold_ms,
+            silent_failure_threshold_ms: self.silent_failure_threshold_ms,
+        })
+    }
+}
+
+// ------------------------------------------------------------------
 // [author] section (Story 1b.5c, AC3)
 // ------------------------------------------------------------------
 
@@ -2118,6 +2248,80 @@ state_schema_version = 0"#;
     fn halt_protocol_compat_rejects_zero() {
         let toml = r#"version = 0"#;
         let result = HaltProtocolCompatibilitySection::from_toml_str(toml);
+        assert!(result.is_err());
+    }
+}
+
+#[cfg(test)]
+mod supervision_manifest_tests {
+    use super::*;
+
+    #[test]
+    fn on_crash_default_nack() {
+        let section = OnCrashSection::from_toml_str("").unwrap();
+        assert_eq!(section.action, maos_domain::supervision::OnCrashAction::Nack);
+    }
+
+    #[test]
+    fn on_crash_explicit_reassign() {
+        let toml = r#"action = "reassign-to-replica""#;
+        let section = OnCrashSection::from_toml_str(toml).unwrap();
+        assert_eq!(section.action, maos_domain::supervision::OnCrashAction::ReassignToReplica);
+    }
+
+    #[test]
+    fn on_crash_explicit_escalate() {
+        let toml = r#"action = "escalate-to-operator""#;
+        let section = OnCrashSection::from_toml_str(toml).unwrap();
+        assert_eq!(section.action, maos_domain::supervision::OnCrashAction::EscalateToOperator);
+    }
+
+    #[test]
+    fn on_crash_rejects_unknown_action() {
+        let toml = r#"action = "panic""#;
+        let result = OnCrashSection::from_toml_str(toml);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("unknown value 'panic'"), "{msg}");
+    }
+
+    #[test]
+    fn supervision_defaults() {
+        let section = SupervisionSection::from_toml_str("").unwrap();
+        assert_eq!(section.heartbeat_interval_ms, 5000);
+        assert_eq!(section.progress_threshold_ms, 30000);
+        assert_eq!(section.silent_failure_threshold_ms, 30000);
+    }
+
+    #[test]
+    fn supervision_explicit_values() {
+        let toml = r#"heartbeat_interval_ms = 2000
+progress_threshold_ms = 10000
+silent_failure_threshold_ms = 15000"#;
+        let section = SupervisionSection::from_toml_str(toml).unwrap();
+        assert_eq!(section.heartbeat_interval_ms, 2000);
+        assert_eq!(section.progress_threshold_ms, 10000);
+        assert_eq!(section.silent_failure_threshold_ms, 15000);
+    }
+
+    #[test]
+    fn supervision_rejects_heartbeat_too_low() {
+        let toml = r#"heartbeat_interval_ms = 500"#;
+        let result = SupervisionSection::from_toml_str(toml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn supervision_rejects_progress_too_high() {
+        let toml = r#"progress_threshold_ms = 400000"#;
+        let result = SupervisionSection::from_toml_str(toml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn supervision_rejects_silent_failure_too_low() {
+        let toml = r#"silent_failure_threshold_ms = 1000"#;
+        let result = SupervisionSection::from_toml_str(toml);
         assert!(result.is_err());
     }
 }

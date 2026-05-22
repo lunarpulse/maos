@@ -15,7 +15,7 @@ use maos_kernel_core::iac::{
 use maos_kernel_core::journal::JournalAdapter;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i4::ApprovalDecision;
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 
 /// Helper: create a tempdir + journal for integration tests.
 fn journal_temp() -> (JournalAdapter, tempfile::TempDir) {
@@ -63,12 +63,12 @@ fn audit_spine_end_to_end() {
         LifecycleEvent::Migrate,
     ];
     for i in 0..50 {
-        journal.append_transition(JournalEntry {
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: i as u64,
             lifecycle_event: events[i % events.len()],
             spirit_id: format!("spirit-{}", i % 10),
             effective_sandbox_tier: None,
-        });
+        }));
     }
 
     // Verify frame count
@@ -111,24 +111,24 @@ fn journal_cold_restart_rehydration() {
     // Boot 1: write entries
     {
         let journal = JournalAdapter::open(&path).unwrap();
-        journal.append_transition(JournalEntry {
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-alpha".into(),
             effective_sandbox_tier: None,
-        });
-        journal.append_transition(JournalEntry {
+        }));
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 2,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: "spirit-alpha".into(),
             effective_sandbox_tier: None,
-        });
-        journal.append_transition(JournalEntry {
+        }));
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 3,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-beta".into(),
             effective_sandbox_tier: None,
-        });
+        }));
     }
 
     // Boot 2: rehydrate and verify
@@ -143,12 +143,12 @@ fn journal_cold_restart_rehydration() {
         .any(|(s, e)| s == "spirit-beta" && *e == LifecycleEvent::Load));
 
     // Can append after rehydration
-    journal.append_transition(JournalEntry {
+    journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
         timestamp: 4,
         lifecycle_event: LifecycleEvent::Unload,
         spirit_id: "spirit-alpha".into(),
         effective_sandbox_tier: None,
-    });
+    }));
     let last = journal.last_event("spirit-alpha").unwrap();
     assert_eq!(last, LifecycleEvent::Unload);
 }

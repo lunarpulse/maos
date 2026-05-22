@@ -1,4 +1,4 @@
-last_updated: '2026-05-21T22:30:00Z'
+last_updated: '2026-05-22T04:00:00Z'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -52,7 +52,7 @@ development_status:
   epic-5: in-progress
   5-1-ship-full-lifecycle-verbs-and-11-triggers-with-priority-weighted-scheduling: done
   5-2-implement-hot-swap-state-transfer-and-cross-major-migration-against-hsis-95: done
-  5-3-detect-spirit-crashes-hangs-and-silent-failures-with-halt-receipt-99-9: backlog
+  5-3-detect-spirit-crashes-hangs-and-silent-failures-with-halt-receipt-99-9: done
   5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s: backlog
   5-5a-sandbox-tier-t3-container-isolation-via-docker-podman: backlog
   5-5b-run-the-multi-provider-ci-matrix-across-anthropic-openai-and-ollama: backlog

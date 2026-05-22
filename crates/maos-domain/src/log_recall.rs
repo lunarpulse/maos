@@ -55,6 +55,8 @@ pub enum FrameKindLabel {
     BudgetWarning,
     BudgetExceeded,
     HotSwapAborted,
+    TaskStalled,
+    SilentFailureSuspect,
 }
 
 impl LogRecallFilter {

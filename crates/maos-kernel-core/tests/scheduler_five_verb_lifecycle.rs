@@ -89,7 +89,7 @@ fn make_scheduler() -> Arc<SpiritSchedulerAdapter> {
 
     Arc::new(SpiritSchedulerAdapter::new(
         tl, capability, memory, iac, halt_registry, telemetry,
-        None, None, None, None, None, None,
+        None, None, None, None, None, None, None,
     ))
 }
 

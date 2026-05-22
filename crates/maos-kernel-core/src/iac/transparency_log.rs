@@ -64,6 +64,10 @@ pub enum FrameKind {
     BudgetExceeded = 13,
     /// Story 5.2 — Hot-swap aborted (swap-out failed, swap-in failed, or auto-revert).
     HotSwapAborted = 14,
+    /// Story 5.3 — Spirit holding in-flight task emitted no progress IAC for > threshold.
+    TaskStalled = 15,
+    /// Story 5.3 — Spirit emitted heartbeat but no progress IAC for > threshold.
+    SilentFailureSuspect = 16,
 }
 
 impl FrameKind {
@@ -85,6 +89,8 @@ impl FrameKind {
             12 => Some(Self::BudgetWarning),
             13 => Some(Self::BudgetExceeded),
             14 => Some(Self::HotSwapAborted),
+            15 => Some(Self::TaskStalled),
+            16 => Some(Self::SilentFailureSuspect),
             _ => None,
         }
     }
@@ -922,5 +928,30 @@ mod tests {
         let entries = log.query_frames(FrameFilter::default()).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].kind, FrameKind::TelemetryEvent);
+    }
+
+    // ---- Story 5.3 — FrameKind variant tests ----
+
+    #[test]
+    fn frame_kind_task_stalled_from_i64() {
+        assert_eq!(FrameKind::from_i64(15), Some(FrameKind::TaskStalled));
+    }
+
+    #[test]
+    fn frame_kind_silent_failure_suspect_from_i64() {
+        assert_eq!(FrameKind::from_i64(16), Some(FrameKind::SilentFailureSuspect));
+    }
+
+    #[test]
+    fn frame_kind_non_exhaustive_match() {
+        let kind = FrameKind::TaskStalled;
+        let _name = match kind {
+            FrameKind::TaskStalled => "stalled",
+            FrameKind::SilentFailureSuspect => "silent_failure",
+            // All other variants — the #[non_exhaustive] on the enum means
+            // downstream crates need a wildcard, but within the defining crate
+            // we can match exhaustively.
+            _ => "other",
+        };
     }
 }

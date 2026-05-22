@@ -127,6 +127,23 @@ impl Mailbox {
 
         // Phase 2: Send to all validated recipients (backpressure via send().await)
         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+
+        // Story 5.3 — update sender's last_progress_iac_ns for spirit-origin frames.
+        if frame.auto_marker.is_spirit_origin() {
+            let guard = self.scbs.lock().unwrap_or_else(|poison| poison.into_inner());
+            if let Some(ref scbs) = *guard {
+                if let Ok(scbs) = scbs.read() {
+                    let sender_spirit_id = frame.from.spirit_id.as_str();
+                    for (_, scb) in scbs.iter() {
+                        if scb.spirit_id == sender_spirit_id {
+                            scb.last_progress_iac_ns.store(now_ns, Ordering::Relaxed);
+                        }
+                    }
+                }
+            }
+            drop(guard);
+        }
+
         for addr in &frame.to {
             let spirit_id = addr.spirit_id.as_str().to_string();
             let sender = self
@@ -135,17 +152,17 @@ impl Mailbox {
                 .expect("validated in phase 1");
 
             // Update last_inbound_frame_ns for the recipient SCB.
-            if let Ok(guard) = self.scbs.lock() {
-                if let Some(ref scbs) = *guard {
-                    if let Ok(scbs) = scbs.read() {
-                        for (_, scb) in scbs.iter() {
-                            if scb.spirit_id == spirit_id {
-                                scb.last_inbound_frame_ns.store(now_ns, Ordering::Relaxed);
-                            }
+            let guard = self.scbs.lock().unwrap_or_else(|poison| poison.into_inner());
+            if let Some(ref scbs) = *guard {
+                if let Ok(scbs) = scbs.read() {
+                    for (_, scb) in scbs.iter() {
+                        if scb.spirit_id == spirit_id {
+                            scb.last_inbound_frame_ns.store(now_ns, Ordering::Relaxed);
                         }
                     }
                 }
             }
+            drop(guard);
 
             match sender.send(frame.clone()).await {
                 Ok(()) => {
@@ -172,9 +189,8 @@ impl Mailbox {
     }
 
     pub fn set_scbs(&self, scbs: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>) {
-        if let Ok(mut guard) = self.scbs.lock() {
-            *guard = Some(scbs);
-        }
+        let mut guard = self.scbs.lock().unwrap_or_else(|poison| poison.into_inner());
+        *guard = Some(scbs);
     }
 }
 

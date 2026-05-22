@@ -82,6 +82,8 @@ fn strictest_of_manifest_trust_operator() {
         Some(&default_epistemic_policy()),
         None,
         None,
+        None,
+        None,
     ).unwrap();
 
     assert_eq!(spec.tier, SandboxTier::T2, "PublicUntrusted must force T0→T2");
@@ -110,6 +112,8 @@ fn t3_effective_tier_rejected() {
         &journal,
         &default_posture_section(),
         Some(&default_epistemic_policy()),
+        None,
+        None,
         None,
         None,
     ).unwrap_err();
@@ -145,6 +149,8 @@ fn t1_effective_tier_rejected() {
         Some(&default_epistemic_policy()),
         None,
         None,
+        None,
+        None,
     ).unwrap_err();
 
     assert!(
@@ -174,6 +180,8 @@ fn effective_tier_is_journaled() {
         &journal,
         &default_posture_section(),
         Some(&default_epistemic_policy()),
+        None,
+        None,
         None,
         None,
     ).unwrap();

@@ -40,6 +40,7 @@ pub mod inference;
 pub mod self_telemetry;  // NEW — Story 4.3 SelfTelemetryPort per FR56
 pub mod log_recall;       // NEW — Story 4.4 LogRecallPort per AC1
 pub mod distillation;     // NEW — Story 4.4 DistillationPort per AC2
+pub mod task;             // NEW — Story 5.3 in-flight task assignment record
 
 pub mod crypto;  // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 / §8.6
 

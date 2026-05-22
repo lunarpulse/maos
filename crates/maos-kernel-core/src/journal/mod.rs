@@ -57,7 +57,8 @@ use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{self, JoinHandle};
 
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::invariants::i1::TokenId;
+use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::ports::SpiritSchedulerPort;
 
 #[derive(Debug, thiserror::Error)]
@@ -117,7 +118,9 @@ impl JournalAdapter {
                     source: e,
                 }
             })?;
-            most_recent.insert(entry.spirit_id.clone(), entry.lifecycle_event);
+            if let JournalEntry::Lifecycle(ref le) = entry {
+                most_recent.insert(le.spirit_id.clone(), le.lifecycle_event);
+            }
         }
 
         let writer = Arc::new(Mutex::new(file));
@@ -168,8 +171,10 @@ impl JournalAdapter {
             );
         }
         drop(file);
-        let mut index = self.most_recent.write().expect("Journal index lock poisoned");
-        index.insert(entry.spirit_id.clone(), entry.lifecycle_event);
+        if let JournalEntry::Lifecycle(ref le) = entry {
+            let mut index = self.most_recent.write().expect("Journal index lock poisoned");
+            index.insert(le.spirit_id.clone(), le.lifecycle_event);
+        }
     }
 
     pub fn last_event(&self, spirit_id: &str) -> Option<LifecycleEvent> {
@@ -185,11 +190,55 @@ impl JournalAdapter {
             .collect()
     }
 
+    /// Append an in-flight task entry to the journal (Story 5.3).
+    pub fn append_in_flight(&self, entry: InFlightEntry) {
+        self.append_transition(JournalEntry::InFlight(entry));
+    }
+
+    /// Re-scan the journal file and return ALL entries (both lifecycle and
+    /// in-flight) instead of collapsing to last-per-spirit.
+    pub fn recover_in_flight_with_tasks(&self) -> RecoveryReport {
+        use std::io::Seek;
+        let mut file = self.writer.lock().expect("Journal writer lock poisoned");
+        let _ = file.flush();
+        let _ = file.seek(std::io::SeekFrom::Start(0));
+        let mut content = String::new();
+        {
+            let mut reader = BufReader::new(&*file);
+            let _ = reader.read_to_string(&mut content);
+        }
+        drop(file);
+
+        let mut lifecycle = Vec::new();
+        let mut in_flight = Vec::new();
+        for line in content.lines() {
+            if line.is_empty() {
+                continue;
+            }
+            if let Ok(entry) = serde_json::from_str::<JournalEntry>(line) {
+                match entry {
+                    JournalEntry::Lifecycle(le) => lifecycle.push((le.spirit_id, le.lifecycle_event)),
+                    JournalEntry::InFlight(ie) => in_flight.push(ie),
+                    #[allow(unreachable_patterns)]
+                    _ => {}
+                }
+            }
+        }
+        RecoveryReport { lifecycle, in_flight }
+    }
+
     fn sync_flush(&self) {
         if let Ok(f) = self.writer.lock() {
             let _ = f.sync_data();
         }
     }
+}
+
+/// Recovery report containing both lifecycle entries and in-flight tasks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryReport {
+    pub lifecycle: Vec<(String, LifecycleEvent)>,
+    pub in_flight: Vec<InFlightEntry>,
 }
 
 impl Drop for JournalAdapter {
@@ -226,18 +275,18 @@ mod tests {
     #[test]
     fn append_and_read_last_event() {
         let (journal, _tmpdir) = JournalAdapter::open_temp().unwrap();
-        journal.append_transition(JournalEntry {
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-alpha".into(),
             effective_sandbox_tier: None,
-        });
-        journal.append_transition(JournalEntry {
+        }));
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 2,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: "spirit-alpha".into(),
             effective_sandbox_tier: None,
-        });
+        }));
 
         let last = journal.last_event("spirit-alpha").unwrap();
         assert_eq!(last, LifecycleEvent::Start);
@@ -249,24 +298,24 @@ mod tests {
     #[test]
     fn recover_in_flight_returns_last_per_spirit() {
         let (journal, _tmpdir) = JournalAdapter::open_temp().unwrap();
-        journal.append_transition(JournalEntry {
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-alpha".into(),
             effective_sandbox_tier: None,
-        });
-        journal.append_transition(JournalEntry {
+        }));
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 2,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: "spirit-alpha".into(),
             effective_sandbox_tier: None,
-        });
-        journal.append_transition(JournalEntry {
+        }));
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 3,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-beta".into(),
             effective_sandbox_tier: None,
-        });
+        }));
 
         let recovered = journal.recover_in_flight();
         assert_eq!(recovered.len(), 2);
@@ -285,24 +334,24 @@ mod tests {
 
         {
             let journal = JournalAdapter::open(&path).unwrap();
-            journal.append_transition(JournalEntry {
+            journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
                 timestamp: 1,
                 lifecycle_event: LifecycleEvent::Load,
                 spirit_id: "spirit-alpha".into(),
                 effective_sandbox_tier: None,
-            });
-            journal.append_transition(JournalEntry {
+            }));
+            journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
                 timestamp: 2,
                 lifecycle_event: LifecycleEvent::Start,
                 spirit_id: "spirit-alpha".into(),
                 effective_sandbox_tier: None,
-            });
-            journal.append_transition(JournalEntry {
+            }));
+            journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
                 timestamp: 3,
                 lifecycle_event: LifecycleEvent::Load,
                 spirit_id: "spirit-beta".into(),
                 effective_sandbox_tier: None,
-            });
+            }));
         }
 
         let journal = JournalAdapter::open(&path).unwrap();
@@ -319,13 +368,87 @@ mod tests {
     #[test]
     fn spirit_scheduler_port_impl() {
         let (journal, _tmpdir) = JournalAdapter::open_temp().unwrap();
-        journal.journal_lifecycle(JournalEntry {
+        journal.journal_lifecycle(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Halt,
             spirit_id: "spirit-gamma".into(),
             effective_sandbox_tier: None,
-        });
+        }));
         let last = journal.last_lifecycle_event("spirit-gamma").unwrap();
         assert_eq!(last, LifecycleEvent::Halt);
+    }
+
+    #[test]
+    fn append_in_flight_roundtrip() {
+        let (journal, _tmpdir) = JournalAdapter::open_temp().unwrap();
+        journal.append_in_flight(InFlightEntry {
+            timestamp_ns: 1_000,
+            spirit_id: "spirit-1".into(),
+            task_id: "task-1".into(),
+            capability_token: TokenId([0u8; 16]),
+            ttl_deadline_ns: 2_000,
+            intent_class: "standard".into(),
+            originator_spirit_id: "origin-1".into(),
+        });
+
+        let report = journal.recover_in_flight_with_tasks();
+        assert_eq!(report.in_flight.len(), 1);
+        assert_eq!(report.in_flight[0].task_id, "task-1");
+        assert!(report.lifecycle.is_empty());
+    }
+
+    #[test]
+    fn recover_in_flight_with_tasks_mixed_entries() {
+        let (journal, _tmpdir) = JournalAdapter::open_temp().unwrap();
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+            timestamp: 1,
+            lifecycle_event: LifecycleEvent::Load,
+            spirit_id: "spirit-alpha".into(),
+            effective_sandbox_tier: None,
+        }));
+        journal.append_in_flight(InFlightEntry {
+            timestamp_ns: 2_000,
+            spirit_id: "spirit-alpha".into(),
+            task_id: "task-alpha".into(),
+            capability_token: TokenId([1u8; 16]),
+            ttl_deadline_ns: 3_000,
+            intent_class: "high_privilege".into(),
+            originator_spirit_id: "origin-alpha".into(),
+        });
+        journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+            timestamp: 3,
+            lifecycle_event: LifecycleEvent::Start,
+            spirit_id: "spirit-alpha".into(),
+            effective_sandbox_tier: None,
+        }));
+
+        let report = journal.recover_in_flight_with_tasks();
+        assert_eq!(report.lifecycle.len(), 2);
+        assert_eq!(report.in_flight.len(), 1);
+        assert_eq!(report.in_flight[0].task_id, "task-alpha");
+    }
+
+    #[test]
+    fn in_flight_entry_survives_cold_restart() {
+        let tmpdir = tempfile::TempDir::new().unwrap();
+        let path = tmpdir.path().join("journal.ndjson");
+
+        {
+            let journal = JournalAdapter::open(&path).unwrap();
+            journal.append_in_flight(InFlightEntry {
+                timestamp_ns: 5_000,
+                spirit_id: "spirit-beta".into(),
+                task_id: "task-beta".into(),
+                capability_token: TokenId([2u8; 16]),
+                ttl_deadline_ns: 6_000,
+                intent_class: "readonly".into(),
+                originator_spirit_id: "origin-beta".into(),
+            });
+        }
+
+        let journal = JournalAdapter::open(&path).unwrap();
+        let report = journal.recover_in_flight_with_tasks();
+        assert_eq!(report.in_flight.len(), 1);
+        assert_eq!(report.in_flight[0].spirit_id, "spirit-beta");
     }
 }

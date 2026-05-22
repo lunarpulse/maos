@@ -98,6 +98,16 @@ pub enum IntentClass {
     Readonly,
 }
 
+impl IntentClass {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            IntentClass::HighPrivilege => "HighPrivilege",
+            IntentClass::Standard => "Standard",
+            IntentClass::Readonly => "Readonly",
+        }
+    }
+}
+
 /// Capability token — short-lived authorization to invoke a specific
 /// Capability with specific arguments under a specific posture (per §3.1
 /// vocabulary + ADR-023).
