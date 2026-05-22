@@ -53,6 +53,10 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
     ("epistemic_policy", "default_action"),
     ("scheduling", "priority_weight"),
     ("lifecycle", "enabled_hooks"),
+    ("hot_swap", "state_schema_uri"),
+    ("hot_swap", "state_schema_version"),
+    ("migrates_from", "versions"),
+    ("halt_protocol_compatibility", "version"),
 ];
 
 const CATEGORIES: &[&str] = &["well-formed", "malformed-rejected", "edge-case"];

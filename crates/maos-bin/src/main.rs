@@ -49,6 +49,7 @@ use maos_kernel_core::iac::Mailbox;
 use maos_kernel_core::inference::InferencePortAdapter;
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 use maos_kernel_core::security::approval::ApprovalManager;
+use maos_kernel_core::hot_swap::HotSwapCoordinator;
 use maos_director_surface::notification::{
     NotificationDispatcher, TerminalChannel,
 };
@@ -258,6 +259,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "director".into(),
     ));
     eprintln!("maos: KernelLifecycleResolver wired (Story 5.1)");
+
+    // Story 5.2 — HotSwapCoordinator constructed exactly once at composition root.
+    // Shared journal opened at default path; one-shot arms that also journal
+    // use separate JournalAdapter instances (acceptable at v0.3-β — file-append
+    // is atomic for small writes on POSIX).
+    let journal_path = maos_audit::default_journal_path();
+    if let Some(parent) = journal_path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            eprintln!("maos: failed to create journal parent directory {}: {e}", parent.display());
+            return Err(format!("journal parent create failed: {e}").into());
+        }
+    }
+    let shared_journal = Arc::new(
+        maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+            .map_err(|e| format!("failed to open shared Lifecycle Journal at {}: {e}", journal_path.display()))?
+    );
+    let archive_dir = maos_audit::default_archive_dir();
+    let hot_swap_coordinator = Arc::new(HotSwapCoordinator::new(
+        scheduler.scbs(),
+        Arc::clone(&shared_journal),
+        Arc::clone(&transparency_log),
+        Arc::clone(&halt_registry),
+        Arc::clone(&capability),
+        Arc::clone(&iac),
+        scheduler.dispatcher_arc(),
+        Arc::clone(&telemetry),
+        archive_dir,
+    ));
+    eprintln!("maos: HotSwapCoordinator wired (Story 5.2)");
 
     // Story 4.5 — spirit_test-only isolation hooks are constructed by
     // integration tests (nfr_sec_14_cross_spirit_isolation.rs,
@@ -501,12 +531,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             drop(journal);
 
-            // Drain: drop senders in order, await audit writer
+            // Drain: drop all Arc holders of audit_tx so the channel closes.
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            drop(orchestrator);
+            drop(scheduler);
+            drop(lifecycle_resolver);
+            drop(hot_swap_coordinator);
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                audit_writer,
+            )
+            .await
+            {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task returned error during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
 
             let _ = new_hash;
@@ -586,6 +627,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let halt_id = maos_domain::halt::HaltId::new(&halt_id_str)
                 .map_err(|e| format!("invalid halt_id: {e}"))?;
 
+            // Seed the halt into the registry so resolution can proceed.
+            // At v0.3-β the halt-resolve one-shot has no preceding invoke_halt
+            // in-process; integration tests seed halt IDs via env.
+            let _ = halt_registry.insert_pending_with_metadata(
+                halt_id.clone(),
+                maos_domain::halt::HaltState::PendingResolution,
+                maos_kernel_core::halt::PendingHaltMetadata {
+                    spirit_pid: 0,
+                    spirit_id: "hello-spirit".into(),
+                    payload: maos_domain::frame::EpistemicHaltPayload {
+                        halt_id: halt_id.as_str().into(),
+                        tag: "test".into(),
+                        value: 0.5,
+                        threshold: None,
+                        policy_id: "test-policy".into(),
+                        derived_from: String::new(),
+                    },
+                    fired_ns: 0,
+                },
+            );
+
             let resolution = match kind_str.as_str() {
                 "provided_context" => {
                     let text = std::env::var("MAOS_HALT_TEXT")
@@ -629,12 +691,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             halt_flow.submit_resolution(halt_id.clone(), resolution.clone(), &spirit_id)
                 .map_err(|e| format!("halt resolution failed: {e}"))?;
 
-            // Drain: drop senders in order, await audit writer
+            // Drain: drop all Arc holders of audit_tx so the channel closes.
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            drop(orchestrator);
+            drop(scheduler);
+            drop(lifecycle_resolver);
+            drop(hot_swap_coordinator);
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                audit_writer,
+            )
+            .await
+            {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task returned error during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
 
             eprintln!("maos: halt resolved {} ({})", halt_id.as_str(), resolution.kind_label());
@@ -1198,9 +1271,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
 
+        if mode == "hot-swap-precheck" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+            let spirit_id = std::env::var("MAOS_SPIRIT_ID")
+                .unwrap_or_else(|_| "hello-spirit".into());
+            let from_version = std::env::var("MAOS_HOTSWAP_FROM_VERSION")
+                .unwrap_or_else(|_| "0.3.1".into());
+            let to_manifest = std::env::var("MAOS_HOTSWAP_TO_MANIFEST")
+                .unwrap_or_else(|_| "spirits/hello-spirit/manifest.toml".into());
+
+            // Load a minimal placeholder spirit so resolve_pid succeeds.
+            struct PrecheckSpirit;
+            impl maos_spirit_abi::lifecycle::Spirit for PrecheckSpirit {}
+
+            let manifest = maos_kernel_core::scheduler::SpiritManifestBundle::default();
+            let _pid = scheduler
+                .load(&spirit_id, manifest, PrecheckSpirit, boot_nonce)
+                .await
+                .map_err(|e| format!("precheck: failed to load spirit: {e}"))?;
+
+            let verdict = hot_swap_coordinator
+                .precheck(&spirit_id, &to_manifest, &from_version)
+                .map_err(|e| format!("precheck failed: {e}"))?;
+
+            let json = serde_json::to_string(&verdict)
+                .map_err(|e| format!("verdict serialization failed: {e}"))?;
+            println!("{json}");
+
+            // Exit code: 0 for Safe*, 2 for violation (matches maosctl expectation).
+            let exit_code = match verdict.verdict {
+                maos_domain::hot_swap::PrecheckOutcome::SafeDrained
+                | maos_domain::hot_swap::PrecheckOutcome::SafeMigrated => 0,
+                _ => 2,
+            };
+
+            // Drain
+            drop(audit_tx);
+            drop(inference);
+            drop(capability);
+            if let Err(e) = audit_writer.await {
+                eprintln!("maos: audit writer task failed during drain: {e}");
+            }
+
+            eprintln!("maos: hot-swap-precheck {spirit_id} ({from_version} -> {to_manifest}) — verdict = {:?}", verdict.verdict);
+            std::process::exit(exit_code);
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }

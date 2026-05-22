@@ -26,6 +26,7 @@ fn mock_scb(pid: u32, weight: u8) -> Arc<SpiritControlBlock> {
     let manifest = SpiritManifestBundle {
         scheduling,
         lifecycle: LifecycleSection::default(),
+        ..Default::default()
     };
     let scb = SpiritControlBlock::new(
         pid,

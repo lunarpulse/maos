@@ -1,0 +1,19 @@
+{
+  "corpus_id": "halt-continuity-corpus-v0",
+  "version": "0.3-β",
+  "methodology": {
+    "tier": "scripted-v0",
+    "threat_model": "halt-set loss across hot-swap boundary",
+    "derivation": "ADR-019 (I14), ADR-017 (state transfer)",
+    "authoring_method": "scripted",
+    "reviewer_attestation": "Story 5.2 integration test",
+    "regeneration_seed": 0xDEAD_BEEF_HALT_01
+  },
+  "scenario_count": 12,
+  "pass_threshold": "100% (halt continuity is mechanical, not statistical)",
+  "references": [
+    "crates/maos-kernel-core/src/halt/mod.rs",
+    "crates/maos-domain/src/halt.rs",
+    "ADR-019"
+  ]
+}

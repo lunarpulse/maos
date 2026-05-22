@@ -486,3 +486,73 @@ pub const IAC_RT_BUCKETS_US: &[f64] = &[
     16000.0, 25000.0,
 ];
 ```
+
+## §4.1.2 Hot-Swap Coordinator — supervisor body (Story 5.2)
+
+The Hot-Swap Coordinator at `crates/maos-kernel-core/src/hot_swap/` implements
+ADR-017 (state-transfer wire format, binding-v0.3). It is part of the Spirit
+Scheduler supervisor per §4.0.2 line 47.
+
+### Coordinator shape
+
+`HotSwapCoordinator` holds Arc handles to all shared adapters (spirits map,
+HaltRegistry, CapabilityRegistryAdapter, IacBusAdapter, JournalAdapter,
+TransparencyLogAdapter, HookDispatcher, IacRtMetrics). Constructed exactly once at
+the composition root per the §A5 gate (no duplicate adapter instances).
+
+The 12-step `initiate_swap` protocol:
+1. Resolve spirit_id → predecessor_pid
+2. Snapshot predecessor SCB for saga rollback
+3. I14 gate — `validate_swap_halt_continuity` (Story 4.5 wrapper)
+4. Fire `on_swap_out` hook
+5. Call `snapshot()` → CBOR state blob
+6. Decode + validate envelope (same-major vs cross-major)
+7. Cross-major → `run_migrator`
+8. Atomic SCB swap under write-lock
+9. Fire `on_swap_in(payload)` hook
+10. Journal `LifecycleEvent::Swap`
+11. Spawn `PostSwapMonitor` (30s window)
+12. Return `HotSwapResult::Completed`
+
+### Saga compensating transactions (ADR-017)
+
+Three failure boundaries with three compensating arms:
+- **on_swap_out failure** → predecessor remains running (no compensation needed)
+- **on_swap_in failure** → restore `pre_swap_snapshot` to spirits map
+- **Post-swap invariant violation** → auto-revert within 30s
+
+### Post-swap monitor (NFR-Rel-5)
+
+Spawned at swap commit. Polls at 1s cadence for 30s. Checks:
+1. Halt-set delta — pending halts before swap ⊆ pending halts after
+2. Boot-nonce stability (defensive)
+3. Output-shape regression (sample 5 most-recent frames)
+
+`MAOS_AUTO_REVERT_FAST=1` collapses the window to 300ms for tests.
+
+### Cross-major migration (ADR-020)
+
+When schema_version major differs, the coordinator calls `run_migrator`:
+1. Verifies `[migrates_from].versions` contains predecessor_version
+2. Fires `migrate(predecessor_state)` hook on successor
+3. Returns `EMigratorMissing` if no migrator declared
+
+`matches_version_pattern` supports `"0.3.x"`-style wildcards.
+
+### ADR-036 precheck UX
+
+`HotSwapPrecheck::check` is a pure function (no kernel-state mutation).
+Wired through `maosctl spirit hot-swap-precheck <spirit> --from <ver> --to <manifest>`.
+Reporting-only at v0.3-β; Story 5.4's `maosctl spirit upgrade` calls this internally.
+
+### I14 halt-continuity enforcement
+
+`HotSwapCoordinator::initiate_swap` step 3 calls Story 4.5's
+`validate_swap_halt_continuity`. SafeDrained/SafeMigrated permits the swap;
+HaltContinuityError maps to `HotSwapError::HaltContinuityViolation`.
+
+### HSIS 300-corpus
+
+`crates/maos-eval/fixtures/hsis-corpus-v0/` hosts 6 classes × 50 = 300
+scenarios. Per-class pass threshold ≥95% (NFR-Rel-3), zero CVSS-7 violations.
+Measured by `crates/maos-eval/tests/hsis_runner.rs`.

@@ -1,0 +1,22 @@
+{
+  "corpus_id": "hsis-corpus-v0",
+  "version": "0.3-β",
+  "methodology": {
+    "tier": "scripted-v0",
+    "threat_model": "hot-swap invariant violation across 6 Spirit classes",
+    "derivation": "ADR-017, ADR-019, ADR-020",
+    "authoring_method": "scripted",
+    "reviewer_attestation": "Story 5.2",
+    "regeneration_seed": "0xHSIS_CORPUS_V0_0001"
+  },
+  "scenario_count": 300,
+  "class_list": ["butler", "researcher", "observer", "orchestrator", "worker", "cliwrapper"],
+  "per_class_count": 50,
+  "pass_threshold": "≥95% per class, zero CVSS-7 violations",
+  "categories": ["same_major_swap", "cross_major_migration", "halt_continuity", "output_shape_regression", "token_rebinding", "auto_revert_window"],
+  "carry_forward": "Story 4.5 hsis-researcher-observer-v0 corpus was never authored; Story 5.2 absorbs full 300",
+  "references": [
+    "ADR-017", "ADR-019", "ADR-020",
+    "crates/maos-kernel-core/src/hot_swap/"
+  ]
+}

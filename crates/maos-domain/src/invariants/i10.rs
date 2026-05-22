@@ -53,6 +53,12 @@ pub enum LifecycleEvent {
     /// Story 3.4 — director-initiated resume from paused state.
     /// Preserves existing discriminator values for wire stability.
     Resume = 8,
+    /// Story 5.2 — hot-swap aborted (swap-out failed, swap-in failed, or halt-continuity violation).
+    HotSwapAborted = 9,
+    /// Story 5.2 — hot-swap auto-reverted (post-swap invariant violation within 30s window).
+    HotSwapAutoReverted = 10,
+    /// Story 5.2 — hot-swap completed successfully.
+    HotSwap = 11,
 }
 
 /// A single journal entry — immutable record of a lifecycle transition.

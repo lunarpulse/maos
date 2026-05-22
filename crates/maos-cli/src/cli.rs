@@ -87,6 +87,9 @@ pub enum Subcommand {
     /// journaled to the Approval Decision Log with director identity +
     /// reason per FR42.
     RevokeToken(RevokeTokenArgs),
+    /// Spirit lifecycle operations (upgrade, hot-swap precheck, etc.).
+    /// Story 5.2 ships `hot-swap-precheck`; Story 5.4 ships `upgrade`.
+    Spirit(SpiritArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -274,4 +277,28 @@ pub struct RevokeTokenArgs {
     /// in the Approval Decision Log `reasoning` column per FR42.
     #[arg(long)]
     pub reason: Option<String>,
+}
+
+/// Story 5.2 — Spirit lifecycle operations.
+#[derive(clap::Args, Debug)]
+pub struct SpiritArgs {
+    #[command(subcommand)]
+    pub op: SpiritOp,
+}
+
+/// Spirit subcommands.
+#[derive(clap::Subcommand, Debug)]
+pub enum SpiritOp {
+    /// Run a hot-swap precondition check (ADR-036, REPORTING-ONLY at v0.3-β).
+    /// Prints JSON verdict to stdout. Exit 0 = safe; exit 2 = violation.
+    HotSwapPrecheck {
+        /// Spirit ID to check (e.g. "butler").
+        spirit: String,
+        /// Predecessor version string (e.g. "0.3.1").
+        #[arg(long)]
+        from: String,
+        /// Path to the successor's manifest TOML file.
+        #[arg(long)]
+        to: String,
+    },
 }

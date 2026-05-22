@@ -37,3 +37,6 @@ pub use crate::memory::for_spirit::SpiritMemoryView;
 // Story 4.4 — Log-recall + Distillate audit chain
 pub use crate::iac::log_recall::LogRecallAdapter;
 pub use crate::iac::distillate::DistillateWriter;
+
+// Story 5.2 — Hot-Swap Coordinator
+pub use crate::hot_swap::HotSwapCoordinator;

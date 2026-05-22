@@ -108,6 +108,7 @@ async fn five_verb_lifecycle_routes_through_scheduler() {
                 "on_unload".into(),
             ],
         },
+        ..Default::default()
     };
 
     // 1. Load

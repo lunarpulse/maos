@@ -19,6 +19,9 @@ const HOOK_NAMES: &[&str] = &[
     "on_resume",
     "on_unload",
     "on_consolidate",
+    "on_swap_out",
+    "snapshot",
+    "migrate",
 ];
 
 fn payload_type_for(hook: &str) -> Option<&str> {
@@ -223,6 +226,80 @@ pub fn spirit(attr: TokenStream, item: TokenStream) -> TokenStream {
         let wrapper_ident = format_ident!("__maos_spirit_vt_{}", hook_name);
         let field_ident = format_ident!("{}", hook_name);
         let is_declared = declared.iter().any(|n| n == hook_name);
+
+        // Story 5.2: snapshot and migrate have special signatures.
+        if hook_name == "snapshot" {
+            // snapshot returns Vec<u8>.
+            let vec_path = quote! { Vec<u8> };
+            let wrapper = if is_declared {
+                quote! {
+                    fn #wrapper_ident(s: &#self_ident, c: &mut #ctx_path) -> #vec_path {
+                        s.#hook_ident(c)
+                    }
+                }
+            } else {
+                quote! {
+                    fn #wrapper_ident(_s: &#self_ident, _c: &mut #ctx_path) -> #vec_path {
+                        Vec::new()
+                    }
+                }
+            };
+            vtable_wrappers.push(wrapper);
+            vtable_fields.push(quote! { #field_ident: #wrapper_ident });
+
+            let method = if is_declared {
+                quote! {
+                    fn #hook_ident(&self, ctx: &mut #ctx_path) -> #vec_path {
+                        self.#hook_ident(ctx)
+                    }
+                }
+            } else {
+                quote! {
+                    fn #hook_ident(&self, _ctx: &mut #ctx_path) -> #vec_path {
+                        Vec::new()
+                    }
+                }
+            };
+            trait_methods.push(method);
+            continue;
+        }
+
+        if hook_name == "migrate" {
+            // migrate takes &[u8] and returns Result<Vec<u8>, MigratorError>.
+            let migrator_err_path = quote! { maos_spirit_abi::lifecycle::MigratorError };
+            let vec_path = quote! { Vec<u8> };
+            let wrapper = if is_declared {
+                quote! {
+                    fn #wrapper_ident(s: &#self_ident, c: &mut #ctx_path, p: &[u8]) -> Result<#vec_path, #migrator_err_path> {
+                        s.#hook_ident(c, p)
+                    }
+                }
+            } else {
+                quote! {
+                    fn #wrapper_ident(_s: &#self_ident, _c: &mut #ctx_path, _p: &[u8]) -> Result<#vec_path, #migrator_err_path> {
+                        Err(#migrator_err_path::NotImplemented)
+                    }
+                }
+            };
+            vtable_wrappers.push(wrapper);
+            vtable_fields.push(quote! { #field_ident: #wrapper_ident });
+
+            let method = if is_declared {
+                quote! {
+                    fn #hook_ident(&self, ctx: &mut #ctx_path, predecessor_state: &[u8]) -> Result<#vec_path, #migrator_err_path> {
+                        self.#hook_ident(ctx, predecessor_state)
+                    }
+                }
+            } else {
+                quote! {
+                    fn #hook_ident(&self, _ctx: &mut #ctx_path, _predecessor_state: &[u8]) -> Result<#vec_path, #migrator_err_path> {
+                        Err(#migrator_err_path::NotImplemented)
+                    }
+                }
+            };
+            trait_methods.push(method);
+            continue;
+        }
 
         if let Some(payload_str) = payload_type_for(hook_name) {
             let payload_ty_ident = format_ident!("{}", payload_str);

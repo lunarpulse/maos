@@ -13,6 +13,7 @@ maos-spirit-abi = { path = "../maos-spirit-abi", features = ["mock"] }
 maos-providers = { path = "../maos-providers" }
 maos-director-surface = { path = "../maos-director-surface" }
 ciborium = "0.2"
+hex = "0.4"
 # Story 1b.1 — SQLite audit spine (Transparency Log + Approval Decision Log).
 # Bundled feature statically links libsqlite3-sys; no system libsqlite3 dep.
 # Eliminates per-host library-version drift risk (relevant to NFR-Onb-2).
@@ -84,4 +85,8 @@ harness = false
 
 [[bench]]
 name = "hello_spirit_p95"
+harness = false
+
+[[bench]]
+name = "hot_swap_latency"
 harness = false

@@ -1,0 +1,40 @@
+{
+  "scenario_id": "researcher/scenario-034",
+  "tier_tag": "scripted-v0",
+  "spirit_class": "researcher",
+  "swap_kind": "same_major",
+  "predecessor": {
+    "spirit_class": "researcher",
+    "version": "0.3.1",
+    "state_schema_version": 1,
+    "halt_protocol_version": 1,
+    "pending_halts": [
+      "halt-001",
+      "halt-002",
+      "halt-003",
+      "halt-004"
+    ]
+  },
+  "successor": {
+    "spirit_class": "researcher",
+    "version": "0.3.2",
+    "state_schema_version": 1,
+    "halt_protocol_compatibility": [
+      1
+    ],
+    "migrates_from": []
+  },
+  "preconditions": {
+    "spirit_pid": 134,
+    "swap_invariants": {
+      "open_pr_state": [],
+      "review_queue": []
+    }
+  },
+  "expected_outcome": {
+    "verdict": "SafeDrained",
+    "post_swap_invariants_held": true,
+    "auto_revert_fired": false,
+    "expected_error": null
+  }
+}

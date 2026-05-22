@@ -1,0 +1,1 @@
+state_schema_uri = "https://example.com/very/long/path/that/exceeds/normal/length/limits/but/is/still/technically/valid"

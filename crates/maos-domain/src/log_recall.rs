@@ -54,6 +54,7 @@ pub enum FrameKindLabel {
     Distillate,
     BudgetWarning,
     BudgetExceeded,
+    HotSwapAborted,
 }
 
 impl LogRecallFilter {

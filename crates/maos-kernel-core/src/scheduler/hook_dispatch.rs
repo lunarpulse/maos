@@ -283,6 +283,139 @@ impl HookDispatcher {
             .await
     }
 
+    /// Story 5.2 — Fire the on_swap_out hook on the predecessor.
+    pub async fn fire_on_swap_out(
+        &self,
+        scb: &SpiritControlBlock,
+    ) -> HookOutcome {
+        self.fire_no_payload_hook(scb, "on_swap_out", |obj, ctx| obj.on_swap_out(ctx))
+            .await
+    }
+
+    /// Story 5.2 — Fire the snapshot hook on the predecessor.
+    /// Returns the CBOR-encoded state blob on success.
+    pub async fn fire_snapshot(
+        &self,
+        scb: &SpiritControlBlock,
+    ) -> Result<Vec<u8>, HookOutcome> {
+        if !Self::hook_allowed(scb, "snapshot") {
+            return Err(HookOutcome::SkippedManifest);
+        }
+        let cap_seconds = self.time_cap_seconds;
+        let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
+        let spirit_obj = Arc::clone(&scb.spirit_obj);
+
+        let snapshot_future = timeout(
+            Duration::from_secs(cap_seconds),
+            tokio::task::spawn_blocking(move || {
+                let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
+                let mut kernel_ctx = KernelCtx::new(&mut ctx);
+                spirit_obj.snapshot(&mut kernel_ctx)
+            }),
+        );
+
+        let result = snapshot_future.await;
+        let wall_ns = crate::capability::cap_tokens::monotonic_now_ns() - wall_start;
+
+        // Determine telemetry outcome from the inner result, not the outer timeout.
+        let telemetry_outcome = match &result {
+            Ok(Ok(_)) => crate::telemetry::iac_rt::Outcome::Ok,
+            Ok(Err(_)) => crate::telemetry::iac_rt::Outcome::Err,
+            Err(_) => crate::telemetry::iac_rt::Outcome::Timeout,
+        };
+        self.metrics.record_iac_rt(
+            crate::telemetry::iac_rt::Service::SpiritScheduler,
+            telemetry_outcome,
+            wall_ns / 1000,
+        );
+
+        match result {
+            Ok(Ok(state_blob)) => Ok(state_blob),
+            Ok(Err(join_err)) => {
+                let msg = if let Ok(panic_msg) = join_err.try_into_panic() {
+                    if let Some(s) = panic_msg.downcast_ref::<String>() {
+                        s.clone()
+                    } else if let Some(s) = panic_msg.downcast_ref::<&str>() {
+                        s.to_string()
+                    } else {
+                        "unknown panic payload".into()
+                    }
+                } else {
+                    "spawn_blocking cancelled".into()
+                };
+                Err(HookOutcome::Panicked { panic_payload_preview: msg })
+            }
+            Err(_elapsed) => {
+                self.emit_budget_frame(scb, "snapshot", wall_ns, cap_seconds, crate::iac::transparency_log::FrameKind::BudgetExceeded);
+                Err(HookOutcome::BudgetExceeded { wall_ns, cap_seconds })
+            }
+        }
+    }
+
+    /// Story 5.2 — Fire the migrate hook on the successor.
+    /// Returns the migrated state blob on success.
+    pub async fn fire_migrate(
+        &self,
+        scb: &SpiritControlBlock,
+        predecessor_state: &[u8],
+    ) -> Result<Vec<u8>, maos_spirit_abi::lifecycle::MigratorError> {
+        if !Self::hook_allowed(scb, "migrate") {
+            return Err(maos_spirit_abi::lifecycle::MigratorError::new_internal("manifest does not permit migrate hook"));
+        }
+        let cap_seconds = self.time_cap_seconds;
+        let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
+        let spirit_obj = Arc::clone(&scb.spirit_obj);
+        let predecessor_state = predecessor_state.to_vec();
+
+        let migrate_future = timeout(
+            Duration::from_secs(cap_seconds),
+            tokio::task::spawn_blocking(move || {
+                let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
+                let mut kernel_ctx = KernelCtx::new(&mut ctx);
+                spirit_obj.migrate(&mut kernel_ctx, &predecessor_state)
+            }),
+        );
+
+        let result = migrate_future.await;
+        let wall_ns = crate::capability::cap_tokens::monotonic_now_ns() - wall_start;
+
+        // Determine telemetry outcome from the inner result, not the outer timeout.
+        let telemetry_outcome = match &result {
+            Ok(Ok(Ok(_))) => crate::telemetry::iac_rt::Outcome::Ok,
+            Ok(Ok(Err(_))) => crate::telemetry::iac_rt::Outcome::Err,
+            Ok(Err(_)) => crate::telemetry::iac_rt::Outcome::Err,
+            Err(_) => crate::telemetry::iac_rt::Outcome::Timeout,
+        };
+        self.metrics.record_iac_rt(
+            crate::telemetry::iac_rt::Service::SpiritScheduler,
+            telemetry_outcome,
+            wall_ns / 1000,
+        );
+
+        match result {
+            Ok(Ok(Ok(migrated_blob))) => Ok(migrated_blob),
+            Ok(Ok(Err(migrator_err))) => Err(migrator_err),
+            Ok(Err(join_err)) => {
+                let msg = if let Ok(panic_msg) = join_err.try_into_panic() {
+                    if let Some(s) = panic_msg.downcast_ref::<String>() {
+                        s.clone()
+                    } else if let Some(s) = panic_msg.downcast_ref::<&str>() {
+                        s.to_string()
+                    } else {
+                        "unknown panic payload".into()
+                    }
+                } else {
+                    "spawn_blocking cancelled".into()
+                };
+                Err(maos_spirit_abi::lifecycle::MigratorError::new_internal(format!("hook panicked: {msg}")))
+            }
+            Err(_elapsed) => {
+                self.emit_budget_frame(scb, "migrate", wall_ns, cap_seconds, crate::iac::transparency_log::FrameKind::BudgetExceeded);
+                Err(maos_spirit_abi::lifecycle::MigratorError::new_internal("migrate hook timed out"))
+            }
+        }
+    }
+
     async fn fire_no_payload_hook<F>(
         &self,
         scb: &SpiritControlBlock,

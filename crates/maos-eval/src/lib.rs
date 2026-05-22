@@ -16,8 +16,10 @@
 
 pub mod halt_corpus;
 pub mod termination_corpus;
-pub mod distillate_corpus;  // NEW — Story 4.4 five-metric distillation gate
-pub mod isolation_corpus;   // NEW — Story 4.5 cross-Spirit isolation 200-corpus
+pub mod distillate_corpus;         // NEW — Story 4.4 five-metric distillation gate
+pub mod isolation_corpus;          // NEW — Story 4.5 cross-Spirit isolation 200-corpus
+pub mod halt_continuity_corpus;    // NEW — Story 5.2 halt-continuity corpus (AC4)
+pub mod hsis_corpus;               // NEW — Story 5.2 HSIS 300-corpus (AC5)
 
 pub use halt_corpus::{HaltCorpus, HaltScenario, HaltScenarioOutcome};
 pub use termination_corpus::{TerminationCorpus, TerminationScenario, TerminationKind};

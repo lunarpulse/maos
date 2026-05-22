@@ -45,6 +45,7 @@ fn make_scb(enabled_hooks: Vec<String>) -> Arc<SpiritControlBlock> {
     let manifest = SpiritManifestBundle {
         scheduling: SchedulingSection::default(),
         lifecycle: LifecycleSection { enabled_hooks },
+        ..Default::default()
     };
     let scb = SpiritControlBlock::new(
         1,
@@ -94,6 +95,7 @@ async fn hook_exceeds_budget_and_returns_budget_exceeded() {
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_load".into()],
         },
+        ..Default::default()
     };
     let scb = SpiritControlBlock::new(
         1,

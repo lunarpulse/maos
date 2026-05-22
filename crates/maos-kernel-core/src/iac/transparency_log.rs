@@ -62,6 +62,8 @@ pub enum FrameKind {
     BudgetWarning = 12,
     /// Story 5.1 — BudgetExceeded IAC frame (100% of time_cap_seconds).
     BudgetExceeded = 13,
+    /// Story 5.2 — Hot-swap aborted (swap-out failed, swap-in failed, or auto-revert).
+    HotSwapAborted = 14,
 }
 
 impl FrameKind {
@@ -82,6 +84,7 @@ impl FrameKind {
             11 => Some(Self::Distillate),
             12 => Some(Self::BudgetWarning),
             13 => Some(Self::BudgetExceeded),
+            14 => Some(Self::HotSwapAborted),
             _ => None,
         }
     }

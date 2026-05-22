@@ -116,6 +116,7 @@ impl LogRecallAdapter {
             FrameKind::Distillate => DomainFrameKindLabel::Distillate,
             FrameKind::BudgetWarning => DomainFrameKindLabel::BudgetWarning,
             FrameKind::BudgetExceeded => DomainFrameKindLabel::BudgetExceeded,
+            FrameKind::HotSwapAborted => DomainFrameKindLabel::HotSwapAborted,
         }
     }
 
@@ -136,6 +137,7 @@ impl LogRecallAdapter {
             DomainFrameKindLabel::Distillate => FrameKind::Distillate,
             DomainFrameKindLabel::BudgetWarning => FrameKind::BudgetWarning,
             DomainFrameKindLabel::BudgetExceeded => FrameKind::BudgetExceeded,
+            DomainFrameKindLabel::HotSwapAborted => FrameKind::HotSwapAborted,
         }
     }
 

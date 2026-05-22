@@ -570,6 +570,35 @@ pub fn default_isolation_corpus_root() -> std::path::PathBuf {
     data_home.join("maos").join("isolation-corpus")
 }
 
+/// Resolve the default Spirit Archive root directory (Story 5.2).
+///
+/// Precedence (highest → lowest):
+///   1. `MAOS_ARCHIVE_DIR` env var
+///   2. `$XDG_DATA_HOME/maos/spirit-archives`
+///   3. `$HOME/.local/share/maos/spirit-archives`
+///   4. `/var/lib/maos/spirit-archives`
+pub fn default_archive_dir() -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Ok(p) = std::env::var("MAOS_ARCHIVE_DIR") {
+        if !p.is_empty() {
+            return PathBuf::from(p);
+        }
+        eprintln!("maos: MAOS_ARCHIVE_DIR is set but empty — falling through to default path");
+    }
+    let data_home = std::env::var("XDG_DATA_HOME")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .filter(|h| !h.is_empty())
+                .map(|h| PathBuf::from(h).join(".local").join("share"))
+        })
+        .unwrap_or_else(|| PathBuf::from("/var/lib"));
+    data_home.join("maos").join("spirit-archives")
+}
+
 /// Pure-function form of the precedence cascade — env values are passed in
 /// explicitly. Used by the inline tests on [`default_journal_path`] to drive
 /// every branch without mutating the process environment (forbidden under

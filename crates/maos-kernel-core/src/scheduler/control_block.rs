@@ -12,7 +12,7 @@ use maos_domain::lifecycle::{LifecycleError, SpiritLifecycleState};
 use maos_spirit_abi::lifecycle::Spirit;
 use crate::scheduler::kernel_ctx::KernelCtx;
 
-use crate::security::manifest::{LifecycleSection, SchedulingSection};
+use crate::security::manifest::{ClassSection, LifecycleSection, SchedulingSection};
 
 /// Kernel-side mirror of `maos_domain::lifecycle::SpiritLifecycleState`
 /// encoded as a `repr(u8)` for atomic CAS transitions.
@@ -74,6 +74,13 @@ pub trait AnySpiritObj: Send + Sync {
     fn on_resume(&self, ctx: &mut KernelCtx);
     fn on_unload(&self, ctx: &mut KernelCtx);
     fn on_consolidate(&self, ctx: &mut KernelCtx, payload: &[u8]);
+    /// Story 5.2 — swap-out preparation hook.
+    fn on_swap_out(&self, ctx: &mut KernelCtx);
+    /// Story 5.2 — state snapshot hook (returns CBOR-encoded state blob).
+    fn snapshot(&self, ctx: &mut KernelCtx) -> Vec<u8>;
+    /// Story 5.2 — cross-major migration hook.
+    fn migrate(&self, ctx: &mut KernelCtx, predecessor_state: &[u8])
+        -> Result<Vec<u8>, maos_spirit_abi::lifecycle::MigratorError>;
 }
 
 /// Wraps a concrete `T: Spirit` with its `SpiritVtable` into an `AnySpiritObj`.
@@ -151,6 +158,16 @@ impl<T: Spirit + Send + Sync + 'static> AnySpiritObj for VtableSpiritObj<T> {
             },
         );
     }
+    fn on_swap_out(&self, kctx: &mut KernelCtx) {
+        (self.vtable.on_swap_out)(&self.spirit, kctx.ctx);
+    }
+    fn snapshot(&self, kctx: &mut KernelCtx) -> Vec<u8> {
+        (self.vtable.snapshot)(&self.spirit, kctx.ctx)
+    }
+    fn migrate(&self, kctx: &mut KernelCtx, predecessor_state: &[u8])
+        -> Result<Vec<u8>, maos_spirit_abi::lifecycle::MigratorError> {
+        (self.vtable.migrate)(&self.spirit, kctx.ctx, predecessor_state)
+    }
 }
 
 /// Construct an `Arc<dyn AnySpiritObj>` from a concrete Spirit and its vtable.
@@ -166,6 +183,10 @@ pub fn make_spirit_obj<T: Spirit + Send + Sync + 'static>(
 pub struct SpiritManifestBundle {
     pub scheduling: SchedulingSection,
     pub lifecycle: LifecycleSection,
+    pub class: Option<ClassSection>,
+    pub hot_swap: Option<crate::security::manifest::HotSwapManifestSection>,
+    pub migrates_from: Option<crate::security::manifest::MigratesFromSection>,
+    pub halt_protocol_compatibility: Option<crate::security::manifest::HaltProtocolCompatibilitySection>,
 }
 
 impl Default for SpiritManifestBundle {
@@ -173,6 +194,10 @@ impl Default for SpiritManifestBundle {
         Self {
             scheduling: SchedulingSection::default(),
             lifecycle: LifecycleSection::default(),
+            class: None,
+            hot_swap: None,
+            migrates_from: None,
+            halt_protocol_compatibility: None,
         }
     }
 }

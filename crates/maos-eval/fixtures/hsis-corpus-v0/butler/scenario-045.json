@@ -1,0 +1,37 @@
+{
+  "scenario_id": "butler/scenario-045",
+  "tier_tag": "scripted-v0",
+  "spirit_class": "butler",
+  "swap_kind": "cross_major",
+  "predecessor": {
+    "spirit_class": "butler",
+    "version": "0.3.1",
+    "state_schema_version": 1,
+    "halt_protocol_version": 1,
+    "pending_halts": []
+  },
+  "successor": {
+    "spirit_class": "butler",
+    "version": "0.4.0",
+    "state_schema_version": 131072,
+    "halt_protocol_compatibility": [
+      1
+    ],
+    "migrates_from": [
+      "0.3.x"
+    ]
+  },
+  "preconditions": {
+    "spirit_pid": 145,
+    "swap_invariants": {
+      "open_pr_state": [],
+      "review_queue": []
+    }
+  },
+  "expected_outcome": {
+    "verdict": "SafeDrained",
+    "post_swap_invariants_held": true,
+    "auto_revert_fired": false,
+    "expected_error": null
+  }
+}

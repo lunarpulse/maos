@@ -41,6 +41,7 @@ fn make_scb(enabled_hooks: Vec<String>, idle_window_ms: u32) -> Arc<SpiritContro
             idle_window_ms,
         },
         lifecycle: LifecycleSection { enabled_hooks },
+        ..Default::default()
     };
     let scb = SpiritControlBlock::new(
         1,

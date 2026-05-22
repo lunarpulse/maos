@@ -1991,3 +1991,133 @@ homepage = "ftp://example.org""#;
         assert_eq!(s.enabled_hooks.len(), 11);
     }
 }
+
+// ------------------------------------------------------------------
+// Story 5.2: Hot-swap manifest sections
+// ------------------------------------------------------------------
+
+/// The `[hot_swap]` manifest section (Story 5.2).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HotSwapManifestSection {
+    pub state_schema_uri: String,
+    pub state_schema_version: u32,
+}
+
+/// The `[migrates_from]` manifest section (Story 5.2).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct MigratesFromSection {
+    pub versions: Vec<String>,
+}
+
+/// The `[halt_protocol_compatibility]` manifest section (Story 5.2).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HaltProtocolCompatibilitySection {
+    pub version: u32,
+}
+
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawHotSwapSection {
+    #[serde(default)]
+    state_schema_uri: String,
+    #[serde(default)]
+    state_schema_version: u32,
+}
+
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawMigratesFromSection {
+    #[serde(default)]
+    versions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawHaltProtocolSection {
+    #[serde(default)]
+    version: u32,
+}
+
+impl HotSwapManifestSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawHotSwapSection = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        if raw.state_schema_version == 0 {
+            return Err(ManifestError::Toml(validation_msg("hot_swap.state_schema_version", "must be > 0")));
+        }
+        Ok(Self {
+            state_schema_uri: raw.state_schema_uri,
+            state_schema_version: raw.state_schema_version,
+        })
+    }
+}
+
+impl MigratesFromSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawMigratesFromSection = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        for v in &raw.versions {
+            if v.is_empty() {
+                return Err(ManifestError::Toml(validation_msg("migrates_from.versions", "must be non-empty")));
+            }
+        }
+        Ok(Self { versions: raw.versions })
+    }
+}
+
+impl HaltProtocolCompatibilitySection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawHaltProtocolSection = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        if raw.version == 0 {
+            return Err(ManifestError::Toml(validation_msg("halt_protocol_compatibility.version", "must be > 0")));
+        }
+        Ok(Self { version: raw.version })
+    }
+}
+
+#[cfg(test)]
+mod hot_swap_manifest_tests {
+    use super::*;
+
+    #[test]
+    fn hot_swap_well_formed() {
+        let toml = r#"state_schema_uri = "https://example.com/schema"
+state_schema_version = 1"#;
+        let section = HotSwapManifestSection::from_toml_str(toml).unwrap();
+        assert_eq!(section.state_schema_version, 1);
+    }
+
+    #[test]
+    fn hot_swap_rejects_zero_schema_version() {
+        let toml = r#"state_schema_uri = ""
+state_schema_version = 0"#;
+        let result = HotSwapManifestSection::from_toml_str(toml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn migrates_from_well_formed() {
+        let toml = r#"versions = ["0.3.x", "0.4.0"]"#;
+        let section = MigratesFromSection::from_toml_str(toml).unwrap();
+        assert_eq!(section.versions.len(), 2);
+    }
+
+    #[test]
+    fn migrates_from_rejects_empty_version() {
+        let toml = r#"versions = [""]"#;
+        let result = MigratesFromSection::from_toml_str(toml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn halt_protocol_compat_well_formed() {
+        let toml = r#"version = 1"#;
+        let section = HaltProtocolCompatibilitySection::from_toml_str(toml).unwrap();
+        assert_eq!(section.version, 1);
+    }
+
+    #[test]
+    fn halt_protocol_compat_rejects_zero() {
+        let toml = r#"version = 0"#;
+        let result = HaltProtocolCompatibilitySection::from_toml_str(toml);
+        assert!(result.is_err());
+    }
+}

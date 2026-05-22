@@ -6,19 +6,17 @@
 //! Per architecture §5.3: "The Spirit ABI is the contract between the
 //! kernel and a Spirit. Every Spirit conforms to it."
 //!
-//! This module ships the **11-hook signature set** per FR55. The 3
-//! deferred hooks from the architecture §5.3 14-hook list are:
+//! This module ships the **14-hook signature set** per FR55 (Story 5.2
+//! extended from the original 11). The 1 deferred hook from the
+//! architecture §5.3 14-hook list is:
 //!
 //! | Hook | Deferred to | Reason |
 //! |---|---|---|
-//! | `on_swap_out` | Story 5.2 | Hot-swap state transfer |
-//! | `snapshot` | Story 5.2 | Hot-swap state capture |
-//! | `migrate` | Story 5.2 | Hot-swap state consume |
 //! | `epistemic_resolve` | Story 4.1 | Halt-protocol resolution |
 //!
-//! Runtime hook firing ships in Story 5.1 (full lifecycle verbs and
-//! 11-trigger firing with priority-weighted scheduling). This story
-//! provides the trait contract only.
+//! Story 5.1 shipped the runtime firing for 11 hooks. Story 5.2 adds
+//! the hot-swap hooks (`on_swap_out`, `snapshot`, `migrate`) with full
+//! dispatcher integration, bringing the total to 14.
 //!
 //! ADR-002 (Spirit form at v0.1): The trait signature serves both
 //! `rust-inproc` and `subprocess` forms. The `CancellationSignal`
@@ -100,10 +98,11 @@ pub enum HookBudgetKey {
 // ------------------------------------------------------------------
 
 /// Count of hook methods on the `Spirit` trait (per FR55).
+/// Story 5.2 extends from 11 to 14 (adding `on_swap_out`, `snapshot`, `migrate`).
 #[doc(hidden)]
 #[macro_export]
 macro_rules! count_hooks {
-    () => { 11 };
+    () => { 14 };
 }
 
 // ------------------------------------------------------------------
@@ -118,19 +117,22 @@ macro_rules! count_hooks {
 ///
 /// # Firing semantics (architecture §5.3 references)
 ///
-/// | Hook | Fires when… | Payload |
-/// |---|---|---|
-/// | `on_load` | Spirit is admitted and loaded (§5.3.1) | — |
-/// | `on_start` | Spirit receives first `Start` verb (§5.3.2) | — |
-/// | `on_frame` | IAC frame arrives (§5.3.3) | `FramePayload` |
-/// | `on_idle` | No frames for ≥ idle_timeout_ms (§5.3.4) | — |
-/// | `on_telemetry_event` | Scalar-tap event fires (§5.3.5) | `TelemetryEventPayload` |
-/// | `on_schedule` | Scheduled invocation fires (§5.3.6) | `SchedulePayload` |
-/// | `on_swap_in` | Predecessor state arrives (§5.3.7) | `SwapInPayload` |
-/// | `on_pause` | Kernel pauses Spirit (§5.3.8) | — |
-/// | `on_resume` | Kernel resumes Spirit (§5.3.9) | — |
-/// | `on_unload` | Spirit receives `Unload` verb (§5.3.10) | — |
-/// | `on_consolidate` | Batch window closes (§5.3.11) | `ConsolidatePayload` |
+/// | Hook | Fires when… | Payload | Implemented at |
+/// |---|---|---|---|
+/// | `on_load` | Spirit is admitted and loaded (§5.3.1) | — | Story 2.1 |
+/// | `on_start` | Spirit receives first `Start` verb (§5.3.2) | — | Story 2.1 |
+/// | `on_frame` | IAC frame arrives (§5.3.3) | `FramePayload` | Story 2.1 |
+/// | `on_idle` | No frames for ≥ idle_timeout_ms (§5.3.4) | — | Story 2.1 |
+/// | `on_telemetry_event` | Scalar-tap event fires (§5.3.5) | `TelemetryEventPayload` | Story 2.1 |
+/// | `on_schedule` | Scheduled invocation fires (§5.3.6) | `SchedulePayload` | Story 2.1 |
+/// | `on_swap_in` | Predecessor state arrives (§5.3.7) | `SwapInPayload` | Story 2.1 |
+/// | `on_pause` | Kernel pauses Spirit (§5.3.8) | — | Story 2.1 |
+/// | `on_resume` | Kernel resumes Spirit (§5.3.9) | — | Story 2.1 |
+/// | `on_unload` | Spirit receives `Unload` verb (§5.3.10) | — | Story 2.1 |
+/// | `on_consolidate` | Batch window closes (§5.3.11) | `ConsolidatePayload` | Story 2.1 |
+/// | `on_swap_out` | Spirit is about to be swapped out (§5.3.12) | — | Story 5.2 ✅ |
+/// | `snapshot` | Produce state snapshot for hot-swap (§5.3.13) | — (returns `Vec<u8>`) | Story 5.2 ✅ |
+/// | `migrate` | Cross-major migration entry (§5.3.14) | predecessor_state `&[u8]` (returns `Result<Vec<u8>, MigratorError>`) | Story 5.2 ✅ |
 ///
 /// All hooks receive a `&mut Ctx` carrying the cancellation signal,
 /// capability handle, and mailbox handle.
@@ -179,7 +181,80 @@ pub trait Spirit {
     /// Fired when a batch window closes; a summary is delivered.
     /// §5.3.11 — Consolidate
     fn on_consolidate<'a>(&self, ctx: &mut Ctx, payload: &ConsolidatePayload<'a>) {}
+
+    /// Fired when the kernel is about to swap this Spirit OUT (predecessor).
+    /// §5.3 line 187 — Swap-out preparation.
+    /// Default: no-op. Override to enumerate in-flight tokens, flush state.
+    /// Implemented at Story 5.2.
+    fn on_swap_out(&self, ctx: &mut Ctx) {}
+
+    /// Produce a CBOR-encoded state snapshot for hot-swap.
+    /// §5.3 line 189 — Snapshot.
+    /// Default: returns an empty Vec (signals "no state to preserve").
+    /// Override to serialize state per `[hot_swap].state_schema_version`.
+    /// Implemented at Story 5.2.
+    fn snapshot(&self, ctx: &mut Ctx) -> alloc::vec::Vec<u8> {
+        alloc::vec::Vec::new()
+    }
+
+    /// Cross-major migration entry point.
+    /// §5.3 line 190 — Migrate.
+    /// Default: returns `Err(MigratorError::NotImplemented)`.
+    /// Override to translate predecessor schema to this class's schema.
+    /// Implemented at Story 5.2.
+    fn migrate(&self, ctx: &mut Ctx, predecessor_state: &[u8]) -> Result<alloc::vec::Vec<u8>, MigratorError> {
+        let _ = predecessor_state;
+        let _ = ctx;
+        Err(MigratorError::NotImplemented)
+    }
 }
+
+/// Cross-major migration error — returned by `Spirit::migrate`.
+///
+/// `#[non_exhaustive]` lets future stories add variants without an ABI bump.
+/// Hand-rolled Display impl because `maos-spirit-abi` is `#![no_std]`
+/// with minimal dependencies (only `serde`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MigratorError {
+    #[doc = "Construct via [`MigratorError::new_malformed`] to enforce validation; struct literals bypass non-empty message integrity check."]
+    NotImplemented,
+    #[doc = "Construct via [`MigratorError::new_malformed`] to enforce validation; struct literals bypass non-empty message integrity check."]
+    Malformed(alloc::string::String),
+    #[doc = "Construct via [`MigratorError::new_internal`] to enforce validation; struct literals bypass non-empty message integrity check."]
+    Internal(alloc::string::String),
+}
+
+impl MigratorError {
+    pub fn new_malformed(msg: impl Into<alloc::string::String>) -> Self {
+        let msg = msg.into();
+        if msg.is_empty() {
+            return Self::Malformed(alloc::string::String::from("(empty)"));
+        }
+        Self::Malformed(msg)
+    }
+
+    pub fn new_internal(msg: impl Into<alloc::string::String>) -> Self {
+        let msg = msg.into();
+        if msg.is_empty() {
+            return Self::Internal(alloc::string::String::from("(empty)"));
+        }
+        Self::Internal(msg)
+    }
+}
+
+impl core::fmt::Display for MigratorError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NotImplemented => write!(f, "migrator not implemented (default no-op)"),
+            Self::Malformed(msg) => write!(f, "predecessor state malformed: {msg}"),
+            Self::Internal(msg) => write!(f, "migration logic failed: {msg}"),
+        }
+    }
+}
+
+// `core::error::Error` available in core since Rust 1.81.
+// Omitted to maintain maximum compatibility; `Display` + `Debug` suffices.
 
 // ------------------------------------------------------------------
 // SpiritVtable — per-hook function-pointer dispatch table
@@ -211,6 +286,12 @@ pub struct SpiritVtable<T: Spirit + 'static> {
     pub on_resume: fn(&T, &mut Ctx),
     pub on_unload: fn(&T, &mut Ctx),
     pub on_consolidate: for<'a> fn(&T, &mut Ctx, &ConsolidatePayload<'a>),
+    /// Story 5.2 — swap-out preparation hook.
+    pub on_swap_out: fn(&T, &mut Ctx),
+    /// Story 5.2 — state snapshot hook (returns CBOR-encoded state blob).
+    pub snapshot: fn(&T, &mut Ctx) -> alloc::vec::Vec<u8>,
+    /// Story 5.2 — cross-major migration hook.
+    pub migrate: fn(&T, &mut Ctx, &[u8]) -> Result<alloc::vec::Vec<u8>, MigratorError>,
     #[doc(hidden)]
     pub _phantom: PhantomData<T>,
 }
@@ -233,6 +314,9 @@ impl<T: Spirit + 'static> SpiritVtable<T> {
         fn on_resume_f<T: Spirit>(s: &T, c: &mut Ctx) { s.on_resume(c); }
         fn on_unload_f<T: Spirit>(s: &T, c: &mut Ctx) { s.on_unload(c); }
         fn on_consolidate_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &ConsolidatePayload<'a>) { s.on_consolidate(c, p); }
+        fn on_swap_out_f<T: Spirit>(s: &T, c: &mut Ctx) { s.on_swap_out(c); }
+        fn snapshot_f<T: Spirit>(s: &T, c: &mut Ctx) -> alloc::vec::Vec<u8> { s.snapshot(c) }
+        fn migrate_f<T: Spirit>(s: &T, c: &mut Ctx, p: &[u8]) -> Result<alloc::vec::Vec<u8>, MigratorError> { s.migrate(c, p) }
 
         Self {
             on_load:           on_load_f::<T>,
@@ -246,6 +330,9 @@ impl<T: Spirit + 'static> SpiritVtable<T> {
             on_resume:         on_resume_f::<T>,
             on_unload:         on_unload_f::<T>,
             on_consolidate:    on_consolidate_f::<T>,
+            on_swap_out:       on_swap_out_f::<T>,
+            snapshot:           snapshot_f::<T>,
+            migrate:            migrate_f::<T>,
             _phantom: PhantomData,
         }
     }
@@ -276,6 +363,7 @@ pub fn kernel_invocation_allowed(enabled_hooks: &[&str], hook_name: &str) -> boo
 mod tests {
     use super::*;
     use crate::cancellation::NeverCancel;
+    use alloc::vec::Vec;
 
     struct TestSpirit {
         called: core::cell::Cell<u32>,
@@ -310,7 +398,7 @@ mod tests {
 
     #[test]
     fn const_assert_hook_count_matches_fr55() {
-        assert_eq!(count_hooks!(), 11, "FR55 mandates exactly 11 hooks");
+        assert_eq!(count_hooks!(), 14, "FR55 mandates exactly 14 hooks (Story 5.2 extended from 11)");
     }
 
     #[test]
@@ -350,6 +438,13 @@ mod tests {
         s.on_pause(&mut ctx);
         s.on_resume(&mut ctx);
         s.on_unload(&mut ctx);
+        // Story 5.2: three new hooks with default bodies.
+        s.on_swap_out(&mut ctx);
+        assert_eq!(s.snapshot(&mut ctx), Vec::new());
+        assert!(matches!(
+            s.migrate(&mut ctx, b"test"),
+            Err(MigratorError::NotImplemented)
+        ));
     }
 
     #[test]

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::accessibility::ColorChoice;
-use crate::cli::{AuditFormat, AuditQuery, HaltArgs, HaltOp, InstallArgs, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs, RevokeTokenArgs, RunArgs, Subcommand};
+use crate::cli::{AuditFormat, AuditQuery, HaltArgs, HaltOp, InstallArgs, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs, RevokeTokenArgs, RunArgs, SpiritArgs, SpiritOp, Subcommand};
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
     match cmd {
@@ -22,6 +22,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Pause(args) => dispatch_pause(args, color),
         Subcommand::Resume(args) => dispatch_resume(args, color),
         Subcommand::RevokeToken(args) => dispatch_revoke_token(args, color),
+        Subcommand::Spirit(args) => dispatch_spirit(args, color),
     }
 }
 
@@ -411,6 +412,47 @@ fn dispatch_revoke_token(args: &RevokeTokenArgs, color: ColorChoice) -> ExitCode
         Err(e) => {
             eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
             ExitCode::from(2)
+        }
+    }
+}
+
+fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
+    match &args.op {
+        SpiritOp::HotSwapPrecheck { spirit, from, to } => {
+            if let Err(diag) = resolve_spirit_pid(spirit) {
+                eprintln!("maosctl: spirit hot-swap-precheck — {diag}");
+                return ExitCode::from(1);
+            }
+            if from.is_empty() {
+                eprintln!("maosctl: spirit hot-swap-precheck — --from version must be non-empty");
+                return ExitCode::from(2);
+            }
+            // Check the --to manifest path exists.
+            let manifest_path = std::path::Path::new(to);
+            if !manifest_path.exists() {
+                eprintln!("maosctl: spirit hot-swap-precheck — manifest file not found: {to}");
+                return ExitCode::from(1);
+            }
+
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "hot-swap-precheck");
+            cmd.env("MAOS_SPIRIT_ID", spirit);
+            cmd.env("MAOS_HOTSWAP_FROM_VERSION", from);
+            cmd.env("MAOS_HOTSWAP_TO_MANIFEST", to);
+
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+
+            match cmd.status() {
+                Ok(s) if s.success() => ExitCode::SUCCESS,
+                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+                Err(e) => {
+                    eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+                    ExitCode::from(2)
+                }
+            }
         }
     }
 }
