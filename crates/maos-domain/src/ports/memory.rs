@@ -7,8 +7,8 @@
 
 use crate::invariants::i5::{MemoryScope, NamespaceKey};
 use crate::memory::{
-    ExportEntry, ForgetReceipt, MemoryEntry, MemoryError, MemoryNamespace, MemoryTier,
-    MemoryValue, PrincipalIndexRow,
+    ExportEntry, ForgetReceipt, MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue,
+    PrincipalIndexRow,
 };
 
 /// Memory Manager — namespace scope enforcement and tiered memory.
@@ -79,10 +79,7 @@ pub trait MemoryManagerPort {
     /// Subject-access query per ADR-026 — returns every `(writer_spirit_pid,
     /// schema, key, timestamp_ns)` indexed for the given `principal_id`
     /// across ALL Spirits on this Host.  Carries NO content.
-    fn subject_access(
-        &self,
-        principal_id: &str,
-    ) -> Result<Vec<PrincipalIndexRow>, MemoryError>;
+    fn subject_access(&self, principal_id: &str) -> Result<Vec<PrincipalIndexRow>, MemoryError>;
 
     /// Class: supervision
     ///

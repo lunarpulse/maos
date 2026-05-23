@@ -36,7 +36,11 @@ pub struct ManifestSelfCheckReport {
 pub enum ManifestSelfCheckViolation {
     TomlParseError(String),
     MissingRequiredSection(&'static str),
-    InvalidValue { field: &'static str, value: String, reason: &'static str },
+    InvalidValue {
+        field: &'static str,
+        value: String,
+        reason: &'static str,
+    },
 }
 
 #[derive(Deserialize)]
@@ -49,13 +53,40 @@ struct ManifestMinimalShape {
     resources: Option<ResourcesSection>,
     sandbox: SandboxSection,
 }
-#[derive(Deserialize)] struct ClassSection { name: String, version: String, forms: Vec<String>, trust_tier: String }
-#[derive(Deserialize)] struct CapabilitiesSection { required: Option<toml::Table> }
-#[derive(Deserialize)] struct PostureSection { default: String, allowed_max: String }
-#[derive(Deserialize)] struct OutputShapeSection { required_fields: Vec<String> }
-#[derive(Deserialize)] struct BudgetSection { context_window_size: Option<u32>, time_cap_seconds: Option<u32> }
-#[derive(Deserialize)] struct ResourcesSection { cpu_max_pct: Option<u32>, memory_max_mb: Option<u32> }
-#[derive(Deserialize)] struct SandboxSection { tier: String }
+#[derive(Deserialize)]
+struct ClassSection {
+    name: String,
+    version: String,
+    forms: Vec<String>,
+    trust_tier: String,
+}
+#[derive(Deserialize)]
+struct CapabilitiesSection {
+    required: Option<toml::Table>,
+}
+#[derive(Deserialize)]
+struct PostureSection {
+    default: String,
+    allowed_max: String,
+}
+#[derive(Deserialize)]
+struct OutputShapeSection {
+    required_fields: Vec<String>,
+}
+#[derive(Deserialize)]
+struct BudgetSection {
+    context_window_size: Option<u32>,
+    time_cap_seconds: Option<u32>,
+}
+#[derive(Deserialize)]
+struct ResourcesSection {
+    cpu_max_pct: Option<u32>,
+    memory_max_mb: Option<u32>,
+}
+#[derive(Deserialize)]
+struct SandboxSection {
+    tier: String,
+}
 
 pub fn manifest_self_check(
     manifest_toml_bytes: &[u8],
@@ -72,7 +103,9 @@ pub fn manifest_self_check(
     } else {
         for (i, form) in parsed.class.forms.iter().enumerate() {
             if form.is_empty() {
-                warnings.push(format!("class.forms[{i}] is empty — Spirit cannot be loaded in an unnamed form"));
+                warnings.push(format!(
+                    "class.forms[{i}] is empty — Spirit cannot be loaded in an unnamed form"
+                ));
             }
         }
     }
@@ -94,7 +127,10 @@ pub fn manifest_self_check(
             }
         }
     }
-    if !matches!(parsed.sandbox.tier.as_str(), "T0" | "T1" | "T2" | "T3" | "T4") {
+    if !matches!(
+        parsed.sandbox.tier.as_str(),
+        "T0" | "T1" | "T2" | "T3" | "T4"
+    ) {
         return Err(ManifestSelfCheckViolation::InvalidValue {
             field: "sandbox.tier",
             value: parsed.sandbox.tier.clone(),
@@ -107,13 +143,17 @@ pub fn manifest_self_check(
         class_version: parsed.class.version,
         forms: parsed.class.forms,
         trust_tier: parsed.class.trust_tier,
-        capabilities_required_count: parsed.capabilities
+        capabilities_required_count: parsed
+            .capabilities
             .and_then(|c| c.required)
             .map(|t| t.len())
             .unwrap_or(0),
         posture_default: parsed.posture.default,
         posture_allowed_max: parsed.posture.allowed_max,
-        output_shape_required_fields: parsed.output_shape.map(|o| o.required_fields).unwrap_or_default(),
+        output_shape_required_fields: parsed
+            .output_shape
+            .map(|o| o.required_fields)
+            .unwrap_or_default(),
         budget_context_window_size: parsed.budget.as_ref().and_then(|b| b.context_window_size),
         budget_time_cap_seconds: parsed.budget.as_ref().and_then(|b| b.time_cap_seconds),
         resources_cpu_max_pct: parsed.resources.as_ref().and_then(|r| r.cpu_max_pct),

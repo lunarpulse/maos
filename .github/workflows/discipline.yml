@@ -753,6 +753,48 @@ jobs:
       - name: Run halt receipt production rate test
         run: cargo test -p maos-kernel-core --test halt_receipt_production_rate --release
 
+  # Story 5.4 — NFR-Rel-9 revocation propagation ≤5s p99
+  nfr-rel-9-revocation-5s-p99:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run revocation propagation bench
+        run: cargo bench -p maos-kernel-core --bench revocation_propagation_p99
+
+  # Story 5.4 — upgrade policy corpus (AC1 + AC2 + AC3 + AC4)
+  upgrade-policy-corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run upgrade policy integration tests
+        run: cargo test -p maos-kernel-core --test upgrade_orchestrator_three_policies --release
+
+  # Story 5.4 — revocation corpus (AC5)
+  revocation-corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run revocation pipeline integration tests
+        run: cargo test -p maos-kernel-core --test revocation_applier_pipeline --release
+
   # Determinism integration tests for maos-corpus-gen — non-blocking at v0.1-α per DF6
   # (deferred-work.md). Promotes to blocking when NFR-Sec-4 redaction filter ships (v0.5).
   # The job always reports success at the GitHub Actions level; the underlying test
@@ -787,7 +829,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus]
     if: always()
     permissions:
       pull-requests: write

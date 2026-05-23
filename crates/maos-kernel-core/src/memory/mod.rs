@@ -12,35 +12,33 @@
 //! - ADR-026 (Principal Memory Namespace, binding-v0.5)
 //! - §9.2 (memory.md universal-cohort convention)
 
-pub mod private;
-pub mod shared;
-pub mod principal;
-pub mod self_telemetry;
 pub mod for_spirit;
+pub mod principal;
+pub mod private;
+pub mod self_telemetry;
+pub mod shared;
 
 pub use maos_domain::ports::MemoryManagerPort;
 
-pub use private::PrivateMemoryStore;
-pub use shared::SharedMemoryStore;
 pub use principal::PrincipalNamespaceIndex;
+pub use private::PrivateMemoryStore;
 pub use self_telemetry::SelfTelemetryAggregator;
+pub use shared::SharedMemoryStore;
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
+#[cfg(feature = "spirit_test")]
+use maos_spirit_sdk::spirit_test::{AttemptResult, IsolationHookPoint, ObservationResult};
 #[cfg(feature = "spirit_test")]
 use parking_lot::Mutex;
-#[cfg(feature = "spirit_test")]
-use maos_spirit_sdk::spirit_test::{
-    IsolationHookPoint, AttemptResult, ObservationResult,
-};
 
+use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::memory::{
     ExportEntry, ExportPayload, ForgetReceipt, MemoryEntry, MemoryError, MemoryNamespace,
     MemoryTier, MemoryValue, PrincipalIndexRow,
 };
-use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 
 // Re-exports above make PrivateMemoryStore, SharedMemoryStore,
 // PrincipalNamespaceIndex available in this module scope.
@@ -50,7 +48,9 @@ use maos_domain::invariants::i5::{MemoryScope, NamespaceKey};
 
 /// Production Memory Manager adapter — implements `MemoryManagerPort`
 /// with three-tier memory, Principal Namespace index, and I5 enforcement.
-#[maos_attrs::i9_exempt(reason = "memory manager three-tier substrate — bounded by principal forget-cascade + per-Spirit memory budget; per-Spirit-keyed map / per-Spirit-namespaced filesystem / sqlite table for ADR-026 principal namespace + I5 isolation; parallel to the capability registry's per-Spirit token state, not pattern-learning")]
+#[maos_attrs::i9_exempt(
+    reason = "memory manager three-tier substrate — bounded by principal forget-cascade + per-Spirit memory budget; per-Spirit-keyed map / per-Spirit-namespaced filesystem / sqlite table for ADR-026 principal namespace + I5 isolation; parallel to the capability registry's per-Spirit token state, not pattern-learning"
+)]
 pub struct MemoryManagerAdapter {
     private: Arc<PrivateMemoryStore>,
     shared: Arc<SharedMemoryStore>,
@@ -91,20 +91,13 @@ impl MemoryManagerAdapter {
     /// Story 4.3 — attach an isolation hook for the `spirit_test` feature.
     /// Only available when the `spirit_test` feature is enabled.
     #[cfg(feature = "spirit_test")]
-    pub fn with_isolation_hook(
-        mut self,
-        hook: Arc<Mutex<dyn IsolationHookPoint + Send>>,
-    ) -> Self {
+    pub fn with_isolation_hook(mut self, hook: Arc<Mutex<dyn IsolationHookPoint + Send>>) -> Self {
         self.isolation_hook = Some(hook);
         self
     }
 
     #[cfg(feature = "spirit_test")]
-    fn fire_isolation_hooks(
-        &self,
-        case_id: &str,
-        attempt_ok: bool,
-    ) {
+    fn fire_isolation_hooks(&self, case_id: &str, attempt_ok: bool) {
         if let Some(hook) = &self.isolation_hook {
             let mut h = hook.lock();
             let _ = h.before_spirit_a_attempt(case_id);
@@ -174,13 +167,17 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         value: MemoryValue,
     ) -> Result<(), MemoryError> {
         #[cfg(feature = "spirit_test")]
-        let case_id = format!("memory.write:{spirit_pid}:{:?}:{key}", namespace.kind_label());
+        let case_id = format!(
+            "memory.write:{spirit_pid}:{:?}:{key}",
+            namespace.kind_label()
+        );
         #[cfg(feature = "spirit_test")]
         self.fire_isolation_hooks(&case_id, true);
 
         match tier {
             MemoryTier::Private => {
-                self.private.write(spirit_pid, namespace, key, value.clone())?;
+                self.private
+                    .write(spirit_pid, namespace, key, value.clone())?;
                 // If this is a principal-tagged write, record in the index.
                 if let MemoryNamespace::Principal {
                     principal_id,
@@ -188,19 +185,12 @@ impl MemoryManagerPort for MemoryManagerAdapter {
                 } = namespace
                 {
                     let ts = Self::now_ns();
-                    self.principal_index.record_write(
-                        principal_id,
-                        spirit_pid,
-                        schema,
-                        key,
-                        ts,
-                    )?;
+                    self.principal_index
+                        .record_write(principal_id, spirit_pid, schema, key, ts)?;
                 }
                 Ok(())
             }
-            MemoryTier::Shared => {
-                self.shared.write(spirit_pid, namespace, key, value)
-            }
+            MemoryTier::Shared => self.shared.write(spirit_pid, namespace, key, value),
             MemoryTier::Collective => Err(MemoryError::CollectiveNotYetAvailable {
                 ship_target: "v1.5",
                 landing_story: "E10 Story 10.4",
@@ -216,7 +206,10 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         key: &str,
     ) -> Result<Option<MemoryValue>, MemoryError> {
         #[cfg(feature = "spirit_test")]
-        let case_id = format!("memory.read:{spirit_pid}:{:?}:{key}", namespace.kind_label());
+        let case_id = format!(
+            "memory.read:{spirit_pid}:{:?}:{key}",
+            namespace.kind_label()
+        );
         #[cfg(feature = "spirit_test")]
         self.fire_isolation_hooks(&case_id, true);
 
@@ -239,7 +232,10 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         limit: usize,
     ) -> Result<Vec<MemoryEntry>, MemoryError> {
         #[cfg(feature = "spirit_test")]
-        let case_id = format!("memory.scan:{spirit_pid}:{:?}:{prefix}", namespace.kind_label());
+        let case_id = format!(
+            "memory.scan:{spirit_pid}:{:?}:{prefix}",
+            namespace.kind_label()
+        );
         #[cfg(feature = "spirit_test")]
         self.fire_isolation_hooks(&case_id, true);
 
@@ -253,10 +249,7 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         }
     }
 
-    fn subject_access(
-        &self,
-        principal_id: &str,
-    ) -> Result<Vec<PrincipalIndexRow>, MemoryError> {
+    fn subject_access(&self, principal_id: &str) -> Result<Vec<PrincipalIndexRow>, MemoryError> {
         self.principal_index.lookup(principal_id)
     }
 
@@ -466,8 +459,13 @@ mod tests {
         let (adapter, _tmp) = make_adapter();
         let view = adapter.for_spirit(7);
         let val = MemoryValue::Text("pid-7".into());
-        view.write(MemoryTier::Private, &MemoryNamespace::Default, "k", val.clone())
-            .unwrap();
+        view.write(
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "k",
+            val.clone(),
+        )
+        .unwrap();
         let got = view
             .read(MemoryTier::Private, &MemoryNamespace::Default, "k")
             .unwrap();

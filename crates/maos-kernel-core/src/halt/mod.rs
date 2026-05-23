@@ -14,26 +14,26 @@
 //! - ADR-022 (tagged-scalar slot) — referenced from `invoke_halt`
 //! - §4.0.7 (kernel does NOT interpret tag semantics) — `invoke_halt` doc-comment
 
-pub mod resolver;
 pub mod output_markers;
+pub mod resolver;
 pub mod termination;
-pub use resolver::{MockHaltResolver, FailingHaltResolver, KernelHaltResolver};
 pub use maos_domain::halt::{HaltResolver, ResolveError};
 pub use output_markers::OutputMarkerRegistry;
+pub use resolver::{FailingHaltResolver, KernelHaltResolver, MockHaltResolver};
 pub use termination::terminate_spirit;
 
-use std::sync::RwLock;
-use std::collections::HashMap;
+use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+use crate::journal::JournalAdapter;
+use maos_domain::frame::EpistemicHaltPayload;
 use maos_domain::halt::{
-    HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState, HaltContinuityError,
+    HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
     InvokeHaltError, Resolution,
 };
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i4::ApprovalDecision;
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
-use maos_domain::frame::EpistemicHaltPayload;
-use crate::iac::transparency_log::{TransparencyLogAdapter, FrameKind};
-use crate::journal::JournalAdapter;
+use std::collections::HashMap;
+use std::sync::RwLock;
 
 /// Journal a halt resolution to the Approval Decision Log (Story 3.3, AC4).
 ///
@@ -56,11 +56,17 @@ pub fn journal_halt_resolution(
     resolution: &Resolution,
 ) -> Result<(), HaltJournalError> {
     let reasoning = match resolution {
-        Resolution::ProvidedContext { text } => Some(format!("halt={}: provided_context: {text}", halt_id.as_str())),
+        Resolution::ProvidedContext { text } => Some(format!(
+            "halt={}: provided_context: {text}",
+            halt_id.as_str()
+        )),
         Resolution::AcceptedHalt => Some(format!("halt={}: accepted_halt", halt_id.as_str())),
-        Resolution::AuthorizedOverride { operator_policy_ref } => {
-            Some(format!("halt={}: authorized_override: operator_policy_ref={operator_policy_ref}", halt_id.as_str()))
-        }
+        Resolution::AuthorizedOverride {
+            operator_policy_ref,
+        } => Some(format!(
+            "halt={}: authorized_override: operator_policy_ref={operator_policy_ref}",
+            halt_id.as_str()
+        )),
     };
     log.insert_approval_decision(ApprovalDecision {
         actor: actor.into(),
@@ -97,7 +103,9 @@ impl HaltJournal for TransparencyLogAdapter {
 /// per-Spirit halt-set size (typically < 100 entries). If this grows
 /// unbounded in production, Story 5.x adds an eviction policy; v0.3-β
 /// trusts the lifecycle to drain.
-#[maos_attrs::i9_exempt(reason = "halt mechanism — per-process pending-resolution state for SINGLE-HALT-OWNER protocol; parallel to capability-token ledger, not pattern-learning")]
+#[maos_attrs::i9_exempt(
+    reason = "halt mechanism — per-process pending-resolution state for SINGLE-HALT-OWNER protocol; parallel to capability-token ledger, not pattern-learning"
+)]
 #[derive(Default)]
 pub struct HaltRegistry {
     pending: RwLock<HashMap<HaltId, HaltState>>,
@@ -105,7 +113,11 @@ pub struct HaltRegistry {
     metadata: RwLock<HashMap<HaltId, PendingHaltMetadata>>,
     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
     #[cfg(feature = "spirit_test")]
-    isolation_hook: Option<std::sync::Arc<parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>>>,
+    isolation_hook: Option<
+        std::sync::Arc<
+            parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>,
+        >,
+    >,
 }
 
 /// Story 4.3 — metadata stored alongside a pending halt so the
@@ -125,10 +137,15 @@ impl std::fmt::Debug for HaltRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut d = f.debug_struct("HaltRegistry");
         d.field("pending", &self.pending)
-         .field("metadata", &self.metadata);
+            .field("metadata", &self.metadata);
         #[cfg(feature = "spirit_test")]
         {
-            d.field("isolation_hook", &self.isolation_hook);
+            let hook_label = if self.isolation_hook.is_some() {
+                "Some(<IsolationHookPoint>)"
+            } else {
+                "None"
+            };
+            d.field("isolation_hook", &hook_label);
         }
         d.finish()
     }
@@ -143,7 +160,9 @@ impl HaltRegistry {
     #[cfg(feature = "spirit_test")]
     pub fn with_isolation_hook(
         mut self,
-        hook: std::sync::Arc<parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>>,
+        hook: std::sync::Arc<
+            parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>,
+        >,
     ) -> Self {
         self.isolation_hook = Some(hook);
         self
@@ -151,7 +170,12 @@ impl HaltRegistry {
 
     /// Story 4.5 — fire isolation hooks for cross-Spirit observation.
     #[cfg(feature = "spirit_test")]
-    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
+    fn fire_isolation_hooks(
+        &self,
+        case_id: &str,
+        _surface: &str,
+        outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome,
+    ) {
         if let Some(ref hook) = self.isolation_hook {
             let mut h = hook.lock();
             let _ = h.before_spirit_a_attempt(case_id);
@@ -183,11 +207,16 @@ impl HaltRegistry {
     ) -> Result<(), InvokeHaltError> {
         let mut map = self.pending.write().expect("HaltRegistry lock poisoned");
         if map.contains_key(&halt_id) {
-            return Err(InvokeHaltError::DuplicateHaltId(halt_id.as_str().to_string()));
+            return Err(InvokeHaltError::DuplicateHaltId(
+                halt_id.as_str().to_string(),
+            ));
         }
         map.insert(halt_id.clone(), state);
         drop(map);
-        let mut meta = self.metadata.write().expect("HaltRegistry metadata lock poisoned");
+        let mut meta = self
+            .metadata
+            .write()
+            .expect("HaltRegistry metadata lock poisoned");
         meta.insert(halt_id, metadata);
         Ok(())
     }
@@ -196,7 +225,9 @@ impl HaltRegistry {
     pub fn insert_pending(&self, halt_id: HaltId, state: HaltState) -> Result<(), InvokeHaltError> {
         let mut map = self.pending.write().expect("HaltRegistry lock poisoned");
         if map.contains_key(&halt_id) {
-            return Err(InvokeHaltError::DuplicateHaltId(halt_id.as_str().to_string()));
+            return Err(InvokeHaltError::DuplicateHaltId(
+                halt_id.as_str().to_string(),
+            ));
         }
         map.insert(halt_id, state);
         Ok(())
@@ -207,7 +238,10 @@ impl HaltRegistry {
     /// halt_id was inserted via the legacy `insert_pending` path
     /// without metadata.
     pub fn lookup_pending_metadata(&self, halt_id: &HaltId) -> Option<PendingHaltMetadata> {
-        let meta = self.metadata.read().expect("HaltRegistry metadata lock poisoned");
+        let meta = self
+            .metadata
+            .read()
+            .expect("HaltRegistry metadata lock poisoned");
         meta.get(halt_id).cloned()
     }
 
@@ -215,7 +249,11 @@ impl HaltRegistry {
     /// to confirm the halt exists, transition the state. The entry stays
     /// in the map in its terminal state so double-resolve returns
     /// `AlreadyResolved`.
-    pub fn resolve(&self, halt_id: &HaltId, terminal: HaltState) -> Result<HaltState, ResolveStateError> {
+    pub fn resolve(
+        &self,
+        halt_id: &HaltId,
+        terminal: HaltState,
+    ) -> Result<HaltState, ResolveStateError> {
         let mut map = self.pending.write().expect("HaltRegistry lock poisoned");
         match map.get(halt_id) {
             Some(HaltState::PendingResolution) => {
@@ -223,11 +261,16 @@ impl HaltRegistry {
                 drop(map);
                 // Story 4.3 — clean up metadata once the halt reaches a
                 // terminal state so the map doesn't grow unbounded.
-                let mut meta = self.metadata.write().expect("HaltRegistry metadata lock poisoned");
+                let mut meta = self
+                    .metadata
+                    .write()
+                    .expect("HaltRegistry metadata lock poisoned");
                 meta.remove(halt_id);
                 Ok(prev)
             }
-            Some(_) => Err(ResolveStateError::AlreadyTerminal(halt_id.as_str().to_string())),
+            Some(_) => Err(ResolveStateError::AlreadyTerminal(
+                halt_id.as_str().to_string(),
+            )),
             None => Err(ResolveStateError::NotPending(halt_id.as_str().to_string())),
         }
     }
@@ -236,7 +279,11 @@ impl HaltRegistry {
     /// by `maosctl halt-list` (Story 3.3 AC7 already wired).
     pub fn pending_halt_ids(&self) -> Vec<HaltId> {
         #[cfg(feature = "spirit_test")]
-        self.fire_isolation_hooks("halt.pending_halt_ids:unknown", "HaltRegistry::pending_halt_ids", maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue);
+        self.fire_isolation_hooks(
+            "halt.pending_halt_ids:unknown",
+            "HaltRegistry::pending_halt_ids",
+            maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue,
+        );
         let map = self.pending.read().expect("HaltRegistry lock poisoned");
         map.iter()
             .filter(|(_, s)| matches!(s, HaltState::PendingResolution))
@@ -265,7 +312,10 @@ impl HaltRegistry {
         }
         drop(map);
         // Clean up metadata for drained halts.
-        let mut meta = self.metadata.write().expect("HaltRegistry metadata lock poisoned");
+        let mut meta = self
+            .metadata
+            .write()
+            .expect("HaltRegistry metadata lock poisoned");
         for (k, _) in &drained {
             meta.remove(k);
         }
@@ -278,7 +328,10 @@ impl HaltRegistry {
     /// Halts inserted via the legacy `insert_pending` path (no metadata)
     /// are NOT matched by this filter — they remain in the registry.
     pub fn drain_for_spirit(&self, spirit_pid: u32) -> Vec<(HaltId, HaltState)> {
-        let meta = self.metadata.read().expect("HaltRegistry metadata lock poisoned");
+        let meta = self
+            .metadata
+            .read()
+            .expect("HaltRegistry metadata lock poisoned");
         let owned: Vec<HaltId> = meta
             .iter()
             .filter(|(_, m)| m.spirit_pid == spirit_pid)
@@ -301,7 +354,10 @@ impl HaltRegistry {
             }
         }
         drop(map);
-        let mut meta = self.metadata.write().expect("HaltRegistry metadata lock poisoned");
+        let mut meta = self
+            .metadata
+            .write()
+            .expect("HaltRegistry metadata lock poisoned");
         for (id, _) in &drained {
             meta.remove(id);
         }
@@ -314,7 +370,10 @@ impl HaltRegistry {
     /// Used by `validate_swap_halt_continuity_dry_run` (Story 5.2 review
     /// patch closure) to preview drain impact before committing a swap.
     pub fn drain_for_spirit_dry_run(&self, spirit_pid: u32) -> Vec<(HaltId, HaltState)> {
-        let meta = self.metadata.read().expect("HaltRegistry metadata lock poisoned");
+        let meta = self
+            .metadata
+            .read()
+            .expect("HaltRegistry metadata lock poisoned");
         let owned: Vec<HaltId> = meta
             .iter()
             .filter(|(_, m)| m.spirit_pid == spirit_pid)
@@ -341,8 +400,15 @@ impl HaltRegistry {
         since_ns: u64,
     ) -> Vec<(HaltId, PendingHaltMetadata)> {
         #[cfg(feature = "spirit_test")]
-        self.fire_isolation_hooks(&format!("halt.metadata_for_spirit:{spirit_pid}"), "HaltRegistry::halt_metadata_for_spirit", maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue);
-        let meta = self.metadata.read().expect("HaltRegistry metadata lock poisoned");
+        self.fire_isolation_hooks(
+            &format!("halt.metadata_for_spirit:{spirit_pid}"),
+            "HaltRegistry::halt_metadata_for_spirit",
+            maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue,
+        );
+        let meta = self
+            .metadata
+            .read()
+            .expect("HaltRegistry metadata lock poisoned");
         meta.iter()
             .filter(|(_, m)| m.spirit_pid == spirit_pid && m.fired_ns >= since_ns)
             .map(|(id, m)| (id.clone(), m.clone()))
@@ -402,9 +468,7 @@ pub fn validate_swap_halt_continuity(
     Ok(SwapVerdict::SafeMigrated {
         migrated_count: remaining.len(),
         predecessor_version: predecessor_halt_protocol_version,
-        successor_versions: successor_accepted_versions
-            .unwrap_or(&[])
-            .to_vec(),
+        successor_versions: successor_accepted_versions.unwrap_or(&[]).to_vec(),
     })
 }
 
@@ -412,9 +476,7 @@ pub fn validate_swap_halt_continuity(
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SwapVerdict {
     /// All predecessor halts drained before swap; swap is safe regardless of schema.
-    SafeDrained {
-        drained_count: usize,
-    },
+    SafeDrained { drained_count: usize },
     /// Halts migrated; schema compatibility was verified.
     SafeMigrated {
         migrated_count: usize,
@@ -502,7 +564,13 @@ pub fn invoke_halt(
         },
     )?;
 
-    Ok(HaltReceipt::new(halt_id, timestamp_ns, spirit_pid, boot_nonce, frame_id))
+    Ok(HaltReceipt::new(
+        halt_id,
+        timestamp_ns,
+        spirit_pid,
+        boot_nonce,
+        frame_id,
+    ))
 }
 
 /// I14 enforcement — verify the successor manifest accepts the
@@ -532,8 +600,8 @@ pub fn validate_halt_set(
     if predecessor_halt_set.is_empty() {
         return Ok(());
     }
-    let accepted = successor_accepted_versions
-        .ok_or(HaltContinuityError::MissingHaltProtocolCompatibility)?;
+    let accepted =
+        successor_accepted_versions.ok_or(HaltContinuityError::MissingHaltProtocolCompatibility)?;
     if accepted.contains(&predecessor_version) {
         Ok(())
     } else {
@@ -564,13 +632,8 @@ mod swap_continuity_tests {
     #[test]
     fn empty_predecessor_returns_safe_drained_zero() {
         let registry = make_registry();
-        let verdict = validate_swap_halt_continuity(
-            &registry, 1, 1, Some(&[1, 2]),
-        ).unwrap();
-        assert_eq!(
-            verdict,
-            SwapVerdict::SafeDrained { drained_count: 0 }
-        );
+        let verdict = validate_swap_halt_continuity(&registry, 1, 1, Some(&[1, 2])).unwrap();
+        assert_eq!(verdict, SwapVerdict::SafeDrained { drained_count: 0 });
     }
 
     #[test]
@@ -578,28 +641,28 @@ mod swap_continuity_tests {
         let registry = make_registry();
         // Insert a pending halt WITH metadata (Story 5.3 per-PID filter)
         let hid = HaltId::new("test-halt-001").unwrap();
-        registry.insert_pending_with_metadata(
-            hid.clone(),
-            HaltState::PendingResolution,
-            PendingHaltMetadata {
-                spirit_pid: 1,
-                spirit_id: "spirit-001".into(),
-                payload: maos_domain::frame::EpistemicHaltPayload {
-                    halt_id: "test-halt-001".into(),
-                    tag: "test".into(),
-                    value: 0.0,
-                    threshold: None,
-                    policy_id: "".into(),
-                    derived_from: "".into(),
+        registry
+            .insert_pending_with_metadata(
+                hid.clone(),
+                HaltState::PendingResolution,
+                PendingHaltMetadata {
+                    spirit_pid: 1,
+                    spirit_id: "spirit-001".into(),
+                    payload: maos_domain::frame::EpistemicHaltPayload {
+                        halt_id: "test-halt-001".into(),
+                        tag: "test".into(),
+                        value: 0.0,
+                        threshold: None,
+                        policy_id: "".into(),
+                        derived_from: "".into(),
+                    },
+                    fired_ns: 0,
                 },
-                fired_ns: 0,
-            },
-        ).unwrap();
+            )
+            .unwrap();
         assert_eq!(registry.pending_halt_ids().len(), 1);
 
-        let verdict = validate_swap_halt_continuity(
-            &registry, 1, 1, Some(&[1]),
-        ).unwrap();
+        let verdict = validate_swap_halt_continuity(&registry, 1, 1, Some(&[1])).unwrap();
         // per-PID drain clears the halt for spirit_pid=1
         assert_eq!(verdict, SwapVerdict::SafeDrained { drained_count: 1 });
     }
@@ -616,7 +679,10 @@ mod swap_continuity_tests {
         assert!(!remaining.is_empty());
 
         let result = validate_halt_set(&remaining, 1, Some(&[1]));
-        assert!(result.is_ok(), "migration should succeed for matching version");
+        assert!(
+            result.is_ok(),
+            "migration should succeed for matching version"
+        );
     }
 
     #[test]
@@ -627,7 +693,10 @@ mod swap_continuity_tests {
         let remaining = registry.pending_halt_ids();
 
         let result = validate_halt_set(&remaining, 1, Some(&[2]));
-        assert!(result.is_err(), "migration should reject for mismatched version");
+        assert!(
+            result.is_err(),
+            "migration should reject for mismatched version"
+        );
     }
 
     #[test]
@@ -638,7 +707,7 @@ mod swap_continuity_tests {
         let result = validate_halt_set(&[hid], 1, None);
         assert!(result.is_err());
         match result.unwrap_err() {
-            HaltContinuityError::MissingHaltProtocolCompatibility => {},
+            HaltContinuityError::MissingHaltProtocolCompatibility => {}
             e => panic!("expected MissingHaltProtocolCompatibility, got {e:?}"),
         }
     }
@@ -649,7 +718,7 @@ mod swap_continuity_tests {
         let result = validate_halt_set(&[hid], 1, Some(&[]));
         assert!(result.is_err());
         match result.unwrap_err() {
-            HaltContinuityError::EHaltContinuityViolation { .. } => {},
+            HaltContinuityError::EHaltContinuityViolation { .. } => {}
             e => panic!("expected EHaltContinuityViolation, got {e:?}"),
         }
     }
@@ -658,7 +727,10 @@ mod swap_continuity_tests {
     fn drain_fails_then_migrate_rejects_via_validate_halt_set() {
         let hid = HaltId::new("test-halt-006").unwrap();
         let result = validate_halt_set(&[hid], 1, Some(&[2]));
-        assert!(result.is_err(), "migration should reject for mismatched version");
+        assert!(
+            result.is_err(),
+            "migration should reject for mismatched version"
+        );
     }
 
     // ---- Story 5.3 — drain_for_spirit per-PID filter tests ----
@@ -691,12 +763,20 @@ mod swap_continuity_tests {
         let registry = make_registry();
         let h1 = HaltId::new("owned-001").unwrap();
         let h2 = HaltId::new("other-001").unwrap();
-        registry.insert_pending_with_metadata(
-            h1.clone(), HaltState::PendingResolution, make_meta(1, "spirit-1", "owned-001"),
-        ).unwrap();
-        registry.insert_pending_with_metadata(
-            h2.clone(), HaltState::PendingResolution, make_meta(2, "spirit-2", "other-001"),
-        ).unwrap();
+        registry
+            .insert_pending_with_metadata(
+                h1.clone(),
+                HaltState::PendingResolution,
+                make_meta(1, "spirit-1", "owned-001"),
+            )
+            .unwrap();
+        registry
+            .insert_pending_with_metadata(
+                h2.clone(),
+                HaltState::PendingResolution,
+                make_meta(2, "spirit-2", "other-001"),
+            )
+            .unwrap();
 
         let drained = registry.drain_for_spirit(1);
         assert_eq!(drained.len(), 1);
@@ -710,7 +790,9 @@ mod swap_continuity_tests {
     fn drain_for_spirit_leaves_legacy_no_meta_untouched() {
         let registry = make_registry();
         let h1 = HaltId::new("legacy-001").unwrap();
-        registry.insert_pending(h1.clone(), HaltState::PendingResolution).unwrap();
+        registry
+            .insert_pending(h1.clone(), HaltState::PendingResolution)
+            .unwrap();
 
         let drained = registry.drain_for_spirit(1);
         assert!(drained.is_empty());
@@ -721,9 +803,13 @@ mod swap_continuity_tests {
     fn drain_for_spirit_idempotent_second_call_empty() {
         let registry = make_registry();
         let h1 = HaltId::new("owned-002").unwrap();
-        registry.insert_pending_with_metadata(
-            h1.clone(), HaltState::PendingResolution, make_meta(1, "spirit-1", "owned-002"),
-        ).unwrap();
+        registry
+            .insert_pending_with_metadata(
+                h1.clone(),
+                HaltState::PendingResolution,
+                make_meta(1, "spirit-1", "owned-002"),
+            )
+            .unwrap();
 
         let first = registry.drain_for_spirit(1);
         assert_eq!(first.len(), 1);
@@ -736,9 +822,13 @@ mod swap_continuity_tests {
     fn drain_for_spirit_dry_run_does_not_mutate() {
         let registry = make_registry();
         let h1 = HaltId::new("dry-001").unwrap();
-        registry.insert_pending_with_metadata(
-            h1.clone(), HaltState::PendingResolution, make_meta(7, "spirit-7", "dry-001"),
-        ).unwrap();
+        registry
+            .insert_pending_with_metadata(
+                h1.clone(),
+                HaltState::PendingResolution,
+                make_meta(7, "spirit-7", "dry-001"),
+            )
+            .unwrap();
 
         let preview = registry.drain_for_spirit_dry_run(7);
         assert_eq!(preview.len(), 1);
@@ -754,9 +844,13 @@ mod swap_continuity_tests {
         let registry = make_registry();
         for pid in 10..=14 {
             let hid = HaltId::new(&format!("multi-{pid}")).unwrap();
-            registry.insert_pending_with_metadata(
-                hid, HaltState::PendingResolution, make_meta(pid, &format!("spirit-{pid}"), &format!("multi-{pid}")),
-            ).unwrap();
+            registry
+                .insert_pending_with_metadata(
+                    hid,
+                    HaltState::PendingResolution,
+                    make_meta(pid, &format!("spirit-{pid}"), &format!("multi-{pid}")),
+                )
+                .unwrap();
         }
 
         let drained_12 = registry.drain_for_spirit(12);
@@ -766,7 +860,9 @@ mod swap_continuity_tests {
         let remaining: Vec<_> = registry.pending_halt_ids();
         assert_eq!(remaining.len(), 4);
         for pid in [10, 11, 13, 14] {
-            assert!(registry.lookup_state(&HaltId::new(&format!("multi-{pid}")).unwrap()).is_some());
+            assert!(registry
+                .lookup_state(&HaltId::new(&format!("multi-{pid}")).unwrap())
+                .is_some());
         }
     }
 }

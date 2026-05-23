@@ -106,18 +106,19 @@ impl JournalAdapter {
         let mut content = String::new();
         {
             let mut reader = BufReader::new(&file);
-            reader.read_to_string(&mut content).map_err(JournalError::Read)?;
+            reader
+                .read_to_string(&mut content)
+                .map_err(JournalError::Read)?;
         }
         for (line_num, line) in content.lines().enumerate() {
             if line.is_empty() {
                 continue;
             }
-            let entry: JournalEntry = serde_json::from_str(line).map_err(|e| {
-                JournalError::Parse {
+            let entry: JournalEntry =
+                serde_json::from_str(line).map_err(|e| JournalError::Parse {
                     line: line_num + 1,
                     source: e,
-                }
-            })?;
+                })?;
             if let JournalEntry::Lifecycle(ref le) = entry {
                 most_recent.insert(le.spirit_id.clone(), le.lifecycle_event);
             }
@@ -162,8 +163,7 @@ impl JournalAdapter {
 
     pub fn append_transition(&self, entry: JournalEntry) {
         let mut file = self.writer.lock().expect("Journal writer lock poisoned");
-        let line = serde_json::to_string(&entry)
-            .expect("JournalEntry serialization is infallible");
+        let line = serde_json::to_string(&entry).expect("JournalEntry serialization is infallible");
         if let Err(e) = write!(file, "{line}\n") {
             panic!(
                 "MAOS kernel panic — Journal append failed: {e}. \
@@ -172,22 +172,28 @@ impl JournalAdapter {
         }
         drop(file);
         if let JournalEntry::Lifecycle(ref le) = entry {
-            let mut index = self.most_recent.write().expect("Journal index lock poisoned");
+            let mut index = self
+                .most_recent
+                .write()
+                .expect("Journal index lock poisoned");
             index.insert(le.spirit_id.clone(), le.lifecycle_event);
         }
     }
 
     pub fn last_event(&self, spirit_id: &str) -> Option<LifecycleEvent> {
-        let index = self.most_recent.read().expect("Journal index lock poisoned");
+        let index = self
+            .most_recent
+            .read()
+            .expect("Journal index lock poisoned");
         index.get(spirit_id).copied()
     }
 
     pub fn recover_in_flight(&self) -> Vec<(String, LifecycleEvent)> {
-        let index = self.most_recent.read().expect("Journal index lock poisoned");
-        index
-            .iter()
-            .map(|(s, e)| (s.clone(), *e))
-            .collect()
+        let index = self
+            .most_recent
+            .read()
+            .expect("Journal index lock poisoned");
+        index.iter().map(|(s, e)| (s.clone(), *e)).collect()
     }
 
     /// Append an in-flight task entry to the journal (Story 5.3).
@@ -217,14 +223,19 @@ impl JournalAdapter {
             }
             if let Ok(entry) = serde_json::from_str::<JournalEntry>(line) {
                 match entry {
-                    JournalEntry::Lifecycle(le) => lifecycle.push((le.spirit_id, le.lifecycle_event)),
+                    JournalEntry::Lifecycle(le) => {
+                        lifecycle.push((le.spirit_id, le.lifecycle_event))
+                    }
                     JournalEntry::InFlight(ie) => in_flight.push(ie),
                     #[allow(unreachable_patterns)]
                     _ => {}
                 }
             }
         }
-        RecoveryReport { lifecycle, in_flight }
+        RecoveryReport {
+            lifecycle,
+            in_flight,
+        }
     }
 
     fn sync_flush(&self) {

@@ -16,32 +16,32 @@
 //! 11. spawn PostSwapMonitor (30s window)
 //! 12. return HotSwapResult::Completed
 
-use std::sync::{Arc, RwLock};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use maos_domain::halt::{HaltContinuityError, HaltId};
 use maos_domain::hot_swap::{HotSwapError, HotSwapResult, PostSwapInvariantViolation};
-use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
+use maos_domain::invariants::i3::FrameOrigin;
 
-use crate::halt::{validate_swap_halt_continuity, validate_halt_set, SwapVerdict, HaltRegistry};
+use crate::capability::CapabilityRegistryAdapter;
+use crate::halt::{validate_halt_set, validate_swap_halt_continuity, HaltRegistry, SwapVerdict};
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::iac::IacBusAdapter;
 use crate::journal::JournalAdapter;
-use crate::capability::CapabilityRegistryAdapter;
 use crate::scheduler::control_block::{AnySpiritObj, SpiritControlBlock};
 use crate::scheduler::hook_dispatch::HookDispatcher;
 use crate::scheduler::HookOutcome;
 use crate::telemetry::iac_rt::IacRtMetrics;
 
-use super::post_swap_monitor::{PostSwapMonitor, PostSwapInvariantSnapshot};
-use super::saga::{HotSwapSaga, SagaPhase, SagaCompensation};
-use super::state_codec::{self, SchemaCompat};
-use super::migrator::run_migrator;
 use super::archive::SpiritArchive;
+use super::migrator::run_migrator;
+use super::post_swap_monitor::{PostSwapInvariantSnapshot, PostSwapMonitor};
 use super::precheck::{HotSwapPrecheck, PrecheckVerdict as KernelPrecheckVerdict};
+use super::saga::{HotSwapSaga, SagaCompensation, SagaPhase};
+use super::state_codec::{self, SchemaCompat};
 
 /// The kernel-side hot-swap coordinator.
 ///
@@ -58,9 +58,11 @@ pub struct HotSwapCoordinator {
     telemetry: Arc<IacRtMetrics>,
     archive_dir: PathBuf,
     /// Active post-swap monitors per PID — used to cancel previous monitors on re-swap.
-    active_monitors: Arc<std::sync::Mutex<std::collections::BTreeMap<u32, tokio::task::JoinHandle<()>>>>,
+    active_monitors:
+        Arc<std::sync::Mutex<std::collections::BTreeMap<u32, tokio::task::JoinHandle<()>>>>,
     /// Pending revert snapshots per PID — pre_swap_snapshot stored at commit for auto_revert.
-    pending_reverts: Arc<std::sync::Mutex<std::collections::BTreeMap<u32, Arc<SpiritControlBlock>>>>,
+    pending_reverts:
+        Arc<std::sync::Mutex<std::collections::BTreeMap<u32, Arc<SpiritControlBlock>>>>,
 }
 
 impl HotSwapCoordinator {
@@ -78,7 +80,10 @@ impl HotSwapCoordinator {
     ) -> Self {
         // Ensure archive directory exists with mode 0700.
         if let Err(e) = std::fs::create_dir_all(&archive_dir) {
-            eprintln!("[hot_swap] WARNING: cannot create archive dir {}: {e}", archive_dir.display());
+            eprintln!(
+                "[hot_swap] WARNING: cannot create archive dir {}: {e}",
+                archive_dir.display()
+            );
         }
         #[cfg(unix)]
         {
@@ -123,16 +128,16 @@ impl HotSwapCoordinator {
         let predecessor_pid = self.resolve_pid(spirit_id)?;
         let predecessor_scb = {
             let map = self.spirits.read().expect("spirits lock poisoned");
-            Arc::clone(map.get(&predecessor_pid).ok_or_else(|| {
-                HotSwapError::NotLoaded {
-                    spirit_id: spirit_id.to_string(),
-                }
-            })?)
+            Arc::clone(
+                map.get(&predecessor_pid)
+                    .ok_or_else(|| HotSwapError::NotLoaded {
+                        spirit_id: spirit_id.to_string(),
+                    })?,
+            )
         };
 
         // Step 2: Snapshot predecessor SCB for saga rollback.
-        let mut saga = HotSwapSaga::new()
-            .with_pre_swap_snapshot(Arc::clone(&predecessor_scb));
+        let mut saga = HotSwapSaga::new().with_pre_swap_snapshot(Arc::clone(&predecessor_scb));
         saga.advance_to(SagaPhase::NotStarted);
 
         let predecessor_version = predecessor_scb
@@ -174,7 +179,8 @@ impl HotSwapCoordinator {
                     },
                     &self.tl,
                     &self.journal,
-                ).await;
+                )
+                .await;
                 return Err(HotSwapError::HaltContinuityViolation(e));
             }
         }
@@ -183,7 +189,10 @@ impl HotSwapCoordinator {
         saga.advance_to(SagaPhase::SwapOutFired);
         let swap_out_result = self.dispatcher.fire_on_swap_out(&predecessor_scb).await;
         match swap_out_result {
-            HookOutcome::Fired { .. } | HookOutcome::BudgetWarning80 { .. } | HookOutcome::SkippedManifest | HookOutcome::DeferredToNextStory => {}
+            HookOutcome::Fired { .. }
+            | HookOutcome::BudgetWarning80 { .. }
+            | HookOutcome::SkippedManifest
+            | HookOutcome::DeferredToNextStory => {}
             HookOutcome::BudgetExceeded { .. } | HookOutcome::Panicked { .. } => {
                 saga.compensate(
                     SagaCompensation::RestorePredecessor {
@@ -191,7 +200,8 @@ impl HotSwapCoordinator {
                     },
                     &self.tl,
                     &self.journal,
-                ).await;
+                )
+                .await;
                 return Err(HotSwapError::SwapOutFailed {
                     spirit_id: spirit_id.to_string(),
                     error: format!("{swap_out_result:?}"),
@@ -210,7 +220,8 @@ impl HotSwapCoordinator {
                     },
                     &self.tl,
                     &self.journal,
-                ).await;
+                )
+                .await;
                 return Err(HotSwapError::SwapOutFailed {
                     spirit_id: spirit_id.to_string(),
                     error: format!("snapshot failed: {outcome:?}"),
@@ -232,11 +243,9 @@ impl HotSwapCoordinator {
 
         // Step 6: Encode + decode CBOR envelope.
         let encoded = state_codec::encode(&state_blob, predecessor_state_schema_version)
-            .map_err(|e| {
-                HotSwapError::Internal(format!("state codec encode failed: {e}"))
-            })?;
-        let envelope = state_codec::decode(&encoded, successor_state_schema_version)
-            .map_err(|e| {
+            .map_err(|e| HotSwapError::Internal(format!("state codec encode failed: {e}")))?;
+        let envelope =
+            state_codec::decode(&encoded, successor_state_schema_version).map_err(|e| {
                 HotSwapError::SchemaIncompatible {
                     predecessor_version: predecessor_state_schema_version,
                     successor_version: successor_state_schema_version,
@@ -259,7 +268,8 @@ impl HotSwapCoordinator {
                     &payload,
                     &successor_manifest,
                     &predecessor_version,
-                ).await?
+                )
+                .await?
             }
             _ => payload,
         };
@@ -278,7 +288,9 @@ impl HotSwapCoordinator {
                 ));
                 // Preserve current state.
                 let current_raw = scb.state.load(std::sync::atomic::Ordering::Acquire);
-                new_scb.state.store(current_raw, std::sync::atomic::Ordering::Release);
+                new_scb
+                    .state
+                    .store(current_raw, std::sync::atomic::Ordering::Release);
                 *scb = new_scb;
             } else {
                 return Err(HotSwapError::NotLoaded {
@@ -290,12 +302,21 @@ impl HotSwapCoordinator {
         // Step 9: Fire on_swap_in(payload) hook on the SUCCESSOR SCB.
         let successor_scb = {
             let map = self.spirits.read().expect("spirits lock poisoned");
-            Arc::clone(map.get(&predecessor_pid).expect("successor SCB just inserted"))
+            Arc::clone(
+                map.get(&predecessor_pid)
+                    .expect("successor SCB just inserted"),
+            )
         };
         saga.advance_to(SagaPhase::SwapInFired);
-        let swap_in_result = self.dispatcher.fire_on_swap_in(&successor_scb, &payload).await;
+        let swap_in_result = self
+            .dispatcher
+            .fire_on_swap_in(&successor_scb, &payload)
+            .await;
         match swap_in_result {
-            HookOutcome::Fired { .. } | HookOutcome::BudgetWarning80 { .. } | HookOutcome::SkippedManifest | HookOutcome::DeferredToNextStory => {}
+            HookOutcome::Fired { .. }
+            | HookOutcome::BudgetWarning80 { .. }
+            | HookOutcome::SkippedManifest
+            | HookOutcome::DeferredToNextStory => {}
             HookOutcome::BudgetExceeded { .. } | HookOutcome::Panicked { .. } => {
                 // Saga: restore predecessor SCB.
                 saga.compensate(
@@ -304,7 +325,8 @@ impl HotSwapCoordinator {
                     },
                     &self.tl,
                     &self.journal,
-                ).await;
+                )
+                .await;
 
                 // Restore predecessor under lock.
                 if let Some(pre_swap) = &saga.pre_swap_snapshot {
@@ -326,18 +348,20 @@ impl HotSwapCoordinator {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos() as u64;
-        self.journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
-            timestamp: timestamp_ns,
-            lifecycle_event: LifecycleEvent::HotSwap,
-            spirit_id: spirit_id.to_string(),
-            effective_sandbox_tier: None,
-        }));
+        self.journal
+            .append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+                timestamp: timestamp_ns,
+                lifecycle_event: LifecycleEvent::HotSwap,
+                spirit_id: spirit_id.to_string(),
+                effective_sandbox_tier: None,
+            }));
 
         // Step 11: Spawn PostSwapMonitor (30s window).
         saga.advance_to(SagaPhase::Committed);
 
         // Collect baseline halt IDs from registry.
-        let pre_swap_halt_ids: Vec<String> = self.halt_registry
+        let pre_swap_halt_ids: Vec<String> = self
+            .halt_registry
             .pending_halt_ids()
             .iter()
             .map(|h| h.as_str().to_string())
@@ -355,13 +379,19 @@ impl HotSwapCoordinator {
 
         // Store pre_swap_snapshot for auto_revert.
         {
-            let mut reverts = self.pending_reverts.lock().expect("pending_reverts lock poisoned");
+            let mut reverts = self
+                .pending_reverts
+                .lock()
+                .expect("pending_reverts lock poisoned");
             reverts.insert(predecessor_pid, Arc::clone(&predecessor_scb));
         }
 
         // Cancel any existing monitor for this PID before spawning a new one.
         {
-            let mut monitors = self.active_monitors.lock().expect("active_monitors lock poisoned");
+            let mut monitors = self
+                .active_monitors
+                .lock()
+                .expect("active_monitors lock poisoned");
             if let Some(old_handle) = monitors.remove(&predecessor_pid) {
                 old_handle.abort();
             }
@@ -384,7 +414,10 @@ impl HotSwapCoordinator {
         let monitor = PostSwapMonitor::new(coordinator_arc, predecessor_pid, invariant_snapshot);
         let monitor_handle = monitor.spawn();
         {
-            let mut monitors = self.active_monitors.lock().expect("active_monitors lock poisoned");
+            let mut monitors = self
+                .active_monitors
+                .lock()
+                .expect("active_monitors lock poisoned");
             monitors.insert(predecessor_pid, monitor_handle);
         }
 
@@ -398,7 +431,8 @@ impl HotSwapCoordinator {
                 .as_ref()
                 .map(|c| c.version.clone())
                 .unwrap_or_else(|| "unknown".into()),
-            0, 0,
+            0,
+            0,
             latency_ns,
             compat,
         )
@@ -419,11 +453,12 @@ impl HotSwapCoordinator {
 
         let predecessor_scb = {
             let map = self.spirits.read().expect("spirits lock poisoned");
-            Arc::clone(map.get(&predecessor_pid).ok_or_else(|| {
-                HotSwapError::NotLoaded {
-                    spirit_id: spirit_id.to_string(),
-                }
-            })?)
+            Arc::clone(
+                map.get(&predecessor_pid)
+                    .ok_or_else(|| HotSwapError::NotLoaded {
+                        spirit_id: spirit_id.to_string(),
+                    })?,
+            )
         };
 
         let predecessor_halt_protocol_version = predecessor_scb
@@ -468,13 +503,17 @@ impl HotSwapCoordinator {
                 let _ = tokio::time::timeout(
                     std::time::Duration::from_secs(2),
                     self.dispatcher.fire_on_swap_out(&scb),
-                ).await;
+                )
+                .await;
             }
         }
 
         // 2. Restore pre_swap_snapshot under spirits write-lock.
         let pre_swap = {
-            let mut reverts = self.pending_reverts.lock().expect("pending_reverts lock poisoned");
+            let mut reverts = self
+                .pending_reverts
+                .lock()
+                .expect("pending_reverts lock poisoned");
             reverts.remove(&spirit_pid)
         };
         if let Some(pre_swap_scb) = pre_swap {
@@ -489,12 +528,13 @@ impl HotSwapCoordinator {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos() as u64;
-        self.journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
-            timestamp: timestamp_ns,
-            lifecycle_event: LifecycleEvent::HotSwapAutoReverted,
-            spirit_id: format!("pid-{spirit_pid}"),
-            effective_sandbox_tier: None,
-        }));
+        self.journal
+            .append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+                timestamp: timestamp_ns,
+                lifecycle_event: LifecycleEvent::HotSwapAutoReverted,
+                spirit_id: format!("pid-{spirit_pid}"),
+                effective_sandbox_tier: None,
+            }));
 
         // 4. Emit HotSwapAborted IAC frame.
         let payload = serde_json::json!({

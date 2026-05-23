@@ -25,7 +25,12 @@ pub trait IoSubsystemPort {
     /// Perform an HTTP POST request to the given URL with the given
     /// body and headers. At v0.1-α this is a structural placeholder;
     /// Story 1b.4 implements it for the Anthropic driver.
-    fn http_post(&self, url: &str, body: &[u8], headers: &[(&str, &str)]) -> Result<Vec<u8>, IoError>;
+    fn http_post(
+        &self,
+        url: &str,
+        body: &[u8],
+        headers: &[(&str, &str)],
+    ) -> Result<Vec<u8>, IoError>;
 }
 
 /// I/O error type for the I/O Subsystem port.

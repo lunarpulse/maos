@@ -3,11 +3,11 @@
 use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i9::SandboxTier;
 
-use maos_kernel_core::capability::cap_policy::{
-    ManifestCapabilityScope, PolicyTable, PolicyTableInner,
-};
 use maos_kernel_core::capability::cap_policy::decision::{
     ApprovalClass, Capability, Intent, PolicyDecision, TrustTier,
+};
+use maos_kernel_core::capability::cap_policy::{
+    ManifestCapabilityScope, PolicyTable, PolicyTableInner,
 };
 
 fn make_policy_table() -> PolicyTable {

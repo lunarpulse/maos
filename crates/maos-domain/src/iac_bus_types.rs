@@ -13,7 +13,9 @@ use crate::invariants::i3::FrameOrigin;
 pub enum IacBusError {
     #[error("spirit {0} is not registered — call register_spirit first")]
     UnknownSpirit(String),
-    #[error("epistemic halt queue overflow for spirit {0} — kernel MUST raise watchdog (Story 3.3)")]
+    #[error(
+        "epistemic halt queue overflow for spirit {0} — kernel MUST raise watchdog (Story 3.3)"
+    )]
     HaltQueueOverflow(String),
     #[error("channel closed for spirit {0} kind {1:?}")]
     ChannelClosed(String, FrameKind),

@@ -3,10 +3,10 @@
 
 use std::process::Command;
 
+use maos_domain::invariants::i9::SandboxTier;
+use maos_kernel_core::security::manifest::ResolvedCaps;
 use maos_kernel_core::security::sandbox::spawn_sandboxed;
 use maos_kernel_core::security::sandbox::SandboxSpec;
-use maos_kernel_core::security::manifest::ResolvedCaps;
-use maos_domain::invariants::i9::SandboxTier;
 
 #[test]
 fn setrlimit_nofile_enforced() {
@@ -22,10 +22,14 @@ fn setrlimit_nofile_enforced() {
         output_shape_predicate: None,
     };
     let mut cmd = Command::new("/bin/sh");
-    cmd.arg("-c").arg(r#"for i in $(seq 1 32); do exec 3>/dev/null; done 2>/dev/null; echo done"#);
+    cmd.arg("-c")
+        .arg(r#"for i in $(seq 1 32); do exec 3>/dev/null; done 2>/dev/null; echo done"#);
     let mut child = spawn_sandboxed(&spec, &mut cmd).unwrap();
     let status = child.wait().unwrap();
-    assert!(status.code().is_some(), "rlimit-enforced child must exit with a code");
+    assert!(
+        status.code().is_some(),
+        "rlimit-enforced child must exit with a code"
+    );
 }
 
 #[test]
@@ -44,5 +48,8 @@ fn memory_cap_smoke() {
     let mut cmd = Command::new("/bin/true");
     let mut child = spawn_sandboxed(&spec, &mut cmd).unwrap();
     let status = child.wait().unwrap();
-    assert!(status.success(), "memory-capped child must exit cleanly under budget");
+    assert!(
+        status.success(),
+        "memory-capped child must exit cleanly under budget"
+    );
 }

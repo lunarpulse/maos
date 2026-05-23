@@ -77,7 +77,9 @@ impl CrashCause {
     pub fn stderr_tail(&self) -> Option<String> {
         match self {
             CrashCause::Fault(FaultCause::NonZeroExit { stderr_tail, .. }) => stderr_tail.clone(),
-            CrashCause::Fault(FaultCause::SignaledByKernel { stderr_tail, .. }) => stderr_tail.clone(),
+            CrashCause::Fault(FaultCause::SignaledByKernel { stderr_tail, .. }) => {
+                stderr_tail.clone()
+            }
             CrashCause::Fault(FaultCause::OomKilled { stderr_tail, .. }) => stderr_tail.clone(),
             _ => None,
         }
@@ -89,11 +91,20 @@ impl CrashCause {
 #[non_exhaustive]
 pub enum FaultCause {
     /// Hook panic in rust-inproc form.
-    Panic { hook_name: String, payload_preview: String },
+    Panic {
+        hook_name: String,
+        payload_preview: String,
+    },
     /// Subprocess received a fatal signal.
-    SignaledByKernel { signal: i32, stderr_tail: Option<String> },
+    SignaledByKernel {
+        signal: i32,
+        stderr_tail: Option<String>,
+    },
     /// Subprocess exited with non-zero code.
-    NonZeroExit { code: i32, stderr_tail: Option<String> },
+    NonZeroExit {
+        code: i32,
+        stderr_tail: Option<String>,
+    },
     /// OOM killer terminated the subprocess.
     OomKilled { stderr_tail: Option<String> },
     /// Hook exceeded its budget cap.
@@ -124,9 +135,15 @@ pub enum ChildExitStatus {
     /// Clean EOF — Spirit shut down gracefully.
     CleanEof,
     /// Fatal signal from kernel.
-    SignaledByKernel { signal: i32, stderr_tail: Option<String> },
+    SignaledByKernel {
+        signal: i32,
+        stderr_tail: Option<String>,
+    },
     /// Non-zero exit code.
-    NonZeroExit { code: i32, stderr_tail: Option<String> },
+    NonZeroExit {
+        code: i32,
+        stderr_tail: Option<String>,
+    },
     /// OOM killer.
     OomKilled { stderr_tail: Option<String> },
     /// Budget timeout.
@@ -142,10 +159,7 @@ pub type ChildHandle = u64;
 /// Story 5.5x lands the production `OsProcessChildSupervisor`.
 pub trait SubprocessSupervisor: Send + Sync + 'static {
     /// Spawn the Spirit subprocess.
-    fn spawn_child(
-        &self,
-        spirit_id: &str,
-    ) -> Result<ChildHandle, SupervisionError>;
+    fn spawn_child(&self, spirit_id: &str) -> Result<ChildHandle, SupervisionError>;
 
     /// Future the supervisor awaits to observe child exit.
     fn wait_for_exit(
@@ -239,7 +253,11 @@ mod tests {
 
     #[test]
     fn on_crash_action_serde_roundtrip_kebab_case() {
-        let actions = [OnCrashAction::Nack, OnCrashAction::ReassignToReplica, OnCrashAction::EscalateToOperator];
+        let actions = [
+            OnCrashAction::Nack,
+            OnCrashAction::ReassignToReplica,
+            OnCrashAction::EscalateToOperator,
+        ];
         for a in actions {
             let json = serde_json::to_string(&a).unwrap();
             let back: OnCrashAction = serde_json::from_str(&json).unwrap();
@@ -250,8 +268,14 @@ mod tests {
     #[test]
     fn on_crash_action_display() {
         assert_eq!(OnCrashAction::Nack.to_string(), "nack");
-        assert_eq!(OnCrashAction::ReassignToReplica.to_string(), "reassign-to-replica");
-        assert_eq!(OnCrashAction::EscalateToOperator.to_string(), "escalate-to-operator");
+        assert_eq!(
+            OnCrashAction::ReassignToReplica.to_string(),
+            "reassign-to-replica"
+        );
+        assert_eq!(
+            OnCrashAction::EscalateToOperator.to_string(),
+            "escalate-to-operator"
+        );
     }
 
     #[test]
@@ -261,14 +285,20 @@ mod tests {
 
     #[test]
     fn fault_cause_signaled_by_kernel_str() {
-        let cause = CrashCause::Fault(FaultCause::SignaledByKernel { signal: 9, stderr_tail: None });
+        let cause = CrashCause::Fault(FaultCause::SignaledByKernel {
+            signal: 9,
+            stderr_tail: None,
+        });
         assert_eq!(cause.as_str(), "fault.signaled");
         assert_eq!(cause.exit_signal(), Some(9));
     }
 
     #[test]
     fn child_exit_status_signaled_debug() {
-        let status = ChildExitStatus::SignaledByKernel { signal: 9, stderr_tail: Some("killed".into()) };
+        let status = ChildExitStatus::SignaledByKernel {
+            signal: 9,
+            stderr_tail: Some("killed".into()),
+        };
         let s = format!("{:?}", status);
         assert!(s.contains("SignaledByKernel"));
     }

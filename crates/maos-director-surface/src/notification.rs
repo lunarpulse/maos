@@ -105,10 +105,7 @@ impl TerminalChannel {
             && std::env::var_os("TERM")
                 .map(|t| t != "dumb")
                 .unwrap_or(false);
-        Self {
-            writer,
-            use_color,
-        }
+        Self { writer, use_color }
     }
 
     pub fn with_color(mut self, use_color: bool) -> Self {
@@ -127,9 +124,10 @@ impl NotificationChannel for TerminalChannel {
         event: &NotificationEvent,
         _level: NotificationLevel,
     ) -> Result<(), NotificationError> {
-        let mut w = self.writer.lock().map_err(|e| {
-            NotificationError::Unavailable(format!("lock poisoned: {e}"))
-        })?;
+        let mut w = self
+            .writer
+            .lock()
+            .map_err(|e| NotificationError::Unavailable(format!("lock poisoned: {e}")))?;
 
         match event {
             NotificationEvent::TaskAssigned {
@@ -180,7 +178,8 @@ impl NotificationChannel for TerminalChannel {
             NotificationEvent::Halt { payload } => {
                 let id_prefix: String = payload.halt_id.chars().take(8).collect();
                 if self.use_color {
-                    let _ = writeln!(
+                    let _ =
+                        writeln!(
                         w,
                         "\x1b[1;31m[maos]\x1b[0m Halt {} tag={} value={} threshold={} policy={}",
                         id_prefix,
@@ -196,7 +195,10 @@ impl NotificationChannel for TerminalChannel {
                         id_prefix,
                         payload.tag,
                         payload.value,
-                        payload.threshold.map(|t| t.to_string()).unwrap_or_else(|| "none".into()),
+                        payload
+                            .threshold
+                            .map(|t| t.to_string())
+                            .unwrap_or_else(|| "none".into()),
                         payload.policy_id,
                     );
                 }
@@ -300,7 +302,9 @@ mod tests {
             from: "a".into(),
             goal: "b".into(),
         };
-        let report = dispatcher.dispatch(event, NotificationLevel::Queue).unwrap();
+        let report = dispatcher
+            .dispatch(event, NotificationLevel::Queue)
+            .unwrap();
         assert_eq!(report.delivered, 0);
         assert_eq!(report.errors, 0);
     }
@@ -317,7 +321,9 @@ mod tests {
             from: "d".into(),
             goal: "test".into(),
         };
-        let report = dispatcher.dispatch(event, NotificationLevel::Immediate).unwrap();
+        let report = dispatcher
+            .dispatch(event, NotificationLevel::Immediate)
+            .unwrap();
         assert_eq!(report.delivered, 1);
         assert_eq!(report.errors, 0);
 
@@ -353,7 +359,9 @@ mod tests {
             from: "x".into(),
             goal: "err-isolation".into(),
         };
-        let report = dispatcher.dispatch(event, NotificationLevel::Immediate).unwrap();
+        let report = dispatcher
+            .dispatch(event, NotificationLevel::Immediate)
+            .unwrap();
         assert_eq!(report.delivered, 1);
         assert_eq!(report.errors, 1);
 
@@ -374,9 +382,7 @@ mod tests {
             "derived_from_x".into(),
         )
         .unwrap();
-        let event = NotificationEvent::Halt {
-            payload,
-        };
+        let event = NotificationEvent::Halt { payload };
         ch.dispatch(&event, NotificationLevel::Immediate).unwrap();
         let out = captured_output(&w);
         assert!(out.contains("halt-abc"));
@@ -399,9 +405,7 @@ mod tests {
             "d".into(),
         )
         .unwrap();
-        let event = NotificationEvent::Halt {
-            payload,
-        };
+        let event = NotificationEvent::Halt { payload };
         ch.dispatch(&event, NotificationLevel::Immediate).unwrap();
         let out = captured_output(&w);
         assert!(!out.contains('\x1b'));
@@ -444,23 +448,26 @@ mod tests {
         let out = captured_output(&w);
         assert!(out.contains("observer-1"), "output: {out}");
         assert!(out.contains("subject-1"), "output: {out}");
-        assert!(out.contains("85%"), "expected 85% confidence, output: {out}");
-        assert!(out.contains("resource exhaustion detected on worker pool"), "output: {out}");
+        assert!(
+            out.contains("85%"),
+            "expected 85% confidence, output: {out}"
+        );
+        assert!(
+            out.contains("resource exhaustion detected on worker pool"),
+            "output: {out}"
+        );
     }
 
     #[test]
     fn terminal_channel_anomaly_event_emits_zero_ansi_under_no_color() {
         let w = capture_writer();
         let ch = TerminalChannel::new(w.clone()).with_color(false);
-        let event = NotificationEvent::anomaly_flagged(
-            "obs",
-            "sub",
-            "test anomaly",
-            0.5,
-        )
-        .unwrap();
+        let event = NotificationEvent::anomaly_flagged("obs", "sub", "test anomaly", 0.5).unwrap();
         ch.dispatch(&event, NotificationLevel::Immediate).unwrap();
         let out = captured_output(&w);
-        assert!(!out.contains('\x1b'), "NO_COLOR output contained ANSI escapes");
+        assert!(
+            !out.contains('\x1b'),
+            "NO_COLOR output contained ANSI escapes"
+        );
     }
 }

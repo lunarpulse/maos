@@ -231,7 +231,11 @@ mod tests {
 
     #[test]
     fn sandbox_tier_default_is_t2() {
-        assert_eq!(SandboxTier::default(), SandboxTier::T2, "DF18: default must be most restrictive enforceable tier");
+        assert_eq!(
+            SandboxTier::default(),
+            SandboxTier::T2,
+            "DF18: default must be most restrictive enforceable tier"
+        );
     }
 
     #[test]
@@ -249,15 +253,33 @@ mod tests {
 
     #[test]
     fn try_from_manifest_str() {
-        assert_eq!(SandboxTier::try_from_manifest_str("T0").unwrap(), SandboxTier::T0);
-        assert_eq!(SandboxTier::try_from_manifest_str("T1").unwrap(), SandboxTier::T1);
-        assert_eq!(SandboxTier::try_from_manifest_str("T2").unwrap(), SandboxTier::T2);
-        assert_eq!(SandboxTier::try_from_manifest_str("T3").unwrap(), SandboxTier::T3);
+        assert_eq!(
+            SandboxTier::try_from_manifest_str("T0").unwrap(),
+            SandboxTier::T0
+        );
+        assert_eq!(
+            SandboxTier::try_from_manifest_str("T1").unwrap(),
+            SandboxTier::T1
+        );
+        assert_eq!(
+            SandboxTier::try_from_manifest_str("T2").unwrap(),
+            SandboxTier::T2
+        );
+        assert_eq!(
+            SandboxTier::try_from_manifest_str("T3").unwrap(),
+            SandboxTier::T3
+        );
         assert!(SandboxTier::try_from_manifest_str("t0").is_err()); // case-sensitive
         assert!(SandboxTier::try_from_manifest_str("T5").is_err());
         assert!(SandboxTier::try_from_manifest_str("foo").is_err());
-        assert!(SandboxTier::try_from_manifest_str("0").is_err(), "numeric strings must be rejected");
-        assert!(SandboxTier::try_from_manifest_str("4").is_err(), "T4 string must be rejected");
+        assert!(
+            SandboxTier::try_from_manifest_str("0").is_err(),
+            "numeric strings must be rejected"
+        );
+        assert!(
+            SandboxTier::try_from_manifest_str("4").is_err(),
+            "T4 string must be rejected"
+        );
     }
 
     #[test]

@@ -20,7 +20,8 @@ pub mod validation;
 // ---------------------------------------------------------------------------
 
 /// SHA-256 hex digest of `seeds/red-team-seeds-v0.1.toml`.
-pub const SEED_FILE_SHA256: &str = "f4a5988b2c622686e78c4c698ff0af575c766bbfa77f505d94b62d41fa742f2e";
+pub const SEED_FILE_SHA256: &str =
+    "f4a5988b2c622686e78c4c698ff0af575c766bbfa77f505d94b62d41fa742f2e";
 
 /// Expansion-rule version.
 pub const RULE_VERSION: &str = "v0.1";
@@ -179,7 +180,11 @@ pub fn build_coverage_report(
     for class in classes.keys() {
         let combos_observed = class_counts.get(class).copied().unwrap_or(0);
         // Each class has 10 seeds × ~8 variants ≈ 80 possible combos
-        let combos_possible = seed_counts.get(class).copied().unwrap_or(0).saturating_mul(8);
+        let combos_possible = seed_counts
+            .get(class)
+            .copied()
+            .unwrap_or(0)
+            .saturating_mul(8);
         let ratio = if combos_possible > 0 {
             (combos_observed as f64 / combos_possible as f64).min(1.0)
         } else {

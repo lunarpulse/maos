@@ -27,21 +27,17 @@ fn cgroup_ceiling_writes_cpu_and_memory_files() {
     let handle = apply_resource_ceiling(pid, &caps).expect("apply_resource_ceiling");
 
     // Verify the files exist with expected contents.
-    let cpu_max = std::fs::read_to_string(
-        format!("/sys/fs/cgroup/maos/spirit-{pid}/cpu.max")
-    ).unwrap();
+    let cpu_max =
+        std::fs::read_to_string(format!("/sys/fs/cgroup/maos/spirit-{pid}/cpu.max")).unwrap();
     assert_eq!(cpu_max.trim(), "10000 100000"); // 10% of 100ms = 10000us quota
 
-    let mem_max = std::fs::read_to_string(
-        format!("/sys/fs/cgroup/maos/spirit-{pid}/memory.max")
-    ).unwrap();
+    let mem_max =
+        std::fs::read_to_string(format!("/sys/fs/cgroup/maos/spirit-{pid}/memory.max")).unwrap();
     assert_eq!(mem_max.trim(), &(64u64 * 1024 * 1024).to_string());
 
     drop(handle);
     // After drop, the directory is removed (best-effort).
-    assert!(
-        !std::path::Path::new(&format!("/sys/fs/cgroup/maos/spirit-{pid}")).exists()
-    );
+    assert!(!std::path::Path::new(&format!("/sys/fs/cgroup/maos/spirit-{pid}")).exists());
 }
 
 #[test]

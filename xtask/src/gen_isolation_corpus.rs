@@ -89,7 +89,11 @@ fn expected_kernel_response(category: &str, scenario_index: usize) -> &'static s
     match category {
         "namespace_enumeration" => "I5Violation",
         "working_memory_read_across" => {
-            if scenario_index % 2 == 0 { "I5Violation" } else { "ScopeViolation" }
+            if scenario_index % 2 == 0 {
+                "I5Violation"
+            } else {
+                "ScopeViolation"
+            }
         }
         "decision_frame_observation" => "ScopeViolation",
         "halt_signal_observation" => "ScopeViolation",
@@ -113,7 +117,11 @@ fn expected_kernel_response(category: &str, scenario_index: usize) -> &'static s
             }
         }
         "sandbox_escape_lateral" => {
-            if scenario_index % 2 == 0 { "SandboxBlock" } else { "CapabilityDenied" }
+            if scenario_index % 2 == 0 {
+                "SandboxBlock"
+            } else {
+                "CapabilityDenied"
+            }
         }
         _ => "ScopeViolation",
     }
@@ -149,7 +157,8 @@ pub fn run(out_dir: &str) -> Result<(), String> {
         let counts = splits_counts[split_idx];
         for (cat_idx, category) in CATEGORIES.iter().enumerate() {
             let cat_dir = split_dir.join(category);
-            std::fs::create_dir_all(&cat_dir).map_err(|e| format!("create {split}/{category}: {e}"))?;
+            std::fs::create_dir_all(&cat_dir)
+                .map_err(|e| format!("create {split}/{category}: {e}"))?;
 
             let count = counts[cat_idx];
             for i in 0..count {
@@ -181,7 +190,8 @@ pub fn run(out_dir: &str) -> Result<(), String> {
 
                 // Add expected_swap_verdict for halt-signal-observation scenarios (AC3)
                 if *category == "halt_signal_observation" {
-                    scenario["expected_swap_verdict"] = expected_swap_verdict(scenario_index + cat_idx * 13);
+                    scenario["expected_swap_verdict"] =
+                        expected_swap_verdict(scenario_index + cat_idx * 13);
                 }
 
                 let scenario_json = serde_json::to_string_pretty(&scenario)
@@ -323,8 +333,7 @@ Each category subdirectory contains `scenario-NNN.json` files plus a
 "##;
 
     let readme_path = out.join("README.md");
-    std::fs::write(&readme_path, readme.as_bytes())
-        .map_err(|e| format!("write README.md: {e}"))?;
+    std::fs::write(&readme_path, readme.as_bytes()).map_err(|e| format!("write README.md: {e}"))?;
 
     eprintln!(
         "Isolation corpus v0 written to {} ({total_scenarios} scenarios: {sec_14a_total} sec-14a + {sec_14b_total} sec-14b)",
@@ -347,7 +356,12 @@ mod tests {
     fn each_category_floor_25_aggregate() {
         for (i, _cat) in CATEGORIES.iter().enumerate() {
             let aggregate = SEC_14A_COUNTS[i] + SEC_14B_COUNTS[i];
-            assert!(aggregate >= 25, "category {} aggregate {} < 25", CATEGORIES[i], aggregate);
+            assert!(
+                aggregate >= 25,
+                "category {} aggregate {} < 25",
+                CATEGORIES[i],
+                aggregate
+            );
         }
     }
 }

@@ -11,12 +11,7 @@ use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::security::manifest::{EpistemicAction, EpistemicPolicySection, Posture};
 use maos_kernel_core::security::posture::{journal_posture_shift, PostureError, PostureState};
 
-fn seed_spirit(
-    policy: &PolicyTable,
-    pid: u32,
-    posture: Posture,
-    allowed_max: Posture,
-) {
+fn seed_spirit(policy: &PolicyTable, pid: u32, posture: Posture, allowed_max: Posture) {
     let mut inner = (*policy.inner().load_full()).clone();
     inner.spirit_postures.insert(
         pid,
@@ -39,11 +34,7 @@ fn shift_posture_succeeds_and_returns_new_hash() {
 
     let old_hash = {
         let inner = policy.inner().load_full();
-        inner
-            .spirit_postures
-            .get(&0)
-            .unwrap()
-            .posture_hash()
+        inner.spirit_postures.get(&0).unwrap().posture_hash()
     };
 
     let new_hash = policy
@@ -81,7 +72,10 @@ fn shift_posture_rejects_autonomous() {
     seed_spirit(&policy, 0, Posture::Assistive, Posture::Autonomous);
 
     let err = policy.shift_posture(0, Posture::Autonomous).unwrap_err();
-    assert!(matches!(err, PostureError::NonRuntimePosture(Posture::Autonomous)));
+    assert!(matches!(
+        err,
+        PostureError::NonRuntimePosture(Posture::Autonomous)
+    ));
 }
 
 #[test]

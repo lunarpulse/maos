@@ -57,6 +57,7 @@ pub enum FrameKindLabel {
     HotSwapAborted,
     TaskStalled,
     SilentFailureSuspect,
+    SpiritRevoked,
 }
 
 impl LogRecallFilter {
@@ -258,7 +259,14 @@ mod tests {
     #[test]
     fn log_recall_page_serde_round_trip() {
         let page = LogRecallPage::new(
-            vec![LogRecallEntry::new([1u8; 16], 100, FrameKindLabel::TaskAssign, "delegate".into(), 7, true)],
+            vec![LogRecallEntry::new(
+                [1u8; 16],
+                100,
+                FrameKindLabel::TaskAssign,
+                "delegate".into(),
+                7,
+                true,
+            )],
             Some(LogRecallCursor::new(100, [1u8; 16])),
         );
         let json = serde_json::to_string(&page).unwrap();
@@ -276,7 +284,11 @@ mod tests {
             owner_pid: 10,
         };
         match err {
-            LogRecallError::ScopeViolation { frame_id, requested_pid, owner_pid } => {
+            LogRecallError::ScopeViolation {
+                frame_id,
+                requested_pid,
+                owner_pid,
+            } => {
                 assert_eq!(frame_id, [0xAA; 16]);
                 assert_eq!(requested_pid, 20);
                 assert_eq!(owner_pid, 10);
@@ -290,7 +302,9 @@ mod tests {
     #[test]
     fn log_recall_error_distinguishes_variants() {
         assert_ne!(
-            LogRecallError::FrameNotFound { frame_id: [0u8; 16] },
+            LogRecallError::FrameNotFound {
+                frame_id: [0u8; 16]
+            },
             LogRecallError::InvalidCursor("".into()),
         );
     }

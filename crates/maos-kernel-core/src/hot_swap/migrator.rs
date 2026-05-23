@@ -46,7 +46,11 @@ pub async fn run_migrator(
         }
     })?;
 
-    if !migrates_from.versions.iter().any(|v| matches_version_pattern(v, predecessor_version)) {
+    if !migrates_from
+        .versions
+        .iter()
+        .any(|v| matches_version_pattern(v, predecessor_version))
+    {
         let class_name = successor_manifest
             .class
             .as_ref()
@@ -77,31 +81,29 @@ pub async fn run_migrator(
 
     match result {
         Ok(migrated_bytes) => Ok(migrated_bytes),
-        Err(e) => {
-            match e {
-                MigratorError::NotImplemented => {
-                    let class_name = successor_manifest
-                        .class
-                        .as_ref()
-                        .map(|c| c.name.clone())
-                        .unwrap_or_else(|| "unknown".into());
-                    let class_version = successor_manifest
-                        .class
-                        .as_ref()
-                        .map(|c| c.version.clone())
-                        .unwrap_or_else(|| "unknown".into());
-                    Err(HotSwapError::EMigratorMissing {
-                        predecessor_class: class_name.clone(),
-                        predecessor_version: predecessor_version.to_string(),
-                        successor_class: class_name,
-                        successor_version: class_version,
-                    })
-                }
-                other => Err(HotSwapError::MigratorFailed {
-                    error: other.to_string(),
-                }),
+        Err(e) => match e {
+            MigratorError::NotImplemented => {
+                let class_name = successor_manifest
+                    .class
+                    .as_ref()
+                    .map(|c| c.name.clone())
+                    .unwrap_or_else(|| "unknown".into());
+                let class_version = successor_manifest
+                    .class
+                    .as_ref()
+                    .map(|c| c.version.clone())
+                    .unwrap_or_else(|| "unknown".into());
+                Err(HotSwapError::EMigratorMissing {
+                    predecessor_class: class_name.clone(),
+                    predecessor_version: predecessor_version.to_string(),
+                    successor_class: class_name,
+                    successor_version: class_version,
+                })
             }
-        }
+            other => Err(HotSwapError::MigratorFailed {
+                error: other.to_string(),
+            }),
+        },
     }
 }
 

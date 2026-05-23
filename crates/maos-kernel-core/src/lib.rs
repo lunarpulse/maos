@@ -21,19 +21,21 @@
 //! `CryptoProvider`. Story 1a.4 ships `maosctl`. Story 2.2 upgrades
 //! `xtask check-service-boundary` from stub to P1–P4 enforcement.
 
-pub mod api;        // surface-classification anchor for NFR-Test-2
-pub mod scheduler;  // supervisor — Spirit Scheduler (architecture §4.1)
-pub mod security;   // supervised service — Security Manager (§4.3)
-pub mod memory;     // supervised service — Memory Manager (§4.2)
-pub mod iac;        // supervised service — IAC Bus (§4.5)
-pub mod journal;    // supervised internal — Lifecycle Journal per I10 / §4.1 (Story 1b.1)
+pub mod api; // surface-classification anchor for NFR-Test-2
 pub mod capability; // supervised service — Capability Registry (§4.6)
 pub mod compliance; // supervised internal — ComplianceClaim structural validator (Story 1b.4)
-pub mod io;         // internal module at v0.1 — I/O Subsystem (§4.4)
-pub mod telemetry;  // internal module at v0.1 — Telemetry Stream (§4.7)
-pub mod inference;  // internal module at v0.1 — Inference Port adapter (Story 1b.4)
-pub mod halt;       // Story 3.3 — HaltResolver trait + resolution journaling (Story 4.1 fills mechanism)
-pub mod hot_swap;   // Story 5.2 — Hot-Swap Coordinator + CBOR codec + saga compensation
-pub mod supervision;   // Story 5.3 — Crash / hang / silent-failure detection + cold restart
-pub mod orchestrator;  // Story 3.4 — Orchestrator instruction buffer + journal helpers
-pub mod isolation;     // Story 4.5 — Cross-Spirit isolation corpus runner (NFR-Sec-14)
+pub mod halt; // Story 3.3 — HaltResolver trait + resolution journaling (Story 4.1 fills mechanism)
+pub mod hot_swap; // Story 5.2 — Hot-Swap Coordinator + CBOR codec + saga compensation
+pub mod iac; // supervised service — IAC Bus (§4.5)
+pub mod inference; // internal module at v0.1 — Inference Port adapter (Story 1b.4)
+pub mod io; // internal module at v0.1 — I/O Subsystem (§4.4)
+pub mod isolation;
+pub mod journal; // supervised internal — Lifecycle Journal per I10 / §4.1 (Story 1b.1)
+pub mod lifecycle; // Story 5.4 — upgrade orchestrator (hot-swap, cold-swap, migrator)
+pub mod memory; // supervised service — Memory Manager (§4.2)
+pub mod orchestrator; // Story 3.4 — Orchestrator instruction buffer + journal helpers
+pub mod revocation; // Story 5.4 — CRL poller, parser, applier, propagation pipeline
+pub mod scheduler; // supervisor — Spirit Scheduler (architecture §4.1)
+pub mod security; // supervised service — Security Manager (§4.3)
+pub mod supervision; // Story 5.3 — Crash / hang / silent-failure detection + cold restart
+pub mod telemetry; // internal module at v0.1 — Telemetry Stream (§4.7) // Story 4.5 — Cross-Spirit isolation corpus runner (NFR-Sec-14)

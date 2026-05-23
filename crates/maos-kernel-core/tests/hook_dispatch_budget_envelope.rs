@@ -22,7 +22,10 @@ struct HookCounter {
 
 impl Default for HookCounter {
     fn default() -> Self {
-        Self { count: AtomicU32::new(0), sleep_ms: 0 }
+        Self {
+            count: AtomicU32::new(0),
+            sleep_ms: 0,
+        }
     }
 }
 
@@ -36,7 +39,9 @@ impl maos_spirit_abi::lifecycle::Spirit for HookCounter {
 }
 
 fn make_dispatcher() -> HookDispatcher {
-    let tl = Arc::new(maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0));
+    let tl = Arc::new(
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0),
+    );
     let metrics = Arc::new(IacRtMetrics::new());
     HookDispatcher::new(tl, metrics)
 }
@@ -54,7 +59,8 @@ fn make_scb(enabled_hooks: Vec<String>) -> Arc<SpiritControlBlock> {
         make_spirit_obj(HookCounter::default()),
         0,
     );
-    scb.state.store(ScbLifecycleState::Running as u8, Ordering::Release);
+    scb.state
+        .store(ScbLifecycleState::Running as u8, Ordering::Release);
     Arc::new(scb)
 }
 
@@ -66,7 +72,11 @@ async fn manifest_gate_skips_disabled_hook() {
     let scb = make_scb(vec!["on_start".into()]);
 
     let outcome = dispatcher.fire_on_load(&scb).await;
-    assert_eq!(outcome, HookOutcome::SkippedManifest, "on_load must be skipped when not in manifest");
+    assert_eq!(
+        outcome,
+        HookOutcome::SkippedManifest,
+        "on_load must be skipped when not in manifest"
+    );
 }
 
 #[tokio::test]
@@ -77,7 +87,10 @@ async fn hook_fires_within_budget() {
     let outcome = dispatcher.fire_on_load(&scb).await;
     match outcome {
         HookOutcome::Fired { wall_ns } => {
-            assert!(wall_ns < 1_000_000_000, "on_load with no sleep must finish in <1s");
+            assert!(
+                wall_ns < 1_000_000_000,
+                "on_load with no sleep must finish in <1s"
+            );
         }
         other => panic!("expected Fired, got {other:?}"),
     }
@@ -101,10 +114,14 @@ async fn hook_exceeds_budget_and_returns_budget_exceeded() {
         1,
         "slow-hook".into(),
         manifest,
-        make_spirit_obj(HookCounter { count: AtomicU32::new(0), sleep_ms: 2000 }),
+        make_spirit_obj(HookCounter {
+            count: AtomicU32::new(0),
+            sleep_ms: 2000,
+        }),
         0,
     );
-    scb.state.store(ScbLifecycleState::Running as u8, Ordering::Release);
+    scb.state
+        .store(ScbLifecycleState::Running as u8, Ordering::Release);
 
     let outcome = dispatcher.fire_on_load(&Arc::new(scb)).await;
     assert!(

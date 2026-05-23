@@ -66,6 +66,10 @@ pub enum LifecycleEvent {
     Stalled = 13,
     /// Story 5.3 — Spirit emitted heartbeat but no progress IAC for > threshold.
     SilentFailureSuspect = 14,
+    /// Story 5.4 — Spirit upgraded via hot-swap, cold-swap, or migrator.
+    Upgrade = 15,
+    /// Story 5.4 — Spirit revoked via CRL propagation.
+    Revoked = 16,
 }
 
 /// A single lifecycle journal entry — the v0.3-β shape.
@@ -130,13 +134,13 @@ impl<'de> serde::Deserialize<'de> for JournalEntry {
 
         match value.get("kind").and_then(|v| v.as_str()) {
             Some("lifecycle") => {
-                let entry: LifecycleEntry = serde_json::from_value(value)
-                    .map_err(D::Error::custom)?;
+                let entry: LifecycleEntry =
+                    serde_json::from_value(value).map_err(D::Error::custom)?;
                 Ok(JournalEntry::Lifecycle(entry))
             }
             Some("in_flight") => {
-                let entry: InFlightEntry = serde_json::from_value(value)
-                    .map_err(D::Error::custom)?;
+                let entry: InFlightEntry =
+                    serde_json::from_value(value).map_err(D::Error::custom)?;
                 Ok(JournalEntry::InFlight(entry))
             }
             Some(other) => Err(D::Error::custom(format!(
@@ -144,8 +148,8 @@ impl<'de> serde::Deserialize<'de> for JournalEntry {
             ))),
             None => {
                 // v0.3-β back-compat: no "kind" field → LifecycleEntry
-                let entry: LifecycleEntry = serde_json::from_value(value)
-                    .map_err(D::Error::custom)?;
+                let entry: LifecycleEntry =
+                    serde_json::from_value(value).map_err(D::Error::custom)?;
                 Ok(JournalEntry::Lifecycle(entry))
             }
         }
@@ -253,5 +257,33 @@ mod tests {
             LifecycleEvent::SilentFailureSuspect => "silent_failure",
             _ => "other",
         };
+    }
+
+    // ---- Story 5.4 — LifecycleEvent variant tests ----
+
+    #[test]
+    fn lifecycle_event_upgrade_discriminant() {
+        assert_eq!(LifecycleEvent::Upgrade as u8, 15);
+    }
+
+    #[test]
+    fn lifecycle_event_revoked_discriminant() {
+        assert_eq!(LifecycleEvent::Revoked as u8, 16);
+    }
+
+    #[test]
+    fn lifecycle_event_upgrade_serde_roundtrip() {
+        let original = LifecycleEvent::Upgrade;
+        let json = serde_json::to_string(&original).unwrap();
+        let back: LifecycleEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, LifecycleEvent::Upgrade);
+    }
+
+    #[test]
+    fn lifecycle_event_revoked_serde_roundtrip() {
+        let original = LifecycleEvent::Revoked;
+        let json = serde_json::to_string(&original).unwrap();
+        let back: LifecycleEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, LifecycleEvent::Revoked);
     }
 }

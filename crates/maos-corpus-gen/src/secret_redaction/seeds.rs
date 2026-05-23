@@ -7,7 +7,8 @@ use super::SecretRedactionSeed;
 
 /// Load seeds from TOML bytes.
 pub fn load_seeds(data: &[u8]) -> Result<Vec<SecretRedactionSeed>, String> {
-    let text = std::str::from_utf8(data).map_err(|e| format!("seed TOML not valid UTF-8: {}", e))?;
+    let text =
+        std::str::from_utf8(data).map_err(|e| format!("seed TOML not valid UTF-8: {}", e))?;
 
     #[derive(serde::Deserialize)]
     struct SeedFile {

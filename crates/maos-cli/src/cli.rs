@@ -90,6 +90,8 @@ pub enum Subcommand {
     /// Spirit lifecycle operations (upgrade, hot-swap precheck, etc.).
     /// Story 5.2 ships `hot-swap-precheck`; Story 5.4 ships `upgrade`.
     Spirit(SpiritArgs),
+    /// Revocation management — import signed CRLs, list applied CRLs (Story 5.4).
+    Revocations(RevocationsArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -301,4 +303,43 @@ pub enum SpiritOp {
         #[arg(long)]
         to: String,
     },
+    /// Upgrade a Spirit to a successor version with a declared policy (Story 5.4, FR49).
+    Upgrade {
+        /// Spirit ID to upgrade (e.g. "butler").
+        spirit: String,
+        /// Path to the successor manifest TOML.
+        #[arg(long)]
+        to: String,
+        /// Upgrade policy. Default: hot-swap.
+        #[arg(long, value_enum, default_value_t = UpgradePolicyArg::HotSwap)]
+        policy: UpgradePolicyArg,
+    },
+}
+
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UpgradePolicyArg {
+    HotSwap,
+    ColdSwap,
+    Migrator,
+}
+
+/// Revocations subcommands.
+#[derive(clap::Args, Debug)]
+pub struct RevocationsArgs {
+    #[command(subcommand)]
+    pub op: RevocationsOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum RevocationsOp {
+    /// Import a signed CRL from offline media (FR60).
+    Import {
+        /// Path to the signed CRL JSON file.
+        file: std::path::PathBuf,
+        /// Re-apply even if this CRL was already imported.
+        #[arg(long)]
+        force: bool,
+    },
+    /// List already-applied CRLs by id + apply timestamp.
+    List,
 }

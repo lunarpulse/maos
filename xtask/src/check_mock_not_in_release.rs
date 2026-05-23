@@ -26,10 +26,7 @@ pub struct Report {
     pub forbidden_symbols_found: Vec<String>,
 }
 
-const FORBIDDEN_PRODUCTION_SYMBOLS: &[&str] = &[
-    "MockHaltResolver",
-    "FailingHaltResolver",
-];
+const FORBIDDEN_PRODUCTION_SYMBOLS: &[&str] = &["MockHaltResolver", "FailingHaltResolver"];
 
 pub fn run(binary_path: &str, build_first: bool, json: bool) -> Result<(), String> {
     if build_first {
@@ -91,7 +88,9 @@ fn extract_symbols(binary_path: &Path) -> Result<Vec<String>, String> {
 
     #[cfg(target_os = "linux")]
     {
-        let bin_str = binary_path.to_str().ok_or_else(|| "binary path is not valid UTF-8".to_string())?;
+        let bin_str = binary_path
+            .to_str()
+            .ok_or_else(|| "binary path is not valid UTF-8".to_string())?;
         let output = Command::new("nm")
             .args(["--demangle", bin_str])
             .output()
@@ -105,7 +104,9 @@ fn extract_symbols(binary_path: &Path) -> Result<Vec<String>, String> {
 
     #[cfg(target_os = "macos")]
     {
-        let bin_str = binary_path.to_str().ok_or_else(|| "binary path is not valid UTF-8".to_string())?;
+        let bin_str = binary_path
+            .to_str()
+            .ok_or_else(|| "binary path is not valid UTF-8".to_string())?;
         let output = Command::new("nm")
             .args(["-gU", bin_str])
             .output()
@@ -119,7 +120,9 @@ fn extract_symbols(binary_path: &Path) -> Result<Vec<String>, String> {
 
     #[cfg(target_os = "windows")]
     {
-        let bin_str = binary_path.to_str().ok_or_else(|| "binary path is not valid UTF-8".to_string())?;
+        let bin_str = binary_path
+            .to_str()
+            .ok_or_else(|| "binary path is not valid UTF-8".to_string())?;
         let output = Command::new("dumpbin")
             .args(["/symbols", bin_str])
             .output()

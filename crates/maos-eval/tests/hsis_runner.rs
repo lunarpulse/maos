@@ -13,14 +13,18 @@ use maos_eval::hsis_corpus::HsisCorpus;
 
 #[test]
 fn hsis_per_class_pass_rate_at_least_95pct() {
-    let corpus_path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/fixtures/hsis-corpus-v0"
-    );
+    let corpus_path = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/hsis-corpus-v0");
 
     let corpus = HsisCorpus::load(corpus_path).expect("load corpus");
 
-    for class in &["butler", "researcher", "observer", "orchestrator", "worker", "cliwrapper"] {
+    for class in &[
+        "butler",
+        "researcher",
+        "observer",
+        "orchestrator",
+        "worker",
+        "cliwrapper",
+    ] {
         let scenarios = corpus.scenarios_for_class(class);
         assert_eq!(
             scenarios.len(),
@@ -61,8 +65,8 @@ fn hsis_corpus_methodology_attestation_parseable() {
         "/fixtures/hsis-corpus-v0/methodology-attestation.json"
     );
     let content = std::fs::read_to_string(path).expect("methodology attestation must exist");
-    let attestation: serde_json::Value = serde_json::from_str(&content)
-        .expect("methodology attestation must be valid JSON");
+    let attestation: serde_json::Value =
+        serde_json::from_str(&content).expect("methodology attestation must be valid JSON");
     assert_eq!(attestation["corpus_id"], "hsis-corpus-v0");
     assert_eq!(attestation["scenario_count"], 300);
     assert_eq!(attestation["class_list"].as_array().unwrap().len(), 6);

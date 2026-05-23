@@ -90,3 +90,11 @@ harness = false
 [[bench]]
 name = "hot_swap_latency"
 harness = false
+
+[[bench]]
+name = "revocation_propagation_p99"
+harness = false
+
+[[bin]]
+name = "assert-revocation-p99-floor"
+path = "src/bin/assert-revocation-p99-floor.rs"

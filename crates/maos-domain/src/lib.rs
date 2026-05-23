@@ -14,16 +14,17 @@
 pub mod invariants;
 pub use invariants::*;
 
-pub mod ports;
+pub mod distillation; // NEW — Story 4.4 distillation domain types
 pub mod frame;
-pub mod iac_bus_types;
-pub mod lifecycle;       // NEW — Story 5.1 lifecycle types + LifecycleResolver trait
-pub mod notification;
 pub mod halt;
 pub mod hot_swap;
+pub mod iac_bus_types;
+pub mod lifecycle; // NEW — Story 5.1 lifecycle types + LifecycleResolver trait
+pub mod log_recall; // NEW — Story 4.4 log-recall domain types
+pub mod memory; // NEW — Story 4.3 memory tier types
+pub mod notification;
 pub mod orchestrator;
-pub mod memory;          // NEW — Story 4.3 memory tier types
-pub mod self_telemetry;  // NEW — Story 4.3 self-telemetry types
-pub mod log_recall;      // NEW — Story 4.4 log-recall domain types
-pub mod distillation;    // NEW — Story 4.4 distillation domain types
-pub mod supervision;     // NEW — Story 5.3 crash / hang / silent-failure detection
+pub mod ports;
+pub mod revocation; // NEW — Story 5.4 CRL types + RegistryClient trait
+pub mod self_telemetry; // NEW — Story 4.3 self-telemetry types
+pub mod supervision; // NEW — Story 5.3 crash / hang / silent-failure detection

@@ -43,8 +43,14 @@ fn manifest_path() -> PathBuf {
 #[test]
 fn lcas_corpus_item_count_is_70() {
     let bytes = fs::read(corpus_path()).expect("read lcas-v0.3.jsonl");
-    let count = bytes.split(|&b| b == b'\n').filter(|line| !line.is_empty()).count();
-    assert_eq!(count, 70, "Story 2.4 LCAS clearly-decidable bucket must be exactly 70 items");
+    let count = bytes
+        .split(|&b| b == b'\n')
+        .filter(|line| !line.is_empty())
+        .count();
+    assert_eq!(
+        count, 70,
+        "Story 2.4 LCAS clearly-decidable bucket must be exactly 70 items"
+    );
 }
 
 #[test]
@@ -58,9 +64,15 @@ fn lcas_corpus_sha256_matches_manifest() {
         .find(|l| l.trim_start().starts_with("sha256"))
         .expect("MANIFEST.toml [corpus.\"lcas-v0.3\"].sha256 line");
     let recorded_hash = recorded
-        .split('=').nth(1).unwrap_or("")
-        .trim().trim_matches('"');
-    assert_eq!(recorded_hash, computed, "SHA-256 mismatch: computed={computed} recorded={recorded}");
+        .split('=')
+        .nth(1)
+        .unwrap_or("")
+        .trim()
+        .trim_matches('"');
+    assert_eq!(
+        recorded_hash, computed,
+        "SHA-256 mismatch: computed={computed} recorded={recorded}"
+    );
 }
 
 #[test]
@@ -69,19 +81,45 @@ fn lcas_corpus_well_formed_schema() {
     for (i, line) in text.lines().enumerate() {
         let item: LcasItem = serde_json::from_str(line)
             .unwrap_or_else(|e| panic!("line {} parse error: {e}", i + 1));
-        assert_eq!(item.class, "clearly_decidable", "v0.3 ships clearly-decidable bucket only");
+        assert_eq!(
+            item.class, "clearly_decidable",
+            "v0.3 ships clearly-decidable bucket only"
+        );
         assert!(item.id.starts_with("lcas-cd-"), "id pattern: {}", item.id);
-        assert!(["halt", "continue"].contains(&item.gold_label.as_str()),
-                "gold_label must be halt or continue: {}", item.gold_label);
-        assert!(item.trajectory_text.len() >= 4096, "trajectory too short: id={} len={}", item.id, item.trajectory_text.len());
-        assert!(item.trajectory_text.len() <= 16384, "trajectory too long: id={} len={}", item.id, item.trajectory_text.len());
-        assert!(!item.planted_claim.is_empty(), "planted_claim empty: {}", item.id);
+        assert!(
+            ["halt", "continue"].contains(&item.gold_label.as_str()),
+            "gold_label must be halt or continue: {}",
+            item.gold_label
+        );
+        assert!(
+            item.trajectory_text.len() >= 4096,
+            "trajectory too short: id={} len={}",
+            item.id,
+            item.trajectory_text.len()
+        );
+        assert!(
+            item.trajectory_text.len() <= 16384,
+            "trajectory too long: id={} len={}",
+            item.id,
+            item.trajectory_text.len()
+        );
+        assert!(
+            !item.planted_claim.is_empty(),
+            "planted_claim empty: {}",
+            item.id
+        );
         if item.gold_label == "continue" {
-            assert!(item.expected_signals.is_empty(),
-                    "continue items must have empty expected_signals: {}", item.id);
+            assert!(
+                item.expected_signals.is_empty(),
+                "continue items must have empty expected_signals: {}",
+                item.id
+            );
         } else {
-            assert!(!item.expected_signals.is_empty(),
-                    "halt items must have non-empty expected_signals: {}", item.id);
+            assert!(
+                !item.expected_signals.is_empty(),
+                "halt items must have non-empty expected_signals: {}",
+                item.id
+            );
         }
     }
 }
@@ -89,9 +127,16 @@ fn lcas_corpus_well_formed_schema() {
 #[test]
 fn lcas_corpus_sorted_by_id() {
     let text = fs::read_to_string(corpus_path()).expect("read lcas-v0.3.jsonl");
-    let ids: Vec<String> = text.lines().filter_map(|l| {
-        serde_json::from_str::<serde_json::Value>(l).ok()?.get("id")?.as_str().map(String::from)
-    }).collect();
+    let ids: Vec<String> = text
+        .lines()
+        .filter_map(|l| {
+            serde_json::from_str::<serde_json::Value>(l)
+                .ok()?
+                .get("id")?
+                .as_str()
+                .map(String::from)
+        })
+        .collect();
     let mut sorted = ids.clone();
     sorted.sort();
     assert_eq!(ids, sorted, "items must be sorted by id ascending");

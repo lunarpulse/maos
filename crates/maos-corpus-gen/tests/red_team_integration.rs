@@ -10,8 +10,8 @@ use std::path::Path;
 fn missing_class_detected_against_violation_fixture() {
     let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/violation-red-team-missing-class/seeds-fixture.toml");
-    let gen = maos_corpus_gen::red_team::RedTeamGenerator::with_fixture_seeds(&fixture_path)
-        .unwrap();
+    let gen =
+        maos_corpus_gen::red_team::RedTeamGenerator::with_fixture_seeds(&fixture_path).unwrap();
 
     let report = gen.coverage_report_n(8);
 
@@ -49,8 +49,8 @@ fn missing_class_detected_against_violation_fixture() {
 fn clean_small_fixture_meets_per_seed_minimum() {
     let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/clean-red-team-small/seeds-fixture.toml");
-    let gen = maos_corpus_gen::red_team::RedTeamGenerator::with_fixture_seeds(&fixture_path)
-        .unwrap();
+    let gen =
+        maos_corpus_gen::red_team::RedTeamGenerator::with_fixture_seeds(&fixture_path).unwrap();
 
     let outcomes = gen.validate_all_n(64);
     assert!(!outcomes.is_empty());
@@ -67,7 +67,10 @@ fn clean_small_fixture_meets_per_seed_minimum() {
     let report = gen.coverage_report_n(64);
     assert_eq!(report.classes.len(), 8, "all 8 classes should be present");
     for (_, cc) in &report.classes {
-        assert!(cc.expanded_count > 0, "every class should have expanded items");
+        assert!(
+            cc.expanded_count > 0,
+            "every class should have expanded items"
+        );
     }
 }
 
@@ -76,8 +79,14 @@ fn clean_small_fixture_meets_per_seed_minimum() {
 fn coverage_binary_passes_for_canonical() {
     let output = std::process::Command::new("cargo")
         .args([
-            "run", "-p", "maos-corpus-gen", "--",
-            "coverage", "--corpus", "red-team-640", "--json",
+            "run",
+            "-p",
+            "maos-corpus-gen",
+            "--",
+            "coverage",
+            "--corpus",
+            "red-team-640",
+            "--json",
         ])
         .output()
         .unwrap();
@@ -98,8 +107,15 @@ fn coverage_binary_fails_on_missing_class_fixture() {
     );
     let output = std::process::Command::new("cargo")
         .args([
-            "run", "-p", "maos-corpus-gen", "--",
-            "coverage", "--corpus", "red-team-640", "--seeds-fixture", &fixture,
+            "run",
+            "-p",
+            "maos-corpus-gen",
+            "--",
+            "coverage",
+            "--corpus",
+            "red-team-640",
+            "--seeds-fixture",
+            &fixture,
         ])
         .output()
         .unwrap();

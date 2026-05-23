@@ -91,8 +91,14 @@ mod tests {
         for (kind, class, capacity) in expected {
             let (found_class, found_cap) =
                 channel_class_for(*kind).expect("IAC frame kind should be routable");
-            assert_eq!(found_class, *class, "channel_class_for({kind:?}) class mismatch");
-            assert_eq!(found_cap, *capacity, "channel_class_for({kind:?}) capacity mismatch");
+            assert_eq!(
+                found_class, *class,
+                "channel_class_for({kind:?}) class mismatch"
+            );
+            assert_eq!(
+                found_cap, *capacity,
+                "channel_class_for({kind:?}) capacity mismatch"
+            );
         }
     }
 

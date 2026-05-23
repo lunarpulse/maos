@@ -33,6 +33,7 @@ use super::redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
 /// Frame-kind discriminator for the Transparency Log row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i64)]
+#[non_exhaustive]
 pub enum FrameKind {
     TaskAssign = 0,
     TaskComplete = 1,
@@ -68,6 +69,8 @@ pub enum FrameKind {
     TaskStalled = 15,
     /// Story 5.3 — Spirit emitted heartbeat but no progress IAC for > threshold.
     SilentFailureSuspect = 16,
+    /// Story 5.4 — Spirit was revoked via CRL propagation.
+    SpiritRevoked = 17,
 }
 
 impl FrameKind {
@@ -91,6 +94,7 @@ impl FrameKind {
             14 => Some(Self::HotSwapAborted),
             15 => Some(Self::TaskStalled),
             16 => Some(Self::SilentFailureSuspect),
+            17 => Some(Self::SpiritRevoked),
             _ => None,
         }
     }
@@ -208,7 +212,10 @@ impl std::fmt::Debug for TransparencyLogInner {
 impl TransparencyLogAdapter {
     /// Return the frame_id of the most recently inserted frame event.
     pub fn last_frame_id(&self) -> [u8; 16] {
-        self.inner.lock().expect("TransparencyLogAdapter inner poisoned").last_frame_id
+        self.inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned")
+            .last_frame_id
     }
     /// Open the per-Host SQLite file. Initializes both tables if not present.
     /// Panics if the file is opened with a schema version this kernel does
@@ -247,10 +254,7 @@ impl TransparencyLogAdapter {
     /// Open an in-memory SQLite database for tests.
     #[doc(hidden)]
     pub fn open_in_memory(boot_nonce: u64) -> Self {
-        Self::open_in_memory_with_policy(
-            boot_nonce,
-            Box::new(CorpusBackedRedactionPolicy::new()),
-        )
+        Self::open_in_memory_with_policy(boot_nonce, Box::new(CorpusBackedRedactionPolicy::new()))
     }
 
     /// Open an in-memory SQLite database with custom redaction policy.
@@ -308,7 +312,10 @@ impl TransparencyLogAdapter {
         origin: FrameOrigin,
     ) -> LogBeforeDeliver<()> {
         let redacted = self.redaction.redact(payload);
-        let mut inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
         let frame_id = Self::next_frame_id(&mut inner);
         let timestamp_ns = wall_clock_now_ns();
 
@@ -359,13 +366,14 @@ impl TransparencyLogAdapter {
     ///
     /// At v0.1-β the Approval Manager does not yet emit approval-decision
     /// events; the runtime body ships in Story 1b.3.
-    pub fn insert_approval_decision(
-        &self,
-        decision: ApprovalDecision,
-    ) -> Result<(), AuditError> {
-        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+    pub fn insert_approval_decision(&self, decision: ApprovalDecision) -> Result<(), AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
         let timestamp_ns = wall_clock_now_ns();
-        inner.conn
+        inner
+            .conn
             .execute(
                 "INSERT INTO approval_decision_log
                     (timestamp_ns, actor, target, capability, intent, decision, reasoning)
@@ -390,7 +398,10 @@ impl TransparencyLogAdapter {
         &self,
         filter: FrameFilter,
     ) -> Result<Vec<TransparencyLogEntry>, AuditError> {
-        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
         let mut sql = String::from(
             "SELECT frame_id, timestamp_ns, spirit_pid, boot_nonce,
                     capability_token, kind, intent, payload_redacted, origin
@@ -415,7 +426,9 @@ impl TransparencyLogAdapter {
             where_clauses.push("timestamp_ns <= ?".to_string());
             params.push(Box::new(until as i64));
         }
-        if let (Some(cursor_ts), Some(cursor_fid)) = (filter.cursor_timestamp_ns, filter.cursor_frame_id) {
+        if let (Some(cursor_ts), Some(cursor_fid)) =
+            (filter.cursor_timestamp_ns, filter.cursor_frame_id)
+        {
             where_clauses.push("(timestamp_ns, frame_id) > (? , ?)".to_string());
             params.push(Box::new(cursor_ts as i64));
             params.push(Box::new(cursor_fid.to_vec()));
@@ -455,7 +468,8 @@ impl TransparencyLogAdapter {
                     spirit_pid: row.get::<_, i64>(2)? as u32,
                     boot_nonce: row.get::<_, i64>(3)? as u64,
                     capability_token: cap_token,
-                    kind: FrameKind::from_i64(row.get::<_, i64>(5)?).unwrap_or(FrameKind::TaskAssign),
+                    kind: FrameKind::from_i64(row.get::<_, i64>(5)?)
+                        .unwrap_or(FrameKind::TaskAssign),
                     intent: row.get(6)?,
                     payload_redacted: row.get(7)?,
                     origin: match row.get::<_, i64>(8)? {
@@ -482,7 +496,10 @@ impl TransparencyLogAdapter {
         &self,
         frame_id: [u8; 16],
     ) -> Result<Option<TransparencyLogEntry>, AuditError> {
-        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
         let mut stmt = inner
             .conn
             .prepare(
@@ -543,24 +560,30 @@ impl TransparencyLogAdapter {
         &self,
         _spirit_pid: Option<u32>,
     ) -> Result<Vec<ApprovalDecision>, AuditError> {
-        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
 
         let sql = "SELECT actor, target, capability, intent, decision, reasoning FROM approval_decision_log ORDER BY timestamp_ns ASC";
 
         let mut stmt = inner.conn.prepare(sql).map_err(AuditError::SqliteRead)?;
 
-        let rows = stmt.query_map([], |row| {
-            Ok(ApprovalDecision {
-                actor: row.get(0)?,
-                target: row.get(1)?,
-                capability: row.get(2)?,
-                intent: row.get(3)?,
-                decision: row.get::<_, i64>(4)? != 0,
-                reasoning: row.get(5)?,
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(ApprovalDecision {
+                    actor: row.get(0)?,
+                    target: row.get(1)?,
+                    capability: row.get(2)?,
+                    intent: row.get(3)?,
+                    decision: row.get::<_, i64>(4)? != 0,
+                    reasoning: row.get(5)?,
+                })
             })
-        }).map_err(AuditError::SqliteRead)?;
+            .map_err(AuditError::SqliteRead)?;
 
-        rows.collect::<Result<Vec<_>, _>>().map_err(AuditError::SqliteRead)
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(AuditError::SqliteRead)
     }
 
     /// Get a reference to the mailbox stub (for testing).
@@ -610,8 +633,9 @@ impl IacBusPort for TransparencyLogAdapter {
         &self,
         frame: maos_domain::frame::IacFrame,
     ) -> Result<LogBeforeDeliver<()>, maos_domain::iac_bus_types::IacBusError> {
-        let payload_bytes = serde_json::to_vec(&frame.payload)
-            .map_err(|e| maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string()))?;
+        let payload_bytes = serde_json::to_vec(&frame.payload).map_err(|e| {
+            maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
+        })?;
         Ok(self.enqueue_frame(&payload_bytes, frame.auto_marker))
     }
 
@@ -717,10 +741,12 @@ mod tests {
                 FrameOrigin::HumanAuthored,
             );
         }
-        let entries = log.query_frames(FrameFilter {
-            spirit_pid: Some(7),
-            ..Default::default()
-        }).unwrap();
+        let entries = log
+            .query_frames(FrameFilter {
+                spirit_pid: Some(7),
+                ..Default::default()
+            })
+            .unwrap();
         assert_eq!(entries.len(), 3);
         assert!(entries.iter().all(|e| e.spirit_pid == 7));
     }
@@ -752,10 +778,12 @@ mod tests {
 
         // Filter with since_ns after the first frame's timestamp — only the second should match.
         let since = all[0].timestamp_ns + 1;
-        let filtered = log.query_frames(FrameFilter {
-            since_ns: Some(since),
-            ..Default::default()
-        }).unwrap();
+        let filtered = log
+            .query_frames(FrameFilter {
+                since_ns: Some(since),
+                ..Default::default()
+            })
+            .unwrap();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].intent, "new");
     }
@@ -786,7 +814,11 @@ mod tests {
             h.join().expect("thread panicked");
         }
         let entries = log.query_frames(FrameFilter::default()).unwrap();
-        assert_eq!(entries.len(), 40, "expected 40 rows from 4 threads × 10 inserts");
+        assert_eq!(
+            entries.len(),
+            40,
+            "expected 40 rows from 4 threads × 10 inserts"
+        );
     }
 
     #[test]
@@ -799,7 +831,8 @@ mod tests {
             intent: "morning-digest".into(),
             decision: true,
             reasoning: Some("user grants calendar read for digest spirit".into()),
-        }).unwrap();
+        })
+        .unwrap();
 
         let approvals = log.query_approvals(None).unwrap();
         assert_eq!(approvals.len(), 1);
@@ -831,7 +864,8 @@ mod tests {
             intent: "intent".into(),
             decision: true,
             reasoning: None,
-        }).unwrap();
+        })
+        .unwrap();
 
         let inner = log.inner.lock().unwrap();
         let conn = &inner.conn;
@@ -855,22 +889,34 @@ mod tests {
         let mut stmt = conn
             .prepare("PRAGMA foreign_key_list(transparency_log)")
             .unwrap();
-        let fk_tlog: Vec<String> = stmt.query_map([], |row| row.get(0)).unwrap().map(|r| r.unwrap()).collect();
+        let fk_tlog: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
         assert!(fk_tlog.is_empty(), "transparency_log has foreign keys");
 
         // 3. No foreign keys on approval_decision_log
         let mut stmt = conn
             .prepare("PRAGMA foreign_key_list(approval_decision_log)")
             .unwrap();
-        let fk_adl: Vec<String> = stmt.query_map([], |row| row.get(0)).unwrap().map(|r| r.unwrap()).collect();
+        let fk_adl: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
         assert!(fk_adl.is_empty(), "approval_decision_log has foreign keys");
 
         // 4. Each table has exactly 1 row
         let tlog_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM transparency_log", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM transparency_log", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         let adl_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM approval_decision_log", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM approval_decision_log", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(tlog_count, 1);
         assert_eq!(adl_count, 1);
@@ -878,9 +924,14 @@ mod tests {
         // 5. Deleting from one table does not affect the other (test-only DELETE)
         conn.execute("DELETE FROM transparency_log", []).unwrap();
         let adl_after: i64 = conn
-            .query_row("SELECT COUNT(*) FROM approval_decision_log", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM approval_decision_log", [], |row| {
+                row.get(0)
+            })
             .unwrap();
-        assert_eq!(adl_after, 1, "approval row affected by transparency_log DELETE");
+        assert_eq!(
+            adl_after, 1,
+            "approval row affected by transparency_log DELETE"
+        );
     }
 
     #[test]
@@ -892,10 +943,8 @@ mod tests {
         {
             let mut inner = log.inner.lock().unwrap();
             // Close the connection to force failure on next write
-            let old_conn = std::mem::replace(
-                &mut inner.conn,
-                Connection::open_in_memory().unwrap(),
-            );
+            let old_conn =
+                std::mem::replace(&mut inner.conn, Connection::open_in_memory().unwrap());
             drop(old_conn);
             // The new connection doesn't have the schema, so INSERT will fail
             // Actually let's just force a failure by dropping and not recreating
@@ -939,7 +988,10 @@ mod tests {
 
     #[test]
     fn frame_kind_silent_failure_suspect_from_i64() {
-        assert_eq!(FrameKind::from_i64(16), Some(FrameKind::SilentFailureSuspect));
+        assert_eq!(
+            FrameKind::from_i64(16),
+            Some(FrameKind::SilentFailureSuspect)
+        );
     }
 
     #[test]
@@ -953,5 +1005,15 @@ mod tests {
             // we can match exhaustively.
             _ => "other",
         };
+    }
+
+    #[test]
+    fn frame_kind_spirit_revoked_from_i64() {
+        assert_eq!(FrameKind::from_i64(17), Some(FrameKind::SpiritRevoked));
+    }
+
+    #[test]
+    fn frame_kind_spirit_revoked_discriminant() {
+        assert_eq!(FrameKind::SpiritRevoked as i64, 17);
     }
 }

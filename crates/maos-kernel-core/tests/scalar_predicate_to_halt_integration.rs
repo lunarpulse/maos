@@ -7,27 +7,24 @@
 //! Mirror of `halt_invoke_test.rs` fixture pattern (in-memory TL,
 //! tmpdir journal, real HaltRegistry).
 
-use std::sync::Arc;
 use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+use std::sync::Arc;
 
-use maos_domain::ports::crypto::CryptoProvider;
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
 use maos_domain::halt::HaltState;
-use maos_kernel_core::capability::{
-    CapabilityRegistryAdapter, CapabilityRegistryPort,
-    cap_tokens::Ed25519SigningKey,
-    cap_policy::PolicyTable,
-    cap_quota::CapQuotaTracker,
-    WorkingMemoryStore,
-};
-use maos_kernel_core::iac::{FrameKind, TransparencyLogAdapter};
-use maos_kernel_core::journal::JournalAdapter;
-use maos_kernel_core::halt::{HaltRegistry, invoke_halt};
-use maos_kernel_core::security::manifest::{
-    EpistemicAction, EpistemicPolicySection, EpistemicPolicyRule, ScalarPredicate,
-};
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+use maos_domain::ports::crypto::CryptoProvider;
 use maos_kernel_core::capability::working_memory::policy_runtime::{
     evaluate_after_set_scalar, PolicyEvaluationOutcome,
+};
+use maos_kernel_core::capability::{
+    cap_policy::PolicyTable, cap_quota::CapQuotaTracker, cap_tokens::Ed25519SigningKey,
+    CapabilityRegistryAdapter, CapabilityRegistryPort, WorkingMemoryStore,
+};
+use maos_kernel_core::halt::{invoke_halt, HaltRegistry};
+use maos_kernel_core::iac::{FrameKind, TransparencyLogAdapter};
+use maos_kernel_core::journal::JournalAdapter;
+use maos_kernel_core::security::manifest::{
+    EpistemicAction, EpistemicPolicyRule, EpistemicPolicySection, ScalarPredicate,
 };
 
 fn make_adapter() -> CapabilityRegistryAdapter {
@@ -39,21 +36,26 @@ fn make_adapter() -> CapabilityRegistryAdapter {
     let working_memory = Arc::new(WorkingMemoryStore::new());
     let telemetry = Arc::new(TelemetryStreamAdapter::default());
     CapabilityRegistryAdapter::new(
-        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory, telemetry,
+        crypto,
+        signing_key,
+        0xCAFE,
+        policy,
+        audit_tx,
+        quota,
+        working_memory,
+        telemetry,
     )
 }
 
 fn make_policy() -> EpistemicPolicySection {
     EpistemicPolicySection {
-        rules: vec![
-            EpistemicPolicyRule::new(
-                "uncertainty".into(),
-                EpistemicAction::Halt,
-                None,
-                None,
-                Some(ScalarPredicate::Above { threshold: 0.7 }),
-            ),
-        ],
+        rules: vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Halt,
+            None,
+            None,
+            Some(ScalarPredicate::Above { threshold: 0.7 }),
+        )],
         default_action: EpistemicAction::VerbalizeOnly,
     }
 }
@@ -82,9 +84,14 @@ fn set_scalar_to_halt_end_to_end() {
 
     // Step 2: evaluate policy
     let outcome = evaluate_after_set_scalar(
-        spirit_id, spirit_pid, boot_nonce,
-        "uncertainty", 0.85, "frame-001",
-        &policy, &adapter as &dyn CapabilityRegistryPort,
+        spirit_id,
+        spirit_pid,
+        boot_nonce,
+        "uncertainty",
+        0.85,
+        "frame-001",
+        &policy,
+        &adapter as &dyn CapabilityRegistryPort,
     )
     .unwrap();
 
@@ -95,8 +102,7 @@ fn set_scalar_to_halt_end_to_end() {
 
     // Step 3: invoke_halt
     let receipt = invoke_halt(
-        &tl, &journal, &registry,
-        payload, spirit_pid, spirit_id, boot_nonce,
+        &tl, &journal, &registry, payload, spirit_pid, spirit_id, boot_nonce,
     )
     .unwrap();
 
@@ -122,8 +128,11 @@ fn set_scalar_to_halt_end_to_end() {
     assert_eq!(pending[0].as_str(), receipt.halt_id.as_str());
 
     // Verify Lifecycle Journal has the Halt entry
-    assert_eq!(journal.last_event("spirit-1"), Some(LifecycleEvent::Halt),
-        "expected LifecycleEvent::Halt in journal");
+    assert_eq!(
+        journal.last_event("spirit-1"),
+        Some(LifecycleEvent::Halt),
+        "expected LifecycleEvent::Halt in journal"
+    );
 }
 
 #[test]
@@ -132,27 +141,33 @@ fn set_scalar_no_halt_when_predicate_does_not_fire() {
     let policy = make_policy();
 
     let outcome = evaluate_after_set_scalar(
-        "spirit-1", 1, 0xCAFE,
-        "uncertainty", 0.5, "frame-001",
-        &policy, &adapter as &dyn CapabilityRegistryPort,
+        "spirit-1",
+        1,
+        0xCAFE,
+        "uncertainty",
+        0.5,
+        "frame-001",
+        &policy,
+        &adapter as &dyn CapabilityRegistryPort,
     )
     .unwrap();
 
-    assert!(outcome.is_none(), "expected no halt when value is below threshold");
+    assert!(
+        outcome.is_none(),
+        "expected no halt when value is below threshold"
+    );
 }
 
 #[test]
 fn set_scalar_flag_action_does_not_halt() {
     let flag_policy = EpistemicPolicySection {
-        rules: vec![
-            EpistemicPolicyRule::new(
-                "uncertainty".into(),
-                EpistemicAction::Flag,
-                None,
-                None,
-                Some(ScalarPredicate::Above { threshold: 0.5 }),
-            ),
-        ],
+        rules: vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::Flag,
+            None,
+            None,
+            Some(ScalarPredicate::Above { threshold: 0.5 }),
+        )],
         default_action: EpistemicAction::VerbalizeOnly,
     };
 
@@ -164,9 +179,14 @@ fn set_scalar_flag_action_does_not_halt() {
     let registry = HaltRegistry::new();
 
     let outcome = evaluate_after_set_scalar(
-        "spirit-1", 1, 0xCAFE,
-        "uncertainty", 0.9, "frame-001",
-        &flag_policy, &adapter as &dyn CapabilityRegistryPort,
+        "spirit-1",
+        1,
+        0xCAFE,
+        "uncertainty",
+        0.9,
+        "frame-001",
+        &flag_policy,
+        &adapter as &dyn CapabilityRegistryPort,
     )
     .unwrap();
 
@@ -176,28 +196,39 @@ fn set_scalar_flag_action_does_not_halt() {
     );
 
     // Negative side-effect assertions: Flag must NOT produce TL rows, journal entries, or registry state
-    let tl_entries = tl.query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
-        kind: Some(FrameKind::EpistemicHalt),
-        ..Default::default()
-    }).unwrap();
-    assert_eq!(tl_entries.len(), 0, "Flag action must not write to Transparency Log");
-    assert_eq!(registry.pending_halt_ids().len(), 0, "Flag action must not insert into HaltRegistry");
-    assert_ne!(journal.last_event("spirit-1"), Some(LifecycleEvent::Halt),
-        "Flag action must not write Halt to journal");
+    let tl_entries = tl
+        .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+            kind: Some(FrameKind::EpistemicHalt),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        tl_entries.len(),
+        0,
+        "Flag action must not write to Transparency Log"
+    );
+    assert_eq!(
+        registry.pending_halt_ids().len(),
+        0,
+        "Flag action must not insert into HaltRegistry"
+    );
+    assert_ne!(
+        journal.last_event("spirit-1"),
+        Some(LifecycleEvent::Halt),
+        "Flag action must not write Halt to journal"
+    );
 }
 
 #[test]
 fn set_scalar_verbalize_only_action_does_not_halt() {
     let verbalize_policy = EpistemicPolicySection {
-        rules: vec![
-            EpistemicPolicyRule::new(
-                "uncertainty".into(),
-                EpistemicAction::VerbalizeOnly,
-                None,
-                None,
-                Some(ScalarPredicate::Above { threshold: 0.5 }),
-            ),
-        ],
+        rules: vec![EpistemicPolicyRule::new(
+            "uncertainty".into(),
+            EpistemicAction::VerbalizeOnly,
+            None,
+            None,
+            Some(ScalarPredicate::Above { threshold: 0.5 }),
+        )],
         default_action: EpistemicAction::VerbalizeOnly,
     };
 
@@ -209,9 +240,14 @@ fn set_scalar_verbalize_only_action_does_not_halt() {
     let registry = HaltRegistry::new();
 
     let outcome = evaluate_after_set_scalar(
-        "spirit-1", 1, 0xCAFE,
-        "uncertainty", 0.9, "frame-001",
-        &verbalize_policy, &adapter as &dyn CapabilityRegistryPort,
+        "spirit-1",
+        1,
+        0xCAFE,
+        "uncertainty",
+        0.9,
+        "frame-001",
+        &verbalize_policy,
+        &adapter as &dyn CapabilityRegistryPort,
     )
     .unwrap();
 
@@ -221,14 +257,27 @@ fn set_scalar_verbalize_only_action_does_not_halt() {
     );
 
     // Negative side-effect assertions
-    let tl_entries = tl.query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
-        kind: Some(FrameKind::EpistemicHalt),
-        ..Default::default()
-    }).unwrap();
-    assert_eq!(tl_entries.len(), 0, "VerbalizeOnly action must not write to Transparency Log");
-    assert_eq!(registry.pending_halt_ids().len(), 0, "VerbalizeOnly action must not insert into HaltRegistry");
-    assert_ne!(journal.last_event("spirit-1"), Some(LifecycleEvent::Halt),
-        "VerbalizeOnly action must not write Halt to journal");
+    let tl_entries = tl
+        .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+            kind: Some(FrameKind::EpistemicHalt),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        tl_entries.len(),
+        0,
+        "VerbalizeOnly action must not write to Transparency Log"
+    );
+    assert_eq!(
+        registry.pending_halt_ids().len(),
+        0,
+        "VerbalizeOnly action must not insert into HaltRegistry"
+    );
+    assert_ne!(
+        journal.last_event("spirit-1"),
+        Some(LifecycleEvent::Halt),
+        "VerbalizeOnly action must not write Halt to journal"
+    );
 }
 
 #[test]
@@ -237,9 +286,14 @@ fn set_scalar_non_matching_tag_no_halt() {
     let policy = make_policy();
 
     let outcome = evaluate_after_set_scalar(
-        "spirit-1", 1, 0xCAFE,
-        "different_tag", 0.85, "frame-001",
-        &policy, &adapter as &dyn CapabilityRegistryPort,
+        "spirit-1",
+        1,
+        0xCAFE,
+        "different_tag",
+        0.85,
+        "frame-001",
+        &policy,
+        &adapter as &dyn CapabilityRegistryPort,
     )
     .unwrap();
 

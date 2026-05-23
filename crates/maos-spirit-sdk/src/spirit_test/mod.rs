@@ -12,19 +12,19 @@
 //! per-language SDK with assertion macros + halt resolution + manifest
 //! self-check + class-specific regression corpus is Story 7.1 at v0.5+.
 
-pub mod harness;
 pub mod assert;
 pub mod halt;
+pub mod harness;
+pub mod isolation;
 pub mod manifest;
 pub mod regression;
-pub mod isolation;
 
-pub use harness::{SpiritTest, ExtendedRunReport};
 pub use halt::{HaltResolutionKind, HaltResolutionRecord};
-pub use manifest::{ManifestSelfCheckReport, ManifestSelfCheckViolation, manifest_self_check};
-pub use regression::{RegressionCorpus, RegressionCase, SpiritClass};
+pub use harness::{ExtendedRunReport, SpiritTest};
 pub use isolation::{
-    CrossSpiritIsolationFixture, IsolationAttackCategory, IsolationAttackCase,
-    IsolationHookPoint, IsolationHookOutcome, IsolationOutcome, DefaultIsolationHook,
-    HookCallRecord, AttemptResult, ObservationResult,
+    AttemptResult, CrossSpiritIsolationFixture, DefaultIsolationHook, HookCallRecord,
+    IsolationAttackCase, IsolationAttackCategory, IsolationHookOutcome, IsolationHookPoint,
+    IsolationOutcome, ObservationResult,
 };
+pub use manifest::{manifest_self_check, ManifestSelfCheckReport, ManifestSelfCheckViolation};
+pub use regression::{RegressionCase, RegressionCorpus, SpiritClass};

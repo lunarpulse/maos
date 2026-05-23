@@ -20,9 +20,8 @@ use maos_spirit_abi::identity::FrameKind;
 /// Exponential, base √2, anchored on the 1500µs SLO from §13.1.
 /// 17 explicit boundaries + implicit +Inf = 18 buckets total.
 pub const IAC_RT_BUCKETS_US: &[f64] = &[
-    50.0, 75.0, 100.0, 150.0, 200.0, 300.0, 450.0, 700.0,
-    1000.0, 1500.0, 2200.0, 3300.0, 5000.0, 7500.0, 11000.0,
-    16000.0, 25000.0,
+    50.0, 75.0, 100.0, 150.0, 200.0, 300.0, 450.0, 700.0, 1000.0, 1500.0, 2200.0, 3300.0, 5000.0,
+    7500.0, 11000.0, 16000.0, 25000.0,
 ];
 
 /// Service label — five variants.
@@ -33,6 +32,10 @@ pub enum Service {
     Iac,
     Capability,
     SpiritScheduler,
+    /// Story 5.4 — revocation applier telemetry.
+    RevocationApplier,
+    /// Story 5.4 — upgrade orchestrator telemetry.
+    UpgradeOrchestrator,
 }
 
 impl Service {
@@ -43,6 +46,8 @@ impl Service {
             Service::Iac => "iac",
             Service::Capability => "capability",
             Service::SpiritScheduler => "spirit_scheduler",
+            Service::RevocationApplier => "revocation_applier",
+            Service::UpgradeOrchestrator => "upgrade_orchestrator",
         }
     }
 }
@@ -88,7 +93,9 @@ impl ErrorKind {
 }
 
 /// One histogram series keyed by (service, outcome).
-#[maos_attrs::i9_exempt(reason = "IAC telemetry accumulator; AtomicU64 buckets are the sanctioned metric state (IAC round-trip telemetry binding per Epic 1b Owns)")]
+#[maos_attrs::i9_exempt(
+    reason = "IAC telemetry accumulator; AtomicU64 buckets are the sanctioned metric state (IAC round-trip telemetry binding per Epic 1b Owns)"
+)]
 #[derive(Debug)]
 struct HistogramSeries {
     buckets: Vec<AtomicU64>,
@@ -122,7 +129,9 @@ impl HistogramSeries {
 }
 
 /// One counter series keyed by (service, kind).
-#[maos_attrs::i9_exempt(reason = "IAC telemetry accumulator; AtomicU64 counter is the sanctioned metric state (IAC round-trip telemetry binding per Epic 1b Owns)")]
+#[maos_attrs::i9_exempt(
+    reason = "IAC telemetry accumulator; AtomicU64 counter is the sanctioned metric state (IAC round-trip telemetry binding per Epic 1b Owns)"
+)]
 #[derive(Debug)]
 struct CounterSeries {
     value: AtomicU64,
@@ -141,7 +150,9 @@ impl CounterSeries {
 }
 
 /// In-memory metrics registry for IAC round-trip telemetry.
-#[maos_attrs::i9_exempt(reason = "IAC round-trip telemetry registry (sanctioned persistent location per Epic 1b Owns); Vec<Atomic> are metric accumulators, not mutable kernel state")]
+#[maos_attrs::i9_exempt(
+    reason = "IAC round-trip telemetry registry (sanctioned persistent location per Epic 1b Owns); Vec<Atomic> are metric accumulators, not mutable kernel state"
+)]
 #[derive(Debug)]
 pub struct IacRtMetrics {
     histograms: Vec<(Service, Outcome, HistogramSeries)>,
@@ -165,12 +176,24 @@ impl IacRtMetrics {
             Service::Iac,
             Service::Capability,
             Service::SpiritScheduler,
+            Service::RevocationApplier,
+            Service::UpgradeOrchestrator,
         ] {
             inflight.push((svc, AtomicI64::new(0)));
-            for out in [Outcome::Ok, Outcome::Err, Outcome::Timeout, Outcome::CrashHandled] {
+            for out in [
+                Outcome::Ok,
+                Outcome::Err,
+                Outcome::Timeout,
+                Outcome::CrashHandled,
+            ] {
                 histograms.push((svc, out, HistogramSeries::new()));
             }
-            for kind in [ErrorKind::Transport, ErrorKind::Decode, ErrorKind::Timeout, ErrorKind::App] {
+            for kind in [
+                ErrorKind::Transport,
+                ErrorKind::Decode,
+                ErrorKind::Timeout,
+                ErrorKind::App,
+            ] {
                 errors.push((svc, kind, CounterSeries::new()));
             }
         }
@@ -208,9 +231,7 @@ impl IacRtMetrics {
         for (s, g) in &self.inflight {
             if *s == service {
                 g.fetch_add(1, Ordering::Relaxed);
-                return InflightGuard {
-                    gauge: Some(g),
-                };
+                return InflightGuard { gauge: Some(g) };
             }
         }
         // Fallback (should never happen if enum is exhaustive)
@@ -281,9 +302,7 @@ impl IacRtMetrics {
             let _ = writeln!(
                 &mut out,
                 "iac_pending_frames_total{{spirit_id=\"{}\",kind=\"{:?}\"}} {}",
-                spirit_id,
-                kind,
-                val
+                spirit_id, kind, val
             );
         }
 
@@ -307,7 +326,12 @@ impl IacRtMetrics {
         if let Some(entry) = self.pending_frames.get(&key) {
             let mut current = entry.load(Ordering::Relaxed);
             while current > 0 {
-                match entry.compare_exchange_weak(current, current - 1, Ordering::Relaxed, Ordering::Relaxed) {
+                match entry.compare_exchange_weak(
+                    current,
+                    current - 1,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                ) {
                     Ok(_) => break,
                     Err(actual) => current = actual,
                 }
@@ -342,9 +366,8 @@ mod tests {
     #[test]
     fn exact_buckets_equality() {
         let expected: &[f64] = &[
-            50.0, 75.0, 100.0, 150.0, 200.0, 300.0, 450.0, 700.0,
-            1000.0, 1500.0, 2200.0, 3300.0, 5000.0, 7500.0, 11000.0,
-            16000.0, 25000.0,
+            50.0, 75.0, 100.0, 150.0, 200.0, 300.0, 450.0, 700.0, 1000.0, 1500.0, 2200.0, 3300.0,
+            5000.0, 7500.0, 11000.0, 16000.0, 25000.0,
         ];
         assert_eq!(IAC_RT_BUCKETS_US, expected);
         assert_eq!(IAC_RT_BUCKETS_US.len(), 17);
@@ -366,8 +389,12 @@ mod tests {
         metrics.record_iac_rt(Service::Capability, Outcome::Ok, 1200);
         metrics.record_iac_error(Service::Capability, ErrorKind::Timeout);
         let rendered = metrics.render_prometheus();
-        assert!(rendered.contains("iac_rt_duration_us_bucket{service=\"capability\",outcome=\"ok\",le=\"1500\"}"));
-        assert!(rendered.contains("iac_rt_duration_us_count{service=\"capability\",outcome=\"ok\"}"));
+        assert!(rendered.contains(
+            "iac_rt_duration_us_bucket{service=\"capability\",outcome=\"ok\",le=\"1500\"}"
+        ));
+        assert!(
+            rendered.contains("iac_rt_duration_us_count{service=\"capability\",outcome=\"ok\"}")
+        );
         assert!(rendered.contains("iac_rt_duration_us_sum{service=\"capability\",outcome=\"ok\"}"));
         assert!(rendered.contains("iac_rt_inflight{service=\"capability\"}"));
         assert!(rendered.contains("iac_rt_errors_total{service=\"capability\",kind=\"timeout\"}"));
@@ -405,11 +432,17 @@ mod tests {
         metrics.record_iac_rt(Service::Security, Outcome::Ok, 1501);
         let rendered = metrics.render_prometheus();
         // 45us -> bucket le="50"
-        assert!(rendered.contains("iac_rt_duration_us_bucket{service=\"security\",outcome=\"ok\",le=\"50\"} 1"));
+        assert!(rendered.contains(
+            "iac_rt_duration_us_bucket{service=\"security\",outcome=\"ok\",le=\"50\"} 1"
+        ));
         // 55us -> bucket le="75"
-        assert!(rendered.contains("iac_rt_duration_us_bucket{service=\"security\",outcome=\"ok\",le=\"75\"} 1"));
+        assert!(rendered.contains(
+            "iac_rt_duration_us_bucket{service=\"security\",outcome=\"ok\",le=\"75\"} 1"
+        ));
         // 1501us -> bucket le="2200"
-        assert!(rendered.contains("iac_rt_duration_us_bucket{service=\"security\",outcome=\"ok\",le=\"2200\"} 1"));
+        assert!(rendered.contains(
+            "iac_rt_duration_us_bucket{service=\"security\",outcome=\"ok\",le=\"2200\"} 1"
+        ));
     }
 
     #[test]

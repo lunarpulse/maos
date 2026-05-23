@@ -1,0 +1,12 @@
+{
+  "scenario_id": "upg-policy_mismatch-004",
+  "category": "policy_mismatch",
+  "predecessor_manifest_path": "crates/maos-eval/fixtures/upgrade-policy-corpus-v0/policy_mismatch_pred_004.toml",
+  "successor_manifest_path": "crates/maos-eval/fixtures/upgrade-policy-corpus-v0/policy_mismatch_succ_004.toml",
+  "policy": "migrator",
+  "expected_outcome": {
+    "report_outcome": "failed",
+    "lifecycle_event_journaled": false,
+    "halt_receipts_produced_min": 0
+  }
+}

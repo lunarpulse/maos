@@ -42,7 +42,10 @@ impl std::fmt::Display for StateCodecError {
             Self::CborDecode(msg) => write!(f, "CBOR decode error: {msg}"),
             Self::CborEncode(msg) => write!(f, "CBOR encode error: {msg}"),
             Self::SchemaVersionMismatch { expected, actual } => {
-                write!(f, "schema version mismatch: expected {expected}, got {actual}")
+                write!(
+                    f,
+                    "schema version mismatch: expected {expected}, got {actual}"
+                )
             }
         }
     }
@@ -91,9 +94,7 @@ pub fn decode(blob: &[u8], expected_schema_version: u32) -> Result<StateEnvelope
     let schema_version_raw = value
         .get("schema_version")
         .and_then(|v| v.as_u64())
-        .ok_or_else(|| {
-            StateCodecError::CborDecode("missing 'schema_version' field".into())
-        })?;
+        .ok_or_else(|| StateCodecError::CborDecode("missing 'schema_version' field".into()))?;
     if schema_version_raw > u32::MAX as u64 {
         return Err(StateCodecError::CborDecode(
             format!("schema_version {schema_version_raw} exceeds u32::MAX").into(),
@@ -173,7 +174,10 @@ impl StateCodec {
         encode(state, schema_version)
     }
 
-    pub fn decode(blob: &[u8], expected_schema_version: u32) -> Result<StateEnvelope, StateCodecError> {
+    pub fn decode(
+        blob: &[u8],
+        expected_schema_version: u32,
+    ) -> Result<StateEnvelope, StateCodecError> {
         decode(blob, expected_schema_version)
     }
 }

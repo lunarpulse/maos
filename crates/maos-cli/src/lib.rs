@@ -29,10 +29,7 @@ pub fn run(args: Vec<OsString>) -> ExitCode {
         }
     };
 
-    let color = accessibility::ColorChoice::resolve(
-        parsed.plain,
-        &accessibility::RealEnv,
-    );
+    let color = accessibility::ColorChoice::resolve(parsed.plain, &accessibility::RealEnv);
 
     subcommands::dispatch(&parsed.command, color)
 }

@@ -15,24 +15,24 @@
 //! `maos-domain::halt` to avoid a circular dependency between
 //! `maos-kernel-core` and `maos-director-surface`.
 
-use std::sync::{Arc, Mutex};
-use maos_domain::halt::{
-    HaltId, HaltResolver, HaltState, OutputMarker, Resolution, ResolveError,
-};
+use crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator;
+use crate::halt::output_markers::OutputMarkerRegistry;
+use crate::halt::HaltRegistry;
+use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+use crate::iac::Mailbox;
+use crate::memory::MemoryManagerAdapter;
+use maos_domain::halt::{HaltId, HaltResolver, HaltState, OutputMarker, Resolution, ResolveError};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::MemoryManagerPort;
-use crate::halt::HaltRegistry;
-use crate::halt::output_markers::OutputMarkerRegistry;
-use crate::iac::transparency_log::{TransparencyLogAdapter, FrameKind};
-use crate::iac::Mailbox;
-use crate::memory::MemoryManagerAdapter;
-use crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator;
+use std::sync::{Arc, Mutex};
 
 /// Captures every `resolve` call for unit-test assertion. Story 3.3
 /// uses this from `halt_ui` tests to verify the submission path
 /// without depending on Story 4.1's kernel-side mechanism.
-#[maos_attrs::i9_exempt(reason = "test double — captures resolve() calls; production wiring is v0.3-β bootstrap; Story 4.1 swaps for KernelHaltResolver")]
+#[maos_attrs::i9_exempt(
+    reason = "test double — captures resolve() calls; production wiring is v0.3-β bootstrap; Story 4.1 swaps for KernelHaltResolver"
+)]
 #[derive(Debug, Default)]
 pub struct MockHaltResolver {
     calls: Mutex<Vec<(HaltId, Resolution)>>,
@@ -54,7 +54,10 @@ impl MockHaltResolver {
 
 impl HaltResolver for MockHaltResolver {
     fn resolve(&self, halt_id: &HaltId, resolution: Resolution) -> Result<(), ResolveError> {
-        self.calls.lock().unwrap().push((halt_id.clone(), resolution));
+        self.calls
+            .lock()
+            .unwrap()
+            .push((halt_id.clone(), resolution));
         Ok(())
     }
 }
@@ -86,7 +89,9 @@ impl HaltResolver for FailingHaltResolver {
 /// ## Architecture references
 /// - §4.6.1 (Epistemic Halt mechanism — three resolution kinds)
 /// - Epic 3 retro A1 (`HaltResolver` at `maos-domain`)
-#[maos_attrs::i9_exempt(reason = "production halt resolver — ties resolution into HaltRegistry + TransparencyLog + OutputMarkerRegistry; kernel-side state machine for three resolution kinds")]
+#[maos_attrs::i9_exempt(
+    reason = "production halt resolver — ties resolution into HaltRegistry + TransparencyLog + OutputMarkerRegistry; kernel-side state machine for three resolution kinds"
+)]
 pub struct KernelHaltResolver {
     registry: Arc<HaltRegistry>,
     tl: Arc<TransparencyLogAdapter>,
@@ -135,12 +140,18 @@ impl HaltResolver for KernelHaltResolver {
         // Story 4.3 — metadata is cleaned up by resolve(), so look it up first.
         let pending_opt = self.registry.lookup_pending_metadata(halt_id);
 
-        let pre = self.registry.resolve(halt_id, terminal).map_err(|e| match e {
-            crate::halt::ResolveStateError::NotPending(s) => ResolveError::UnknownHalt(s),
-            crate::halt::ResolveStateError::AlreadyTerminal(s) => ResolveError::AlreadyResolved(s),
-        })?;
+        let pre = self
+            .registry
+            .resolve(halt_id, terminal)
+            .map_err(|e| match e {
+                crate::halt::ResolveStateError::NotPending(s) => ResolveError::UnknownHalt(s),
+                crate::halt::ResolveStateError::AlreadyTerminal(s) => {
+                    ResolveError::AlreadyResolved(s)
+                }
+            })?;
         assert_eq!(
-            pre, HaltState::PendingResolution,
+            pre,
+            HaltState::PendingResolution,
             "registry must only transition from PendingResolution"
         );
 
@@ -161,9 +172,7 @@ impl HaltResolver for KernelHaltResolver {
                         &format!("halt_context::{}", halt_id.as_str()),
                         MemoryValue::Text(text.clone()),
                     )
-                    .map_err(|e| {
-                        ResolveError::Internal(format!("memory.write failed: {e}"))
-                    })?;
+                    .map_err(|e| ResolveError::Internal(format!("memory.write failed: {e}")))?;
 
                 // 3. Publish a marker scalar via the WorkingMemoryOrchestrator
                 //    so the Spirit's epistemic_policy can detect that a halt
@@ -178,9 +187,7 @@ impl HaltResolver for KernelHaltResolver {
                         halt_id.as_str(),
                     )
                     .map_err(|e| {
-                        ResolveError::Internal(format!(
-                            "scalar marker publish failed: {e}"
-                        ))
+                        ResolveError::Internal(format!("scalar marker publish failed: {e}"))
                     })?;
             }
             Resolution::AcceptedHalt => {
@@ -189,7 +196,9 @@ impl HaltResolver for KernelHaltResolver {
                 // "orphaned: accepted_halt halt_id=..."
                 self.emit_task_orphaned(halt_id);
             }
-            Resolution::AuthorizedOverride { operator_policy_ref } => {
+            Resolution::AuthorizedOverride {
+                operator_policy_ref,
+            } => {
                 // Append OutputMarker::Override to the Spirit's output queue.
                 // Story 4.2's output_shape predicates consume this marker
                 // to gate subsequent output frames.
@@ -241,9 +250,12 @@ mod tests {
     #[test]
     fn mock_call_count_reflects_multiple_calls() {
         let mock = MockHaltResolver::new();
-        mock.resolve(&HaltId::new("a").unwrap(), Resolution::AcceptedHalt).unwrap();
-        mock.resolve(&HaltId::new("b").unwrap(), Resolution::AcceptedHalt).unwrap();
-        mock.resolve(&HaltId::new("c").unwrap(), Resolution::AcceptedHalt).unwrap();
+        mock.resolve(&HaltId::new("a").unwrap(), Resolution::AcceptedHalt)
+            .unwrap();
+        mock.resolve(&HaltId::new("b").unwrap(), Resolution::AcceptedHalt)
+            .unwrap();
+        mock.resolve(&HaltId::new("c").unwrap(), Resolution::AcceptedHalt)
+            .unwrap();
         assert_eq!(mock.call_count(), 3);
     }
 

@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
+use maos_domain::orchestrator::OrchestratorInstruction;
 use std::collections::VecDeque;
 use std::sync::Mutex;
-use maos_domain::orchestrator::OrchestratorInstruction;
 
 /// Bounded per-Spirit instruction buffer. The Orchestrator-class Spirit
 /// owns the dequeue cadence; the kernel only enforces FIFO + capacity.
@@ -13,7 +13,9 @@ use maos_domain::orchestrator::OrchestratorInstruction;
 ///
 /// Backpressure: `enqueue` returns `OrchestratorBufferError::QueueFull`
 /// when at capacity; CLI surfaces this to the director rather than dropping.
-#[maos_attrs::i9_exempt(reason = "orchestrator instruction buffer — transient per-process VecDeque for FR20 checkpoint/resume primitive; parallel to Mailbox routing state")]
+#[maos_attrs::i9_exempt(
+    reason = "orchestrator instruction buffer — transient per-process VecDeque for FR20 checkpoint/resume primitive; parallel to Mailbox routing state"
+)]
 #[derive(Debug)]
 pub struct OrchestratorBuffer {
     queue: Mutex<VecDeque<OrchestratorInstruction>>,
@@ -104,12 +106,7 @@ mod tests {
     use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
 
     fn make_instruction(id: u64, goal: impl Into<String>) -> OrchestratorInstruction {
-        OrchestratorInstruction::new(
-            OrchestratorInstructionId(id),
-            goal,
-            0,
-        )
-        .unwrap()
+        OrchestratorInstruction::new(OrchestratorInstructionId(id), goal, 0).unwrap()
     }
 
     #[test]
@@ -134,7 +131,8 @@ mod tests {
     fn enqueue_32_succeeds_33rd_returns_queue_full() {
         let buf = OrchestratorBuffer::new();
         for i in 0..32 {
-            buf.enqueue(make_instruction(i as u64, format!("goal {}", i))).unwrap();
+            buf.enqueue(make_instruction(i as u64, format!("goal {}", i)))
+                .unwrap();
         }
         assert_eq!(buf.pending_count(), 32);
         let err = buf.enqueue(make_instruction(99, "overflow")).unwrap_err();

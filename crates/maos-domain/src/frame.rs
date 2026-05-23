@@ -16,8 +16,8 @@
 //! | `ConsentEnvelope` | `None` | Story 6.3 (ADR-012) |
 
 use crate::invariants::i1::{IntentClass, Scope};
-use crate::invariants::i3::FrameOrigin;
 use crate::invariants::i13::IntentLineage;
+use crate::invariants::i3::FrameOrigin;
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
 use smallvec::SmallVec;
 
@@ -119,7 +119,9 @@ pub struct HaltPolicyOverride {
 impl PartialEq for HaltPolicyOverride {
     fn eq(&self, other: &Self) -> bool {
         self.tag == other.tag
-            && self.recall_vs_precision.total_cmp(&other.recall_vs_precision)
+            && self
+                .recall_vs_precision
+                .total_cmp(&other.recall_vs_precision)
                 == std::cmp::Ordering::Equal
     }
 }
@@ -394,7 +396,9 @@ mod tests {
 
     #[test]
     fn iac_frame_task_complete_serde_round_trip() {
-        let payload = FramePayload::TaskComplete(TaskCompletePayload { result: "done".into() });
+        let payload = FramePayload::TaskComplete(TaskCompletePayload {
+            result: "done".into(),
+        });
         let mut frame = make_frame(payload);
         frame.kind = FrameKind::TaskComplete;
         let json = serde_json::to_string(&frame).unwrap();
@@ -427,14 +431,17 @@ mod tests {
 
     #[test]
     fn iac_frame_epistemic_halt_serde_round_trip() {
-        let payload = FramePayload::EpistemicHalt(EpistemicHaltPayload::new(
-            "halt-001".into(),
-            "claim.security".into(),
-            0.3,
-            Some(0.5),
-            "pol-1".into(),
-            "derived".into(),
-        ).unwrap());
+        let payload = FramePayload::EpistemicHalt(
+            EpistemicHaltPayload::new(
+                "halt-001".into(),
+                "claim.security".into(),
+                0.3,
+                Some(0.5),
+                "pol-1".into(),
+                "derived".into(),
+            )
+            .unwrap(),
+        );
         let mut frame = make_frame(payload);
         frame.kind = FrameKind::EpistemicHalt;
         let json = serde_json::to_string(&frame).unwrap();
@@ -455,7 +462,12 @@ mod tests {
     #[test]
     fn epistemic_halt_payload_rejects_nan_value() {
         let result = EpistemicHaltPayload::new(
-            "h".into(), "t".into(), f32::NAN, None, "p".into(), "d".into(),
+            "h".into(),
+            "t".into(),
+            f32::NAN,
+            None,
+            "p".into(),
+            "d".into(),
         );
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), HaltPayloadError::NanValue));
@@ -464,17 +476,24 @@ mod tests {
     #[test]
     fn epistemic_halt_payload_rejects_nan_threshold() {
         let result = EpistemicHaltPayload::new(
-            "h".into(), "t".into(), 0.0, Some(f32::NAN), "p".into(), "d".into(),
+            "h".into(),
+            "t".into(),
+            0.0,
+            Some(f32::NAN),
+            "p".into(),
+            "d".into(),
         );
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), HaltPayloadError::NanThreshold));
+        assert!(matches!(
+            result.unwrap_err(),
+            HaltPayloadError::NanThreshold
+        ));
     }
 
     #[test]
     fn epistemic_halt_payload_rejects_empty_halt_id() {
-        let result = EpistemicHaltPayload::new(
-            "".into(), "t".into(), 0.0, None, "p".into(), "d".into(),
-        );
+        let result =
+            EpistemicHaltPayload::new("".into(), "t".into(), 0.0, None, "p".into(), "d".into());
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), HaltPayloadError::EmptyHaltId));
     }
@@ -542,7 +561,10 @@ mod tests {
         let payload = DecisionDispatchPayload {
             decision_id: 99,
             approved: false,
-            working_memory_digest_refs: WorkingMemoryDigestRefs::new(vec!["f1".into(), "f2".into()]),
+            working_memory_digest_refs: WorkingMemoryDigestRefs::new(vec![
+                "f1".into(),
+                "f2".into(),
+            ]),
         };
         let json = serde_json::to_string(&payload).unwrap();
         let back: DecisionDispatchPayload = serde_json::from_str(&json).unwrap();
@@ -578,8 +600,7 @@ mod tests {
         });
         let mut frame = make_frame(payload);
         frame.kind = FrameKind::TaskAssign;
-        frame.intent_lineage =
-            IntentLineage::new(vec![A2AIntent::new("standard")]);
+        frame.intent_lineage = IntentLineage::new(vec![A2AIntent::new("standard")]);
         let json = serde_json::to_string(&frame).unwrap();
         let back: IacFrame = serde_json::from_str(&json).unwrap();
         assert_eq!(back.intent_lineage.as_slice().len(), 1);

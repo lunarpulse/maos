@@ -41,7 +41,10 @@ CREATE TABLE IF NOT EXISTS transparency_log (
 fn seed_db(path: &PathBuf) {
     let conn = Connection::open(path).expect("open SQLite");
     conn.execute_batch(SCHEMA_SQL).expect("schema init");
-    for (i, kind) in [(1u8, 9i64), (2u8, 7i64), (3u8, 9i64)].into_iter().enumerate() {
+    for (i, kind) in [(1u8, 9i64), (2u8, 7i64), (3u8, 9i64)]
+        .into_iter()
+        .enumerate()
+    {
         conn.execute(
             "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin) \
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -109,9 +112,21 @@ fn ndjson_with_term_dumb_emits_zero_ansi_bytes() {
     let out = run_maosctl(
         &db,
         &[("TERM", "dumb")],
-        &["audit", "query", "--spirit", "hello-spirit", "--format", "ndjson"],
+        &[
+            "audit",
+            "query",
+            "--spirit",
+            "hello-spirit",
+            "--format",
+            "ndjson",
+        ],
     );
-    assert!(out.status.success(), "TERM=dumb ndjson exit: {:?}\n{}", out.status, String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "TERM=dumb ndjson exit: {:?}\n{}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_no_ansi(&out.stdout, "TERM=dumb --format ndjson");
 }
 
@@ -123,9 +138,21 @@ fn ndjson_with_no_color_emits_zero_ansi_bytes() {
     let out = run_maosctl(
         &db,
         &[("NO_COLOR", "1")],
-        &["audit", "query", "--spirit", "hello-spirit", "--format", "ndjson"],
+        &[
+            "audit",
+            "query",
+            "--spirit",
+            "hello-spirit",
+            "--format",
+            "ndjson",
+        ],
     );
-    assert!(out.status.success(), "NO_COLOR=1 ndjson exit: {:?}\n{}", out.status, String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "NO_COLOR=1 ndjson exit: {:?}\n{}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_no_ansi(&out.stdout, "NO_COLOR=1 --format ndjson");
 }
 
@@ -137,9 +164,21 @@ fn plain_with_term_dumb_emits_zero_ansi_bytes() {
     let out = run_maosctl(
         &db,
         &[("TERM", "dumb")],
-        &["audit", "query", "--spirit", "hello-spirit", "--format", "plain"],
+        &[
+            "audit",
+            "query",
+            "--spirit",
+            "hello-spirit",
+            "--format",
+            "plain",
+        ],
     );
-    assert!(out.status.success(), "TERM=dumb plain exit: {:?}\n{}", out.status, String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "TERM=dumb plain exit: {:?}\n{}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_no_ansi(&out.stdout, "TERM=dumb --format plain");
 }
 
@@ -151,9 +190,21 @@ fn plain_with_no_color_emits_zero_ansi_bytes() {
     let out = run_maosctl(
         &db,
         &[("NO_COLOR", "1")],
-        &["audit", "query", "--spirit", "hello-spirit", "--format", "plain"],
+        &[
+            "audit",
+            "query",
+            "--spirit",
+            "hello-spirit",
+            "--format",
+            "plain",
+        ],
     );
-    assert!(out.status.success(), "NO_COLOR=1 plain exit: {:?}\n{}", out.status, String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "NO_COLOR=1 plain exit: {:?}\n{}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_no_ansi(&out.stdout, "NO_COLOR=1 --format plain");
 }
 
@@ -186,7 +237,14 @@ fn fr4_schema_violation_exits_two_with_diagnostic() {
     let out = run_maosctl(
         &db,
         &[("NO_COLOR", "1")],
-        &["audit", "query", "--spirit", "hello-spirit", "--format", "ndjson"],
+        &[
+            "audit",
+            "query",
+            "--spirit",
+            "hello-spirit",
+            "--format",
+            "ndjson",
+        ],
     );
     assert!(
         !out.status.success(),
@@ -194,7 +252,10 @@ fn fr4_schema_violation_exits_two_with_diagnostic() {
         out.status
     );
     let code = out.status.code().unwrap_or(-1);
-    assert_eq!(code, 2, "exit code must be 2 on FR4 schema violation, got {code}");
+    assert_eq!(
+        code, 2,
+        "exit code must be 2 on FR4 schema violation, got {code}"
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("FR4 schema violation"),
@@ -214,7 +275,14 @@ fn unknown_spirit_exits_two_with_clear_diagnostic() {
     let out = run_maosctl(
         &db,
         &[("NO_COLOR", "1")],
-        &["audit", "query", "--spirit", "orchestrator", "--format", "ndjson"],
+        &[
+            "audit",
+            "query",
+            "--spirit",
+            "orchestrator",
+            "--format",
+            "ndjson",
+        ],
     );
     assert_eq!(out.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&out.stderr);

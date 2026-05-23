@@ -66,21 +66,16 @@ pub struct HaltCorpus {
 impl HaltCorpus {
     pub fn load_from(dir: &Path) -> Result<Self, crate::CorpusError> {
         if !dir.is_dir() {
-            return Err(crate::CorpusError::NotFound(
-                dir.display().to_string(),
-            ));
+            return Err(crate::CorpusError::NotFound(dir.display().to_string()));
         }
 
         let mut scenarios = Vec::new();
-        for entry in walkdir::WalkDir::new(dir)
-            .sort_by_file_name()
-            .into_iter()
-        {
+        for entry in walkdir::WalkDir::new(dir).sort_by_file_name().into_iter() {
             let entry = entry.map_err(|e| {
                 let msg = e.to_string();
                 crate::CorpusError::Io(
                     e.into_io_error()
-                        .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg))
+                        .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
                 )
             })?;
             let path = entry.path();
@@ -88,12 +83,11 @@ impl HaltCorpus {
                 continue;
             }
             let content = std::fs::read_to_string(path)?;
-            let scenario: HaltScenario = serde_json::from_str(&content).map_err(|e| {
-                crate::CorpusError::Parse {
+            let scenario: HaltScenario =
+                serde_json::from_str(&content).map_err(|e| crate::CorpusError::Parse {
                     path: path.display().to_string(),
                     source: e,
-                }
-            })?;
+                })?;
             scenarios.push(scenario);
         }
 

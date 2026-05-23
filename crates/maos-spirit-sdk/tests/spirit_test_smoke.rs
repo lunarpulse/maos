@@ -3,11 +3,11 @@
 //! Smoke test for spirit_test SDK seed — exercises the harness +
 //! halt resolution + manifest self-check + assertion macros.
 
-use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use maos_spirit_sdk::spirit_test::{
-    SpiritTest, HaltResolutionKind, manifest_self_check, ManifestSelfCheckViolation,
+    manifest_self_check, HaltResolutionKind, ManifestSelfCheckViolation, SpiritTest,
 };
-use maos_spirit_sdk::{assert_hook_fired, assert_halts_with, assert_manifest_well_formed};
+use maos_spirit_sdk::{assert_halts_with, assert_hook_fired, assert_manifest_well_formed};
+use maos_spirit_sdk::{spirit, Ctx, Spirit};
 
 pub struct TestSpirit;
 
@@ -35,7 +35,9 @@ fn provided_context_resolution_carries_bytes() {
     let mut h = SpiritTest::new(&s, v);
     h.resolve_halt(
         "halt-002".to_string(),
-        HaltResolutionKind::ProvidedContext { context_bytes: b"clarification text".to_vec() },
+        HaltResolutionKind::ProvidedContext {
+            context_bytes: b"clarification text".to_vec(),
+        },
     );
     let report = h.run();
     assert_eq!(report.halt_resolutions.len(), 1);
@@ -54,7 +56,9 @@ fn authorized_override_resolution_carries_marker() {
     let mut h = SpiritTest::new(&s, v);
     h.resolve_halt(
         "halt-003".to_string(),
-        HaltResolutionKind::AuthorizedOverride { override_marker: b"OPS-OVERRIDE-42".to_vec() },
+        HaltResolutionKind::AuthorizedOverride {
+            override_marker: b"OPS-OVERRIDE-42".to_vec(),
+        },
     );
     let report = h.run();
     assert_eq!(report.halt_resolutions.len(), 1);
@@ -113,7 +117,10 @@ fn manifest_self_check_rejects_whitespace_in_required_field() {
     let result = manifest_self_check(manifest);
     assert!(matches!(
         result,
-        Err(ManifestSelfCheckViolation::InvalidValue { field: "output_shape.required_fields", .. })
+        Err(ManifestSelfCheckViolation::InvalidValue {
+            field: "output_shape.required_fields",
+            ..
+        })
     ));
 }
 
@@ -136,6 +143,9 @@ fn manifest_self_check_rejects_invalid_sandbox_tier() {
     let result = manifest_self_check(manifest);
     assert!(matches!(
         result,
-        Err(ManifestSelfCheckViolation::InvalidValue { field: "sandbox.tier", .. })
+        Err(ManifestSelfCheckViolation::InvalidValue {
+            field: "sandbox.tier",
+            ..
+        })
     ));
 }

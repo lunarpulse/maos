@@ -6,7 +6,9 @@
 
 use std::sync::{Arc, Mutex};
 
-use maos_director_surface::notification::{NotificationChannel, NotificationDispatcher, NotificationError};
+use maos_director_surface::notification::{
+    NotificationChannel, NotificationDispatcher, NotificationError,
+};
 use maos_domain::notification::{ApprovalClass, NotificationEvent, NotificationLevel};
 use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::security::approval::ApprovalManager;
@@ -57,7 +59,11 @@ fn approval_prompt_e2e_dispatches_and_logs() {
     // Verify the notification was dispatched to our capture channel
     {
         let events = captured.lock().unwrap();
-        assert_eq!(events.len(), 1, "exactly one notification should be dispatched");
+        assert_eq!(
+            events.len(),
+            1,
+            "exactly one notification should be dispatched"
+        );
         match &events[0] {
             NotificationEvent::ApprovalPrompt { capability, .. } => {
                 assert_eq!(capability, "fs.read");

@@ -65,22 +65,70 @@ struct RedactionRule {
 /// Lifted from `maos-corpus-gen::secret_redaction::seeds` to `maos-domain`
 /// per AC4 Option B recommendation.
 static RULES: &[RedactionRule] = &[
-    RedactionRule { prefix: b"sk-ant-api03-", class: "api_key_anthropic" },
-    RedactionRule { prefix: b"sk-ant-", class: "api_key_anthropic" },
-    RedactionRule { prefix: b"sk-proj-", class: "api_key_openai" },
-    RedactionRule { prefix: b"sk-", class: "api_key_generic" },
-    RedactionRule { prefix: b"ghp_", class: "api_key_github" },
-    RedactionRule { prefix: b"gho_", class: "api_key_github" },
-    RedactionRule { prefix: b"ghs_", class: "api_key_github" },
-    RedactionRule { prefix: b"ghu_", class: "api_key_github" },
-    RedactionRule { prefix: b"ghc_", class: "api_key_github" },
-    RedactionRule { prefix: b"ghr_", class: "api_key_github" },
-    RedactionRule { prefix: b"AKIA", class: "aws_access_key" },
-    RedactionRule { prefix: b"ASIA", class: "aws_access_key" },
-    RedactionRule { prefix: b"-----BEGIN PRIVATE KEY-----", class: "private_key" },
-    RedactionRule { prefix: b"-----BEGIN RSA PRIVATE KEY-----", class: "private_key_rsa" },
-    RedactionRule { prefix: b"AIza", class: "google_api_key" },
-    RedactionRule { prefix: b"ya29.", class: "google_oauth_token" },
+    RedactionRule {
+        prefix: b"sk-ant-api03-",
+        class: "api_key_anthropic",
+    },
+    RedactionRule {
+        prefix: b"sk-ant-",
+        class: "api_key_anthropic",
+    },
+    RedactionRule {
+        prefix: b"sk-proj-",
+        class: "api_key_openai",
+    },
+    RedactionRule {
+        prefix: b"sk-",
+        class: "api_key_generic",
+    },
+    RedactionRule {
+        prefix: b"ghp_",
+        class: "api_key_github",
+    },
+    RedactionRule {
+        prefix: b"gho_",
+        class: "api_key_github",
+    },
+    RedactionRule {
+        prefix: b"ghs_",
+        class: "api_key_github",
+    },
+    RedactionRule {
+        prefix: b"ghu_",
+        class: "api_key_github",
+    },
+    RedactionRule {
+        prefix: b"ghc_",
+        class: "api_key_github",
+    },
+    RedactionRule {
+        prefix: b"ghr_",
+        class: "api_key_github",
+    },
+    RedactionRule {
+        prefix: b"AKIA",
+        class: "aws_access_key",
+    },
+    RedactionRule {
+        prefix: b"ASIA",
+        class: "aws_access_key",
+    },
+    RedactionRule {
+        prefix: b"-----BEGIN PRIVATE KEY-----",
+        class: "private_key",
+    },
+    RedactionRule {
+        prefix: b"-----BEGIN RSA PRIVATE KEY-----",
+        class: "private_key_rsa",
+    },
+    RedactionRule {
+        prefix: b"AIza",
+        class: "google_api_key",
+    },
+    RedactionRule {
+        prefix: b"ya29.",
+        class: "google_oauth_token",
+    },
 ];
 
 /// Token-shaped pattern: 64 consecutive hex chars (32-byte Ed25519 token).
@@ -224,7 +272,10 @@ mod tests {
         let policy = CorpusBackedRedactionPolicy::new();
         let clean = b"hello from spirit-butler; calendar event read OK";
         let result = policy.redact(clean);
-        assert!(matches!(result, Cow::Borrowed(_)), "clean payload triggered allocation");
+        assert!(
+            matches!(result, Cow::Borrowed(_)),
+            "clean payload triggered allocation"
+        );
     }
 
     #[test]
@@ -233,7 +284,10 @@ mod tests {
         let input = b"api_key=sk-ant-api03-abcdef1234567890 endpoint=prod";
         let result = policy.redact(input);
         let s = std::str::from_utf8(&result).unwrap();
-        assert!(s.contains("<REDACTED:type=api_key_anthropic"), "anthropic key not redacted: {s}");
+        assert!(
+            s.contains("<REDACTED:type=api_key_anthropic"),
+            "anthropic key not redacted: {s}"
+        );
         assert!(!s.contains("sk-ant-api03-abcdef"), "raw key leaked");
     }
 
@@ -243,7 +297,10 @@ mod tests {
         let input = b"token: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh";
         let result = policy.redact(input);
         let s = std::str::from_utf8(&result).unwrap();
-        assert!(s.contains("<REDACTED:type=api_key_github"), "github token not redacted");
+        assert!(
+            s.contains("<REDACTED:type=api_key_github"),
+            "github token not redacted"
+        );
         assert!(!s.contains("ghp_ABCDEF"), "raw token leaked");
     }
 
@@ -253,7 +310,10 @@ mod tests {
         let input = b"AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE";
         let result = policy.redact(input);
         let s = std::str::from_utf8(&result).unwrap();
-        assert!(s.contains("<REDACTED:type=aws_access_key"), "aws key not redacted");
+        assert!(
+            s.contains("<REDACTED:type=aws_access_key"),
+            "aws key not redacted"
+        );
     }
 
     #[test]
@@ -262,7 +322,10 @@ mod tests {
         let input = b"-----BEGIN PRIVATE KEY-----\nMIIEvQ...\n-----END PRIVATE KEY-----";
         let result = policy.redact(input);
         let s = std::str::from_utf8(&result).unwrap();
-        assert!(s.contains("<REDACTED:type=private_key"), "private key not redacted");
+        assert!(
+            s.contains("<REDACTED:type=private_key"),
+            "private key not redacted"
+        );
     }
 
     #[test]
@@ -272,7 +335,10 @@ mod tests {
         let input = b"token=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
         let result = policy.redact(input);
         let s = std::str::from_utf8(&result).unwrap();
-        assert!(s.contains("<REDACTED:type=capability_token"), "hex token not redacted");
+        assert!(
+            s.contains("<REDACTED:type=capability_token"),
+            "hex token not redacted"
+        );
     }
 
     #[test]

@@ -399,7 +399,11 @@ mod tests {
 
     #[test]
     fn memory_tier_serde_round_trip() {
-        for tier in [MemoryTier::Private, MemoryTier::Shared, MemoryTier::Collective] {
+        for tier in [
+            MemoryTier::Private,
+            MemoryTier::Shared,
+            MemoryTier::Collective,
+        ] {
             let json = serde_json::to_string(&tier).unwrap();
             let back: MemoryTier = serde_json::from_str(&json).unwrap();
             assert_eq!(tier, back);

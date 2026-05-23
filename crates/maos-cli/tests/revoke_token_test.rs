@@ -58,7 +58,9 @@ fn revoke_token_rejects_invalid_hex_short() {
 
     let mut cmd = Command::new(maosctl_path());
     cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") { cmd.env("PATH", p); }
+    if let Ok(p) = std::env::var("PATH") {
+        cmd.env("PATH", p);
+    }
     cmd.current_dir(&workspace_root());
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
@@ -86,7 +88,9 @@ fn revoke_token_rejects_invalid_hex_nonhex() {
 
     let mut cmd = Command::new(maosctl_path());
     cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") { cmd.env("PATH", p); }
+    if let Ok(p) = std::env::var("PATH") {
+        cmd.env("PATH", p);
+    }
     cmd.current_dir(&workspace_root());
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
@@ -114,7 +118,9 @@ fn revoke_token_unknown_token_exits_nonzero() {
 
     let mut cmd = Command::new(maosctl_path());
     cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") { cmd.env("PATH", p); }
+    if let Ok(p) = std::env::var("PATH") {
+        cmd.env("PATH", p);
+    }
     cmd.current_dir(&workspace_root());
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
@@ -143,7 +149,9 @@ fn revoke_token_no_color_zero_ansi() {
 
     let mut cmd = Command::new(maosctl_path());
     cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") { cmd.env("PATH", p); }
+    if let Ok(p) = std::env::var("PATH") {
+        cmd.env("PATH", p);
+    }
     cmd.current_dir(&workspace_root());
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);

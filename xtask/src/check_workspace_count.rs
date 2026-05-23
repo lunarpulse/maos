@@ -63,8 +63,8 @@ fn check(cargo_toml_path: &str, kernel_design_path: &str) -> Result<Report, Stri
 
 /// Count `[workspace] members` array entries in `Cargo.toml`.
 fn count_cargo_toml_members(path: &Path) -> Result<usize, String> {
-    let src = fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let src =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     let root: toml::Value =
         toml::from_str(&src).map_err(|e| format!("toml parse error in {}: {e}", path.display()))?;
 
@@ -87,8 +87,8 @@ fn count_cargo_toml_members(path: &Path) -> Result<usize, String> {
 /// immediately preceding text like `**21 workspace members**`, then parses
 /// the bold integer.
 fn extract_declared_count(path: &Path) -> Result<(usize, String), String> {
-    let src = fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let src =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
 
     let sentinel = "<!-- workspace-count-authoritative -->";
 

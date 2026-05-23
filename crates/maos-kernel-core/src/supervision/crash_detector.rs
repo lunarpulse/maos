@@ -12,17 +12,21 @@ use tokio::task::JoinHandle;
 
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::invariants::i3::FrameOrigin;
-use maos_domain::supervision::{CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver};
+use maos_domain::supervision::{
+    CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+};
 
-use crate::halt::{HaltRegistry, terminate_spirit};
-use maos_domain::halt::TerminationKind;
+use crate::halt::{terminate_spirit, HaltRegistry};
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::journal::JournalAdapter;
 use crate::scheduler::control_block::SpiritControlBlock;
 use crate::telemetry::iac_rt::{IacRtMetrics, Outcome, Service};
+use maos_domain::halt::TerminationKind;
 
 /// The kernel-side crash detector.
-#[maos_attrs::i9_exempt(reason = "supervision surface — holds only Arc references to existing kernel state (SCB map, TransparencyLog, HaltRegistry, CapabilityRegistry, IAC Bus, telemetry); no independently-mutable persistent state")]
+#[maos_attrs::i9_exempt(
+    reason = "supervision surface — holds only Arc references to existing kernel state (SCB map, TransparencyLog, HaltRegistry, CapabilityRegistry, IAC Bus, telemetry); no independently-mutable persistent state"
+)]
 pub struct CrashDetector {
     /// Same Arc the Scheduler holds — composition-root gate enforces single instance.
     spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
@@ -97,7 +101,10 @@ impl CrashDetector {
 
         // Active-handler dedup / abort
         {
-            let mut handlers = self.active_handlers.lock().expect("active_handlers lock poisoned");
+            let mut handlers = self
+                .active_handlers
+                .lock()
+                .expect("active_handlers lock poisoned");
             // Abort previous handler for this PID if any
             if let Some(prev) = handlers.remove(&spirit_pid) {
                 prev.abort();
@@ -117,7 +124,8 @@ impl CrashDetector {
         );
 
         // Step 3: Revoke all capability tokens for the PID
-        let actual_tokens_revoked = self.capability.revoke_all_for_pid(spirit_pid).unwrap_or(0) as usize;
+        let actual_tokens_revoked =
+            self.capability.revoke_all_for_pid(spirit_pid).unwrap_or(0) as usize;
 
         // Step 4: Produce halt-receipts via terminate_spirit
         let receipts = terminate_spirit(
@@ -132,7 +140,10 @@ impl CrashDetector {
 
         // Step 5: Emit task.orphaned for each in-flight task
         let drained_tasks: Vec<_> = {
-            let mut tasks = scb.task_assignments_in_flight.lock().expect("task ledger lock poisoned");
+            let mut tasks = scb
+                .task_assignments_in_flight
+                .lock()
+                .expect("task ledger lock poisoned");
             std::mem::take(&mut *tasks)
         };
         let tokens_revoked = actual_tokens_revoked;
@@ -168,12 +179,14 @@ impl CrashDetector {
         );
 
         // Step 7: Journal LifecycleEvent::Crash, THEN remove SCB from the map
-        let _ = self.journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
-            timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
-            lifecycle_event: LifecycleEvent::Crash,
-            spirit_id: scb.spirit_id.clone(),
-            effective_sandbox_tier: Some(scb.sandbox_tier),
-        }));
+        let _ = self
+            .journal
+            .append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+                timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
+                lifecycle_event: LifecycleEvent::Crash,
+                spirit_id: scb.spirit_id.clone(),
+                effective_sandbox_tier: Some(scb.sandbox_tier),
+            }));
 
         {
             let mut map = self.spirits.write().expect("spirits lock poisoned");
@@ -204,7 +217,10 @@ impl CrashDetector {
 
         // Clean up active_handlers
         {
-            let mut handlers = self.active_handlers.lock().expect("active_handlers lock poisoned");
+            let mut handlers = self
+                .active_handlers
+                .lock()
+                .expect("active_handlers lock poisoned");
             handlers.remove(&spirit_pid);
         }
 

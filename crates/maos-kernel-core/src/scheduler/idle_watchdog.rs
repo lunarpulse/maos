@@ -65,8 +65,7 @@ impl IdleWatchdog {
         let candidates: Vec<Arc<SpiritControlBlock>> = {
             let scbs = self.scbs.read().unwrap();
             let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
-            scbs
-                .iter()
+            scbs.iter()
                 .filter(|(_, scb)| {
                     if scb.current_state() != ScbLifecycleState::Running {
                         return false;
@@ -93,8 +92,7 @@ impl IdleWatchdog {
 
         for scb in &candidates {
             let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
-            scb.last_idle_fire_ns
-                .store(now_ns, Ordering::Release);
+            scb.last_idle_fire_ns.store(now_ns, Ordering::Release);
             let _outcome = self.dispatcher.fire_on_idle(scb).await;
         }
     }

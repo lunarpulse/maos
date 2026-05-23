@@ -100,10 +100,7 @@ pub fn apply_resource_ceiling(
 }
 
 #[cfg(target_os = "linux")]
-fn apply_cgroup_v2(
-    spirit_pid: u32,
-    caps: &ResourceCaps,
-) -> Result<ResourceCeilingHandle, IoError> {
+fn apply_cgroup_v2(spirit_pid: u32, caps: &ResourceCaps) -> Result<ResourceCeilingHandle, IoError> {
     let cgroup_dir = PathBuf::from(format!("/sys/fs/cgroup/maos/spirit-{}", spirit_pid));
 
     // Create the cgroup directory
@@ -135,10 +132,7 @@ fn apply_cgroup_v2(
     // Write memory.max: bytes
     if let Some(mem_mb) = caps.memory_max_mb {
         let mem_bytes = (mem_mb as u64) * 1024 * 1024;
-        std::fs::write(
-            cgroup_dir.join("memory.max"),
-            mem_bytes.to_string(),
-        )?;
+        std::fs::write(cgroup_dir.join("memory.max"), mem_bytes.to_string())?;
     }
 
     Ok(ResourceCeilingHandle::linux(cgroup_dir))

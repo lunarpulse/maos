@@ -17,7 +17,9 @@ use maos_domain::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue
 const MAX_KEY_LEN: usize = 1024;
 
 /// Per-Spirit in-memory + filesystem-backed key-value store.
-#[maos_attrs::i9_exempt(reason = "memory manager private tier — per-Spirit-keyed in-memory map + per-Spirit-namespaced filesystem area for ADR-026 + I5 isolation; bounded by principal forget-cascade and per-Spirit memory budget")]
+#[maos_attrs::i9_exempt(
+    reason = "memory manager private tier — per-Spirit-keyed in-memory map + per-Spirit-namespaced filesystem area for ADR-026 + I5 isolation; bounded by principal forget-cascade and per-Spirit memory budget"
+)]
 pub struct PrivateMemoryStore {
     in_mem: RwLock<HashMap<(u32, MemoryNamespace, String), MemoryValue>>,
     fs_root: PathBuf,
@@ -108,17 +110,19 @@ impl PrivateMemoryStore {
         let bytes = fs::read(path).map_err(MemoryError::Io)?;
         match kind {
             ValueKind::Json => {
-                let val: serde_json::Value =
-                    serde_json::from_slice(&bytes).map_err(|e| MemoryError::Storage(e.to_string()))?;
+                let val: serde_json::Value = serde_json::from_slice(&bytes)
+                    .map_err(|e| MemoryError::Storage(e.to_string()))?;
                 Ok(MemoryValue::Json(val))
             }
             ValueKind::Markdown => {
-                let s = String::from_utf8(bytes).map_err(|e| MemoryError::Storage(e.to_string()))?;
+                let s =
+                    String::from_utf8(bytes).map_err(|e| MemoryError::Storage(e.to_string()))?;
                 Ok(MemoryValue::Markdown(s))
             }
             ValueKind::Blob => Ok(MemoryValue::Blob(bytes)),
             ValueKind::Text => {
-                let s = String::from_utf8(bytes).map_err(|e| MemoryError::Storage(e.to_string()))?;
+                let s =
+                    String::from_utf8(bytes).map_err(|e| MemoryError::Storage(e.to_string()))?;
                 Ok(MemoryValue::Text(s))
             }
         }
@@ -130,7 +134,8 @@ impl PrivateMemoryStore {
         }
         match value {
             MemoryValue::Json(v) => {
-                let bytes = serde_json::to_vec(v).map_err(|e| MemoryError::Storage(e.to_string()))?;
+                let bytes =
+                    serde_json::to_vec(v).map_err(|e| MemoryError::Storage(e.to_string()))?;
                 fs::write(path, &bytes).map_err(MemoryError::Io)?;
             }
             MemoryValue::Markdown(s) => {
@@ -146,8 +151,14 @@ impl PrivateMemoryStore {
         Ok(())
     }
 
-    fn should_spill_to_disk(value: &MemoryValue, inline_threshold: usize) -> Result<bool, MemoryError> {
-        Ok(matches!(value, MemoryValue::Markdown(_)) || value.approximate_len()? > inline_threshold)
+    fn should_spill_to_disk(
+        value: &MemoryValue,
+        inline_threshold: usize,
+    ) -> Result<bool, MemoryError> {
+        Ok(
+            matches!(value, MemoryValue::Markdown(_))
+                || value.approximate_len()? > inline_threshold,
+        )
     }
 
     // ------------------------------------------------------------------
@@ -165,8 +176,7 @@ impl PrivateMemoryStore {
 
         let needs_spill = Self::should_spill_to_disk(&value, self.inline_threshold)?;
         if needs_spill {
-            let path =
-                Self::fs_path_for(&self.fs_root, spirit_pid, namespace, key, value.kind())?;
+            let path = Self::fs_path_for(&self.fs_root, spirit_pid, namespace, key, value.kind())?;
             Self::write_to_disk(&path, &value)?;
         }
 
@@ -179,7 +189,10 @@ impl PrivateMemoryStore {
 
         // For all other values, update the in-memory map for cache-warm reads.
         let key_tuple = (spirit_pid, namespace.clone(), key.to_string());
-        let mut map = self.in_mem.write().expect("PrivateMemoryStore lock poisoned");
+        let mut map = self
+            .in_mem
+            .write()
+            .expect("PrivateMemoryStore lock poisoned");
         map.insert(key_tuple, value);
         Ok(())
     }
@@ -196,7 +209,10 @@ impl PrivateMemoryStore {
 
         // Check in-memory cache first (non-Markdown values only).
         {
-            let map = self.in_mem.read().expect("PrivateMemoryStore lock poisoned");
+            let map = self
+                .in_mem
+                .read()
+                .expect("PrivateMemoryStore lock poisoned");
             if let Some(v) = map.get(&key_tuple) {
                 return Ok(Some(v.clone()));
             }
@@ -204,13 +220,21 @@ impl PrivateMemoryStore {
 
         // Try filesystem — for Markdown this is the canonical source;
         // for other types it's the spill fallback.
-        for kind in &[ValueKind::Markdown, ValueKind::Json, ValueKind::Blob, ValueKind::Text] {
+        for kind in &[
+            ValueKind::Markdown,
+            ValueKind::Json,
+            ValueKind::Blob,
+            ValueKind::Text,
+        ] {
             let path = Self::fs_path_for(&self.fs_root, spirit_pid, namespace, key, *kind)?;
             if path.exists() {
                 let value = Self::read_from_disk(&path, *kind)?;
                 // Populate cache for non-Markdown values only.
                 if !matches!(value, MemoryValue::Markdown(_)) {
-                    let mut map = self.in_mem.write().expect("PrivateMemoryStore lock poisoned");
+                    let mut map = self
+                        .in_mem
+                        .write()
+                        .expect("PrivateMemoryStore lock poisoned");
                     map.insert(key_tuple, value.clone());
                 }
                 return Ok(Some(value));
@@ -236,7 +260,10 @@ impl PrivateMemoryStore {
 
         // In-memory entries.
         {
-            let map = self.in_mem.read().expect("PrivateMemoryStore lock poisoned");
+            let map = self
+                .in_mem
+                .read()
+                .expect("PrivateMemoryStore lock poisoned");
             for ((pid_k, ns_k, key), value) in map.iter() {
                 if *pid_k == pid && *ns_k == ns && key.starts_with(prefix) {
                     if entries.len() >= limit {
@@ -294,7 +321,10 @@ impl PrivateMemoryStore {
 
         // Collect keys to remove (in-memory).
         let to_remove: Vec<(u32, MemoryNamespace, String)> = {
-            let map = self.in_mem.read().expect("PrivateMemoryStore lock poisoned");
+            let map = self
+                .in_mem
+                .read()
+                .expect("PrivateMemoryStore lock poisoned");
             map.iter()
                 .filter(|((_pid, ns, _key), _v)| match ns {
                     MemoryNamespace::Principal {
@@ -308,7 +338,10 @@ impl PrivateMemoryStore {
 
         // Remove from in-memory map.
         {
-            let mut map = self.in_mem.write().expect("PrivateMemoryStore lock poisoned");
+            let mut map = self
+                .in_mem
+                .write()
+                .expect("PrivateMemoryStore lock poisoned");
             for (pid, ns, key) in &to_remove {
                 map.remove(&(*pid, ns.clone(), key.clone()));
                 count += 1;
@@ -462,7 +495,9 @@ mod tests {
                 MemoryValue::Text("ok".into()),
             )
             .unwrap();
-        let got = store.read(1, &MemoryNamespace::Default, "foo..bar").unwrap();
+        let got = store
+            .read(1, &MemoryNamespace::Default, "foo..bar")
+            .unwrap();
         assert_eq!(got, Some(MemoryValue::Text("ok".into())));
     }
 
@@ -503,9 +538,7 @@ mod tests {
                 MemoryValue::Text("spirit-1 secret".into()),
             )
             .unwrap();
-        let got = store
-            .read(2, &MemoryNamespace::Default, "secret")
-            .unwrap();
+        let got = store.read(2, &MemoryNamespace::Default, "secret").unwrap();
         assert!(got.is_none());
     }
 
@@ -536,9 +569,7 @@ mod tests {
                 MemoryValue::Text("c".into()),
             )
             .unwrap();
-        let results = store
-            .scan(1, &MemoryNamespace::Default, "ap", 10)
-            .unwrap();
+        let results = store.scan(1, &MemoryNamespace::Default, "ap", 10).unwrap();
         assert_eq!(results.len(), 2);
         let keys: Vec<&str> = results.iter().map(|e| e.key.as_str()).collect();
         assert!(keys.contains(&"apple"));
@@ -564,14 +595,10 @@ mod tests {
         let deleted = store.forget_principal("alice@example.org").unwrap();
         assert!(deleted >= 2, "should have deleted alice's entries");
 
-        let got1 = store
-            .read(1, &ns1, "event-1")
-            .unwrap();
+        let got1 = store.read(1, &ns1, "event-1").unwrap();
         assert!(got1.is_none(), "alice's entry should be gone");
 
-        let got2 = store
-            .read(2, &ns2, "task-1")
-            .unwrap();
+        let got2 = store.read(2, &ns2, "task-1").unwrap();
         assert!(got2.is_some(), "bob's entry should remain");
     }
 

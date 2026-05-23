@@ -13,8 +13,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use maos_kernel_core::scheduler::{
-    control_block::SpiritManifestBundle,
-    scheduler_loop::SpiritSchedulerAdapter,
+    control_block::SpiritManifestBundle, scheduler_loop::SpiritSchedulerAdapter,
 };
 use maos_kernel_core::security::manifest::{LifecycleSection, SchedulingSection};
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
@@ -58,24 +57,40 @@ fn make_scheduler() -> Arc<SpiritSchedulerAdapter> {
             Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
         ),
     );
-    let memory = Arc::new(
-        maos_kernel_core::memory::MemoryManagerAdapter::new(
-            Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(memory_root, 4)),
-            Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path).unwrap()),
-            Arc::new(maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path).unwrap()),
-            Arc::clone(&tl),
-        )
-    );
+    let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
+        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
+            memory_root,
+            4,
+        )),
+        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path).unwrap()),
+        Arc::new(
+            maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path).unwrap(),
+        ),
+        Arc::clone(&tl),
+    ));
     let iac = Arc::new(maos_kernel_core::iac::IacBusAdapter::new(
-        Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::new(IacRtMetrics::new()))),
+        Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::new(
+            IacRtMetrics::new(),
+        ))),
         Arc::clone(&tl),
     ));
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
     let telemetry = Arc::new(IacRtMetrics::new());
 
     Arc::new(SpiritSchedulerAdapter::new(
-        tl, capability, memory, iac, halt_registry, telemetry,
-        None, None, None, None, None, None, None,
+        tl,
+        capability,
+        memory,
+        iac,
+        halt_registry,
+        telemetry,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     ))
 }
 
@@ -91,7 +106,10 @@ async fn same_major_swap_happy_path() {
         ..Default::default()
     };
 
-    let pid = scheduler.load("test-spirit", manifest.clone(), predecessor, 0xBEEF).await.expect("load");
+    let pid = scheduler
+        .load("test-spirit", manifest.clone(), predecessor, 0xBEEF)
+        .await
+        .expect("load");
     scheduler.start(pid).await.expect("start");
 
     // TODO: construct HotSwapCoordinator, run initiate_swap with successor,

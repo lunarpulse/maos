@@ -11,8 +11,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn fixtures_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/abi-diff")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/abi-diff")
 }
 
 fn run_public_api(manifest_path: &str) -> String {
@@ -102,7 +101,10 @@ fn pub_use_reexport_removal_detected() {
     let root = fixtures_root();
     let manifest = root.join("pub-use-reexport/modified-removed/Cargo.toml");
     let output = run_public_api(manifest.to_str().unwrap());
-    assert!(!output.contains("bar"), "bar() should not appear after pub use removal");
+    assert!(
+        !output.contains("bar"),
+        "bar() should not appear after pub use removal"
+    );
 }
 
 // --- Soundness gap 3: generic-bound order ---
@@ -130,5 +132,8 @@ fn inline_mod_items_visible() {
     let root = fixtures_root();
     let manifest = root.join("inline-mod-items/baseline/Cargo.toml");
     let output = run_public_api(manifest.to_str().unwrap());
-    assert!(output.contains("foo::bar"), "inline mod pub fn should be visible");
+    assert!(
+        output.contains("foo::bar"),
+        "inline mod pub fn should be visible"
+    );
 }

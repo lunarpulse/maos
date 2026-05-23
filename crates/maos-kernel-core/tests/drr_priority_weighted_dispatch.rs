@@ -35,7 +35,8 @@ fn mock_scb(pid: u32, weight: u8) -> Arc<SpiritControlBlock> {
         make_spirit_obj(DummySpirit),
         0,
     );
-    scb.state.store(ScbLifecycleState::Running as u8, Ordering::Release);
+    scb.state
+        .store(ScbLifecycleState::Running as u8, Ordering::Release);
     Arc::new(scb)
 }
 
@@ -93,7 +94,9 @@ fn drr_equal_weights_rotate() {
 fn drr_skips_non_running_spirits() {
     let running = mock_scb(1, 100);
     let paused = mock_scb(2, 100);
-    paused.state.store(ScbLifecycleState::Paused as u8, Ordering::Release);
+    paused
+        .state
+        .store(ScbLifecycleState::Paused as u8, Ordering::Release);
 
     let scbs = vec![running.clone(), paused];
     let pid = pick_next_spirit_from_slice(&scbs);

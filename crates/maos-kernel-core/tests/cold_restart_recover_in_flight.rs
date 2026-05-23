@@ -26,9 +26,16 @@ fn in_flight_entry_survives_journal_reopen() {
     let recovered = maos_kernel_core::journal::JournalAdapter::open(&journal_path).unwrap();
     let report = recovered.recover_in_flight_with_tasks();
 
-    assert_eq!(report.in_flight.len(), 1, "expected exactly 1 in-flight entry");
+    assert_eq!(
+        report.in_flight.len(),
+        1,
+        "expected exactly 1 in-flight entry"
+    );
     let entry = &report.in_flight[0];
     assert_eq!(entry.spirit_id, "cold-restart-spirit");
     assert_eq!(entry.task_id, "cold-task-001");
-    assert_eq!(entry.capability_token, maos_domain::invariants::i1::TokenId([7u8; 16]));
+    assert_eq!(
+        entry.capability_token,
+        maos_domain::invariants::i1::TokenId([7u8; 16])
+    );
 }

@@ -27,7 +27,9 @@ CREATE INDEX IF NOT EXISTS principal_index_id_idx ON principal_index(principal_i
 
 /// Kernel-side address-only index for ADR-026 principal namespace
 /// lifecycle operations (subject-access, forget, redaction-on-export).
-#[maos_attrs::i9_exempt(reason = "principal namespace index — kernel-side address-only index of principal:<id>:<schema> writes for ADR-026 subject-access query + GDPR Art. 17 forget cascade; bounded by principal forget cascade; NO content interpretation per §4.0.7")]
+#[maos_attrs::i9_exempt(
+    reason = "principal namespace index — kernel-side address-only index of principal:<id>:<schema> writes for ADR-026 subject-access query + GDPR Art. 17 forget cascade; bounded by principal forget cascade; NO content interpretation per §4.0.7"
+)]
 pub struct PrincipalNamespaceIndex {
     conn: Mutex<Connection>,
 }
@@ -68,7 +70,10 @@ impl PrincipalNamespaceIndex {
         key: &str,
         timestamp_ns: u64,
     ) -> Result<(), MemoryError> {
-        let conn = self.conn.lock().expect("PrincipalNamespaceIndex lock poisoned");
+        let conn = self
+            .conn
+            .lock()
+            .expect("PrincipalNamespaceIndex lock poisoned");
         conn.execute(
             "INSERT OR REPLACE INTO principal_index
                 (principal_id, writer_spirit_pid, schema, key, timestamp_ns)
@@ -88,11 +93,11 @@ impl PrincipalNamespaceIndex {
     /// Subject-access query — returns every `(writer_spirit_pid, schema,
     /// key, timestamp_ns)` indexed for the given `principal_id` across
     /// ALL Spirits on this Host.  Sorted by `(writer_spirit_pid, schema, key)`.
-    pub fn lookup(
-        &self,
-        principal_id: &str,
-    ) -> Result<Vec<PrincipalIndexRow>, MemoryError> {
-        let conn = self.conn.lock().expect("PrincipalNamespaceIndex lock poisoned");
+    pub fn lookup(&self, principal_id: &str) -> Result<Vec<PrincipalIndexRow>, MemoryError> {
+        let conn = self
+            .conn
+            .lock()
+            .expect("PrincipalNamespaceIndex lock poisoned");
 
         let mut stmt = conn
             .prepare(
@@ -108,7 +113,11 @@ impl PrincipalNamespaceIndex {
                 let pid: String = row.get(0)?;
                 let wsp: i64 = row.get(1)?;
                 let wsp_u32 = u32::try_from(wsp).map_err(|_| {
-                    rusqlite::Error::InvalidColumnType(1, "writer_spirit_pid".into(), rusqlite::types::Type::Integer)
+                    rusqlite::Error::InvalidColumnType(
+                        1,
+                        "writer_spirit_pid".into(),
+                        rusqlite::types::Type::Integer,
+                    )
                 })?;
                 let schema: String = row.get(2)?;
                 let key: String = row.get(3)?;
@@ -133,7 +142,10 @@ impl PrincipalNamespaceIndex {
     /// Forget all index rows for a given `principal_id` — returns the
     /// deleted row count.
     pub fn forget(&self, principal_id: &str) -> Result<u64, MemoryError> {
-        let conn = self.conn.lock().expect("PrincipalNamespaceIndex lock poisoned");
+        let conn = self
+            .conn
+            .lock()
+            .expect("PrincipalNamespaceIndex lock poisoned");
         let deleted = conn
             .execute(
                 "DELETE FROM principal_index WHERE principal_id = ?1",

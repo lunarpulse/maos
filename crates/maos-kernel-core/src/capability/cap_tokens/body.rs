@@ -44,7 +44,8 @@ fn intent_class_discriminant(ic: &IntentClass) -> u8 {
 pub fn scope_hash(scope: &Scope) -> [u8; 32] {
     use ring::digest;
     let mut ctx = digest::Context::new(&digest::SHA256);
-    let bytes = serde_json::to_vec(scope).expect("Scope serialization is infallible for the nine v0.1-β variants");
+    let bytes = serde_json::to_vec(scope)
+        .expect("Scope serialization is infallible for the nine v0.1-β variants");
     ctx.update(&bytes);
     let d = ctx.finish();
     let mut out = [0u8; 32];

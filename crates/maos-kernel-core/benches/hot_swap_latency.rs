@@ -16,8 +16,11 @@
 //! Run locally with:
 //!   cargo bench -p maos-kernel-core --bench hot_swap_latency
 
-use criterion::{criterion_group, criterion_main, Criterion, BatchSize};
-use std::sync::{Arc, atomic::{AtomicU32, Ordering}};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use std::sync::{
+    atomic::{AtomicU32, Ordering},
+    Arc,
+};
 
 use maos_kernel_core::hot_swap::HotSwapCoordinator;
 use maos_kernel_core::scheduler::{
@@ -36,7 +39,9 @@ struct BenchPredecessorSpirit {
 
 impl Default for BenchPredecessorSpirit {
     fn default() -> Self {
-        Self { snapshot_count: AtomicU32::new(0) }
+        Self {
+            snapshot_count: AtomicU32::new(0),
+        }
     }
 }
 
@@ -91,31 +96,46 @@ impl TestKernel {
                 Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
             ),
         );
-        let memory = Arc::new(
-            maos_kernel_core::memory::MemoryManagerAdapter::new(
-                Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(memory_root, 4)),
-                Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path).unwrap()),
-                Arc::new(maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path).unwrap()),
-                Arc::clone(&tl),
-            )
-        );
+        let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
+            Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
+                memory_root,
+                4,
+            )),
+            Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path).unwrap()),
+            Arc::new(
+                maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path)
+                    .unwrap(),
+            ),
+            Arc::clone(&tl),
+        ));
         let iac = Arc::new(maos_kernel_core::iac::IacBusAdapter::new(
-            Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::new(IacRtMetrics::new()))),
+            Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::new(
+                IacRtMetrics::new(),
+            ))),
             Arc::clone(&tl),
         ));
         let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
         let telemetry = Arc::new(IacRtMetrics::new());
 
         let scheduler = Arc::new(SpiritSchedulerAdapter::new(
-            tl.clone(), capability.clone(), memory.clone(), iac.clone(),
-            halt_registry.clone(), telemetry.clone(),
-            None, None, None, None, None, None, None,
+            tl.clone(),
+            capability.clone(),
+            memory.clone(),
+            iac.clone(),
+            halt_registry.clone(),
+            telemetry.clone(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         ));
 
         let journal_path = tmp.path().join("journal.ndjson");
         let journal = Arc::new(
-            maos_kernel_core::journal::JournalAdapter::open(&journal_path)
-                .expect("journal open")
+            maos_kernel_core::journal::JournalAdapter::open(&journal_path).expect("journal open"),
         );
 
         let coordinator = Arc::new(HotSwapCoordinator::new(
@@ -168,8 +188,13 @@ impl TestKernel {
         };
         let successor = BenchSuccessorSpirit;
 
-        let result = self.coordinator
-            .initiate_swap("bench-spirit", &successor_manifest, make_spirit_obj(successor))
+        let result = self
+            .coordinator
+            .initiate_swap(
+                "bench-spirit",
+                &successor_manifest,
+                make_spirit_obj(successor),
+            )
             .await;
 
         // In a bench we expect success; panic on error so the bench fails loud.
@@ -187,12 +212,12 @@ fn bench_state_codec_roundtrip(c: &mut Criterion) {
     c.bench_function("state_codec_encode_decode_1kib", |b| {
         let payload = vec![0xAB; 1024];
         b.iter(|| {
-            let encoded = criterion::black_box(
-                maos_kernel_core::hot_swap::StateCodec::encode(&payload, 1)
-            ).unwrap();
-            let _decoded = criterion::black_box(
-                maos_kernel_core::hot_swap::StateCodec::decode(&encoded, 1)
-            ).unwrap();
+            let encoded =
+                criterion::black_box(maos_kernel_core::hot_swap::StateCodec::encode(&payload, 1))
+                    .unwrap();
+            let _decoded =
+                criterion::black_box(maos_kernel_core::hot_swap::StateCodec::decode(&encoded, 1))
+                    .unwrap();
         });
     });
 }

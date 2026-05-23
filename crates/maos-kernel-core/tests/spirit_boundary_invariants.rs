@@ -54,13 +54,13 @@ fn spirit_boundary_invariants() {
     let jsonl_path = corpus_path();
     let manifest_path = manifest_path();
 
-    let jsonl_data = fs::read_to_string(&jsonl_path)
-        .unwrap_or_else(|e| panic!("cannot read corpus: {e}"));
+    let jsonl_data =
+        fs::read_to_string(&jsonl_path).unwrap_or_else(|e| panic!("cannot read corpus: {e}"));
 
     // Verify SHA-256 against MANIFEST.toml
     let computed_sha = sha256_hex(&jsonl_data);
-    let manifest_src = fs::read_to_string(&manifest_path)
-        .unwrap_or_else(|e| panic!("cannot read manifest: {e}"));
+    let manifest_src =
+        fs::read_to_string(&manifest_path).unwrap_or_else(|e| panic!("cannot read manifest: {e}"));
     let manifest: toml::Value = manifest_src.parse().expect("MANIFEST.toml must parse");
     let expected_sha = manifest
         .get("corpus")
@@ -166,7 +166,9 @@ fn handle_compliance_emit(case: &CaseLine) -> Result<(), String> {
                 ));
             }
             if let Some(claim_check) = case.expected_outcome.get("claim_check") {
-                if let Some(expected_size) = claim_check.get("claim_bytes_min").and_then(|v| v.as_u64()) {
+                if let Some(expected_size) =
+                    claim_check.get("claim_bytes_min").and_then(|v| v.as_u64())
+                {
                     if envelope.claim_bytes.len() < expected_size as usize {
                         return Err(format!(
                             "claim_bytes too small: expected at least {}, got {}",

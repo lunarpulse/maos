@@ -45,6 +45,9 @@ mod tests {
         let c = HaltContinuityCheck::Drained;
         assert!(matches!(c, HaltContinuityCheck::Drained));
         let c2 = HaltContinuityCheck::MigratedSchemaCompatibleVN(2);
-        assert!(matches!(c2, HaltContinuityCheck::MigratedSchemaCompatibleVN(2)));
+        assert!(matches!(
+            c2,
+            HaltContinuityCheck::MigratedSchemaCompatibleVN(2)
+        ));
     }
 }

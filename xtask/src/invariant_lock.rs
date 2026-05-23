@@ -102,9 +102,11 @@ fn invariant_lock(
 ) -> Result<LockReport, String> {
     let root = workspace_root();
     let lock_path = root.join("xtask/invariants/lock.toml");
-    let lock: BTreeMap<String, String> = toml::from_str(&fs::read_to_string(&lock_path)
-        .map_err(|e| format!("cannot read {}: {e}", lock_path.display()))?)
-        .map_err(|e| format!("cannot parse {}: {e}", lock_path.display()))?;
+    let lock: BTreeMap<String, String> = toml::from_str(
+        &fs::read_to_string(&lock_path)
+            .map_err(|e| format!("cannot read {}: {e}", lock_path.display()))?,
+    )
+    .map_err(|e| format!("cannot parse {}: {e}", lock_path.display()))?;
 
     let changed: BTreeSet<String> = match changed_files {
         Some(path) => fs::read_to_string(path)
@@ -126,7 +128,10 @@ fn invariant_lock(
     if changed.contains("xtask/invariants/lock.toml") {
         touched_invariants.push("lock.toml".into());
     }
-    if changed.iter().any(|p| p.contains("crates/maos-domain/src/invariants.rs")) {
+    if changed
+        .iter()
+        .any(|p| p.contains("crates/maos-domain/src/invariants.rs"))
+    {
         touched_invariants.push("maos-domain-invariants".into());
     }
 
@@ -211,7 +216,11 @@ fn detect_changed_files_git(root: &std::path::Path) -> Result<BTreeSet<String>, 
         return Err("git diff exited with error".into());
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(stdout.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+    Ok(stdout
+        .lines()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect())
 }
 
 fn has_cadence_change(path: &std::path::Path) -> Result<bool, String> {
@@ -236,9 +245,7 @@ fn check_reviews(pr_number: Option<u64>) -> Result<(usize, bool), String> {
                 Ok(o) if o.status.success() => {
                     let json: serde_json::Value =
                         serde_json::from_slice(&o.stdout).map_err(|e| e.to_string())?;
-                    json["number"]
-                        .as_u64()
-                        .ok_or("cannot parse PR number")? as u64
+                    json["number"].as_u64().ok_or("cannot parse PR number")? as u64
                 }
                 _ => {
                     return Ok((0, false));
@@ -248,13 +255,7 @@ fn check_reviews(pr_number: Option<u64>) -> Result<(usize, bool), String> {
     };
 
     let output = Command::new("gh")
-        .args([
-            "pr",
-            "view",
-            &pr.to_string(),
-            "--json",
-            "reviews",
-        ])
+        .args(["pr", "view", &pr.to_string(), "--json", "reviews"])
         .output();
 
     match output {
@@ -274,7 +275,9 @@ fn check_reviews(pr_number: Option<u64>) -> Result<(usize, bool), String> {
             return Err(format!("could not query PR reviews: {stderr}"));
         }
         Err(e) => {
-            return Err(format!("gh CLI not available for review check (required by ADR-037): {e}"));
+            return Err(format!(
+                "gh CLI not available for review check (required by ADR-037): {e}"
+            ));
         }
     }
 }
@@ -384,8 +387,12 @@ fn append_journal(
     // /tmp/<dir>/... which the workflow has not necessarily pre-created.
     if let Some(parent) = output_path.parent() {
         if !parent.as_os_str().is_empty() && !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("cannot create journal output parent {}: {e}", parent.display()))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                format!(
+                    "cannot create journal output parent {}: {e}",
+                    parent.display()
+                )
+            })?;
         }
     }
 
@@ -432,10 +439,7 @@ fn detect_revert(pr_body_path: &str) -> Result<Option<RevertReference>, String> 
         }
         // "This reverts commit <sha>." — 40-char hex (GitHub's full SHA).
         if let Some(rest) = trimmed.strip_prefix("This reverts commit ") {
-            let hex: String = rest
-                .chars()
-                .take_while(|c| c.is_ascii_hexdigit())
-                .collect();
+            let hex: String = rest.chars().take_while(|c| c.is_ascii_hexdigit()).collect();
             if hex.len() == 40 {
                 sha = Some(hex);
             }

@@ -3,7 +3,7 @@
 //! Distillation port trait — kernel-enforced I11 audit chain on every digest,
 //! kernel-computed intent lineage (I13), and consumer-side admission.
 
-use crate::distillation::{DistillationReceipt, DistillationRequest, DistillationError};
+use crate::distillation::{DistillationError, DistillationReceipt, DistillationRequest};
 use crate::invariants::i13::AllowedPromotionSet;
 
 /// Persistence surface for Spirit-authored digests with kernel-enforced I11

@@ -6,9 +6,9 @@ use maos_domain::distillation::{DigestPayload, DistillationRequest};
 use maos_domain::log_recall::LogRecallFilter;
 use maos_domain::ports::{DistillationPort, LogRecallPort};
 
+use maos_domain::invariants::i3::FrameOrigin;
 use maos_kernel_core::iac::distillate::DistillateWriter;
 use maos_kernel_core::iac::log_recall::LogRecallAdapter;
-use maos_domain::invariants::i3::FrameOrigin;
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
@@ -42,7 +42,10 @@ fn recall_emits_capability_invocation() {
     };
     let audit_rows = tl.query_frames(audit_filter).unwrap();
     assert_eq!(
-        audit_rows.iter().filter(|r| r.intent == "log.recall").count(),
+        audit_rows
+            .iter()
+            .filter(|r| r.intent == "log.recall")
+            .count(),
         1,
         "expected exactly one CapabilityInvocation row with intent log.recall"
     );
@@ -64,7 +67,10 @@ fn fetch_emits_capability_invocation() {
     };
     let audit_rows = tl.query_frames(audit_filter).unwrap();
     assert_eq!(
-        audit_rows.iter().filter(|r| r.intent == "log.fetch").count(),
+        audit_rows
+            .iter()
+            .filter(|r| r.intent == "log.fetch")
+            .count(),
         1,
         "expected exactly one CapabilityInvocation row with intent log.fetch"
     );
@@ -97,13 +103,9 @@ fn write_distillate_emits_capability_invocation() {
     );
     let raw_id = tl.last_frame_id();
 
-    let request = DistillationRequest::new(
-        vec![raw_id],
-        1,
-        DigestPayload::Text("digest".into()),
-        None,
-    )
-    .unwrap();
+    let request =
+        DistillationRequest::new(vec![raw_id], 1, DigestPayload::Text("digest".into()), None)
+            .unwrap();
     writer.write_distillate(1, request).unwrap();
 
     let audit_filter = FrameFilter {

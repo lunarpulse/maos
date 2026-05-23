@@ -9,18 +9,20 @@
 //! ## Classification target
 //! universal-arithmetic (§4.0.7) — no variance/entropy/EFE/KL computation.
 
-use std::sync::RwLock;
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 use maos_domain::invariants::i7::ScalarTapEvent;
 
-use super::{WorkingMemorySlot, SetScalarError};
+use super::{SetScalarError, WorkingMemorySlot};
 
 /// Per-Spirit-per-tag scalar slot storage.
 ///
 /// Composite key `(spirit_pid: u32, tag: String)` scopes slots per-Spirit.
 /// One slot per tag; new writes replace prior values.
-#[maos_attrs::i9_exempt(reason = "capability registry tagged-scalar slot — per-Spirit working memory state for ADR-022 universal-arithmetic predicate evaluation; parallel to capability-token ledger, not pattern-learning")]
+#[maos_attrs::i9_exempt(
+    reason = "capability registry tagged-scalar slot — per-Spirit working memory state for ADR-022 universal-arithmetic predicate evaluation; parallel to capability-token ledger, not pattern-learning"
+)]
 #[derive(Debug, Default)]
 pub struct WorkingMemoryStore {
     slots: RwLock<HashMap<(u32, String), WorkingMemorySlot>>,
@@ -61,12 +63,8 @@ impl WorkingMemoryStore {
 
         let timestamp = unix_timestamp_ms();
 
-        let slot = WorkingMemorySlot::new(
-            tag.to_string(),
-            value,
-            derived_from.to_string(),
-            timestamp,
-        )?;
+        let slot =
+            WorkingMemorySlot::new(tag.to_string(), value, derived_from.to_string(), timestamp)?;
 
         {
             let mut map = self.slots.write().unwrap_or_else(|e| e.into_inner());
@@ -134,9 +132,7 @@ mod tests {
     #[test]
     fn set_scalar_rejects_empty_derived_from() {
         let store = WorkingMemoryStore::new();
-        let err = store
-            .set_scalar(1, "spirit-1", "tag", 0.5, "")
-            .unwrap_err();
+        let err = store.set_scalar(1, "spirit-1", "tag", 0.5, "").unwrap_err();
         assert!(matches!(err, SetScalarError::EmptyDerivedFrom));
     }
 
@@ -171,12 +167,8 @@ mod tests {
     #[test]
     fn set_scalar_scoped_per_spirit_per_tag() {
         let store = WorkingMemoryStore::new();
-        store
-            .set_scalar(1, "spirit-a", "tag-x", 0.1, "f1")
-            .unwrap();
-        store
-            .set_scalar(2, "spirit-b", "tag-x", 0.9, "f2")
-            .unwrap();
+        store.set_scalar(1, "spirit-a", "tag-x", 0.1, "f1").unwrap();
+        store.set_scalar(2, "spirit-b", "tag-x", 0.9, "f2").unwrap();
         // Different spirit_pid => different slots
         let (v1, _) = store.get_scalar(1, "tag-x").unwrap();
         let (v2, _) = store.get_scalar(2, "tag-x").unwrap();

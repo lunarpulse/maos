@@ -128,7 +128,9 @@ pub fn spawn_sandboxed(
     // --- cgroups v2 (parent side, post-spawn) ---
     if let Some(path) = cgroup_path_for_post {
         if let Err(e) = apply_cgroup_limits(&path, &spec.resolved_caps, child.id()) {
-            eprintln!("maos-sandbox: cgroup limit apply failed: {e}; relying on setrlimit fallback");
+            eprintln!(
+                "maos-sandbox: cgroup limit apply failed: {e}; relying on setrlimit fallback"
+            );
         }
         return Ok(SandboxedChild {
             child,
@@ -153,8 +155,8 @@ pub fn spawn_sandboxed(
 /// where only `restrict_self()` (a single syscall) is called.
 fn prepare_landlock(scopes: &[Scope]) -> Result<landlock::RulesetCreated, SpawnError> {
     use landlock::{
-        ABI, Access, AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, Ruleset,
-        RulesetAttr, RulesetCreatedAttr,
+        Access, AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, Ruleset, RulesetAttr,
+        RulesetCreatedAttr, ABI,
     };
 
     let abi = ABI::V1;
@@ -345,8 +347,7 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
 }
 
 fn apply_seccomp(bpf: &[seccompiler::sock_filter]) -> Result<(), String> {
-    seccompiler::apply_filter(bpf)
-        .map_err(|e| format!("seccomp apply_filter failed: {e}"))
+    seccompiler::apply_filter(bpf).map_err(|e| format!("seccomp apply_filter failed: {e}"))
 }
 
 // ------------------------------------------------------------------

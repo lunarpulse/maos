@@ -1,0 +1,12 @@
+{
+  "scenario_id": "upg-migrator_success-004",
+  "category": "migrator_success",
+  "predecessor_manifest_path": "crates/maos-eval/fixtures/upgrade-policy-corpus-v0/migrator_success_pred_004.toml",
+  "successor_manifest_path": "crates/maos-eval/fixtures/upgrade-policy-corpus-v0/migrator_success_succ_004.toml",
+  "policy": "migrator",
+  "expected_outcome": {
+    "report_outcome": "completed",
+    "lifecycle_event_journaled": true,
+    "halt_receipts_produced_min": 0
+  }
+}

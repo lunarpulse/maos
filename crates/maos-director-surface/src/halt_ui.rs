@@ -5,11 +5,13 @@
 //! (Story 4.1) emits halts via `invoke_halt`; this module is the
 //! director's-surface side of the loop.
 
-use std::sync::Arc;
-use maos_domain::halt::{HaltId, HaltJournal, HaltJournalError, HaltResolver, Resolution, ResolveError};
-use maos_domain::frame::EpistemicHaltPayload;
-use maos_domain::notification::{NotificationEvent, NotificationLevel};
 use crate::notification::{DispatchReport, NotificationDispatcher, NotificationError};
+use maos_domain::frame::EpistemicHaltPayload;
+use maos_domain::halt::{
+    HaltId, HaltJournal, HaltJournalError, HaltResolver, Resolution, ResolveError,
+};
+use maos_domain::notification::{NotificationEvent, NotificationLevel};
+use std::sync::Arc;
 
 /// The three taps the director performs in the worst case. Used by
 /// `resolve_flow` to bound the click-path; the unit test
@@ -42,7 +44,11 @@ impl<R: HaltResolver> HaltFlow<R> {
         dispatcher: Arc<NotificationDispatcher>,
         journal: Arc<dyn HaltJournal>,
     ) -> Self {
-        Self { resolver, dispatcher, journal }
+        Self {
+            resolver,
+            dispatcher,
+            journal,
+        }
     }
 
     /// Surface a halt to the director through the wired dispatcher.
@@ -53,10 +59,9 @@ impl<R: HaltResolver> HaltFlow<R> {
         halt_id: HaltId,
         payload: EpistemicHaltPayload,
     ) -> Result<DispatchReport, NotificationError> {
-        let event = NotificationEvent::Halt {
-            payload,
-        };
-        self.dispatcher.dispatch(event, NotificationLevel::Immediate)
+        let event = NotificationEvent::Halt { payload };
+        self.dispatcher
+            .dispatch(event, NotificationLevel::Immediate)
     }
 
     /// Submit a resolution — resolves via the HaltResolver FIRST, then
@@ -70,12 +75,8 @@ impl<R: HaltResolver> HaltFlow<R> {
         spirit_id: &str,
     ) -> Result<(), HaltUiError> {
         self.resolver.resolve(&halt_id, resolution.clone())?;
-        self.journal.journal_halt_resolution(
-            "director",
-            spirit_id,
-            &halt_id,
-            &resolution,
-        )?;
+        self.journal
+            .journal_halt_resolution("director", spirit_id, &halt_id, &resolution)?;
         Ok(())
     }
 
@@ -115,8 +116,8 @@ pub enum HaltUiError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex as StdMutex;
     use maos_domain::halt::HaltJournalError;
+    use std::sync::Mutex as StdMutex;
 
     struct MockJournal;
 
@@ -141,7 +142,9 @@ mod tests {
 
     impl TestResolver {
         fn new() -> Self {
-            Self { calls: StdMutex::new(Vec::new()) }
+            Self {
+                calls: StdMutex::new(Vec::new()),
+            }
         }
 
         fn calls(&self) -> Vec<(HaltId, Resolution)> {
@@ -151,7 +154,10 @@ mod tests {
 
     impl HaltResolver for TestResolver {
         fn resolve(&self, halt_id: &HaltId, resolution: Resolution) -> Result<(), ResolveError> {
-            self.calls.lock().unwrap().push((halt_id.clone(), resolution));
+            self.calls
+                .lock()
+                .unwrap()
+                .push((halt_id.clone(), resolution));
             Ok(())
         }
     }
@@ -172,7 +178,9 @@ mod tests {
     }
 
     impl CaptureChannel {
-        fn new(events: Arc<std::sync::Mutex<Vec<maos_domain::notification::NotificationEvent>>>) -> Self {
+        fn new(
+            events: Arc<std::sync::Mutex<Vec<maos_domain::notification::NotificationEvent>>>,
+        ) -> Self {
             Self { events }
         }
     }
@@ -204,10 +212,18 @@ mod tests {
         let flow = HaltFlow::new(resolver, Arc::new(dispatcher), journal);
 
         let payload = EpistemicHaltPayload::new(
-            "halt-001".into(), "tag".into(), 0.3, Some(0.5), "pol".into(), "d".into(),
-        ).unwrap();
+            "halt-001".into(),
+            "tag".into(),
+            0.3,
+            Some(0.5),
+            "pol".into(),
+            "d".into(),
+        )
+        .unwrap();
 
-        let report = flow.dispatch_halt(HaltId::new("halt-001").unwrap(), payload).unwrap();
+        let report = flow
+            .dispatch_halt(HaltId::new("halt-001").unwrap(), payload)
+            .unwrap();
         assert_eq!(report.delivered, 1);
         assert_eq!(report.errors, 0);
 
@@ -223,13 +239,18 @@ mod tests {
         let flow = HaltFlow::new(resolver, Arc::new(NotificationDispatcher::new()), journal);
 
         let hid = HaltId::new("halt-001").unwrap();
-        let res = Resolution::ProvidedContext { text: "missing context".into() };
-        flow.submit_resolution(hid.clone(), res.clone(), "hello-spirit").unwrap();
+        let res = Resolution::ProvidedContext {
+            text: "missing context".into(),
+        };
+        flow.submit_resolution(hid.clone(), res.clone(), "hello-spirit")
+            .unwrap();
 
         let calls = flow.resolver.as_ref().calls();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].0, hid);
-        assert!(matches!(&calls[0].1, Resolution::ProvidedContext { text } if text == "missing context"));
+        assert!(
+            matches!(&calls[0].1, Resolution::ProvidedContext { text } if text == "missing context")
+        );
     }
 
     #[test]
@@ -239,7 +260,8 @@ mod tests {
         let flow = HaltFlow::new(resolver, Arc::new(NotificationDispatcher::new()), journal);
 
         let hid = HaltId::new("halt-002").unwrap();
-        flow.submit_resolution(hid, Resolution::AcceptedHalt, "hello-spirit").unwrap();
+        flow.submit_resolution(hid, Resolution::AcceptedHalt, "hello-spirit")
+            .unwrap();
 
         let calls = flow.resolver.as_ref().calls();
         assert_eq!(calls.len(), 1);
@@ -253,12 +275,16 @@ mod tests {
         let flow = HaltFlow::new(resolver, Arc::new(NotificationDispatcher::new()), journal);
 
         let hid = HaltId::new("halt-003").unwrap();
-        let res = Resolution::AuthorizedOverride { operator_policy_ref: "policy://x".into() };
+        let res = Resolution::AuthorizedOverride {
+            operator_policy_ref: "policy://x".into(),
+        };
         flow.submit_resolution(hid, res, "hello-spirit").unwrap();
 
         let calls = flow.resolver.as_ref().calls();
         assert_eq!(calls.len(), 1);
-        assert!(matches!(&calls[0].1, Resolution::AuthorizedOverride { operator_policy_ref } if operator_policy_ref == "policy://x"));
+        assert!(
+            matches!(&calls[0].1, Resolution::AuthorizedOverride { operator_policy_ref } if operator_policy_ref == "policy://x")
+        );
     }
 
     #[test]
@@ -271,7 +297,10 @@ mod tests {
         let result = flow.submit_resolution(hid, Resolution::AcceptedHalt, "hello-spirit");
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(matches!(err, HaltUiError::Resolver(ResolveError::UnknownHalt(_))));
+        assert!(matches!(
+            err,
+            HaltUiError::Resolver(ResolveError::UnknownHalt(_))
+        ));
     }
 
     #[test]
@@ -288,8 +317,14 @@ mod tests {
         assert_eq!(s3, Done);
 
         // Done is absorbing
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Done, Acknowledge), Done);
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Done, SelectKind), Done);
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Done, Acknowledge),
+            Done
+        );
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Done, SelectKind),
+            Done
+        );
         assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Done, Submit), Done);
     }
 
@@ -300,23 +335,56 @@ mod tests {
 
         // All 12 pairs: 4 states × 3 events — every pair has a defined output.
         // Tap1Acknowledge
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Tap1Acknowledge, Acknowledge), Tap2SelectKind);
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Tap1Acknowledge, SelectKind), Tap1Acknowledge); // stays — wrong tap
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Tap1Acknowledge, Submit), Tap1Acknowledge);     // stays — wrong tap
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Tap1Acknowledge, Acknowledge),
+            Tap2SelectKind
+        );
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Tap1Acknowledge, SelectKind),
+            Tap1Acknowledge
+        ); // stays — wrong tap
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Tap1Acknowledge, Submit),
+            Tap1Acknowledge
+        ); // stays — wrong tap
 
         // Tap2SelectKind
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Tap2SelectKind, Acknowledge), Tap2SelectKind);   // stays
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Tap2SelectKind, SelectKind), Tap3Submit);
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Tap2SelectKind, Submit), Tap2SelectKind);        // stays
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Tap2SelectKind, Acknowledge),
+            Tap2SelectKind
+        ); // stays
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Tap2SelectKind, SelectKind),
+            Tap3Submit
+        );
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Tap2SelectKind, Submit),
+            Tap2SelectKind
+        ); // stays
 
         // Tap3Submit
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Tap3Submit, Acknowledge), Tap3Submit);           // stays
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Tap3Submit, SelectKind), Tap3Submit);            // stays
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Tap3Submit, Submit), Done);
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Tap3Submit, Acknowledge),
+            Tap3Submit
+        ); // stays
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Tap3Submit, SelectKind),
+            Tap3Submit
+        ); // stays
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Tap3Submit, Submit),
+            Done
+        );
 
         // Done — absorbing
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Done, Acknowledge), Done);
-        assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Done, SelectKind), Done);
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Done, Acknowledge),
+            Done
+        );
+        assert_eq!(
+            HaltFlow::<TestResolver>::resolve_flow(Done, SelectKind),
+            Done
+        );
         assert_eq!(HaltFlow::<TestResolver>::resolve_flow(Done, Submit), Done);
     }
 }

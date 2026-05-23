@@ -2,7 +2,14 @@ use std::process::Command;
 
 fn xtask() -> Command {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "--manifest-path", concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.toml"), "-p", "xtask", "--"]);
+    cmd.args([
+        "run",
+        "--manifest-path",
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.toml"),
+        "-p",
+        "xtask",
+        "--",
+    ]);
     cmd
 }
 
@@ -15,11 +22,16 @@ fn calibrate_passes_on_clean_corpus() {
     let output = xtask()
         .args([
             "calibrate",
-            "--corpus", "calibration-seed-v0.1",
-            "--n", "10",
-            "--p", "0.95",
-            "--manifest", &fixture("clean-calibration/MANIFEST.toml"),
-            "--corpora-dir", &fixture("clean-calibration/corpora"),
+            "--corpus",
+            "calibration-seed-v0.1",
+            "--n",
+            "10",
+            "--p",
+            "0.95",
+            "--manifest",
+            &fixture("clean-calibration/MANIFEST.toml"),
+            "--corpora-dir",
+            &fixture("clean-calibration/corpora"),
         ])
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/.."))
         .output()
@@ -43,11 +55,16 @@ fn calibrate_passes_on_mismatch_but_within_ci() {
     let output = xtask()
         .args([
             "calibrate",
-            "--corpus", "calibration-seed-v0.1-mismatched",
-            "--n", "100",
-            "--p", "0.95",
-            "--manifest", &fixture("violation-calibration-mismatch/MANIFEST.toml"),
-            "--corpora-dir", &fixture("violation-calibration-mismatch/corpora"),
+            "--corpus",
+            "calibration-seed-v0.1-mismatched",
+            "--n",
+            "100",
+            "--p",
+            "0.95",
+            "--manifest",
+            &fixture("violation-calibration-mismatch/MANIFEST.toml"),
+            "--corpora-dir",
+            &fixture("violation-calibration-mismatch/corpora"),
         ])
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/.."))
         .output()
@@ -59,10 +76,7 @@ fn calibrate_passes_on_mismatch_but_within_ci() {
         "expected success (pass_rate=0.70 gives ci_width≈0.18 < 0.20), got failure. stderr:\n{stderr}"
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        stdout.contains("PASSED"),
-        "expected PASSED, got:\n{stdout}"
-    );
+    assert!(stdout.contains("PASSED"), "expected PASSED, got:\n{stdout}");
 }
 
 #[test]
@@ -72,11 +86,16 @@ fn calibrate_fails_on_mismatch_at_p_0_99() {
     let output = xtask()
         .args([
             "calibrate",
-            "--corpus", "calibration-seed-v0.1-mismatched",
-            "--n", "100",
-            "--p", "0.99",
-            "--manifest", &fixture("violation-calibration-mismatch/MANIFEST.toml"),
-            "--corpora-dir", &fixture("violation-calibration-mismatch/corpora"),
+            "--corpus",
+            "calibration-seed-v0.1-mismatched",
+            "--n",
+            "100",
+            "--p",
+            "0.99",
+            "--manifest",
+            &fixture("violation-calibration-mismatch/MANIFEST.toml"),
+            "--corpora-dir",
+            &fixture("violation-calibration-mismatch/corpora"),
         ])
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/.."))
         .output()
@@ -98,11 +117,16 @@ fn calibrate_surfaces_malformed_items() {
     let output = xtask()
         .args([
             "calibrate",
-            "--corpus", "calibration-seed-v0.1-malformed",
-            "--n", "10",
-            "--p", "0.95",
-            "--manifest", &fixture("violation-calibration-malformed/MANIFEST.toml"),
-            "--corpora-dir", &fixture("violation-calibration-malformed/corpora"),
+            "--corpus",
+            "calibration-seed-v0.1-malformed",
+            "--n",
+            "10",
+            "--p",
+            "0.95",
+            "--manifest",
+            &fixture("violation-calibration-malformed/MANIFEST.toml"),
+            "--corpora-dir",
+            &fixture("violation-calibration-malformed/corpora"),
             "--json",
         ])
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/.."))

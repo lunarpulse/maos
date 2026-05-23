@@ -54,9 +54,12 @@ mod tests {
                 provider: "openai".into(),
             },
         };
-        tx.try_send(event.clone()).expect("channel should not be full");
+        tx.try_send(event.clone())
+            .expect("channel should not be full");
         let received = rx.try_recv().expect("should receive event");
-        assert!(matches!(received, DriftEvent::CapabilityScopeDrift { spirit_pid, .. } if spirit_pid == 42));
+        assert!(
+            matches!(received, DriftEvent::CapabilityScopeDrift { spirit_pid, .. } if spirit_pid == 42)
+        );
     }
 
     #[test]

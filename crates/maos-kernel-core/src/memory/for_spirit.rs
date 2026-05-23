@@ -45,8 +45,7 @@ impl<'a> SpiritMemoryView<'a> {
         namespace: &MemoryNamespace,
         key: &str,
     ) -> Result<Option<MemoryValue>, MemoryError> {
-        self.adapter
-            .read(self.spirit_pid, tier, namespace, key)
+        self.adapter.read(self.spirit_pid, tier, namespace, key)
     }
 
     pub fn scan(

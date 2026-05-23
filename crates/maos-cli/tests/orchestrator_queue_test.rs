@@ -53,8 +53,7 @@ fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Outpu
     if let Ok(path) = std::env::var("PATH") {
         cmd.env("PATH", path);
     }
-    let workspace_root =
-        std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+    let workspace_root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
     cmd.current_dir(&workspace_root);
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
@@ -69,9 +68,7 @@ fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Outpu
     out
 }
 
-fn run_queue_and_inspect_db(
-    args: &[&str],
-) -> (std::process::Output, rusqlite::Connection) {
+fn run_queue_and_inspect_db(args: &[&str]) -> (std::process::Output, rusqlite::Connection) {
     let tmp = TempDir::new().expect("tempdir");
     let db_path = tmp.path().join("transparency.sqlite");
     let journal_path = tmp.path().join("journal.ndjson");
@@ -83,8 +80,7 @@ fn run_queue_and_inspect_db(
     if let Ok(path) = std::env::var("PATH") {
         cmd.env("PATH", path);
     }
-    let workspace_root =
-        std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+    let workspace_root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
     cmd.current_dir(&workspace_root);
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
@@ -93,10 +89,9 @@ fn run_queue_and_inspect_db(
     cmd.args(args);
     let out = cmd.output().expect("spawn maosctl");
 
-    let conn = rusqlite::Connection::open_with_flags(
-        &db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    ).expect("open db for inspection");
+    let conn =
+        rusqlite::Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .expect("open db for inspection");
 
     std::mem::forget(tmp);
     (out, conn)
@@ -107,23 +102,25 @@ fn orchestrator_queue_exits_zero() {
     let out = run_maosctl(
         &[],
         &[
-            "orchestrator", "queue",
-            "--spirit", "hello-spirit",
+            "orchestrator",
+            "queue",
+            "--spirit",
+            "hello-spirit",
             "draft the PR",
         ],
     );
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 #[test]
 fn orchestrator_queue_rejects_unknown_spirit() {
     let out = run_maosctl(
         &[],
-        &[
-            "orchestrator", "queue",
-            "--spirit", "unknown-spirit",
-            "x",
-        ],
+        &["orchestrator", "queue", "--spirit", "unknown-spirit", "x"],
     );
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -137,11 +134,7 @@ fn orchestrator_queue_rejects_unknown_spirit() {
 fn orchestrator_queue_rejects_empty_instruction() {
     let out = run_maosctl(
         &[],
-        &[
-            "orchestrator", "queue",
-            "--spirit", "hello-spirit",
-            "",
-        ],
+        &["orchestrator", "queue", "--spirit", "hello-spirit", ""],
     );
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -153,24 +146,19 @@ fn orchestrator_queue_rejects_empty_instruction() {
 
 #[test]
 fn orchestrator_status_exits_zero() {
-    let out = run_maosctl(
-        &[],
-        &[
-            "orchestrator", "status",
-            "--spirit", "hello-spirit",
-        ],
+    let out = run_maosctl(&[], &["orchestrator", "status", "--spirit", "hello-spirit"]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
     );
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
 }
 
 #[test]
 fn orchestrator_status_no_color_zero_ansi() {
     let out = run_maosctl(
         &[("NO_COLOR", "1")],
-        &[
-            "orchestrator", "status",
-            "--spirit", "hello-spirit",
-        ],
+        &["orchestrator", "status", "--spirit", "hello-spirit"],
     );
     let stderr = out.stderr;
     let esc_count = stderr.iter().filter(|b| **b == 0x1b).count();
@@ -180,32 +168,41 @@ fn orchestrator_status_no_color_zero_ansi() {
 #[test]
 fn orchestrator_queue_writes_adl_row_with_correct_content() {
     let (out, conn) = run_queue_and_inspect_db(&[
-        "orchestrator", "queue",
-        "--spirit", "hello-spirit",
+        "orchestrator",
+        "queue",
+        "--spirit",
+        "hello-spirit",
         "draft the PR",
     ]);
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let mut stmt = conn.prepare(
         "SELECT capability, intent, reasoning FROM approval_decision_log ORDER BY id DESC LIMIT 1"
     ).unwrap();
-    let row: (String, String, Option<String>) = stmt.query_row([], |row| {
-        Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-    }).unwrap();
+    let row: (String, String, Option<String>) = stmt
+        .query_row([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .unwrap();
 
     assert_eq!(row.0, "orchestrator.queue", "capability mismatch");
     assert_eq!(row.1, "queue", "intent mismatch");
-    assert!(row.2.as_ref().map_or(false, |r| r.contains("draft the PR")),
-        "reasoning should contain goal text, got: {:?}", row.2);
+    assert!(
+        row.2.as_ref().map_or(false, |r| r.contains("draft the PR")),
+        "reasoning should contain goal text, got: {:?}",
+        row.2
+    );
 }
 
 #[test]
 fn hex_validation_rejects_uppercase() {
-    let out = run_maosctl(
-        &[],
-        &["revoke-token", "AABBCCDDEEFF00112233445566778899"],
-    );
+    let out = run_maosctl(&[], &["revoke-token", "AABBCCDDEEFF00112233445566778899"]);
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("lowercase hex"), "expected lowercase rejection, got: {stderr}");
+    assert!(
+        stderr.contains("lowercase hex"),
+        "expected lowercase rejection, got: {stderr}"
+    );
 }

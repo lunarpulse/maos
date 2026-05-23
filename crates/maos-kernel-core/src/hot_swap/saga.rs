@@ -19,8 +19,8 @@ use std::time::Instant;
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::journal::JournalAdapter;
 use crate::scheduler::control_block::SpiritControlBlock;
-use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
+use maos_domain::invariants::i3::FrameOrigin;
 
 use super::post_swap_monitor::PostSwapInvariantViolation;
 
@@ -38,9 +38,15 @@ pub enum SagaPhase {
 /// Compensation action for a failed swap phase.
 #[derive(Debug, Clone)]
 pub enum SagaCompensation {
-    RestorePredecessor { reason: String },
-    DiscardSuccessor { reason: String },
-    AutoRevert { invariant: PostSwapInvariantViolation },
+    RestorePredecessor {
+        reason: String,
+    },
+    DiscardSuccessor {
+        reason: String,
+    },
+    AutoRevert {
+        invariant: PostSwapInvariantViolation,
+    },
 }
 
 /// A saga records the state needed to compensate for each phase's failure.
@@ -110,7 +116,9 @@ impl HotSwapSaga {
                 (reason.clone(), phase)
             }
             SagaCompensation::DiscardSuccessor { reason } => (reason.clone(), "SnapshotTaken"),
-            SagaCompensation::AutoRevert { invariant } => (format!("{invariant:?}"), "PostSwapWindow"),
+            SagaCompensation::AutoRevert { invariant } => {
+                (format!("{invariant:?}"), "PostSwapWindow")
+            }
         };
 
         // Journal the abort.
@@ -148,7 +156,9 @@ impl Default for HotSwapSaga {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scheduler::control_block::{SpiritControlBlock, SpiritManifestBundle, make_spirit_obj};
+    use crate::scheduler::control_block::{
+        make_spirit_obj, SpiritControlBlock, SpiritManifestBundle,
+    };
     use maos_spirit_abi::lifecycle::Spirit;
 
     struct TestSpirit;

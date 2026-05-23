@@ -63,25 +63,25 @@ impl HotSwapPrecheck {
         };
 
         let verdict = match schema_compat {
-        SchemaCompat::Breaking => PrecheckOutcome::SchemaIncompatible,
-        SchemaCompat::SameMajor | SchemaCompat::CrossMajor => {
-            // Check halt continuity dry-run style (no mutation).
-            match crate::halt::validate_halt_set(
-                &halt_registry.pending_halt_ids(),
-                predecessor_halt_protocol_version,
-                Some(successor_accepted_versions),
-            ) {
-                Ok(()) => {
-                    if remaining_halt_count(halt_registry) == 0 {
-                        PrecheckOutcome::SafeDrained
-                    } else {
-                        PrecheckOutcome::SafeMigrated
+            SchemaCompat::Breaking => PrecheckOutcome::SchemaIncompatible,
+            SchemaCompat::SameMajor | SchemaCompat::CrossMajor => {
+                // Check halt continuity dry-run style (no mutation).
+                match crate::halt::validate_halt_set(
+                    &halt_registry.pending_halt_ids(),
+                    predecessor_halt_protocol_version,
+                    Some(successor_accepted_versions),
+                ) {
+                    Ok(()) => {
+                        if remaining_halt_count(halt_registry) == 0 {
+                            PrecheckOutcome::SafeDrained
+                        } else {
+                            PrecheckOutcome::SafeMigrated
+                        }
                     }
+                    Err(_) => PrecheckOutcome::HaltContinuityViolation,
                 }
-                Err(_) => PrecheckOutcome::HaltContinuityViolation,
             }
-        }
-    };
+        };
 
         PrecheckVerdict {
             verdict,
@@ -112,11 +112,7 @@ mod tests {
     #[test]
     fn precheck_empty_halt_set_returns_safe_drained() {
         let registry = make_registry();
-        let verdict = HotSwapPrecheck::check(
-            &registry,
-            1, 1, &[1, 2],
-            1, 1,
-        );
+        let verdict = HotSwapPrecheck::check(&registry, 1, 1, &[1, 2], 1, 1);
         assert_eq!(verdict.verdict, PrecheckOutcome::SafeDrained);
         assert_eq!(verdict.schema_compat, SchemaCompat::SameMajor);
     }
@@ -124,11 +120,7 @@ mod tests {
     #[test]
     fn precheck_cross_major_detected() {
         let registry = make_registry();
-        let verdict = HotSwapPrecheck::check(
-            &registry,
-            1, 1, &[1, 2],
-            0x0001_0000, 0x0002_0000,
-        );
+        let verdict = HotSwapPrecheck::check(&registry, 1, 1, &[1, 2], 0x0001_0000, 0x0002_0000);
         assert_eq!(verdict.schema_compat, SchemaCompat::CrossMajor);
     }
 
@@ -140,8 +132,11 @@ mod tests {
 
         let verdict = HotSwapPrecheck::check(
             &registry,
-            1, 1, &[/* empty — no compatible versions */],
-            1, 1,
+            1,
+            1,
+            &[/* empty — no compatible versions */],
+            1,
+            1,
         );
         assert_eq!(verdict.verdict, PrecheckOutcome::HaltContinuityViolation);
     }

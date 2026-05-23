@@ -12,7 +12,10 @@ use super::{SecretRedactionItem, SecretRedactionSeed};
 use crate::ValidationOutcome;
 
 /// Validate a single expanded item against its originating seed.
-pub fn validate_item(item: &SecretRedactionItem, seeds: &[SecretRedactionSeed]) -> ValidationOutcome {
+pub fn validate_item(
+    item: &SecretRedactionItem,
+    seeds: &[SecretRedactionSeed],
+) -> ValidationOutcome {
     let Some(seed) = seeds.iter().find(|s| s.id == item.seed_id) else {
         return ValidationOutcome::Invalid {
             reason: format!("seed_id '{}' not found in seed corpus", item.seed_id),

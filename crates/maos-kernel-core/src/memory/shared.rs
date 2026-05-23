@@ -28,7 +28,9 @@ CREATE INDEX IF NOT EXISTS shared_memory_namespace_idx ON shared_memory(namespac
 ";
 
 /// Host-wide SQLite-backed shared memory store.
-#[maos_attrs::i9_exempt(reason = "memory manager shared tier — Host-wide SQLite-backed kv with namespace prefix per writer for cross-Spirit coordination; bounded by Spirit lifetime + namespace ownership; kernel writer_spirit_pid is kernel-set, not Spirit-supplied")]
+#[maos_attrs::i9_exempt(
+    reason = "memory manager shared tier — Host-wide SQLite-backed kv with namespace prefix per writer for cross-Spirit coordination; bounded by Spirit lifetime + namespace ownership; kernel writer_spirit_pid is kernel-set, not Spirit-supplied"
+)]
 pub struct SharedMemoryStore {
     conn: Mutex<Connection>,
 }
@@ -86,8 +88,8 @@ impl SharedMemoryStore {
         let kind = Self::kind_from_str(kind_str)?;
         match kind {
             ValueKind::Json => {
-                let v: serde_json::Value =
-                    serde_json::from_slice(bytes).map_err(|e| MemoryError::Storage(e.to_string()))?;
+                let v: serde_json::Value = serde_json::from_slice(bytes)
+                    .map_err(|e| MemoryError::Storage(e.to_string()))?;
                 Ok(MemoryValue::Json(v))
             }
             ValueKind::Markdown => {
@@ -214,18 +216,15 @@ impl SharedMemoryStore {
             .replace('_', "\\_");
         let like_pattern = format!("{like_pattern}%");
         let rows = stmt
-            .query_map(
-                params![ns_str, like_pattern, limit as i64],
-                |row| {
-                    let _writer_pid: i64 = row.get(0)?;
-                    let namespace_str: String = row.get(1)?;
-                    let key: String = row.get(2)?;
-                    let bytes: Vec<u8> = row.get(3)?;
-                    let kind_str: String = row.get(4)?;
-                    let ts: i64 = row.get(5)?;
-                    Ok((namespace_str, key, bytes, kind_str, ts))
-                },
-            )
+            .query_map(params![ns_str, like_pattern, limit as i64], |row| {
+                let _writer_pid: i64 = row.get(0)?;
+                let namespace_str: String = row.get(1)?;
+                let key: String = row.get(2)?;
+                let bytes: Vec<u8> = row.get(3)?;
+                let kind_str: String = row.get(4)?;
+                let ts: i64 = row.get(5)?;
+                Ok((namespace_str, key, bytes, kind_str, ts))
+            })
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
 
         let mut entries = Vec::new();
@@ -266,9 +265,7 @@ mod tests {
         store
             .write(1, &MemoryNamespace::Coordination, "k1", val.clone())
             .unwrap();
-        let got = store
-            .read(1, &MemoryNamespace::Coordination, "k1")
-            .unwrap();
+        let got = store.read(1, &MemoryNamespace::Coordination, "k1").unwrap();
         assert_eq!(got, Some(val));
     }
 
@@ -277,7 +274,12 @@ mod tests {
         let (store, _tmp) = make_store();
         let val = MemoryValue::Text("spirit-a data".into());
         store
-            .write(10, &MemoryNamespace::Coordination, "shared-key", val.clone())
+            .write(
+                10,
+                &MemoryNamespace::Coordination,
+                "shared-key",
+                val.clone(),
+            )
             .unwrap();
         // Spirit-B reads the same key — shared-tier semantics.
         let got = store
@@ -305,9 +307,7 @@ mod tests {
                 MemoryValue::Text("second".into()),
             )
             .unwrap();
-        let got = store
-            .read(1, &MemoryNamespace::Default, "k")
-            .unwrap();
+        let got = store.read(1, &MemoryNamespace::Default, "k").unwrap();
         assert_eq!(got, Some(MemoryValue::Text("second".into())));
     }
 

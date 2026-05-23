@@ -13,21 +13,32 @@ use std::time::Duration;
 use tokio::time::timeout;
 
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
-use maos_domain::invariants::i3::FrameOrigin;
 use crate::scheduler::control_block::SpiritControlBlock;
 use crate::scheduler::kernel_ctx::KernelCtx;
 use crate::telemetry::iac_rt::IacRtMetrics;
+use maos_domain::invariants::i3::FrameOrigin;
 use std::collections::BTreeMap;
 use std::sync::RwLock;
 
 /// Outcome of a hook fire.
 #[derive(Debug, Clone, PartialEq)]
 pub enum HookOutcome {
-    Fired { wall_ns: u64 },
+    Fired {
+        wall_ns: u64,
+    },
     SkippedManifest,
-    BudgetExceeded { wall_ns: u64, cap_seconds: u64 },
-    BudgetWarning80 { wall_ns: u64, cap_seconds: u64, fired: bool },
-    Panicked { panic_payload_preview: String },
+    BudgetExceeded {
+        wall_ns: u64,
+        cap_seconds: u64,
+    },
+    BudgetWarning80 {
+        wall_ns: u64,
+        cap_seconds: u64,
+        fired: bool,
+    },
+    Panicked {
+        panic_payload_preview: String,
+    },
     DeferredToNextStory,
 }
 
@@ -39,9 +50,8 @@ pub struct HookDispatcher {
     pub metrics: Arc<IacRtMetrics>,
     memory_manager: Option<Arc<crate::memory::MemoryManagerAdapter>>,
     capability: Option<Arc<crate::capability::CapabilityRegistryAdapter>>,
-    working_memory_orchestrator: Option<
-        Arc<crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator>,
-    >,
+    working_memory_orchestrator:
+        Option<Arc<crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator>>,
     iac: Option<Arc<crate::iac::IacBusAdapter>>,
     halt_registry: Option<Arc<crate::halt::HaltRegistry>>,
     log_recall: Option<Arc<crate::iac::log_recall::LogRecallAdapter>>,
@@ -54,10 +64,7 @@ pub struct HookDispatcher {
 }
 
 impl HookDispatcher {
-    pub fn new(
-        tl: Arc<TransparencyLogAdapter>,
-        metrics: Arc<IacRtMetrics>,
-    ) -> Self {
+    pub fn new(tl: Arc<TransparencyLogAdapter>, metrics: Arc<IacRtMetrics>) -> Self {
         Self {
             tl,
             metrics,
@@ -133,9 +140,12 @@ impl HookDispatcher {
         self
     }
 
-    fn build_kernel_ctx<'a>(&self, ctx: &'a mut maos_spirit_abi::ctx::Ctx, spirit_pid: u32) -> KernelCtx<'a> {
-        let mut kctx = KernelCtx::new(ctx)
-            .with_spirit_pid(spirit_pid);
+    fn build_kernel_ctx<'a>(
+        &self,
+        ctx: &'a mut maos_spirit_abi::ctx::Ctx,
+        spirit_pid: u32,
+    ) -> KernelCtx<'a> {
+        let mut kctx = KernelCtx::new(ctx).with_spirit_pid(spirit_pid);
         if let Some(ref m) = self.memory_manager {
             kctx = kctx.with_memory_manager(Arc::clone(m));
         }
@@ -207,59 +217,37 @@ impl HookDispatcher {
         );
     }
 
-    pub async fn fire_on_load(
-        &self,
-        scb: &SpiritControlBlock,
-    ) -> HookOutcome {
+    pub async fn fire_on_load(&self, scb: &SpiritControlBlock) -> HookOutcome {
         self.fire_no_payload_hook(scb, "on_load", |obj, ctx| obj.on_load(ctx))
             .await
     }
 
-    pub async fn fire_on_start(
-        &self,
-        scb: &SpiritControlBlock,
-    ) -> HookOutcome {
+    pub async fn fire_on_start(&self, scb: &SpiritControlBlock) -> HookOutcome {
         self.fire_no_payload_hook(scb, "on_start", |obj, ctx| obj.on_start(ctx))
             .await
     }
 
-    pub async fn fire_on_idle(
-        &self,
-        scb: &SpiritControlBlock,
-    ) -> HookOutcome {
+    pub async fn fire_on_idle(&self, scb: &SpiritControlBlock) -> HookOutcome {
         self.fire_no_payload_hook(scb, "on_idle", |obj, ctx| obj.on_idle(ctx))
             .await
     }
 
-    pub async fn fire_on_pause(
-        &self,
-        scb: &SpiritControlBlock,
-    ) -> HookOutcome {
+    pub async fn fire_on_pause(&self, scb: &SpiritControlBlock) -> HookOutcome {
         self.fire_no_payload_hook(scb, "on_pause", |obj, ctx| obj.on_pause(ctx))
             .await
     }
 
-    pub async fn fire_on_resume(
-        &self,
-        scb: &SpiritControlBlock,
-    ) -> HookOutcome {
+    pub async fn fire_on_resume(&self, scb: &SpiritControlBlock) -> HookOutcome {
         self.fire_no_payload_hook(scb, "on_resume", |obj, ctx| obj.on_resume(ctx))
             .await
     }
 
-    pub async fn fire_on_unload(
-        &self,
-        scb: &SpiritControlBlock,
-    ) -> HookOutcome {
+    pub async fn fire_on_unload(&self, scb: &SpiritControlBlock) -> HookOutcome {
         self.fire_no_payload_hook(scb, "on_unload", |obj, ctx| obj.on_unload(ctx))
             .await
     }
 
-    pub async fn fire_on_frame(
-        &self,
-        scb: &SpiritControlBlock,
-        payload: &[u8],
-    ) -> HookOutcome {
+    pub async fn fire_on_frame(&self, scb: &SpiritControlBlock, payload: &[u8]) -> HookOutcome {
         self.fire_payload_hook(scb, "on_frame", payload, |obj, ctx, p| obj.on_frame(ctx, p))
             .await
     }
@@ -269,26 +257,24 @@ impl HookDispatcher {
         scb: &SpiritControlBlock,
         payload: &[u8],
     ) -> HookOutcome {
-        self.fire_payload_hook(scb, "on_telemetry_event", payload, |obj, ctx, p| obj.on_telemetry_event(ctx, p))
-            .await
+        self.fire_payload_hook(scb, "on_telemetry_event", payload, |obj, ctx, p| {
+            obj.on_telemetry_event(ctx, p)
+        })
+        .await
     }
 
-    pub async fn fire_on_schedule(
-        &self,
-        scb: &SpiritControlBlock,
-        payload: &[u8],
-    ) -> HookOutcome {
-        self.fire_payload_hook(scb, "on_schedule", payload, |obj, ctx, p| obj.on_schedule(ctx, p))
-            .await
+    pub async fn fire_on_schedule(&self, scb: &SpiritControlBlock, payload: &[u8]) -> HookOutcome {
+        self.fire_payload_hook(scb, "on_schedule", payload, |obj, ctx, p| {
+            obj.on_schedule(ctx, p)
+        })
+        .await
     }
 
-    pub async fn fire_on_swap_in(
-        &self,
-        scb: &SpiritControlBlock,
-        payload: &[u8],
-    ) -> HookOutcome {
-        self.fire_payload_hook(scb, "on_swap_in", payload, |obj, ctx, p| obj.on_swap_in(ctx, p))
-            .await
+    pub async fn fire_on_swap_in(&self, scb: &SpiritControlBlock, payload: &[u8]) -> HookOutcome {
+        self.fire_payload_hook(scb, "on_swap_in", payload, |obj, ctx, p| {
+            obj.on_swap_in(ctx, p)
+        })
+        .await
     }
 
     pub async fn fire_on_consolidate(
@@ -296,25 +282,21 @@ impl HookDispatcher {
         scb: &SpiritControlBlock,
         payload: &[u8],
     ) -> HookOutcome {
-        self.fire_payload_hook(scb, "on_consolidate", payload, |obj, ctx, p| obj.on_consolidate(ctx, p))
-            .await
+        self.fire_payload_hook(scb, "on_consolidate", payload, |obj, ctx, p| {
+            obj.on_consolidate(ctx, p)
+        })
+        .await
     }
 
     /// Story 5.2 — Fire the on_swap_out hook on the predecessor.
-    pub async fn fire_on_swap_out(
-        &self,
-        scb: &SpiritControlBlock,
-    ) -> HookOutcome {
+    pub async fn fire_on_swap_out(&self, scb: &SpiritControlBlock) -> HookOutcome {
         self.fire_no_payload_hook(scb, "on_swap_out", |obj, ctx| obj.on_swap_out(ctx))
             .await
     }
 
     /// Story 5.2 — Fire the snapshot hook on the predecessor.
     /// Returns the CBOR-encoded state blob on success.
-    pub async fn fire_snapshot(
-        &self,
-        scb: &SpiritControlBlock,
-    ) -> Result<Vec<u8>, HookOutcome> {
+    pub async fn fire_snapshot(&self, scb: &SpiritControlBlock) -> Result<Vec<u8>, HookOutcome> {
         if !Self::hook_allowed(scb, "snapshot") {
             return Err(HookOutcome::SkippedManifest);
         }
@@ -328,8 +310,7 @@ impl HookDispatcher {
             Duration::from_secs(cap_seconds),
             tokio::task::spawn_blocking(move || {
                 let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
-                let mut kernel_ctx = KernelCtx::new(&mut ctx)
-                    .with_spirit_pid(spirit_pid);
+                let mut kernel_ctx = KernelCtx::new(&mut ctx).with_spirit_pid(spirit_pid);
                 if let Some(ref s) = spirits {
                     kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
                 }
@@ -366,11 +347,22 @@ impl HookDispatcher {
                 } else {
                     "spawn_blocking cancelled".into()
                 };
-                Err(HookOutcome::Panicked { panic_payload_preview: msg })
+                Err(HookOutcome::Panicked {
+                    panic_payload_preview: msg,
+                })
             }
             Err(_elapsed) => {
-                self.emit_budget_frame(scb, "snapshot", wall_ns, cap_seconds, crate::iac::transparency_log::FrameKind::BudgetExceeded);
-                Err(HookOutcome::BudgetExceeded { wall_ns, cap_seconds })
+                self.emit_budget_frame(
+                    scb,
+                    "snapshot",
+                    wall_ns,
+                    cap_seconds,
+                    crate::iac::transparency_log::FrameKind::BudgetExceeded,
+                );
+                Err(HookOutcome::BudgetExceeded {
+                    wall_ns,
+                    cap_seconds,
+                })
             }
         }
     }
@@ -383,7 +375,9 @@ impl HookDispatcher {
         predecessor_state: &[u8],
     ) -> Result<Vec<u8>, maos_spirit_abi::lifecycle::MigratorError> {
         if !Self::hook_allowed(scb, "migrate") {
-            return Err(maos_spirit_abi::lifecycle::MigratorError::new_internal("manifest does not permit migrate hook"));
+            return Err(maos_spirit_abi::lifecycle::MigratorError::new_internal(
+                "manifest does not permit migrate hook",
+            ));
         }
         let cap_seconds = self.time_cap_seconds;
         let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
@@ -396,8 +390,7 @@ impl HookDispatcher {
             Duration::from_secs(cap_seconds),
             tokio::task::spawn_blocking(move || {
                 let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
-                let mut kernel_ctx = KernelCtx::new(&mut ctx)
-                    .with_spirit_pid(spirit_pid);
+                let mut kernel_ctx = KernelCtx::new(&mut ctx).with_spirit_pid(spirit_pid);
                 if let Some(ref s) = spirits {
                     kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
                 }
@@ -436,11 +429,21 @@ impl HookDispatcher {
                 } else {
                     "spawn_blocking cancelled".into()
                 };
-                Err(maos_spirit_abi::lifecycle::MigratorError::new_internal(format!("hook panicked: {msg}")))
+                Err(maos_spirit_abi::lifecycle::MigratorError::new_internal(
+                    format!("hook panicked: {msg}"),
+                ))
             }
             Err(_elapsed) => {
-                self.emit_budget_frame(scb, "migrate", wall_ns, cap_seconds, crate::iac::transparency_log::FrameKind::BudgetExceeded);
-                Err(maos_spirit_abi::lifecycle::MigratorError::new_internal("migrate hook timed out"))
+                self.emit_budget_frame(
+                    scb,
+                    "migrate",
+                    wall_ns,
+                    cap_seconds,
+                    crate::iac::transparency_log::FrameKind::BudgetExceeded,
+                );
+                Err(maos_spirit_abi::lifecycle::MigratorError::new_internal(
+                    "migrate hook timed out",
+                ))
             }
         }
     }
@@ -452,9 +455,13 @@ impl HookDispatcher {
         fire_fn: F,
     ) -> HookOutcome
     where
-        F: Fn(&Arc<dyn crate::scheduler::control_block::AnySpiritObj>, &mut KernelCtx) + Send + Sync + 'static,
+        F: Fn(&Arc<dyn crate::scheduler::control_block::AnySpiritObj>, &mut KernelCtx)
+            + Send
+            + Sync
+            + 'static,
     {
-        self.fire_payload_hook(scb, hook_name, &[], move |obj, ctx, _| fire_fn(obj, ctx)).await
+        self.fire_payload_hook(scb, hook_name, &[], move |obj, ctx, _| fire_fn(obj, ctx))
+            .await
     }
 
     async fn fire_payload_hook<F>(
@@ -465,7 +472,10 @@ impl HookDispatcher {
         fire_fn: F,
     ) -> HookOutcome
     where
-        F: Fn(&Arc<dyn crate::scheduler::control_block::AnySpiritObj>, &mut KernelCtx, &[u8]) + Send + Sync + 'static,
+        F: Fn(&Arc<dyn crate::scheduler::control_block::AnySpiritObj>, &mut KernelCtx, &[u8])
+            + Send
+            + Sync
+            + 'static,
     {
         if !Self::hook_allowed(scb, hook_name) {
             return HookOutcome::SkippedManifest;
@@ -483,8 +493,7 @@ impl HookDispatcher {
             Duration::from_secs(cap_seconds),
             tokio::task::spawn_blocking(move || {
                 let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
-                let mut kernel_ctx = KernelCtx::new(&mut ctx)
-                    .with_spirit_pid(spirit_pid);
+                let mut kernel_ctx = KernelCtx::new(&mut ctx).with_spirit_pid(spirit_pid);
                 if let Some(ref s) = spirits {
                     kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
                 }

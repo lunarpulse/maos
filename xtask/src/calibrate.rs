@@ -38,18 +38,36 @@ pub fn run(
         return Err("confidence p must be in (0,1)".into());
     }
     if !known_p_values().iter().any(|&kp| (p - kp).abs() < 0.001) {
-        eprintln!("calibrate warning: unknown confidence p={p:.2} — supported: {:?}; using z=1.96", known_p_values());
+        eprintln!(
+            "calibrate warning: unknown confidence p={p:.2} — supported: {:?}; using z=1.96",
+            known_p_values()
+        );
     }
-    let report = calibrate_corpus(corpus_name, n, p, Path::new(manifest_path), Path::new(corpora_dir))?;
+    let report = calibrate_corpus(
+        corpus_name,
+        n,
+        p,
+        Path::new(manifest_path),
+        Path::new(corpora_dir),
+    )?;
     if json {
-        println!("{}", serde_json::to_string_pretty(&report).unwrap_or_else(|e| format!("{{\"error\":\"json serialize failed: {e}\"}}")));
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report)
+                .unwrap_or_else(|e| format!("{{\"error\":\"json serialize failed: {e}\"}}"))
+        );
     } else if report.passed {
-        println!("calibrate: PASSED (corpus={}, n={}, ci_width={:.4}, malformed={})", report.corpus, report.n, report.ci_width, report.malformed_items);
+        println!(
+            "calibrate: PASSED (corpus={}, n={}, ci_width={:.4}, malformed={})",
+            report.corpus, report.n, report.ci_width, report.malformed_items
+        );
     } else {
         eprintln!("NFR-Aud-8 violation: corpus {} {} CI-width {:.4} exceeds {} at p={:.2} — increase N or accept wider window with assessor sign-off",
             report.corpus, if report.n >= 500 { "quarterly" } else { "per-commit" }, report.ci_width, report.threshold.unwrap_or(0.0), p);
     }
-    if !report.passed { return Err("calibrate failed".into()); }
+    if !report.passed {
+        return Err("calibrate failed".into());
+    }
     Ok(())
 }
 
@@ -115,7 +133,10 @@ fn calibrate_corpus(
         match serde_json::from_str::<serde_json::Value>(&line) {
             Ok(item) => {
                 items_scanned += 1;
-                let expected = item.get("expected_judgment").cloned().unwrap_or(serde_json::Value::Null);
+                let expected = item
+                    .get("expected_judgment")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
                 if expected == serde_json::Value::Null {
                     malformed += 1;
                     // Missing expected_judgment counts as a non-success
@@ -123,9 +144,12 @@ fn calibrate_corpus(
                 }
                 match judge.judge(&item, &expected) {
                     Ok(true) => successes += 1,
-                    Ok(false) => {},
+                    Ok(false) => {}
                     Err(e) => {
-                        eprintln!("judge error on item {}: {e}", item.get("id").unwrap_or(&serde_json::Value::Null));
+                        eprintln!(
+                            "judge error on item {}: {e}",
+                            item.get("id").unwrap_or(&serde_json::Value::Null)
+                        );
                     }
                 }
             }
@@ -171,8 +195,12 @@ fn calibrate_corpus(
 
 /// Wilson score interval (Agresti & Coull 1998).
 pub fn wilson_ci(successes: u64, n: u64, z: f64) -> Result<(f64, f64), String> {
-    if n == 0 { return Ok((0.0, 1.0)); }
-    if successes > n { return Err(format!("wilson_ci: successes ({successes}) > n ({n})")); }
+    if n == 0 {
+        return Ok((0.0, 1.0));
+    }
+    if successes > n {
+        return Err(format!("wilson_ci: successes ({successes}) > n ({n})"));
+    }
     let n_f = n as f64;
     let p_hat = successes as f64 / n_f;
     let z2 = z * z;
@@ -183,13 +211,22 @@ pub fn wilson_ci(successes: u64, n: u64, z: f64) -> Result<(f64, f64), String> {
 }
 
 fn z_for_confidence(p: f64) -> f64 {
-    if (p - 0.90).abs() < 0.001 { 1.6449 }
-    else if (p - 0.95).abs() < 0.001 { 1.96 }
-    else if (p - 0.99).abs() < 0.001 { 2.5758 }
-    else { 1.96 }
+    if (p - 0.90).abs() < 0.001 {
+        1.6449
+    } else if (p - 0.95).abs() < 0.001 {
+        1.96
+    } else if (p - 0.99).abs() < 0.001 {
+        2.5758
+    } else {
+        1.96
+    }
 }
 
-pub fn known_p_values() -> Vec<f64> { vec![0.90, 0.95, 0.99] }
+pub fn known_p_values() -> Vec<f64> {
+    vec![0.90, 0.95, 0.99]
+}
 
 #[cfg(test)]
-mod tests { include!("tests/calibrate_tests.rs"); }
+mod tests {
+    include!("tests/calibrate_tests.rs");
+}

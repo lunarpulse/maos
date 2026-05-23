@@ -21,13 +21,20 @@ use std::sync::OnceLock;
 fn pub_use_adapter_re() -> &'static regex::Regex {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
     // Capture only the final type name (e.g. SpiritSchedulerAdapter), not the full path.
-    RE.get_or_init(|| regex::Regex::new(r"pub\s+use\s+(?:[\w:]+::)*(\w+Adapter)(?:\s+as\s+\w+)?\s*;").unwrap())
+    RE.get_or_init(|| {
+        regex::Regex::new(r"pub\s+use\s+(?:[\w:]+::)*(\w+Adapter)(?:\s+as\s+\w+)?\s*;").unwrap()
+    })
 }
 
 fn arc_new_adapter_re() -> &'static regex::Regex {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
     // Match Arc::new(...Adapter::new/open/default(...)) OR ...Adapter::new/open/default(...)
-    RE.get_or_init(|| regex::Regex::new(r"(?:Arc::new\s*\(\s*)?(?:[\w:]+::)?(\w+Adapter)::(?:new|open|default)\s*\(").unwrap())
+    RE.get_or_init(|| {
+        regex::Regex::new(
+            r"(?:Arc::new\s*\(\s*)?(?:[\w:]+::)?(\w+Adapter)::(?:new|open|default)\s*\(",
+        )
+        .unwrap()
+    })
 }
 
 fn load_whitelist(path: &str) -> HashSet<String> {
@@ -49,16 +56,11 @@ fn load_whitelist(path: &str) -> HashSet<String> {
     set
 }
 
-pub fn run(
-    api_rs: &str,
-    main_rs: &str,
-    whitelist_path: &str,
-    json: bool,
-) -> Result<(), String> {
-    let api_content = fs::read_to_string(api_rs)
-        .map_err(|e| format!("failed to read {api_rs}: {e}"))?;
-    let main_content = fs::read_to_string(main_rs)
-        .map_err(|e| format!("failed to read {main_rs}: {e}"))?;
+pub fn run(api_rs: &str, main_rs: &str, whitelist_path: &str, json: bool) -> Result<(), String> {
+    let api_content =
+        fs::read_to_string(api_rs).map_err(|e| format!("failed to read {api_rs}: {e}"))?;
+    let main_content =
+        fs::read_to_string(main_rs).map_err(|e| format!("failed to read {main_rs}: {e}"))?;
     let whitelist = load_whitelist(whitelist_path);
 
     // 1. Collect all *Adapter symbols re-exported from api.rs.
@@ -72,10 +74,7 @@ pub fn run(
     for (line_no, line) in main_content.lines().enumerate() {
         for cap in arc_new_adapter_re().captures_iter(line) {
             let name = cap[1].to_string();
-            constructions
-                .entry(name)
-                .or_default()
-                .push(line_no + 1);
+            constructions.entry(name).or_default().push(line_no + 1);
         }
     }
 

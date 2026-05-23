@@ -13,20 +13,15 @@
 use std::sync::Arc;
 
 use maos_domain::invariants::i7::{ScalarTapEvent, TelemetryTopic};
-use maos_domain::ports::TelemetryStreamPort;
 use maos_domain::ports::crypto::CryptoProvider;
+use maos_domain::ports::TelemetryStreamPort;
 use maos_kernel_core::capability::{
-    CapabilityRegistryAdapter,
-    cap_tokens::Ed25519SigningKey,
-    cap_policy::PolicyTable,
-    cap_quota::CapQuotaTracker,
-    WorkingMemoryStore,
+    cap_policy::PolicyTable, cap_quota::CapQuotaTracker, cap_tokens::Ed25519SigningKey,
+    CapabilityRegistryAdapter, WorkingMemoryStore,
 };
 use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 
-fn make_adapter(
-    telemetry: Arc<TelemetryStreamAdapter>,
-) -> CapabilityRegistryAdapter {
+fn make_adapter(telemetry: Arc<TelemetryStreamAdapter>) -> CapabilityRegistryAdapter {
     let crypto: Arc<dyn CryptoProvider> = Arc::new(maos_kernel_core::api::RingCryptoProvider);
     let signing_key = Ed25519SigningKey::new([0u8; 32]);
     let policy = Arc::new(PolicyTable::new());
@@ -34,7 +29,14 @@ fn make_adapter(
     let quota = CapQuotaTracker::new();
     let working_memory = Arc::new(WorkingMemoryStore::new());
     CapabilityRegistryAdapter::new(
-        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory, telemetry,
+        crypto,
+        signing_key,
+        0xCAFE,
+        policy,
+        audit_tx,
+        quota,
+        working_memory,
+        telemetry,
     )
 }
 
@@ -61,15 +63,13 @@ async fn subscriber_receives_scalar_tap_event() {
     });
 
     // Wait for the subscriber to receive the event (bound 100ms)
-    let result = tokio::time::timeout(
-        std::time::Duration::from_millis(100),
-        rx.recv(),
-    )
-    .await;
+    let result = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
 
     write_task.await.unwrap();
 
-    let received = result.expect("subscriber should receive event within 100ms").unwrap();
+    let received = result
+        .expect("subscriber should receive event within 100ms")
+        .unwrap();
     assert_eq!(received.spirit_id, "spirit-1");
     assert_eq!(received.tag, "uncertainty");
     assert_eq!(received.value, 0.75);
@@ -94,7 +94,10 @@ async fn subscribe_different_spirit_same_topic_returns_true() {
     let topic = TelemetryTopic::new("scalar.tap.uncertainty");
 
     assert!(telemetry.subscribe_topic("observer-1", &topic));
-    assert!(telemetry.subscribe_topic("observer-2", &topic), "different spirit subscribing to same topic should return true");
+    assert!(
+        telemetry.subscribe_topic("observer-2", &topic),
+        "different spirit subscribing to same topic should return true"
+    );
 }
 
 #[tokio::test]

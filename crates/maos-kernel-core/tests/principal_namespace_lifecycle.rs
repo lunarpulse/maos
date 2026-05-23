@@ -5,10 +5,10 @@ use std::sync::Arc;
 
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::MemoryManagerPort;
+use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
-use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use tempfile::TempDir;
 
 fn make_adapter() -> (Arc<MemoryManagerAdapter>, TempDir) {
@@ -32,20 +32,50 @@ fn principal_namespace_full_lifecycle() {
 
     // Spirit 10 writes 3 calendar entries.
     adapter
-        .write(10, MemoryTier::Private, &ns_cal, "e1", MemoryValue::Text("cal-1".into()))
+        .write(
+            10,
+            MemoryTier::Private,
+            &ns_cal,
+            "e1",
+            MemoryValue::Text("cal-1".into()),
+        )
         .unwrap();
     adapter
-        .write(10, MemoryTier::Private, &ns_cal, "e2", MemoryValue::Text("cal-2".into()))
+        .write(
+            10,
+            MemoryTier::Private,
+            &ns_cal,
+            "e2",
+            MemoryValue::Text("cal-2".into()),
+        )
         .unwrap();
     adapter
-        .write(10, MemoryTier::Private, &ns_cal, "e3", MemoryValue::Text("cal-3".into()))
+        .write(
+            10,
+            MemoryTier::Private,
+            &ns_cal,
+            "e3",
+            MemoryValue::Text("cal-3".into()),
+        )
         .unwrap();
     // Spirit 20 writes 2 task entries.
     adapter
-        .write(20, MemoryTier::Private, &ns_task, "t1", MemoryValue::Text("task-1".into()))
+        .write(
+            20,
+            MemoryTier::Private,
+            &ns_task,
+            "t1",
+            MemoryValue::Text("task-1".into()),
+        )
         .unwrap();
     adapter
-        .write(20, MemoryTier::Private, &ns_task, "t2", MemoryValue::Text("task-2".into()))
+        .write(
+            20,
+            MemoryTier::Private,
+            &ns_task,
+            "t2",
+            MemoryValue::Text("task-2".into()),
+        )
         .unwrap();
 
     // subject_access should return 5 rows.
@@ -62,6 +92,8 @@ fn principal_namespace_full_lifecycle() {
     assert!(rows_after.is_empty());
 
     // Original keys should be gone.
-    let got = adapter.read(10, MemoryTier::Private, &ns_cal, "e1").unwrap();
+    let got = adapter
+        .read(10, MemoryTier::Private, &ns_cal, "e1")
+        .unwrap();
     assert!(got.is_none());
 }

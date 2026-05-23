@@ -511,3 +511,16 @@
 "maos_kernel_core::security::manifest::OnCrashSection"                    = "supervision"
 "maos_kernel_core::security::manifest::SupervisionSection"                = "supervision"
 
+
+# Story 5.4 — lifecycle upgrade + revocation types
+"maos_kernel_core::lifecycle::upgrade::UpgradeOrchestrator"              = "supervision"
+"maos_kernel_core::lifecycle::upgrade::UpgradeReport"                    = "supervision"
+"maos_kernel_core::lifecycle::upgrade::UpgradeError"                     = "supervision"
+"maos_kernel_core::lifecycle::upgrade::UpgradePolicy"                    = "supervision"
+"maos_kernel_core::lifecycle::upgrade::UpgradeOutcome"                   = "supervision"
+"maos_kernel_core::revocation::applier::RevocationApplier"              = "supervision"
+"maos_kernel_core::revocation::poller::RevocationPoller"                = "supervision"
+"maos_kernel_core::revocation::parser::parse_signed_crl"                = "data-movement"
+"maos_kernel_core::revocation::version_match::semver_range_contains"    = "universal-arithmetic"
+"maos_kernel_core::revocation::version_match::maos_domain::revocation::semver_range_contains" = "universal-arithmetic"
+"maos_kernel_core::revocation::version_match::maos_domain::revocation::parse_range" = "universal-arithmetic"

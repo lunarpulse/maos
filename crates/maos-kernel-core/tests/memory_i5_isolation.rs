@@ -5,10 +5,10 @@ use std::sync::Arc;
 
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::MemoryManagerPort;
+use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
-use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use tempfile::TempDir;
 
 fn make_adapter() -> (Arc<MemoryManagerAdapter>, TempDir) {
@@ -28,14 +28,23 @@ fn make_adapter() -> (Arc<MemoryManagerAdapter>, TempDir) {
 fn spirit_a_private_not_readable_by_spirit_b() {
     let (adapter, _tmp) = make_adapter();
     adapter
-        .write(1, MemoryTier::Private, &MemoryNamespace::Default, "secret", MemoryValue::Text("spirit-1".into()))
+        .write(
+            1,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "secret",
+            MemoryValue::Text("spirit-1".into()),
+        )
         .unwrap();
 
     // Spirit 2 attempts to read Spirit 1's private key.
     let got = adapter
         .read(2, MemoryTier::Private, &MemoryNamespace::Default, "secret")
         .unwrap();
-    assert!(got.is_none(), "cross-Spirit private read must return None (I5)");
+    assert!(
+        got.is_none(),
+        "cross-Spirit private read must return None (I5)"
+    );
 }
 
 #[test]
@@ -43,7 +52,13 @@ fn spirit_b_cannot_write_as_spirit_a() {
     let (adapter, _tmp) = make_adapter();
     // Spirit 2 writes to its own namespace.
     adapter
-        .write(2, MemoryTier::Private, &MemoryNamespace::Default, "k", MemoryValue::Text("b".into()))
+        .write(
+            2,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "k",
+            MemoryValue::Text("b".into()),
+        )
         .unwrap();
 
     // Spirit 1's key should not exist (Spirit 2 wrote under pid=2).

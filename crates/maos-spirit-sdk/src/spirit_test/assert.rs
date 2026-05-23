@@ -11,11 +11,16 @@
 #[cfg(feature = "spirit_test")]
 macro_rules! assert_emits_frame {
     ($report:expr, $predicate:expr) => {{
-        let matched: Vec<_> = $report.captured_frames.iter().filter(|f| $predicate(f)).collect();
+        let matched: Vec<_> = $report
+            .captured_frames
+            .iter()
+            .filter(|f| $predicate(f))
+            .collect();
         assert!(
             !matched.is_empty(),
             "assert_emits_frame!: no captured frame matched the predicate. \
-             captured_frames={:?}", $report.captured_frames
+             captured_frames={:?}",
+            $report.captured_frames
         );
     }};
 }
@@ -26,11 +31,16 @@ macro_rules! assert_emits_frame {
 #[cfg(feature = "spirit_test")]
 macro_rules! assert_halts_with {
     ($report:expr, $kind_predicate:expr) => {{
-        let matched: Vec<_> = $report.halt_resolutions.iter().filter(|r| $kind_predicate(&r.kind)).collect();
+        let matched: Vec<_> = $report
+            .halt_resolutions
+            .iter()
+            .filter(|r| $kind_predicate(&r.kind))
+            .collect();
         assert!(
             !matched.is_empty(),
             "assert_halts_with!: no halt resolution matched the predicate. \
-             halt_resolutions={:?}", $report.halt_resolutions
+             halt_resolutions={:?}",
+            $report.halt_resolutions
         );
     }};
 }
@@ -40,7 +50,12 @@ macro_rules! assert_halts_with {
 #[cfg(feature = "spirit_test")]
 macro_rules! assert_hook_fired {
     ($report:expr, $hook_name:expr, $expected_count:expr) => {{
-        let actual = $report.base.hooks_fired.get($hook_name).copied().unwrap_or(0);
+        let actual = $report
+            .base
+            .hooks_fired
+            .get($hook_name)
+            .copied()
+            .unwrap_or(0);
         assert_eq!(
             actual, $expected_count,
             "assert_hook_fired!: hook '{}' fired {} times, expected {}",
@@ -55,13 +70,20 @@ macro_rules! assert_hook_fired {
 macro_rules! assert_no_capability_invocation {
     ($report:expr, $scope:expr) => {{
         use $crate::local_runner::MockBusFrameKind;
-        let matched: Vec<_> = $report.captured_frames.iter().filter(|f| {
-            f.kind == MockBusFrameKind::CapInvoke && f.bytes.starts_with($scope.as_bytes())
-        }).collect();
+        let matched: Vec<_> = $report
+            .captured_frames
+            .iter()
+            .filter(|f| {
+                f.kind == MockBusFrameKind::CapInvoke && f.bytes.starts_with($scope.as_bytes())
+            })
+            .collect();
         assert!(
             matched.is_empty(),
             "assert_no_capability_invocation!: found {} capability invocations for scope '{}'. \
-             matches={:?}", matched.len(), $scope, matched
+             matches={:?}",
+            matched.len(),
+            $scope,
+            matched
         );
     }};
 }

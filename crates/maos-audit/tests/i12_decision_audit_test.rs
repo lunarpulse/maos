@@ -156,7 +156,6 @@ fn decision_dispatch_with_empty_digest_refs_round_trips() {
             |row| row.get(0),
         )
         .expect("read payload");
-    let back: DecisionDispatchPayload =
-        serde_json::from_slice(&bytes).expect("deserialize");
+    let back: DecisionDispatchPayload = serde_json::from_slice(&bytes).expect("deserialize");
     assert!(back.working_memory_digest_refs.as_slice().is_empty());
 }

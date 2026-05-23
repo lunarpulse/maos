@@ -64,9 +64,7 @@ fn test_fr4_full_mediation() {
         // call_type must be a known kind.
         match entry.call_type.as_str() {
             "inference.call" | "capability.invocation" => {}
-            other => panic!(
-                "FR4 violation at line {line_no}: unknown call_type '{other}'"
-            ),
+            other => panic!("FR4 violation at line {line_no}: unknown call_type '{other}'"),
         }
 
         // timestamp_ns must be non-zero (synthetic fixture uses

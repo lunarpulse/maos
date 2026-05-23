@@ -21,15 +21,17 @@ use crate::capability::WorkingMemoryStore;
 use crate::iac::{FrameKind, TransparencyLogAdapter};
 use crate::telemetry::iac_rt::{IacRtMetrics, Outcome, Service};
 
-use maos_providers::Provider;
 use maos_providers::provider::ProviderError;
+use maos_providers::Provider;
 
 /// Kernel-side adapter for the Inference Port.
 ///
 /// Holds references to the capability registry (for authorization),
 /// the transparency log (for audit), the telemetry registry (for SLO
 /// metrics), and the provider driver (for the actual LLM call).
-#[maos_attrs::i9_exempt(reason = "inference port adapter; holds Arc references to co-services — not independently-mutable state (sanctioned persistent location per Epic 1b Owns)")]
+#[maos_attrs::i9_exempt(
+    reason = "inference port adapter; holds Arc references to co-services — not independently-mutable state (sanctioned persistent location per Epic 1b Owns)"
+)]
 pub struct InferencePortAdapter {
     provider: Arc<dyn Provider>,
     provider_id: String,
@@ -76,9 +78,7 @@ impl InferencePortAdapter {
         let posture_hash = [0u8; 32]; // v0.1-β scaffold: zero posture hash
         self.capabilities
             .verify_and_audit(token, posture_hash, SandboxTier(0))
-            .map_err(|e| {
-                InferenceError::CapabilityDenied
-            })?;
+            .map_err(|e| InferenceError::CapabilityDenied)?;
 
         // 2. Scope check: must be ProviderInfer with matching provider
         let scope = self.capabilities.get_token_scope(&token.token_id);
@@ -90,10 +90,7 @@ impl InferencePortAdapter {
 }
 
 impl InferencePort for InferencePortAdapter {
-    fn complete(
-        &self,
-        req: InferenceRequest,
-    ) -> Result<InferenceResponse, InferenceError> {
+    fn complete(&self, req: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
         let provider_id = &self.provider_id;
 
         // 1. Capability check
@@ -103,7 +100,10 @@ impl InferencePort for InferencePortAdapter {
         let _inflight = self.telemetry.inflight(Service::Capability);
 
         // 3. Record in Transparency Log before delivering
-        let intent = format!("infer:{provider_id}:{}", req.options.model_id.as_deref().unwrap_or("default"));
+        let intent = format!(
+            "infer:{provider_id}:{}",
+            req.options.model_id.as_deref().unwrap_or("default")
+        );
         let payload = req.prompt.as_bytes();
         let mut token_bytes = [0u8; 32];
         token_bytes[..16].copy_from_slice(&req.capability_token.token_id.0);
@@ -120,7 +120,10 @@ impl InferencePort for InferencePortAdapter {
         let start = std::time::Instant::now();
         let result = self.provider.complete(&req).map_err(|e| match e {
             ProviderError::Transport(msg) => InferenceError::ProviderTransport(msg),
-            ProviderError::ProviderRejected { status, body } => InferenceError::ProviderRejected { status, message: body },
+            ProviderError::ProviderRejected { status, body } => InferenceError::ProviderRejected {
+                status,
+                message: body,
+            },
             ProviderError::Serde(msg) => InferenceError::MalformedResponse(msg),
             ProviderError::Unconfigured => InferenceError::Unconfigured,
         });
@@ -133,11 +136,8 @@ impl InferencePort for InferencePortAdapter {
                     .record_iac_rt(Service::Capability, Outcome::Ok, duration_us);
             }
             Err(_) => {
-                self.telemetry.record_iac_rt(
-                    Service::Capability,
-                    Outcome::Err,
-                    duration_us,
-                );
+                self.telemetry
+                    .record_iac_rt(Service::Capability, Outcome::Err, duration_us);
             }
         }
 
@@ -148,9 +148,9 @@ impl InferencePort for InferencePortAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::capability::cap_tokens::Ed25519SigningKey;
-    use crate::capability::cap_quota::CapQuotaTracker;
     use crate::capability::cap_policy::PolicyTable;
+    use crate::capability::cap_quota::CapQuotaTracker;
+    use crate::capability::cap_tokens::Ed25519SigningKey;
     use crate::iac::TransparencyLogAdapter;
     use crate::security::crypto::tests::MockCryptoProvider;
     use crate::telemetry::iac_rt::IacRtMetrics;
@@ -161,10 +161,7 @@ mod tests {
     struct MockProvider;
 
     impl Provider for MockProvider {
-        fn complete(
-            &self,
-            _req: &InferenceRequest,
-        ) -> Result<InferenceResponse, ProviderError> {
+        fn complete(&self, _req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
             Ok(InferenceResponse {
                 text: "mock response".into(),
                 stop_reason: maos_domain::ports::inference::StopReason::StopSequence,
@@ -182,16 +179,22 @@ mod tests {
     }
 
     fn test_adapter() -> InferencePortAdapter {
-        let crypto: Arc<dyn maos_domain::ports::crypto::CryptoProvider> = Arc::new(MockCryptoProvider);
+        let crypto: Arc<dyn maos_domain::ports::crypto::CryptoProvider> =
+            Arc::new(MockCryptoProvider);
         let signing_key = Ed25519SigningKey::new([0u8; 32]);
         let policy = Arc::new(PolicyTable::new());
         {
             let mut inner = crate::capability::cap_policy::PolicyTableInner::default();
-            inner.manifest_scopes.insert(7, crate::capability::cap_policy::ManifestCapabilityScope {
-                scopes: vec![Scope::ProviderInfer { provider: "anthropic".into() }],
-                declared_tier: maos_domain::invariants::i9::SandboxTier(0),
-                trust_tier: crate::capability::cap_policy::decision::TrustTier::Verified,
-            });
+            inner.manifest_scopes.insert(
+                7,
+                crate::capability::cap_policy::ManifestCapabilityScope {
+                    scopes: vec![Scope::ProviderInfer {
+                        provider: "anthropic".into(),
+                    }],
+                    declared_tier: maos_domain::invariants::i9::SandboxTier(0),
+                    trust_tier: crate::capability::cap_policy::decision::TrustTier::Verified,
+                },
+            );
             policy.update(inner);
         }
         let (audit_tx, _audit_rx) = crate::capability::cap_audit::channel();
@@ -212,19 +215,24 @@ mod tests {
         let telemetry = Arc::new(IacRtMetrics::new());
         let provider: Arc<dyn Provider> = Arc::new(MockProvider);
 
-        InferencePortAdapter::new(provider, "anthropic".into(), capabilities, transparency_log, telemetry)
+        InferencePortAdapter::new(
+            provider,
+            "anthropic".into(),
+            capabilities,
+            transparency_log,
+            telemetry,
+        )
     }
 
-    fn make_token(adapter: &InferencePortAdapter, spirit_pid: u32, scope: Scope) -> CapabilityToken {
+    fn make_token(
+        adapter: &InferencePortAdapter,
+        spirit_pid: u32,
+        scope: Scope,
+    ) -> CapabilityToken {
         crate::capability::cap_tokens::init_monotonic_base();
-        adapter.capabilities
-            .issue_with_mediation(
-                spirit_pid,
-                scope,
-                60,
-                [0u8; 32],
-                IntentClass::Standard,
-            )
+        adapter
+            .capabilities
+            .issue_with_mediation(spirit_pid, scope, 60, [0u8; 32], IntentClass::Standard)
             .unwrap()
     }
 
@@ -244,7 +252,13 @@ mod tests {
     #[test]
     fn mock_provider_round_trip_logs_inference_call() {
         let adapter = test_adapter();
-        let token = make_token(&adapter, 7, Scope::ProviderInfer { provider: "anthropic".into() });
+        let token = make_token(
+            &adapter,
+            7,
+            Scope::ProviderInfer {
+                provider: "anthropic".into(),
+            },
+        );
         let req = InferenceRequest {
             spirit_pid: 7,
             capability_token: token,

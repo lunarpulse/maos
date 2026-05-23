@@ -163,24 +163,21 @@ mod tests {
 
     #[test]
     fn request_new_rejects_empty_source() {
-        let result = DistillationRequest::new(
-            vec![],
-            1,
-            DigestPayload::Text("test".into()),
-            None,
-        );
-        assert!(matches!(result, Err(DistillationError::AuditChainMissing { .. })));
+        let result = DistillationRequest::new(vec![], 1, DigestPayload::Text("test".into()), None);
+        assert!(matches!(
+            result,
+            Err(DistillationError::AuditChainMissing { .. })
+        ));
     }
 
     #[test]
     fn request_new_rejects_depth_zero() {
-        let result = DistillationRequest::new(
-            vec![[1u8; 16]],
-            0,
-            DigestPayload::Text("test".into()),
-            None,
-        );
-        assert!(matches!(result, Err(DistillationError::AuditChainMissing { .. })));
+        let result =
+            DistillationRequest::new(vec![[1u8; 16]], 0, DigestPayload::Text("test".into()), None);
+        assert!(matches!(
+            result,
+            Err(DistillationError::AuditChainMissing { .. })
+        ));
     }
 
     #[test]
@@ -220,7 +217,9 @@ mod tests {
 
     #[test]
     fn distillation_error_audit_chain_missing_display() {
-        let err = DistillationError::AuditChainMissing { reason: "empty source_log_ref".into() };
+        let err = DistillationError::AuditChainMissing {
+            reason: "empty source_log_ref".into(),
+        };
         let display = format!("{err}");
         assert!(display.contains("E_DIGEST_AUDIT_CHAIN_MISSING"));
         assert!(display.contains("empty source_log_ref"));
@@ -230,7 +229,9 @@ mod tests {
     fn distillation_error_distinguishes_variants() {
         assert_ne!(
             DistillationError::AuditChainMissing { reason: "a".into() },
-            DistillationError::IntentPromotionDenied { digest_frame_id: [0u8; 16] },
+            DistillationError::IntentPromotionDenied {
+                digest_frame_id: [0u8; 16]
+            },
         );
     }
 }

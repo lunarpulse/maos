@@ -597,3 +597,46 @@ Planned termination (`scheduler.unload`) and unplanned termination (`CrashDetect
 ### smoke-supervision-5 observability arm
 
 `MAOS_ONE_SHOT=smoke-supervision-5` walks all four supervision surfaces end-to-end in one command, printing JSON lines per step with magnitude assertions (≥1 halt receipt, ≥1 task stalled, ≥1 silent failure suspect, ≥1 in-flight recovery).
+
+## §4.1.4 Spirit Lifecycle — upgrade body + revocation pipeline (Story 5.4)
+
+### UpgradeOrchestrator (FR49)
+
+`UpgradeOrchestrator` at `maos-kernel-core::lifecycle::upgrade` dispatches three upgrade policies:
+
+1. **`hot-swap`** (default) — delegates to `HotSwapCoordinator::initiate_swap` (Story 5.2's 12-step protocol with saga compensation, I14 halt-continuity gate, PostSwapMonitor 30s window).
+2. **`cold-swap`** — sequenced `scheduler.unload(predecessor_pid)` then manual SCB insertion with new PID. In-flight tasks are lost; halt-receipts produced during unload are captured.
+3. **`migrator`** — upfront `[migrates_from]` declaration check (`UpgradeError::MigratorNotDeclared` if absent), then delegates to `HotSwapCoordinator` which routes `SchemaCompat::CrossMajor` through `run_migrator` automatically.
+
+All successful upgrades journal `LifecycleEvent::Upgrade = 15` and emit one `FrameKind::CapabilityInvocation` row with `cap_used=spirit.upgrade`.
+
+### RevocationApplier + RevocationPoller (FR13, FR60)
+
+`RevocationApplier` at `maos-kernel-core::revocation::applier` implements the CRL propagation pipeline:
+
+1. **Idempotency** — `applied_crls: BTreeSet<CrlId>` rejects re-imports with `RevocationError::AlreadyApplied`.
+2. **Match** — iterates `spirits.read()` snapshot, matches each SCB against CRL entries by `(spirit_class, semver_range_contains(version, entry.version_range))`.
+3. **Revoke** — `capability.revoke_all_for_pid(pid)` sets per-token `AtomicBool` on all 64 shards.
+4. **Emit** — `FrameKind::SpiritRevoked = 17` IAC frame with full payload (spirit_id, pid, class, version, origin, reason, action).
+5. **Apply action** — `TerminateImmediately` (default): `terminate_spirit(RevocationTerminated)` + fire-and-forget unload. `DrainThenTerminate`: spawn deadline task (`progress_threshold_ms * 2`), let in-flight tasks complete, then terminate + unload. `Quarantine`: v0.3-β downgrades to `DrainThenTerminate + quarantine_requested` audit marker; real T3 container isolation lands at Story 5.5a.
+6. **Journal** — `LifecycleEvent::Revoked = 16` per revoked Spirit.
+
+`RevocationPoller` spawns a periodic fetch loop (300s default, 100ms under `MAOS_REVOCATION_FAST=1`) via `RegistryClient` trait. v0.3-β default `LocalFileRegistryClient` reads `~/.local/share/maos/crl/latest.signed.json`. Production `McpRegistryClient` lands at Story 5.5d.
+
+### RegistryClient trait seam
+
+`RegistryClient` lives in `maos-domain::revocation` per architecture §4.0.9 dependency-triangle rule. The kernel-side `RevocationPoller` holds `Arc<dyn RegistryClient>`; the v0.3-β default `LocalFileRegistryClient` lives in `maos-domain::revocation` (zero kernel-core deps); the production `McpRegistryClient` lands at Story 5.5d in `crates/maos-registry/` which depends on `maos-mcp` (Story 5.5c) but NEVER on `maos-kernel-core`.
+
+### NFR-Rel-9 bench
+
+`cargo bench -p maos-kernel-core --bench revocation_propagation_p99` measures `revoke_all_for_pid` latency under 100 issued tokens. The bench is a v0.3-β structural placeholder; the full 10⁴-concurrent-verify storm with first-revoked observation lands at v0.5 measurement gate (§13.1).
+
+### smoke-upgrade-revoke-5 observability arm
+
+`MAOS_ONE_SHOT=smoke-upgrade-revoke-5` walks hot-swap upgrade, cold-swap upgrade, CRL apply, and capability denial in one command, printing 4 JSON lines.
+
+### CI gates
+
+- `nfr-rel-9-revocation-5s-p99` — runs the Criterion bench
+- `upgrade-policy-corpus` — runs `upgrade_orchestrator_three_policies` integration test
+- `revocation-corpus` — runs `revocation_applier_pipeline` integration test

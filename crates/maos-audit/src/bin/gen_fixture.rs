@@ -46,7 +46,10 @@ impl Lcg {
     }
 
     fn next_u64(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(Self::MULTIPLIER).wrapping_add(Self::INCREMENT);
+        self.0 = self
+            .0
+            .wrapping_mul(Self::MULTIPLIER)
+            .wrapping_add(Self::INCREMENT);
         self.0
     }
 }

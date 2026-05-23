@@ -5,10 +5,10 @@ use std::sync::Arc;
 
 use maos_domain::memory::{MemoryError, MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::MemoryManagerPort;
+use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
-use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use tempfile::TempDir;
 
 fn make_adapter() -> (Arc<MemoryManagerAdapter>, TempDir) {
@@ -29,7 +29,13 @@ fn write_read_private() {
     let (adapter, _tmp) = make_adapter();
     let val = MemoryValue::Text("hello private".into());
     adapter
-        .write(1, MemoryTier::Private, &MemoryNamespace::Default, "k1", val.clone())
+        .write(
+            1,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "k1",
+            val.clone(),
+        )
         .unwrap();
     let got = adapter
         .read(1, MemoryTier::Private, &MemoryNamespace::Default, "k1")
@@ -42,7 +48,13 @@ fn write_read_shared() {
     let (adapter, _tmp) = make_adapter();
     let val = MemoryValue::Text("hello shared".into());
     adapter
-        .write(2, MemoryTier::Shared, &MemoryNamespace::Coordination, "s1", val.clone())
+        .write(
+            2,
+            MemoryTier::Shared,
+            &MemoryNamespace::Coordination,
+            "s1",
+            val.clone(),
+        )
         .unwrap();
     let got = adapter
         .read(2, MemoryTier::Shared, &MemoryNamespace::Coordination, "s1")
@@ -54,7 +66,13 @@ fn write_read_shared() {
 fn collective_returns_typed_error() {
     let (adapter, _tmp) = make_adapter();
     let err = adapter
-        .write(1, MemoryTier::Collective, &MemoryNamespace::Default, "k", MemoryValue::Text("x".into()))
+        .write(
+            1,
+            MemoryTier::Collective,
+            &MemoryNamespace::Default,
+            "k",
+            MemoryValue::Text("x".into()),
+        )
         .unwrap_err();
     match err {
         MemoryError::CollectiveNotYetAvailable {
@@ -72,10 +90,22 @@ fn collective_returns_typed_error() {
 fn scan_private_returns_entries() {
     let (adapter, _tmp) = make_adapter();
     adapter
-        .write(1, MemoryTier::Private, &MemoryNamespace::Default, "alpha", MemoryValue::Text("a".into()))
+        .write(
+            1,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "alpha",
+            MemoryValue::Text("a".into()),
+        )
         .unwrap();
     adapter
-        .write(1, MemoryTier::Private, &MemoryNamespace::Default, "beta", MemoryValue::Text("b".into()))
+        .write(
+            1,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "beta",
+            MemoryValue::Text("b".into()),
+        )
         .unwrap();
     let results = adapter
         .scan(1, MemoryTier::Private, &MemoryNamespace::Default, "", 10)

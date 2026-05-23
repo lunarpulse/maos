@@ -5,11 +5,13 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::sync::Arc;
 
-use maos_kernel_core::capability::cap_tokens::{init_monotonic_base, CapTokensShardRing, Ed25519SigningKey};
-use maos_kernel_core::capability::cap_audit;
 use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::crypto::CryptoProvider;
+use maos_kernel_core::capability::cap_audit;
+use maos_kernel_core::capability::cap_tokens::{
+    init_monotonic_base, CapTokensShardRing, Ed25519SigningKey,
+};
 
 struct MockCryptoProvider;
 

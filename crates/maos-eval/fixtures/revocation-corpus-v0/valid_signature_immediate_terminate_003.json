@@ -1,0 +1,12 @@
+{
+  "scenario_id": "rev-valid_signature_immediate_terminate-003",
+  "category": "valid_signature_immediate_terminate",
+  "crl_blob_path": "crates/maos-eval/fixtures/revocation-corpus-v0/valid_signature_immediate_terminate_crl_003.signed.json",
+  "trust_anchor_pub_path": "crates/maos-eval/fixtures/revocation-corpus-v0/valid_signature_immediate_terminate_anchor_003.pub",
+  "expected_outcome": {
+    "accepted": true,
+    "propagation_latency_ms": 5000,
+    "revoked_spirit_count": 1,
+    "error_variant": null
+  }
+}

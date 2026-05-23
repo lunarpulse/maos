@@ -4,9 +4,11 @@
 
 use std::sync::Arc;
 
-use maos_kernel_core::scheduler::control_block::{SpiritControlBlock, SpiritManifestBundle, make_spirit_obj};
-use maos_kernel_core::scheduler::hook_dispatch::{HookDispatcher, HookOutcome};
 use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
+use maos_kernel_core::scheduler::control_block::{
+    make_spirit_obj, SpiritControlBlock, SpiritManifestBundle,
+};
+use maos_kernel_core::scheduler::hook_dispatch::{HookDispatcher, HookOutcome};
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 use maos_spirit_abi::lifecycle::{MigratorError, Spirit};
 

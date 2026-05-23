@@ -7,14 +7,20 @@ use maos_domain::invariants::i13::AllowedPromotionSet;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::ports::DistillationPort;
 
-use maos_kernel_core::iac::distillate::DistillateWriter;
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_kernel_core::iac::distillate::DistillateWriter;
 use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
 
-fn make_writer(nonce: u64) -> (DistillateWriter, Arc<TransparencyLogAdapter>, tempfile::TempDir) {
+fn make_writer(
+    nonce: u64,
+) -> (
+    DistillateWriter,
+    Arc<TransparencyLogAdapter>,
+    tempfile::TempDir,
+) {
     let tmp = tempfile::TempDir::new().unwrap();
     let memory_root = tmp.path().join("memory");
     let db_path = tmp.path().join("audit.db");
@@ -159,13 +165,9 @@ fn admit_allows_matching_lineage() {
     let (writer, tl, _tmp) = make_writer(0xE416);
     let raw_id = insert_raw_frame(&tl, 1, "consult");
 
-    let request = DistillationRequest::new(
-        vec![raw_id],
-        1,
-        DigestPayload::Text("digest".into()),
-        None,
-    )
-    .unwrap();
+    let request =
+        DistillationRequest::new(vec![raw_id], 1, DigestPayload::Text("digest".into()), None)
+            .unwrap();
     let receipt = writer.write_distillate(1, request).unwrap();
 
     let mut allowed = AllowedPromotionSet::new();
@@ -180,13 +182,9 @@ fn admit_denies_non_matching_lineage() {
     let (writer, tl, _tmp) = make_writer(0xE417);
     let raw_id = insert_raw_frame(&tl, 1, "delegate");
 
-    let request = DistillationRequest::new(
-        vec![raw_id],
-        1,
-        DigestPayload::Text("digest".into()),
-        None,
-    )
-    .unwrap();
+    let request =
+        DistillationRequest::new(vec![raw_id], 1, DigestPayload::Text("digest".into()), None)
+            .unwrap();
     let receipt = writer.write_distillate(1, request).unwrap();
 
     let mut allowed = AllowedPromotionSet::new();
@@ -194,7 +192,10 @@ fn admit_denies_non_matching_lineage() {
     let err = writer
         .admit_for_consumer(receipt.digest_frame_id, &allowed)
         .unwrap_err();
-    assert!(matches!(err, DistillationError::IntentPromotionDenied { .. }));
+    assert!(matches!(
+        err,
+        DistillationError::IntentPromotionDenied { .. }
+    ));
 }
 
 #[test]
@@ -265,13 +266,8 @@ fn cycle_detection() {
     ));
     let writer = DistillateWriter::new(Arc::clone(&tl), memory);
 
-    let req = DistillationRequest::new(
-        vec![poison_id],
-        1,
-        DigestPayload::Text("B".into()),
-        None,
-    )
-    .unwrap();
+    let req = DistillationRequest::new(vec![poison_id], 1, DigestPayload::Text("B".into()), None)
+        .unwrap();
 
     let err = writer.write_distillate(1, req).unwrap_err();
     assert!(

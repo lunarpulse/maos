@@ -128,7 +128,9 @@ pub struct ExecutionContextFingerprint {
 }
 
 /// Trust tier — operator-visible metadata classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 #[repr(u8)]
 #[serde(rename_all = "snake_case")]
 pub enum TrustTier {
@@ -143,7 +145,9 @@ pub enum TrustTier {
 }
 
 /// Sandbox tier — OS-native sandbox primitive classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 #[repr(u8)]
 #[serde(rename_all = "snake_case")]
 pub enum SandboxTier {
@@ -204,7 +208,9 @@ pub struct Claim {
 /// shape, less abi-diff churn. The `uuid` crate's serde impl emits a *string*
 /// in human-readable formats and *bytes* in binary formats — using the newtype
 /// guarantees `[u8;16]` in all codecs without qualification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub struct Uuid([u8; 16]);
 
 impl Uuid {

@@ -14,9 +14,9 @@
 //! per §4.0.7. The kernel does NOT compute variance, entropy, EFE, KL,
 //! or derivatives — only the four ADR-022 predicates.
 
-pub mod store;
-pub mod policy_runtime;
 pub mod orchestrator;
+pub mod policy_runtime;
+pub mod store;
 
 use maos_domain::invariants::i7::ScalarTapEvent;
 
@@ -98,57 +98,27 @@ mod tests {
 
     #[test]
     fn working_memory_slot_rejects_nan() {
-        let err = WorkingMemorySlot::new(
-            "t".into(),
-            f64::NAN,
-            "d".into(),
-            0,
-        )
-        .unwrap_err();
+        let err = WorkingMemorySlot::new("t".into(), f64::NAN, "d".into(), 0).unwrap_err();
         assert!(matches!(err, SetScalarError::NanValue));
     }
 
     #[test]
     fn working_memory_slot_rejects_empty_tag() {
-        let err = WorkingMemorySlot::new(
-            "".into(),
-            0.5,
-            "d".into(),
-            0,
-        )
-        .unwrap_err();
+        let err = WorkingMemorySlot::new("".into(), 0.5, "d".into(), 0).unwrap_err();
         assert!(matches!(err, SetScalarError::EmptyTag));
     }
 
     #[test]
     fn working_memory_slot_rejects_empty_derived_from() {
-        let err = WorkingMemorySlot::new(
-            "t".into(),
-            0.5,
-            "".into(),
-            0,
-        )
-        .unwrap_err();
+        let err = WorkingMemorySlot::new("t".into(), 0.5, "".into(), 0).unwrap_err();
         assert!(matches!(err, SetScalarError::EmptyDerivedFrom));
     }
 
     #[test]
     fn working_memory_slot_rejects_infinite_value() {
-        let err = WorkingMemorySlot::new(
-            "t".into(),
-            f64::INFINITY,
-            "d".into(),
-            0,
-        )
-        .unwrap_err();
+        let err = WorkingMemorySlot::new("t".into(), f64::INFINITY, "d".into(), 0).unwrap_err();
         assert!(matches!(err, SetScalarError::OverflowingPersistence));
-        let err = WorkingMemorySlot::new(
-            "t".into(),
-            f64::NEG_INFINITY,
-            "d".into(),
-            0,
-        )
-        .unwrap_err();
+        let err = WorkingMemorySlot::new("t".into(), f64::NEG_INFINITY, "d".into(), 0).unwrap_err();
         assert!(matches!(err, SetScalarError::OverflowingPersistence));
     }
 }

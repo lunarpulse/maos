@@ -93,7 +93,9 @@ pub enum HotSwapError {
     #[error("halt-continuity violation: {0}")]
     HaltContinuityViolation(#[from] HaltContinuityError),
 
-    #[error("schema incompatible: predecessor {predecessor_version} vs successor {successor_version}")]
+    #[error(
+        "schema incompatible: predecessor {predecessor_version} vs successor {successor_version}"
+    )]
     SchemaIncompatible {
         predecessor_version: u32,
         successor_version: u32,
@@ -157,7 +159,9 @@ impl PostSwapInvariantViolation {
         Self::BootNonceMismatch { expected, observed }
     }
 
-    pub fn output_shape_regression(rejected_shape: impl Into<String>) -> Result<Self, &'static str> {
+    pub fn output_shape_regression(
+        rejected_shape: impl Into<String>,
+    ) -> Result<Self, &'static str> {
         let s = rejected_shape.into();
         if s.is_empty() {
             return Err("rejected_shape must be non-empty");

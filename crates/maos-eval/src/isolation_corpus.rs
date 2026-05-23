@@ -8,17 +8,14 @@
 //! Loader pattern mirrors `halt_corpus.rs::HaltCorpus::load_from` and
 //! `distillate_corpus.rs::DistillateCorpus::load_from`.
 
-use serde::{Deserialize, Serialize};
 use serde::de::Error as _;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use crate::CorpusError;
 
 /// Eight attack categories for cross-Spirit isolation testing.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
-    Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IsolationAttackCategory {
     NamespaceEnumeration,
@@ -161,7 +158,10 @@ impl IsolationCorpus {
     /// Count scenarios for a given category across both splits.
     pub fn scenarios_per_category(&self, category: IsolationAttackCategory) -> usize {
         let cat_str = serde_variant::to_snake_case(&category);
-        self.scenarios.iter().filter(|s| s.category == cat_str).count()
+        self.scenarios
+            .iter()
+            .filter(|s| s.category == cat_str)
+            .count()
     }
 }
 
@@ -176,8 +176,12 @@ pub mod serde_variant {
             IsolationAttackCategory::DecisionFrameObservation => "decision_frame_observation",
             IsolationAttackCategory::HaltSignalObservation => "halt_signal_observation",
             IsolationAttackCategory::TransparencyLogCrossRead => "transparency_log_cross_read",
-            IsolationAttackCategory::WorkingMemoryDigestCrossRead => "working_memory_digest_cross_read",
-            IsolationAttackCategory::CapabilityTokenForgeryCrossSpirit => "capability_token_forgery_cross_spirit",
+            IsolationAttackCategory::WorkingMemoryDigestCrossRead => {
+                "working_memory_digest_cross_read"
+            }
+            IsolationAttackCategory::CapabilityTokenForgeryCrossSpirit => {
+                "capability_token_forgery_cross_spirit"
+            }
             IsolationAttackCategory::SandboxEscapeLateral => "sandbox_escape_lateral",
         }
     }
@@ -204,18 +208,15 @@ impl IsolationCorpus {
 
         // Load root methodology attestation
         let methodology_path = dir.join("methodology-attestation.json");
-        let methodology_bytes = std::fs::read_to_string(&methodology_path).map_err(|e| {
-            CorpusError::Parse {
+        let methodology_bytes =
+            std::fs::read_to_string(&methodology_path).map_err(|e| CorpusError::Parse {
                 path: methodology_path.display().to_string(),
                 source: serde_json::Error::io(e),
-            }
-        })?;
-        let methodology: MethodologyAttestation =
-            serde_json::from_str(&methodology_bytes).map_err(|e| {
-                CorpusError::Parse {
-                    path: methodology_path.display().to_string(),
-                    source: e,
-                }
+            })?;
+        let methodology: MethodologyAttestation = serde_json::from_str(&methodology_bytes)
+            .map_err(|e| CorpusError::Parse {
+                path: methodology_path.display().to_string(),
+                source: e,
             })?;
 
         // The methodology declares expected counts; we validate against actual loaded counts
@@ -235,7 +236,10 @@ impl IsolationCorpus {
                 .filter_map(|e| match e {
                     Ok(entry) => Some(entry),
                     Err(err) => {
-                        eprintln!("isolation-corpus loader: read_dir entry error in {}: {err}", split_dir.display());
+                        eprintln!(
+                            "isolation-corpus loader: read_dir entry error in {}: {err}",
+                            split_dir.display()
+                        );
                         None
                     }
                 })
@@ -248,18 +252,15 @@ impl IsolationCorpus {
 
                 // Load category-attestation.json
                 let attestation_path = cat_dir.join("category-attestation.json");
-                let att_bytes = std::fs::read_to_string(&attestation_path).map_err(|e| {
-                    CorpusError::Parse {
+                let att_bytes =
+                    std::fs::read_to_string(&attestation_path).map_err(|e| CorpusError::Parse {
                         path: attestation_path.display().to_string(),
                         source: serde_json::Error::io(e),
-                    }
-                })?;
-                let cat_attestation: CategoryAttestation =
-                    serde_json::from_str(&att_bytes).map_err(|e| {
-                        CorpusError::Parse {
-                            path: attestation_path.display().to_string(),
-                            source: e,
-                        }
+                    })?;
+                let cat_attestation: CategoryAttestation = serde_json::from_str(&att_bytes)
+                    .map_err(|e| CorpusError::Parse {
+                        path: attestation_path.display().to_string(),
+                        source: e,
                     })?;
 
                 // Load scenario JSONs
@@ -268,7 +269,10 @@ impl IsolationCorpus {
                     .filter_map(|e| match e {
                         Ok(entry) => Some(entry),
                         Err(err) => {
-                            eprintln!("isolation-corpus loader: read_dir entry error in {}: {err}", cat_dir.display());
+                            eprintln!(
+                                "isolation-corpus loader: read_dir entry error in {}: {err}",
+                                cat_dir.display()
+                            );
                             None
                         }
                     })
@@ -287,25 +291,25 @@ impl IsolationCorpus {
                         path: attestation_path.display().to_string(),
                         source: serde_json::Error::custom(format!(
                             "category-attestation scenario_count {} != on-disk count {} for {}/{}",
-                            cat_attestation.scenario_count, scenario_files.len(), split, cat_name
+                            cat_attestation.scenario_count,
+                            scenario_files.len(),
+                            split,
+                            cat_name
                         )),
                     });
                 }
 
                 for sf in &scenario_files {
                     let sf_path = sf.path();
-                    let content = std::fs::read_to_string(&sf_path).map_err(|e| {
-                        CorpusError::Parse {
+                    let content =
+                        std::fs::read_to_string(&sf_path).map_err(|e| CorpusError::Parse {
                             path: sf_path.display().to_string(),
                             source: serde_json::Error::io(e),
-                        }
-                    })?;
-                    let scenario: IsolationCorpusScenario =
-                        serde_json::from_str(&content).map_err(|e| {
-                            CorpusError::Parse {
-                                path: sf_path.display().to_string(),
-                                source: e,
-                            }
+                        })?;
+                    let scenario: IsolationCorpusScenario = serde_json::from_str(&content)
+                        .map_err(|e| CorpusError::Parse {
+                            path: sf_path.display().to_string(),
+                            source: e,
                         })?;
 
                     // Validate scenario_id matches file path (category directory + filename)
@@ -313,7 +317,8 @@ impl IsolationCorpus {
                     let expected_id = format!(
                         "{}{}",
                         expected_prefix,
-                        sf.file_name().to_string_lossy()
+                        sf.file_name()
+                            .to_string_lossy()
                             .strip_suffix(".json")
                             .unwrap_or("")
                     );
@@ -332,7 +337,7 @@ impl IsolationCorpus {
                         return Err(CorpusError::Parse {
                             path: sf_path.display().to_string(),
                             source: serde_json::Error::custom(
-                                "isolation_maintained must be true at v0.3-β"
+                                "isolation_maintained must be true at v0.3-β",
                             ),
                         });
                     }
@@ -415,7 +420,11 @@ mod tests {
         })
     }
 
-    fn make_category_attestation_json(category: &str, count: usize, split: &str) -> serde_json::Value {
+    fn make_category_attestation_json(
+        category: &str,
+        count: usize,
+        split: &str,
+    ) -> serde_json::Value {
         serde_json::json!({
             "category": category,
             "scenario_count": count,
@@ -509,7 +518,10 @@ mod tests {
         assert_eq!(corpus.total(), 16); // 8 categories × 2 splits × 1 = 16
         assert_eq!(corpus.count_split("sec-14a"), 8);
         assert_eq!(corpus.count_split("sec-14b"), 8);
-        assert_eq!(corpus.scenarios_per_category(IsolationAttackCategory::NamespaceEnumeration), 2);
+        assert_eq!(
+            corpus.scenarios_per_category(IsolationAttackCategory::NamespaceEnumeration),
+            2
+        );
     }
 
     #[test]
@@ -667,7 +679,10 @@ mod tests {
         std::fs::create_dir_all(root.join("sec-14b")).unwrap();
 
         let result = IsolationCorpus::load_from(&root);
-        assert!(result.is_err(), "should reject missing category attestation");
+        assert!(
+            result.is_err(),
+            "should reject missing category attestation"
+        );
     }
 
     #[test]

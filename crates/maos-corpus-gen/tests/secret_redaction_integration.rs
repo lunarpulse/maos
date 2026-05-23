@@ -15,11 +15,10 @@ use std::path::Path;
 fn false_negative_fixture_surfaces_misclassified_class_in_coverage() {
     let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/violation-secret-redaction-false-negative/seeds-fixture.toml");
-    let gen =
-        maos_corpus_gen::secret_redaction::SecretRedactionGenerator::with_fixture_seeds(
-            &fixture_path,
-        )
-        .unwrap();
+    let gen = maos_corpus_gen::secret_redaction::SecretRedactionGenerator::with_fixture_seeds(
+        &fixture_path,
+    )
+    .unwrap();
 
     let report = gen.coverage_report_n(200);
 
@@ -63,11 +62,10 @@ fn false_negative_fixture_surfaces_misclassified_class_in_coverage() {
 fn clean_small_fixture_validates_all_items() {
     let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/clean-secret-redaction-small/seeds-fixture.toml");
-    let gen =
-        maos_corpus_gen::secret_redaction::SecretRedactionGenerator::with_fixture_seeds(
-            &fixture_path,
-        )
-        .unwrap();
+    let gen = maos_corpus_gen::secret_redaction::SecretRedactionGenerator::with_fixture_seeds(
+        &fixture_path,
+    )
+    .unwrap();
 
     let outcomes = gen.validate_all_n(200);
     assert!(!outcomes.is_empty());
@@ -96,8 +94,14 @@ fn coverage_binary_fails_on_floor_violation() {
     // Use the main binary. The clean fixture's coverage report must pass.
     let output = std::process::Command::new("cargo")
         .args([
-            "run", "-p", "maos-corpus-gen", "--",
-            "coverage", "--corpus", "secret-redaction-1e4", "--json",
+            "run",
+            "-p",
+            "maos-corpus-gen",
+            "--",
+            "coverage",
+            "--corpus",
+            "secret-redaction-1e4",
+            "--json",
         ])
         .output()
         .unwrap();
@@ -111,8 +115,13 @@ fn coverage_binary_fails_on_floor_violation() {
     // Also test unknown corpus name
     let unknown = std::process::Command::new("cargo")
         .args([
-            "run", "-p", "maos-corpus-gen", "--",
-            "coverage", "--corpus", "nonexistent-corpus",
+            "run",
+            "-p",
+            "maos-corpus-gen",
+            "--",
+            "coverage",
+            "--corpus",
+            "nonexistent-corpus",
         ])
         .output()
         .unwrap();

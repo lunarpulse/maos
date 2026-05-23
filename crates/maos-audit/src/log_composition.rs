@@ -217,7 +217,8 @@ pub fn ranged_recall(
                     .unwrap_or("unknown")
                     .to_string();
                 let tier = entry["effective_sandbox_tier"]
-                    .get("T0").or(entry["effective_sandbox_tier"].get("T1"))
+                    .get("T0")
+                    .or(entry["effective_sandbox_tier"].get("T1"))
                     .or(entry["effective_sandbox_tier"].get("T2"))
                     .or(entry["effective_sandbox_tier"].get("T3"));
                 let tier_num = if let Some(t) = tier {
@@ -312,8 +313,9 @@ mod tests {
                 intent TEXT NOT NULL,
                 decision INTEGER NOT NULL DEFAULT 1,
                 reasoning TEXT DEFAULT ''
-            );"
-        ).unwrap();
+            );",
+        )
+        .unwrap();
         drop(conn);
 
         let range = LogRange {
@@ -352,8 +354,9 @@ mod tests {
                 intent TEXT NOT NULL,
                 decision INTEGER NOT NULL DEFAULT 1,
                 reasoning TEXT DEFAULT ''
-            );"
-        ).unwrap();
+            );",
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -365,7 +368,8 @@ mod tests {
             "INSERT INTO approval_decision_log (timestamp_ns, actor, target, capability, intent)
              VALUES (100, 'director', 'hello-spirit', 'test.cap', 'test')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         drop(conn);
 
         let journal = r#"{"timestamp":100,"lifecycle_event":"Pause","spirit_id":"hello-spirit"}"#;
@@ -411,27 +415,39 @@ mod tests {
                 intent TEXT NOT NULL,
                 decision INTEGER NOT NULL DEFAULT 1,
                 reasoning TEXT DEFAULT ''
-            );"
-        ).unwrap();
+            );",
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO approval_decision_log (timestamp_ns, actor, target, capability, intent)
              VALUES (100, 'director', 'spirit', 'cap', 'test')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO approval_decision_log (timestamp_ns, actor, target, capability, intent)
              VALUES (200, 'director', 'spirit', 'cap', 'test')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         drop(conn);
 
-        let journal = "{\"timestamp\":200,\"lifecycle_event\":\"Pause\",\"spirit_id\":\"hello-spirit\"}\n";
+        let journal =
+            "{\"timestamp\":200,\"lifecycle_event\":\"Pause\",\"spirit_id\":\"hello-spirit\"}\n";
         std::fs::write(&journal_path, journal).unwrap();
 
-        let range = LogRange { since_ns: 50, until_ns: 200 };
+        let range = LogRange {
+            since_ns: 50,
+            until_ns: 200,
+        };
         let result = ranged_recall(&db_path, &journal_path, range, None).unwrap();
 
-        assert_eq!(result.len(), 1, "half-open [50, 200) should exclude ts=200, got: {:?}", result);
+        assert_eq!(
+            result.len(),
+            1,
+            "half-open [50, 200) should exclude ts=200, got: {:?}",
+            result
+        );
         assert_eq!(result[0].source, LogSource::ApprovalDecisionLog);
         assert_eq!(result[0].timestamp_ns, 100);
     }
@@ -464,8 +480,9 @@ mod tests {
                 intent TEXT NOT NULL,
                 decision INTEGER NOT NULL DEFAULT 1,
                 reasoning TEXT DEFAULT ''
-            );"
-        ).unwrap();
+            );",
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -477,20 +494,37 @@ mod tests {
             "INSERT INTO approval_decision_log (timestamp_ns, actor, target, capability, intent)
              VALUES (100, 'director', 'other-spirit', 'cap', 'test')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         drop(conn);
 
-        let journal = "{\"timestamp\":100,\"lifecycle_event\":\"Pause\",\"spirit_id\":\"other-spirit\"}\n";
+        let journal =
+            "{\"timestamp\":100,\"lifecycle_event\":\"Pause\",\"spirit_id\":\"other-spirit\"}\n";
         std::fs::write(&journal_path, journal).unwrap();
 
-        let range = LogRange { since_ns: 0, until_ns: i64::MAX as u64 };
+        let range = LogRange {
+            since_ns: 0,
+            until_ns: i64::MAX as u64,
+        };
         let result = ranged_recall(&db_path, &journal_path, range, Some("hello-spirit")).unwrap();
 
-        assert!(result.iter().any(|e| e.source == LogSource::TransparencyLog),
-            "spirit_filter should not exclude TransparencyLog entries");
-        assert!(!result.iter().any(|e| matches!(e.source, LogSource::ApprovalDecisionLog)),
-            "spirit_filter should exclude non-matching ADL entries");
-        assert!(!result.iter().any(|e| matches!(e.source, LogSource::LifecycleJournal)),
-            "spirit_filter should exclude non-matching journal entries");
+        assert!(
+            result
+                .iter()
+                .any(|e| e.source == LogSource::TransparencyLog),
+            "spirit_filter should not exclude TransparencyLog entries"
+        );
+        assert!(
+            !result
+                .iter()
+                .any(|e| matches!(e.source, LogSource::ApprovalDecisionLog)),
+            "spirit_filter should exclude non-matching ADL entries"
+        );
+        assert!(
+            !result
+                .iter()
+                .any(|e| matches!(e.source, LogSource::LifecycleJournal)),
+            "spirit_filter should exclude non-matching journal entries"
+        );
     }
 }

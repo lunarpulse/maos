@@ -14,19 +14,25 @@
 //! tests under `tests/` can pull it in as a dev-dependency for
 //! integration runs.
 
+pub mod distillate_corpus; // NEW — Story 4.4 five-metric distillation gate
+pub mod halt_continuity_corpus; // NEW — Story 5.2 halt-continuity corpus (AC4)
 pub mod halt_corpus;
-pub mod termination_corpus;
-pub mod distillate_corpus;         // NEW — Story 4.4 five-metric distillation gate
-pub mod isolation_corpus;          // NEW — Story 4.5 cross-Spirit isolation 200-corpus
-pub mod halt_continuity_corpus;    // NEW — Story 5.2 halt-continuity corpus (AC4)
-pub mod hsis_corpus;               // NEW — Story 5.2 HSIS 300-corpus (AC5)
+pub mod hsis_corpus;
+pub mod isolation_corpus; // NEW — Story 4.5 cross-Spirit isolation 200-corpus
+pub mod revocation_corpus; // NEW — Story 5.4 revocation corpus (AC5)
+pub mod termination_corpus; // NEW — Story 5.2 HSIS 300-corpus (AC5)
+pub mod upgrade_policy_corpus; // NEW — Story 5.4 upgrade-policy corpus (AC1)
 
-pub use halt_corpus::{HaltCorpus, HaltScenario, HaltScenarioOutcome};
-pub use termination_corpus::{TerminationCorpus, TerminationScenario, TerminationKind};
 pub use distillate_corpus::{DistillateCorpus, DistillateScenario, IaaAttestation};
+pub use halt_corpus::{HaltCorpus, HaltScenario, HaltScenarioOutcome};
 pub use isolation_corpus::{
-    IsolationCorpus, IsolationCorpusScenario, IsolationAttackCategory,
-    MethodologyAttestation, CategoryAttestation,
+    CategoryAttestation, IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+    MethodologyAttestation,
+};
+pub use revocation_corpus::{RevocationCorpus, RevocationExpectedOutcome, RevocationScenario};
+pub use termination_corpus::{TerminationCorpus, TerminationKind, TerminationScenario};
+pub use upgrade_policy_corpus::{
+    UpgradePolicyCorpus, UpgradePolicyExpectedOutcome, UpgradePolicyScenario,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -34,7 +40,10 @@ pub enum CorpusError {
     #[error("corpus directory not found: {0}")]
     NotFound(String),
     #[error("scenario parse error at {path}: {source}")]
-    Parse { path: String, source: serde_json::Error },
+    Parse {
+        path: String,
+        source: serde_json::Error,
+    },
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 }

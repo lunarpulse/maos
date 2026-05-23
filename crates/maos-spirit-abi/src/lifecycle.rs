@@ -102,7 +102,9 @@ pub enum HookBudgetKey {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! count_hooks {
-    () => { 14 };
+    () => {
+        14
+    };
 }
 
 // ------------------------------------------------------------------
@@ -202,7 +204,11 @@ pub trait Spirit {
     /// Default: returns `Err(MigratorError::NotImplemented)`.
     /// Override to translate predecessor schema to this class's schema.
     /// Implemented at Story 5.2.
-    fn migrate(&self, ctx: &mut Ctx, predecessor_state: &[u8]) -> Result<alloc::vec::Vec<u8>, MigratorError> {
+    fn migrate(
+        &self,
+        ctx: &mut Ctx,
+        predecessor_state: &[u8],
+    ) -> Result<alloc::vec::Vec<u8>, MigratorError> {
         let _ = predecessor_state;
         let _ = ctx;
         Err(MigratorError::NotImplemented)
@@ -303,36 +309,68 @@ impl<T: Spirit + 'static> SpiritVtable<T> {
     /// proc-macro reference implementation.
     #[allow(clippy::too_many_lines)]
     pub fn from_spirit() -> Self {
-        fn on_load_f<T: Spirit>(s: &T, c: &mut Ctx) { s.on_load(c); }
-        fn on_start_f<T: Spirit>(s: &T, c: &mut Ctx) { s.on_start(c); }
-        fn on_frame_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &FramePayload<'a>) { s.on_frame(c, p); }
-        fn on_idle_f<T: Spirit>(s: &T, c: &mut Ctx) { s.on_idle(c); }
-        fn on_telemetry_event_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &TelemetryEventPayload<'a>) { s.on_telemetry_event(c, p); }
-        fn on_schedule_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &SchedulePayload<'a>) { s.on_schedule(c, p); }
-        fn on_swap_in_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &SwapInPayload<'a>) { s.on_swap_in(c, p); }
-        fn on_pause_f<T: Spirit>(s: &T, c: &mut Ctx) { s.on_pause(c); }
-        fn on_resume_f<T: Spirit>(s: &T, c: &mut Ctx) { s.on_resume(c); }
-        fn on_unload_f<T: Spirit>(s: &T, c: &mut Ctx) { s.on_unload(c); }
-        fn on_consolidate_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &ConsolidatePayload<'a>) { s.on_consolidate(c, p); }
-        fn on_swap_out_f<T: Spirit>(s: &T, c: &mut Ctx) { s.on_swap_out(c); }
-        fn snapshot_f<T: Spirit>(s: &T, c: &mut Ctx) -> alloc::vec::Vec<u8> { s.snapshot(c) }
-        fn migrate_f<T: Spirit>(s: &T, c: &mut Ctx, p: &[u8]) -> Result<alloc::vec::Vec<u8>, MigratorError> { s.migrate(c, p) }
+        fn on_load_f<T: Spirit>(s: &T, c: &mut Ctx) {
+            s.on_load(c);
+        }
+        fn on_start_f<T: Spirit>(s: &T, c: &mut Ctx) {
+            s.on_start(c);
+        }
+        fn on_frame_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &FramePayload<'a>) {
+            s.on_frame(c, p);
+        }
+        fn on_idle_f<T: Spirit>(s: &T, c: &mut Ctx) {
+            s.on_idle(c);
+        }
+        fn on_telemetry_event_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &TelemetryEventPayload<'a>) {
+            s.on_telemetry_event(c, p);
+        }
+        fn on_schedule_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &SchedulePayload<'a>) {
+            s.on_schedule(c, p);
+        }
+        fn on_swap_in_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &SwapInPayload<'a>) {
+            s.on_swap_in(c, p);
+        }
+        fn on_pause_f<T: Spirit>(s: &T, c: &mut Ctx) {
+            s.on_pause(c);
+        }
+        fn on_resume_f<T: Spirit>(s: &T, c: &mut Ctx) {
+            s.on_resume(c);
+        }
+        fn on_unload_f<T: Spirit>(s: &T, c: &mut Ctx) {
+            s.on_unload(c);
+        }
+        fn on_consolidate_f<'a, T: Spirit>(s: &T, c: &mut Ctx, p: &ConsolidatePayload<'a>) {
+            s.on_consolidate(c, p);
+        }
+        fn on_swap_out_f<T: Spirit>(s: &T, c: &mut Ctx) {
+            s.on_swap_out(c);
+        }
+        fn snapshot_f<T: Spirit>(s: &T, c: &mut Ctx) -> alloc::vec::Vec<u8> {
+            s.snapshot(c)
+        }
+        fn migrate_f<T: Spirit>(
+            s: &T,
+            c: &mut Ctx,
+            p: &[u8],
+        ) -> Result<alloc::vec::Vec<u8>, MigratorError> {
+            s.migrate(c, p)
+        }
 
         Self {
-            on_load:           on_load_f::<T>,
-            on_start:          on_start_f::<T>,
-            on_frame:          on_frame_f::<T>,
-            on_idle:           on_idle_f::<T>,
+            on_load: on_load_f::<T>,
+            on_start: on_start_f::<T>,
+            on_frame: on_frame_f::<T>,
+            on_idle: on_idle_f::<T>,
             on_telemetry_event: on_telemetry_event_f::<T>,
-            on_schedule:       on_schedule_f::<T>,
-            on_swap_in:        on_swap_in_f::<T>,
-            on_pause:          on_pause_f::<T>,
-            on_resume:         on_resume_f::<T>,
-            on_unload:         on_unload_f::<T>,
-            on_consolidate:    on_consolidate_f::<T>,
-            on_swap_out:       on_swap_out_f::<T>,
-            snapshot:           snapshot_f::<T>,
-            migrate:            migrate_f::<T>,
+            on_schedule: on_schedule_f::<T>,
+            on_swap_in: on_swap_in_f::<T>,
+            on_pause: on_pause_f::<T>,
+            on_resume: on_resume_f::<T>,
+            on_unload: on_unload_f::<T>,
+            on_consolidate: on_consolidate_f::<T>,
+            on_swap_out: on_swap_out_f::<T>,
+            snapshot: snapshot_f::<T>,
+            migrate: migrate_f::<T>,
             _phantom: PhantomData,
         }
     }
@@ -371,7 +409,9 @@ mod tests {
 
     impl TestSpirit {
         fn new() -> Self {
-            Self { called: core::cell::Cell::new(0) }
+            Self {
+                called: core::cell::Cell::new(0),
+            }
         }
     }
 
@@ -398,7 +438,11 @@ mod tests {
 
     #[test]
     fn const_assert_hook_count_matches_fr55() {
-        assert_eq!(count_hooks!(), 14, "FR55 mandates exactly 14 hooks (Story 5.2 extended from 11)");
+        assert_eq!(
+            count_hooks!(),
+            14,
+            "FR55 mandates exactly 14 hooks (Story 5.2 extended from 11)"
+        );
     }
 
     #[test]
@@ -473,15 +517,30 @@ mod tests {
 
     #[test]
     fn payload_types_exist() {
-        let fp = FramePayload { frame_data: b"hello", frame_len: 5 };
+        let fp = FramePayload {
+            frame_data: b"hello",
+            frame_len: 5,
+        };
         assert_eq!(fp.frame_len, 5);
-        let tp = TelemetryEventPayload { event_data: b"t", event_len: 1 };
+        let tp = TelemetryEventPayload {
+            event_data: b"t",
+            event_len: 1,
+        };
         assert_eq!(tp.event_len, 1);
-        let sp = SchedulePayload { schedule_data: b"s", schedule_len: 1 };
+        let sp = SchedulePayload {
+            schedule_data: b"s",
+            schedule_len: 1,
+        };
         assert_eq!(sp.schedule_len, 1);
-        let sip = SwapInPayload { predecessor_state: b"p", state_len: 1 };
+        let sip = SwapInPayload {
+            predecessor_state: b"p",
+            state_len: 1,
+        };
         assert_eq!(sip.state_len, 1);
-        let cp = ConsolidatePayload { batch_data: b"c", batch_len: 1 };
+        let cp = ConsolidatePayload {
+            batch_data: b"c",
+            batch_len: 1,
+        };
         assert_eq!(cp.batch_len, 1);
     }
 }

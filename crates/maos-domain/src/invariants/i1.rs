@@ -154,9 +154,10 @@ mod serde_sig64 {
     pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<[u8; 64], D::Error> {
         let bytes: Vec<u8> = serde::Deserialize::deserialize(de)?;
         if bytes.len() != 64 {
-            return Err(serde::de::Error::custom(
-                format!("expected 64-byte signature, got {} bytes", bytes.len())
-            ));
+            return Err(serde::de::Error::custom(format!(
+                "expected 64-byte signature, got {} bytes",
+                bytes.len()
+            )));
         }
         let mut arr = [0u8; 64];
         arr.copy_from_slice(&bytes);

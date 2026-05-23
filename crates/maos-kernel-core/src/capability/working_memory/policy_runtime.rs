@@ -93,19 +93,27 @@ pub fn evaluate_after_set_scalar(
 
         let fires = match predicate {
             ScalarPredicate::Above { threshold } => {
-                if threshold.is_nan() { continue; }
+                if threshold.is_nan() {
+                    continue;
+                }
                 registry.on_value_above(value, *threshold as f64)
             }
             ScalarPredicate::Below { threshold } => {
-                if threshold.is_nan() { continue; }
+                if threshold.is_nan() {
+                    continue;
+                }
                 registry.on_value_below(value, *threshold as f64)
             }
             ScalarPredicate::Within { lower, upper } => {
-                if lower.is_nan() || upper.is_nan() { continue; }
+                if lower.is_nan() || upper.is_nan() {
+                    continue;
+                }
                 registry.on_value_within(value, *lower as f64, *upper as f64)
             }
             ScalarPredicate::Outside { lower, upper } => {
-                if lower.is_nan() || upper.is_nan() { continue; }
+                if lower.is_nan() || upper.is_nan() {
+                    continue;
+                }
                 registry.on_value_outside(value, *lower as f64, *upper as f64)
             }
         };
@@ -148,10 +156,10 @@ pub fn evaluate_after_set_scalar(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::security::manifest::EpistemicPolicyRule;
     use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope, TokenId};
     use maos_domain::invariants::i9::SandboxTier;
     use maos_domain::ports::capability::CapError;
-    use crate::security::manifest::EpistemicPolicyRule;
 
     /// Test impl of CapabilityRegistryPort — delegates predicate logic to
     /// the real `CapabilityRegistryAdapter` to avoid drift between test
@@ -171,16 +179,33 @@ mod tests {
         fn on_value_outside(&self, value: f64, lower: f64, upper: f64) -> bool {
             value < lower || value > upper
         }
-        fn issue(&self, _spirit_pid: u32, _scope: Scope, _ttl_secs: u32, _posture_snapshot_hash: [u8; 32], _intent_class: IntentClass) -> Result<CapabilityToken, CapError> {
+        fn issue(
+            &self,
+            _spirit_pid: u32,
+            _scope: Scope,
+            _ttl_secs: u32,
+            _posture_snapshot_hash: [u8; 32],
+            _intent_class: IntentClass,
+        ) -> Result<CapabilityToken, CapError> {
             unimplemented!()
         }
-        fn verify(&self, _token: &CapabilityToken, _current_posture_hash: [u8; 32], _current_sandbox: SandboxTier) -> Result<(), CapError> {
+        fn verify(
+            &self,
+            _token: &CapabilityToken,
+            _current_posture_hash: [u8; 32],
+            _current_sandbox: SandboxTier,
+        ) -> Result<(), CapError> {
             unimplemented!()
         }
         fn revoke(&self, _token_id: TokenId) -> Result<(), CapError> {
             unimplemented!()
         }
-        fn record_invocation(&self, _token: &CapabilityToken, _intent: String, _payload: &[u8]) -> Result<(), CapError> {
+        fn record_invocation(
+            &self,
+            _token: &CapabilityToken,
+            _intent: String,
+            _payload: &[u8],
+        ) -> Result<(), CapError> {
             unimplemented!()
         }
     }
@@ -204,8 +229,14 @@ mod tests {
             Some(ScalarPredicate::Above { threshold: 0.7 }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.85, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.85,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(matches!(result, Some(PolicyEvaluationOutcome::Halt(_))));
@@ -221,8 +252,14 @@ mod tests {
             Some(ScalarPredicate::Above { threshold: 0.7 }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.5, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.5,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(result.is_none());
@@ -238,8 +275,14 @@ mod tests {
             Some(ScalarPredicate::Below { threshold: 0.3 }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.5, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.5,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(result.is_none());
@@ -252,11 +295,20 @@ mod tests {
             EpistemicAction::Halt,
             None,
             None,
-            Some(ScalarPredicate::Within { lower: 0.4, upper: 0.6 }),
+            Some(ScalarPredicate::Within {
+                lower: 0.4,
+                upper: 0.6,
+            }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.85, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.85,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(result.is_none());
@@ -269,11 +321,20 @@ mod tests {
             EpistemicAction::Halt,
             None,
             None,
-            Some(ScalarPredicate::Outside { lower: 0.3, upper: 0.7 }),
+            Some(ScalarPredicate::Outside {
+                lower: 0.3,
+                upper: 0.7,
+            }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.5, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.5,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(result.is_none());
@@ -291,8 +352,14 @@ mod tests {
             Some(ScalarPredicate::Below { threshold: 0.3 }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.2, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.2,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(matches!(result, Some(PolicyEvaluationOutcome::Halt(_))));
@@ -307,11 +374,20 @@ mod tests {
             EpistemicAction::Halt,
             None,
             None,
-            Some(ScalarPredicate::Within { lower: 0.4, upper: 0.6 }),
+            Some(ScalarPredicate::Within {
+                lower: 0.4,
+                upper: 0.6,
+            }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.5, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.5,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(matches!(result, Some(PolicyEvaluationOutcome::Halt(_))));
@@ -326,11 +402,20 @@ mod tests {
             EpistemicAction::Halt,
             None,
             None,
-            Some(ScalarPredicate::Outside { lower: 0.3, upper: 0.7 }),
+            Some(ScalarPredicate::Outside {
+                lower: 0.3,
+                upper: 0.7,
+            }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.85, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.85,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(matches!(result, Some(PolicyEvaluationOutcome::Halt(_))));
@@ -348,8 +433,14 @@ mod tests {
             Some(ScalarPredicate::Above { threshold: 0.7 }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.9, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.9,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(matches!(result, Some(PolicyEvaluationOutcome::Flag(_))));
@@ -365,11 +456,20 @@ mod tests {
             Some(ScalarPredicate::Above { threshold: 0.7 }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.9, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.9,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
-        assert!(matches!(result, Some(PolicyEvaluationOutcome::VerbalizeOnly)));
+        assert!(matches!(
+            result,
+            Some(PolicyEvaluationOutcome::VerbalizeOnly)
+        ));
     }
 
     // --- Rule-not-matching-tag pass-through ---
@@ -384,8 +484,14 @@ mod tests {
             Some(ScalarPredicate::Above { threshold: 0.5 }),
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.9, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.9,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(result.is_none());
@@ -403,8 +509,14 @@ mod tests {
             None,
         )]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.9, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.9,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         assert!(result.is_none());
@@ -431,11 +543,19 @@ mod tests {
             ),
         ]);
         let result = evaluate_after_set_scalar(
-            "spirit-1", 1, 0xCAFE, "uncertainty", 0.95, "frame-001",
-            &policy, &TestPort,
+            "spirit-1",
+            1,
+            0xCAFE,
+            "uncertainty",
+            0.95,
+            "frame-001",
+            &policy,
+            &TestPort,
         )
         .unwrap();
         // First rule fires with Flag action (not Halt)
-        assert!(matches!(result, Some(PolicyEvaluationOutcome::Flag(ref tag)) if tag == "uncertainty"));
+        assert!(
+            matches!(result, Some(PolicyEvaluationOutcome::Flag(ref tag)) if tag == "uncertainty")
+        );
     }
 }

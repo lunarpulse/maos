@@ -2,7 +2,14 @@ use std::process::Command;
 
 fn xtask() -> Command {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "--manifest-path", concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.toml"), "-p", "xtask", "--"]);
+    cmd.args([
+        "run",
+        "--manifest-path",
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.toml"),
+        "-p",
+        "xtask",
+        "--",
+    ]);
     cmd
 }
 
@@ -70,7 +77,10 @@ fn violation_judge_direct_call_fails() {
     std::fs::create_dir_all(&tmp).unwrap();
     std::fs::create_dir_all(tmp.join("tests")).unwrap();
     std::fs::copy(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/violation-judge-direct-call/some_test.rs"),
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/violation-judge-direct-call/some_test.rs"
+        ),
         tmp.join("tests/some_test.rs"),
     )
     .unwrap();
@@ -79,9 +89,15 @@ fn violation_judge_direct_call_fails() {
         .args([
             "check-judge-config",
             "--config",
-            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/clean-judge-config/judge-config.toml"),
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/clean-judge-config/judge-config.toml"
+            ),
             "--identifiers",
-            concat!(env!("CARGO_MANIFEST_DIR"), "/judge-direct-call-identifiers.toml"),
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/judge-direct-call-identifiers.toml"
+            ),
         ])
         .current_dir(&tmp)
         .output()
@@ -102,12 +118,18 @@ fn violation_judge_direct_call_fails() {
 
 #[test]
 fn clean_judge_direct_call_passes() {
-    let tmp = std::env::temp_dir().join(format!("maos-judge-direct-call-clean-{}", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!(
+        "maos-judge-direct-call-clean-{}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(&tmp).unwrap();
     std::fs::create_dir_all(tmp.join("tests")).unwrap();
     std::fs::copy(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/clean-judge-direct-call/some_test.rs"),
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/clean-judge-direct-call/some_test.rs"
+        ),
         tmp.join("tests/some_test.rs"),
     )
     .unwrap();
@@ -116,9 +138,15 @@ fn clean_judge_direct_call_passes() {
         .args([
             "check-judge-config",
             "--config",
-            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/clean-judge-config/judge-config.toml"),
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/clean-judge-config/judge-config.toml"
+            ),
             "--identifiers",
-            concat!(env!("CARGO_MANIFEST_DIR"), "/judge-direct-call-identifiers.toml"),
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/judge-direct-call-identifiers.toml"
+            ),
         ])
         .current_dir(&tmp)
         .output()

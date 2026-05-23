@@ -1,0 +1,12 @@
+{
+  "scenario_id": "upg-cold_swap_success-003",
+  "category": "cold_swap_success",
+  "predecessor_manifest_path": "crates/maos-eval/fixtures/upgrade-policy-corpus-v0/cold_swap_success_pred_003.toml",
+  "successor_manifest_path": "crates/maos-eval/fixtures/upgrade-policy-corpus-v0/cold_swap_success_succ_003.toml",
+  "policy": "cold-swap",
+  "expected_outcome": {
+    "report_outcome": "completed",
+    "lifecycle_event_journaled": true,
+    "halt_receipts_produced_min": 0
+  }
+}

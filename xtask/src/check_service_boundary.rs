@@ -63,7 +63,9 @@ pub struct KernelSurface {
     pub items: Vec<SurfaceItem>,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Ord, PartialOrd, Eq, PartialEq, Clone, Hash)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, Ord, PartialOrd, Eq, PartialEq, Clone, Hash,
+)]
 pub struct SurfaceItem {
     pub kind: String,
     pub path: String,
@@ -137,7 +139,8 @@ fn check_service_boundary(
     spirit_abi_derive: &Path,
 ) -> Result<Report, String> {
     let crate_path = path.unwrap_or(Path::new("crates/maos-kernel-core"));
-    let workspace_root = if crate_path.file_name() == Some(std::ffi::OsStr::new("maos-kernel-core")) {
+    let workspace_root = if crate_path.file_name() == Some(std::ffi::OsStr::new("maos-kernel-core"))
+    {
         crate_path.ancestors().nth(2).unwrap_or(Path::new("."))
     } else {
         crate_path
@@ -170,15 +173,15 @@ fn check_service_boundary(
             let baseline: KernelSurface = serde_json::from_str(&baseline_src)
                 .map_err(|e| format!("json parse error in {}: {e}", baseline_path.display()))?;
 
-        let baseline_items: std::collections::HashSet<SurfaceItem> =
-            baseline.items.into_iter().collect();
-        let current_items: std::collections::HashSet<SurfaceItem> =
-            current.items.clone().into_iter().collect();
+            let baseline_items: std::collections::HashSet<SurfaceItem> =
+                baseline.items.into_iter().collect();
+            let current_items: std::collections::HashSet<SurfaceItem> =
+                current.items.clone().into_iter().collect();
 
-        // Removed items are violations (monotonicity).
-        for item in &baseline_items {
-            if !current_items.contains(item) {
-                violations.push(Violation {
+            // Removed items are violations (monotonicity).
+            for item in &baseline_items {
+                if !current_items.contains(item) {
+                    violations.push(Violation {
                     file: baseline_path.display().to_string(),
                     line: 1,
                     path: item.path.clone(),
@@ -187,15 +190,19 @@ fn check_service_boundary(
                         item.path
                     ),
                 });
+                }
             }
-        }
 
-        // Added items must be classified.
-        for item in &current_items {
-            if !baseline_items.contains(item) {
-                let class = classes.classes.get(&item.path).cloned().unwrap_or_else(|| "other".into());
-                if class == "other" {
-                    violations.push(Violation {
+            // Added items must be classified.
+            for item in &current_items {
+                if !baseline_items.contains(item) {
+                    let class = classes
+                        .classes
+                        .get(&item.path)
+                        .cloned()
+                        .unwrap_or_else(|| "other".into());
+                    if class == "other" {
+                        violations.push(Violation {
                         file: baseline_path.display().to_string(),
                         line: 1,
                         path: item.path.clone(),
@@ -204,9 +211,9 @@ fn check_service_boundary(
                             item.path
                         ),
                     });
+                    }
                 }
             }
-        }
         }
     }
 
@@ -235,11 +242,8 @@ fn check_service_boundary(
     )?);
 
     // Spirit ABI type reflection (AC5).
-    let (spirit_abi_violations, spirit_abi_json) = check_spirit_abi_types(
-        workspace_root,
-        spirit_abi_lifecycle,
-        spirit_abi_derive,
-    )?;
+    let (spirit_abi_violations, spirit_abi_json) =
+        check_spirit_abi_types(workspace_root, spirit_abi_lifecycle, spirit_abi_derive)?;
     violations.extend(spirit_abi_violations);
 
     let passed = violations.is_empty();
@@ -292,15 +296,19 @@ fn walk_mod(
     mod_path: &str,
     items: &mut Vec<SurfaceItem>,
 ) -> Result<(), String> {
-    let src = fs::read_to_string(file)
-        .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
-    let ast = syn::parse_file(&src)
-        .map_err(|e| format!("parse error in {}: {e}", file.display()))?;
+    let src =
+        fs::read_to_string(file).map_err(|e| format!("cannot read {}: {e}", file.display()))?;
+    let ast =
+        syn::parse_file(&src).map_err(|e| format!("parse error in {}: {e}", file.display()))?;
 
     for item in &ast.items {
         match item {
             syn::Item::Fn(i) if is_pub(&i.vis) => {
-                items.push(surface_item("fn", &format!("{}::{}", mod_path, i.sig.ident), item));
+                items.push(surface_item(
+                    "fn",
+                    &format!("{}::{}", mod_path, i.sig.ident),
+                    item,
+                ));
             }
             syn::Item::Struct(i) if is_pub(&i.vis) => {
                 items.push(surface_item(
@@ -310,19 +318,39 @@ fn walk_mod(
                 ));
             }
             syn::Item::Enum(i) if is_pub(&i.vis) => {
-                items.push(surface_item("enum", &format!("{}::{}", mod_path, i.ident), item));
+                items.push(surface_item(
+                    "enum",
+                    &format!("{}::{}", mod_path, i.ident),
+                    item,
+                ));
             }
             syn::Item::Trait(i) if is_pub(&i.vis) => {
-                items.push(surface_item("trait", &format!("{}::{}", mod_path, i.ident), item));
+                items.push(surface_item(
+                    "trait",
+                    &format!("{}::{}", mod_path, i.ident),
+                    item,
+                ));
             }
             syn::Item::Type(i) if is_pub(&i.vis) => {
-                items.push(surface_item("type", &format!("{}::{}", mod_path, i.ident), item));
+                items.push(surface_item(
+                    "type",
+                    &format!("{}::{}", mod_path, i.ident),
+                    item,
+                ));
             }
             syn::Item::Const(i) if is_pub(&i.vis) => {
-                items.push(surface_item("const", &format!("{}::{}", mod_path, i.ident), item));
+                items.push(surface_item(
+                    "const",
+                    &format!("{}::{}", mod_path, i.ident),
+                    item,
+                ));
             }
             syn::Item::Static(i) if is_pub(&i.vis) => {
-                items.push(surface_item("static", &format!("{}::{}", mod_path, i.ident), item));
+                items.push(surface_item(
+                    "static",
+                    &format!("{}::{}", mod_path, i.ident),
+                    item,
+                ));
             }
             syn::Item::Use(i) if is_pub(&i.vis) => {
                 for path in collect_use_paths(&i.tree, mod_path) {
@@ -363,25 +391,53 @@ fn walk_inline_mod_item(
 ) -> Result<(), String> {
     match item {
         syn::Item::Fn(i) if is_pub(&i.vis) => {
-            items.push(surface_item("fn", &format!("{}::{}", mod_path, i.sig.ident), item));
+            items.push(surface_item(
+                "fn",
+                &format!("{}::{}", mod_path, i.sig.ident),
+                item,
+            ));
         }
         syn::Item::Struct(i) if is_pub(&i.vis) => {
-            items.push(surface_item("struct", &format!("{}::{}", mod_path, i.ident), item));
+            items.push(surface_item(
+                "struct",
+                &format!("{}::{}", mod_path, i.ident),
+                item,
+            ));
         }
         syn::Item::Enum(i) if is_pub(&i.vis) => {
-            items.push(surface_item("enum", &format!("{}::{}", mod_path, i.ident), item));
+            items.push(surface_item(
+                "enum",
+                &format!("{}::{}", mod_path, i.ident),
+                item,
+            ));
         }
         syn::Item::Trait(i) if is_pub(&i.vis) => {
-            items.push(surface_item("trait", &format!("{}::{}", mod_path, i.ident), item));
+            items.push(surface_item(
+                "trait",
+                &format!("{}::{}", mod_path, i.ident),
+                item,
+            ));
         }
         syn::Item::Type(i) if is_pub(&i.vis) => {
-            items.push(surface_item("type", &format!("{}::{}", mod_path, i.ident), item));
+            items.push(surface_item(
+                "type",
+                &format!("{}::{}", mod_path, i.ident),
+                item,
+            ));
         }
         syn::Item::Const(i) if is_pub(&i.vis) => {
-            items.push(surface_item("const", &format!("{}::{}", mod_path, i.ident), item));
+            items.push(surface_item(
+                "const",
+                &format!("{}::{}", mod_path, i.ident),
+                item,
+            ));
         }
         syn::Item::Static(i) if is_pub(&i.vis) => {
-            items.push(surface_item("static", &format!("{}::{}", mod_path, i.ident), item));
+            items.push(surface_item(
+                "static",
+                &format!("{}::{}", mod_path, i.ident),
+                item,
+            ));
         }
         syn::Item::Use(i) if is_pub(&i.vis) => {
             for path in collect_use_paths(&i.tree, mod_path) {
@@ -428,7 +484,10 @@ fn canonicalize_signature(item: &syn::Item) -> String {
         .collect::<Vec<_>>()
         .join("\n");
     // Normalize whitespace.
-    without_docs.split_whitespace().collect::<Vec<_>>().join(" ")
+    without_docs
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn sha256_hex(input: &str) -> String {
@@ -442,7 +501,10 @@ fn collect_use_paths(tree: &syn::UseTree, prefix: &str) -> Vec<String> {
     match tree {
         syn::UseTree::Name(name) => vec![format!("{}::{}", prefix, name.ident)],
         syn::UseTree::Rename(rename) => {
-            vec![format!("{}::{} (as {})", prefix, rename.ident, rename.rename)]
+            vec![format!(
+                "{}::{} (as {})",
+                prefix, rename.ident, rename.rename
+            )]
         }
         syn::UseTree::Glob(_) => vec![format!("{}::*", prefix)],
         syn::UseTree::Group(group) => group
@@ -458,8 +520,8 @@ fn collect_use_paths(tree: &syn::UseTree, prefix: &str) -> Vec<String> {
 }
 
 fn load_toml<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
-    let src = fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let src =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     toml::from_str(&src).map_err(|e| format!("toml parse error in {}: {e}", path.display()))
 }
 
@@ -475,8 +537,8 @@ fn load_toml<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
 fn check_p1_single_owner(main_rs: &Path) -> Result<Vec<Violation>, String> {
     let src = fs::read_to_string(main_rs)
         .map_err(|e| format!("cannot read {}: {e}", main_rs.display()))?;
-    let ast = syn::parse_file(&src)
-        .map_err(|e| format!("parse error in {}: {e}", main_rs.display()))?;
+    let ast =
+        syn::parse_file(&src).map_err(|e| format!("parse error in {}: {e}", main_rs.display()))?;
 
     let mut visitor = P1OwnerVisitor {
         counts: BTreeMap::new(),
@@ -514,7 +576,10 @@ impl<'ast> syn::visit::Visit<'ast> for P1OwnerVisitor {
             for (_, adapter) in SERVICE_ADAPTERS {
                 let pattern = format!("{}::new", adapter);
                 if path_str == pattern || path_str.ends_with(&format!("::{}", pattern)) {
-                    self.counts.entry((*adapter).to_string()).or_default().push(node.func.span().start().line);
+                    self.counts
+                        .entry((*adapter).to_string())
+                        .or_default()
+                        .push(node.func.span().start().line);
                 }
             }
         }
@@ -542,8 +607,8 @@ fn check_p2_port_pairing(workspace_root: &Path) -> Result<Vec<Violation>, String
 
     let src = fs::read_to_string(&api_rs)
         .map_err(|e| format!("cannot read {}: {e}", api_rs.display()))?;
-    let ast = syn::parse_file(&src)
-        .map_err(|e| format!("parse error in {}: {e}", api_rs.display()))?;
+    let ast =
+        syn::parse_file(&src).map_err(|e| format!("parse error in {}: {e}", api_rs.display()))?;
 
     let mut adapters = Vec::new();
     for item in &ast.items {
@@ -669,11 +734,7 @@ fn extract_adapter_uses(tree: &syn::UseTree) -> Vec<(String, String)> {
                 _ => Vec::new(),
             }
         }
-        syn::UseTree::Group(group) => group
-            .items
-            .iter()
-            .flat_map(extract_adapter_uses)
-            .collect(),
+        syn::UseTree::Group(group) => group.items.iter().flat_map(extract_adapter_uses).collect(),
         _ => Vec::new(),
     }
 }
@@ -710,8 +771,12 @@ fn check_p3_state_ownership(workspace_root: &Path) -> Result<Vec<Violation>, Str
         Path::new("docs/invariants/i9-exemptions.md").to_path_buf()
     };
 
-    let report =
-        crate::check_empty_kernel::run_silent(&kernel_path, &whitelist_path, &denylist_path, &exemptions_path)?;
+    let report = crate::check_empty_kernel::run_silent(
+        &kernel_path,
+        &whitelist_path,
+        &denylist_path,
+        &exemptions_path,
+    )?;
 
     let mut violations = Vec::new();
     for v in report.violations {
@@ -784,7 +849,12 @@ fn check_p4_audit_chain(
 
     let mut violations = Vec::new();
     let lib_rs = kernel_src.join("lib.rs");
-    let mod_path = if kernel_src.exists() && kernel_src.parent().map(|p| p.file_name() == Some(std::ffi::OsStr::new("maos-kernel-core"))).unwrap_or(false) {
+    let mod_path = if kernel_src.exists()
+        && kernel_src
+            .parent()
+            .map(|p| p.file_name() == Some(std::ffi::OsStr::new("maos-kernel-core")))
+            .unwrap_or(false)
+    {
         "maos_kernel_core"
     } else {
         "fixture"
@@ -812,10 +882,10 @@ fn walk_p4_mod(
     exemptions: &[String],
     violations: &mut Vec<Violation>,
 ) -> Result<(), String> {
-    let src = fs::read_to_string(file)
-        .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
-    let ast = syn::parse_file(&src)
-        .map_err(|e| format!("parse error in {}: {e}", file.display()))?;
+    let src =
+        fs::read_to_string(file).map_err(|e| format!("cannot read {}: {e}", file.display()))?;
+    let ast =
+        syn::parse_file(&src).map_err(|e| format!("parse error in {}: {e}", file.display()))?;
     let file_str = file.display().to_string();
 
     for item in &ast.items {
@@ -833,7 +903,12 @@ fn walk_p4_mod(
             }
             syn::Item::Impl(i) => {
                 let self_ty = match &*i.self_ty {
-                    syn::Type::Path(tp) => tp.path.segments.last().map(|s| s.ident.to_string()).unwrap_or_default(),
+                    syn::Type::Path(tp) => tp
+                        .path
+                        .segments
+                        .last()
+                        .map(|s| s.ident.to_string())
+                        .unwrap_or_default(),
                     _ => String::new(),
                 };
                 for impl_item in &i.items {
@@ -859,16 +934,23 @@ fn walk_p4_mod(
             syn::Item::Mod(i) => {
                 if i.attrs.iter().any(|a| {
                     a.meta.path().is_ident("cfg")
-                        && a.meta.require_list().map_or(false, |ml| {
-                            ml.tokens.to_string().contains("test")
-                        })
+                        && a.meta
+                            .require_list()
+                            .map_or(false, |ml| ml.tokens.to_string().contains("test"))
                 }) {
                     continue;
                 }
                 let child_path = format!("{}::{}", mod_path, i.ident);
                 if let Some((_, content)) = &i.content {
                     for child in content {
-                        walk_p4_inline_item(child, &child_path, &file_str, denylist, exemptions, violations)?;
+                        walk_p4_inline_item(
+                            child,
+                            &child_path,
+                            &file_str,
+                            denylist,
+                            exemptions,
+                            violations,
+                        )?;
                     }
                 } else {
                     let parent = file.parent().unwrap_or(src_dir);
@@ -876,9 +958,23 @@ fn walk_p4_mod(
                     let child_file = parent.join(format!("{}.rs", child_name));
                     let child_mod_dir = parent.join(&child_name).join("mod.rs");
                     if child_file.exists() {
-                        walk_p4_mod(&child_file, src_dir, &child_path, denylist, exemptions, violations)?;
+                        walk_p4_mod(
+                            &child_file,
+                            src_dir,
+                            &child_path,
+                            denylist,
+                            exemptions,
+                            violations,
+                        )?;
                     } else if child_mod_dir.exists() {
-                        walk_p4_mod(&child_mod_dir, src_dir, &child_path, denylist, exemptions, violations)?;
+                        walk_p4_mod(
+                            &child_mod_dir,
+                            src_dir,
+                            &child_path,
+                            denylist,
+                            exemptions,
+                            violations,
+                        )?;
                     }
                 }
             }
@@ -910,7 +1006,12 @@ fn walk_p4_inline_item(
         }
         syn::Item::Impl(i) => {
             let self_ty = match &*i.self_ty {
-                syn::Type::Path(tp) => tp.path.segments.last().map(|s| s.ident.to_string()).unwrap_or_default(),
+                syn::Type::Path(tp) => tp
+                    .path
+                    .segments
+                    .last()
+                    .map(|s| s.ident.to_string())
+                    .unwrap_or_default(),
                 _ => String::new(),
             };
             for impl_item in &i.items {
@@ -936,16 +1037,23 @@ fn walk_p4_inline_item(
         syn::Item::Mod(i) => {
             if i.attrs.iter().any(|a| {
                 a.meta.path().is_ident("cfg")
-                    && a.meta.require_list().map_or(false, |ml| {
-                        ml.tokens.to_string().contains("test")
-                    })
+                    && a.meta
+                        .require_list()
+                        .map_or(false, |ml| ml.tokens.to_string().contains("test"))
             }) {
                 return Ok(());
             }
             if let Some((_, content)) = &i.content {
                 let child_path = format!("{}::{}", mod_path, i.ident);
                 for child in content {
-                    walk_p4_inline_item(child, &child_path, file, denylist, exemptions, violations)?;
+                    walk_p4_inline_item(
+                        child,
+                        &child_path,
+                        file,
+                        denylist,
+                        exemptions,
+                        violations,
+                    )?;
                 }
             }
         }
@@ -1075,7 +1183,12 @@ fn check_spirit_abi_types(
                     }
                 }
             }
-            syn::Item::Macro(m) if m.ident.as_ref().map(|i| i == "count_hooks").unwrap_or(false) => {
+            syn::Item::Macro(m)
+                if m.ident
+                    .as_ref()
+                    .map(|i| i == "count_hooks")
+                    .unwrap_or(false) =>
+            {
                 let tokens = m.mac.tokens.to_string();
                 for part in tokens.split(|c: char| !c.is_ascii_digit()) {
                     if !part.is_empty() {
@@ -1202,12 +1315,18 @@ fn check_spirit_abi_types(
 fn p1_p4_status_payload(violations: &[Violation]) -> serde_json::Value {
     let p1_uniform = "enforced";
     let p2_uniform = "enforced";
-    let p3_uniform = if violations.iter().any(|v| v.message.starts_with("P3 violation:")) {
+    let p3_uniform = if violations
+        .iter()
+        .any(|v| v.message.starts_with("P3 violation:"))
+    {
         "violated"
     } else {
         "enforced"
     };
-    let p4_uniform = if violations.iter().any(|v| v.message.starts_with("P4 violation:")) {
+    let p4_uniform = if violations
+        .iter()
+        .any(|v| v.message.starts_with("P4 violation:"))
+    {
         "violated"
     } else {
         "enforced"
@@ -1215,12 +1334,18 @@ fn p1_p4_status_payload(violations: &[Violation]) -> serde_json::Value {
 
     let mut per_service = serde_json::Map::new();
     for (service, adapter) in SERVICE_ADAPTERS {
-        let p1 = if violations.iter().any(|v| v.message.starts_with("P1 violation:") && v.path == *adapter) {
+        let p1 = if violations
+            .iter()
+            .any(|v| v.message.starts_with("P1 violation:") && v.path == *adapter)
+        {
             "violated"
         } else {
             p1_uniform
         };
-        let p2 = if violations.iter().any(|v| v.message.starts_with("P2 violation:") && v.path == *adapter) {
+        let p2 = if violations
+            .iter()
+            .any(|v| v.message.starts_with("P2 violation:") && v.path == *adapter)
+        {
             "violated"
         } else {
             p2_uniform

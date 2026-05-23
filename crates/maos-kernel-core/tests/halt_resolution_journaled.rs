@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use maos_director_surface::halt_ui::HaltFlow;
+use maos_director_surface::notification::NotificationDispatcher;
 use maos_domain::halt::{HaltId, HaltJournal, Resolution};
 use maos_kernel_core::halt::{FailingHaltResolver, MockHaltResolver};
 use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
-use maos_director_surface::notification::NotificationDispatcher;
 
 #[test]
 fn halt_resolution_three_variants_journaled() {
@@ -19,17 +19,20 @@ fn halt_resolution_three_variants_journaled() {
     let res1 = Resolution::ProvidedContext {
         text: "the issue is X".into(),
     };
-    flow.submit_resolution(hid1.clone(), res1.clone(), "spirit-1").unwrap();
+    flow.submit_resolution(hid1.clone(), res1.clone(), "spirit-1")
+        .unwrap();
 
     let hid2 = HaltId::new("halt-002").unwrap();
     let res2 = Resolution::AcceptedHalt;
-    flow.submit_resolution(hid2.clone(), res2.clone(), "spirit-1").unwrap();
+    flow.submit_resolution(hid2.clone(), res2.clone(), "spirit-1")
+        .unwrap();
 
     let hid3 = HaltId::new("halt-003").unwrap();
     let res3 = Resolution::AuthorizedOverride {
         operator_policy_ref: "policy://override/2026-05".into(),
     };
-    flow.submit_resolution(hid3.clone(), res3.clone(), "spirit-1").unwrap();
+    flow.submit_resolution(hid3.clone(), res3.clone(), "spirit-1")
+        .unwrap();
 
     let approvals = log.query_approvals(None).unwrap();
     assert_eq!(approvals.len(), 3, "expected 3 approval decision rows");
@@ -68,10 +71,13 @@ fn halt_resolution_three_variants_journaled() {
             ..Default::default()
         })
         .unwrap();
-    let halt_in_tl_count = frames.iter().filter(|f| {
-        let payload_str = String::from_utf8_lossy(&f.payload_redacted);
-        payload_str.contains("halt.resolve")
-    }).count();
+    let halt_in_tl_count = frames
+        .iter()
+        .filter(|f| {
+            let payload_str = String::from_utf8_lossy(&f.payload_redacted);
+            payload_str.contains("halt.resolve")
+        })
+        .count();
     assert_eq!(
         halt_in_tl_count, 0,
         "halt resolution must not appear in transparency_log"
@@ -93,8 +99,14 @@ fn failing_resolver_prevents_journal_write() {
     let result = flow.submit_resolution(hid.clone(), res.clone(), "spirit-1");
     assert!(result.is_err(), "expected resolver error");
     let err_str = result.unwrap_err().to_string();
-    assert!(err_str.contains("unknown halt_id"), "error should mention unknown halt_id: {err_str}");
+    assert!(
+        err_str.contains("unknown halt_id"),
+        "error should mention unknown halt_id: {err_str}"
+    );
 
     let approvals = log.query_approvals(None).unwrap();
-    assert!(approvals.is_empty(), "no approval row should be written on resolver failure");
+    assert!(
+        approvals.is_empty(),
+        "no approval row should be written on resolver failure"
+    );
 }

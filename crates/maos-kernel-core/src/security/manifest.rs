@@ -47,7 +47,8 @@ pub struct SandboxConfig {
 
 impl SandboxConfig {
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
-        let raw: RawSandboxConfig = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        let raw: RawSandboxConfig =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         Ok(SandboxConfig { tier: raw.tier })
     }
 }
@@ -62,7 +63,8 @@ pub struct ResourceCaps {
 
 impl ResourceCaps {
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
-        let raw: RawResourceCaps = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        let raw: RawResourceCaps =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         raw.validate()
     }
 }
@@ -123,20 +125,32 @@ impl RawResourceCaps {
             .unwrap_or(1);
         if let Some(v) = self.cpu_max_pct {
             if v == 0 {
-                return Err(ManifestError::CapOutOfRange { field: "cpu_max_pct".into(), value: v });
+                return Err(ManifestError::CapOutOfRange {
+                    field: "cpu_max_pct".into(),
+                    value: v,
+                });
             }
             if v > 100 * num_cpus {
-                return Err(ManifestError::CapOutOfRange { field: "cpu_max_pct".into(), value: v });
+                return Err(ManifestError::CapOutOfRange {
+                    field: "cpu_max_pct".into(),
+                    value: v,
+                });
             }
         }
         if let Some(v) = self.memory_max_mb {
             if v == 0 {
-                return Err(ManifestError::CapOutOfRange { field: "memory_max_mb".into(), value: v });
+                return Err(ManifestError::CapOutOfRange {
+                    field: "memory_max_mb".into(),
+                    value: v,
+                });
             }
         }
         if let Some(v) = self.fd_max {
             if v == 0 {
-                return Err(ManifestError::CapOutOfRange { field: "fd_max".into(), value: v });
+                return Err(ManifestError::CapOutOfRange {
+                    field: "fd_max".into(),
+                    value: v,
+                });
             }
         }
         Ok(ResourceCaps {
@@ -152,7 +166,9 @@ impl RawResourceCaps {
 // ------------------------------------------------------------------
 
 /// The `[class]` manifest section — Spirit identity + ABI + trust tier.
-#[maos_attrs::i9_exempt(reason = "manifest data; parsed-then-dropped at admission, no kernel persistence")]
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClassSection {
     pub name: String,
@@ -173,7 +189,9 @@ impl ClassSection {
     }
 }
 
-#[maos_attrs::i9_exempt(reason = "manifest data; parsed-then-dropped at admission, no kernel persistence")]
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawClassSection {
@@ -199,20 +217,39 @@ impl RawClassSection {
                 &format!("len {} > 128", self.name.len()),
             )));
         }
-        if !self.name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
-            return Err(ManifestError::Toml(validation_msg("class.name", "must be [a-z0-9-] only")));
+        if !self
+            .name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        {
+            return Err(ManifestError::Toml(validation_msg(
+                "class.name",
+                "must be [a-z0-9-] only",
+            )));
         }
         // version: semver-ish (best-effort major.minor.patch).
         if self.version.split('.').count() < 3 {
-            return Err(ManifestError::Toml(validation_msg("class.version", &format!("not semver: {}", self.version))));
+            return Err(ManifestError::Toml(validation_msg(
+                "class.version",
+                &format!("not semver: {}", self.version),
+            )));
         }
         // abi: format `<major>.<minor>`; v0.1-β only accepts `"1.0"`.
         if self.abi != "1.0" {
-            return Err(ManifestError::Toml(validation_msg("class.abi", &format!("v0.1-β only accepts \"1.0\", got {}", self.abi))));
+            return Err(ManifestError::Toml(validation_msg(
+                "class.abi",
+                &format!("v0.1-β only accepts \"1.0\", got {}", self.abi),
+            )));
         }
         // manifest_schema_version: v0.1-β only accepts 1.
         if self.manifest_schema_version != 1 {
-            return Err(ManifestError::Toml(validation_msg("class.manifest_schema_version", &format!("v0.1-β only accepts 1, got {}", self.manifest_schema_version))));
+            return Err(ManifestError::Toml(validation_msg(
+                "class.manifest_schema_version",
+                &format!(
+                    "v0.1-β only accepts 1, got {}",
+                    self.manifest_schema_version
+                ),
+            )));
         }
         // min_substrate_version: best-effort semver-ish (allow pre-release suffix).
         let prefix = self
@@ -221,15 +258,24 @@ impl RawClassSection {
             .next()
             .unwrap_or_default();
         if prefix.split('.').count() < 3 {
-            return Err(ManifestError::Toml(validation_msg("class.min_substrate_version", &format!("not semver: {}", self.min_substrate_version))));
+            return Err(ManifestError::Toml(validation_msg(
+                "class.min_substrate_version",
+                &format!("not semver: {}", self.min_substrate_version),
+            )));
         }
         // forms: non-empty + every value ∈ {rust-inproc, subprocess}.
         if self.forms.is_empty() {
-            return Err(ManifestError::Toml(validation_msg("class.forms", "must be non-empty")));
+            return Err(ManifestError::Toml(validation_msg(
+                "class.forms",
+                "must be non-empty",
+            )));
         }
         for f in &self.forms {
             if !matches!(f.as_str(), "rust-inproc" | "subprocess") {
-                return Err(ManifestError::Toml(validation_msg("class.forms", &format!("unknown form: {f}"))));
+                return Err(ManifestError::Toml(validation_msg(
+                    "class.forms",
+                    &format!("unknown form: {f}"),
+                )));
             }
         }
         // trust_tier ∈ {local, org-internal, public-untrusted}.
@@ -237,11 +283,17 @@ impl RawClassSection {
             self.trust_tier.as_str(),
             "local" | "org-internal" | "public-untrusted"
         ) {
-            return Err(ManifestError::Toml(validation_msg("class.trust_tier", &format!("unknown trust_tier: {}", self.trust_tier))));
+            return Err(ManifestError::Toml(validation_msg(
+                "class.trust_tier",
+                &format!("unknown trust_tier: {}", self.trust_tier),
+            )));
         }
         // description: non-empty + ≤4 KiB.
         if self.description.is_empty() {
-            return Err(ManifestError::Toml(validation_msg("class.description", "empty")));
+            return Err(ManifestError::Toml(validation_msg(
+                "class.description",
+                "empty",
+            )));
         }
         if self.description.len() > 4096 {
             return Err(ManifestError::Toml(validation_msg(
@@ -275,7 +327,9 @@ pub struct CapabilitiesRequired {
     pub provider: ProviderCapabilities,
 }
 
-#[maos_attrs::i9_exempt(reason = "manifest data; parsed-then-dropped at admission, no kernel persistence")]
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderCapabilities {
     pub complete: Vec<String>,
@@ -295,7 +349,9 @@ struct RawCapabilitiesRequired {
     provider: RawProviderCapabilities,
 }
 
-#[maos_attrs::i9_exempt(reason = "manifest data; parsed-then-dropped at admission, no kernel persistence")]
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawProviderCapabilities {
@@ -305,11 +361,17 @@ struct RawProviderCapabilities {
 impl RawCapabilitiesRequired {
     fn validate(self) -> Result<CapabilitiesRequired, ManifestError> {
         if self.provider.complete.is_empty() {
-            return Err(ManifestError::Toml(validation_msg("capabilities.required.provider.complete", "must be non-empty")));
+            return Err(ManifestError::Toml(validation_msg(
+                "capabilities.required.provider.complete",
+                "must be non-empty",
+            )));
         }
         for v in &self.provider.complete {
             if v.len() > 128 {
-                return Err(ManifestError::Toml(validation_msg("capabilities.required.provider.complete", &format!("entry > 128 chars: {v}"))));
+                return Err(ManifestError::Toml(validation_msg(
+                    "capabilities.required.provider.complete",
+                    &format!("entry > 128 chars: {v}"),
+                )));
             }
         }
         Ok(CapabilitiesRequired {
@@ -327,7 +389,9 @@ impl RawCapabilitiesRequired {
 /// → `ProviderInfer { provider: "anthropic" }`). Other scope classes
 /// (fs, net, iac, mem) return a clearly-commented TODO and are not
 /// produced — they ship in Epic 7.
-pub fn capabilities_required_to_scopes(caps: &CapabilitiesRequired) -> Vec<maos_domain::invariants::i1::Scope> {
+pub fn capabilities_required_to_scopes(
+    caps: &CapabilitiesRequired,
+) -> Vec<maos_domain::invariants::i1::Scope> {
     caps.provider
         .complete
         .iter()
@@ -410,7 +474,9 @@ impl RawPostureSection {
 /// The `[output_shape]` manifest section — declared required fields the
 /// Spirit's response must carry (FR58 mandate; the orchestrator verifies
 /// this shape at admission).
-#[maos_attrs::i9_exempt(reason = "manifest data; parsed-then-dropped at admission, no kernel persistence")]
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutputShape {
     pub required_fields: Vec<String>,
@@ -424,7 +490,9 @@ impl OutputShape {
     }
 }
 
-#[maos_attrs::i9_exempt(reason = "manifest data; parsed-then-dropped at admission, no kernel persistence")]
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawOutputShape {
@@ -434,7 +502,10 @@ struct RawOutputShape {
 impl RawOutputShape {
     fn validate(self) -> Result<OutputShape, ManifestError> {
         if self.required_fields.is_empty() {
-            return Err(ManifestError::Toml(validation_msg("output_shape.required_fields", "must be non-empty")));
+            return Err(ManifestError::Toml(validation_msg(
+                "output_shape.required_fields",
+                "must be non-empty",
+            )));
         }
         if self.required_fields.len() > 32 {
             return Err(ManifestError::Toml(validation_msg(
@@ -478,7 +549,9 @@ impl RawOutputShape {
 /// Scaffolding for Story 7.3 fail-loud enforcement: the predicate is
 /// constructed at admission and held by the kernel; the emit-side
 /// enforcement (`check()` on every frame emit) lands at E7.
-#[maos_attrs::i9_exempt(reason = "manifest-derived predicate; constructed at admission and held in SandboxSpec — dropped after spawn, no kernel persistence")]
+#[maos_attrs::i9_exempt(
+    reason = "manifest-derived predicate; constructed at admission and held in SandboxSpec — dropped after spawn, no kernel persistence"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutputShapePredicate {
     fields: Vec<String>,
@@ -541,8 +614,7 @@ pub struct Budget {
 
 impl Budget {
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
-        let raw: RawBudget =
-            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        let raw: RawBudget = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         raw.validate()
     }
 }
@@ -557,13 +629,22 @@ struct RawBudget {
 impl RawBudget {
     fn validate(self) -> Result<Budget, ManifestError> {
         if self.context_window_size == 0 {
-            return Err(ManifestError::Toml(validation_msg("budget.context_window_size", "must be > 0")));
+            return Err(ManifestError::Toml(validation_msg(
+                "budget.context_window_size",
+                "must be > 0",
+            )));
         }
         if self.context_window_size > (1u32 << 24) {
-            return Err(ManifestError::Toml(validation_msg("budget.context_window_size", &format!("{} > 2^24", self.context_window_size))));
+            return Err(ManifestError::Toml(validation_msg(
+                "budget.context_window_size",
+                &format!("{} > 2^24", self.context_window_size),
+            )));
         }
         if self.time_cap_seconds == 0 {
-            return Err(ManifestError::Toml(validation_msg("budget.time_cap_seconds", "must be > 0")));
+            return Err(ManifestError::Toml(validation_msg(
+                "budget.time_cap_seconds",
+                "must be > 0",
+            )));
         }
         if self.time_cap_seconds > 86_400 {
             return Err(ManifestError::Toml(validation_msg(
@@ -664,7 +745,9 @@ pub enum ScalarPredicate {
 
 /// The `[epistemic_policy]` manifest section — per-tag halt policy rules
 /// plus a default action that defaults to `VerbalizeOnly` (fail-open).
-#[maos_attrs::i9_exempt(reason = "manifest data; parsed-then-dropped at admission, no kernel persistence")]
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct EpistemicPolicySection {
     pub rules: Vec<EpistemicPolicyRule>,
@@ -686,7 +769,9 @@ impl EpistemicPolicySection {
     }
 }
 
-#[maos_attrs::i9_exempt(reason = "manifest data; parsed-then-dropped at admission, no kernel persistence")]
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawEpistemicPolicySection {
@@ -874,10 +959,7 @@ fn collapse_predicate_fields(
         if raw.lower > raw.upper {
             return Err(ManifestError::Toml(validation_msg(
                 "epistemic_policy.on_value_within",
-                &format!(
-                    "lower ({}) > upper ({})",
-                    raw.lower, raw.upper
-                ),
+                &format!("lower ({}) > upper ({})", raw.lower, raw.upper),
             )));
         }
         return Ok(Some(ScalarPredicate::Within {
@@ -895,10 +977,7 @@ fn collapse_predicate_fields(
         if raw.lower > raw.upper {
             return Err(ManifestError::Toml(validation_msg(
                 "epistemic_policy.on_value_outside",
-                &format!(
-                    "lower ({}) > upper ({})",
-                    raw.lower, raw.upper
-                ),
+                &format!("lower ({}) > upper ({})", raw.lower, raw.upper),
             )));
         }
         return Ok(Some(ScalarPredicate::Outside {
@@ -970,28 +1049,19 @@ impl RawSchedulingSection {
         if self.priority_weight < 1 || self.priority_weight > 255 {
             return Err(ManifestError::Toml(validation_msg(
                 "scheduling.priority_weight",
-                &format!(
-                    "must be in [1, 255], got {}",
-                    self.priority_weight
-                ),
+                &format!("must be in [1, 255], got {}", self.priority_weight),
             )));
         }
         if self.yield_every_polls < 1 || self.yield_every_polls > 4096 {
             return Err(ManifestError::Toml(validation_msg(
                 "scheduling.yield_every_polls",
-                &format!(
-                    "must be in [1, 4096], got {}",
-                    self.yield_every_polls
-                ),
+                &format!("must be in [1, 4096], got {}", self.yield_every_polls),
             )));
         }
         if self.idle_window_ms < 100 || self.idle_window_ms > 3_600_000 {
             return Err(ManifestError::Toml(validation_msg(
                 "scheduling.idle_window_ms",
-                &format!(
-                    "must be in [100, 3600000], got {}",
-                    self.idle_window_ms
-                ),
+                &format!("must be in [100, 3600000], got {}", self.idle_window_ms),
             )));
         }
         Ok(SchedulingSection {
@@ -1127,6 +1197,49 @@ impl RawOnCrashSection {
 }
 
 // ------------------------------------------------------------------
+// [on_revocation] section (Story 5.4, AC5)
+// ------------------------------------------------------------------
+
+/// The `[on_revocation]` manifest section — revocation policy for this Spirit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OnRevocationSection {
+    pub action: maos_domain::revocation::RevocationAction,
+}
+
+impl OnRevocationSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawOnRevocationSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        raw.validate()
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawOnRevocationSection {
+    #[serde(default)]
+    action: String,
+}
+
+impl RawOnRevocationSection {
+    fn validate(self) -> Result<OnRevocationSection, ManifestError> {
+        use maos_domain::revocation::RevocationAction;
+        let action = match self.action.as_str() {
+            "" | "terminate-immediately" => RevocationAction::TerminateImmediately,
+            "drain-then-terminate" => RevocationAction::DrainThenTerminate,
+            "quarantine" => RevocationAction::Quarantine,
+            other => {
+                return Err(ManifestError::Toml(validation_msg(
+                    "on_revocation.action",
+                    &format!("unknown value '{}'", other),
+                )));
+            }
+        };
+        Ok(OnRevocationSection { action })
+    }
+}
+
+// ------------------------------------------------------------------
 // [supervision] section (Story 5.3, AC2 + AC3)
 // ------------------------------------------------------------------
 
@@ -1228,8 +1341,7 @@ pub struct Author {
 
 impl Author {
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
-        let raw: RawAuthor =
-            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        let raw: RawAuthor = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         raw.validate()
     }
 }
@@ -1248,7 +1360,10 @@ impl RawAuthor {
         }
         if let Some(ref h) = self.homepage {
             if !(h.starts_with("http://") || h.starts_with("https://")) {
-                return Err(ManifestError::Toml(validation_msg("author.homepage", &format!("must start with http:// or https://, got: {h}"))));
+                return Err(ManifestError::Toml(validation_msg(
+                    "author.homepage",
+                    &format!("must start with http:// or https://, got: {h}"),
+                )));
             }
         }
         Ok(Author {
@@ -1296,7 +1411,9 @@ mod tests {
 
     #[test]
     fn resource_caps_well_formed() {
-        let caps = ResourceCaps::from_toml_str("cpu_max_pct = 50\nmemory_max_mb = 512\nfd_max = 64").unwrap();
+        let caps =
+            ResourceCaps::from_toml_str("cpu_max_pct = 50\nmemory_max_mb = 512\nfd_max = 64")
+                .unwrap();
         assert_eq!(caps.cpu_max_pct, Some(50));
         assert_eq!(caps.memory_max_mb, Some(512));
         assert_eq!(caps.fd_max, Some(64));
@@ -1305,7 +1422,9 @@ mod tests {
     #[test]
     fn resource_caps_malformed_zero_rejected() {
         let err = ResourceCaps::from_toml_str(r#"memory_max_mb = 0"#).unwrap_err();
-        assert!(matches!(err, ManifestError::CapOutOfRange { field, .. } if field == "memory_max_mb"));
+        assert!(
+            matches!(err, ManifestError::CapOutOfRange { field, .. } if field == "memory_max_mb")
+        );
     }
 
     #[test]
@@ -1327,8 +1446,16 @@ mod tests {
 
     #[test]
     fn resolve_caps_manifest_wins_when_tighter() {
-        let m = ResourceCaps { cpu_max_pct: Some(30), memory_max_mb: Some(256), fd_max: None };
-        let o = ResourceCaps { cpu_max_pct: Some(50), memory_max_mb: Some(512), fd_max: None };
+        let m = ResourceCaps {
+            cpu_max_pct: Some(30),
+            memory_max_mb: Some(256),
+            fd_max: None,
+        };
+        let o = ResourceCaps {
+            cpu_max_pct: Some(50),
+            memory_max_mb: Some(512),
+            fd_max: None,
+        };
         let r = resolve_caps(&m, &o);
         assert_eq!(r.cpu_max_pct, Some(30));
         assert_eq!(r.memory_max_mb, Some(256));
@@ -1336,8 +1463,16 @@ mod tests {
 
     #[test]
     fn resolve_caps_operator_wins_when_tighter() {
-        let m = ResourceCaps { cpu_max_pct: Some(80), memory_max_mb: None, fd_max: Some(128) };
-        let o = ResourceCaps { cpu_max_pct: Some(40), memory_max_mb: Some(1024), fd_max: Some(64) };
+        let m = ResourceCaps {
+            cpu_max_pct: Some(80),
+            memory_max_mb: None,
+            fd_max: Some(128),
+        };
+        let o = ResourceCaps {
+            cpu_max_pct: Some(40),
+            memory_max_mb: Some(1024),
+            fd_max: Some(64),
+        };
         let r = resolve_caps(&m, &o);
         assert_eq!(r.cpu_max_pct, Some(40));
         assert_eq!(r.memory_max_mb, Some(1024));
@@ -1346,8 +1481,16 @@ mod tests {
 
     #[test]
     fn resolve_caps_none_falls_through() {
-        let m = ResourceCaps { cpu_max_pct: None, memory_max_mb: Some(256), fd_max: None };
-        let o = ResourceCaps { cpu_max_pct: Some(50), memory_max_mb: None, fd_max: Some(32) };
+        let m = ResourceCaps {
+            cpu_max_pct: None,
+            memory_max_mb: Some(256),
+            fd_max: None,
+        };
+        let o = ResourceCaps {
+            cpu_max_pct: Some(50),
+            memory_max_mb: None,
+            fd_max: Some(32),
+        };
         let r = resolve_caps(&m, &o);
         assert_eq!(r.cpu_max_pct, Some(50));
         assert_eq!(r.memory_max_mb, Some(256));
@@ -1412,10 +1555,12 @@ description = "MAOS reference Spirit"
 
     #[test]
     fn class_section_rejects_zero_schema_version() {
-        let s = class_toml_full()
-            .replace("manifest_schema_version = 1", "manifest_schema_version = 0");
+        let s =
+            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 0");
         let err = ClassSection::from_toml_str(&s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.manifest_schema_version")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.manifest_schema_version"))
+        );
     }
 
     #[test]
@@ -1453,7 +1598,9 @@ description = "MAOS reference Spirit"
     fn capabilities_required_rejects_empty_complete() {
         let s = r#"provider.complete = []"#;
         let err = CapabilitiesRequired::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("capabilities.required.provider.complete")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("capabilities.required.provider.complete"))
+        );
     }
 
     #[test]
@@ -1461,7 +1608,9 @@ description = "MAOS reference Spirit"
         let long = "a".repeat(200);
         let s = format!(r#"provider.complete = ["{long}"]"#);
         let err = CapabilitiesRequired::from_toml_str(&s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("capabilities.required.provider.complete")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("capabilities.required.provider.complete"))
+        );
     }
 
     #[test]
@@ -1521,7 +1670,9 @@ allowed_max = "autonomous""#;
     fn output_shape_rejects_empty() {
         let s = r#"required_fields = []"#;
         let err = OutputShape::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("output_shape.required_fields")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("output_shape.required_fields"))
+        );
     }
 
     #[test]
@@ -1534,7 +1685,9 @@ allowed_max = "autonomous""#;
             .join(",");
         let s = format!(r#"required_fields = [{joined}]"#);
         let err = OutputShape::from_toml_str(&s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("validation failed for")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("validation failed for"))
+        );
     }
 
     #[test]
@@ -1593,7 +1746,9 @@ allowed_max = "autonomous""#;
 
     #[test]
     fn predicate_misses_first_field() {
-        let shape = OutputShape { required_fields: vec!["a".into(), "b".into()] };
+        let shape = OutputShape {
+            required_fields: vec!["a".into(), "b".into()],
+        };
         let pred = OutputShapePredicate::from(&shape);
         let value = json!({"b": 1});
         let err = pred.check(&value).unwrap_err();
@@ -1602,7 +1757,9 @@ allowed_max = "autonomous""#;
 
     #[test]
     fn predicate_misses_second_field() {
-        let shape = OutputShape { required_fields: vec!["a".into(), "b".into()] };
+        let shape = OutputShape {
+            required_fields: vec!["a".into(), "b".into()],
+        };
         let pred = OutputShapePredicate::from(&shape);
         let value = json!({"a": 1});
         let err = pred.check(&value).unwrap_err();
@@ -1611,7 +1768,9 @@ allowed_max = "autonomous""#;
 
     #[test]
     fn predicate_rejects_null_field() {
-        let shape = OutputShape { required_fields: vec!["a".into()] };
+        let shape = OutputShape {
+            required_fields: vec!["a".into()],
+        };
         let pred = OutputShapePredicate::from(&shape);
         let value = json!({"a": null});
         let err = pred.check(&value).unwrap_err();
@@ -1621,7 +1780,9 @@ allowed_max = "autonomous""#;
     #[test]
     fn predicate_accepts_empty_object_for_empty_required_fields() {
         // Empty predicate trivially satisfied.
-        let shape = OutputShape { required_fields: vec![] };
+        let shape = OutputShape {
+            required_fields: vec![],
+        };
         let pred = OutputShapePredicate::from(&shape);
         assert!(pred.check(&json!({})).is_ok());
     }
@@ -1640,21 +1801,27 @@ allowed_max = "autonomous""#;
     fn budget_rejects_zero_context_window_size() {
         let s = "context_window_size = 0\ntime_cap_seconds = 30";
         let err = Budget::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("budget.context_window_size")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("budget.context_window_size"))
+        );
     }
 
     #[test]
     fn budget_rejects_zero_time_cap_seconds() {
         let s = "context_window_size = 4096\ntime_cap_seconds = 0";
         let err = Budget::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("budget.time_cap_seconds")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("budget.time_cap_seconds"))
+        );
     }
 
     #[test]
     fn budget_rejects_excessive_time_cap() {
         let s = "context_window_size = 4096\ntime_cap_seconds = 86401";
         let err = Budget::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("budget.time_cap_seconds")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("budget.time_cap_seconds"))
+        );
     }
 
     // ---- EpistemicPolicySection (Story 3.2, AC1) ----
@@ -1684,7 +1851,9 @@ tag = "x"
 action = "halt"
 on_confidence_below = 1.5"#;
         let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("epistemic_policy.on_confidence_below")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("epistemic_policy.on_confidence_below"))
+        );
     }
 
     #[test]
@@ -1694,7 +1863,9 @@ tag = "x"
 action = "halt"
 on_confidence_below = -0.1"#;
         let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("epistemic_policy.on_confidence_below")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("epistemic_policy.on_confidence_below"))
+        );
     }
 
     #[test]
@@ -1715,7 +1886,9 @@ action = "flag""#;
 tag = ""
 action = "halt""#;
         let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("tag must be non-empty")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("tag must be non-empty"))
+        );
     }
 
     #[test]
@@ -1771,10 +1944,9 @@ on_confidence_below = 1.0"#;
 
     #[test]
     fn epistemic_policy_malformed_fixture_default_action_is_rejected() {
-        let s = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("tests/fixtures/manifest/epistemic_policy/malformed-rejected/default_action.toml"),
-        )
+        let s = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/fixtures/manifest/epistemic_policy/malformed-rejected/default_action.toml",
+        ))
         .unwrap();
         let err = EpistemicPolicySection::from_toml_str(&s).unwrap_err();
         assert!(
@@ -1857,7 +2029,9 @@ tag = "x"
 action = "halt"
 on_value_within = { lower = 0.7, upper = 0.3 }"#;
         let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("lower") && msg.contains("upper")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("lower") && msg.contains("upper"))
+        );
     }
 
     #[test]
@@ -1887,7 +2061,9 @@ tag = "x"
 action = "halt"
 on_value_outside = { lower = 0.7, upper = 0.3 }"#;
         let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("lower") && msg.contains("upper")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("lower") && msg.contains("upper"))
+        );
     }
 
     #[test]
@@ -1898,7 +2074,9 @@ action = "halt"
 on_value_above = { threshold = 0.5 }
 on_value_below = { threshold = 0.3 }"#;
         let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("multiple predicate forms")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("multiple predicate forms"))
+        );
     }
 
     #[test]
@@ -1909,7 +2087,9 @@ action = "halt"
 on_confidence_below = 0.5
 on_value_above = { threshold = 0.8 }"#;
         let err = EpistemicPolicySection::from_toml_str(s).unwrap_err();
-        assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("both on_confidence_below and on_value_*")));
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("both on_confidence_below and on_value_*"))
+        );
     }
 
     #[test]
@@ -2039,8 +2219,7 @@ homepage = "ftp://example.org""#;
 
     #[test]
     fn scheduling_malformed_idle_window_too_high() {
-        let err =
-            SchedulingSection::from_toml_str("idle_window_ms = 4000000").unwrap_err();
+        let err = SchedulingSection::from_toml_str("idle_window_ms = 4000000").unwrap_err();
         assert!(
             matches!(&err, ManifestError::Toml(ref msg) if msg.contains("scheduling.idle_window_ms")),
             "got: {err:?}"
@@ -2077,10 +2256,8 @@ homepage = "ftp://example.org""#;
 
     #[test]
     fn lifecycle_malformed_unknown_hook_rejected() {
-        let err = LifecycleSection::from_toml_str(
-            r#"enabled_hooks = ["on_load", "on_missing"]"#,
-        )
-        .unwrap_err();
+        let err = LifecycleSection::from_toml_str(r#"enabled_hooks = ["on_load", "on_missing"]"#)
+            .unwrap_err();
         assert!(
             matches!(&err, ManifestError::Toml(ref msg) if msg.contains("on_missing")),
             "got: {err:?}"
@@ -2089,10 +2266,8 @@ homepage = "ftp://example.org""#;
 
     #[test]
     fn lifecycle_malformed_duplicate_rejected() {
-        let err = LifecycleSection::from_toml_str(
-            r#"enabled_hooks = ["on_load", "on_load"]"#,
-        )
-        .unwrap_err();
+        let err = LifecycleSection::from_toml_str(r#"enabled_hooks = ["on_load", "on_load"]"#)
+            .unwrap_err();
         assert!(
             matches!(&err, ManifestError::Toml(ref msg) if msg.contains("duplicate")),
             "got: {err:?}"
@@ -2170,9 +2345,13 @@ struct RawHaltProtocolSection {
 
 impl HotSwapManifestSection {
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
-        let raw: RawHotSwapSection = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        let raw: RawHotSwapSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         if raw.state_schema_version == 0 {
-            return Err(ManifestError::Toml(validation_msg("hot_swap.state_schema_version", "must be > 0")));
+            return Err(ManifestError::Toml(validation_msg(
+                "hot_swap.state_schema_version",
+                "must be > 0",
+            )));
         }
         Ok(Self {
             state_schema_uri: raw.state_schema_uri,
@@ -2183,23 +2362,35 @@ impl HotSwapManifestSection {
 
 impl MigratesFromSection {
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
-        let raw: RawMigratesFromSection = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        let raw: RawMigratesFromSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         for v in &raw.versions {
             if v.is_empty() {
-                return Err(ManifestError::Toml(validation_msg("migrates_from.versions", "must be non-empty")));
+                return Err(ManifestError::Toml(validation_msg(
+                    "migrates_from.versions",
+                    "must be non-empty",
+                )));
             }
         }
-        Ok(Self { versions: raw.versions })
+        Ok(Self {
+            versions: raw.versions,
+        })
     }
 }
 
 impl HaltProtocolCompatibilitySection {
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
-        let raw: RawHaltProtocolSection = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        let raw: RawHaltProtocolSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         if raw.version == 0 {
-            return Err(ManifestError::Toml(validation_msg("halt_protocol_compatibility.version", "must be > 0")));
+            return Err(ManifestError::Toml(validation_msg(
+                "halt_protocol_compatibility.version",
+                "must be > 0",
+            )));
         }
-        Ok(Self { version: raw.version })
+        Ok(Self {
+            version: raw.version,
+        })
     }
 }
 
@@ -2259,21 +2450,30 @@ mod supervision_manifest_tests {
     #[test]
     fn on_crash_default_nack() {
         let section = OnCrashSection::from_toml_str("").unwrap();
-        assert_eq!(section.action, maos_domain::supervision::OnCrashAction::Nack);
+        assert_eq!(
+            section.action,
+            maos_domain::supervision::OnCrashAction::Nack
+        );
     }
 
     #[test]
     fn on_crash_explicit_reassign() {
         let toml = r#"action = "reassign-to-replica""#;
         let section = OnCrashSection::from_toml_str(toml).unwrap();
-        assert_eq!(section.action, maos_domain::supervision::OnCrashAction::ReassignToReplica);
+        assert_eq!(
+            section.action,
+            maos_domain::supervision::OnCrashAction::ReassignToReplica
+        );
     }
 
     #[test]
     fn on_crash_explicit_escalate() {
         let toml = r#"action = "escalate-to-operator""#;
         let section = OnCrashSection::from_toml_str(toml).unwrap();
-        assert_eq!(section.action, maos_domain::supervision::OnCrashAction::EscalateToOperator);
+        assert_eq!(
+            section.action,
+            maos_domain::supervision::OnCrashAction::EscalateToOperator
+        );
     }
 
     #[test]
@@ -2323,5 +2523,52 @@ silent_failure_threshold_ms = 15000"#;
         let toml = r#"silent_failure_threshold_ms = 1000"#;
         let result = SupervisionSection::from_toml_str(toml);
         assert!(result.is_err());
+    }
+}
+
+#[cfg(test)]
+mod on_revocation_tests {
+    use super::*;
+
+    #[test]
+    fn on_revocation_default_terminate_immediately() {
+        let section = OnRevocationSection::from_toml_str("").unwrap();
+        assert_eq!(
+            section.action,
+            maos_domain::revocation::RevocationAction::TerminateImmediately
+        );
+    }
+
+    #[test]
+    fn on_revocation_drain_then_terminate() {
+        let toml = r#"action = "drain-then-terminate""#;
+        let section = OnRevocationSection::from_toml_str(toml).unwrap();
+        assert_eq!(
+            section.action,
+            maos_domain::revocation::RevocationAction::DrainThenTerminate
+        );
+    }
+
+    #[test]
+    fn on_revocation_quarantine() {
+        let toml = r#"action = "quarantine""#;
+        let section = OnRevocationSection::from_toml_str(toml).unwrap();
+        assert_eq!(
+            section.action,
+            maos_domain::revocation::RevocationAction::Quarantine
+        );
+    }
+
+    #[test]
+    fn on_revocation_rejects_unknown_policy() {
+        let toml = r#"action = "unknown-policy""#;
+        let result = OnRevocationSection::from_toml_str(toml);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("unknown value 'unknown-policy'"),
+            "err={}",
+            err
+        );
     }
 }

@@ -5,8 +5,8 @@ use std::sync::Arc;
 use maos_domain::log_recall::{LogRecallError, LogRecallFilter};
 use maos_domain::ports::LogRecallPort;
 
-use maos_kernel_core::iac::log_recall::LogRecallAdapter;
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_kernel_core::iac::log_recall::LogRecallAdapter;
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 
 fn seed_frames(tl: &Arc<TransparencyLogAdapter>, pid: u32, count: usize) {

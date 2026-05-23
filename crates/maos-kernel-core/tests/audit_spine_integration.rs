@@ -9,13 +9,11 @@
 //! - Crash-recovery rehydration
 //! - Concurrent writes
 
-use maos_kernel_core::iac::{
-    TransparencyLogAdapter, FrameKind, FrameFilter,
-};
-use maos_kernel_core::journal::JournalAdapter;
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i4::ApprovalDecision;
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
+use maos_kernel_core::iac::{FrameFilter, FrameKind, TransparencyLogAdapter};
+use maos_kernel_core::journal::JournalAdapter;
 
 /// Helper: create a tempdir + journal for integration tests.
 fn journal_temp() -> (JournalAdapter, tempfile::TempDir) {
@@ -35,12 +33,26 @@ fn audit_spine_end_to_end() {
     // Insert 100 frame events
     for i in 0..100 {
         let _token = log.insert_frame_event(
-            if i % 3 == 0 { FrameKind::TaskAssign } else if i % 3 == 1 { FrameKind::CapabilityInvocation } else { FrameKind::TelemetryEvent },
+            if i % 3 == 0 {
+                FrameKind::TaskAssign
+            } else if i % 3 == 1 {
+                FrameKind::CapabilityInvocation
+            } else {
+                FrameKind::TelemetryEvent
+            },
             (i % 10) as u32,
-            if i % 5 == 0 { Some(&[0xAA_u8; 32]) } else { None },
+            if i % 5 == 0 {
+                Some(&[0xAA_u8; 32])
+            } else {
+                None
+            },
             if i % 2 == 0 { "delegate" } else { "broadcast" },
             format!("payload-{}", i).as_bytes(),
-            if i % 2 == 0 { FrameOrigin::HumanAuthored } else { FrameOrigin::SpiritAuto },
+            if i % 2 == 0 {
+                FrameOrigin::HumanAuthored
+            } else {
+                FrameOrigin::SpiritAuto
+            },
         );
     }
 
@@ -52,14 +64,23 @@ fn audit_spine_end_to_end() {
             capability: "calendar.read".into(),
             intent: format!("morning-digest-{}", i),
             decision: i % 2 == 0,
-            reasoning: if i % 3 == 0 { Some("routine approval".into()) } else { None },
-        }).unwrap();
+            reasoning: if i % 3 == 0 {
+                Some("routine approval".into())
+            } else {
+                None
+            },
+        })
+        .unwrap();
     }
 
     // Insert 50 lifecycle transitions
     let events = [
-        LifecycleEvent::Load, LifecycleEvent::Start, LifecycleEvent::Pause,
-        LifecycleEvent::Swap, LifecycleEvent::Unload, LifecycleEvent::Halt,
+        LifecycleEvent::Load,
+        LifecycleEvent::Start,
+        LifecycleEvent::Pause,
+        LifecycleEvent::Swap,
+        LifecycleEvent::Unload,
+        LifecycleEvent::Halt,
         LifecycleEvent::Migrate,
     ];
     for i in 0..50 {
@@ -94,10 +115,12 @@ fn audit_spine_end_to_end() {
     }
 
     // Verify filter works
-    let filtered = log.query_frames(FrameFilter {
-        spirit_pid: Some(5),
-        ..Default::default()
-    }).unwrap();
+    let filtered = log
+        .query_frames(FrameFilter {
+            spirit_pid: Some(5),
+            ..Default::default()
+        })
+        .unwrap();
     assert!(filtered.iter().all(|f| f.spirit_pid == 5));
     assert_eq!(filtered.len(), 10, "spirit_pid=5 should have 10 entries");
 }
@@ -180,5 +203,9 @@ fn concurrent_transparency_log_writes() {
         h.join().expect("thread panicked");
     }
     let entries = log.query_frames(FrameFilter::default()).unwrap();
-    assert_eq!(entries.len(), 100, "expected 100 rows from 4 threads × 25 inserts");
+    assert_eq!(
+        entries.len(),
+        100,
+        "expected 100 rows from 4 threads × 25 inserts"
+    );
 }

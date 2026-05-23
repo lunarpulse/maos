@@ -42,7 +42,10 @@ pub enum FrameOrigin {
 impl FrameOrigin {
     /// Story 5.3 — returns true for Spirit-originated frames (auto or drafted).
     pub fn is_spirit_origin(&self) -> bool {
-        matches!(self, FrameOrigin::SpiritAuto | FrameOrigin::SpiritDraftedHumanApproved)
+        matches!(
+            self,
+            FrameOrigin::SpiritAuto | FrameOrigin::SpiritDraftedHumanApproved
+        )
     }
 }
 

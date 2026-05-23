@@ -31,7 +31,9 @@ use maos_domain::invariants::i7::{ScalarTapEvent, TelemetryTopic};
 /// Broadcast is lossy on slow consumers (Tokio broadcast semantics).
 /// Backlog overflow is the consumer's problem — the kernel does NOT
 /// block the emission path.
-#[maos_attrs::i9_exempt(reason = "telemetry stream — per-process broadcast channel state for ADR-035 scalar.tap; parallel to IacRtMetrics, no persistence across restarts")]
+#[maos_attrs::i9_exempt(
+    reason = "telemetry stream — per-process broadcast channel state for ADR-035 scalar.tap; parallel to IacRtMetrics, no persistence across restarts"
+)]
 #[derive(Debug)]
 pub struct TelemetryStreamAdapter {
     topics: Arc<DashMap<TelemetryTopic, tokio::sync::broadcast::Sender<ScalarTapEvent>>>,
@@ -76,11 +78,13 @@ impl TelemetryStreamPort for TelemetryStreamAdapter {
     fn publish_event(&self, topic: &TelemetryTopic, event: ScalarTapEvent) {
         if let Some(sender) = self.topics.get(topic) {
             if sender.send(event).is_err() {
-                self.drop_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.drop_count
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
         } else {
             // No topic channel exists — count as dropped
-            self.drop_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.drop_count
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
@@ -97,7 +101,10 @@ impl TelemetryStreamPort for TelemetryStreamAdapter {
         }
 
         // Track per-spirit subscription
-        match self.subscribers.entry((spirit_id.to_string(), topic.clone())) {
+        match self
+            .subscribers
+            .entry((spirit_id.to_string(), topic.clone()))
+        {
             Entry::Occupied(_) => false,
             Entry::Vacant(entry) => {
                 entry.insert(());
@@ -110,7 +117,10 @@ impl TelemetryStreamPort for TelemetryStreamAdapter {
 impl TelemetryStreamAdapter {
     /// Get a receiver for a topic. Returns `None` if the topic hasn't
     /// been subscribed to yet.
-    pub fn subscribe(&self, topic: &TelemetryTopic) -> Option<tokio::sync::broadcast::Receiver<ScalarTapEvent>> {
+    pub fn subscribe(
+        &self,
+        topic: &TelemetryTopic,
+    ) -> Option<tokio::sync::broadcast::Receiver<ScalarTapEvent>> {
         self.topics.get(topic).map(|sender| sender.subscribe())
     }
 }
@@ -137,7 +147,10 @@ mod tests {
         let adapter = TelemetryStreamAdapter::new(2048);
         let topic = TelemetryTopic::new("scalar.tap.uncertainty");
         adapter.subscribe_topic("spirit-1", &topic);
-        assert!(!adapter.subscribe_topic("spirit-1", &topic), "re-subscribe by same spirit should return false");
+        assert!(
+            !adapter.subscribe_topic("spirit-1", &topic),
+            "re-subscribe by same spirit should return false"
+        );
     }
 
     #[test]
@@ -145,7 +158,10 @@ mod tests {
         let adapter = TelemetryStreamAdapter::new(2048);
         let topic = TelemetryTopic::new("scalar.tap.uncertainty");
         assert!(adapter.subscribe_topic("spirit-1", &topic));
-        assert!(adapter.subscribe_topic("spirit-2", &topic), "different spirit subscribing to same topic should return true");
+        assert!(
+            adapter.subscribe_topic("spirit-2", &topic),
+            "different spirit subscribing to same topic should return true"
+        );
     }
 
     #[test]
@@ -153,13 +169,21 @@ mod tests {
         let adapter = TelemetryStreamAdapter::new(2048);
         // No subscribers — send should be silently dropped
         let topic = TelemetryTopic::new("scalar.tap.uncertainty");
-        adapter.publish_event(&topic, ScalarTapEvent {
-            spirit_id: "s1".into(),
-            tag: "uncertainty".into(),
-            value: 0.75,
-            timestamp: 1,
-        });
-        assert_eq!(adapter.drop_count.load(std::sync::atomic::Ordering::Relaxed), 1);
+        adapter.publish_event(
+            &topic,
+            ScalarTapEvent {
+                spirit_id: "s1".into(),
+                tag: "uncertainty".into(),
+                value: 0.75,
+                timestamp: 1,
+            },
+        );
+        assert_eq!(
+            adapter
+                .drop_count
+                .load(std::sync::atomic::Ordering::Relaxed),
+            1
+        );
     }
 
     #[test]
@@ -169,12 +193,15 @@ mod tests {
         adapter.subscribe_topic("spirit-1", &topic);
         let mut rx = adapter.subscribe(&topic).unwrap();
 
-        adapter.publish_event(&topic, ScalarTapEvent {
-            spirit_id: "s1".into(),
-            tag: "uncertainty".into(),
-            value: 0.75,
-            timestamp: 1,
-        });
+        adapter.publish_event(
+            &topic,
+            ScalarTapEvent {
+                spirit_id: "s1".into(),
+                tag: "uncertainty".into(),
+                value: 0.75,
+                timestamp: 1,
+            },
+        );
 
         let received = rx.try_recv().expect("subscriber should receive the event");
         assert_eq!(received.spirit_id, "s1");

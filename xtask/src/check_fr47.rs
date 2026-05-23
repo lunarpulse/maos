@@ -84,7 +84,9 @@ pub fn check_fr47(
     let allowlist: Allowlist = if allowlist_path.exists() {
         load_toml(allowlist_path)?
     } else {
-        Allowlist { allowed: Vec::new() }
+        Allowlist {
+            allowed: Vec::new(),
+        }
     };
 
     let denyset: HashSet<String> = denylist.vendor_sdk_denylist.into_iter().collect();
@@ -126,9 +128,9 @@ pub fn check_fr47(
         }
         let content = fs::read_to_string(&manifest_path)
             .map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
-        let doc: toml::Value = content.parse().map_err(|e| {
-            format!("toml parse error in {}: {e}", manifest_path.display())
-        })?;
+        let doc: toml::Value = content
+            .parse()
+            .map_err(|e| format!("toml parse error in {}: {e}", manifest_path.display()))?;
         let crate_name = doc
             .get("package")
             .and_then(|p| p.get("name"))
@@ -164,8 +166,8 @@ pub fn check_fr47(
 }
 
 fn load_toml<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
-    let src = fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let src =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     toml::from_str(&src).map_err(|e| format!("toml parse error in {}: {e}", path.display()))
 }
 

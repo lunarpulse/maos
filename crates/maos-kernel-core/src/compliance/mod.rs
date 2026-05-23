@@ -10,9 +10,7 @@
 //! The validator always returns a `Result` — never panics, never silently
 //! passes. This is the "100% schema validation and 100% emit-rate" contract.
 
-use maos_spirit_abi::compliance::{
-    Claim, ComplianceClaimEnvelope, PrincipleRef, Verdict,
-};
+use maos_spirit_abi::compliance::{Claim, ComplianceClaimEnvelope, PrincipleRef, Verdict};
 
 /// A claim that has passed structural validation.
 #[derive(Debug, Clone, PartialEq)]
@@ -73,15 +71,13 @@ pub fn validate_envelope(
     }
 
     // 3. CBOR decode
-    let claim: Claim = ciborium::de::from_reader(&env.claim_bytes[..]).map_err(|e| {
-        ComplianceValidationError::MalformedCbor(format!("{e}"))
-    })?;
+    let claim: Claim = ciborium::de::from_reader(&env.claim_bytes[..])
+        .map_err(|e| ComplianceValidationError::MalformedCbor(format!("{e}")))?;
 
     // 4. Canonical round-trip
     let mut re_encoded = Vec::new();
-    ciborium::ser::into_writer(&claim, &mut re_encoded).map_err(|e| {
-        ComplianceValidationError::MalformedCbor(format!("re-encode failed: {e}"))
-    })?;
+    ciborium::ser::into_writer(&claim, &mut re_encoded)
+        .map_err(|e| ComplianceValidationError::MalformedCbor(format!("re-encode failed: {e}")))?;
     if re_encoded != env.claim_bytes {
         return Err(ComplianceValidationError::NonCanonicalEncoding);
     }
@@ -128,7 +124,7 @@ mod tests {
     use super::*;
     use maos_spirit_abi::compliance::{
         Claim, ComplianceClaimEnvelope, EvidenceKind, PrincipleRef, ProviderEndpointPin,
-        SigningAlg, TrustTier, SandboxTier, Uuid, Verdict,
+        SandboxTier, SigningAlg, TrustTier, Uuid, Verdict,
     };
 
     fn minimal_claim() -> Claim {
@@ -192,7 +188,10 @@ mod tests {
         // Append a trailing byte to make re-encode differ
         env.claim_bytes.push(0x00);
         let err = validate_envelope(&env).unwrap_err();
-        assert!(matches!(err, ComplianceValidationError::NonCanonicalEncoding));
+        assert!(matches!(
+            err,
+            ComplianceValidationError::NonCanonicalEncoding
+        ));
     }
 
     #[test]
@@ -208,7 +207,9 @@ mod tests {
             signing_alg: SigningAlg::Ed25519,
         };
         let err = validate_envelope(&env).unwrap_err();
-        assert!(matches!(err, ComplianceValidationError::UnknownEnumVariant { field, value } if field.starts_with("principle_refs") && value == "UnknownPrinciple"));
+        assert!(
+            matches!(err, ComplianceValidationError::UnknownEnumVariant { field, value } if field.starts_with("principle_refs") && value == "UnknownPrinciple")
+        );
     }
 
     #[test]
@@ -224,7 +225,9 @@ mod tests {
             signing_alg: SigningAlg::Ed25519,
         };
         let err = validate_envelope(&env).unwrap_err();
-        assert!(matches!(err, ComplianceValidationError::UnknownEnumVariant { field, value } if field == "verdict" && value == "UnknownVerdict"));
+        assert!(
+            matches!(err, ComplianceValidationError::UnknownEnumVariant { field, value } if field == "verdict" && value == "UnknownVerdict")
+        );
     }
 
     #[test]
@@ -257,7 +260,13 @@ mod tests {
             signing_alg: SigningAlg::Ed25519,
         };
         let err = validate_envelope(&env).unwrap_err();
-        assert!(matches!(err, ComplianceValidationError::ExpiryBeforeIssue { issue: 1000, expiry: 500 }));
+        assert!(matches!(
+            err,
+            ComplianceValidationError::ExpiryBeforeIssue {
+                issue: 1000,
+                expiry: 500
+            }
+        ));
     }
 
     #[test]
@@ -266,44 +275,70 @@ mod tests {
         // class maps to its own distinct error variant.
         let errors = vec![
             validate_envelope(&{
-                let mut e = minimal_envelope(); e.claim_bytes.clear(); e
+                let mut e = minimal_envelope();
+                e.claim_bytes.clear();
+                e
             }),
             validate_envelope(&{
-                let mut e = minimal_envelope(); e.signature = [0u8; 64]; e
+                let mut e = minimal_envelope();
+                e.signature = [0u8; 64];
+                e
             }),
             validate_envelope(&{
-                let mut e = minimal_envelope(); e.claim_bytes = vec![0xFF]; e
+                let mut e = minimal_envelope();
+                e.claim_bytes = vec![0xFF];
+                e
             }),
             validate_envelope(&{
-                let mut e = minimal_envelope(); e.claim_bytes.push(0x00); e
+                let mut e = minimal_envelope();
+                e.claim_bytes.push(0x00);
+                e
             }),
             validate_envelope(&{
-                let mut c = minimal_claim(); c.principle_refs = vec![PrincipleRef::UnknownPrinciple];
-                let mut b = Vec::new(); ciborium::ser::into_writer(&c, &mut b).unwrap();
-                let mut e = minimal_envelope(); e.claim_bytes = b; e
+                let mut c = minimal_claim();
+                c.principle_refs = vec![PrincipleRef::UnknownPrinciple];
+                let mut b = Vec::new();
+                ciborium::ser::into_writer(&c, &mut b).unwrap();
+                let mut e = minimal_envelope();
+                e.claim_bytes = b;
+                e
             }),
             validate_envelope(&{
-                let mut c = minimal_claim(); c.verdict = Verdict::UnknownVerdict;
-                let mut b = Vec::new(); ciborium::ser::into_writer(&c, &mut b).unwrap();
-                let mut e = minimal_envelope(); e.claim_bytes = b; e
+                let mut c = minimal_claim();
+                c.verdict = Verdict::UnknownVerdict;
+                let mut b = Vec::new();
+                ciborium::ser::into_writer(&c, &mut b).unwrap();
+                let mut e = minimal_envelope();
+                e.claim_bytes = b;
+                e
             }),
             validate_envelope(&{
-                let mut c = minimal_claim(); c.issued_at_unix_ms = 0;
-                let mut b = Vec::new(); ciborium::ser::into_writer(&c, &mut b).unwrap();
-                let mut e = minimal_envelope(); e.claim_bytes = b; e
+                let mut c = minimal_claim();
+                c.issued_at_unix_ms = 0;
+                let mut b = Vec::new();
+                ciborium::ser::into_writer(&c, &mut b).unwrap();
+                let mut e = minimal_envelope();
+                e.claim_bytes = b;
+                e
             }),
             validate_envelope(&{
-                let mut c = minimal_claim(); c.issued_at_unix_ms = 1000; c.expires_at_unix_ms = Some(500);
-                let mut b = Vec::new(); ciborium::ser::into_writer(&c, &mut b).unwrap();
-                let mut e = minimal_envelope(); e.claim_bytes = b; e
+                let mut c = minimal_claim();
+                c.issued_at_unix_ms = 1000;
+                c.expires_at_unix_ms = Some(500);
+                let mut b = Vec::new();
+                ciborium::ser::into_writer(&c, &mut b).unwrap();
+                let mut e = minimal_envelope();
+                e.claim_bytes = b;
+                e
             }),
         ];
-        let variant_names: Vec<String> = errors.iter().map(|r| {
-            match r {
+        let variant_names: Vec<String> = errors
+            .iter()
+            .map(|r| match r {
                 Ok(_) => "Ok".into(),
                 Err(e) => format!("{e:?}").split('(').next().unwrap().to_string(),
-            }
-        }).collect();
+            })
+            .collect();
         let unique: std::collections::HashSet<_> = variant_names.iter().collect();
         assert_eq!(
             unique.len(),

@@ -109,15 +109,17 @@ pub(crate) fn run_silent(
     fs_walk::collect_rs_files(kernel_path, &mut rs_files);
 
     for file in &rs_files {
-        let src = fs::read_to_string(file)
-            .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
-        let ast = syn::parse_file(&src)
-            .map_err(|e| format!("parse error in {}: {e}", file.display()))?;
+        let src =
+            fs::read_to_string(file).map_err(|e| format!("cannot read {}: {e}", file.display()))?;
+        let ast =
+            syn::parse_file(&src).map_err(|e| format!("parse error in {}: {e}", file.display()))?;
 
         let file_str = file.display().to_string();
         let in_whitelist = whitelist.paths.iter().any(|p| {
             // Tolerate non-existent whitelist entries by checking path-prefix match.
-            file_str == p.as_str() || file_str.starts_with(&format!("{p}/")) || (Path::new(p).is_dir() && file_str.starts_with(p))
+            file_str == p.as_str()
+                || file_str.starts_with(&format!("{p}/"))
+                || (Path::new(p).is_dir() && file_str.starts_with(p))
         });
 
         let mut visitor = EmptyKernelVisitor {
@@ -136,10 +138,17 @@ pub(crate) fn run_silent(
         let exemptions_src = fs::read_to_string(exemptions_path)
             .map_err(|e| format!("cannot read {}: {e}", exemptions_path.display()))?;
         for site in &exemption_sites {
-            let key = format!("{}::{}::{}::", site.crate_name, site.module_path, site.struct_name);
+            let key = format!(
+                "{}::{}::{}::",
+                site.crate_name, site.module_path, site.struct_name
+            );
             let trimmed_key = key.trim_end_matches(':').to_string();
-            if !exemptions_src.lines().any(|line| line.contains(&trimmed_key))
-                && !exemptions_src.lines().any(|line| line.contains(&site.struct_name))
+            if !exemptions_src
+                .lines()
+                .any(|line| line.contains(&trimmed_key))
+                && !exemptions_src
+                    .lines()
+                    .any(|line| line.contains(&site.struct_name))
             {
                 exemption_violations.push(ExemptionViolation {
                     file: site.file.clone(),
@@ -167,8 +176,8 @@ pub(crate) fn run_silent(
 }
 
 fn load_toml<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
-    let src = fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let src =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     toml::from_str(&src).map_err(|e| format!("toml parse error in {}: {e}", path.display()))
 }
 
@@ -236,7 +245,10 @@ fn has_i9_exempt(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|attr| {
         let segments = &attr.path().segments;
         let is_i9_exempt = attr.path().is_ident("i9_exempt")
-            || segments.last().map(|s| s.ident == "i9_exempt").unwrap_or(false);
+            || segments
+                .last()
+                .map(|s| s.ident == "i9_exempt")
+                .unwrap_or(false);
         if is_i9_exempt {
             if let Ok(meta) = attr.meta.require_list() {
                 let tokens = meta.tokens.to_string();
@@ -310,10 +322,17 @@ fn extract_vec_inner(compact: &str) -> Option<&str> {
 fn is_primitive_type(type_str: &str) -> bool {
     matches!(
         type_str,
-        "u8" | "u16" | "u32" | "u64"
-            | "i8" | "i16" | "i32" | "i64"
-            | "usize" | "isize"
-            | "f32" | "f64"
+        "u8" | "u16"
+            | "u32"
+            | "u64"
+            | "i8"
+            | "i16"
+            | "i32"
+            | "i64"
+            | "usize"
+            | "isize"
+            | "f32"
+            | "f64"
             | "bool"
     )
 }

@@ -32,10 +32,7 @@ use maos_spirit_abi::identity::SpiritId;
 /// composition root passes a closure returning
 /// `WorkingMemoryDigestRefs::default()`; Story 4.3 replaces this with
 /// a Memory Manager query.
-pub fn decorate_decision_frame<F>(
-    mut frame: IacFrame,
-    digest_provider: F,
-) -> IacFrame
+pub fn decorate_decision_frame<F>(mut frame: IacFrame, digest_provider: F) -> IacFrame
 where
     F: FnOnce(&SpiritId) -> WorkingMemoryDigestRefs,
 {
@@ -130,7 +127,7 @@ mod tests {
         assert!(received_id.is_some());
         assert_eq!(received_id.unwrap().as_str(), "test-spirit");
         match &decorated.payload {
-            FramePayload::DecisionDispatch(_) => {},
+            FramePayload::DecisionDispatch(_) => {}
             _ => panic!("expected DecisionDispatch"),
         }
     }

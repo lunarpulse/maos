@@ -78,7 +78,10 @@ pub fn validate_item(item: &RedTeamItem, seeds: &[RedTeamSeed]) -> ValidationOut
 
     if !VALID_CLASSES.contains(&item.class.as_str()) {
         return ValidationOutcome::Invalid {
-            reason: format!("unknown class '{}' — must be one of the 8 §8.1 classes", item.class),
+            reason: format!(
+                "unknown class '{}' — must be one of the 8 §8.1 classes",
+                item.class
+            ),
         };
     }
 

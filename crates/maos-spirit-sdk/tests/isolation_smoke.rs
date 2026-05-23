@@ -6,12 +6,11 @@
 //! well-formed.
 
 use maos_spirit_sdk::spirit_test::{
-    CrossSpiritIsolationFixture, DefaultIsolationHook, IsolationAttackCase,
-    IsolationAttackCategory,
+    CrossSpiritIsolationFixture, DefaultIsolationHook, IsolationAttackCase, IsolationAttackCategory,
 };
 
 mod spirit_a {
-    use maos_spirit_sdk::{spirit, Spirit, Ctx, FramePayload};
+    use maos_spirit_sdk::{spirit, Ctx, FramePayload, Spirit};
 
     pub struct SpiritA;
     #[spirit]
@@ -21,7 +20,7 @@ mod spirit_a {
 }
 
 mod spirit_b {
-    use maos_spirit_sdk::{spirit, Spirit, Ctx};
+    use maos_spirit_sdk::{spirit, Ctx, Spirit};
 
     pub struct SpiritB;
     #[spirit]
@@ -57,8 +56,16 @@ fn isolation_framework_fires_4_hook_points_in_order() {
     assert_eq!(hook.records[3].hook_name, "after_spirit_b_observe");
     assert_eq!(outcome.case_id, "iso-smoke-001");
     assert!(outcome.isolation_maintained);
-    assert!(outcome.attempt_result.hooks_fired_during_attempt.iter().any(|h| h == "on_frame"));
-    assert!(outcome.observation_result.hooks_fired_during_observation.iter().any(|h| h == "on_idle"));
+    assert!(outcome
+        .attempt_result
+        .hooks_fired_during_attempt
+        .iter()
+        .any(|h| h == "on_frame"));
+    assert!(outcome
+        .observation_result
+        .hooks_fired_during_observation
+        .iter()
+        .any(|h| h == "on_idle"));
 }
 
 #[test]
@@ -73,5 +80,9 @@ fn all_8_categories_constructible() {
         IsolationAttackCategory::CapabilityTokenForgeryCrossSpirit,
         IsolationAttackCategory::SandboxEscapeLateral,
     ];
-    assert_eq!(_all.len(), 8, "architecture §8.1 + epic-4 line 17 enumerate exactly 8 categories");
+    assert_eq!(
+        _all.len(),
+        8,
+        "architecture §8.1 + epic-4 line 17 enumerate exactly 8 categories"
+    );
 }

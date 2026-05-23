@@ -9,8 +9,8 @@
 
 use std::path::Path;
 
-use maos_eval::isolation_corpus::{IsolationCorpus, IsolationAttackCategory};
 use maos_eval::isolation_corpus::serde_variant::to_snake_case;
+use maos_eval::isolation_corpus::{IsolationAttackCategory, IsolationCorpus};
 use maos_kernel_core::isolation::IsolationCorpusRunner;
 
 #[test]
@@ -30,20 +30,29 @@ fn nfr_sec_14_200_scenarios_zero_leaks() {
     assert_eq!(corpus.count_split("sec-14b"), 100);
 
     let runner = IsolationCorpusRunner::new(corpus);
-    let report = runner.run_all()
+    let report = runner
+        .run_all()
         .expect("NFR-Sec-14 floor: 200/200 isolation maintained — ANY leak is a P0 ship-block");
 
-    assert_eq!(report.scenarios_passed + report.scenarios_deferred, 200,
-        "all 200 scenarios must pass or be explicitly deferred");
-    assert_eq!(report.scenarios_with_breach, 0,
-        "P0 ship-block: any breach fails CI");
+    assert_eq!(
+        report.scenarios_passed + report.scenarios_deferred,
+        200,
+        "all 200 scenarios must pass or be explicitly deferred"
+    );
+    assert_eq!(
+        report.scenarios_with_breach, 0,
+        "P0 ship-block: any breach fails CI"
+    );
 
     // Category-level coverage assertion: aggregate ≥25 per category
     for category in IsolationAttackCategory::all() {
         let cat_str = to_snake_case(category);
         let count = report.per_category.get(cat_str).copied().unwrap_or(0);
-        assert!(count >= 25,
+        assert!(
+            count >= 25,
             "category {:?} below 25-scenario aggregate floor: got {}",
-            category, count);
+            category,
+            count
+        );
     }
 }

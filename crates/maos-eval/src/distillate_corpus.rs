@@ -76,18 +76,15 @@ impl DistillateCorpus {
 
         // Load IAA attestation
         let iaa_path = dir.join("iaa-attestation.json");
-        let iaa_bytes = std::fs::read_to_string(&iaa_path).map_err(|e| {
-            CorpusError::Parse {
-                path: iaa_path.display().to_string(),
-                source: serde_json::Error::io(e),
-            }
+        let iaa_bytes = std::fs::read_to_string(&iaa_path).map_err(|e| CorpusError::Parse {
+            path: iaa_path.display().to_string(),
+            source: serde_json::Error::io(e),
         })?;
-        let iaa_attestation: IaaAttestation = serde_json::from_str(&iaa_bytes).map_err(|e| {
-            CorpusError::Parse {
+        let iaa_attestation: IaaAttestation =
+            serde_json::from_str(&iaa_bytes).map_err(|e| CorpusError::Parse {
                 path: iaa_path.display().to_string(),
                 source: e,
-            }
-        })?;
+            })?;
 
         // Load scenarios
         let mut scenario_files: Vec<_> = std::fs::read_dir(dir)
@@ -106,24 +103,21 @@ impl DistillateCorpus {
         let mut scenarios = Vec::with_capacity(scenario_files.len());
         for entry in &scenario_files {
             let path = entry.path();
-            let file_name = path.file_name()
-                .and_then(|n| n.to_str())
-                .ok_or_else(|| CorpusError::Io(std::io::Error::new(
+            let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+                CorpusError::Io(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("non-UTF-8 filename in corpus directory: {path:?}")
-                )))?;
-            let content = std::fs::read_to_string(&path).map_err(|e| {
-                CorpusError::Parse {
-                    path: path.display().to_string(),
-                    source: serde_json::Error::io(e),
-                }
+                    format!("non-UTF-8 filename in corpus directory: {path:?}"),
+                ))
             })?;
-            let scenario: DistillateScenario = serde_json::from_str(&content).map_err(|e| {
-                CorpusError::Parse {
+            let content = std::fs::read_to_string(&path).map_err(|e| CorpusError::Parse {
+                path: path.display().to_string(),
+                source: serde_json::Error::io(e),
+            })?;
+            let scenario: DistillateScenario =
+                serde_json::from_str(&content).map_err(|e| CorpusError::Parse {
                     path: path.display().to_string(),
                     source: e,
-                }
-            })?;
+                })?;
             scenarios.push(scenario);
         }
 

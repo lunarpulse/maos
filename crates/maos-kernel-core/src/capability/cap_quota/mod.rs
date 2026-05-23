@@ -69,7 +69,10 @@ impl CapQuotaTracker {
         if budget == 0 {
             return Err(CapError::ContextExhausted { spirit_id });
         }
-        let entry = self.inner.entry(spirit_id).or_insert_with(|| AtomicU64::new(0));
+        let entry = self
+            .inner
+            .entry(spirit_id)
+            .or_insert_with(|| AtomicU64::new(0));
         let prev = entry.load(Ordering::Relaxed);
         let projected = prev + cost;
         let ratio = projected as f64 / budget as f64;
@@ -93,7 +96,10 @@ impl CapQuotaTracker {
     /// One-shot pressure event: returns true the FIRST time the Spirit
     /// crosses the pressure threshold this window.
     pub fn try_fire_pressure(&self, spirit_id: u32) -> bool {
-        let entry = self.pressure_fired.entry(spirit_id).or_insert_with(|| AtomicU64::new(0));
+        let entry = self
+            .pressure_fired
+            .entry(spirit_id)
+            .or_insert_with(|| AtomicU64::new(0));
         let prev = entry.fetch_or(0b01, Ordering::Relaxed);
         (prev & 0b01) == 0
     }
@@ -101,7 +107,10 @@ impl CapQuotaTracker {
     /// One-shot limit event: returns true the FIRST time the Spirit
     /// crosses the limit threshold this window.
     pub fn try_fire_limit(&self, spirit_id: u32) -> bool {
-        let entry = self.pressure_fired.entry(spirit_id).or_insert_with(|| AtomicU64::new(0));
+        let entry = self
+            .pressure_fired
+            .entry(spirit_id)
+            .or_insert_with(|| AtomicU64::new(0));
         let prev = entry.fetch_or(0b10, Ordering::Relaxed);
         (prev & 0b10) == 0
     }
@@ -157,7 +166,10 @@ mod tests {
     fn check_and_increment_exhausted() {
         let tracker = CapQuotaTracker::new();
         let err = tracker.check_and_increment(7, 101, 100);
-        assert!(matches!(err, Err(CapError::ContextExhausted { spirit_id: 7 })));
+        assert!(matches!(
+            err,
+            Err(CapError::ContextExhausted { spirit_id: 7 })
+        ));
     }
 
     #[test]

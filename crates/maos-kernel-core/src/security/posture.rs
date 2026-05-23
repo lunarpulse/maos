@@ -34,12 +34,32 @@ pub const POSTURE_APPROVAL_MATRIX: &[(Posture, ApprovalClass, bool)] = &[
     (Posture::Assistive, ApprovalClass::ControlPlane, true),
     (Posture::Assistive, ApprovalClass::Interactive, true),
     // autonomous-with-halt row
-    (Posture::AutonomousWithHalt, ApprovalClass::ReadonlyScoped, false),
-    (Posture::AutonomousWithHalt, ApprovalClass::ReadonlySearch, false),
+    (
+        Posture::AutonomousWithHalt,
+        ApprovalClass::ReadonlyScoped,
+        false,
+    ),
+    (
+        Posture::AutonomousWithHalt,
+        ApprovalClass::ReadonlySearch,
+        false,
+    ),
     (Posture::AutonomousWithHalt, ApprovalClass::Mutating, false),
-    (Posture::AutonomousWithHalt, ApprovalClass::ExecCapable, false),
-    (Posture::AutonomousWithHalt, ApprovalClass::ControlPlane, true),
-    (Posture::AutonomousWithHalt, ApprovalClass::Interactive, false),
+    (
+        Posture::AutonomousWithHalt,
+        ApprovalClass::ExecCapable,
+        false,
+    ),
+    (
+        Posture::AutonomousWithHalt,
+        ApprovalClass::ControlPlane,
+        true,
+    ),
+    (
+        Posture::AutonomousWithHalt,
+        ApprovalClass::Interactive,
+        false,
+    ),
 ];
 
 /// Look up whether the given (posture, class) pair requires approval.
@@ -92,7 +112,8 @@ impl PostureState {
         hasher.update(&[posture_u8(self.allowed_max)]);
 
         // Rules: sorted by tag for determinism
-        let mut sorted_rules: Vec<&EpistemicPolicyRule> = self.epistemic_policy.rules.iter().collect();
+        let mut sorted_rules: Vec<&EpistemicPolicyRule> =
+            self.epistemic_policy.rules.iter().collect();
         sorted_rules.sort_by(|a, b| a.tag.cmp(&b.tag));
 
         // LEB128-encode rules count
@@ -125,9 +146,7 @@ impl PostureState {
         }
 
         // default_action_u8
-        hasher.update(&[epistemic_action_u8(
-            &self.epistemic_policy.default_action,
-        )]);
+        hasher.update(&[epistemic_action_u8(&self.epistemic_policy.default_action)]);
 
         let result = hasher.finalize();
         let mut out = [0u8; 32];
@@ -236,7 +255,10 @@ fn leb128_encode_u64(mut val: u64, hasher: &mut Sha256) {
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum PostureError {
     #[error("requested posture {requested:?} exceeds allowed_max {allowed:?}")]
-    AboveCeiling { requested: Posture, allowed: Posture },
+    AboveCeiling {
+        requested: Posture,
+        allowed: Posture,
+    },
     #[error(
         "posture {0:?} is not a runtime posture at v0.3 — use cautious / assistive / autonomous-with-halt"
     )]
@@ -335,13 +357,7 @@ mod tests {
     fn posture_hash_stable_under_rule_reordering() {
         let policy1 = EpistemicPolicySection {
             rules: vec![
-                EpistemicPolicyRule::new(
-                    "b".into(),
-                    EpistemicAction::Flag,
-                    None,
-                    None,
-                    None,
-                ),
+                EpistemicPolicyRule::new("b".into(), EpistemicAction::Flag, None, None, None),
                 EpistemicPolicyRule::new(
                     "a".into(),
                     EpistemicAction::Halt,
@@ -361,19 +377,17 @@ mod tests {
                     Some(true),
                     None,
                 ),
-                EpistemicPolicyRule::new(
-                    "b".into(),
-                    EpistemicAction::Flag,
-                    None,
-                    None,
-                    None,
-                ),
+                EpistemicPolicyRule::new("b".into(), EpistemicAction::Flag, None, None, None),
             ],
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let s1 = make_state_with_policy(Posture::Assistive, Posture::AutonomousWithHalt, policy1);
         let s2 = make_state_with_policy(Posture::Assistive, Posture::AutonomousWithHalt, policy2);
-        assert_eq!(s1.posture_hash(), s2.posture_hash(), "hash must be stable under rule reordering");
+        assert_eq!(
+            s1.posture_hash(),
+            s2.posture_hash(),
+            "hash must be stable under rule reordering"
+        );
     }
 
     #[test]
@@ -430,10 +444,12 @@ mod tests {
             )],
             default_action: EpistemicAction::VerbalizeOnly,
         };
-        let result =
-            PostureState::apply_director_preferences(policy.clone(), &[]).unwrap();
+        let result = PostureState::apply_director_preferences(policy.clone(), &[]).unwrap();
         assert_eq!(result.rules[0].tag, policy.rules[0].tag);
-        assert_eq!(result.rules[0].on_confidence_below, policy.rules[0].on_confidence_below);
+        assert_eq!(
+            result.rules[0].on_confidence_below,
+            policy.rules[0].on_confidence_below
+        );
         assert_eq!(result.default_action, policy.default_action);
     }
 
@@ -494,8 +510,14 @@ mod tests {
             default_action: EpistemicAction::VerbalizeOnly,
         };
         let overrides = vec![
-            HaltPolicyOverride { tag: "x".into(), recall_vs_precision: 0.5 },
-            HaltPolicyOverride { tag: "x".into(), recall_vs_precision: -0.5 },
+            HaltPolicyOverride {
+                tag: "x".into(),
+                recall_vs_precision: 0.5,
+            },
+            HaltPolicyOverride {
+                tag: "x".into(),
+                recall_vs_precision: -0.5,
+            },
         ];
         let err = PostureState::apply_director_preferences(policy, &overrides).unwrap_err();
         assert!(
@@ -551,7 +573,11 @@ mod tests {
                     .iter()
                     .filter(|(p, c, _)| p == posture && c == class)
                     .count();
-                assert_eq!(count, 1, "(posture={:?}, class={:?}) must appear once", posture, class);
+                assert_eq!(
+                    count, 1,
+                    "(posture={:?}, class={:?}) must appear once",
+                    posture, class
+                );
             }
         }
     }
@@ -571,12 +597,32 @@ mod tests {
             (Posture::Assistive, ApprovalClass::ExecCapable, true),
             (Posture::Assistive, ApprovalClass::ControlPlane, true),
             (Posture::Assistive, ApprovalClass::Interactive, true),
-            (Posture::AutonomousWithHalt, ApprovalClass::ReadonlyScoped, false),
-            (Posture::AutonomousWithHalt, ApprovalClass::ReadonlySearch, false),
+            (
+                Posture::AutonomousWithHalt,
+                ApprovalClass::ReadonlyScoped,
+                false,
+            ),
+            (
+                Posture::AutonomousWithHalt,
+                ApprovalClass::ReadonlySearch,
+                false,
+            ),
             (Posture::AutonomousWithHalt, ApprovalClass::Mutating, false),
-            (Posture::AutonomousWithHalt, ApprovalClass::ExecCapable, false),
-            (Posture::AutonomousWithHalt, ApprovalClass::ControlPlane, true),
-            (Posture::AutonomousWithHalt, ApprovalClass::Interactive, false),
+            (
+                Posture::AutonomousWithHalt,
+                ApprovalClass::ExecCapable,
+                false,
+            ),
+            (
+                Posture::AutonomousWithHalt,
+                ApprovalClass::ControlPlane,
+                true,
+            ),
+            (
+                Posture::AutonomousWithHalt,
+                ApprovalClass::Interactive,
+                false,
+            ),
         ];
         assert_eq!(POSTURE_APPROVAL_MATRIX, expected);
     }

@@ -20,7 +20,8 @@ pub mod validation;
 
 /// SHA-256 hex digest of `seeds/secret-redaction-seeds-v0.1.toml`.
 /// This constant is verified at build time by `build.rs`.
-pub const SEED_FILE_SHA256: &str = "a9dce6273711e44ffc20157cd026dcc94fbfcb95bf1b8989a0e1451a62799aec";
+pub const SEED_FILE_SHA256: &str =
+    "a9dce6273711e44ffc20157cd026dcc94fbfcb95bf1b8989a0e1451a62799aec";
 
 /// Expansion-rule version.  Bump this when expansion axes change and the
 /// JSONL corpus must be regenerated.
@@ -105,8 +106,7 @@ impl SecretRedactionGenerator {
 
     /// Build a generator from a fixture seed file (for integration tests).
     pub fn with_fixture_seeds(path: &Path) -> Result<Self, String> {
-        let data =
-            std::fs::read(path).map_err(|e| format!("failed to read fixture: {}", e))?;
+        let data = std::fs::read(path).map_err(|e| format!("failed to read fixture: {}", e))?;
         let seeds: Vec<SecretRedactionSeed> = seeds::load_seeds(&data)?;
         Ok(Self { seeds })
     }
@@ -150,12 +150,12 @@ impl SecretRedactionGenerator {
             let marker_hex: String = marker[..16].iter().map(|b| format!("{:02x}", b)).collect();
 
             let class = "canary_marker";
-            let raw = format!(
-                "<CANARY-{}-{:04}-{}>",
-                marker_namespace, i, marker_hex
+            let raw = format!("<CANARY-{}-{:04}-{}>", marker_namespace, i, marker_hex);
+            let expected_redacted = format!(
+                "<REDACTED:type=canary,len={},hash={}>",
+                raw.len(),
+                &marker_hex[..8]
             );
-            let expected_redacted =
-                format!("<REDACTED:type=canary,len={},hash={}>", raw.len(), &marker_hex[..8]);
             items.push(SecretRedactionItem {
                 id: format!("secret-red-cnry-{:05}", i),
                 class: class.to_string(),

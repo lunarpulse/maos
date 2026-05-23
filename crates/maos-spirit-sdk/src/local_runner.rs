@@ -9,8 +9,10 @@
 //! manifest self-check + class-specific regression corpus is Story 2.4 seed
 //! → Story 7.1 full.
 
+use crate::{
+    ConsolidatePayload, FramePayload, SchedulePayload, SwapInPayload, TelemetryEventPayload,
+};
 use crate::{Ctx, Spirit, SpiritVtable};
-use crate::{ConsolidatePayload, FramePayload, SchedulePayload, SwapInPayload, TelemetryEventPayload};
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
@@ -87,7 +89,10 @@ impl LocalRunner {
                 $expr;
                 let elapsed = start.elapsed();
                 *report.hooks_fired.entry($name.to_string()).or_insert(0) += 1;
-                *report.elapsed_per_hook.entry($name.to_string()).or_insert(Duration::ZERO) += elapsed;
+                *report
+                    .elapsed_per_hook
+                    .entry($name.to_string())
+                    .or_insert(Duration::ZERO) += elapsed;
             }};
         }
 
@@ -98,22 +103,37 @@ impl LocalRunner {
             fire!("on_start", (vtable.on_start)(spirit, &mut ctx));
         }
         for bytes in &fixture.frames {
-            let p = FramePayload { frame_data: bytes.as_slice(), frame_len: bytes.len() };
+            let p = FramePayload {
+                frame_data: bytes.as_slice(),
+                frame_len: bytes.len(),
+            };
             fire!("on_frame", (vtable.on_frame)(spirit, &mut ctx, &p));
         }
         if fixture.invoke_on_idle {
             fire!("on_idle", (vtable.on_idle)(spirit, &mut ctx));
         }
         for bytes in &fixture.telemetry_events {
-            let p = TelemetryEventPayload { event_data: bytes.as_slice(), event_len: bytes.len() };
-            fire!("on_telemetry_event", (vtable.on_telemetry_event)(spirit, &mut ctx, &p));
+            let p = TelemetryEventPayload {
+                event_data: bytes.as_slice(),
+                event_len: bytes.len(),
+            };
+            fire!(
+                "on_telemetry_event",
+                (vtable.on_telemetry_event)(spirit, &mut ctx, &p)
+            );
         }
         for bytes in &fixture.schedule_payloads {
-            let p = SchedulePayload { schedule_data: bytes.as_slice(), schedule_len: bytes.len() };
+            let p = SchedulePayload {
+                schedule_data: bytes.as_slice(),
+                schedule_len: bytes.len(),
+            };
             fire!("on_schedule", (vtable.on_schedule)(spirit, &mut ctx, &p));
         }
         for bytes in &fixture.swap_in_payloads {
-            let p = SwapInPayload { predecessor_state: bytes.as_slice(), state_len: bytes.len() };
+            let p = SwapInPayload {
+                predecessor_state: bytes.as_slice(),
+                state_len: bytes.len(),
+            };
             fire!("on_swap_in", (vtable.on_swap_in)(spirit, &mut ctx, &p));
         }
         if fixture.invoke_on_pause {
@@ -123,8 +143,14 @@ impl LocalRunner {
             fire!("on_resume", (vtable.on_resume)(spirit, &mut ctx));
         }
         for bytes in &fixture.consolidate_payloads {
-            let p = ConsolidatePayload { batch_data: bytes.as_slice(), batch_len: bytes.len() };
-            fire!("on_consolidate", (vtable.on_consolidate)(spirit, &mut ctx, &p));
+            let p = ConsolidatePayload {
+                batch_data: bytes.as_slice(),
+                batch_len: bytes.len(),
+            };
+            fire!(
+                "on_consolidate",
+                (vtable.on_consolidate)(spirit, &mut ctx, &p)
+            );
         }
         if fixture.invoke_on_unload {
             fire!("on_unload", (vtable.on_unload)(spirit, &mut ctx));

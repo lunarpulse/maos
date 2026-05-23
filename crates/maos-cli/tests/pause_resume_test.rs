@@ -52,8 +52,7 @@ fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Outpu
     if let Ok(path) = std::env::var("PATH") {
         cmd.env("PATH", path);
     }
-    let workspace_root =
-        std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+    let workspace_root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
     cmd.current_dir(&workspace_root);
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
@@ -71,13 +70,21 @@ fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Outpu
 #[test]
 fn pause_hello_spirit_exits_zero() {
     let out = run_maosctl(&[], &["pause", "hello-spirit"]);
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 #[test]
 fn resume_hello_spirit_exits_zero() {
     let out = run_maosctl(&[], &["resume", "hello-spirit"]);
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 #[test]
@@ -85,7 +92,10 @@ fn pause_rejects_unknown_spirit() {
     let out = run_maosctl(&[], &["pause", "unknown-spirit"]);
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("only 'hello-spirit'"), "expected rejection, got: {stderr}");
+    assert!(
+        stderr.contains("only 'hello-spirit'"),
+        "expected rejection, got: {stderr}"
+    );
 }
 
 #[test]
@@ -93,7 +103,10 @@ fn resume_rejects_unknown_spirit() {
     let out = run_maosctl(&[], &["resume", "unknown-spirit"]);
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("only 'hello-spirit'"), "expected rejection, got: {stderr}");
+    assert!(
+        stderr.contains("only 'hello-spirit'"),
+        "expected rejection, got: {stderr}"
+    );
 }
 
 #[test]
@@ -112,13 +125,14 @@ fn lifecycle_journal_has_pause_and_resume() {
     let xdg = tmp.path().join("xdg");
     std::fs::create_dir_all(&xdg).expect("xdg mkdir");
 
-    let workspace_root =
-        std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+    let workspace_root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
 
     // Pause
     let mut cmd = Command::new(maosctl_path());
     cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") { cmd.env("PATH", p); }
+    if let Ok(p) = std::env::var("PATH") {
+        cmd.env("PATH", p);
+    }
     cmd.current_dir(&workspace_root);
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
@@ -126,12 +140,18 @@ fn lifecycle_journal_has_pause_and_resume() {
     cmd.env("MAOS_BIN_PATH", maos_bin_path());
     cmd.args(["pause", "hello-spirit"]);
     let out1 = cmd.output().expect("spawn pause");
-    assert!(out1.status.success(), "pause failed: {}", String::from_utf8_lossy(&out1.stderr));
+    assert!(
+        out1.status.success(),
+        "pause failed: {}",
+        String::from_utf8_lossy(&out1.stderr)
+    );
 
     // Resume
     let mut cmd = Command::new(maosctl_path());
     cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") { cmd.env("PATH", p); }
+    if let Ok(p) = std::env::var("PATH") {
+        cmd.env("PATH", p);
+    }
     cmd.current_dir(&workspace_root);
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
@@ -139,12 +159,22 @@ fn lifecycle_journal_has_pause_and_resume() {
     cmd.env("MAOS_BIN_PATH", maos_bin_path());
     cmd.args(["resume", "hello-spirit"]);
     let out2 = cmd.output().expect("spawn resume");
-    assert!(out2.status.success(), "resume failed: {}", String::from_utf8_lossy(&out2.stderr));
+    assert!(
+        out2.status.success(),
+        "resume failed: {}",
+        String::from_utf8_lossy(&out2.stderr)
+    );
 
     // Verify Lifecycle Journal has Pause and Resume
     let journal_content = std::fs::read_to_string(&journal_path).expect("read journal");
-    assert!(journal_content.contains("\"Pause\""), "Journal missing Pause: {journal_content}");
-    assert!(journal_content.contains("\"Resume\""), "Journal missing Resume: {journal_content}");
+    assert!(
+        journal_content.contains("\"Pause\""),
+        "Journal missing Pause: {journal_content}"
+    );
+    assert!(
+        journal_content.contains("\"Resume\""),
+        "Journal missing Resume: {journal_content}"
+    );
 
     drop(tmp);
 }

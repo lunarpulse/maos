@@ -22,11 +22,15 @@ pub fn run(base: &str, json: bool) -> Result<(), String> {
 
 fn resolve_baseline(base: &str) -> std::path::PathBuf {
     let p = Path::new(base);
-    if p.exists() { return p.to_path_buf(); }
+    if p.exists() {
+        return p.to_path_buf();
+    }
     if let Some(stem) = base.strip_suffix(".json") {
         let txt = format!("{stem}.txt");
         let tp = Path::new(&txt);
-        if tp.exists() { return tp.to_path_buf(); }
+        if tp.exists() {
+            return tp.to_path_buf();
+        }
     }
     p.to_path_buf()
 }
@@ -34,48 +38,82 @@ fn resolve_baseline(base: &str) -> std::path::PathBuf {
 fn line_diff<'a>(a: &'a str, b: &'a str) -> (Vec<&'a str>, Vec<&'a str>) {
     let al: Vec<&str> = a.lines().filter(|l| !l.is_empty()).collect();
     let bl: Vec<&str> = b.lines().filter(|l| !l.is_empty()).collect();
-    (bl.iter().filter(|l| !al.contains(l)).copied().collect(),
-     al.iter().filter(|l| !bl.contains(l)).copied().collect())
+    (
+        bl.iter().filter(|l| !al.contains(l)).copied().collect(),
+        al.iter().filter(|l| !bl.contains(l)).copied().collect(),
+    )
 }
 
 fn report(json: bool, added: Vec<&str>, removed: Vec<&str>) -> Result<(), String> {
     let passed = removed.is_empty();
     if json {
-        println!("{}", serde_json::json!({"passed": passed, "added": added, "removed": removed}));
+        println!(
+            "{}",
+            serde_json::json!({"passed": passed, "added": added, "removed": removed})
+        );
     } else if passed {
         println!("abi-diff: PASSED (no breaking changes)");
     } else {
         eprintln!("abi-diff: breaking change detected");
-        for l in &removed { eprintln!("  [-] {l}"); }
-        for l in &added { eprintln!("  [+] {l}"); }
+        for l in &removed {
+            eprintln!("  [-] {l}");
+        }
+        for l in &added {
+            eprintln!("  [+] {l}");
+        }
     }
-    if !passed { Err("abi-diff failed".into()) } else { Ok(()) }
+    if !passed {
+        Err("abi-diff failed".into())
+    } else {
+        Ok(())
+    }
 }
 
 fn diff_git(base: &str, json: bool) -> Result<(), String> {
     let spec = format!("{base}..HEAD");
     let out = Command::new("cargo")
-        .args(["public-api", "diff", &spec, "--manifest-path", MANIFEST,
-               "--deny", "removed", "--deny", "changed"])
-        .output().map_err(|e| format!("cargo-public-api not installed: {e}"))?;
+        .args([
+            "public-api",
+            "diff",
+            &spec,
+            "--manifest-path",
+            MANIFEST,
+            "--deny",
+            "removed",
+            "--deny",
+            "changed",
+        ])
+        .output()
+        .map_err(|e| format!("cargo-public-api not installed: {e}"))?;
     let stdout = String::from_utf8_lossy(&out.stdout);
     let passed = out.status.success();
     if json {
-        println!("{}", serde_json::json!({"passed": passed, "output": stdout.trim()}));
+        println!(
+            "{}",
+            serde_json::json!({"passed": passed, "output": stdout.trim()})
+        );
     } else if passed {
         println!("abi-diff: PASSED");
     } else {
         eprintln!("abi-diff: breaking change detected\n{stdout}");
     }
-    if !passed { Err("abi-diff failed".into()) } else { Ok(()) }
+    if !passed {
+        Err("abi-diff failed".into())
+    } else {
+        Ok(())
+    }
 }
 
 fn capture_public_api() -> Result<String, String> {
     let out = Command::new("cargo")
         .args(["public-api", "--manifest-path", MANIFEST, "-sss"])
-        .output().map_err(|e| format!("cargo-public-api not installed: {e}"))?;
+        .output()
+        .map_err(|e| format!("cargo-public-api not installed: {e}"))?;
     if !out.status.success() {
-        return Err(format!("cargo-public-api failed: {}", String::from_utf8_lossy(&out.stderr)));
+        return Err(format!(
+            "cargo-public-api failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        ));
     }
     Ok(String::from_utf8_lossy(&out.stdout).to_string())
 }
@@ -95,5 +133,7 @@ mod tests {
         assert_eq!(r, vec!["b"]);
     }
     #[test]
-    fn line_diff_identical() { assert!(line_diff("x\ny\n", "x\ny\n") == (vec![], vec![])); }
+    fn line_diff_identical() {
+        assert!(line_diff("x\ny\n", "x\ny\n") == (vec![], vec![]));
+    }
 }

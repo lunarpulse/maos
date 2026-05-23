@@ -1,0 +1,21 @@
+{
+  "corpus_name": "revocation-corpus-v0",
+  "version": "0.1.0",
+  "story": "5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s",
+  "generated_at": "2026-05-22T09:00:00Z",
+  "generator": "manual-synthetic",
+  "scenario_count": 30,
+  "categories": [
+    "valid_signature_immediate_terminate",
+    "valid_signature_drain_then_terminate",
+    "valid_signature_quarantine",
+    "invalid_signature_rejected",
+    "malformed_version_range_rejected",
+    "trust_anchor_mismatch_rejected"
+  ],
+  "distribution": "6 categories × 5 scenarios each = 30 total",
+  "trust_anchor_source": "synthetic-ed25519-test-only",
+  "signature_algorithm": "Ed25519",
+  "schema_version": 1,
+  "note": "v0.3-β synthetic corpus. Production trust anchors and signed CRLs arrive at Story 5.5d."
+}

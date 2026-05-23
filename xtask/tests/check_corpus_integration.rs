@@ -6,7 +6,14 @@ fn fixture(path: &str) -> String {
 
 fn xtask() -> Command {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "--manifest-path", concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.toml"), "-p", "xtask", "--"]);
+    cmd.args([
+        "run",
+        "--manifest-path",
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.toml"),
+        "-p",
+        "xtask",
+        "--",
+    ]);
     cmd
 }
 
@@ -69,14 +76,19 @@ fn clean_corpus_passes() {
 fn clean_calibration_corpus_smoke() {
     // Smoke test: parse MANIFEST.toml, assert exactly one [corpus.*] row exists,
     // assert item_count == 10 (fixture size), assert valid_until == "2027-05-12".
-    let manifest_src = std::fs::read_to_string(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/clean-calibration/MANIFEST.toml")
-    ).expect("read clean-calibration MANIFEST.toml");
+    let manifest_src = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/clean-calibration/MANIFEST.toml"
+    ))
+    .expect("read clean-calibration MANIFEST.toml");
     let manifest: toml::Value = toml::from_str(&manifest_src).expect("parse TOML");
     let corpus_table = manifest.get("corpus").expect("corpus key");
     let entries = corpus_table.as_table().expect("corpus is a table");
     assert_eq!(entries.len(), 1, "exactly one corpus entry");
     let entry = entries.values().next().unwrap();
     assert_eq!(entry.get("item_count").unwrap().as_integer().unwrap(), 10);
-    assert_eq!(entry.get("valid_until").unwrap().as_str().unwrap(), "2027-05-12");
+    assert_eq!(
+        entry.get("valid_until").unwrap().as_str().unwrap(),
+        "2027-05-12"
+    );
 }

@@ -36,6 +36,9 @@ pub struct RegressionCorpus {
 
 impl RegressionCorpus {
     pub fn new(class: SpiritClass) -> Self {
-        Self { class, cases: Vec::new() }
+        Self {
+            class,
+            cases: Vec::new(),
+        }
     }
 }

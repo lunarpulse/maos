@@ -25,20 +25,20 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 #[cfg(feature = "spirit_test")]
-use parking_lot::Mutex;
+use maos_spirit_sdk::spirit_test::{AttemptResult, IsolationHookPoint, ObservationResult};
 #[cfg(feature = "spirit_test")]
-use maos_spirit_sdk::spirit_test::{
-    IsolationHookPoint, AttemptResult, ObservationResult,
-};
+use parking_lot::Mutex;
 
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::log_recall::{
-    FrameKindLabel as DomainFrameKindLabel, LogFetchResponse, LogRecallCursor,
-    LogRecallEntry, LogRecallError, LogRecallFilter, LogRecallPage,
+    FrameKindLabel as DomainFrameKindLabel, LogFetchResponse, LogRecallCursor, LogRecallEntry,
+    LogRecallError, LogRecallFilter, LogRecallPage,
 };
 use maos_domain::ports::LogRecallPort;
 
-use super::transparency_log::{FrameKind, FrameFilter, TransparencyLogAdapter, TransparencyLogEntry};
+use super::transparency_log::{
+    FrameFilter, FrameKind, TransparencyLogAdapter, TransparencyLogEntry,
+};
 
 /// Stable intent string constant for `CapabilityInvocation` audit row.
 pub const LOG_RECALL_INTENT: &str = "log.recall";
@@ -71,10 +71,7 @@ impl LogRecallAdapter {
     /// Story 4.4 — attach an isolation hook for the `spirit_test` feature.
     /// Only available when the `spirit_test` feature is enabled.
     #[cfg(feature = "spirit_test")]
-    pub fn with_isolation_hook(
-        mut self,
-        hook: Arc<Mutex<dyn IsolationHookPoint + Send>>,
-    ) -> Self {
+    pub fn with_isolation_hook(mut self, hook: Arc<Mutex<dyn IsolationHookPoint + Send>>) -> Self {
         self.isolation_hook = Some(hook);
         self
     }
@@ -119,6 +116,7 @@ impl LogRecallAdapter {
             FrameKind::HotSwapAborted => DomainFrameKindLabel::HotSwapAborted,
             FrameKind::TaskStalled => DomainFrameKindLabel::TaskStalled,
             FrameKind::SilentFailureSuspect => DomainFrameKindLabel::SilentFailureSuspect,
+            FrameKind::SpiritRevoked => DomainFrameKindLabel::SpiritRevoked,
         }
     }
 
@@ -142,6 +140,7 @@ impl LogRecallAdapter {
             DomainFrameKindLabel::HotSwapAborted => FrameKind::HotSwapAborted,
             DomainFrameKindLabel::TaskStalled => FrameKind::TaskStalled,
             DomainFrameKindLabel::SilentFailureSuspect => FrameKind::SilentFailureSuspect,
+            DomainFrameKindLabel::SpiritRevoked => FrameKind::SpiritRevoked,
         }
     }
 
@@ -234,22 +233,21 @@ impl LogRecallPort for LogRecallAdapter {
 
         // 1a. Spirit_test isolation hook (Story 4.4 → Story 4.5 corpus plug).
         #[cfg(feature = "spirit_test")]
-        self.fire_isolation_hooks(
-            &format!("log.recall:{spirit_pid}"),
-            true,
-        );
+        self.fire_isolation_hooks(&format!("log.recall:{spirit_pid}"), true);
 
         // 2. Build kernel-side filter.
-        let kind_filter = filter
-            .kind
-            .as_ref()
-            .map(|l| Self::to_kernel_kind(l));
+        let kind_filter = filter.kind.as_ref().map(|l| Self::to_kernel_kind(l));
         let kernel_filter = FrameFilter {
             spirit_pid: Some(spirit_pid), // emitter-scope at v0.3-β
             kind: kind_filter,
             since_ns: filter.since_ns,
             until_ns: filter.until_ns,
-            limit: Some(filter.limit.min(LogRecallFilter::MAX_LIMIT).saturating_add(1)),
+            limit: Some(
+                filter
+                    .limit
+                    .min(LogRecallFilter::MAX_LIMIT)
+                    .saturating_add(1),
+            ),
             cursor_timestamp_ns: filter.cursor.as_ref().map(|c| c.last_timestamp_ns),
             cursor_frame_id: filter.cursor.as_ref().map(|c| c.last_frame_id),
         };
@@ -311,11 +309,12 @@ impl LogRecallPort for LogRecallAdapter {
         // 1a. Spirit_test isolation hook (Story 4.4 → Story 4.5 corpus plug).
         #[cfg(feature = "spirit_test")]
         {
-            let hex_prefix: String = frame_id.iter().take(4).map(|b| format!("{b:02x}")).collect();
-            self.fire_isolation_hooks(
-                &format!("log.fetch:{spirit_pid}:{hex_prefix}"),
-                true,
-            );
+            let hex_prefix: String = frame_id
+                .iter()
+                .take(4)
+                .map(|b| format!("{b:02x}"))
+                .collect();
+            self.fire_isolation_hooks(&format!("log.fetch:{spirit_pid}:{hex_prefix}"), true);
         }
 
         // 2. Query transparency log for the specific frame by primary key.
@@ -362,9 +361,7 @@ mod tests {
     use maos_domain::ports::LogRecallPort;
 
     fn make_adapter(nonce: u64) -> LogRecallAdapter {
-        LogRecallAdapter::new(Arc::new(
-            TransparencyLogAdapter::open_in_memory(nonce),
-        ))
+        LogRecallAdapter::new(Arc::new(TransparencyLogAdapter::open_in_memory(nonce)))
     }
 
     fn seed_frames(tl: &Arc<TransparencyLogAdapter>, pid: u32, count: usize) {
@@ -389,9 +386,7 @@ mod tests {
         seed_frames(&tl, 30, 3);
 
         let adapter = LogRecallAdapter::new(tl);
-        let page = adapter
-            .recall(10, LogRecallFilter::default())
-            .unwrap();
+        let page = adapter.recall(10, LogRecallFilter::default()).unwrap();
 
         assert_eq!(page.entries.len(), 5);
         assert!(page.entries.iter().all(|e| e.peer_spirit_pid == 10));
@@ -406,10 +401,7 @@ mod tests {
 
         // Page 1: limit=2
         let page1 = adapter
-            .recall(
-                10,
-                LogRecallFilter::new(None, None, None, 2, None, None),
-            )
+            .recall(10, LogRecallFilter::new(None, None, None, 2, None, None))
             .unwrap();
         assert_eq!(page1.entries.len(), 2);
         assert!(page1.next_cursor.is_some());
@@ -418,14 +410,7 @@ mod tests {
         let page2 = adapter
             .recall(
                 10,
-                LogRecallFilter::new(
-                    None,
-                    None,
-                    None,
-                    2,
-                    page1.next_cursor,
-                    None,
-                ),
+                LogRecallFilter::new(None, None, None, 2, page1.next_cursor, None),
             )
             .unwrap();
         assert_eq!(page2.entries.len(), 2);
@@ -435,14 +420,7 @@ mod tests {
         let page3 = adapter
             .recall(
                 10,
-                LogRecallFilter::new(
-                    None,
-                    None,
-                    None,
-                    2,
-                    page2.next_cursor,
-                    None,
-                ),
+                LogRecallFilter::new(None, None, None, 2, page2.next_cursor, None),
             )
             .unwrap();
         assert_eq!(page3.entries.len(), 1);
@@ -476,7 +454,11 @@ mod tests {
         let adapter = LogRecallAdapter::new(tl);
         let err = adapter.fetch(20, frame_id).unwrap_err();
         match err {
-            LogRecallError::ScopeViolation { frame_id: fid, requested_pid, owner_pid } => {
+            LogRecallError::ScopeViolation {
+                frame_id: fid,
+                requested_pid,
+                owner_pid,
+            } => {
                 assert_eq!(fid, frame_id);
                 assert_eq!(requested_pid, 20);
                 assert_eq!(owner_pid, 10);
@@ -491,9 +473,7 @@ mod tests {
         seed_frames(&tl, 10, 3);
 
         let adapter = LogRecallAdapter::new(Arc::clone(&tl));
-        adapter
-            .recall(10, LogRecallFilter::default())
-            .unwrap();
+        adapter.recall(10, LogRecallFilter::default()).unwrap();
 
         let audit_filter = FrameFilter {
             kind: Some(FrameKind::CapabilityInvocation),
@@ -531,9 +511,8 @@ mod tests {
 
     #[test]
     fn fetch_nonexistent_frame_returns_not_found() {
-        let adapter = LogRecallAdapter::new(Arc::new(
-            TransparencyLogAdapter::open_in_memory(0xD407),
-        ));
+        let adapter =
+            LogRecallAdapter::new(Arc::new(TransparencyLogAdapter::open_in_memory(0xD407)));
         let err = adapter.fetch(10, [0xDE; 16]).unwrap_err();
         assert!(
             matches!(err, LogRecallError::FrameNotFound { frame_id } if frame_id == [0xDE; 16]),
@@ -549,10 +528,7 @@ mod tests {
         let adapter = LogRecallAdapter::new(tl);
 
         let page1 = adapter
-            .recall(
-                10,
-                LogRecallFilter::new(None, None, None, 2, None, None),
-            )
+            .recall(10, LogRecallFilter::new(None, None, None, 2, None, None))
             .unwrap();
         assert_eq!(page1.entries.len(), 2);
         let cursor1 = page1.next_cursor.expect("expected next_cursor");
@@ -560,14 +536,7 @@ mod tests {
         let page2 = adapter
             .recall(
                 10,
-                LogRecallFilter::new(
-                    None,
-                    None,
-                    None,
-                    2,
-                    Some(cursor1.clone()),
-                    None,
-                ),
+                LogRecallFilter::new(None, None, None, 2, Some(cursor1.clone()), None),
             )
             .unwrap();
         assert_eq!(page2.entries.len(), 2);
@@ -584,13 +553,15 @@ mod tests {
         // Strict ordering within each page
         for window in page1.entries.windows(2) {
             assert!(
-                (window[0].timestamp_ns, window[0].frame_id) < (window[1].timestamp_ns, window[1].frame_id),
+                (window[0].timestamp_ns, window[0].frame_id)
+                    < (window[1].timestamp_ns, window[1].frame_id),
                 "page1 entries must be strictly ordered"
             );
         }
         for window in page2.entries.windows(2) {
             assert!(
-                (window[0].timestamp_ns, window[0].frame_id) < (window[1].timestamp_ns, window[1].frame_id),
+                (window[0].timestamp_ns, window[0].frame_id)
+                    < (window[1].timestamp_ns, window[1].frame_id),
                 "page2 entries must be strictly ordered"
             );
         }
@@ -603,10 +574,7 @@ mod tests {
 
         let adapter = LogRecallAdapter::new(tl);
         let page = adapter
-            .recall(
-                10,
-                LogRecallFilter::new(None, None, None, 0, None, None),
-            )
+            .recall(10, LogRecallFilter::new(None, None, None, 0, None, None))
             .unwrap();
         assert!(page.entries.is_empty());
         assert!(page.next_cursor.is_none());

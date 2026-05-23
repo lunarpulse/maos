@@ -29,30 +29,30 @@
 //! doc lacks a `/// Class:` line, OR carries a class not in the three-element
 //! set, defaults to `other` and fails the surface gate.
 
+pub mod capability;
+pub mod distillation; // NEW — Story 4.4 DistillationPort per AC2
+pub mod iac_bus;
+pub mod inference;
+pub mod io_subsystem;
+pub mod log_recall; // NEW — Story 4.4 LogRecallPort per AC1
+pub mod memory;
 pub mod scheduler;
 pub mod security;
-pub mod memory;
-pub mod iac_bus;
-pub mod capability;
-pub mod io_subsystem;
-pub mod telemetry;
-pub mod inference;
-pub mod self_telemetry;  // NEW — Story 4.3 SelfTelemetryPort per FR56
-pub mod log_recall;       // NEW — Story 4.4 LogRecallPort per AC1
-pub mod distillation;     // NEW — Story 4.4 DistillationPort per AC2
-pub mod task;             // NEW — Story 5.3 in-flight task assignment record
+pub mod self_telemetry; // NEW — Story 4.3 SelfTelemetryPort per FR56
+pub mod task;
+pub mod telemetry; // NEW — Story 5.3 in-flight task assignment record
 
-pub mod crypto;  // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 / §8.6
+pub mod crypto; // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 / §8.6
 
+pub use capability::CapabilityRegistryPort;
+pub use crypto::{CryptoError, CryptoProvider};
+pub use distillation::DistillationPort; // NEW — Story 4.4
+pub use iac_bus::IacBusPort;
+pub use inference::InferencePort;
+pub use io_subsystem::IoSubsystemPort;
+pub use log_recall::LogRecallPort; // NEW — Story 4.4
+pub use memory::MemoryManagerPort;
 pub use scheduler::SpiritSchedulerPort;
 pub use security::SecurityManagerPort;
-pub use memory::MemoryManagerPort;
-pub use iac_bus::IacBusPort;
-pub use capability::CapabilityRegistryPort;
-pub use io_subsystem::IoSubsystemPort;
-pub use telemetry::TelemetryStreamPort;
-pub use inference::InferencePort;
-pub use self_telemetry::SelfTelemetryPort;  // NEW — Story 4.3
-pub use log_recall::LogRecallPort;          // NEW — Story 4.4
-pub use distillation::DistillationPort;     // NEW — Story 4.4
-pub use crypto::{CryptoProvider, CryptoError};  // NEW
+pub use self_telemetry::SelfTelemetryPort; // NEW — Story 4.3
+pub use telemetry::TelemetryStreamPort; // NEW

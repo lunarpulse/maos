@@ -110,8 +110,8 @@ mod tests {
     use super::*;
     use maos_domain::invariants::i1::TokenId;
     use maos_domain::ports::inference::{
-        InferenceError, InferencePort, InferenceRequest,
-        InferenceResponse, ProviderAttribution, StopReason, TokenUsage,
+        InferenceError, InferencePort, InferenceRequest, InferenceResponse, ProviderAttribution,
+        StopReason, TokenUsage,
     };
     use serde_json;
 
@@ -122,10 +122,7 @@ mod tests {
     }
 
     impl InferencePort for MockInferencePort {
-        fn complete(
-            &self,
-            _req: InferenceRequest,
-        ) -> Result<InferenceResponse, InferenceError> {
+        fn complete(&self, _req: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
             if self.should_fail_unconfigured {
                 return Err(InferenceError::Unconfigured);
             }
@@ -207,9 +204,10 @@ mod tests {
         };
         let token = zero_token();
         let err = run(&port, token).unwrap_err();
-        assert!(
-            matches!(&err, HelloError::Inference(InferenceError::CapabilityDenied))
-        );
+        assert!(matches!(
+            &err,
+            HelloError::Inference(InferenceError::CapabilityDenied)
+        ));
     }
 
     #[test]
@@ -230,8 +228,7 @@ mod tests {
 
     #[test]
     fn test_manifest_validates() {
-        let manifest_raw =
-            include_str!("../../../spirits/hello-spirit/manifest.toml");
+        let manifest_raw = include_str!("../../../spirits/hello-spirit/manifest.toml");
         let manifest: toml::Value =
             toml::from_str(manifest_raw).expect("manifest.toml must be valid TOML");
 
@@ -272,10 +269,7 @@ mod tests {
             .expect("output_shape must have required_fields")
             .as_array()
             .expect("required_fields must be an array");
-        let fields: Vec<&str> = required_fields
-            .iter()
-            .filter_map(|v| v.as_str())
-            .collect();
+        let fields: Vec<&str> = required_fields.iter().filter_map(|v| v.as_str()).collect();
         assert!(fields.contains(&"introduction"));
         assert!(fields.contains(&"capability_scope"));
         assert!(fields.contains(&"halt_tags"));

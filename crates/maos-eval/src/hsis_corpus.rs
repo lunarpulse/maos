@@ -6,9 +6,9 @@
 //! `crates/maos-eval/fixtures/hsis-corpus-v0/` with per-class accessors
 //! and category attestation validation.
 
-use std::path::Path;
-use serde::{Deserialize, Serialize};
 use crate::CorpusError;
+use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 /// An HSIS corpus scenario.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -103,24 +103,32 @@ pub struct HsisCorpus {
 }
 
 impl HsisCorpus {
-        /// Load all scenarios from the corpus directory structure.
+    /// Load all scenarios from the corpus directory structure.
     pub fn load(corpus_path: impl AsRef<Path>) -> Result<Self, CorpusError> {
         let base = corpus_path.as_ref();
         let mut scenarios = Vec::new();
 
-        for class in &["butler", "researcher", "observer", "orchestrator", "worker", "cliwrapper"] {
+        for class in &[
+            "butler",
+            "researcher",
+            "observer",
+            "orchestrator",
+            "worker",
+            "cliwrapper",
+        ] {
             let class_dir = base.join(class);
             if !class_dir.is_dir() {
                 continue;
             }
-            let mut entries: Vec<_> = std::fs::read_dir(&class_dir)?.collect::<Result<Vec<_>, _>>()?;
+            let mut entries: Vec<_> =
+                std::fs::read_dir(&class_dir)?.collect::<Result<Vec<_>, _>>()?;
             entries.sort_by_key(|e| e.file_name());
             for entry in entries {
                 let path = entry.path();
                 if path.extension().map_or(false, |ext| ext == "json") {
                     let content = std::fs::read_to_string(&path)?;
-                    let scenario: HsisScenario = serde_json::from_str(&content)
-                        .map_err(|e| CorpusError::Parse {
+                    let scenario: HsisScenario =
+                        serde_json::from_str(&content).map_err(|e| CorpusError::Parse {
                             path: format!("{path:?}"),
                             source: e,
                         })?;

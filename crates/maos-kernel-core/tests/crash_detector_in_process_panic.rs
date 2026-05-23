@@ -23,23 +23,30 @@ async fn panic_hook_triggers_crash_detector() {
 
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xBEEF));
     let metrics = Arc::new(IacRtMetrics::new());
-    let capability = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
-        Arc::new(maos_kernel_core::api::RingCryptoProvider),
-        maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
-        0,
-        Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
-        maos_kernel_core::capability::cap_audit::channel().0,
-        maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
-        Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
-        Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
-    ));
+    let capability = Arc::new(
+        maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
+            0,
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            maos_kernel_core::capability::cap_audit::channel().0,
+            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
+        ),
+    );
     let tmp_mem = tempfile::TempDir::new().unwrap();
     let db_path = tmp_mem.path().join("audit.db");
     let memory_root = tmp_mem.path().join("memory");
     let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
-        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(memory_root, 4)),
+        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
+            memory_root,
+            4,
+        )),
         Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path).unwrap()),
-        Arc::new(maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path).unwrap()),
+        Arc::new(
+            maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path).unwrap(),
+        ),
         Arc::clone(&tl),
     ));
     let iac = Arc::new(maos_kernel_core::iac::IacBusAdapter::new(
@@ -64,8 +71,13 @@ async fn panic_hook_triggers_crash_detector() {
     ));
 
     let mut scheduler_mut = scheduler;
-    let journal_path = std::env::temp_dir().join(format!("maos-crash-detector-test-{}.ndjson", std::process::id()));
-    let journal = Arc::new(maos_kernel_core::journal::JournalAdapter::open(&journal_path).expect("journal open"));
+    let journal_path = std::env::temp_dir().join(format!(
+        "maos-crash-detector-test-{}.ndjson",
+        std::process::id()
+    ));
+    let journal = Arc::new(
+        maos_kernel_core::journal::JournalAdapter::open(&journal_path).expect("journal open"),
+    );
     let crash_detector = Arc::new(maos_kernel_core::supervision::CrashDetector::new(
         scheduler_mut.scbs(),
         Arc::clone(&tl),

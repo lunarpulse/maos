@@ -23,9 +23,9 @@
 //! state (the shard ring) is exempt from the I9 denylist by virtue of
 //! living in this whitelisted directory.
 
-pub mod shard;
-pub mod key;
 pub mod body;
+pub mod key;
+pub mod shard;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -38,9 +38,9 @@ use subtle::ConstantTimeEq;
 
 use crate::capability::cap_audit;
 
-pub use shard::{CapShard, TokenState, TokenStateSnapshot, SHARD_COUNT};
+pub use body::{scope_hash, CapTokenBody};
 pub use key::Ed25519SigningKey;
-pub use body::{CapTokenBody, scope_hash};
+pub use shard::{CapShard, TokenState, TokenStateSnapshot, SHARD_COUNT};
 
 /// Monotonic nanosecond counter. Initialized once per boot.
 static MONOTONIC_BASE: AtomicU64 = AtomicU64::new(0);
@@ -62,7 +62,8 @@ pub fn init_monotonic_base() {
 /// Computes epoch-base + elapsed-since-init so the clock actually advances.
 pub fn monotonic_now_ns() -> u64 {
     let base = MONOTONIC_BASE.load(Ordering::Relaxed);
-    let elapsed = BOOT_INSTANT.get()
+    let elapsed = BOOT_INSTANT
+        .get()
         .map(|i| i.elapsed().as_nanos() as u64)
         .unwrap_or(0);
     base.saturating_add(elapsed)
@@ -73,7 +74,10 @@ fn generate_token_id(boot_nonce: u64) -> TokenId {
     use std::sync::atomic::{AtomicU64, Ordering};
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let c = COUNTER.fetch_add(1, Ordering::Relaxed);
-    assert!(c < u64::MAX - 1, "cap_tokens: token ID counter exhausted — restart required");
+    assert!(
+        c < u64::MAX - 1,
+        "cap_tokens: token ID counter exhausted — restart required"
+    );
     let mut bytes = [0u8; 16];
     bytes[0..8].copy_from_slice(&boot_nonce.to_be_bytes());
     bytes[8..16].copy_from_slice(&c.to_be_bytes());
@@ -162,8 +166,9 @@ impl CapTokensShardRing {
         let signature_vec = self
             .crypto
             .sign_capability_token(self.signing_key.as_seed_bytes(), &body_bytes)?;
-        let signature: [u8; 64] = signature_vec.as_slice().try_into()
-            .map_err(|_| maos_domain::ports::crypto::CryptoError::OperationFailed("signature must be 64 bytes"))?;
+        let signature: [u8; 64] = signature_vec.as_slice().try_into().map_err(|_| {
+            maos_domain::ports::crypto::CryptoError::OperationFailed("signature must be 64 bytes")
+        })?;
 
         let shard_idx = shard::hash_token_id(&token_id);
         let shard = &self.shards[shard_idx];
@@ -181,16 +186,22 @@ impl CapTokensShardRing {
         );
 
         // Audit (try_send, never block)
-        if self.audit.try_send(cap_audit::CapAuditEvent::Issue {
-            token_id,
-            spirit_pid,
-            scope,
-            ttl_secs: effective_ttl,
-        }).is_err() {
+        if self
+            .audit
+            .try_send(cap_audit::CapAuditEvent::Issue {
+                token_id,
+                spirit_pid,
+                scope,
+                ttl_secs: effective_ttl,
+            })
+            .is_err()
+        {
             cap_audit::record_drop();
         }
 
-        Ok(CapabilityToken::new(token_id, spirit_pid, expiry_ns, signature))
+        Ok(CapabilityToken::new(
+            token_id, spirit_pid, expiry_ns, signature,
+        ))
     }
 
     /// Verify a capability token. THE hot path. Must complete in <5µs P99.
@@ -207,8 +218,7 @@ impl CapTokensShardRing {
         let shard = &self.shards[shard_idx];
 
         // Read-lock on this one shard; no global lock.
-        let state = shard.get(&token.token_id)
-            .ok_or(CapError::UnknownToken)?;
+        let state = shard.get(&token.token_id).ok_or(CapError::UnknownToken)?;
 
         // Expiry check (TTL)
         let now_ns = monotonic_now_ns();
@@ -252,13 +262,13 @@ impl CapTokensShardRing {
         let shard_idx = shard::hash_token_id(&token_id);
         let shard = &self.shards[shard_idx];
 
-        let was_present = shard.set_revoked(&token_id)
+        let was_present = shard
+            .set_revoked(&token_id)
             .map_err(|_| CapError::UnknownToken)?;
         if was_present {
-            let _ = self.audit.try_send(cap_audit::CapAuditEvent::Revoke {
-                token_id,
-                reason,
-            });
+            let _ = self
+                .audit
+                .try_send(cap_audit::CapAuditEvent::Revoke { token_id, reason });
             Ok(())
         } else {
             Err(CapError::UnknownToken)
@@ -272,10 +282,14 @@ impl CapTokensShardRing {
         for shard in self.shards.iter() {
             count += shard.revoke_for_spirit(spirit_pid);
         }
-        if self.audit.try_send(cap_audit::CapAuditEvent::Revoke {
-            token_id: TokenId::ZERO,
-            reason: RevokeReason::SpiritUnload { spirit_pid, count },
-        }).is_err() {
+        if self
+            .audit
+            .try_send(cap_audit::CapAuditEvent::Revoke {
+                token_id: TokenId::ZERO,
+                reason: RevokeReason::SpiritUnload { spirit_pid, count },
+            })
+            .is_err()
+        {
             cap_audit::record_drop();
         }
         count
@@ -310,7 +324,17 @@ mod tests {
         init_monotonic_base();
         let ring = test_ring();
         let posture = [1u8; 32];
-        let token = ring.issue(7, Scope::FsRead { subtree: "/tmp".into() }, 60, posture, IntentClass::Standard).unwrap();
+        let token = ring
+            .issue(
+                7,
+                Scope::FsRead {
+                    subtree: "/tmp".into(),
+                },
+                60,
+                posture,
+                IntentClass::Standard,
+            )
+            .unwrap();
         assert_eq!(token.spirit_pid, 7);
         assert!(ring.verify(&token, posture, SandboxTier(2)).is_ok());
     }
@@ -321,9 +345,22 @@ mod tests {
         let ring = test_ring();
         let posture_v1 = [1u8; 32];
         let posture_v2 = [2u8; 32];
-        let token = ring.issue(7, Scope::FsRead { subtree: "/tmp".into() }, 60, posture_v1, IntentClass::Standard).unwrap();
+        let token = ring
+            .issue(
+                7,
+                Scope::FsRead {
+                    subtree: "/tmp".into(),
+                },
+                60,
+                posture_v1,
+                IntentClass::Standard,
+            )
+            .unwrap();
         assert!(ring.verify(&token, posture_v1, SandboxTier(2)).is_ok());
-        assert_eq!(ring.verify(&token, posture_v2, SandboxTier(2)), Err(CapError::PostureMismatch));
+        assert_eq!(
+            ring.verify(&token, posture_v2, SandboxTier(2)),
+            Err(CapError::PostureMismatch)
+        );
     }
 
     #[test]
@@ -331,10 +368,23 @@ mod tests {
         init_monotonic_base();
         let ring = test_ring();
         let posture = [1u8; 32];
-        let token = ring.issue(7, Scope::FsRead { subtree: "/tmp".into() }, 60, posture, IntentClass::Standard).unwrap();
+        let token = ring
+            .issue(
+                7,
+                Scope::FsRead {
+                    subtree: "/tmp".into(),
+                },
+                60,
+                posture,
+                IntentClass::Standard,
+            )
+            .unwrap();
         let mut tampered = token.clone();
         tampered.spirit_pid = 8;
-        assert_eq!(ring.verify(&tampered, posture, SandboxTier(2)), Err(CapError::SpiritIdMismatch));
+        assert_eq!(
+            ring.verify(&tampered, posture, SandboxTier(2)),
+            Err(CapError::SpiritIdMismatch)
+        );
     }
 
     #[test]
@@ -342,9 +392,22 @@ mod tests {
         init_monotonic_base();
         let ring = test_ring();
         let posture = [1u8; 32];
-        let token = ring.issue(7, Scope::FsRead { subtree: "/tmp".into() }, 60, posture, IntentClass::Standard).unwrap();
+        let token = ring
+            .issue(
+                7,
+                Scope::FsRead {
+                    subtree: "/tmp".into(),
+                },
+                60,
+                posture,
+                IntentClass::Standard,
+            )
+            .unwrap();
         ring.revoke(token.token_id, RevokeReason::Operator).unwrap();
-        assert_eq!(ring.verify(&token, posture, SandboxTier(2)), Err(CapError::Revoked));
+        assert_eq!(
+            ring.verify(&token, posture, SandboxTier(2)),
+            Err(CapError::Revoked)
+        );
     }
 
     #[test]
@@ -352,7 +415,17 @@ mod tests {
         init_monotonic_base();
         let ring = test_ring();
         let posture = [1u8; 32];
-        let token = ring.issue(7, Scope::FsRead { subtree: "/tmp".into() }, 3600, posture, IntentClass::HighPrivilege).unwrap();
+        let token = ring
+            .issue(
+                7,
+                Scope::FsRead {
+                    subtree: "/tmp".into(),
+                },
+                3600,
+                posture,
+                IntentClass::HighPrivilege,
+            )
+            .unwrap();
         let now_ns = monotonic_now_ns();
         assert!(token.expiry_ns <= now_ns + 60 * 1_000_000_000 + 1_000_000);
     }

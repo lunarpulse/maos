@@ -105,11 +105,7 @@ fn canonical_form(item: &SecretRedactionItem) -> String {
 }
 
 /// Build a single corpus item from a seed and variant combo.
-fn build_item(
-    idx: usize,
-    seed: &SecretRedactionSeed,
-    variant_combo: &str,
-) -> SecretRedactionItem {
+fn build_item(idx: usize, seed: &SecretRedactionSeed, variant_combo: &str) -> SecretRedactionItem {
     let id = format!("secret-red-{:05}", idx + 1);
     let raw = synthetic_raw(seed, idx, variant_combo);
     let expected_redacted = synthetic_redacted(seed, &raw);
@@ -131,7 +127,11 @@ fn deterministic_variant(variant_idx: usize, seed_id_bytes: &[u8]) -> String {
     hasher.update(b":variant:");
     hasher.update(variant_idx.to_le_bytes());
     let hash = hasher.finalize();
-    let hex = hash.iter().take(4).map(|b| format!("{:02x}", b)).collect::<String>();
+    let hex = hash
+        .iter()
+        .take(4)
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
     format!("v-{}", hex)
 }
 
@@ -282,7 +282,10 @@ fn synthetic_redacted(seed: &SecretRedactionSeed, raw: &str) -> String {
         let mut h = Sha256::new();
         h.update(raw.as_bytes());
         let d = h.finalize();
-        d.iter().take(4).map(|b| format!("{:02x}", b)).collect::<String>()
+        d.iter()
+            .take(4)
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>()
     };
     format!(
         "<REDACTED:type={},len={},hash={}>",

@@ -33,9 +33,8 @@ pub fn run(workspace_root: &Path, check_mode: bool, json_mode: bool) -> Result<(
                 continue;
             }
             let example_path = example_dir.join(rel_path);
-            let committed_content = std::fs::read_to_string(&example_path).map_err(|e| {
-                format!("failed to read {}: {e}", example_path.display())
-            })?;
+            let committed_content = std::fs::read_to_string(&example_path)
+                .map_err(|e| format!("failed to read {}: {e}", example_path.display()))?;
             if *rendered_content != committed_content {
                 mismatches.push(format!(
                     "drift: {rel_path}: rendered output differs from committed example-spirit"
@@ -85,12 +84,9 @@ pub fn run(workspace_root: &Path, check_mode: bool, json_mode: bool) -> Result<(
 }
 
 /// Recursively read all files under a template directory into a BTreeMap.
-fn read_template_files(
-    dir: &Path,
-    out: &mut BTreeMap<String, String>,
-) -> Result<(), String> {
-    for entry in std::fs::read_dir(dir)
-        .map_err(|e| format!("failed to read dir {}: {e}", dir.display()))?
+fn read_template_files(dir: &Path, out: &mut BTreeMap<String, String>) -> Result<(), String> {
+    for entry in
+        std::fs::read_dir(dir).map_err(|e| format!("failed to read dir {}: {e}", dir.display()))?
     {
         let entry = entry.map_err(|e| format!("dir entry error: {e}"))?;
         let path = entry.path();
@@ -171,4 +167,3 @@ fn extract_features(line: &str) -> String {
         _ => String::new(),
     }
 }
-

@@ -264,3 +264,30 @@ existing exempt holders (TransparencyLogAdapter, MemoryManagerAdapter,
 LogRecallAdapter, HaltRegistry). Same exemption shape as `SelfTelemetryAggregator`
 (Story 4.3) and `LogRecallAdapter` (Story 4.4). No parameter drift; no learned
 state; counters are discarded after each `run_all` call.
+
+### `UpgradeOrchestrator` — `crates/maos-kernel-core/src/lifecycle/upgrade.rs`
+
+**Reason:** upgrade orchestrator composite (Story 5.4) — holds `Arc` references to
+existing exempt kernel adapters (SpiritSchedulerAdapter, HotSwapCoordinator,
+TransparencyLogAdapter, JournalAdapter, IacRtMetrics). Does NOT retain mutable
+state across calls; delegates to already-exempt sub-modules. The `UpgradeReport`
+and `UpgradeError` types are transient value types. No parameter drift; no learned
+state.
+
+### `RevocationApplier` — `crates/maos-kernel-core/src/revocation/applier.rs`
+
+**Reason:** revocation applier composite (Story 5.4) — holds `Arc` references to
+existing exempt kernel adapters (CapabilityRegistryAdapter, IacBusAdapter,
+HaltRegistry, TransparencyLogAdapter, JournalAdapter, IacRtMetrics). The
+`applied_crls: BTreeSet<CrlId>` is an idempotency cache for already-processed
+CRLs; it is bounded by operator-supplied input (not learned state). The
+`active_drains: BTreeMap<u32, JoinHandle<()>>` tracks in-flight deadline tasks
+for `DrainThenTerminate` policy; bounded by the number of loaded Spirits. No
+parameter drift.
+
+### `RevocationPoller` — `crates/maos-kernel-core/src/revocation/poller.rs`
+
+**Reason:** revocation poller composite (Story 5.4) — holds `Arc` references to
+RevocationApplier, RegistryClient, CryptoProvider, and IacRtMetrics. The poller
+is a stateless periodic fetch loop; all mutable state lives in the already-exempt
+RevocationApplier. No parameter drift; no learned state.

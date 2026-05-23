@@ -1,6 +1,8 @@
 use std::path::Path;
 
-use crate::corpus_types::{load_toml, CorpusManifest, CoverageMatrixFile, GateRegistry, PhaseConfig};
+use crate::corpus_types::{
+    load_toml, CorpusManifest, CoverageMatrixFile, GateRegistry, PhaseConfig,
+};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Violation {
@@ -29,30 +31,65 @@ pub struct Report {
     pub checked: usize,
 }
 
-pub fn run(config_path: &str, phase_config_path: &str, manifest_path: &str, gate_registry_path: &str, json: bool) -> Result<(), String> {
-    let report = check_coverage_matrix(Path::new(config_path), Path::new(phase_config_path), Path::new(manifest_path), Path::new(gate_registry_path))?;
+pub fn run(
+    config_path: &str,
+    phase_config_path: &str,
+    manifest_path: &str,
+    gate_registry_path: &str,
+    json: bool,
+) -> Result<(), String> {
+    let report = check_coverage_matrix(
+        Path::new(config_path),
+        Path::new(phase_config_path),
+        Path::new(manifest_path),
+        Path::new(gate_registry_path),
+    )?;
     if json {
-        println!("{}", serde_json::to_string_pretty(&report).unwrap_or_else(|e| format!("{{\"error\":\"json serialize failed: {e}\"}}")));
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report)
+                .unwrap_or_else(|e| format!("{{\"error\":\"json serialize failed: {e}\"}}"))
+        );
     } else {
         if report.passed && report.violations.is_empty() {
             println!("coverage-matrix: PASSED ({} rows checked)", report.checked);
         } else {
-            for v in &report.violations { eprintln!("{v}"); }
+            for v in &report.violations {
+                eprintln!("{v}");
+            }
         }
-        for d in &report.out_of_scope_deferred { eprintln!("coverage-matrix: deferred {} at phase {}", d.id, d.phase); }
+        for d in &report.out_of_scope_deferred {
+            eprintln!("coverage-matrix: deferred {} at phase {}", d.id, d.phase);
+        }
     }
-    if !report.violations.is_empty() && report.mode == "hard" { return Err("coverage-matrix failed".into()); }
+    if !report.violations.is_empty() && report.mode == "hard" {
+        return Err("coverage-matrix failed".into());
+    }
     Ok(())
 }
 
-fn check_coverage_matrix(config_path: &Path, phase_config_path: &Path, manifest_path: &Path, gate_registry_path: &Path) -> Result<Report, String> {
-    let yaml_src = std::fs::read_to_string(config_path).map_err(|e| format!("cannot read {}: {e}", config_path.display()))?;
-    let coverage: CoverageMatrixFile = serde_yaml::from_str(&yaml_src).map_err(|e| format!("yaml parse error in {}: {e}", config_path.display()))?;
+fn check_coverage_matrix(
+    config_path: &Path,
+    phase_config_path: &Path,
+    manifest_path: &Path,
+    gate_registry_path: &Path,
+) -> Result<Report, String> {
+    let yaml_src = std::fs::read_to_string(config_path)
+        .map_err(|e| format!("cannot read {}: {e}", config_path.display()))?;
+    let coverage: CoverageMatrixFile = serde_yaml::from_str(&yaml_src)
+        .map_err(|e| format!("yaml parse error in {}: {e}", config_path.display()))?;
     let phase_config: PhaseConfig = load_toml(phase_config_path)?;
-    let manifest: CorpusManifest = if manifest_path.exists() { load_toml(manifest_path)? } else { CorpusManifest { corpus: std::collections::BTreeMap::new() } };
+    let manifest: CorpusManifest = if manifest_path.exists() {
+        load_toml(manifest_path)?
+    } else {
+        CorpusManifest {
+            corpus: std::collections::BTreeMap::new(),
+        }
+    };
     let registry: GateRegistry = load_toml(gate_registry_path)?;
 
-    let manifest_keys: std::collections::HashSet<String> = manifest.corpus.keys().cloned().collect();
+    let manifest_keys: std::collections::HashSet<String> =
+        manifest.corpus.keys().cloned().collect();
     let registry_keys: std::collections::HashSet<String> = registry.gates.into_iter().collect();
     let mut violations = Vec::new();
     let mut deferred = Vec::new();
@@ -62,10 +99,22 @@ fn check_coverage_matrix(config_path: &Path, phase_config_path: &Path, manifest_
         violations.push(Violation { id: "phase-mismatch".into(), message: format!("NFR-Meta-3 violation: phase mismatch — coverage-matrix.yaml says {}, phase-config.toml says {}", coverage.current_phase, phase_config.current_phase) });
     }
     if !coverage.phase_order.contains(&coverage.current_phase) {
-        violations.push(Violation { id: "invalid-current-phase".into(), message: format!("NFR-Meta-3 violation: current_phase '{}' not in phase_order", coverage.current_phase) });
+        violations.push(Violation {
+            id: "invalid-current-phase".into(),
+            message: format!(
+                "NFR-Meta-3 violation: current_phase '{}' not in phase_order",
+                coverage.current_phase
+            ),
+        });
     }
     if !matches!(coverage.mode.as_str(), "warning" | "hard") {
-        violations.push(Violation { id: "invalid-mode".into(), message: format!("NFR-Meta-3 violation: mode must be 'warning' or 'hard', got '{}'", coverage.mode) });
+        violations.push(Violation {
+            id: "invalid-mode".into(),
+            message: format!(
+                "NFR-Meta-3 violation: mode must be 'warning' or 'hard', got '{}'",
+                coverage.mode
+            ),
+        });
     }
     if phase_config.phase_order != coverage.phase_order {
         violations.push(Violation { id: "phase-order-drift".into(), message: format!("NFR-Meta-3 violation: phase_order mismatch — coverage-matrix.yaml and phase-config.toml diverge") });
@@ -74,7 +123,13 @@ fn check_coverage_matrix(config_path: &Path, phase_config_path: &Path, manifest_
     for (id, row) in &coverage.coverage {
         checked += 1;
         if !coverage.phase_order.contains(&row.phase) {
-            violations.push(Violation { id: id.clone(), message: format!("NFR-Meta-3 violation: {} has invalid phase '{}' not in phase_order", id, row.phase) });
+            violations.push(Violation {
+                id: id.clone(),
+                message: format!(
+                    "NFR-Meta-3 violation: {} has invalid phase '{}' not in phase_order",
+                    id, row.phase
+                ),
+            });
             continue;
         }
         for corpus_name in &row.corpora {
@@ -92,7 +147,10 @@ fn check_coverage_matrix(config_path: &Path, phase_config_path: &Path, manifest_
                 violations.push(Violation { id: id.clone(), message: format!("NFR-Meta-3 violation: {} delivered at {} has zero corpus and zero gate coverage", id, row.phase) });
             }
         } else {
-            deferred.push(DeferredRow { id: id.clone(), phase: row.phase.clone() });
+            deferred.push(DeferredRow {
+                id: id.clone(),
+                phase: row.phase.clone(),
+            });
         }
     }
 
@@ -103,20 +161,34 @@ fn check_coverage_matrix(config_path: &Path, phase_config_path: &Path, manifest_
         if !coverage.coverage.contains_key(&fr_key) {
             violations.push(Violation {
                 id: "complete-FR-coverage".into(),
-                message: format!("NFR-Meta-3 lint: complete-FR-coverage — {} absent from coverage-matrix.yaml", fr_key),
+                message: format!(
+                    "NFR-Meta-3 lint: complete-FR-coverage — {} absent from coverage-matrix.yaml",
+                    fr_key
+                ),
             });
         }
     }
 
     let passed = violations.is_empty();
-    Ok(Report { passed, mode: coverage.mode.clone(), violations, out_of_scope_deferred: deferred, checked })
+    Ok(Report {
+        passed,
+        mode: coverage.mode.clone(),
+        violations,
+        out_of_scope_deferred: deferred,
+        checked,
+    })
 }
 
 pub fn phase_le(a: &str, b: &str, order: &[String]) -> bool {
     let a_idx = order.iter().position(|p| p == a);
     let b_idx = order.iter().position(|p| p == b);
-    match (a_idx, b_idx) { (Some(ai), Some(bi)) => ai <= bi, _ => false }
+    match (a_idx, b_idx) {
+        (Some(ai), Some(bi)) => ai <= bi,
+        _ => false,
+    }
 }
 
 #[cfg(test)]
-mod tests { include!("tests/coverage_matrix_tests.rs"); }
+mod tests {
+    include!("tests/coverage_matrix_tests.rs");
+}

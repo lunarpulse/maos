@@ -7,8 +7,8 @@
 //! construction returns `ProviderError::Unconfigured`.
 
 use maos_domain::ports::inference::{
-    InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution,
-    StopReason, TokenUsage,
+    InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+    TokenUsage,
 };
 use maos_domain::ports::IoSubsystemPort;
 
@@ -33,9 +33,8 @@ impl AnthropicProvider {
         endpoint_url: String,
         model_id: String,
     ) -> Result<Self, ProviderError> {
-        let api_key = std::env::var("MAOS_ANTHROPIC_API_KEY").map_err(|_| {
-            ProviderError::Unconfigured
-        })?;
+        let api_key =
+            std::env::var("MAOS_ANTHROPIC_API_KEY").map_err(|_| ProviderError::Unconfigured)?;
         Ok(Self {
             api_key,
             endpoint_url,
@@ -62,12 +61,10 @@ impl AnthropicProvider {
 }
 
 impl Provider for AnthropicProvider {
-    fn complete(
-        &self,
-        req: &InferenceRequest,
-    ) -> Result<InferenceResponse, ProviderError> {
+    fn complete(&self, req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
         let body = build_request_body(req, &self.model_id);
-        let body_bytes = serde_json::to_vec(&body).map_err(|e| ProviderError::Serde(e.to_string()))?;
+        let body_bytes =
+            serde_json::to_vec(&body).map_err(|e| ProviderError::Serde(e.to_string()))?;
 
         let url = format!("{}/v1/messages", self.endpoint_url);
         let response_bytes = self
@@ -214,8 +211,12 @@ mod tests {
             "stop_reason": "end_turn",
             "usage": { "input_tokens": 5, "output_tokens": 10 }
         });
-        let resp = parse_response(&json, "https://api.anthropic.com", "claude-3-haiku-20240307")
-            .unwrap();
+        let resp = parse_response(
+            &json,
+            "https://api.anthropic.com",
+            "claude-3-haiku-20240307",
+        )
+        .unwrap();
         assert_eq!(resp.text, "Greetings!");
         assert!(matches!(resp.stop_reason, StopReason::StopSequence));
         assert_eq!(resp.usage.input_tokens, 5);
@@ -230,8 +231,12 @@ mod tests {
             "stop_reason": "max_tokens",
             "usage": { "input_tokens": 1, "output_tokens": 2 }
         });
-        let resp = parse_response(&json, "https://api.anthropic.com", "claude-3-haiku-20240307")
-            .unwrap();
+        let resp = parse_response(
+            &json,
+            "https://api.anthropic.com",
+            "claude-3-haiku-20240307",
+        )
+        .unwrap();
         assert!(matches!(resp.stop_reason, StopReason::MaxTokens));
     }
 
@@ -242,9 +247,8 @@ mod tests {
             "stop_reason": "end_turn",
             "usage": { "input_tokens": 3, "output_tokens": 4 }
         });
-        let transport = std::sync::Arc::new(MockTransport(
-            serde_json::to_vec(&response_json).unwrap(),
-        ));
+        let transport =
+            std::sync::Arc::new(MockTransport(serde_json::to_vec(&response_json).unwrap()));
         let provider = AnthropicProvider::with_api_key(
             transport,
             "https://api.anthropic.com".into(),
@@ -282,9 +286,8 @@ mod tests {
             "stop_reason": "end_turn",
             "usage": { "input_tokens": 1, "output_tokens": 1 }
         });
-        let transport = std::sync::Arc::new(MockTransport(
-            serde_json::to_vec(&response_json).unwrap(),
-        ));
+        let transport =
+            std::sync::Arc::new(MockTransport(serde_json::to_vec(&response_json).unwrap()));
         let provider = AnthropicProvider::new(
             transport,
             "https://api.anthropic.com".into(),

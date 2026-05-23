@@ -7,8 +7,8 @@
 //! (triggering `EMigratorMissing` if no migrator is declared).
 
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::io;
+use std::path::{Path, PathBuf};
 
 /// Errors from archive operations.
 #[derive(Debug)]

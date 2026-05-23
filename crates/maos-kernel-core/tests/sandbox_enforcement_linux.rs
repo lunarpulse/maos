@@ -11,10 +11,10 @@
 use std::io;
 use std::process::Command;
 
-use maos_kernel_core::security::sandbox::{
-    spawn_sandboxed, classify_exit, SandboxSpec, SpawnError,
-};
 use maos_domain::invariants::i9::SandboxTier;
+use maos_kernel_core::security::sandbox::{
+    classify_exit, spawn_sandboxed, SandboxSpec, SpawnError,
+};
 
 fn skip_if_perm_denied<T>(result: Result<T, SpawnError>, test_name: &str) -> Option<T> {
     match result {
@@ -72,7 +72,10 @@ fn t2_benign_process_not_killed_by_seccomp() {
         None => return,
     };
     let status = child.wait().unwrap();
-    assert!(status.success(), "benign sh+echo must survive seccomp allow-list");
+    assert!(
+        status.success(),
+        "benign sh+echo must survive seccomp allow-list"
+    );
 }
 
 #[test]

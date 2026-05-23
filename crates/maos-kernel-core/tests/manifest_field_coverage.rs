@@ -165,11 +165,7 @@ fn find_orphan_fixtures(root: &Path) -> Vec<PathBuf> {
 #[test]
 fn test_nfr_test_13_three_cases_per_field() {
     let root = fixture_root();
-    assert!(
-        root.is_dir(),
-        "fixture root missing: {}",
-        root.display()
-    );
+    assert!(root.is_dir(), "fixture root missing: {}", root.display());
 
     let mut shortfalls: Vec<String> = Vec::new();
     for (section, field) in MANIFEST_FIELDS {

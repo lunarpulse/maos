@@ -11,10 +11,14 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Mutex;
 
-use maos_domain::supervision::{ChildExitStatus, ChildHandle, SubprocessSupervisor, SupervisionError};
+use maos_domain::supervision::{
+    ChildExitStatus, ChildHandle, SubprocessSupervisor, SupervisionError,
+};
 
 /// Test double: `wait_for_exit` resolves with a pre-configured exit status.
-#[maos_attrs::i9_exempt(reason = "test double — transient per-test state; production wiring uses real SubprocessSupervisor impl")]
+#[maos_attrs::i9_exempt(
+    reason = "test double — transient per-test state; production wiring uses real SubprocessSupervisor impl"
+)]
 pub struct SimulatedChildSupervisor {
     next_handle: Mutex<u64>,
     exit_status: Mutex<Option<ChildExitStatus>>,
@@ -46,7 +50,12 @@ impl SubprocessSupervisor for SimulatedChildSupervisor {
         &self,
         _child: ChildHandle,
     ) -> Pin<Box<dyn Future<Output = ChildExitStatus> + Send>> {
-        let status = self.exit_status.lock().expect("lock poisoned").take().unwrap_or(ChildExitStatus::CleanEof);
+        let status = self
+            .exit_status
+            .lock()
+            .expect("lock poisoned")
+            .take()
+            .unwrap_or(ChildExitStatus::CleanEof);
         Box::pin(async move { status })
     }
 }

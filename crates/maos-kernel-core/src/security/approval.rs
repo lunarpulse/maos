@@ -12,19 +12,21 @@
 
 use std::sync::Arc;
 
+use maos_director_surface::notification::NotificationDispatcher;
 use maos_domain::invariants::i4::ApprovalDecision;
 use maos_domain::notification::{ApprovalClass, NotificationEvent, NotificationLevel};
-use maos_director_surface::notification::NotificationDispatcher;
 
 use crate::iac::transparency_log::{AuditError, TransparencyLogAdapter};
-use crate::security::posture::posture_requires_approval;
 use crate::security::manifest::Posture;
+use crate::security::posture::posture_requires_approval;
 
 /// Approval Manager — v0.3-β.
 ///
 /// At v0.3-β returns `Ok(true)` (auto-allow with logged decision).
 /// Story 3.3 adds interactive resolution.
-#[maos_attrs::i9_exempt(reason = "Approval Manager adapter; holds Arc<TransparencyLogAdapter> + AtomicU64 counter — transient/sanctioned state")]
+#[maos_attrs::i9_exempt(
+    reason = "Approval Manager adapter; holds Arc<TransparencyLogAdapter> + AtomicU64 counter — transient/sanctioned state"
+)]
 pub struct ApprovalManager {
     log: Arc<TransparencyLogAdapter>,
     decision_counter: std::sync::atomic::AtomicU64,
@@ -126,7 +128,9 @@ mod tests {
     ) {
         let events = std::sync::Arc::new(Mutex::new(Vec::new()));
         let mut dispatcher = NotificationDispatcher::new();
-        dispatcher.register(Box::new(CaptureChannel::new(std::sync::Arc::clone(&events))));
+        dispatcher.register(Box::new(CaptureChannel::new(std::sync::Arc::clone(
+            &events,
+        ))));
         (events, dispatcher)
     }
 
@@ -157,12 +161,17 @@ mod tests {
         let mgr = ApprovalManager::new(Arc::clone(&log));
         let dispatcher = NotificationDispatcher::new();
 
-        mgr.prompt(ApprovalClass::ReadonlyScoped, "a".into(), None, &dispatcher).unwrap();
-        mgr.prompt(ApprovalClass::Mutating, "b".into(), None, &dispatcher).unwrap();
+        mgr.prompt(ApprovalClass::ReadonlyScoped, "a".into(), None, &dispatcher)
+            .unwrap();
+        mgr.prompt(ApprovalClass::Mutating, "b".into(), None, &dispatcher)
+            .unwrap();
 
         let approvals = log.query_approvals(None).unwrap();
         assert_eq!(approvals.len(), 2, "two decisions should be logged");
-        assert_ne!(approvals[0].capability, approvals[1].capability, "decisions should be distinct");
+        assert_ne!(
+            approvals[0].capability, approvals[1].capability,
+            "decisions should be distinct"
+        );
     }
 
     #[test]
@@ -186,7 +195,10 @@ mod tests {
         let approvals = log.query_approvals(None).unwrap();
         assert!(approvals.is_empty(), "silent allow should not log");
         // No notification should be dispatched (silent allow)
-        assert!(captured.lock().unwrap().is_empty(), "silent allow should not dispatch notification");
+        assert!(
+            captured.lock().unwrap().is_empty(),
+            "silent allow should not dispatch notification"
+        );
     }
 
     #[test]
@@ -210,7 +222,11 @@ mod tests {
         assert_eq!(approvals.len(), 1, "should log approval decision");
         assert_eq!(approvals[0].capability, "fs.write");
         // Notification must have been dispatched
-        assert_eq!(captured.lock().unwrap().len(), 1, "should dispatch notification");
+        assert_eq!(
+            captured.lock().unwrap().len(),
+            1,
+            "should dispatch notification"
+        );
     }
 
     #[test]
@@ -222,37 +238,38 @@ mod tests {
             let mgr = ApprovalManager::new(Arc::clone(&log));
             let (captured, dispatcher) = make_capture_dispatcher();
 
-            let result = mgr.prompt_with_posture(
-                *posture,
-                *class,
-                "test.cap".into(),
-                None,
-                &dispatcher,
-            );
+            let result =
+                mgr.prompt_with_posture(*posture, *class, "test.cap".into(), None, &dispatcher);
             assert!(result.is_ok());
 
             let approvals = log.query_approvals(None).unwrap();
             if *requires_approval {
                 assert_eq!(
-                    approvals.len(), 1,
+                    approvals.len(),
+                    1,
                     "(posture={:?}, class={:?}) should prompt",
-                    posture, class
+                    posture,
+                    class
                 );
                 assert_eq!(
-                    captured.lock().unwrap().len(), 1,
+                    captured.lock().unwrap().len(),
+                    1,
                     "(posture={:?}, class={:?}) should dispatch notification",
-                    posture, class
+                    posture,
+                    class
                 );
             } else {
                 assert!(
                     approvals.is_empty(),
                     "(posture={:?}, class={:?}) should silent-allow",
-                    posture, class
+                    posture,
+                    class
                 );
                 assert!(
                     captured.lock().unwrap().is_empty(),
                     "(posture={:?}, class={:?}) should not dispatch notification",
-                    posture, class
+                    posture,
+                    class
                 );
             }
         }

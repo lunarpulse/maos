@@ -12,11 +12,11 @@
 //! hung-Spirit detection) that AC4's 1000-termination corpus probes;
 //! Story 4.1 scaffolds the planned-termination receipt path.
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::halt::HaltRegistry;
+use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use maos_domain::halt::{HaltId, HaltReceipt, HaltState, TerminationKind};
 use maos_domain::invariants::i3::FrameOrigin;
-use crate::halt::HaltRegistry;
-use crate::iac::transparency_log::{TransparencyLogAdapter, FrameKind};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Drain all pending halts for a Spirit, produce HaltReceipts, and
 /// write them to the Transparency Log. For Spirits with zero pending
@@ -68,9 +68,7 @@ pub fn terminate_spirit(
         // Write serialized receipt to TL
         let payload = match serde_json::to_vec(&receipt) {
             Ok(p) => p,
-            Err(e) => {
-                format!(r#"{{"error":"{}","halt_id":"{}"}}"#, e, hid.as_str()).into_bytes()
-            }
+            Err(e) => format!(r#"{{"error":"{}","halt_id":"{}"}}"#, e, hid.as_str()).into_bytes(),
         };
         tl.insert_frame_event(
             FrameKind::EpistemicHalt,

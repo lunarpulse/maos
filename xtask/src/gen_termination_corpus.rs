@@ -26,8 +26,7 @@ fn sp(n: usize) -> String {
 
 pub fn run(out_dir: &str) -> Result<(), String> {
     let dir = PathBuf::from(out_dir);
-    fs::create_dir_all(&dir)
-        .map_err(|e| format!("mkdir {out_dir}: {e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| format!("mkdir {out_dir}: {e}"))?;
 
     let mut n = 0usize;
 
@@ -197,10 +196,9 @@ pub fn run(out_dir: &str) -> Result<(), String> {
 
 fn write_scenario(dir: &std::path::Path, n: usize, scenario: &Value) -> Result<(), String> {
     let path = dir.join(format!("scenario-{:04}.json", n));
-    let mut f = fs::File::create(&path)
-        .map_err(|e| format!("create {path:?}: {e}"))?;
-    let json = serde_json::to_string_pretty(scenario)
-        .map_err(|e| format!("json serialize: {e}"))?;
+    let mut f = fs::File::create(&path).map_err(|e| format!("create {path:?}: {e}"))?;
+    let json =
+        serde_json::to_string_pretty(scenario).map_err(|e| format!("json serialize: {e}"))?;
     f.write_all(json.as_bytes())
         .map_err(|e| format!("write {path:?}: {e}"))?;
     Ok(())
@@ -244,7 +242,8 @@ mod tests {
 
         let mut kinds = std::collections::HashMap::<String, usize>::new();
         for i in 1..=1000 {
-            let content = std::fs::read_to_string(dir.join(format!("scenario-{:04}.json", i))).unwrap();
+            let content =
+                std::fs::read_to_string(dir.join(format!("scenario-{:04}.json", i))).unwrap();
             let v: serde_json::Value = serde_json::from_str(&content).unwrap();
             let kind = v["kind"].as_str().unwrap().to_string();
             *kinds.entry(kind).or_default() += 1;

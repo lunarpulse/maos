@@ -3,14 +3,16 @@
 //! Per-halt output-marker registry. Story 4.2's predicate-firing path
 //! consumes markers via `consume_for_halt(halt_id) -> Vec<OutputMarker>`.
 
-use std::collections::VecDeque;
-use std::sync::Mutex;
 use dashmap::DashMap;
 use maos_domain::halt::{HaltId, OutputMarker};
+use std::collections::VecDeque;
+use std::sync::Mutex;
 
 /// Per-halt output-marker registry. Story 4.2's predicate-firing path
 /// consumes markers via `consume_for_halt(halt_id) -> Vec<OutputMarker>`.
-#[maos_attrs::i9_exempt(reason = "halt mechanism — per-process override markers awaiting output_shape consumption; transient kernel state parallel to OrchestratorBuffer")]
+#[maos_attrs::i9_exempt(
+    reason = "halt mechanism — per-process override markers awaiting output_shape consumption; transient kernel state parallel to OrchestratorBuffer"
+)]
 #[derive(Debug, Default)]
 pub struct OutputMarkerRegistry {
     by_halt: DashMap<HaltId, Mutex<VecDeque<OutputMarker>>>,
@@ -26,7 +28,10 @@ impl OutputMarkerRegistry {
             .by_halt
             .entry(halt_id.clone())
             .or_insert_with(|| Mutex::new(VecDeque::new()));
-        queue.lock().expect("OutputMarkerRegistry lock poisoned").push_back(marker);
+        queue
+            .lock()
+            .expect("OutputMarkerRegistry lock poisoned")
+            .push_back(marker);
     }
 
     pub fn consume_for_halt(&self, halt_id: &HaltId) -> Vec<OutputMarker> {

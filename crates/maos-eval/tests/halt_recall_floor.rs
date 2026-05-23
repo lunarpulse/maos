@@ -49,9 +49,8 @@ fn simulate_predicate(scenario: &maos_eval::HaltScenario) -> bool {
 
 #[test]
 fn test_halt_recall_floor() {
-    let corpus = HaltCorpus::load_from(
-        std::path::Path::new("fixtures/halt-corpus-v0/"),
-    ).expect("halt-corpus-v0 must exist");
+    let corpus = HaltCorpus::load_from(std::path::Path::new("fixtures/halt-corpus-v0/"))
+        .expect("halt-corpus-v0 must exist");
     assert_eq!(corpus.len(), 62, "corpus size lock — 62 synthetic scenarios authoritative (50 base + 12 Story 4.2 within/outside)");
     assert!(
         corpus.scenarios.iter().all(|s| s.tag == "synthetic-v0"),
@@ -106,8 +105,16 @@ fn test_halt_recall_floor() {
         }
     }
 
-    let recall = if tp + fn_count == 0 { 0.0 } else { tp as f64 / (tp + fn_count) as f64 };
-    let precision = if tp + fp == 0 { 0.0 } else { tp as f64 / (tp + fp) as f64 };
+    let recall = if tp + fn_count == 0 {
+        0.0
+    } else {
+        tp as f64 / (tp + fn_count) as f64
+    };
+    let precision = if tp + fp == 0 {
+        0.0
+    } else {
+        tp as f64 / (tp + fp) as f64
+    };
     let predicate_recall = predicate_fired as f64 / predicate_expected.max(1) as f64;
 
     assert!(

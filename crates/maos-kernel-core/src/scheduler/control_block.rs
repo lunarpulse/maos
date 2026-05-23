@@ -8,16 +8,19 @@
 use std::sync::atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 
+use crate::scheduler::kernel_ctx::KernelCtx;
 use maos_domain::lifecycle::{LifecycleError, SpiritLifecycleState};
 use maos_spirit_abi::lifecycle::Spirit;
-use crate::scheduler::kernel_ctx::KernelCtx;
 
 use std::sync::Mutex;
 
-use crate::security::manifest::{ClassSection, LifecycleSection, OnCrashSection, SchedulingSection, SupervisionSection};
-use maos_domain::ports::task::TaskAssignmentRecord;
-use maos_domain::supervision::OnCrashAction;
+use crate::security::manifest::{
+    ClassSection, LifecycleSection, OnCrashSection, SchedulingSection, SupervisionSection,
+};
 use maos_domain::invariants::i9::SandboxTier;
+use maos_domain::ports::task::TaskAssignmentRecord;
+use maos_domain::revocation::RevocationAction;
+use maos_domain::supervision::OnCrashAction;
 
 /// Kernel-side mirror of `maos_domain::lifecycle::SpiritLifecycleState`
 /// encoded as a `repr(u8)` for atomic CAS transitions.
@@ -84,8 +87,11 @@ pub trait AnySpiritObj: Send + Sync {
     /// Story 5.2 — state snapshot hook (returns CBOR-encoded state blob).
     fn snapshot(&self, ctx: &mut KernelCtx) -> Vec<u8>;
     /// Story 5.2 — cross-major migration hook.
-    fn migrate(&self, ctx: &mut KernelCtx, predecessor_state: &[u8])
-        -> Result<Vec<u8>, maos_spirit_abi::lifecycle::MigratorError>;
+    fn migrate(
+        &self,
+        ctx: &mut KernelCtx,
+        predecessor_state: &[u8],
+    ) -> Result<Vec<u8>, maos_spirit_abi::lifecycle::MigratorError>;
 }
 
 /// Wraps a concrete `T: Spirit` with its `SpiritVtable` into an `AnySpiritObj`.
@@ -169,16 +175,17 @@ impl<T: Spirit + Send + Sync + 'static> AnySpiritObj for VtableSpiritObj<T> {
     fn snapshot(&self, kctx: &mut KernelCtx) -> Vec<u8> {
         (self.vtable.snapshot)(&self.spirit, kctx.ctx)
     }
-    fn migrate(&self, kctx: &mut KernelCtx, predecessor_state: &[u8])
-        -> Result<Vec<u8>, maos_spirit_abi::lifecycle::MigratorError> {
+    fn migrate(
+        &self,
+        kctx: &mut KernelCtx,
+        predecessor_state: &[u8],
+    ) -> Result<Vec<u8>, maos_spirit_abi::lifecycle::MigratorError> {
         (self.vtable.migrate)(&self.spirit, kctx.ctx, predecessor_state)
     }
 }
 
 /// Construct an `Arc<dyn AnySpiritObj>` from a concrete Spirit and its vtable.
-pub fn make_spirit_obj<T: Spirit + Send + Sync + 'static>(
-    spirit: T,
-) -> Arc<dyn AnySpiritObj> {
+pub fn make_spirit_obj<T: Spirit + Send + Sync + 'static>(spirit: T) -> Arc<dyn AnySpiritObj> {
     let vtable = maos_spirit_abi::lifecycle::SpiritVtable::<T>::from_spirit();
     Arc::new(VtableSpiritObj { spirit, vtable })
 }
@@ -191,8 +198,10 @@ pub struct SpiritManifestBundle {
     pub class: Option<ClassSection>,
     pub hot_swap: Option<crate::security::manifest::HotSwapManifestSection>,
     pub migrates_from: Option<crate::security::manifest::MigratesFromSection>,
-    pub halt_protocol_compatibility: Option<crate::security::manifest::HaltProtocolCompatibilitySection>,
+    pub halt_protocol_compatibility:
+        Option<crate::security::manifest::HaltProtocolCompatibilitySection>,
     pub on_crash: Option<OnCrashSection>,
+    pub on_revocation: Option<crate::security::manifest::OnRevocationSection>,
     pub supervision: Option<SupervisionSection>,
 }
 
@@ -206,6 +215,7 @@ impl Default for SpiritManifestBundle {
             migrates_from: None,
             halt_protocol_compatibility: None,
             on_crash: None,
+            on_revocation: None,
             supervision: None,
         }
     }
@@ -239,6 +249,8 @@ pub struct SpiritControlBlock {
     pub last_silent_failure_emit_ns: AtomicU64,
     /// Story 5.3 — FR50 dead-Spirit task disposition policy.
     pub on_crash_action: OnCrashAction,
+    /// Story 5.4 — revocation policy read from manifest at load time.
+    pub on_revocation_action: RevocationAction,
     /// Story 5.3 — per-SCB in-flight task ledger.
     pub task_assignments_in_flight: Mutex<Vec<TaskAssignmentRecord>>,
     /// Kernel boot nonce for token validation.
@@ -255,9 +267,18 @@ impl std::fmt::Debug for SpiritControlBlock {
             .field("state", &self.current_state())
             .field("manifest", &self.manifest)
             .field("priority_weight", &self.priority_weight)
-            .field("deficit_counter", &self.deficit_counter.load(Ordering::Relaxed))
-            .field("last_inbound_frame_ns", &self.last_inbound_frame_ns.load(Ordering::Relaxed))
-            .field("last_idle_fire_ns", &self.last_idle_fire_ns.load(Ordering::Relaxed))
+            .field(
+                "deficit_counter",
+                &self.deficit_counter.load(Ordering::Relaxed),
+            )
+            .field(
+                "last_inbound_frame_ns",
+                &self.last_inbound_frame_ns.load(Ordering::Relaxed),
+            )
+            .field(
+                "last_idle_fire_ns",
+                &self.last_idle_fire_ns.load(Ordering::Relaxed),
+            )
             .field("boot_nonce", &self.boot_nonce)
             .finish_non_exhaustive()
     }
@@ -277,6 +298,11 @@ impl SpiritControlBlock {
             .as_ref()
             .map(|s| s.action.clone())
             .unwrap_or_default();
+        let on_revocation_action = manifest
+            .on_revocation
+            .as_ref()
+            .map(|s| s.action)
+            .unwrap_or_default();
         Self {
             pid,
             spirit_id,
@@ -292,6 +318,7 @@ impl SpiritControlBlock {
             last_stall_emit_ns: AtomicU64::new(0),
             last_silent_failure_emit_ns: AtomicU64::new(0),
             on_crash_action,
+            on_revocation_action,
             task_assignments_in_flight: Mutex::new(Vec::new()),
             boot_nonce,
             sandbox_tier: SandboxTier::default(),
@@ -316,9 +343,12 @@ impl SpiritControlBlock {
         expected: ScbLifecycleState,
         next: ScbLifecycleState,
     ) -> Result<ScbLifecycleState, StateTransitionError> {
-        let old =
-            self.state
-                .compare_exchange(expected as u8, next as u8, Ordering::AcqRel, Ordering::Acquire);
+        let old = self.state.compare_exchange(
+            expected as u8,
+            next as u8,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        );
         match old {
             Ok(prev) => {
                 let prev_state = match prev {
@@ -345,10 +375,7 @@ impl SpiritControlBlock {
     }
 
     /// Check if a transition is allowed by the state machine.
-    pub fn is_transition_allowed(
-        from: ScbLifecycleState,
-        to: ScbLifecycleState,
-    ) -> bool {
+    pub fn is_transition_allowed(from: ScbLifecycleState, to: ScbLifecycleState) -> bool {
         use ScbLifecycleState::*;
         matches!(
             (from, to),
@@ -384,7 +411,10 @@ impl SpiritControlBlock {
         self.try_transition(current, next)
             .map(|_| next.into())
             .map_err(|e| {
-                let StateTransitionError::RaceLost { expected: _, actual } = e;
+                let StateTransitionError::RaceLost {
+                    expected: _,
+                    actual,
+                } = e;
                 LifecycleError::InvalidStateTransition {
                     spirit_id: self.spirit_id.clone(),
                     current: actual.into(),
@@ -479,7 +509,10 @@ mod tests {
     #[test]
     fn unload_idempotent() {
         let scb = make_scb(ScbLifecycleState::Unloaded);
-        let result = scb.transition(ScbLifecycleState::Unloaded, maos_domain::lifecycle::LifecycleVerb::Unload);
+        let result = scb.transition(
+            ScbLifecycleState::Unloaded,
+            maos_domain::lifecycle::LifecycleVerb::Unload,
+        );
         assert!(result.is_ok());
     }
 
@@ -490,7 +523,10 @@ mod tests {
         assert!(r1.is_ok());
         let r2 = scb.try_transition(ScbLifecycleState::Loaded, ScbLifecycleState::Running);
         assert!(r2.is_err());
-        assert!(matches!(r2.unwrap_err(), StateTransitionError::RaceLost { .. }));
+        assert!(matches!(
+            r2.unwrap_err(),
+            StateTransitionError::RaceLost { .. }
+        ));
     }
 
     // ---- Story 5.3 — SCB extension tests ----
@@ -516,14 +552,31 @@ mod tests {
             action: OnCrashAction::EscalateToOperator,
         });
         let spirit_obj = make_spirit_obj(TestSpirit);
-        let scb = SpiritControlBlock::new(
-            42,
-            "test-spirit".into(),
-            bundle,
-            spirit_obj,
-            0xCAFE,
-        );
+        let scb = SpiritControlBlock::new(42, "test-spirit".into(), bundle, spirit_obj, 0xCAFE);
         assert_eq!(scb.on_crash_action, OnCrashAction::EscalateToOperator);
+    }
+
+    #[test]
+    fn scb_on_revocation_action_default() {
+        let bundle = SpiritManifestBundle::default();
+        let spirit_obj = make_spirit_obj(TestSpirit);
+        let scb = SpiritControlBlock::new(42, "test-spirit".into(), bundle, spirit_obj, 0xCAFE);
+        assert_eq!(
+            scb.on_revocation_action,
+            RevocationAction::TerminateImmediately
+        );
+    }
+
+    #[test]
+    fn scb_on_revocation_action_from_manifest() {
+        use crate::security::manifest::OnRevocationSection;
+        let mut bundle = SpiritManifestBundle::default();
+        bundle.on_revocation = Some(OnRevocationSection {
+            action: RevocationAction::Quarantine,
+        });
+        let spirit_obj = make_spirit_obj(TestSpirit);
+        let scb = SpiritControlBlock::new(42, "test-spirit".into(), bundle, spirit_obj, 0xCAFE);
+        assert_eq!(scb.on_revocation_action, RevocationAction::Quarantine);
     }
 
     #[test]
@@ -553,9 +606,9 @@ mod tests {
         let scb = make_scb(ScbLifecycleState::Running);
         let old = scb.last_stall_emit_ns.load(Ordering::Relaxed);
         let new = 12345u64;
-        let cas = scb.last_stall_emit_ns.compare_exchange(
-            old, new, Ordering::AcqRel, Ordering::Relaxed,
-        );
+        let cas =
+            scb.last_stall_emit_ns
+                .compare_exchange(old, new, Ordering::AcqRel, Ordering::Relaxed);
         assert!(cas.is_ok());
         assert_eq!(scb.last_stall_emit_ns.load(Ordering::Relaxed), new);
     }

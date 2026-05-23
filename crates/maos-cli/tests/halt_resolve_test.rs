@@ -53,8 +53,7 @@ fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Outpu
     if let Ok(path) = std::env::var("PATH") {
         cmd.env("PATH", path);
     }
-    let workspace_root =
-        std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+    let workspace_root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
     cmd.current_dir(&workspace_root);
     cmd.env("MAOS_AUDIT_DB", &db_path);
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
@@ -74,9 +73,13 @@ fn halt_resolve_accepted_halt_exits_zero() {
     let out = run_maosctl(
         &[],
         &[
-            "halt", "resolve", "halt-001",
-            "--spirit", "hello-spirit",
-            "--kind", "accepted-halt",
+            "halt",
+            "resolve",
+            "halt-001",
+            "--spirit",
+            "hello-spirit",
+            "--kind",
+            "accepted-halt",
         ],
     );
     assert!(
@@ -93,10 +96,15 @@ fn halt_resolve_provided_context_exits_zero_with_reasoning() {
     let out = run_maosctl(
         &[],
         &[
-            "halt", "resolve", "halt-002",
-            "--spirit", "hello-spirit",
-            "--kind", "provided-context",
-            "--text", "missing context for the halt",
+            "halt",
+            "resolve",
+            "halt-002",
+            "--spirit",
+            "hello-spirit",
+            "--kind",
+            "provided-context",
+            "--text",
+            "missing context for the halt",
         ],
     );
     assert!(
@@ -113,10 +121,15 @@ fn halt_resolve_authorized_override_exits_zero() {
     let out = run_maosctl(
         &[],
         &[
-            "halt", "resolve", "halt-003",
-            "--spirit", "hello-spirit",
-            "--kind", "authorized-override",
-            "--operator-policy", "policy://ops-override-001",
+            "halt",
+            "resolve",
+            "halt-003",
+            "--spirit",
+            "hello-spirit",
+            "--kind",
+            "authorized-override",
+            "--operator-policy",
+            "policy://ops-override-001",
         ],
     );
     assert!(
@@ -133,9 +146,13 @@ fn halt_resolve_missing_text_rejected_by_clap() {
     let out = run_maosctl(
         &[],
         &[
-            "halt", "resolve", "halt-004",
-            "--spirit", "hello-spirit",
-            "--kind", "provided-context",
+            "halt",
+            "resolve",
+            "halt-004",
+            "--spirit",
+            "hello-spirit",
+            "--kind",
+            "provided-context",
         ],
     );
     assert!(
@@ -150,9 +167,13 @@ fn halt_resolve_no_color_emits_zero_ansi() {
     let out = run_maosctl(
         &[("NO_COLOR", "1")],
         &[
-            "halt", "resolve", "halt-005",
-            "--spirit", "hello-spirit",
-            "--kind", "accepted-halt",
+            "halt",
+            "resolve",
+            "halt-005",
+            "--spirit",
+            "hello-spirit",
+            "--kind",
+            "accepted-halt",
         ],
     );
     assert!(
@@ -178,9 +199,13 @@ fn halt_resolve_unknown_spirit_exits_nonzero() {
     let out = run_maosctl(
         &[],
         &[
-            "halt", "resolve", "halt-006",
-            "--spirit", "unknown-spirit",
-            "--kind", "accepted-halt",
+            "halt",
+            "resolve",
+            "halt-006",
+            "--spirit",
+            "unknown-spirit",
+            "--kind",
+            "accepted-halt",
         ],
     );
     assert!(

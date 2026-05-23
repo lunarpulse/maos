@@ -146,10 +146,7 @@ mod tests {
 
     #[test]
     fn cap_error_distinguishes_variants() {
-        assert_ne!(
-            CapError::UnknownToken,
-            CapError::Expired
-        );
+        assert_ne!(CapError::UnknownToken, CapError::Expired);
         assert_ne!(
             CapError::ContextExhausted { spirit_id: 1 },
             CapError::ContextExhausted { spirit_id: 2 }

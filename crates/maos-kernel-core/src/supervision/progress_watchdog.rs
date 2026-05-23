@@ -17,12 +17,14 @@ use crate::scheduler::control_block::ScbLifecycleState;
 use crate::scheduler::control_block::SpiritControlBlock;
 use crate::telemetry::iac_rt::{IacRtMetrics, Outcome, Service};
 
-#[maos_attrs::i9_exempt(reason = "supervision surface — holds only Arc references to existing kernel state (SCB map, TransparencyLog, telemetry); no independently-mutable persistent state")]
+#[maos_attrs::i9_exempt(
+    reason = "supervision surface — holds only Arc references to existing kernel state (SCB map, TransparencyLog, telemetry); no independently-mutable persistent state"
+)]
 pub struct ProgressWatchdog {
     spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
     tl: Arc<TransparencyLogAdapter>,
     telemetry: Arc<IacRtMetrics>,
-        notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+    notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
 }
 
 impl ProgressWatchdog {
@@ -30,9 +32,14 @@ impl ProgressWatchdog {
         spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
         tl: Arc<TransparencyLogAdapter>,
         telemetry: Arc<IacRtMetrics>,
-    notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+        notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
     ) -> Self {
-        Self { spirits, tl, telemetry, notification_dispatcher }
+        Self {
+            spirits,
+            tl,
+            telemetry,
+            notification_dispatcher,
+        }
     }
 
     pub fn spawn(self: Arc<Self>, cancel: CancellationToken) -> JoinHandle<()> {
@@ -62,7 +69,10 @@ impl ProgressWatchdog {
             }
 
             let in_flight_count = {
-                let tasks = scb.task_assignments_in_flight.lock().expect("task ledger lock poisoned");
+                let tasks = scb
+                    .task_assignments_in_flight
+                    .lock()
+                    .expect("task ledger lock poisoned");
                 tasks.len()
             };
             if in_flight_count == 0 {
@@ -94,7 +104,10 @@ impl ProgressWatchdog {
                 );
                 if cas.is_ok() {
                     let first_task = {
-                        let tasks = scb.task_assignments_in_flight.lock().expect("task ledger lock poisoned");
+                        let tasks = scb
+                            .task_assignments_in_flight
+                            .lock()
+                            .expect("task ledger lock poisoned");
                         tasks.first().cloned()
                     };
 
@@ -116,11 +129,8 @@ impl ProgressWatchdog {
                         maos_domain::invariants::i3::FrameOrigin::Kernel,
                     );
 
-                    self.telemetry.record_iac_rt(
-                        Service::SpiritScheduler,
-                        Outcome::Ok,
-                        0,
-                    );
+                    self.telemetry
+                        .record_iac_rt(Service::SpiritScheduler, Outcome::Ok, 0);
                 }
             }
         }

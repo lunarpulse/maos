@@ -112,7 +112,10 @@ fn query_returns_all_three_seeded_rows_in_timestamp_order() {
     assert_eq!(entries[2].timestamp_ns, 3_000);
     assert!(entries[0].capability_token_hex.is_some());
     assert!(entries[1].capability_token_hex.is_some());
-    assert!(entries[2].capability_token_hex.is_none(), "row 3 must have NULL token");
+    assert!(
+        entries[2].capability_token_hex.is_none(),
+        "row 3 must have NULL token"
+    );
 }
 
 #[test]
@@ -180,7 +183,10 @@ fn fr4_projection_rejects_null_token_with_line_and_field() {
     let mut buf = Vec::new();
     let err = to_fr4_ndjson(entries, &mut buf).expect_err("must fail on NULL token");
     match err {
-        AuditError::Fr4SchemaViolation { line, missing_field } => {
+        AuditError::Fr4SchemaViolation {
+            line,
+            missing_field,
+        } => {
             assert_eq!(line, 3, "violation must name the offending 1-indexed line");
             assert_eq!(missing_field, "capability_token");
         }

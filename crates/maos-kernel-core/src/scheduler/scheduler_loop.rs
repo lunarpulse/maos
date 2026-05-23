@@ -9,18 +9,18 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::lifecycle::{LifecycleError, SpiritLifecycleState};
 use maos_domain::ports::scheduler::SpiritSchedulerPort;
-use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 
 use crate::halt::terminate_spirit;
 use crate::iac::transparency_log::TransparencyLogAdapter;
-use maos_domain::halt::TerminationKind;
-use maos_domain::invariants::i3::FrameOrigin;
 use crate::scheduler::control_block::{
     make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle,
 };
 use crate::scheduler::hook_dispatch::{HookDispatcher, HookOutcome};
+use maos_domain::halt::TerminationKind;
+use maos_domain::invariants::i3::FrameOrigin;
 use maos_spirit_abi::lifecycle::Spirit;
 
 /// Quantum size for deficit round-robin scheduling.
@@ -28,7 +28,7 @@ pub const SCHEDULER_QUANTUM: u32 = 64;
 
 static NEXT_SPIRIT_PID: AtomicU32 = AtomicU32::new(1);
 
-fn allocate_pid() -> u32 {
+pub(crate) fn allocate_pid() -> u32 {
     NEXT_SPIRIT_PID.fetch_add(1, Ordering::Relaxed)
 }
 
@@ -177,12 +177,18 @@ impl SpiritSchedulerAdapter {
         // Story 1b.3 — admit the Spirit through the security manager.
         if let Some(ref security) = self.security_manager {
             use crate::security::{
-                CapabilitiesRequired, Posture, PostureSection, ProviderCapabilities,
-                ResourceCaps, SandboxConfig,
+                CapabilitiesRequired, Posture, PostureSection, ProviderCapabilities, ResourceCaps,
+                SandboxConfig,
             };
             use maos_domain::invariants::i9::SandboxTier;
-            let sandbox_cfg = SandboxConfig { tier: SandboxTier::T2 };
-            let caps = ResourceCaps { cpu_max_pct: None, memory_max_mb: None, fd_max: None };
+            let sandbox_cfg = SandboxConfig {
+                tier: SandboxTier::T2,
+            };
+            let caps = ResourceCaps {
+                cpu_max_pct: None,
+                memory_max_mb: None,
+                fd_max: None,
+            };
             let caps_required = CapabilitiesRequired {
                 provider: ProviderCapabilities { complete: vec![] },
             };
@@ -214,7 +220,9 @@ impl SpiritSchedulerAdapter {
                 pid,
                 None,
                 "lifecycle.admit",
-                serde_json::json!({"spirit_id": spirit_id}).to_string().as_bytes(),
+                serde_json::json!({"spirit_id": spirit_id})
+                    .to_string()
+                    .as_bytes(),
                 FrameOrigin::SpiritAuto,
             );
         }
@@ -258,7 +266,10 @@ impl SpiritSchedulerAdapter {
     /// AC1 verb: start a loaded Spirit.
     pub async fn start(&self, spirit_pid: u32) -> Result<(), LifecycleError> {
         let scb = self.get_scb(spirit_pid)?;
-        scb.transition(ScbLifecycleState::Running, maos_domain::lifecycle::LifecycleVerb::Start)?;
+        scb.transition(
+            ScbLifecycleState::Running,
+            maos_domain::lifecycle::LifecycleVerb::Start,
+        )?;
 
         let payload = serde_json::json!({
             "lifecycle_event": "Start",
@@ -282,7 +293,10 @@ impl SpiritSchedulerAdapter {
     /// AC1 verb: pause a running Spirit.
     pub async fn pause(&self, spirit_pid: u32) -> Result<(), LifecycleError> {
         let scb = self.get_scb(spirit_pid)?;
-        scb.transition(ScbLifecycleState::Paused, maos_domain::lifecycle::LifecycleVerb::Pause)?;
+        scb.transition(
+            ScbLifecycleState::Paused,
+            maos_domain::lifecycle::LifecycleVerb::Pause,
+        )?;
 
         let payload = serde_json::json!({
             "lifecycle_event": "Pause",
@@ -306,7 +320,10 @@ impl SpiritSchedulerAdapter {
     /// AC1 verb: resume a paused Spirit.
     pub async fn resume(&self, spirit_pid: u32) -> Result<(), LifecycleError> {
         let scb = self.get_scb(spirit_pid)?;
-        scb.transition(ScbLifecycleState::Running, maos_domain::lifecycle::LifecycleVerb::Resume)?;
+        scb.transition(
+            ScbLifecycleState::Running,
+            maos_domain::lifecycle::LifecycleVerb::Resume,
+        )?;
 
         let payload = serde_json::json!({
             "lifecycle_event": "Resume",
@@ -356,7 +373,10 @@ impl SpiritSchedulerAdapter {
             return Ok(());
         }
 
-        scb.transition(ScbLifecycleState::Unloaded, maos_domain::lifecycle::LifecycleVerb::Unload)?;
+        scb.transition(
+            ScbLifecycleState::Unloaded,
+            maos_domain::lifecycle::LifecycleVerb::Unload,
+        )?;
 
         let payload = serde_json::json!({
             "lifecycle_event": "Unload",
@@ -435,29 +455,34 @@ impl SpiritSchedulerAdapter {
             | HookOutcome::SkippedManifest
             | HookOutcome::BudgetWarning80 { .. }
             | HookOutcome::DeferredToNextStory => Ok(()),
-            HookOutcome::BudgetExceeded { wall_ns, cap_seconds } => {
-                Err(LifecycleError::HookBudgetExceeded {
-                    hook_name,
-                    wall_ns,
-                    cap_seconds,
-                })
-            }
-            HookOutcome::Panicked { panic_payload_preview } => {
+            HookOutcome::BudgetExceeded {
+                wall_ns,
+                cap_seconds,
+            } => Err(LifecycleError::HookBudgetExceeded {
+                hook_name,
+                wall_ns,
+                cap_seconds,
+            }),
+            HookOutcome::Panicked {
+                panic_payload_preview,
+            } => {
                 // Story 5.3 — fire-and-forget crash handler BEFORE propagating error
                 if let Some(ref cd) = self.crash_detector {
                     let cd_clone = Arc::clone(cd);
                     let hook_name_clone = hook_name.to_string();
                     let payload_clone = panic_payload_preview.clone();
                     let _ = tokio::spawn(async move {
-                        let _ = cd_clone.handle_crash(
-                            spirit_pid,
-                            maos_domain::supervision::CrashCause::Fault(
-                                maos_domain::supervision::FaultCause::Panic {
-                                    hook_name: hook_name_clone,
-                                    payload_preview: payload_clone,
-                                }
-                            ),
-                        ).await;
+                        let _ = cd_clone
+                            .handle_crash(
+                                spirit_pid,
+                                maos_domain::supervision::CrashCause::Fault(
+                                    maos_domain::supervision::FaultCause::Panic {
+                                        hook_name: hook_name_clone,
+                                        payload_preview: payload_clone,
+                                    },
+                                ),
+                            )
+                            .await;
                     });
                 }
                 Err(LifecycleError::Internal(format!(

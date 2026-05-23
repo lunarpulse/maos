@@ -1,4 +1,11 @@
 
+## Deferred from: code review of 5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s (2026-05-22)
+
+- No upper bound on `entries.len()` in `SignedRevocationList::new()` — DoS hardening beyond v0.3-β scope (revocation.rs:107)
+- No `issued_at_ns` sanity check — zero or future timestamps pass through silently (revocation.rs:96-97)
+- `RevocationEntry::reason` has no validation — spec says "free-form", accepted by design (revocation.rs:144-147)
+- Signature/pubkey JSON wire format (byte arrays) may need hex/base64 for future external CRL interop (Story 5.5d) — acceptable for v0.3-β internal format
+
 ## Deferred from: code review of 5-1-ship-full-lifecycle-verbs-and-11-triggers-with-priority-weighted-scheduling (2026-05-21)
 
 - `smoke_epic_4.sh` validates presence but not magnitude of outcomes — meets spec floor, could be strengthened. Pre-existing weak test pattern.

@@ -1,30 +1,30 @@
 use clap::{Parser, Subcommand};
 use std::process;
 
-mod check_unsafe;
-mod check_empty_kernel;
-mod check_loom;
-mod check_fr47;
-mod check_service_boundary;
-mod check_security_md;
-mod fs_walk;
-mod kloc_check;
 mod abi_diff;
-mod invariant_lock;
-mod corpus_types;
-mod check_corpus;
-mod check_judge_config;
-mod coverage_matrix;
-mod corpus_staleness;
 mod calibrate;
-mod rebaseline_check;
-mod example_spirit_regen;
-mod check_workspace_count;
-mod gen_termination_corpus;
-mod gen_isolation_corpus;
+mod check_composition_root_completeness;
+mod check_corpus;
+mod check_empty_kernel;
+mod check_fr47;
+mod check_judge_config;
+mod check_loom;
 pub mod check_mock_not_in_release;
 mod check_pub_field_constructors;
-mod check_composition_root_completeness;
+mod check_security_md;
+mod check_service_boundary;
+mod check_unsafe;
+mod check_workspace_count;
+mod corpus_staleness;
+mod corpus_types;
+mod coverage_matrix;
+mod example_spirit_regen;
+mod fs_walk;
+mod gen_isolation_corpus;
+mod gen_termination_corpus;
+mod invariant_lock;
+mod kloc_check;
+mod rebaseline_check;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -37,30 +37,90 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// AC2 — Zero-unsafe gate for the capability-validation path.
-    CheckUnsafe { #[arg(long, default_value = "crates/maos-kernel-core/capability")] path: String, #[arg(long)] json: bool },
+    CheckUnsafe {
+        #[arg(long, default_value = "crates/maos-kernel-core/capability")]
+        path: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC3 — KLOC budget check with alarm and hard-fail thresholds.
-    KlocCheck { #[arg(long, default_value = "xtask/kloc.toml")] config: String, #[arg(long)] json: bool },
+    KlocCheck {
+        #[arg(long, default_value = "xtask/kloc.toml")]
+        config: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC4 — ABI diff against the previous tagged baseline.
-    AbiDiff { #[arg(long, default_value = "HEAD~1")] base: String, #[arg(long)] json: bool },
+    AbiDiff {
+        #[arg(long, default_value = "HEAD~1")]
+        base: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC6 — I9 structural-state lint for empty-kernel invariant.
-    CheckEmptyKernel { #[arg(long, default_value = "crates/maos-kernel-core")] path: String, #[arg(long, default_value = "xtask/i9-whitelist.toml")] whitelist: String, #[arg(long, default_value = "xtask/i9-denylist.toml")] denylist: String, #[arg(long, default_value = "docs/invariants/i9-exemptions.md")] exemptions: String, #[arg(long)] json: bool },
+    CheckEmptyKernel {
+        #[arg(long, default_value = "crates/maos-kernel-core")]
+        path: String,
+        #[arg(long, default_value = "xtask/i9-whitelist.toml")]
+        whitelist: String,
+        #[arg(long, default_value = "xtask/i9-denylist.toml")]
+        denylist: String,
+        #[arg(long, default_value = "docs/invariants/i9-exemptions.md")]
+        exemptions: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC7 — NFR-Test-9 Loom-not-in-kernel structural grep.
-    CheckLoom { #[arg(long)] path: Option<String>, #[arg(long, default_value = "xtask/kernel-crates.toml")] crates: String, #[arg(long, default_value = "xtask/loom-blocklist.toml")] blocklist: String, #[arg(long, default_value = "xtask/loom-allowlist.toml")] allowlist: String, #[arg(long)] json: bool },
+    CheckLoom {
+        #[arg(long)]
+        path: Option<String>,
+        #[arg(long, default_value = "xtask/kernel-crates.toml")]
+        crates: String,
+        #[arg(long, default_value = "xtask/loom-blocklist.toml")]
+        blocklist: String,
+        #[arg(long, default_value = "xtask/loom-allowlist.toml")]
+        allowlist: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC8 — NFR-Test-2 service-boundary P1–P4 + Spirit-ABI reflection.
     CheckServiceBoundary {
-        #[arg(long)] path: Option<String>,
-        #[arg(long, default_value = "docs/ci-baselines/kernel-surface-v0.1-beta.json")] baseline: String,
-        #[arg(long, default_value = "xtask/kernel-api-classes.toml")] classes: String,
-        #[arg(long, default_value = "xtask/p4-external-io-denylist.toml")] p4_denylist: String,
-        #[arg(long, default_value = "xtask/p4-mediated-io-paths.toml")] p4_exemptions: String,
-        #[arg(long, default_value = "crates/maos-spirit-abi/src/lifecycle.rs")] spirit_abi_lifecycle: String,
-        #[arg(long, default_value = "crates/maos-spirit-derive/src/lib.rs")] spirit_abi_derive: String,
-        #[arg(long)] json: bool
+        #[arg(long)]
+        path: Option<String>,
+        #[arg(
+            long,
+            default_value = "docs/ci-baselines/kernel-surface-v0.1-beta.json"
+        )]
+        baseline: String,
+        #[arg(long, default_value = "xtask/kernel-api-classes.toml")]
+        classes: String,
+        #[arg(long, default_value = "xtask/p4-external-io-denylist.toml")]
+        p4_denylist: String,
+        #[arg(long, default_value = "xtask/p4-mediated-io-paths.toml")]
+        p4_exemptions: String,
+        #[arg(long, default_value = "crates/maos-spirit-abi/src/lifecycle.rs")]
+        spirit_abi_lifecycle: String,
+        #[arg(long, default_value = "crates/maos-spirit-derive/src/lib.rs")]
+        spirit_abi_derive: String,
+        #[arg(long)]
+        json: bool,
     },
     /// AC2 — FR47 enforcement: vendor LLM SDK dependency scan.
-    CheckFr47 { #[arg(long)] path: Option<String>, #[arg(long, default_value = "xtask/fr47-vendor-sdk-denylist.toml")] denylist: String, #[arg(long, default_value = "xtask/fr47-allowlist.toml")] allowlist: String, #[arg(long)] json: bool },
+    CheckFr47 {
+        #[arg(long)]
+        path: Option<String>,
+        #[arg(long, default_value = "xtask/fr47-vendor-sdk-denylist.toml")]
+        denylist: String,
+        #[arg(long, default_value = "xtask/fr47-allowlist.toml")]
+        allowlist: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC9 — NFR-Ops-4 + FR61 SECURITY.md section gate.
-    CheckSecurityMd { #[arg(long)] json: bool },
+    CheckSecurityMd {
+        #[arg(long)]
+        json: bool,
+    },
     /// AC5 — Invariant lock gate for constitutional amendments.
     ///
     /// `--write-journal` opts the run into persisting a journal entry; without
@@ -73,44 +133,153 @@ enum Commands {
     /// if the body matches the GitHub revert idiom, a paired "reverted" entry
     /// is appended after the primary entry.
     InvariantLock {
-        #[arg(long)] changed_files: Option<String>,
-        #[arg(long)] pr_number: Option<u64>,
-        #[arg(long)] sha: Option<String>,
-        #[arg(long)] write_journal: bool,
-        #[arg(long, default_value = "docs/invariants/journal.jsonl")] journal_output: String,
-        #[arg(long)] pr_body: Option<String>,
-        #[arg(long)] json: bool,
+        #[arg(long)]
+        changed_files: Option<String>,
+        #[arg(long)]
+        pr_number: Option<u64>,
+        #[arg(long)]
+        sha: Option<String>,
+        #[arg(long)]
+        write_journal: bool,
+        #[arg(long, default_value = "docs/invariants/journal.jsonl")]
+        journal_output: String,
+        #[arg(long)]
+        pr_body: Option<String>,
+        #[arg(long)]
+        json: bool,
     },
     /// AC1 — SHA-256-pinned JSONL corpus verification (NFR-Test-1).
-    CheckCorpus { #[arg(long, default_value = "tests/corpora/MANIFEST.toml")] manifest: String, #[arg(long, default_value = "tests/corpora")] corpora_dir: String, #[arg(long)] register: Option<String>, #[arg(long)] json: bool },
+    CheckCorpus {
+        #[arg(long, default_value = "tests/corpora/MANIFEST.toml")]
+        manifest: String,
+        #[arg(long, default_value = "tests/corpora")]
+        corpora_dir: String,
+        #[arg(long)]
+        register: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC2 — Pinned-judge-LLM structural contract (NFR-Test-1).
-    CheckJudgeConfig { #[arg(long, default_value = "tests/judge-config.toml")] config: String, #[arg(long, default_value = "xtask/judge-direct-call-identifiers.toml")] identifiers: String, #[arg(long)] json: bool },
+    CheckJudgeConfig {
+        #[arg(long, default_value = "tests/judge-config.toml")]
+        config: String,
+        #[arg(long, default_value = "xtask/judge-direct-call-identifiers.toml")]
+        identifiers: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC4 — Coverage-matrix delivered-phase enforcement (NFR-Meta-3).
-    CoverageMatrix { #[arg(long, default_value = "tests/coverage-matrix.yaml")] config: String, #[arg(long, default_value = "tests/phase-config.toml")] phase_config: String, #[arg(long, default_value = "tests/corpora/MANIFEST.toml")] manifest: String, #[arg(long, default_value = "xtask/gate-registry.toml")] gate_registry: String, #[arg(long)] json: bool },
+    CoverageMatrix {
+        #[arg(long, default_value = "tests/coverage-matrix.yaml")]
+        config: String,
+        #[arg(long, default_value = "tests/phase-config.toml")]
+        phase_config: String,
+        #[arg(long, default_value = "tests/corpora/MANIFEST.toml")]
+        manifest: String,
+        #[arg(long, default_value = "xtask/gate-registry.toml")]
+        gate_registry: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC5 — Corpus staleness `valid_until` enforcement (NFR-Meta-2).
-    CorpusStaleness { #[arg(long, default_value = "tests/coverage-matrix.yaml")] config: String, #[arg(long, default_value = "tests/corpora/MANIFEST.toml")] manifest: String, #[arg(long, default_value = "30")] warn_window_days: i64, #[arg(long)] json: bool },
+    CorpusStaleness {
+        #[arg(long, default_value = "tests/coverage-matrix.yaml")]
+        config: String,
+        #[arg(long, default_value = "tests/corpora/MANIFEST.toml")]
+        manifest: String,
+        #[arg(long, default_value = "30")]
+        warn_window_days: i64,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC6 — Calibration Wilson-CI math (NFR-Aud-8).
-    Calibrate { #[arg(long)] corpus: String, #[arg(long)] n: u64, #[arg(long)] p: f64, #[arg(long, default_value = "tests/corpora/MANIFEST.toml")] manifest: String, #[arg(long, default_value = "tests/corpora")] corpora_dir: String, #[arg(long)] synthetic_pass_rate: Option<f64>, #[arg(long)] json: bool },
+    Calibrate {
+        #[arg(long)]
+        corpus: String,
+        #[arg(long)]
+        n: u64,
+        #[arg(long)]
+        p: f64,
+        #[arg(long, default_value = "tests/corpora/MANIFEST.toml")]
+        manifest: String,
+        #[arg(long, default_value = "tests/corpora")]
+        corpora_dir: String,
+        #[arg(long)]
+        synthetic_pass_rate: Option<f64>,
+        #[arg(long)]
+        json: bool,
+    },
     /// AC3 — Quarterly rebaseline check (NFR-Test-1).
-    RebaselineCheck { #[arg(long, default_value = "tests/corpora/MANIFEST.toml")] manifest: String, #[arg(long, default_value = "tests/corpora")] corpora_dir: String, #[arg(long, default_value = "tests/judge-config.toml")] judge_config: String, #[arg(long, default_value = "0.98")] threshold: f64, #[arg(long)] out: Option<String>, #[arg(long)] json: bool },
+    RebaselineCheck {
+        #[arg(long, default_value = "tests/corpora/MANIFEST.toml")]
+        manifest: String,
+        #[arg(long, default_value = "tests/corpora")]
+        corpora_dir: String,
+        #[arg(long, default_value = "tests/judge-config.toml")]
+        judge_config: String,
+        #[arg(long, default_value = "0.98")]
+        threshold: f64,
+        #[arg(long)]
+        out: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 2.3 — Template-to-example drift detector and regenerator.
-    ExampleSpiritRegen { #[arg(long)] check: bool, #[arg(long)] json: bool },
+    ExampleSpiritRegen {
+        #[arg(long)]
+        check: bool,
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 2.5 AC3 — workspace-member-count guard (Cargo.toml vs architecture doc).
-    CheckWorkspaceCount { #[arg(long, default_value = "Cargo.toml")] cargo_toml: String, #[arg(long, default_value = "_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md")] kernel_design: String, #[arg(long)] json: bool },
+    CheckWorkspaceCount {
+        #[arg(long, default_value = "Cargo.toml")]
+        cargo_toml: String,
+        #[arg(
+            long,
+            default_value = "_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md"
+        )]
+        kernel_design: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 4.1 AC4 — deterministic 1000-scenario termination-corpus generator.
-    GenTerminationCorpus { #[arg(long, default_value = "crates/maos-eval/fixtures/termination-corpus-v0")] out_dir: String },
+    GenTerminationCorpus {
+        #[arg(
+            long,
+            default_value = "crates/maos-eval/fixtures/termination-corpus-v0"
+        )]
+        out_dir: String,
+    },
     /// Story 4.5 — deterministic 200-scenario cross-spirit isolation-corpus generator.
-    GenIsolationCorpus { #[arg(long, default_value = "crates/maos-eval/fixtures/isolation-corpus-v0")] out_dir: String },
+    GenIsolationCorpus {
+        #[arg(long, default_value = "crates/maos-eval/fixtures/isolation-corpus-v0")]
+        out_dir: String,
+    },
     /// Story 4.1 A2 — check release binary for forbidden test-double symbols.
-    CheckMockNotInRelease { #[arg(long, default_value = "target/release/maos")] binary: String, #[arg(long)] build_first: bool, #[arg(long)] json: bool },
+    CheckMockNotInRelease {
+        #[arg(long, default_value = "target/release/maos")]
+        binary: String,
+        #[arg(long)]
+        build_first: bool,
+        #[arg(long)]
+        json: bool,
+    },
     /// Epic 4 retro §A4 — pub fields with `Construct via ::new` doc-attr MUST have a matching `::new` impl.
-    CheckPubFieldConstructors { #[arg(long)] json: bool },
+    CheckPubFieldConstructors {
+        #[arg(long)]
+        json: bool,
+    },
     /// Epic 4 retro §A5 — every `*Adapter` re-exported from `api.rs` MUST be constructed exactly once in `main.rs`.
     CheckCompositionRootCompleteness {
-        #[arg(long, default_value = "crates/maos-kernel-core/src/api.rs")] api_rs: String,
-        #[arg(long, default_value = "crates/maos-bin/src/main.rs")] main_rs: String,
-        #[arg(long, default_value = "xtask/composition-root-whitelist.toml")] whitelist: String,
-        #[arg(long)] json: bool,
+        #[arg(long, default_value = "crates/maos-kernel-core/src/api.rs")]
+        api_rs: String,
+        #[arg(long, default_value = "crates/maos-bin/src/main.rs")]
+        main_rs: String,
+        #[arg(long, default_value = "xtask/composition-root-whitelist.toml")]
+        whitelist: String,
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -118,10 +287,45 @@ fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
         Commands::CheckUnsafe { path, json } => check_unsafe::run(&path, json),
-        Commands::CheckEmptyKernel { path, whitelist, denylist, exemptions, json } => check_empty_kernel::run(&path, &whitelist, &denylist, &exemptions, json),
-        Commands::CheckLoom { path, crates, blocklist, allowlist, json } => check_loom::run(path.as_deref(), &crates, &blocklist, &allowlist, json),
-        Commands::CheckFr47 { path, denylist, allowlist, json } => check_fr47::run(path.as_deref(), &denylist, &allowlist, json),
-        Commands::CheckServiceBoundary { path, baseline, classes, p4_denylist, p4_exemptions, spirit_abi_lifecycle, spirit_abi_derive, json } => check_service_boundary::run(path.as_deref(), &baseline, &classes, &p4_denylist, &p4_exemptions, &spirit_abi_lifecycle, &spirit_abi_derive, json),
+        Commands::CheckEmptyKernel {
+            path,
+            whitelist,
+            denylist,
+            exemptions,
+            json,
+        } => check_empty_kernel::run(&path, &whitelist, &denylist, &exemptions, json),
+        Commands::CheckLoom {
+            path,
+            crates,
+            blocklist,
+            allowlist,
+            json,
+        } => check_loom::run(path.as_deref(), &crates, &blocklist, &allowlist, json),
+        Commands::CheckFr47 {
+            path,
+            denylist,
+            allowlist,
+            json,
+        } => check_fr47::run(path.as_deref(), &denylist, &allowlist, json),
+        Commands::CheckServiceBoundary {
+            path,
+            baseline,
+            classes,
+            p4_denylist,
+            p4_exemptions,
+            spirit_abi_lifecycle,
+            spirit_abi_derive,
+            json,
+        } => check_service_boundary::run(
+            path.as_deref(),
+            &baseline,
+            &classes,
+            &p4_denylist,
+            &p4_exemptions,
+            &spirit_abi_lifecycle,
+            &spirit_abi_derive,
+            json,
+        ),
         Commands::CheckSecurityMd { json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             let report = check_security_md::check_security_md(&workspace_root);
@@ -133,9 +337,15 @@ fn main() {
                 });
                 println!("{}", payload);
             } else if report.passed {
-                eprintln!("check-security-md: PASS ({} sections found)", report.present_sections.len());
+                eprintln!(
+                    "check-security-md: PASS ({} sections found)",
+                    report.present_sections.len()
+                );
             } else {
-                eprintln!("check-security-md: FAIL — missing sections: {:?}", report.missing_sections);
+                eprintln!(
+                    "check-security-md: FAIL — missing sections: {:?}",
+                    report.missing_sections
+                );
             }
             if report.passed {
                 Ok(())
@@ -145,35 +355,105 @@ fn main() {
         }
         Commands::KlocCheck { config, json } => kloc_check::run(&config, json),
         Commands::AbiDiff { base, json } => abi_diff::run(&base, json),
-        Commands::InvariantLock { changed_files, pr_number, sha, write_journal, journal_output, pr_body, json } => invariant_lock::run(changed_files.as_deref(), pr_number, sha.as_deref(), write_journal, &journal_output, pr_body.as_deref(), json),
-        Commands::CheckCorpus { manifest, corpora_dir, register, json } => check_corpus::run(&manifest, &corpora_dir, register.as_deref(), json),
-        Commands::CheckJudgeConfig { config, identifiers, json } => check_judge_config::run(&config, &identifiers, json),
-        Commands::CoverageMatrix { config, phase_config, manifest, gate_registry, json } => coverage_matrix::run(&config, &phase_config, &manifest, &gate_registry, json),
-        Commands::CorpusStaleness { config, manifest, warn_window_days, json } => corpus_staleness::run(&config, &manifest, warn_window_days, json),
-        Commands::Calibrate { corpus, n, p, manifest, corpora_dir, synthetic_pass_rate, json } => calibrate::run(&corpus, n, p, &manifest, &corpora_dir, synthetic_pass_rate, json),
-        Commands::RebaselineCheck { manifest, corpora_dir, judge_config, threshold, out, json } => rebaseline_check::run(&manifest, &corpora_dir, &judge_config, threshold, out.as_deref(), json),
+        Commands::InvariantLock {
+            changed_files,
+            pr_number,
+            sha,
+            write_journal,
+            journal_output,
+            pr_body,
+            json,
+        } => invariant_lock::run(
+            changed_files.as_deref(),
+            pr_number,
+            sha.as_deref(),
+            write_journal,
+            &journal_output,
+            pr_body.as_deref(),
+            json,
+        ),
+        Commands::CheckCorpus {
+            manifest,
+            corpora_dir,
+            register,
+            json,
+        } => check_corpus::run(&manifest, &corpora_dir, register.as_deref(), json),
+        Commands::CheckJudgeConfig {
+            config,
+            identifiers,
+            json,
+        } => check_judge_config::run(&config, &identifiers, json),
+        Commands::CoverageMatrix {
+            config,
+            phase_config,
+            manifest,
+            gate_registry,
+            json,
+        } => coverage_matrix::run(&config, &phase_config, &manifest, &gate_registry, json),
+        Commands::CorpusStaleness {
+            config,
+            manifest,
+            warn_window_days,
+            json,
+        } => corpus_staleness::run(&config, &manifest, warn_window_days, json),
+        Commands::Calibrate {
+            corpus,
+            n,
+            p,
+            manifest,
+            corpora_dir,
+            synthetic_pass_rate,
+            json,
+        } => calibrate::run(
+            &corpus,
+            n,
+            p,
+            &manifest,
+            &corpora_dir,
+            synthetic_pass_rate,
+            json,
+        ),
+        Commands::RebaselineCheck {
+            manifest,
+            corpora_dir,
+            judge_config,
+            threshold,
+            out,
+            json,
+        } => rebaseline_check::run(
+            &manifest,
+            &corpora_dir,
+            &judge_config,
+            threshold,
+            out.as_deref(),
+            json,
+        ),
         Commands::ExampleSpiritRegen { check, json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             example_spirit_regen::run(&workspace_root, check, json)
         }
-        Commands::CheckWorkspaceCount { cargo_toml, kernel_design, json } => {
-            check_workspace_count::run(&cargo_toml, &kernel_design, json)
-        }
-        Commands::GenTerminationCorpus { out_dir } => {
-            gen_termination_corpus::run(&out_dir)
-        }
-        Commands::GenIsolationCorpus { out_dir } => {
-            gen_isolation_corpus::run(&out_dir)
-        }
-        Commands::CheckMockNotInRelease { binary, build_first, json } => {
-            check_mock_not_in_release::run(&binary, build_first, json)
-        }
-        Commands::CheckPubFieldConstructors { json } => {
-            check_pub_field_constructors::run(json)
-        }
-        Commands::CheckCompositionRootCompleteness { api_rs, main_rs, whitelist, json } => {
-            check_composition_root_completeness::run(&api_rs, &main_rs, &whitelist, json)
-        }
+        Commands::CheckWorkspaceCount {
+            cargo_toml,
+            kernel_design,
+            json,
+        } => check_workspace_count::run(&cargo_toml, &kernel_design, json),
+        Commands::GenTerminationCorpus { out_dir } => gen_termination_corpus::run(&out_dir),
+        Commands::GenIsolationCorpus { out_dir } => gen_isolation_corpus::run(&out_dir),
+        Commands::CheckMockNotInRelease {
+            binary,
+            build_first,
+            json,
+        } => check_mock_not_in_release::run(&binary, build_first, json),
+        Commands::CheckPubFieldConstructors { json } => check_pub_field_constructors::run(json),
+        Commands::CheckCompositionRootCompleteness {
+            api_rs,
+            main_rs,
+            whitelist,
+            json,
+        } => check_composition_root_completeness::run(&api_rs, &main_rs, &whitelist, json),
     };
-    if let Err(e) = result { eprintln!("{e}"); process::exit(1); }
+    if let Err(e) = result {
+        eprintln!("{e}");
+        process::exit(1);
+    }
 }

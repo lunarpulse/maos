@@ -11,8 +11,8 @@ use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, RwLock};
 
-use maos_spirit_abi::ctx::Ctx;
 use maos_domain::supervision::SupervisionError;
+use maos_spirit_abi::ctx::Ctx;
 
 /// Wraps the ABI `Ctx` with `Arc` handles to all Epic-4 adapters,
 /// routing Spirit-author-facing convenience calls into the kernel.
@@ -20,9 +20,8 @@ pub struct KernelCtx<'a> {
     pub ctx: &'a mut Ctx,
     pub memory_manager: Option<Arc<crate::memory::MemoryManagerAdapter>>,
     pub capability: Option<Arc<crate::capability::CapabilityRegistryAdapter>>,
-    pub working_memory_orchestrator: Option<
-        Arc<crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator>,
-    >,
+    pub working_memory_orchestrator:
+        Option<Arc<crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator>>,
     pub iac: Option<Arc<crate::iac::IacBusAdapter>>,
     pub halt_registry: Option<Arc<crate::halt::HaltRegistry>>,
     pub log_recall: Option<Arc<crate::iac::log_recall::LogRecallAdapter>>,
@@ -32,7 +31,9 @@ pub struct KernelCtx<'a> {
     /// Story 5.3 — spirit PID for SCB lookups (heartbeat, etc.)
     pub spirit_pid: u32,
     /// Story 5.3 — shared SCB map for heartbeat updates
-    pub spirits: Option<Arc<RwLock<BTreeMap<u32, Arc<crate::scheduler::control_block::SpiritControlBlock>>>>>,
+    pub spirits: Option<
+        Arc<RwLock<BTreeMap<u32, Arc<crate::scheduler::control_block::SpiritControlBlock>>>>,
+    >,
 }
 
 impl<'a> KernelCtx<'a> {
@@ -117,7 +118,9 @@ impl<'a> KernelCtx<'a> {
 
     pub fn with_spirits(
         mut self,
-        spirits: Arc<RwLock<BTreeMap<u32, Arc<crate::scheduler::control_block::SpiritControlBlock>>>>,
+        spirits: Arc<
+            RwLock<BTreeMap<u32, Arc<crate::scheduler::control_block::SpiritControlBlock>>>,
+        >,
     ) -> Self {
         self.spirits = Some(spirits);
         self

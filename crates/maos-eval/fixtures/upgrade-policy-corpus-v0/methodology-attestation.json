@@ -1,0 +1,17 @@
+{
+  "corpus_name": "upgrade-policy-corpus-v0",
+  "version": "0.1.0",
+  "story": "5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s",
+  "generated_at": "2026-05-22T09:00:00Z",
+  "generator": "manual-synthetic",
+  "scenario_count": 20,
+  "categories": [
+    "hot_swap_success",
+    "cold_swap_success",
+    "migrator_success",
+    "policy_mismatch"
+  ],
+  "distribution": "4 categories × 5 scenarios each = 20 total",
+  "manifest_format": "TOML-v1",
+  "note": "v0.3-β synthetic corpus. Successor manifests are minimal valid manifests for upgrade orchestrator testing."
+}

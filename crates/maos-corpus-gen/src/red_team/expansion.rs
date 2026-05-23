@@ -146,7 +146,11 @@ fn axis_value(seed: &RedTeamSeed, axis_name: &str, axis_idx: usize, variant_idx:
     h.update(&axis_idx.to_le_bytes());
     h.update(&variant_idx.to_le_bytes());
     let hex = h.finalize();
-    let tag = hex.iter().take(4).map(|b| format!("{:02x}", b)).collect::<String>();
+    let tag = hex
+        .iter()
+        .take(4)
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
 
     // Map to meaningful axis values per class
     match seed.class.as_str() {
@@ -169,7 +173,11 @@ fn axis_value(seed: &RedTeamSeed, axis_name: &str, axis_idx: usize, variant_idx:
 }
 
 /// Build a scenario description from seed + parameters.
-fn build_scenario(seed: &RedTeamSeed, params: &BTreeMap<String, String>, variant_idx: usize) -> String {
+fn build_scenario(
+    seed: &RedTeamSeed,
+    params: &BTreeMap<String, String>,
+    variant_idx: usize,
+) -> String {
     let params_str = params
         .iter()
         .map(|(k, v)| format!("{}={}", k, v))

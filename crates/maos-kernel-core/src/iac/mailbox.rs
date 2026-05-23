@@ -35,7 +35,9 @@ use crate::scheduler::control_block::SpiritControlBlock;
 use crate::telemetry::iac_rt::IacRtMetrics;
 
 /// Per-Host Mailbox — the same-Host IAC router.
-#[maos_attrs::i9_exempt(reason = "per-Spirit mailbox router; DashMap holds transient per-process mpsc senders, not persistent state")]
+#[maos_attrs::i9_exempt(
+    reason = "per-Spirit mailbox router; DashMap holds transient per-process mpsc senders, not persistent state"
+)]
 #[derive(Debug)]
 pub struct Mailbox {
     mpsc_senders: DashMap<(String, FrameKind), mpsc::Sender<IacFrame>>,
@@ -70,7 +72,10 @@ impl Mailbox {
 
     pub fn register_spirit(&self, spirit_id: &str) -> Result<SpiritMailboxHandle, IacBusError> {
         // Guard against double-registration (F14)
-        if self.mpsc_senders.contains_key(&(spirit_id.to_string(), FrameKind::TaskAssign)) {
+        if self
+            .mpsc_senders
+            .contains_key(&(spirit_id.to_string(), FrameKind::TaskAssign))
+        {
             return Err(IacBusError::AlreadyRegistered(spirit_id.to_string()));
         }
         let mut receivers = Vec::with_capacity(6);
@@ -83,8 +88,8 @@ impl Mailbox {
             FrameKind::Retract,
         ];
         for &kind in kinds {
-            let (class, capacity) = channel_class_for(kind)
-                .expect("IAC frame kind must be routable");
+            let (class, capacity) =
+                channel_class_for(kind).expect("IAC frame kind must be routable");
             assert_eq!(class, ChannelClass::Mpsc, "all 1:1 kinds must use mpsc");
             let (tx, rx) = mpsc::channel(capacity);
             self.mpsc_senders.insert((spirit_id.to_string(), kind), tx);
@@ -130,7 +135,10 @@ impl Mailbox {
 
         // Story 5.3 — update sender's last_progress_iac_ns for spirit-origin frames.
         if frame.auto_marker.is_spirit_origin() {
-            let guard = self.scbs.lock().unwrap_or_else(|poison| poison.into_inner());
+            let guard = self
+                .scbs
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner());
             if let Some(ref scbs) = *guard {
                 if let Ok(scbs) = scbs.read() {
                     let sender_spirit_id = frame.from.spirit_id.as_str();
@@ -152,7 +160,10 @@ impl Mailbox {
                 .expect("validated in phase 1");
 
             // Update last_inbound_frame_ns for the recipient SCB.
-            let guard = self.scbs.lock().unwrap_or_else(|poison| poison.into_inner());
+            let guard = self
+                .scbs
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner());
             if let Some(ref scbs) = *guard {
                 if let Ok(scbs) = scbs.read() {
                     for (_, scb) in scbs.iter() {
@@ -189,13 +200,18 @@ impl Mailbox {
     }
 
     pub fn set_scbs(&self, scbs: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>) {
-        let mut guard = self.scbs.lock().unwrap_or_else(|poison| poison.into_inner());
+        let mut guard = self
+            .scbs
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
         *guard = Some(scbs);
     }
 }
 
 /// Handle returned by `Mailbox::register_spirit`.
-#[maos_attrs::i9_exempt(reason = "per-Spirit mailbox handle; Vec<mpsc::Receiver> is transient per-process state")]
+#[maos_attrs::i9_exempt(
+    reason = "per-Spirit mailbox handle; Vec<mpsc::Receiver> is transient per-process state"
+)]
 pub struct SpiritMailboxHandle {
     pub spirit_id: String,
     receivers: Vec<(FrameKind, mpsc::Receiver<IacFrame>)>,
@@ -260,37 +276,23 @@ impl SpiritMailboxHandle {
 impl IacBusPort for super::IacBusAdapter {
     type MailboxHandle = SpiritMailboxHandle;
 
-    fn enqueue_frame(
-        &self,
-        frame_bytes: &[u8],
-        origin: FrameOrigin,
-    ) -> LogBeforeDeliver<()> {
+    fn enqueue_frame(&self, frame_bytes: &[u8], origin: FrameOrigin) -> LogBeforeDeliver<()> {
         // TODO(F5): raw-byte path always logs FrameKind::TaskAssign — legacy callers
         // only. Use deliver() for typed frames. Story 6.1 owns the raw-byte path.
         self.enqueue_frame_bytes(frame_bytes, origin)
     }
 
-    fn broadcast_frame(
-        &self,
-        frame_bytes: &[u8],
-        origin: FrameOrigin,
-    ) -> LogBeforeDeliver<()> {
+    fn broadcast_frame(&self, frame_bytes: &[u8], origin: FrameOrigin) -> LogBeforeDeliver<()> {
         // TODO(F5): raw-byte path always logs FrameKind::TaskAssign — legacy callers
         // only. Use deliver() for typed frames. Story 6.1 owns the raw-byte path.
         self.broadcast_frame_bytes(frame_bytes, origin)
     }
 
-    async fn deliver(
-        &self,
-        frame: IacFrame,
-    ) -> Result<LogBeforeDeliver<()>, IacBusError> {
+    async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError> {
         self.deliver_typed(frame).await
     }
 
-    fn register_spirit(
-        &self,
-        spirit_id: &SpiritId,
-    ) -> Result<Self::MailboxHandle, IacBusError> {
+    fn register_spirit(&self, spirit_id: &SpiritId) -> Result<Self::MailboxHandle, IacBusError> {
         self.register_spirit_typed(spirit_id)
     }
 }
@@ -298,10 +300,10 @@ impl IacBusPort for super::IacBusAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use maos_domain::invariants::i1::IntentClass;
     use maos_domain::frame::{
         FrameAddress, FramePayload, TaskAssignPayload, TelemetryEventPayload,
     };
+    use maos_domain::invariants::i1::IntentClass;
     use maos_spirit_abi::identity::{HostId, SpiritId, SpiritRole};
     use smallvec::smallvec;
 

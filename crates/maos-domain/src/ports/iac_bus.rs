@@ -41,18 +41,12 @@ pub trait IacBusPort {
     /// Deliver a typed `IacFrame` through the I2 log-before-deliver
     /// pipeline. Story 3.1 wires the Mailbox; Story 6.1 adds DRR
     /// fairness scheduling.
-    async fn deliver(
-        &self,
-        frame: IacFrame,
-    ) -> Result<LogBeforeDeliver<()>, IacBusError>;
+    async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
 
     /// Class: data-movement
     ///
     /// Register a Spirit on the IAC Bus, creating per-kind bounded
     /// channels with §7.1.1 capacity floors. Story 3.1 wires the
     /// real Mailbox; Story 6.1 adds persistence.
-    fn register_spirit(
-        &self,
-        spirit_id: &SpiritId,
-    ) -> Result<Self::MailboxHandle, IacBusError>;
+    fn register_spirit(&self, spirit_id: &SpiritId) -> Result<Self::MailboxHandle, IacBusError>;
 }

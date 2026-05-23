@@ -3,7 +3,10 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "maos-corpus-gen", about = "MAOS parameterized corpus generators")]
+#[command(
+    name = "maos-corpus-gen",
+    about = "MAOS parameterized corpus generators"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -101,8 +104,7 @@ fn run_generate(
                     write_jsonl(out_path, &items)
                 }
                 "canary" => {
-                    let seed = rng_seed
-                        .ok_or("canary mode requires --rng-seed <u64>")?;
+                    let seed = rng_seed.ok_or("canary mode requires --rng-seed <u64>")?;
                     let ns = marker_namespace
                         .ok_or("canary mode requires --marker-namespace <string>")?;
                     let items = gen.generate_canary_batch(1000, seed, &ns);
@@ -133,9 +135,7 @@ fn run_coverage(corpus: &str, json: bool, seeds_fixture: Option<&str>) -> Result
         "secret-redaction-1e4" => {
             maos_corpus_gen::secret_redaction::run_coverage("secret-redaction-1e4", json)
         }
-        "red-team-640" => {
-            maos_corpus_gen::red_team::run_coverage("red-team-640", json)
-        }
+        "red-team-640" => maos_corpus_gen::red_team::run_coverage("red-team-640", json),
         other => Err(format!(
             "unknown corpus name; supported: secret-redaction-1e4, red-team-640\n  got: {}",
             other
@@ -151,7 +151,10 @@ fn run_coverage_with_fixture(
     use maos_corpus_gen::CorpusGenerator;
     match corpus {
         "secret-redaction-1e4" => {
-            let gen = maos_corpus_gen::secret_redaction::SecretRedactionGenerator::with_fixture_seeds(fixture_path)
+            let gen =
+                maos_corpus_gen::secret_redaction::SecretRedactionGenerator::with_fixture_seeds(
+                    fixture_path,
+                )
                 .map_err(|e| format!("failed to load fixture: {}", e))?;
             let report = gen.coverage_report();
             let ac5_floor = 1000;
@@ -206,8 +209,8 @@ fn run_coverage_with_fixture(
 fn write_jsonl<I: serde::Serialize>(path: &str, items: &[I]) -> Result<(), String> {
     let mut buf = String::new();
     for item in items {
-        let line = serde_json::to_string(item)
-            .map_err(|e| format!("serialization error: {}", e))?;
+        let line =
+            serde_json::to_string(item).map_err(|e| format!("serialization error: {}", e))?;
         buf.push_str(&line);
         buf.push('\n');
     }

@@ -56,10 +56,14 @@ impl CryptoProvider for RingCryptoProvider {
         plaintext: &[u8],
     ) -> Result<Vec<u8>, CryptoError> {
         if sealing_key.len() != 32 {
-            return Err(CryptoError::MalformedKey("AES-256-GCM key must be 32 bytes"));
+            return Err(CryptoError::MalformedKey(
+                "AES-256-GCM key must be 32 bytes",
+            ));
         }
         if nonce.len() != 12 {
-            return Err(CryptoError::OperationFailed("AES-GCM nonce must be 12 bytes"));
+            return Err(CryptoError::OperationFailed(
+                "AES-GCM nonce must be 12 bytes",
+            ));
         }
         let unbound = aead::UnboundKey::new(&aead::AES_256_GCM, sealing_key)
             .map_err(|_| CryptoError::MalformedKey("AES-256-GCM key rejected by ring"))?;
@@ -68,7 +72,10 @@ impl CryptoProvider for RingCryptoProvider {
             .map_err(|_| CryptoError::OperationFailed("nonce construction failed"))?;
         let aad = aead::Aad::from(aad);
         let mut in_out = plaintext.to_vec();
-        if key.seal_in_place_append_tag(nonce, aad, &mut in_out).is_err() {
+        if key
+            .seal_in_place_append_tag(nonce, aad, &mut in_out)
+            .is_err()
+        {
             // Zeroize buffer on failure — plaintext may still be present.
             in_out.iter_mut().for_each(|b| *b = 0);
             return Err(CryptoError::OperationFailed("AES-GCM seal failed"));
@@ -191,7 +198,9 @@ pub mod tests {
         let nonce = [2u8; 12];
         let aad = b"compliance-claim-header";
         let plaintext = b"sealed audit bundle bytes";
-        let ciphertext = provider.seal_for_export(&key, &nonce, aad, plaintext).unwrap();
+        let ciphertext = provider
+            .seal_for_export(&key, &nonce, aad, plaintext)
+            .unwrap();
         assert_eq!(
             ciphertext.len(),
             plaintext.len() + 16,

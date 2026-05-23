@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use maos_eval::isolation_corpus::{
-    IsolationCorpus, IsolationCorpusScenario, IsolationAttackCategory,
+    IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
 };
 
 /// Typed error for isolation corpus execution.
@@ -50,7 +50,9 @@ pub struct ScenarioOutcome {
 /// Stateless value type produced by `IsolationCorpusRunner::run_all`.
 /// The `BTreeMap` fields hold transient per-run counters, not persistent
 /// kernel state.
-#[maos_attrs::i9_exempt(reason = "IsolationCorpusReport is a transient value type produced by the test-only corpus runner; BTreeMap fields hold per-run counters, not persistent state. Same exemption shape as SelfTelemetryAggregator (Story 4.3) and LogRecallAdapter (Story 4.4).")]
+#[maos_attrs::i9_exempt(
+    reason = "IsolationCorpusReport is a transient value type produced by the test-only corpus runner; BTreeMap fields hold per-run counters, not persistent state. Same exemption shape as SelfTelemetryAggregator (Story 4.3) and LogRecallAdapter (Story 4.4)."
+)]
 #[derive(Debug, Clone)]
 pub struct IsolationCorpusReport {
     pub scenarios_passed: usize,
@@ -106,7 +108,10 @@ impl IsolationCorpusRunner {
                 });
             }
 
-            *report.per_category.entry(scenario.category.clone()).or_insert(0) += 1;
+            *report
+                .per_category
+                .entry(scenario.category.clone())
+                .or_insert(0) += 1;
             *report.per_split.entry(scenario.split.clone()).or_insert(0) += 1;
         }
 
@@ -186,9 +191,7 @@ impl IsolationCorpusRunner {
 fn validate_kernel_response(category: &str, response: &str) -> bool {
     match category {
         "namespace_enumeration" => response == "I5Violation",
-        "working_memory_read_across" => {
-            response == "I5Violation" || response == "ScopeViolation"
-        }
+        "working_memory_read_across" => response == "I5Violation" || response == "ScopeViolation",
         "decision_frame_observation" => response == "ScopeViolation",
         "halt_signal_observation" => response == "ScopeViolation",
         "transparency_log_cross_read" => response == "ScopeViolation",
@@ -202,9 +205,7 @@ fn validate_kernel_response(category: &str, response: &str) -> bool {
                 || response == "TokenExpired"
                 || response == "TokenSignatureInvalid"
         }
-        "sandbox_escape_lateral" => {
-            response == "SandboxBlock" || response == "CapabilityDenied"
-        }
+        "sandbox_escape_lateral" => response == "SandboxBlock" || response == "CapabilityDenied",
         _ => false,
     }
 }
@@ -240,9 +241,21 @@ mod tests {
 
     #[test]
     fn validate_kernel_response_known_variants() {
-        assert!(validate_kernel_response("namespace_enumeration", "I5Violation"));
-        assert!(!validate_kernel_response("namespace_enumeration", "UnknownError"));
-        assert!(validate_kernel_response("working_memory_digest_cross_read", "EIntentLineageBroken"));
-        assert!(validate_kernel_response("sandbox_escape_lateral", "CapabilityDenied"));
+        assert!(validate_kernel_response(
+            "namespace_enumeration",
+            "I5Violation"
+        ));
+        assert!(!validate_kernel_response(
+            "namespace_enumeration",
+            "UnknownError"
+        ));
+        assert!(validate_kernel_response(
+            "working_memory_digest_cross_read",
+            "EIntentLineageBroken"
+        ));
+        assert!(validate_kernel_response(
+            "sandbox_escape_lateral",
+            "CapabilityDenied"
+        ));
     }
 }

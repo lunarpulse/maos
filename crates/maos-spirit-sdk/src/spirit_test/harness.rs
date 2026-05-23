@@ -3,10 +3,12 @@
 //! `SpiritTest<S>` — wraps `LocalRunner` (Story 2.3) with halt resolution
 //! + manifest self-check + frame capture support.
 
-use crate::local_runner::{LocalRunner, LocalRunnerFixture, RunReport, MockBusFrame};
-use crate::{Spirit, SpiritVtable};
+use crate::local_runner::{LocalRunner, LocalRunnerFixture, MockBusFrame, RunReport};
 use crate::spirit_test::halt::{HaltResolutionKind, HaltResolutionRecord};
-use crate::spirit_test::manifest::{ManifestSelfCheckReport, ManifestSelfCheckViolation, manifest_self_check};
+use crate::spirit_test::manifest::{
+    manifest_self_check, ManifestSelfCheckReport, ManifestSelfCheckViolation,
+};
+use crate::{Spirit, SpiritVtable};
 
 /// Extended report carrying everything `RunReport` carries plus the
 /// halt resolutions the simulator recorded.
@@ -47,7 +49,9 @@ impl<'a, S: Spirit + 'static> SpiritTest<'a, S> {
     /// At v0.3 prerequisite this does NOT yet invoke an
     /// `on_epistemic_resolve` hook (that hook ships at Story 4.1).
     pub fn resolve_halt(&mut self, halt_id: String, kind: HaltResolutionKind) {
-        self.report.halt_resolutions.push(HaltResolutionRecord { halt_id, kind });
+        self.report
+            .halt_resolutions
+            .push(HaltResolutionRecord { halt_id, kind });
     }
 
     /// Run the fixture against the Spirit through the vtable. Returns

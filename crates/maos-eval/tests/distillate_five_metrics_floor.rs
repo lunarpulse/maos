@@ -25,10 +25,9 @@ fn mean(values: &[f64]) -> f64 {
 
 #[test]
 fn test_distillate_five_metrics_floor() {
-    let corpus = DistillateCorpus::load_from(
-        std::path::Path::new("fixtures/distillate-corpus-v0/"),
-    )
-    .expect("distillate-corpus-v0 must exist");
+    let corpus =
+        DistillateCorpus::load_from(std::path::Path::new("fixtures/distillate-corpus-v0/"))
+            .expect("distillate-corpus-v0 must exist");
 
     // Corpus size lock
     assert_eq!(
@@ -51,9 +50,20 @@ fn test_distillate_five_metrics_floor() {
     );
 
     // Metric floors
-    let recall_mean = mean(&corpus.scenarios.iter().map(|s| s.expected_recall).collect::<Vec<_>>());
-    let faithfulness_mean =
-        mean(&corpus.scenarios.iter().map(|s| s.expected_faithfulness).collect::<Vec<_>>());
+    let recall_mean = mean(
+        &corpus
+            .scenarios
+            .iter()
+            .map(|s| s.expected_recall)
+            .collect::<Vec<_>>(),
+    );
+    let faithfulness_mean = mean(
+        &corpus
+            .scenarios
+            .iter()
+            .map(|s| s.expected_faithfulness)
+            .collect::<Vec<_>>(),
+    );
     let hedge_mean = mean(
         &corpus
             .scenarios
@@ -128,8 +138,7 @@ fn test_distillate_five_metrics_floor() {
 #[test]
 #[ignore = "quarterly audit slice not present — v0.3-β acceptable; lands in Story 8.2 alongside Researcher"]
 fn test_distillate_corpus_quarterly_audit_shape() {
-    let quarterly_dir =
-        std::path::Path::new("fixtures/distillate-corpus-v0/quarterly-audit-v0");
+    let quarterly_dir = std::path::Path::new("fixtures/distillate-corpus-v0/quarterly-audit-v0");
 
     if !quarterly_dir.exists() {
         println!(
@@ -148,10 +157,9 @@ fn test_distillate_corpus_quarterly_audit_shape() {
 
 #[test]
 fn test_distillate_corpus_category_distribution() {
-    let corpus = DistillateCorpus::load_from(
-        std::path::Path::new("fixtures/distillate-corpus-v0/"),
-    )
-    .expect("distillate-corpus-v0 must exist");
+    let corpus =
+        DistillateCorpus::load_from(std::path::Path::new("fixtures/distillate-corpus-v0/"))
+            .expect("distillate-corpus-v0 must exist");
 
     let contradiction_count = corpus
         .scenarios

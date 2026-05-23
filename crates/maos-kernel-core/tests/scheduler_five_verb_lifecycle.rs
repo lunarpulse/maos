@@ -6,13 +6,12 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
+use maos_domain::lifecycle::LifecycleError;
 use maos_kernel_core::scheduler::{
-    control_block::SpiritManifestBundle,
-    scheduler_loop::SpiritSchedulerAdapter,
+    control_block::SpiritManifestBundle, scheduler_loop::SpiritSchedulerAdapter,
 };
 use maos_kernel_core::security::manifest::{LifecycleSection, SchedulingSection};
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
-use maos_domain::lifecycle::LifecycleError;
 
 struct TestSpirit {
     on_load: AtomicU32,
@@ -57,7 +56,9 @@ fn make_scheduler() -> Arc<SpiritSchedulerAdapter> {
     let db_path = tmp.path().join("audit.db");
     let memory_root = tmp.path().join("memory");
 
-    let tl = Arc::new(maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0xBEEF));
+    let tl = Arc::new(
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0xBEEF),
+    );
     let capability = Arc::new(
         maos_kernel_core::capability::CapabilityRegistryAdapter::new(
             Arc::new(maos_kernel_core::api::RingCryptoProvider),
@@ -68,28 +69,42 @@ fn make_scheduler() -> Arc<SpiritSchedulerAdapter> {
             maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
             Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
             Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
-        )
+        ),
     );
-    let memory = Arc::new(
-        maos_kernel_core::memory::MemoryManagerAdapter::new(
-            Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(memory_root, 4)),
-            Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path).unwrap()),
-            Arc::new(maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path).unwrap()),
-            Arc::clone(&tl),
-        )
-    );
-    let iac = Arc::new(
-        maos_kernel_core::iac::IacBusAdapter::new(
-            Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::new(IacRtMetrics::new()))),
-            Arc::clone(&tl),
-        )
-    );
+    let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
+        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
+            memory_root,
+            4,
+        )),
+        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path).unwrap()),
+        Arc::new(
+            maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path).unwrap(),
+        ),
+        Arc::clone(&tl),
+    ));
+    let iac = Arc::new(maos_kernel_core::iac::IacBusAdapter::new(
+        Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::new(
+            IacRtMetrics::new(),
+        ))),
+        Arc::clone(&tl),
+    ));
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
     let telemetry = Arc::new(IacRtMetrics::new());
 
     Arc::new(SpiritSchedulerAdapter::new(
-        tl, capability, memory, iac, halt_registry, telemetry,
-        None, None, None, None, None, None, None,
+        tl,
+        capability,
+        memory,
+        iac,
+        halt_registry,
+        telemetry,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
     ))
 }
 
@@ -112,7 +127,10 @@ async fn five_verb_lifecycle_routes_through_scheduler() {
     };
 
     // 1. Load
-    let pid = scheduler.load("test-spirit", manifest, spirit, 0xBEEF).await.expect("load");
+    let pid = scheduler
+        .load("test-spirit", manifest, spirit, 0xBEEF)
+        .await
+        .expect("load");
     assert!(pid > 0, "pid must be non-zero");
 
     // 2. Start
@@ -128,7 +146,11 @@ async fn five_verb_lifecycle_routes_through_scheduler() {
     scheduler.unload(pid).await.expect("unload");
 
     // Verify SCB is removed.
-    assert_eq!(scheduler.resolve_pid("test-spirit"), None, "SCB must be removed after unload");
+    assert_eq!(
+        scheduler.resolve_pid("test-spirit"),
+        None,
+        "SCB must be removed after unload"
+    );
 }
 
 #[tokio::test]
@@ -137,10 +159,16 @@ async fn unload_is_idempotent() {
     let spirit = TestSpirit::default();
     let manifest = SpiritManifestBundle::default();
 
-    let pid = scheduler.load("idempotent-spirit", manifest, spirit, 0).await.expect("load");
+    let pid = scheduler
+        .load("idempotent-spirit", manifest, spirit, 0)
+        .await
+        .expect("load");
     scheduler.start(pid).await.expect("start");
     scheduler.unload(pid).await.expect("first unload");
-    scheduler.unload(pid).await.expect("second unload must be idempotent");
+    scheduler
+        .unload(pid)
+        .await
+        .expect("second unload must be idempotent");
 }
 
 #[tokio::test]
@@ -149,7 +177,10 @@ async fn invalid_state_transition_rejected() {
     let spirit = TestSpirit::default();
     let manifest = SpiritManifestBundle::default();
 
-    let pid = scheduler.load("transition-spirit", manifest, spirit, 0).await.expect("load");
+    let pid = scheduler
+        .load("transition-spirit", manifest, spirit, 0)
+        .await
+        .expect("load");
 
     // Start without load transition is invalid — but load already sets Loaded.
     // Try pause on Loaded (not Running).

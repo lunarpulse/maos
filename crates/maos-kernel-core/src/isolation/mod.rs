@@ -14,6 +14,5 @@
 pub mod runner;
 
 pub use runner::{
-    IsolationCorpusRunner, IsolationCorpusReport, IsolationCorpusError,
-    ScenarioOutcome,
+    IsolationCorpusError, IsolationCorpusReport, IsolationCorpusRunner, ScenarioOutcome,
 };

@@ -9,8 +9,8 @@
 //!
 //! Architecture §8.1 + epic-4 line 17 enumerate the 8 categories.
 
-use crate::{Spirit, SpiritVtable};
 use crate::local_runner::{LocalRunner, LocalRunnerFixture};
+use crate::{Spirit, SpiritVtable};
 
 /// The 8 categories per architecture §8.1 + epic-4 line 17.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,9 +74,17 @@ pub struct HookCallRecord {
 /// into these methods; DefaultIsolationHook records calls for inspection.
 pub trait IsolationHookPoint {
     fn before_spirit_a_attempt(&mut self, case_id: &str) -> IsolationHookOutcome;
-    fn after_spirit_a_attempt(&mut self, case_id: &str, result: &AttemptResult) -> IsolationHookOutcome;
+    fn after_spirit_a_attempt(
+        &mut self,
+        case_id: &str,
+        result: &AttemptResult,
+    ) -> IsolationHookOutcome;
     fn before_spirit_b_observe(&mut self, case_id: &str) -> IsolationHookOutcome;
-    fn after_spirit_b_observe(&mut self, case_id: &str, observation: &ObservationResult) -> IsolationHookOutcome;
+    fn after_spirit_b_observe(
+        &mut self,
+        case_id: &str,
+        observation: &ObservationResult,
+    ) -> IsolationHookOutcome;
 }
 
 /// Reference impl recording all hook firings into a Vec.
@@ -94,7 +102,11 @@ impl IsolationHookPoint for DefaultIsolationHook {
         });
         IsolationHookOutcome::Continue
     }
-    fn after_spirit_a_attempt(&mut self, case_id: &str, _result: &AttemptResult) -> IsolationHookOutcome {
+    fn after_spirit_a_attempt(
+        &mut self,
+        case_id: &str,
+        _result: &AttemptResult,
+    ) -> IsolationHookOutcome {
         self.records.push(HookCallRecord {
             hook_name: "after_spirit_a_attempt",
             case_id: case_id.to_string(),
@@ -110,7 +122,11 @@ impl IsolationHookPoint for DefaultIsolationHook {
         });
         IsolationHookOutcome::Continue
     }
-    fn after_spirit_b_observe(&mut self, case_id: &str, _observation: &ObservationResult) -> IsolationHookOutcome {
+    fn after_spirit_b_observe(
+        &mut self,
+        case_id: &str,
+        _observation: &ObservationResult,
+    ) -> IsolationHookOutcome {
         self.records.push(HookCallRecord {
             hook_name: "after_spirit_b_observe",
             case_id: case_id.to_string(),
@@ -144,7 +160,12 @@ impl<'a, A: Spirit + 'static, B: Spirit + 'static> CrossSpiritIsolationFixture<'
         spirit_b: &'a B,
         vtable_b: &'a SpiritVtable<B>,
     ) -> Self {
-        Self { spirit_a, vtable_a, spirit_b, vtable_b }
+        Self {
+            spirit_a,
+            vtable_a,
+            spirit_b,
+            vtable_b,
+        }
     }
 
     /// Run one attack case through the 4-point hook protocol.
@@ -170,7 +191,10 @@ impl<'a, A: Spirit + 'static, B: Spirit + 'static> CrossSpiritIsolationFixture<'
         let _ = hook.before_spirit_b_observe(&case.id);
 
         // Fire Spirit-B through on_idle to drain observable state.
-        let fixture_b = LocalRunnerFixture { invoke_on_idle: true, ..Default::default() };
+        let fixture_b = LocalRunnerFixture {
+            invoke_on_idle: true,
+            ..Default::default()
+        };
         let report_b = LocalRunner::run(self.spirit_b, self.vtable_b, &fixture_b);
         let observation = ObservationResult {
             hooks_fired_during_observation: report_b.hooks_fired.keys().cloned().collect(),

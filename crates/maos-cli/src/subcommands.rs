@@ -6,7 +6,11 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::accessibility::ColorChoice;
-use crate::cli::{AuditFormat, AuditQuery, HaltArgs, HaltOp, InstallArgs, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs, RevokeTokenArgs, RunArgs, SpiritArgs, SpiritOp, Subcommand};
+use crate::cli::{
+    AuditFormat, AuditQuery, HaltArgs, HaltOp, InstallArgs, OrchestratorArgs, OrchestratorOp,
+    PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs, RevocationsArgs,
+    RevocationsOp, RevokeTokenArgs, RunArgs, SpiritArgs, SpiritOp, Subcommand, UpgradePolicyArg,
+};
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
     match cmd {
@@ -23,6 +27,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Resume(args) => dispatch_resume(args, color),
         Subcommand::RevokeToken(args) => dispatch_revoke_token(args, color),
         Subcommand::Spirit(args) => dispatch_spirit(args, color),
+        Subcommand::Revocations(args) => dispatch_revocations(args, color),
     }
 }
 
@@ -56,7 +61,10 @@ fn run(args: &RunArgs, _color: ColorChoice) -> ExitCode {
         Ok(s) if s.success() => ExitCode::SUCCESS,
         Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
         Err(e) => {
-            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+            eprintln!(
+                "maosctl: failed to execute maos-bin at '{}': {e}",
+                bin.display()
+            );
             ExitCode::from(2)
         }
     }
@@ -191,7 +199,10 @@ fn dispatch_posture(args: &PostureArgs, color: ColorChoice) -> ExitCode {
         Ok(s) if s.success() => ExitCode::SUCCESS,
         Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
         Err(e) => {
-            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+            eprintln!(
+                "maosctl: failed to execute maos-bin at '{}': {e}",
+                bin.display()
+            );
             ExitCode::from(2)
         }
     }
@@ -218,7 +229,10 @@ fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
                 Ok(s) if s.success() => ExitCode::SUCCESS,
                 Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
                 Err(e) => {
-                    eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+                    eprintln!(
+                        "maosctl: failed to execute maos-bin at '{}': {e}",
+                        bin.display()
+                    );
                     ExitCode::from(2)
                 }
             }
@@ -271,7 +285,10 @@ fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
                 Ok(s) if s.success() => ExitCode::SUCCESS,
                 Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
                 Err(e) => {
-                    eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+                    eprintln!(
+                        "maosctl: failed to execute maos-bin at '{}': {e}",
+                        bin.display()
+                    );
                     ExitCode::from(2)
                 }
             }
@@ -298,7 +315,10 @@ fn dispatch_pause(args: &PauseArgs, color: ColorChoice) -> ExitCode {
         Ok(s) if s.success() => ExitCode::SUCCESS,
         Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
         Err(e) => {
-            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+            eprintln!(
+                "maosctl: failed to execute maos-bin at '{}': {e}",
+                bin.display()
+            );
             ExitCode::from(2)
         }
     }
@@ -323,7 +343,10 @@ fn dispatch_resume(args: &ResumeArgs, color: ColorChoice) -> ExitCode {
         Ok(s) if s.success() => ExitCode::SUCCESS,
         Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
         Err(e) => {
-            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+            eprintln!(
+                "maosctl: failed to execute maos-bin at '{}': {e}",
+                bin.display()
+            );
             ExitCode::from(2)
         }
     }
@@ -331,7 +354,10 @@ fn dispatch_resume(args: &ResumeArgs, color: ColorChoice) -> ExitCode {
 
 fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCode {
     match &args.op {
-        OrchestratorOp::Queue { spirit, instruction } => {
+        OrchestratorOp::Queue {
+            spirit,
+            instruction,
+        } => {
             if let Err(diag) = resolve_spirit_pid(spirit) {
                 eprintln!("maosctl: orchestrator queue — {diag}");
                 return ExitCode::from(2);
@@ -355,7 +381,10 @@ fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCod
                 Ok(s) if s.success() => ExitCode::SUCCESS,
                 Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
                 Err(e) => {
-                    eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+                    eprintln!(
+                        "maosctl: failed to execute maos-bin at '{}': {e}",
+                        bin.display()
+                    );
                     ExitCode::from(2)
                 }
             }
@@ -379,7 +408,10 @@ fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCod
                 Ok(s) if s.success() => ExitCode::SUCCESS,
                 Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
                 Err(e) => {
-                    eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+                    eprintln!(
+                        "maosctl: failed to execute maos-bin at '{}': {e}",
+                        bin.display()
+                    );
                     ExitCode::from(2)
                 }
             }
@@ -389,8 +421,16 @@ fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCod
 
 fn dispatch_revoke_token(args: &RevokeTokenArgs, color: ColorChoice) -> ExitCode {
     // Validate hex format BEFORE shelling out
-    if args.token_id.len() != 32 || !args.token_id.chars().all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c)) {
-        eprintln!("maosctl: revoke-token — invalid token_id '{}' (expected 32-char lowercase hex)", args.token_id);
+    if args.token_id.len() != 32
+        || !args
+            .token_id
+            .chars()
+            .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
+    {
+        eprintln!(
+            "maosctl: revoke-token — invalid token_id '{}' (expected 32-char lowercase hex)",
+            args.token_id
+        );
         return ExitCode::from(2);
     }
 
@@ -410,8 +450,70 @@ fn dispatch_revoke_token(args: &RevokeTokenArgs, color: ColorChoice) -> ExitCode
         Ok(s) if s.success() => ExitCode::SUCCESS,
         Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
         Err(e) => {
-            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+            eprintln!(
+                "maosctl: failed to execute maos-bin at '{}': {e}",
+                bin.display()
+            );
             ExitCode::from(2)
+        }
+    }
+}
+
+fn dispatch_revocations(args: &RevocationsArgs, color: ColorChoice) -> ExitCode {
+    match &args.op {
+        RevocationsOp::Import { file, force } => {
+            if !file.exists() {
+                eprintln!(
+                    "maosctl: revocations import — file not found: {}",
+                    file.display()
+                );
+                return ExitCode::from(1);
+            }
+
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "revocations-import");
+            cmd.env("MAOS_CRL_PATH", file.as_os_str());
+            if *force {
+                cmd.env("MAOS_CRL_FORCE_REAPPLY", "1");
+            }
+
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+
+            match cmd.status() {
+                Ok(s) if s.success() => ExitCode::SUCCESS,
+                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+                Err(e) => {
+                    eprintln!(
+                        "maosctl: failed to execute maos-bin at '{}': {e}",
+                        bin.display()
+                    );
+                    ExitCode::from(2)
+                }
+            }
+        }
+        RevocationsOp::List => {
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "revocations-list");
+
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+
+            match cmd.status() {
+                Ok(s) if s.success() => ExitCode::SUCCESS,
+                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+                Err(e) => {
+                    eprintln!(
+                        "maosctl: failed to execute maos-bin at '{}': {e}",
+                        bin.display()
+                    );
+                    ExitCode::from(2)
+                }
+            }
         }
     }
 }
@@ -449,7 +551,51 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
                 Ok(s) if s.success() => ExitCode::SUCCESS,
                 Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
                 Err(e) => {
-                    eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+                    eprintln!(
+                        "maosctl: failed to execute maos-bin at '{}': {e}",
+                        bin.display()
+                    );
+                    ExitCode::from(2)
+                }
+            }
+        }
+        SpiritOp::Upgrade { spirit, to, policy } => {
+            if let Err(diag) = resolve_spirit_pid(spirit) {
+                eprintln!("maosctl: spirit upgrade — {diag}");
+                return ExitCode::from(1);
+            }
+            let manifest_path = std::path::Path::new(to);
+            if !manifest_path.exists() {
+                eprintln!("maosctl: spirit upgrade — manifest file not found: {to}");
+                return ExitCode::from(1);
+            }
+
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "spirit-upgrade");
+            cmd.env("MAOS_SPIRIT_ID", spirit);
+            cmd.env("MAOS_UPGRADE_TO_MANIFEST", to);
+            cmd.env(
+                "MAOS_UPGRADE_POLICY",
+                match policy {
+                    UpgradePolicyArg::HotSwap => "hot-swap",
+                    UpgradePolicyArg::ColdSwap => "cold-swap",
+                    UpgradePolicyArg::Migrator => "migrator",
+                },
+            );
+
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+
+            match cmd.status() {
+                Ok(s) if s.success() => ExitCode::SUCCESS,
+                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+                Err(e) => {
+                    eprintln!(
+                        "maosctl: failed to execute maos-bin at '{}': {e}",
+                        bin.display()
+                    );
                     ExitCode::from(2)
                 }
             }
@@ -553,7 +699,10 @@ fn audit_query(spirit: Option<&str>, format: AuditFormat, _color: ColorChoice) -
     };
     match write_result {
         Ok(()) => ExitCode::SUCCESS,
-        Err(maos_audit::AuditError::Fr4SchemaViolation { line, missing_field }) => {
+        Err(maos_audit::AuditError::Fr4SchemaViolation {
+            line,
+            missing_field,
+        }) => {
             eprintln!(
                 "maosctl: audit query — FR4 schema violation at line {line}: missing field '{missing_field}'"
             );
@@ -575,12 +724,11 @@ fn default_transparency_log_path() -> PathBuf {
     maos_audit::default_transparency_log_path()
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::{Cli, Subcommand, RunArgs, InstallArgs};
     use crate::accessibility::ColorChoice;
+    use crate::cli::{Cli, InstallArgs, RunArgs, Subcommand};
     use clap::Parser;
 
     #[test]
@@ -632,9 +780,15 @@ mod tests {
 
     #[test]
     fn audit_query_accepts_spirit_and_format_flags() {
-        use crate::cli::{AuditQuery, AuditFormat};
+        use crate::cli::{AuditFormat, AuditQuery};
         let cli = Cli::try_parse_from([
-            "maosctl", "audit", "query", "--spirit", "hello-spirit", "--format", "ndjson",
+            "maosctl",
+            "audit",
+            "query",
+            "--spirit",
+            "hello-spirit",
+            "--format",
+            "ndjson",
         ])
         .expect("audit query --spirit / --format must parse");
         match &cli.command {
@@ -651,9 +805,15 @@ mod tests {
 
     #[test]
     fn audit_query_accepts_plain_format() {
-        use crate::cli::{AuditQuery, AuditFormat};
+        use crate::cli::{AuditFormat, AuditQuery};
         let cli = Cli::try_parse_from([
-            "maosctl", "audit", "query", "--spirit", "hello-spirit", "--format", "plain",
+            "maosctl",
+            "audit",
+            "query",
+            "--spirit",
+            "hello-spirit",
+            "--format",
+            "plain",
         ])
         .expect("audit query --format plain must parse");
         match &cli.command {
@@ -669,7 +829,7 @@ mod tests {
 
     #[test]
     fn audit_query_defaults_format_to_ndjson() {
-        use crate::cli::{AuditQuery, AuditFormat};
+        use crate::cli::{AuditFormat, AuditQuery};
         let cli = Cli::try_parse_from(["maosctl", "audit", "query"])
             .expect("audit query with no flags must parse");
         match &cli.command {
@@ -746,4 +906,3 @@ mod tests {
         assert_ne!(code, ExitCode::SUCCESS);
     }
 }
-

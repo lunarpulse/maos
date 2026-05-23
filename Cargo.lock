@@ -929,6 +929,7 @@ name = "maos-bin"
 version = "0.1.0-alpha"
 dependencies = [
  "getrandom 0.3.4",
+ "hex",
  "maos-audit",
  "maos-director-surface",
  "maos-domain",
@@ -991,6 +992,7 @@ dependencies = [
 name = "maos-domain"
 version = "0.1.0-alpha"
 dependencies = [
+ "hex",
  "maos-spirit-abi",
  "serde",
  "serde_json",

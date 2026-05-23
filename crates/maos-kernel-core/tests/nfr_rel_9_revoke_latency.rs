@@ -15,8 +15,10 @@ use maos_domain::invariants::i1::{IntentClass, Scope, TokenId};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::crypto::CryptoError;
 use maos_domain::ports::CryptoProvider;
-use maos_kernel_core::capability::cap_tokens::{CapTokensShardRing, Ed25519SigningKey, RevokeReason};
 use maos_kernel_core::capability::cap_audit;
+use maos_kernel_core::capability::cap_tokens::{
+    CapTokensShardRing, Ed25519SigningKey, RevokeReason,
+};
 
 use std::sync::Arc;
 
@@ -24,9 +26,21 @@ const REVOKE_P99_BUDGET_US: u64 = 5_000_000;
 
 struct TestCrypto;
 impl CryptoProvider for TestCrypto {
-    fn verify_signature(&self, _pk: &[u8], _msg: &[u8], _sig: &[u8]) -> Result<(), CryptoError> { Ok(()) }
-    fn seal_for_export(&self, _key: &[u8], _nonce: &[u8], _aad: &[u8], _pt: &[u8]) -> Result<Vec<u8>, CryptoError> { Ok(vec![]) }
-    fn sign_capability_token(&self, _key: &[u8], _msg: &[u8]) -> Result<Vec<u8>, CryptoError> { Ok(vec![0u8; 64]) }
+    fn verify_signature(&self, _pk: &[u8], _msg: &[u8], _sig: &[u8]) -> Result<(), CryptoError> {
+        Ok(())
+    }
+    fn seal_for_export(
+        &self,
+        _key: &[u8],
+        _nonce: &[u8],
+        _aad: &[u8],
+        _pt: &[u8],
+    ) -> Result<Vec<u8>, CryptoError> {
+        Ok(vec![])
+    }
+    fn sign_capability_token(&self, _key: &[u8], _msg: &[u8]) -> Result<Vec<u8>, CryptoError> {
+        Ok(vec![0u8; 64])
+    }
 }
 
 fn setup_ring() -> CapTokensShardRing {
@@ -45,7 +59,9 @@ fn nfr_rel_9_1000_token_revoke_latency_v03_scaffold() {
         .map(|i| {
             ring.issue(
                 i as u32,
-                Scope::FsRead { subtree: format!("/tmp/{i}").into() },
+                Scope::FsRead {
+                    subtree: format!("/tmp/{i}").into(),
+                },
                 60,
                 [0u8; 32],
                 IntentClass::Standard,
@@ -60,7 +76,10 @@ fn nfr_rel_9_1000_token_revoke_latency_v03_scaffold() {
         let t0 = Instant::now();
         ring.revoke(token.token_id, RevokeReason::Operator).unwrap();
         let result = ring.verify(token, [0u8; 32], SandboxTier(2));
-        assert_eq!(result, Err(maos_domain::ports::capability::CapError::Revoked));
+        assert_eq!(
+            result,
+            Err(maos_domain::ports::capability::CapError::Revoked)
+        );
         revoke_latencies_us.push(t0.elapsed().as_micros() as u64);
     }
 

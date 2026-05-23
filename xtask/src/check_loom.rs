@@ -93,7 +93,9 @@ fn check_loom(
     let allowlist: Allowlist = if allowlist_path.exists() {
         load_toml(allowlist_path)?
     } else {
-        Allowlist { allowed: Vec::new() }
+        Allowlist {
+            allowed: Vec::new(),
+        }
     };
 
     let blockset: HashSet<String> = blocklist.blocklist.into_iter().collect();
@@ -154,8 +156,8 @@ fn check_loom(
 }
 
 fn load_toml<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
-    let src = fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let src =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     toml::from_str(&src).map_err(|e| format!("toml parse error in {}: {e}", path.display()))
 }
 
@@ -274,7 +276,11 @@ fn collect_use_names(tree: &syn::UseTree, on_glob: &mut dyn FnMut(&str)) -> Vec<
             on_glob(&path);
             Vec::new()
         }
-        syn::UseTree::Group(group) => group.items.iter().flat_map(|t| collect_use_names(t, on_glob)).collect(),
+        syn::UseTree::Group(group) => group
+            .items
+            .iter()
+            .flat_map(|t| collect_use_names(t, on_glob))
+            .collect(),
         syn::UseTree::Path(path) => collect_use_names(&path.tree, on_glob),
     }
 }

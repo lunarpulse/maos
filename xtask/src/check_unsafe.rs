@@ -80,10 +80,10 @@ fn check_unsafe(capability_path: &Path) -> Result<Report, String> {
 
     // Verify each crate root carries #![forbid(unsafe_code)].
     for root in &crate_roots {
-        let src = fs::read_to_string(root)
-            .map_err(|e| format!("cannot read {}: {e}", root.display()))?;
-        let ast = syn::parse_file(&src)
-            .map_err(|e| format!("parse error in {}: {e}", root.display()))?;
+        let src =
+            fs::read_to_string(root).map_err(|e| format!("cannot read {}: {e}", root.display()))?;
+        let ast =
+            syn::parse_file(&src).map_err(|e| format!("parse error in {}: {e}", root.display()))?;
         if !has_forbid_unsafe_code(&ast.attrs) {
             missing_forbid.push(root.display().to_string());
         }
@@ -91,10 +91,10 @@ fn check_unsafe(capability_path: &Path) -> Result<Report, String> {
 
     // Walk every .rs file for unsafe constructs.
     for file in &rs_files {
-        let src = fs::read_to_string(file)
-            .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
-        let ast = syn::parse_file(&src)
-            .map_err(|e| format!("parse error in {}: {e}", file.display()))?;
+        let src =
+            fs::read_to_string(file).map_err(|e| format!("cannot read {}: {e}", file.display()))?;
+        let ast =
+            syn::parse_file(&src).map_err(|e| format!("parse error in {}: {e}", file.display()))?;
         let mut visitor = UnsafeVisitor {
             file: file.display().to_string(),
             violations: &mut violations,
@@ -129,7 +129,12 @@ fn is_allow_unsafe_code(attr: &Attribute) -> bool {
     }
     if attr.path().is_ident("cfg_attr") {
         if let Ok(meta) = attr.meta.require_list() {
-            let tokens: String = meta.tokens.to_string().replace(' ', "").replace('\t', "").replace('\n', "");
+            let tokens: String = meta
+                .tokens
+                .to_string()
+                .replace(' ', "")
+                .replace('\t', "")
+                .replace('\n', "");
             return tokens.contains("allow(unsafe_code)") || tokens.contains("warn(unsafe_code)");
         }
     }

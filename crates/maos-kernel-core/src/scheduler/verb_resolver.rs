@@ -6,12 +6,10 @@
 
 use std::sync::Arc;
 
-use maos_domain::lifecycle::{
-    LifecycleError, LifecycleReceipt, LifecycleResolver, LifecycleVerb,
-};
+use maos_domain::lifecycle::{LifecycleError, LifecycleReceipt, LifecycleResolver, LifecycleVerb};
 
-use crate::scheduler::scheduler_loop::SpiritSchedulerAdapter;
 use crate::iac::transparency_log::TransparencyLogAdapter;
+use crate::scheduler::scheduler_loop::SpiritSchedulerAdapter;
 
 /// Kernel-side lifecycle resolver — routes operator verbs through
 /// the Spirit Scheduler and journals FR42 director-action audit rows.
@@ -27,7 +25,11 @@ impl KernelLifecycleResolver {
         transparency_log: Arc<TransparencyLogAdapter>,
         director_identity: String,
     ) -> Self {
-        Self { scheduler, transparency_log, director_identity }
+        Self {
+            scheduler,
+            transparency_log,
+            director_identity,
+        }
     }
 }
 
@@ -151,10 +153,7 @@ pub mod test_double {
             spirit_id: &str,
             verb: LifecycleVerb,
         ) -> Result<LifecycleReceipt, LifecycleError> {
-            self.calls
-                .lock()
-                .unwrap()
-                .push((spirit_id.into(), verb));
+            self.calls.lock().unwrap().push((spirit_id.into(), verb));
             Ok(LifecycleReceipt {
                 spirit_pid: 1,
                 verb,

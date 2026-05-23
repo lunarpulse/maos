@@ -35,7 +35,12 @@ impl CapAuditWriter {
 
 fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter) {
     match event {
-        CapAuditEvent::Issue { token_id, spirit_pid, scope, ttl_secs: _ } => {
+        CapAuditEvent::Issue {
+            token_id,
+            spirit_pid,
+            scope,
+            ttl_secs: _,
+        } => {
             let intent = format!("cap.issue.{:?}", std::mem::discriminant(scope));
             let payload = serde_json::to_vec(scope).unwrap_or_default();
             log.insert_frame_event(
@@ -47,7 +52,11 @@ fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter
                 FrameOrigin::Kernel,
             );
         }
-        CapAuditEvent::Verify { token_id, spirit_pid, outcome } => {
+        CapAuditEvent::Verify {
+            token_id,
+            spirit_pid,
+            outcome,
+        } => {
             let intent = match outcome {
                 VerifyOutcome::Ok => "cap.verify.ok",
                 _ => "cap.verify.fail",
@@ -63,7 +72,9 @@ fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter
         }
         CapAuditEvent::Revoke { token_id, reason } => {
             let spirit_pid = match reason {
-                crate::capability::cap_tokens::RevokeReason::SpiritUnload { spirit_pid, .. } => *spirit_pid,
+                crate::capability::cap_tokens::RevokeReason::SpiritUnload {
+                    spirit_pid, ..
+                } => *spirit_pid,
                 _ => 0,
             };
             log.insert_frame_event(
@@ -75,7 +86,13 @@ fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter
                 FrameOrigin::Kernel,
             );
         }
-        CapAuditEvent::Invocation { token_id, spirit_pid, capability_token_bytes, intent, payload } => {
+        CapAuditEvent::Invocation {
+            token_id,
+            spirit_pid,
+            capability_token_bytes,
+            intent,
+            payload,
+        } => {
             let mut combined = capability_token_bytes.clone();
             combined.extend_from_slice(payload);
             log.insert_frame_event(
@@ -87,7 +104,11 @@ fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter
                 FrameOrigin::Kernel,
             );
         }
-        CapAuditEvent::SandboxBlock { spirit_pid, attempted_syscall, sandbox_tier } => {
+        CapAuditEvent::SandboxBlock {
+            spirit_pid,
+            attempted_syscall,
+            sandbox_tier,
+        } => {
             let intent = format!("sandbox.block.{}", attempted_syscall);
             let payload = format!("tier={}", sandbox_tier.0).into_bytes();
             log.insert_frame_event(

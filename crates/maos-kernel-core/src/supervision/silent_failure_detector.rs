@@ -17,12 +17,14 @@ use crate::scheduler::control_block::ScbLifecycleState;
 use crate::scheduler::control_block::SpiritControlBlock;
 use crate::telemetry::iac_rt::{IacRtMetrics, Outcome, Service};
 
-#[maos_attrs::i9_exempt(reason = "supervision surface — holds only Arc references to existing kernel state (SCB map, TransparencyLog, telemetry); no independently-mutable persistent state")]
+#[maos_attrs::i9_exempt(
+    reason = "supervision surface — holds only Arc references to existing kernel state (SCB map, TransparencyLog, telemetry); no independently-mutable persistent state"
+)]
 pub struct SilentFailureDetector {
     spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
     tl: Arc<TransparencyLogAdapter>,
     telemetry: Arc<IacRtMetrics>,
-        notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+    notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
 }
 
 impl SilentFailureDetector {
@@ -30,9 +32,14 @@ impl SilentFailureDetector {
         spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
         tl: Arc<TransparencyLogAdapter>,
         telemetry: Arc<IacRtMetrics>,
-    notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+        notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
     ) -> Self {
-        Self { spirits, tl, telemetry, notification_dispatcher }
+        Self {
+            spirits,
+            tl,
+            telemetry,
+            notification_dispatcher,
+        }
     }
 
     pub fn spawn(self: Arc<Self>, cancel: CancellationToken) -> JoinHandle<()> {
@@ -62,7 +69,10 @@ impl SilentFailureDetector {
             }
 
             let in_flight_count = {
-                let tasks = scb.task_assignments_in_flight.lock().expect("task ledger lock poisoned");
+                let tasks = scb
+                    .task_assignments_in_flight
+                    .lock()
+                    .expect("task ledger lock poisoned");
                 tasks.len()
             };
             if in_flight_count == 0 {
@@ -77,16 +87,18 @@ impl SilentFailureDetector {
                 .unwrap_or(30000);
             let last_heartbeat_ns = scb.last_heartbeat_ns.load(Ordering::Relaxed);
             let last_progress_iac_ns = scb.last_progress_iac_ns.load(Ordering::Relaxed);
-            let last_silent_failure_emit_ns = scb.last_silent_failure_emit_ns.load(Ordering::Relaxed);
+            let last_silent_failure_emit_ns =
+                scb.last_silent_failure_emit_ns.load(Ordering::Relaxed);
 
             // Silent-failure condition: heartbeat is newer than progress, AND
             // the gap between heartbeat and progress exceeds threshold.
             let heartbeat_progress_gap = last_heartbeat_ns.saturating_sub(last_progress_iac_ns);
-            let gap_exceeds_threshold = heartbeat_progress_gap
-                > (silent_failure_threshold_ms as u64 * 1_000_000);
+            let gap_exceeds_threshold =
+                heartbeat_progress_gap > (silent_failure_threshold_ms as u64 * 1_000_000);
             // Derive refire cooldown from 2x the progress threshold
             let refire_cooldown_ns = (silent_failure_threshold_ms as u64 * 2) * 1_000_000;
-            let can_refire = (now_ns.saturating_sub(last_silent_failure_emit_ns)) > refire_cooldown_ns;
+            let can_refire =
+                (now_ns.saturating_sub(last_silent_failure_emit_ns)) > refire_cooldown_ns;
 
             if gap_exceeds_threshold && can_refire && last_heartbeat_ns > 0 {
                 let cas = scb.last_silent_failure_emit_ns.compare_exchange(
@@ -114,11 +126,8 @@ impl SilentFailureDetector {
                         maos_domain::invariants::i3::FrameOrigin::Kernel,
                     );
 
-                    self.telemetry.record_iac_rt(
-                        Service::SpiritScheduler,
-                        Outcome::Ok,
-                        0,
-                    );
+                    self.telemetry
+                        .record_iac_rt(Service::SpiritScheduler, Outcome::Ok, 0);
                 }
             }
         }

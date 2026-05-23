@@ -2,7 +2,14 @@ use std::process::Command;
 
 fn xtask() -> Command {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "--manifest-path", concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.toml"), "-p", "xtask", "--"]);
+    cmd.args([
+        "run",
+        "--manifest-path",
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.toml"),
+        "-p",
+        "xtask",
+        "--",
+    ]);
     cmd
 }
 

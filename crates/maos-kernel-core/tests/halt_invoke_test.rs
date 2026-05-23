@@ -10,23 +10,25 @@
 //! - `maos_kernel_core::halt::KernelHaltResolver`
 //! - `maos_kernel_core::halt::OutputMarkerRegistry`
 
-use std::sync::Arc;
 use maos_domain::frame::EpistemicHaltPayload;
-use maos_domain::halt::{HaltId, HaltResolver, Resolution, HaltState, OutputMarkerKind};
+use maos_domain::halt::{HaltId, HaltResolver, HaltState, OutputMarkerKind, Resolution};
+use maos_domain::ports::crypto::CryptoProvider;
+use maos_kernel_core::capability::cap_policy::PolicyTable;
+use maos_kernel_core::capability::cap_tokens::Ed25519SigningKey;
+use maos_kernel_core::capability::CapabilityRegistryAdapter;
 use maos_kernel_core::halt::{
-    HaltRegistry, MockHaltResolver, invoke_halt, OutputMarkerRegistry,
-    KernelHaltResolver,
+    invoke_halt, HaltRegistry, KernelHaltResolver, MockHaltResolver, OutputMarkerRegistry,
 };
 use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::iac::Mailbox;
 use maos_kernel_core::journal::JournalAdapter;
-use maos_kernel_core::memory::{MemoryManagerAdapter, private::PrivateMemoryStore, shared::SharedMemoryStore, principal::PrincipalNamespaceIndex};
-use maos_kernel_core::capability::CapabilityRegistryAdapter;
-use maos_kernel_core::capability::cap_tokens::Ed25519SigningKey;
+use maos_kernel_core::memory::{
+    principal::PrincipalNamespaceIndex, private::PrivateMemoryStore, shared::SharedMemoryStore,
+    MemoryManagerAdapter,
+};
 use maos_kernel_core::security::RingCryptoProvider;
-use maos_domain::ports::crypto::CryptoProvider;
-use maos_kernel_core::capability::cap_policy::PolicyTable;
 use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+use std::sync::Arc;
 
 fn make_journal() -> (JournalAdapter, tempfile::TempDir) {
     let tmpdir = tempfile::TempDir::new().unwrap();
@@ -48,14 +50,27 @@ fn invoke_halt_writes_tl_row_journal_entry_and_inserts_registry() {
         Some(0.8),
         "pol-1".into(),
         "frame:abc".into(),
-    ).unwrap();
+    )
+    .unwrap();
 
-    let receipt = invoke_halt(&tl, &journal, &registry, payload, 42, "hello-spirit", 0xCAFE).unwrap();
+    let receipt = invoke_halt(
+        &tl,
+        &journal,
+        &registry,
+        payload,
+        42,
+        "hello-spirit",
+        0xCAFE,
+    )
+    .unwrap();
 
     // Receipt produced
     assert_eq!(receipt.halt_id.as_str(), "halt-001");
     assert_eq!(receipt.spirit_pid, 42);
-    assert!(receipt.terminal_state.is_none(), "invocation-time receipt has no terminal state");
+    assert!(
+        receipt.terminal_state.is_none(),
+        "invocation-time receipt has no terminal state"
+    );
 
     // TL row written — verify FrameKind::EpistemicHalt exists
     let filter = maos_kernel_core::iac::transparency_log::FrameFilter {
@@ -63,7 +78,8 @@ fn invoke_halt_writes_tl_row_journal_entry_and_inserts_registry() {
         ..Default::default()
     };
     let frames = tl.query_frames(filter).unwrap();
-    assert!(frames.iter().any(|f| f.kind == maos_kernel_core::iac::transparency_log::FrameKind::EpistemicHalt
+    assert!(frames.iter().any(|f| f.kind
+        == maos_kernel_core::iac::transparency_log::FrameKind::EpistemicHalt
         && f.spirit_pid == 42));
 
     // Lifecycle Journal entry written (LifecycleEvent::Halt)
@@ -81,12 +97,29 @@ fn invoke_halt_rejects_duplicate_halt_id_with_typed_error() {
     let registry = HaltRegistry::new();
 
     let payload = EpistemicHaltPayload::new(
-        "halt-dup".into(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
-    ).unwrap();
+        "halt-dup".into(),
+        "t".into(),
+        0.5,
+        Some(0.4),
+        "p".into(),
+        "d".into(),
+    )
+    .unwrap();
 
-    invoke_halt(&tl, &journal, &registry, payload.clone(), 1, "spirit-a", 0xCAFE).unwrap();
+    invoke_halt(
+        &tl,
+        &journal,
+        &registry,
+        payload.clone(),
+        1,
+        "spirit-a",
+        0xCAFE,
+    )
+    .unwrap();
     let err = invoke_halt(&tl, &journal, &registry, payload, 1, "spirit-a", 0xCAFE).unwrap_err();
-    assert!(matches!(err, maos_domain::halt::InvokeHaltError::DuplicateHaltId(s) if s == "halt-dup"));
+    assert!(
+        matches!(err, maos_domain::halt::InvokeHaltError::DuplicateHaltId(s) if s == "halt-dup")
+    );
 }
 
 #[test]
@@ -96,8 +129,14 @@ fn invoke_halt_then_resolve_via_mock_records_call() {
     let registry = HaltRegistry::new();
 
     let payload = EpistemicHaltPayload::new(
-        "halt-x".into(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
-    ).unwrap();
+        "halt-x".into(),
+        "t".into(),
+        0.5,
+        Some(0.4),
+        "p".into(),
+        "d".into(),
+    )
+    .unwrap();
     invoke_halt(&tl, &journal, &registry, payload, 1, "spirit-a", 0xCAFE).unwrap();
 
     let mock = MockHaltResolver::new();
@@ -118,7 +157,12 @@ fn make_memory_adapter(
     let private = Arc::new(PrivateMemoryStore::new(memory_root, 4 * 1024));
     let shared = Arc::new(SharedMemoryStore::open(&db_path).unwrap());
     let principal_index = Arc::new(PrincipalNamespaceIndex::open(&db_path).unwrap());
-    let adapter = Arc::new(MemoryManagerAdapter::new(private, shared, principal_index, tl));
+    let adapter = Arc::new(MemoryManagerAdapter::new(
+        private,
+        shared,
+        principal_index,
+        tl,
+    ));
     (adapter, Arc::new(tmp))
 }
 
@@ -156,13 +200,17 @@ fn setup_kernel_resolver() -> (
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xBEEF));
     let registry = Arc::new(HaltRegistry::new());
     let output_markers = Arc::new(OutputMarkerRegistry::new());
-    let mailbox = Arc::new(Mailbox::new(Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new())));
+    let mailbox = Arc::new(Mailbox::new(Arc::new(
+        maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new(),
+    )));
     let (memory, mem_tmp) = make_memory_adapter(Arc::clone(&tl));
     let capability = make_capability();
-    let orchestrator = Arc::new(maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
-        Arc::clone(&capability),
-        Arc::clone(&registry),
-    ));
+    let orchestrator = Arc::new(
+        maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
+            Arc::clone(&capability),
+            Arc::clone(&registry),
+        ),
+    );
     let resolver = Arc::new(KernelHaltResolver::new(
         Arc::clone(&registry),
         Arc::clone(&tl),
@@ -173,35 +221,85 @@ fn setup_kernel_resolver() -> (
         orchestrator,
     ));
     let (journal, tmpdir) = make_journal();
-    (tl, registry, resolver, output_markers, mailbox, journal, tmpdir, memory, capability, mem_tmp)
+    (
+        tl,
+        registry,
+        resolver,
+        output_markers,
+        mailbox,
+        journal,
+        tmpdir,
+        memory,
+        capability,
+        mem_tmp,
+    )
 }
 
 #[test]
 fn kernel_resolver_provided_context_marks_resumed_and_clears_registry() {
-    let (tl, registry, resolver, output_markers, _mailbox, journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
+    let (
+        tl,
+        registry,
+        resolver,
+        output_markers,
+        _mailbox,
+        journal,
+        _tmpdir,
+        _memory,
+        _capability,
+        _mem_tmp,
+    ) = setup_kernel_resolver();
 
     let payload = EpistemicHaltPayload::new(
-        "halt-pc".into(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
-    ).unwrap();
+        "halt-pc".into(),
+        "t".into(),
+        0.5,
+        Some(0.4),
+        "p".into(),
+        "d".into(),
+    )
+    .unwrap();
     let _receipt = invoke_halt(&tl, &journal, &registry, payload, 1, "s", 0xBEEF).unwrap();
 
     let hid = HaltId::new("halt-pc").unwrap();
-    let resolution = Resolution::ProvidedContext { text: "more info".into() };
+    let resolution = Resolution::ProvidedContext {
+        text: "more info".into(),
+    };
     resolver.resolve(&hid, resolution).unwrap();
 
     let pending = registry.pending_halt_ids();
-    assert!(pending.is_empty(), "halt should be resolved and removed from pending");
+    assert!(
+        pending.is_empty(),
+        "halt should be resolved and removed from pending"
+    );
 
     assert_eq!(output_markers.pending_count(&hid), 0);
 }
 
 #[test]
 fn kernel_resolver_accepted_halt_emits_task_orphaned_and_marks_terminated() {
-    let (tl, registry, resolver, output_markers, _mailbox, journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
+    let (
+        tl,
+        registry,
+        resolver,
+        output_markers,
+        _mailbox,
+        journal,
+        _tmpdir,
+        _memory,
+        _capability,
+        _mem_tmp,
+    ) = setup_kernel_resolver();
 
     let payload = EpistemicHaltPayload::new(
-        "halt-ah".into(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
-    ).unwrap();
+        "halt-ah".into(),
+        "t".into(),
+        0.5,
+        Some(0.4),
+        "p".into(),
+        "d".into(),
+    )
+    .unwrap();
     let _receipt = invoke_halt(&tl, &journal, &registry, payload, 1, "s", 0xBEEF).unwrap();
 
     let hid = HaltId::new("halt-ah").unwrap();
@@ -215,26 +313,51 @@ fn kernel_resolver_accepted_halt_emits_task_orphaned_and_marks_terminated() {
     // TL has task.orphaned via TaskComplete frame
     let filter = maos_kernel_core::iac::transparency_log::FrameFilter::default();
     let frames = tl.query_frames(filter).unwrap();
-    let orphan_frames: Vec<_> = frames.iter()
-        .filter(|f| f.kind == maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete
-            && std::str::from_utf8(&f.payload_redacted)
-                .map(|s| s.contains("orphaned: accepted_halt"))
-                .unwrap_or(false))
+    let orphan_frames: Vec<_> = frames
+        .iter()
+        .filter(|f| {
+            f.kind == maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete
+                && std::str::from_utf8(&f.payload_redacted)
+                    .map(|s| s.contains("orphaned: accepted_halt"))
+                    .unwrap_or(false)
+        })
         .collect();
-    assert!(!orphan_frames.is_empty(), "TL should have task.orphaned TaskComplete row");
+    assert!(
+        !orphan_frames.is_empty(),
+        "TL should have task.orphaned TaskComplete row"
+    );
 }
 
 #[test]
 fn kernel_resolver_authorized_override_enqueues_output_marker_and_marks_overridden() {
-    let (tl, registry, resolver, output_markers, _mailbox, journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
+    let (
+        tl,
+        registry,
+        resolver,
+        output_markers,
+        _mailbox,
+        journal,
+        _tmpdir,
+        _memory,
+        _capability,
+        _mem_tmp,
+    ) = setup_kernel_resolver();
 
     let payload = EpistemicHaltPayload::new(
-        "halt-ao".into(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
-    ).unwrap();
+        "halt-ao".into(),
+        "t".into(),
+        0.5,
+        Some(0.4),
+        "p".into(),
+        "d".into(),
+    )
+    .unwrap();
     let _receipt = invoke_halt(&tl, &journal, &registry, payload, 1, "s", 0xBEEF).unwrap();
 
     let hid = HaltId::new("halt-ao").unwrap();
-    let resolution = Resolution::AuthorizedOverride { operator_policy_ref: "policy://test".into() };
+    let resolution = Resolution::AuthorizedOverride {
+        operator_policy_ref: "policy://test".into(),
+    };
     resolver.resolve(&hid, resolution).unwrap();
 
     let pending = registry.pending_halt_ids();
@@ -244,37 +367,89 @@ fn kernel_resolver_authorized_override_enqueues_output_marker_and_marks_overridd
     assert_eq!(markers.len(), 1);
     assert_eq!(markers[0].kind, OutputMarkerKind::Override);
     assert_eq!(markers[0].halt_id.as_str(), "halt-ao");
-    assert_eq!(markers[0].operator_policy_ref.as_deref(), Some("policy://test"));
+    assert_eq!(
+        markers[0].operator_policy_ref.as_deref(),
+        Some("policy://test")
+    );
 }
 
 #[test]
 fn kernel_resolver_unknown_halt_returns_error() {
-    let (_tl, _registry, resolver, _output_markers, _mailbox, _journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
+    let (
+        _tl,
+        _registry,
+        resolver,
+        _output_markers,
+        _mailbox,
+        _journal,
+        _tmpdir,
+        _memory,
+        _capability,
+        _mem_tmp,
+    ) = setup_kernel_resolver();
 
     let hid = HaltId::new("halt-unknown").unwrap();
-    let err = resolver.resolve(&hid, Resolution::AcceptedHalt).unwrap_err();
-    assert!(matches!(err, maos_domain::halt::ResolveError::UnknownHalt(_)));
+    let err = resolver
+        .resolve(&hid, Resolution::AcceptedHalt)
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        maos_domain::halt::ResolveError::UnknownHalt(_)
+    ));
 }
 
 #[test]
 fn kernel_resolver_double_resolve_returns_already_resolved() {
-    let (tl, registry, resolver, _output_markers, _mailbox, journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
+    let (
+        tl,
+        registry,
+        resolver,
+        _output_markers,
+        _mailbox,
+        journal,
+        _tmpdir,
+        _memory,
+        _capability,
+        _mem_tmp,
+    ) = setup_kernel_resolver();
 
     let payload = EpistemicHaltPayload::new(
-        "halt-dr".into(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
-    ).unwrap();
+        "halt-dr".into(),
+        "t".into(),
+        0.5,
+        Some(0.4),
+        "p".into(),
+        "d".into(),
+    )
+    .unwrap();
     let _receipt = invoke_halt(&tl, &journal, &registry, payload, 1, "s", 0xBEEF).unwrap();
 
     let hid = HaltId::new("halt-dr").unwrap();
     resolver.resolve(&hid, Resolution::AcceptedHalt).unwrap();
-    let err = resolver.resolve(&hid, Resolution::AcceptedHalt).unwrap_err();
-    assert!(matches!(err, maos_domain::halt::ResolveError::AlreadyResolved(_)));
+    let err = resolver
+        .resolve(&hid, Resolution::AcceptedHalt)
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        maos_domain::halt::ResolveError::AlreadyResolved(_)
+    ));
 }
 
 #[test]
 fn kernel_resolver_is_send_and_sync() {
     fn _assert_send_sync<T: Send + Sync>(_: T) {}
-    let (_tl, registry, _resolver, _output_markers, _mailbox, _journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
+    let (
+        _tl,
+        registry,
+        _resolver,
+        _output_markers,
+        _mailbox,
+        _journal,
+        _tmpdir,
+        _memory,
+        _capability,
+        _mem_tmp,
+    ) = setup_kernel_resolver();
     _assert_send_sync(registry);
 }
 
@@ -297,7 +472,9 @@ fn invoke_halt_empty_halt_id_returns_registry_insert_failed() {
     };
 
     let err = invoke_halt(&tl, &journal, &registry, payload, 1, "s", 0).unwrap_err();
-    assert!(matches!(err, maos_domain::halt::InvokeHaltError::RegistryInsertFailed(s) if s.contains("invalid")));
+    assert!(
+        matches!(err, maos_domain::halt::InvokeHaltError::RegistryInsertFailed(s) if s.contains("invalid"))
+    );
 }
 
 // --- P13: terminal_state verification on resolved receipt ---
@@ -309,21 +486,52 @@ fn invoke_halt_empty_halt_id_returns_registry_insert_failed() {
 
 #[test]
 fn kernel_resolver_transitions_registry_state_for_all_three_resolution_kinds() {
-    let (tl, registry, resolver, _output_markers, _mailbox, journal, _tmpdir, _memory, _capability, _mem_tmp) = setup_kernel_resolver();
+    let (
+        tl,
+        registry,
+        resolver,
+        _output_markers,
+        _mailbox,
+        journal,
+        _tmpdir,
+        _memory,
+        _capability,
+        _mem_tmp,
+    ) = setup_kernel_resolver();
 
     // Setup three halts
     for id in &["halt-a", "halt-b", "halt-c"] {
         let payload = EpistemicHaltPayload::new(
-            id.to_string(), "t".into(), 0.5, Some(0.4), "p".into(), "d".into(),
-        ).unwrap();
+            id.to_string(),
+            "t".into(),
+            0.5,
+            Some(0.4),
+            "p".into(),
+            "d".into(),
+        )
+        .unwrap();
         invoke_halt(&tl, &journal, &registry, payload, 1, "s", 0xBEEF).unwrap();
     }
     assert_eq!(registry.pending_halt_ids().len(), 3);
 
     // Resolve each with a different kind
-    resolver.resolve(&HaltId::new("halt-a").unwrap(), Resolution::ProvidedContext { text: "ctx".into() }).unwrap();
-    resolver.resolve(&HaltId::new("halt-b").unwrap(), Resolution::AcceptedHalt).unwrap();
-    resolver.resolve(&HaltId::new("halt-c").unwrap(), Resolution::AuthorizedOverride { operator_policy_ref: "policy://x".into() }).unwrap();
+    resolver
+        .resolve(
+            &HaltId::new("halt-a").unwrap(),
+            Resolution::ProvidedContext { text: "ctx".into() },
+        )
+        .unwrap();
+    resolver
+        .resolve(&HaltId::new("halt-b").unwrap(), Resolution::AcceptedHalt)
+        .unwrap();
+    resolver
+        .resolve(
+            &HaltId::new("halt-c").unwrap(),
+            Resolution::AuthorizedOverride {
+                operator_policy_ref: "policy://x".into(),
+            },
+        )
+        .unwrap();
 
     // All three should be removed from pending (registry transitions)
     assert_eq!(registry.pending_halt_ids().len(), 0);

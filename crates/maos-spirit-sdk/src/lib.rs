@@ -18,8 +18,8 @@ pub use maos_spirit_abi::{
     compliance,
     ctx::{CapabilityHandle, Ctx, MailboxHandle},
     lifecycle::{
-        ConsolidatePayload, FramePayload, HookBudgetKey, SchedulePayload, Spirit,
-        SpiritVtable, SwapInPayload, TelemetryEventPayload,
+        ConsolidatePayload, FramePayload, HookBudgetKey, SchedulePayload, Spirit, SpiritVtable,
+        SwapInPayload, TelemetryEventPayload,
     },
     ABI_VERSION,
 };

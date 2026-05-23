@@ -11,16 +11,16 @@
 //! This module lives inside `maos-kernel-core` per §4.0.2 precedent
 //! (same as `hot_swap/` in Story 5.2).
 
+pub mod cold_restart;
 pub mod crash_detector;
+pub mod disposition;
 pub mod progress_watchdog;
 pub mod silent_failure_detector;
-pub(crate) mod watchdog_common;
-pub mod cold_restart;
-pub mod disposition;
 pub mod test_double;
+pub(crate) mod watchdog_common;
 
+pub use cold_restart::{graceful_drain, hard_kill_drain, DrainError, DrainReport};
 pub use crash_detector::CrashDetector;
+pub use disposition::enforce_disposition;
 pub use progress_watchdog::ProgressWatchdog;
 pub use silent_failure_detector::SilentFailureDetector;
-pub use cold_restart::{graceful_drain, hard_kill_drain, DrainReport, DrainError};
-pub use disposition::enforce_disposition;

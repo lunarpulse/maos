@@ -100,14 +100,12 @@ pub struct AuditFilter {
 }
 
 /// Open the per-Host SQLite file read-only and return matching entries.
-pub fn query(
-    db_path: &Path,
-    filter: AuditFilter,
-) -> Result<Vec<AuditEntry>, AuditError> {
+pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, AuditError> {
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    ).map_err(AuditError::Open)?;
+    )
+    .map_err(AuditError::Open)?;
 
     let mut sql = String::from(
         "SELECT frame_id, timestamp_ns, spirit_pid, boot_nonce,
@@ -147,8 +145,7 @@ pub fn query(
     }
 
     let mut stmt = conn.prepare(&sql).map_err(AuditError::Read)?;
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
-        params.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
     let rows = stmt
         .query_map(params_refs.as_slice(), |row| {
             let frame_id_blob: Vec<u8> = row.get(0)?;
@@ -340,10 +337,7 @@ pub fn to_plain<W: Write>(
         "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns", "capability_token",
     )?;
     for entry in entries {
-        let token = entry
-            .capability_token_hex
-            .as_deref()
-            .unwrap_or("<missing>");
+        let token = entry.capability_token_hex.as_deref().unwrap_or("<missing>");
         writeln!(
             out,
             "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}",
@@ -428,7 +422,10 @@ pub fn default_transparency_log_path() -> std::path::PathBuf {
                 .map(|h| PathBuf::from(h).join(".local").join("share"))
         })
         .unwrap_or_else(|| PathBuf::from("/var/lib"));
-    data_home.join("maos").join("audit").join("transparency.sqlite")
+    data_home
+        .join("maos")
+        .join("audit")
+        .join("transparency.sqlite")
 }
 
 /// Resolve the default Lifecycle Journal NDJSON path.
@@ -470,7 +467,10 @@ pub fn default_journal_path() -> std::path::PathBuf {
                 .map(|h| PathBuf::from(h).join(".local").join("share"))
         })
         .unwrap_or_else(|| PathBuf::from("/var/lib"));
-    data_home.join("maos").join("journal").join("lifecycle.ndjson")
+    data_home
+        .join("maos")
+        .join("journal")
+        .join("lifecycle.ndjson")
 }
 
 /// Resolve the default Memory Root directory.
@@ -525,7 +525,9 @@ pub fn default_distillate_corpus_root() -> std::path::PathBuf {
         if !p.is_empty() {
             return PathBuf::from(p);
         }
-        eprintln!("maos: MAOS_DISTILLATE_CORPUS_ROOT is set but empty — falling through to default path");
+        eprintln!(
+            "maos: MAOS_DISTILLATE_CORPUS_ROOT is set but empty — falling through to default path"
+        );
     }
     let data_home = std::env::var("XDG_DATA_HOME")
         .ok()
@@ -554,7 +556,9 @@ pub fn default_isolation_corpus_root() -> std::path::PathBuf {
         if !p.is_empty() {
             return PathBuf::from(p);
         }
-        eprintln!("maos: MAOS_ISOLATION_CORPUS_ROOT is set but empty — falling through to default path");
+        eprintln!(
+            "maos: MAOS_ISOLATION_CORPUS_ROOT is set but empty — falling through to default path"
+        );
     }
     let data_home = std::env::var("XDG_DATA_HOME")
         .ok()
@@ -619,9 +623,15 @@ fn resolve_journal_path_from_env_internal(
     let data_home = xdg_data_home
         .filter(|s| !s.is_empty())
         .map(PathBuf::from)
-        .or_else(|| home.filter(|h| !h.is_empty()).map(|h| PathBuf::from(h).join(".local").join("share")))
+        .or_else(|| {
+            home.filter(|h| !h.is_empty())
+                .map(|h| PathBuf::from(h).join(".local").join("share"))
+        })
         .unwrap_or_else(|| PathBuf::from("/var/lib"));
-    data_home.join("maos").join("journal").join("lifecycle.ndjson")
+    data_home
+        .join("maos")
+        .join("journal")
+        .join("lifecycle.ndjson")
 }
 
 /// Pure-function form of the memory-root precedence cascade for testing.
@@ -721,8 +731,9 @@ mod tests {
                 intent TEXT NOT NULL,
                 payload_redacted BLOB NOT NULL,
                 origin INTEGER NOT NULL
-            );"
-        ).unwrap();
+            );",
+        )
+        .unwrap();
         drop(conn);
 
         let entries = query(&db_path, AuditFilter::default()).unwrap();
@@ -746,8 +757,9 @@ mod tests {
                 intent TEXT NOT NULL,
                 payload_redacted BLOB NOT NULL,
                 origin INTEGER NOT NULL
-            );"
-        ).unwrap();
+            );",
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -848,7 +860,14 @@ mod tests {
         keys.sort();
         assert_eq!(
             keys,
-            vec!["boot_nonce", "call_id", "call_type", "capability_token", "spirit_pid", "timestamp_ns"]
+            vec![
+                "boot_nonce",
+                "call_id",
+                "call_type",
+                "capability_token",
+                "spirit_pid",
+                "timestamp_ns"
+            ]
         );
     }
 
@@ -862,7 +881,10 @@ mod tests {
         let mut buf = Vec::new();
         let err = to_fr4_ndjson(vec![good, bad], &mut buf).unwrap_err();
         match err {
-            AuditError::Fr4SchemaViolation { line, missing_field } => {
+            AuditError::Fr4SchemaViolation {
+                line,
+                missing_field,
+            } => {
                 assert_eq!(line, 2);
                 assert_eq!(missing_field, "capability_token");
             }
@@ -926,11 +948,7 @@ mod tests {
 
     #[test]
     fn default_journal_path_falls_through_to_xdg() {
-        let p = super::resolve_journal_path_from_env_internal(
-            None,
-            Some("/tmp/xdgtest"),
-            None,
-        );
+        let p = super::resolve_journal_path_from_env_internal(None, Some("/tmp/xdgtest"), None);
         assert_eq!(
             p,
             std::path::PathBuf::from("/tmp/xdgtest/maos/journal/lifecycle.ndjson")
@@ -939,16 +957,10 @@ mod tests {
 
     #[test]
     fn default_journal_path_falls_through_to_home_when_xdg_unset() {
-        let p = super::resolve_journal_path_from_env_internal(
-            None,
-            None,
-            Some("/tmp/hometest"),
-        );
+        let p = super::resolve_journal_path_from_env_internal(None, None, Some("/tmp/hometest"));
         assert_eq!(
             p,
-            std::path::PathBuf::from(
-                "/tmp/hometest/.local/share/maos/journal/lifecycle.ndjson"
-            )
+            std::path::PathBuf::from("/tmp/hometest/.local/share/maos/journal/lifecycle.ndjson")
         );
     }
 
@@ -968,31 +980,20 @@ mod tests {
 
     #[test]
     fn default_memory_root_respects_env_override() {
-        let p = super::resolve_memory_root_from_env_internal(
-            Some("/tmp/maos-test-memory"),
-            None,
-            None,
-        );
+        let p =
+            super::resolve_memory_root_from_env_internal(Some("/tmp/maos-test-memory"), None, None);
         assert_eq!(p, std::path::PathBuf::from("/tmp/maos-test-memory"));
     }
 
     #[test]
     fn default_memory_root_falls_through_to_xdg() {
-        let p = super::resolve_memory_root_from_env_internal(
-            None,
-            Some("/tmp/xdgtest"),
-            None,
-        );
+        let p = super::resolve_memory_root_from_env_internal(None, Some("/tmp/xdgtest"), None);
         assert_eq!(p, std::path::PathBuf::from("/tmp/xdgtest/maos/memory"));
     }
 
     #[test]
     fn default_memory_root_falls_through_to_home_when_xdg_unset() {
-        let p = super::resolve_memory_root_from_env_internal(
-            None,
-            None,
-            Some("/tmp/hometest"),
-        );
+        let p = super::resolve_memory_root_from_env_internal(None, None, Some("/tmp/hometest"));
         assert_eq!(
             p,
             std::path::PathBuf::from("/tmp/hometest/.local/share/maos/memory")
@@ -1002,10 +1003,7 @@ mod tests {
     #[test]
     fn default_memory_root_last_resort_var_lib() {
         let p = super::resolve_memory_root_from_env_internal(None, None, None);
-        assert_eq!(
-            p,
-            std::path::PathBuf::from("/var/lib/maos/memory")
-        );
+        assert_eq!(p, std::path::PathBuf::from("/var/lib/maos/memory"));
     }
 
     // ── default_distillate_corpus_root tests (Story 4.4) ────────────────────
@@ -1017,7 +1015,10 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(p, std::path::PathBuf::from("/tmp/maos-test-distillate-corpus"));
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/tmp/maos-test-distillate-corpus")
+        );
     }
 
     #[test]
@@ -1027,7 +1028,10 @@ mod tests {
             Some("/tmp/xdgtest"),
             None,
         );
-        assert_eq!(p, std::path::PathBuf::from("/tmp/xdgtest/maos/distillate-corpus"));
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/tmp/xdgtest/maos/distillate-corpus")
+        );
     }
 
     #[test]
@@ -1071,7 +1075,10 @@ mod tests {
             Some("/tmp/xdgtest"),
             None,
         );
-        assert_eq!(p, std::path::PathBuf::from("/tmp/xdgtest/maos/isolation-corpus"));
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/tmp/xdgtest/maos/isolation-corpus")
+        );
     }
 
     #[test]

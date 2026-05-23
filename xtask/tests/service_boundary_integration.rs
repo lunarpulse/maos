@@ -30,11 +30,14 @@ fn violation_service_boundary_fails() {
         .expect("xtask should run");
 
     let clean_stdout = String::from_utf8_lossy(&clean_output.stdout);
-    let clean_report: serde_json::Value = serde_json::from_str(&clean_stdout)
-        .expect("clean fixture should produce valid JSON");
+    let clean_report: serde_json::Value =
+        serde_json::from_str(&clean_stdout).expect("clean fixture should produce valid JSON");
     let baseline_surface = &clean_report["current_surface"];
-    std::fs::write(&baseline_path, serde_json::to_string_pretty(baseline_surface).unwrap())
-        .unwrap();
+    std::fs::write(
+        &baseline_path,
+        serde_json::to_string_pretty(baseline_surface).unwrap(),
+    )
+    .unwrap();
 
     // Now run against the violation fixture with the clean baseline.
     let output = xtask()
@@ -236,7 +239,8 @@ fn p3_clean_fixture_passes() {
 }
 
 #[test]
-fn p3_violation_fixture_fails_with_message_containing_p3_violation_and_check_empty_kernel_reference() {
+fn p3_violation_fixture_fails_with_message_containing_p3_violation_and_check_empty_kernel_reference(
+) {
     let output = xtask()
         .args([
             "check-service-boundary",

@@ -22,15 +22,14 @@ use std::collections::{BTreeSet, HashSet};
 use std::sync::Arc;
 
 use maos_domain::distillation::{
-    DigestPayload, DistillationError, DistillationReceipt, DistillationRequest,
-    SegmentHint,
+    DigestPayload, DistillationError, DistillationReceipt, DistillationRequest, SegmentHint,
 };
+use maos_domain::invariants::i13::{AllowedPromotionSet, IntentLineage};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i8::A2AIntent;
-use maos_domain::invariants::i13::{AllowedPromotionSet, IntentLineage};
 use maos_domain::ports::DistillationPort;
 
-use super::transparency_log::{FrameKind, FrameFilter, TransparencyLogAdapter};
+use super::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use crate::memory::MemoryManagerAdapter;
 
 /// Stable intent string constant for `CapabilityInvocation` audit row.
@@ -49,7 +48,11 @@ pub struct DistillateWriter {
     memory: Arc<MemoryManagerAdapter>,
     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
     #[cfg(feature = "spirit_test")]
-    isolation_hook: Option<std::sync::Arc<parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>>>,
+    isolation_hook: Option<
+        std::sync::Arc<
+            parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>,
+        >,
+    >,
 }
 
 impl DistillateWriter {
@@ -70,7 +73,9 @@ impl DistillateWriter {
     #[cfg(feature = "spirit_test")]
     pub fn with_isolation_hook(
         mut self,
-        hook: std::sync::Arc<parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>>,
+        hook: std::sync::Arc<
+            parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>,
+        >,
     ) -> Self {
         self.isolation_hook = Some(hook);
         self
@@ -78,7 +83,12 @@ impl DistillateWriter {
 
     /// Story 4.5 — fire isolation hooks for cross-Spirit observation.
     #[cfg(feature = "spirit_test")]
-    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
+    fn fire_isolation_hooks(
+        &self,
+        case_id: &str,
+        _surface: &str,
+        outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome,
+    ) {
         if let Some(ref hook) = self.isolation_hook {
             let mut h = hook.lock();
             let _ = h.before_spirit_a_attempt(case_id);
@@ -126,8 +136,7 @@ impl DistillateWriter {
             "digest_payload": digest_payload,
             "segment_hint": segment_hint,
         });
-        serde_json::to_vec(&payload)
-            .map_err(|e| DistillationError::Storage(format!("serde: {e}")))
+        serde_json::to_vec(&payload).map_err(|e| DistillationError::Storage(format!("serde: {e}")))
     }
 
     /// Parse a JSON receipt payload from a Distillate frame back into a `DistillationReceipt`.
@@ -139,11 +148,17 @@ impl DistillateWriter {
             .get("digest_frame_id")
             .and_then(|s| s.as_str())
             .and_then(|s| parse_hex_frame_id(s))
-            .ok_or_else(|| DistillationError::Storage("missing or invalid digest_frame_id in receipt".into()))?;
+            .ok_or_else(|| {
+                DistillationError::Storage("missing or invalid digest_frame_id in receipt".into())
+            })?;
         let depth = v
             .get("distillation_depth")
             .and_then(|d| d.as_u64())
-            .ok_or_else(|| DistillationError::Storage("missing or invalid distillation_depth in receipt".into()))? as u32;
+            .ok_or_else(|| {
+                DistillationError::Storage(
+                    "missing or invalid distillation_depth in receipt".into(),
+                )
+            })? as u32;
 
         let refs: Vec<[u8; 16]> = v
             .get("source_log_ref")
@@ -330,7 +345,8 @@ impl DistillationPort for DistillateWriter {
             effective_depth,
             timestamp_ns,
         );
-        let payload_bytes = Self::serialize_receipt(&receipt_pre, &request.digest_payload, &request.segment_hint)?;
+        let payload_bytes =
+            Self::serialize_receipt(&receipt_pre, &request.digest_payload, &request.segment_hint)?;
 
         // 5. Insert FrameKind::Distillate row into Transparency Log.
         let _token = self.transparency_log.insert_frame_event(
@@ -360,7 +376,11 @@ impl DistillationPort for DistillateWriter {
         consumer_allowed_promotion_set: &AllowedPromotionSet,
     ) -> Result<(), DistillationError> {
         #[cfg(feature = "spirit_test")]
-        self.fire_isolation_hooks("distillate.admit_for_consumer:unknown", "DistillateWriter::admit_for_consumer", maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue);
+        self.fire_isolation_hooks(
+            "distillate.admit_for_consumer:unknown",
+            "DistillateWriter::admit_for_consumer",
+            maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue,
+        );
 
         // Query TL for the digest frame.
         let entries = self
@@ -425,7 +445,10 @@ fn hex_char_to_nibble(c: u8) -> Option<u8> {
 }
 
 /// Parse a frame_id from a JSON field value.
-fn parse_frame_id_hex_field(v: &serde_json::Value, field: &str) -> Result<[u8; 16], DistillationError> {
+fn parse_frame_id_hex_field(
+    v: &serde_json::Value,
+    field: &str,
+) -> Result<[u8; 16], DistillationError> {
     v.get(field)
         .and_then(|s| s.as_str())
         .and_then(|s| parse_hex_frame_id(s))
@@ -437,14 +460,24 @@ mod tests {
     use super::*;
     use maos_domain::ports::DistillationPort;
 
-    fn make_writer(nonce: u64) -> (DistillateWriter, Arc<TransparencyLogAdapter>, tempfile::TempDir) {
+    fn make_writer(
+        nonce: u64,
+    ) -> (
+        DistillateWriter,
+        Arc<TransparencyLogAdapter>,
+        tempfile::TempDir,
+    ) {
         let tmp = tempfile::TempDir::new().unwrap();
         let memory_root = tmp.path().join("memory");
         let db_path = tmp.path().join("audit.db");
         let tl = Arc::new(TransparencyLogAdapter::open_in_memory(nonce));
-        let private = Arc::new(crate::memory::PrivateMemoryStore::new(memory_root, 4 * 1024));
+        let private = Arc::new(crate::memory::PrivateMemoryStore::new(
+            memory_root,
+            4 * 1024,
+        ));
         let shared = Arc::new(crate::memory::SharedMemoryStore::open(&db_path).unwrap());
-        let principal_index = Arc::new(crate::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
+        let principal_index =
+            Arc::new(crate::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
         let memory = Arc::new(crate::memory::MemoryManagerAdapter::new(
             private,
             shared,
@@ -500,7 +533,9 @@ mod tests {
         };
 
         let err = writer.write_distillate(1, request).unwrap_err();
-        assert!(matches!(err, DistillationError::AuditChainMissing { reason } if reason == "empty source_log_ref"));
+        assert!(
+            matches!(err, DistillationError::AuditChainMissing { reason } if reason == "empty source_log_ref")
+        );
     }
 
     #[test]
@@ -515,7 +550,9 @@ mod tests {
         };
 
         let err = writer.write_distillate(1, request).unwrap_err();
-        assert!(matches!(err, DistillationError::AuditChainMissing { reason } if reason == "distillation_depth < 1"));
+        assert!(
+            matches!(err, DistillationError::AuditChainMissing { reason } if reason == "distillation_depth < 1")
+        );
     }
 
     #[test]
@@ -571,13 +608,9 @@ mod tests {
         let (writer, tl, _tmp) = make_writer(0xD416);
         let raw_id = insert_raw_frame(&tl, 1, "consult");
 
-        let request = DistillationRequest::new(
-            vec![raw_id],
-            1,
-            DigestPayload::Text("digest".into()),
-            None,
-        )
-        .unwrap();
+        let request =
+            DistillationRequest::new(vec![raw_id], 1, DigestPayload::Text("digest".into()), None)
+                .unwrap();
         let receipt = writer.write_distillate(1, request).unwrap();
 
         let mut allowed = AllowedPromotionSet::new();
@@ -592,13 +625,9 @@ mod tests {
         let (writer, tl, _tmp) = make_writer(0xD417);
         let raw_id = insert_raw_frame(&tl, 1, "delegate");
 
-        let request = DistillationRequest::new(
-            vec![raw_id],
-            1,
-            DigestPayload::Text("digest".into()),
-            None,
-        )
-        .unwrap();
+        let request =
+            DistillationRequest::new(vec![raw_id], 1, DigestPayload::Text("digest".into()), None)
+                .unwrap();
         let receipt = writer.write_distillate(1, request).unwrap();
 
         let mut allowed = AllowedPromotionSet::new();
@@ -623,13 +652,9 @@ mod tests {
         let (writer, tl, _tmp) = make_writer(0xD419);
         let raw_id = insert_raw_frame(&tl, 1, "delegate");
 
-        let request = DistillationRequest::new(
-            vec![raw_id],
-            1,
-            DigestPayload::Text("digest".into()),
-            None,
-        )
-        .unwrap();
+        let request =
+            DistillationRequest::new(vec![raw_id], 1, DigestPayload::Text("digest".into()), None)
+                .unwrap();
         writer.write_distillate(1, request).unwrap();
 
         let audit_filter = FrameFilter {
@@ -638,7 +663,9 @@ mod tests {
         };
         let audit_rows = tl.query_frames(audit_filter).unwrap();
         assert!(
-            audit_rows.iter().any(|r| r.intent == DISTILLATE_WRITE_INTENT),
+            audit_rows
+                .iter()
+                .any(|r| r.intent == DISTILLATE_WRITE_INTENT),
             "expected CapabilityInvocation row with intent distillate.write"
         );
     }
@@ -657,13 +684,9 @@ mod tests {
         );
         let raw_id = tl.last_frame_id();
 
-        let request = DistillationRequest::new(
-            vec![raw_id],
-            1,
-            DigestPayload::Text("digest".into()),
-            None,
-        )
-        .unwrap();
+        let request =
+            DistillationRequest::new(vec![raw_id], 1, DigestPayload::Text("digest".into()), None)
+                .unwrap();
 
         let err = writer.write_distillate(1, request).unwrap_err();
         assert!(

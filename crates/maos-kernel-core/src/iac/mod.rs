@@ -11,27 +11,27 @@
 //! holder `transparency_log.rs`, plus the redaction filter and mailbox
 //! stub.
 
-pub mod transparency_log;
-pub mod redaction;
-pub mod mailbox_stub;
-pub mod frame;
 pub mod channels;
-pub mod mailbox;
 pub mod decision_logger;
-pub mod log_recall;    // NEW — Story 4.4 LogRecallAdapter
-pub mod distillate;    // NEW — Story 4.4 DistillateWriter
+pub mod distillate;
+pub mod frame;
+pub mod log_recall; // NEW — Story 4.4 LogRecallAdapter
+pub mod mailbox;
+pub mod mailbox_stub;
+pub mod redaction;
+pub mod transparency_log; // NEW — Story 4.4 DistillateWriter
 
 pub use maos_domain::ports::IacBusPort;
 
-pub use transparency_log::{
-    TransparencyLogAdapter, FrameKind, FrameFilter, TransparencyLogEntry, AuditError,
-};
-pub use redaction::{RedactionPolicy, CorpusBackedRedactionPolicy};
-pub use mailbox_stub::MailboxStub;
-pub use mailbox::Mailbox;
-pub use frame::*;
 pub use channels::*;
+pub use frame::*;
+pub use mailbox::Mailbox;
 pub use mailbox::*;
+pub use mailbox_stub::MailboxStub;
+pub use redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
+pub use transparency_log::{
+    AuditError, FrameFilter, FrameKind, TransparencyLogAdapter, TransparencyLogEntry,
+};
 
 /// Adapter for the IAC Bus port trait.
 ///
@@ -39,15 +39,27 @@ pub use mailbox::*;
 /// Holds an `Arc<Mailbox>` for per-Spirit routing and an
 /// `Arc<TransparencyLogAdapter>` for the I2 log-before-deliver
 /// guarantee.
-#[maos_attrs::i9_exempt(reason = "IAC Bus adapter; holds Arc<Mailbox> + Arc<TransparencyLogAdapter> — both are I9-sanctioned locations")]
+#[maos_attrs::i9_exempt(
+    reason = "IAC Bus adapter; holds Arc<Mailbox> + Arc<TransparencyLogAdapter> — both are I9-sanctioned locations"
+)]
 #[derive(Clone)]
 pub struct IacBusAdapter {
     mailbox: std::sync::Arc<Mailbox>,
     transparency_log: std::sync::Arc<TransparencyLogAdapter>,
-    digest_provider: std::sync::Arc<dyn Fn(&maos_spirit_abi::identity::SpiritId) -> maos_domain::invariants::i12::WorkingMemoryDigestRefs + Send + Sync>,
+    digest_provider: std::sync::Arc<
+        dyn Fn(
+                &maos_spirit_abi::identity::SpiritId,
+            ) -> maos_domain::invariants::i12::WorkingMemoryDigestRefs
+            + Send
+            + Sync,
+    >,
     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
     #[cfg(feature = "spirit_test")]
-    isolation_hook: Option<std::sync::Arc<parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>>>,
+    isolation_hook: Option<
+        std::sync::Arc<
+            parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>,
+        >,
+    >,
 }
 
 impl IacBusAdapter {
@@ -59,7 +71,9 @@ impl IacBusAdapter {
         Self {
             mailbox,
             transparency_log,
-            digest_provider: std::sync::Arc::new(|_| maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()),
+            digest_provider: std::sync::Arc::new(|_| {
+                maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
+            }),
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
@@ -69,7 +83,9 @@ impl IacBusAdapter {
     #[cfg(feature = "spirit_test")]
     pub fn with_isolation_hook(
         mut self,
-        hook: std::sync::Arc<parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>>,
+        hook: std::sync::Arc<
+            parking_lot::Mutex<dyn maos_spirit_sdk::spirit_test::IsolationHookPoint + Send>,
+        >,
     ) -> Self {
         self.isolation_hook = Some(hook);
         self
@@ -77,7 +93,12 @@ impl IacBusAdapter {
 
     /// Story 4.5 — fire isolation hooks for cross-Spirit observation.
     #[cfg(feature = "spirit_test")]
-    fn fire_isolation_hooks(&self, case_id: &str, _surface: &str, outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome) {
+    fn fire_isolation_hooks(
+        &self,
+        case_id: &str,
+        _surface: &str,
+        outcome: maos_spirit_sdk::spirit_test::IsolationHookOutcome,
+    ) {
         if let Some(ref hook) = self.isolation_hook {
             let mut h = hook.lock();
             let _ = h.before_spirit_a_attempt(case_id);
@@ -101,7 +122,12 @@ impl IacBusAdapter {
     /// Memory Manager query.
     pub fn with_digest_provider<F>(mut self, provider: F) -> Self
     where
-        F: Fn(&maos_spirit_abi::identity::SpiritId) -> maos_domain::invariants::i12::WorkingMemoryDigestRefs + Send + Sync + 'static,
+        F: Fn(
+                &maos_spirit_abi::identity::SpiritId,
+            ) -> maos_domain::invariants::i12::WorkingMemoryDigestRefs
+            + Send
+            + Sync
+            + 'static,
     {
         self.digest_provider = std::sync::Arc::new(provider);
         self
@@ -152,10 +178,7 @@ impl IacBusAdapter {
     // ── Story 5.3 — FR50 disposition helpers ────────────────────
 
     /// Emit a `task.nacked` TL row for a dead-Spirit's in-flight task.
-    pub fn emit_task_complete_nack(
-        &self,
-        task: &maos_domain::ports::task::TaskAssignmentRecord,
-    ) {
+    pub fn emit_task_complete_nack(&self, task: &maos_domain::ports::task::TaskAssignmentRecord) {
         let payload = serde_json::json!({
             "task_id": task.task_id,
             "originator_spirit_id": task.originator_spirit_id,
@@ -217,11 +240,15 @@ impl IacBusAdapter {
     pub(crate) async fn deliver_typed(
         &self,
         frame: maos_domain::frame::IacFrame,
-    ) -> Result<maos_domain::invariants::i2::LogBeforeDeliver<()>, maos_domain::iac_bus_types::IacBusError> {
+    ) -> Result<
+        maos_domain::invariants::i2::LogBeforeDeliver<()>,
+        maos_domain::iac_bus_types::IacBusError,
+    > {
         // 0. I12 decorate decision frames BEFORE serialization (Story 3.3 AC5)
         // so the logged payload already carries working_memory_digest_refs.
         // digest_provider is injected from the composition root.
-        let mut frame = decision_logger::decorate_decision_frame(frame, |sid| (self.digest_provider)(sid));
+        let mut frame =
+            decision_logger::decorate_decision_frame(frame, |sid| (self.digest_provider)(sid));
 
         // Story 4.5 — AC5: fire isolation hooks BEFORE lineage check
         // so corpus harness observes the attempt before the kernel rejects it.
@@ -229,7 +256,11 @@ impl IacBusAdapter {
         {
             let caller_pid = frame.from.spirit_id.as_str().to_string();
             let surface = "IacBusAdapter::deliver_typed";
-            self.fire_isolation_hooks(&caller_pid, surface, maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue);
+            self.fire_isolation_hooks(
+                &caller_pid,
+                surface,
+                maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue,
+            );
         }
 
         // Story 4.5 — NFR-Aud-14 intent-lineage propagation.
@@ -237,28 +268,51 @@ impl IacBusAdapter {
         // (broadcasts with no `to` entries are NOT cross-Spirit — they're 1:N telemetry,
         // the lineage is broadcast-implicit).
         {
-            let is_cross_spirit = frame.to.iter().any(|addr| addr.spirit_id != frame.from.spirit_id);
+            let is_cross_spirit = frame
+                .to
+                .iter()
+                .any(|addr| addr.spirit_id != frame.from.spirit_id);
             if is_cross_spirit {
                 if frame.intent_lineage.is_empty() {
                     match frame.auto_marker {
                         // Originating human intent — kernel attaches single-class lineage.
                         maos_domain::invariants::i3::FrameOrigin::HumanAuthored => {
-                            let class_as_intent = maos_domain::invariants::i8::A2AIntent::new(match frame.intent {
-                                maos_domain::invariants::i1::IntentClass::HighPrivilege => "high",
-                                maos_domain::invariants::i1::IntentClass::Standard => "standard",
-                                maos_domain::invariants::i1::IntentClass::Readonly => "readonly",
-                            });
-                            frame.intent_lineage = maos_domain::invariants::i13::IntentLineage::new(vec![class_as_intent]);
+                            let class_as_intent =
+                                maos_domain::invariants::i8::A2AIntent::new(match frame.intent {
+                                    maos_domain::invariants::i1::IntentClass::HighPrivilege => {
+                                        "high"
+                                    }
+                                    maos_domain::invariants::i1::IntentClass::Standard => {
+                                        "standard"
+                                    }
+                                    maos_domain::invariants::i1::IntentClass::Readonly => {
+                                        "readonly"
+                                    }
+                                });
+                            frame.intent_lineage =
+                                maos_domain::invariants::i13::IntentLineage::new(vec![
+                                    class_as_intent,
+                                ]);
                         }
                         // Spirit-drafted but human-approved: treat as human-originated —
                         // a human reviewed and approved the draft, so auto-populate lineage.
                         maos_domain::invariants::i3::FrameOrigin::SpiritDraftedHumanApproved => {
-                            let class_as_intent = maos_domain::invariants::i8::A2AIntent::new(match frame.intent {
-                                maos_domain::invariants::i1::IntentClass::HighPrivilege => "high",
-                                maos_domain::invariants::i1::IntentClass::Standard => "standard",
-                                maos_domain::invariants::i1::IntentClass::Readonly => "readonly",
-                            });
-                            frame.intent_lineage = maos_domain::invariants::i13::IntentLineage::new(vec![class_as_intent]);
+                            let class_as_intent =
+                                maos_domain::invariants::i8::A2AIntent::new(match frame.intent {
+                                    maos_domain::invariants::i1::IntentClass::HighPrivilege => {
+                                        "high"
+                                    }
+                                    maos_domain::invariants::i1::IntentClass::Standard => {
+                                        "standard"
+                                    }
+                                    maos_domain::invariants::i1::IntentClass::Readonly => {
+                                        "readonly"
+                                    }
+                                });
+                            frame.intent_lineage =
+                                maos_domain::invariants::i13::IntentLineage::new(vec![
+                                    class_as_intent,
+                                ]);
                         }
                         // Kernel-generated frames (audit telemetry, capability mediation, etc.)
                         // are internal infrastructure — accept with empty lineage.
@@ -272,13 +326,23 @@ impl IacBusAdapter {
                             #[cfg(feature = "spirit_test")]
                             {
                                 let caller_pid = frame.from.spirit_id.as_str().to_string();
-                                self.fire_isolation_hooks(&caller_pid, "IacBusAdapter::deliver_typed::lineage_broken", maos_spirit_sdk::spirit_test::IsolationHookOutcome::Abort);
+                                self.fire_isolation_hooks(
+                                    &caller_pid,
+                                    "IacBusAdapter::deliver_typed::lineage_broken",
+                                    maos_spirit_sdk::spirit_test::IsolationHookOutcome::Abort,
+                                );
                             }
-                            return Err(maos_domain::iac_bus_types::IacBusError::EIntentLineageBroken {
-                                from: frame.from.spirit_id.as_str().to_string(),
-                                to: frame.to.first().map(|a| a.spirit_id.as_str().to_string()).unwrap_or_default(),
-                                origin: frame.auto_marker,
-                            });
+                            return Err(
+                                maos_domain::iac_bus_types::IacBusError::EIntentLineageBroken {
+                                    from: frame.from.spirit_id.as_str().to_string(),
+                                    to: frame
+                                        .to
+                                        .first()
+                                        .map(|a| a.spirit_id.as_str().to_string())
+                                        .unwrap_or_default(),
+                                    origin: frame.auto_marker,
+                                },
+                            );
                         }
                     }
                 }
@@ -288,8 +352,9 @@ impl IacBusAdapter {
         }
 
         // 1. Serialize payload for log write
-        let payload_bytes = serde_json::to_vec(&frame.payload)
-            .map_err(|e| maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string()))?;
+        let payload_bytes = serde_json::to_vec(&frame.payload).map_err(|e| {
+            maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
+        })?;
 
         // 2. Log before deliver (I2)
         let spirit_pid = 0u32; // v0.3-β: PID not yet relevant for pure routing
@@ -301,16 +366,34 @@ impl IacBusAdapter {
 
         // Convert domain FrameKind to kernel FrameKind for transparency_log
         let tl_kind = match frame.kind {
-            maos_spirit_abi::identity::FrameKind::TaskAssign => transparency_log::FrameKind::TaskAssign,
-            maos_spirit_abi::identity::FrameKind::TaskComplete => transparency_log::FrameKind::TaskComplete,
-            maos_spirit_abi::identity::FrameKind::DecisionDispatch => transparency_log::FrameKind::DecisionDispatch,
-            maos_spirit_abi::identity::FrameKind::EpistemicHalt => transparency_log::FrameKind::EpistemicHalt,
-            maos_spirit_abi::identity::FrameKind::TelemetryEvent => transparency_log::FrameKind::TelemetryEvent,
-            maos_spirit_abi::identity::FrameKind::ConsentRequest => transparency_log::FrameKind::ConsentRequest,
+            maos_spirit_abi::identity::FrameKind::TaskAssign => {
+                transparency_log::FrameKind::TaskAssign
+            }
+            maos_spirit_abi::identity::FrameKind::TaskComplete => {
+                transparency_log::FrameKind::TaskComplete
+            }
+            maos_spirit_abi::identity::FrameKind::DecisionDispatch => {
+                transparency_log::FrameKind::DecisionDispatch
+            }
+            maos_spirit_abi::identity::FrameKind::EpistemicHalt => {
+                transparency_log::FrameKind::EpistemicHalt
+            }
+            maos_spirit_abi::identity::FrameKind::TelemetryEvent => {
+                transparency_log::FrameKind::TelemetryEvent
+            }
+            maos_spirit_abi::identity::FrameKind::ConsentRequest => {
+                transparency_log::FrameKind::ConsentRequest
+            }
             maos_spirit_abi::identity::FrameKind::Retract => transparency_log::FrameKind::Retract,
-            maos_spirit_abi::identity::FrameKind::CapabilityInvocation => transparency_log::FrameKind::CapabilityInvocation,
-            maos_spirit_abi::identity::FrameKind::SandboxBlock => transparency_log::FrameKind::SandboxBlock,
-            maos_spirit_abi::identity::FrameKind::InferenceCall => transparency_log::FrameKind::InferenceCall,
+            maos_spirit_abi::identity::FrameKind::CapabilityInvocation => {
+                transparency_log::FrameKind::CapabilityInvocation
+            }
+            maos_spirit_abi::identity::FrameKind::SandboxBlock => {
+                transparency_log::FrameKind::SandboxBlock
+            }
+            maos_spirit_abi::identity::FrameKind::InferenceCall => {
+                transparency_log::FrameKind::InferenceCall
+            }
         };
 
         // I2: insert_frame_event panics on SQLite write failure (transparency_log.rs:296-307).
@@ -343,10 +426,10 @@ impl Default for IacBusAdapter {
             mailbox: std::sync::Arc::new(Mailbox::new(std::sync::Arc::new(
                 crate::telemetry::iac_rt::IacRtMetrics::new(),
             ))),
-            transparency_log: std::sync::Arc::new(
-                TransparencyLogAdapter::open_in_memory(0),
-            ),
-            digest_provider: std::sync::Arc::new(|_| maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()),
+            transparency_log: std::sync::Arc::new(TransparencyLogAdapter::open_in_memory(0)),
+            digest_provider: std::sync::Arc::new(|_| {
+                maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
+            }),
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
@@ -356,17 +439,17 @@ impl Default for IacBusAdapter {
 #[cfg(test)]
 mod decision_audit_tests {
     use super::*;
-    use std::sync::Arc;
     use maos_domain::frame::{
-        DecisionDispatchPayload, FrameAddress, FramePayload, IacFrame,
-        TaskAssignPayload, PosturePreferences,
+        DecisionDispatchPayload, FrameAddress, FramePayload, IacFrame, PosturePreferences,
+        TaskAssignPayload,
     };
     use maos_domain::invariants::i1::IntentClass;
-    use maos_domain::invariants::i3::FrameOrigin;
     use maos_domain::invariants::i12::WorkingMemoryDigestRefs;
     use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
     use maos_spirit_abi::identity::{FrameKind as DomainFrameKind, SpiritId};
     use smallvec::smallvec;
+    use std::sync::Arc;
 
     fn make_decision_frame(decision_id: u64) -> IacFrame {
         IacFrame {
@@ -401,7 +484,9 @@ mod decision_audit_tests {
         let adapter = IacBusAdapter::new(mailbox, log.clone());
 
         // Register a target spirit so deliver_typed can route
-        adapter.register_spirit_typed(&SpiritId::from("target")).ok();
+        adapter
+            .register_spirit_typed(&SpiritId::from("target"))
+            .ok();
 
         // Construct and deliver 10 decision frames
         for id in 0..10 {
@@ -417,7 +502,11 @@ mod decision_audit_tests {
             })
             .unwrap();
 
-        assert_eq!(entries.len(), 10, "expected 10 decision frames in transparency log");
+        assert_eq!(
+            entries.len(),
+            10,
+            "expected 10 decision frames in transparency log"
+        );
 
         // Deserialize each logged payload (FramePayload tagged enum) and verify refs
         for (i, entry) in entries.iter().enumerate() {
@@ -445,7 +534,9 @@ mod decision_audit_tests {
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
 
-        adapter.register_spirit_typed(&SpiritId::from("target")).ok();
+        adapter
+            .register_spirit_typed(&SpiritId::from("target"))
+            .ok();
 
         let task_frame = IacFrame {
             frame_id: [1u8; 16],
@@ -487,7 +578,10 @@ mod decision_audit_tests {
                 // TaskAssign payload should NOT have working_memory_digest_refs
                 // (the decorator only attaches to DecisionDispatch frames)
             }
-            other => panic!("expected TaskAssign, got {:?}", std::mem::discriminant(&other)),
+            other => panic!(
+                "expected TaskAssign, got {:?}",
+                std::mem::discriminant(&other)
+            ),
         }
     }
 
@@ -529,10 +623,15 @@ mod decision_audit_tests {
             crate::telemetry::iac_rt::IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
-        let _target_handle = adapter.register_spirit_typed(&SpiritId::from("spirit-b")).unwrap();
+        let _target_handle = adapter
+            .register_spirit_typed(&SpiritId::from("spirit-b"))
+            .unwrap();
 
         let frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::HumanAuthored);
-        assert!(frame.intent_lineage.is_empty(), "precondition: empty lineage");
+        assert!(
+            frame.intent_lineage.is_empty(),
+            "precondition: empty lineage"
+        );
         let result = adapter.deliver_typed(frame).await;
         assert!(result.is_ok(), "human-authored cross-spirit should succeed");
 
@@ -547,11 +646,16 @@ mod decision_audit_tests {
             crate::telemetry::iac_rt::IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
-        let _target_handle = adapter.register_spirit_typed(&SpiritId::from("spirit-b")).unwrap();
+        let _target_handle = adapter
+            .register_spirit_typed(&SpiritId::from("spirit-b"))
+            .unwrap();
 
         let frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
         let result = adapter.deliver_typed(frame).await;
-        assert!(result.is_err(), "spirit-auto cross-spirit with empty lineage should be rejected");
+        assert!(
+            result.is_err(),
+            "spirit-auto cross-spirit with empty lineage should be rejected"
+        );
         match result.unwrap_err() {
             maos_domain::iac_bus_types::IacBusError::EIntentLineageBroken { from, to, origin } => {
                 assert_eq!(from, "spirit-a");
@@ -572,14 +676,20 @@ mod decision_audit_tests {
             crate::telemetry::iac_rt::IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
-        let _target_handle = adapter.register_spirit_typed(&SpiritId::from("spirit-b")).unwrap();
+        let _target_handle = adapter
+            .register_spirit_typed(&SpiritId::from("spirit-b"))
+            .unwrap();
 
         let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
-        frame.intent_lineage = IntentLineage::new(vec![
-            maos_domain::invariants::i8::A2AIntent::new("standard"),
-        ]);
+        frame.intent_lineage =
+            IntentLineage::new(vec![maos_domain::invariants::i8::A2AIntent::new(
+                "standard",
+            )]);
         let result = adapter.deliver_typed(frame).await;
-        assert!(result.is_ok(), "spirit-auto with non-empty lineage should succeed");
+        assert!(
+            result.is_ok(),
+            "spirit-auto with non-empty lineage should succeed"
+        );
     }
 
     #[tokio::test]
@@ -589,7 +699,9 @@ mod decision_audit_tests {
             crate::telemetry::iac_rt::IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
-        let _target_handle = adapter.register_spirit_typed(&SpiritId::from("spirit-a")).unwrap();
+        let _target_handle = adapter
+            .register_spirit_typed(&SpiritId::from("spirit-a"))
+            .unwrap();
 
         let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
         // make it same-spirit: from == to
@@ -599,7 +711,10 @@ mod decision_audit_tests {
             role: None,
         }];
         let result = adapter.deliver_typed(frame).await;
-        assert!(result.is_ok(), "same-spirit with empty lineage should succeed per ADR-018");
+        assert!(
+            result.is_ok(),
+            "same-spirit with empty lineage should succeed per ADR-018"
+        );
     }
 
     #[tokio::test]
@@ -613,7 +728,10 @@ mod decision_audit_tests {
         let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
         frame.to = smallvec![]; // broadcast — bypass lineage check
         let result = adapter.deliver_typed(frame).await;
-        assert!(result.is_ok(), "broadcast with empty lineage should succeed");
+        assert!(
+            result.is_ok(),
+            "broadcast with empty lineage should succeed"
+        );
     }
 
     #[tokio::test]
@@ -623,15 +741,19 @@ mod decision_audit_tests {
             crate::telemetry::iac_rt::IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
-        let _target_handle = adapter.register_spirit_typed(&SpiritId::from("spirit-b")).unwrap();
+        let _target_handle = adapter
+            .register_spirit_typed(&SpiritId::from("spirit-b"))
+            .unwrap();
 
         let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::HumanAuthored);
-        let existing = IntentLineage::new(vec![
-            maos_domain::invariants::i8::A2AIntent::new("consult"),
-        ]);
+        let existing =
+            IntentLineage::new(vec![maos_domain::invariants::i8::A2AIntent::new("consult")]);
         frame.intent_lineage = existing.clone();
         let result = adapter.deliver_typed(frame).await;
-        assert!(result.is_ok(), "human-authored with pre-existing lineage should succeed");
+        assert!(
+            result.is_ok(),
+            "human-authored with pre-existing lineage should succeed"
+        );
         // The frame was consumed; we verify delivery succeeded (no rejection).
     }
 }

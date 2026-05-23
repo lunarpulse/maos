@@ -7,12 +7,12 @@ use std::sync::Arc;
 
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::MemoryManagerPort;
+use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
-use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_spirit_sdk::spirit_test::{
-    DefaultIsolationHook, IsolationHookPoint, AttemptResult, ObservationResult,
+    AttemptResult, DefaultIsolationHook, IsolationHookPoint, ObservationResult,
 };
 use parking_lot::Mutex;
 use tempfile::TempDir;
@@ -30,13 +30,18 @@ fn isolation_hooks_fire_on_memory_write_and_read() {
     let concrete_hook = Arc::new(Mutex::new(DefaultIsolationHook::default()));
     let hook: Arc<Mutex<dyn IsolationHookPoint + Send>> = concrete_hook.clone();
     let adapter = Arc::new(
-        MemoryManagerAdapter::new(private, shared, principal, tl)
-            .with_isolation_hook(hook),
+        MemoryManagerAdapter::new(private, shared, principal, tl).with_isolation_hook(hook),
     );
 
     // Spirit A writes.
     adapter
-        .write(1, MemoryTier::Private, &MemoryNamespace::Default, "k", MemoryValue::Text("a".into()))
+        .write(
+            1,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "k",
+            MemoryValue::Text("a".into()),
+        )
         .unwrap();
 
     // Spirit B reads (returns None due to I5).
@@ -45,19 +50,27 @@ fn isolation_hooks_fire_on_memory_write_and_read() {
     // Hooks should have fired for both operations.
     let records = concrete_hook.lock().records.clone();
     assert!(
-        records.iter().any(|r| r.hook_name == "before_spirit_a_attempt"),
+        records
+            .iter()
+            .any(|r| r.hook_name == "before_spirit_a_attempt"),
         "before_spirit_a_attempt should fire"
     );
     assert!(
-        records.iter().any(|r| r.hook_name == "after_spirit_a_attempt"),
+        records
+            .iter()
+            .any(|r| r.hook_name == "after_spirit_a_attempt"),
         "after_spirit_a_attempt should fire"
     );
     assert!(
-        records.iter().any(|r| r.hook_name == "before_spirit_b_observe"),
+        records
+            .iter()
+            .any(|r| r.hook_name == "before_spirit_b_observe"),
         "before_spirit_b_observe should fire"
     );
     assert!(
-        records.iter().any(|r| r.hook_name == "after_spirit_b_observe"),
+        records
+            .iter()
+            .any(|r| r.hook_name == "after_spirit_b_observe"),
         "after_spirit_b_observe should fire"
     );
 }

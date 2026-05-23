@@ -6,8 +6,8 @@
 
 use std::sync::Arc;
 
-use maos_kernel_core::capability::cap_policy::PolicyTable;
 use maos_kernel_core::capability::cap_policy::decision::PolicyDecision;
+use maos_kernel_core::capability::cap_policy::PolicyTable;
 use maos_kernel_core::security::manifest::{EpistemicAction, EpistemicPolicySection, Posture};
 use maos_kernel_core::security::posture::{ApprovalClass, PostureState};
 
@@ -37,7 +37,11 @@ async fn nfr_perf_4_1000_shift_propagation_corpus() {
     }
 
     let mut latencies_ns: Vec<u64> = Vec::with_capacity(1000);
-    let postures = [Posture::Cautious, Posture::Assistive, Posture::AutonomousWithHalt];
+    let postures = [
+        Posture::Cautious,
+        Posture::Assistive,
+        Posture::AutonomousWithHalt,
+    ];
 
     for i in 0..1000 {
         let pid = (i as u32) % num_spirits;
@@ -72,7 +76,10 @@ async fn nfr_perf_4_1000_shift_propagation_corpus() {
             let expected = if matches!(new_posture, Posture::AutonomousWithHalt) {
                 PolicyDecision::Allow
             } else {
-                PolicyDecision::RequireApproval { class: maos_kernel_core::capability::cap_policy::decision::ApprovalClass::Mutating }
+                PolicyDecision::RequireApproval {
+                    class:
+                        maos_kernel_core::capability::cap_policy::decision::ApprovalClass::Mutating,
+                }
             };
             assert_eq!(
                 std::mem::discriminant(&decision),

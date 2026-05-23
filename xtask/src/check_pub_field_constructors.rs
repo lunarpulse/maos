@@ -49,10 +49,21 @@ fn load_allowlist(path: &str) -> Vec<AllowEntry> {
             if let Ok(toml) = content.parse::<toml::Value>() {
                 if let Some(arr) = toml.get("allow").and_then(|v| v.as_array()) {
                     for item in arr {
-                        let type_name = item.get("type_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                        let field_name = item.get("field_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        let type_name = item
+                            .get("type_name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let field_name = item
+                            .get("field_name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
                         if !type_name.is_empty() && !field_name.is_empty() {
-                            entries.push(AllowEntry { type_name, field_name });
+                            entries.push(AllowEntry {
+                                type_name,
+                                field_name,
+                            });
                         }
                     }
                 }
@@ -123,14 +134,9 @@ fn scan_file(path: &Path) -> Vec<(String, String)> {
         // Detect pub field
         if let Some(cap) = field_re().captures(trimmed) {
             if current_struct.is_some() {
-                let has_construct_doc = pending_docs
-                    .iter()
-                    .any(|d| construct_doc_re().is_match(d));
+                let has_construct_doc = pending_docs.iter().any(|d| construct_doc_re().is_match(d));
                 if has_construct_doc {
-                    results.push((
-                        current_struct.as_ref().unwrap().clone(),
-                        cap[1].to_string(),
-                    ));
+                    results.push((current_struct.as_ref().unwrap().clone(), cap[1].to_string()));
                 }
             }
             pending_docs.clear();
@@ -163,8 +169,8 @@ fn gather_new_impls(workspace_root: &Path) -> HashSet<String> {
 }
 
 pub fn run(json: bool) -> Result<(), String> {
-    let workspace_root = std::env::current_dir()
-        .map_err(|e| format!("failed to get current dir: {e}"))?;
+    let workspace_root =
+        std::env::current_dir().map_err(|e| format!("failed to get current dir: {e}"))?;
     let new_impls = gather_new_impls(&workspace_root);
     let allowlist = load_allowlist("xtask/pub-field-constructor-allowlist.toml");
 
@@ -174,7 +180,9 @@ pub fn run(json: bool) -> Result<(), String> {
         let dir = workspace_root.join(crate_dir);
         for path in find_rs_files(&dir) {
             for (type_name, field_name) in scan_file(&path) {
-                let allowed = allowlist.iter().any(|e| e.type_name == type_name && e.field_name == field_name);
+                let allowed = allowlist
+                    .iter()
+                    .any(|e| e.type_name == type_name && e.field_name == field_name);
                 if !allowed && !new_impls.contains(&type_name) {
                     let rel = path.strip_prefix(&workspace_root).unwrap_or(&path);
                     violations.push(format!(
@@ -197,7 +205,10 @@ pub fn run(json: bool) -> Result<(), String> {
         for v in &violations {
             eprintln!("{v}");
         }
-        eprintln!("check-pub-field-constructors: FAIL ({} violation(s))", violations.len());
+        eprintln!(
+            "check-pub-field-constructors: FAIL ({} violation(s))",
+            violations.len()
+        );
     } else {
         eprintln!("check-pub-field-constructors: PASS");
     }

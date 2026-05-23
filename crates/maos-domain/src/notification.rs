@@ -120,12 +120,8 @@ mod tests {
 
     #[test]
     fn anomaly_flagged_rejects_nan_confidence() {
-        let result = NotificationEvent::anomaly_flagged(
-            "observer-1",
-            "subject-1",
-            "test anomaly",
-            f32::NAN,
-        );
+        let result =
+            NotificationEvent::anomaly_flagged("observer-1", "subject-1", "test anomaly", f32::NAN);
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -135,12 +131,7 @@ mod tests {
 
     #[test]
     fn anomaly_flagged_rejects_empty_summary() {
-        let result = NotificationEvent::anomaly_flagged(
-            "observer-1",
-            "subject-1",
-            "",
-            0.5,
-        );
+        let result = NotificationEvent::anomaly_flagged("observer-1", "subject-1", "", 0.5);
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -150,12 +141,7 @@ mod tests {
 
     #[test]
     fn anomaly_flagged_rejects_whitespace_only_summary() {
-        let result = NotificationEvent::anomaly_flagged(
-            "observer-1",
-            "subject-1",
-            "   ",
-            0.5,
-        );
+        let result = NotificationEvent::anomaly_flagged("observer-1", "subject-1", "   ", 0.5);
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -192,12 +178,7 @@ mod tests {
     fn anomaly_flagged_rejects_out_of_range_confidence() {
         let cases = [-1.0f32, 1.5, f32::INFINITY, f32::NEG_INFINITY, 100.0];
         for bad_confidence in cases {
-            let result = NotificationEvent::anomaly_flagged(
-                "obs",
-                "sub",
-                "test",
-                bad_confidence,
-            );
+            let result = NotificationEvent::anomaly_flagged("obs", "sub", "test", bad_confidence);
             assert!(
                 matches!(result, Err(NotificationEventError::ConfidenceOutOfRange)),
                 "expected ConfidenceOutOfRange for {bad_confidence}, got {:?}",
@@ -220,4 +201,3 @@ mod tests {
         }
     }
 }
-

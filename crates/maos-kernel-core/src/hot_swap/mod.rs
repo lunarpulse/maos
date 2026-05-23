@@ -17,19 +17,21 @@
 //! - `archive` — Predecessor binary archive persistence.
 //! - `precheck` — ADR-036 pure-function precheck reporter.
 
-pub mod coordinator;
-pub mod state_codec;
-pub mod saga;
-pub mod post_swap_monitor;
-pub mod migrator;
 pub mod archive;
+pub mod coordinator;
+pub mod migrator;
+pub mod post_swap_monitor;
 pub mod precheck;
+pub mod saga;
+pub mod state_codec;
 
+pub use archive::{ArchiveError, SpiritArchive};
 pub use coordinator::HotSwapCoordinator;
-pub use state_codec::{StateCodec, StateEnvelope, StateCodecError};
-pub use saga::{HotSwapSaga, SagaPhase, SagaCompensation};
-pub use post_swap_monitor::{PostSwapMonitor, PostSwapInvariantSnapshot, PostSwapInvariantViolation};
-pub use migrator::{run_migrator, matches_version_pattern};
-pub use archive::{SpiritArchive, ArchiveError};
+pub use migrator::{matches_version_pattern, run_migrator};
+pub use post_swap_monitor::{
+    PostSwapInvariantSnapshot, PostSwapInvariantViolation, PostSwapMonitor,
+};
 pub use precheck::{HotSwapPrecheck, PrecheckVerdict};
 pub use precheck::{PrecheckOutcome, SchemaCompat};
+pub use saga::{HotSwapSaga, SagaCompensation, SagaPhase};
+pub use state_codec::{StateCodec, StateCodecError, StateEnvelope};

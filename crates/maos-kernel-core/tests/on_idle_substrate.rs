@@ -12,7 +12,7 @@ use std::sync::{Arc, RwLock};
 use maos_kernel_core::scheduler::{
     control_block::{make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle},
     hook_dispatch::HookDispatcher,
-    idle_watchdog::{IdleWatchdog, pick_poll_interval},
+    idle_watchdog::{pick_poll_interval, IdleWatchdog},
 };
 use maos_kernel_core::security::manifest::{LifecycleSection, SchedulingSection};
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
@@ -23,7 +23,9 @@ struct IdleSpirit {
 
 impl Default for IdleSpirit {
     fn default() -> Self {
-        Self { on_idle_count: AtomicU32::new(0) }
+        Self {
+            on_idle_count: AtomicU32::new(0),
+        }
     }
 }
 
@@ -50,37 +52,58 @@ fn make_scb(enabled_hooks: Vec<String>, idle_window_ms: u32) -> Arc<SpiritContro
         make_spirit_obj(IdleSpirit::default()),
         0,
     );
-    scb.state.store(ScbLifecycleState::Running as u8, Ordering::Release);
+    scb.state
+        .store(ScbLifecycleState::Running as u8, Ordering::Release);
     Arc::new(scb)
 }
 
 fn make_dispatcher() -> Arc<HookDispatcher> {
-    let tl = Arc::new(maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0));
+    let tl = Arc::new(
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0),
+    );
     let metrics = Arc::new(IacRtMetrics::new());
     Arc::new(HookDispatcher::new(tl, metrics))
 }
 
 #[test]
 fn pick_poll_interval_bounds() {
-    assert_eq!(pick_poll_interval(100), std::time::Duration::from_millis(100));
-    assert_eq!(pick_poll_interval(3000), std::time::Duration::from_millis(300));
-    assert_eq!(pick_poll_interval(30_000), std::time::Duration::from_millis(3000));
-    assert_eq!(pick_poll_interval(3_600_000), std::time::Duration::from_millis(5000));
-    assert_eq!(pick_poll_interval(10_000_000), std::time::Duration::from_millis(5000));
+    assert_eq!(
+        pick_poll_interval(100),
+        std::time::Duration::from_millis(100)
+    );
+    assert_eq!(
+        pick_poll_interval(3000),
+        std::time::Duration::from_millis(300)
+    );
+    assert_eq!(
+        pick_poll_interval(30_000),
+        std::time::Duration::from_millis(3000)
+    );
+    assert_eq!(
+        pick_poll_interval(3_600_000),
+        std::time::Duration::from_millis(5000)
+    );
+    assert_eq!(
+        pick_poll_interval(10_000_000),
+        std::time::Duration::from_millis(5000)
+    );
 }
 
 #[tokio::test]
 async fn idle_watchdog_fires_on_idle_after_quiescence() {
     maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let scb = make_scb(vec!["on_idle".into()], 100); // 100ms idle window
-    // Simulate a past inbound frame so the idle check sees quiescence.
+                                                     // Simulate a past inbound frame so the idle check sees quiescence.
     scb.last_inbound_frame_ns.store(1, Ordering::Relaxed);
     let scbs = Arc::new(RwLock::new(BTreeMap::new()));
     scbs.write().unwrap().insert(1, Arc::clone(&scb));
 
     let dispatcher = make_dispatcher();
     let cancel = tokio_util::sync::CancellationToken::new();
-    let watchdog = Arc::new(IdleWatchdog::new(Arc::clone(&scbs), Arc::clone(&dispatcher)));
+    let watchdog = Arc::new(IdleWatchdog::new(
+        Arc::clone(&scbs),
+        Arc::clone(&dispatcher),
+    ));
     let handle = watchdog.spawn(cancel.child_token());
 
     // Wait for the idle window + poll interval to pass.
@@ -102,13 +125,17 @@ async fn idle_watchdog_fires_on_idle_after_quiescence() {
 #[tokio::test]
 async fn idle_watchdog_skips_paused_spirit() {
     let scb = make_scb(vec!["on_idle".into()], 100);
-    scb.state.store(ScbLifecycleState::Paused as u8, Ordering::Release);
+    scb.state
+        .store(ScbLifecycleState::Paused as u8, Ordering::Release);
     let scbs = Arc::new(RwLock::new(BTreeMap::new()));
     scbs.write().unwrap().insert(1, Arc::clone(&scb));
 
     let dispatcher = make_dispatcher();
     let cancel = tokio_util::sync::CancellationToken::new();
-    let watchdog = Arc::new(IdleWatchdog::new(Arc::clone(&scbs), Arc::clone(&dispatcher)));
+    let watchdog = Arc::new(IdleWatchdog::new(
+        Arc::clone(&scbs),
+        Arc::clone(&dispatcher),
+    ));
     let handle = watchdog.spawn(cancel.child_token());
 
     tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
@@ -130,7 +157,10 @@ async fn idle_watchdog_skips_manifest_disabled_hook() {
 
     let dispatcher = make_dispatcher();
     let cancel = tokio_util::sync::CancellationToken::new();
-    let watchdog = Arc::new(IdleWatchdog::new(Arc::clone(&scbs), Arc::clone(&dispatcher)));
+    let watchdog = Arc::new(IdleWatchdog::new(
+        Arc::clone(&scbs),
+        Arc::clone(&dispatcher),
+    ));
     let handle = watchdog.spawn(cancel.child_token());
 
     tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;

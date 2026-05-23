@@ -1,0 +1,12 @@
+{
+  "scenario_id": "rev-invalid_signature_rejected-001",
+  "category": "invalid_signature_rejected",
+  "crl_blob_path": "crates/maos-eval/fixtures/revocation-corpus-v0/invalid_signature_rejected_crl_001.signed.json",
+  "trust_anchor_pub_path": "crates/maos-eval/fixtures/revocation-corpus-v0/invalid_signature_rejected_anchor_001.pub",
+  "expected_outcome": {
+    "accepted": false,
+    "propagation_latency_ms": null,
+    "revoked_spirit_count": 0,
+    "error_variant": "SignatureInvalid"
+  }
+}

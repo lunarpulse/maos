@@ -64,11 +64,7 @@ mod tests {
 
     #[test]
     fn instruction_new_rejects_empty_goal() {
-        let result = OrchestratorInstruction::new(
-            OrchestratorInstructionId(1),
-            "",
-            1000,
-        );
+        let result = OrchestratorInstruction::new(OrchestratorInstructionId(1), "", 1000);
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -78,11 +74,7 @@ mod tests {
 
     #[test]
     fn instruction_new_rejects_whitespace_only_goal() {
-        let result = OrchestratorInstruction::new(
-            OrchestratorInstructionId(1),
-            "   ",
-            1000,
-        );
+        let result = OrchestratorInstruction::new(OrchestratorInstructionId(1), "   ", 1000);
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -92,12 +84,9 @@ mod tests {
 
     #[test]
     fn instruction_new_accepts_nonempty_goal() {
-        let instr = OrchestratorInstruction::new(
-            OrchestratorInstructionId(42),
-            "draft the PR",
-            1000,
-        )
-        .unwrap();
+        let instr =
+            OrchestratorInstruction::new(OrchestratorInstructionId(42), "draft the PR", 1000)
+                .unwrap();
         assert_eq!(instr.id.0, 42);
         assert_eq!(instr.goal, "draft the PR");
         assert_eq!(instr.enqueued_at_ns, 1000);
@@ -114,12 +103,9 @@ mod tests {
 
     #[test]
     fn instruction_serde_round_trip() {
-        let instr = OrchestratorInstruction::new(
-            OrchestratorInstructionId(42),
-            "draft the PR",
-            1000,
-        )
-        .unwrap();
+        let instr =
+            OrchestratorInstruction::new(OrchestratorInstructionId(42), "draft the PR", 1000)
+                .unwrap();
         let json = serde_json::to_string(&instr).unwrap();
         assert_eq!(
             json,

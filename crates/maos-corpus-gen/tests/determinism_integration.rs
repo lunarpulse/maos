@@ -79,7 +79,11 @@ fn red_team_byte_identical_across_runs() {
     let items2 = gen2.expand(640);
 
     assert_eq!(items1.len(), items2.len());
-    assert!(items1.len() >= 640, "red-team expand(640) produced only {} items", items1.len());
+    assert!(
+        items1.len() >= 640,
+        "red-team expand(640) produced only {} items",
+        items1.len()
+    );
 
     for (i, (a, b)) in items1.iter().zip(items2.iter()).enumerate() {
         let ja = serde_json::to_string(a).unwrap();
@@ -141,7 +145,10 @@ fn no_nondeterminism_sources() {
         "thread::current",
     ];
 
-    for entry in walkdir::WalkDir::new(&src_dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in walkdir::WalkDir::new(&src_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         if !entry.file_type().is_file() {
             continue;
         }

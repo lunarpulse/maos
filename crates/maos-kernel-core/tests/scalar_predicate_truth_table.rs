@@ -12,19 +12,17 @@
 //! NaN inputs are NOT tested here — they are rejected at `set_scalar`
 //! (AC1) and never reach the predicate functions.
 
-use maos_kernel_core::capability::CapabilityRegistryPort;
-use maos_kernel_core::capability::CapabilityRegistryAdapter;
 use maos_kernel_core::api::RingCryptoProvider;
+use maos_kernel_core::capability::CapabilityRegistryAdapter;
+use maos_kernel_core::capability::CapabilityRegistryPort;
 
-use std::sync::Arc;
-use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_kernel_core::capability::{
-    cap_tokens::Ed25519SigningKey,
-    cap_policy::PolicyTable,
-    cap_quota::CapQuotaTracker,
+    cap_policy::PolicyTable, cap_quota::CapQuotaTracker, cap_tokens::Ed25519SigningKey,
     WorkingMemoryStore,
 };
+use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+use std::sync::Arc;
 
 fn make_adapter() -> CapabilityRegistryAdapter {
     let crypto: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);
@@ -35,7 +33,14 @@ fn make_adapter() -> CapabilityRegistryAdapter {
     let working_memory = Arc::new(WorkingMemoryStore::new());
     let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default());
     CapabilityRegistryAdapter::new(
-        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory, telemetry,
+        crypto,
+        signing_key,
+        0xCAFE,
+        policy,
+        audit_tx,
+        quota,
+        working_memory,
+        telemetry,
     )
 }
 
@@ -47,9 +52,9 @@ fn truth_table_on_value_above() {
         // value, threshold, expected
         (5.0, 3.0, true),
         (2.0, 3.0, false),
-        (3.0, 3.0, false),     // == threshold → exclusive, does NOT fire
+        (3.0, 3.0, false), // == threshold → exclusive, does NOT fire
         (0.0, 0.0, false),
-        (0.0, -0.0, false),    // -0.0 == 0.0
+        (0.0, -0.0, false), // -0.0 == 0.0
         (f64::INFINITY, 1.0, true),
         (1.0, f64::INFINITY, false),
         (1.0, f64::NEG_INFINITY, true),
@@ -57,7 +62,7 @@ fn truth_table_on_value_above() {
         (0.5, f64::NEG_INFINITY, true),
         (0.0, f64::NEG_INFINITY, true),
         (f64::NEG_INFINITY, f64::NEG_INFINITY, false), // == → false
-        (f64::INFINITY, f64::INFINITY, false),        // == → false
+        (f64::INFINITY, f64::INFINITY, false),         // == → false
         (1e-10, 0.0, true),
         (-1e-10, 0.0, false),
         (-1.0, -2.0, true),
@@ -93,7 +98,7 @@ fn truth_table_on_value_below() {
     let cases: &[(f64, f64, bool)] = &[
         (2.0, 3.0, true),
         (5.0, 3.0, false),
-        (3.0, 3.0, false),     // == threshold → exclusive, does NOT fire
+        (3.0, 3.0, false), // == threshold → exclusive, does NOT fire
         (0.0, 0.0, false),
         (0.0, -0.0, false),
         (f64::NEG_INFINITY, 1.0, true),
@@ -131,12 +136,12 @@ fn truth_table_on_value_within() {
 
     let cases: &[(f64, f64, f64, bool)] = &[
         (2.0, 1.0, 3.0, true),
-        (1.0, 1.0, 3.0, true),      // value == lower → inclusive, fires
-        (3.0, 1.0, 3.0, true),      // value == upper → inclusive, fires
+        (1.0, 1.0, 3.0, true), // value == lower → inclusive, fires
+        (3.0, 1.0, 3.0, true), // value == upper → inclusive, fires
         (0.5, 1.0, 3.0, false),
         (4.0, 1.0, 3.0, false),
-        (0.0, 0.0, 0.0, true),      // degenerate range
-        (0.5, 1.0, 0.5, false),     // lower > upper but not rejected at runtime
+        (0.0, 0.0, 0.0, true),  // degenerate range
+        (0.5, 1.0, 0.5, false), // lower > upper but not rejected at runtime
         (f64::INFINITY, 1.0, 2.0, false),
         (1.5, f64::NEG_INFINITY, f64::INFINITY, true),
         (f64::NEG_INFINITY, f64::NEG_INFINITY, 0.0, true),
@@ -168,12 +173,12 @@ fn truth_table_on_value_outside() {
 
     let cases: &[(f64, f64, f64, bool)] = &[
         (2.0, 1.0, 3.0, false),
-        (0.5, 1.0, 3.0, true),          // below lower → fires
-        (4.0, 1.0, 3.0, true),          // above upper → fires
-        (1.0, 1.0, 3.0, false),         // == lower → inclusive, inside
-        (3.0, 1.0, 3.0, false),         // == upper → inclusive, inside
-        (0.0, 0.0, 1.0, false),         // == lower → inside (inclusive)
-        (1.0, 0.0, 1.0, false),         // == upper (inside)
+        (0.5, 1.0, 3.0, true),  // below lower → fires
+        (4.0, 1.0, 3.0, true),  // above upper → fires
+        (1.0, 1.0, 3.0, false), // == lower → inclusive, inside
+        (3.0, 1.0, 3.0, false), // == upper → inclusive, inside
+        (0.0, 0.0, 1.0, false), // == lower → inside (inclusive)
+        (1.0, 0.0, 1.0, false), // == upper (inside)
         (f64::INFINITY, 1.0, 2.0, true),
         (f64::NEG_INFINITY, 1.0, 2.0, true),
         (1.5, f64::NEG_INFINITY, f64::INFINITY, false), // everything inside

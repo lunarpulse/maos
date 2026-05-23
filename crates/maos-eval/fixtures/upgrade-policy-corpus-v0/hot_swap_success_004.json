@@ -1,0 +1,12 @@
+{
+  "scenario_id": "upg-hot_swap_success-004",
+  "category": "hot_swap_success",
+  "predecessor_manifest_path": "crates/maos-eval/fixtures/upgrade-policy-corpus-v0/hot_swap_success_pred_004.toml",
+  "successor_manifest_path": "crates/maos-eval/fixtures/upgrade-policy-corpus-v0/hot_swap_success_succ_004.toml",
+  "policy": "hot-swap",
+  "expected_outcome": {
+    "report_outcome": "completed",
+    "lifecycle_event_journaled": true,
+    "halt_receipts_produced_min": 0
+  }
+}

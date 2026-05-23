@@ -1,9 +1,9 @@
 #![forbid(unsafe_code)]
 
-use std::sync::Arc;
+use super::buffer::OrchestratorBuffer;
 use dashmap::DashMap;
 use maos_spirit_abi::identity::SpiritId;
-use super::buffer::OrchestratorBuffer;
+use std::sync::Arc;
 
 /// Per-Host registry of Orchestrator-class buffer instances. One
 /// `OrchestratorBuffer` per Orchestrator Spirit; lookup by `SpiritId`.
@@ -12,7 +12,9 @@ use super::buffer::OrchestratorBuffer;
 /// supervised Orchestrator process see the same buffer. At v0.3-β the
 /// one-shot arms instantiate a fresh registry per invocation — Story 5.1
 /// will share it with the long-running supervisor.
-#[maos_attrs::i9_exempt(reason = "orchestrator registry — DashMap of per-Spirit transient buffers; parallel to Mailbox::mpsc_senders")]
+#[maos_attrs::i9_exempt(
+    reason = "orchestrator registry — DashMap of per-Spirit transient buffers; parallel to Mailbox::mpsc_senders"
+)]
 #[derive(Debug, Default)]
 pub struct OrchestratorBufferRegistry {
     buffers: DashMap<String, Arc<OrchestratorBuffer>>,

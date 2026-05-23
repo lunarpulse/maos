@@ -10,16 +10,16 @@
 //! (replacing the hardcoded injection in `maos-bin::main`),
 //! `OutputShapePredicate` scaffold, and a `DriftEvent` channel.
 
-pub mod crypto;
-pub mod manifest;
-pub mod sandbox;
-pub mod drift;
 pub mod approval;
+pub mod crypto;
+pub mod drift;
+pub mod manifest;
 pub mod posture;
+pub mod sandbox;
 
-pub use maos_domain::ports::SecurityManagerPort;
 pub use crypto::RingCryptoProvider;
-pub use manifest::{ManifestError, ResourceCaps, SandboxConfig, ResolvedCaps, resolve_caps};
+pub use manifest::{resolve_caps, ManifestError, ResolvedCaps, ResourceCaps, SandboxConfig};
+pub use maos_domain::ports::SecurityManagerPort;
 // Story 1b.5c — appended to preserve original re-export order so the
 // signature_hash of each existing symbol remains stable under
 // `check-service-boundary`'s use-item hashing (the gate hashes the
@@ -30,15 +30,17 @@ pub use manifest::{
     ProviderCapabilities,
 };
 // Story 2.1 — appended to preserve re-export order (same discipline).
-pub use manifest::{OutputShapePredicate, OutputShapeViolation, capabilities_required_to_scopes};
+pub use manifest::{capabilities_required_to_scopes, OutputShapePredicate, OutputShapeViolation};
 // Story 2.3 — appended for P2 port-pair completeness (RingCryptoProvider adapter → CryptoProvider Port).
+pub use drift::{make_drift_channel, DriftEvent};
 pub use maos_domain::ports::CryptoProvider;
-pub use sandbox::{SandboxSpec, SandboxedChild, SpawnError, spawn_sandboxed, classify_exit, SandboxViolation};
-pub use drift::{DriftEvent, make_drift_channel};
+pub use sandbox::{
+    classify_exit, spawn_sandboxed, SandboxSpec, SandboxViolation, SandboxedChild, SpawnError,
+};
 // Story 3.2 — appended to preserve re-export order.
 pub use manifest::{EpistemicAction, EpistemicPolicyRule, EpistemicPolicySection, ScalarPredicate};
 // Story 5.1 — appended to preserve re-export order.
-pub use manifest::{SchedulingSection, LifecycleSection};
+pub use manifest::{LifecycleSection, SchedulingSection};
 // Story 5.3 — appended to preserve re-export order.
 pub use manifest::{OnCrashSection, SupervisionSection};
 pub use posture::{PostureError, PostureState};
@@ -46,13 +48,13 @@ pub use posture::{PostureError, PostureState};
 use std::sync::Arc;
 
 use maos_domain::invariants::i1::Scope;
-use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
+use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::scheduler::SpiritSchedulerPort;
 use tokio::sync::mpsc;
 
 use crate::capability::cap_audit::{self, CapAuditEvent};
-use crate::capability::cap_policy::{PolicyTable, ManifestCapabilityScope, decision::TrustTier};
+use crate::capability::cap_policy::{decision::TrustTier, ManifestCapabilityScope, PolicyTable};
 
 /// Security error raised during admission or enforcement.
 #[derive(Debug, thiserror::Error)]
@@ -72,7 +74,9 @@ pub enum SecurityError {
 ///
 /// Promoted from ZST (v0.1-α) to hold `Arc<PolicyTable>` (Story 1b.3).
 /// Story 2.1 adds an optional drift-event sender.
-#[maos_attrs::i9_exempt(reason = "security manager adapter; holds Arc<PolicyTable> for runtime policy enforcement — structural-state caching per I9")]
+#[maos_attrs::i9_exempt(
+    reason = "security manager adapter; holds Arc<PolicyTable> for runtime policy enforcement — structural-state caching per I9"
+)]
 #[derive(Debug, Clone)]
 pub struct SecurityManagerAdapter {
     policy: Arc<PolicyTable>,
@@ -133,7 +137,9 @@ impl SecurityManagerAdapter {
                 .map(|m| m.trust_tier)
                 .unwrap_or(TrustTier::Verified);
 
-            let effective = self.policy.effective_sandbox_tier(spirit_pid, trust_tier, &inner);
+            let effective = self
+                .policy
+                .effective_sandbox_tier(spirit_pid, trust_tier, &inner);
 
             let mut new_inner = (*inner).clone();
             new_inner.manifest_scopes.insert(
@@ -165,7 +171,9 @@ impl SecurityManagerAdapter {
             .map(|m| m.trust_tier)
             .unwrap_or(TrustTier::Verified);
 
-        let effective = self.policy.effective_sandbox_tier(spirit_pid, trust_tier, &inner);
+        let effective = self
+            .policy
+            .effective_sandbox_tier(spirit_pid, trust_tier, &inner);
 
         // Fail-closed: T3+ not enforceable at v0.1-β.
         if effective.0 > SandboxTier::T2.0 {
@@ -252,7 +260,10 @@ impl SecurityManagerPort for SecurityManagerAdapter {
             .get(&spirit_pid)
             .map(|m| m.trust_tier)
             .unwrap_or(TrustTier::Verified);
-        Some(self.policy.effective_sandbox_tier(spirit_pid, trust_tier, &inner))
+        Some(
+            self.policy
+                .effective_sandbox_tier(spirit_pid, trust_tier, &inner),
+        )
     }
 
     fn approval_class(&self, _capability: &str) -> maos_domain::invariants::i4::ApprovalDecision {

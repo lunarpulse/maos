@@ -6,21 +6,26 @@ use std::sync::Arc;
 use maos_domain::halt::{HaltId, HaltResolver, Resolution};
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::MemoryManagerPort;
-use maos_kernel_core::halt::{HaltRegistry, invoke_halt, KernelHaltResolver, OutputMarkerRegistry};
+use maos_kernel_core::capability::cap_audit;
+use maos_kernel_core::capability::cap_policy::PolicyTable;
+use maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator;
+use maos_kernel_core::capability::CapabilityRegistryAdapter;
+use maos_kernel_core::halt::{invoke_halt, HaltRegistry, KernelHaltResolver, OutputMarkerRegistry};
+use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
+use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
-use maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator;
-use maos_kernel_core::capability::CapabilityRegistryAdapter;
-use maos_kernel_core::capability::cap_policy::PolicyTable;
-use maos_kernel_core::capability::cap_audit;
-use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
-use maos_kernel_core::journal::JournalAdapter;
-use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 use maos_kernel_core::security::crypto::RingCryptoProvider;
+use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 use tempfile::TempDir;
 
-fn make_resolver() -> (KernelHaltResolver, Arc<MemoryManagerAdapter>, Arc<HaltRegistry>, TempDir) {
+fn make_resolver() -> (
+    KernelHaltResolver,
+    Arc<MemoryManagerAdapter>,
+    Arc<HaltRegistry>,
+    TempDir,
+) {
     let tmp = TempDir::new().unwrap();
     let memory_root = tmp.path().join("memory");
     let db_path = tmp.path().join("audit.db");
@@ -29,7 +34,12 @@ fn make_resolver() -> (KernelHaltResolver, Arc<MemoryManagerAdapter>, Arc<HaltRe
     let shared = Arc::new(SharedMemoryStore::open(&db_path).unwrap());
     let principal = Arc::new(PrincipalNamespaceIndex::open(&db_path).unwrap());
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xBEE6));
-    let memory = Arc::new(MemoryManagerAdapter::new(private, shared, principal, Arc::clone(&tl)));
+    let memory = Arc::new(MemoryManagerAdapter::new(
+        private,
+        shared,
+        principal,
+        Arc::clone(&tl),
+    ));
 
     let halt_registry = Arc::new(HaltRegistry::new());
     let output_markers = Arc::new(OutputMarkerRegistry::new());

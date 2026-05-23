@@ -6,8 +6,8 @@
 //! invariant snapshot. On violation, calls `auto_revert` on the
 //! coordinator.
 
-use std::sync::Arc;
 use std::collections::BTreeSet;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use maos_domain::halt::HaltId;
@@ -91,9 +91,14 @@ impl PostSwapMonitor {
 
         // (i) Halt-set delta — no silent loss of pending halts.
         {
-            let map = self.coordinator.spirits_map().read().expect("spirits lock poisoned");
+            let map = self
+                .coordinator
+                .spirits_map()
+                .read()
+                .expect("spirits lock poisoned");
             if let Some(_scb) = map.get(&self.spirit_pid) {
-                let current_halt_ids: std::collections::BTreeSet<String> = self.coordinator
+                let current_halt_ids: std::collections::BTreeSet<String> = self
+                    .coordinator
                     .halt_registry_ref()
                     .pending_halt_ids()
                     .iter()
@@ -111,7 +116,11 @@ impl PostSwapMonitor {
 
         // (ii) Boot-nonce stability.
         {
-            let map = self.coordinator.spirits_map().read().expect("spirits lock poisoned");
+            let map = self
+                .coordinator
+                .spirits_map()
+                .read()
+                .expect("spirits lock poisoned");
             if let Some(scb) = map.get(&self.spirit_pid) {
                 if scb.boot_nonce != snapshot.boot_nonce {
                     return Some(PostSwapInvariantViolation::BootNonceMismatch {

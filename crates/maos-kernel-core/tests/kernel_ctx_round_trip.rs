@@ -12,19 +12,29 @@ use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 fn kernel_ctx_builder_wires_all_adapters() {
     let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
     let kctx = KernelCtx::new(&mut ctx)
-        .with_memory_manager(Arc::new(
-            {
-                let tmp = tempfile::TempDir::new().unwrap();
-                let db_path = tmp.path().join("audit.db");
-                let memory_root = tmp.path().join("memory");
-                maos_kernel_core::memory::MemoryManagerAdapter::new(
-                    Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(memory_root, 4)),
-                    Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path).unwrap()),
-                    Arc::new(maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path).unwrap()),
-                    Arc::new(maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0)),
-                )
-            }
-        ))
+        .with_memory_manager(Arc::new({
+            let tmp = tempfile::TempDir::new().unwrap();
+            let db_path = tmp.path().join("audit.db");
+            let memory_root = tmp.path().join("memory");
+            maos_kernel_core::memory::MemoryManagerAdapter::new(
+                Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
+                    memory_root,
+                    4,
+                )),
+                Arc::new(
+                    maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path).unwrap(),
+                ),
+                Arc::new(
+                    maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path)
+                        .unwrap(),
+                ),
+                Arc::new(
+                    maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(
+                        0,
+                    ),
+                ),
+            )
+        }))
         .with_capability(Arc::new(
             maos_kernel_core::capability::CapabilityRegistryAdapter::new(
                 Arc::new(maos_kernel_core::api::RingCryptoProvider),
@@ -35,14 +45,16 @@ fn kernel_ctx_builder_wires_all_adapters() {
                 maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
                 Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
                 Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
-            )
+            ),
         ))
-        .with_iac(Arc::new(
-            maos_kernel_core::iac::IacBusAdapter::new(
-                Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::new(IacRtMetrics::new()))),
-                Arc::new(maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0)),
-            )
-        ))
+        .with_iac(Arc::new(maos_kernel_core::iac::IacBusAdapter::new(
+            Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::new(
+                IacRtMetrics::new(),
+            ))),
+            Arc::new(
+                maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0),
+            ),
+        )))
         .with_halt_registry(Arc::new(maos_kernel_core::halt::HaltRegistry::new()));
 
     // Verify each wired adapter is reachable.

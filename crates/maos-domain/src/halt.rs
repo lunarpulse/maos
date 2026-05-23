@@ -74,12 +74,16 @@ impl Resolution {
     }
 
     /// Construct an `AuthorizedOverride` resolution with non-empty validation.
-    pub fn authorized_override(operator_policy_ref: impl Into<String>) -> Result<Self, ResolutionError> {
+    pub fn authorized_override(
+        operator_policy_ref: impl Into<String>,
+    ) -> Result<Self, ResolutionError> {
         let operator_policy_ref = operator_policy_ref.into();
         if operator_policy_ref.trim().is_empty() {
             return Err(ResolutionError::EmptyOperatorPolicyRef);
         }
-        Ok(Self::AuthorizedOverride { operator_policy_ref })
+        Ok(Self::AuthorizedOverride {
+            operator_policy_ref,
+        })
     }
     /// Stable label for the Approval Decision Log `intent` column.
     /// Returns one of `"provided_context"` / `"accepted_halt"` /
@@ -153,6 +157,7 @@ pub enum HaltJournalError {
 /// Replaces the raw `&str` at `terminate_spirit`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum TerminationKind {
     /// Director-initiated unload (FR51-class)
     PlannedUnload,
@@ -162,6 +167,8 @@ pub enum TerminationKind {
     UnplannedCrash,
     /// `[epistemic_policy]` rejected the halt; receipt still produced
     HaltRejection,
+    /// Story 5.4 — Spirit revoked via CRL propagation.
+    RevocationTerminated,
 }
 
 impl TerminationKind {
@@ -171,6 +178,7 @@ impl TerminationKind {
             Self::HaltAccepted => "halt_accepted",
             Self::UnplannedCrash => "unplanned_crash",
             Self::HaltRejection => "halt_rejection",
+            Self::RevocationTerminated => "revocation_terminated",
         }
     }
 }
@@ -369,14 +377,20 @@ mod tests {
     fn resolution_authorized_override_rejects_empty() {
         let result = Resolution::authorized_override("");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ResolutionError::EmptyOperatorPolicyRef));
+        assert!(matches!(
+            result.unwrap_err(),
+            ResolutionError::EmptyOperatorPolicyRef
+        ));
     }
 
     #[test]
     fn resolution_authorized_override_rejects_whitespace_only() {
         let result = Resolution::authorized_override("  ");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ResolutionError::EmptyOperatorPolicyRef));
+        assert!(matches!(
+            result.unwrap_err(),
+            ResolutionError::EmptyOperatorPolicyRef
+        ));
     }
 
     #[test]
@@ -456,15 +470,21 @@ mod tests {
         let receipt = HaltReceipt::new(hid, 100, 1, 0, [0u8; 16]);
         let resolved = receipt.with_resolution(HaltState::Resumed, "provided_context", 200);
         assert_eq!(resolved.terminal_state, Some(HaltState::Resumed));
-        assert_eq!(resolved.resolution_kind.as_deref(), Some("provided_context"));
+        assert_eq!(
+            resolved.resolution_kind.as_deref(),
+            Some("provided_context")
+        );
         assert_eq!(resolved.resolution_timestamp_ns, Some(200));
     }
 
     #[test]
     fn halt_receipt_serde_round_trip() {
         let hid = HaltId::new("halt-serde").unwrap();
-        let receipt = HaltReceipt::new(hid, 1, 2, 3, [0xFF; 16])
-            .with_resolution(HaltState::Terminated, "accepted_halt", 1000);
+        let receipt = HaltReceipt::new(hid, 1, 2, 3, [0xFF; 16]).with_resolution(
+            HaltState::Terminated,
+            "accepted_halt",
+            1000,
+        );
         let json = serde_json::to_string(&receipt).unwrap();
         let back: HaltReceipt = serde_json::from_str(&json).unwrap();
         assert_eq!(back.halt_id.as_str(), "halt-serde");
@@ -474,7 +494,12 @@ mod tests {
 
     #[test]
     fn halt_state_serde_round_trip() {
-        for state in [HaltState::PendingResolution, HaltState::Resumed, HaltState::Terminated, HaltState::Overridden] {
+        for state in [
+            HaltState::PendingResolution,
+            HaltState::Resumed,
+            HaltState::Terminated,
+            HaltState::Overridden,
+        ] {
             let json = serde_json::to_string(&state).unwrap();
             let back: HaltState = serde_json::from_str(&json).unwrap();
             assert_eq!(state, back);
@@ -540,5 +565,21 @@ mod tests {
         assert!(s.contains("2"));
         let e = HaltContinuityError::MissingHaltProtocolCompatibility;
         assert!(e.to_string().contains("halt_protocol_compatibility"));
+    }
+
+    #[test]
+    fn termination_kind_revocation_terminated_as_str() {
+        assert_eq!(
+            TerminationKind::RevocationTerminated.as_str(),
+            "revocation_terminated"
+        );
+    }
+
+    #[test]
+    fn termination_kind_revocation_terminated_serde_roundtrip() {
+        let original = TerminationKind::RevocationTerminated;
+        let json = serde_json::to_string(&original).unwrap();
+        let back: TerminationKind = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, TerminationKind::RevocationTerminated);
     }
 }

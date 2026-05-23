@@ -45,19 +45,34 @@ fn test_all_undeclared_hooks_are_noops() {
     let mut ctx = Ctx::mock();
 
     let data = b"test";
-    let fp = maos_spirit_sdk::FramePayload { frame_data: data, frame_len: 4 };
+    let fp = maos_spirit_sdk::FramePayload {
+        frame_data: data,
+        frame_len: 4,
+    };
     (vtable.on_frame)(&s, &mut ctx, &fp);
 
-    let tp = maos_spirit_sdk::TelemetryEventPayload { event_data: data, event_len: 4 };
+    let tp = maos_spirit_sdk::TelemetryEventPayload {
+        event_data: data,
+        event_len: 4,
+    };
     (vtable.on_telemetry_event)(&s, &mut ctx, &tp);
 
-    let sp = maos_spirit_sdk::SchedulePayload { schedule_data: data, schedule_len: 4 };
+    let sp = maos_spirit_sdk::SchedulePayload {
+        schedule_data: data,
+        schedule_len: 4,
+    };
     (vtable.on_schedule)(&s, &mut ctx, &sp);
 
-    let sip = maos_spirit_sdk::SwapInPayload { predecessor_state: data, state_len: 4 };
+    let sip = maos_spirit_sdk::SwapInPayload {
+        predecessor_state: data,
+        state_len: 4,
+    };
     (vtable.on_swap_in)(&s, &mut ctx, &sip);
 
-    let cp = maos_spirit_sdk::ConsolidatePayload { batch_data: data, batch_len: 4 };
+    let cp = maos_spirit_sdk::ConsolidatePayload {
+        batch_data: data,
+        batch_len: 4,
+    };
     (vtable.on_consolidate)(&s, &mut ctx, &cp);
 
     (vtable.on_pause)(&s, &mut ctx);

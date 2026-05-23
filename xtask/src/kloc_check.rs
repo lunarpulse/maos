@@ -53,11 +53,7 @@ pub fn run(config: &str, json: bool) -> Result<(), String> {
             let mut table = String::from("| Crate | LOC | Budget | Status |\n|---|---|---|---|\n");
             for (crate_name, loc) in &report.per_crate {
                 let budget = get_budget(config, crate_name).unwrap_or(0);
-                let status = if *loc > budget {
-                    "❌ OVER"
-                } else {
-                    "✅ ok"
-                };
+                let status = if *loc > budget { "❌ OVER" } else { "✅ ok" };
                 table.push_str(&format!("| {crate_name} | {loc} | {budget} | {status} |\n"));
             }
             eprintln!("NFR-Maint-1 violation: 20 KLOC ceiling breached: current={}, per-crate breakdown:\n{table}", report.aggregate);
@@ -75,8 +71,8 @@ pub fn run(config: &str, json: bool) -> Result<(), String> {
 
 fn kloc_check(config_path: &str) -> Result<Report, String> {
     // Read budget configuration.
-    let config_src = fs::read_to_string(config_path)
-        .map_err(|e| format!("cannot read {config_path}: {e}"))?;
+    let config_src =
+        fs::read_to_string(config_path).map_err(|e| format!("cannot read {config_path}: {e}"))?;
     let config: toml::Table = config_src
         .parse()
         .map_err(|e| format!("cannot parse {config_path}: {e}"))?;
@@ -116,23 +112,8 @@ fn kloc_check(config_path: &str) -> Result<Report, String> {
 
     let output = Command::new(tokei_path)
         .args([
-            "--output",
-            "json",
-            "--types",
-            "Rust",
-            "-e",
-            "target",
-            "-e",
-            "tests",
-            "-e",
-            "benches",
-            "-e",
-            "examples",
-            "-e",
-            "fuzz",
-            "-e",
-            "spirits",
-            ".",
+            "--output", "json", "--types", "Rust", "-e", "target", "-e", "tests", "-e", "benches",
+            "-e", "examples", "-e", "fuzz", "-e", "spirits", ".",
         ])
         .current_dir(workspace_root)
         .output()
@@ -143,8 +124,8 @@ fn kloc_check(config_path: &str) -> Result<Report, String> {
         return Err(format!("tokei exited with error: {stderr}"));
     }
 
-    let tokei: TokeiOutput =
-        serde_json::from_slice(&output.stdout).map_err(|e| format!("tokei JSON parse error: {e}"))?;
+    let tokei: TokeiOutput = serde_json::from_slice(&output.stdout)
+        .map_err(|e| format!("tokei JSON parse error: {e}"))?;
 
     let rust = tokei.rust.ok_or("tokei returned no Rust statistics")?;
 

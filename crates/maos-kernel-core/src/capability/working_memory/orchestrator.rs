@@ -14,11 +14,11 @@ use maos_domain::frame::EpistemicHaltPayload;
 use maos_domain::halt::HaltReceipt;
 use maos_domain::ports::CapabilityRegistryPort;
 
-use crate::capability::CapabilityRegistryAdapter;
 use crate::capability::working_memory::policy_runtime::{
     evaluate_after_set_scalar, PolicyEvaluationOutcome,
 };
-use crate::halt::{HaltRegistry, invoke_halt};
+use crate::capability::CapabilityRegistryAdapter;
+use crate::halt::{invoke_halt, HaltRegistry};
 use crate::iac::transparency_log::TransparencyLogAdapter;
 use crate::journal::JournalAdapter;
 use crate::security::manifest::EpistemicPolicySection;
@@ -60,9 +60,9 @@ impl WorkingMemoryOrchestrator {
         policy: &EpistemicPolicySection,
     ) -> Result<Option<HaltReceipt>, Box<dyn std::error::Error>> {
         // Step 1: persist + publish tap
-        let event = self.capability.set_scalar(
-            spirit_pid, spirit_id, tag, value, derived_from,
-        )?;
+        let event = self
+            .capability
+            .set_scalar(spirit_pid, spirit_id, tag, value, derived_from)?;
 
         // Step 2: evaluate policy
         let outcome = evaluate_after_set_scalar(
@@ -108,9 +108,8 @@ impl WorkingMemoryOrchestrator {
         value: f64,
         derived_from: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.capability.set_scalar(
-            spirit_pid, spirit_id, tag, value, derived_from,
-        )?;
+        self.capability
+            .set_scalar(spirit_pid, spirit_id, tag, value, derived_from)?;
         Ok(())
     }
 }

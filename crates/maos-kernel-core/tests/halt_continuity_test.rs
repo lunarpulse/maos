@@ -27,10 +27,17 @@ fn validate_halt_set_matching_version_succeeds() {
 
 #[test]
 fn validate_halt_set_mismatched_version_returns_typed_error() {
-    let halts = vec![HaltId::new("halt-1").unwrap(), HaltId::new("halt-2").unwrap()];
+    let halts = vec![
+        HaltId::new("halt-1").unwrap(),
+        HaltId::new("halt-2").unwrap(),
+    ];
     let err = validate_halt_set(&halts, 1, Some(&[2, 3])).unwrap_err();
     match err {
-        HaltContinuityError::EHaltContinuityViolation { predecessor, successor, orphan_count } => {
+        HaltContinuityError::EHaltContinuityViolation {
+            predecessor,
+            successor,
+            orphan_count,
+        } => {
             assert_eq!(predecessor, 1);
             assert_eq!(successor, 3, "successor field is max of accepted_versions");
             assert_eq!(orphan_count, 2);
@@ -43,7 +50,10 @@ fn validate_halt_set_mismatched_version_returns_typed_error() {
 fn validate_halt_set_missing_compatibility_returns_typed_error() {
     let halts = vec![HaltId::new("halt-1").unwrap()];
     let err = validate_halt_set(&halts, 1, None).unwrap_err();
-    assert!(matches!(err, HaltContinuityError::MissingHaltProtocolCompatibility));
+    assert!(matches!(
+        err,
+        HaltContinuityError::MissingHaltProtocolCompatibility
+    ));
 }
 
 #[test]
@@ -53,5 +63,8 @@ fn validate_halt_set_empty_accepted_versions_returns_violation_not_compatibility
     // accepted_versions is Some(&[]) — present but empty; this is a
     // schema mismatch (orphan_count > 0, no matching version), NOT a
     // missing-field error.
-    assert!(matches!(err, HaltContinuityError::EHaltContinuityViolation { .. }));
+    assert!(matches!(
+        err,
+        HaltContinuityError::EHaltContinuityViolation { .. }
+    ));
 }

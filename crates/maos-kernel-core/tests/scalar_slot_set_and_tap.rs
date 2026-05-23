@@ -6,17 +6,13 @@
 //! Uses the real `CapabilityRegistryAdapter` via `test_adapter()`-style
 //! construction mirroring `halt_invoke_test.rs`.
 
-use std::sync::Arc;
 use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+use std::sync::Arc;
 
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_kernel_core::capability::{
-    CapabilityRegistryAdapter,
-    cap_tokens::Ed25519SigningKey,
-    cap_policy::PolicyTable,
-    cap_quota::CapQuotaTracker,
-    WorkingMemoryStore,
-    SetScalarError,
+    cap_policy::PolicyTable, cap_quota::CapQuotaTracker, cap_tokens::Ed25519SigningKey,
+    CapabilityRegistryAdapter, SetScalarError, WorkingMemoryStore,
 };
 
 fn make_adapter() -> CapabilityRegistryAdapter {
@@ -28,7 +24,14 @@ fn make_adapter() -> CapabilityRegistryAdapter {
     let working_memory = Arc::new(WorkingMemoryStore::new());
     let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default());
     CapabilityRegistryAdapter::new(
-        crypto, signing_key, 0xCAFE, policy, audit_tx, quota, working_memory, telemetry,
+        crypto,
+        signing_key,
+        0xCAFE,
+        policy,
+        audit_tx,
+        quota,
+        working_memory,
+        telemetry,
     )
 }
 
@@ -50,7 +53,9 @@ fn set_scalar_publishes_to_telemetry_stream() {
     let topic = maos_domain::invariants::i7::TelemetryTopic::new("scalar.tap.uncertainty");
 
     // Subscribe to the telemetry topic before writing
-    adapter.set_scalar(1, "spirit-1", "uncertainty", 0.75, "frame-001").unwrap();
+    adapter
+        .set_scalar(1, "spirit-1", "uncertainty", 0.75, "frame-001")
+        .unwrap();
 }
 
 #[test]

@@ -7,16 +7,16 @@
 //! Story 1a.1; this story adds the port-trait re-export and the
 //! `CapabilityRegistryAdapter` composite with runtime bodies.
 
-pub mod cap_tokens;
-pub mod cap_policy;
 pub mod cap_audit;
+pub mod cap_policy;
 pub mod cap_quota;
+pub mod cap_tokens;
 pub mod working_memory;
 
-pub use maos_domain::ports::CapabilityRegistryPort;
 pub use maos_domain::ports::capability::TokenIssuer;
-pub use working_memory::{WorkingMemorySlot, SetScalarError};
+pub use maos_domain::ports::CapabilityRegistryPort;
 pub use working_memory::store::WorkingMemoryStore;
+pub use working_memory::{SetScalarError, WorkingMemorySlot};
 
 use std::sync::Arc;
 
@@ -25,22 +25,36 @@ use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::capability::CapError;
 use maos_domain::ports::crypto::CryptoProvider;
 
+use crate::telemetry::TelemetryStreamAdapter;
 use cap_audit::Sender;
 use cap_policy::PolicyTable;
 use cap_quota::CapQuotaTracker;
 use cap_tokens::CapTokensShardRing;
-use crate::telemetry::TelemetryStreamAdapter;
 use maos_domain::ports::TelemetryStreamPort;
 
 fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
     match scope {
-        Scope::FsRead { subtree } => cap_policy::decision::Intent::FsRead { subtree: subtree.clone() },
-        Scope::FsWrite { subtree } => cap_policy::decision::Intent::FsWrite { subtree: subtree.clone() },
-        Scope::NetHttps { domain } => cap_policy::decision::Intent::NetHttps { domain: domain.clone() },
-        Scope::ProcExec { binary } => cap_policy::decision::Intent::ProcExec { binary: binary.clone() },
-        Scope::SubSpiritSpawn { class } => cap_policy::decision::Intent::SubSpiritSpawn { class: class.clone() },
-        Scope::ProviderInfer { provider } => cap_policy::decision::Intent::ProviderInfer { provider: provider.clone() },
-        Scope::IacSend { peer_class } => cap_policy::decision::Intent::IacSend { peer_class: peer_class.clone() },
+        Scope::FsRead { subtree } => cap_policy::decision::Intent::FsRead {
+            subtree: subtree.clone(),
+        },
+        Scope::FsWrite { subtree } => cap_policy::decision::Intent::FsWrite {
+            subtree: subtree.clone(),
+        },
+        Scope::NetHttps { domain } => cap_policy::decision::Intent::NetHttps {
+            domain: domain.clone(),
+        },
+        Scope::ProcExec { binary } => cap_policy::decision::Intent::ProcExec {
+            binary: binary.clone(),
+        },
+        Scope::SubSpiritSpawn { class } => cap_policy::decision::Intent::SubSpiritSpawn {
+            class: class.clone(),
+        },
+        Scope::ProviderInfer { provider } => cap_policy::decision::Intent::ProviderInfer {
+            provider: provider.clone(),
+        },
+        Scope::IacSend { peer_class } => cap_policy::decision::Intent::IacSend {
+            peer_class: peer_class.clone(),
+        },
         Scope::MemRead { scope: s } => cap_policy::decision::Intent::MemRead { scope: s.clone() },
         Scope::MemWrite { scope: s } => cap_policy::decision::Intent::MemWrite { scope: s.clone() },
         Scope::SelfTelemetryRead => cap_policy::decision::Intent::SelfTelemetryRead,
@@ -123,9 +137,7 @@ impl CapabilityRegistryAdapter {
     ) -> Result<CapabilityToken, CapError> {
         // 1. Quota check
         let budget = 1_000_000u64;
-        let _quota_state = self
-            .quota
-            .check_and_increment(spirit_pid, 1, budget)?;
+        let _quota_state = self.quota.check_and_increment(spirit_pid, 1, budget)?;
 
         // 2. Policy check: derive Intent from the actual scope
         let cap = cap_policy::decision::Capability {
@@ -163,8 +175,11 @@ impl CapabilityRegistryAdapter {
         value: f64,
         derived_from: &str,
     ) -> Result<maos_domain::invariants::i7::ScalarTapEvent, SetScalarError> {
-        let event = self.working_memory.set_scalar(spirit_pid, spirit_id, tag, value, derived_from)?;
-        let topic = maos_domain::invariants::i7::TelemetryTopic::new(&format!("scalar.tap.{}", tag));
+        let event =
+            self.working_memory
+                .set_scalar(spirit_pid, spirit_id, tag, value, derived_from)?;
+        let topic =
+            maos_domain::invariants::i7::TelemetryTopic::new(&format!("scalar.tap.{}", tag));
         self.telemetry.publish_event(&topic, event.clone());
         Ok(event)
     }
@@ -184,11 +199,15 @@ impl CapabilityRegistryAdapter {
         let result = self.tokens.verify(token, posture_hash, sandbox);
         let outcome = cap_audit::VerifyOutcome::from_result(&result);
 
-        if self.audit.try_send(cap_audit::CapAuditEvent::Verify {
-            token_id: token.token_id,
-            spirit_pid: token.spirit_pid,
-            outcome,
-        }).is_err() {
+        if self
+            .audit
+            .try_send(cap_audit::CapAuditEvent::Verify {
+                token_id: token.token_id,
+                spirit_pid: token.spirit_pid,
+                outcome,
+            })
+            .is_err()
+        {
             cap_audit::record_drop();
         }
 
@@ -205,7 +224,14 @@ impl TokenIssuer for CapabilityRegistryAdapter {
         posture_hash: [u8; 32],
         intent_class: IntentClass,
     ) -> Result<CapabilityToken, CapError> {
-        CapabilityRegistryAdapter::issue_with_mediation(self, spirit_pid, scope, ttl_secs, posture_hash, intent_class)
+        CapabilityRegistryAdapter::issue_with_mediation(
+            self,
+            spirit_pid,
+            scope,
+            ttl_secs,
+            posture_hash,
+            intent_class,
+        )
     }
 
     fn get_token_scope(&self, token_id: &TokenId) -> Option<Scope> {
@@ -257,7 +283,8 @@ impl CapabilityRegistryPort for CapabilityRegistryAdapter {
     }
 
     fn revoke(&self, token_id: TokenId) -> Result<(), CapError> {
-        self.tokens.revoke(token_id, cap_tokens::RevokeReason::Operator)
+        self.tokens
+            .revoke(token_id, cap_tokens::RevokeReason::Operator)
     }
 
     fn record_invocation(
@@ -266,13 +293,17 @@ impl CapabilityRegistryPort for CapabilityRegistryAdapter {
         intent: String,
         payload: &[u8],
     ) -> Result<(), CapError> {
-        if self.audit.try_send(cap_audit::CapAuditEvent::Invocation {
-            token_id: token.token_id,
-            spirit_pid: token.spirit_pid,
-            capability_token_bytes: token.token_id.0.to_vec(),
-            intent,
-            payload: payload.to_vec(),
-        }).is_err() {
+        if self
+            .audit
+            .try_send(cap_audit::CapAuditEvent::Invocation {
+                token_id: token.token_id,
+                spirit_pid: token.spirit_pid,
+                capability_token_bytes: token.token_id.0.to_vec(),
+                intent,
+                payload: payload.to_vec(),
+            })
+            .is_err()
+        {
             cap_audit::record_drop();
         }
         Ok(())
@@ -304,11 +335,16 @@ mod tests {
         // Register Spirit 7 in the policy table so evaluate() doesn't deny it
         {
             let mut inner = cap_policy::PolicyTableInner::default();
-            inner.manifest_scopes.insert(7, cap_policy::ManifestCapabilityScope {
-                scopes: vec![Scope::FsRead { subtree: "/tmp".into() }],
-                declared_tier: SandboxTier(0),
-                trust_tier: cap_policy::decision::TrustTier::Verified,
-            });
+            inner.manifest_scopes.insert(
+                7,
+                cap_policy::ManifestCapabilityScope {
+                    scopes: vec![Scope::FsRead {
+                        subtree: "/tmp".into(),
+                    }],
+                    declared_tier: SandboxTier(0),
+                    trust_tier: cap_policy::decision::TrustTier::Verified,
+                },
+            );
             policy.update(inner);
         }
         let (audit_tx, _audit_rx) = cap_audit::channel();
@@ -333,7 +369,15 @@ mod tests {
         let adapter = test_adapter();
         let posture = [1u8; 32];
         let token = adapter
-            .issue(7, Scope::FsRead { subtree: "/tmp".into() }, 60, posture, IntentClass::Standard)
+            .issue(
+                7,
+                Scope::FsRead {
+                    subtree: "/tmp".into(),
+                },
+                60,
+                posture,
+                IntentClass::Standard,
+            )
             .unwrap();
         assert_eq!(token.spirit_pid, 7);
         assert!(adapter.verify(&token, posture, SandboxTier(2)).is_ok());

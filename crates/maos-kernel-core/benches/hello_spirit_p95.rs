@@ -15,15 +15,12 @@ use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_domain::ports::inference::{
-    InferenceRequest, InferenceResponse,
-    ProviderAttribution, StopReason, TokenUsage,
+    InferenceRequest, InferenceResponse, ProviderAttribution, StopReason, TokenUsage,
 };
 
 use maos_kernel_core::capability::cap_audit;
 use maos_kernel_core::capability::cap_policy::PolicyTable;
-use maos_kernel_core::capability::cap_tokens::{
-    init_monotonic_base, Ed25519SigningKey,
-};
+use maos_kernel_core::capability::cap_tokens::{init_monotonic_base, Ed25519SigningKey};
 use maos_kernel_core::capability::CapabilityRegistryAdapter;
 use maos_kernel_core::iac::TransparencyLogAdapter;
 use maos_kernel_core::inference::InferencePortAdapter;
@@ -70,10 +67,7 @@ impl CryptoProvider for MockCryptoProvider {
 struct MockProvider;
 
 impl Provider for MockProvider {
-    fn complete(
-        &self,
-        _req: &InferenceRequest,
-    ) -> Result<InferenceResponse, ProviderError> {
+    fn complete(&self, _req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
         Ok(InferenceResponse {
             text: "I am the MAOS hello-Spirit. I provide structured acknowledgement.".into(),
             stop_reason: StopReason::StopSequence,
@@ -132,7 +126,13 @@ fn make_test_adapter() -> InferencePortAdapter {
     let telemetry = Arc::new(IacRtMetrics::new());
     let provider: Arc<dyn Provider> = Arc::new(MockProvider);
 
-    InferencePortAdapter::new(provider, "mock".into(), capabilities, transparency_log, telemetry)
+    InferencePortAdapter::new(
+        provider,
+        "mock".into(),
+        capabilities,
+        transparency_log,
+        telemetry,
+    )
 }
 
 /// Issue a valid capability token for the bench.

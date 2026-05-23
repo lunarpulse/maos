@@ -22,9 +22,9 @@ pub mod registry;
 pub use buffer::{OrchestratorBuffer, OrchestratorBufferError};
 pub use registry::OrchestratorBufferRegistry;
 
+use crate::iac::transparency_log::TransparencyLogAdapter;
 use maos_domain::halt::HaltJournalError;
 use maos_domain::invariants::i4::ApprovalDecision;
-use crate::iac::transparency_log::TransparencyLogAdapter;
 
 /// Journal an orchestrator enqueue to the Approval Decision Log (Story 3.4 AC2).
 /// Mirrors `crate::halt::journal_halt_resolution` (Story 3.3 AC4) — one canonical

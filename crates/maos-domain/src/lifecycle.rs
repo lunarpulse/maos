@@ -65,7 +65,7 @@ impl LifecycleReceipt {
 }
 
 /// Errors surfaced by lifecycle operations.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 #[non_exhaustive]
 pub enum LifecycleError {
     #[error("spirit not loaded: {spirit_id}")]
@@ -109,15 +109,7 @@ pub enum LifecycleError {
 /// Mirrors `maos_kernel_core::scheduler::SpiritControlBlock`'s `AtomicU8`
 /// encoding. A `From` impl in both directions connects the domain and
 /// kernel representations.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SpiritLifecycleState {
     Loaded = 0,
     Running = 1,
@@ -182,8 +174,7 @@ mod tests {
 
     #[test]
     fn lifecycle_receipt_new_with_none_offset() {
-        let r = LifecycleReceipt::new(42, LifecycleVerb::Start, 1000, None)
-            .expect("valid receipt");
+        let r = LifecycleReceipt::new(42, LifecycleVerb::Start, 1000, None).expect("valid receipt");
         assert_eq!(r.spirit_pid, 42);
         assert_eq!(r.verb, LifecycleVerb::Start);
         assert_eq!(r.timestamp_ns, 1000);
@@ -192,11 +183,8 @@ mod tests {
 
     #[test]
     fn lifecycle_receipt_rejects_pid_zero() {
-        let err = LifecycleReceipt::new(0, LifecycleVerb::Load, 1000, None)
-            .unwrap_err();
-        assert!(
-            matches!(err, LifecycleError::Internal(ref msg) if msg.contains("non-zero"))
-        );
+        let err = LifecycleReceipt::new(0, LifecycleVerb::Load, 1000, None).unwrap_err();
+        assert!(matches!(err, LifecycleError::Internal(ref msg) if msg.contains("non-zero")));
     }
 
     #[test]

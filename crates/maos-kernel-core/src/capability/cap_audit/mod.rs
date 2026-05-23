@@ -49,10 +49,18 @@ impl VerifyOutcome {
             Err(e) => match e {
                 maos_domain::ports::capability::CapError::Expired => VerifyOutcome::Expired,
                 maos_domain::ports::capability::CapError::Revoked => VerifyOutcome::Revoked,
-                maos_domain::ports::capability::CapError::SignatureMismatch => VerifyOutcome::SignatureMismatch,
-                maos_domain::ports::capability::CapError::PostureMismatch => VerifyOutcome::PostureMismatch,
-                maos_domain::ports::capability::CapError::SpiritIdMismatch => VerifyOutcome::SpiritIdMismatch,
-                maos_domain::ports::capability::CapError::UnknownToken => VerifyOutcome::UnknownToken,
+                maos_domain::ports::capability::CapError::SignatureMismatch => {
+                    VerifyOutcome::SignatureMismatch
+                }
+                maos_domain::ports::capability::CapError::PostureMismatch => {
+                    VerifyOutcome::PostureMismatch
+                }
+                maos_domain::ports::capability::CapError::SpiritIdMismatch => {
+                    VerifyOutcome::SpiritIdMismatch
+                }
+                maos_domain::ports::capability::CapError::UnknownToken => {
+                    VerifyOutcome::UnknownToken
+                }
                 _ => VerifyOutcome::UnknownToken,
             },
         }

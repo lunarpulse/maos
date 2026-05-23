@@ -41,7 +41,9 @@ pub struct ManifestCapabilityScope {
 
 /// Inner policy table — the actual data.
 #[derive(Debug, Clone, Default)]
-#[maos_attrs::i9_exempt(reason = "inner policy data behind ArcSwap; structural-state caching per I9")]
+#[maos_attrs::i9_exempt(
+    reason = "inner policy data behind ArcSwap; structural-state caching per I9"
+)]
 pub struct PolicyTableInner {
     pub manifest_scopes: HashMap<u32, ManifestCapabilityScope>,
     pub trust_tier_floor: HashMap<decision::TrustTier, SandboxTier>,
@@ -84,8 +86,10 @@ impl PolicyTable {
         // its own data without per-read operator admission.  The rule is
         // enumerable so operators can audit the policy table and see the
         // self-telemetry cap-class explicitly (NFR-Aud-1).
-        if matches!(capability.scope, maos_domain::invariants::i1::Scope::SelfTelemetryRead)
-            || matches!(intent, Intent::SelfTelemetryRead)
+        if matches!(
+            capability.scope,
+            maos_domain::invariants::i1::Scope::SelfTelemetryRead
+        ) || matches!(intent, Intent::SelfTelemetryRead)
         {
             return PolicyDecision::Allow;
         }
@@ -100,9 +104,10 @@ impl PolicyTable {
 
         // Scope-match check: the requested capability must be in the
         // Spirit's declared manifest scopes.
-        let scope_match = manifest.scopes.iter().any(|s| {
-            std::mem::discriminant(s) == std::mem::discriminant(&capability.scope)
-        });
+        let scope_match = manifest
+            .scopes
+            .iter()
+            .any(|s| std::mem::discriminant(s) == std::mem::discriminant(&capability.scope));
         if !scope_match {
             return PolicyDecision::Deny;
         }
@@ -133,11 +138,19 @@ impl PolicyTable {
         // Approval-class lookup from operator policy (by scope discriminant
         // and by intent discriminant).
         let scope_key = format!("{:?}", std::mem::discriminant(&capability.scope));
-        if let Some(class) = inner.operator_policy.per_capability_approval.get(&scope_key) {
+        if let Some(class) = inner
+            .operator_policy
+            .per_capability_approval
+            .get(&scope_key)
+        {
             return PolicyDecision::RequireApproval { class: *class };
         }
         let intent_key = format!("{:?}", std::mem::discriminant(intent));
-        if let Some(class) = inner.operator_policy.per_capability_approval.get(&intent_key) {
+        if let Some(class) = inner
+            .operator_policy
+            .per_capability_approval
+            .get(&intent_key)
+        {
             return PolicyDecision::RequireApproval { class: *class };
         }
 
@@ -244,7 +257,8 @@ impl PolicyTable {
         }
 
         // Step 3: Posture × class matrix lookup
-        let requires = crate::security::posture::posture_requires_approval(state.current, base_class);
+        let requires =
+            crate::security::posture::posture_requires_approval(state.current, base_class);
         let matrix_decision = if requires {
             PolicyDecision::RequireApproval {
                 class: domain_class_to_decision(base_class),
@@ -255,7 +269,11 @@ impl PolicyTable {
 
         // Step 4: Operator policy overrides take precedence (existing evaluate semantics)
         let scope_key = format!("{:?}", std::mem::discriminant(&base_class));
-        if let Some(class) = inner.operator_policy.per_capability_approval.get(&scope_key) {
+        if let Some(class) = inner
+            .operator_policy
+            .per_capability_approval
+            .get(&scope_key)
+        {
             return PolicyDecision::RequireApproval { class: *class };
         }
 
@@ -269,14 +287,26 @@ pub fn strictest_of(a: SandboxTier, b: SandboxTier, c: SandboxTier) -> SandboxTi
 }
 
 /// Map domain ApprovalClass → kernel decision::ApprovalClass.
-fn domain_class_to_decision(c: maos_domain::notification::ApprovalClass) -> decision::ApprovalClass {
+fn domain_class_to_decision(
+    c: maos_domain::notification::ApprovalClass,
+) -> decision::ApprovalClass {
     match c {
-        maos_domain::notification::ApprovalClass::ReadonlyScoped => decision::ApprovalClass::ReadonlyScoped,
-        maos_domain::notification::ApprovalClass::ReadonlySearch => decision::ApprovalClass::ReadonlySearch,
+        maos_domain::notification::ApprovalClass::ReadonlyScoped => {
+            decision::ApprovalClass::ReadonlyScoped
+        }
+        maos_domain::notification::ApprovalClass::ReadonlySearch => {
+            decision::ApprovalClass::ReadonlySearch
+        }
         maos_domain::notification::ApprovalClass::Mutating => decision::ApprovalClass::Mutating,
-        maos_domain::notification::ApprovalClass::ExecCapable => decision::ApprovalClass::ExecCapable,
-        maos_domain::notification::ApprovalClass::ControlPlane => decision::ApprovalClass::ControlPlane,
-        maos_domain::notification::ApprovalClass::Interactive => decision::ApprovalClass::Interactive,
+        maos_domain::notification::ApprovalClass::ExecCapable => {
+            decision::ApprovalClass::ExecCapable
+        }
+        maos_domain::notification::ApprovalClass::ControlPlane => {
+            decision::ApprovalClass::ControlPlane
+        }
+        maos_domain::notification::ApprovalClass::Interactive => {
+            decision::ApprovalClass::Interactive
+        }
     }
 }
 
@@ -288,75 +318,122 @@ mod tests {
 
     #[test]
     fn strictest_of_three() {
-        assert_eq!(strictest_of(SandboxTier(0), SandboxTier(1), SandboxTier(2)), SandboxTier(2));
-        assert_eq!(strictest_of(SandboxTier(2), SandboxTier(0), SandboxTier(0)), SandboxTier(2));
+        assert_eq!(
+            strictest_of(SandboxTier(0), SandboxTier(1), SandboxTier(2)),
+            SandboxTier(2)
+        );
+        assert_eq!(
+            strictest_of(SandboxTier(2), SandboxTier(0), SandboxTier(0)),
+            SandboxTier(2)
+        );
     }
 
     #[test]
     fn policy_table_update_is_atomic() {
         let table = PolicyTable::new();
         let mut new_inner = PolicyTableInner::default();
-        new_inner.operator_policy.spirit_tier_floor.insert(7, SandboxTier(2));
+        new_inner
+            .operator_policy
+            .spirit_tier_floor
+            .insert(7, SandboxTier(2));
         table.update(new_inner);
         let loaded = table.inner.load_full();
-        assert_eq!(loaded.operator_policy.spirit_tier_floor.get(&7), Some(&SandboxTier(2)));
+        assert_eq!(
+            loaded.operator_policy.spirit_tier_floor.get(&7),
+            Some(&SandboxTier(2))
+        );
     }
 
     #[test]
     fn strictest_of_floor_forces_t0_to_t2_for_public_untrusted() {
         let table = PolicyTable::new();
         let mut inner = PolicyTableInner::default();
-        inner.manifest_scopes.insert(42, ManifestCapabilityScope {
-            scopes: vec![Scope::FsRead { subtree: "/tmp".into() }],
-            declared_tier: SandboxTier(0),
-            trust_tier: TrustTier::PublicUntrusted,
-        });
-        inner.trust_tier_floor.insert(TrustTier::PublicUntrusted, SandboxTier(2));
+        inner.manifest_scopes.insert(
+            42,
+            ManifestCapabilityScope {
+                scopes: vec![Scope::FsRead {
+                    subtree: "/tmp".into(),
+                }],
+                declared_tier: SandboxTier(0),
+                trust_tier: TrustTier::PublicUntrusted,
+            },
+        );
+        inner
+            .trust_tier_floor
+            .insert(TrustTier::PublicUntrusted, SandboxTier(2));
         table.update(inner);
 
         let loaded = table.inner.load_full();
         let effective = table.effective_sandbox_tier(42, TrustTier::PublicUntrusted, &loaded);
-        assert_eq!(effective, SandboxTier(2), "trust tier floor must force T0→T2 for PublicUntrusted");
+        assert_eq!(
+            effective,
+            SandboxTier(2),
+            "trust tier floor must force T0→T2 for PublicUntrusted"
+        );
     }
 
     #[test]
     fn operator_floor_can_force_above_manifest_and_trust_tier() {
         let table = PolicyTable::new();
         let mut inner = PolicyTableInner::default();
-        inner.manifest_scopes.insert(42, ManifestCapabilityScope {
-            scopes: vec![Scope::FsRead { subtree: "/tmp".into() }],
-            declared_tier: SandboxTier(0),
-            trust_tier: TrustTier::Verified,
-        });
-        inner.trust_tier_floor.insert(TrustTier::Verified, SandboxTier(0));
-        inner.operator_policy.spirit_tier_floor.insert(42, SandboxTier(3));
+        inner.manifest_scopes.insert(
+            42,
+            ManifestCapabilityScope {
+                scopes: vec![Scope::FsRead {
+                    subtree: "/tmp".into(),
+                }],
+                declared_tier: SandboxTier(0),
+                trust_tier: TrustTier::Verified,
+            },
+        );
+        inner
+            .trust_tier_floor
+            .insert(TrustTier::Verified, SandboxTier(0));
+        inner
+            .operator_policy
+            .spirit_tier_floor
+            .insert(42, SandboxTier(3));
         table.update(inner);
 
         let loaded = table.inner.load_full();
         let effective = table.effective_sandbox_tier(42, TrustTier::Verified, &loaded);
-        assert_eq!(effective, SandboxTier(3), "operator floor must override manifest+trust");
+        assert_eq!(
+            effective,
+            SandboxTier(3),
+            "operator floor must override manifest+trust"
+        );
     }
 
     #[test]
     fn concurrent_readers_never_block_writer() {
         let table = Arc::new(PolicyTable::new());
         let mut inner = PolicyTableInner::default();
-        inner.manifest_scopes.insert(1, ManifestCapabilityScope {
-            scopes: vec![Scope::FsRead { subtree: "/tmp".into() }],
-            declared_tier: SandboxTier(0),
-            trust_tier: TrustTier::Verified,
-        });
+        inner.manifest_scopes.insert(
+            1,
+            ManifestCapabilityScope {
+                scopes: vec![Scope::FsRead {
+                    subtree: "/tmp".into(),
+                }],
+                declared_tier: SandboxTier(0),
+                trust_tier: TrustTier::Verified,
+            },
+        );
         table.update(inner);
 
         let writer_table = table.clone();
         let writer = thread::spawn(move || {
             for i in 0..100 {
                 let mut new_inner = PolicyTableInner::default();
-                new_inner.manifest_scopes.insert(1, ManifestCapabilityScope {
-                    scopes: vec![Scope::FsRead { subtree: format!("/tmp/{i}") }],
-                    declared_tier: SandboxTier(0),
-                    trust_tier: TrustTier::Verified,
-                });
+                new_inner.manifest_scopes.insert(
+                    1,
+                    ManifestCapabilityScope {
+                        scopes: vec![Scope::FsRead {
+                            subtree: format!("/tmp/{i}"),
+                        }],
+                        declared_tier: SandboxTier(0),
+                        trust_tier: TrustTier::Verified,
+                    },
+                );
                 writer_table.update(new_inner);
             }
         });
@@ -375,21 +452,19 @@ mod tests {
 
     #[test]
     fn evaluate_with_posture_returns_deny_for_unknown_spirit() {
-        use crate::security::posture::PostureState;
         use crate::security::manifest::{EpistemicAction, EpistemicPolicySection, Posture};
+        use crate::security::posture::PostureState;
 
         let table = PolicyTable::new();
-        let decision = table.evaluate_with_posture(
-            999,
-            maos_domain::notification::ApprovalClass::Mutating,
-        );
+        let decision =
+            table.evaluate_with_posture(999, maos_domain::notification::ApprovalClass::Mutating);
         assert!(matches!(decision, PolicyDecision::Deny));
     }
 
     #[test]
     fn evaluate_with_posture_operator_override_takes_precedence() {
-        use crate::security::posture::PostureState;
         use crate::security::manifest::{EpistemicAction, EpistemicPolicySection, Posture};
+        use crate::security::posture::PostureState;
 
         let table = PolicyTable::new();
         let mut inner = PolicyTableInner::default();
@@ -407,12 +482,16 @@ mod tests {
         // AutonomousWithHalt + Mutating = Allow per matrix, but operator
         // override forces RequireApproval
         inner.operator_policy.per_capability_approval.insert(
-            format!("{:?}", std::mem::discriminant(&maos_domain::notification::ApprovalClass::Mutating)),
+            format!(
+                "{:?}",
+                std::mem::discriminant(&maos_domain::notification::ApprovalClass::Mutating)
+            ),
             decision::ApprovalClass::Mutating,
         );
         table.update(inner);
 
-        let decision = table.evaluate_with_posture(0, maos_domain::notification::ApprovalClass::Mutating);
+        let decision =
+            table.evaluate_with_posture(0, maos_domain::notification::ApprovalClass::Mutating);
         assert!(
             matches!(decision, PolicyDecision::RequireApproval { .. }),
             "operator override must take precedence over matrix Allow"

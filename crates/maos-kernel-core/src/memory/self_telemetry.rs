@@ -20,13 +20,15 @@ use maos_domain::self_telemetry::{
 };
 
 use crate::halt::HaltRegistry;
-use maos_domain::halt::HaltState;
 use crate::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use crate::telemetry::iac_rt::IacRtMetrics;
+use maos_domain::halt::HaltState;
 
 /// Self-telemetry aggregator — read-only composer over existing kernel
 /// state.  Does NOT retain its own state across calls.
-#[maos_attrs::i9_exempt(reason = "self-telemetry aggregator — read-only composer over existing kernel state (IacRtMetrics, HaltRegistry, TransparencyLogAdapter); does not retain its own state across calls; FR56 surface for Spirit-side calibration without per-read operator admission")]
+#[maos_attrs::i9_exempt(
+    reason = "self-telemetry aggregator — read-only composer over existing kernel state (IacRtMetrics, HaltRegistry, TransparencyLogAdapter); does not retain its own state across calls; FR56 surface for Spirit-side calibration without per-read operator admission"
+)]
 pub struct SelfTelemetryAggregator {
     iac_rt_metrics: Arc<IacRtMetrics>,
     halt_registry: Arc<HaltRegistry>,
@@ -119,12 +121,13 @@ impl SelfTelemetryPort for SelfTelemetryAggregator {
         }
 
         // 1. Latency quantiles (v0.3-β stub).
-        let (latency_p50_us, latency_p95_us, latency_p99_us) =
-            self.latency_quantiles(spirit_pid);
+        let (latency_p50_us, latency_p95_us, latency_p99_us) = self.latency_quantiles(spirit_pid);
 
         // 2. Halt events from registry — scoped to calling spirit_pid.
         let halt_events: Vec<HaltTelemetryEntry> = {
-            let metas = self.halt_registry.halt_metadata_for_spirit(spirit_pid, window_start_ns);
+            let metas = self
+                .halt_registry
+                .halt_metadata_for_spirit(spirit_pid, window_start_ns);
             let mut entries = Vec::with_capacity(metas.len());
             for (hid, meta) in &metas {
                 // Best-effort: look up current state in the pending map.
@@ -243,9 +246,7 @@ mod tests {
     #[test]
     fn invalid_window_returns_error() {
         let agg = make_aggregator();
-        let err = agg
-            .self_telemetry(1, Some(u64::MAX))
-            .unwrap_err();
+        let err = agg.self_telemetry(1, Some(u64::MAX)).unwrap_err();
         assert!(matches!(err, SelfTelemetryError::WindowInvalid { .. }));
     }
 

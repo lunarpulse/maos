@@ -32,8 +32,7 @@ fn gate_passes_on_clean_binary() {
     assert!(
         report.passed,
         "gate failed on a known-clean binary {} — forbidden symbols found: {:?}",
-        binary_path,
-        report.forbidden_symbols_found
+        binary_path, report.forbidden_symbols_found
     );
 }
 

@@ -9,8 +9,8 @@ use std::sync::Arc;
 use maos_domain::log_recall::LogRecallFilter;
 use maos_domain::ports::LogRecallPort;
 
-use maos_kernel_core::iac::log_recall::LogRecallAdapter;
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_kernel_core::iac::log_recall::LogRecallAdapter;
 use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use maos_spirit_sdk::spirit_test::DefaultIsolationHook;
 use parking_lot::Mutex;
@@ -47,11 +47,15 @@ fn isolation_hooks_fire_on_recall_and_fetch() {
 
     let records = hook.lock().records.clone();
     assert!(
-        records.iter().any(|r| r.hook_name == "before_spirit_a_attempt"),
+        records
+            .iter()
+            .any(|r| r.hook_name == "before_spirit_a_attempt"),
         "before_spirit_a_attempt should fire"
     );
     assert!(
-        records.iter().any(|r| r.hook_name == "after_spirit_a_attempt"),
+        records
+            .iter()
+            .any(|r| r.hook_name == "after_spirit_a_attempt"),
         "after_spirit_a_attempt should fire"
     );
     assert!(

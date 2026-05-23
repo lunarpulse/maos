@@ -5,10 +5,10 @@ use std::sync::Arc;
 
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue, ValueKind};
 use maos_domain::ports::MemoryManagerPort;
+use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
-use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use tempfile::TempDir;
 
 fn make_adapter() -> (Arc<MemoryManagerAdapter>, TempDir) {
@@ -30,12 +30,23 @@ fn markdown_spills_to_disk_and_reads_back_byte_identical() {
     let payload = "# Memory\n\n---\nkey: value\n\nRaw \0 control chars".to_string();
     let val = MemoryValue::Markdown(payload.clone());
     adapter
-        .write(7, MemoryTier::Private, &MemoryNamespace::Default, "memory.md", val.clone())
+        .write(
+            7,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "memory.md",
+            val.clone(),
+        )
         .unwrap();
 
     // Verify via read (namespace_to_dirname hex-encodes the namespace).
     let got = adapter
-        .read(7, MemoryTier::Private, &MemoryNamespace::Default, "memory.md")
+        .read(
+            7,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "memory.md",
+        )
         .unwrap();
     assert_eq!(got, Some(MemoryValue::Markdown(payload)));
 }
@@ -45,7 +56,13 @@ fn operator_hand_edit_survives_on_next_read() {
     let (adapter, tmp) = make_adapter();
     let original = "# Original\n".to_string();
     adapter
-        .write(8, MemoryTier::Private, &MemoryNamespace::Default, "notes", MemoryValue::Markdown(original.clone()))
+        .write(
+            8,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "notes",
+            MemoryValue::Markdown(original.clone()),
+        )
         .unwrap();
 
     // Simulate operator editing the file on disk.
