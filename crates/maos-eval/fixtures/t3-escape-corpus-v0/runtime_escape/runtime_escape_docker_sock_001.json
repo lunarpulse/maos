@@ -1,0 +1,21 @@
+{
+  "scenario_id": "runtime_escape_docker_sock_001",
+  "category": "runtime_escape",
+  "attack_payload": {
+    "command": ["sh", "-c", "curl --unix-socket /var/run/docker.sock http://localhost/containers/json"],
+    "expected_runtime_blocker": "no socket mount"
+  },
+  "attack_surface": "Docker daemon API via /var/run/docker.sock",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.runtime.docker_sock"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

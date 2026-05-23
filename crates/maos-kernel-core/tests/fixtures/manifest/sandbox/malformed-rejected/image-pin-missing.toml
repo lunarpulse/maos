@@ -1,0 +1,3 @@
+# expect: SecurityError::T3AdmissionFailed (image_pin not in lock)
+tier = "T3"
+image_pin = "nonexistent-pin"

@@ -70,6 +70,8 @@ pub enum LifecycleEvent {
     Upgrade = 15,
     /// Story 5.4 — Spirit revoked via CRL propagation.
     Revoked = 16,
+    /// Story 5.5a — T3 sandbox tier applied at admission time.
+    SandboxApplied = 17,
 }
 
 /// A single lifecycle journal entry — the v0.3-β shape.

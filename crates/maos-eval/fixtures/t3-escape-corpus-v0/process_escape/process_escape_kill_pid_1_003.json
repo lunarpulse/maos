@@ -1,0 +1,21 @@
+{
+  "scenario_id": "process_escape_kill_pid_1_003",
+  "category": "process_escape",
+  "attack_payload": {
+    "command": ["kill", "-9", "1"],
+    "expected_runtime_blocker": "PID namespace (init is PID 1 in container)"
+  },
+  "attack_surface": "host init process termination via signal to PID 1",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.process.kill_pid_1"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

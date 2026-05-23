@@ -1,0 +1,21 @@
+{
+  "scenario_id": "filesystem_escape_proc_1_root_002",
+  "category": "filesystem_escape",
+  "attack_payload": {
+    "command": ["ls", "/proc/1/root"],
+    "expected_runtime_blocker": "PID namespace"
+  },
+  "attack_surface": "host filesystem via /proc/1/root traversal",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.filesystem.proc_1_root"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

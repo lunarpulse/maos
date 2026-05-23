@@ -59,7 +59,7 @@ use crate::capability::cap_policy::{decision::TrustTier, ManifestCapabilityScope
 /// Security error raised during admission or enforcement.
 #[derive(Debug, thiserror::Error)]
 pub enum SecurityError {
-    #[error("sandbox tier T3+ unsupported at v0.1-β: requested {0}")]
+    #[error("sandbox tier unsupported at this version: requested {0}")]
     SandboxTierUnsupported(SandboxTier),
     #[error("sandbox unavailable on platform: {reason}")]
     SandboxUnavailable { reason: String },
@@ -67,6 +67,8 @@ pub enum SecurityError {
     Manifest(#[from] ManifestError),
     #[error("policy table lookup failed for spirit {spirit_pid}")]
     PolicyLookup { spirit_pid: u32 },
+    #[error("T3 admission failed: {0}")]
+    T3AdmissionFailed(String),
 }
 
 /// Adapter — implements `SecurityManagerPort` with sandbox tier
@@ -175,8 +177,21 @@ impl SecurityManagerAdapter {
             .policy
             .effective_sandbox_tier(spirit_pid, trust_tier, &inner);
 
-        // Fail-closed: T3+ not enforceable at v0.1-β.
-        if effective.0 > SandboxTier::T2.0 {
+        // Story 5.5a: T3 is now admissible on Linux with container isolation.
+        // T4 remains rejected (WASM tier scheduled for v2.0).
+        if effective == SandboxTier::T3 {
+            let lock = crate::security::sandbox::t3::image_lock::T3ImageLock::load_default()
+                .map_err(|e| SecurityError::T3AdmissionFailed(e.to_string()))?;
+            if let Some(ref image_pin) = _manifest.image_pin {
+                lock.resolve_pin(image_pin)
+                    .ok_or_else(|| SecurityError::T3AdmissionFailed(
+                        format!("sandbox.image_pin '{}' not present in t3-image.lock", image_pin)
+                    ))?;
+            } else {
+                lock.default_attestation()
+                    .map_err(|e| SecurityError::T3AdmissionFailed(e.to_string()))?;
+            }
+        } else if effective.0 > SandboxTier::T3.0 {
             return Err(SecurityError::SandboxTierUnsupported(effective));
         }
 
@@ -210,6 +225,15 @@ impl SecurityManagerAdapter {
             spirit_id: spirit_id.into(),
             effective_sandbox_tier: Some(effective),
         }));
+
+        if effective == SandboxTier::T3 {
+            journal.journal_lifecycle(JournalEntry::Lifecycle(LifecycleEntry {
+                timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
+                lifecycle_event: LifecycleEvent::SandboxApplied,
+                spirit_id: spirit_id.into(),
+                effective_sandbox_tier: Some(effective),
+            }));
+        }
 
         Ok(SandboxSpec {
             tier: effective,

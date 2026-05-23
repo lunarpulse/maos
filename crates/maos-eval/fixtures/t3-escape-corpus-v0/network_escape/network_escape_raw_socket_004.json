@@ -1,0 +1,21 @@
+{
+  "scenario_id": "network_escape_raw_socket_004",
+  "category": "network_escape",
+  "attack_payload": {
+    "command": ["sh", "-c", "python3 -c \"import socket; s=socket.socket(socket.AF_INET,socket.SOCK_RAW)\""],
+    "expected_runtime_blocker": "--cap-drop=ALL"
+  },
+  "attack_surface": "raw socket creation for network packet injection",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.network.raw_socket"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

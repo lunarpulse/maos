@@ -1,0 +1,21 @@
+{
+  "scenario_id": "filesystem_escape_home_004",
+  "category": "filesystem_escape",
+  "attack_payload": {
+    "command": ["ls", "/home"],
+    "expected_runtime_blocker": "--read-only"
+  },
+  "attack_surface": "host user directories via /home listing",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.filesystem.home"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "scenario_id": "runtime_escape_image_pull_via_sock_003",
+  "category": "runtime_escape",
+  "attack_payload": {
+    "command": ["sh", "-c", "curl -X POST --unix-socket /var/run/docker.sock http://localhost/images/create?fromImage=alpine"],
+    "expected_runtime_blocker": "no socket mount"
+  },
+  "attack_surface": "Docker image pull via daemon socket API",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.runtime.image_pull_via_sock"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

@@ -183,6 +183,7 @@ impl SpiritSchedulerAdapter {
             use maos_domain::invariants::i9::SandboxTier;
             let sandbox_cfg = SandboxConfig {
                 tier: SandboxTier::T2,
+                image_pin: None,
             };
             let caps = ResourceCaps {
                 cpu_max_pct: None,

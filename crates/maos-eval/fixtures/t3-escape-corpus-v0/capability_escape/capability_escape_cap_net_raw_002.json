@@ -1,0 +1,21 @@
+{
+  "scenario_id": "capability_escape_cap_net_raw_002",
+  "category": "capability_escape",
+  "attack_payload": {
+    "command": ["sh", "-c", "ping -c1 127.0.0.1"],
+    "expected_runtime_blocker": "--cap-drop=ALL + --network=none"
+  },
+  "attack_surface": "CAP_NET_RAW ICMP socket creation for network probing",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.capability.cap_net_raw"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

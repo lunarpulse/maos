@@ -1,0 +1,21 @@
+{
+  "scenario_id": "network_escape_dns_resolution_003",
+  "category": "network_escape",
+  "attack_payload": {
+    "command": ["nslookup", "example.com"],
+    "expected_runtime_blocker": "--network=none"
+  },
+  "attack_surface": "DNS resolution leaking host network info",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.network.dns_resolution"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

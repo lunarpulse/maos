@@ -1,0 +1,21 @@
+{
+  "scenario_id": "capability_escape_cap_setuid_005",
+  "category": "capability_escape",
+  "attack_payload": {
+    "command": ["su", "-c", "id"],
+    "expected_runtime_blocker": "--cap-drop=ALL + --user=65534:65534"
+  },
+  "attack_surface": "CAP_SETUID privilege escalation via su",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.capability.cap_setuid"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

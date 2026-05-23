@@ -1,0 +1,21 @@
+{
+  "scenario_id": "process_escape_proc_1_exe_002",
+  "category": "process_escape",
+  "attack_payload": {
+    "command": ["ls", "-la", "/proc/1/exe"],
+    "expected_runtime_blocker": "PID namespace"
+  },
+  "attack_surface": "host binary path disclosure via /proc/1/exe symlink",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.process.proc_1_exe"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

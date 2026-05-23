@@ -600,6 +600,38 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
                 }
             }
         }
+        SpiritOp::Inspect { spirit, sandbox } => {
+            if !sandbox {
+                eprintln!("maos: spirit inspect requires --sandbox at v0.3-β; full inspect surface arrives at Story 9.x");
+                return ExitCode::SUCCESS;
+            }
+            if let Err(diag) = resolve_spirit_pid(spirit) {
+                eprintln!("maos: {diag}");
+                return ExitCode::from(2);
+            }
+
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "spirit-inspect");
+            cmd.env("MAOS_SPIRIT_ID", spirit);
+            cmd.env("MAOS_INSPECT_SANDBOX", "1");
+
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+
+            match cmd.status() {
+                Ok(s) if s.success() => ExitCode::SUCCESS,
+                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+                Err(e) => {
+                    eprintln!(
+                        "maosctl: failed to execute maos-bin at '{}': {e}",
+                        bin.display()
+                    );
+                    ExitCode::from(2)
+                }
+            }
+        }
     }
 }
 

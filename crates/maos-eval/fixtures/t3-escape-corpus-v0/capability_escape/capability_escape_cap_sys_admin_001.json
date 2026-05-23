@@ -1,0 +1,21 @@
+{
+  "scenario_id": "capability_escape_cap_sys_admin_001",
+  "category": "capability_escape",
+  "attack_payload": {
+    "command": ["sh", "-c", "mount -t tmpfs tmpfs /tmp/mount_test"],
+    "expected_runtime_blocker": "--cap-drop=ALL"
+  },
+  "attack_surface": "CAP_SYS_ADMIN mount operation inside container",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.capability.cap_sys_admin"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

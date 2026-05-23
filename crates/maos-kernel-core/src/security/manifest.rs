@@ -43,13 +43,19 @@ fn validation_msg(field: &str, reason: &str) -> String {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SandboxConfig {
     pub tier: SandboxTier,
+    /// Optional image-pin name referencing an entry in `t3-image.lock`.
+    /// `None` uses the `default_for_v05 = true` entry.
+    pub image_pin: Option<String>,
 }
 
 impl SandboxConfig {
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
         let raw: RawSandboxConfig =
             toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
-        Ok(SandboxConfig { tier: raw.tier })
+        Ok(SandboxConfig {
+            tier: raw.tier,
+            image_pin: raw.image_pin,
+        })
     }
 }
 
@@ -104,6 +110,8 @@ fn strictest_opt(a: Option<u32>, b: Option<u32>) -> Option<u32> {
 struct RawSandboxConfig {
     #[serde(default = "default_tier")]
     tier: SandboxTier,
+    #[serde(default)]
+    image_pin: Option<String>,
 }
 
 fn default_tier() -> SandboxTier {

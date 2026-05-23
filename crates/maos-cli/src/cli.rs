@@ -314,6 +314,14 @@ pub enum SpiritOp {
         #[arg(long, value_enum, default_value_t = UpgradePolicyArg::HotSwap)]
         policy: UpgradePolicyArg,
     },
+    /// Inspect a Spirit's sandbox report (Story 5.5a, AC5).
+    Inspect {
+        /// Spirit ID to inspect (e.g. "butler").
+        spirit: String,
+        /// Print sandbox isolation details.
+        #[arg(long)]
+        sandbox: bool,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]

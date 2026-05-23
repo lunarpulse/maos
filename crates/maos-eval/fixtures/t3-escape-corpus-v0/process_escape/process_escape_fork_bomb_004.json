@@ -1,0 +1,21 @@
+{
+  "scenario_id": "process_escape_fork_bomb_004",
+  "category": "process_escape",
+  "attack_payload": {
+    "command": ["sh", "-c", ":(){ :|:& };:"],
+    "expected_runtime_blocker": "--pids-limit"
+  },
+  "attack_surface": "resource exhaustion via fork bomb",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.process.fork_bomb"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

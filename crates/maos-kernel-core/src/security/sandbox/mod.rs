@@ -6,6 +6,7 @@
 #![deny(unsafe_code)]
 
 pub mod unsupported;
+pub mod t3;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -61,6 +62,10 @@ pub enum SpawnError {
     CgroupUnavailable,
     #[error("sandbox unavailable on this platform: {reason}")]
     SandboxUnavailable { reason: String },
+    #[error("T3 image SHA mismatch: expected {expected}, observed {observed}")]
+    SandboxImageMismatch { expected: String, observed: String },
+    #[error("T3 container runtime unavailable: {reason}")]
+    T3RuntimeUnavailable { reason: String },
 }
 
 /// A sandbox violation detected from child exit status.
@@ -119,12 +124,23 @@ impl Drop for SandboxedChild {
 
 /// Spawn a command under the given sandbox spec.
 ///
-/// Platform dispatch: Linux → Landlock+seccomp+cgroups; macOS →
+/// Platform dispatch: T3 → container isolation; otherwise
+/// Linux → Landlock+seccomp+cgroups; macOS →
 /// sandbox-exec+setrlimit; Windows → restricted-token+Job Object.
 pub fn spawn_sandboxed(
     spec: &SandboxSpec,
     command: &mut Command,
 ) -> Result<SandboxedChild, SpawnError> {
+    if spec.tier == SandboxTier::T3 {
+        // T3 container isolation: forwarded to t3::spawn::spawn_t3.
+        // The Command is ignored; spawn_t3 builds its own argv.
+        // v0.5-α: T3 spawn requires the full SandboxSpec + image
+        // attestation + T3SpawnContext, so this arm returns
+        // SandboxUnavailable to guide callers to use spawn_t3 directly.
+        return Err(SpawnError::SandboxUnavailable {
+            reason: "T3 container isolation cannot be spawned via generic Command; use t3::spawn::spawn_t3 directly".into(),
+        });
+    }
     #[cfg(target_os = "linux")]
     {
         linux::spawn_sandboxed(spec, command)

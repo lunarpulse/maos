@@ -1,0 +1,21 @@
+{
+  "scenario_id": "network_escape_ipv6_outbound_005",
+  "category": "network_escape",
+  "attack_payload": {
+    "command": ["sh", "-c", "ping6 -c1 ::1"],
+    "expected_runtime_blocker": "--network=none"
+  },
+  "attack_surface": "IPv6 loopback connectivity to host network",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.network.ipv6_outbound"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

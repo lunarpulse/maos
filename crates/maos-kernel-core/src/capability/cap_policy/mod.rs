@@ -114,7 +114,7 @@ impl PolicyTable {
 
         // Effective sandbox tier: strictest of manifest, trust-tier-floor, operator.
         let effective = self.effective_sandbox_tier(spirit_pid, manifest.trust_tier, &inner);
-        if effective.0 >= 3 {
+        if effective.0 > 3 {
             return PolicyDecision::Deny;
         }
 

@@ -1,0 +1,21 @@
+{
+  "scenario_id": "capability_escape_cap_dac_override_003",
+  "category": "capability_escape",
+  "attack_payload": {
+    "command": ["sh", "-c", "chmod 777 /etc/passwd"],
+    "expected_runtime_blocker": "--cap-drop=ALL + --read-only"
+  },
+  "attack_surface": "CAP_DAC_OVERRIDE file permission bypass on host files",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.capability.cap_dac_override"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

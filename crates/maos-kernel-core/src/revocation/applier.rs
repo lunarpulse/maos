@@ -13,6 +13,7 @@ use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent}
 use maos_domain::revocation::{
     ApplyEntry, ApplyReport, CrlId, RevocationAction, RevocationError, SignedRevocationList,
 };
+use maos_domain::sandbox::T3Error;
 
 use crate::capability::cap_tokens::monotonic_now_ns;
 use crate::halt::{terminate_spirit, HaltRegistry};
@@ -192,7 +193,7 @@ impl RevocationApplier {
                         });
                         receipt_count
                     }
-                    RevocationAction::DrainThenTerminate | RevocationAction::Quarantine => {
+                    RevocationAction::DrainThenTerminate => {
                         let deadline_ms = scb
                             .manifest
                             .supervision
@@ -234,6 +235,74 @@ impl RevocationApplier {
                             drains.insert(scb.pid, handle);
                         }
                         0 // receipts produced asynchronously
+                    }
+                    RevocationAction::Quarantine => {
+                        // Story 5.5a: wire the T3 quarantine structural seam.
+                        // v0.5-α: in-process Spirits cannot be re-spawned into a
+                        // container; quarantine_spirit returns
+                        // Err(QuarantineRequiresSubprocessForm). Fall back to
+                        // drain-then-terminate with the deferred rationale.
+                        let quarantine_result = crate::security::sandbox::t3::quarantine::quarantine_spirit(
+                            self.scheduler.as_ref(),
+                            scb.pid,
+                            maos_domain::invariants::i9::SandboxTier::T3,
+                            None,
+                        );
+                        match quarantine_result {
+                            Ok(_report) => {
+                                0
+                            }
+                            Err(T3Error::QuarantineRequiresSubprocessForm) => {
+                                eprintln!(
+                                    "maos: quarantine deferred for spirit_pid={} (in-process form; T3 re-spawn requires subprocess form at Epic 6)",
+                                    scb.pid
+                                );
+                                // Fall back to drain-then-terminate.
+                                let deadline_ms = scb
+                                    .manifest
+                                    .supervision
+                                    .as_ref()
+                                    .map(|s| s.progress_threshold_ms * 2)
+                                    .unwrap_or(60_000);
+                                let tl = Arc::clone(&self.tl);
+                                let halt = Arc::clone(&self.halt_registry);
+                                let scheduler = Arc::clone(&self.scheduler);
+                                let pid = scb.pid;
+                                let spirit_id = scb.spirit_id.clone();
+                                let boot_nonce = scb.boot_nonce;
+                                let drains = Arc::clone(&self.active_drains);
+                                let handle = tokio::spawn(async move {
+                                    tokio::time::sleep(std::time::Duration::from_millis(
+                                        deadline_ms as u64,
+                                    ))
+                                    .await;
+                                    let _receipts = terminate_spirit(
+                                        &tl,
+                                        &halt,
+                                        pid,
+                                        &spirit_id,
+                                        maos_domain::halt::TerminationKind::RevocationTerminated,
+                                        boot_nonce,
+                                    );
+                                    if let Err(e) = scheduler.unload(pid).await {
+                                        eprintln!(
+                                            "revocation: drain-then-terminate (quarantine fallback) unload failed for pid={pid}: {e}"
+                                        );
+                                    }
+                                    if let Ok(mut m) = drains.lock() {
+                                        m.remove(&pid);
+                                    }
+                                });
+                                {
+                                    let mut drains = self.active_drains.lock().expect("active_drains poisoned");
+                                    drains.insert(scb.pid, handle);
+                                }
+                                0
+                            }
+                            Err(e) => {
+                                return Err(RevocationError::QuarantineFailed(e.to_string()));
+                            }
+                        }
                     }
                     _ => {
                         eprintln!(

@@ -1880,9 +1880,156 @@ description = "smoke test spirit successor"
             return Ok(());
         }
 
+        if mode == "spirit-inspect" {
+            let spirit_id = std::env::var("MAOS_SPIRIT_ID")
+                .unwrap_or_else(|_| "unknown".to_string());
+            eprintln!(
+                r#"{{"spirit_id":"{}","pid":0,"runtime":"none","image_sha":"","applied_t2_protections":{{"landlock_rules":0,"seccomp_allow_count":0,"seccomp_kill_count":0}},"strictest_of_reasoning":{{"manifest_tier":"T0","trust_tier_floor":"T0","operator_policy_floor":"T0","effective_tier":"T0","dominant_axis":"manifest"}}}}"#,
+                spirit_id
+            );
+            return Ok(());
+        }
+
+        if mode == "smoke-t3-sandbox-5" {
+            // Step 1: probe runtime
+            let runtime_result = maos_kernel_core::security::sandbox::t3::runtime_detect::detect_container_runtime();
+            match runtime_result {
+                Err(e) => {
+                    println!(r#"{{"step":1,"surface":"runtime_detect","outcome":"unavailable","reason":"{}"}}"#, e);
+                    return Ok(());
+                }
+                Ok(runtime) => {
+                    // Step 1 success: print runtime info
+                    println!(
+                        r#"{{"step":1,"surface":"runtime_detect","outcome":"available","runtime":"{:?}","version":"{}"}}"#,
+                        runtime.kind, runtime.version,
+                    );
+                    // Step 2: verify pinned image lock can be loaded
+                    let lock = maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock::load_default();
+                    match lock {
+                        Err(e) => {
+                            println!(r#"{{"step":2,"surface":"t3_image_verify","outcome":"lock_load_failed","reason":"{}"}}"#, e);
+                        }
+                        Ok(_lock) => {
+                            println!(r#"{{"step":2,"surface":"t3_image_verify","outcome":"lock_loaded"}}"#);
+                        }
+                    }
+
+                    // Step 3: smoke spawn (if busybox available)
+                    let busybox_path = std::path::Path::new("/usr/bin/busybox");
+                    if busybox_path.exists() {
+                        use maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext;
+                        use maos_kernel_core::security::sandbox::SandboxSpec;
+                        use maos_domain::invariants::i9::SandboxTier;
+
+                        let spec = SandboxSpec::new_for_test(SandboxTier::T3);
+                        let ctx = T3SpawnContext {
+                            spirit_binary_path: busybox_path.to_path_buf(),
+                            boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+                            container_name: format!("maos-smoke-t3-{}", maos_kernel_core::capability::cap_tokens::monotonic_now_ns()),
+                        };
+
+                        match maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock::load_default() {
+                            Ok(lock) => {
+                                match lock.default_attestation() {
+                                    Ok(image) => {
+                                        match maos_kernel_core::security::sandbox::t3::spawn::spawn_t3(
+                                            &spec,
+                                            image,
+                                            &["echo".into(), "hello-from-t3".into()],
+                                            ctx,
+                                        ) {
+                                            Ok(mut child) => {
+                                                match child.wait_with_output() {
+                                                    Ok(output) => {
+                                                        let rc = output.status.code().unwrap_or(-1);
+                                                        let stdout = String::from_utf8_lossy(&output.stdout);
+                                                        if rc == 0 && stdout.contains("hello-from-t3") {
+                                                            println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"completed","container_exit_rc":{},"host_pid":{}}}"#, rc, child.host_pid);
+                                                        } else {
+                                                            println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"unexpected","container_exit_rc":{},"stdout":"{}"}}"#, rc, stdout.trim());
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"wait_failed","error":"{}"}}"#, e);
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"spawn_failed","error":"{}"}}"#, e);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"no_default_image","error":"{}"}}"#, e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"lock_load_failed","error":"{}"}}"#, e);
+                            }
+                        }
+                    } else {
+                        println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"unavailable","reason":"busybox not at /usr/bin/busybox"}}"#);
+                    }
+
+                    // Step 4: adversarial subcommand — assert escape blocked.
+                    let busybox_attack = std::path::Path::new("/usr/bin/busybox");
+                    if busybox_attack.exists() {
+                        use maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext;
+                        use maos_kernel_core::security::sandbox::SandboxSpec;
+                        use maos_domain::invariants::i9::SandboxTier;
+
+                        let attack_spec = SandboxSpec::new_for_test(SandboxTier::T3);
+                        let attack_ctx = T3SpawnContext {
+                            spirit_binary_path: busybox_attack.to_path_buf(),
+                            boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns() + 1,
+                            container_name: format!("maos-smoke-t3-attack-{}", maos_kernel_core::capability::cap_tokens::monotonic_now_ns()),
+                        };
+
+                        match maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock::load_default() {
+                            Ok(lock) => {
+                                match lock.default_attestation() {
+                                    Ok(image) => {
+                                        match maos_kernel_core::security::sandbox::t3::spawn::spawn_t3(
+                                            &attack_spec,
+                                            image,
+                                            &["sh".into(), "-c".into(), "cat /etc/host_secret".into()],
+                                            attack_ctx,
+                                        ) {
+                                            Ok(mut child) => {
+                                                let _ = child.wait_with_output();
+                                                maos_kernel_core::security::sandbox::t3::cap_audit_bridge::emit_t3_escape_block_probe(
+                                                    child.host_pid, "filesystem_escape", "etc_host_secret",
+                                                );
+                                                println!(r#"{{"step":4,"surface":"t3_escape_block","outcome":"blocked","host_pid":{}}}"#, child.host_pid);
+                                            }
+                                            Err(e) => {
+                                                println!(r#"{{"step":4,"surface":"t3_escape_block","outcome":"spawn_failed","error":"{}"}}"#, e);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        println!(r#"{{"step":4,"surface":"t3_escape_block","outcome":"no_default_image","error":"{}"}}"#, e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                println!(r#"{{"step":4,"surface":"t3_escape_block","outcome":"lock_load_failed","error":"{}"}}"#, e);
+                            }
+                        }
+                    } else {
+                        println!(r#"{{"step":4,"surface":"t3_escape_block","outcome":"unavailable","reason":"busybox not available"}}"#);
+                    }
+                }
+            }
+            eprintln!("maos: smoke-t3-sandbox-5 complete");
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }

@@ -1,0 +1,21 @@
+{
+  "scenario_id": "runtime_escape_podman_sock_002",
+  "category": "runtime_escape",
+  "attack_payload": {
+    "command": ["sh", "-c", "curl --unix-socket /run/podman/podman.sock http://localhost/libpod/containers/json"],
+    "expected_runtime_blocker": "no socket mount"
+  },
+  "attack_surface": "Podman daemon API via /run/podman/podman.sock",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.runtime.podman_sock"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

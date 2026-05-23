@@ -1,0 +1,21 @@
+{
+  "scenario_id": "filesystem_escape_var_log_maos_003",
+  "category": "filesystem_escape",
+  "attack_payload": {
+    "command": ["cat", "/var/log/maos/kernel.log"],
+    "expected_runtime_blocker": "filesystem isolation"
+  },
+  "attack_surface": "host log files via /var/log/maos/kernel.log read",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.filesystem.var_log_maos"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

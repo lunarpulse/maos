@@ -88,6 +88,7 @@ fn strictest_of_manifest_trust_operator() {
             "spirit-42",
             &SandboxConfig {
                 tier: SandboxTier::T0,
+                image_pin: None,
             },
             &ResourceCaps::default(),
             &empty_caps_required(),
@@ -111,7 +112,7 @@ fn strictest_of_manifest_trust_operator() {
 }
 
 #[test]
-fn t3_effective_tier_rejected() {
+fn t3_effective_tier_admitted() {
     let (adapter, journal, _tmpdir) = make_adapter_with_trust_floors();
 
     let mut inner = (*adapter.policy().inner().load_full()).clone();
@@ -129,12 +130,61 @@ fn t3_effective_tier_rejected() {
         .insert(99, SandboxTier::T3);
     adapter.policy().update(inner);
 
-    let err = adapter
+    let spec = adapter
         .admit_spirit(
             99,
             "spirit-99",
             &SandboxConfig {
                 tier: SandboxTier::T0,
+                image_pin: None,
+            },
+            &ResourceCaps::default(),
+            &empty_caps_required(),
+            None,
+            &journal,
+            &default_posture_section(),
+            Some(&default_epistemic_policy()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    assert_eq!(
+        spec.tier,
+        SandboxTier::T3,
+        "T3 effective tier must be admitted (Story 5.5a)"
+    );
+    assert_eq!(spec.spirit_id, "spirit-99");
+}
+
+#[test]
+fn t4_effective_tier_rejected() {
+    let (adapter, journal, _tmpdir) = make_adapter_with_trust_floors();
+
+    let mut inner = (*adapter.policy().inner().load_full()).clone();
+    inner.manifest_scopes.insert(
+        100,
+        ManifestCapabilityScope {
+            scopes: vec![],
+            declared_tier: SandboxTier::T4,
+            trust_tier: TrustTier::Verified,
+        },
+    );
+    inner
+        .trust_tier_floor
+        .insert(TrustTier::Verified, SandboxTier::T0);
+    inner.operator_policy.global_sandbox_floor = SandboxTier::T0;
+    adapter.policy().update(inner);
+
+    let err = adapter
+        .admit_spirit(
+            100,
+            "spirit-100",
+            &SandboxConfig {
+                tier: SandboxTier::T4,
+                image_pin: None,
             },
             &ResourceCaps::default(),
             &empty_caps_required(),
@@ -150,8 +200,8 @@ fn t3_effective_tier_rejected() {
         .unwrap_err();
 
     assert!(
-        matches!(err, SecurityError::SandboxTierUnsupported(SandboxTier::T3)),
-        "T3 effective tier must fail-closed with SandboxTierUnsupported: got {err}"
+        matches!(err, SecurityError::SandboxTierUnsupported(SandboxTier::T4)),
+        "T4 effective tier must still be rejected: got {err}"
     );
 }
 
@@ -180,6 +230,7 @@ fn t1_effective_tier_rejected() {
             "spirit-55",
             &SandboxConfig {
                 tier: SandboxTier::T1,
+                image_pin: None,
             },
             &ResourceCaps::default(),
             &empty_caps_required(),
@@ -221,6 +272,7 @@ fn effective_tier_is_journaled() {
             "spirit-seven",
             &SandboxConfig {
                 tier: SandboxTier::T2,
+                image_pin: None,
             },
             &ResourceCaps::default(),
             &empty_caps_required(),

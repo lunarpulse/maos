@@ -1,0 +1,21 @@
+{
+  "scenario_id": "runtime_escape_runtime_version_disclosure_005",
+  "category": "runtime_escape",
+  "attack_payload": {
+    "command": ["podman", "version"],
+    "expected_runtime_blocker": "--cap-drop=ALL + no runtime in container"
+  },
+  "attack_surface": "container runtime version disclosure via podman binary",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.runtime.runtime_version_disclosure"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

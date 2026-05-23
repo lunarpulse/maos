@@ -20,6 +20,7 @@ pub mod halt_corpus;
 pub mod hsis_corpus;
 pub mod isolation_corpus; // NEW — Story 4.5 cross-Spirit isolation 200-corpus
 pub mod revocation_corpus; // NEW — Story 5.4 revocation corpus (AC5)
+pub mod t3_escape_corpus; // NEW — Story 5.5a T3 escape corpus (AC4)
 pub mod termination_corpus; // NEW — Story 5.2 HSIS 300-corpus (AC5)
 pub mod upgrade_policy_corpus; // NEW — Story 5.4 upgrade-policy corpus (AC1)
 
@@ -30,6 +31,9 @@ pub use isolation_corpus::{
     MethodologyAttestation,
 };
 pub use revocation_corpus::{RevocationCorpus, RevocationExpectedOutcome, RevocationScenario};
+pub use t3_escape_corpus::{
+    T3AttackPayload, T3EscapeCorpus, T3EscapeScenario, T3ExpectedOutcome, T3Preconditions,
+};
 pub use termination_corpus::{TerminationCorpus, TerminationKind, TerminationScenario};
 pub use upgrade_policy_corpus::{
     UpgradePolicyCorpus, UpgradePolicyExpectedOutcome, UpgradePolicyScenario,

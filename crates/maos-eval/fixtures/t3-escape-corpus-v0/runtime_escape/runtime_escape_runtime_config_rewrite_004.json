@@ -1,0 +1,21 @@
+{
+  "scenario_id": "runtime_escape_runtime_config_rewrite_004",
+  "category": "runtime_escape",
+  "attack_payload": {
+    "command": ["sh", "-c", "cat /etc/containers/containers.conf"],
+    "expected_runtime_blocker": "--read-only + no host mount"
+  },
+  "attack_surface": "container runtime configuration disclosure via /etc/containers/containers.conf",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.runtime.runtime_config_rewrite"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

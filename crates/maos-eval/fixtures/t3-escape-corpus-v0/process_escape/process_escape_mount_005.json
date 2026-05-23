@@ -1,0 +1,21 @@
+{
+  "scenario_id": "process_escape_mount_005",
+  "category": "process_escape",
+  "attack_payload": {
+    "command": ["mount", "-t", "proc", "proc", "/mnt"],
+    "expected_runtime_blocker": "--cap-drop=ALL (CAP_SYS_ADMIN)"
+  },
+  "attack_surface": "host filesystem mount via proc filesystem mount",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.process.mount"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  }
+}

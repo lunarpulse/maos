@@ -1,0 +1,14 @@
+{
+  "scenario_id": "t3-escape-corpus-v0-methodology",
+  "title": "T3 Escape Corpus v0 — Authoring Methodology",
+  "description": "The T3 escape corpus at v0.5-alpha covers 25 scenarios across 5 categories of container-runtime-specific attack surfaces. Each scenario JSON specifies an attack payload (command to run inside the T3 container) and the expected containment outcome (SandboxBlock audit frame emitted, attack command fails). Scenarios are authored to complement Story 4.5's isolation-corpus-v0 Sec-14a sandbox_escape_lateral/ scenarios — the Tier T3 scenarios SKIPPED at v0.3-beta are NOT duplicated here; this corpus authors fresh T3-runtime-specific attack surfaces.",
+  "categories": {
+    "filesystem_escape": "Attempts to read/write files outside the container's rootfs (e.g., /etc/passwd, /proc/1/root, /var/log/maos)",
+    "network_escape": "Attempts to make outbound network connections from within the container (TCP, UDP, DNS, raw sockets, IPv6)",
+    "process_escape": "Attempts to interact with host processes (ptrace, /proc/1/exe, kill pid 1, fork bomb, mount)",
+    "capability_escape": "Attempts to use container capabilities dropped by --cap-drop=ALL (CAP_SYS_ADMIN, CAP_NET_RAW, etc.)",
+    "runtime_escape": "Attempts to escape through the container runtime interface (docker.sock, podman.sock, image pull via sock)"
+  },
+  "v05_alpha_scope": "25 scenarios total; Linux Podman/Docker only; busybox-based attack vehicle",
+  "relationship_to_story_4_5": "Complements isolation-corpus-v0 sec-14a sandbox_escape_lateral/ scenarios; the Tier T3 scenarios SKIPPED at v0.3-beta per deferred-work.md:61-64 are NOT duplicated here"
+}

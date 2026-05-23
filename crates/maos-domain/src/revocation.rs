@@ -323,6 +323,8 @@ pub enum RevocationError {
     RegistryClient(String),
     #[error("I/O error reading offline CRL: {0}")]
     Io(String),
+    #[error("quarantine failed: {0}")]
+    QuarantineFailed(String),
 }
 
 // ---------------------------------------------------------------------------
