@@ -55,19 +55,21 @@ pub fn run(
     let halt_tags = halt_tags_default();
     let transparency_log = transparency_log_default();
 
-    let req = InferenceRequest {
-        spirit_pid: 0,
-        capability_token: token,
-        prompt: "Introduce yourself as the MAOS hello-Spirit. \
+    let req = InferenceRequest::new(
+        0,
+        token,
+        "Introduce yourself as the MAOS hello-Spirit. \
                  State your capability scope, expected halt tags, \
                  and transparency log endpoint."
             .into(),
-        options: InferenceOptions {
+        InferenceOptions {
             max_tokens: 256,
             temperature: None,
             model_id: None,
         },
-    };
+        None,
+        vec![],
+    );
 
     match inference.complete(req) {
         Ok(resp) => Ok(HelloResponse {

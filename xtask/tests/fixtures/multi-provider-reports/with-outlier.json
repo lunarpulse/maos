@@ -1,0 +1,5 @@
+[
+  {"fixture_id": "case_1", "provider": "anthropic", "response_text_len": 100, "input_tokens": 50, "output_tokens": 30, "stop_reason": "StopSequence", "latency_us": 1000, "error": null},
+  {"fixture_id": "case_1", "provider": "openai", "response_text_len": 200, "input_tokens": 100, "output_tokens": 60, "stop_reason": "StopSequence", "latency_us": 2000, "error": null},
+  {"fixture_id": "case_1", "provider": "ollama", "response_text_len": 100, "input_tokens": 50, "output_tokens": 30, "stop_reason": "StopSequence", "latency_us": 900, "error": null}
+]

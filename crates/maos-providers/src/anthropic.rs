@@ -174,21 +174,23 @@ mod tests {
     }
 
     fn sample_request() -> InferenceRequest {
-        InferenceRequest {
-            spirit_pid: 42,
-            capability_token: maos_domain::invariants::i1::CapabilityToken::new(
+        InferenceRequest::new(
+            42,
+            maos_domain::invariants::i1::CapabilityToken::new(
                 maos_domain::invariants::i1::TokenId::ZERO,
                 42,
                 0,
                 [0u8; 64],
             ),
-            prompt: "Hello, world!".into(),
-            options: InferenceOptions {
+            "Hello, world!".into(),
+            InferenceOptions {
                 max_tokens: 100,
                 temperature: Some(0.5),
                 model_id: None,
             },
-        }
+            None,
+            vec![],
+        )
     }
 
     #[test]

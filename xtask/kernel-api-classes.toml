@@ -524,3 +524,7 @@
 "maos_kernel_core::revocation::version_match::semver_range_contains"    = "universal-arithmetic"
 "maos_kernel_core::revocation::version_match::maos_domain::revocation::semver_range_contains" = "universal-arithmetic"
 "maos_kernel_core::revocation::version_match::maos_domain::revocation::parse_range" = "universal-arithmetic"
+
+# Story 5.5b — multi-provider router types (data-movement: inference dispatch)
+"maos_kernel_core::inference::router::MultiProviderRouter"            = "data-movement"
+"maos_kernel_core::inference::router::RouterError"                    = "data-movement"

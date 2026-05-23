@@ -1,0 +1,10 @@
+{
+  "fixture_id": "case_json_output_request",
+  "prompt": "Return a JSON object with key 'status' and value 'ok'",
+  "options": { "max_tokens": 50, "temperature": 0.0 },
+  "expected_outputs": {
+    "anthropic": { "text": "{\"status\": \"ok\"}", "stop_reason": "end_turn", "input_tokens": 15, "output_tokens": 8 },
+    "openai": { "text": "{\"status\": \"ok\"}", "stop_reason": "stop", "input_tokens": 15, "output_tokens": 8 },
+    "ollama": { "text": "{\"status\": \"ok\"}", "stop_reason": "stop", "input_tokens": 15, "output_tokens": 8 }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "fixture_id": "case_empty_prompt",
+  "prompt": "",
+  "options": { "max_tokens": 50, "temperature": 0.0 },
+  "expected_outputs": {
+    "anthropic": { "text": "", "stop_reason": "end_turn", "input_tokens": 0, "output_tokens": 0 },
+    "openai": { "text": "", "stop_reason": "stop", "input_tokens": 0, "output_tokens": 0 },
+    "ollama": { "text": "", "stop_reason": "stop", "input_tokens": 0, "output_tokens": 0 }
+  }
+}

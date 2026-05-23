@@ -1,0 +1,10 @@
+{
+  "fixture_id": "case_unicode_korean",
+  "prompt": "안녕하세요",
+  "options": { "max_tokens": 50, "temperature": 0.0 },
+  "expected_outputs": {
+    "anthropic": { "text": "안녕하세요! 무엇을 도와드릴까요?", "stop_reason": "end_turn", "input_tokens": 5, "output_tokens": 10 },
+    "openai": { "text": "안녕하세요! 무엇을 도와드릴까요?", "stop_reason": "stop", "input_tokens": 5, "output_tokens": 10 },
+    "ollama": { "text": "안녕하세요! 무엇을 도와드릴까요?", "stop_reason": "stop", "input_tokens": 5, "output_tokens": 10 }
+  }
+}

@@ -212,6 +212,7 @@ impl SpiritSchedulerAdapter {
                     Some(&manifest.lifecycle),
                     manifest.on_crash.as_ref(),
                     manifest.supervision.as_ref(),
+                    None,
                 )
                 .map_err(|e| LifecycleError::Admission(e.to_string()))?;
         } else {

@@ -1,0 +1,10 @@
+{
+  "fixture_id": "case_provider_429_rate_limit",
+  "prompt": "test",
+  "options": { "max_tokens": 10, "temperature": 0.0 },
+  "expected_outputs": {
+    "anthropic": { "error": "rate_limit" },
+    "openai": { "error": "rate_limit" },
+    "ollama": { "error": "rate_limit" }
+  }
+}

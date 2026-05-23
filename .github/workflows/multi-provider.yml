@@ -1,0 +1,61 @@
+name: multi-provider
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [anthropic, openai, ollama]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with: { toolchain: stable }
+      - uses: Swatinem/rust-cache@v2
+        with: { key: ${{ hashFiles('**/Cargo.lock') }} }
+      - name: Run multi-provider fixture suite for ${{ matrix.provider }}
+        run: |
+          cargo test -p maos-providers --features fixture_replay \
+            --test multi_provider_matrix \
+            -- --nocapture \
+            matrix_${{ matrix.provider }}
+      - name: Upload per-provider report
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-provider-${{ matrix.provider }}-report
+          path: tests/reports/multi-provider-${{ github.sha }}-${{ matrix.provider }}.json
+          retention-days: 90
+
+  report-aggregate:
+    runs-on: ubuntu-latest
+    needs: matrix
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with: { toolchain: stable }
+      - uses: Swatinem/rust-cache@v2
+        with: { key: ${{ hashFiles('**/Cargo.lock') }} }
+      - name: Download all per-provider reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: multi-provider-*-report
+          path: tests/reports/
+          merge-multiple: true
+      - name: Aggregate + drift-check
+        run: |
+          cargo run -p xtask -- check-multi-provider-drift \
+            --report tests/reports/multi-provider-${{ github.sha }}.json \
+            --threshold 10 \
+            --json
+      - name: Upload aggregated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-provider-aggregate
+          path: tests/reports/multi-provider-${{ github.sha }}.json
+          retention-days: 90

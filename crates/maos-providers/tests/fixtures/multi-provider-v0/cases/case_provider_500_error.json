@@ -1,0 +1,10 @@
+{
+  "fixture_id": "case_provider_500_error",
+  "prompt": "test",
+  "options": { "max_tokens": 10, "temperature": 0.0 },
+  "expected_outputs": {
+    "anthropic": { "error": "server_error" },
+    "openai": { "error": "server_error" },
+    "ollama": { "error": "server_error" }
+  }
+}

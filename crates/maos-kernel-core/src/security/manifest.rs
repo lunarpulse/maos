@@ -1382,6 +1382,135 @@ impl RawAuthor {
 }
 
 // ------------------------------------------------------------------
+// [providers] section (Story 5.5b, AC2)
+// ------------------------------------------------------------------
+
+const ALLOWED_PROVIDER_IDS: &[&str] = &["anthropic", "openai", "ollama"];
+
+fn is_hex_sha256(s: &str) -> bool {
+    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProvidersSection {
+    #[doc = "Construct via [`ProvidersSection::new`] to enforce id/endpoint validation; struct literals bypass schema checks."]
+    pub primary: ProviderConfig,
+    #[doc = "Construct via [`ProvidersSection::new`] to enforce id/endpoint validation; struct literals bypass schema checks."]
+    pub fallback: Vec<ProviderConfig>,
+}
+
+impl ProvidersSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawProvidersSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        raw.validate()
+    }
+
+    pub fn new(primary: ProviderConfig, fallback: Vec<ProviderConfig>) -> Self {
+        Self { primary, fallback }
+    }
+}
+
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderConfig {
+    #[doc = "Construct via [`ProviderConfig::new`] to enforce non-empty id."]
+    pub id: String,
+    #[doc = "Construct via [`ProviderConfig::new`] to enforce non-empty id."]
+    pub endpoint_url: Option<String>,
+    #[doc = "Construct via [`ProviderConfig::new`] to enforce non-empty id."]
+    pub model_id: Option<String>,
+    #[doc = "Construct via [`ProviderConfig::new`] to enforce non-empty id."]
+    pub provider_endpoint_pin: Option<String>,
+}
+
+impl ProviderConfig {
+    pub fn new(
+        id: String,
+        endpoint_url: Option<String>,
+        model_id: Option<String>,
+        provider_endpoint_pin: Option<String>,
+    ) -> Self {
+        Self {
+            id,
+            endpoint_url,
+            model_id,
+            provider_endpoint_pin,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawProvidersSection {
+    primary: RawProviderConfig,
+    #[serde(default)]
+    fallback: Vec<RawProviderConfig>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawProviderConfig {
+    id: String,
+    endpoint_url: Option<String>,
+    model_id: Option<String>,
+    provider_endpoint_pin: Option<String>,
+}
+
+fn validate_provider_config(
+    raw: RawProviderConfig,
+    prefix: &str,
+) -> Result<ProviderConfig, ManifestError> {
+    if !ALLOWED_PROVIDER_IDS.contains(&raw.id.as_str()) {
+        return Err(ManifestError::Toml(format!(
+            "providers.{}.id '{}' unsupported at v0.5-α (allowed: {})",
+            prefix,
+            raw.id,
+            ALLOWED_PROVIDER_IDS.join(", ")
+        )));
+    }
+    if let Some(ref url) = raw.endpoint_url {
+        if url.is_empty() {
+            return Err(ManifestError::Toml(format!(
+                "providers.{}.endpoint_url must not be empty if present",
+                prefix
+            )));
+        }
+    }
+    if let Some(ref pin) = raw.provider_endpoint_pin {
+        if !is_hex_sha256(pin) {
+            return Err(ManifestError::Toml(format!(
+                "providers.{}.provider_endpoint_pin must be 64-char hex SHA-256",
+                prefix
+            )));
+        }
+    }
+    Ok(ProviderConfig {
+        id: raw.id,
+        endpoint_url: raw.endpoint_url,
+        model_id: raw.model_id,
+        provider_endpoint_pin: raw.provider_endpoint_pin,
+    })
+}
+
+impl RawProvidersSection {
+    fn validate(self) -> Result<ProvidersSection, ManifestError> {
+        let primary = validate_provider_config(self.primary, "primary")?;
+        let mut fallback = Vec::with_capacity(self.fallback.len());
+        for (i, raw_fb) in self.fallback.into_iter().enumerate() {
+            let cfg = validate_provider_config(raw_fb, &format!("fallback[{}]", i))?;
+            fallback.push(cfg);
+        }
+        Ok(ProvidersSection { primary, fallback })
+    }
+}
+
+// ------------------------------------------------------------------
 // Tests (NFR-Test-13 ≥3 cases per field)
 // ------------------------------------------------------------------
 
@@ -2578,5 +2707,119 @@ mod on_revocation_tests {
             "err={}",
             err
         );
+    }
+
+    // ---- ProvidersSection (Story 5.5b, AC2) ----
+
+    #[test]
+    fn providers_well_formed_anthropic_no_fallback() {
+        let toml = r#"
+[primary]
+id = "anthropic"
+"#;
+        let section = ProvidersSection::from_toml_str(toml).unwrap();
+        assert_eq!(section.primary.id, "anthropic");
+        assert!(section.fallback.is_empty());
+    }
+
+    #[test]
+    fn providers_well_formed_openai_with_anthropic_fallback() {
+        let toml = r#"
+[primary]
+id = "openai"
+
+[[fallback]]
+id = "anthropic"
+"#;
+        let section = ProvidersSection::from_toml_str(toml).unwrap();
+        assert_eq!(section.primary.id, "openai");
+        assert_eq!(section.fallback.len(), 1);
+        assert_eq!(section.fallback[0].id, "anthropic");
+    }
+
+    #[test]
+    fn providers_well_formed_ollama_air_gapped() {
+        let toml = r#"
+[primary]
+id = "ollama"
+endpoint_url = "http://localhost:11434"
+"#;
+        let section = ProvidersSection::from_toml_str(toml).unwrap();
+        assert_eq!(section.primary.id, "ollama");
+        assert_eq!(
+            section.primary.endpoint_url.as_deref(),
+            Some("http://localhost:11434")
+        );
+    }
+
+    #[test]
+    fn providers_rejects_unsupported_id() {
+        let toml = r#"
+[primary]
+id = "kimi"
+"#;
+        let err = ProvidersSection::from_toml_str(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("kimi") && msg.contains("unsupported"), "msg={}", msg);
+    }
+
+    #[test]
+    fn providers_rejects_empty_endpoint_url() {
+        let toml = r#"
+[primary]
+id = "anthropic"
+endpoint_url = ""
+"#;
+        let err = ProvidersSection::from_toml_str(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("endpoint_url must not be empty"),
+            "msg={}",
+            msg
+        );
+    }
+
+    #[test]
+    fn providers_rejects_bad_pin() {
+        let toml = r#"
+[primary]
+id = "anthropic"
+provider_endpoint_pin = "not-hex"
+"#;
+        let err = ProvidersSection::from_toml_str(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("64-char hex SHA-256"),
+            "msg={}",
+            msg
+        );
+    }
+
+    #[test]
+    fn providers_accepts_valid_pin() {
+        let toml = format!(
+            r#"
+[primary]
+id = "anthropic"
+provider_endpoint_pin = "{}"
+"#,
+            "a".repeat(64)
+        );
+        let section = ProvidersSection::from_toml_str(&toml).unwrap();
+        assert_eq!(section.primary.provider_endpoint_pin.as_deref(), Some("a".repeat(64).as_str()));
+    }
+
+    #[test]
+    fn providers_fallback_validated_independently() {
+        let toml = r#"
+[primary]
+id = "openai"
+
+[[fallback]]
+id = "kimi"
+"#;
+        let err = ProvidersSection::from_toml_str(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("fallback[0]") && msg.contains("kimi"), "msg={}", msg);
     }
 }

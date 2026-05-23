@@ -1,0 +1,10 @@
+{
+  "fixture_id": "case_max_tokens_truncation",
+  "prompt": "Explain quantum computing in detail.",
+  "options": { "max_tokens": 10, "temperature": 0.0 },
+  "expected_outputs": {
+    "anthropic": { "stop_reason": "max_tokens", "input_tokens": 15, "output_tokens": 10 },
+    "openai": { "stop_reason": "length", "input_tokens": 15, "output_tokens": 10 },
+    "ollama": { "stop_reason": "length", "input_tokens": 15, "output_tokens": 10 }
+  }
+}

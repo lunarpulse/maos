@@ -90,3 +90,10 @@
 - **`recover_in_flight_with_tasks` holds writer Mutex during full file parse** — No fsync occurs during cold-restart journal parsing. Acceptable for cold-restart-only path (infrequent), but could block background flush for seconds on large journal files.
 - **`scb.transition()` result discarded in crash handler** — Transition to `Unloaded` uses CAS; race-lost is benign (mostly harmless). Follows existing pattern.
 - **`terminate_spirit` drains halts during unload — conflicts with concurrent resolution** — Director's concurrent `resolve()` may receive `NotPending` if `drain_for_spirit` removes halt first. Follows established drain-then-resolve ordering.
+
+## Deferred from: code review of 5-5b-run-the-multi-provider-ci-matrix-across-anthropic-openai-and-ollama (2026-05-23)
+
+- Ollama driver lacks `with_api_key` test helper — intentional, no API key needed. `OllamaProvider::new` returns `Ok` unconditionally.
+- `provider_history` HashMap in `admit_spirit` grows unbounded under high spirit churn — no cleanup path for terminated spirits. Forward-shaped to Story 9.4.
+- `io_call_journal` non-feature stub returns empty `Vec` — currently `#[cfg]`-protected on tests. Acceptable for v0.5-α; structural improvement at v0.5+.
+- `UnconfiguredProvider` inserted under `"anthropic"` key in composition root — semantically misleading (enumerating `registered_ids()` shows Anthropic when it's not configured). Pre-existing Story 1b.4 pattern.

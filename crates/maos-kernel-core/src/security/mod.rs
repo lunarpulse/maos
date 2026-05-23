@@ -43,6 +43,8 @@ pub use manifest::{EpistemicAction, EpistemicPolicyRule, EpistemicPolicySection,
 pub use manifest::{LifecycleSection, SchedulingSection};
 // Story 5.3 — appended to preserve re-export order.
 pub use manifest::{OnCrashSection, SupervisionSection};
+// Story 5.5b — appended to preserve re-export order.
+pub use manifest::{ProviderConfig, ProvidersSection};
 pub use posture::{PostureError, PostureState};
 
 use std::sync::Arc;
@@ -85,6 +87,8 @@ pub struct SecurityManagerAdapter {
     /// Drift-event channel sender (Story 2.1 AC4).
     /// The runtime detector that emits events ships in Story 9.x.
     drift_sender: Option<mpsc::Sender<DriftEvent>>,
+    /// Story 5.5b — tracks last provider per spirit_id for ProviderSwitched emission.
+    provider_history: Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>,
 }
 
 impl SecurityManagerAdapter {
@@ -92,6 +96,7 @@ impl SecurityManagerAdapter {
         Self {
             policy,
             drift_sender: None,
+            provider_history: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         }
     }
 
@@ -113,22 +118,23 @@ impl SecurityManagerAdapter {
     ///
     /// Story 2.1: added `caps_required` parameter for capability-declaration
     /// → policy-table wiring (replaces hardcoded injection in `maos-bin`).
-    pub fn admit_spirit(
-        &self,
-        spirit_pid: u32,
-        spirit_id: &str,
-        _manifest: &SandboxConfig,
-        caps: &ResourceCaps,
-        caps_required: &CapabilitiesRequired,
-        output_shape: Option<&OutputShape>,
-        journal: &dyn SpiritSchedulerPort,
-        posture_section: &PostureSection,
-        epistemic_policy: Option<&EpistemicPolicySection>,
-        _scheduling: Option<&SchedulingSection>,
-        _lifecycle: Option<&LifecycleSection>,
-        _on_crash: Option<&OnCrashSection>,
-        _supervision: Option<&SupervisionSection>,
-    ) -> Result<SandboxSpec, SecurityError> {
+     pub fn admit_spirit(
+         &self,
+         spirit_pid: u32,
+         spirit_id: &str,
+         _manifest: &SandboxConfig,
+         caps: &ResourceCaps,
+         caps_required: &CapabilitiesRequired,
+         output_shape: Option<&OutputShape>,
+         journal: &dyn SpiritSchedulerPort,
+         posture_section: &PostureSection,
+         epistemic_policy: Option<&EpistemicPolicySection>,
+         _scheduling: Option<&SchedulingSection>,
+         _lifecycle: Option<&LifecycleSection>,
+         _on_crash: Option<&OnCrashSection>,
+         _supervision: Option<&SupervisionSection>,
+         providers: Option<&ProvidersSection>,
+     ) -> Result<SandboxSpec, SecurityError> {
         {
             let declared_scopes = capabilities_required_to_scopes(caps_required);
             let inner = self.policy.inner().load_full();
@@ -235,6 +241,33 @@ impl SecurityManagerAdapter {
             }));
         }
 
+        // Story 5.5b — ProviderSwitched emission.
+        if let Some(providers_section) = providers {
+            let new_provider = &providers_section.primary.id;
+            let mut history = self.provider_history.lock().unwrap();
+            if let Some(prev_provider) = history.get(spirit_id) {
+                if prev_provider != new_provider {
+                    let payload = maos_domain::invariants::i10::ProviderSwitchedPayload {
+                        spirit_id: spirit_id.into(),
+                        from_provider: prev_provider.clone(),
+                        to_provider: new_provider.clone(),
+                        manifest_path: manifest_path.to_string_lossy().into_owned(),
+                        applied_at_ns: crate::capability::cap_tokens::monotonic_now_ns(),
+                    };
+                    let payload_bytes = serde_json::to_vec(&payload)
+                        .map_err(|e| SecurityError::T3AdmissionFailed(e.to_string()))?;
+                    journal.journal_lifecycle(JournalEntry::Lifecycle(LifecycleEntry {
+                        timestamp: payload.applied_at_ns,
+                        lifecycle_event: LifecycleEvent::ProviderSwitched,
+                        spirit_id: spirit_id.into(),
+                        effective_sandbox_tier: None,
+                        payload: Some(payload_bytes),
+                    }));
+                }
+            }
+            history.insert(spirit_id.into(), new_provider.clone());
+        }
+
         Ok(SandboxSpec {
             tier: effective,
             resolved_caps,
@@ -266,7 +299,11 @@ impl SecurityManagerAdapter {
 
 impl Default for SecurityManagerAdapter {
     fn default() -> Self {
-        Self::new(Arc::new(PolicyTable::new()))
+        Self {
+            policy: Arc::new(PolicyTable::new()),
+            drift_sender: None,
+            provider_history: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+        }
     }
 }
 

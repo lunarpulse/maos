@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use std::path::Path;
 use std::process;
 
 mod abi_diff;
@@ -25,6 +26,7 @@ mod gen_termination_corpus;
 mod invariant_lock;
 mod kloc_check;
 mod rebaseline_check;
+mod check_multi_provider_drift;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -281,6 +283,17 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 5.5b — multi-provider drift check across aggregated reports.
+    CheckMultiProviderDrift {
+        #[arg(long)]
+        report: String,
+        #[arg(long, default_value = "10")]
+        threshold: f64,
+        #[arg(long)]
+        strict: bool,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -451,6 +464,23 @@ fn main() {
             whitelist,
             json,
         } => check_composition_root_completeness::run(&api_rs, &main_rs, &whitelist, json),
+        Commands::CheckMultiProviderDrift {
+            report,
+            threshold,
+            strict,
+            json,
+        } => {
+            let exit_code = check_multi_provider_drift::run(
+                Path::new(&report),
+                threshold,
+                strict,
+                json,
+            );
+            if exit_code != 0 {
+                process::exit(exit_code);
+            }
+            Ok(())
+        }
     };
     if let Err(e) = result {
         eprintln!("{e}");

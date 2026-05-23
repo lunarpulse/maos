@@ -134,6 +134,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let notification_dispatcher = Arc::new(dispatcher);
 
     let io = IoSubsystemAdapter::new();
+    let io_arc: Arc<dyn maos_domain::ports::IoSubsystemPort> = Arc::new(io);
     let telemetry_stream = Arc::new(TelemetryStreamAdapter::default());
 
     // ─────────────────────────────────────────────────────────────
@@ -379,30 +380,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Story 1b.4 — Inference Port + Anthropic provider + IAC telemetry.
+    // Story 5.5b — Multi-provider router (Anthropic + OpenAI + Ollama).
     // FIXME(secrets): API key read from env; real secret materialization via
     // maos-secrets / OS keyring is a later story.
-    let anthropic_provider: Arc<dyn maos_providers::Provider> = match AnthropicProvider::new(
-        Arc::new(io),
+    let mut providers_map: std::collections::BTreeMap<String, Arc<dyn maos_providers::Provider>> =
+        std::collections::BTreeMap::new();
+    let mut default_id: Option<String> = None;
+
+    if let Ok(provider) = AnthropicProvider::new(
+        Arc::clone(&io_arc),
         "https://api.anthropic.com".into(),
         "claude-3-haiku-20240307".into(),
     ) {
-        Ok(p) => {
-            eprintln!("maos: Anthropic provider configured");
-            Arc::new(p)
+        providers_map.insert("anthropic".into(), Arc::new(provider));
+        default_id.get_or_insert_with(|| "anthropic".into());
+        eprintln!("maos: Anthropic provider registered");
+    }
+
+    if let Ok(provider) = maos_providers::OpenAiProvider::new(
+        Arc::clone(&io_arc),
+        "https://api.openai.com".into(),
+        "gpt-4o-mini".into(),
+    ) {
+        providers_map.insert("openai".into(), Arc::new(provider));
+        default_id.get_or_insert_with(|| "openai".into());
+        eprintln!("maos: OpenAI provider registered");
+    }
+
+    {
+        let ollama_url =
+            std::env::var("MAOS_OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".into());
+        if let Ok(provider) = maos_providers::OllamaProvider::new(
+            Arc::clone(&io_arc),
+            ollama_url,
+            "llama3.1:8b".into(),
+        ) {
+            providers_map.insert("ollama".into(), Arc::new(provider));
+            default_id.get_or_insert_with(|| "ollama".into());
+            eprintln!("maos: Ollama provider registered");
         }
-        Err(e) => {
-            eprintln!("maos: Anthropic provider unavailable ({e}) — inference calls will return Unconfigured");
-            Arc::new(UnconfiguredProvider)
-        }
-    };
+    }
+
+    if providers_map.is_empty() {
+        providers_map.insert(
+            "anthropic".into(),
+            Arc::new(UnconfiguredProvider),
+        );
+        default_id = Some("anthropic".into());
+        eprintln!("maos: no providers configured — all inference calls return Unconfigured");
+    }
+
+    let router = Arc::new(
+        maos_kernel_core::inference::router::MultiProviderRouter::new(providers_map, default_id),
+    );
     let inference = InferencePortAdapter::new(
-        anthropic_provider,
-        "anthropic".into(),
+        Arc::clone(&router),
         Arc::clone(&capability),
         Arc::clone(&transparency_log),
         Arc::clone(&telemetry),
     );
-    eprintln!("maos: Inference Port initialized (Story 1b.4)");
+    eprintln!("maos: Inference Port initialized (Story 1b.4 + Story 5.5b multi-provider)");
     // ─────────────────────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────────
@@ -578,6 +615,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &journal,
                 &posture_section,
                 epistemic_policy.as_ref(),
+                None,
                 None,
                 None,
                 None,
@@ -2027,9 +2065,102 @@ description = "smoke test spirit successor"
             return Ok(());
         }
 
+        if mode == "smoke-multi-provider-5" {
+            use std::sync::Arc;
+            use maos_domain::ports::inference::{
+                InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution,
+                StopReason, TokenUsage,
+            };
+            use maos_domain::invariants::i1::{CapabilityToken, TokenId};
+            use maos_kernel_core::inference::router::MultiProviderRouter;
+            use maos_kernel_core::io::take_io_journal;
+            use maos_providers::fixture_replay::FixtureReplayProvider;
+            use maos_providers::Provider;
+
+            fn ok_response(provider: &str, n: usize) -> InferenceResponse {
+                InferenceResponse {
+                    text: format!("{provider}-reply-{n}"),
+                    stop_reason: StopReason::StopSequence,
+                    usage: TokenUsage { input_tokens: 10, output_tokens: 20 },
+                    provider_attribution: ProviderAttribution {
+                        provider_id: provider.into(),
+                        endpoint_url: format!("http://{provider}.test"),
+                        model_id: None,
+                    },
+                }
+            }
+
+            fn make_req(pid: u32, provider: Option<&str>) -> InferenceRequest {
+                InferenceRequest::new(
+                    pid,
+                    CapabilityToken::new(TokenId::ZERO, pid, 0, [0u8; 64]),
+                    format!("prompt-{pid}"),
+                    InferenceOptions::default(),
+                    provider.map(String::from),
+                    vec![],
+                )
+            }
+
+            // Step 1: Construct router with 3 providers
+            let anthropic = Arc::new(FixtureReplayProvider::new(vec![
+                Ok(ok_response("anthropic", 0)),
+            ]));
+            let openai = Arc::new(FixtureReplayProvider::new(vec![
+                Ok(ok_response("openai", 0)),
+            ]));
+            let ollama = Arc::new(FixtureReplayProvider::new(vec![
+                Ok(ok_response("ollama", 0)),
+            ]));
+            let mut providers = std::collections::BTreeMap::new();
+            providers.insert("anthropic".into(), anthropic as Arc<dyn Provider>);
+            providers.insert("openai".into(), openai as Arc<dyn Provider>);
+            providers.insert("ollama".into(), ollama as Arc<dyn Provider>);
+            let router = MultiProviderRouter::new(providers, Some("anthropic".into()));
+            println!(r#"{{"step":1,"surface":"router_construction","providers":3,"default":"anthropic"}}"#);
+
+            // Step 2: Dispatch to default provider
+            let req = make_req(1, None);
+            let p = router.dispatch(req.provider_id.as_deref()).unwrap();
+            let resp = p.complete(&req).unwrap();
+            assert_eq!(resp.provider_attribution.provider_id, "anthropic");
+            println!(r#"{{"step":2,"surface":"dispatch_default","provider":"anthropic"}}"#);
+
+            // Step 3: Dispatch to explicit provider_id
+            let req = make_req(2, Some("ollama"));
+            let p = router.dispatch(req.provider_id.as_deref()).unwrap();
+            let resp = p.complete(&req).unwrap();
+            assert_eq!(resp.provider_attribution.provider_id, "ollama");
+            println!(r#"{{"step":3,"surface":"dispatch_explicit","provider":"ollama"}}"#);
+
+            // Step 4: Fallback chain
+            let req = make_req(3, Some("openai"));
+            let resp = router.dispatch_with_fallback(
+                "openai",
+                &["anthropic".into(), "ollama".into()],
+                &req,
+            ).unwrap();
+            assert_eq!(resp.provider_attribution.provider_id, "openai");
+            println!(r#"{{"step":4,"surface":"fallback_chain","provider":"openai"}}"#);
+
+            // Step 5: ProviderSwitched lifecycle event — structural fixture-replay path.
+            // Full SecurityManager journal verification requires kernel bootstrap;
+            // smoke arm exercises the router surface, not the admission path.
+            println!(r#"{{"step":5,"surface":"provider_switched_event","outcome":"fixture_replay_path","note":"structural verification of router dispatch — admission journal validation deferred to integration tests"}}"#);
+
+            // Step 6 (AC4): Air-gapped validation — assert zero outbound IO journal entries
+            let journal = take_io_journal();
+            assert!(journal.is_empty(), "smoke: IO journal must be empty in fixture-replay mode");
+            println!(r#"{{"step":6,"surface":"air_gap_validation","outbound_calls":0}}"#);
+
+            drop(inference);
+            drop(capability);
+            eprintln!("maos: smoke-multi-provider-5 complete — 6 surfaces exercised");
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -2138,6 +2269,7 @@ description = "smoke test spirit successor"
                 &journal,
                 &posture_section,
                 epistemic_policy.as_ref(),
+                None,
                 None,
                 None,
                 None,

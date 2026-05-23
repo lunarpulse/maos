@@ -1,0 +1,6 @@
+[primary]
+id = "anthropic"
+endpoint_url = "https://api.anthropic.com/v1"
+
+[primary.fallback]
+id = "openai"

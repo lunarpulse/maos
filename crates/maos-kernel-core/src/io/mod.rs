@@ -15,6 +15,13 @@
 //! was an overreach at story-creation time. This module implements only
 //! `http_post` (and `http_get` structurally) via `ureq`; bandwidth quotas
 //! and the full mediation surface are not part of this story.
+//!
+//! # Feature: `io_call_journal`
+//!
+//! When the `io_call_journal` feature is enabled, every `http_post` and
+//! `http_get` URL is recorded in a thread-local journal. Use
+//! [`take_io_journal`] to drain it. This is used by Story 5.5b AC4 for
+//! air-gapped Ollama validation (asserting zero outbound non-Ollama calls).
 
 pub use maos_domain::ports::IoSubsystemPort;
 
@@ -22,18 +29,34 @@ use std::io::Read;
 
 use maos_domain::ports::io_subsystem::IoError;
 
-/// Maximum response body size (10 MiB). Prevents OOM from unbounded provider responses.
 const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
 
-/// Real HTTP client adapter — blocking `ureq` with `rustls` TLS.
-///
-/// Implements `IoSubsystemPort` for the Anthropic driver and any other
-/// kernel-side HTTP needs at v0.1-β.
+#[cfg(feature = "io_call_journal")]
+std::thread_local! {
+    static IO_JOURNAL: std::cell::RefCell<Vec<String>> = std::cell::RefCell::new(Vec::new());
+}
+
+#[cfg(feature = "io_call_journal")]
+fn journal_record(method: &str, url: &str) {
+    IO_JOURNAL.with(|j| {
+        j.borrow_mut().push(format!("{method} {url}"));
+    });
+}
+
+#[cfg(feature = "io_call_journal")]
+pub fn take_io_journal() -> Vec<String> {
+    IO_JOURNAL.with(|j| j.borrow_mut().drain(..).collect())
+}
+
+#[cfg(not(feature = "io_call_journal"))]
+pub fn take_io_journal() -> Vec<String> {
+    Vec::new()
+}
+
 #[derive(Debug, Clone)]
 pub struct IoSubsystemAdapter;
 
 impl IoSubsystemAdapter {
-    /// Construct the adapter.
     pub fn new() -> Self {
         Self
     }
@@ -47,6 +70,9 @@ impl Default for IoSubsystemAdapter {
 
 impl IoSubsystemPort for IoSubsystemAdapter {
     fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
+        #[cfg(feature = "io_call_journal")]
+        journal_record("GET", url);
+
         let response = ureq::get(url)
             .call()
             .map_err(|e| IoError::Transport(format!("ureq GET {url}: {e}")))?;
@@ -70,6 +96,9 @@ impl IoSubsystemPort for IoSubsystemAdapter {
         body: &[u8],
         headers: &[(&str, &str)],
     ) -> Result<Vec<u8>, IoError> {
+        #[cfg(feature = "io_call_journal")]
+        journal_record("POST", url);
+
         let mut req = ureq::post(url);
         for (k, v) in headers {
             req = req.set(k, v);

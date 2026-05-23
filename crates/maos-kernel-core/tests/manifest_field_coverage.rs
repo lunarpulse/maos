@@ -57,6 +57,15 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
     ("hot_swap", "state_schema_version"),
     ("migrates_from", "versions"),
     ("halt_protocol_compatibility", "version"),
+    ("providers", "primary-anthropic-no-fallback"),
+    ("providers", "primary-openai-with-anthropic-fallback"),
+    ("providers", "primary-ollama-air-gapped"),
+    ("providers", "bad-pin"),
+    ("providers", "empty-endpoint"),
+    ("providers", "unsupported-id"),
+    ("sandbox", "tier-t3"),
+    ("sandbox", "tier-t3-with-pin"),
+    ("sandbox", "image-pin-missing"),
 ];
 
 const CATEGORIES: &[&str] = &["well-formed", "malformed-rejected", "edge-case"];

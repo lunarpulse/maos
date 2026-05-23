@@ -31,6 +31,16 @@ use crate::invariants::i9::SandboxTier;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InvariantI10;
 
+/// Payload for `LifecycleEvent::ProviderSwitched`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ProviderSwitchedPayload {
+    pub spirit_id: String,
+    pub from_provider: String,
+    pub to_provider: String,
+    pub manifest_path: String,
+    pub applied_at_ns: u64,
+}
+
 /// Lifecycle events that MUST be journaled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
@@ -72,21 +82,20 @@ pub enum LifecycleEvent {
     Revoked = 16,
     /// Story 5.5a — T3 sandbox tier applied at admission time.
     SandboxApplied = 17,
+    /// Story 5.5b — Spirit's provider changed between admissions.
+    ProviderSwitched = 18,
 }
 
 /// A single lifecycle journal entry — the v0.3-β shape.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LifecycleEntry {
-    /// Unix timestamp (seconds) of the transition.
     pub timestamp: u64,
-    /// Which lifecycle event occurred.
     pub lifecycle_event: LifecycleEvent,
-    /// Spirit identifier affected.
     pub spirit_id: String,
-    /// Effective sandbox tier at admission (Story 1b.3).
-    /// `serde(default)` keeps old NDJSON journal lines parseable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effective_sandbox_tier: Option<SandboxTier>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payload: Option<Vec<u8>>,
 }
 
 /// A single in-flight task journal entry — cold-restart recovery.
@@ -287,5 +296,34 @@ mod tests {
         let json = serde_json::to_string(&original).unwrap();
         let back: LifecycleEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(back, LifecycleEvent::Revoked);
+    }
+
+    // ---- Story 5.5b — ProviderSwitched variant ----
+
+    #[test]
+    fn lifecycle_event_provider_switched_discriminant() {
+        assert_eq!(LifecycleEvent::ProviderSwitched as u8, 18);
+    }
+
+    #[test]
+    fn lifecycle_event_provider_switched_serde_roundtrip() {
+        let original = LifecycleEvent::ProviderSwitched;
+        let json = serde_json::to_string(&original).unwrap();
+        let back: LifecycleEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, LifecycleEvent::ProviderSwitched);
+    }
+
+    #[test]
+    fn provider_switched_payload_roundtrip() {
+        let payload = ProviderSwitchedPayload {
+            spirit_id: "spirit-a".into(),
+            from_provider: "anthropic".into(),
+            to_provider: "openai".into(),
+            manifest_path: "/path/to/manifest.toml".into(),
+            applied_at_ns: 1_700_000_000_000_000_000,
+        };
+        let json = serde_json::to_string(&payload).unwrap();
+        let back: ProviderSwitchedPayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, payload);
     }
 }

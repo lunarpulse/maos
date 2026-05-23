@@ -1,0 +1,3 @@
+[primary]
+id = "openai"
+provider_endpoint_pin = "not-a-valid-sha256-hex-string"

@@ -1,4 +1,4 @@
-last_updated: '2026-05-23T18:00:00Z'
+last_updated: '2026-05-23T19:30:00Z'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -55,7 +55,7 @@ development_status:
   5-3-detect-spirit-crashes-hangs-and-silent-failures-with-halt-receipt-99-9: done
   5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s: done
   5-5a-sandbox-tier-t3-container-isolation-via-docker-podman: done
-  5-5b-run-the-multi-provider-ci-matrix-across-anthropic-openai-and-ollama: ready-for-dev
+  5-5b-run-the-multi-provider-ci-matrix-across-anthropic-openai-and-ollama: done
   5-5c-mcp-client-acp-server-tool-servers-and-editor-hosts: backlog
   5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers: backlog
   5-5e-section-13-1-rust-inproc-measurement-gate-subprocess-vs-in-process-latency-decision: backlog

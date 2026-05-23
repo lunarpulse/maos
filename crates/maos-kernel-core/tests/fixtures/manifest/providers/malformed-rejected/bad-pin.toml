@@ -1,0 +1,3 @@
+[primary]
+id = "anthropic"
+provider_endpoint_pin = "not-hex"

@@ -1,0 +1,10 @@
+{
+  "fixture_id": "case_temperature_zero",
+  "prompt": "What is the capital of France?",
+  "options": { "max_tokens": 50, "temperature": 0.0 },
+  "expected_outputs": {
+    "anthropic": { "text": "Paris", "stop_reason": "end_turn", "input_tokens": 10, "output_tokens": 5 },
+    "openai": { "text": "Paris", "stop_reason": "stop", "input_tokens": 10, "output_tokens": 5 },
+    "ollama": { "text": "Paris", "stop_reason": "stop", "input_tokens": 10, "output_tokens": 5 }
+  }
+}

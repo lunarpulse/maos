@@ -1,0 +1,5 @@
+{
+  "schema": "multi-provider-v0",
+  "rationale": "Provider-orthogonal prompts validated against three drivers in fixture-replay mode. Prompts are chosen to exercise varying token counts, stop reasons, and character encodings without depending on live provider behavior.",
+  "date": "2026-05-23"
+}

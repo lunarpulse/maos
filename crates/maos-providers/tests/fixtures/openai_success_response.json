@@ -1,0 +1,4 @@
+{
+  "choices": [{ "message": { "content": "Greetings from OpenAI!" }, "finish_reason": "stop" }],
+  "usage": { "prompt_tokens": 5, "completion_tokens": 8 }
+}

@@ -1,0 +1,4 @@
+{
+  "choices": [{ "message": { "content": "truncated" }, "finish_reason": "length" }],
+  "usage": { "prompt_tokens": 2, "completion_tokens": 10 }
+}

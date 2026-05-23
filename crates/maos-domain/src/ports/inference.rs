@@ -1,8 +1,9 @@
 //! Inference Port trait per ADR-005 + ADR-010.
 //!
 //! The Inference Port is the kernel's uniform surface for LLM inference.
-//! v0.1-β implements `complete` only with the Anthropic driver.
-//! Streaming (`stream`) and embeddings (`embed`) are deferred to Story 5.5b.
+//! v0.1-β implements `complete` only with the Anthropic, OpenAI, and Ollama drivers
+//! (Story 5.5b). Streaming (`stream`) and embeddings (`embed`) are deferred to a
+//! v0.5+ follow-up story; see open-items-carried-forward-to-implementation.md.
 //!
 //! Per ADR-010, the trait is **sync** — the kernel's async callers wrap it
 //! in `tokio::task::spawn_blocking` (consistent with `IoSubsystemPort`).
@@ -25,6 +26,7 @@ pub trait InferencePort {
 
 /// Request payload for a completion inference call.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct InferenceRequest {
     /// Spirit process ID making the request.
     pub spirit_pid: u32,
@@ -34,6 +36,32 @@ pub struct InferenceRequest {
     pub prompt: String,
     /// Inference options (temperature, max_tokens, model override).
     pub options: InferenceOptions,
+    /// v0.5-α dispatch key; None → composition-root default.
+    #[doc = "Construct via [`InferenceRequest::new`] to ensure all fields are populated."]
+    pub provider_id: Option<String>,
+    /// v0.5-α fallback chain; empty = no fallback.
+    #[doc = "Construct via [`InferenceRequest::new`] to ensure all fields are populated."]
+    pub fallback_provider_ids: Vec<String>,
+}
+
+impl InferenceRequest {
+    pub fn new(
+        spirit_pid: u32,
+        capability_token: CapabilityToken,
+        prompt: String,
+        options: InferenceOptions,
+        provider_id: Option<String>,
+        fallback_provider_ids: Vec<String>,
+    ) -> Self {
+        Self {
+            spirit_pid,
+            capability_token,
+            prompt,
+            options,
+            provider_id,
+            fallback_provider_ids,
+        }
+    }
 }
 
 /// Options controlling inference behavior.

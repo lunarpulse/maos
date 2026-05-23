@@ -36,6 +36,21 @@ The following items were knowingly carried into implementation rather than close
 
 ---
 
+## 4. Multi-provider streaming, embeddings, tool-calling equivalence, and rate-limit isolation (Story 5.5b carry-forward)
+
+**Status:** Story 5.5b landed synchronous `complete` for Anthropic, OpenAI, and Ollama drivers with multi-provider routing, fixture-replay CI matrix, and `ProviderSwitched` lifecycle events. The following were explicitly out of scope and carried forward:
+
+- **Streaming (`stream`)** and **embeddings (`embed`)** on the `Provider` trait — deferred to a v0.5+ follow-up story.
+- **Tool-calling cross-provider equivalence** — each provider's tool-calling API surface (Anthropic tool_use, OpenAI function_calling, Ollama's passthrough) needs a unified abstraction. Deferred to Story 9.4.
+- **Provider rate-limit isolation (NFR-Scale-4)** — per-provider token-bucket rate limiters to prevent one provider's 429 backoff from starving another. Deferred to the v1.0 performance hardening sprint.
+- **MAOS-mediated provider proxies (v1.5)** — the kernel sits between Spirits and providers, enabling audit, content-policy filtering, and egress control. The `io_call_journal` feature (Story 5.5b AC4) is the structural scaffold; full proxying requires the v1.5 I/O mediation surface.
+
+**Why deferred:** Each of these is a substantial API surface that would have scope-crept Story 5.5b well beyond its CI-matrix charter. The current `complete`-only surface validates the multi-provider routing, fallback, and lifecycle event architecture without blocking on provider-specific streaming protocol differences.
+
+**Closure path:** Story 9.4 owns tool-calling equivalence. Streaming/embeddings are scheduled for the v0.5 inference-expansion milestone. Rate-limit isolation is gated on NFR-Scale-4 profiling data from the v1.0 performance sprint.
+
+---
+
 ## Summary
 
 These three items are known shapes of the v0.1 → v1.0 sprint plan, not defects in the epic/story breakdown. Dev agents implementing E4 should treat Story 4.1's `synthetic-v0` corpus as a v0.3-shippable measurement floor, not a permanent target. Sprint planners should sequence Story 4.5 + Story 5.2 corpus authoring **before** any v1.0 gate-closure attempt on Story 4.1. PMs running `/bmad-create-story` to extract individual story specs should consult `architecture-maos-minimal-opus.md` §4.0.2 to concretize "the kernel" references into specific crate paths at story-extraction time.

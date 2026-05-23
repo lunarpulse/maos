@@ -1,0 +1,3 @@
+[primary]
+id = "anthropic"
+provider_endpoint_pin = "a3f1b2c4d5e6f7890123456789abcdef0123456789abcdef0123456789abcdef"

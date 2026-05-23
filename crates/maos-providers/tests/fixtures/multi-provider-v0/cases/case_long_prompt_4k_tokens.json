@@ -1,0 +1,10 @@
+{
+  "fixture_id": "case_long_prompt_4k_tokens",
+  "prompt": "The following is a lengthy passage for testing long prompt handling. Artificial intelligence has evolved significantly over the past decade, transforming industries from healthcare to finance. Machine learning models, particularly deep neural networks, have demonstrated remarkable capabilities in natural language processing, computer vision, and reinforcement learning. The development of transformer architectures has been particularly impactful, enabling models to capture long-range dependencies in sequential data. These advances have led to the creation of large language models that can generate coherent text, answer questions, translate languages, and even write code. However, with these capabilities come significant challenges including bias, hallucination, and the potential for misuse. Responsible AI development requires careful consideration of these issues, along with robust evaluation frameworks and transparent reporting of model limitations. The field continues to evolve rapidly, with new architectures, training techniques, and applications emerging regularly. Researchers are exploring ways to make models more efficient, more aligned with human values, and more capable of reasoning about the world. The intersection of AI with other fields such as neuroscience, cognitive science, and philosophy raises profound questions about the nature of intelligence and consciousness.",
+  "options": { "max_tokens": 100, "temperature": 0.0 },
+  "expected_outputs": {
+    "anthropic": { "stop_reason": "end_turn", "input_tokens": 200, "output_tokens": 50 },
+    "openai": { "stop_reason": "stop", "input_tokens": 200, "output_tokens": 50 },
+    "ollama": { "stop_reason": "stop", "input_tokens": 200, "output_tokens": 50 }
+  }
+}

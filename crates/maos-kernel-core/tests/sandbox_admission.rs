@@ -100,6 +100,7 @@ fn strictest_of_manifest_trust_operator() {
             None,
             None,
             None,
+            None,
         )
         .unwrap();
 
@@ -144,6 +145,7 @@ fn t3_effective_tier_admitted() {
             &journal,
             &default_posture_section(),
             Some(&default_epistemic_policy()),
+            None,
             None,
             None,
             None,
@@ -196,6 +198,7 @@ fn t4_effective_tier_rejected() {
             None,
             None,
             None,
+            None,
         )
         .unwrap_err();
 
@@ -242,6 +245,7 @@ fn t1_effective_tier_rejected() {
             None,
             None,
             None,
+            None,
         )
         .unwrap_err();
 
@@ -280,6 +284,7 @@ fn effective_tier_is_journaled() {
             &journal,
             &default_posture_section(),
             Some(&default_epistemic_policy()),
+            None,
             None,
             None,
             None,

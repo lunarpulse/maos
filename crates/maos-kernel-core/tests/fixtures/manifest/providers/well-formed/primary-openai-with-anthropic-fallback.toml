@@ -1,0 +1,5 @@
+[primary]
+id = "openai"
+
+[[fallback]]
+id = "anthropic"

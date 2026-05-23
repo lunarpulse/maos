@@ -1,0 +1,3 @@
+[primary]
+id = "ollama"
+endpoint_url = "http://localhost:11434"
