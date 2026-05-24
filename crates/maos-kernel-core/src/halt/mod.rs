@@ -549,6 +549,7 @@ pub fn invoke_halt(
         timestamp: timestamp_ns,
         lifecycle_event: LifecycleEvent::Halt,
         spirit_id: spirit_id.to_string(),
+        payload: None,
         effective_sandbox_tier: None,
     }));
 

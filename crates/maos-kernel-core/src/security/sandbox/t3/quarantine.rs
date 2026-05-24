@@ -35,6 +35,7 @@ pub fn quarantine_spirit(
             timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
             lifecycle_event: maos_domain::invariants::i10::LifecycleEvent::SandboxApplied,
             spirit_id: spirit_id.clone(),
+            payload: None,
             effective_sandbox_tier: Some(target_tier),
         },
     ));

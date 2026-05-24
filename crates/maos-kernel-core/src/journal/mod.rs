@@ -290,12 +290,14 @@ mod tests {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-alpha".into(),
+            payload: None,
             effective_sandbox_tier: None,
         }));
         journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 2,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: "spirit-alpha".into(),
+            payload: None,
             effective_sandbox_tier: None,
         }));
 
@@ -313,18 +315,21 @@ mod tests {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-alpha".into(),
+            payload: None,
             effective_sandbox_tier: None,
         }));
         journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 2,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: "spirit-alpha".into(),
+            payload: None,
             effective_sandbox_tier: None,
         }));
         journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
             timestamp: 3,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-beta".into(),
+            payload: None,
             effective_sandbox_tier: None,
         }));
 
@@ -349,18 +354,21 @@ mod tests {
                 timestamp: 1,
                 lifecycle_event: LifecycleEvent::Load,
                 spirit_id: "spirit-alpha".into(),
+                payload: None,
                 effective_sandbox_tier: None,
             }));
             journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
                 timestamp: 2,
                 lifecycle_event: LifecycleEvent::Start,
                 spirit_id: "spirit-alpha".into(),
+                payload: None,
                 effective_sandbox_tier: None,
             }));
             journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
                 timestamp: 3,
                 lifecycle_event: LifecycleEvent::Load,
                 spirit_id: "spirit-beta".into(),
+                payload: None,
                 effective_sandbox_tier: None,
             }));
         }
@@ -383,6 +391,7 @@ mod tests {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Halt,
             spirit_id: "spirit-gamma".into(),
+            payload: None,
             effective_sandbox_tier: None,
         }));
         let last = journal.last_lifecycle_event("spirit-gamma").unwrap();
@@ -415,6 +424,7 @@ mod tests {
             timestamp: 1,
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "spirit-alpha".into(),
+            payload: None,
             effective_sandbox_tier: None,
         }));
         journal.append_in_flight(InFlightEntry {
@@ -430,6 +440,7 @@ mod tests {
             timestamp: 3,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: "spirit-alpha".into(),
+            payload: None,
             effective_sandbox_tier: None,
         }));
 

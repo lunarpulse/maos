@@ -528,3 +528,8 @@
 # Story 5.5b — multi-provider router types (data-movement: inference dispatch)
 "maos_kernel_core::inference::router::MultiProviderRouter"            = "data-movement"
 "maos_kernel_core::inference::router::RouterError"                    = "data-movement"
+
+# Story 5.5c — MCP client kernel-side adapter (data-movement: routes MCP payloads)
+"maos_kernel_core::mcp::McpClientAdapter"                             = "data-movement"
+"maos_kernel_core::api::McpClientAdapter"                             = "data-movement"
+"maos_kernel_core::api::maos_domain::ports::McpClientPort"             = "data-movement"

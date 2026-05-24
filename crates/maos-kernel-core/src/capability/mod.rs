@@ -61,6 +61,10 @@ fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
         Scope::LogRecall => cap_policy::decision::Intent::LogRecall,
         Scope::LogFetch => cap_policy::decision::Intent::LogFetch,
         Scope::DistillateWrite => cap_policy::decision::Intent::DistillateWrite,
+        Scope::McpCall { server, tool } => cap_policy::decision::Intent::McpCall {
+            server: server.clone(),
+            tool: tool.clone(),
+        },
         _ => {
             panic!(
                 "scope_to_intent: unmapped Scope variant {:?} — add an explicit arm before calling this function",

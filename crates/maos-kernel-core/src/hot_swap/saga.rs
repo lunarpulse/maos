@@ -126,6 +126,7 @@ impl HotSwapSaga {
             timestamp: timestamp_ns,
             lifecycle_event: LifecycleEvent::HotSwapAborted,
             spirit_id: spirit_id.clone(),
+            payload: None,
             effective_sandbox_tier: None,
         }));
 

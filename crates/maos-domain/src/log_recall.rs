@@ -39,6 +39,7 @@ pub struct LogRecallFilter {
 /// Frame kind label for log-recall filtering (mirrors the audit-log FrameKind
 /// discriminator without depending on maos-kernel-core).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum FrameKindLabel {
     TaskAssign,
     TaskComplete,
@@ -58,6 +59,8 @@ pub enum FrameKindLabel {
     TaskStalled,
     SilentFailureSuspect,
     SpiritRevoked,
+    /// Story 5.5c — MCP tool invocation.
+    McpInvocation,
 }
 
 impl LogRecallFilter {

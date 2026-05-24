@@ -490,6 +490,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
                     lifecycle_event: event,
                     spirit_id: spirit_id.clone(),
+                    payload: None,
                     effective_sandbox_tier: None,
                 },
             ));
@@ -638,6 +639,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
                         lifecycle_event: maos_domain::invariants::i10::LifecycleEvent::PostureShift,
                         spirit_id: spirit_id.clone(),
+                        payload: None,
                         effective_sandbox_tier: None,
                     },
                 ),
@@ -972,6 +974,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
                     lifecycle_event: event,
                     spirit_id: spirit_id.clone(),
+                    payload: None,
                     effective_sandbox_tier: None,
                 },
             ));
@@ -2158,9 +2161,203 @@ description = "smoke test spirit successor"
             return Ok(());
         }
 
+        if mode == "smoke-mcp-acp-5" {
+            use std::collections::BTreeMap;
+            use std::sync::Arc;
+            use maos_domain::invariants::i1::{CapabilityToken, TokenId};
+            use maos_domain::ports::mcp::McpTransportId;
+            use maos_mcp::fixture_replay::FixtureReplayMcpServer;
+            use maos_mcp::{McpClient, McpServerEntry, McpTransport};
+            use maos_acp::fixture_replay::FixtureReplayAcpClient;
+            use maos_acp::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+            use maos_acp::AcpServer;
+            use maos_domain::lifecycle::LifecycleResolver;
+            use maos_domain::halt::HaltResolver;
+
+            eprintln!("maos: smoke-mcp-acp-5 — MCP + ACP smoke arm");
+
+            // Step 1: mcp_client_init
+            {
+                let t1 = Arc::new(FixtureReplayMcpServer::new(vec![], McpTransportId::Stdio));
+                let t2 = Arc::new(FixtureReplayMcpServer::new(vec![], McpTransportId::Sse));
+                let t3 = Arc::new(FixtureReplayMcpServer::new(vec![], McpTransportId::StreamableHttp));
+                let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> = BTreeMap::new();
+                transports.insert(McpTransportId::Stdio, t1 as Arc<dyn McpTransport>);
+                transports.insert(McpTransportId::Sse, t2 as Arc<dyn McpTransport>);
+                transports.insert(McpTransportId::StreamableHttp, t3 as Arc<dyn McpTransport>);
+                let _client = McpClient::new(transports, McpTransportId::StreamableHttp, BTreeMap::new()).unwrap();
+                println!(r#"{{"step":1,"surface":"mcp_client_init","transports":["stdio","sse","streamable_http"],"default":"streamable_http"}}"#);
+            }
+
+            // Step 2: mcp_call
+            {
+                let fake_resp = maos_domain::ports::mcp::McpResponse::new(
+                    serde_json::json!({"result": "echo-ok"}),
+                    false,
+                    maos_domain::ports::mcp::McpAttribution::new(
+                        "test-server".into(), McpTransportId::Stdio, "echo".into(),
+                    ),
+                );
+                let t = Arc::new(FixtureReplayMcpServer::new(
+                    vec![Ok(fake_resp)], McpTransportId::Stdio,
+                ));
+                let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> = BTreeMap::new();
+                transports.insert(McpTransportId::Stdio, t as Arc<dyn McpTransport>);
+                let mut servers = BTreeMap::new();
+                servers.insert("test-server".into(), McpServerEntry {
+                    name: "test-server".into(),
+                    transport: McpTransportId::Stdio,
+                    fallback_transport: None,
+                });
+                let client = McpClient::new(transports, McpTransportId::StreamableHttp, servers).unwrap();
+                let resp = client.call("test-server", "echo", serde_json::json!({"msg":"hello"})).unwrap();
+                assert!(!resp.is_error);
+                println!(r#"{{"step":2,"surface":"mcp_call","outcome":"ok","server":"test-server","tool":"echo"}}"#);
+            }
+
+            // Step 3: mcp_fallback
+            {
+                let primary = Arc::new(FixtureReplayMcpServer::new(
+                    vec![Err(maos_mcp::McpTransportError::Transport("boom".into()))],
+                    McpTransportId::StreamableHttp,
+                ));
+                let fake_resp = maos_domain::ports::mcp::McpResponse::new(
+                    serde_json::json!({"result": "fallback-ok"}),
+                    false,
+                    maos_domain::ports::mcp::McpAttribution::new(
+                        "fb-srv".into(), McpTransportId::Stdio, "echo".into(),
+                    ),
+                );
+                let fallback = Arc::new(FixtureReplayMcpServer::new(
+                    vec![Ok(fake_resp)], McpTransportId::Stdio,
+                ));
+                let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> = BTreeMap::new();
+                transports.insert(McpTransportId::StreamableHttp, primary as Arc<dyn McpTransport>);
+                transports.insert(McpTransportId::Stdio, fallback as Arc<dyn McpTransport>);
+                let mut servers = BTreeMap::new();
+                servers.insert("fb-srv".into(), McpServerEntry {
+                    name: "fb-srv".into(),
+                    transport: McpTransportId::StreamableHttp,
+                    fallback_transport: Some(McpTransportId::Stdio),
+                });
+                let client = McpClient::new(transports, McpTransportId::StreamableHttp, servers).unwrap();
+                let resp = client.call("fb-srv", "echo", serde_json::json!({})).unwrap();
+                assert_eq!(resp.attribution.transport_id, McpTransportId::Stdio);
+                println!(r#"{{"step":3,"surface":"mcp_fallback","outcome":"ok","primary":"streamable_http","fallback_used":"stdio"}}"#);
+            }
+
+            // Step 4: acp_session
+            struct MockLifecycleResolver;
+            impl LifecycleResolver for MockLifecycleResolver {
+                fn resolve_verb(&self, _spirit_id: &str, verb: maos_domain::lifecycle::LifecycleVerb)
+                    -> Result<maos_domain::lifecycle::LifecycleReceipt, maos_domain::lifecycle::LifecycleError> {
+                    Ok(maos_domain::lifecycle::LifecycleReceipt {
+                        spirit_pid: 42,
+                        verb,
+                        timestamp_ns: 100,
+                        journal_offset_bytes: None,
+                    })
+                }
+            }
+            struct MockHaltResolver;
+            impl HaltResolver for MockHaltResolver {
+                fn resolve(&self, _halt_id: &maos_domain::halt::HaltId, _resolution: maos_domain::halt::Resolution)
+                    -> Result<(), maos_domain::halt::ResolveError> { Ok(()) }
+            }
+            {
+                let server = AcpServer::new(
+                    Arc::new(MockLifecycleResolver),
+                    Arc::new(MockHaltResolver),
+                );
+                let sessions = server.session_registry();
+                let mut server = maos_acp::AcpServer {
+                    lifecycle: Arc::new(MockLifecycleResolver),
+                    halts: Arc::new(MockHaltResolver),
+                    sessions,
+                };
+                let input = r#"{"kind":"session_start","session_id":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"editor_id":"zed","editor_version":"1.0"}
+{"kind":"lifecycle_verb","session_id":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"decision_id":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"verb":"load","spirit_id":"hello"}"#;
+                let mut output = Vec::new();
+                server.run(input.as_bytes(), &mut output).unwrap();
+                let out = String::from_utf8(output).unwrap();
+                assert!(out.contains("lifecycle_receipt"));
+                assert!(out.contains("ok"));
+                println!(r#"{{"step":4,"surface":"acp_session","outcome":"ok","verb":"load"}}"#);
+            }
+
+            // Step 5: acp_notification
+            {
+                let sessions = Arc::new(std::sync::Mutex::new(Vec::new()));
+                let channel = maos_acp::AcpEditorChannelImpl::new(Arc::clone(&sessions));
+
+                let (tx, rx) = crossbeam_channel::bounded::<AcpFrameOut>(4);
+                sessions.lock().unwrap().push(maos_acp::notification_channel::AcpOutboundHandle {
+                    session_id: [1u8; 16],
+                    outbound: tx,
+                    started_at_ns: 0,
+                });
+
+                let event_json = serde_json::json!({"TaskAssigned": {"frame_id": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], "from": "director", "goal": "test"}});
+                let n = channel.dispatch_event(event_json, "immediate").unwrap();
+                assert_eq!(n, 1);
+
+                let received = rx.try_recv().unwrap();
+                match received {
+                    AcpFrameOut::NotificationDispatch { level, .. } => {
+                        assert_eq!(level, "immediate");
+                    }
+                    _ => panic!("expected NotificationDispatch"),
+                }
+                println!(r#"{{"step":5,"surface":"acp_notification","outcome":"ok","level":"immediate","event_kind":"TaskAssigned"}}"#);
+            }
+
+            // Step 6: acp_halt_resolve
+            {
+                let server = AcpServer::new(
+                    Arc::new(MockLifecycleResolver),
+                    Arc::new(MockHaltResolver),
+                );
+                let sessions = server.session_registry();
+                let mut server = maos_acp::AcpServer {
+                    lifecycle: Arc::new(MockLifecycleResolver),
+                    halts: Arc::new(MockHaltResolver),
+                    sessions,
+                };
+                let input = r#"{"kind":"session_start","session_id":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"editor_id":"zed","editor_version":"1.0"}
+{"kind":"halt_resolve","session_id":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"decision_id":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],"halt_id":"h1","resolution":"approve","operator_note":null}"#;
+                let mut output = Vec::new();
+                server.run(input.as_bytes(), &mut output).unwrap();
+                let out = String::from_utf8(output).unwrap();
+                assert!(out.contains("halt_receipt"));
+                assert!(out.contains("resolved"));
+                println!(r#"{{"step":6,"surface":"acp_halt_resolve","outcome":"ok","resolution":"approve"}}"#);
+            }
+
+            return Ok(());
+        }
+
+        if mode == "acp-server" {
+            use maos_acp::AcpServer;
+            struct StubLifecycleResolver;
+            impl maos_domain::lifecycle::LifecycleResolver for StubLifecycleResolver {
+                fn resolve_verb(&self, spirit_id: &str, _verb: maos_domain::lifecycle::LifecycleVerb)
+                    -> Result<maos_domain::lifecycle::LifecycleReceipt, maos_domain::lifecycle::LifecycleError> {
+                    Err(maos_domain::lifecycle::LifecycleError::NotLoaded { spirit_id: spirit_id.into() })
+                }
+            }
+            struct StubHaltResolver;
+            impl maos_domain::halt::HaltResolver for StubHaltResolver {
+                fn resolve(&self, _halt_id: &maos_domain::halt::HaltId, _resolution: maos_domain::halt::Resolution)
+                    -> Result<(), maos_domain::halt::ResolveError> { Ok(()) }
+            }
+            let mut server = AcpServer::new(Arc::new(StubLifecycleResolver), Arc::new(StubHaltResolver));
+            server.run(std::io::stdin(), std::io::stdout())?;
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }

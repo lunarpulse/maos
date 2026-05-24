@@ -45,6 +45,8 @@ pub use manifest::{LifecycleSection, SchedulingSection};
 pub use manifest::{OnCrashSection, SupervisionSection};
 // Story 5.5b — appended to preserve re-export order.
 pub use manifest::{ProviderConfig, ProvidersSection};
+// Story 5.5c — appended to preserve re-export order.
+pub use manifest::{McpCapabilities, McpCapabilityServerEntry, McpSection, McpServerEntry};
 pub use posture::{PostureError, PostureState};
 
 use std::sync::Arc;
@@ -229,6 +231,7 @@ impl SecurityManagerAdapter {
             timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: spirit_id.into(),
+            payload: None,
             effective_sandbox_tier: Some(effective),
         }));
 
@@ -237,6 +240,7 @@ impl SecurityManagerAdapter {
                 timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
                 lifecycle_event: LifecycleEvent::SandboxApplied,
                 spirit_id: spirit_id.into(),
+                payload: None,
                 effective_sandbox_tier: Some(effective),
             }));
         }
@@ -251,7 +255,10 @@ impl SecurityManagerAdapter {
                         spirit_id: spirit_id.into(),
                         from_provider: prev_provider.clone(),
                         to_provider: new_provider.clone(),
-                        manifest_path: manifest_path.to_string_lossy().into_owned(),
+                        // manifest_path: synthetic — manifest file path is not available in this scope
+                        // (admit_spirit receives parsed sections, not the original path). Consumers
+                        // should not parse this field as a real filesystem path.
+                        manifest_path: format!("manifest:{spirit_id}"),
                         applied_at_ns: crate::capability::cap_tokens::monotonic_now_ns(),
                     };
                     let payload_bytes = serde_json::to_vec(&payload)

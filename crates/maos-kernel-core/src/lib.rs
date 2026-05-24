@@ -32,6 +32,7 @@ pub mod io; // internal module at v0.1 — I/O Subsystem (§4.4)
 pub mod isolation;
 pub mod journal; // supervised internal — Lifecycle Journal per I10 / §4.1 (Story 1b.1)
 pub mod lifecycle; // Story 5.4 — upgrade orchestrator (hot-swap, cold-swap, migrator)
+pub mod mcp; // Story 5.5c — MCP client kernel-side adapter
 pub mod memory; // supervised service — Memory Manager (§4.2)
 pub mod orchestrator; // Story 3.4 — Orchestrator instruction buffer + journal helpers
 pub mod revocation; // Story 5.4 — CRL poller, parser, applier, propagation pipeline

@@ -41,3 +41,7 @@ pub use crate::iac::log_recall::LogRecallAdapter;
 
 // Story 5.2 — Hot-Swap Coordinator
 pub use crate::hot_swap::HotSwapCoordinator;
+
+// Story 5.5c — MCP client adapter + port trait
+pub use crate::mcp::McpClientAdapter;
+pub use maos_domain::ports::McpClientPort;

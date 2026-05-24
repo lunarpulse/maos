@@ -8,3 +8,14 @@ rust-version.workspace = true
 description = "MAOS MCP — Model Context Protocol gateway and adapters"
 
 [dependencies]
+maos-domain = { path = "../maos-domain" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[features]
+default = []
+fixture_replay = []

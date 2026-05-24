@@ -85,6 +85,9 @@ pub enum Scope {
     LogFetch,
     /// Story 4.4 — Distillate write with kernel-enforced I11 audit chain.
     DistillateWrite,
+    /// Story 5.5c — MCP tool invocation. server = manifest [mcp].servers[i].name;
+    /// tool = the tool identifier exposed by the MCP server.
+    McpCall { server: String, tool: String },
 }
 
 /// Intent classification for approval policy.
@@ -196,5 +199,27 @@ mod tests {
             expiry_ns: 1_000_000_000,
             signature: [2u8; 64],
         };
+    }
+
+    /// Story 5.5c — `Scope::McpCall` round-trip serde.
+    #[test]
+    fn mcp_call_scope_serde_round_trip() {
+        let scope = Scope::McpCall {
+            server: "loom-lite".into(),
+            tool: "recall".into(),
+        };
+        let json = serde_json::to_string(&scope).unwrap();
+        let back: Scope = serde_json::from_str(&json).unwrap();
+        match back {
+            Scope::McpCall { server, tool } => {
+                assert_eq!(server, "loom-lite");
+                assert_eq!(tool, "recall");
+            }
+            other => panic!("expected McpCall, got {other:?}"),
+        }
+        // Verify the JSON shape is stable
+        assert!(json.contains("McpCall"));
+        assert!(json.contains("loom-lite"));
+        assert!(json.contains("recall"));
     }
 }

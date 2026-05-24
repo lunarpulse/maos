@@ -341,6 +341,7 @@ impl RevocationApplier {
                         timestamp: now_ns / 1_000_000_000,
                         lifecycle_event: LifecycleEvent::Revoked,
                         spirit_id: scb.spirit_id.clone(),
+                        payload: None,
                         effective_sandbox_tier: None,
                     }));
 

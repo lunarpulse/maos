@@ -5,6 +5,15 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "MAOS ACP — Agent Context Protocol gateway and adapters"
+description = "MAOS ACP — Agent Communication Protocol server (NDJSON over stdio)"
 
 [dependencies]
+maos-domain = { path = "../maos-domain" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+crossbeam-channel = "0.5"
+
+[features]
+default = []
+fixture_replay = []

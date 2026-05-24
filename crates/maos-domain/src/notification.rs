@@ -24,7 +24,7 @@ pub enum NotificationSurface {
 ///
 /// Story 3.1 ships `TaskAssigned` + `ApprovalPrompt`;
 /// Story 3.3 adds `Halt`; Story 3.4 adds `AnomalyFlagged`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum NotificationEvent {
     TaskAssigned {

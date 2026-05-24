@@ -185,6 +185,7 @@ impl CrashDetector {
                 timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
                 lifecycle_event: LifecycleEvent::Crash,
                 spirit_id: scb.spirit_id.clone(),
+                payload: None,
                 effective_sandbox_tier: Some(scb.sandbox_tier),
             }));
 

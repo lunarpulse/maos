@@ -12,7 +12,9 @@ name = "maos_director_surface"
 [dependencies]
 maos-domain = { path = "../maos-domain" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
+maos-acp = { path = "../maos-acp" }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["sync", "rt"] }
 # kernel-core NOT a dep — avoids circular dep since kernel-core's

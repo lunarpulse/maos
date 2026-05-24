@@ -20,6 +20,7 @@
 //!     lifecycle_event: LifecycleEvent::Load,
 //!     spirit_id: "spirit-nash".into(),
 //!     effective_sandbox_tier: None,
+//!     payload: None,
 //! });
 //! assert!(matches!(entry, JournalEntry::Lifecycle(_)));
 //! ```
@@ -178,6 +179,7 @@ mod tests {
             lifecycle_event: LifecycleEvent::Halt,
             spirit_id: "s".into(),
             effective_sandbox_tier: None,
+            payload: None,
         });
         assert!(matches!(e, JournalEntry::Lifecycle(_)));
     }
@@ -205,6 +207,7 @@ mod tests {
             lifecycle_event: LifecycleEvent::Load,
             spirit_id: "test".into(),
             effective_sandbox_tier: Some(SandboxTier::T2),
+            payload: None,
         });
         let json = serde_json::to_string(&entry).unwrap();
         assert!(json.contains("T2"));

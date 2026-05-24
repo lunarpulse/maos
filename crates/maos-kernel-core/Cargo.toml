@@ -12,6 +12,7 @@ maos-domain = { path = "../maos-domain" }
 maos-spirit-abi = { path = "../maos-spirit-abi", features = ["mock"] }
 maos-providers = { path = "../maos-providers" }
 maos-director-surface = { path = "../maos-director-surface" }
+maos-mcp = { path = "../maos-mcp" }
 ciborium = "0.2"
 hex = "0.4"
 # Story 1b.1 — SQLite audit spine (Transparency Log + Approval Decision Log).
@@ -69,6 +70,8 @@ default = []
 spirit_test = ["maos-spirit-sdk"]
 # Story 5.5b AC4 — records every http_post URL for air-gapped validation.
 io_call_journal = []
+# Story 5.5c — MCP fixture replay for adapter tests.
+fixture_replay = ["maos-mcp/fixture_replay"]
 
 [dev-dependencies]
 tempfile = "3"

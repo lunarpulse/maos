@@ -35,6 +35,7 @@ pub mod iac_bus;
 pub mod inference;
 pub mod io_subsystem;
 pub mod log_recall; // NEW — Story 4.4 LogRecallPort per AC1
+pub mod mcp; // NEW — Story 5.5c McpClientPort + domain types
 pub mod memory;
 pub mod scheduler;
 pub mod security;
@@ -51,6 +52,7 @@ pub use iac_bus::IacBusPort;
 pub use inference::InferencePort;
 pub use io_subsystem::IoSubsystemPort;
 pub use log_recall::LogRecallPort; // NEW — Story 4.4
+pub use mcp::{McpClientPort, McpError, McpRequest, McpResponse, McpAttribution, McpTransportId}; // NEW — Story 5.5c
 pub use memory::MemoryManagerPort;
 pub use scheduler::SpiritSchedulerPort;
 pub use security::SecurityManagerPort;

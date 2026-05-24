@@ -353,6 +353,7 @@ impl HotSwapCoordinator {
                 timestamp: timestamp_ns,
                 lifecycle_event: LifecycleEvent::HotSwap,
                 spirit_id: spirit_id.to_string(),
+                payload: None,
                 effective_sandbox_tier: None,
             }));
 
@@ -533,6 +534,7 @@ impl HotSwapCoordinator {
                 timestamp: timestamp_ns,
                 lifecycle_event: LifecycleEvent::HotSwapAutoReverted,
                 spirit_id: format!("pid-{spirit_pid}"),
+                payload: None,
                 effective_sandbox_tier: None,
             }));
 

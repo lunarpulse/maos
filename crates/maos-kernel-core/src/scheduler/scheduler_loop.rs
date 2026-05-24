@@ -177,8 +177,8 @@ impl SpiritSchedulerAdapter {
         // Story 1b.3 — admit the Spirit through the security manager.
         if let Some(ref security) = self.security_manager {
             use crate::security::{
-                CapabilitiesRequired, Posture, PostureSection, ProviderCapabilities, ResourceCaps,
-                SandboxConfig,
+                CapabilitiesRequired, McpCapabilities, Posture, PostureSection, ProviderCapabilities,
+                ResourceCaps, SandboxConfig,
             };
             use maos_domain::invariants::i9::SandboxTier;
             let sandbox_cfg = SandboxConfig {
@@ -192,6 +192,7 @@ impl SpiritSchedulerAdapter {
             };
             let caps_required = CapabilitiesRequired {
                 provider: ProviderCapabilities { complete: vec![] },
+                mcp: McpCapabilities { servers: vec![] },
             };
             let posture = PostureSection {
                 default: Posture::Cautious,

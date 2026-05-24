@@ -12,7 +12,7 @@ use thiserror::Error;
 /// Per §4.4: "The I/O Subsystem is an internal module at v0.1.
 /// It becomes a supervised service only if v0.5+ multi-Host
 /// topology requires independent I/O task pools."
-pub trait IoSubsystemPort {
+pub trait IoSubsystemPort: Send + Sync {
     /// Class: data-movement
     ///
     /// Perform an HTTP GET request to the given URL. At v0.1-α this

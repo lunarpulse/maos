@@ -61,6 +61,8 @@ pub enum Intent {
     LogFetch,
     /// Distillate write (I11 audit chain) — Story 4.4.
     DistillateWrite,
+    /// MCP tool invocation — Story 5.5c.
+    McpCall { server: String, tool: String },
 }
 
 /// Trust tier classification.

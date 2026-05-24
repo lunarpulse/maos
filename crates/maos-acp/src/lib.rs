@@ -1,8 +1,18 @@
 #![forbid(unsafe_code)]
 
-//! \`maos-acp\` — Agent Context Protocol gateway and adapters.
+//! `maos-acp` — Agent Communication Protocol server (NDJSON over stdio).
 //!
-//! At v0.1-α this is a placeholder; substantive implementation lands in
-//! future stories per the architecture phased roadmap.
+//! Per architecture §7.5 + appendix-a-cohort-prior-art-map.md (convergent
+//! across openclaw / opencode / hermes; ratified by Zed).
 //!
-//! See architecture §4.0.2 for the canonical 17-crate workspace layout.
+//! Consumer-facing surface: `AcpServer::new(lifecycle, halts).run(stdin, stdout)`.
+
+pub mod frame;
+#[cfg(any(test, feature = "fixture_replay"))]
+pub mod fixture_replay;
+pub mod notification_channel;
+pub mod server;
+
+pub use frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+pub use notification_channel::AcpEditorChannelImpl;
+pub use server::{AcpError, AcpServer};

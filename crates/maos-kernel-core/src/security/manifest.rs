@@ -333,6 +333,7 @@ impl RawClassSection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapabilitiesRequired {
     pub provider: ProviderCapabilities,
+    pub mcp: McpCapabilities,
 }
 
 #[maos_attrs::i9_exempt(
@@ -341,6 +342,22 @@ pub struct CapabilitiesRequired {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderCapabilities {
     pub complete: Vec<String>,
+}
+
+/// Story 5.5c — MCP server/tool capability declarations.
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpCapabilities {
+    pub servers: Vec<McpCapabilityServerEntry>,
+}
+
+/// Story 5.5c — a single MCP server with its allowed tools.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpCapabilityServerEntry {
+    pub name: String,
+    pub allowed_tools: Vec<String>,
 }
 
 impl CapabilitiesRequired {
@@ -355,6 +372,8 @@ impl CapabilitiesRequired {
 #[serde(deny_unknown_fields)]
 struct RawCapabilitiesRequired {
     provider: RawProviderCapabilities,
+    #[serde(default)]
+    mcp: RawMcpCapabilities,
 }
 
 #[maos_attrs::i9_exempt(
@@ -364,6 +383,21 @@ struct RawCapabilitiesRequired {
 #[serde(deny_unknown_fields)]
 struct RawProviderCapabilities {
     complete: Vec<String>,
+}
+
+/// Story 5.5c — raw MCP capability section from TOML.
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawMcpCapabilities {
+    #[serde(default)]
+    servers: Vec<RawMcpCapabilityServerEntry>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawMcpCapabilityServerEntry {
+    name: String,
+    allowed_tools: Vec<String>,
 }
 
 impl RawCapabilitiesRequired {
@@ -386,21 +420,30 @@ impl RawCapabilitiesRequired {
             provider: ProviderCapabilities {
                 complete: self.provider.complete,
             },
+            mcp: McpCapabilities {
+                servers: self
+                    .mcp
+                    .servers
+                    .into_iter()
+                    .map(|s| McpCapabilityServerEntry {
+                        name: s.name,
+                        allowed_tools: s.allowed_tools,
+                    })
+                    .collect(),
+            },
         })
     }
 }
 
 /// Convert a `CapabilitiesRequired` manifest declaration to a `Vec<Scope>`.
 ///
-/// v0.1-β only produces `Scope::ProviderInfer` — the provider prefix is
-/// extracted before the first `.` in each entry (e.g., `"anthropic.claude-3-haiku-20240307"`
-/// → `ProviderInfer { provider: "anthropic" }`). Other scope classes
-/// (fs, net, iac, mem) return a clearly-commented TODO and are not
-/// produced — they ship in Epic 7.
+/// v0.1-β produces `Scope::ProviderInfer` from provider entries and
+/// `Scope::McpCall` from MCP server/tool entries (Story 5.5c).
 pub fn capabilities_required_to_scopes(
     caps: &CapabilitiesRequired,
 ) -> Vec<maos_domain::invariants::i1::Scope> {
-    caps.provider
+    let mut scopes: Vec<maos_domain::invariants::i1::Scope> = caps
+        .provider
         .complete
         .iter()
         .map(|entry| {
@@ -414,7 +457,16 @@ pub fn capabilities_required_to_scopes(
                 provider: provider.to_string(),
             }
         })
-        .collect()
+        .collect();
+    for server_entry in &caps.mcp.servers {
+        for tool in &server_entry.allowed_tools {
+            scopes.push(maos_domain::invariants::i1::Scope::McpCall {
+                server: server_entry.name.clone(),
+                tool: tool.clone(),
+            });
+        }
+    }
+    scopes
 }
 
 // ------------------------------------------------------------------
@@ -1511,6 +1563,162 @@ impl RawProvidersSection {
 }
 
 // ------------------------------------------------------------------
+// [mcp] section (Story 5.5c)
+// ------------------------------------------------------------------
+
+/// Story 5.5c — MCP tool-server declarations for the Spirit manifest.
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpSection {
+    #[doc = "Construct via [`McpSection::new`] to enforce uniqueness of server.name across the section."]
+    pub servers: Vec<McpServerEntry>,
+}
+
+impl McpSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawMcpSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        raw.validate()
+    }
+
+    pub fn new(servers: Vec<McpServerEntry>) -> Self {
+        Self { servers }
+    }
+}
+
+/// A single MCP server entry in the `[mcp].servers` manifest table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpServerEntry {
+    #[doc = "Construct via [`McpServerEntry::new`] to enforce non-empty name + non-empty uri + non-empty allowed_tools."]
+    pub name: String,
+    #[doc = "Construct via [`McpServerEntry::new`] to enforce non-empty name + non-empty uri + non-empty allowed_tools."]
+    pub uri: String,
+    pub transport: maos_domain::ports::mcp::McpTransportId,
+    #[doc = "Construct via [`McpServerEntry::new`] to enforce non-empty name + non-empty uri + non-empty allowed_tools."]
+    pub fallback_transport: Option<maos_domain::ports::mcp::McpTransportId>,
+    pub server_trust_tier: maos_spirit_abi::compliance::TrustTier,
+    #[doc = "Construct via [`McpServerEntry::new`] to enforce non-empty name + non-empty uri + non-empty allowed_tools."]
+    pub allowed_tools: Vec<String>,
+}
+
+impl McpServerEntry {
+    pub fn new(
+        name: String,
+        uri: String,
+        transport: maos_domain::ports::mcp::McpTransportId,
+        fallback_transport: Option<maos_domain::ports::mcp::McpTransportId>,
+        server_trust_tier: maos_spirit_abi::compliance::TrustTier,
+        allowed_tools: Vec<String>,
+    ) -> Self {
+        Self {
+            name,
+            uri,
+            transport,
+            fallback_transport,
+            server_trust_tier,
+            allowed_tools,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawMcpSection {
+    #[serde(default)]
+    servers: Vec<RawMcpServerEntry>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawMcpServerEntry {
+    name: String,
+    uri: String,
+    transport: maos_domain::ports::mcp::McpTransportId,
+    #[serde(default)]
+    fallback_transport: Option<maos_domain::ports::mcp::McpTransportId>,
+    #[serde(default = "default_server_trust_tier")]
+    server_trust_tier: maos_spirit_abi::compliance::TrustTier,
+    #[serde(default)]
+    allowed_tools: Vec<String>,
+}
+
+fn default_server_trust_tier() -> maos_spirit_abi::compliance::TrustTier {
+    maos_spirit_abi::compliance::TrustTier::PublicUntrusted
+}
+
+impl RawMcpSection {
+    fn validate(self) -> Result<McpSection, ManifestError> {
+        let mut seen_names = std::collections::BTreeSet::new();
+        let mut entries = Vec::with_capacity(self.servers.len());
+
+        for (i, raw) in self.servers.into_iter().enumerate() {
+            // Reject empty name
+            if raw.name.trim().is_empty() {
+                return Err(ManifestError::Toml(format!(
+                    "mcp.servers[{i}].name must not be empty"
+                )));
+            }
+            // Reject duplicate names
+            if !seen_names.insert(raw.name.clone()) {
+                return Err(ManifestError::Toml(format!(
+                    "mcp.servers[{i}].name '{}' is a duplicate",
+                    raw.name
+                )));
+            }
+            // Reject empty URI
+            if raw.uri.trim().is_empty() {
+                return Err(ManifestError::Toml(format!(
+                    "mcp.servers[{i}].uri must not be empty"
+                )));
+            }
+            // Reject fallback == primary
+            if let Some(ref fb) = raw.fallback_transport {
+                if fb == &raw.transport {
+                    return Err(ManifestError::Toml(format!(
+                        "mcp.servers[{i}].fallback_transport must differ from primary"
+                    )));
+                }
+            }
+            // Reject public-vetted trust tier (FR37 exclusion)
+            if raw.server_trust_tier == maos_spirit_abi::compliance::TrustTier::PublicVetted {
+                return Err(ManifestError::Toml(format!(
+                    "mcp.servers[{i}].server_trust_tier 'public_vetted' deferred per FR37 to v2.5; allowed: local, org_internal, public_untrusted"
+                )));
+            }
+            // Reject empty or glob allowed_tools
+            if raw.allowed_tools.is_empty() {
+                return Err(ManifestError::Toml(format!(
+                    "mcp.servers[{i}].allowed_tools must not be empty"
+                )));
+            }
+            for (j, tool) in raw.allowed_tools.iter().enumerate() {
+                if tool.trim().is_empty() || tool.contains('*') {
+                    return Err(ManifestError::Toml(format!(
+                        "mcp.servers[{i}].allowed_tools[{j}] '{}' — empty-or-glob, explicit tool names only at v0.5-α",
+                        tool
+                    )));
+                }
+            }
+
+            entries.push(McpServerEntry::new(
+                raw.name,
+                raw.uri,
+                raw.transport,
+                raw.fallback_transport,
+                raw.server_trust_tier,
+                raw.allowed_tools,
+            ));
+        }
+
+        Ok(McpSection::new(entries))
+    }
+}
+
+// ------------------------------------------------------------------
+// Tests (NFR-Test-13 &ge;3 cases per field)
+// ------------------------------------------------------------------
 // Tests (NFR-Test-13 ≥3 cases per field)
 // ------------------------------------------------------------------
 
@@ -2431,6 +2639,131 @@ homepage = "ftp://example.org""#;
         ]"#;
         let s = LifecycleSection::from_toml_str(hooks_toml).unwrap();
         assert_eq!(s.enabled_hooks.len(), 11);
+    }
+
+    // ---- McpSection (Story 5.5c, Fix #26) ----
+
+    fn mcp_section_toml_valid() -> &'static str {
+        r#"
+[[servers]]
+name = "my-server"
+uri = "http://localhost:8080"
+transport = "stdio"
+allowed_tools = ["echo", "cat"]
+"#
+    }
+
+    #[test]
+    fn mcp_section_well_formed_parse() {
+        let section = McpSection::from_toml_str(mcp_section_toml_valid()).unwrap();
+        assert_eq!(section.servers.len(), 1);
+        assert_eq!(section.servers[0].name, "my-server");
+        assert_eq!(section.servers[0].uri, "http://localhost:8080");
+        assert_eq!(section.servers[0].allowed_tools, vec!["echo", "cat"]);
+    }
+
+    #[test]
+    fn mcp_section_rejects_empty_name() {
+        let s = r#"
+[[servers]]
+name = ""
+uri = "http://localhost:8080"
+transport = "stdio"
+allowed_tools = ["echo"]
+"#;
+        let err = McpSection::from_toml_str(s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("name must not be empty")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn mcp_section_rejects_duplicate_names() {
+        let s = r#"
+[[servers]]
+name = "dup"
+uri = "http://a:8080"
+transport = "stdio"
+allowed_tools = ["echo"]
+
+[[servers]]
+name = "dup"
+uri = "http://b:9090"
+transport = "sse"
+allowed_tools = ["cat"]
+"#;
+        let err = McpSection::from_toml_str(s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("duplicate")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn mcp_section_rejects_empty_uri() {
+        let s = r#"
+[[servers]]
+name = "srv"
+uri = ""
+transport = "stdio"
+allowed_tools = ["echo"]
+"#;
+        let err = McpSection::from_toml_str(s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("uri must not be empty")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn mcp_section_rejects_fallback_equals_primary() {
+        let s = r#"
+[[servers]]
+name = "srv"
+uri = "http://localhost:8080"
+transport = "stdio"
+fallback_transport = "stdio"
+allowed_tools = ["echo"]
+"#;
+        let err = McpSection::from_toml_str(s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("fallback_transport must differ from primary")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn mcp_section_rejects_public_vetted_tier() {
+        let s = r#"
+[[servers]]
+name = "srv"
+uri = "http://localhost:8080"
+transport = "stdio"
+server_trust_tier = "public_vetted"
+allowed_tools = ["echo"]
+"#;
+        let err = McpSection::from_toml_str(s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("public_vetted")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn mcp_section_rejects_glob_in_allowed_tools() {
+        let s = r#"
+[[servers]]
+name = "srv"
+uri = "http://localhost:8080"
+transport = "stdio"
+allowed_tools = ["echo", "wild*"]
+"#;
+        let err = McpSection::from_toml_str(s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("empty-or-glob")),
+            "got: {err:?}"
+        );
     }
 }
 

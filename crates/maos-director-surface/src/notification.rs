@@ -232,8 +232,16 @@ impl NotificationChannel for TerminalChannel {
     }
 }
 
-/// Stub ACP editor channel — Story 5.5c.
-pub struct AcpEditorChannel;
+/// Story 5.5c — ACP editor channel (seam closed: wraps `maos-acp` impl).
+pub struct AcpEditorChannel {
+    inner: maos_acp::AcpEditorChannelImpl,
+}
+
+impl AcpEditorChannel {
+    pub fn new(inner: maos_acp::AcpEditorChannelImpl) -> Self {
+        Self { inner }
+    }
+}
 
 impl NotificationChannel for AcpEditorChannel {
     fn surface(&self) -> NotificationSurface {
@@ -242,10 +250,20 @@ impl NotificationChannel for AcpEditorChannel {
 
     fn dispatch(
         &self,
-        _event: &NotificationEvent,
-        _level: NotificationLevel,
+        event: &NotificationEvent,
+        level: NotificationLevel,
     ) -> Result<(), NotificationError> {
-        unimplemented!("Story 5.5c — ACP server notification channel")
+        let level_str = match level {
+            NotificationLevel::Immediate => "immediate",
+            NotificationLevel::Queue => "queue",
+            NotificationLevel::Digest => "digest",
+        };
+        let event_json = serde_json::to_value(event)
+            .map_err(|e| NotificationError::WriteFailed(format!("serialize event: {e}")))?;
+        self.inner
+            .dispatch_event(event_json, level_str)
+            .map_err(|e| NotificationError::WriteFailed(e))?;
+        Ok(())
     }
 }
 

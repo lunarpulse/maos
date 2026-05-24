@@ -117,6 +117,7 @@ impl LogRecallAdapter {
             FrameKind::TaskStalled => DomainFrameKindLabel::TaskStalled,
             FrameKind::SilentFailureSuspect => DomainFrameKindLabel::SilentFailureSuspect,
             FrameKind::SpiritRevoked => DomainFrameKindLabel::SpiritRevoked,
+            FrameKind::McpInvocation => DomainFrameKindLabel::McpInvocation,
         }
     }
 
@@ -141,6 +142,8 @@ impl LogRecallAdapter {
             DomainFrameKindLabel::TaskStalled => FrameKind::TaskStalled,
             DomainFrameKindLabel::SilentFailureSuspect => FrameKind::SilentFailureSuspect,
             DomainFrameKindLabel::SpiritRevoked => FrameKind::SpiritRevoked,
+            DomainFrameKindLabel::McpInvocation => FrameKind::McpInvocation,
+            _ => FrameKind::McpInvocation,
         }
     }
 

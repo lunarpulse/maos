@@ -199,6 +199,7 @@ impl UpgradeOrchestrator {
                 timestamp: now_ns / 1_000_000_000,
                 lifecycle_event: LifecycleEvent::Upgrade,
                 spirit_id: spirit_id.into(),
+                payload: None,
                 effective_sandbox_tier: None,
             }));
 

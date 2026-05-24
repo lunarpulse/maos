@@ -71,6 +71,8 @@ pub enum FrameKind {
     SilentFailureSuspect = 16,
     /// Story 5.4 — Spirit was revoked via CRL propagation.
     SpiritRevoked = 17,
+    /// Story 5.5c — MCP tool invocation routed through kernel capability mediation.
+    McpInvocation = 18,
 }
 
 impl FrameKind {
@@ -95,6 +97,7 @@ impl FrameKind {
             15 => Some(Self::TaskStalled),
             16 => Some(Self::SilentFailureSuspect),
             17 => Some(Self::SpiritRevoked),
+            18 => Some(Self::McpInvocation),
             _ => None,
         }
     }
