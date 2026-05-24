@@ -118,6 +118,8 @@ impl LogRecallAdapter {
             FrameKind::SilentFailureSuspect => DomainFrameKindLabel::SilentFailureSuspect,
             FrameKind::SpiritRevoked => DomainFrameKindLabel::SpiritRevoked,
             FrameKind::McpInvocation => DomainFrameKindLabel::McpInvocation,
+            FrameKind::SpiritAdmitted => DomainFrameKindLabel::SpiritAdmitted,
+            FrameKind::RegistryYank => DomainFrameKindLabel::RegistryYank,
         }
     }
 
@@ -143,7 +145,12 @@ impl LogRecallAdapter {
             DomainFrameKindLabel::SilentFailureSuspect => FrameKind::SilentFailureSuspect,
             DomainFrameKindLabel::SpiritRevoked => FrameKind::SpiritRevoked,
             DomainFrameKindLabel::McpInvocation => FrameKind::McpInvocation,
-            _ => FrameKind::McpInvocation,
+            DomainFrameKindLabel::SpiritAdmitted => FrameKind::SpiritAdmitted,
+            DomainFrameKindLabel::RegistryYank => FrameKind::RegistryYank,
+            _ => {
+                eprintln!("maos: warning: unmapped FrameKindLabel in to_kernel_kind, defaulting to McpInvocation");
+                FrameKind::McpInvocation
+            }
         }
     }
 

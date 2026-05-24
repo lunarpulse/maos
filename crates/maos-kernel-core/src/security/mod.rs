@@ -14,6 +14,7 @@ pub mod approval;
 pub mod crypto;
 pub mod drift;
 pub mod manifest;
+pub mod operator_config;
 pub mod posture;
 pub mod sandbox;
 

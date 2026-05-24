@@ -1,0 +1,21 @@
+{
+  "description": "Compliance claim missing fingerprint_hash — local tier admits anyway (claim only checked for public_untrusted)",
+  "spirit_id": "spirit-missing-claim-005",
+  "version": "0.1.0",
+  "manifest_toml_b64": "W3NwaXJpdF0KbmFtZSA9ICJ0ZXN0LW1pc3NpbmctY2xhaW0iCnZlcnNpb24gPSAiMC4xLjAiCnRydXN0X3RpZXIgPSAibG9jYWwiCg==",
+  "artifact_bytes_b64": "ZHVtbXktYXJ0aWZhY3QtYnl0ZXMtMDEyMzQ1Njc4OQ==",
+  "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "publisher_pubkey_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compliance_envelope": {
+    "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "attester_pubkey_hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "claim_bytes_b64": "eyJ0cnVzdF90aWVyIjoibG9jYWwiLCJzYW5kYm94X3RpZXIiOiJ0MCIsImNhcGFiaWxpdHlfc2NvcGUiOltdLCJwcm92aWRlcl9lbmRwb2ludCI6eyJwcm92aWRlcl9pZCI6IiIsImVuZHBvaW50X3VybCI6IiJ9LCJjcnlwdG9fcHJvdmlkZXIiOiIifQ==",
+    "signing_alg": "Ed25519"
+  },
+  "expected_admission": {
+    "admit": true,
+    "effective_tier": "local",
+    "error_variant": null
+  },
+  "expected_error": null
+}

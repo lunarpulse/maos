@@ -1,3 +1,9 @@
+## Deferred from: code review of 5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers (2026-05-24)
+
+- Server tests are `#[ignore]` stubs with no replacement e2e test — deferred to Task 16 (unchecked). `server.rs` JSON-RPC dispatch path completely untested.
+- `search()` holds index Mutex while repeatedly acquiring yanks Mutex — O(N×M) lock contention. Acceptable at v0.5-α scale (<10⁴ Spirits). Deferred to Story 7.2 for B-tree/inverted-index optimization.
+- `monotonic_now_ns()` resets on process restart — `yanks_since` timestamps not comparable across restarts. Inherent to `Instant`-based approach. Deferred to Story 7.2 for persistent timestamp model.
+- `bin/server.rs` is a stub exiting with code 1 — deferred to Task 13/16 decision on `[[bin]]` vs `MAOS_ONE_SHOT` mode.
 
 ## Deferred from: code review of 5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s (2026-05-22)
 

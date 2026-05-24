@@ -533,3 +533,8 @@
 "maos_kernel_core::mcp::McpClientAdapter"                             = "data-movement"
 "maos_kernel_core::api::McpClientAdapter"                             = "data-movement"
 "maos_kernel_core::api::maos_domain::ports::McpClientPort"             = "data-movement"
+
+# Story 5.5d — Spirit Registry client + admission (data-movement: registry ops)
+"maos_registry::client::McpSpiritRegistryClient"                       = "data-movement"
+"maos_registry::admission::admit_spirit"                                = "data-movement"
+"maos_domain::ports::registry::SpiritRegistryClient"                    = "data-movement"

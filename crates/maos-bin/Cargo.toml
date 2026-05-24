@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [features]
 spirit_test = ["maos-kernel-core/spirit_test", "maos-spirit-sdk/spirit_test"]
-fixture_replay = ["maos-mcp/fixture_replay", "maos-acp/fixture_replay", "maos-providers/fixture_replay"]
+fixture_replay = ["maos-mcp/fixture_replay", "maos-acp/fixture_replay", "maos-providers/fixture_replay", "maos-registry/fixture_replay"]
 
 [dependencies]
 maos-audit = { path = "../maos-audit" }
@@ -21,6 +21,7 @@ maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-mcp = { path = "../maos-mcp" }
+maos-registry = { path = "../maos-registry" }
 maos-acp = { path = "../maos-acp" }
 maos-providers = { path = "../maos-providers" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
@@ -34,3 +35,5 @@ toml = "0.8"
 parking_lot = "0.12"
 crossbeam-channel = "0.5"
 hex = "0.4"
+sha2 = "0.10"
+ring = "0.17"

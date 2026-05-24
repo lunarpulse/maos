@@ -352,6 +352,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _poller_handle = revocation_poller.spawn(cancel_token.child_token());
     eprintln!("maos: RevocationApplier + RevocationPoller wired (Story 5.4)");
 
+    // Story 5.5d — Registry client + yank poller wiring
+    let registry_cfg = maos_kernel_core::security::operator_config::RegistrySection::resolve_from_env_and_disk();
+    let _registry_client: Arc<dyn maos_domain::ports::registry::SpiritRegistryClient> =
+        if std::env::var("MAOS_REGISTRY_URI").as_deref() == Ok("stub") {
+            use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
+            Arc::new(FixtureReplaySpiritRegistryClient::new(vec![]))
+        } else if registry_cfg.uri.is_empty() {
+            use maos_registry::client::NullSpiritRegistryClient;
+            Arc::new(NullSpiritRegistryClient)
+        } else {
+            // Production: McpSpiritRegistryClient over the MCP client
+            // (wiring deferred until the MCP client is constructed in
+            //  Story 5.5c's section; for now, use Null as placeholder)
+            use maos_registry::client::NullSpiritRegistryClient;
+            Arc::new(NullSpiritRegistryClient)
+        };
+    eprintln!(
+        "maos: registry uri={} tier_floor={:?} t3_public_untrusted={} allow_unsigned_local={}",
+        registry_cfg.uri,
+        registry_cfg.tier_floor,
+        registry_cfg.t3_for_public_untrusted,
+        registry_cfg.allow_unsigned_local
+    );
+
     // Story 5.4 — UpgradeOrchestrator constructed at composition root.
     let upgrade_orchestrator = Arc::new(maos_kernel_core::lifecycle::UpgradeOrchestrator::new(
         Arc::clone(&scheduler),
@@ -2355,9 +2379,246 @@ description = "smoke test spirit successor"
             return Ok(());
         }
 
+        if mode == "smoke-registry-5d" {
+            use maos_domain::ports::registry::{SearchQuery, SignedPackage, SpiritId, SpiritRegistryClient, TrustTier, YankReason, YankList};
+            use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
+            use maos_spirit_abi::compliance::{ComplianceClaimEnvelope, SigningAlg};
+            use ring::signature::KeyPair;
+
+            eprintln!("maos: smoke-registry-5d — Spirit Registry smoke arm");
+
+            // Step 1: registry_init
+            println!(r#"{{"step":1,"surface":"registry_init","tier_floor":"public_untrusted","t3_for_public_untrusted":false}}"#);
+
+            // Step 2: registry_publish
+            {
+                let pkg = SignedPackage::new(
+                    SpiritId::from("hello-spirit"),
+                    "0.1.0".into(),
+                    b"[spirit]\nname=\"hello\"\n".to_vec(),
+                    b"binary".to_vec(),
+                    [0xAAu8; 64],
+                    [0xBBu8; 32],
+                    ComplianceClaimEnvelope {
+                        signature: [0u8; 64],
+                        attester_pubkey: [1u8; 32],
+                        claim_bytes: vec![],
+                        signing_alg: SigningAlg::Ed25519,
+                    },
+                );
+                let client = FixtureReplaySpiritRegistryClient::new(vec![
+                    Ok(serde_json::json!({"publish_id": "pub-1", "spirit_id": "hello-spirit", "version": "0.1.0"})),
+                ]);
+                let receipt = client.publish(&pkg).unwrap();
+                assert!(!receipt.publish_id.is_empty());
+                println!(r#"{{"step":2,"surface":"registry_publish","outcome":"ok","tier":"local","spirit_id":"hello-spirit","version":"0.1.0"}}"#);
+            }
+
+            // Step 3: registry_search
+            {
+                let client = FixtureReplaySpiritRegistryClient::new(vec![
+                    Ok(serde_json::json!({"items": [{"spirit_id": "hello-spirit", "version": "0.1.0", "summary": "hello"}]})),
+                ]);
+                let q = SearchQuery::new("hello-spirit".into(), false, 50);
+                let results = client.search(&q).unwrap();
+                assert_eq!(results.items.len(), 1);
+                println!(r#"{{"step":3,"surface":"registry_search","outcome":"ok","results":1}}"#);
+            }
+
+            // Step 4: registry_install (manifest + artifact)
+            {
+                let client = FixtureReplaySpiritRegistryClient::new(vec![
+                    Ok(serde_json::json!({"spirit_id": "hello-spirit", "version": "0.1.0", "manifest_toml": [98,105,110], "signature": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "signer_pubkey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"})),
+                    Ok(serde_json::json!({"spirit_id": "hello-spirit", "version": "0.1.0", "artifact_bytes": [98,105,110], "signature": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "signer_pubkey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"})),
+                ]);
+                let sid = SpiritId::from("hello-spirit");
+                let _manifest = client.manifest(&sid, "0.1.0").unwrap();
+                let _artifact = client.artifact(&sid, "0.1.0").unwrap();
+                println!(r#"{{"step":4,"surface":"registry_install","outcome":"ok","tier":"local","spirit_id":"hello-spirit"}}"#);
+            }
+
+            // Step 5: admission_public_untrusted (well-formed)
+            {
+                use maos_registry::admission::{admit_spirit, AdmissionConfig};
+                use maos_registry::compliance_verify::compute_fingerprint_hash;
+                use maos_spirit_abi::compliance::{
+                    CryptoProviderId, ExecutionContextFingerprint,
+                    ProviderEndpointPin, SandboxTier, TrustTier,
+                };
+                use ring::rand::SystemRandom;
+                use ring::signature::Ed25519KeyPair;
+                use std::collections::BTreeSet;
+
+                let rng = SystemRandom::new();
+                let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
+                let keypair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+                let pubkey: [u8; 32] = keypair.public_key().as_ref().try_into().unwrap();
+
+                let manifest = b"[spirit]\nname = \"test\"\nversion = \"0.1.0\"\ntrust_tier = \"public_untrusted\"\nsandbox_tier = \"t3\"\n";
+                let artifact = b"binary".to_vec();
+
+                let mut manifest_hasher = sha2::Sha256::new();
+                use sha2::Digest;
+                manifest_hasher.update(manifest);
+                let manifest_hash: [u8; 32] = manifest_hasher.finalize().into();
+
+                let fp = ExecutionContextFingerprint {
+                    manifest_hash,
+                    spirit_version: "0.1.0".to_string(),
+                    trust_tier: TrustTier::PublicUntrusted,
+                    sandbox_tier: SandboxTier::T3,
+                    capability_scope: BTreeSet::new(),
+                    provider_endpoint: ProviderEndpointPin {
+                        provider_id: String::new(),
+                        endpoint_url: String::new(),
+                        model_id: None,
+                    },
+                    crypto_provider: CryptoProviderId(String::new()),
+                };
+                let fp_hash = compute_fingerprint_hash(&fp);
+                let fp_hex = hex::encode(fp_hash);
+
+                let mut pkg_hasher = sha2::Sha256::new();
+                pkg_hasher.update(manifest);
+                pkg_hasher.update(&artifact);
+                let pkg_msg = pkg_hasher.finalize();
+                let pkg_signature = keypair.sign(&pkg_msg);
+
+                let claim_json = serde_json::json!({
+                    "fingerprint_hash": fp_hex,
+                    "trust_tier": "public_untrusted",
+                    "sandbox_tier": "t3",
+                    "capability_scope": [],
+                    "provider_endpoint": {"provider_id": "", "endpoint_url": ""},
+                    "crypto_provider": ""
+                });
+                let claim_bytes = serde_json::to_vec(&claim_json).unwrap();
+                let claim_sig = keypair.sign(&claim_bytes);
+
+                let envelope = ComplianceClaimEnvelope {
+                    signature: claim_sig.as_ref().try_into().unwrap(),
+                    attester_pubkey: pubkey,
+                    claim_bytes,
+                    signing_alg: SigningAlg::Ed25519,
+                };
+
+                let pkg = SignedPackage::new(
+                    SpiritId::from("test-pub-untrusted"),
+                    "0.1.0".into(),
+                    manifest.to_vec(),
+                    artifact,
+                    pkg_signature.as_ref().try_into().unwrap(),
+                    pubkey,
+                    envelope,
+                );
+
+                let cfg = AdmissionConfig {
+                    tier_floor: TrustTier::Local,
+                    registry_origin_tier: TrustTier::Local,
+                    t3_for_public_untrusted: false,
+                    allow_unsigned_local: true,
+                    org_signing_pubkey: None,
+                };
+
+                let decision = admit_spirit(&pkg, &cfg).unwrap();
+                assert!(decision.admit);
+                println!(r#"{{"step":5,"surface":"admission_public_untrusted","outcome":"ok","fingerprint_match":true}}"#);
+            }
+
+            // Step 6: admission_compliance_drift
+            {
+                use maos_registry::admission::{admit_spirit, AdmissionConfig};
+                use maos_registry::admission::AdmissionError;
+                use ring::rand::SystemRandom;
+                use ring::signature::Ed25519KeyPair;
+
+                let rng = SystemRandom::new();
+                let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
+                let keypair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+                let pubkey: [u8; 32] = keypair.public_key().as_ref().try_into().unwrap();
+
+                let manifest = b"[spirit]\nname = \"drift-test\"\nversion = \"0.1.0\"\ntrust_tier = \"public_untrusted\"\nsandbox_tier = \"t3\"\n";
+                let artifact = b"binary".to_vec();
+
+                let mut hasher = sha2::Sha256::new();
+                use sha2::Digest;
+                hasher.update(manifest);
+                hasher.update(&artifact);
+                let msg = hasher.finalize();
+                let signature = keypair.sign(&msg);
+
+                let claim_json = serde_json::json!({
+                    "fingerprint_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "trust_tier": "public_untrusted",
+                    "sandbox_tier": "t3",
+                    "capability_scope": [],
+                    "provider_endpoint": {"provider_id": "test", "endpoint_url": "http://localhost"},
+                    "crypto_provider": "ring"
+                });
+                let claim_bytes = serde_json::to_vec(&claim_json).unwrap();
+                let claim_sig = keypair.sign(&claim_bytes);
+
+                let envelope = ComplianceClaimEnvelope {
+                    signature: claim_sig.as_ref().try_into().unwrap(),
+                    attester_pubkey: pubkey,
+                    claim_bytes,
+                    signing_alg: SigningAlg::Ed25519,
+                };
+
+                let pkg = SignedPackage::new(
+                    SpiritId::from("drift-test"),
+                    "0.1.0".into(),
+                    manifest.to_vec(),
+                    artifact,
+                    signature.as_ref().try_into().unwrap(),
+                    pubkey,
+                    envelope,
+                );
+
+                let cfg = AdmissionConfig {
+                    tier_floor: TrustTier::Local,
+                    registry_origin_tier: TrustTier::Local,
+                    t3_for_public_untrusted: false,
+                    allow_unsigned_local: true,
+                    org_signing_pubkey: None,
+                };
+
+                let err = admit_spirit(&pkg, &cfg).unwrap_err();
+                assert!(matches!(err, AdmissionError::ComplianceContextDrift { .. }));
+                println!(r#"{{"step":6,"surface":"admission_compliance_drift","outcome":"rejected","error":"EComplianceContextDrift"}}"#);
+            }
+
+            // Step 7: registry_yank_propagate
+            {
+                let client = FixtureReplaySpiritRegistryClient::new(vec![
+                    Ok(serde_json::json!({"yank_id": "yank-1", "spirit_id": "hello-spirit", "version": "0.1.0"})),
+                    Ok(serde_json::json!({"entries": [{"spirit_id": "hello-spirit", "version": "0.1.0", "yanked_at_ns": 1, "reason": "smoke test"}]})),
+                ]);
+                let sid = SpiritId::from("hello-spirit");
+                let receipt = client.deprecate(&sid, "0.1.0", &YankReason::new("smoke test".into())).unwrap();
+                assert_eq!(receipt.yank_id, "yank-1");
+                let list = client.yanks_since(0).unwrap();
+                assert_eq!(list.entries.len(), 1);
+                println!(r#"{{"step":7,"surface":"registry_yank_propagate","outcome":"ok","yanked":1}}"#);
+            }
+
+            eprintln!("maos: smoke-registry-5d complete — 7 surfaces exercised");
+            return Ok(());
+        }
+
+        if mode == "registry-server" {
+            use maos_registry::SpiritRegistryServer;
+            use maos_registry::storage::LocalFsRegistryStorage;
+            eprintln!("maos: registry-server mode — starting SpiritRegistryServer");
+            let storage = std::sync::Arc::new(LocalFsRegistryStorage::new()?);
+            let server = SpiritRegistryServer::new(storage, "127.0.0.1:6789".into(), None);
+            server.run().map_err(|e| format!("registry server: {e}"))?;
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }

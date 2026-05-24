@@ -1,0 +1,16 @@
+{
+  "description": "Public vetted trust tier cannot be self-asserted \u2014 should reject with PublicVettedDeferred",
+  "spirit_id": "spirit-vetted-008",
+  "version": "0.1.0",
+  "manifest_toml_b64": "W3NwaXJpdF0KbmFtZSA9ICJ0ZXN0LXB1YmxpYy12ZXR0ZWQiCnZlcnNpb24gPSAiMC4xLjAiCnRydXN0X3RpZXIgPSAicHVibGljX3ZldHRlZCIK",
+  "artifact_bytes_b64": "ZHVtbXktYXJ0aWZhY3QtYnl0ZXMtMDEyMzQ1Njc4OQ==",
+  "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "publisher_pubkey_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compliance_envelope": {
+    "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "attester_pubkey_hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "claim_bytes_b64": "eyJmaW5nZXJwcmludF9oYXNoIjoiMDAwMDAwMDAwMDAwMDAwNyIsInRydXN0X3RpZXIiOiJwdWJsaWNfdmV0dGVkIiwic2FuZGJveF90aWVyIjoidDIiLCJjYXBhYmlsaXR5X3Njb3BlIjpbXSwicHJvdmlkZXJfZW5kcG9pbnQiOnsicHJvdmlkZXJfaWQiOiIiLCJlbmRwb2ludF91cmwiOiIifSwiY3J5cHRvX3Byb3ZpZGVyIjoiIn0=",
+    "signing_alg": "Ed25519"
+  },
+  "expected_error": "PublicVettedDeferred"
+}

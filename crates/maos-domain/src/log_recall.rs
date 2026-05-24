@@ -61,6 +61,10 @@ pub enum FrameKindLabel {
     SpiritRevoked,
     /// Story 5.5c — MCP tool invocation.
     McpInvocation,
+    /// Story 5.5d — Spirit admitted to the kernel via registry.
+    SpiritAdmitted,
+    /// Story 5.5d — Registry yank propagated to the kernel.
+    RegistryYank,
 }
 
 impl LogRecallFilter {

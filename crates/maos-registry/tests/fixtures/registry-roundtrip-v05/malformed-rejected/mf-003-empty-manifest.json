@@ -1,0 +1,21 @@
+{
+  "description": "Manifest TOML decodes to zero bytes — defaults to local tier, admits when unsigned allowed",
+  "spirit_id": "spirit-empty-manifest-003",
+  "version": "0.1.0",
+  "manifest_toml_b64": "",
+  "artifact_bytes_b64": "ZHVtbXktYXJ0aWZhY3QtYnl0ZXMtMDEyMzQ1Njc4OQ==",
+  "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "publisher_pubkey_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compliance_envelope": {
+    "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "attester_pubkey_hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "claim_bytes_b64": "eyJmaW5nZXJwcmludF9oYXNoIjoiMDAwMDAwMDAwMDAwMDAwMiIsInRydXN0X3RpZXIiOiJsb2NhbCIsInNhbmRib3hfdGllciI6InQwIiwiY2FwYWJpbGl0eV9zY29wZSI6W10sInByb3ZpZGVyX2VuZHBvaW50Ijp7InByb3ZpZGVyX2lkIjoiIiwiZW5kcG9pbnRfdXJsIjoiIn0sImNyeXB0b19wcm92aWRlciI6IiJ9",
+    "signing_alg": "Ed25519"
+  },
+  "expected_admission": {
+    "admit": true,
+    "effective_tier": "local",
+    "error_variant": null
+  },
+  "expected_error": null
+}

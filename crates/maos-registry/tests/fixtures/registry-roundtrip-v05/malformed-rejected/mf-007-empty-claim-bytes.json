@@ -1,0 +1,16 @@
+{
+  "description": "Claim bytes is empty \u2014 compliance envelope with no claim payload",
+  "spirit_id": "spirit-empty-claim-007",
+  "version": "0.1.0",
+  "manifest_toml_b64": "W3NwaXJpdF0KbmFtZSA9ICJ0ZXN0LWVtcHR5LWNsYWltIgp2ZXJzaW9uID0gIjAuMS4wIgp0cnVzdF90aWVyID0gInB1YmxpY191bnRydXN0ZWQiCg==",
+  "artifact_bytes_b64": "ZHVtbXktYXJ0aWZhY3QtYnl0ZXMtMDEyMzQ1Njc4OQ==",
+  "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "publisher_pubkey_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compliance_envelope": {
+    "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "attester_pubkey_hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "claim_bytes_b64": "",
+    "signing_alg": "Ed25519"
+  },
+  "expected_error": "PublisherSignatureInvalid"
+}

@@ -1,0 +1,20 @@
+{
+  "description": "Full manifest with all optional fields - org_internal tier with no org_signing_pubkey → OrgSignatureInvalid",
+  "spirit_id": "spirit-full-007",
+  "version": "0.1.0",
+  "manifest_toml_b64": "W3NwaXJpdF0KbmFtZSA9ICJ0ZXN0LWZ1bGwtbWFuaWZlc3QiCnZlcnNpb24gPSAiMC4xLjAiCnRydXN0X3RpZXIgPSAib3JnX2ludGVybmFsIgpzYW5kYm94X3RpZXIgPSAidDIiCmNhcGFiaWxpdHlfc2NvcGUgPSBbImZzLnJlYWQiLCAibmV0LnRjcCJdCnByb3ZpZGVyX2lkID0gInByb3ZpZGVyLTAwNyIKZW5kcG9pbnRfdXJsID0gImh0dHBzOi8vYXBpLmV4YW1wbGUuY29tL3YxL3NwaXJpdCIKbW9kZWxfaWQgPSAiZ3B0LTRvLW1pbmkiCmNyeXB0b19wcm92aWRlciA9ICJyaW5nIgo=",
+  "artifact_bytes_b64": "ZHVtbXktYXJ0aWZhY3QtYnl0ZXMtMDEyMzQ1Njc4OQ==",
+  "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "publisher_pubkey_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compliance_envelope": {
+    "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "attester_pubkey_hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "claim_bytes_b64": "eyJmaW5nZXJwcmludF9oYXNoIjoiMDAwMDAwMDAwMDAwMDAwNiIsInRydXN0X3RpZXIiOiJvcmdfaW50ZXJuYWwiLCJzYW5kYm94X3RpZXIiOiJ0MiIsImNhcGFiaWxpdHlfc2NvcGUiOlsiZnMucmVhZCIsIm5ldC50Y3AiXSwicHJvdmlkZXJfZW5kcG9pbnQiOnsicHJvdmlkZXJfaWQiOiJwcm92aWRlci0wMDciLCJlbmRwb2ludF91cmwiOiJodHRwczovL2FwaS5leGFtcGxlLmNvbS92MS9zcGlyaXQifSwiY3J5cHRvX3Byb3ZpZGVyIjoicmluZyJ9",
+    "signing_alg": "Ed25519"
+  },
+  "expected_admission": {
+    "admit": false,
+    "effective_tier": "org_internal",
+    "error_variant": "OrgSignatureInvalid"
+  }
+}

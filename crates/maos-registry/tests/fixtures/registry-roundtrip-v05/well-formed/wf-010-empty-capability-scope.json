@@ -1,0 +1,20 @@
+{
+  "description": "Public untrusted with empty capability_scope - dummy Ed25519 signature will fail verification → PublisherSignatureInvalid",
+  "spirit_id": "spirit-empty-cap-010",
+  "version": "0.1.0",
+  "manifest_toml_b64": "W3NwaXJpdF0KbmFtZSA9ICJ0ZXN0LWVtcHR5LWNhcCIKdmVyc2lvbiA9ICIwLjEuMCIKdHJ1c3RfdGllciA9ICJwdWJsaWNfdW50cnVzdGVkIgo=",
+  "artifact_bytes_b64": "ZHVtbXktYXJ0aWZhY3QtYnl0ZXMtMDEyMzQ1Njc4OQ==",
+  "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "publisher_pubkey_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compliance_envelope": {
+    "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "attester_pubkey_hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "claim_bytes_b64": "eyJmaW5nZXJwcmludF9oYXNoIjoiMDAwMDAwMDAwMDAwMDAwOSIsInRydXN0X3RpZXIiOiJwdWJsaWNfdW50cnVzdGVkIiwic2FuZGJveF90aWVyIjoidDIiLCJjYXBhYmlsaXR5X3Njb3BlIjpbXSwicHJvdmlkZXJfZW5kcG9pbnQiOnsicHJvdmlkZXJfaWQiOiIiLCJlbmRwb2ludF91cmwiOiIifSwiY3J5cHRvX3Byb3ZpZGVyIjoiIn0=",
+    "signing_alg": "Ed25519"
+  },
+  "expected_admission": {
+    "admit": false,
+    "effective_tier": "public_untrusted",
+    "error_variant": "PublisherSignatureInvalid"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "description": "Org internal trust tier, valid Ed25519 signature from org publisher - should admit",
+  "spirit_id": "spirit-org-internal-003",
+  "version": "0.1.0",
+  "manifest_toml_b64": "W3NwaXJpdF0KbmFtZSA9ICJ0ZXN0LW9yZy1pbnRlcm5hbCIKdmVyc2lvbiA9ICIwLjEuMCIKdHJ1c3RfdGllciA9ICJvcmdfaW50ZXJuYWwiCg==",
+  "artifact_bytes_b64": "ZHVtbXktYXJ0aWZhY3QtYnl0ZXMtMDEyMzQ1Njc4OQ==",
+  "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "publisher_pubkey_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compliance_envelope": {
+    "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "attester_pubkey_hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "claim_bytes_b64": "eyJmaW5nZXJwcmludF9oYXNoIjoiMDAwMDAwMDAwMDAwMDAwMiIsInRydXN0X3RpZXIiOiJvcmdfaW50ZXJuYWwiLCJzYW5kYm94X3RpZXIiOiJ0MSIsImNhcGFiaWxpdHlfc2NvcGUiOltdLCJwcm92aWRlcl9lbmRwb2ludCI6eyJwcm92aWRlcl9pZCI6IiIsImVuZHBvaW50X3VybCI6IiJ9LCJjcnlwdG9fcHJvdmlkZXIiOiIifQ==",
+    "signing_alg": "Ed25519"
+  },
+  "expected_admission": {
+    "admit": false,
+    "effective_tier": "org_internal",
+    "error_variant": "OrgSignatureInvalid"
+  }
+}

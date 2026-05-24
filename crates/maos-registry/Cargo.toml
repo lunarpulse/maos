@@ -1,0 +1,32 @@
+[package]
+name = "maos-registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS Spirit Registry — MCP-Streamable-HTTP server + kernel-side client (v0.5-α)"
+
+[dependencies]
+maos-domain = { path = "../maos-domain" }
+maos-mcp = { path = "../maos-mcp" }
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+sha2 = "0.10"
+ring = "0.17"
+hex = "0.4"
+serde_cbor = "0.11"
+
+[dev-dependencies]
+base64 = "0.22"
+tempfile = "3"
+
+[features]
+default = []
+fixture_replay = ["maos-mcp/fixture_replay"]
+
+[[bin]]
+name = "maos-registry-server"
+path = "src/bin/server.rs"

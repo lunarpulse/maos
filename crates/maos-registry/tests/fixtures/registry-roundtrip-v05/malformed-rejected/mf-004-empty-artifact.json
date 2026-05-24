@@ -1,0 +1,21 @@
+{
+  "description": "Artifact bytes decodes to zero bytes — local tier admits when unsigned allowed (empty artifact is valid)",
+  "spirit_id": "spirit-empty-artifact-004",
+  "version": "0.1.0",
+  "manifest_toml_b64": "W3NwaXJpdF0KbmFtZSA9ICJ0ZXN0LWVtcHR5LWFydCIKdmVyc2lvbiA9ICIwLjEuMCIKdHJ1c3RfdGllciA9ICJsb2NhbCIK",
+  "artifact_bytes_b64": "",
+  "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "publisher_pubkey_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compliance_envelope": {
+    "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "attester_pubkey_hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "claim_bytes_b64": "eyJmaW5nZXJwcmludF9oYXNoIjoiMDAwMDAwMDAwMDAwMDAwMyIsInRydXN0X3RpZXIiOiJsb2NhbCIsInNhbmRib3hfdGllciI6InQwIiwiY2FwYWJpbGl0eV9zY29wZSI6W10sInByb3ZpZGVyX2VuZHBvaW50Ijp7InByb3ZpZGVyX2lkIjoiIiwiZW5kcG9pbnRfdXJsIjoiIn0sImNyeXB0b19wcm92aWRlciI6IiJ9",
+    "signing_alg": "Ed25519"
+  },
+  "expected_admission": {
+    "admit": true,
+    "effective_tier": "local",
+    "error_variant": null
+  },
+  "expected_error": null
+}

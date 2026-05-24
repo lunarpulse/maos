@@ -205,7 +205,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57663b653d948a338bfb3eeba9bb2fd5fcfaecb9e199e87e1eda4d9e8b240fd9"
 dependencies = [
  "ciborium-io",
- "half",
+ "half 2.7.1",
 ]
 
 [[package]]
@@ -594,6 +594,12 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "half"
+version = "1.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b43ede17f21864e81be2fa654110bf1e793774238d86ef8555c37e6519c0403"
+
+[[package]]
+name = "half"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b"
@@ -954,11 +960,14 @@ dependencies = [
  "maos-kernel-core",
  "maos-mcp",
  "maos-providers",
+ "maos-registry",
  "maos-spirit-abi",
  "maos-spirit-hello",
  "maos-spirit-sdk",
  "parking_lot",
+ "ring",
  "serde_json",
+ "sha2",
  "tokio",
  "tokio-util",
  "toml 0.8.23",
@@ -1097,6 +1106,24 @@ dependencies = [
  "maos-domain",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "maos-registry"
+version = "0.1.0-alpha"
+dependencies = [
+ "base64",
+ "hex",
+ "maos-domain",
+ "maos-mcp",
+ "maos-spirit-abi",
+ "ring",
+ "serde",
+ "serde_cbor",
+ "serde_json",
+ "sha2",
+ "tempfile",
  "thiserror 2.0.18",
 ]
 
@@ -1541,6 +1568,16 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde_cbor"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bef2ebfde456fb76bbcf9f59315333decc4fda0b2b44b420243c11e0f5ec1f5"
+dependencies = [
+ "half 1.8.3",
+ "serde",
 ]
 
 [[package]]

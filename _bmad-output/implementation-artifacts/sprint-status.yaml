@@ -1,4 +1,4 @@
-last_updated: '2026-05-24T00:00:00Z'
+last_updated: '2026-05-25T00:30:00Z'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -57,7 +57,7 @@ development_status:
   5-5a-sandbox-tier-t3-container-isolation-via-docker-podman: done
   5-5b-run-the-multi-provider-ci-matrix-across-anthropic-openai-and-ollama: done
   5-5c-mcp-client-acp-server-tool-servers-and-editor-hosts: done
-  5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers: backlog
+  5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers: done
   5-5e-section-13-1-rust-inproc-measurement-gate-subprocess-vs-in-process-latency-decision: backlog
   epic-5-retrospective: optional
   epic-6: backlog

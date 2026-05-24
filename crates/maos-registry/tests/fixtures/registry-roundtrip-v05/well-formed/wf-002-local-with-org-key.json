@@ -1,0 +1,20 @@
+{
+  "description": "Local trust tier, publisher key matches org key - should admit as org_internal",
+  "spirit_id": "spirit-org-key-002",
+  "version": "0.1.0",
+  "manifest_toml_b64": "W3NwaXJpdF0KbmFtZSA9ICJ0ZXN0LW9yZy1rZXkiCnZlcnNpb24gPSAiMC4xLjAiCnRydXN0X3RpZXIgPSAibG9jYWwiCnByb3ZpZGVyX2lkID0gIm9yZy1rZXktbWF0Y2giCg==",
+  "artifact_bytes_b64": "ZHVtbXktYXJ0aWZhY3QtYnl0ZXMtMDEyMzQ1Njc4OQ==",
+  "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "publisher_pubkey_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compliance_envelope": {
+    "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "attester_pubkey_hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "claim_bytes_b64": "eyJmaW5nZXJwcmludF9oYXNoIjoiMDAwMDAwMDAwMDAwMDAwMSIsInRydXN0X3RpZXIiOiJsb2NhbCIsInNhbmRib3hfdGllciI6InQwIiwiY2FwYWJpbGl0eV9zY29wZSI6W10sInByb3ZpZGVyX2VuZHBvaW50Ijp7InByb3ZpZGVyX2lkIjoib3JnLWtleS1tYXRjaCIsImVuZHBvaW50X3VybCI6IiJ9LCJjcnlwdG9fcHJvdmlkZXIiOiIifQ==",
+    "signing_alg": "Ed25519"
+  },
+  "expected_admission": {
+    "admit": true,
+    "effective_tier": "local",
+    "error_variant": null
+  }
+}

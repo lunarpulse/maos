@@ -14,6 +14,7 @@ members = [
     "crates/maos-domain",
     "crates/maos-kernel-core",
     "crates/maos-mcp",
+    "crates/maos-registry",
     "crates/maos-persistence",
     "crates/maos-providers",
     "crates/maos-secrets",

@@ -1,0 +1,186 @@
+//! Operator configuration — operator-policy section for [registry].
+//!
+//! Resolved at composition root in this priority order:
+//! env-vars (MAOS_REGISTRY_*) → ~/.config/maos/operator.toml → built-in defaults.
+
+use maos_spirit_abi::compliance::TrustTier;
+
+/// Operator-configurable registry section per ADR-009.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RegistrySection {
+    #[doc = "Construct via [`RegistrySection::new`] — registry MCP endpoint URI."]
+    pub uri: String,
+    #[doc = "Construct via [`RegistrySection::new`] — minimum trust-tier floor enforced."]
+    pub tier_floor: TrustTier,
+    #[doc = "Construct via [`RegistrySection::new`] — escalate public-untrusted to T3 sandbox."]
+    pub t3_for_public_untrusted: bool,
+    #[doc = "Construct via [`RegistrySection::new`] — allow unsigned local Spirits (dev workflow)."]
+    pub allow_unsigned_local: bool,
+    #[doc = "Construct via [`RegistrySection::new`] — Ed25519 public key the registry-side org-internal anchor signs with."]
+    pub org_signing_pubkey: Option<[u8; 32]>,
+}
+
+impl RegistrySection {
+    pub fn new(
+        uri: String,
+        tier_floor: TrustTier,
+        t3_for_public_untrusted: bool,
+        allow_unsigned_local: bool,
+        org_signing_pubkey: Option<[u8; 32]>,
+    ) -> Self {
+        Self {
+            uri,
+            tier_floor,
+            t3_for_public_untrusted,
+            allow_unsigned_local,
+            org_signing_pubkey,
+        }
+    }
+
+    /// Resolve from env-vars, operator.toml, and built-in defaults.
+    pub fn resolve_from_env_and_disk() -> Self {
+        // 1. Start with built-in defaults
+        let mut section = Self::defaults();
+
+        // 2. Override from ~/.config/maos/operator.toml if present
+        if let Ok(home) = std::env::var("HOME") {
+            let path = std::path::PathBuf::from(home)
+                .join(".config")
+                .join("maos")
+                .join("operator.toml");
+            if path.exists() {
+                if let Ok(contents) = std::fs::read_to_string(&path) {
+                    if let Ok(toml_val) = contents.parse::<toml::Value>() {
+                        if let Some(registry_table) = toml_val.get("registry") {
+                            if let Some(uri) = registry_table.get("uri").and_then(|v| v.as_str()) {
+                                section.uri = uri.to_string();
+                            }
+                            if let Some(tf) = registry_table.get("tier_floor").and_then(|v| v.as_str()) {
+                                section.tier_floor = parse_tier(tf);
+                            }
+                            if let Some(b) = registry_table.get("t3_for_public_untrusted").and_then(|v| v.as_bool()) {
+                                section.t3_for_public_untrusted = b;
+                            }
+                            if let Some(b) = registry_table.get("allow_unsigned_local").and_then(|v| v.as_bool()) {
+                                section.allow_unsigned_local = b;
+                            }
+                            if let Some(hex_key) = registry_table.get("org_signing_pubkey").and_then(|v| v.as_str()) {
+                                if let Ok(bytes) = hex::decode(hex_key) {
+                                    if let Ok(arr) = bytes.try_into() {
+                                        section.org_signing_pubkey = Some(arr);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Override from env vars (highest priority)
+        if let Ok(uri) = std::env::var("MAOS_REGISTRY_URI") {
+            section.uri = uri;
+        }
+        if let Ok(tf) = std::env::var("MAOS_REGISTRY_TIER_FLOOR") {
+            section.tier_floor = parse_tier(&tf);
+        }
+        if let Ok(v) = std::env::var("MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED") {
+            section.t3_for_public_untrusted = v == "true" || v == "1";
+        }
+        if let Ok(v) = std::env::var("MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL") {
+            section.allow_unsigned_local = !(v == "false" || v == "0");
+        }
+        if let Ok(hex_key) = std::env::var("MAOS_REGISTRY_ORG_SIGNING_PUBKEY") {
+            if let Ok(bytes) = hex::decode(&hex_key) {
+                if let Ok(arr) = bytes.try_into() {
+                    section.org_signing_pubkey = Some(arr);
+                }
+            }
+        }
+
+        section
+    }
+
+    /// Built-in defaults: most-permissive, unconfigured.
+    fn defaults() -> Self {
+        Self {
+            uri: String::new(),
+            tier_floor: TrustTier::Local,
+            t3_for_public_untrusted: false,
+            allow_unsigned_local: true,
+            org_signing_pubkey: None,
+        }
+    }
+}
+
+fn parse_tier(s: &str) -> TrustTier {
+    match s.trim().to_lowercase().as_str() {
+        "local" => TrustTier::Local,
+        "org_internal" => TrustTier::OrgInternal,
+        "public_vetted" => TrustTier::PublicVetted,
+        "public_untrusted" => TrustTier::PublicUntrusted,
+        _ => {
+            eprintln!("maos: warning: unrecognized trust tier '{}', defaulting to 'local'", s);
+            TrustTier::Local
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defaults_are_local_tier() {
+        let section = RegistrySection::defaults();
+        assert!(section.uri.is_empty());
+        assert_eq!(section.tier_floor, TrustTier::Local);
+        assert!(!section.t3_for_public_untrusted);
+        assert!(section.allow_unsigned_local);
+        assert!(section.org_signing_pubkey.is_none());
+    }
+
+    #[test]
+    fn resolve_from_defaults_when_no_env() {
+        let section = RegistrySection::resolve_from_env_and_disk();
+        assert!(section.allow_unsigned_local);
+    }
+
+    #[test]
+    fn parse_tier_maps_correctly() {
+        assert_eq!(parse_tier("local"), TrustTier::Local);
+        assert_eq!(parse_tier("org_internal"), TrustTier::OrgInternal);
+        assert_eq!(parse_tier("public_vetted"), TrustTier::PublicVetted);
+        assert_eq!(parse_tier("public_untrusted"), TrustTier::PublicUntrusted);
+        assert_eq!(parse_tier("unknown"), TrustTier::Local);
+    }
+
+    #[test]
+    fn env_overrides_disk_config() {
+        std::env::set_var("MAOS_REGISTRY_URI", "env://override");
+        std::env::set_var("MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED", "true");
+        std::env::set_var("MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL", "false");
+
+        let section = RegistrySection::resolve_from_env_and_disk();
+        assert_eq!(section.uri, "env://override");
+        assert!(section.t3_for_public_untrusted);
+        assert!(!section.allow_unsigned_local);
+
+        std::env::remove_var("MAOS_REGISTRY_URI");
+        std::env::remove_var("MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED");
+        std::env::remove_var("MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL");
+    }
+
+    #[test]
+    fn env_allows_negating_bools() {
+        std::env::set_var("MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED", "false");
+        std::env::set_var("MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL", "true");
+
+        let section = RegistrySection::resolve_from_env_and_disk();
+        assert!(!section.t3_for_public_untrusted);
+        assert!(section.allow_unsigned_local);
+
+        std::env::remove_var("MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED");
+        std::env::remove_var("MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL");
+    }
+}

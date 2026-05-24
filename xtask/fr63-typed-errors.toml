@@ -1,0 +1,169 @@
+# FR63 typed-error catalog for maos-registry (Story 5-5d, AC6)
+#
+# CI gate: `cargo run -p xtask -- check-fr63`
+# Every error variant in RegistryError + AdmissionError must have an entry
+# with all 6 metadata fields: code, severity, recovery_class, owner,
+# emitter (kernel|spirit), since_version.
+
+[meta]
+catalog_version = "0.1.0"
+since_story = "5-5d"
+fr_reference = "FR63"
+
+# ---------------------------------------------------------------------------
+# RegistryError — crates/maos-domain/src/ports/registry.rs
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EUnknownSpirit"
+description = "Requested spirit_id does not exist in the registry"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "RegistryError::UnknownSpirit"
+
+[[error]]
+code = "EVersionNotFound"
+description = "Requested version does not exist for the given spirit_id"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "RegistryError::VersionNotFound"
+
+[[error]]
+code = "ESignatureInvalid"
+description = "Ed25519 signature verification failed on the signed package or compliance claim"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "RegistryError::SignatureInvalid"
+
+[[error]]
+code = "ETrustTierFloorViolated"
+description = "Manifest trust tier is below the operator-configured tier floor"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "RegistryError::TrustTierFloorViolated"
+
+[[error]]
+code = "EComplianceContextDrift"
+description = "ComplianceClaim fingerprint hash does not match actual execution-context fingerprint"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "RegistryError::ComplianceContextDrift"
+
+[[error]]
+code = "EYanked"
+description = "Requested spirit version has been yanked/deprecated from the registry"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "RegistryError::Yanked"
+
+[[error]]
+code = "ETransport"
+description = "Registry transport error (network, serialization, protocol)"
+severity = "infra"
+recovery_class = "retry"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "RegistryError::Transport"
+
+[[error]]
+code = "EUnconfigured"
+description = "Registry not configured (set MAOS_REGISTRY_URI or [registry].uri in operator.toml)"
+severity = "config"
+recovery_class = "fix_config"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "RegistryError::Unconfigured"
+
+[[error]]
+code = "EOrgSignatureInvalid"
+description = "Org signature does not match operator-configured org signing key"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "RegistryError::OrgSignatureInvalid"
+
+[[error]]
+code = "EPublicVettedDeferred"
+description = "public_vetted trust tier deferred per FR37 to v2.5"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "RegistryError::PublicVettedDeferred"
+
+# ---------------------------------------------------------------------------
+# AdmissionError — crates/maos-registry/src/admission.rs
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EAdmissionPublicVettedDeferred"
+description = "Trust tier public_vetted is not yet supported (deferred per FR37 to v2.5)"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "AdmissionError::PublicVettedDeferred"
+
+[[error]]
+code = "EAdmissionOrgSignatureInvalid"
+description = "Org signature does not match operator-configured org key for org_internal tier"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "AdmissionError::OrgSignatureInvalid"
+
+[[error]]
+code = "EAdmissionPublisherSignatureInvalid"
+description = "Publisher Ed25519 signature verification failed on artifact bytes"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "AdmissionError::PublisherSignatureInvalid"
+
+[[error]]
+code = "EAdmissionComplianceContextDrift"
+description = "ComplianceClaim execution-context fingerprint drift during admission"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "AdmissionError::ComplianceContextDrift"
+
+[[error]]
+code = "EAdmissionUnsignedLocalRejected"
+description = "Operator policy disallows unsigned local Spirits (set allow_unsigned_local=true)"
+severity = "policy"
+recovery_class = "fix_config"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "AdmissionError::UnsignedLocalRejected"

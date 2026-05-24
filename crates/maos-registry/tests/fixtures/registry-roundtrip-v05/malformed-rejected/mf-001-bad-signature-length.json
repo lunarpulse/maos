@@ -1,0 +1,16 @@
+{
+  "description": "Signature is only 32 bytes (64 hex chars) instead of required 64 bytes (128 hex chars)",
+  "spirit_id": "spirit-bad-sig-001",
+  "version": "0.1.0",
+  "manifest_toml_b64": "W3NwaXJpdF0KbmFtZSA9ICJ0ZXN0LWJhZC1zaWciCnZlcnNpb24gPSAiMC4xLjAiCnRydXN0X3RpZXIgPSAibG9jYWwiCg==",
+  "artifact_bytes_b64": "ZHVtbXktYXJ0aWZhY3QtYnl0ZXMtMDEyMzQ1Njc4OQ==",
+  "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "publisher_pubkey_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "compliance_envelope": {
+    "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "attester_pubkey_hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "claim_bytes_b64": "eyJmaW5nZXJwcmludF9oYXNoIjoiMDAwMDAwMDAwMDAwMDAwMCIsInRydXN0X3RpZXIiOiJsb2NhbCIsInNhbmRib3hfdGllciI6InQwIiwiY2FwYWJpbGl0eV9zY29wZSI6W10sInByb3ZpZGVyX2VuZHBvaW50Ijp7InByb3ZpZGVyX2lkIjoiIiwiZW5kcG9pbnRfdXJsIjoiIn0sImNyeXB0b19wcm92aWRlciI6IiJ9",
+    "signing_alg": "Ed25519"
+  },
+  "expected_error": "PublisherSignatureInvalid"
+}

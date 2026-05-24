@@ -73,6 +73,10 @@ pub enum FrameKind {
     SpiritRevoked = 17,
     /// Story 5.5c — MCP tool invocation routed through kernel capability mediation.
     McpInvocation = 18,
+    /// Story 5.5d — Spirit admitted to the kernel via registry.
+    SpiritAdmitted = 19,
+    /// Story 5.5d — Registry yank propagated to the kernel.
+    RegistryYank = 20,
 }
 
 impl FrameKind {
@@ -98,6 +102,8 @@ impl FrameKind {
             16 => Some(Self::SilentFailureSuspect),
             17 => Some(Self::SpiritRevoked),
             18 => Some(Self::McpInvocation),
+            19 => Some(Self::SpiritAdmitted),
+            20 => Some(Self::RegistryYank),
             _ => None,
         }
     }
