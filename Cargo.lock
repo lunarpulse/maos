@@ -947,6 +947,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "maos-bench"
+version = "0.1.0-alpha"
+dependencies = [
+ "criterion",
+ "maos-domain",
+ "maos-kernel-core",
+ "maos-spirit-abi",
+ "maos-spirit-hello",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "maos-bin"
 version = "0.1.0-alpha"
 dependencies = [
@@ -955,6 +971,7 @@ dependencies = [
  "hex",
  "maos-acp",
  "maos-audit",
+ "maos-bench",
  "maos-director-surface",
  "maos-domain",
  "maos-kernel-core",

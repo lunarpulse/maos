@@ -89,6 +89,15 @@ impl MultiProviderRouter {
     pub fn registered_ids(&self) -> Vec<String> {
         self.providers.keys().cloned().collect()
     }
+
+    /// The composition-root default provider id, if any. Story 5.5b backfill
+    /// review (2026-05-25): exposed so `InferencePortAdapter` can route to
+    /// the operator-declared default rather than the alphabetically-first
+    /// `registered_ids()` entry — the prior shape coincidentally returned
+    /// "anthropic" first only because BTreeMap iteration is alphabetic.
+    pub fn default_id(&self) -> Option<&str> {
+        self.default_id.as_deref()
+    }
 }
 
 #[derive(Debug, Clone, thiserror::Error)]

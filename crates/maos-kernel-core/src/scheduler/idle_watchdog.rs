@@ -77,7 +77,12 @@ impl IdleWatchdog {
                         scb.manifest.scheduling.idle_window_ms as u64
                     };
                     let idle_window_ns = idle_window_ms * 1_000_000;
-                    if last_inbound == 0 || now_ns.saturating_sub(last_inbound) < idle_window_ns {
+                    // Story 5.1 review backfill — removed `last_inbound == 0`
+                    // short-circuit. SCB constructor now seeds last_inbound to
+                    // creation time so this check is purely temporal. A
+                    // never-frame-received Spirit fires on_idle one
+                    // idle_window after load, matching AC4 scenario 1.
+                    if now_ns.saturating_sub(last_inbound) < idle_window_ns {
                         return false;
                     }
                     let last_fire = scb.last_idle_fire_ns.load(Ordering::Relaxed);
@@ -91,9 +96,19 @@ impl IdleWatchdog {
         };
 
         for scb in &candidates {
-            let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
-            scb.last_idle_fire_ns.store(now_ns, Ordering::Release);
-            let _outcome = self.dispatcher.fire_on_idle(scb).await;
+            // Story 5.1 review backfill — fire FIRST then store
+            // last_idle_fire_ns only when the outcome reflects an actual
+            // dispatch (Fired / BudgetWarning80 / BudgetExceeded).  Storing
+            // unconditionally hid SkippedManifest cases (the previous test
+            // `idle_watchdog_skips_manifest_disabled_hook` passed for the
+            // wrong reason — see test comment for context).
+            let outcome = self.dispatcher.fire_on_idle(scb).await;
+            use crate::scheduler::hook_dispatch::HookOutcome;
+            let actually_fired = !matches!(outcome, HookOutcome::SkippedManifest);
+            if actually_fired {
+                let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+                scb.last_idle_fire_ns.store(now_ns, Ordering::Release);
+            }
         }
     }
 }

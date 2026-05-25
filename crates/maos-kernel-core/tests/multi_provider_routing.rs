@@ -73,13 +73,14 @@ fn manifest_with_openai_primary_dispatches_to_openai() {
 
 #[test]
 fn manifest_with_anthropic_fallback_walks_on_503() {
-    let primary = Arc::new(FixtureReplayProvider::new(vec![
+    let primary: Arc<dyn Provider> = Arc::new(FixtureReplayProvider::new(vec![
         Err(ProviderError::ProviderRejected { status: 503, body: "unavailable".into() }),
     ]));
-    let secondary = Arc::new(FixtureReplayProvider::new(vec![
+    let secondary: Arc<dyn Provider> = Arc::new(FixtureReplayProvider::new(vec![
         Ok(ok_response("openai", "fallback reply")),
     ]));
-    let mut providers = std::collections::BTreeMap::new();
+    let mut providers: std::collections::BTreeMap<String, Arc<dyn Provider>> =
+        std::collections::BTreeMap::new();
     providers.insert("primary".into(), primary);
     providers.insert("secondary".into(), secondary);
     let router = MultiProviderRouter::new(providers, Some("primary".into()));
@@ -98,14 +99,14 @@ fn manifest_unsupported_provider_id_rejected_at_admission() {
     // the router also rejects unknown providers at dispatch time.
     let router = make_router();
     let result = router.dispatch(Some("unknown-provider"));
-    assert!(matches!(result, Err(RouterError::UnknownProvider(ref s) if s == "unknown-provider")));
+    assert!(matches!(result, Err(RouterError::UnknownProvider(ref s)) if s == "unknown-provider"));
 }
 
 #[test]
 fn request_with_unregistered_provider_id_returns_router_error() {
     let router = make_router();
     let result = router.dispatch(Some("nonexistent"));
-    assert!(matches!(result, Err(RouterError::UnknownProvider(ref s) if s == "nonexistent")));
+    assert!(matches!(result, Err(RouterError::UnknownProvider(ref s)) if s == "nonexistent"));
 }
 
 #[test]

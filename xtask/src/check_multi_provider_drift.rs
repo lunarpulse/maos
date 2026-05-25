@@ -56,7 +56,11 @@ pub fn run(report: &Path, threshold: f64, strict: bool, json: bool) -> i32 {
             }
             let sorted = {
                 let mut v = values.clone();
-                v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                // Use total_cmp to handle NaN deterministically — provider
+                // reports may carry NaN tokens/latency in pathological cases
+                // and `partial_cmp(...).unwrap()` would panic. total_cmp
+                // gives a total order where NaNs sort to one end.
+                v.sort_by(|a, b| a.total_cmp(b));
                 v
             };
             let median = if sorted.len() % 2 == 0 {
@@ -115,14 +119,32 @@ pub fn run(report: &Path, threshold: f64, strict: bool, json: bool) -> i32 {
             "fixtures_checked": by_fixture.len(),
             "threshold": threshold,
         });
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        // Story 5.5b backfill review: propagate serde error rather than
+        // panicking — discipline §1373 (no `.unwrap()` on serde paths).
+        match serde_json::to_string_pretty(&output) {
+            Ok(s) => println!("{s}"),
+            Err(e) => {
+                eprintln!("check-multi-provider-drift: failed to serialize JSON: {e}");
+                return 1;
+            }
+        }
+    } else if outliers.is_empty() {
+        println!(
+            "check-multi-provider-drift: no outliers detected ({} fixtures, threshold={}%)",
+            by_fixture.len(),
+            threshold
+        );
     } else {
-        if outliers.is_empty() {
-            println!("check-multi-provider-drift: no outliers detected ({} fixtures, threshold={}%)", by_fixture.len(), threshold);
-        } else {
-            println!("check-multi-provider-drift: {} outlier(s) detected:", outliers.len());
-            for outlier in &outliers {
-                println!("  - {}", serde_json::to_string(outlier).unwrap());
+        println!("check-multi-provider-drift: {} outlier(s) detected:", outliers.len());
+        for outlier in &outliers {
+            match serde_json::to_string(outlier) {
+                Ok(s) => println!("  - {s}"),
+                Err(e) => eprintln!("  - <serialization error: {e}>"),
+            }
+            // GitHub Actions annotation for PR-visible drift markers
+            // (story narrative line 511; original code skipped this).
+            if let Some(fixture) = outlier.get("fixture_id").and_then(|v| v.as_str()) {
+                println!("::notice file=tests/reports/multi-provider.json::Drift outlier in fixture {fixture}");
             }
         }
     }

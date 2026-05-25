@@ -26,46 +26,50 @@ pub async fn run_migrator(
     successor_manifest: &SpiritManifestBundle,
     predecessor_version: &str,
 ) -> Result<Vec<u8>, HotSwapError> {
+    // Derive predecessor + successor class names from the SCBs/manifests.
+    // Story 5.2 review backfill: predecessor_class must come from predecessor SCB,
+    // not from successor manifest (they may differ for a class-rename swap; today
+    // same-class-only is enforced upstream but the error variant carries both
+    // sides for diagnostic accuracy).
+    let predecessor_class = scb
+        .manifest
+        .class
+        .as_ref()
+        .map(|c| c.name.clone())
+        .unwrap_or_else(|| "unknown".into());
+    let successor_class = successor_manifest
+        .class
+        .as_ref()
+        .map(|c| c.name.clone())
+        .unwrap_or_else(|| "unknown".into());
+    let successor_version = successor_manifest
+        .class
+        .as_ref()
+        .map(|c| c.version.clone())
+        .unwrap_or_else(|| "unknown".into());
+
     // 1. Verify successor's [migrates_from].versions contains predecessor_version.
-    let migrates_from = successor_manifest.migrates_from.as_ref().ok_or_else(|| {
-        let class_name = successor_manifest
-            .class
+    let migrates_from =
+        successor_manifest
+            .migrates_from
             .as_ref()
-            .map(|c| c.name.clone())
-            .unwrap_or_else(|| "unknown".into());
-        let class_version = successor_manifest
-            .class
-            .as_ref()
-            .map(|c| c.version.clone())
-            .unwrap_or_else(|| "unknown".into());
-        HotSwapError::EMigratorMissing {
-            predecessor_class: class_name.clone(),
-            predecessor_version: predecessor_version.into(),
-            successor_class: class_name,
-            successor_version: class_version,
-        }
-    })?;
+            .ok_or_else(|| HotSwapError::EMigratorMissing {
+                predecessor_class: predecessor_class.clone(),
+                predecessor_version: predecessor_version.into(),
+                successor_class: successor_class.clone(),
+                successor_version: successor_version.clone(),
+            })?;
 
     if !migrates_from
         .versions
         .iter()
         .any(|v| matches_version_pattern(v, predecessor_version))
     {
-        let class_name = successor_manifest
-            .class
-            .as_ref()
-            .map(|c| c.name.clone())
-            .unwrap_or_else(|| "unknown".into());
-        let class_version = successor_manifest
-            .class
-            .as_ref()
-            .map(|c| c.version.clone())
-            .unwrap_or_else(|| "unknown".into());
         return Err(HotSwapError::EMigratorMissing {
-            predecessor_class: class_name.clone(),
+            predecessor_class: predecessor_class.clone(),
             predecessor_version: predecessor_version.into(),
-            successor_class: class_name,
-            successor_version: class_version,
+            successor_class: successor_class.clone(),
+            successor_version: successor_version.clone(),
         });
     }
 
@@ -82,24 +86,12 @@ pub async fn run_migrator(
     match result {
         Ok(migrated_bytes) => Ok(migrated_bytes),
         Err(e) => match e {
-            MigratorError::NotImplemented => {
-                let class_name = successor_manifest
-                    .class
-                    .as_ref()
-                    .map(|c| c.name.clone())
-                    .unwrap_or_else(|| "unknown".into());
-                let class_version = successor_manifest
-                    .class
-                    .as_ref()
-                    .map(|c| c.version.clone())
-                    .unwrap_or_else(|| "unknown".into());
-                Err(HotSwapError::EMigratorMissing {
-                    predecessor_class: class_name.clone(),
-                    predecessor_version: predecessor_version.to_string(),
-                    successor_class: class_name,
-                    successor_version: class_version,
-                })
-            }
+            MigratorError::NotImplemented => Err(HotSwapError::EMigratorMissing {
+                predecessor_class,
+                predecessor_version: predecessor_version.to_string(),
+                successor_class,
+                successor_version,
+            }),
             other => Err(HotSwapError::MigratorFailed {
                 error: other.to_string(),
             }),

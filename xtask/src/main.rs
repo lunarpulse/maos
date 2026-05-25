@@ -27,6 +27,10 @@ mod invariant_lock;
 mod kloc_check;
 mod rebaseline_check;
 mod check_multi_provider_drift;
+mod check_adr_040_accepted;
+mod check_serde_error_handling;
+mod check_review_findings_resolved;
+mod check_dev_record_completeness;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -294,6 +298,40 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 5.5e — v0.5 release-block: ADR-040 must be committed with status `accepted`.
+    CheckAdr040Accepted {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Epic 5 retro §A3 (closes Epic 4 retro §A6) — flag `.unwrap_or_default()` / `.unwrap()` / `.expect(...)` after serde calls.
+    CheckSerdeErrorHandling {
+        #[arg(long, default_value = "crates")]
+        path: String,
+        #[arg(long, default_value = "xtask/serde-error-allowlist.toml")]
+        allowlist: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Epic 5 retro §A5 — open Review Findings rows MUST block sprint-status `done`; closed rows MUST reference a File List entry.
+    CheckReviewFindingsResolved {
+        #[arg(long, default_value = "_bmad-output/implementation-artifacts")]
+        stories_dir: String,
+        #[arg(long, default_value = "_bmad-output/implementation-artifacts/sprint-status.yaml")]
+        sprint_status: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Epic 5 retro §A6 (closes Epic 4 retro §A7) — `done` stories MUST have non-TBD model + non-empty dev record + File List files in `git diff`.
+    CheckDevRecordCompleteness {
+        #[arg(long, default_value = "_bmad-output/implementation-artifacts")]
+        stories_dir: String,
+        #[arg(long, default_value = "_bmad-output/implementation-artifacts/sprint-status.yaml")]
+        sprint_status: String,
+        #[arg(long, default_value_t = false)]
+        check_git_diff: bool,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -480,6 +518,16 @@ fn main() {
                 process::exit(exit_code);
             }
             Ok(())
+        }
+        Commands::CheckAdr040Accepted { json } => check_adr_040_accepted::run(json),
+        Commands::CheckSerdeErrorHandling { path, allowlist, json } => {
+            check_serde_error_handling::run(&path, &allowlist, json)
+        }
+        Commands::CheckReviewFindingsResolved { stories_dir, sprint_status, json } => {
+            check_review_findings_resolved::run(&stories_dir, &sprint_status, json)
+        }
+        Commands::CheckDevRecordCompleteness { stories_dir, sprint_status, check_git_diff, json } => {
+            check_dev_record_completeness::run(&stories_dir, &sprint_status, check_git_diff, json)
         }
     };
     if let Err(e) = result {

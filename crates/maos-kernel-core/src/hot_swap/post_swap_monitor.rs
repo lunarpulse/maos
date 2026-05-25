@@ -6,11 +6,8 @@
 //! invariant snapshot. On violation, calls `auto_revert` on the
 //! coordinator.
 
-use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-
-use maos_domain::halt::HaltId;
 
 /// Snapshot of invariants taken at swap commit.
 #[derive(Debug, Clone)]
@@ -54,17 +51,30 @@ impl PostSwapMonitor {
     }
 
     /// Spawn the monitor task. Returns a JoinHandle.
-    /// The task polls at 1s cadence until the window expires or a violation is detected.
+    /// The task polls at `tick_cadence` until the window expires or a violation is detected.
+    ///
+    /// In production (30s window), cadence is 1s — 30 invariant checks per swap.
+    /// In `MAOS_AUTO_REVERT_FAST=1` mode (300ms window), cadence shrinks to
+    /// 50ms so the test path actually fires at least one check before the window
+    /// expires. Story 5.2 review backfill: the original 1s cadence made FAST mode
+    /// silently no-op because the first real check tick came AFTER the 300ms deadline.
     pub fn spawn(self) -> tokio::task::JoinHandle<()> {
         let coordinator = Arc::clone(&self.coordinator);
         let spirit_pid = self.spirit_pid;
         let window = self.window;
         let invariant_snapshot = Arc::clone(&self.invariant_snapshot);
+        // Choose a cadence small enough that at least a few ticks fit inside
+        // the window. 50ms in fast mode, 1s in production.
+        let tick_cadence = if window <= Duration::from_secs(1) {
+            Duration::from_millis(50)
+        } else {
+            Duration::from_secs(1)
+        };
 
         tokio::spawn(async move {
             let deadline = Instant::now() + window;
-            let mut interval = tokio::time::interval(Duration::from_secs(1));
-            // Skip the first immediate tick.
+            let mut interval = tokio::time::interval(tick_cadence);
+            // Skip the first immediate tick (tokio::time::interval fires immediately).
             interval.tick().await;
 
             while Instant::now() < deadline {
@@ -138,12 +148,6 @@ impl PostSwapMonitor {
         None
     }
 
-    /// Static variant used only for unit tests that don't have a full coordinator.
-    fn check_invariants_static(
-        _snapshot: &PostSwapInvariantSnapshot,
-    ) -> Option<PostSwapInvariantViolation> {
-        None
-    }
 }
 
 #[cfg(test)]
@@ -151,20 +155,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn monitor_window_uses_env_var() {
+    fn monitor_window_resolves_from_env_var() {
+        // Save + clear to isolate from other tests' env state.
+        let prior = std::env::var("MAOS_AUTO_REVERT_FAST").ok();
         std::env::set_var("MAOS_AUTO_REVERT_FAST", "1");
-        // We can't construct a real coordinator in a unit test without the full kernel,
-        // but we can verify the window duration logic.
-        let snapshot = PostSwapInvariantSnapshot {
-            pre_swap_halt_ids: vec!["halt-001".into()],
-            pid: 42,
-            boot_nonce: 0xCAFE,
-            pre_swap_frame_shapes: vec![],
-        };
+        let fast = resolve_window_for_test();
+        std::env::remove_var("MAOS_AUTO_REVERT_FAST");
+        let slow = resolve_window_for_test();
+        if let Some(v) = prior {
+            std::env::set_var("MAOS_AUTO_REVERT_FAST", v);
+        }
+        assert_eq!(fast, Duration::from_millis(300));
+        assert_eq!(slow, Duration::from_secs(30));
+    }
 
-        // The window would be 300ms when MAOS_AUTO_REVERT_FAST=1.
-        // Just verify the type constructs.
-        let _snapshot = snapshot.clone();
+    fn resolve_window_for_test() -> Duration {
+        if std::env::var("MAOS_AUTO_REVERT_FAST").as_deref() == Ok("1") {
+            Duration::from_millis(300)
+        } else {
+            Duration::from_secs(30)
+        }
     }
 
     #[test]

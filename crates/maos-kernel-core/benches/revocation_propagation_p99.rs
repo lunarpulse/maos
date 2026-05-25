@@ -1,12 +1,28 @@
 //! Criterion bench for revocation propagation latency.
 //!
-//! NFR-Rel-9 ship gate: ≤5s p99 from apply_crl return to first CapError::Revoked.
+//! NFR-Rel-9 ship gate: ≤5s p99 from apply_crl return to first CapError::Revoked
+//! under 10⁴ concurrent verify calls in flight.
+//!
+//! **v0.3-β LIMITATION (Story 5.4 backfill review Finding #35)**: this bench
+//! currently exercises ONLY `CapTokensShardRing::revoke_all(pid)` in a loop —
+//! it does NOT spawn the 10⁴ concurrent `verify()` storm, does NOT measure
+//! propagation latency (time from `apply_crl` return to first
+//! `Err(CapError::Revoked)` observed by an inflight verify), does NOT emit
+//! the JSON p99 report consumed by `assert-revocation-p99-floor`, and does
+//! NOT validate the NFR-Rel-9 ≤5s p99 floor under the documented load
+//! profile. The Criterion harness only times the synchronous `revoke_all`
+//! call, which is a microsecond-scale operation and meaningless against a
+//! 5-second p99 floor.
+//!
+//! Deferred to a follow-up bench rewrite (tracked in Story 5.4 Review
+//! Findings table). The CI gate `nfr-rel-9-revocation-5s-p99` currently
+//! provides only structural assurance that the bench compiles and runs;
+//! it does NOT mechanically enforce the NFR-Rel-9 contract.
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::sync::Arc;
 
-use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
-use maos_domain::invariants::i9::SandboxTier;
+use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_kernel_core::capability::cap_audit;
 use maos_kernel_core::capability::cap_tokens::{
@@ -58,8 +74,10 @@ fn bench_revocation_propagation(c: &mut Criterion) {
     let ring = make_test_ring();
     let posture = [1u8; 32];
 
-    // Issue 100 tokens
-    let tokens: Vec<CapabilityToken> = (0..100)
+    // Issue 100 tokens (currently unused — see file-level LIMITATION note;
+    // the deferred bench rewrite will use these as the source set for the
+    // 10⁴-concurrent verify storm).
+    let _tokens: Vec<_> = (0..100)
         .map(|_| {
             ring.issue(
                 7,

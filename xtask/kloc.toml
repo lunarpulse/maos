@@ -4,6 +4,40 @@
 # even if the aggregate alarm has not fired.
 #
 # Ceilings are reviewed at each epic retrospective.
+#
+# -----------------------------------------------------------------------------
+# Epic 5 retro §A4 Debt 3 — in-progress decomposition of `maos-kernel-core`
+# -----------------------------------------------------------------------------
+# `maos-kernel-core` measures ~21,370 LOC at HEAD (post-Story-5.5d), 3.56× over
+# the 6,000 ceiling below. Per §A4 decision (2026-05-24): DECOMPOSE the crate
+# across Epic 6/7 stories. DO NOT raise the ceiling — amending the ceiling to
+# fit current size would invert ADR-038's purpose (the ceiling is the
+# architectural discipline, not a measurement of current state).
+#
+# Phased extraction plan:
+#   Phase 1 — Story 6.5 (gateway sub-modules)
+#     extract `maos-iac`            (~3,350 LOC: TL + log_recall + bus routing)
+#     extract `maos-manifest`       (~2,500 LOC: TOML parsing + section schemas)
+#   Phase 2 — Story 6.1 prep (full IAC bus + DRR + retract primitive)
+#     extract `maos-capability`     (~2,400 LOC: cap_tokens/cap_policy/cap_audit/cap_quota)
+#   Phase 3 — Story 7.2 (full registry publish/install/yank + air-gapped import)
+#     residual security/* fold      (~1,000 LOC moves into maos-manifest or
+#                                    maos-sandbox depending on classifier)
+#   Phase 4 — Story 7.x (TBD; scheduling depends on remaining size)
+#     extract `maos-scheduler`      (~1,961 LOC)
+#     extract `maos-memory`         (~1,659 LOC)
+#     extract `maos-hot-swap`       (~1,317 LOC)
+#     extract `maos-supervision`    (~569 LOC)
+#
+# At HEAD post-Phase-4 the residual `maos-kernel-core` is ~5,400 LOC (halt +
+# inference + telemetry + revocation + journal + lifecycle + orchestrator +
+# small glue modules + composition-root forwarders). Under the 6,000 ceiling.
+#
+# **Interim posture (Epics 6/7 in flight before Phase 4 completes):**
+# the kloc gate stays strict. Stories that ADD to `maos-kernel-core` MUST first
+# extract a candidate module netting to ≤0 added LOC. The gate's continuing
+# failure on every CI run keeps the breach visible until decomposition lands.
+# -----------------------------------------------------------------------------
 
 maos-kernel-core = 6000
 maos-cap-registry = 3000
@@ -27,6 +61,7 @@ maos-compliance = 2000
 maos-control = 1500
 maos-cli = 2000
 maos-bin = 1000
+maos-bench = 500
 
 _aggregate_alarm = 16000
 _aggregate_hardfail = 20000

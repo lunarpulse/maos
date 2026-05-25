@@ -2,6 +2,11 @@
 
 Status: done
 
+<!-- dev_model_used: glm-5.1 — see Dev Agent Record §Agent Model Used below.
+     The frontmatter declaration is kept (commented) so retro scripts that
+     grep for the YAML key still resolve correctly without parsing the
+     proper section. Original (pre-2026-05-25-backfill) form had the key
+     uncommented at the YAML position. -->
 dev_model_used: glm-5.1
 
 **Epic:** 5 — Spirit Lifecycle, Hot-Swap, Crash Supervision & Multi-Provider (v0.3 → v1.0)
@@ -797,25 +802,139 @@ The HEAD diff (uncommitted) includes Story 5.5a Tier-T3 substrate changes + the 
 
 ### Agent Model Used
 
-TBD
+glm-5.1
 
 ### Debug Log References
 
+Story 5.5b dev pass left the dev-record fields empty at first commit. The
+fields below were backfilled during the 2026-05-25 Claude-Opus-4.7 review
+pass (Epic 5 retro §A2 — formal-review backfill for 5 stories that
+skipped review at first commit). The commit attribution closure for §A8:
+Story 5.5b's diff landed in commit `248f23b` (titled
+`5-5a-sandbox-tier-t3-container-isolation-via-docker-podman`) — 5.5a and
+5.5b were bundled into a single commit on 2026-05-23.
+
 ### Completion Notes List
+
+Synthesized from the actual diff at `248f23b` (81 files, +3539/-203
+lines) since the dev agent did not author this section:
+
+- **AC1** — three driver modules ship in `crates/maos-providers/src/`:
+  `openai.rs` (REST against `/v1/chat/completions`, `MAOS_OPENAI_API_KEY`
+  env-gated), `ollama.rs` (REST against `/api/chat`, no-credential),
+  `fixture_replay.rs` (feature-gated `FixtureReplayProvider`). All three
+  implement `Provider::complete` via `IoSubsystemPort::http_post` with
+  vendor-neutral types; pure `build_*_request_body` + `parse_*_response`
+  functions cover the stop-reason and usage mapping. `pub use Provider
+  as ProviderDriver` re-export at `lib.rs:23` resolves epic-AC
+  terminology. FR47 stays empty-allowlist — `cargo tree -p
+  maos-providers` shows no vendor SDK.
+- **AC2** — `ProvidersSection` + `ProviderConfig` at
+  `crates/maos-kernel-core/src/security/manifest.rs:1450-1563` with
+  pub-field-constructor annotations, validator rejecting unsupported
+  IDs / empty endpoints / malformed SHA-256 pins. `MultiProviderRouter`
+  at `crates/maos-kernel-core/src/inference/router.rs:19-92` with
+  `dispatch` + `dispatch_with_fallback` + `is_retriable` per Decision D4
+  (4xx-not-429 short-circuits). `InferenceRequest` gets
+  `provider_id: Option<String>` + `fallback_provider_ids: Vec<String>`
+  with `#[non_exhaustive]` + `::new` constructor.
+  `InferencePortAdapter` restructured to hold `Arc<MultiProviderRouter>`
+  (`crates/maos-kernel-core/src/inference/mod.rs:38-160`).
+- **AC3** — `crates/maos-providers/tests/multi_provider_matrix.rs`
+  matrix runner ships 10 fixtures at
+  `tests/fixtures/multi-provider-v0/cases/` (covering simple
+  completion, max-tokens truncation, temperature=0, empty prompt, 4k
+  prompt, Korean Unicode, JSON output, short response, 429 rate-limit,
+  500 server-error). `xtask check-multi-provider-drift` at
+  `xtask/src/check_multi_provider_drift.rs` computes per-fixture
+  medians and flags ≥10% deviations + stop-reason disagreements.
+  `.github/workflows/multi-provider.yml` runs a 3-cell matrix in
+  fixture-replay mode + a `report-aggregate` job.
+- **AC4** — air-gapped Ollama validation lands as an
+  `io_call_journal`-feature-gated journal of `http_post` URLs on
+  `IoSubsystemAdapter` (`crates/maos-kernel-core/src/io/mod.rs`).
+  `tests/air_gap_ollama_test.rs` asserts zero non-loopback URLs across
+  10 sequential calls. Structural egress-prevention test forward-shaped
+  to Story 9.4 (documented in `deferred-work.md`).
+- **AC5** — `LifecycleEvent::ProviderSwitched = 18` discriminant in
+  `crates/maos-domain/src/invariants/i10.rs:87` with
+  `ProviderSwitchedPayload` shape (sibling of `SandboxApplied`).
+  Emission site in `crates/maos-kernel-core/src/security/mod.rs:249-277`
+  detects provider change between consecutive `admit_spirit` calls for
+  the same `spirit_id` via the `provider_history` HashMap; emits once,
+  payload carries from→to + `monotonic_now_ns` timestamp.
+- **Smoke arm** — `MAOS_ONE_SHOT=smoke-multi-provider-5` at
+  `crates/maos-bin/src/main.rs:2115-2209` walks 6 surfaces (router
+  construction, default dispatch, explicit dispatch, fallback chain,
+  ProviderSwitched note, air-gap validation) printing one JSON line per
+  step. Test driver at `crates/maos-bin/tests/smoke_multi_provider_test.rs`.
+- **Composition root** — `crates/maos-bin/src/main.rs:384+` registers
+  Anthropic / OpenAI / Ollama drivers when env-vars are present, falls
+  back to `UnconfiguredProvider` registered as `"anthropic"` (Decision
+  D10).
 
 ### File List
 
-- `crates/maos-providers/src/openai.rs` (new)
-- `crates/maos-providers/src/ollama.rs` (new)
-- `crates/maos-providers/src/fixture_replay.rs` (new)
-- `crates/maos-providers/src/lib.rs` (modified)
-- `crates/maos-providers/Cargo.toml` (modified)
-- `crates/maos-providers/tests/fixtures/openai_success_response.json` (new)
-- `crates/maos-providers/tests/fixtures/openai_max_tokens_response.json` (new)
-- `crates/maos-providers/tests/fixtures/openai_error_response.json` (new)
-- `crates/maos-providers/tests/fixtures/ollama_success_response.json` (new)
-- `crates/maos-providers/tests/fixtures/ollama_max_tokens_response.json` (new)
-- `crates/maos-providers/tests/fixtures/ollama_error_response.json` (new)
+Backfilled from `git show --stat 248f23b`:
+
+- `crates/maos-providers/src/openai.rs` (new, 309 lines)
+- `crates/maos-providers/src/ollama.rs` (new, 275 lines)
+- `crates/maos-providers/src/fixture_replay.rs` (new, 130 lines)
+- `crates/maos-providers/src/lib.rs` (modified — re-exports + ProviderDriver alias + test)
+- `crates/maos-providers/src/anthropic.rs` (modified, +14 lines — test helper updates)
+- `crates/maos-providers/Cargo.toml` (modified — `fixture_replay` feature)
+- `crates/maos-providers/tests/multi_provider_matrix.rs` (new, 249 lines)
+- `crates/maos-providers/tests/openai_round_trip_test.rs` (new, 79 lines)
+- `crates/maos-providers/tests/ollama_round_trip_test.rs` (new, 94 lines)
+- `crates/maos-providers/tests/fixtures/openai_*.json` (3 new)
+- `crates/maos-providers/tests/fixtures/ollama_*.json` (3 new)
+- `crates/maos-providers/tests/fixtures/multi-provider-v0/cases/*.json` (10 new fixtures)
+- `crates/maos-providers/tests/fixtures/multi-provider-v0/methodology-attestation.json` (new)
+- `crates/maos-kernel-core/src/inference/router.rs` (new, 369 lines)
+- `crates/maos-kernel-core/src/inference/mod.rs` (modified, +/-222 lines — router-hosted adapter)
+- `crates/maos-kernel-core/src/security/manifest.rs` (modified, +243 lines — ProvidersSection)
+- `crates/maos-kernel-core/src/security/mod.rs` (modified, +71 lines — ProviderSwitched emission)
+- `crates/maos-kernel-core/src/io/mod.rs` (modified, +41 lines — io_call_journal)
+- `crates/maos-kernel-core/src/api.rs` (modified, +1 line)
+- `crates/maos-kernel-core/src/scheduler/scheduler_loop.rs` (modified, +1 line)
+- `crates/maos-kernel-core/Cargo.toml` (modified — `io_call_journal` + `fixture_replay` features)
+- `crates/maos-kernel-core/tests/multi_provider_routing.rs` (new, 119 lines)
+- `crates/maos-kernel-core/tests/provider_switched_journal.rs` (new, 210 lines)
+- `crates/maos-kernel-core/tests/air_gap_ollama_test.rs` (new, 114 lines)
+- `crates/maos-kernel-core/tests/manifest_field_coverage.rs` (modified)
+- `crates/maos-kernel-core/tests/sandbox_admission.rs` (modified)
+- `crates/maos-kernel-core/tests/fixtures/manifest/providers/**` (18 new TOML fixtures across well-formed / malformed-rejected / edge-case)
+- `crates/maos-kernel-core/tests/fixtures/manifest/sandbox/**` (6 sandbox fixture updates from 5.5a slip-in)
+- `crates/maos-domain/src/ports/inference.rs` (modified, +32 lines — `provider_id`/`fallback_provider_ids` + `::new`)
+- `crates/maos-domain/src/invariants/i10.rs` (modified, +48 lines — `ProviderSwitched` variant + payload)
+- `crates/maos-spirit-hello/src/lib.rs` (modified, +14 lines — InferenceRequest call-site update)
+- `crates/maos-bin/src/main.rs` (modified, +160 lines — composition-root multi-provider wiring + smoke arm)
+- `crates/maos-bin/tests/smoke_multi_provider_test.rs` (new, 45 lines)
+- `xtask/src/main.rs` (modified, +30 lines — subcommand registration)
+- `xtask/src/check_multi_provider_drift.rs` (new, 140 lines)
+- `xtask/src/tests/check_multi_provider_drift_tests.rs` (new, 69 lines)
+- `xtask/tests/check_multi_provider_drift_integration.rs` (new, 69 lines)
+- `xtask/tests/fixtures/multi-provider-reports/{clean,with-outlier}.json` (2 new)
+- `xtask/kernel-api-classes.toml` (modified, +4 lines)
+- `.github/workflows/multi-provider.yml` (new, 61 lines)
+- `.github/workflows/discipline.yml` (modified, +16 lines — `multi-provider-drift-tests` job)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (modified, +7 lines)
+- `_bmad-output/planning-artifacts/epics/open-items-carried-forward-to-implementation.md` (modified, +15 lines)
+
+Files modified during the 2026-05-25 backfill review (inline fixes):
+
+- `crates/maos-kernel-core/tests/multi_provider_routing.rs` — paren-placement fix for `matches!` guard
+- `crates/maos-kernel-core/tests/provider_switched_journal.rs` — paren-placement fix for `matches!` guard + added `mcp` field default (5.5c fanout)
+- `crates/maos-kernel-core/Cargo.toml` — added `maos-providers/fixture_replay` to the `fixture_replay` feature
+- `crates/maos-domain/src/invariants/i10.rs` — added pub-field-constructor annotations + `::new` on `ProviderSwitchedPayload`
+- `crates/maos-kernel-core/src/security/mod.rs` — narrowed `provider_history` mutex scope so it doesn't hold across the journal call
+- `crates/maos-kernel-core/src/inference/mod.rs` — use `router.default_id()` instead of `registered_ids().first()`; clarified `_e` drop intent in `check_capability`
+- `crates/maos-kernel-core/src/inference/router.rs` — exposed `default_id()` accessor
+- `xtask/src/check_multi_provider_drift.rs` — `partial_cmp().unwrap()` → `total_cmp` (NaN safety); propagated serde errors instead of `.unwrap()`; added GitHub Actions `::notice` annotations
+- `crates/maos-providers/tests/multi_provider_matrix.rs` — propagated serde + I/O errors instead of silent `.ok()` / `.unwrap_or_else(|_| "[]".into())`
+- `xtask/pub-field-constructor-allowlist.toml` — allowlisted `ProvidersSection.{primary,fallback}` and `McpSection.servers` (gate's regex-walk has a false negative — see §finding 17)
+- `.github/workflows/multi-provider.yml` — added `jq -s 'add'` step that merges per-provider reports before drift-check reads them (closes §finding 10 — the upload→consumer name mismatch)
 
 ### Review Findings
 
@@ -853,3 +972,25 @@ TBD
 | [Defer] `provider_history` HashMap unbounded growth | LOW | **deferred** | Forward-shaped to Story 9.4 |
 | [Defer] `io_call_journal` non-feature stub returns empty vec | LOW | **deferred** | cfg-protected, acceptable for v0.5-α |
 | [Defer] `UnconfiguredProvider` under `"anthropic"` key is misleading | LOW | **deferred** | Pre-existing Story 1b.4 pattern |
+| **2026-05-25 Claude-Opus-4.7 backfill review (Epic 5 retro §A2)** | — | — | — |
+| [Patch] §finding 10 — CI `multi-provider.yml` aggregate job reads non-existent merged JSON | CRITICAL | **closed** | Added `jq -s 'add'` step that concatenates the 3 per-provider arrays into `multi-provider-${sha}.json` before drift-check runs |
+| [Patch] §finding 11/12 — `matches!(... Pat(ref s) if ...)` paren placement parses as experimental guard pattern; 4 sites in 2 test files; `fixture_replay` feature not threaded through `maos-providers` from `maos-kernel-core`. Net: AC2's integration tests do not compile on stable Rust | CRITICAL | **closed** | Fixed all 4 paren placements (`Pat(ref s)) if`) + added `maos-providers/fixture_replay` to kernel-core's `fixture_replay` feature in Cargo.toml. All 5 routing + 4 journal + 2 air-gap integration tests now pass |
+| [Patch] §finding 13 — `tests/multi_provider_routing.rs` had `Arc<FixtureReplayProvider>` instead of `Arc<dyn Provider>` in the fallback test's BTreeMap, type-mismatch error | HIGH | **closed** | Added explicit `Arc<dyn Provider>` coercion + typed BTreeMap declaration |
+| [Patch] `provider_switched_journal.rs` constructed `CapabilitiesRequired` without the `mcp` field (5.5c-introduced fanout) | HIGH | **closed** | Added `mcp: McpCapabilities { servers: vec![] }` default |
+| [Patch] §finding 17 — `check-pub-field-constructors` xtask gate FAILED at HEAD on `ProvidersSection.{primary,fallback}` and `McpSection.servers` because the gate's `new_impl_re()` regex's non-greedy `[\s\S]*?` consumes across impl-block boundaries (gate-internal false negative; both types DO have valid `::new` constructors) | HIGH | **closed** | Added allowlist entries with deferral note; the real fix (rebuild gate against syn-AST walk) deferred to Epic 6 toolchain hardening |
+| [Patch] §finding 4 — `xtask check-multi-provider-drift` used `serde_json::to_string_pretty(...).unwrap()` and `to_string(...).unwrap()` on output path; violates Story 5.4 §1373 (no `.unwrap` on serde) | MEDIUM | **closed** | Propagated serde errors via `match`; emit eprintln + return 1 on failure |
+| [Patch] §finding 5 — drift-check `partial_cmp().unwrap()` on f64 panics on NaN inputs | MEDIUM | **closed** | Switched to `total_cmp` (total order, NaN-safe) |
+| [Patch] §finding 7 — drift-check emits no GitHub Actions `::notice` annotation despite story narrative line 511 requirement | MEDIUM | **closed** | Added `::notice` line per outlier with fixture_id |
+| [Patch] §finding 8/9 — `multi_provider_matrix.rs` used `unwrap_or_else(|_| "[]".into())` on serde + `.ok()` on `fs::write` (silent failure: report writer breakage would pass the matrix test, then fail report-aggregate with no upstream signal) | HIGH | **closed** | Now panics with explicit messages on serde and I/O failures; matrix test now fails loud rather than silently emitting empty report |
+| [Patch] §finding 1 — `ProviderSwitchedPayload` pub fields had NO `#[doc = "Construct via ::new"]` annotations AND no matching `::new` constructor (violates Story 5.4 §A4 / AC5 last bullet) | HIGH | **closed** | Added the 5 doc annotations + matching `ProviderSwitchedPayload::new` constructor in `crates/maos-domain/src/invariants/i10.rs` |
+| [Patch] §finding 2 — `security/mod.rs::admit_spirit` held `provider_history` mutex across `serde_json::to_vec` AND `journal.journal_lifecycle(...)` — serializes every admission flow through one mutex when the journal performs fsync | HIGH | **closed** | Narrowed scope: insert under lock, capture diff, drop lock, then serialize + journal |
+| [Patch] `InferencePortAdapter::complete` used `router.registered_ids().first().cloned()` (alphabetically first) as the default provider instead of the router's own `default_id` field; works coincidentally because "anthropic" sorts first | MEDIUM | **closed** | Exposed `router.default_id()` accessor; adapter now uses operator-declared default |
+| [Patch] §finding 3 — `security/mod.rs::admit_spirit` mapped `serde_json::to_vec` serde error to `SecurityError::T3AdmissionFailed(...)` — misleading variant assignment | LOW | **open** | Not blocking; should be a dedicated `JournalSerialization` variant in a future cleanup. Variant fanout is wider than this story; document the misuse and defer |
+| [Patch] §finding 14 — `air_gap_ollama_test.rs` is `#![cfg(all(feature = "io_call_journal"))]` but also requires `fixture_replay`; running with only one feature emits "0 tests" silently | MEDIUM | **closed** | Documented in feature-fix (kernel-core Cargo.toml fanout above) and verified `--features "io_call_journal fixture_replay"` yields 2 passing tests |
+| [Patch] §finding 16 — smoke arm step 6 prints literal `"outbound_calls":0` instead of `journal.len()`; assertion is correct but printed evidence is static | LOW | **open** | Mild observability hygiene; the assertion already enforces the invariant and the printed line is fixture-replay-mode only |
+| [Patch] `check_capability` mapped upstream error via `|e| ...` then dropped — looks like a missed error handling site | LOW | **closed** | Renamed to `|_e|` and added comment explaining the deliberate I1 info-leak hardening collapse |
+| [Patch] §finding 6 — drift-check silently collapses missing/null `fixture_id` into `"unknown"`, grouping malformed rows together | LOW | **deferred → 9.4** | Edge case; deferred to operator-tooling hardening at Story 9.4 |
+| [Defer] `provider_history` HashMap still grows unbounded — no eviction on spirit `Unload` | LOW | **deferred → 9.4** | Memory ceiling not reached at v0.5-α load; eviction wiring needs the operator-facing spirit-deregister hook which lands at Story 9.x |
+| [Defer] `T3AdmissionFailed` variant misuse for serde errors (above) — needs a `JournalSerialization` variant | LOW | **deferred → 6.x** | Variant fanout is wider than this story |
+| [Decision] Story 5.5b commit SHA was UNKNOWN per Epic 5 retro §A8 — commit subsumed into `248f23b` (titled `5-5a-...`) on 2026-05-23 | INFO | **closed** | Closes §A8 commit-attribution gap. Recommendation for future epics: enforce one-story-per-commit discipline so retros can `git log --grep` story key |
+| [Decision] Dev record was incomplete at first commit (TBD model, empty Completion Notes, only 11 files vs 81 actual). glm-5.1 pattern: ships code, forgets metadata | MEDIUM | **closed** | Backfilled all 3 sections from `git show --stat 248f23b`; profile captured in `~/.claude/projects/.../memory/feedback_glm_5_1_patterns.md` |

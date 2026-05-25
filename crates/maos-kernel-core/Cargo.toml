@@ -9,7 +9,11 @@ description = "MAOS kernel core — capability mediation, IAC bus, journal"
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
-maos-spirit-abi = { path = "../maos-spirit-abi", features = ["mock"] }
+# Story 5.1 review backfill — `mock` feature moved to dev-dependencies so
+# the test-only `Ctx::mock()` constructor is NOT reachable from production
+# (release) builds. The production hook dispatcher uses
+# `Ctx::for_rust_inproc_hook()` which is unconditionally available.
+maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-providers = { path = "../maos-providers" }
 maos-director-surface = { path = "../maos-director-surface" }
 maos-mcp = { path = "../maos-mcp" }
@@ -71,12 +75,18 @@ spirit_test = ["maos-spirit-sdk"]
 # Story 5.5b AC4 — records every http_post URL for air-gapped validation.
 io_call_journal = []
 # Story 5.5c — MCP fixture replay for adapter tests.
-fixture_replay = ["maos-mcp/fixture_replay"]
+# Story 5.5b — multi-provider routing integration test uses
+# `maos_providers::fixture_replay::FixtureReplayProvider`; enable that
+# feature on the maos-providers dep when this feature is active so the
+# integration test at `tests/multi_provider_routing.rs` compiles.
+fixture_replay = ["maos-mcp/fixture_replay", "maos-providers/fixture_replay"]
 
 [dev-dependencies]
 tempfile = "3"
 criterion = "0.5"
 tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time"] }
+# Story 5.1 review backfill — `mock` feature enabled for tests only.
+maos-spirit-abi = { path = "../maos-spirit-abi", features = ["mock"] }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 smallvec = "1"
 

@@ -352,22 +352,89 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _poller_handle = revocation_poller.spawn(cancel_token.child_token());
     eprintln!("maos: RevocationApplier + RevocationPoller wired (Story 5.4)");
 
-    // Story 5.5d — Registry client + yank poller wiring
+    // Story 5.5d — Registry client + yank poller wiring (Finding #4 closed).
+    //
+    // Four-way switch on MAOS_REGISTRY_URI:
+    //   "stub"               → FixtureReplaySpiritRegistryClient (test-only, fixture_replay feature)
+    //   ""    / unset        → NullSpiritRegistryClient
+    //   "file://..."         → not yet supported (LocalFs adapter is Story 7.2);
+    //                           fall through to Null with a warning.
+    //   any HTTP(S) URI      → McpSpiritRegistryClient over McpClient::StreamableHttp.
     let registry_cfg = maos_kernel_core::security::operator_config::RegistrySection::resolve_from_env_and_disk();
-    let _registry_client: Arc<dyn maos_domain::ports::registry::SpiritRegistryClient> =
-        if std::env::var("MAOS_REGISTRY_URI").as_deref() == Ok("stub") {
-            use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
-            Arc::new(FixtureReplaySpiritRegistryClient::new(vec![]))
+    let _registry_client: Arc<dyn maos_domain::ports::registry::SpiritRegistryClient> = {
+        let env_uri = std::env::var("MAOS_REGISTRY_URI").unwrap_or_default();
+        if env_uri == "stub" {
+            #[cfg(feature = "fixture_replay")]
+            {
+                use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
+                Arc::new(FixtureReplaySpiritRegistryClient::new(vec![]))
+            }
+            #[cfg(not(feature = "fixture_replay"))]
+            {
+                eprintln!(
+                    "maos: warning: MAOS_REGISTRY_URI=stub requires --features fixture_replay; \
+                     falling back to NullSpiritRegistryClient"
+                );
+                use maos_registry::client::NullSpiritRegistryClient;
+                Arc::new(NullSpiritRegistryClient) as Arc<dyn maos_domain::ports::registry::SpiritRegistryClient>
+            }
         } else if registry_cfg.uri.is_empty() {
             use maos_registry::client::NullSpiritRegistryClient;
             Arc::new(NullSpiritRegistryClient)
-        } else {
-            // Production: McpSpiritRegistryClient over the MCP client
-            // (wiring deferred until the MCP client is constructed in
-            //  Story 5.5c's section; for now, use Null as placeholder)
+        } else if registry_cfg.uri.starts_with("file://") {
+            // LocalFs adapter for air-gapped + dev workflows is Story 7.2.
+            // For v0.5-α, log and fall through to Null so the kernel boots cleanly.
+            eprintln!(
+                "maos: warning: file:// registry URI not yet supported (Story 7.2); \
+                 using NullSpiritRegistryClient — set MAOS_REGISTRY_URI=stub or an http(s):// URI"
+            );
             use maos_registry::client::NullSpiritRegistryClient;
             Arc::new(NullSpiritRegistryClient)
-        };
+        } else {
+            // Production path: McpSpiritRegistryClient wrapping the Streamable-HTTP
+            // transport over IoSubsystemPort. This is the path the operator uses
+            // when MAOS_REGISTRY_URI points to a real HTTP endpoint.
+            use std::collections::BTreeMap;
+            use maos_domain::ports::mcp::McpTransportId;
+            use maos_mcp::client::{McpClient, McpServerEntry};
+            use maos_mcp::transport::streamable_http::StreamableHttpTransport;
+            use maos_mcp::transport::McpTransport;
+            use maos_registry::client::McpSpiritRegistryClient;
+
+            let transport: Arc<dyn McpTransport> = Arc::new(StreamableHttpTransport::new(
+                Arc::clone(&io_arc),
+                registry_cfg.uri.clone(),
+            ));
+            let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> = BTreeMap::new();
+            transports.insert(McpTransportId::StreamableHttp, transport);
+
+            let mut servers: BTreeMap<String, McpServerEntry> = BTreeMap::new();
+            servers.insert(
+                "spirit-registry".into(),
+                McpServerEntry {
+                    name: "spirit-registry".into(),
+                    transport: McpTransportId::StreamableHttp,
+                    fallback_transport: None,
+                },
+            );
+
+            match McpClient::new(transports, McpTransportId::StreamableHttp, servers) {
+                Ok(mcp) => Arc::new(McpSpiritRegistryClient::new(
+                    Arc::new(mcp),
+                    "spirit-registry".into(),
+                )) as Arc<dyn maos_domain::ports::registry::SpiritRegistryClient>,
+                Err(e) => {
+                    eprintln!(
+                        "maos: warning: failed to construct McpClient for registry uri '{}': {e} \
+                         — falling back to NullSpiritRegistryClient",
+                        registry_cfg.uri
+                    );
+                    use maos_registry::client::NullSpiritRegistryClient;
+                    Arc::new(NullSpiritRegistryClient)
+                }
+            }
+        }
+    };
     eprintln!(
         "maos: registry uri={} tier_floor={:?} t3_public_untrusted={} allow_unsigned_local={}",
         registry_cfg.uri,
@@ -1863,11 +1930,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .await
                 .map_err(|e| format!("smoke: failed to start smoke-spirit: {e}"))?;
 
-            // Step 2: Hot-swap upgrade to v0.1.1 (we just verify wiring; real hot-swap needs manifest on disk)
-            println!("{{\"step\":1,\"surface\":\"upgrade_orchestrator\",\"policy\":\"hot-swap\",\"outcome\":\"completed\"}}");
-
-            // Step 3: Cold-swap upgrade (orchestrator handles unload + reload)
-            // Write a dummy successor manifest so the orchestrator can parse it.
+            // Step 2: Hot-swap upgrade — actually exercise the upgrade orchestrator
+            // (Story 5.4 backfill review Finding #34: Step 1 was a stage-show
+            // println — now invokes upgrade_orchestrator.upgrade(.., HotSwap)).
+            // Write the successor manifest once, reuse for both hot-swap and
+            // cold-swap.
             let dummy_manifest_path = std::path::PathBuf::from("/tmp/maos-smoke-successor.toml");
             std::fs::write(
                 &dummy_manifest_path,
@@ -1892,6 +1959,26 @@ description = "smoke test spirit successor"
 "#,
             )
             .map_err(|e| format!("smoke: failed to write dummy successor manifest: {e}"))?;
+
+            let hot_swap_outcome = match upgrade_orchestrator
+                .upgrade(
+                    "smoke-spirit",
+                    &dummy_manifest_path,
+                    maos_kernel_core::lifecycle::UpgradePolicy::HotSwap,
+                )
+                .await
+            {
+                Ok(report) => report.outcome.as_str().to_string(),
+                Err(e) => {
+                    // Hot-swap requires Story 5.2 coordinator wiring that may not be
+                    // fully composed in the smoke arm's minimal composition root;
+                    // record the actual error rather than asserting completion.
+                    format!("failed: {e}")
+                }
+            };
+            println!("{{\"step\":1,\"surface\":\"upgrade_orchestrator\",\"policy\":\"hot-swap\",\"outcome\":\"{}\"}}", hot_swap_outcome);
+
+            // Step 3: Cold-swap upgrade (orchestrator handles unload + reload)
             let cold_report = upgrade_orchestrator
                 .upgrade(
                     "smoke-spirit",
@@ -1946,9 +2033,12 @@ description = "smoke test spirit successor"
         }
 
         if mode == "spirit-inspect" {
+            // Story 5.5a AC5: JSON report to stdout (operator-facing diagnostic
+            // surface; consumers pipe to `jq`). Story 5.5a review finding
+            // §inspect-on-stderr corrected the original `eprintln!` here.
             let spirit_id = std::env::var("MAOS_SPIRIT_ID")
                 .unwrap_or_else(|_| "unknown".to_string());
-            eprintln!(
+            println!(
                 r#"{{"spirit_id":"{}","pid":0,"runtime":"none","image_sha":"","applied_t2_protections":{{"landlock_rules":0,"seccomp_allow_count":0,"seccomp_kill_count":0}},"strictest_of_reasoning":{{"manifest_tier":"T0","trust_tier_floor":"T0","operator_policy_floor":"T0","effective_tier":"T0","dominant_axis":"manifest"}}}}"#,
                 spirit_id
             );
@@ -2616,9 +2706,134 @@ description = "smoke test spirit successor"
             return Ok(());
         }
 
+        if mode == "smoke-bench-5e" {
+            use maos_bench::fixture_replay::FixtureReplayBenchRunner;
+            use maos_bench::decision::decide;
+            use maos_bench::harness;
+            use maos_bench::report::BenchReport;
+
+            eprintln!("maos: smoke-bench-5e — §13.1 measurement gate smoke arm (fixture-replay)");
+
+            // Step 1: init
+            let mut bench_harness = harness::BenchHarness::new();
+            eprintln!(r#"{{"step":1,"surface":"bench_init","run_id":"{}","git_sha":"{}"}}"#,
+                bench_harness.run_id, bench_harness.git_sha);
+
+            // Step 2: J1 fixture-replay measurement (50 invocations)
+            {
+                let runner = FixtureReplayBenchRunner::new("J1", 50, 15_000);
+                let j1 = runner.run().unwrap();
+                assert_eq!(j1.invocation_count, 50);
+                assert!(j1.p95_us > 0);
+                eprintln!(r#"{{"step":2,"surface":"j1_fixture_replay","invocations":50,"p50_us":{},"p95_us":{},"budget_met":{}}}"#,
+                    j1.p50_us, j1.p95_us, j1.budget_met);
+                bench_harness.add_journey(j1.clone());
+            }
+
+            // Step 3: J4 fixture-replay measurement (50 invocations)
+            {
+                let runner = FixtureReplayBenchRunner::new("J4", 50, 7_000);
+                let j4 = runner.run().unwrap();
+                assert_eq!(j4.invocation_count, 50);
+                assert!(j4.p95_us > 0);
+                eprintln!(r#"{{"step":3,"surface":"j4_fixture_replay","invocations":50,"p50_us":{},"p95_us":{},"budget_met":{}}}"#,
+                    j4.p50_us, j4.p95_us, j4.budget_met);
+                bench_harness.add_journey(j4.clone());
+            }
+
+            // Step 4: decision
+            let j1 = &bench_harness.journey_results[0];
+            let j4 = &bench_harness.journey_results[1];
+            let decision = decide(j1, j4);
+            eprintln!(r#"{{"step":4,"surface":"decision","outcome":"{}","j1_p95_met":{},"j4_p95_met":{}}}"#,
+                decision.outcome, decision.j1_p95_met, decision.j4_p95_met);
+
+            // Step 5: write smoke report
+            let report = BenchReport::new(
+                bench_harness.run_id.clone(),
+                bench_harness.started_at_ns,
+                bench_harness.git_sha.clone(),
+                bench_harness.journey_results.clone(),
+                decision,
+            );
+            let _ = std::fs::create_dir_all("tests/reports");
+            let json = serde_json::to_vec_pretty(&report)
+                .map_err(|e| format!("serialization: {e}"))?;
+            std::fs::write("tests/reports/section-13-1-smoke.json", &json)
+                .map_err(|e| format!("write smoke report: {e}"))?;
+            eprintln!(r#"{{"step":5,"surface":"report_write","path":"tests/reports/section-13-1-smoke.json"}}"#);
+
+            eprintln!("maos: smoke-bench-5e complete — 5 surfaces exercised (fixture-replay)");
+            return Ok(());
+        }
+
+        if mode == "bench-section-13-1" {
+            use maos_bench::harness;
+            use maos_bench::harness::j1::J1Config;
+            use maos_bench::harness::j4::J4Config;
+            use maos_bench::decision::decide;
+            use maos_bench::report::BenchReport;
+
+            let invocation_count: u64 = std::env::var("MAOS_BENCH_INVOCATIONS")
+                .unwrap_or_else(|_| "1000".into())
+                .parse()
+                .map_err(|e| format!("invalid MAOS_BENCH_INVOCATIONS: {e}"))?;
+
+            eprintln!("maos: bench-section-13-1 — §13.1 real measurement (N={})", invocation_count);
+
+            let mut bench_harness = harness::BenchHarness::new();
+            let git_sha = bench_harness.git_sha.clone();
+
+            // J1 measurement
+            let j1_config = J1Config {
+                invocation_count,
+                ..Default::default()
+            };
+            let j1 = harness::j1::run_j1_measurement(&j1_config)
+                .map_err(|e| format!("J1 measurement failed: {e}"))?;
+            bench_harness.add_journey(j1.clone());
+
+            // J4 measurement
+            let j4_config = J4Config {
+                invocation_count,
+            };
+            let j4 = harness::j4::run_j4_measurement(&j4_config)
+                .map_err(|e| format!("J4 measurement failed: {e}"))?;
+            bench_harness.add_journey(j4.clone());
+
+            // Decision
+            let decision = decide(&j1, &j4);
+            let report = BenchReport::new(
+                bench_harness.run_id,
+                bench_harness.started_at_ns,
+                bench_harness.git_sha.clone(),
+                bench_harness.journey_results,
+                decision.clone(),
+            );
+
+            // Write report
+            std::fs::create_dir_all("tests/reports")
+                .map_err(|e| format!("create dir: {e}"))?;
+            let report_path = format!("tests/reports/section-13-1-{}.json", git_sha);
+            let json = serde_json::to_vec_pretty(&report)
+                .map_err(|e| format!("serialization: {e}"))?;
+            std::fs::write(&report_path, &json)
+                .map_err(|e| format!("write report: {e}"))?;
+
+            println!(
+                "bench-section-13-1 complete: J1 P95={}us (budget 25000us, met={}); J4 P95={}us (budget 10000us, met={}); decision={}; report={}",
+                j1.p95_us, j1.budget_met,
+                j4.p95_us, j4.budget_met,
+                decision.outcome,
+                report_path,
+            );
+
+            return Ok(());
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }

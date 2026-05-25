@@ -11,4 +11,10 @@ paths = [
   "crates/maos-kernel-core/src/security/sandbox/",
   "crates/maos-kernel-core/src/journal/",
   "crates/maos-kernel-core/src/iac/transparency_log.rs",
+  # Story 5.5d §A4 Debt 2b — operator-config TOML resolution (`~/.config/maos/operator.toml`)
+  # is a startup-only mediated-I/O surface. The kernel boots once, reads the
+  # operator's policy, and never returns to disk for this config. Adding a
+  # full IoSubsystemPort::read_file_at_path surface would be a v0.7 deferred
+  # work item per RegistrySection design notes.
+  "crates/maos-kernel-core/src/security/operator_config.rs",
 ]

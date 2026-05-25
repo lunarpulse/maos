@@ -151,7 +151,13 @@ async fn idle_watchdog_skips_paused_spirit() {
 
 #[tokio::test]
 async fn idle_watchdog_skips_manifest_disabled_hook() {
-    let scb = make_scb(vec![], 100); // empty enabled_hooks → on_idle NOT declared
+    // Story 5.1 review backfill — corrected test. Per kernel_invocation_allowed,
+    // empty enabled_hooks means "all hooks allowed" (matches
+    // `kernel_invocation_allowed(&[], _) → true`). To verify manifest gating
+    // ACTUALLY skips on_idle, the manifest must declare a NON-EMPTY enabled_hooks
+    // subset that EXCLUDES on_idle.
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let scb = make_scb(vec!["on_start".into()], 100); // on_idle NOT in subset
     let scbs = Arc::new(RwLock::new(BTreeMap::new()));
     scbs.write().unwrap().insert(1, Arc::clone(&scb));
 
@@ -167,9 +173,12 @@ async fn idle_watchdog_skips_manifest_disabled_hook() {
     cancel.cancel();
     let _ = tokio::time::timeout(tokio::time::Duration::from_secs(2), handle).await;
 
+    // After the review backfill, the watchdog only updates last_idle_fire_ns
+    // when the hook actually fired (not SkippedManifest). A Spirit whose
+    // manifest excludes on_idle MUST leave last_idle_fire_ns at 0.
     assert_eq!(
         scb.last_idle_fire_ns.load(Ordering::Relaxed),
         0,
-        "Spirit without on_idle in manifest must NOT fire"
+        "Spirit without on_idle in enabled_hooks must not advance last_idle_fire_ns"
     );
 }

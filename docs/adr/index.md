@@ -20,9 +20,11 @@ Committed ADRs for the MAOS project.
 | [ADR-037](ADR-037-constitutional-amendment-process.md) | Constitutional amendment process | binding-v0.1 | invariant-lock CI gate |
 | [ADR-038](ADR-038-per-service-kloc-ceiling.md) | Per-service KLOC ceiling | binding-v0.1 | xtask/kloc.toml enforced by tokei |
 | [ADR-039](ADR-039-per-module-unsafe-code-policy.md) | Per-module `#![forbid(unsafe_code)]` policy | binding-v0.1 | `xtask check-unsafe` + `xtask/unsafe-allowlist.toml` |
+| [ADR-040](ADR-040-rust-inproc-measurement-gate-v05-decision.md) | §13.1 rust-inproc measurement gate — v0.5 decision | binding-v0.5 | `xtask check-adr-040-accepted` + `crates/maos-bench/` |
 
-> 14 `binding-v0.1` ADRs as of Story 1a.1; **15 as of Story 1b.6** (ADR-039 — per-module unsafe policy, accepts the 1b.3 relaxation).
+> 16 `binding-v0.1` ADRs as of Story 1a.1; **15 as of Story 1b.6** (ADR-039 — per-module unsafe policy, accepts the 1b.3 relaxation).
+> **17 as of Story 5.5e** (ADR-040 — §13.1 rust-inproc measurement gate, binding-v0.5).
 > The `speculative-vNext` and post-v0.1 ADRs (ADR-008, 009, 014 [runtime], 015,
-> 016–021, 024, 025, 027–029, 031, 033–036, 040) are tracked in
+> 016–021, 024, 025, 027–029, 031, 033–036) are tracked in
 > `architecture-maos-minimal-opus/12-architecture-decision-records.md` and land
 > at their respective phase epics.

@@ -7,10 +7,6 @@
 //! at v0.3-β). Story 5.4's `maosctl spirit upgrade` calls this internally
 //! before the actual swap.
 
-use std::sync::Arc;
-
-use maos_domain::halt::HaltContinuityError;
-
 /// Precheck verdict outcome.
 pub use maos_domain::hot_swap::PrecheckOutcome;
 
@@ -40,7 +36,7 @@ impl HotSwapPrecheck {
     /// a verdict without mutating the halt registry.
     pub fn check(
         halt_registry: &crate::halt::HaltRegistry,
-        predecessor_pid: u32,
+        _predecessor_pid: u32,
         predecessor_halt_protocol_version: u32,
         successor_accepted_versions: &[u32],
         predecessor_state_schema_version: u32,
@@ -52,15 +48,7 @@ impl HotSwapPrecheck {
         );
 
         let version_list = successor_accepted_versions.to_vec();
-
-        // Determine if cross-major requires a migrator.
-        let (drained_count, migrated_count) = {
-            let pending = halt_registry.pending_halt_ids();
-            let remaining = pending.len();
-            // At v0.3-β global-drain always succeeds, so drained == total pending.
-            let drained = remaining;
-            (Some(drained), Some(remaining))
-        };
+        let pending_count = halt_registry.pending_halt_ids().len();
 
         let verdict = match schema_compat {
             SchemaCompat::Breaking => PrecheckOutcome::SchemaIncompatible,
@@ -72,7 +60,7 @@ impl HotSwapPrecheck {
                     Some(successor_accepted_versions),
                 ) {
                     Ok(()) => {
-                        if remaining_halt_count(halt_registry) == 0 {
+                        if pending_count == 0 {
                             PrecheckOutcome::SafeDrained
                         } else {
                             PrecheckOutcome::SafeMigrated
@@ -83,20 +71,27 @@ impl HotSwapPrecheck {
             }
         };
 
+        // Story 5.2 review backfill: drained_count and migrated_count are
+        // mutually exclusive per AC7's JSON shape. Populate exactly the field
+        // that matches the verdict; the other is None.
+        let (drained_count, migrated_count) = match verdict {
+            PrecheckOutcome::SafeDrained => (Some(pending_count), None),
+            PrecheckOutcome::SafeMigrated => (Some(0), Some(pending_count)),
+            PrecheckOutcome::HaltContinuityViolation
+            | PrecheckOutcome::SchemaIncompatible
+            | PrecheckOutcome::EMigratorMissing => (None, None),
+        };
+
         PrecheckVerdict {
             verdict,
             predecessor_halt_protocol_version,
             successor_accepted_versions: version_list,
             drained_count,
-            migrated_count: Some(remaining_halt_count(halt_registry)),
+            migrated_count,
             schema_compat,
             auto_revert_window_seconds: 30,
         }
     }
-}
-
-fn remaining_halt_count(registry: &crate::halt::HaltRegistry) -> usize {
-    registry.pending_halt_ids().len()
 }
 
 #[cfg(test)]

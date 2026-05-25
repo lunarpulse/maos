@@ -91,6 +91,9 @@ pub fn spawn_t3(
         }
 
         // 3. Build argv via the pure-function argv builder.
+        //    `parent.container_name` is the canonical identity used both
+        //    for `--name` and for inspect/cleanup — argv and spawn MUST
+        //    agree (Story 5.5a review finding §argv-divergence).
         let argv = super::argv::build_runtime_argv(
             &runtime,
             image,
@@ -99,6 +102,7 @@ pub fn spawn_t3(
             command,
             &spec.spirit_id,
             parent.boot_nonce,
+            &parent.container_name,
         );
 
         // 4. Spawn via std::process::Command.

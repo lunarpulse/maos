@@ -72,9 +72,16 @@ impl InferencePortAdapter {
         provider_id: &str,
     ) -> Result<(), InferenceError> {
         let posture_hash = [0u8; 32];
+        // Story 5.5b backfill review: the upstream error from
+        // verify_and_audit IS the auth failure detail (e.g., quota
+        // exceeded vs signature mismatch vs revoked). The kernel-side
+        // InferenceError surface intentionally collapses these into
+        // CapabilityDenied to avoid leaking enforcement detail to the
+        // Spirit (info-leak hardening per I1). The `_e` drop is
+        // deliberate, not a missed error-handling site.
         self.capabilities
             .verify_and_audit(token, posture_hash, SandboxTier(0))
-            .map_err(|e| InferenceError::CapabilityDenied)?;
+            .map_err(|_e| InferenceError::CapabilityDenied)?;
 
         let scope = self.capabilities.get_token_scope(&token.token_id);
         match scope {
@@ -86,11 +93,16 @@ impl InferencePortAdapter {
 
 impl InferencePort for InferencePortAdapter {
     fn complete(&self, req: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
-        let default_id = self.router.registered_ids().first().cloned();
+        // Story 5.5b backfill review: prefer the router's operator-declared
+        // default_id over the alphabetically-first registered_id. The prior
+        // shape `registered_ids().first()` coincidentally returned
+        // "anthropic" only because BTreeMap iteration is alphabetic — any
+        // future provider id sorting earlier (e.g. "amazon-bedrock") would
+        // silently change the default.
         let provider_id = req
             .provider_id
             .as_deref()
-            .or_else(|| default_id.as_deref())
+            .or_else(|| self.router.default_id())
             .ok_or(InferenceError::Unconfigured)?;
 
         self.check_capability(&req.capability_token, provider_id)?;

@@ -27,4 +27,11 @@ gates = [
     "isolation-framework-tests",
     "server-exit-drain",
     "check-workspace-count",
+    "check-adr040-accepted",
+    # Epic 5 retro §A3 — closes Epic 4 retro §A6 (.unwrap_or_default on serde calls).
+    "check-serde-error-handling",
+    # Epic 5 retro §A5 — open Review Findings rows block sprint-status `done`; closed rows reference File List.
+    "check-review-findings-resolved",
+    # Epic 5 retro §A6 — closes Epic 4 retro §A7 (dev-record completeness + TBD-placeholder catch).
+    "check-dev-record-completeness",
 ]

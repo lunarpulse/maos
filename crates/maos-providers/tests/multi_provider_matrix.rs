@@ -164,14 +164,22 @@ fn run_matrix(provider: &str) -> Vec<serde_json::Value> {
         results.push(row);
     }
 
-    let _ = std::fs::create_dir_all(&reports_dir);
+    std::fs::create_dir_all(&reports_dir)
+        .unwrap_or_else(|e| panic!("matrix: failed to create reports dir: {e}"));
     let report_path = reports_dir.join(format!(
         "multi-provider-{}-{}.json",
         std::env::var("GITHUB_SHA").unwrap_or_else(|_| "local".into()),
         provider
     ));
-    let report_json = serde_json::to_string_pretty(&results).unwrap_or_else(|_| "[]".into());
-    std::fs::write(&report_path, report_json).ok();
+    // Story 5.5b backfill review: propagate serde + I/O errors rather than
+    // silently dropping. Prior shape (`unwrap_or_else(|_| "[]".into())` +
+    // `.ok()`) would silently emit an empty report and pass the matrix
+    // test even when the report writer or serializer broke, which would
+    // then cause the report-aggregate job to fail with no upstream signal.
+    let report_json = serde_json::to_string_pretty(&results)
+        .unwrap_or_else(|e| panic!("matrix: failed to serialize report: {e}"));
+    std::fs::write(&report_path, report_json)
+        .unwrap_or_else(|e| panic!("matrix: failed to write report at {}: {e}", report_path.display()));
 
     results
 }

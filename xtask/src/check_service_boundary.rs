@@ -1106,14 +1106,46 @@ fn is_file_exempt(file: &str, exemptions: &[String]) -> bool {
 // Spirit ABI type reflection (AC5)
 // ------------------------------------------------------------------
 
+/// Load the expected Spirit-trait hook count from `xtask/spirit-abi-hook-count.toml`.
+/// Per Epic 5 retro §A4 Debt 2c: this used to be a hard-coded `11` literal; now
+/// configured so future hook additions (Story 5.2's hot-swap trio, future
+/// `epistemic_resolve`) don't require gate code changes.
+fn load_expected_hook_count(workspace_root: &Path, config_path: Option<&Path>) -> usize {
+    let default_path = workspace_root.join("xtask/spirit-abi-hook-count.toml");
+    let path = config_path
+        .map(|p| {
+            if p.is_absolute() {
+                p.to_path_buf()
+            } else {
+                workspace_root.join(p)
+            }
+        })
+        .unwrap_or(default_path);
+    if !path.exists() {
+        return 11; // back-compat fallback to the FR55 Epic 2 baseline.
+    }
+    let Ok(content) = fs::read_to_string(&path) else {
+        return 11;
+    };
+    let Ok(toml) = content.parse::<toml::Value>() else {
+        return 11;
+    };
+    toml.get("expected_count")
+        .and_then(|v| v.as_integer())
+        .map(|n| n as usize)
+        .unwrap_or(11)
+}
+
 /// AST-walk `maos-spirit-abi/src/lifecycle.rs` + `maos-spirit-derive/src/lib.rs`
 /// and assert trait method count, vtable fields, #[repr(C)], HOOK_NAMES, and
-/// count_hooks!() all agree on exactly 11 hooks.
+/// count_hooks!() all agree on the expected hook count loaded from
+/// `xtask/spirit-abi-hook-count.toml`.
 fn check_spirit_abi_types(
     workspace_root: &Path,
     lifecycle_path: &Path,
     derive_path: &Path,
 ) -> Result<(Vec<Violation>, serde_json::Value), String> {
+    let expected_hooks = load_expected_hook_count(workspace_root, None);
     let mut violations = Vec::new();
 
     let lifecycle_file = if lifecycle_path.exists() {
@@ -1226,26 +1258,28 @@ fn check_spirit_abi_types(
         }
     }
 
-    if trait_methods.len() != 11 {
+    if trait_methods.len() != expected_hooks {
         violations.push(Violation {
             file: lifecycle_file.display().to_string(),
             line: 1,
             path: "Spirit".into(),
             message: format!(
-                "spirit-ABI-drift: Spirit trait has {} methods but FR55 mandates 11",
-                trait_methods.len()
+                "spirit-ABI-drift: Spirit trait has {} methods but xtask/spirit-abi-hook-count.toml expects {}",
+                trait_methods.len(),
+                expected_hooks,
             ),
         });
     }
 
-    if vtable_fields.len() != 11 {
+    if vtable_fields.len() != expected_hooks {
         violations.push(Violation {
             file: lifecycle_file.display().to_string(),
             line: 1,
             path: "SpiritVtable".into(),
             message: format!(
-                "spirit-ABI-drift: SpiritVtable has {} hook fields but expected 11 (excluding _phantom)",
-                vtable_fields.len()
+                "spirit-ABI-drift: SpiritVtable has {} hook fields but expected {} (excluding _phantom)",
+                vtable_fields.len(),
+                expected_hooks,
             ),
         });
     }
@@ -1285,14 +1319,14 @@ fn check_spirit_abi_types(
         });
     }
 
-    if count_hooks_literal != 11 {
+    if count_hooks_literal != expected_hooks {
         violations.push(Violation {
             file: lifecycle_file.display().to_string(),
             line: 1,
             path: "count_hooks!".into(),
             message: format!(
-                "spirit-ABI-drift: count_hooks!() expands to {} but expected 11",
-                count_hooks_literal
+                "spirit-ABI-drift: count_hooks!() expands to {} but expected {}",
+                count_hooks_literal, expected_hooks,
             ),
         });
     }
@@ -1302,7 +1336,8 @@ fn check_spirit_abi_types(
         "vtable_field_count": vtable_fields.len(),
         "hook_names_match": trait_methods == hook_names,
         "repr_c_present": repr_c_present,
-        "count_hooks_macro_matches": count_hooks_literal == 11,
+        "count_hooks_macro_matches": count_hooks_literal == expected_hooks,
+        "expected_hook_count": expected_hooks,
     });
 
     Ok((violations, json))

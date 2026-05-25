@@ -36,6 +36,9 @@ fn default_caps_required() -> CapabilitiesRequired {
         provider: ProviderCapabilities {
             complete: vec!["anthropic.default".into()],
         },
+        // Story 5.5c added the `mcp` field; default to an empty MCP capability
+        // set so this 5.5b regression test stays unchanged in spirit.
+        mcp: maos_kernel_core::security::manifest::McpCapabilities { servers: vec![] },
     }
 }
 
@@ -98,7 +101,9 @@ id = "anthropic"
     let entries = journal.entries.lock().unwrap();
     let switch_events: Vec<_> = entries
         .iter()
-        .filter(|e| matches!(e, JournalEntry::Lifecycle(le) if le.lifecycle_event == LifecycleEvent::ProviderSwitched))
+        .filter(|e| {
+            matches!(e, JournalEntry::Lifecycle(le) if le.lifecycle_event == LifecycleEvent::ProviderSwitched)
+        })
         .collect();
     assert!(switch_events.is_empty(), "first admit should not emit ProviderSwitched");
 }
@@ -122,7 +127,9 @@ id = "anthropic"
     let entries = journal.entries.lock().unwrap();
     let switch_events: Vec<_> = entries
         .iter()
-        .filter(|e| matches!(e, JournalEntry::Lifecycle(le) if le.lifecycle_event == LifecycleEvent::ProviderSwitched))
+        .filter(|e| {
+            matches!(e, JournalEntry::Lifecycle(le) if le.lifecycle_event == LifecycleEvent::ProviderSwitched)
+        })
         .collect();
     assert!(switch_events.is_empty(), "same provider should not emit ProviderSwitched");
 }

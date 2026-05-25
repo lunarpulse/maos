@@ -47,6 +47,18 @@ jobs:
           pattern: multi-provider-*-report
           path: tests/reports/
           merge-multiple: true
+      - name: Aggregate per-provider JSON arrays into a single report
+        # Story 5.5b backfill review §finding 10 fix: the matrix step uploads
+        # `multi-provider-${sha}-anthropic.json` etc. (each is a JSON array
+        # of per-fixture rows). The drift-check expects ONE merged array at
+        # `multi-provider-${sha}.json`. Concatenate the arrays via jq.
+        run: |
+          set -euo pipefail
+          jq -s 'add' \
+            tests/reports/multi-provider-${{ github.sha }}-anthropic.json \
+            tests/reports/multi-provider-${{ github.sha }}-openai.json \
+            tests/reports/multi-provider-${{ github.sha }}-ollama.json \
+            > tests/reports/multi-provider-${{ github.sha }}.json
       - name: Aggregate + drift-check
         run: |
           cargo run -p xtask -- check-multi-provider-drift \

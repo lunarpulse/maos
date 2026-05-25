@@ -167,3 +167,81 @@ owner = "maos-registry"
 emitter = "kernel"
 since_version = "0.5.0"
 rust_variant = "AdmissionError::UnsignedLocalRejected"
+
+# ---------------------------------------------------------------------------
+# StorageError — crates/maos-registry/src/storage.rs
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EStorageIo"
+description = "Filesystem I/O error in the local registry storage tree"
+severity = "infra"
+recovery_class = "retry"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "StorageError::Io"
+
+[[error]]
+code = "EStorageSerde"
+description = "JSON serialization/deserialization error in the local registry storage tree"
+severity = "infra"
+recovery_class = "fix_config"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "StorageError::Serde"
+
+[[error]]
+code = "EStorageVersionNotFound"
+description = "Spirit version not present in the local registry storage tree"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "StorageError::VersionNotFound"
+
+# ---------------------------------------------------------------------------
+# Server-side ergonomic shapes (HTTP framing / JSON-RPC dispatch)
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EServerInvalidParams"
+description = "JSON-RPC params shape does not match the requested method's argument schema"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "Server::InvalidParams"
+
+[[error]]
+code = "EServerUnknownMethod"
+description = "JSON-RPC method name is not one of registry.{search,manifest,artifact,publish,deprecate,yanks_since}"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "Server::UnknownMethod"
+
+[[error]]
+code = "EServerPayloadTooLarge"
+description = "POST body exceeds the v0.5-α maximum (64 MB); reject with HTTP 413"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "Server::PayloadTooLarge"
+
+[[error]]
+code = "EYankPollerSourceUnreachable"
+description = "Yank poller could not reach the registry's yanks_since op — retry next poll cycle"
+severity = "infra"
+recovery_class = "retry"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "YankPoller::SourceUnreachable"

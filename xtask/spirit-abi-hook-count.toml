@@ -1,0 +1,76 @@
+# Per Epic 5 retro §A4 Debt 2c: the spirit-ABI-drift check in
+# `xtask check-service-boundary` previously hard-coded the literal `11` (FR55
+# Epic 2 baseline). Story 5.2 added 3 hooks (on_swap_out, snapshot, migrate per
+# ADR-017/020), bringing the count to 14. Architecture §5-spirit-abi.md mentions
+# `epistemic_resolve` as a planned 15th — verify at story open before bumping.
+#
+# Every entry below documents WHICH story/ADR added the hook so future
+# extensions don't require code changes to the gate.
+
+# Expected count: total methods on the `Spirit` trait MINUS Self-only / Ctx-only
+# infrastructure methods (e.g. provided defaults that aren't lifecycle hooks).
+# Matches the trait surface at HEAD post-Story-5.2.
+expected_count = 14
+
+# Per-hook attribution — when the expected_count changes, also update this list.
+[[hooks]]
+name = "on_load"
+added_by = "epic-2 / FR55 baseline"
+
+[[hooks]]
+name = "on_start"
+added_by = "epic-2 / FR55 baseline"
+
+[[hooks]]
+name = "on_frame"
+added_by = "epic-2 / FR55 baseline"
+
+[[hooks]]
+name = "on_idle"
+added_by = "epic-2 / FR55 baseline + Story 8.1 Butler anchor"
+
+[[hooks]]
+name = "on_telemetry_event"
+added_by = "epic-2 / FR55 baseline + Story 8.3 Observer anchor"
+
+[[hooks]]
+name = "on_schedule"
+added_by = "epic-2 / FR55 baseline"
+
+[[hooks]]
+name = "on_swap_in"
+added_by = "epic-2 / FR55 baseline (hot-swap predecessor → successor handoff)"
+
+[[hooks]]
+name = "on_pause"
+added_by = "epic-2 / FR55 baseline"
+
+[[hooks]]
+name = "on_resume"
+added_by = "epic-2 / FR55 baseline"
+
+[[hooks]]
+name = "on_unload"
+added_by = "epic-2 / FR55 baseline"
+
+[[hooks]]
+name = "on_consolidate"
+added_by = "epic-2 / FR55 baseline"
+
+[[hooks]]
+name = "on_swap_out"
+added_by = "Story 5.2 / ADR-017 (hot-swap predecessor cleanup)"
+
+[[hooks]]
+name = "snapshot"
+added_by = "Story 5.2 / ADR-017 (hot-swap state-transfer encode)"
+
+[[hooks]]
+name = "migrate"
+added_by = "Story 5.2 / ADR-020 (cross-major migration)"
+
+# Forward-shape note: `epistemic_resolve` is referenced in arch §5-spirit-abi.md
+# as planned for Story 4.1's halt-protocol-resolution. At HEAD post-Story-4.1,
+# the resolution surface lives at `KernelHaltResolver::resolve` (kernel-internal)
+# and does NOT extend the Spirit trait. If a future story adds Spirit-side halt
+# resolution, append the hook here and bump expected_count to 15.

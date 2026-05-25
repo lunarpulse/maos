@@ -102,16 +102,25 @@ pub fn decode(blob: &[u8], expected_schema_version: u32) -> Result<StateEnvelope
     }
     let schema_version = schema_version_raw as u32;
 
-    let payload = value
+    // Story 5.2 review backfill: do NOT silently default missing/malformed
+    // payload — that is the carry-forward serde-error anti-pattern #1/#7.
+    let payload_str = value
         .get("payload")
         .and_then(|v| v.as_str())
-        .and_then(|s| hex::decode(s).ok())
-        .unwrap_or_default();
+        .ok_or_else(|| StateCodecError::CborDecode("missing 'payload' field".into()))?;
+    let payload = hex::decode(payload_str)
+        .map_err(|e| StateCodecError::CborDecode(format!("payload hex decode failed: {e}")))?;
 
-    let envelope_version = value
+    let envelope_version_raw = value
         .get("envelope_version")
         .and_then(|v| v.as_u64())
-        .unwrap_or(1) as u32;
+        .ok_or_else(|| StateCodecError::CborDecode("missing 'envelope_version' field".into()))?;
+    if envelope_version_raw > u32::MAX as u64 {
+        return Err(StateCodecError::CborDecode(format!(
+            "envelope_version {envelope_version_raw} exceeds u32::MAX"
+        )));
+    }
+    let envelope_version = envelope_version_raw as u32;
 
     let envelope = StateEnvelope {
         schema_version,

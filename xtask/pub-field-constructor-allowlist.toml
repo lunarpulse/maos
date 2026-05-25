@@ -21,3 +21,29 @@ reason = "Pre-existing drift from Story 4.4 — field carries #[doc = 'Construct
 type_name = "LogRecallCursor"
 field_name = "last_frame_id"
 reason = "Pre-existing drift from Story 4.4 — field carries #[doc = 'Construct via ...::new'] but no ::new impl exists. Deferred to Story 5.4 (operator HTTP API / log-recall surface hardening)."
+
+# Story 5.5b — backfill review (2026-05-25): the gate's regex-based detection
+# is unable to match `impl ProvidersSection { pub fn new ... }` and
+# `impl McpSection { pub fn new ... }` because non-greedy `[\s\S]*?` in
+# `new_impl_re()` consumes across impl-block boundaries when an earlier
+# impl block's `pub fn new` is consumed first (see review §finding 17).
+# Both types DO have valid `::new` constructors at
+# `crates/maos-kernel-core/src/security/manifest.rs:1464` and `:1586` —
+# the gate bug is the false negative. Allowlist these three pairs while
+# the regex-based gate gets rebuilt against a proper Rust syn-walk; the
+# real fix is tracked as a deferred-work item against Epic 6 toolchain
+# hardening. NOT a real pub-field-constructor violation in Story 5.5b's code.
+[[allow]]
+type_name = "ProvidersSection"
+field_name = "primary"
+reason = "Pre-existing GATE regex bug — `impl ProvidersSection { pub fn new }` exists at manifest.rs:1464 but the regex's non-greedy `[\\s\\S]*?` consumes the new_impl_re match across an earlier impl block. Allowlisted at Story 5.5b backfill review per §finding 17."
+
+[[allow]]
+type_name = "ProvidersSection"
+field_name = "fallback"
+reason = "Pre-existing GATE regex bug — `impl ProvidersSection { pub fn new }` exists at manifest.rs:1464 but the regex's non-greedy `[\\s\\S]*?` consumes the new_impl_re match across an earlier impl block. Allowlisted at Story 5.5b backfill review per §finding 17."
+
+[[allow]]
+type_name = "McpSection"
+field_name = "servers"
+reason = "Pre-existing GATE regex bug — `impl McpSection { pub fn new }` exists at manifest.rs:1586 but the regex's non-greedy `[\\s\\S]*?` consumes the new_impl_re match across an earlier impl block. Allowlisted at Story 5.5b backfill review (5.5c-introduced type). Resolution path: rebuild the gate with a syn-based AST walk that respects impl-block scoping."

@@ -415,4 +415,290 @@ mod tests {
         // The key point: the admission path didn't fail at tier level.
         assert!(result.is_err());
     }
+
+    // ----------------------------------------------------------------
+    // Real-signature tests using deterministic seeded Ed25519 keypairs
+    // (Story 4.5 §A6 precedent — seed 0x150C04A5). NEVER commit the
+    // private key; we derive it deterministically in-test from the seed.
+    // ----------------------------------------------------------------
+
+    /// Deterministic Ed25519 keypair derived from a 4-byte seed prefix,
+    /// expanded to 32 bytes by repeating the prefix.  Suitable for tests
+    /// ONLY — never use this for production keys.
+    fn seeded_keypair(seed: u32) -> (ring::signature::Ed25519KeyPair, [u8; 32]) {
+        use ring::signature::{Ed25519KeyPair, KeyPair};
+        let prefix = seed.to_le_bytes();
+        let mut s = [0u8; 32];
+        for (i, b) in s.iter_mut().enumerate() {
+            *b = prefix[i % 4];
+        }
+        let kp = Ed25519KeyPair::from_seed_unchecked(&s).unwrap();
+        let pk: [u8; 32] = kp.public_key().as_ref().try_into().unwrap();
+        (kp, pk)
+    }
+
+    /// Build a SignedPackage with a real Ed25519 signature over
+    /// sha256(manifest_toml || artifact_bytes).
+    fn signed_pkg_with(
+        spirit_id: &str,
+        version: &str,
+        tier: &str,
+        keypair: &ring::signature::Ed25519KeyPair,
+        pubkey: [u8; 32],
+    ) -> SignedPackage {
+        use sha2::Digest;
+        let manifest = format!(
+            "[spirit]\nname = \"{}\"\nversion = \"{}\"\ntrust_tier = \"{}\"\n",
+            spirit_id, version, tier
+        );
+        let artifact = b"binary".to_vec();
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(manifest.as_bytes());
+        hasher.update(&artifact);
+        let msg = hasher.finalize();
+        let sig = keypair.sign(&msg);
+        let sig_bytes: [u8; 64] = sig.as_ref().try_into().unwrap();
+        SignedPackage::new(
+            SpiritId::from(spirit_id),
+            version.into(),
+            manifest.into_bytes(),
+            artifact,
+            sig_bytes,
+            pubkey,
+            empty_envelope(),
+        )
+    }
+
+    /// Build a SignedPackage for a public_untrusted spirit with a valid
+    /// ComplianceClaim envelope whose fingerprint matches the manifest.
+    fn public_untrusted_pkg_with_valid_envelope(
+        spirit_id: &str,
+        version: &str,
+        keypair: &ring::signature::Ed25519KeyPair,
+        pubkey: [u8; 32],
+    ) -> SignedPackage {
+        use crate::compliance_verify::compute_fingerprint_hash;
+        use maos_spirit_abi::compliance::{
+            CapabilityId, CryptoProviderId, ExecutionContextFingerprint,
+            ProviderEndpointPin, SandboxTier as Sb, TrustTier as Tt,
+        };
+        use sha2::Digest;
+        use std::collections::BTreeSet;
+
+        let manifest = format!(
+            "[spirit]\nname = \"{}\"\nversion = \"{}\"\ntrust_tier = \"public_untrusted\"\nsandbox_tier = \"t3\"\n",
+            spirit_id, version
+        );
+        let artifact = b"binary".to_vec();
+
+        // Re-derive the expected fingerprint from the manifest fields
+        let mut mh = sha2::Sha256::new();
+        mh.update(manifest.as_bytes());
+        let manifest_hash: [u8; 32] = mh.finalize().into();
+
+        let fp = ExecutionContextFingerprint {
+            manifest_hash,
+            spirit_version: version.to_string(),
+            trust_tier: Tt::PublicUntrusted,
+            sandbox_tier: Sb::T3,
+            capability_scope: BTreeSet::<CapabilityId>::new(),
+            provider_endpoint: ProviderEndpointPin {
+                provider_id: String::new(),
+                endpoint_url: String::new(),
+                model_id: None,
+            },
+            crypto_provider: CryptoProviderId(String::new()),
+        };
+        let fp_hex = hex::encode(compute_fingerprint_hash(&fp));
+
+        let claim_json = serde_json::json!({
+            "fingerprint_hash": fp_hex,
+            "trust_tier": "public_untrusted",
+            "sandbox_tier": "t3",
+            "capability_scope": [],
+            "provider_endpoint": {"provider_id": "", "endpoint_url": ""},
+            "crypto_provider": ""
+        });
+        let claim_bytes = serde_json::to_vec(&claim_json).unwrap();
+        let claim_sig = keypair.sign(&claim_bytes);
+        let envelope = ComplianceClaimEnvelope {
+            signature: claim_sig.as_ref().try_into().unwrap(),
+            attester_pubkey: pubkey,
+            claim_bytes,
+            signing_alg: SigningAlg::Ed25519,
+        };
+
+        // Package signature over sha256(manifest || artifact)
+        let mut h = sha2::Sha256::new();
+        h.update(manifest.as_bytes());
+        h.update(&artifact);
+        let msg = h.finalize();
+        let pkg_sig = keypair.sign(&msg);
+        let pkg_sig_bytes: [u8; 64] = pkg_sig.as_ref().try_into().unwrap();
+
+        SignedPackage::new(
+            SpiritId::from(spirit_id),
+            version.into(),
+            manifest.into_bytes(),
+            artifact,
+            pkg_sig_bytes,
+            pubkey,
+            envelope,
+        )
+    }
+
+    #[test]
+    fn org_internal_signature_matches_admits() {
+        // Story 5.5d Finding #6: real Ed25519 publisher_pubkey == org_signing_pubkey
+        // matches and the signature verifies — admit.
+        let (kp, pk) = seeded_keypair(0x150C04A5);
+        let pkg = signed_pkg_with("org-spirit", "0.1.0", "org_internal", &kp, pk);
+
+        let cfg = AdmissionConfig {
+            tier_floor: TrustTier::Local,
+            registry_origin_tier: TrustTier::Local,
+            t3_for_public_untrusted: false,
+            allow_unsigned_local: false,
+            // Operator-configured org key matches publisher.
+            org_signing_pubkey: Some(pk),
+        };
+
+        let decision = admit_spirit(&pkg, &cfg).expect("expected admit");
+        assert!(decision.admit);
+        assert_eq!(decision.effective_tier, TrustTier::OrgInternal);
+    }
+
+    #[test]
+    fn org_internal_signature_mismatch_rejects() {
+        // Story 5.5d Finding #6: publisher key does NOT match operator-configured
+        // org key — reject with OrgSignatureInvalid.
+        let (kp_publisher, pk_publisher) = seeded_keypair(0x150C04A5);
+        let (_kp_org, pk_org) = seeded_keypair(0xDEADBEEF); // different seed
+
+        let pkg = signed_pkg_with("org-spirit", "0.1.0", "org_internal", &kp_publisher, pk_publisher);
+
+        let cfg = AdmissionConfig {
+            tier_floor: TrustTier::Local,
+            registry_origin_tier: TrustTier::Local,
+            t3_for_public_untrusted: false,
+            allow_unsigned_local: false,
+            org_signing_pubkey: Some(pk_org),
+        };
+
+        let err = admit_spirit(&pkg, &cfg).unwrap_err();
+        assert!(matches!(err, AdmissionError::OrgSignatureInvalid));
+    }
+
+    #[test]
+    fn public_untrusted_with_valid_envelope_admits() {
+        // Story 5.5d Finding #6: real Ed25519 signature + matching ComplianceClaim
+        // envelope fingerprint — admit.
+        let (kp, pk) = seeded_keypair(0x150C04A5);
+        let pkg = public_untrusted_pkg_with_valid_envelope("pub-spirit", "0.1.0", &kp, pk);
+
+        let cfg = AdmissionConfig {
+            tier_floor: TrustTier::Local,
+            registry_origin_tier: TrustTier::Local,
+            t3_for_public_untrusted: false,
+            allow_unsigned_local: true,
+            org_signing_pubkey: None,
+        };
+
+        let decision = admit_spirit(&pkg, &cfg).expect("expected admit");
+        assert!(decision.admit);
+        assert_eq!(decision.effective_tier, TrustTier::PublicUntrusted);
+    }
+
+    #[test]
+    fn public_untrusted_with_tampered_envelope_rejects() {
+        // Story 5.5d Finding #6: valid publisher signature but tampered envelope
+        // signature (signed by a different key than the attester_pubkey).
+        let (kp_pub, pk_pub) = seeded_keypair(0x150C04A5);
+        let (kp_tamper, _pk_tamper) = seeded_keypair(0xC0FFEE00);
+
+        // Start from a valid envelope, then tamper its signature
+        let mut pkg = public_untrusted_pkg_with_valid_envelope("pub-spirit", "0.1.0", &kp_pub, pk_pub);
+        // Re-sign claim_bytes with a DIFFERENT key but keep the attester_pubkey
+        // pointing at the original publisher → signature won't verify.
+        let bad_sig = kp_tamper.sign(&pkg.compliance_envelope.claim_bytes);
+        pkg.compliance_envelope.signature = bad_sig.as_ref().try_into().unwrap();
+
+        let cfg = AdmissionConfig {
+            tier_floor: TrustTier::Local,
+            registry_origin_tier: TrustTier::Local,
+            t3_for_public_untrusted: false,
+            allow_unsigned_local: true,
+            org_signing_pubkey: None,
+        };
+
+        let err = admit_spirit(&pkg, &cfg).unwrap_err();
+        assert!(
+            matches!(err, AdmissionError::PublisherSignatureInvalid),
+            "expected PublisherSignatureInvalid, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn public_untrusted_with_fingerprint_drift_rejects() {
+        // Story 5.5d Finding #30 — make outcome deterministic by signing
+        // both pkg + envelope so we KNOW signatures verify; the only
+        // mismatch is the claimed fingerprint_hash. Must reject with
+        // ComplianceContextDrift (not SignatureInvalid).
+        use sha2::Digest;
+
+        let (kp, pk) = seeded_keypair(0x150C04A5);
+        let manifest = b"[spirit]\nname = \"drift\"\nversion = \"0.1.0\"\ntrust_tier = \"public_untrusted\"\nsandbox_tier = \"t3\"\n";
+        let artifact = b"binary".to_vec();
+
+        let claim_json = serde_json::json!({
+            // Deliberately wrong fingerprint hash
+            "fingerprint_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "trust_tier": "public_untrusted",
+            "sandbox_tier": "t3",
+            "capability_scope": [],
+            "provider_endpoint": {"provider_id": "", "endpoint_url": ""},
+            "crypto_provider": ""
+        });
+        let claim_bytes = serde_json::to_vec(&claim_json).unwrap();
+        let claim_sig = kp.sign(&claim_bytes);
+
+        let envelope = ComplianceClaimEnvelope {
+            signature: claim_sig.as_ref().try_into().unwrap(),
+            attester_pubkey: pk,
+            claim_bytes,
+            signing_alg: SigningAlg::Ed25519,
+        };
+
+        // Valid pkg signature
+        let mut h = sha2::Sha256::new();
+        h.update(manifest);
+        h.update(&artifact);
+        let msg = h.finalize();
+        let pkg_sig = kp.sign(&msg);
+        let pkg_sig_bytes: [u8; 64] = pkg_sig.as_ref().try_into().unwrap();
+
+        let pkg = SignedPackage::new(
+            SpiritId::from("drift"),
+            "0.1.0".into(),
+            manifest.to_vec(),
+            artifact,
+            pkg_sig_bytes,
+            pk,
+            envelope,
+        );
+
+        let cfg = AdmissionConfig {
+            tier_floor: TrustTier::Local,
+            registry_origin_tier: TrustTier::Local,
+            t3_for_public_untrusted: false,
+            allow_unsigned_local: true,
+            org_signing_pubkey: None,
+        };
+
+        let err = admit_spirit(&pkg, &cfg).unwrap_err();
+        assert!(
+            matches!(err, AdmissionError::ComplianceContextDrift { .. }),
+            "expected ComplianceContextDrift (deterministic), got {err:?}"
+        );
+    }
 }

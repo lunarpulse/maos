@@ -105,17 +105,24 @@ impl HotSwapSaga {
             .unwrap_or_default()
             .as_nanos() as u64;
 
+        // Story 5.2 review backfill: per AC3, the phase label MUST reflect the
+        // saga's current state at compensation time. Exhaustive match — no silent
+        // wildcards (carry-forward Epic 4 retro pattern #5).
         let (reason, phase_str) = match &compensation {
             SagaCompensation::RestorePredecessor { reason } => {
                 let phase = match self.current_phase {
+                    SagaPhase::NotStarted => "NotStarted",
                     SagaPhase::HaltContinuityChecked => "HaltContinuityChecked",
                     SagaPhase::SwapOutFired => "SwapOutFired",
                     SagaPhase::SnapshotTaken => "SnapshotTaken",
-                    _ => "restore_predecessor",
+                    SagaPhase::SwapInFired => "SwapInFired",
+                    SagaPhase::Committed => "Committed",
                 };
                 (reason.clone(), phase)
             }
-            SagaCompensation::DiscardSuccessor { reason } => (reason.clone(), "SnapshotTaken"),
+            // DiscardSuccessor fires from step 9 (on_swap_in failure), which is
+            // SagaPhase::SwapInFired — NOT SnapshotTaken (the prior label).
+            SagaCompensation::DiscardSuccessor { reason } => (reason.clone(), "SwapInFired"),
             SagaCompensation::AutoRevert { invariant } => {
                 (format!("{invariant:?}"), "PostSwapWindow")
             }

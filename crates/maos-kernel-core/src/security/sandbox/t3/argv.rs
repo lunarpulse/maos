@@ -15,9 +15,15 @@ use super::runtime_detect::ContainerRuntime;
 
 /// Build the argv for `podman run` / `docker run`.
 ///
-/// The container name suffix uses lower 32 bits of `boot_nonce` to
-/// prevent name collisions on rapid spawn-then-respawn.
-/// Image URI format: `<image_uri>@sha256:<hex>`.
+/// `container_name` is the canonical identifier used both for `--name`
+/// (the runtime's container name) AND for `<runtime> inspect` / `stop` /
+/// `rm` cleanup downstream — argv and spawn MUST agree on the same name
+/// (Story 5.5a review finding §argv-divergence). The caller (`spawn_t3`)
+/// owns the name and is responsible for collision-resistance via
+/// `boot_nonce`-derived suffixing.
+///
+/// Image URI format: `<image_uri>@sha256:<hex>` — the runtime verifies
+/// the SHA at pull/use time (TOCTOU mitigation).
 pub fn build_runtime_argv(
     runtime: &ContainerRuntime,
     image: &T3ImageAttestation,
@@ -26,6 +32,7 @@ pub fn build_runtime_argv(
     command: &[String],
     spirit_id: &str,
     boot_nonce: u64,
+    container_name: &str,
 ) -> Vec<String> {
     let cpu_str = spec
         .resolved_caps
@@ -37,18 +44,17 @@ pub fn build_runtime_argv(
         .memory_max_mb
         .map(|v| format!("{v}m"))
         .unwrap_or_else(|| "256m".to_string());
+    // NOTE: `--pids-limit` is sourced from `fd_max` at v0.5-α because the
+    // ResolvedCaps surface does not yet carry a dedicated `pids_max` cap.
+    // FD count and process count are distinct kernel limits (RLIMIT_NOFILE
+    // vs cgroup `pids.max`) — sharing the slot is a v0.5-α placeholder
+    // documented in DR-5.5a-9; full split lands at the same trigger as
+    // the operator-policy resource-floor expansion (Story 9.x).
     let pid_str = spec
         .resolved_caps
         .fd_max
         .map(|v| format!("{v}"))
         .unwrap_or_else(|| "64".to_string());
-
-    let container_name = format!(
-        "maos-{}-{:08x}-{:04x}",
-        spirit_id,
-        boot_nonce as u32,
-        (boot_nonce >> 32) as u16 ^ (boot_nonce & 0xFFFF) as u16
-    );
 
     // Use the first entry's image_uri + sha256 hex for the image reference.
     let image_ref = if let Some(entry) = image.entries.first() {
@@ -135,6 +141,7 @@ mod tests {
             &["echo".into(), "hello".into()],
             "test-spirit",
             12345,
+            "maos-test-spirit-00003039-3039",
         );
 
         assert_eq!(argv[0], "/usr/bin/podman");

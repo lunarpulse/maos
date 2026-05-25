@@ -311,7 +311,17 @@ impl SpiritControlBlock {
             spirit_obj,
             priority_weight,
             deficit_counter: AtomicU32::new(0),
-            last_inbound_frame_ns: AtomicU64::new(0),
+            // Story 5.1 review backfill — seed `last_inbound_frame_ns` to SCB
+            // creation time so the IdleWatchdog can fire on_idle even for
+            // Spirits that never received a frame. Previously initialized to
+            // 0, which the watchdog filter `last_inbound == 0` rejected,
+            // causing the substrate to never fire on_idle in production for
+            // freshly-loaded Spirits (the test `idle_watchdog_skips_manifest_
+            // disabled_hook` passed for the wrong reason — it relied on this
+            // bug). Mailbox::deliver overwrites this on first inbound frame.
+            last_inbound_frame_ns: AtomicU64::new(
+                crate::capability::cap_tokens::monotonic_now_ns(),
+            ),
             last_idle_fire_ns: AtomicU64::new(0),
             last_progress_iac_ns: AtomicU64::new(crate::capability::cap_tokens::monotonic_now_ns()),
             last_heartbeat_ns: AtomicU64::new(crate::capability::cap_tokens::monotonic_now_ns()),

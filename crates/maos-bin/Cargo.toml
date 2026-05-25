@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [features]
 spirit_test = ["maos-kernel-core/spirit_test", "maos-spirit-sdk/spirit_test"]
-fixture_replay = ["maos-mcp/fixture_replay", "maos-acp/fixture_replay", "maos-providers/fixture_replay", "maos-registry/fixture_replay"]
+fixture_replay = ["maos-mcp/fixture_replay", "maos-acp/fixture_replay", "maos-providers/fixture_replay", "maos-registry/fixture_replay", "maos-bench/fixture_replay"]
 
 [dependencies]
 maos-audit = { path = "../maos-audit" }
@@ -24,6 +24,7 @@ maos-mcp = { path = "../maos-mcp" }
 maos-registry = { path = "../maos-registry" }
 maos-acp = { path = "../maos-acp" }
 maos-providers = { path = "../maos-providers" }
+maos-bench = { path = "../maos-bench" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 maos-spirit-sdk = { path = "../maos-spirit-sdk" }

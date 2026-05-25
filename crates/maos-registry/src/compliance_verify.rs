@@ -165,8 +165,30 @@ pub fn verify_envelope_structural(
     // Step 4: Compare hashes
     if actual_hash != claimed.fingerprint_hash {
         return VerificationResult::Drift {
-            actual_hex: hex::encode(&actual_hash),
-            claimed_hex: hex::encode(&claimed.fingerprint_hash),
+            actual_hex: hex::encode(actual_hash),
+            claimed_hex: hex::encode(claimed.fingerprint_hash),
+        };
+    }
+
+    // Step 4b (Story 5.5d Finding #1 defense-in-depth): cross-check the
+    // CLAIMED structural fields against the MANIFEST-derived fields. The
+    // fingerprint_hash comparison above already catches drift via the CBOR
+    // hash, but the structural check makes the drift cause explicit and
+    // catches the case where a publisher tries to misrepresent the claim
+    // shape (claimed_trust_tier="local" while manifest declares
+    // public_untrusted, for instance).
+    if claimed.trust_tier != actual.trust_tier
+        || claimed.sandbox_tier != actual.sandbox_tier
+        || claimed.capability_scope != actual.capability_scope
+        || claimed.provider_endpoint != actual.provider_endpoint
+        || claimed.crypto_provider != actual.crypto_provider
+    {
+        return VerificationResult::Drift {
+            actual_hex: hex::encode(actual_hash),
+            claimed_hex: format!(
+                "structural-mismatch:claim_tier={:?}/manifest_tier={:?}",
+                claimed.trust_tier, actual.trust_tier
+            ),
         };
     }
 

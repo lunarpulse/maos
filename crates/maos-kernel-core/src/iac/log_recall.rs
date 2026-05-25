@@ -124,32 +124,43 @@ impl LogRecallAdapter {
     }
 
     /// Map domain `FrameKindLabel` → kernel-side `FrameKind`.
-    fn to_kernel_kind(label: &DomainFrameKindLabel) -> FrameKind {
+    ///
+    /// Returns `None` if the domain label has no kernel-side equivalent — the
+    /// caller must treat this as "no kind filter" rather than silently routing
+    /// to a default kind (Story 5.5d Finding #11 — the previous `_ =>
+    /// FrameKind::McpInvocation` catch-all silently misclassified future
+    /// `FrameKindLabel` variants in audit recall).
+    fn to_kernel_kind(label: &DomainFrameKindLabel) -> Option<FrameKind> {
         match label {
-            DomainFrameKindLabel::TaskAssign => FrameKind::TaskAssign,
-            DomainFrameKindLabel::TaskComplete => FrameKind::TaskComplete,
-            DomainFrameKindLabel::DecisionDispatch => FrameKind::DecisionDispatch,
-            DomainFrameKindLabel::EpistemicHalt => FrameKind::EpistemicHalt,
-            DomainFrameKindLabel::TelemetryEvent => FrameKind::TelemetryEvent,
-            DomainFrameKindLabel::ConsentRequest => FrameKind::ConsentRequest,
-            DomainFrameKindLabel::Retract => FrameKind::Retract,
-            DomainFrameKindLabel::CapabilityInvocation => FrameKind::CapabilityInvocation,
-            DomainFrameKindLabel::SandboxBlock => FrameKind::SandboxBlock,
-            DomainFrameKindLabel::InferenceCall => FrameKind::InferenceCall,
-            DomainFrameKindLabel::Decision => FrameKind::Decision,
-            DomainFrameKindLabel::Distillate => FrameKind::Distillate,
-            DomainFrameKindLabel::BudgetWarning => FrameKind::BudgetWarning,
-            DomainFrameKindLabel::BudgetExceeded => FrameKind::BudgetExceeded,
-            DomainFrameKindLabel::HotSwapAborted => FrameKind::HotSwapAborted,
-            DomainFrameKindLabel::TaskStalled => FrameKind::TaskStalled,
-            DomainFrameKindLabel::SilentFailureSuspect => FrameKind::SilentFailureSuspect,
-            DomainFrameKindLabel::SpiritRevoked => FrameKind::SpiritRevoked,
-            DomainFrameKindLabel::McpInvocation => FrameKind::McpInvocation,
-            DomainFrameKindLabel::SpiritAdmitted => FrameKind::SpiritAdmitted,
-            DomainFrameKindLabel::RegistryYank => FrameKind::RegistryYank,
-            _ => {
-                eprintln!("maos: warning: unmapped FrameKindLabel in to_kernel_kind, defaulting to McpInvocation");
-                FrameKind::McpInvocation
+            DomainFrameKindLabel::TaskAssign => Some(FrameKind::TaskAssign),
+            DomainFrameKindLabel::TaskComplete => Some(FrameKind::TaskComplete),
+            DomainFrameKindLabel::DecisionDispatch => Some(FrameKind::DecisionDispatch),
+            DomainFrameKindLabel::EpistemicHalt => Some(FrameKind::EpistemicHalt),
+            DomainFrameKindLabel::TelemetryEvent => Some(FrameKind::TelemetryEvent),
+            DomainFrameKindLabel::ConsentRequest => Some(FrameKind::ConsentRequest),
+            DomainFrameKindLabel::Retract => Some(FrameKind::Retract),
+            DomainFrameKindLabel::CapabilityInvocation => Some(FrameKind::CapabilityInvocation),
+            DomainFrameKindLabel::SandboxBlock => Some(FrameKind::SandboxBlock),
+            DomainFrameKindLabel::InferenceCall => Some(FrameKind::InferenceCall),
+            DomainFrameKindLabel::Decision => Some(FrameKind::Decision),
+            DomainFrameKindLabel::Distillate => Some(FrameKind::Distillate),
+            DomainFrameKindLabel::BudgetWarning => Some(FrameKind::BudgetWarning),
+            DomainFrameKindLabel::BudgetExceeded => Some(FrameKind::BudgetExceeded),
+            DomainFrameKindLabel::HotSwapAborted => Some(FrameKind::HotSwapAborted),
+            DomainFrameKindLabel::TaskStalled => Some(FrameKind::TaskStalled),
+            DomainFrameKindLabel::SilentFailureSuspect => Some(FrameKind::SilentFailureSuspect),
+            DomainFrameKindLabel::SpiritRevoked => Some(FrameKind::SpiritRevoked),
+            DomainFrameKindLabel::McpInvocation => Some(FrameKind::McpInvocation),
+            DomainFrameKindLabel::SpiritAdmitted => Some(FrameKind::SpiritAdmitted),
+            DomainFrameKindLabel::RegistryYank => Some(FrameKind::RegistryYank),
+            other => {
+                eprintln!(
+                    "maos: warning: unmapped FrameKindLabel {:?} in to_kernel_kind \
+                     — treating as no-kind-filter (returning None) to avoid \
+                     silent misclassification",
+                    other
+                );
+                None
             }
         }
     }
@@ -246,7 +257,7 @@ impl LogRecallPort for LogRecallAdapter {
         self.fire_isolation_hooks(&format!("log.recall:{spirit_pid}"), true);
 
         // 2. Build kernel-side filter.
-        let kind_filter = filter.kind.as_ref().map(|l| Self::to_kernel_kind(l));
+        let kind_filter = filter.kind.as_ref().and_then(Self::to_kernel_kind);
         let kernel_filter = FrameFilter {
             spirit_pid: Some(spirit_pid), // emitter-scope at v0.3-β
             kind: kind_filter,

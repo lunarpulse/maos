@@ -73,6 +73,34 @@ impl Ctx {
             mailbox_handle: MailboxHandle(0),
         }
     }
+
+    /// Construct a kernel-internal `Ctx` for rust-inproc hook dispatch.
+    ///
+    /// Story 5.1 closure: the kernel-side `HookDispatcher` requires a
+    /// `Ctx` to pass to each hook fire. At v0.3-β the rust-inproc form
+    /// uses a `&'static NeverCancel` because the kernel mediates
+    /// cancellation through `KernelCtx`'s SCB state, not through `Ctx`.
+    /// Real handles are zero-valued (rust-inproc form does not use them;
+    /// Story 5.5x's subprocess form will populate them from the wire
+    /// decode handshake).
+    ///
+    /// This constructor is NOT gated behind the `mock` feature — it is
+    /// the production-supported kernel-side surface for rust-inproc
+    /// dispatch, and is callable only from within `maos-kernel-core`
+    /// (no Spirit author can call this; the Spirit receives a fully-
+    /// constructed `Ctx` from the kernel and never constructs one
+    /// itself).
+    pub fn for_rust_inproc_hook(
+        capability_handle: CapabilityHandle,
+        mailbox_handle: MailboxHandle,
+    ) -> Self {
+        static NEVER: crate::cancellation::NeverCancel = crate::cancellation::NeverCancel;
+        Self {
+            cancellation: &NEVER,
+            capability_handle,
+            mailbox_handle,
+        }
+    }
 }
 
 impl core::fmt::Debug for Ctx {

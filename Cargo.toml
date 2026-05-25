@@ -24,6 +24,7 @@ members = [
     "crates/maos-attrs",
     "crates/maos-spirit-derive",
     "crates/maos-eval",
+    "crates/maos-bench",
     "examples/example-spirit",
 ]
 default-members = []

@@ -21,13 +21,12 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use maos_domain::halt::{HaltContinuityError, HaltId};
 use maos_domain::hot_swap::{HotSwapError, HotSwapResult, PostSwapInvariantViolation};
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::invariants::i3::FrameOrigin;
 
 use crate::capability::CapabilityRegistryAdapter;
-use crate::halt::{validate_halt_set, validate_swap_halt_continuity, HaltRegistry, SwapVerdict};
+use crate::halt::{validate_swap_halt_continuity, HaltRegistry, SwapVerdict};
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::iac::IacBusAdapter;
 use crate::journal::JournalAdapter;
@@ -36,7 +35,6 @@ use crate::scheduler::hook_dispatch::HookDispatcher;
 use crate::scheduler::HookOutcome;
 use crate::telemetry::iac_rt::IacRtMetrics;
 
-use super::archive::SpiritArchive;
 use super::migrator::run_migrator;
 use super::post_swap_monitor::{PostSwapInvariantSnapshot, PostSwapMonitor};
 use super::precheck::{HotSwapPrecheck, PrecheckVerdict as KernelPrecheckVerdict};
@@ -139,6 +137,18 @@ impl HotSwapCoordinator {
         // Step 2: Snapshot predecessor SCB for saga rollback.
         let mut saga = HotSwapSaga::new().with_pre_swap_snapshot(Arc::clone(&predecessor_scb));
         saga.advance_to(SagaPhase::NotStarted);
+
+        // Story 5.2 review backfill: capture the pre-swap halt-id baseline
+        // BEFORE step 3 (validate_swap_halt_continuity) runs, since the
+        // wrapper may drain halts as a side effect. Without this, the
+        // PostSwapMonitor's halt-set-delta invariant compares against a
+        // post-drain baseline and can never detect halt-set loss.
+        let pre_swap_halt_ids_baseline: Vec<String> = self
+            .halt_registry
+            .pending_halt_ids()
+            .iter()
+            .map(|h| h.as_str().to_string())
+            .collect();
 
         let predecessor_version = predecessor_scb
             .manifest
@@ -244,13 +254,21 @@ impl HotSwapCoordinator {
         // Step 6: Encode + decode CBOR envelope.
         let encoded = state_codec::encode(&state_blob, predecessor_state_schema_version)
             .map_err(|e| HotSwapError::Internal(format!("state codec encode failed: {e}")))?;
-        let envelope =
-            state_codec::decode(&encoded, successor_state_schema_version).map_err(|e| {
-                HotSwapError::SchemaIncompatible {
-                    predecessor_version: predecessor_state_schema_version,
-                    successor_version: successor_state_schema_version,
+        let envelope = state_codec::decode(&encoded, successor_state_schema_version).map_err(
+            |e| match e {
+                // Story 5.2 review backfill: distinguish schema-version mismatch
+                // (legitimate SchemaIncompatible) from decode-level failures
+                // (malformed CBOR, missing fields). The latter is an Internal error,
+                // not a SchemaIncompatible verdict.
+                state_codec::StateCodecError::SchemaVersionMismatch { .. } => {
+                    HotSwapError::SchemaIncompatible {
+                        predecessor_version: predecessor_state_schema_version,
+                        successor_version: successor_state_schema_version,
+                    }
                 }
-            })?;
+                other => HotSwapError::Internal(format!("state codec decode failed: {other}")),
+            },
+        )?;
 
         let payload = envelope.payload;
 
@@ -259,6 +277,8 @@ impl HotSwapCoordinator {
             predecessor_state_schema_version,
             successor_state_schema_version,
         );
+        // Story 5.2 review backfill: exhaustive match — Breaking schema must
+        // hard-reject, not silently fall through (carry-forward Epic 4 retro #5).
         let payload = match compat {
             SchemaCompat::CrossMajor => {
                 run_migrator(
@@ -266,12 +286,18 @@ impl HotSwapCoordinator {
                     &predecessor_scb,
                     &successor_spirit_obj,
                     &payload,
-                    &successor_manifest,
+                    successor_manifest,
                     &predecessor_version,
                 )
                 .await?
             }
-            _ => payload,
+            SchemaCompat::SameMajor => payload,
+            SchemaCompat::Breaking => {
+                return Err(HotSwapError::SchemaIncompatible {
+                    predecessor_version: predecessor_state_schema_version,
+                    successor_version: successor_state_schema_version,
+                });
+            }
         };
 
         // Step 8: Atomic SCB swap under spirits write-lock.
@@ -360,13 +386,10 @@ impl HotSwapCoordinator {
         // Step 11: Spawn PostSwapMonitor (30s window).
         saga.advance_to(SagaPhase::Committed);
 
-        // Collect baseline halt IDs from registry.
-        let pre_swap_halt_ids: Vec<String> = self
-            .halt_registry
-            .pending_halt_ids()
-            .iter()
-            .map(|h| h.as_str().to_string())
-            .collect();
+        // Story 5.2 review backfill: use the baseline captured BEFORE step 3
+        // (validate_swap_halt_continuity), not after — see comment near the
+        // declaration of pre_swap_halt_ids_baseline.
+        let pre_swap_halt_ids: Vec<String> = pre_swap_halt_ids_baseline;
 
         // Collect sample frame shapes from journal (placeholder — up to 5 recent).
         let pre_swap_frame_shapes: Vec<String> = vec![]; // TODO: sample from journal

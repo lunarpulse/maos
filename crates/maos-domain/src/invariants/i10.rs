@@ -32,14 +32,41 @@ use crate::invariants::i9::SandboxTier;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InvariantI10;
 
-/// Payload for `LifecycleEvent::ProviderSwitched`.
+/// Payload for `LifecycleEvent::ProviderSwitched` (Story 5.5b AC5).
+///
+/// Construct via [`ProviderSwitchedPayload::new`] to ensure all fields are
+/// populated and to keep the field-init shape stable across versions.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ProviderSwitchedPayload {
+    #[doc = "Construct via [`ProviderSwitchedPayload::new`] to ensure all fields are populated."]
     pub spirit_id: String,
+    #[doc = "Construct via [`ProviderSwitchedPayload::new`] to ensure all fields are populated."]
     pub from_provider: String,
+    #[doc = "Construct via [`ProviderSwitchedPayload::new`] to ensure all fields are populated."]
     pub to_provider: String,
+    #[doc = "Construct via [`ProviderSwitchedPayload::new`] to ensure all fields are populated."]
     pub manifest_path: String,
+    #[doc = "Construct via [`ProviderSwitchedPayload::new`] to ensure all fields are populated."]
     pub applied_at_ns: u64,
+}
+
+impl ProviderSwitchedPayload {
+    /// Construct the payload from validated components.
+    pub fn new(
+        spirit_id: String,
+        from_provider: String,
+        to_provider: String,
+        manifest_path: String,
+        applied_at_ns: u64,
+    ) -> Self {
+        Self {
+            spirit_id,
+            from_provider,
+            to_provider,
+            manifest_path,
+            applied_at_ns,
+        }
+    }
 }
 
 /// Lifecycle events that MUST be journaled.

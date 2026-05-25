@@ -309,7 +309,10 @@ impl HookDispatcher {
         let snapshot_future = timeout(
             Duration::from_secs(cap_seconds),
             tokio::task::spawn_blocking(move || {
-                let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
+                let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
+                    maos_spirit_abi::ctx::CapabilityHandle(0),
+                    maos_spirit_abi::ctx::MailboxHandle(0),
+                );
                 let mut kernel_ctx = KernelCtx::new(&mut ctx).with_spirit_pid(spirit_pid);
                 if let Some(ref s) = spirits {
                     kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
@@ -389,7 +392,10 @@ impl HookDispatcher {
         let migrate_future = timeout(
             Duration::from_secs(cap_seconds),
             tokio::task::spawn_blocking(move || {
-                let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
+                let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
+                    maos_spirit_abi::ctx::CapabilityHandle(0),
+                    maos_spirit_abi::ctx::MailboxHandle(0),
+                );
                 let mut kernel_ctx = KernelCtx::new(&mut ctx).with_spirit_pid(spirit_pid);
                 if let Some(ref s) = spirits {
                     kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
@@ -492,7 +498,10 @@ impl HookDispatcher {
         let hook_future = timeout(
             Duration::from_secs(cap_seconds),
             tokio::task::spawn_blocking(move || {
-                let mut ctx = maos_spirit_abi::ctx::Ctx::mock();
+                let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
+                    maos_spirit_abi::ctx::CapabilityHandle(0),
+                    maos_spirit_abi::ctx::MailboxHandle(0),
+                );
                 let mut kernel_ctx = KernelCtx::new(&mut ctx).with_spirit_pid(spirit_pid);
                 if let Some(ref s) = spirits {
                     kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));

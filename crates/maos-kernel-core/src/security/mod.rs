@@ -247,33 +247,44 @@ impl SecurityManagerAdapter {
         }
 
         // Story 5.5b — ProviderSwitched emission.
+        //
+        // Backfill review (2026-05-25): scope the mutex narrowly. The earlier
+        // shape held the lock across `serde_json::to_vec` AND
+        // `journal.journal_lifecycle` — the journal call can perform I/O
+        // (fsync on the lifecycle journal), and holding a global mutex across
+        // I/O serializes every admission. Capture the from/to diff under the
+        // lock, swap the value, drop the lock, then serialize + journal.
         if let Some(providers_section) = providers {
-            let new_provider = &providers_section.primary.id;
-            let mut history = self.provider_history.lock().unwrap();
-            if let Some(prev_provider) = history.get(spirit_id) {
-                if prev_provider != new_provider {
-                    let payload = maos_domain::invariants::i10::ProviderSwitchedPayload {
-                        spirit_id: spirit_id.into(),
-                        from_provider: prev_provider.clone(),
-                        to_provider: new_provider.clone(),
-                        // manifest_path: synthetic — manifest file path is not available in this scope
-                        // (admit_spirit receives parsed sections, not the original path). Consumers
-                        // should not parse this field as a real filesystem path.
-                        manifest_path: format!("manifest:{spirit_id}"),
-                        applied_at_ns: crate::capability::cap_tokens::monotonic_now_ns(),
-                    };
-                    let payload_bytes = serde_json::to_vec(&payload)
-                        .map_err(|e| SecurityError::T3AdmissionFailed(e.to_string()))?;
-                    journal.journal_lifecycle(JournalEntry::Lifecycle(LifecycleEntry {
-                        timestamp: payload.applied_at_ns,
-                        lifecycle_event: LifecycleEvent::ProviderSwitched,
-                        spirit_id: spirit_id.into(),
-                        effective_sandbox_tier: None,
-                        payload: Some(payload_bytes),
-                    }));
+            let new_provider = providers_section.primary.id.clone();
+            let from_provider_opt = {
+                let mut history = self.provider_history.lock().unwrap();
+                let prev = history.insert(spirit_id.into(), new_provider.clone());
+                match prev {
+                    Some(prev) if prev != new_provider => Some(prev),
+                    _ => None,
                 }
+            };
+            if let Some(from_provider) = from_provider_opt {
+                let payload = maos_domain::invariants::i10::ProviderSwitchedPayload::new(
+                    spirit_id.into(),
+                    from_provider,
+                    new_provider,
+                    // manifest_path: synthetic — admit_spirit receives parsed
+                    // sections, not the original path. Consumers should not
+                    // parse this field as a real filesystem path.
+                    format!("manifest:{spirit_id}"),
+                    crate::capability::cap_tokens::monotonic_now_ns(),
+                );
+                let payload_bytes = serde_json::to_vec(&payload)
+                    .map_err(|e| SecurityError::T3AdmissionFailed(e.to_string()))?;
+                journal.journal_lifecycle(JournalEntry::Lifecycle(LifecycleEntry {
+                    timestamp: payload.applied_at_ns,
+                    lifecycle_event: LifecycleEvent::ProviderSwitched,
+                    spirit_id: spirit_id.into(),
+                    effective_sandbox_tier: None,
+                    payload: Some(payload_bytes),
+                }));
             }
-            history.insert(spirit_id.into(), new_provider.clone());
         }
 
         Ok(SandboxSpec {
