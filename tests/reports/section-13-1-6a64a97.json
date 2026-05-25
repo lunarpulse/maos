@@ -1,0 +1,42 @@
+{
+  "run_id": "maos-bench-1779668199385641235",
+  "started_at_ns": 320,
+  "git_sha": "6a64a97",
+  "journeys": [
+    {
+      "name": "J1",
+      "invocation_count": 1000,
+      "p50_us": 5,
+      "p95_us": 6,
+      "p99_us": 10,
+      "max_us": 416,
+      "mean_us": 5,
+      "std_dev_us": 13,
+      "cpu_user_pct": 0,
+      "cpu_sys_pct": 0,
+      "rss_max_mb": 0,
+      "budget_met": true
+    },
+    {
+      "name": "J4",
+      "invocation_count": 1000,
+      "p50_us": 3480,
+      "p95_us": 5740,
+      "p99_us": 5940,
+      "max_us": 5980,
+      "mean_us": 3490,
+      "std_dev_us": 1443,
+      "cpu_user_pct": 0,
+      "cpu_sys_pct": 0,
+      "rss_max_mb": 0,
+      "budget_met": true
+    }
+  ],
+  "decision": {
+    "outcome": "defer-rust-inproc-to-v2.0+",
+    "j1_p95_met": true,
+    "j4_p95_met": true,
+    "rationale": "J1 P95 = 6us (budget 25000us, met=true); J4 P95 = 5740us (budget 10000us, met=true); both-met=true → defer-rust-inproc-to-v2.0+",
+    "adr_id": "ADR-040"
+  }
+}
