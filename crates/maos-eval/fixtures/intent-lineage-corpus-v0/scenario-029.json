@@ -1,0 +1,16 @@
+{
+  "scenario_id": "intent-lineage-lineage_union_via_distillate-029",
+  "class": "lineage_union_via_distillate",
+  "description": "Worker A intent=readonly, Worker B intent=standard, distillate union, hop=2",
+  "originating_intent": "readonly",
+  "hop_count": 2,
+  "origin": "spirit_auto",
+  "secondary_intent": "standard",
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": [
+      "readonly",
+      "standard"
+    ]
+  }
+}

@@ -18,6 +18,7 @@ pub mod distillate_corpus; // NEW — Story 4.4 five-metric distillation gate
 pub mod halt_continuity_corpus; // NEW — Story 5.2 halt-continuity corpus (AC4)
 pub mod halt_corpus;
 pub mod hsis_corpus;
+pub mod intent_lineage_corpus; // NEW — Story 6.2 AC4 NFR-Aud-14 100% intent_lineage corpus
 pub mod isolation_corpus; // NEW — Story 4.5 cross-Spirit isolation 200-corpus
 pub mod retract_corpus; // NEW — Story 6.1 retract corpus (AC2)
 pub mod revocation_corpus; // NEW — Story 5.4 revocation corpus (AC5)

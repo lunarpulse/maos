@@ -1,0 +1,15 @@
+{
+  "scenario_id": "intent-lineage-lineage_continuity_across_retract-041",
+  "class": "lineage_continuity_across_retract",
+  "description": "Worker A emits F1 with intent=consult; Worker B retracts via IacBusPort::retract; the Retract frame carries the SAME lineage",
+  "originating_intent": "consult",
+  "hop_count": 1,
+  "origin": "kernel",
+  "secondary_intent": null,
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": [
+      "consult"
+    ]
+  }
+}

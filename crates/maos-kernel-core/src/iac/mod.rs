@@ -19,6 +19,7 @@ pub mod frame;
 pub mod log_recall; // NEW — Story 4.4 LogRecallAdapter
 pub mod mailbox;
 pub mod mailbox_stub;
+pub mod orchestrator_dispatch; // NEW — Story 6.2 AC2 FR21 distillate-dispatch check
 pub mod redaction;
 pub mod transparency_log; // NEW — Story 4.4 DistillateWriter
 
@@ -44,7 +45,7 @@ pub use transparency_log::{
 /// `Arc<TransparencyLogAdapter>` for the I2 log-before-deliver
 /// guarantee.
 #[maos_attrs::i9_exempt(
-    reason = "IAC Bus adapter; holds Arc<Mailbox> + Arc<TransparencyLogAdapter> — both are I9-sanctioned locations"
+    reason = "IAC Bus adapter; holds Arc<Mailbox> + Arc<TransparencyLogAdapter> + Story 6.2 AC4 frame_lineage_cache (in-memory, bounded by session lifetime) — all I9-sanctioned"
 )]
 #[derive(Clone)]
 pub struct IacBusAdapter {
@@ -59,6 +60,13 @@ pub struct IacBusAdapter {
             + Send
             + Sync,
     >,
+    /// Story 6.2 AC4 — frame_id → intent_lineage cache for retract continuity.
+    /// Populated at deliver_typed for cross-Spirit frames; read by retract() to
+    /// carry the original lineage onto the emitted Retract frame.
+    /// Bounded by session lifetime; eviction at MAX_LINEAGE_CACHE_ENTRIES.
+    frame_lineage_cache: std::sync::Arc<
+        dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>,
+    >,
     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
     #[cfg(feature = "spirit_test")]
     isolation_hook: Option<
@@ -67,6 +75,12 @@ pub struct IacBusAdapter {
         >,
     >,
 }
+
+/// Story 6.2 AC4 — soft cap on the lineage cache. Entries are added on
+/// deliver_typed and never explicitly removed; once the cap is reached new
+/// inserts skip the cache (retract on a stale frame falls back to empty
+/// lineage). Sized for ~5min of 10 tasks/sec sustained throughput.
+const MAX_LINEAGE_CACHE_ENTRIES: usize = 4096;
 
 impl IacBusAdapter {
     /// Construct a new adapter wrapping the given Mailbox and Transparency Log.
@@ -81,6 +95,7 @@ impl IacBusAdapter {
             digest_provider: std::sync::Arc::new(|_| {
                 maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
             }),
+            frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
@@ -288,6 +303,15 @@ impl IacBusAdapter {
             );
         }
 
+        // Story 6.2 AC2 — FR21: Orchestrator distillate-dispatch gate.
+        // Fires BEFORE the I13 lineage check below; the gate is a permission
+        // check (no TL row written for rejected frames).
+        orchestrator_dispatch::check_orchestrator_distillate_required(
+            &frame,
+            &self.transparency_log,
+            orchestrator_dispatch::DEFAULT_ORCHESTRATOR_DISPATCH_WINDOW_NS,
+        )?;
+
         // Story 4.5 — NFR-Aud-14 intent-lineage propagation.
         // Cross-Spirit determination: `frame.from.spirit_id != frame.to[0].spirit_id`
         // (broadcasts with no `to` entries are NOT cross-Spirit — they're 1:N telemetry,
@@ -419,7 +443,17 @@ impl IacBusAdapter {
             maos_spirit_abi::identity::FrameKind::InferenceCall => {
                 transparency_log::FrameKind::InferenceCall
             }
+            maos_spirit_abi::identity::FrameKind::CliSubprocessOutput => {
+                transparency_log::FrameKind::CliSubprocessOutput
+            }
         };
+
+        // Story 6.2 AC4 — populate the frame_lineage_cache so retract() can
+        // recover the original lineage. Bounded by MAX_LINEAGE_CACHE_ENTRIES.
+        if self.frame_lineage_cache.len() < MAX_LINEAGE_CACHE_ENTRIES {
+            self.frame_lineage_cache
+                .insert(frame.frame_id, frame.intent_lineage.clone());
+        }
 
         // I2: log before deliver.
         // Story 6.1 — use DRR scheduler if present, otherwise synchronous write.
@@ -551,6 +585,17 @@ impl IacBusAdapter {
         )
         .map_err(maos_domain::iac_bus_types::IacBusError::RetractPayloadInvalid)?;
 
+        // Story 6.2 AC4 — lineage continuity across retract.
+        // Recover the original frame's lineage from the frame_lineage_cache
+        // populated at deliver_typed time. Falls back to default() when the
+        // cache has evicted the entry (sessions older than the cache window).
+        // The retract is a continuation of the original intent, not a new one.
+        let original_lineage = self
+            .frame_lineage_cache
+            .get(&original_frame_id)
+            .map(|e| e.value().clone())
+            .unwrap_or_default();
+
         // Build retract frame with a UNIQUE frame_id (not reusing original_frame_id)
         // The TL auto-generates a frame_id for the new Retract row.
         let retract_frame = maos_domain::frame::IacFrame {
@@ -592,7 +637,8 @@ impl IacBusAdapter {
             payload: maos_domain::frame::FramePayload::Retract(retract_payload),
             auto_marker: maos_domain::invariants::i3::FrameOrigin::Kernel,
             consent_envelope: None,
-            intent_lineage: maos_domain::invariants::i13::IntentLineage::default(),
+            // Story 6.2 AC4 — continuity: carry the original frame's lineage.
+            intent_lineage: original_lineage,
         };
 
         // Step 4.5: Atomically check-and-mark retracted BEFORE writing TL row
@@ -679,6 +725,7 @@ impl Default for IacBusAdapter {
             digest_provider: std::sync::Arc::new(|_| {
                 maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
             }),
+            frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
@@ -804,6 +851,7 @@ mod decision_audit_tests {
                 scope: vec![],
                 success_criteria: "done".into(),
                 posture_preferences: PosturePreferences::default(),
+                prior_distillate_ref: None,
             }),
             auto_marker: FrameOrigin::HumanAuthored,
             consent_envelope: None,
@@ -858,6 +906,7 @@ mod decision_audit_tests {
                 scope: vec![],
                 success_criteria: "ok".into(),
                 posture_preferences: PosturePreferences::default(),
+                prior_distillate_ref: None,
             }),
             auto_marker: origin,
             consent_envelope: None,

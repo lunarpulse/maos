@@ -47,6 +47,7 @@ fn make_frame(from: &str, to: &[&str], origin: FrameOrigin) -> IacFrame {
             scope: vec![],
             success_criteria: "ok".into(),
             posture_preferences: PosturePreferences::default(),
+            prior_distillate_ref: None,
         }),
         auto_marker: origin,
         consent_envelope: None,

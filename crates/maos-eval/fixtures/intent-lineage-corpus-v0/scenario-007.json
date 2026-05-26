@@ -1,0 +1,15 @@
+{
+  "scenario_id": "intent-lineage-lineage_chain_uninterrupted-007",
+  "class": "lineage_chain_uninterrupted",
+  "description": "single-hop HumanAuthored\u2192SpiritAuto re-emission, hop=3, intent=consult",
+  "originating_intent": "consult",
+  "hop_count": 3,
+  "origin": "spirit_auto",
+  "secondary_intent": null,
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": [
+      "consult"
+    ]
+  }
+}

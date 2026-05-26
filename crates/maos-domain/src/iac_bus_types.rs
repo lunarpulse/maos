@@ -47,6 +47,16 @@ pub enum IacBusError {
     /// Story 6.1 — retract payload validation failed.
     #[error("retract payload validation failed: {0}")]
     RetractPayloadInvalid(#[from] RetractPayloadError),
+    /// Story 6.2 — FR21: Orchestrator emitted a follow-up `task.assign` referencing
+    /// raw Worker output (or no predecessor at all) when a prior Worker
+    /// `TaskComplete` exists in the session's log_recall window. Closes the
+    /// raw-output context-overflow loophole — the Orchestrator MUST dispatch
+    /// against a `DistillationReceipt::digest_frame_id`, not against raw frame ids.
+    #[error("orchestrator dispatch references raw worker output not a distillate: orchestrator {orchestrator} task {task_id}")]
+    EOrchestratorDispatchRawOutput {
+        orchestrator: String,
+        task_id: String,
+    },
 }
 
 /// Outcome of a `retract` operation — Story 6.1.

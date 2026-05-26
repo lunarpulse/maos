@@ -17,4 +17,12 @@ paths = [
   # full IoSubsystemPort::read_file_at_path surface would be a v0.7 deferred
   # work item per RegistrySection design notes.
   "crates/maos-kernel-core/src/security/operator_config.rs",
+  # Story 6.2 AC5 — CliWrapperSpirit admission probe. `probe_and_verify_shape`
+  # invokes the declared CLI subprocess once at admission to verify the
+  # output-shape adapter version (ADR-021 fail-loud). The full FR52 runtime
+  # subprocess invocation routes through the existing `security/sandbox/t3/`
+  # exempt path (Story 5.5a); the admission-time probe lives in its own
+  # mediated lane because it runs BEFORE the Spirit transitions to Loaded
+  # (no T3 sandbox context yet established).
+  "crates/maos-kernel-core/src/lifecycle/cli_wrapper/",
 ]

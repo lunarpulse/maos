@@ -76,6 +76,7 @@ fn make_frame_for_scenario(
             scope: vec![],
             success_criteria: "done".into(),
             posture_preferences: Default::default(),
+            prior_distillate_ref: None,
         }),
     };
     IacFrame {

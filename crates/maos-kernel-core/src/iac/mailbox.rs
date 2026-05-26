@@ -358,6 +358,7 @@ mod tests {
                 scope: vec![],
                 success_criteria: "done".into(),
                 posture_preferences: Default::default(),
+                prior_distillate_ref: None,
             }),
             auto_marker: FrameOrigin::HumanAuthored,
             consent_envelope: None,

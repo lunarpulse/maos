@@ -6,7 +6,25 @@ use std::path::Path;
 /// Exits 0 only if all 9 checks pass. Reports each check individually.
 /// CORRECTED 2026-05-25: §A2 check reports truth; team accepts deferred
 /// review debt per Option D consensus.
+#[allow(dead_code)]
 pub fn run(json: bool) -> Result<(), String> {
+    run_with_story(json, None)
+}
+
+/// Story 6.2 AC1 — extended gate with `--story 6.2` rows.
+///
+/// When `story_arg == Some("6.2")` the gate adds the following rows on top of
+/// Story 6.1's 9 checks:
+///   * **D-2.10** (blocking_6_2) — `retract-corpus-tests` discipline job present
+///   * **D-4.\*** (blocking_6_2) — `iac_routing_budget.rs` bench + `nfr-perf-1-iac-routing-budget` job
+///   * **§A3** (blocking_6_2) — `check_serde_error_handling.rs` + job
+///   * **D-3.7/3.8** (verify-only) — DRR fairness test + job
+///   * **D-5.1/5.2** (verify-only) — `smoke-iac-bus-6` arm in main.rs
+///   * **§A4-Debt-2c-relaxed** (verify) — hook-count file present (14 or 15 acceptable)
+///
+/// blocking_6_2 rows fail the gate (exit non-zero); verify-only rows report state
+/// without blocking. Per Story 6.1 §A2 / §A5 / §A6 carry-forward precedent.
+pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String> {
     let mut results = Vec::new();
 
     // --- §A1: Story 5.5d zero open Critical/High findings ---
@@ -36,11 +54,43 @@ pub fn run(json: bool) -> Result<(), String> {
     // --- Umbrella: discipline.yml has epic-6-bridge-preconditions job ---
     results.push(check_umbrella_discipline());
 
-    let all_pass = results.iter().all(|r: &CheckResult| r.passed);
+    // Story 6.2 AC1 row extensions — classify into {closed, still_deferred, blocking_6_2}.
+    // Per Story 6.1 §A2 / §A5 / §A6 carry-forward precedent: only blocking_6_2 rows
+    // can fail the gate.
+    let is_story_6_2 = matches!(story_arg, Some("6.2"));
+    if is_story_6_2 {
+        results.push(check_6_2_d_2_10());
+        results.push(check_6_2_d_4());
+        results.push(check_6_2_a3_blocking());
+        results.push(check_6_2_d_3_7_3_8());
+        results.push(check_6_2_d_5_1_5_2());
+        results.push(check_6_2_a4_debt_2c_relaxed().map_err(|e| format!("6.2-A4-Debt-2c error: {}", e))?);
+    }
+
+    // 6.1 rows: failure on any 6.1 row blocks the gate (legacy behavior).
+    // 6.2 extension rows: only blocking_6_2 rows (D-2.10, D-4, A3 blocking) gate
+    // the run when --story 6.2; verify-only rows (D-3.7/3.8, D-5.1/5.2, A4-Debt-2c-relaxed)
+    // report state but do not fail the gate.
+    let all_pass = if is_story_6_2 {
+        // Story 6.2 spec: command exits 0 only if every `blocking_6_2` row has cleared.
+        // Blocking rows: D-2.10, D-4, A3 (the new 6.2-* checks). All other rows are
+        // verify-only / carry-forward per the §Bridge-Preconditions table.
+        results.iter().all(|r: &CheckResult| {
+            if matches!(r.id.as_str(), "6.2-D-2.10" | "6.2-D-4" | "6.2-A3") {
+                r.passed
+            } else {
+                true // informational — never gates 6.2
+            }
+        })
+    } else {
+        // Story 6.1 legacy behavior — all 9 checks must pass.
+        results.iter().all(|r: &CheckResult| r.passed)
+    };
 
     if json {
         let payload = serde_json::json!({
             "passed": all_pass,
+            "story": story_arg.unwrap_or("6.1"),
             "checks": results,
         });
         println!("{}", payload);
@@ -50,7 +100,8 @@ pub fn run(json: bool) -> Result<(), String> {
             eprintln!("  [{}] {} — {}", status, r.id, r.message);
         }
         let status = if all_pass { "PASS" } else { "FAIL" };
-        eprintln!("check-epic-6-bridge: {}", status);
+        let scope = story_arg.unwrap_or("6.1");
+        eprintln!("check-epic-6-bridge[{}]: {}", scope, status);
     }
 
     if all_pass {
@@ -348,5 +399,147 @@ fn discipline_yml_has_step(step_name: &str) -> bool {
     match fs::read_to_string(path) {
         Ok(content) => content.contains(step_name),
         Err(_) => false,
+    }
+}
+
+// ─── Story 6.2 AC1 row classifiers ─────────────────────────────────────────────
+
+fn check_6_2_d_2_10() -> CheckResult {
+    let id = "6.2-D-2.10".to_string();
+    let job_present = discipline_yml_has_step("retract-corpus-tests");
+    // Per spec §1: substring-match on the `cargo test -p maos-kernel-core --test retract_corpus_v0`
+    // command in any discipline.yml run block.
+    let cmd_present = discipline_yml_has_step("retract_corpus_v0");
+    if job_present && cmd_present {
+        CheckResult {
+            id,
+            passed: true,
+            message: "blocking_6_2: retract-corpus-tests job wired with retract_corpus_v0 invocation".into(),
+        }
+    } else {
+        CheckResult {
+            id,
+            passed: false,
+            message: format!(
+                "blocking_6_2: retract-corpus-tests job missing (job_present={}, cmd_present={})",
+                job_present, cmd_present
+            ),
+        }
+    }
+}
+
+fn check_6_2_d_4() -> CheckResult {
+    let id = "6.2-D-4".to_string();
+    let bench_present = Path::new("crates/maos-bench/benches/iac_routing_budget.rs").exists();
+    let job_present = discipline_yml_has_step("nfr-perf-1-iac-routing-budget");
+    if bench_present && job_present {
+        CheckResult {
+            id,
+            passed: true,
+            message: "blocking_6_2: iac_routing_budget.rs bench + nfr-perf-1-iac-routing-budget job present".into(),
+        }
+    } else {
+        CheckResult {
+            id,
+            passed: false,
+            message: format!(
+                "blocking_6_2: bench_present={} job_present={} — must ship inline as 6.2 Task 0.1",
+                bench_present, job_present
+            ),
+        }
+    }
+}
+
+fn check_6_2_a3_blocking() -> CheckResult {
+    let id = "6.2-A3".to_string();
+    let xtask_exists = Path::new("xtask/src/check_serde_error_handling.rs").exists();
+    let job_present = discipline_yml_has_step("check-serde-error-handling");
+    if xtask_exists && job_present {
+        CheckResult {
+            id,
+            passed: true,
+            message: "blocking_6_2: check-serde-error-handling xtask + job present".into(),
+        }
+    } else {
+        CheckResult {
+            id,
+            passed: false,
+            message: format!(
+                "blocking_6_2: xtask_present={} job_present={} — must ship inline as 6.2 Task 0.2",
+                xtask_exists, job_present
+            ),
+        }
+    }
+}
+
+fn check_6_2_d_3_7_3_8() -> CheckResult {
+    let id = "6.2-D-3.7/3.8".to_string();
+    let test_present = Path::new(
+        "crates/maos-kernel-core/tests/log_writer_drr_matches_scheduler.rs",
+    )
+    .exists();
+    let job_present = discipline_yml_has_step("nfr-scale-3-drr-fairness");
+    let passed = test_present && job_present;
+    CheckResult {
+        id,
+        passed,
+        message: format!(
+            "verify-only: test_present={} job_present={} (does NOT block 6.2)",
+            test_present, job_present
+        ),
+    }
+}
+
+fn check_6_2_d_5_1_5_2() -> CheckResult {
+    let id = "6.2-D-5.1/5.2".to_string();
+    let main_path = "crates/maos-bin/src/main.rs";
+    let arm_present = if Path::new(main_path).exists() {
+        match fs::read_to_string(main_path) {
+            Ok(c) => c.contains("smoke-iac-bus-6"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    CheckResult {
+        id,
+        passed: arm_present,
+        message: format!(
+            "verify-only: smoke-iac-bus-6 arm in main.rs present={} (does NOT block 6.2)",
+            arm_present
+        ),
+    }
+}
+
+fn check_6_2_a4_debt_2c_relaxed() -> Result<CheckResult, std::io::Error> {
+    let id = "6.2-A4-Debt-2c-relaxed".to_string();
+    let hook_count_file = Path::new("xtask/spirit-abi-hook-count.toml");
+    if !hook_count_file.exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "spirit-abi-hook-count.toml not found".into(),
+        });
+    }
+    let content = fs::read_to_string(hook_count_file)?;
+    // Story 6.2 §Boundary-Note: hook count may be 14 (CapabilityRegistry route)
+    // or 15 (on_cli_subprocess_invoke hook). Both acceptable per the boundary-note.
+    let has_count_14 = content.contains("expected_count = 14") || content.contains("count = 14");
+    let has_count_15 = content.contains("expected_count = 15") || content.contains("count = 15");
+    if has_count_14 || has_count_15 {
+        Ok(CheckResult {
+            id,
+            passed: true,
+            message: format!(
+                "verify: hook count present (14={} 15={}) — §Boundary-Note honored",
+                has_count_14, has_count_15
+            ),
+        })
+    } else {
+        Ok(CheckResult {
+            id,
+            passed: false,
+            message: "hook-count file present but no expected_count = 14 or 15 line".into(),
+        })
     }
 }

@@ -3156,3 +3156,225 @@ id = "kimi"
         assert!(msg.contains("fallback[0]") && msg.contains("kimi"), "msg={}", msg);
     }
 }
+
+// ────────────────────────────────────────────────────────────────────
+// Story 6.2 AC5 — [cli_wrapper] manifest section per ADR-021 + architecture §6.7
+// ────────────────────────────────────────────────────────────────────
+
+/// `[cli_wrapper]` manifest section. PRESENT means this Spirit is a
+/// CliWrapperSpirit; ABSENT means it is a native Rust Spirit using the
+/// Spirit ABI directly. The two modes are mutually exclusive at admission
+/// (`CliWrapperAdmissionError::EManifestSchemaConflict`).
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CliWrapperConfig {
+    /// Path to the CLI binary (e.g., `claude`, `opencode`, `gemini-cli`,
+    /// `kimi-cli`). Resolved at admission via `which` against the operator's
+    /// PATH OR an explicit absolute path. Bare-name resolution is logged with
+    /// the resolved absolute path for audit trail (FR52 provenance).
+    pub command: String,
+    /// Optional argv prefix prepended to every invocation
+    /// (e.g., `["code"]` for `claude code`). Empty by default.
+    #[serde(default)]
+    pub argv_prefix: Vec<String>,
+    /// Declared output shape version — semver string. Kernel asserts at
+    /// admission; observed shape divergence fires `EOutputShapeAdapterMismatch`.
+    pub output_shape_version: String,
+    /// Skill bundle: persona + `maos-bridge`. Validated against the Spirit
+    /// registry (resolves to `cli-wrapper-template:<cli-name>:<shape-version>`
+    /// per architecture §6.7).
+    #[serde(default)]
+    pub skill_bundle: Vec<String>,
+    /// Recovery policy on subprocess death.
+    #[serde(default)]
+    pub recovery_policy: CliWrapperRecoveryPolicy,
+    /// Posture for the subprocess: stdio shape, control-channel mechanism,
+    /// shutdown signal.
+    pub posture: CliWrapperPosture,
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default,
+)]
+#[non_exhaustive]
+#[serde(rename_all = "snake_case")]
+pub enum CliWrapperRecoveryPolicy {
+    /// Respawn the subprocess with the prior context handed over
+    /// (state-transfer across restart). Default for stateful wrappers.
+    #[default]
+    RespawnWithContext,
+    /// Respawn fresh — new conversation, no context transfer. For stateless CLIs.
+    RespawnFresh,
+    /// Do NOT respawn. Escalate to the supervisor; emit `SpiritDied` per §6.7.
+    Escalate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CliWrapperPosture {
+    /// On-wire stdio shape — must round-trip through the registered
+    /// output-shape adapter.
+    pub stdio_shape: CliWrapperStdioShape,
+    /// Control-channel mechanism — how MAOS sends `pause` / `resume` /
+    /// `unload` etc.
+    pub control_channel: CliWrapperControlChannel,
+    /// Signal sent on `unload` lifecycle hook (default SIGTERM; `SIGINT`
+    /// for CLIs that handle SIGINT as graceful shutdown).
+    #[serde(default)]
+    pub shutdown_signal: Option<String>,
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+)]
+#[non_exhaustive]
+#[serde(rename_all = "snake_case")]
+pub enum CliWrapperStdioShape {
+    NdjsonOverStdio,
+    JsonRpcOverStdio,
+    Raw,
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+)]
+#[non_exhaustive]
+#[serde(rename_all = "snake_case")]
+pub enum CliWrapperControlChannel {
+    /// Linux/macOS signals only.
+    Signals,
+    /// For platforms where signals are inadequate.
+    NamedPipe,
+    /// In-band stdin control messages.
+    StdinCommands,
+}
+
+impl CliWrapperConfig {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let cfg: Self = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        cfg.validate()?;
+        Ok(cfg)
+    }
+
+    /// Validate manifest-level constraints not catchable by serde alone.
+    fn validate(&self) -> Result<(), ManifestError> {
+        if self.command.trim().is_empty() {
+            return Err(ManifestError::Toml(
+                "cli_wrapper.command must be non-empty".into(),
+            ));
+        }
+        if let Some(ref sig) = self.posture.shutdown_signal {
+            const VALID_SIGNALS: &[&str] = &[
+                "SIGTERM", "SIGINT", "SIGKILL", "SIGHUP", "SIGQUIT", "SIGUSR1", "SIGUSR2",
+            ];
+            if !VALID_SIGNALS.contains(&sig.as_str()) {
+                return Err(ManifestError::Toml(format!(
+                    "cli_wrapper.posture.shutdown_signal must be one of {VALID_SIGNALS:?}, got \"{sig}\""
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod cli_wrapper_tests {
+    use super::*;
+
+    #[test]
+    fn cli_wrapper_minimal_round_trip() {
+        let toml = r#"
+command = "echo"
+output_shape_version = "1.0.0"
+
+[posture]
+stdio_shape = "ndjson_over_stdio"
+control_channel = "signals"
+"#;
+        let cfg = CliWrapperConfig::from_toml_str(toml).unwrap();
+        assert_eq!(cfg.command, "echo");
+        assert_eq!(cfg.output_shape_version, "1.0.0");
+        assert!(cfg.argv_prefix.is_empty());
+        assert_eq!(cfg.recovery_policy, CliWrapperRecoveryPolicy::RespawnWithContext);
+        assert_eq!(cfg.posture.stdio_shape, CliWrapperStdioShape::NdjsonOverStdio);
+        assert_eq!(cfg.posture.control_channel, CliWrapperControlChannel::Signals);
+        assert_eq!(cfg.posture.shutdown_signal, None);
+    }
+
+    #[test]
+    fn cli_wrapper_full_with_argv_prefix_and_recovery() {
+        let toml = r#"
+command = "/usr/local/bin/claude"
+argv_prefix = ["code"]
+output_shape_version = "1.2.3"
+skill_bundle = ["orchestrator-bmad", "maos-bridge"]
+recovery_policy = "respawn_fresh"
+
+[posture]
+stdio_shape = "json_rpc_over_stdio"
+control_channel = "stdin_commands"
+shutdown_signal = "SIGINT"
+"#;
+        let cfg = CliWrapperConfig::from_toml_str(toml).unwrap();
+        assert_eq!(cfg.argv_prefix, vec!["code"]);
+        assert_eq!(cfg.recovery_policy, CliWrapperRecoveryPolicy::RespawnFresh);
+        assert_eq!(
+            cfg.posture.stdio_shape,
+            CliWrapperStdioShape::JsonRpcOverStdio
+        );
+        assert_eq!(cfg.posture.shutdown_signal.as_deref(), Some("SIGINT"));
+    }
+
+    #[test]
+    fn cli_wrapper_rejects_empty_command() {
+        let toml = r#"
+command = ""
+output_shape_version = "1.0.0"
+
+[posture]
+stdio_shape = "ndjson_over_stdio"
+control_channel = "signals"
+"#;
+        let err = CliWrapperConfig::from_toml_str(toml).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("command must be non-empty"),
+            "expected validation error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn cli_wrapper_rejects_invalid_shutdown_signal() {
+        let toml = r#"
+command = "echo"
+output_shape_version = "1.0.0"
+
+[posture]
+stdio_shape = "ndjson_over_stdio"
+control_channel = "signals"
+shutdown_signal = "SIGTEM"
+"#;
+        let err = CliWrapperConfig::from_toml_str(toml).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("shutdown_signal must be one of"),
+            "expected validation error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn cli_wrapper_accepts_without_shutdown_signal() {
+        let toml = r#"
+command = "/usr/bin/env"
+output_shape_version = "1.0.0"
+
+[posture]
+stdio_shape = "raw"
+control_channel = "signals"
+"#;
+        let cfg = CliWrapperConfig::from_toml_str(toml).unwrap();
+        assert_eq!(cfg.command, "/usr/bin/env");
+        assert_eq!(cfg.posture.shutdown_signal, None);
+    }
+}

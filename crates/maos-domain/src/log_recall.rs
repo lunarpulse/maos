@@ -65,6 +65,10 @@ pub enum FrameKindLabel {
     SpiritAdmitted,
     /// Story 5.5d — Registry yank propagated to the kernel.
     RegistryYank,
+    /// Story 6.2 AC6 — FR52: a line of stdout/stderr captured from a
+    /// CliWrapperSpirit's invoked CLI subprocess. Audit-style row; Spirits
+    /// do not directly read this surface (the host kernel mediates it).
+    CliSubprocessOutput,
 }
 
 impl LogRecallFilter {

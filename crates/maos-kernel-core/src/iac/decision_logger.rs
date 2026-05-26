@@ -97,6 +97,7 @@ mod tests {
             scope: vec![],
             success_criteria: "test".into(),
             posture_preferences: maos_domain::frame::PosturePreferences::default(),
+            prior_distillate_ref: None,
         });
         frame.kind = maos_spirit_abi::identity::FrameKind::TaskAssign;
         frame

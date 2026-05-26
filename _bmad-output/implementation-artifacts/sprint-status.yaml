@@ -1,4 +1,4 @@
-last_updated: '2026-05-26T00:00:00Z'
+last_updated: '2026-05-26T20:00:00Z'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -62,7 +62,7 @@ development_status:
   epic-5-retrospective: done
   epic-6: in-progress
   6-1-ship-the-full-iac-bus-with-retract-primitive-and-drr-fairness-scheduler: done
-  6-2-dispatch-orchestrator-distillates-with-intent-lineage-and-cliwrapperspirit-worker-pattern: backlog
+  6-2-dispatch-orchestrator-distillates-with-intent-lineage-and-cliwrapperspirit-worker-pattern: done
   6-3-build-the-a2a-peer-mesh-from-loopback-to-cross-host-with-mtls-rotation-chaos: backlog
   6-4-wire-scheduled-invocations-with-consentrupture-and-provider-rate-limit-isolation: backlog
   6-5-gateway-sub-modules-adr-029-telegram-slack-discord-signal-email: backlog

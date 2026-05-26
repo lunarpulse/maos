@@ -1,0 +1,16 @@
+{
+  "scenario_id": "intent-lineage-lineage_union_via_distillate-027",
+  "class": "lineage_union_via_distillate",
+  "description": "Worker A intent=standard, Worker B intent=high, distillate union, hop=3",
+  "originating_intent": "standard",
+  "hop_count": 3,
+  "origin": "spirit_auto",
+  "secondary_intent": "high",
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": [
+      "standard",
+      "high"
+    ]
+  }
+}

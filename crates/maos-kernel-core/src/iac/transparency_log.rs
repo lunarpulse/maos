@@ -77,6 +77,9 @@ pub enum FrameKind {
     SpiritAdmitted = 19,
     /// Story 5.5d — Registry yank propagated to the kernel.
     RegistryYank = 20,
+    /// Story 6.2 AC6 — FR52: a line of stdout/stderr captured from a
+    /// CliWrapperSpirit's invoked CLI subprocess.
+    CliSubprocessOutput = 21,
 }
 
 impl FrameKind {
@@ -104,6 +107,7 @@ impl FrameKind {
             18 => Some(Self::McpInvocation),
             19 => Some(Self::SpiritAdmitted),
             20 => Some(Self::RegistryYank),
+            21 => Some(Self::CliSubprocessOutput),
             _ => None,
         }
     }
@@ -544,7 +548,12 @@ impl TransparencyLogAdapter {
                     capability_token: cap_token,
                     kind: FrameKind::from_i64(row.get::<_, i64>(7)?)
                         .unwrap_or_else(|| {
-                            eprintln!("unrecognized FrameKind discriminant in TL query");
+                            let disc = row.get::<_, i64>(7).unwrap_or(-1);
+                            eprintln!(
+                                "TL query: unrecognized FrameKind discriminant ({disc}); \
+                                 mapping to TaskAssign as best-effort fallback \
+                                 (schema-migration or cross-version log inspection)"
+                            );
                             FrameKind::TaskAssign
                         }),
                     intent: row.get(8)?,
@@ -614,7 +623,12 @@ impl TransparencyLogAdapter {
                     capability_token: cap_token,
                     kind: FrameKind::from_i64(row.get::<_, i64>(7)?)
                         .unwrap_or_else(|| {
-                            eprintln!("unrecognized FrameKind discriminant in TL query");
+                            let disc = row.get::<_, i64>(7).unwrap_or(-1);
+                            eprintln!(
+                                "TL query: unrecognized FrameKind discriminant ({disc}); \
+                                 mapping to TaskAssign as best-effort fallback \
+                                 (schema-migration or cross-version log inspection)"
+                            );
                             FrameKind::TaskAssign
                         }),
                     intent: row.get(8)?,

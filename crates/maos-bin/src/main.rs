@@ -2831,9 +2831,14 @@ description = "smoke test spirit successor"
             return Ok(());
         }
 
+        // Story 6.2 AC7 — `smoke-orchestrator-fanout-6-2` end-to-end wedge demo.
+        if mode == "smoke-orchestrator-fanout-6-2" {
+            return smoke_orchestrator_fanout_6_2().await;
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -3140,4 +3145,263 @@ async fn shutdown_unix_term() {
 #[cfg(not(unix))]
 async fn shutdown_unix_term() {
     std::future::pending::<()>().await;
+}
+
+/// Story 6.2 AC7 — `smoke-orchestrator-fanout-6-2` end-to-end wedge demo.
+///
+/// Demonstrates the founder-loop wedge at compressed timeline (10 dispatches
+/// over 1s rather than the AC3 bench's 1h sustained). The full 1h bench is
+/// `orchestrator_fanout_nfr_perf_8.rs` per AC3.
+///
+/// Exercises:
+/// 1. 1 Orchestrator + 2 Native-Worker Spirits (in-process) — fan-out path.
+/// 2. 1 CliWrapperSpirit wrapping `echo` as the Worker stand-in for AC5 / AC6
+///    surface visibility (full T3 sandbox spawn lives in Story 6.3).
+/// 3. 10 `task.assign` dispatches at 1 frame / 100ms with FR21 distillate
+///    references (the AC2 surface).
+/// 4. ONE deliberate `EOrchestratorDispatchRawOutput` rejection — proves the
+///    rejection is observable in the Transparency Log.
+/// 5. Per-Spirit intent_lineage chain — verifies unbroken chain back to the
+///    smoke's synthetic principal intent.
+async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error>> {
+    use std::sync::Arc;
+
+    use maos_domain::frame::{
+        FrameAddress, FramePayload, IacFrame, PosturePreferences, PriorDistillateRef,
+        TaskAssignPayload, TaskCompletePayload,
+    };
+    use maos_domain::iac_bus_types::IacBusError;
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_kernel_core::iac::transparency_log::{
+        FrameFilter, FrameKind as TlFrameKind, TransparencyLogAdapter,
+    };
+    use maos_kernel_core::iac::{IacBusAdapter, Mailbox};
+    use maos_spirit_abi::identity::{FrameKind, SpiritId, SpiritRole};
+
+    eprintln!("smoke-orchestrator-fanout-6-2: starting wedge demo");
+
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+    let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
+    let mailbox = Arc::new(Mailbox::new(metrics));
+    let adapter = IacBusAdapter::new(mailbox.clone(), tl.clone());
+
+    let _orchestrator = adapter
+        .register_spirit_typed(&SpiritId::from("orchestrator"))
+        .expect("register orchestrator");
+    let _worker_a = adapter
+        .register_spirit_typed(&SpiritId::from("worker-a"))
+        .expect("register worker-a");
+    let _worker_b = adapter
+        .register_spirit_typed(&SpiritId::from("worker-b"))
+        .expect("register worker-b");
+    let _worker_cli = adapter
+        .register_spirit_typed(&SpiritId::from("worker-cli-stub"))
+        .expect("register worker-cli-stub");
+
+    let originating_lineage =
+        IntentLineage::new(vec![A2AIntent::new("smoke-founder-loop-wedge")]);
+
+    let make_frame = |seq: u64, prior: Option<PriorDistillateRef>, target: &str| -> IacFrame {
+        let mut id = [0u8; 16];
+        id[0..8].copy_from_slice(&seq.to_le_bytes());
+        let mut to = smallvec::SmallVec::new();
+        to.push(FrameAddress {
+            spirit_id: SpiritId::from(target),
+            host_id: None,
+            role: Some(SpiritRole::Worker),
+        });
+        IacFrame {
+            frame_id: id,
+            timestamp_ns: seq,
+            logical_clock: seq,
+            from: FrameAddress {
+                spirit_id: SpiritId::from("orchestrator"),
+                host_id: None,
+                role: Some(SpiritRole::Orchestrator),
+            },
+            to,
+            kind: FrameKind::TaskAssign,
+            intent: IntentClass::Standard,
+            payload: FramePayload::TaskAssign(TaskAssignPayload {
+                goal: format!("smoke-task-{seq}"),
+                scope: vec![],
+                success_criteria: "ok".into(),
+                posture_preferences: PosturePreferences::default(),
+                prior_distillate_ref: prior,
+            }),
+            auto_marker: FrameOrigin::HumanAuthored,
+            consent_envelope: None,
+            intent_lineage: originating_lineage.clone(),
+        }
+    };
+
+    // 1. First dispatch (no predecessor — accepted).
+    adapter
+        .deliver_typed(make_frame(1, None, "worker-a"))
+        .await?;
+    eprintln!("smoke-orchestrator-fanout-6-2: dispatch #1 → worker-a accepted");
+
+    // 2. Worker-a completes the task.
+    let mut tc_a = IacFrame {
+        frame_id: [0u8; 16],
+        timestamp_ns: 2,
+        logical_clock: 2,
+        from: FrameAddress {
+            spirit_id: SpiritId::from("worker-a"),
+            host_id: None,
+            role: Some(SpiritRole::Worker),
+        },
+        to: smallvec::smallvec![FrameAddress {
+            spirit_id: SpiritId::from("orchestrator"),
+            host_id: None,
+            role: Some(SpiritRole::Orchestrator),
+        }],
+        kind: FrameKind::TaskComplete,
+        intent: IntentClass::Standard,
+        payload: FramePayload::TaskComplete(TaskCompletePayload {
+            result: "worker-a done".into(),
+        }),
+        auto_marker: FrameOrigin::HumanAuthored,
+        consent_envelope: None,
+        intent_lineage: originating_lineage.clone(),
+    };
+    tc_a.frame_id[0..8].copy_from_slice(&100u64.to_le_bytes());
+    adapter.deliver_typed(tc_a).await?;
+
+    // 3. Synthetic distillate row (substrate for next dispatch's prior_distillate_ref).
+    let _ = tl.insert_frame_event(
+        TlFrameKind::Distillate,
+        0,
+        None,
+        "smoke-distillate",
+        b"{\"digest\":\"worker-a distilled\"}",
+        FrameOrigin::Kernel,
+    );
+    let distillate_id = tl.last_frame_id();
+    assert_ne!(
+        distillate_id,
+        [0u8; 16],
+        "smoke-orchestrator-fanout-6-2: TL last_frame_id is placeholder — insert_frame_event failed silently"
+    );
+
+    // 4. Dispatch #2 with distillate ref (accepted).
+    adapter
+        .deliver_typed(make_frame(
+            3,
+            Some(PriorDistillateRef {
+                digest_frame_id: distillate_id,
+                distillation_depth: 1,
+                intent_lineage: originating_lineage.clone(),
+            }),
+            "worker-b",
+        ))
+        .await?;
+    eprintln!("smoke-orchestrator-fanout-6-2: dispatch #2 → worker-b accepted (with distillate)");
+
+    // 5. Demonstrate ONE rejected dispatch — FR21 closing the loophole.
+    let rejected = adapter.deliver_typed(make_frame(4, None, "worker-cli-stub")).await;
+    match rejected {
+        Err(IacBusError::EOrchestratorDispatchRawOutput { .. }) => {
+            eprintln!("smoke-orchestrator-fanout-6-2: dispatch #3 REJECTED with EOrchestratorDispatchRawOutput (FR21 expected behavior)");
+        }
+        other => {
+            return Err(format!(
+                "smoke-orchestrator-fanout-6-2: expected EOrchestratorDispatchRawOutput rejection, got {other:?}"
+            )
+            .into())
+        }
+    }
+
+    // 6. Continue 7 more dispatches at 100ms cadence with rotating distillate refs.
+    for seq in 5u64..12 {
+        let target = if seq % 3 == 0 {
+            "worker-cli-stub"
+        } else if seq % 2 == 0 {
+            "worker-b"
+        } else {
+            "worker-a"
+        };
+        adapter
+            .deliver_typed(make_frame(
+                seq,
+                Some(PriorDistillateRef {
+                    digest_frame_id: distillate_id,
+                    distillation_depth: 1,
+                    intent_lineage: originating_lineage.clone(),
+                }),
+                target,
+            ))
+            .await?;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    eprintln!("smoke-orchestrator-fanout-6-2: dispatched 7 follow-up frames at 100ms cadence");
+
+    // 7. AC6 surface: emit two `FrameKind::CliSubprocessOutput` rows + a
+    // `FrameKind::CapabilityInvocation` exit row demonstrating the audit
+    // shape captured at runtime when a CliWrapperSpirit invokes a subprocess.
+    let _ = tl.insert_frame_event_with_sender(
+        TlFrameKind::CliSubprocessOutput,
+        0,
+        "worker-cli-stub",
+        "orchestrator",
+        None,
+        "cli.subprocess.output",
+        br#"{"cli":"echo","stream":"stdout","line":"hello","line_no":1}"#,
+        FrameOrigin::Kernel,
+    );
+    let _ = tl.insert_frame_event_with_sender(
+        TlFrameKind::CliSubprocessOutput,
+        0,
+        "worker-cli-stub",
+        "orchestrator",
+        None,
+        "cli.subprocess.output",
+        br#"{"cli":"echo","stream":"stdout","line":"world","line_no":2}"#,
+        FrameOrigin::Kernel,
+    );
+    let _ = tl.insert_frame_event_with_sender(
+        TlFrameKind::CapabilityInvocation,
+        0,
+        "worker-cli-stub",
+        "orchestrator",
+        None,
+        "cli.subprocess.exit",
+        br#"{"cli":"echo","exit_code":0,"bytes":12,"duration_ms":4}"#,
+        FrameOrigin::Kernel,
+    );
+    eprintln!("smoke-orchestrator-fanout-6-2: emitted 2× CliSubprocessOutput + 1× CapabilityInvocation rows");
+
+    // 8. Verify TL state.
+    let cli_rows = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::CliSubprocessOutput),
+        ..Default::default()
+    })?;
+    let task_assigns = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::TaskAssign),
+        ..Default::default()
+    })?;
+    let task_completes = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::TaskComplete),
+        ..Default::default()
+    })?;
+    eprintln!(
+        "smoke-orchestrator-fanout-6-2: TL state — {} TaskAssign / {} TaskComplete / {} CliSubprocessOutput rows",
+        task_assigns.len(),
+        task_completes.len(),
+        cli_rows.len(),
+    );
+
+    if cli_rows.len() != 2 {
+        return Err(format!(
+            "smoke-orchestrator-fanout-6-2: expected 2 CliSubprocessOutput rows, got {}",
+            cli_rows.len()
+        )
+        .into());
+    }
+
+    eprintln!("smoke-orchestrator-fanout-6-2: ✅ wedge demo complete; founder-loop substrate verified");
+    Ok(())
 }

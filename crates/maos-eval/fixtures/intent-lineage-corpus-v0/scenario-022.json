@@ -1,0 +1,16 @@
+{
+  "scenario_id": "intent-lineage-lineage_union_via_distillate-022",
+  "class": "lineage_union_via_distillate",
+  "description": "Worker A intent=audit, Worker B intent=consult, distillate union, hop=1",
+  "originating_intent": "audit",
+  "hop_count": 1,
+  "origin": "spirit_auto",
+  "secondary_intent": "consult",
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": [
+      "audit",
+      "consult"
+    ]
+  }
+}

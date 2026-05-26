@@ -14,6 +14,7 @@
 pub mod invariants;
 pub use invariants::*;
 
+pub mod cli_wrapper; // NEW — Story 6.2 AC5 CliWrapperSpirit admission errors
 pub mod distillation; // NEW — Story 4.4 distillation domain types
 pub mod frame;
 pub mod halt;

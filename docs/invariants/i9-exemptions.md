@@ -291,3 +291,87 @@ parameter drift.
 RevocationApplier, RegistryClient, CryptoProvider, and IacRtMetrics. The poller
 is a stateless periodic fetch loop; all mutable state lives in the already-exempt
 RevocationApplier. No parameter drift; no learned state.
+
+### `ProvidersSection` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** manifest data (Story 5.5b multi-provider); parsed-then-dropped at
+admission, no kernel persistence. Holds the primary + fallback `ProviderConfig`
+vector declared in the Spirit manifest's `[providers]` section. Documented post-hoc
+as a Story 6.2 sweep — entry pre-dates this story.
+
+### `ProviderConfig` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** manifest data (Story 5.5b multi-provider); parsed-then-dropped at
+admission, no kernel persistence. Per-provider id + endpoint_url + model_id +
+provider_endpoint_pin. Documented post-hoc as a Story 6.2 sweep.
+
+### `McpSection` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** manifest data (Story 5.5c MCP tool-server declarations); parsed-then-
+dropped at admission, no kernel persistence. Holds `Vec<McpServerEntry>`
+declared in the Spirit manifest's `[mcp]` section. Documented post-hoc as a
+Story 6.2 sweep.
+
+### `CliWrapperConfig` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** Story 6.2 AC5 manifest data per ADR-021 + architecture §6.7;
+parsed-then-dropped at admission, no kernel persistence. Holds the `[cli_wrapper]`
+section: `command`, `argv_prefix`, `output_shape_version`, `skill_bundle`,
+`recovery_policy`, `posture` for the CliWrapperSpirit class. PRESENT means the
+Spirit is a CliWrapperSpirit; ABSENT means native Rust Spirit. The two modes
+are mutually exclusive at admission (`EManifestSchemaConflict`).
+
+### `SilentFailureDetector` — `crates/maos-kernel-core/src/supervision/silent_failure_detector.rs`
+
+**Reason:** supervision surface (Story 5.3) — holds only Arc references to
+existing kernel state (SCB map, TransparencyLog, telemetry); no independently-
+mutable persistent state. Documented post-hoc as a Story 6.2 sweep.
+
+### `ProgressWatchdog` — `crates/maos-kernel-core/src/supervision/progress_watchdog.rs`
+
+**Reason:** supervision surface (Story 5.3) — holds only Arc references to
+existing kernel state (SCB map, TransparencyLog, telemetry); no independently-
+mutable persistent state. Documented post-hoc as a Story 6.2 sweep.
+
+### `SimulatedChildSupervisor` — `crates/maos-kernel-core/src/supervision/test_double.rs`
+
+**Reason:** test double (Story 5.3) — transient per-test state; production
+wiring uses the real SubprocessSupervisor impl. Documented post-hoc as a
+Story 6.2 sweep.
+
+### `CrashDetector` — `crates/maos-kernel-core/src/supervision/crash_detector.rs`
+
+**Reason:** supervision surface (Story 5.3) — holds only Arc references to
+existing kernel state (SCB map, TransparencyLog, HaltRegistry, CapabilityRegistry,
+IAC Bus, telemetry); no independently-mutable persistent state. Documented
+post-hoc as a Story 6.2 sweep.
+
+### `MultiProviderRouter` — `crates/maos-kernel-core/src/inference/router.rs`
+
+**Reason:** inference port adapter aggregate (Story 5.5b multi-provider); holds
+`BTreeMap<String, Arc<dyn Provider>>` of driver instances — not independently-
+mutable state. Updated at composition-root time only. Documented post-hoc as a
+Story 6.2 sweep.
+
+### `McpClientAdapter` — `crates/maos-kernel-core/src/mcp/mod.rs`
+
+**Reason:** MCP-client adapter aggregate (Story 5.5c); holds Arc references to
+wire-level client + audit infrastructure. No independently-mutable state.
+Documented post-hoc as a Story 6.2 sweep.
+
+### `McpCapabilities` — `crates/maos-kernel-core/src/security/manifest.rs`
+
+**Reason:** manifest data (Story 5.5c); parsed-then-dropped at admission, no
+kernel persistence. Holds `Vec<McpCapabilityServerEntry>` declared in the
+Spirit manifest's `[capabilities.required.mcp]` section. Documented post-hoc
+as a Story 6.2 sweep.
+
+### `IacBusAdapter` (extended) — `crates/maos-kernel-core/src/iac/mod.rs`
+
+**Reason:** Story 6.2 AC4 extends the existing exemption to also cover the
+`frame_lineage_cache: Arc<DashMap<[u8;16], IntentLineage>>` populated at
+deliver_typed time and consumed by `retract()` for lineage continuity. The
+cache is bounded by `MAX_LINEAGE_CACHE_ENTRIES = 4096` (sized for ~5min of
+10-tasks/sec sustained throughput); entries are never explicitly removed but
+new inserts skip the cache once the cap is reached (long-tail eviction is
+observable in retract continuity). NFR-Aud-14 corpus PASSES on the cache window.

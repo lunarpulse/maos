@@ -20,6 +20,8 @@ tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", 
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 criterion = "0.5"
 tempfile = "3"
+smallvec = { version = "1", features = ["serde"] }
+parking_lot = "0.12"
 
 [features]
 fixture_replay = []
@@ -32,3 +34,20 @@ path = "src/bin/section_13_1_run.rs"
 [[bench]]
 name = "section_13_1"
 harness = false
+
+# Story 6.2 AC1 Task 0.1 — Story 6.1 D-4.* carry-forward closure.
+# Measures per-frame IAC routing latency budget; NFR-Perf-1 baseline that
+# Story 6.2 AC3 NFR-Perf-8 fan-out bench inherits.
+# Gated behind `kernel_measurement` (same as section_13_1) because it needs
+# real `maos-kernel-core` types at compile time.
+[[bench]]
+name = "iac_routing_budget"
+harness = false
+required-features = ["kernel_measurement"]
+
+# Story 6.2 AC3 — NFR-Perf-8 orchestrator fan-out bench
+# (50 concurrent Workers / 10 tasks/sec / 1h sustained / P99 ≤500ms / 0 dropped).
+[[bench]]
+name = "orchestrator_fanout_nfr_perf_8"
+harness = false
+required-features = ["kernel_measurement"]

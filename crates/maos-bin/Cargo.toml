@@ -38,3 +38,4 @@ crossbeam-channel = "0.5"
 hex = "0.4"
 sha2 = "0.10"
 ring = "0.17"
+smallvec = { version = "1", features = ["serde"] }

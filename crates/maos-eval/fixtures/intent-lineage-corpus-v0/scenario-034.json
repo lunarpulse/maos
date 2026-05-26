@@ -1,0 +1,13 @@
+{
+  "scenario_id": "intent-lineage-lineage_broken_spirit_auto_strips_field-034",
+  "class": "lineage_broken_spirit_auto_strips_field",
+  "description": "adversarial: SpiritAuto strips intent_lineage on cross-Spirit emission (originating intent was standard \u2014 laundering attack)",
+  "originating_intent": "standard",
+  "hop_count": 1,
+  "origin": "spirit_auto",
+  "secondary_intent": null,
+  "expected_outcome": {
+    "accepted": false,
+    "expected_lineage_intents": []
+  }
+}

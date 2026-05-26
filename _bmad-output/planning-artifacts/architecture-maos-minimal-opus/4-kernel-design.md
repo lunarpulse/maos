@@ -383,6 +383,8 @@ The two internal modules — I/O Subsystem (§4.4) and Telemetry Stream (§4.7) 
 
 **Partial-consent failure semantics.** A frame whose sender approved but whose receiver rejected mid-frame (intent allowlist mismatch, posture change during transmission, token revocation) becomes a typed `ConsentRupture` event; the frame is quarantined, not delivered, not silently dropped. The sender's Spirit receives a `ConsentRupture` IAC frame; the operator surface logs the rupture for forensic review.
 
+**Orchestrator distillate dispatch (Story 6.2 / FR21).** Orchestrator dispatch follow-up to prior Worker completion within `ORCHESTRATOR_DISPATCH_WINDOW` (default 60s; operator-configurable) MUST reference the `DistillationReceipt::digest_frame_id`, not raw frame ids — FR21 closes the raw-output context-overflow loophole. The kernel-side gate `check_orchestrator_distillate_required` fires from `IacBusAdapter::deliver_typed` BEFORE the I13 lineage check and rejects offending frames with `EOrchestratorDispatchRawOutput`. The bus REJECTS the frame; the Transparency Log row is NOT written.
+
 ## 4.6 Capability Registry
 
 **Responsibility:** Mediate every external call. Issue, verify, and revoke capability tokens. Enforce manifest-declared capability surfaces. Validate I11/I12/I13 audit-chain fields on digest writes. Track per-Spirit budget (ADR-016 token-budget accounting).

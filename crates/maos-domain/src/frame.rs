@@ -77,6 +77,32 @@ pub struct TaskAssignPayload {
     pub scope: Vec<Scope>,
     pub success_criteria: String,
     pub posture_preferences: PosturePreferences,
+    /// Story 6.2 — FR21. Optional reference to the `DistillationReceipt::digest_frame_id`
+    /// of the prior Worker output this dispatch is built upon. `None` for the FIRST
+    /// dispatch in a fan-out (no predecessor exists). Required for every subsequent
+    /// dispatch in the same Orchestrator session: AC2's `EOrchestratorDispatchRawOutput`
+    /// fires if the Orchestrator emits a follow-up `task.assign` with `prior_distillate_ref = None`
+    /// when a prior Worker completion exists in the session's log_recall window.
+    #[serde(default)]
+    pub prior_distillate_ref: Option<PriorDistillateRef>,
+}
+
+/// Story 6.2 — reference to a prior Worker's distilled output, used by the Orchestrator
+/// to dispatch follow-up tasks against the distillate rather than raw output.
+///
+/// The `digest_frame_id` MUST resolve to a `FrameKind::Distillate` row in the
+/// Transparency Log; the AC2 runtime check `check_orchestrator_distillate_required`
+/// rejects references to raw `TaskComplete` rows.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PriorDistillateRef {
+    /// The `FrameKind::Distillate` row id in the Transparency Log.
+    pub digest_frame_id: [u8; 16],
+    /// Effective distillation depth at this hop
+    /// (`DistillationReceipt::effective_distillation_depth`).
+    pub distillation_depth: u32,
+    /// The IntentLineage union the kernel computed for this digest (I13).
+    #[serde(default)]
+    pub intent_lineage: crate::invariants::i13::IntentLineage,
 }
 
 /// v0.3 placeholder — Story 3.2 populates the body.
@@ -410,6 +436,7 @@ mod tests {
             }],
             success_criteria: "PR approved".into(),
             posture_preferences: PosturePreferences::default(),
+            prior_distillate_ref: None,
         });
         let frame = make_frame(payload);
         let json = serde_json::to_string(&frame).unwrap();
@@ -621,6 +648,8 @@ mod tests {
     fn iac_frame_retract_serde_round_trip() {
         let payload = FramePayload::Retract(RetractPayload {
             original_frame_id: [0xAB; 16],
+            reason: String::new(),
+            original_kind: None,
         });
         let mut frame = make_frame(payload);
         frame.kind = FrameKind::Retract;
@@ -641,6 +670,7 @@ mod tests {
             scope: vec![],
             success_criteria: "done".into(),
             posture_preferences: PosturePreferences::default(),
+            prior_distillate_ref: None,
         });
         let mut frame = make_frame(payload);
         frame.kind = FrameKind::TaskAssign;

@@ -66,6 +66,10 @@ pub fn monotonic_now_ns() -> u64 {
         .get()
         .map(|i| i.elapsed().as_nanos() as u64)
         .unwrap_or(0);
+    debug_assert!(
+        BOOT_INSTANT.get().is_some(),
+        "monotonic_now_ns() called before init_monotonic_base()"
+    );
     base.saturating_add(elapsed)
 }
 
@@ -93,6 +97,13 @@ pub enum RevokeReason {
     SpiritUnload { spirit_pid: u32, count: usize },
     /// TTL expired (natural death).
     TtlExpired,
+    /// Story 6.2 AC6 — FR52: a CLI subprocess invocation exited; the
+    /// cap-token issued for that invocation is revoked. The audit row links
+    /// the cap-token id to the `FrameKind::CapabilityInvocation` exit record.
+    CliSubprocessExit {
+        spirit_pid: u32,
+        exit_code: Option<i32>,
+    },
 }
 
 /// The cap-tokens shard ring. One per Host; constructed in the

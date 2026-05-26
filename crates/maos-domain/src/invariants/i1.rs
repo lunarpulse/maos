@@ -88,6 +88,18 @@ pub enum Scope {
     /// Story 5.5c — MCP tool invocation. server = manifest [mcp].servers[i].name;
     /// tool = the tool identifier exposed by the MCP server.
     McpCall { server: String, tool: String },
+    /// Story 6.2 AC6 — FR52: invoke an external CLI subprocess under
+    /// capability-token authority. Scoped to the
+    /// `(cli_binary_path, argv_prefix_hash, output_shape_version)` triplet
+    /// declared in the Spirit's `[cli_wrapper]` manifest section.
+    /// TTL: 300s (Standard intent_class) per ADR-023.
+    CliSubprocessSpawn {
+        cli_binary_path: String,
+        /// SHA-256 of argv_prefix; bound to the cap-token at issue-time to
+        /// prevent TOCTOU between admission and invocation.
+        argv_prefix_hash: [u8; 32],
+        output_shape_version: String,
+    },
 }
 
 /// Intent classification for approval policy.

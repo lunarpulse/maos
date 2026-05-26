@@ -114,3 +114,17 @@
 - iac_log_writer_quantum_consumed_total metric deferred — Task 3.5.
 - Spec-drift test log_writer_drr_matches_scheduler.rs deferred — Task 3.7.
 - Bridge precondition failures (A2/A3/A5/A6/A4-Debt-1/A4-Debt-2c) accepted as documented debt per Option D team consensus. Missing CI wiring for A3/A5/A6 gates.
+
+## Deferred from: code review of 6-2-dispatch-orchestrator-distillates-with-intent-lineage-and-cliwrapperspirit-worker-pattern (2026-05-26)
+
+- CliWrapper runtime scaffold — actual subprocess stdio bridge NOT implemented; v0.5-α scaffolding by design; full bridge lands in Story 6.5 / Epic 8 Worker pattern [lifecycle/cli_wrapper/runtime.rs:26-30]
+- log_recall.rs maps CliSubprocessOutput -> CapabilityInvocation because domain label enum lacks variant; Spirit queries for CapabilityInvocation will leak CLI output rows [iac/log_recall.rs:127]
+- FramePayload enum missing CliSubprocessOutput variant — semantic gap between kind and payload type; kernel-internal audit rows don't need domain payload by design [domain/src/frame.rs:62-71]
+- from_i64 silently defaults unknown TL discriminants to TaskAssign — pre-existing; cross-version log inspection would misclassify rows [iac/transparency_log.rs:549-553]
+- retract_frame_id placeholder [0u8;16] before actual TL write — race window in concurrent retract; pre-existing from Story 6.1 [iac/mod.rs:646-706]
+- i9-exemptions.md scope creep — post-hoc exemptions for ProvidersSection, ProviderConfig, McpSection, etc. documented in Story 6.2 sweep [docs/invariants/i9-exemptions.md]
+- DashMap race can modestly exceed MAX_LINEAGE_CACHE_ENTRIES (4096) under concurrent delivery; soft cap design [iac/mod.rs:453-456]
+- resolve_command TOCTOU between exists() check and spawn — unlikely in practice [lifecycle/cli_wrapper/admission.rs:134-149]
+- monotonic_now_ns() returns 0 before init_monotonic_base() — integration test concern [capability/cap_tokens/mod.rs:63-70]
+- handle_subprocess_death signature promises Result but always returns Ok [lifecycle/cli_wrapper/lifecycle.rs:30-44]
+- Smoke test distillate_id could be [0u8;16] if TL insert silently fails [maos-bin/src/main.rs:3283]

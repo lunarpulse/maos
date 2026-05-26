@@ -26,6 +26,12 @@ pub enum FrameKind {
     CapabilityInvocation = 7,
     SandboxBlock = 8,
     InferenceCall = 9,
+    /// Story 6.2 AC6 — FR52: a line of stdout/stderr captured from a
+    /// CliWrapperSpirit's invoked CLI subprocess. Payload shape:
+    /// `{ cli_binary_path, invoking_spirit_id, output_stream: "stdout"|"stderr",
+    ///   line: String, line_no: u64 }`. The row carries `intent_lineage`
+    /// inherited from the invoking Spirit's session-originating intent.
+    CliSubprocessOutput = 21,
 }
 
 impl FrameKind {
@@ -41,6 +47,7 @@ impl FrameKind {
             7 => Some(Self::CapabilityInvocation),
             8 => Some(Self::SandboxBlock),
             9 => Some(Self::InferenceCall),
+            21 => Some(Self::CliSubprocessOutput),
             _ => None,
         }
     }

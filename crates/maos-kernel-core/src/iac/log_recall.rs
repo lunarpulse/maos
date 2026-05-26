@@ -120,6 +120,7 @@ impl LogRecallAdapter {
             FrameKind::McpInvocation => DomainFrameKindLabel::McpInvocation,
             FrameKind::SpiritAdmitted => DomainFrameKindLabel::SpiritAdmitted,
             FrameKind::RegistryYank => DomainFrameKindLabel::RegistryYank,
+            FrameKind::CliSubprocessOutput => DomainFrameKindLabel::CliSubprocessOutput,
         }
     }
 
@@ -153,6 +154,7 @@ impl LogRecallAdapter {
             DomainFrameKindLabel::McpInvocation => Some(FrameKind::McpInvocation),
             DomainFrameKindLabel::SpiritAdmitted => Some(FrameKind::SpiritAdmitted),
             DomainFrameKindLabel::RegistryYank => Some(FrameKind::RegistryYank),
+            DomainFrameKindLabel::CliSubprocessOutput => Some(FrameKind::CliSubprocessOutput),
             other => {
                 eprintln!(
                     "maos: warning: unmapped FrameKindLabel {:?} in to_kernel_kind \

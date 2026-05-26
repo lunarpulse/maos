@@ -323,10 +323,17 @@ enum Commands {
         json: bool,
     },
     /// Story 6.1 AC1 — Epic 6 bridge precondition gate (9 mechanical checks).
+    /// Story 6.2 AC1 — extended with `--story 6.2` flag adding 6.2-specific rows
+    /// (D-2.10 retract-corpus, D-4.* iac-routing-budget, D-3.7/3.8 DRR fairness,
+    /// D-5.1/5.2 smoke-iac-bus-6, §A4-Debt-2c hook-count drift). When the flag
+    /// is set, blocking_6_2 rows must clear before the command exits 0.
     #[command(name = "check-epic-6-bridge")]
     CheckEpic6Bridge {
         #[arg(long)]
         json: bool,
+        /// Story scope — if set to "6.2", extends the gate with Story 6.2 rows.
+        #[arg(long)]
+        story: Option<String>,
     },
     /// Epic 5 retro §A6 (closes Epic 4 retro §A7) — `done` stories MUST have non-TBD model + non-empty dev record + File List files in `git diff`.
     CheckDevRecordCompleteness {
@@ -533,8 +540,8 @@ fn main() {
         Commands::CheckReviewFindingsResolved { stories_dir, sprint_status, json } => {
             check_review_findings_resolved::run(&stories_dir, &sprint_status, json)
         }
-        Commands::CheckEpic6Bridge { json } => {
-            check_epic_6_bridge::run(json)
+        Commands::CheckEpic6Bridge { json, story } => {
+            check_epic_6_bridge::run_with_story(json, story.as_deref())
         }
         Commands::CheckDevRecordCompleteness { stories_dir, sprint_status, check_git_diff, json } => {
             check_dev_record_completeness::run(&stories_dir, &sprint_status, check_git_diff, json)
