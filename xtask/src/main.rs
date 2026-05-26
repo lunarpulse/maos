@@ -31,6 +31,7 @@ mod check_adr_040_accepted;
 mod check_serde_error_handling;
 mod check_review_findings_resolved;
 mod check_dev_record_completeness;
+mod check_epic_6_bridge;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -321,6 +322,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 6.1 AC1 — Epic 6 bridge precondition gate (9 mechanical checks).
+    #[command(name = "check-epic-6-bridge")]
+    CheckEpic6Bridge {
+        #[arg(long)]
+        json: bool,
+    },
     /// Epic 5 retro §A6 (closes Epic 4 retro §A7) — `done` stories MUST have non-TBD model + non-empty dev record + File List files in `git diff`.
     CheckDevRecordCompleteness {
         #[arg(long, default_value = "_bmad-output/implementation-artifacts")]
@@ -525,6 +532,9 @@ fn main() {
         }
         Commands::CheckReviewFindingsResolved { stories_dir, sprint_status, json } => {
             check_review_findings_resolved::run(&stories_dir, &sprint_status, json)
+        }
+        Commands::CheckEpic6Bridge { json } => {
+            check_epic_6_bridge::run(json)
         }
         Commands::CheckDevRecordCompleteness { stories_dir, sprint_status, check_git_diff, json } => {
             check_dev_record_completeness::run(&stories_dir, &sprint_status, check_git_diff, json)

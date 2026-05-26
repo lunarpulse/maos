@@ -1,0 +1,29 @@
+[package]
+name = "maos-capability"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS capability registry — pure token, policy, audit, and working-memory types"
+
+[package.metadata.maos]
+class = "universal-arithmetic"
+
+[dependencies]
+maos-domain = { path = "../maos-domain" }
+maos-attrs = { path = "../maos-attrs" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1", features = ["sync"] }
+dashmap = "6.1"
+parking_lot = "0.12"
+subtle = "2.6"
+ring = "0.17"
+
+[features]
+default = []
+test-introspection = []
+
+[dev-dependencies]

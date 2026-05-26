@@ -6,6 +6,7 @@
 
 use maos_spirit_abi::identity::FrameKind;
 
+use crate::frame::RetractPayloadError;
 use crate::invariants::i3::FrameOrigin;
 
 /// Typed error for IAC bus operations.
@@ -39,6 +40,24 @@ pub enum IacBusError {
         to: String,
         origin: FrameOrigin,
     },
+    /// Story 6.1 — retract authority violation: only the original sender
+    /// can retract their own frame in v0.5-α.
+    #[error("retract authority violation: spirit {caller} cannot retract frame from spirit {original_sender}")]
+    RetractAuthorityViolation { caller: String, original_sender: String },
+    /// Story 6.1 — retract payload validation failed.
+    #[error("retract payload validation failed: {0}")]
+    RetractPayloadInvalid(#[from] RetractPayloadError),
+}
+
+/// Outcome of a `retract` operation — Story 6.1.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RetractOutcome {
+    /// Retract emitted; original frame marked retracted in TL.
+    Retracted { retract_frame_id: [u8; 16] },
+    /// Already retracted earlier — idempotent re-emission.
+    Already { existing_retract_frame_id: [u8; 16] },
+    /// Original frame_id not found in TL — return error rather than silently emit.
+    OriginalNotFound,
 }
 
 #[cfg(test)]

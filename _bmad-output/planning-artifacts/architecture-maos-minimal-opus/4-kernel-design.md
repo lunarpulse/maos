@@ -102,7 +102,7 @@ Dependencies point inward (adapter ring → kernel services → domain core), wi
 
 **Workspace member count (post Story 1b.6):** 18 library/binary crates + xtask = **19 workspace members**. Added since the original §4.0.2 description: `maos-audit` (Story 1b.1 — read-side audit query adapter), `maos-attrs` (Story 1b.3 — `#[i9_exempt]` proc-macro), `maos-corpus-gen` (Epic 0 — deterministic corpus generators). `default-members = []` in the workspace root forces every cargo invocation to be `-p`-explicit (Story 1b.6 retro action A7).
 
-**Workspace member count (post Story 5.5e):**<!-- workspace-count-authoritative --> 22 library/binary crates + xtask + `crates/maos-bench` + `examples/example-spirit` = **25 workspace members**. Story 5.5e added `maos-bench` (§13.1 measurement gate) as the 25th member.
+**Workspace member count (post Story 6.1):**<!-- workspace-count-authoritative --> 23 library/binary crates + xtask + `crates/maos-bench` + `examples/example-spirit` = **26 workspace members**. Story 5.5e added `maos-bench` (§13.1 measurement gate) as the 25th member. Story 6.1 added `maos-capability` (Phase 2 decomposition per Epic 5 retro §A4 Debt 3) as the 26th member.
 
 **`spirit_test` feature on `maos-spirit-sdk` (post Story 2.4):** The crate gains an opt-in `spirit_test` cargo feature (depends on `local_runner` + `std` + `mock`) gating a new `crates/maos-spirit-sdk/src/spirit_test/` module that ships the SDK seed (assertion macros + IAC frame I/O capture + halt resolution simulator + manifest self-check + class-specific regression corpus skeleton + cross-Spirit isolation framework hooks). Workspace member count stays at **21** — the new module is feature-gated inside the existing crate, not a new workspace member.
 

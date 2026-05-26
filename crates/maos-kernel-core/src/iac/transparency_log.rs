@@ -115,6 +115,8 @@ pub struct TransparencyLogEntry {
     pub frame_id: [u8; 16], // ULID bytes
     pub timestamp_ns: u64,
     pub spirit_pid: u32,
+    pub from_spirit_id: String,
+    pub to_spirit_id: String,
     pub boot_nonce: u64,
     pub capability_token: Option<[u8; 32]>,
     pub kind: FrameKind,
@@ -133,6 +135,8 @@ pub struct FrameFilter {
     pub since_ns: Option<u64>,
     pub until_ns: Option<u64>,
     pub limit: Option<usize>,
+    /// Story 6.1 — filter by exact frame_id (for retract authority lookup).
+    pub frame_id: Option<[u8; 16]>,
     /// Keyset-pagination cursor — exclusive lower bound on `(timestamp_ns, frame_id)`.
     /// When both are `Some`, the query adds `WHERE (timestamp_ns, frame_id) > (?cursor_ts, ?cursor_id)`.
     pub cursor_timestamp_ns: Option<u64>,
@@ -159,6 +163,8 @@ CREATE TABLE IF NOT EXISTS transparency_log (
     frame_id            BLOB    NOT NULL PRIMARY KEY,
     timestamp_ns        INTEGER NOT NULL,
     spirit_pid          INTEGER NOT NULL,
+    from_spirit_id      TEXT    NOT NULL DEFAULT '',
+    to_spirit_id        TEXT    NOT NULL DEFAULT '',
     boot_nonce          INTEGER NOT NULL,
     capability_token    BLOB,
     kind                INTEGER NOT NULL,
@@ -171,6 +177,16 @@ CREATE INDEX IF NOT EXISTS idx_tlog_spirit_pid
     ON transparency_log(spirit_pid, timestamp_ns);
 CREATE INDEX IF NOT EXISTS idx_tlog_kind
     ON transparency_log(kind, timestamp_ns);
+
+-- Story 6.1 — retraction companion table.
+-- Per AC2: original row is APPEND-ONLY-PRESERVED.
+-- The retraction marker lives in this companion table, not as a column
+-- on transparency_log, to minimize schema migration blast radius.
+CREATE TABLE IF NOT EXISTS transparency_log_retractions (
+    original_frame_id   BLOB    NOT NULL PRIMARY KEY,
+    retract_frame_id    BLOB    NOT NULL,
+    retracted_at_ns     INTEGER NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS approval_decision_log (
     decision_id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -248,6 +264,10 @@ impl TransparencyLogAdapter {
         let conn = Connection::open(path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;
         conn.execute_batch(SCHEMA_SQL)?;
+        // Story 6.1 — migration: add to_spirit_id column to existing databases
+        let _ = conn.execute_batch(
+            "ALTER TABLE transparency_log ADD COLUMN to_spirit_id TEXT NOT NULL DEFAULT '';",
+        );
         Ok(Self {
             inner: Mutex::new(TransparencyLogInner {
                 conn,
@@ -301,7 +321,22 @@ impl TransparencyLogAdapter {
         bytes
     }
 
-    /// Insert a frame event. Returns `LogBeforeDeliver<()>` per I2 typestate:
+    /// Backward-compatible wrapper — delegates to [`Self::insert_frame_event_with_sender`]
+    /// with empty sender/recipient IDs. Used by callers that do not need
+    /// retraction authority tracking.
+    pub fn insert_frame_event(
+        &self,
+        kind: FrameKind,
+        spirit_pid: u32,
+        capability_token: Option<&[u8; 32]>,
+        intent: &str,
+        payload: &[u8],
+        origin: FrameOrigin,
+    ) -> LogBeforeDeliver<()> {
+        self.insert_frame_event_with_sender(kind, spirit_pid, "", "", capability_token, intent, payload, origin)
+    }
+
+    /// Insert a frame event with sender tracking. Returns `LogBeforeDeliver<()>` per I2 typestate:
     /// the caller can only construct `LogBeforeDeliver` by going through
     /// this method (the `i2::LogBeforeDeliver::new` constructor uses
     /// `#[doc(hidden)] pub` — visible but convention-gated at v0.1-beta).
@@ -311,10 +346,32 @@ impl TransparencyLogAdapter {
     /// the frame"). The panic-vs-Result choice is binding-v0.1 and is
     /// documented as the only kernel-side `panic!` outside of explicit
     /// `unreachable!()` paths.
-    pub fn insert_frame_event(
+    pub fn insert_frame_event_with_sender(
         &self,
         kind: FrameKind,
         spirit_pid: u32,
+        from_spirit_id: &str,
+        to_spirit_id: &str,
+        capability_token: Option<&[u8; 32]>,
+        intent: &str,
+        payload: &[u8],
+        origin: FrameOrigin,
+    ) -> LogBeforeDeliver<()> {
+        self.insert_frame_event_with_id(None, kind, spirit_pid, from_spirit_id, to_spirit_id, capability_token, intent, payload, origin)
+    }
+
+    /// Insert a frame event with explicit frame ID and sender tracking.
+    ///
+    /// Use this when the frame ID is externally generated (e.g. an IAC frame
+    /// that must be retrievable by its original frame_id for retraction).
+    /// Pass `None` for `frame_id` to auto-generate one.
+    pub fn insert_frame_event_with_id(
+        &self,
+        frame_id: Option<[u8; 16]>,
+        kind: FrameKind,
+        spirit_pid: u32,
+        from_spirit_id: &str,
+        to_spirit_id: &str,
         capability_token: Option<&[u8; 32]>,
         intent: &str,
         payload: &[u8],
@@ -325,20 +382,22 @@ impl TransparencyLogAdapter {
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
-        let frame_id = Self::next_frame_id(&mut inner);
+        let frame_id = frame_id.unwrap_or_else(|| Self::next_frame_id(&mut inner));
         let timestamp_ns = wall_clock_now_ns();
 
         inner.last_frame_id = frame_id;
 
         let result = inner.conn.execute(
             "INSERT INTO transparency_log
-                (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token,
+                (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce, capability_token,
                  kind, intent, payload_redacted, origin)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             rusqlite::params![
                 &frame_id[..],
                 timestamp_ns as i64,
                 spirit_pid as i64,
+                from_spirit_id,
+                to_spirit_id,
                 inner.boot_nonce as i64,
                 capability_token.map(|t| &t[..]),
                 kind as i64,
@@ -412,7 +471,7 @@ impl TransparencyLogAdapter {
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
         let mut sql = String::from(
-            "SELECT frame_id, timestamp_ns, spirit_pid, boot_nonce,
+            "SELECT frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
                     capability_token, kind, intent, payload_redacted, origin
              FROM transparency_log",
         );
@@ -422,6 +481,10 @@ impl TransparencyLogAdapter {
         if let Some(pid) = filter.spirit_pid {
             where_clauses.push("spirit_pid = ?".to_string());
             params.push(Box::new(pid as i64));
+        }
+        if let Some(fid) = filter.frame_id {
+            where_clauses.push("frame_id = ?".to_string());
+            params.push(Box::new(fid.to_vec()));
         }
         if let Some(kind) = filter.kind {
             where_clauses.push("kind = ?".to_string());
@@ -462,7 +525,7 @@ impl TransparencyLogAdapter {
                 if frame_id_blob.len() == 16 {
                     frame_id.copy_from_slice(&frame_id_blob);
                 }
-                let cap_blob: Option<Vec<u8>> = row.get(4)?;
+                let cap_blob: Option<Vec<u8>> = row.get(6)?;
                 let mut cap_token = None;
                 if let Some(ref blob) = cap_blob {
                     if blob.len() == 32 {
@@ -475,13 +538,18 @@ impl TransparencyLogAdapter {
                     frame_id,
                     timestamp_ns: row.get::<_, i64>(1)? as u64,
                     spirit_pid: row.get::<_, i64>(2)? as u32,
-                    boot_nonce: row.get::<_, i64>(3)? as u64,
+                    from_spirit_id: row.get(3)?,
+                    to_spirit_id: row.get(4)?,
+                    boot_nonce: row.get::<_, i64>(5)? as u64,
                     capability_token: cap_token,
-                    kind: FrameKind::from_i64(row.get::<_, i64>(5)?)
-                        .unwrap_or(FrameKind::TaskAssign),
-                    intent: row.get(6)?,
-                    payload_redacted: row.get(7)?,
-                    origin: match row.get::<_, i64>(8)? {
+                    kind: FrameKind::from_i64(row.get::<_, i64>(7)?)
+                        .unwrap_or_else(|| {
+                            eprintln!("unrecognized FrameKind discriminant in TL query");
+                            FrameKind::TaskAssign
+                        }),
+                    intent: row.get(8)?,
+                    payload_redacted: row.get(9)?,
+                    origin: match row.get::<_, i64>(10)? {
                         0 => FrameOrigin::HumanAuthored,
                         1 => FrameOrigin::SpiritAuto,
                         2 => FrameOrigin::SpiritDraftedHumanApproved,
@@ -512,7 +580,7 @@ impl TransparencyLogAdapter {
         let mut stmt = inner
             .conn
             .prepare(
-                "SELECT frame_id, timestamp_ns, spirit_pid, boot_nonce,
+                "SELECT frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
                         capability_token, kind, intent, payload_redacted, origin
                  FROM transparency_log
                  WHERE frame_id = ?1
@@ -527,7 +595,7 @@ impl TransparencyLogAdapter {
                 if frame_id_blob.len() == 16 {
                     fid.copy_from_slice(&frame_id_blob);
                 }
-                let cap_blob: Option<Vec<u8>> = row.get(4)?;
+                let cap_blob: Option<Vec<u8>> = row.get(6)?;
                 let mut cap_token = None;
                 if let Some(ref blob) = cap_blob {
                     if blob.len() == 32 {
@@ -540,13 +608,18 @@ impl TransparencyLogAdapter {
                     frame_id: fid,
                     timestamp_ns: row.get::<_, i64>(1)? as u64,
                     spirit_pid: row.get::<_, i64>(2)? as u32,
-                    boot_nonce: row.get::<_, i64>(3)? as u64,
+                    from_spirit_id: row.get(3)?,
+                    to_spirit_id: row.get(4)?,
+                    boot_nonce: row.get::<_, i64>(5)? as u64,
                     capability_token: cap_token,
-                    kind: FrameKind::from_i64(row.get::<_, i64>(5)?)
-                        .unwrap_or(FrameKind::TaskAssign),
-                    intent: row.get(6)?,
-                    payload_redacted: row.get(7)?,
-                    origin: match row.get::<_, i64>(8)? {
+                    kind: FrameKind::from_i64(row.get::<_, i64>(7)?)
+                        .unwrap_or_else(|| {
+                            eprintln!("unrecognized FrameKind discriminant in TL query");
+                            FrameKind::TaskAssign
+                        }),
+                    intent: row.get(8)?,
+                    payload_redacted: row.get(9)?,
+                    origin: match row.get::<_, i64>(10)? {
                         0 => FrameOrigin::HumanAuthored,
                         1 => FrameOrigin::SpiritAuto,
                         2 => FrameOrigin::SpiritDraftedHumanApproved,
@@ -593,6 +666,113 @@ impl TransparencyLogAdapter {
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(AuditError::SqliteRead)
+    }
+
+    /// Story 6.1 — mark a frame as retracted in the companion table.
+    ///
+    /// Returns `true` if this was the first retraction, `false` if already
+    /// retracted (idempotent).
+    pub fn mark_retracted(
+        &self,
+        original_frame_id: [u8; 16],
+        retract_frame_id: [u8; 16],
+    ) -> Result<bool, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let timestamp_ns = wall_clock_now_ns();
+        let rows = inner
+            .conn
+            .execute(
+                "INSERT OR IGNORE INTO transparency_log_retractions
+                 (original_frame_id, retract_frame_id, retracted_at_ns)
+                 VALUES (?1, ?2, ?3)",
+                rusqlite::params![
+                    &original_frame_id[..],
+                    &retract_frame_id[..],
+                    timestamp_ns as i64,
+                ],
+            )
+            .map_err(AuditError::SqliteWriteFatal)?;
+        Ok(rows > 0)
+    }
+    
+    /// Story 6.1 — atomically check-and-mark retraction.
+    ///
+    /// Holds the inner lock across both operations to prevent TOCTOU races.
+    /// Returns `Ok(retract_frame_id)` if already retracted, `Ok(None)` if
+    /// not yet retracted (caller should proceed with retraction).
+    pub fn check_and_mark_retracted(
+        &self,
+        original_frame_id: [u8; 16],
+        retract_frame_id: [u8; 16],
+    ) -> Result<Option<[u8; 16]>, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        // Check if already retracted
+        let row: Option<Vec<u8>> = inner
+            .conn
+            .query_row(
+                "SELECT retract_frame_id FROM transparency_log_retractions
+                 WHERE original_frame_id = ?1 LIMIT 1",
+                rusqlite::params![&original_frame_id[..]],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(AuditError::SqliteRead)?;
+        if let Some(blob) = row {
+            let mut arr = [0u8; 16];
+            if blob.len() == 16 {
+                arr.copy_from_slice(&blob);
+            }
+            return Ok(Some(arr));
+        }
+        // Not yet retracted — mark it atomically
+        let timestamp_ns = wall_clock_now_ns();
+        inner
+            .conn
+            .execute(
+                "INSERT OR IGNORE INTO transparency_log_retractions
+                 (original_frame_id, retract_frame_id, retracted_at_ns)
+                 VALUES (?1, ?2, ?3)",
+                rusqlite::params![
+                    &original_frame_id[..],
+                    &retract_frame_id[..],
+                    timestamp_ns as i64,
+                ],
+            )
+            .map_err(AuditError::SqliteWriteFatal)?;
+        Ok(None)
+    }
+
+    /// Story 6.1 — check whether a frame has been retracted.
+    ///
+    /// Returns `Some(retract_frame_id)` if retracted, `None` otherwise.
+    pub fn is_retracted(&self, original_frame_id: [u8; 16]) -> Result<Option<[u8; 16]>, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let row: Option<Vec<u8>> = inner
+            .conn
+            .query_row(
+                "SELECT retract_frame_id FROM transparency_log_retractions
+                 WHERE original_frame_id = ?1 LIMIT 1",
+                rusqlite::params![&original_frame_id[..]],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(AuditError::SqliteRead)?;
+        Ok(row.map(|blob| {
+            let mut arr = [0u8; 16];
+            if blob.len() == 16 {
+                arr.copy_from_slice(&blob);
+            }
+            arr
+        }))
     }
 
     /// Get a reference to the mailbox stub (for testing).
@@ -653,6 +833,21 @@ impl IacBusPort for TransparencyLogAdapter {
         _spirit_id: &maos_spirit_abi::identity::SpiritId,
     ) -> Result<(), maos_domain::iac_bus_types::IacBusError> {
         Ok(())
+    }
+
+    async fn retract(
+        &self,
+        _original_frame_id: [u8; 16],
+        _reason: String,
+        _retracting_spirit: &maos_spirit_abi::identity::SpiritId,
+    ) -> Result<
+        maos_domain::iac_bus_types::RetractOutcome,
+        maos_domain::iac_bus_types::IacBusError,
+    > {
+        // Stub implementation — the real retract lives in IacBusAdapter.
+        // This stub satisfies the trait for TransparencyLogAdapter which
+        // is only used in test contexts as a standalone IacBusPort impl.
+        Ok(maos_domain::iac_bus_types::RetractOutcome::OriginalNotFound)
     }
 }
 

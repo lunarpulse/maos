@@ -1,0 +1,21 @@
+{
+  "scenario_id": "retract-idempotent-002",
+  "category": "idempotent",
+  "description": "Sender retracts same frame twice; second retract returns Already",
+  "original_frame": {
+    "frame_id_hex": "0000000000000000000000000000001b",
+    "from_spirit": "spirit-3",
+    "to_spirit": "spirit-4",
+    "kind": "TaskComplete",
+    "payload_size_bytes": 512
+  },
+  "retract_request": {
+    "retracting_spirit": "spirit-3",
+    "reason": "idempotent retract test 2"
+  },
+  "expected_outcome": {
+    "success": true,
+    "outcome_variant": "Already",
+    "error_variant": null
+  }
+}

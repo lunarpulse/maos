@@ -9,6 +9,8 @@ description = "MAOS kernel core — capability mediation, IAC bus, journal"
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
+# Story 6.1 — Phase 2 maos-capability extraction (Epic 5 retro §A4 Debt 3)
+maos-capability = { path = "../maos-capability" }
 # Story 5.1 review backfill — `mock` feature moved to dev-dependencies so
 # the test-only `Ctx::mock()` constructor is NOT reachable from production
 # (release) builds. The production hook dispatcher uses
@@ -82,6 +84,8 @@ io_call_journal = []
 fixture_replay = ["maos-mcp/fixture_replay", "maos-providers/fixture_replay"]
 
 [dev-dependencies]
+# Enable test-introspection methods from maos-capability in kernel-core tests
+maos-capability = { path = "../maos-capability", features = ["test-introspection"] }
 tempfile = "3"
 criterion = "0.5"
 tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time"] }

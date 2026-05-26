@@ -6,12 +6,34 @@
 //! audit / quota). At v0.1-α the four sub-module shells exist from
 //! Story 1a.1; this story adds the port-trait re-export and the
 //! `CapabilityRegistryAdapter` composite with runtime bodies.
+//!
+//! Phase 2 extraction (Story 6.1): `cap_tokens`, `cap_quota`, and the
+//! pure types of `cap_audit` and `working_memory` moved to the
+//! `maos-capability` workspace crate. This module re-exports them for
+//! backward compatibility and hosts the cross-cutting orchestration
+//! (`orchestrator`, `policy_runtime`, `writer_task`) that depends on
+//! other kernel services.
 
-pub mod cap_audit;
+// Pure modules — re-exported from maos-capability
+pub use maos_capability::cap_tokens;
+pub use maos_capability::cap_quota;
+
+// Hybrid modules — types from maos-capability, local extensions for
+// cross-cutting orchestration
+pub mod cap_audit {
+    pub use maos_capability::cap_audit::*;
+    pub mod writer_task;
+    pub use writer_task::CapAuditWriter;
+}
+
+pub mod working_memory {
+    pub use maos_capability::working_memory::*;
+    pub mod orchestrator;
+    pub mod policy_runtime;
+}
+
+// Local modules that depend on other kernel services
 pub mod cap_policy;
-pub mod cap_quota;
-pub mod cap_tokens;
-pub mod working_memory;
 
 pub use maos_domain::ports::capability::TokenIssuer;
 pub use maos_domain::ports::CapabilityRegistryPort;

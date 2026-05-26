@@ -1,0 +1,21 @@
+{
+  "scenario_id": "retract-authority-violation-002",
+  "category": "authority_violation",
+  "description": "Non-sender attempts to retract a frame they did not send",
+  "original_frame": {
+    "frame_id_hex": "00000000000000000000000000000016",
+    "from_spirit": "spirit-3",
+    "to_spirit": "spirit-1",
+    "kind": "TaskAssign",
+    "payload_size_bytes": 256
+  },
+  "retract_request": {
+    "retracting_spirit": "spirit-1",
+    "reason": "malicious retract attempt 2"
+  },
+  "expected_outcome": {
+    "success": false,
+    "outcome_variant": "Error",
+    "error_variant": "RetractAuthorityViolation"
+  }
+}

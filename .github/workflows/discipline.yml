@@ -891,9 +891,39 @@ jobs:
       - name: Run multi-provider drift-check unit + integration tests
         run: cargo test -p xtask check_multi_provider_drift --locked
 
+  # Story 6.1 — Epic 6 bridge precondition gate (AC1)
+  check-epic-6-bridge:
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Debt: A2/A3/A5/A6 bridges pending; gate reports truth with exit 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-epic-6-bridge
+        run: cargo run -p xtask -- check-epic-6-bridge --json
+
+  # Story 6.1 — retract corpus integration tests (AC2)
+  retract-corpus-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run retract corpus integration tests
+        run: cargo test -p maos-kernel-core --test retract_corpus_v0 retract_corpus_fixtures --locked
+
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests]
     if: always()
     permissions:
       pull-requests: write
@@ -936,6 +966,8 @@ jobs:
           echo "cwc=${{ needs.check-workspace-count.result }}" >> $GITHUB_OUTPUT
           echo "cpfc=${{ needs.check-pub-field-constructors.result }}" >> $GITHUB_OUTPUT
           echo "ccrc=${{ needs.check-composition-root-completeness.result }}" >> $GITHUB_OUTPUT
+          echo "ceb=${{ needs.check-epic-6-bridge.result }}" >> $GITHUB_OUTPUT
+          echo "rct=${{ needs.retract-corpus-tests.result }}" >> $GITHUB_OUTPUT
       - name: Check for failures
         id: status
         run: |
@@ -984,7 +1016,8 @@ jobs:
             const cwc = '${{ needs.check-workspace-count.result }}';
             const cpfc = '${{ needs.check-pub-field-constructors.result }}';
             const ccrc = '${{ needs.check-composition-root-completeness.result }}';
-            const dt = '${{ needs.determinism-tests.outputs.test_result }}';  // advisory at v0.1-α per DF6
+            const ceb = '${{ needs.check-epic-6-bridge.result }}';
+            const rct = '${{ needs.retract-corpus-tests.result }}';
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
             const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
 
@@ -1027,6 +1060,8 @@ jobs:
             | check-workspace-count | ${icon(cwc)} ${cwc} |
             | check-pub-field-constructors | ${icon(cpfc)} ${cpfc} |
             | check-composition-root-completeness | ${icon(ccrc)} ${ccrc} |
+            | check-epic-6-bridge | ${icon(ceb)} ${ceb} |
+            | retract-corpus-tests | ${icon(rct)} ${rct} |
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 
             ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).

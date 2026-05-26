@@ -5,7 +5,7 @@
 //! Bus with retract primitive and DRR fairness scheduler.
 
 use crate::frame::IacFrame;
-use crate::iac_bus_types::IacBusError;
+use crate::iac_bus_types::{IacBusError, RetractOutcome};
 use crate::invariants::i2::LogBeforeDeliver;
 use crate::invariants::i3::FrameOrigin;
 use maos_spirit_abi::identity::SpiritId;
@@ -49,4 +49,16 @@ pub trait IacBusPort {
     /// channels with §7.1.1 capacity floors. Story 3.1 wires the
     /// real Mailbox; Story 6.1 adds persistence.
     fn register_spirit(&self, spirit_id: &SpiritId) -> Result<Self::MailboxHandle, IacBusError>;
+
+    /// Class: data-movement
+    ///
+    /// Retract a previously-delivered frame. Idempotent: re-retracting the same
+    /// `original_frame_id` returns `Ok(Already)` rather than a duplicate-emission
+    /// error. Story 6.1 (FR22 full features + ADR-022 retract semantics).
+    async fn retract(
+        &self,
+        original_frame_id: [u8; 16],
+        reason: String,
+        retracting_spirit: &SpiritId,
+    ) -> Result<RetractOutcome, IacBusError>;
 }

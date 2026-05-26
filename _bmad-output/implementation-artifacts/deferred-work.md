@@ -103,3 +103,14 @@
 - `provider_history` HashMap in `admit_spirit` grows unbounded under high spirit churn — no cleanup path for terminated spirits. Forward-shaped to Story 9.4.
 - `io_call_journal` non-feature stub returns empty `Vec` — currently `#[cfg]`-protected on tests. Acceptable for v0.5-α; structural improvement at v0.5+.
 - `UnconfiguredProvider` inserted under `"anthropic"` key in composition root — semantically misleading (enumerating `registered_ids()` shows Anthropic when it's not configured). Pre-existing Story 1b.4 pattern.
+
+## Deferred from: code review of 6-1-ship-the-full-iac-bus-with-retract-primitive-and-drr-fairness-scheduler (2026-05-26)
+
+- AC4 IAC routing budget benchmark entirely deferred to Story 6.2 — no bench file, latency measurement, throughput sweep, budget report, or nfr-perf-1 CI job shipped.
+- 4 of 5 promised CI jobs not yet wired — retract-corpus-tests, nfr-scale-3-drr-fairness, nfr-perf-1-iac-routing-budget, smoke-iac-bus-6 all marked as acknowledged deferrals in Task checklist.
+- No smoke-iac-bus-6 arm in crates/maos-bin/src/main.rs — Task 5.1 deferred.
+- DRR SpiritControlBlock weight integration + [scheduler.weights] config parsing deferred — Tasks 3.3/3.4. All spirits get uniform quantum, hardcoded weight=1.
+- NFR-Scale-3 5-spirit + 60s sustained fairness gate test not shipped — Tasks 3.7/3.8 deferred. Only 3 basic integration tests exist.
+- iac_log_writer_quantum_consumed_total metric deferred — Task 3.5.
+- Spec-drift test log_writer_drr_matches_scheduler.rs deferred — Task 3.7.
+- Bridge precondition failures (A2/A3/A5/A6/A4-Debt-1/A4-Debt-2c) accepted as documented debt per Option D team consensus. Missing CI wiring for A3/A5/A6 gates.

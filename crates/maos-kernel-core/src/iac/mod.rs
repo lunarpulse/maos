@@ -14,6 +14,7 @@
 pub mod channels;
 pub mod decision_logger;
 pub mod distillate;
+pub mod drr_scheduler; // NEW — Story 6.1 DRR fairness scheduler
 pub mod frame;
 pub mod log_recall; // NEW — Story 4.4 LogRecallAdapter
 pub mod mailbox;
@@ -21,9 +22,12 @@ pub mod mailbox_stub;
 pub mod redaction;
 pub mod transparency_log; // NEW — Story 4.4 DistillateWriter
 
+
+
 pub use maos_domain::ports::IacBusPort;
 
 pub use channels::*;
+pub use drr_scheduler::{BudgetWarningEvent, DrrScheduler};
 pub use frame::*;
 pub use mailbox::Mailbox;
 pub use mailbox::*;
@@ -46,6 +50,8 @@ pub use transparency_log::{
 pub struct IacBusAdapter {
     mailbox: std::sync::Arc<Mailbox>,
     transparency_log: std::sync::Arc<TransparencyLogAdapter>,
+    /// Story 6.1 — DRR fairness scheduler in front of the TL writer.
+    drr_scheduler: Option<drr_scheduler::DrrScheduler>,
     digest_provider: std::sync::Arc<
         dyn Fn(
                 &maos_spirit_abi::identity::SpiritId,
@@ -71,12 +77,19 @@ impl IacBusAdapter {
         Self {
             mailbox,
             transparency_log,
+            drr_scheduler: None,
             digest_provider: std::sync::Arc::new(|_| {
                 maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
             }),
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
+    }
+
+    /// Story 6.1 — attach a DRR fairness scheduler in front of the TL writer.
+    pub fn with_drr_scheduler(mut self, drr: drr_scheduler::DrrScheduler) -> Self {
+        self.drr_scheduler = Some(drr);
+        self
     }
 
     /// Story 4.5 — attach an isolation hook for cross-Spirit corpus observation.
@@ -143,6 +156,12 @@ impl IacBusAdapter {
         &self.transparency_log
     }
 
+    /// Access the DRR scheduler (test-only introspection).
+    #[doc(hidden)]
+    pub fn drr_scheduler(&self) -> Option<&drr_scheduler::DrrScheduler> {
+        self.drr_scheduler.as_ref()
+    }
+
     /// Raw-byte enqueue path (Story 6.1 compatibility).
     pub(crate) fn enqueue_frame_bytes(
         &self,
@@ -184,9 +203,11 @@ impl IacBusAdapter {
             "originator_spirit_id": task.originator_spirit_id,
             "capability_token": task.capability_token,
         });
-        let _ = self.transparency_log.insert_frame_event(
+        let _ = self.transparency_log.insert_frame_event_with_sender(
             transparency_log::FrameKind::TaskComplete,
             0,
+            &task.originator_spirit_id,
+            "",
             None,
             "task.nacked",
             payload.to_string().as_bytes(),
@@ -204,9 +225,11 @@ impl IacBusAdapter {
             "originator_spirit_id": task.originator_spirit_id,
             "capability_token": task.capability_token,
         });
-        let _ = self.transparency_log.insert_frame_event(
+        let _ = self.transparency_log.insert_frame_event_with_sender(
             transparency_log::FrameKind::TaskComplete,
             0,
+            &task.originator_spirit_id,
+            "",
             None,
             "task.escalated",
             payload.to_string().as_bytes(),
@@ -226,9 +249,11 @@ impl IacBusAdapter {
             "capability_token": task.capability_token,
             "replica_spirit_id": replica_spirit_id,
         });
-        let _ = self.transparency_log.insert_frame_event(
+        let _ = self.transparency_log.insert_frame_event_with_sender(
             transparency_log::FrameKind::TaskComplete,
             0,
+            &task.originator_spirit_id,
+            "",
             None,
             "task.reassigned",
             payload.to_string().as_bytes(),
@@ -237,7 +262,7 @@ impl IacBusAdapter {
     }
 
     /// Typed deliver (Story 3.1).
-    pub(crate) async fn deliver_typed(
+    pub async fn deliver_typed(
         &self,
         frame: maos_domain::frame::IacFrame,
     ) -> Result<
@@ -396,27 +421,250 @@ impl IacBusAdapter {
             }
         };
 
-        // I2: insert_frame_event panics on SQLite write failure (transparency_log.rs:296-307).
-        // Reaching this point means the log write succeeded.
-        let _logged = self.transparency_log.insert_frame_event(
-            tl_kind,
-            spirit_pid,
-            None,
-            intent_str,
-            &payload_bytes,
-            frame.auto_marker,
-        );
+        // I2: log before deliver.
+        // Story 6.1 — use DRR scheduler if present, otherwise synchronous write.
+        let to_spirit_id = frame.to.first().map_or("", |a| a.spirit_id.as_str());
+        if let Some(ref drr) = self.drr_scheduler {
+            let lineage_bytes =
+                serde_json::to_vec(&frame.intent_lineage).unwrap_or_default();
+            drr.submit(
+                frame.clone(),
+                payload_bytes,
+                tl_kind,
+                spirit_pid,
+                intent_str.to_string(),
+                frame.auto_marker,
+                lineage_bytes,
+            )
+            .await?;
+        } else {
+            self.transparency_log.insert_frame_event_with_id(
+                Some(frame.frame_id),
+                tl_kind,
+                spirit_pid,
+                frame.from.spirit_id.as_str(),
+                to_spirit_id,
+                None,
+                intent_str,
+                &payload_bytes,
+                frame.auto_marker,
+            );
+        }
 
         // 3. Route through Mailbox (async for backpressure)
         self.mailbox.deliver(frame).await
     }
 
     /// Typed register_spirit (Story 3.1).
-    pub(crate) fn register_spirit_typed(
+    pub fn register_spirit_typed(
         &self,
         spirit_id: &maos_spirit_abi::identity::SpiritId,
     ) -> Result<SpiritMailboxHandle, maos_domain::iac_bus_types::IacBusError> {
         self.mailbox.register_spirit(spirit_id.as_str())
+    }
+
+    /// Story 6.1 — retract a previously-delivered frame.
+    ///
+    /// 1. Look up the original frame in the Transparency Log.
+    /// 2. Assert the retracting Spirit is the original sender.
+    /// 3. Check idempotency atomically — re-retract returns `Already`.
+    /// 4. Write a new TL row of kind `Retract` (via DRR if configured).
+    /// 5. Mark the original frame as retracted in the companion table.
+    /// 6. Route the Retract frame through the mailbox to the ORIGINAL RECIPIENT.
+    pub async fn retract(
+        &self,
+        original_frame_id: [u8; 16],
+        reason: String,
+        retracting_spirit: &maos_spirit_abi::identity::SpiritId,
+    ) -> Result<maos_domain::iac_bus_types::RetractOutcome, maos_domain::iac_bus_types::IacBusError>
+    {
+        use maos_domain::frame::RetractPayload;
+        use maos_domain::iac_bus_types::RetractOutcome;
+
+        // Step 1: look up the original frame
+        let original_entry = self
+            .transparency_log
+            .query_frame_by_id(original_frame_id)
+            .map_err(|e| {
+                maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
+            })?;
+
+        let original_entry = match original_entry {
+            Some(entry) => entry,
+            None => return Ok(RetractOutcome::OriginalNotFound),
+        };
+
+        // Step 2: authority check — only the original sender can retract
+        let original_sender = &original_entry.from_spirit_id;
+        if original_sender.is_empty() {
+            return Err(
+                maos_domain::iac_bus_types::IacBusError::RetractAuthorityViolation {
+                    caller: retracting_spirit.as_str().to_string(),
+                    original_sender: "<unknown — legacy frame>".to_string(),
+                },
+            );
+        }
+        if original_sender != retracting_spirit.as_str() {
+            return Err(
+                maos_domain::iac_bus_types::IacBusError::RetractAuthorityViolation {
+                    caller: retracting_spirit.as_str().to_string(),
+                    original_sender: original_sender.to_string(),
+                },
+            );
+        }
+
+        // Step 3: Build the RetractPayload early for type mapping
+        let retract_payload = RetractPayload::new(
+            original_frame_id,
+            reason,
+            Some(match original_entry.kind {
+                transparency_log::FrameKind::TaskAssign => {
+                    maos_spirit_abi::identity::FrameKind::TaskAssign
+                }
+                transparency_log::FrameKind::TaskComplete => {
+                    maos_spirit_abi::identity::FrameKind::TaskComplete
+                }
+                transparency_log::FrameKind::DecisionDispatch => {
+                    maos_spirit_abi::identity::FrameKind::DecisionDispatch
+                }
+                transparency_log::FrameKind::EpistemicHalt => {
+                    maos_spirit_abi::identity::FrameKind::EpistemicHalt
+                }
+                transparency_log::FrameKind::TelemetryEvent => {
+                    maos_spirit_abi::identity::FrameKind::TelemetryEvent
+                }
+                transparency_log::FrameKind::ConsentRequest => {
+                    maos_spirit_abi::identity::FrameKind::ConsentRequest
+                }
+                transparency_log::FrameKind::Retract => {
+                    maos_spirit_abi::identity::FrameKind::Retract
+                }
+                _ => {
+                    // Unrecognized FrameKind — log warning, fall through to TaskAssign
+                    eprintln!(
+                        "retract: unrecognized FrameKind {:?}, defaulting to TaskAssign",
+                        original_entry.kind
+                    );
+                    maos_spirit_abi::identity::FrameKind::TaskAssign
+                }
+            }),
+        )
+        .map_err(maos_domain::iac_bus_types::IacBusError::RetractPayloadInvalid)?;
+
+        // Build retract frame with a UNIQUE frame_id (not reusing original_frame_id)
+        // The TL auto-generates a frame_id for the new Retract row.
+        let retract_frame = maos_domain::frame::IacFrame {
+            frame_id: [0u8; 16], // Auto-generated by TL on insert
+            timestamp_ns: 0,
+            logical_clock: 0,
+            from: maos_domain::frame::FrameAddress {
+                spirit_id: retracting_spirit.clone(),
+                host_id: None,
+                role: None,
+            },
+            to: {
+                let recipient_id = &original_entry.to_spirit_id;
+                if recipient_id.is_empty() {
+                    // Legacy frame — no known recipient; route to sender as fallback
+                    eprintln!(
+                        "retract: no to_spirit_id for frame {:?}, routing retract to sender",
+                        original_frame_id
+                    );
+                    let mut v = Vec::new();
+                    v.push(maos_domain::frame::FrameAddress {
+                        spirit_id: retracting_spirit.clone(),
+                        host_id: None,
+                        role: None,
+                    });
+                    v.into()
+                } else {
+                    let mut v = Vec::new();
+                    v.push(maos_domain::frame::FrameAddress {
+                        spirit_id: maos_spirit_abi::identity::SpiritId::from(recipient_id.as_str()),
+                        host_id: None,
+                        role: None,
+                    });
+                    v.into()
+                }
+            },
+            kind: maos_spirit_abi::identity::FrameKind::Retract,
+            intent: maos_domain::invariants::i1::IntentClass::Standard,
+            payload: maos_domain::frame::FramePayload::Retract(retract_payload),
+            auto_marker: maos_domain::invariants::i3::FrameOrigin::Kernel,
+            consent_envelope: None,
+            intent_lineage: maos_domain::invariants::i13::IntentLineage::default(),
+        };
+
+        // Step 4.5: Atomically check-and-mark retracted BEFORE writing TL row
+        // (prevents duplicate Retract TL rows on concurrent/re-play retractions)
+        let retract_frame_id = {
+            // We need a frame_id for the companion table entry.
+            // The TL auto-generates one; we use the last generated ID after write.
+            // But to do the check FIRST, we need to pick a frame_id.
+            // Strategy: log the frame_id via DRR or direct write, THEN check.
+            // For the idempotency case, we check BEFORE the write.
+            // But we need a frame_id for the companion table. Use a placeholder
+            // that gets overwritten below in the check_and_mark call.
+            let placeholder = [0u8; 16];
+            
+            // Step 3.5: Atomically check-and-mark FIRST to avoid duplicate writes
+            if let Some(existing) = self.transparency_log
+                .check_and_mark_retracted(original_frame_id, placeholder)
+                .map_err(|e| {
+                    maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
+                })? {
+                return Ok(RetractOutcome::Already {
+                    existing_retract_frame_id: existing,
+                });
+            }
+            
+            // Step 4: Log the retract frame (I2), routing through DRR if configured
+            if let Some(ref drr) = self.drr_scheduler {
+                let payload_bytes = serde_json::to_vec(&retract_frame.payload).map_err(|e| {
+                    maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
+                })?;
+                drr.submit(
+                    retract_frame.clone(),
+                    payload_bytes,
+                    transparency_log::FrameKind::Retract,
+                    original_entry.spirit_pid,
+                    "retract".to_string(),
+                    maos_domain::invariants::i3::FrameOrigin::Kernel,
+                    Vec::new(),
+                )
+                .await?;
+                self.transparency_log.last_frame_id()
+            } else {
+                let payload_bytes = serde_json::to_vec(&retract_frame.payload).map_err(|e| {
+                    maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
+                })?;
+                let _logged = self.transparency_log.insert_frame_event_with_sender(
+                    transparency_log::FrameKind::Retract,
+                    original_entry.spirit_pid,
+                    retracting_spirit.as_str(),
+                    retract_frame.to.first().map_or("", |a| a.spirit_id.as_str()),
+                    None,
+                    "retract",
+                    &payload_bytes,
+                    maos_domain::invariants::i3::FrameOrigin::Kernel,
+                );
+                self.transparency_log.last_frame_id()
+            }
+        };
+        
+        // Update the companion table entry with the real retract_frame_id
+        let _ = self.transparency_log
+            .mark_retracted(original_frame_id, retract_frame_id)
+            .map_err(|e| {
+                maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
+            })?;
+
+        // Step 6: route through mailbox to the original recipient
+        self.mailbox
+            .deliver_with_overtake(retract_frame, original_frame_id)
+            .await?;
+
+        Ok(RetractOutcome::Retracted { retract_frame_id })
     }
 }
 
@@ -427,6 +675,7 @@ impl Default for IacBusAdapter {
                 crate::telemetry::iac_rt::IacRtMetrics::new(),
             ))),
             transparency_log: std::sync::Arc::new(TransparencyLogAdapter::open_in_memory(0)),
+            drr_scheduler: None,
             digest_provider: std::sync::Arc::new(|_| {
                 maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
             }),

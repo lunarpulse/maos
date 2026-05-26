@@ -195,6 +195,26 @@ impl Mailbox {
         self.broadcast_sender.subscribe()
     }
 
+    /// Story 6.1 — deliver a retract frame with in-queue overtake.
+    ///
+    /// NOTE: True in-queue overtake (scanning the recipient's channel and
+    /// dropping the original frame before delivery) is not implementable
+    /// with tokio::sync::mpsc from the sender side. The practical v0.5
+    /// semantics are:
+    ///   1. Mark the original frame as retracted in the Transparency Log.
+    ///   2. Deliver the Retract frame through the normal pipeline.
+    ///   3. If the original frame is still in the recipient's channel, it
+    ///      will be delivered post-hoc; the recipient checks the TL retraction
+    ///      marker and handles it appropriately (per ADR-022).
+    pub async fn deliver_with_overtake(
+        &self,
+        retract_frame: IacFrame,
+        _original_frame_id: [u8; 16],
+    ) -> Result<LogBeforeDeliver<()>, IacBusError> {
+        // Deliver the retract frame normally
+        self.deliver(retract_frame).await
+    }
+
     pub fn metrics(&self) -> &Arc<IacRtMetrics> {
         &self.metrics
     }
@@ -294,6 +314,15 @@ impl IacBusPort for super::IacBusAdapter {
 
     fn register_spirit(&self, spirit_id: &SpiritId) -> Result<Self::MailboxHandle, IacBusError> {
         self.register_spirit_typed(spirit_id)
+    }
+
+    async fn retract(
+        &self,
+        original_frame_id: [u8; 16],
+        reason: String,
+        retracting_spirit: &SpiritId,
+    ) -> Result<maos_domain::iac_bus_types::RetractOutcome, IacBusError> {
+        self.retract(original_frame_id, reason, retracting_spirit).await
     }
 }
 

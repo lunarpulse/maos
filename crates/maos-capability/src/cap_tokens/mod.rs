@@ -36,7 +36,7 @@ use maos_domain::ports::capability::CapError;
 use maos_domain::ports::crypto::CryptoProvider;
 use subtle::ConstantTimeEq;
 
-use crate::capability::cap_audit;
+use crate::cap_audit;
 
 pub use body::{scope_hash, CapTokenBody};
 pub use key::Ed25519SigningKey;
@@ -310,7 +310,44 @@ impl CapTokensShardRing {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::security::crypto::tests::MockCryptoProvider;
+    use maos_domain::ports::crypto::{CryptoProvider, CryptoError};
+
+    struct MockCryptoProvider;
+
+    impl CryptoProvider for MockCryptoProvider {
+        fn verify_signature(
+            &self,
+            _public_key: &[u8],
+            _message: &[u8],
+            signature: &[u8],
+        ) -> Result<(), CryptoError> {
+            if signature.iter().all(|&b| b == 0) {
+                Ok(())
+            } else {
+                Err(CryptoError::SignatureInvalid)
+            }
+        }
+        fn seal_for_export(
+            &self,
+            _key: &[u8],
+            _nonce: &[u8],
+            _aad: &[u8],
+            plaintext: &[u8],
+        ) -> Result<Vec<u8>, CryptoError> {
+            Ok(plaintext.to_vec())
+        }
+        fn sign_capability_token(
+            &self,
+            _signing_key: &[u8],
+            token_bytes: &[u8],
+        ) -> Result<Vec<u8>, CryptoError> {
+            let mut sig = [0u8; 64];
+            for (i, b) in token_bytes.iter().enumerate() {
+                sig[i % 64] ^= *b;
+            }
+            Ok(sig.to_vec())
+        }
+    }
 
     fn test_ring() -> CapTokensShardRing {
         let crypto: Arc<dyn CryptoProvider> = Arc::new(MockCryptoProvider);

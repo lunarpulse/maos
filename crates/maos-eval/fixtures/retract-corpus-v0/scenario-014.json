@@ -1,0 +1,21 @@
+{
+  "scenario_id": "retract-after-delivery-004",
+  "category": "after_delivery",
+  "description": "Sender retracts their own frame after recipient has processed it",
+  "original_frame": {
+    "frame_id_hex": "0000000000000000000000000000000e",
+    "from_spirit": "spirit-5",
+    "to_spirit": "spirit-2",
+    "kind": "TelemetryEvent",
+    "payload_size_bytes": 712
+  },
+  "retract_request": {
+    "retracting_spirit": "spirit-5",
+    "reason": "test retract after delivery scenario 4"
+  },
+  "expected_outcome": {
+    "success": true,
+    "outcome_variant": "Retracted",
+    "error_variant": null
+  }
+}

@@ -260,6 +260,7 @@ impl LogRecallPort for LogRecallAdapter {
         let kind_filter = filter.kind.as_ref().and_then(Self::to_kernel_kind);
         let kernel_filter = FrameFilter {
             spirit_pid: Some(spirit_pid), // emitter-scope at v0.3-β
+            frame_id: None,
             kind: kind_filter,
             since_ns: filter.since_ns,
             until_ns: filter.until_ns,

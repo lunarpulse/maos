@@ -19,7 +19,13 @@
 #     extract `maos-iac`            (~3,350 LOC: TL + log_recall + bus routing)
 #     extract `maos-manifest`       (~2,500 LOC: TOML parsing + section schemas)
 #   Phase 2 — Story 6.1 prep (full IAC bus + DRR + retract primitive)
-#     extract `maos-capability`     (~2,400 LOC: cap_tokens/cap_policy/cap_audit/cap_quota)
+#     CORRECTED 2026-05-25: Original boundary at `capability/` directory level
+#     created circular dependencies via `working_memory/orchestrator.rs` (depends
+#     on halt, iac, journal, security) and `cap_audit/writer_task.rs` (depends on
+#     iac::TL). New boundary extracts ONLY the pure capability surface:
+#       cap_tokens, cap_quota, cap_audit (types + channel only),
+#       working_memory (types + store only).
+#     Extracted LOC: ~1,271 (was ~2,400). Status: DONE.
 #   Phase 3 — Story 7.2 (full registry publish/install/yank + air-gapped import)
 #     residual security/* fold      (~1,000 LOC moves into maos-manifest or
 #                                    maos-sandbox depending on classifier)
@@ -40,6 +46,7 @@
 # -----------------------------------------------------------------------------
 
 maos-kernel-core = 6000
+maos-capability = 2000
 maos-cap-registry = 3000
 maos-corpus-gen = 3000
 maos-wire = 2000
@@ -65,3 +72,9 @@ maos-bench = 500
 
 _aggregate_alarm = 16000
 _aggregate_hardfail = 20000
+
+[in_progress_decomposition]
+phase_1 = { target = "maos-iac + maos-manifest", status = "pending", epic = "6.5" }
+phase_2 = { target = "maos-capability", status = "done", epic = "6.1", notes = "CORRECTED 2026-05-25: extracted ~1,271 LOC of pure surface; cross-cutting orchestration remains in kernel-core" }
+phase_3 = { target = "security/* residual", status = "pending", epic = "7.2" }
+phase_4 = { target = "maos-scheduler + maos-memory + maos-hot-swap + maos-supervision", status = "pending", epic = "7.x" }

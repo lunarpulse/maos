@@ -256,10 +256,54 @@ pub struct ConsentRequestPayload {
     pub capability: String,
 }
 
-/// TODO(Story 6.1): shape filled by E6 Story 6.1.
+/// Retract payload — Story 6.1.
+///
+/// Per architecture §4.5: "a Spirit can issue `retract(message_id, reason)`;
+/// the kernel marks the original log entry as retracted, sends a structured
+/// `retract` frame to the peer, and the peer's IAC Bus surfaces it to its
+/// human. **Retract is not delete** — the Transparency Log is append-only."
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RetractPayload {
     pub original_frame_id: [u8; 16],
+    /// Free-form retraction reason — surfaced through the notification dispatcher
+    /// to the original recipient's human. Empty string permitted; max 4096 bytes
+    /// enforced at construction time (`RetractPayload::new`) to prevent log inflation.
+    #[serde(default)]
+    pub reason: String,
+    /// The `FrameKind` of the frame being retracted — captured at retraction time
+    /// because the original frame's TL row may be redacted before this Retract
+    /// frame is read; the discriminator is needed for retract-corpus replay tests.
+    #[serde(default)]
+    pub original_kind: Option<maos_spirit_abi::identity::FrameKind>,
+}
+
+/// Error raised when `RetractPayload::new` rejects invalid input.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum RetractPayloadError {
+    #[error("retract reason exceeds 4096-byte cap (was {0} bytes)")]
+    ReasonTooLong(usize),
+}
+
+impl RetractPayload {
+    /// Construct a `RetractPayload` with validation.
+    ///
+    /// Enforces the 4096-byte reason cap per architecture §4.5.
+    pub fn new(
+        original_frame_id: [u8; 16],
+        reason: String,
+        original_kind: Option<maos_spirit_abi::identity::FrameKind>,
+    ) -> Result<Self, RetractPayloadError> {
+        if reason.len() > 4096 {
+            return Err(RetractPayloadError::ReasonTooLong(reason.len()));
+        }
+        // Ensure truncation safety: validate at char boundary for UTF-8 display
+        let _ = reason.get(..4096.min(reason.ceil_char_boundary(4096)));
+        Ok(Self {
+            original_frame_id,
+            reason,
+            original_kind,
+        })
+    }
 }
 
 /// Consent envelope for ADR-012 — None at v0.3 (Story 6.3).

@@ -1,0 +1,21 @@
+{
+  "scenario_id": "retract-before-delivery-004",
+  "category": "before_delivery",
+  "description": "Sender retracts their own frame before recipient processes it",
+  "original_frame": {
+    "frame_id_hex": "00000000000000000000000000000004",
+    "from_spirit": "spirit-5",
+    "to_spirit": "spirit-1",
+    "kind": "DecisionDispatch",
+    "payload_size_bytes": 656
+  },
+  "retract_request": {
+    "retracting_spirit": "spirit-5",
+    "reason": "test retract before delivery scenario 4"
+  },
+  "expected_outcome": {
+    "success": true,
+    "outcome_variant": "Retracted",
+    "error_variant": null
+  }
+}
