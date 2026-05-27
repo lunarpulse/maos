@@ -1,0 +1,33 @@
+[package]
+name = "maos-iac"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS Inter-Agent Communication bus — mailbox, transparency log, frame routing"
+
+[dependencies]
+maos-domain = { path = "../maos-domain" }
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+maos-capability = { path = "../maos-capability" }
+maos-attrs = { path = "../maos-attrs" }
+tokio = { version = "1", features = ["sync", "rt", "time", "macros", "rt-multi-thread"] }
+dashmap = "6.1"
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+ulid = "1.1"
+ring = "0.17"
+arc-swap = "1.7"
+# Story 1b.1 — SQLite audit spine (Transparency Log + Approval Decision Log).
+# Bundled feature statically links libsqlite3-sys; no system libsqlite3 dep.
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time", "test-util"] }
+tempfile = "3"
+async-trait = "0.1"
+smallvec = "1"
+maos-spirit-sdk = { path = "../maos-spirit-sdk", features = ["spirit_test"] }

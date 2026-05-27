@@ -911,6 +911,8 @@ jobs:
         run: cargo run -p xtask -- check-epic-6-bridge --story 6.3 --json
       - name: Run check-epic-6-bridge --story 6.4
         run: cargo run -p xtask -- check-epic-6-bridge --story 6.4 --json
+      - name: Run check-epic-6-bridge --story 6.5
+        run: cargo run -p xtask -- check-epic-6-bridge --story 6.5 --json
 
   # Story 6.1 — retract corpus integration tests (AC2)
   retract-corpus-tests:

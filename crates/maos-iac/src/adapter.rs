@@ -19,6 +19,7 @@ pub mod frame;
 pub mod log_recall; // NEW — Story 4.4 LogRecallAdapter
 pub mod mailbox;
 pub mod mailbox_stub;
+pub mod metrics; // NEW — Story 6.5 IacRtMetrics extraction
 pub mod orchestrator_dispatch; // NEW — Story 6.2 AC2 FR21 distillate-dispatch check
 pub mod payload; // NEW — Story 6.4 typed payloads (ScheduleFireRecord)
 pub mod redaction;
@@ -34,6 +35,7 @@ pub use frame::*;
 pub use mailbox::Mailbox;
 pub use mailbox::*;
 pub use mailbox_stub::MailboxStub;
+pub use metrics::IacRtMetrics;
 pub use redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
 pub use transparency_log::{
     AuditError, FrameFilter, FrameKind, TransparencyLogAdapter, TransparencyLogEntry,
@@ -725,7 +727,7 @@ impl Default for IacBusAdapter {
     fn default() -> Self {
         Self {
             mailbox: std::sync::Arc::new(Mailbox::new(std::sync::Arc::new(
-                crate::telemetry::iac_rt::IacRtMetrics::new(),
+                IacRtMetrics::new(),
             ))),
             transparency_log: std::sync::Arc::new(TransparencyLogAdapter::open_in_memory(0)),
             drr_scheduler: None,
@@ -782,7 +784,7 @@ mod decision_audit_tests {
     async fn i12_10_decision_frames_100_percent_carry_refs() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
         let mailbox = Arc::new(Mailbox::new(Arc::new(
-            crate::telemetry::iac_rt::IacRtMetrics::new(),
+            IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
 
@@ -833,7 +835,7 @@ mod decision_audit_tests {
     async fn i12_non_decision_frames_not_decorated() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
         let mailbox = Arc::new(Mailbox::new(Arc::new(
-            crate::telemetry::iac_rt::IacRtMetrics::new(),
+            IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
 
@@ -925,7 +927,7 @@ mod decision_audit_tests {
     async fn lineage_human_authored_cross_spirit_auto_populates() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
         let mailbox = Arc::new(Mailbox::new(Arc::new(
-            crate::telemetry::iac_rt::IacRtMetrics::new(),
+            IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
         let _target_handle = adapter
@@ -948,7 +950,7 @@ mod decision_audit_tests {
     async fn lineage_spirit_auto_cross_spirit_empty_lineage_rejected() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
         let mailbox = Arc::new(Mailbox::new(Arc::new(
-            crate::telemetry::iac_rt::IacRtMetrics::new(),
+            IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
         let _target_handle = adapter
@@ -978,7 +980,7 @@ mod decision_audit_tests {
     async fn lineage_spirit_auto_cross_spirit_non_empty_lineage_succeeds() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
         let mailbox = Arc::new(Mailbox::new(Arc::new(
-            crate::telemetry::iac_rt::IacRtMetrics::new(),
+            IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
         let _target_handle = adapter
@@ -1001,7 +1003,7 @@ mod decision_audit_tests {
     async fn lineage_same_spirit_empty_lineage_spirit_auto_succeeds() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
         let mailbox = Arc::new(Mailbox::new(Arc::new(
-            crate::telemetry::iac_rt::IacRtMetrics::new(),
+            IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
         let _target_handle = adapter
@@ -1026,7 +1028,7 @@ mod decision_audit_tests {
     async fn lineage_broadcast_empty_to_succeeds() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
         let mailbox = Arc::new(Mailbox::new(Arc::new(
-            crate::telemetry::iac_rt::IacRtMetrics::new(),
+            IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
 
@@ -1043,7 +1045,7 @@ mod decision_audit_tests {
     async fn lineage_human_authored_non_empty_lineage_not_overwritten() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
         let mailbox = Arc::new(Mailbox::new(Arc::new(
-            crate::telemetry::iac_rt::IacRtMetrics::new(),
+            IacRtMetrics::new(),
         )));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
         let _target_handle = adapter

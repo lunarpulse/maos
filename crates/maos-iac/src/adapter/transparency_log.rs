@@ -881,6 +881,41 @@ fn wall_clock_now_ns() -> u64 {
         .as_nanos() as u64
 }
 
+// Story 6.5 — HaltJournal trait impl moved from maos-kernel-core to maos-iac
+// per orphan rules (TransparencyLogAdapter is now defined in maos-iac).
+impl maos_domain::halt::HaltJournal for TransparencyLogAdapter {
+    fn journal_halt_resolution(
+        &self,
+        actor: &str,
+        spirit_id: &str,
+        halt_id: &maos_domain::halt::HaltId,
+        resolution: &maos_domain::halt::Resolution,
+    ) -> Result<(), maos_domain::halt::HaltJournalError> {
+        let reasoning = match resolution {
+            maos_domain::halt::Resolution::ProvidedContext { text } => Some(format!(
+                "halt={}: provided_context: {text}",
+                halt_id.as_str()
+            )),
+            maos_domain::halt::Resolution::AcceptedHalt => Some(format!("halt={}: accepted_halt", halt_id.as_str())),
+            maos_domain::halt::Resolution::AuthorizedOverride {
+                operator_policy_ref,
+            } => Some(format!(
+                "halt={}: authorized_override: operator_policy_ref={operator_policy_ref}",
+                halt_id.as_str()
+            )),
+        };
+        self.insert_approval_decision(ApprovalDecision {
+            actor: actor.into(),
+            target: spirit_id.into(),
+            capability: "halt.resolve".into(),
+            intent: resolution.kind_label().into(),
+            decision: true,
+            reasoning,
+        })
+        .map_err(|e| maos_domain::halt::HaltJournalError::WriteFailed(e.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

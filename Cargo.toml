@@ -13,6 +13,7 @@ members = [
     "crates/maos-director-surface",
     "crates/maos-domain",
     "crates/maos-capability",
+    "crates/maos-iac",
     "crates/maos-kernel-core",
     "crates/maos-mcp",
     "crates/maos-registry",

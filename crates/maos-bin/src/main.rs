@@ -226,9 +226,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let log_recall_adapter = Arc::new(maos_kernel_core::iac::log_recall::LogRecallAdapter::new(
         Arc::clone(&transparency_log),
     ));
+    let memory_any: Arc<dyn std::any::Any + Send + Sync> = memory;
     let distillate_writer = Arc::new(maos_kernel_core::iac::distillate::DistillateWriter::new(
         Arc::clone(&transparency_log),
-        Arc::clone(&memory),
+        memory_any,
     ));
     eprintln!("maos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)");
 
@@ -307,7 +308,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("maos: CrashDetector wired (Story 5.3)");
 
     // Wire SCB map into Mailbox so deliver() updates last_inbound_frame_ns.
-    mailbox.set_scbs(scheduler.scbs());
+    // Story 6.5 — trait-based decoupling: ScbTracker wraps the SCB map.
+    let tracker = Arc::new(maos_kernel_core::iac::ScbTracker::new(scheduler.scbs()));
+    mailbox.set_tracker(tracker);
 
     // Story 5.1 — KernelLifecycleResolver assembled for CLI / ACP / HTTP API consumers.
     let lifecycle_resolver = Arc::new(maos_kernel_core::scheduler::KernelLifecycleResolver::new(
@@ -568,6 +571,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "start" => Some(maos_domain::invariants::i10::LifecycleEvent::Start),
             "stop" => Some(maos_domain::invariants::i10::LifecycleEvent::Halt),
             "unload" => Some(maos_domain::invariants::i10::LifecycleEvent::Unload),
+            "uninstall" => Some(maos_domain::invariants::i10::LifecycleEvent::Uninstall),
             _ => None,
         } {
             // Initialize the monotonic clock so journal timestamps are
@@ -612,6 +616,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "start" => "started",
                 "stop" => "stopped",
                 "unload" => "unloaded",
+                "uninstall" => "uninstalled",
                 _ => unreachable!(),
             };
             eprintln!(

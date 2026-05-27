@@ -112,6 +112,8 @@ pub enum LifecycleEvent {
     SandboxApplied = 17,
     /// Story 5.5b — Spirit's provider changed between admissions.
     ProviderSwitched = 18,
+    /// Story 6.5 — Spirit uninstalled and proof-of-erasure record emitted.
+    Uninstall = 19,
 }
 
 /// A single lifecycle journal entry — the v0.3-β shape.

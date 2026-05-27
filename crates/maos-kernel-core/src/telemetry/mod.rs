@@ -12,7 +12,8 @@
 //!   derived_from)` write emits a `scalar.tap` event."
 //! - I7: Telemetry is broadcast; subscription is per-Spirit.
 
-pub mod iac_rt;
+// Story 6.5 — IacRtMetrics moved to maos-iac; re-export for backward compatibility.
+pub use maos_iac::metrics as iac_rt;
 
 pub use maos_domain::ports::TelemetryStreamPort;
 

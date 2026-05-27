@@ -1,4 +1,4 @@
-last_updated: '2026-05-27T00:00:00Z'
+last_updated: '2026-05-27T00:00:00Z+story-6-5-context'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -65,7 +65,7 @@ development_status:
   6-2-dispatch-orchestrator-distillates-with-intent-lineage-and-cliwrapperspirit-worker-pattern: done
   6-3-build-the-a2a-peer-mesh-from-loopback-to-cross-host-with-mtls-rotation-chaos: done
   6-4-wire-scheduled-invocations-with-consentrupture-and-provider-rate-limit-isolation: done
-  6-5-gateway-sub-modules-adr-029-telegram-slack-discord-signal-email: backlog
+  6-5-gateway-sub-modules-adr-029-telegram-slack-discord-signal-email: in-progress
   epic-6-retrospective: optional
   epic-7: backlog
   7-1-full-cargo-generate-per-language-full-spirit-test-sdk-with-assertion-macros: backlog

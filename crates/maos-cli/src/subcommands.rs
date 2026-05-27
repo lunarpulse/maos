@@ -18,6 +18,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Start(args) => lifecycle_verb("start", args.spirit.as_deref(), color),
         Subcommand::Stop(args) => lifecycle_verb("stop", args.spirit.as_deref(), color),
         Subcommand::Unload(args) => lifecycle_verb("unload", args.spirit.as_deref(), color),
+        Subcommand::Uninstall(args) => lifecycle_verb("uninstall", args.spirit.as_deref(), color),
         Subcommand::Run(args) => run(args, color),
         Subcommand::Audit(args) => audit_dispatch(&args.query, color),
         Subcommand::Posture(args) => dispatch_posture(args, color),

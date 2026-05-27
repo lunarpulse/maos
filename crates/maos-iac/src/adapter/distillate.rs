@@ -30,8 +30,6 @@ use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::ports::DistillationPort;
 
 use super::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
-use crate::memory::MemoryManagerAdapter;
-
 /// Stable intent string constant for `CapabilityInvocation` audit row.
 pub const DISTILLATE_WRITE_INTENT: &str = "distillate.write";
 
@@ -41,11 +39,11 @@ const RECEIPT_KIND: &str = "distillate";
 /// DistillateWriter — stateless composer over `Arc<TransparencyLogAdapter>`.
 ///
 /// Does NOT require `#[i9_exempt]` — holds only `Arc` references to
-/// existing I9-sanctioned holders (TransparencyLogAdapter, MemoryManagerAdapter).
+/// existing I9-sanctioned holders (TransparencyLogAdapter, memory handle).
 pub struct DistillateWriter {
     transparency_log: Arc<TransparencyLogAdapter>,
     #[allow(dead_code)]
-    memory: Arc<MemoryManagerAdapter>,
+    memory: Arc<dyn std::any::Any + Send + Sync>,
     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
     #[cfg(feature = "spirit_test")]
     isolation_hook: Option<
@@ -59,7 +57,7 @@ impl DistillateWriter {
     /// Construct a new writer.
     pub fn new(
         transparency_log: Arc<TransparencyLogAdapter>,
-        memory: Arc<MemoryManagerAdapter>,
+        memory: Arc<dyn std::any::Any + Send + Sync>,
     ) -> Self {
         Self {
             transparency_log,
@@ -468,22 +466,9 @@ mod tests {
         tempfile::TempDir,
     ) {
         let tmp = tempfile::TempDir::new().unwrap();
-        let memory_root = tmp.path().join("memory");
-        let db_path = tmp.path().join("audit.db");
         let tl = Arc::new(TransparencyLogAdapter::open_in_memory(nonce));
-        let private = Arc::new(crate::memory::PrivateMemoryStore::new(
-            memory_root,
-            4 * 1024,
-        ));
-        let shared = Arc::new(crate::memory::SharedMemoryStore::open(&db_path).unwrap());
-        let principal_index =
-            Arc::new(crate::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
-        let memory = Arc::new(crate::memory::MemoryManagerAdapter::new(
-            private,
-            shared,
-            principal_index,
-            Arc::clone(&tl),
-        ));
+        // Story 6.5 — memory field is unused in production; pass a dummy value.
+        let memory: Arc<dyn std::any::Any + Send + Sync> = Arc::new(42u64);
         let writer = DistillateWriter::new(Arc::clone(&tl), memory);
         (writer, tl, tmp)
     }

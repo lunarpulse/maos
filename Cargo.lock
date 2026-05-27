@@ -1122,6 +1122,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "maos-iac"
+version = "0.1.0-alpha"
+dependencies = [
+ "arc-swap",
+ "async-trait",
+ "dashmap",
+ "maos-attrs",
+ "maos-capability",
+ "maos-domain",
+ "maos-spirit-abi",
+ "maos-spirit-sdk",
+ "parking_lot",
+ "ring",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "ulid",
+]
+
+[[package]]
 name = "maos-kernel-core"
 version = "0.1.0-alpha"
 dependencies = [
@@ -1138,6 +1162,7 @@ dependencies = [
  "maos-director-surface",
  "maos-domain",
  "maos-eval",
+ "maos-iac",
  "maos-mcp",
  "maos-providers",
  "maos-spirit-abi",

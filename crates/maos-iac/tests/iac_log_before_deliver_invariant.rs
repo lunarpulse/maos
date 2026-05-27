@@ -12,9 +12,9 @@ use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, TaskAssignPayload
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
-use maos_kernel_core::iac::mailbox::Mailbox;
-use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
-use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
+use maos_iac::adapter::mailbox::Mailbox;
+use maos_iac::adapter::transparency_log::TransparencyLogAdapter;
+use maos_iac::adapter::IacRtMetrics;
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 use smallvec::smallvec;
 
@@ -83,7 +83,7 @@ async fn log_before_deliver_adapter_panics_on_broken_log() {
     let metrics = Arc::new(IacRtMetrics::new());
     let mailbox = Arc::new(Mailbox::new(Arc::clone(&metrics)));
 
-    let adapter = maos_kernel_core::iac::IacBusAdapter::new(Arc::clone(&mailbox), Arc::clone(&log));
+    let adapter = maos_iac::adapter::IacBusAdapter::new(Arc::clone(&mailbox), Arc::clone(&log));
 
     let mut handle = mailbox.register_spirit("test-spirit").unwrap();
 

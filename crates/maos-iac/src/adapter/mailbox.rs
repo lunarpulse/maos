@@ -16,9 +16,7 @@
 //! The `DashMap<(String, FrameKind), mpsc::Sender<IacFrame>>` is transient
 //! per-process state, not persistent — no I9 exemption needed.
 
-use std::collections::BTreeMap;
-use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc};
@@ -35,8 +33,17 @@ use maos_spirit_abi::identity::{FrameKind, SpiritId};
 
 use super::channels::{channel_class_for, ChannelClass};
 use super::transparency_log::TransparencyLogAdapter;
-use crate::scheduler::control_block::SpiritControlBlock;
-use crate::telemetry::iac_rt::IacRtMetrics;
+use super::metrics::IacRtMetrics;
+
+/// Story 6.5 — trait abstraction for updating Spirit activity timestamps
+/// without coupling the mailbox to kernel-core's `SpiritControlBlock`.
+pub trait SpiritActivityTracker: Send + Sync {
+    /// Update the last inbound frame timestamp for the given spirit.
+    fn update_last_inbound_frame(&self, spirit_id: &str, timestamp_ns: u64);
+    /// Update the last progress IAC timestamp for the given spirit
+    /// (Story 5.3 — sender's last_progress_iac_ns for spirit-origin frames).
+    fn update_last_progress_iac(&self, spirit_id: &str, timestamp_ns: u64);
+}
 
 /// Story 6.4 / ADR-034 binding-v0.9 — per-recipient consent gate hook.
 ///
@@ -51,7 +58,7 @@ pub trait ConsentGate: Send + Sync {
 /// Kernel-internal sender identity for ConsentRupture emission. Reserved
 /// so that a recipient's "ConsentRupture from kernel" frame is exempt from
 /// the per-recipient consent check (recursion floor).
-pub(crate) const KERNEL_SENDER_SPIRIT_ID: &str = "__kernel";
+pub const KERNEL_SENDER_SPIRIT_ID: &str = "__kernel";
 
 /// Generate a 16-byte correlation ID suitable for in-memory frame
 /// correlation. Uses monotonic time + thread-local counter + PID to
@@ -63,7 +70,7 @@ fn generate_correlation_id() -> [u8; 16] {
     thread_local! {
         static COUNTER: Cell<u64> = const { Cell::new(0) };
     }
-    let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    let now_ns = maos_capability::cap_tokens::monotonic_now_ns();
     let pid = std::process::id() as u64;
     let seq = COUNTER.with(|c| {
         let n = c.get().wrapping_add(1);
@@ -112,7 +119,7 @@ pub struct Mailbox {
     mpsc_senders: DashMap<(String, FrameKind), mpsc::Sender<IacFrame>>,
     broadcast_sender: broadcast::Sender<IacFrame>,
     metrics: Arc<IacRtMetrics>,
-    scbs: Mutex<Option<Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>>>,
+    scbs: Mutex<Option<Arc<dyn SpiritActivityTracker>>>,
     /// Story 6.3 — A2A router installed at composition root. `None` means
     /// no peer is configured; cross-host frames fire `CrossHostNotConfigured`.
     a2a_router: Option<Arc<dyn A2ARouter>>,
@@ -132,7 +139,7 @@ impl std::fmt::Debug for Mailbox {
             .field("mpsc_senders", &self.mpsc_senders)
             .field("broadcast_sender", &self.broadcast_sender)
             .field("metrics", &self.metrics)
-            .field("scbs", &self.scbs)
+            .field("tracker_present", &self.scbs.lock().map(|g| g.is_some()).unwrap_or(false))
             .field("a2a_router_present", &self.a2a_router.is_some())
             .field("consent_gate_present", &self.consent_gate.get().is_some())
             .field("transparency_log_present", &self.transparency_log.get().is_some())
@@ -154,16 +161,16 @@ impl Mailbox {
         }
     }
 
-    pub fn new_with_scbs(
+    pub fn new_with_tracker(
         metrics: Arc<IacRtMetrics>,
-        scbs: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
+        tracker: Arc<dyn SpiritActivityTracker>,
     ) -> Self {
         let (broadcast_sender, _) = broadcast::channel(256);
         Self {
             mpsc_senders: DashMap::new(),
             broadcast_sender,
             metrics,
-            scbs: Mutex::new(Some(scbs)),
+            scbs: Mutex::new(Some(tracker)),
             a2a_router: None,
             consent_gate: std::sync::OnceLock::new(),
             transparency_log: std::sync::OnceLock::new(),
@@ -330,7 +337,7 @@ impl Mailbox {
                         .map(|r| serde_json::to_value(&r.reason)
                             .unwrap_or_else(|_| serde_json::Value::String("serialization_error".into())))
                         .collect::<Vec<_>>(),
-                    "ruptured_at_ns": crate::capability::cap_tokens::monotonic_now_ns(),
+                    "ruptured_at_ns": maos_capability::cap_tokens::monotonic_now_ns(),
                 });
                 let _ = tl.insert_frame_event_with_sender(
                     super::transparency_log::FrameKind::ConsentRupture,
@@ -351,12 +358,12 @@ impl Mailbox {
                 original_kind: frame.kind,
                 accepted: accepted_recipients.clone(),
                 rejected: rejected_recipients,
-                ruptured_at_ns: crate::capability::cap_tokens::monotonic_now_ns(),
+                ruptured_at_ns: maos_capability::cap_tokens::monotonic_now_ns(),
             };
             let rupture_to: Vec<FrameAddress> = vec![frame.from.clone()];
             let rupture_frame = IacFrame {
                 frame_id: generate_correlation_id(),
-                timestamp_ns: crate::capability::cap_tokens::monotonic_now_ns(),
+                timestamp_ns: maos_capability::cap_tokens::monotonic_now_ns(),
                 logical_clock: 0,
                 from: FrameAddress {
                     spirit_id: SpiritId::from(KERNEL_SENDER_SPIRIT_ID),
@@ -414,7 +421,7 @@ impl Mailbox {
         // Phase 2: Deliver to same-host recipients FIRST (independent from
         // cross-host). Per D3: cross-host failures MUST NOT block same-host
         // delivery — these are separate concerns.
-        let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    let now_ns = maos_capability::cap_tokens::monotonic_now_ns();
 
         // Story 5.3 — update sender's last_progress_iac_ns for spirit-origin frames.
         if frame.auto_marker.is_spirit_origin() {
@@ -427,15 +434,9 @@ impl Mailbox {
                     .unwrap_or_else(|poison| poison.into_inner());
                 guard.as_ref().map(Arc::clone)
             };
-            if let Some(scbs) = scbs_handle {
-                if let Ok(scbs) = scbs.read() {
-                    let sender_spirit_id = frame.from.spirit_id.as_str();
-                    for (_, scb) in scbs.iter() {
-                        if scb.spirit_id == sender_spirit_id {
-                            scb.last_progress_iac_ns.store(now_ns, Ordering::Relaxed);
-                        }
-                    }
-                }
+            if let Some(tracker) = scbs_handle {
+                let sender_spirit_id = frame.from.spirit_id.as_str();
+                tracker.update_last_progress_iac(sender_spirit_id, now_ns);
             }
         }
 
@@ -451,23 +452,18 @@ impl Mailbox {
                 .get(&(spirit_id.clone(), kind))
                 .expect("validated in phase 1");
 
-            // Update last_inbound_frame_ns for the recipient SCB. Mutex guard
-            // is scoped to this block so the future remains `Send`.
-            let scbs_handle = {
+            // Update last_inbound_frame_ns for the recipient via the activity
+            // tracker trait. Mutex guard is scoped to this block so the future
+            // remains `Send`.
+            let tracker_handle = {
                 let guard = self
                     .scbs
                     .lock()
                     .unwrap_or_else(|poison| poison.into_inner());
                 guard.as_ref().map(Arc::clone)
             };
-            if let Some(scbs) = scbs_handle {
-                if let Ok(scbs) = scbs.read() {
-                    for (_, scb) in scbs.iter() {
-                        if scb.spirit_id == spirit_id {
-                            scb.last_inbound_frame_ns.store(now_ns, Ordering::Relaxed);
-                        }
-                    }
-                }
+            if let Some(tracker) = tracker_handle {
+                tracker.update_last_inbound_frame(&spirit_id, now_ns);
             }
 
             match sender.send(frame.clone()).await {
@@ -543,12 +539,12 @@ impl Mailbox {
         &self.metrics
     }
 
-    pub fn set_scbs(&self, scbs: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>) {
+    pub fn set_tracker(&self, tracker: Arc<dyn SpiritActivityTracker>) {
         let mut guard = self
             .scbs
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
-        *guard = Some(scbs);
+        *guard = Some(tracker);
     }
 }
 
@@ -810,7 +806,7 @@ mod tests {
 
         // Initialize the monotonic clock base (kernel-core's runtime
         // invariant; the production path initializes at composition root).
-        crate::capability::cap_tokens::init_monotonic_base();
+        maos_capability::cap_tokens::init_monotonic_base();
 
         struct StubRouter {
             calls: tokio::sync::Mutex<Vec<String>>,

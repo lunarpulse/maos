@@ -79,17 +79,8 @@ pub fn journal_halt_resolution(
     .map_err(|e| HaltJournalError::WriteFailed(e.to_string()))
 }
 
-impl HaltJournal for TransparencyLogAdapter {
-    fn journal_halt_resolution(
-        &self,
-        actor: &str,
-        spirit_id: &str,
-        halt_id: &HaltId,
-        resolution: &Resolution,
-    ) -> Result<(), HaltJournalError> {
-        journal_halt_resolution(self, actor, spirit_id, halt_id, resolution)
-    }
-}
+// Story 6.5 — HaltJournal impl moved to maos-iac/src/adapter/transparency_log.rs
+// per orphan rules (TransparencyLogAdapter is now in maos-iac).
 
 // ----- Story 4.1 — kernel-side halt mechanism (additive) -----
 

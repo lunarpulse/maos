@@ -60,6 +60,7 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
     let is_story_6_2 = matches!(story_arg, Some("6.2"));
     let is_story_6_3 = matches!(story_arg, Some("6.3"));
     let is_story_6_4 = matches!(story_arg, Some("6.4"));
+    let is_story_6_5 = matches!(story_arg, Some("6.5"));
     if is_story_6_2 {
         results.push(check_6_2_d_2_10());
         results.push(check_6_2_d_4());
@@ -94,6 +95,21 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
         results.push(check_6_4_framekind_baseline().map_err(|e| format!("6.4-FK error: {}", e))?);
         results.push(check_6_4_schedule_watchdog_baseline());
     }
+    if is_story_6_5 {
+        // 12 row classifications per Story 6.5 AC1.
+        results.push(check_6_5_a3_gate());
+        results.push(check_6_5_6_4_review_findings().map_err(|e| format!("6.5-6.4-RF error: {}", e))?);
+        results.push(check_6_5_6_3_p4_ci_targets().map_err(|e| format!("6.5-6.3-P4 error: {}", e))?);
+        results.push(check_6_5_6_4_smoke_arm());
+        results.push(check_6_5_6_4_framekind_shipped().map_err(|e| format!("6.5-6.4-FK error: {}", e))?);
+        results.push(check_6_5_a2_backfill_carry_forward().map_err(|e| format!("6.5-A2 error: {}", e))?);
+        results.push(check_6_5_iac_baseline().map_err(|e| format!("6.5-IAC error: {}", e))?);
+        results.push(check_6_5_manifest_baseline().map_err(|e| format!("6.5-MANIFEST error: {}", e))?);
+        results.push(check_6_5_gateway_baseline().map_err(|e| format!("6.5-GATEWAY error: {}", e))?);
+        results.push(check_6_5_uninstall_baseline().map_err(|e| format!("6.5-UNINSTALL error: {}", e))?);
+        results.push(check_6_5_kloc_ownership().map_err(|e| format!("6.5-KLOC error: {}", e))?);
+        results.push(check_6_5_review_findings_status().map_err(|e| format!("6.5-RF error: {}", e))?);
+    }
 
     // 6.1 rows: failure on any 6.1 row blocks the gate (legacy behavior).
     // 6.2 extension rows: only blocking_6_2 rows (D-2.10, D-4, A3 blocking) gate
@@ -102,7 +118,30 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
     // 6.3 extension rows: only blocking_6_3 rows gate. Per Story 6.3 AC1 §Bridge-Preconditions:
     //   blocking_6_3 = §A3/§A5/§A6 gates SHIPPED (existence). All other 6.3 rows are
     //   verify-only / carry-forward per the table.
-    let all_pass = if is_story_6_4 {
+    let all_pass = if is_story_6_5 {
+        // Story 6.5 spec: command exits 0 only if every `blocking_6_5` row has cleared.
+        // Blocking rows:
+        //   * 6.5-MAOS-IAC-BASELINE (canvas clean for extraction)
+        //   * 6.5-MAOS-MANIFEST-BASELINE (canvas clean for extraction)
+        //   * 6.5-GATEWAY-BASELINE (canvas clean for gateway trait)
+        //   * 6.5-UNINSTALL-BASELINE (uninstall surface exists for piggyback)
+        //   * 6.5-6.3-P4 (CI test-target verification — must PASS at HEAD)
+        // All other rows are verify-only / carry-forward per AC1.
+        results.iter().all(|r: &CheckResult| {
+            if matches!(
+                r.id.as_str(),
+                "6.5-IAC-BASELINE"
+                    | "6.5-MANIFEST-BASELINE"
+                    | "6.5-GATEWAY-BASELINE"
+                    | "6.5-UNINSTALL-BASELINE"
+                    | "6.5-6.3-P4"
+            ) {
+                r.passed
+            } else {
+                true // informational — never gates 6.5
+            }
+        })
+    } else if is_story_6_4 {
         // Story 6.4 spec: command exits 0 only if every `blocking_6_4` row has cleared.
         // Blocking rows:
         //   * 6.4-P4 (CI test-target verification — every Story 6.4 PR would otherwise fail CI)
@@ -1149,5 +1188,298 @@ fn check_6_4_schedule_watchdog_baseline() -> CheckResult {
             "blocking_6_4: schedule_watchdog.rs present={} mod declared={} → consistent={}",
             file_present, module_declared, consistent
         ),
+    }
+}
+
+// ─── Story 6.5 AC1 row classifiers ─────────────────────────────────────────────
+
+/// §A3 gate PASS at HEAD (verify): assert check_serde_error_handling exists and run it.
+fn check_6_5_a3_gate() -> CheckResult {
+    let id = "6.5-A3".to_string();
+    let xtask_exists = Path::new("xtask/src/check_serde_error_handling.rs").exists();
+    let pass = xtask_exists && run_xtask_gate("check-serde-error-handling");
+    CheckResult {
+        id,
+        passed: pass,
+        message: format!("verify: §A3 gate xtask={} run={} — zero new unwrap_or_default() on serde paths", xtask_exists, pass),
+    }
+}
+
+/// 6.4 Review Findings status — count `**open**` Critical/High rows in Story 6.4's Review Findings table.
+fn check_6_5_6_4_review_findings() -> Result<CheckResult, std::io::Error> {
+    let id = "6.5-6.4-RF".to_string();
+    match find_story_file("6-4") {
+        None => Ok(CheckResult {
+            id,
+            passed: true,
+            message: "verify-only: Story 6.4 file not found (does NOT block 6.5)".into(),
+        }),
+        Some(path) => {
+            let content = fs::read_to_string(&path)?;
+            let open_critical_high = content
+                .lines()
+                .filter(|line| {
+                    let lower = line.to_lowercase();
+                    (lower.contains("critical") || lower.contains("high"))
+                        && lower.contains("**open**")
+                })
+                .count();
+            Ok(CheckResult {
+                id,
+                passed: true,
+                message: format!("verify-only: Story 6.4 has {} open Critical/High findings (does NOT block 6.5)", open_critical_high),
+            })
+        }
+    }
+}
+
+/// 6.3-P4 CI test-target verification (must PASS at HEAD): every `cargo test -p maos-a2a --test <name>` invocation.
+fn check_6_5_6_3_p4_ci_targets() -> Result<CheckResult, std::io::Error> {
+    let id = "6.5-6.3-P4".to_string();
+    let path = ".github/workflows/discipline.yml";
+    if !Path::new(path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: ".github/workflows/discipline.yml not found".into(),
+        });
+    }
+    let content = fs::read_to_string(path)?;
+    let mut missing: Vec<String> = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("run: cargo test -p maos-a2a --test ") {
+            let test_name = rest.split_whitespace().next().unwrap_or("");
+            if test_name.is_empty() {
+                continue;
+            }
+            let target = format!("crates/maos-a2a/tests/{}.rs", test_name);
+            if !Path::new(&target).exists() {
+                missing.push(target);
+            }
+        }
+    }
+    if missing.is_empty() {
+        Ok(CheckResult {
+            id,
+            passed: true,
+            message: "blocking_6_5: 6.3-P4 — every a2a-loopback-corpus-v0 test target resolves".into(),
+        })
+    } else {
+        Ok(CheckResult {
+            id,
+            passed: false,
+            message: format!("blocking_6_5: 6.3-P4 — missing test targets: {}", missing.join(", ")),
+        })
+    }
+}
+
+/// 6.4-AC5 smoke arm verification — `smoke-schedule-6-4` arm shipped in main.rs.
+fn check_6_5_6_4_smoke_arm() -> CheckResult {
+    let id = "6.5-6.4-SMOKE".to_string();
+    let main_path = "crates/maos-bin/src/main.rs";
+    let present = if Path::new(main_path).exists() {
+        match fs::read_to_string(main_path) {
+            Ok(c) => c.contains("smoke-schedule-6-4"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    CheckResult {
+        id,
+        passed: present,
+        message: format!("verify: smoke-schedule-6-4 arm in main.rs present={} (does NOT block 6.5)", present),
+    }
+}
+
+/// 6.4-FRAMEKIND-SHIPPED — assert FrameKind::ConsentRupture=22 and RateLimited=23 are present.
+fn check_6_5_6_4_framekind_shipped() -> Result<CheckResult, std::io::Error> {
+    let id = "6.5-6.4-FRAMEKIND".to_string();
+    let path = "crates/maos-spirit-abi/src/identity.rs";
+    if !Path::new(path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "blocking_6_5: maos-spirit-abi identity.rs not found".into(),
+        });
+    }
+    let src = fs::read_to_string(path)?;
+    let has_consent_rupture = src.contains("ConsentRupture = 22");
+    let has_rate_limited = src.contains("RateLimited = 23");
+    let has_cli_output = src.contains("CliSubprocessOutput = 21");
+    Ok(CheckResult {
+        id,
+        passed: has_consent_rupture && has_rate_limited && has_cli_output,
+        message: format!(
+            "verify: CliSubprocessOutput=21 present={} ConsentRupture=22 present={} RateLimited=23 present={}",
+            has_cli_output, has_consent_rupture, has_rate_limited
+        ),
+    })
+}
+
+/// §A2 carry-forward — 5-story Review Findings backfill.
+fn check_6_5_a2_backfill_carry_forward() -> Result<CheckResult, std::io::Error> {
+    let id = "6.5-A2-BACKFILL".to_string();
+    let stories = ["5-1", "5-2", "5-4", "5-5a", "5-5b"];
+    let mut populated = 0;
+    let mut placeholder = 0;
+    for prefix in &stories {
+        if let Some(path) = find_story_file(prefix) {
+            let content = fs::read_to_string(&path)?;
+            if content.contains("### Review Findings") {
+                if content.contains("_No review findings._") {
+                    placeholder += 1;
+                } else {
+                    populated += 1;
+                }
+            }
+        }
+    }
+    Ok(CheckResult {
+        id,
+        passed: true,
+        message: format!("carry-forward: §A2 backfill — populated={}/5 placeholder={}/5 (does NOT block 6.5)", populated, placeholder),
+    })
+}
+
+/// 6.5-MAOS-IAC-BASELINE (blocking_6_5) — assert maos-iac/ does NOT yet exist and all 13 IAC source files exist.
+fn check_6_5_iac_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "6.5-IAC-BASELINE".to_string();
+    let maos_iac_exists = Path::new("crates/maos-iac").exists();
+    let expected_files = [
+        "crates/maos-kernel-core/src/iac/mailbox.rs",
+        "crates/maos-kernel-core/src/iac/mailbox_stub.rs",
+        "crates/maos-kernel-core/src/iac/mod.rs",
+        "crates/maos-kernel-core/src/iac/channels.rs",
+        "crates/maos-kernel-core/src/iac/transparency_log.rs",
+        "crates/maos-kernel-core/src/iac/frame.rs",
+        "crates/maos-kernel-core/src/iac/payload.rs",
+        "crates/maos-kernel-core/src/iac/distillate.rs",
+        "crates/maos-kernel-core/src/iac/orchestrator_dispatch.rs",
+        "crates/maos-kernel-core/src/iac/drr_scheduler.rs",
+        "crates/maos-kernel-core/src/iac/decision_logger.rs",
+        "crates/maos-kernel-core/src/iac/redaction.rs",
+        "crates/maos-kernel-core/src/iac/log_recall.rs",
+    ];
+    let all_present = expected_files.iter().all(|f| Path::new(f).exists());
+    let total_loc: usize = expected_files.iter()
+        .map(|f| fs::read_to_string(f).unwrap_or_default().lines().count())
+        .sum();
+    let passed = !maos_iac_exists && all_present;
+    Ok(CheckResult {
+        id,
+        passed,
+        message: format!("blocking_6_5: maos-iac exists={} (must be false) all_13_files={} total_loc={} → passed={}", maos_iac_exists, all_present, total_loc, passed),
+    })
+}
+
+/// 6.5-MAOS-MANIFEST-BASELINE (blocking_6_5) — assert maos-manifest/ does NOT yet exist and manifest.rs exists.
+fn check_6_5_manifest_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "6.5-MANIFEST-BASELINE".to_string();
+    let maos_manifest_exists = Path::new("crates/maos-manifest").exists();
+    let manifest_path = "crates/maos-kernel-core/src/security/manifest.rs";
+    let manifest_exists = Path::new(manifest_path).exists();
+    let loc = if manifest_exists { fs::read_to_string(manifest_path)?.lines().count() } else { 0 };
+    let passed = !maos_manifest_exists && manifest_exists;
+    Ok(CheckResult {
+        id,
+        passed,
+        message: format!("blocking_6_5: maos-manifest exists={} (must be false) manifest.rs exists={} loc={} → passed={}", maos_manifest_exists, manifest_exists, loc, passed),
+    })
+}
+
+/// 6.5-GATEWAY-BASELINE (blocking_6_5) — assert gateway surfaces are absent (canvas clean).
+fn check_6_5_gateway_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "6.5-GATEWAY-BASELINE".to_string();
+    let gateway_rs = Path::new("crates/maos-spirit-abi/src/gateway.rs").exists();
+    let dispatcher_rs = Path::new("crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs").exists();
+    let schema_json = Path::new("schemas/gateway-submodule.schema.json").exists();
+    let identity_path = "crates/maos-spirit-abi/src/identity.rs";
+    let has_gateway_inbound = if Path::new(identity_path).exists() {
+        fs::read_to_string(identity_path)?.contains("GatewayInbound")
+    } else { false };
+    let has_gateway_outbound = if Path::new(identity_path).exists() {
+        fs::read_to_string(identity_path)?.contains("GatewayOutbound")
+    } else { false };
+    let d24_free = if Path::new(identity_path).exists() {
+        !fs::read_to_string(identity_path)?.contains("= 24,")
+    } else { true };
+    let d25_free = if Path::new(identity_path).exists() {
+        !fs::read_to_string(identity_path)?.contains("= 25,")
+    } else { true };
+    let passed = !gateway_rs && !dispatcher_rs && !schema_json && !has_gateway_inbound && !has_gateway_outbound && d24_free && d25_free;
+    Ok(CheckResult {
+        id,
+        passed,
+        message: format!(
+            "blocking_6_5: gateway.rs={} dispatcher.rs={} schema.json={} GatewayInbound={} GatewayOutbound={} d24_free={} d25_free={} → passed={}",
+            gateway_rs, dispatcher_rs, schema_json, has_gateway_inbound, has_gateway_outbound, d24_free, d25_free, passed
+        ),
+    })
+}
+
+/// 6.5-UNINSTALL-BASELINE (blocking_6_5) — assert uninstall subcommand exists.
+fn check_6_5_uninstall_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "6.5-UNINSTALL-BASELINE".to_string();
+    let cli_src = "crates/maos-cli/src";
+    let mut has_uninstall = false;
+    if Path::new(cli_src).exists() {
+        for entry in fs::read_dir(cli_src)? {
+            let entry = entry?;
+            if entry.file_name().to_string_lossy().ends_with(".rs") {
+                let content = fs::read_to_string(entry.path())?;
+                if content.contains("Uninstall") || content.contains("uninstall") {
+                    has_uninstall = true;
+                    break;
+                }
+            }
+        }
+    }
+    Ok(CheckResult {
+        id,
+        passed: has_uninstall,
+        message: format!("blocking_6_5: uninstall subcommand present={} → {}", has_uninstall, if has_uninstall { "passed" } else { "MISSING — v0.5 stub piggyback target does not exist" }),
+    })
+}
+
+/// 6.5-PHASE-1-KLOC-OWNERSHIP (informational) — assert kloc.toml declares 6.5 ownership.
+fn check_6_5_kloc_ownership() -> Result<CheckResult, std::io::Error> {
+    let id = "6.5-KLOC-OWNERSHIP".to_string();
+    let kloc = fs::read_to_string("xtask/kloc.toml")?;
+    let has_phase_1 = kloc.contains("phase_1") && kloc.contains("maos-iac + maos-manifest") && kloc.contains("6.5");
+    Ok(CheckResult {
+        id,
+        passed: has_phase_1,
+        message: format!("informational: kloc.toml phase_1 ownership by 6.5={}", has_phase_1),
+    })
+}
+
+/// 6.5-RF-Review-Findings status (verify-only) — placeholder for own review findings at done transition.
+fn check_6_5_review_findings_status() -> Result<CheckResult, std::io::Error> {
+    let id = "6.5-RF-STATUS".to_string();
+    match find_story_file("6-5") {
+        None => Ok(CheckResult {
+            id,
+            passed: true,
+            message: "verify-only: Story 6.5 file not found (does NOT block 6.5)".into(),
+        }),
+        Some(path) => {
+            let content = fs::read_to_string(&path)?;
+            let has_review_section = content.contains("### Review Findings");
+            let open_critical_high = content
+                .lines()
+                .filter(|line| {
+                    let lower = line.to_lowercase();
+                    (lower.contains("critical") || lower.contains("high"))
+                        && lower.contains("**open**")
+                })
+                .count();
+            Ok(CheckResult {
+                id,
+                passed: true,
+                message: format!("verify-only: Story 6.5 Review Findings section={} open Critical/High={} (checked at done transition)", has_review_section, open_critical_high),
+            })
+        }
     }
 }

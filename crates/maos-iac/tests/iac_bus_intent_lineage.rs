@@ -16,8 +16,8 @@ use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::ports::IacBusPort;
-use maos_kernel_core::iac::{IacBusAdapter, Mailbox, TransparencyLogAdapter};
-use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
+use maos_iac::adapter::{IacBusAdapter, Mailbox, TransparencyLogAdapter};
+use maos_iac::adapter::IacRtMetrics;
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 use smallvec::smallvec;
 

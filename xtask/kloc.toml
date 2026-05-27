@@ -54,6 +54,9 @@ maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
 xtask = 4000
+# Story 6.5 — Phase 1 extraction
+maos-iac = 5500        # ~5,062 actual code lines (13 files extracted); ceiling updated per actual count
+maos-manifest = 3000   # ~2,500 target; pending extraction
 
 # Story 1a.1 — 13 new crate stubs
 maos-domain = 3000
