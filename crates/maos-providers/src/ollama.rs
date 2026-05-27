@@ -41,6 +41,12 @@ impl OllamaProvider {
 }
 
 impl Provider for OllamaProvider {
+    fn credential_fingerprint(&self) -> u64 {
+        // Ollama has no api_key; hash the endpoint_url so per-instance
+        // isolation still applies if the operator runs two Ollama servers.
+        crate::rate_limit::fingerprint_credential(&self.endpoint_url)
+    }
+
     fn complete(&self, req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
         let body = build_ollama_request_body(req, &self.model_id);
         let body_bytes =

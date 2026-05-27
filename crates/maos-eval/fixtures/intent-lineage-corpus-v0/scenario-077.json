@@ -1,0 +1,13 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_consent_rupture-077",
+  "class": "lineage_chain_uninterrupted",
+  "description": "Story 6.4 — ADR-034 binding-v0.9 ConsentRupture frame inherits originating intent from the ruptured cross-Spirit frame. Rupture emission is a derived re-emission per architecture §7.3.2; the SAME lineage chain attaches to the rupture frame the kernel sends to the sender.",
+  "originating_intent": "consent-fractured-intent-077",
+  "hop_count": 1,
+  "origin": "human_authored",
+  "secondary_intent": null,
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": ["consent-fractured-intent-077"]
+  }
+}

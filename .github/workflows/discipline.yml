@@ -909,6 +909,8 @@ jobs:
         run: cargo run -p xtask -- check-epic-6-bridge --story 6.2 --json
       - name: Run check-epic-6-bridge --story 6.3
         run: cargo run -p xtask -- check-epic-6-bridge --story 6.3 --json
+      - name: Run check-epic-6-bridge --story 6.4
+        run: cargo run -p xtask -- check-epic-6-bridge --story 6.4 --json
 
   # Story 6.1 — retract corpus integration tests (AC2)
   retract-corpus-tests:
@@ -1076,9 +1078,91 @@ jobs:
       - name: Run intent_lineage_corpus_load
         run: cargo test -p maos-eval --test intent_lineage_corpus_load --locked
 
+  # Story 6.4 AC5 — end-to-end wedge demo: ScheduleWatchdog firing + rate-limit cap +
+  # ConsentRupture detection + RateLimited frame emission.
+  smoke-schedule-6-4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build maos-bin
+        run: cargo build -p maos-bin --release --features fixture_replay
+      - name: Run smoke-schedule-6-4
+        env:
+          MAOS_ONE_SHOT: smoke-schedule-6-4
+          MAOS_SCHEDULE_FAST: "1"
+        run: ./target/release/maos-bin
+
+  # Story 6.4 AC2 — FR26 / ADR-025 schedule firing corpus (8 integration tests).
+  fr26-schedule-firing-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run schedule_watchdog_fr26 integration tests
+        run: cargo test -p maos-kernel-core --features fixture_replay --test schedule_watchdog_fr26 --locked
+
+  # Story 6.4 AC3 — ADR-034 binding-v0.9 ConsentRupture corpus (11 integration tests).
+  adr-034-consent-rupture-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run consent_rupture_adr_034 integration tests
+        run: cargo test -p maos-kernel-core --features fixture_replay --test consent_rupture_adr_034 --locked
+
+  # Story 6.4 AC4 — NFR-Scale-4 per-(provider, credential) bucket isolation (8 integration tests).
+  nfr-scale-4-rate-limit-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run rate_limit_isolation_nfr_scale_4 integration tests
+        run: cargo test -p maos-providers --test rate_limit_isolation_nfr_scale_4 --locked
+
+  # Story 6.4 Task 6 — lineage corpus extends to 100 scenarios with three
+  # new lineage classes (consent_rupture / rate_limited / on_schedule).
+  intent-lineage-6-4-extension:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run intent_lineage_corpus_load (100-scenario corpus)
+        run: cargo test -p maos-eval --test intent_lineage_corpus_load --locked
+
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension]
     if: always()
     permissions:
       pull-requests: write

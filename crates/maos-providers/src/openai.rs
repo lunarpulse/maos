@@ -63,6 +63,10 @@ impl OpenAiProvider {
 }
 
 impl Provider for OpenAiProvider {
+    fn credential_fingerprint(&self) -> u64 {
+        crate::rate_limit::fingerprint_credential(&self.api_key)
+    }
+
     fn complete(&self, req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
         let body = build_openai_request_body(req, &self.model_id);
         let body_bytes =

@@ -332,12 +332,17 @@ enum Commands {
     /// §A2 backfill carry-forward, 6.2 RF count, smoke-iac-bus chain, maos-a2a
     /// baseline). When `--story 6.X` is set, blocking_6_X rows must clear before
     /// the command exits 0.
+    /// Story 6.4 AC1 — extended with `--story 6.4` flag adding 10 6.4-specific
+    /// row classifications (§A3/§A5/§A6 gate-exists, 6.3 smoke-arm, 6.3-P4 CI
+    /// test-target verification, 6.3 RF count, DRR carry-forward, cli_wrapper
+    /// bench carry-forward, §A2 backfill carry-forward, maos-providers baseline,
+    /// FrameKind baseline, ScheduleWatchdog baseline).
     #[command(name = "check-epic-6-bridge")]
     CheckEpic6Bridge {
         #[arg(long)]
         json: bool,
-        /// Story scope — "6.2" extends with Story 6.2 rows; "6.3" extends with
-        /// Story 6.3 rows. Unset = Story 6.1 legacy 9-check semantics.
+        /// Story scope — "6.2" / "6.3" / "6.4" extends with the story-specific
+        /// rows. Unset = Story 6.1 legacy 9-check semantics.
         #[arg(long)]
         story: Option<String>,
     },

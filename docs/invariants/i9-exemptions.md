@@ -375,3 +375,28 @@ cache is bounded by `MAX_LINEAGE_CACHE_ENTRIES = 4096` (sized for ~5min of
 10-tasks/sec sustained throughput); entries are never explicitly removed but
 new inserts skip the cache once the cap is reached (long-tail eviction is
 observable in retract continuity). NFR-Aud-14 corpus PASSES on the cache window.
+
+### `ScheduleWatchdog` — `crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs`
+
+**Reason:** per-Spirit schedule firing watchdog (Story 6.4 / FR26 / ADR-025).
+Holds two `DashMap` entries:
+
+* `rate_limits: DashMap<(String, String), Arc<ScheduleBucket>>` — per-schedule
+  token buckets for `rate_limit_per_hour` enforcement. Transient per-process;
+  bucket lifetime matches the Spirit's manifest declaration. No persistence.
+* `last_fire_ns: DashMap<(u32, String), u64>` — last-fire timestamp per
+  `(spirit_pid, schedule_id)`. Used to honor cadence intervals between fires.
+  Transient per-process; entries are scoped to active Spirit PIDs.
+
+Both maps are bounded by `active_spirit_count × declared_schedule_count` (≤ a
+few hundred entries in practice). The watchdog itself is dropped on graceful
+shutdown via the same `CancellationToken` pattern as `IdleWatchdog`.
+
+### `ScheduleBucket` — `crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs`
+
+**Reason:** per-schedule rate-limit token bucket (Story 6.4 / FR26 / ADR-025).
+The `AtomicU64 last_refill_ns` carries the monotonic timestamp of the last
+refill; the `parking_lot::Mutex<f64> tokens` carries the current token balance.
+Both fields are transient per-process state OWNED by the
+`ScheduleWatchdog::rate_limits` DashMap (already I9-exempt). Bucket lifetime
+matches its parent watchdog; entries drop on Spirit unload. No persistence.

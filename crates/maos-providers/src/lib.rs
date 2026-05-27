@@ -9,12 +9,17 @@ pub mod anthropic;
 pub mod openai;
 pub mod ollama;
 pub mod provider;
+pub mod rate_limit; // Story 6.4 / NFR-Scale-4
 pub mod fixture_replay;
 
 pub use anthropic::AnthropicProvider;
 pub use openai::OpenAiProvider;
 pub use ollama::OllamaProvider;
 pub use provider::{Provider, ProviderError};
+pub use rate_limit::{
+    fingerprint_credential, BucketKey, BucketSnapshot, ProviderQuota, ProviderRateLimitConfig,
+    ProviderRateLimiter, RetryAfter, TokenBucket,
+};
 
 /// The epic spec refers to `ProviderDriver`; the canonical name in this crate
 /// is `Provider` (introduced at Story 1b.4). They are the same trait; the

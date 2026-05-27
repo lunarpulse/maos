@@ -80,6 +80,10 @@ pub enum FrameKind {
     /// Story 6.2 AC6 — FR52: a line of stdout/stderr captured from a
     /// CliWrapperSpirit's invoked CLI subprocess.
     CliSubprocessOutput = 21,
+    /// Story 6.4 — ADR-034 binding-v0.9: partial-consent rupture event.
+    ConsentRupture = 22,
+    /// Story 6.4 — NFR-Scale-4: per-(provider, credential) bucket-exhaustion event.
+    RateLimited = 23,
 }
 
 impl FrameKind {
@@ -108,6 +112,8 @@ impl FrameKind {
             19 => Some(Self::SpiritAdmitted),
             20 => Some(Self::RegistryYank),
             21 => Some(Self::CliSubprocessOutput),
+            22 => Some(Self::ConsentRupture),
+            23 => Some(Self::RateLimited),
             _ => None,
         }
     }

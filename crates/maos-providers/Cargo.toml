@@ -12,6 +12,15 @@ maos-domain = { path = "../maos-domain" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
+# Story 6.4 / NFR-Scale-4 — per-(provider, credential) rate-limit substrate.
+# `dashmap` for lock-free bucket map; `sha2` for credential fingerprinting.
+# Both are workspace-pinned in kernel-core already; NO new transitive
+# protocol-layer deps (FR47 verified via `cargo tree -p maos-providers`).
+dashmap = "6.1"
+sha2 = "0.10"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time", "test-util"] }
 
 [features]
 default = []

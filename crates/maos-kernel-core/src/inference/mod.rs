@@ -40,6 +40,12 @@ pub struct InferencePortAdapter {
     capabilities: Arc<CapabilityRegistryAdapter>,
     transparency_log: Arc<TransparencyLogAdapter>,
     telemetry: Arc<IacRtMetrics>,
+    /// Story 6.4 / NFR-Scale-4 — per-(provider, credential) rate-limit
+    /// substrate. `None` preserves the v0.4 path (no rate-limit gating).
+    rate_limiter: Option<Arc<maos_providers::ProviderRateLimiter>>,
+    /// Story 6.4 — IacBusAdapter handle for `RateLimited` frame emission.
+    /// `None` => router returns the synchronous error but emits no frame.
+    iac: Option<Arc<crate::iac::IacBusAdapter>>,
 }
 
 impl InferencePortAdapter {
@@ -55,7 +61,152 @@ impl InferencePortAdapter {
             capabilities,
             transparency_log,
             telemetry,
+            rate_limiter: None,
+            iac: None,
         }
+    }
+
+    /// Story 6.4 — install the per-(provider, credential) rate-limit
+    /// substrate.
+    pub fn with_rate_limiter(
+        mut self,
+        rate_limiter: Arc<maos_providers::ProviderRateLimiter>,
+    ) -> Self {
+        self.rate_limiter = Some(rate_limiter);
+        self
+    }
+
+    /// Story 6.4 — install the IacBusAdapter for `RateLimited` frame emission.
+    pub fn with_iac(mut self, iac: Arc<crate::iac::IacBusAdapter>) -> Self {
+        self.iac = Some(iac);
+        self
+    }
+
+    /// Compute the cross-credential isolation key for a given provider id.
+    /// Returns `None` only when the rate-limiter is not configured; unknown
+    /// providers are rejected with `InferenceError::Unconfigured` to fail
+    /// closed (Story 6.4 review fix — never bypass rate-limit for unknown
+    /// providers).
+    fn bucket_key(
+        &self,
+        provider_id: &str,
+    ) -> Result<Option<maos_providers::BucketKey>, InferenceError> {
+        // Intern the provider id into the static set.
+        let interned: &'static str = match provider_id {
+            "anthropic" => "anthropic",
+            "openai" => "openai",
+            "ollama" => "ollama",
+            _ => return Err(InferenceError::Unconfigured),
+        };
+        // Recover the driver to read its credential_fingerprint.
+        let driver = self.router.dispatch(Some(interned))
+            .map_err(|e| InferenceError::ProviderTransport(e.to_string()))?;
+        let fp = driver.credential_fingerprint();
+        Ok(Some(maos_providers::BucketKey::new(interned, fp)))
+    }
+
+    /// Build an `IntentLineage` for the `RateLimited` frame from the
+    /// invocation context. At v0.5 the lineage is anchored to the
+    /// provider-inference intent since the original frame lineage is not
+    /// threaded through `InferenceRequest` (architecture gap).
+    fn build_rate_limit_lineage(
+        &self,
+        provider_id: &str,
+    ) -> maos_domain::invariants::i13::IntentLineage {
+        use maos_domain::invariants::i8::A2AIntent;
+        maos_domain::invariants::i13::IntentLineage::new(vec![
+            A2AIntent::new(format!("infer:{}", provider_id)),
+        ])
+    }
+
+    /// Story 6.4 — emit a typed `RateLimited` IAC frame to the invoking
+    /// Spirit. Synchronous delivery attempt; logs failure but does not block
+    /// the inference error return path.
+    fn emit_rate_limited_frame(
+        &self,
+        invoking_spirit_id: &str,
+        provider_id: &str,
+        credential_fp: u64,
+        retry_after_ms: u64,
+        bucket_remaining: u32,
+        bucket_capacity: u32,
+        refill_per_sec: u32,
+        intent_lineage: maos_domain::invariants::i13::IntentLineage,
+    ) {
+        let Some(iac) = &self.iac else { return };
+        let payload = maos_domain::frame::RateLimitedPayload {
+            provider_id: provider_id.into(),
+            credential_fingerprint_prefix_hex: format!("{:016x}", credential_fp),
+            retry_after_ms,
+            bucket_remaining,
+            bucket_capacity,
+            refill_per_sec,
+            schedule_id: None,
+        };
+        let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+        let mut frame_id = [0u8; 16];
+        frame_id[..8].copy_from_slice(&now_ns.to_le_bytes());
+        frame_id[8..12].copy_from_slice(&(std::process::id() as u32).to_le_bytes());
+        // Use a thread-local counter for the remaining 4 bytes to avoid collisions.
+        std::thread_local! {
+            static COUNTER: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+        }
+        let seq = COUNTER.with(|c| {
+            let n = c.get().wrapping_add(1);
+            c.set(n);
+            n
+        });
+        frame_id[12..].copy_from_slice(&seq.to_le_bytes());
+
+        let frame = maos_domain::frame::IacFrame {
+            frame_id,
+            timestamp_ns: now_ns,
+            logical_clock: 0,
+            from: maos_domain::frame::FrameAddress {
+                spirit_id: maos_spirit_abi::identity::SpiritId::from(
+                    crate::iac::mailbox::KERNEL_SENDER_SPIRIT_ID,
+                ),
+                host_id: None,
+                role: None,
+            },
+            to: {
+                let mut v: Vec<maos_domain::frame::FrameAddress> = Vec::new();
+                v.push(maos_domain::frame::FrameAddress {
+                    spirit_id: maos_spirit_abi::identity::SpiritId::from(invoking_spirit_id),
+                    host_id: None,
+                    role: None,
+                });
+                v.into()
+            },
+            kind: maos_spirit_abi::identity::FrameKind::RateLimited,
+            intent: maos_domain::invariants::i1::IntentClass::Standard,
+            payload: maos_domain::frame::FramePayload::RateLimited(payload),
+            auto_marker: FrameOrigin::Kernel,
+            consent_envelope: None,
+            intent_lineage,
+        };
+        let iac = Arc::clone(iac);
+        // Best-effort synchronous delivery on the current runtime. If the
+        // runtime is shutting down, the frame may be dropped — the
+        // synchronous InferenceError::RateLimited is the primary contract.
+        let _ = iac.deliver_typed(frame);
+    }
+
+    /// Parse `retry-after` value from provider response body. Accepts
+    /// integer seconds or a floating-point string. Returns `None` if
+    /// the header/value is absent or unparseable.
+    fn parse_retry_after_ms(body: &str) -> Option<u64> {
+        // The provider response body may contain a `retry-after` header
+        // value forwarded by the provider driver. We try to parse it as
+        // seconds first, then as a float.
+        let trimmed = body.trim();
+        if let Ok(secs) = trimmed.parse::<u64>() {
+            return Some(secs * 1000);
+        }
+        if let Ok(secs_f) = trimmed.parse::<f64>() {
+            return Some((secs_f * 1000.0) as u64);
+        }
+        None
     }
 
     /// Access the capability registry as a `TokenIssuer` (for bench/test
@@ -107,35 +258,77 @@ impl InferencePort for InferencePortAdapter {
 
         self.check_capability(&req.capability_token, provider_id)?;
 
+        // Story 6.4 / NFR-Scale-4 — consult the per-(provider, credential)
+        // token bucket BEFORE dispatching to the provider. On exhaustion,
+        // emit the typed `RateLimited` IAC frame to the invoking Spirit AND
+        // return `InferenceError::RateLimited { retry_after_ms }` SYNCHRONOUSLY.
+        if let Some(rate_limiter) = &self.rate_limiter {
+            let key = self.bucket_key(provider_id)?;
+            if let Some(key) = key {
+                if let Err(retry) = rate_limiter.try_consume(key) {
+                    let invoking_spirit_id = format!("spirit:{}", req.spirit_pid);
+                    let lineage = self.build_rate_limit_lineage(provider_id);
+                    self.emit_rate_limited_frame(
+                        &invoking_spirit_id,
+                        provider_id,
+                        key.credential_fingerprint,
+                        retry.retry_after_ms,
+                        retry.snapshot.remaining,
+                        retry.snapshot.capacity,
+                        retry.snapshot.refill_per_sec,
+                        lineage,
+                    );
+                    return Err(InferenceError::RateLimited {
+                        retry_after_ms: retry.retry_after_ms,
+                    });
+                }
+            }
+        }
+
         let _inflight = self.telemetry.inflight(Service::Capability);
 
         let start = std::time::Instant::now();
-        let result = if req.fallback_provider_ids.is_empty() {
+        let provider_result = if req.fallback_provider_ids.is_empty() {
             let driver = self.router.dispatch(Some(provider_id)).map_err(|e| {
                 InferenceError::ProviderTransport(e.to_string())
             })?;
-            driver.complete(&req).map_err(|e| match e {
-                ProviderError::Transport(msg) => InferenceError::ProviderTransport(msg),
-                ProviderError::ProviderRejected { status, body } => InferenceError::ProviderRejected {
-                    status,
-                    message: body,
-                },
-                ProviderError::Serde(msg) => InferenceError::MalformedResponse(msg),
-                ProviderError::Unconfigured => InferenceError::Unconfigured,
-            })
+            driver.complete(&req)
         } else {
             self.router
                 .dispatch_with_fallback(provider_id, &req.fallback_provider_ids, &req)
-                .map_err(|e| match e {
-                    ProviderError::Transport(msg) => InferenceError::ProviderTransport(msg),
-                    ProviderError::ProviderRejected { status, body } => InferenceError::ProviderRejected {
-                        status,
-                        message: body,
-                    },
-                    ProviderError::Serde(msg) => InferenceError::MalformedResponse(msg),
-                    ProviderError::Unconfigured => InferenceError::Unconfigured,
-                })
         };
+
+        // Story 6.4 / AC4 — provider-side HTTP 429 maps to RateLimited frame
+        // + error (does NOT double-decrement the bucket).
+        if let Err(ProviderError::ProviderRejected { status, body }) = &provider_result {
+            if *status == 429 {
+                let retry_after_ms = Self::parse_retry_after_ms(body)
+                    .unwrap_or(5000);
+                let invoking_spirit_id = format!("spirit:{}", req.spirit_pid);
+                let lineage = self.build_rate_limit_lineage(provider_id);
+                self.emit_rate_limited_frame(
+                    &invoking_spirit_id,
+                    provider_id,
+                    0, // credential fingerprint unavailable post-call
+                    retry_after_ms,
+                    0,
+                    0,
+                    0,
+                    lineage,
+                );
+                return Err(InferenceError::RateLimited { retry_after_ms });
+            }
+        }
+
+        let result = provider_result.map_err(|e| match e {
+            ProviderError::Transport(msg) => InferenceError::ProviderTransport(msg),
+            ProviderError::ProviderRejected { status, body } => InferenceError::ProviderRejected {
+                status,
+                message: body,
+            },
+            ProviderError::Serde(msg) => InferenceError::MalformedResponse(msg),
+            ProviderError::Unconfigured => InferenceError::Unconfigured,
+        });
         let duration_us = start.elapsed().as_micros() as u64;
 
         let actual_provider = result.as_ref().map(|r| r.provider_attribution.provider_id.as_str()).unwrap_or("unknown");

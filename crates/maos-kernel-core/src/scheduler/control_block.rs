@@ -15,7 +15,8 @@ use maos_spirit_abi::lifecycle::Spirit;
 use std::sync::Mutex;
 
 use crate::security::manifest::{
-    ClassSection, LifecycleSection, OnCrashSection, SchedulingSection, SupervisionSection,
+    ClassSection, LifecycleSection, OnCrashSection, SchedulesSection, SchedulingSection,
+    SupervisionSection,
 };
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::task::TaskAssignmentRecord;
@@ -203,6 +204,9 @@ pub struct SpiritManifestBundle {
     pub on_crash: Option<OnCrashSection>,
     pub on_revocation: Option<crate::security::manifest::OnRevocationSection>,
     pub supervision: Option<SupervisionSection>,
+    /// Story 6.4 / FR26 — `[[schedule]]` entries declared at admission.
+    /// Defaults to the empty section (no scheduled invocations).
+    pub schedules: SchedulesSection,
 }
 
 impl Default for SpiritManifestBundle {
@@ -217,6 +221,7 @@ impl Default for SpiritManifestBundle {
             on_crash: None,
             on_revocation: None,
             supervision: None,
+            schedules: SchedulesSection::default(),
         }
     }
 }

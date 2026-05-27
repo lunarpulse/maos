@@ -32,6 +32,17 @@ pub enum FrameKind {
     ///   line: String, line_no: u64 }`. The row carries `intent_lineage`
     /// inherited from the invoking Spirit's session-originating intent.
     CliSubprocessOutput = 21,
+    /// Story 6.4 — ADR-034 binding-v0.9. Sender-approved / receiver-rejected
+    /// mid-frame becomes a `ConsentRupture` event; the original frame is
+    /// quarantined for the rejected slice and DELIVERED to the accepted slice;
+    /// the sender's mailbox receives a typed ConsentRupture frame so the
+    /// application can decide retry/escalate/halt.
+    ConsentRupture = 22,
+    /// Story 6.4 — NFR-Scale-4. Per-(provider, credential) token bucket
+    /// exhaustion emits this typed frame to the invoking Spirit. The frame
+    /// is NOT a stalled call; the inference router returns
+    /// `InferenceError::RateLimited { retry_after_ms }` simultaneously.
+    RateLimited = 23,
 }
 
 impl FrameKind {
@@ -48,6 +59,8 @@ impl FrameKind {
             8 => Some(Self::SandboxBlock),
             9 => Some(Self::InferenceCall),
             21 => Some(Self::CliSubprocessOutput),
+            22 => Some(Self::ConsentRupture),
+            23 => Some(Self::RateLimited),
             _ => None,
         }
     }

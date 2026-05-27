@@ -90,7 +90,7 @@ tempfile = "3"
 # Story 6.3 — needed for the cross-host router stub in mailbox tests.
 async-trait = "0.1"
 criterion = "0.5"
-tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time", "test-util"] }
 # Story 5.1 review backfill — `mock` feature enabled for tests only.
 maos-spirit-abi = { path = "../maos-spirit-abi", features = ["mock"] }
 maos-spirit-hello = { path = "../maos-spirit-hello" }

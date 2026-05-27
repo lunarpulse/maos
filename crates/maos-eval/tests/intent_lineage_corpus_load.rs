@@ -73,3 +73,62 @@ fn story_6_3_a2a_scenarios_assert_accept_with_non_empty_lineage() {
         );
     }
 }
+
+/// Story 6.4 Task 6 — confirm the lineage corpus extends to 100 scenarios
+/// with three new lineage-class buckets (consent_rupture / rate_limited /
+/// on_schedule).
+#[test]
+fn story_6_4_lineage_corpus_extends_to_100_scenarios() {
+    let dir = corpus_dir();
+    let corpus = IntentLineageCorpus::load_from(&dir).expect("corpus load");
+    assert!(
+        corpus.len() >= 100,
+        "expected at least 100 scenarios; got {}",
+        corpus.len()
+    );
+
+    let consent_rupture_count = corpus
+        .scenarios
+        .iter()
+        .filter(|s| s.scenario_id.contains("lineage_via_consent_rupture"))
+        .count();
+    let rate_limited_count = corpus
+        .scenarios
+        .iter()
+        .filter(|s| s.scenario_id.contains("lineage_via_rate_limited"))
+        .count();
+    let on_schedule_count = corpus
+        .scenarios
+        .iter()
+        .filter(|s| s.scenario_id.contains("lineage_via_on_schedule"))
+        .count();
+    assert_eq!(
+        consent_rupture_count, 10,
+        "expected 10 lineage_via_consent_rupture scenarios"
+    );
+    assert_eq!(
+        rate_limited_count, 10,
+        "expected 10 lineage_via_rate_limited scenarios"
+    );
+    assert_eq!(
+        on_schedule_count, 10,
+        "expected 10 lineage_via_on_schedule scenarios"
+    );
+}
+
+#[test]
+fn story_6_4_new_scenarios_use_existing_class() {
+    let corpus = IntentLineageCorpus::load_from(&corpus_dir()).expect("load");
+    for s in corpus.scenarios.iter().filter(|s| {
+        s.scenario_id.contains("lineage_via_consent_rupture")
+            || s.scenario_id.contains("lineage_via_rate_limited")
+            || s.scenario_id.contains("lineage_via_on_schedule")
+    }) {
+        assert_eq!(
+            s.class,
+            IntentLineageClass::LineageChainUninterrupted,
+            "{}: must use LineageChainUninterrupted class",
+            s.scenario_id
+        );
+    }
+}

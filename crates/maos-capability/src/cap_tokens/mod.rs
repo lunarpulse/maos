@@ -306,6 +306,13 @@ impl CapTokensShardRing {
         count
     }
 
+    /// Return `true` if the given `spirit_pid` holds at least one
+    /// non-revoked, non-expired token across any shard. Used by the
+    /// ScheduleWatchdog principal-revocability gate (Story 6.4).
+    pub fn has_active_tokens_for_spirit(&self, spirit_pid: u32) -> bool {
+        self.shards.iter().any(|shard| shard.has_active_tokens_for_spirit(spirit_pid))
+    }
+
     /// Debug introspection: list all active (non-revoked) token IDs
     /// across all shards. Gated behind test cfg.
     #[cfg(any(test, feature = "test-introspection"))]

@@ -1,0 +1,13 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_on_schedule-095",
+  "class": "lineage_chain_uninterrupted",
+  "description": "Story 6.4 — FR26/ADR-025 on_schedule firing originates a NEW lineage chain anchored to the schedule_id. The operator-managed scheduling lets the audit surface attribute scheduled work to its declared cadence.",
+  "originating_intent": "schedule-fire-095",
+  "hop_count": 0,
+  "origin": "kernel",
+  "secondary_intent": null,
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": ["schedule-fire-095"]
+  }
+}

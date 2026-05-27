@@ -1182,10 +1182,13 @@ version = "0.1.0-alpha"
 name = "maos-providers"
 version = "0.1.0-alpha"
 dependencies = [
+ "dashmap",
  "maos-domain",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]

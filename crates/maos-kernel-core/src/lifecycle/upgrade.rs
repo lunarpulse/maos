@@ -390,6 +390,21 @@ fn load_bundle_from_file(
         .map(|s| SupervisionSection::from_toml_str(&s))
         .transpose()?;
 
+    // Story 6.4 — `[[schedule]]` array-of-tables. The raw section parser
+    // reads the array under the `schedule` key; we synthesize a doc that
+    // mirrors that shape so the existing from_toml_str surface works.
+    let schedules = match root.get("schedule") {
+        None => SchedulesSection::default(),
+        Some(value) => {
+            // Wrap the array under `schedule = [...]` for the raw parser.
+            let mut wrapper = toml::value::Table::new();
+            wrapper.insert("schedule".into(), value.clone());
+            let wrapper_str = toml::to_string(&toml::Value::Table(wrapper))
+                .map_err(|e| ManifestError::Toml(format!("serialize [[schedule]]: {e}")))?;
+            SchedulesSection::from_toml_str(&wrapper_str)?
+        }
+    };
+
     Ok(SpiritManifestBundle {
         scheduling,
         lifecycle,
@@ -400,5 +415,6 @@ fn load_bundle_from_file(
         on_crash,
         on_revocation,
         supervision,
+        schedules,
     })
 }

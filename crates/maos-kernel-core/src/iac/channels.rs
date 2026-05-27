@@ -28,6 +28,12 @@ pub const CHANNEL_CLASSES: &[(FrameKind, ChannelClass, usize)] = &[
     (FrameKind::TelemetryEvent, ChannelClass::Broadcast, 256),
     (FrameKind::ConsentRequest, ChannelClass::Mpsc, 32),
     (FrameKind::Retract, ChannelClass::Mpsc, 32),
+    // Story 6.4 — ADR-034 binding-v0.9: partial-consent failure event.
+    // §7.1.1 cardinality matches `consent.request` (1:1 sender ← bus).
+    (FrameKind::ConsentRupture, ChannelClass::Mpsc, 32),
+    // Story 6.4 — NFR-Scale-4: per-(provider, credential) rate-limit event.
+    // §7.1.1 cardinality matches `consent.request` (1:1 sender ← bus).
+    (FrameKind::RateLimited, ChannelClass::Mpsc, 32),
 ];
 
 /// Look up the channel class and capacity floor for a given frame kind.
@@ -63,6 +69,8 @@ mod tests {
             (FrameKind::TelemetryEvent, ChannelClass::Broadcast, 256),
             (FrameKind::ConsentRequest, ChannelClass::Mpsc, 32),
             (FrameKind::Retract, ChannelClass::Mpsc, 32),
+            (FrameKind::ConsentRupture, ChannelClass::Mpsc, 32),
+            (FrameKind::RateLimited, ChannelClass::Mpsc, 32),
         ];
 
         assert_eq!(
@@ -131,6 +139,8 @@ mod tests {
             FrameKind::TelemetryEvent,
             FrameKind::ConsentRequest,
             FrameKind::Retract,
+            FrameKind::ConsentRupture,
+            FrameKind::RateLimited,
         ] {
             assert!(
                 channel_class_for(*kind).is_some(),

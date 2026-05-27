@@ -23,7 +23,9 @@ use std::sync::{Arc, Mutex, RwLock};
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc};
 
-use maos_domain::frame::IacFrame;
+use maos_domain::frame::{
+    ConsentRupturePayload, FrameAddress, FramePayload, IacFrame, RuptureReason, RuptureRejection,
+};
 use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i2::LogBeforeDeliver;
 use maos_domain::invariants::i3::FrameOrigin;
@@ -32,8 +34,75 @@ use maos_domain::ports::IacBusPort;
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 
 use super::channels::{channel_class_for, ChannelClass};
+use super::transparency_log::TransparencyLogAdapter;
 use crate::scheduler::control_block::SpiritControlBlock;
 use crate::telemetry::iac_rt::IacRtMetrics;
+
+/// Story 6.4 / ADR-034 binding-v0.9 — per-recipient consent gate hook.
+///
+/// Returns `Err(RuptureReason)` to reject a recipient (its slice quarantined);
+/// returns `Ok(())` to accept. Default implementation is "accept all" so
+/// existing flows are unchanged. Tests + production wiring install custom
+/// gates via `Mailbox::with_consent_gate`.
+pub trait ConsentGate: Send + Sync {
+    fn evaluate(&self, frame: &IacFrame, recipient: &FrameAddress) -> Result<(), RuptureReason>;
+}
+
+/// Kernel-internal sender identity for ConsentRupture emission. Reserved
+/// so that a recipient's "ConsentRupture from kernel" frame is exempt from
+/// the per-recipient consent check (recursion floor).
+pub(crate) const KERNEL_SENDER_SPIRIT_ID: &str = "__kernel";
+
+/// Generate a 16-byte correlation ID suitable for in-memory frame
+/// correlation. Uses monotonic time + thread-local counter + PID to
+/// avoid collisions on rapid consecutive calls (Story 6.4 review fix).
+/// Not cryptographically random; the kernel never persists these
+/// beyond a session.
+fn generate_correlation_id() -> [u8; 16] {
+    use std::cell::Cell;
+    thread_local! {
+        static COUNTER: Cell<u64> = const { Cell::new(0) };
+    }
+    let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    let pid = std::process::id() as u64;
+    let seq = COUNTER.with(|c| {
+        let n = c.get().wrapping_add(1);
+        c.set(n);
+        n
+    });
+    let mut out = [0u8; 16];
+    out[..8].copy_from_slice(&now_ns.to_le_bytes());
+    out[8..12].copy_from_slice(&(pid as u32).to_le_bytes());
+    out[12..].copy_from_slice(&(seq as u32).to_le_bytes());
+    out
+}
+
+/// Generate a ULID-like 16-byte identifier for ConsentRupture frames.
+/// 48 bits = timestamp (ms since Unix epoch), 80 bits = counter+pid entropy.
+/// Lexicographically sortable by time; sufficient for correlation.
+fn generate_rupture_id() -> [u8; 16] {
+    use std::cell::Cell;
+    thread_local! {
+        static COUNTER: Cell<u64> = const { Cell::new(0) };
+    }
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let pid = std::process::id() as u64;
+    let seq = COUNTER.with(|c| {
+        let n = c.get().wrapping_add(1);
+        c.set(n);
+        n
+    });
+    let mut out = [0u8; 16];
+    // 48 bits timestamp (truncated to fit)
+    out[..6].copy_from_slice(&(now_ms & 0xFFFFFFFFFFFF).to_be_bytes()[2..]);
+    // 80 bits of counter + pid
+    out[6..14].copy_from_slice(&pid.to_be_bytes());
+    out[14..].copy_from_slice(&(seq as u16).to_be_bytes());
+    out
+}
 
 /// Per-Host Mailbox — the same-Host IAC router.
 #[maos_attrs::i9_exempt(
@@ -47,6 +116,14 @@ pub struct Mailbox {
     /// Story 6.3 — A2A router installed at composition root. `None` means
     /// no peer is configured; cross-host frames fire `CrossHostNotConfigured`.
     a2a_router: Option<Arc<dyn A2ARouter>>,
+    /// Story 6.4 — per-recipient consent gate (Phase 1.5). `OnceLock` allows
+    /// post-construction injection from the composition root since the gate
+    /// may need types built later in the wiring sequence.
+    consent_gate: std::sync::OnceLock<Arc<dyn ConsentGate>>,
+    /// Story 6.4 — TL adapter for the quarantine row written BEFORE the
+    /// ConsentRupture frame is emitted (I2 log-before-deliver). `OnceLock`
+    /// for the same post-construction injection reason.
+    transparency_log: std::sync::OnceLock<Arc<TransparencyLogAdapter>>,
 }
 
 impl std::fmt::Debug for Mailbox {
@@ -57,6 +134,8 @@ impl std::fmt::Debug for Mailbox {
             .field("metrics", &self.metrics)
             .field("scbs", &self.scbs)
             .field("a2a_router_present", &self.a2a_router.is_some())
+            .field("consent_gate_present", &self.consent_gate.get().is_some())
+            .field("transparency_log_present", &self.transparency_log.get().is_some())
             .finish()
     }
 }
@@ -70,6 +149,8 @@ impl Mailbox {
             metrics,
             scbs: Mutex::new(None),
             a2a_router: None,
+            consent_gate: std::sync::OnceLock::new(),
+            transparency_log: std::sync::OnceLock::new(),
         }
     }
 
@@ -84,6 +165,8 @@ impl Mailbox {
             metrics,
             scbs: Mutex::new(Some(scbs)),
             a2a_router: None,
+            consent_gate: std::sync::OnceLock::new(),
+            transparency_log: std::sync::OnceLock::new(),
         }
     }
 
@@ -94,6 +177,36 @@ impl Mailbox {
         self
     }
 
+    /// Story 6.4 — install the consent gate for Phase 1.5 per-recipient
+    /// evaluation. By default no gate is installed and all recipients accept
+    /// (existing behavior preserved).
+    pub fn with_consent_gate(self, gate: Arc<dyn ConsentGate>) -> Self {
+        let _ = self.consent_gate.set(gate);
+        self
+    }
+
+    /// Story 6.4 — install the Transparency Log adapter so the Phase 1.5
+    /// quarantine row can be written before the ConsentRupture frame is
+    /// emitted. When unset, the quarantine row write is skipped (I2 still
+    /// honored because the existing TL write in `IacBusAdapter::deliver_typed`
+    /// already wrote the original frame's row).
+    pub fn with_transparency_log(self, tl: Arc<TransparencyLogAdapter>) -> Self {
+        let _ = self.transparency_log.set(tl);
+        self
+    }
+
+    /// Story 6.4 — post-construction installer for the consent gate. Returns
+    /// `Ok(())` if the gate was set for the first time, `Err` if already set.
+    pub fn install_consent_gate(&self, gate: Arc<dyn ConsentGate>) -> Result<(), ()> {
+        self.consent_gate.set(gate).map_err(|_| ())
+    }
+
+    /// Story 6.4 — post-construction installer for the transparency log
+    /// adapter. Returns `Ok(())` if set for the first time, `Err` if already set.
+    pub fn install_transparency_log(&self, tl: Arc<TransparencyLogAdapter>) -> Result<(), ()> {
+        self.transparency_log.set(tl).map_err(|_| ())
+    }
+
     pub fn register_spirit(&self, spirit_id: &str) -> Result<SpiritMailboxHandle, IacBusError> {
         // Guard against double-registration (F14)
         if self
@@ -102,7 +215,7 @@ impl Mailbox {
         {
             return Err(IacBusError::AlreadyRegistered(spirit_id.to_string()));
         }
-        let mut receivers = Vec::with_capacity(6);
+        let mut receivers = Vec::with_capacity(8);
         let kinds: &[FrameKind] = &[
             FrameKind::TaskAssign,
             FrameKind::TaskComplete,
@@ -110,6 +223,10 @@ impl Mailbox {
             FrameKind::EpistemicHalt,
             FrameKind::ConsentRequest,
             FrameKind::Retract,
+            // Story 6.4 — ConsentRupture + RateLimited delivered to sender
+            // via 1:1 mpsc with capacity 32 (§7.1.1 cardinality).
+            FrameKind::ConsentRupture,
+            FrameKind::RateLimited,
         ];
         for &kind in kinds {
             let (class, capacity) =
@@ -131,6 +248,21 @@ impl Mailbox {
     /// The I2 log-before-deliver guarantee is satisfied by the caller
     /// (`IacBusAdapter::deliver_typed`) BEFORE calling this method.
     pub async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError> {
+        self.deliver_inner(frame, 0).await
+    }
+
+    /// Recursive deliver entry point with rupture-depth tracking. ConsentRupture
+    /// frames emitted to the sender re-enter `deliver_inner` with `depth+1`;
+    /// the cycle breaks at depth ≥ 2 (per Story 6.4 AC3 test 3.8 — second-level
+    /// rupture is logged as a Critical telemetry event and NOT re-emitted).
+    fn deliver_inner<'a>(
+        &'a self,
+        frame: IacFrame,
+        rupture_depth: u8,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send + 'a>,
+    > {
+        Box::pin(async move {
         let kind = frame.kind;
 
         if kind == FrameKind::TelemetryEvent {
@@ -158,6 +290,127 @@ impl Mailbox {
             }
         }
 
+        // Phase 1.5 — Story 6.4 / ADR-034 binding-v0.9: per-recipient consent
+        // gate. The kernel-internal sender (KERNEL_SENDER_SPIRIT_ID) is exempt
+        // so ConsentRupture/RateLimited frames the kernel emits don't enter
+        // the gate (recursion floor). The gate is also bypassed at
+        // `rupture_depth ≥ 1` to prevent rupture-on-rupture cycles per
+        // Story 6.4 AC3 test 3.8.
+        let is_kernel_sender = frame.from.spirit_id.as_str() == KERNEL_SENDER_SPIRIT_ID;
+        let gate_enabled = !is_kernel_sender && rupture_depth < 2;
+        let (accepted_recipients, rejected_recipients): (Vec<FrameAddress>, Vec<RuptureRejection>) =
+            if let (Some(gate), true) = (self.consent_gate.get(), gate_enabled) {
+                let mut accept = Vec::new();
+                let mut reject: Vec<RuptureRejection> = Vec::new();
+                for addr in frame.to.iter() {
+                    match gate.evaluate(&frame, addr) {
+                        Ok(()) => accept.push(addr.clone()),
+                        Err(reason) => reject.push(RuptureRejection {
+                            address: addr.clone(),
+                            reason,
+                        }),
+                    }
+                }
+                (accept, reject)
+            } else {
+                (frame.to.iter().cloned().collect(), Vec::new())
+            };
+
+        if !rejected_recipients.is_empty() {
+            // Quarantine TL row BEFORE rupture emission (I2 log-before-deliver).
+            if let Some(tl) = self.transparency_log.get() {
+                let payload = serde_json::json!({
+                    "original_frame_id": frame.frame_id,
+                    "quarantined_recipients": rejected_recipients
+                        .iter()
+                        .map(|r| r.address.spirit_id.as_str())
+                        .collect::<Vec<_>>(),
+                    "reasons": rejected_recipients
+                        .iter()
+                        .map(|r| serde_json::to_value(&r.reason)
+                            .unwrap_or_else(|_| serde_json::Value::String("serialization_error".into())))
+                        .collect::<Vec<_>>(),
+                    "ruptured_at_ns": crate::capability::cap_tokens::monotonic_now_ns(),
+                });
+                let _ = tl.insert_frame_event_with_sender(
+                    super::transparency_log::FrameKind::ConsentRupture,
+                    0,
+                    frame.from.spirit_id.as_str(),
+                    "",
+                    None,
+                    "consent.rupture.quarantine",
+                    payload.to_string().as_bytes(),
+                    FrameOrigin::Kernel,
+                );
+            }
+
+            // Build the ConsentRupture payload and recursively emit to sender.
+            let rupture_payload = ConsentRupturePayload {
+                rupture_id: generate_rupture_id(),
+                original_frame_id: frame.frame_id,
+                original_kind: frame.kind,
+                accepted: accepted_recipients.clone(),
+                rejected: rejected_recipients,
+                ruptured_at_ns: crate::capability::cap_tokens::monotonic_now_ns(),
+            };
+            let rupture_to: Vec<FrameAddress> = vec![frame.from.clone()];
+            let rupture_frame = IacFrame {
+                frame_id: generate_correlation_id(),
+                timestamp_ns: crate::capability::cap_tokens::monotonic_now_ns(),
+                logical_clock: 0,
+                from: FrameAddress {
+                    spirit_id: SpiritId::from(KERNEL_SENDER_SPIRIT_ID),
+                    host_id: None,
+                    role: None,
+                },
+                to: rupture_to.into(),
+                kind: FrameKind::ConsentRupture,
+                intent: frame.intent,
+                payload: FramePayload::ConsentRupture(rupture_payload),
+                auto_marker: FrameOrigin::Kernel,
+                consent_envelope: None,
+                // I13 — rupture inherits original lineage (derived emission).
+                intent_lineage: frame.intent_lineage.clone(),
+            };
+
+            if rupture_depth >= 2 {
+                // Cycle break — second-level rupture is logged but not emitted.
+                eprintln!(
+                    "maos: WARN consent-rupture recursion depth={} exceeded; cycle broken",
+                    rupture_depth + 1
+                );
+            } else {
+                // Best-effort delivery of the rupture frame. The sender's
+                // mailbox may also have been torn down (depth-2 scenario);
+                // we tolerate that with the depth gate above.
+                if self
+                    .mpsc_senders
+                    .contains_key(&(
+                        frame.from.spirit_id.as_str().to_string(),
+                        FrameKind::ConsentRupture,
+                    ))
+                {
+                    let _ = self.deliver_inner(rupture_frame, rupture_depth + 1).await;
+                }
+            }
+
+            // If NO recipients accepted, the entire frame is quarantined.
+            if accepted_recipients.is_empty() {
+                return Ok(LogBeforeDeliver::new(()));
+            }
+        }
+
+        // Replace the frame's `to` slice with the accepted set so Phase 2/3
+        // delivery only fires for accepted recipients.
+        let mut frame = frame;
+        frame.to = accepted_recipients.into_iter().collect();
+        // Recompute cross_host_targets after consent gate pruning.
+        let cross_host_targets: Vec<maos_spirit_abi::identity::HostId> = frame
+            .to
+            .iter()
+            .filter_map(|a| a.host_id.clone())
+            .collect();
+
         // Phase 2: Deliver to same-host recipients FIRST (independent from
         // cross-host). Per D3: cross-host failures MUST NOT block same-host
         // delivery — these are separate concerns.
@@ -165,11 +418,16 @@ impl Mailbox {
 
         // Story 5.3 — update sender's last_progress_iac_ns for spirit-origin frames.
         if frame.auto_marker.is_spirit_origin() {
-            let guard = self
-                .scbs
-                .lock()
-                .unwrap_or_else(|poison| poison.into_inner());
-            if let Some(ref scbs) = *guard {
+            // Lexical block scopes the std::sync::MutexGuard so the future
+            // remains `Send` (the guard does NOT cross any await point).
+            let scbs_handle = {
+                let guard = self
+                    .scbs
+                    .lock()
+                    .unwrap_or_else(|poison| poison.into_inner());
+                guard.as_ref().map(Arc::clone)
+            };
+            if let Some(scbs) = scbs_handle {
                 if let Ok(scbs) = scbs.read() {
                     let sender_spirit_id = frame.from.spirit_id.as_str();
                     for (_, scb) in scbs.iter() {
@@ -179,7 +437,6 @@ impl Mailbox {
                     }
                 }
             }
-            drop(guard);
         }
 
         for addr in &frame.to {
@@ -194,12 +451,16 @@ impl Mailbox {
                 .get(&(spirit_id.clone(), kind))
                 .expect("validated in phase 1");
 
-            // Update last_inbound_frame_ns for the recipient SCB.
-            let guard = self
-                .scbs
-                .lock()
-                .unwrap_or_else(|poison| poison.into_inner());
-            if let Some(ref scbs) = *guard {
+            // Update last_inbound_frame_ns for the recipient SCB. Mutex guard
+            // is scoped to this block so the future remains `Send`.
+            let scbs_handle = {
+                let guard = self
+                    .scbs
+                    .lock()
+                    .unwrap_or_else(|poison| poison.into_inner());
+                guard.as_ref().map(Arc::clone)
+            };
+            if let Some(scbs) = scbs_handle {
                 if let Ok(scbs) = scbs.read() {
                     for (_, scb) in scbs.iter() {
                         if scb.spirit_id == spirit_id {
@@ -208,7 +469,6 @@ impl Mailbox {
                     }
                 }
             }
-            drop(guard);
 
             match sender.send(frame.clone()).await {
                 Ok(()) => {
@@ -252,6 +512,7 @@ impl Mailbox {
         }
 
         Ok(LogBeforeDeliver::new(()))
+        }) // close Box::pin async move
     }
 
     pub fn subscribe_telemetry(&self) -> broadcast::Receiver<IacFrame> {
@@ -435,7 +696,8 @@ mod tests {
         let mailbox = Mailbox::new(metrics);
         let handle = mailbox.register_spirit("test-spirit").unwrap();
         assert_eq!(handle.spirit_id, "test-spirit");
-        assert_eq!(handle.receivers.len(), 6);
+        // Story 6.4 — 8 channels: 6 base + ConsentRupture + RateLimited.
+        assert_eq!(handle.receivers.len(), 8);
     }
 
     #[tokio::test]

@@ -69,6 +69,10 @@ pub enum FrameKindLabel {
     /// CliWrapperSpirit's invoked CLI subprocess. Audit-style row; Spirits
     /// do not directly read this surface (the host kernel mediates it).
     CliSubprocessOutput,
+    /// Story 6.4 — ADR-034 binding-v0.9: partial-consent rupture event.
+    ConsentRupture,
+    /// Story 6.4 — NFR-Scale-4: per-(provider, credential) rate-limit event.
+    RateLimited,
 }
 
 impl LogRecallFilter {

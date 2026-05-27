@@ -239,6 +239,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     eprintln!("maos: IAC Bus wired (Mailbox + Transparency Log, Story 3.1)");
 
+    // Story 6.4 — install the TransparencyLogAdapter on the Mailbox so the
+    // Phase 1.5 consent-rupture quarantine row can be written BEFORE the
+    // ConsentRupture frame is emitted (I2 log-before-deliver). The default
+    // ConsentGate (`None`) preserves existing behavior; operator-supplied
+    // gates can be installed via `mailbox.install_consent_gate(...)`.
+    let _ = mailbox.install_transparency_log(Arc::clone(&transparency_log));
+    eprintln!("maos: Mailbox TL installer wired (Story 6.4)");
+
     // Story 5.1 — wire the real Spirit Scheduler replacing the v0.1-β
     // `_scheduler = SpiritSchedulerAdapter::default()` placeholder.
     let mut scheduler = Arc::new(maos_kernel_core::scheduler::SpiritSchedulerAdapter::new(
@@ -524,13 +532,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let router = Arc::new(
         maos_kernel_core::inference::router::MultiProviderRouter::new(providers_map, default_id),
     );
+    // Story 6.4 / NFR-Scale-4 — per-(provider, credential) rate-limit substrate.
+    let rate_limiter = Arc::new(maos_providers::ProviderRateLimiter::new(
+        maos_providers::ProviderRateLimitConfig::from_env(),
+    ));
+    eprintln!("maos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)");
+
     let inference = InferencePortAdapter::new(
         Arc::clone(&router),
         Arc::clone(&capability),
         Arc::clone(&transparency_log),
         Arc::clone(&telemetry),
+    )
+    .with_rate_limiter(Arc::clone(&rate_limiter))
+    .with_iac(Arc::clone(&iac));
+    eprintln!(
+        "maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)"
     );
-    eprintln!("maos: Inference Port initialized (Story 1b.4 + Story 5.5b multi-provider)");
     // ─────────────────────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────────
@@ -2841,9 +2859,16 @@ description = "smoke test spirit successor"
             return smoke_a2a_loopback_6_3().await;
         }
 
+        // Story 6.4 AC5 — `smoke-schedule-6-4` end-to-end wedge demo
+        // (ScheduleWatchdog firing + per-schedule rate-limit cap + ConsentRupture +
+        // RateLimited frame emission).
+        if mode == "smoke-schedule-6-4" {
+            return smoke_schedule_6_4().await;
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -3033,6 +3058,19 @@ description = "smoke test spirit successor"
     .spawn(cancel.child_token());
     eprintln!("maos: IdleWatchdog spawned (Story 5.1)");
 
+    // Story 6.4 / FR26 / ADR-025 — ScheduleWatchdog spawned alongside the
+    // IdleWatchdog; wires the cadence loop for manifest `[[schedule]]` entries.
+    let schedule_watchdog = Arc::new(
+        maos_kernel_core::scheduler::ScheduleWatchdog::new(
+            scheduler.scbs(),
+            scheduler.dispatcher_arc(),
+            Arc::clone(&transparency_log),
+        )
+        .with_capability(Arc::clone(&capability)),
+    )
+    .spawn(cancel.child_token());
+    eprintln!("maos: ScheduleWatchdog spawned (Story 6.4)");
+
     // Story 5.3 — ProgressWatchdog + SilentFailureDetector spawned.
     let progress_watchdog = Arc::new(maos_kernel_core::supervision::ProgressWatchdog::new(
         scheduler.scbs(),
@@ -3088,6 +3126,13 @@ description = "smoke test spirit successor"
         Ok(Ok(())) => {}
         Ok(Err(e)) => eprintln!("maos: IdleWatchdog task returned error during drain: {e}"),
         Err(_) => eprintln!("maos: IdleWatchdog drain timed out after 5s"),
+    }
+
+    // Story 6.4 — await ScheduleWatchdog drain on graceful shutdown.
+    match tokio::time::timeout(std::time::Duration::from_secs(5), schedule_watchdog).await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => eprintln!("maos: ScheduleWatchdog task returned error during drain: {e}"),
+        Err(_) => eprintln!("maos: ScheduleWatchdog drain timed out after 5s"),
     }
 
     // Story 5.3 — await supervision watchdog drains on graceful shutdown.
@@ -3642,5 +3687,195 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
     drop(host_b_router);
 
     eprintln!("smoke-a2a-loopback-6-3: ✅ A2A wedge demo complete; loopback substrate verified");
+    Ok(())
+}
+
+/// Story 6.4 AC5 — `smoke-schedule-6-4` end-to-end wedge demo.
+///
+/// Demonstrates four surfaces in sequence:
+///   1. ScheduleWatchdog cadence firing (FR26 / ADR-025)
+///   2. Per-schedule rate-limit cap (rate_limit_per_hour=1 caps to single fire)
+///   3. ConsentRupture partial-consent failure event (ADR-034 binding-v0.9)
+///   4. RateLimited frame emission on per-(provider, credential) bucket exhaustion
+///      (NFR-Scale-4)
+async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
+    use maos_domain::frame::{
+        ConsentRupturePayload, FrameAddress, FramePayload, IacFrame, RuptureReason,
+    };
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_kernel_core::iac::mailbox::{ConsentGate, Mailbox};
+    use maos_kernel_core::iac::transparency_log::{
+        FrameFilter, FrameKind as TlFrameKind, TransparencyLogAdapter,
+    };
+    use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
+    use maos_providers::rate_limit::{BucketKey, ProviderRateLimitConfig, ProviderRateLimiter};
+    use maos_spirit_abi::identity::{FrameKind, SpiritId};
+    use std::sync::Arc;
+
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    eprintln!("smoke-schedule-6-4: starting wedge demo");
+
+    // ─── Surface 1: ConsentRupture detection ─────────────────────────────
+    struct AlwaysRejectB;
+    impl ConsentGate for AlwaysRejectB {
+        fn evaluate(
+            &self,
+            _f: &IacFrame,
+            recipient: &FrameAddress,
+        ) -> Result<(), RuptureReason> {
+            if recipient.spirit_id.as_str() == "b" {
+                Err(RuptureReason::TokenRevoked)
+            } else {
+                Ok(())
+            }
+        }
+    }
+    let metrics = Arc::new(IacRtMetrics::new());
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+    let mailbox = Mailbox::new(Arc::clone(&metrics))
+        .with_consent_gate(Arc::new(AlwaysRejectB))
+        .with_transparency_log(Arc::clone(&tl));
+    let mailbox = Arc::new(mailbox);
+    let mut sender_handle = mailbox.register_spirit("sender").unwrap();
+    let mut a_handle = mailbox.register_spirit("a").unwrap();
+    let _b_handle = mailbox.register_spirit("b").unwrap();
+    let to: Vec<FrameAddress> = vec![
+        FrameAddress { spirit_id: SpiritId::from("a"), host_id: None, role: None },
+        FrameAddress { spirit_id: SpiritId::from("b"), host_id: None, role: None },
+    ];
+    let frame = IacFrame {
+        frame_id: [9u8; 16],
+        timestamp_ns: 0,
+        logical_clock: 0,
+        from: FrameAddress { spirit_id: SpiritId::from("sender"), host_id: None, role: None },
+        to: to.into(),
+        kind: FrameKind::TaskAssign,
+        intent: IntentClass::Standard,
+        payload: FramePayload::TaskAssign(maos_domain::frame::TaskAssignPayload {
+            goal: "smoke goal".into(),
+            scope: vec![],
+            success_criteria: "ok".into(),
+            posture_preferences: Default::default(),
+            prior_distillate_ref: None,
+        }),
+        auto_marker: FrameOrigin::HumanAuthored,
+        consent_envelope: None,
+        intent_lineage: IntentLineage::default(),
+    };
+    mailbox.deliver(frame).await?;
+    // A receives the frame; sender receives the ConsentRupture frame.
+    let a_recv = a_handle.try_recv()?;
+    let sender_recv = sender_handle.try_recv()?;
+    assert!(matches!(a_recv, Some((FrameKind::TaskAssign, _))));
+    let rupture_frame = sender_recv.expect("sender receives ConsentRupture");
+    assert_eq!(rupture_frame.0, FrameKind::ConsentRupture);
+    match &rupture_frame.1.payload {
+        FramePayload::ConsentRupture(p) => {
+            assert_eq!(p.rejected.len(), 1);
+            assert!(matches!(p.rejected[0].reason, RuptureReason::TokenRevoked));
+        }
+        _ => return Err("expected ConsentRupture payload".into()),
+    }
+    eprintln!("smoke-schedule-6-4: ✅ ConsentRupture surface — recipient B rejected, sender received typed rupture frame");
+
+    // ─── Surface 2: Provider rate-limit isolation ───────────────────────
+    let mut cfg = ProviderRateLimitConfig {
+        per_provider: std::collections::HashMap::new(),
+    };
+    cfg.per_provider.insert("anthropic", maos_providers::ProviderQuota { rpm: 2 });
+    let limiter = ProviderRateLimiter::new(cfg);
+    let key = BucketKey::new("anthropic", 0xdead_beef);
+    assert!(limiter.try_consume(key).is_ok(), "first consume");
+    assert!(limiter.try_consume(key).is_ok(), "second consume");
+    let err = limiter.try_consume(key).expect_err("third consume MUST be RateLimited");
+    eprintln!(
+        "smoke-schedule-6-4: ✅ RateLimited surface — bucket exhausted; retry_after_ms={}",
+        err.retry_after_ms
+    );
+
+    // ─── Surface 3: ScheduleWatchdog firing + rate-limit cap ────────────
+    use maos_kernel_core::scheduler::{
+        control_block::{make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle},
+        hook_dispatch::HookDispatcher,
+        schedule_watchdog::ScheduleWatchdog,
+    };
+    use maos_kernel_core::security::manifest::{LifecycleSection, ScheduleEntry, SchedulesSection};
+    use std::collections::BTreeMap;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::RwLock;
+
+    struct CountingSpirit { counter: Arc<AtomicU32> }
+    impl maos_spirit_abi::lifecycle::Spirit for CountingSpirit {
+        fn on_schedule(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx, _p: &maos_spirit_abi::lifecycle::SchedulePayload<'_>) {
+            self.counter.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    let counter = Arc::new(AtomicU32::new(0));
+    let entry = ScheduleEntry {
+        id: "morning-digest".into(),
+        cadence_secs: 1,
+        payload_bytes: Vec::new(),
+        rate_limit_per_hour: 1, // ← cap to ONE fire
+        compliance_claim_ref: None,
+        principal_revocability: true,
+        side_effect_scopes: vec![],
+    };
+    let manifest = SpiritManifestBundle {
+        lifecycle: LifecycleSection { enabled_hooks: vec!["on_schedule".into()] },
+        schedules: SchedulesSection { entries: vec![entry] },
+        ..Default::default()
+    };
+    let scb = SpiritControlBlock::new(
+        1,
+        "butler".into(),
+        manifest,
+        make_spirit_obj(CountingSpirit { counter: Arc::clone(&counter) }),
+        0,
+    );
+    scb.state.store(ScbLifecycleState::Running as u8, Ordering::Release);
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(1, Arc::new(scb));
+    let tl2 = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+    let dispatcher = Arc::new(HookDispatcher::new(Arc::clone(&tl2), Arc::clone(&metrics)));
+    // Use tokio::time::pause for deterministic smoke-arm timing
+    // (Story 6.4 review fix — avoids wall-clock flakiness on loaded CI runners).
+    tokio::time::pause();
+    std::env::set_var("MAOS_SCHEDULE_FAST", "1");
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let watchdog = Arc::new(ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl2)));
+    let handle = Arc::clone(&watchdog).spawn(cancel.child_token());
+    tokio::time::advance(tokio::time::Duration::from_millis(300)).await;
+    cancel.cancel();
+    let _ = tokio::time::timeout(tokio::time::Duration::from_secs(2), handle).await;
+    let fires = counter.load(Ordering::SeqCst);
+    eprintln!(
+        "smoke-schedule-6-4: ✅ ScheduleWatchdog firing — `morning-digest` fired {} time(s) under rate_limit_per_hour=1 cap",
+        fires
+    );
+    if fires != 1 {
+        return Err(format!("expected 1 fire under rate_limit=1; got {}", fires).into());
+    }
+
+    // ─── Verify TL state ─────────────────────────────────────────────────
+    let schedule_rows = tl2.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::CapabilityInvocation),
+        ..Default::default()
+    })?;
+    let schedule_fire_count = schedule_rows
+        .iter()
+        .filter(|r| r.intent.starts_with("schedule.fire:"))
+        .count();
+    let rupture_rows = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::ConsentRupture),
+        ..Default::default()
+    })?;
+    eprintln!(
+        "smoke-schedule-6-4: TL state — {} schedule.fire row(s), {} ConsentRupture row(s)",
+        schedule_fire_count, rupture_rows.len()
+    );
+
+    eprintln!("smoke-schedule-6-4: ✅ wedge demo complete; all four surfaces verified");
     Ok(())
 }

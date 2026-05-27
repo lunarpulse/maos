@@ -59,6 +59,7 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
     // can fail the gate.
     let is_story_6_2 = matches!(story_arg, Some("6.2"));
     let is_story_6_3 = matches!(story_arg, Some("6.3"));
+    let is_story_6_4 = matches!(story_arg, Some("6.4"));
     if is_story_6_2 {
         results.push(check_6_2_d_2_10());
         results.push(check_6_2_d_4());
@@ -80,6 +81,19 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
         results.push(check_6_3_smoke_iac_bus_chain());
         results.push(check_6_3_maos_a2a_baseline());
     }
+    if is_story_6_4 {
+        // 10 row classifications per Story 6.4 AC1.
+        results.push(check_6_4_a3_a5_a6_shipped());
+        results.push(check_6_4_smoke_a2a_loopback_arm());
+        results.push(check_6_4_ci_test_targets().map_err(|e| format!("6.4-P4 error: {}", e))?);
+        results.push(check_6_4_story_6_3_review_findings().map_err(|e| format!("6.4-6.3-RF error: {}", e))?);
+        results.push(check_6_4_drr_carry_forward());
+        results.push(check_6_4_cli_wrapper_bench_carry_forward());
+        results.push(check_6_4_a2_backfill_carry_forward().map_err(|e| format!("6.4-A2 error: {}", e))?);
+        results.push(check_6_4_providers_baseline().map_err(|e| format!("6.4-PROV error: {}", e))?);
+        results.push(check_6_4_framekind_baseline().map_err(|e| format!("6.4-FK error: {}", e))?);
+        results.push(check_6_4_schedule_watchdog_baseline());
+    }
 
     // 6.1 rows: failure on any 6.1 row blocks the gate (legacy behavior).
     // 6.2 extension rows: only blocking_6_2 rows (D-2.10, D-4, A3 blocking) gate
@@ -88,7 +102,29 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
     // 6.3 extension rows: only blocking_6_3 rows gate. Per Story 6.3 AC1 §Bridge-Preconditions:
     //   blocking_6_3 = §A3/§A5/§A6 gates SHIPPED (existence). All other 6.3 rows are
     //   verify-only / carry-forward per the table.
-    let all_pass = if is_story_6_3 {
+    let all_pass = if is_story_6_4 {
+        // Story 6.4 spec: command exits 0 only if every `blocking_6_4` row has cleared.
+        // Blocking rows:
+        //   * 6.4-P4 (CI test-target verification — every Story 6.4 PR would otherwise fail CI)
+        //   * 6.4-MAOS-PROVIDERS-BASELINE / 6.4-FRAMEKIND-BASELINE / 6.4-SCHEDULE-WATCHDOG-BASELINE
+        //     (substrate-canvas snapshot — accepts EITHER pre-6.4 or post-6.4 consistent
+        //     state, fails on partial scaffolds per the explicit-discriminant additive
+        //     contract).
+        // All other rows are verify-only / carry-forward per AC1.
+        results.iter().all(|r: &CheckResult| {
+            if matches!(
+                r.id.as_str(),
+                "6.4-P4"
+                    | "6.4-MAOS-PROVIDERS-BASELINE"
+                    | "6.4-FRAMEKIND-BASELINE"
+                    | "6.4-SCHEDULE-WATCHDOG-BASELINE"
+            ) {
+                r.passed
+            } else {
+                true // informational — never gates 6.4
+            }
+        })
+    } else if is_story_6_3 {
         // Story 6.3 spec: command exits 0 only if every `blocking_6_3` row has cleared.
         // Blocking rows: 6.3-A3-A5-A6 (gate-exists), 6.3-MAOS-A2A-BASELINE (canvas-clean).
         // All other rows are verify-only / carry-forward.
@@ -800,6 +836,318 @@ fn check_6_3_maos_a2a_baseline() -> CheckResult {
         message: format!(
             "blocking_6_3: maos-a2a/Cargo.toml={} src/lib.rs={} (Story 6.3 canvas)",
             cargo, lib
+        ),
+    }
+}
+
+// ─── Story 6.4 AC1 row classifiers ─────────────────────────────────────────────
+
+/// §A3 / §A5 / §A6 gate-exists check (Story 6.4 inherits the same posture as
+/// Story 6.3 — the xtask binaries are SHIPPED; §A5 / §A6 discipline.yml wiring
+/// is Epic 5 retro carry-forward debt). The discipline.yml wiring gap is
+/// documented as inherited; the gate ships discipline-as-code via xtask presence.
+fn check_6_4_a3_a5_a6_shipped() -> CheckResult {
+    let id = "6.4-A3-A5-A6".to_string();
+    let a3_xtask = Path::new("xtask/src/check_serde_error_handling.rs").exists();
+    let a3_job = discipline_yml_has_step("check-serde-error-handling");
+    let a5_xtask = Path::new("xtask/src/check_review_findings_resolved.rs").exists();
+    let a5_job = discipline_yml_has_step("check-review-findings-resolved");
+    let a6_xtask = Path::new("xtask/src/check_dev_record_completeness.rs").exists();
+    let a6_job = discipline_yml_has_step("check-dev-record-completeness");
+
+    // Run each gate and capture the exit code (Story 6.4 review fix).
+    let a3_pass = a3_xtask && run_xtask_gate("check-serde-error-handling");
+    let a5_pass = a5_xtask && run_xtask_gate("check-review-findings-resolved");
+    let a6_pass = a6_xtask && run_xtask_gate("check-dev-record-completeness");
+
+    CheckResult {
+        id,
+        passed: a3_pass && a5_pass && a6_pass,
+        message: format!(
+            "verify: §A3 xtask={} job={} run={} §A5 xtask={} job={}({}) run={} §A6 xtask={} job={}({}) run={}",
+            a3_xtask, a3_job, a3_pass,
+            a5_xtask, a5_job, if a5_job { "shipped" } else { "carry-forward" }, a5_pass,
+            a6_xtask, a6_job, if a6_job { "shipped" } else { "carry-forward" }, a6_pass,
+        ),
+    }
+}
+
+/// Run an xtask gate binary and return true if it exits 0.
+fn run_xtask_gate(gate_name: &str) -> bool {
+    match std::process::Command::new("cargo")
+        .args([
+            "run",
+            "-p",
+            "xtask",
+            "--",
+            &gate_name.replace("check-", "check_").replace("-", "_"),
+        ])
+        .output()
+    {
+        Ok(out) => out.status.success(),
+        Err(_) => false,
+    }
+}
+
+/// 6.3-AC7 smoke-arm verification — `smoke-a2a-loopback-6-3` arm shipped in
+/// `crates/maos-bin/src/main.rs`. The new Story 6.4 smoke arm
+/// `smoke-schedule-6-4` chains on top.
+fn check_6_4_smoke_a2a_loopback_arm() -> CheckResult {
+    let id = "6.4-AC7-SMOKE-ARM".to_string();
+    let main_path = "crates/maos-bin/src/main.rs";
+    let present = if Path::new(main_path).exists() {
+        match fs::read_to_string(main_path) {
+            Ok(c) => c.contains("smoke-a2a-loopback-6-3"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    CheckResult {
+        id,
+        passed: present,
+        message: format!(
+            "verify: smoke-a2a-loopback-6-3 arm in main.rs present={} (does NOT block 6.4)",
+            present
+        ),
+    }
+}
+
+/// 6.3-P4 CI test-target verification (must PASS at HEAD): every `cargo test
+/// -p maos-a2a --test <name>` invocation in `a2a-loopback-corpus-v0` job must
+/// resolve to an existing test file. Blocks 6.4: every Story 6.4 PR would
+/// otherwise fail CI on pre-existing breakage.
+fn check_6_4_ci_test_targets() -> Result<CheckResult, std::io::Error> {
+    let id = "6.4-P4".to_string();
+    let path = ".github/workflows/discipline.yml";
+    if !Path::new(path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: ".github/workflows/discipline.yml not found".into(),
+        });
+    }
+    let content = fs::read_to_string(path)?;
+    // Substring-match: `cargo test -p maos-a2a --test <NAME>` patterns.
+    let mut missing: Vec<String> = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("run: cargo test -p maos-a2a --test ") {
+            let test_name = rest.split_whitespace().next().unwrap_or("");
+            if test_name.is_empty() {
+                continue;
+            }
+            let target = format!("crates/maos-a2a/tests/{}.rs", test_name);
+            if !Path::new(&target).exists() {
+                missing.push(target);
+            }
+        }
+    }
+    if missing.is_empty() {
+        Ok(CheckResult {
+            id,
+            passed: true,
+            message: "blocking_6_4: 6.3-P4 — every a2a-loopback-corpus-v0 test target resolves".into(),
+        })
+    } else {
+        Ok(CheckResult {
+            id,
+            passed: false,
+            message: format!(
+                "blocking_6_4: 6.3-P4 — missing test targets: {} (Story 6.4 PRs would fail CI)",
+                missing.join(", ")
+            ),
+        })
+    }
+}
+
+/// 6.3 Review Findings status — count `**open**` Critical/High rows in
+/// Story 6.3's Review Findings table. Story 6.4 does NOT block on these; it
+/// reports state for the dev record.
+fn check_6_4_story_6_3_review_findings() -> Result<CheckResult, std::io::Error> {
+    let id = "6.4-6.3-RF".to_string();
+    match find_story_file("6-3") {
+        None => Ok(CheckResult {
+            id,
+            passed: true, // verify-only
+            message: "verify-only: Story 6.3 file not found (does NOT block 6.4)".into(),
+        }),
+        Some(path) => {
+            let content = fs::read_to_string(&path)?;
+            let open_critical_high = content
+                .lines()
+                .filter(|line| {
+                    let lower = line.to_lowercase();
+                    (lower.contains("critical") || lower.contains("high"))
+                        && lower.contains("**open**")
+                })
+                .count();
+            Ok(CheckResult {
+                id,
+                passed: true, // informational only — never blocks 6.4
+                message: format!(
+                    "verify-only: Story 6.3 has {} open Critical/High findings (does NOT block 6.4)",
+                    open_critical_high
+                ),
+            })
+        }
+    }
+}
+
+/// 6.1-D-3.* carry-forward — DRR scheduler tasks 3.3-3.8 reported.
+/// Story 6.4's scheduled invocations DO NOT bypass DRR — they fire `on_schedule`
+/// through the existing HookDispatcher. Carry-forward; never blocks 6.4.
+fn check_6_4_drr_carry_forward() -> CheckResult {
+    let id = "6.4-6.1-D-3".to_string();
+    let test = Path::new("crates/maos-kernel-core/tests/log_writer_drr_matches_scheduler.rs").exists();
+    let job = discipline_yml_has_step("nfr-scale-3-drr-fairness");
+    CheckResult {
+        id,
+        passed: true, // informational only
+        message: format!(
+            "carry-forward: DRR test_present={} job_present={} (does NOT block 6.4)",
+            test, job
+        ),
+    }
+}
+
+/// 6.2-D-Bench-Note carry-forward — `cli_wrapper_subprocess_fan_out.rs` bench.
+/// Calibration-phase; not blocking 6.4.
+fn check_6_4_cli_wrapper_bench_carry_forward() -> CheckResult {
+    let id = "6.4-6.2-BENCH-NOTE".to_string();
+    let bench = Path::new("crates/maos-bench/benches/cli_wrapper_subprocess_fan_out.rs").exists();
+    CheckResult {
+        id,
+        passed: true, // informational only
+        message: format!(
+            "carry-forward: cli_wrapper_subprocess_fan_out.rs bench_present={} (does NOT block 6.4)",
+            bench
+        ),
+    }
+}
+
+/// §A2 carry-forward — 5-story (5.1/5.2/5.4/5.5a/5.5b) Review Findings backfill.
+/// Story 6.4 reports current state; carry-forward, does NOT block.
+fn check_6_4_a2_backfill_carry_forward() -> Result<CheckResult, std::io::Error> {
+    let id = "6.4-A2-BACKFILL".to_string();
+    let stories = ["5-1", "5-2", "5-4", "5-5a", "5-5b"];
+    let mut populated = 0;
+    let mut placeholder = 0;
+    for prefix in &stories {
+        if let Some(path) = find_story_file(prefix) {
+            let content = fs::read_to_string(&path)?;
+            if content.contains("### Review Findings") {
+                if content.contains("_No review findings._") {
+                    placeholder += 1;
+                } else {
+                    populated += 1;
+                }
+            }
+        }
+    }
+    Ok(CheckResult {
+        id,
+        passed: true, // informational only
+        message: format!(
+            "carry-forward: §A2 backfill — populated={}/5 placeholder={}/5 (does NOT block 6.4)",
+            populated, placeholder
+        ),
+    })
+}
+
+/// 6.4-MAOS-PROVIDERS-BASELINE (blocking_6_4) — assert `crates/maos-providers`
+/// substrate is consistent: either pre-6.4 (NO `rate_limit.rs`) OR post-6.4
+/// (rate_limit.rs SHIPPED). Both are acceptable; the check fails on partial
+/// scaffolds. Mirrors the Story 6.3 maos-a2a-baseline pattern.
+fn check_6_4_providers_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "6.4-MAOS-PROVIDERS-BASELINE".to_string();
+    let cargo = Path::new("crates/maos-providers/Cargo.toml").exists();
+    let lib = Path::new("crates/maos-providers/src/lib.rs").exists();
+    if !cargo || !lib {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: format!(
+                "blocking_6_4: maos-providers/Cargo.toml={} src/lib.rs={} — substrate missing",
+                cargo, lib
+            ),
+        });
+    }
+    let lib_src = fs::read_to_string("crates/maos-providers/src/lib.rs")?;
+    let exports_provider = lib_src.contains("pub use provider::{Provider, ProviderError}")
+        || lib_src.contains("pub mod provider");
+    let rate_limit_file_exists = Path::new("crates/maos-providers/src/rate_limit.rs").exists();
+    let rate_limit_module_declared = lib_src.contains("pub mod rate_limit");
+    // Accept BOTH pre-6.4 (file absent + module not declared) and post-6.4
+    // (file present + module declared). Partial states fail.
+    let consistent = match (rate_limit_file_exists, rate_limit_module_declared) {
+        (false, false) => true, // pre-6.4 canvas clean
+        (true, true) => true,   // post-6.4 substrate shipped
+        _ => false,             // partial scaffold — STOP and surface
+    };
+    Ok(CheckResult {
+        id,
+        passed: exports_provider && consistent,
+        message: format!(
+            "blocking_6_4: maos-providers Provider/ProviderError exported={} rate_limit.rs={} module_declared={} → consistent={}",
+            exports_provider, rate_limit_file_exists, rate_limit_module_declared, consistent
+        ),
+    })
+}
+
+/// 6.4-FRAMEKIND-BASELINE (blocking_6_4) — assert `FrameKind::ConsentRupture`
+/// (discriminant 22) and `FrameKind::RateLimited` (discriminant 23) are EITHER
+/// both absent (pre-6.4) OR both present (post-6.4). Partial scaffolds fail —
+/// preserves the explicit-discriminant additive contract.
+fn check_6_4_framekind_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "6.4-FRAMEKIND-BASELINE".to_string();
+    let path = "crates/maos-spirit-abi/src/identity.rs";
+    if !Path::new(path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "blocking_6_4: maos-spirit-abi identity.rs not found".into(),
+        });
+    }
+    let src = fs::read_to_string(path)?;
+    let has_consent_rupture = src.contains("ConsentRupture = 22");
+    let has_rate_limited = src.contains("RateLimited = 23");
+    // Accept BOTH pre-6.4 (neither present) and post-6.4 (both present).
+    let consistent = has_consent_rupture == has_rate_limited;
+    Ok(CheckResult {
+        id,
+        passed: consistent,
+        message: format!(
+            "blocking_6_4: FrameKind::ConsentRupture=22 present={} FrameKind::RateLimited=23 present={} → consistent={}",
+            has_consent_rupture, has_rate_limited, consistent
+        ),
+    })
+}
+
+/// 6.4-SCHEDULE-WATCHDOG-BASELINE (blocking_6_4) — assert
+/// `crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs` is either
+/// absent (pre-6.4) OR present alongside a `pub mod schedule_watchdog`
+/// declaration in `scheduler/mod.rs` (post-6.4). Partial scaffolds fail.
+fn check_6_4_schedule_watchdog_baseline() -> CheckResult {
+    let id = "6.4-SCHEDULE-WATCHDOG-BASELINE".to_string();
+    let file_present = Path::new("crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs").exists();
+    let mod_path = "crates/maos-kernel-core/src/scheduler/mod.rs";
+    let module_declared = if Path::new(mod_path).exists() {
+        match fs::read_to_string(mod_path) {
+            Ok(c) => c.contains("schedule_watchdog"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    // Accept BOTH pre-6.4 (neither) and post-6.4 (both).
+    let consistent = file_present == module_declared;
+    CheckResult {
+        id,
+        passed: consistent,
+        message: format!(
+            "blocking_6_4: schedule_watchdog.rs present={} mod declared={} → consistent={}",
+            file_present, module_declared, consistent
         ),
     }
 }

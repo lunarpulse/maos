@@ -1300,6 +1300,228 @@ impl RawOnRevocationSection {
 }
 
 // ------------------------------------------------------------------
+// [[schedule]] section (Story 6.4 / FR26 / ADR-025)
+// ------------------------------------------------------------------
+
+/// Story 6.4 / FR26 — `[[schedule]]` manifest entry.
+///
+/// Each entry declares one scheduled invocation that fires
+/// `on_schedule(ctx, schedule_id, payload)` at the declared cadence. ADR-025
+/// governs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScheduleEntry {
+    /// Unique id within this manifest. `[a-zA-Z0-9_-]{1,64}`.
+    pub id: String,
+    /// Firing cadence in seconds. Range `[1, 604_800]` (1s to 1 week).
+    pub cadence_secs: u32,
+    /// Opaque payload bytes delivered to `on_schedule`. Decoded from
+    /// `payload_b64` at parse time; empty when absent.
+    pub payload_bytes: Vec<u8>,
+    /// Per-schedule rate-limit (firing cap regardless of cadence). Range
+    /// `[1, 3600]` per ADR-025's ≥1s cadence floor.
+    pub rate_limit_per_hour: u32,
+    /// ComplianceClaim envelope reference (Story 7.3). At v0.5 a structural
+    /// pass-through into the TL row; Story 7.3 lands the cryptographic verify.
+    pub compliance_claim_ref: Option<[u8; 32]>,
+    /// When true, a revoked principal halts the firing.
+    pub principal_revocability: bool,
+    /// Side-effect allowlist — `Scope` subset granted to the per-firing
+    /// cap-token. Empty = memory-only.
+    pub side_effect_scopes: Vec<maos_domain::invariants::i1::Scope>,
+}
+
+/// The `[[schedule]]` section — `Vec<ScheduleEntry>` with cross-entry id
+/// uniqueness.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SchedulesSection {
+    pub entries: Vec<ScheduleEntry>,
+}
+
+impl SchedulesSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawSchedulesSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        raw.validate()
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSchedulesSection {
+    #[serde(default, rename = "schedule")]
+    entries: Vec<RawScheduleEntry>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawScheduleEntry {
+    id: String,
+    cadence_secs: u32,
+    #[serde(default)]
+    payload_b64: String,
+    #[serde(default = "default_rate_limit_per_hour")]
+    rate_limit_per_hour: u32,
+    #[serde(default)]
+    compliance_claim_ref_hex: Option<String>,
+    #[serde(default = "default_principal_revocability")]
+    principal_revocability: bool,
+    #[serde(default)]
+    side_effect_scopes: Vec<maos_domain::invariants::i1::Scope>,
+}
+
+fn default_rate_limit_per_hour() -> u32 {
+    60
+}
+fn default_principal_revocability() -> bool {
+    true
+}
+
+impl RawSchedulesSection {
+    fn validate(self) -> Result<SchedulesSection, ManifestError> {
+        let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut entries = Vec::with_capacity(self.entries.len());
+        for raw in self.entries {
+            // id shape — non-empty, [a-zA-Z0-9_-]{1,64}
+            if raw.id.is_empty() || raw.id.len() > 64 {
+                return Err(ManifestError::Toml(validation_msg(
+                    "schedule.id",
+                    &format!("must be 1..=64 chars, got len {}", raw.id.len()),
+                )));
+            }
+            if !raw
+                .id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            {
+                return Err(ManifestError::Toml(validation_msg(
+                    "schedule.id",
+                    &format!("must match [a-zA-Z0-9_-]+, got '{}'", raw.id),
+                )));
+            }
+            if !seen_ids.insert(raw.id.clone()) {
+                return Err(ManifestError::Toml(validation_msg(
+                    "schedule.id",
+                    &format!("duplicate schedule id '{}'", raw.id),
+                )));
+            }
+            if raw.cadence_secs < 1 || raw.cadence_secs > 604_800 {
+                return Err(ManifestError::Toml(validation_msg(
+                    "schedule.cadence_secs",
+                    &format!("must be in [1, 604_800], got {}", raw.cadence_secs),
+                )));
+            }
+            if raw.rate_limit_per_hour < 1 || raw.rate_limit_per_hour > 3600 {
+                return Err(ManifestError::Toml(validation_msg(
+                    "schedule.rate_limit_per_hour",
+                    &format!("must be in [1, 3600], got {}", raw.rate_limit_per_hour),
+                )));
+            }
+            // payload_b64 decode (base64 standard). Hand-rolled minimal decoder
+            // — workspace has no `base64` dep; FR47 forbids adding one for
+            // Story 6.4 (verified via xtask). Empty string → empty bytes.
+            let payload_bytes = decode_b64_strict(&raw.payload_b64).map_err(|e| {
+                ManifestError::Toml(validation_msg("schedule.payload_b64", &e))
+            })?;
+            // compliance_claim_ref_hex — 64 hex chars (= 32 bytes) if present.
+            let compliance_claim_ref = match raw.compliance_claim_ref_hex {
+                None => None,
+                Some(hex) => {
+                    // Accept `sha256:<hex>` prefix or raw hex.
+                    let stripped = hex.strip_prefix("sha256:").unwrap_or(hex.as_str());
+                    if stripped.len() != 64 {
+                        return Err(ManifestError::Toml(validation_msg(
+                            "schedule.compliance_claim_ref_hex",
+                            &format!(
+                                "must be 64 hex chars (32 bytes), got {} chars",
+                                stripped.len()
+                            ),
+                        )));
+                    }
+                    let mut buf = [0u8; 32];
+                    for (i, byte) in buf.iter_mut().enumerate() {
+                        let s = &stripped[i * 2..i * 2 + 2];
+                        *byte = u8::from_str_radix(s, 16).map_err(|_| {
+                            ManifestError::Toml(validation_msg(
+                                "schedule.compliance_claim_ref_hex",
+                                &format!("non-hex char in '{}'", s),
+                            ))
+                        })?;
+                    }
+                    Some(buf)
+                }
+            };
+            entries.push(ScheduleEntry {
+                id: raw.id,
+                cadence_secs: raw.cadence_secs,
+                payload_bytes,
+                rate_limit_per_hour: raw.rate_limit_per_hour,
+                compliance_claim_ref,
+                principal_revocability: raw.principal_revocability,
+                side_effect_scopes: raw.side_effect_scopes,
+            });
+        }
+        Ok(SchedulesSection { entries })
+    }
+}
+
+/// Minimal base64 (RFC 4648 §4 standard alphabet) decoder for the
+/// `[[schedule]].payload_b64` field. We avoid pulling a new workspace
+/// dependency (FR47 posture); the alphabet table is constant and the loop
+/// is straight-line. Padding (`=`) is required to complete the final group.
+fn decode_b64_strict(input: &str) -> Result<Vec<u8>, String> {
+    if input.is_empty() {
+        return Ok(Vec::new());
+    }
+    let bytes = input.as_bytes();
+    if bytes.len() % 4 != 0 {
+        return Err(format!("length {} is not a multiple of 4", bytes.len()));
+    }
+    fn decode_char(c: u8) -> Result<u8, String> {
+        Ok(match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return Err(format!("non-base64 char '{}'", c as char)),
+        })
+    }
+    let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
+    for chunk in bytes.chunks_exact(4) {
+        let pad_count = chunk.iter().rev().take_while(|&&b| b == b'=').count();
+        if pad_count > 2 {
+            return Err("more than 2 padding chars in a group".into());
+        }
+        // Reject padding in non-trailing positions (e.g., "A=BC").
+        let mut vals = [0u8; 4];
+        let mut pad_seen = false;
+        for (i, &c) in chunk.iter().enumerate() {
+            if c == b'=' {
+                pad_seen = true;
+                vals[i] = 0;
+            } else {
+                if pad_seen {
+                    return Err("padding character '=' in non-trailing position".into());
+                }
+                vals[i] = decode_char(c)?;
+            }
+        }
+        let triplet = (u32::from(vals[0]) << 18)
+            | (u32::from(vals[1]) << 12)
+            | (u32::from(vals[2]) << 6)
+            | u32::from(vals[3]);
+        out.push((triplet >> 16) as u8);
+        if pad_count < 2 {
+            out.push((triplet >> 8) as u8);
+        }
+        if pad_count < 1 {
+            out.push(triplet as u8);
+        }
+    }
+    Ok(out)
+}
+
+// ------------------------------------------------------------------
 // [supervision] section (Story 5.3, AC2 + AC3)
 // ------------------------------------------------------------------
 
@@ -3376,5 +3598,232 @@ control_channel = "signals"
         let cfg = CliWrapperConfig::from_toml_str(toml).unwrap();
         assert_eq!(cfg.command, "/usr/bin/env");
         assert_eq!(cfg.posture.shutdown_signal, None);
+    }
+
+    // ---- SchedulesSection (Story 6.4, AC2 Task 1) ----
+
+    #[test]
+    fn schedule_well_formed_round_trip() {
+        let toml = r#"
+[[schedule]]
+id = "morning-digest"
+cadence_secs = 3600
+payload_b64 = ""
+rate_limit_per_hour = 60
+principal_revocability = true
+side_effect_scopes = [
+  { MemWrite = { scope = "spirit:butler:digest" } },
+  { ProviderInfer = { provider = "anthropic" } },
+]
+"#;
+        let s = SchedulesSection::from_toml_str(toml).unwrap();
+        assert_eq!(s.entries.len(), 1);
+        let e = &s.entries[0];
+        assert_eq!(e.id, "morning-digest");
+        assert_eq!(e.cadence_secs, 3600);
+        assert!(e.payload_bytes.is_empty());
+        assert_eq!(e.rate_limit_per_hour, 60);
+        assert!(e.principal_revocability);
+        assert_eq!(e.side_effect_scopes.len(), 2);
+    }
+
+    #[test]
+    fn schedule_deny_unknown_field_rejected() {
+        let toml = r#"
+[[schedule]]
+id = "x"
+cadence_secs = 60
+unknown_field = "boom"
+"#;
+        let err = SchedulesSection::from_toml_str(toml).unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("unknown_field")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn schedule_cadence_out_of_range_rejected() {
+        // cadence_secs = 0 < 1 floor
+        let toml_zero = r#"
+[[schedule]]
+id = "x"
+cadence_secs = 0
+"#;
+        let err = SchedulesSection::from_toml_str(toml_zero).unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("cadence_secs")),
+            "got: {err:?}"
+        );
+        // cadence_secs = 604801 > 604800 (1 week) ceiling
+        let toml_max = r#"
+[[schedule]]
+id = "x"
+cadence_secs = 604801
+"#;
+        let err = SchedulesSection::from_toml_str(toml_max).unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("cadence_secs")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn schedule_rate_limit_out_of_range_rejected() {
+        let toml_zero = r#"
+[[schedule]]
+id = "x"
+cadence_secs = 60
+rate_limit_per_hour = 0
+"#;
+        let err = SchedulesSection::from_toml_str(toml_zero).unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("rate_limit_per_hour")),
+            "got: {err:?}"
+        );
+        let toml_max = r#"
+[[schedule]]
+id = "x"
+cadence_secs = 60
+rate_limit_per_hour = 3601
+"#;
+        let err = SchedulesSection::from_toml_str(toml_max).unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("rate_limit_per_hour")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn schedule_duplicate_id_rejected() {
+        let toml = r#"
+[[schedule]]
+id = "dup"
+cadence_secs = 60
+
+[[schedule]]
+id = "dup"
+cadence_secs = 120
+"#;
+        let err = SchedulesSection::from_toml_str(toml).unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("duplicate")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn schedule_empty_section_default() {
+        // No `[[schedule]]` entries — parses to empty SchedulesSection.
+        let s = SchedulesSection::from_toml_str("").unwrap();
+        assert!(s.entries.is_empty());
+        let s = SchedulesSection::default();
+        assert!(s.entries.is_empty());
+    }
+
+    #[test]
+    fn schedule_compliance_claim_ref_hex_invalid_length() {
+        let toml = r#"
+[[schedule]]
+id = "x"
+cadence_secs = 60
+compliance_claim_ref_hex = "deadbeef"
+"#;
+        let err = SchedulesSection::from_toml_str(toml).unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("compliance_claim_ref_hex")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn schedule_side_effect_scopes_round_trip() {
+        // Confirms Scope subtypes round-trip through the manifest parser.
+        let toml = r#"
+[[schedule]]
+id = "arxiv"
+cadence_secs = 86400
+side_effect_scopes = [
+  { NetHttps = { domain = "export.arxiv.org" } },
+  { MemWrite = { scope = "spirit:researcher:papers" } },
+]
+"#;
+        let s = SchedulesSection::from_toml_str(toml).unwrap();
+        let e = &s.entries[0];
+        assert_eq!(e.side_effect_scopes.len(), 2);
+        match &e.side_effect_scopes[0] {
+            maos_domain::invariants::i1::Scope::NetHttps { domain } => {
+                assert_eq!(domain, "export.arxiv.org");
+            }
+            other => panic!("expected NetHttps, got {other:?}"),
+        }
+        match &e.side_effect_scopes[1] {
+            maos_domain::invariants::i1::Scope::MemWrite { scope } => {
+                assert_eq!(scope, "spirit:researcher:papers");
+            }
+            other => panic!("expected MemWrite, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn schedule_payload_b64_round_trip() {
+        let toml = r#"
+[[schedule]]
+id = "arxiv-watch"
+cadence_secs = 60
+payload_b64 = "eyJxdWVyeSI6ImNzLkFJIn0="
+"#;
+        let s = SchedulesSection::from_toml_str(toml).unwrap();
+        let e = &s.entries[0];
+        assert_eq!(
+            std::str::from_utf8(&e.payload_bytes).unwrap(),
+            r#"{"query":"cs.AI"}"#
+        );
+    }
+
+    #[test]
+    fn schedule_compliance_claim_ref_hex_valid_with_sha256_prefix() {
+        let hex64 = "0".repeat(64);
+        let toml = format!(
+            r#"
+[[schedule]]
+id = "x"
+cadence_secs = 60
+compliance_claim_ref_hex = "sha256:{hex64}"
+"#
+        );
+        let s = SchedulesSection::from_toml_str(&toml).unwrap();
+        assert_eq!(s.entries[0].compliance_claim_ref, Some([0u8; 32]));
+    }
+
+    #[test]
+    fn schedule_id_regex_rejects_bad_chars() {
+        let toml = r#"
+[[schedule]]
+id = "has space"
+cadence_secs = 60
+"#;
+        let err = SchedulesSection::from_toml_str(toml).unwrap_err();
+        assert!(
+            matches!(&err, ManifestError::Toml(ref msg) if msg.contains("schedule.id")),
+            "got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn schedule_two_entries_distinct_ids() {
+        let toml = r#"
+[[schedule]]
+id = "a"
+cadence_secs = 1
+
+[[schedule]]
+id = "b"
+cadence_secs = 2
+"#;
+        let s = SchedulesSection::from_toml_str(toml).unwrap();
+        assert_eq!(s.entries.len(), 2);
+        assert_eq!(s.entries[0].id, "a");
+        assert_eq!(s.entries[1].id, "b");
     }
 }

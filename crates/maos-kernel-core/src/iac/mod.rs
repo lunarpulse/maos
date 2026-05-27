@@ -20,6 +20,7 @@ pub mod log_recall; // NEW — Story 4.4 LogRecallAdapter
 pub mod mailbox;
 pub mod mailbox_stub;
 pub mod orchestrator_dispatch; // NEW — Story 6.2 AC2 FR21 distillate-dispatch check
+pub mod payload; // NEW — Story 6.4 typed payloads (ScheduleFireRecord)
 pub mod redaction;
 pub mod transparency_log; // NEW — Story 4.4 DistillateWriter
 
@@ -445,6 +446,12 @@ impl IacBusAdapter {
             }
             maos_spirit_abi::identity::FrameKind::CliSubprocessOutput => {
                 transparency_log::FrameKind::CliSubprocessOutput
+            }
+            maos_spirit_abi::identity::FrameKind::ConsentRupture => {
+                transparency_log::FrameKind::ConsentRupture
+            }
+            maos_spirit_abi::identity::FrameKind::RateLimited => {
+                transparency_log::FrameKind::RateLimited
             }
         };
 

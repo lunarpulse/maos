@@ -1,0 +1,13 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_rate_limited-085",
+  "class": "lineage_chain_uninterrupted",
+  "description": "Story 6.4 — NFR-Scale-4 RateLimited frame emitted on per-(provider, credential) bucket exhaustion. The frame inherits the invocation's intent_lineage so the Spirit can correlate the back-off with the original ProviderInfer call.",
+  "originating_intent": "provider-infer-rate-limited-085",
+  "hop_count": 1,
+  "origin": "spirit_auto",
+  "secondary_intent": null,
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": ["provider-infer-rate-limited-085"]
+  }
+}

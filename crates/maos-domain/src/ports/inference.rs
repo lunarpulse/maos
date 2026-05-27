@@ -150,4 +150,9 @@ pub enum InferenceError {
     /// Provider is not configured (e.g., `MAOS_ANTHROPIC_API_KEY` unset).
     #[error("provider unconfigured")]
     Unconfigured,
+    /// Story 6.4 / NFR-Scale-4 — per-(provider, credential) bucket exhausted.
+    /// The kernel emits a typed `FrameKind::RateLimited` IAC frame in parallel;
+    /// `retry_after_ms` is the recommended back-off interval.
+    #[error("rate limited; retry_after_ms={retry_after_ms}")]
+    RateLimited { retry_after_ms: u64 },
 }

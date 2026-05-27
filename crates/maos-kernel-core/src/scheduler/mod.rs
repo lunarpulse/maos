@@ -19,6 +19,7 @@ pub mod hook_dispatch;
 pub mod idle_watchdog;
 pub mod kernel_ctx;
 pub mod resource_ceiling;
+pub mod schedule_watchdog;
 pub mod scheduler_loop;
 pub mod verb_resolver;
 
@@ -26,5 +27,6 @@ pub use control_block::{make_spirit_obj, AnySpiritObj, SpiritControlBlock, Spiri
 pub use hook_dispatch::{HookDispatcher, HookOutcome};
 pub use idle_watchdog::IdleWatchdog;
 pub use kernel_ctx::KernelCtx;
+pub use schedule_watchdog::ScheduleWatchdog;
 pub use scheduler_loop::{pick_next_spirit_from_slice, SpiritSchedulerAdapter, SCHEDULER_QUANTUM};
 pub use verb_resolver::KernelLifecycleResolver;

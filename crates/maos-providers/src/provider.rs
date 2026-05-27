@@ -11,6 +11,17 @@ use maos_domain::ports::inference::{InferenceRequest, InferenceResponse};
 pub trait Provider {
     /// Perform a single completion call.
     fn complete(&self, req: &InferenceRequest) -> Result<InferenceResponse, ProviderError>;
+
+    /// Story 6.4 / NFR-Scale-4 — return a 64-bit fingerprint of this driver's
+    /// credential bytes for cross-credential isolation in the rate-limit
+    /// bucket map. The default returns `u64::MAX` as a sentinel; each concrete
+    /// provider MUST override with `first-8-bytes-of-sha256(api_key)`. The
+    /// sentinel ensures that a driver forgetting to override shares a bucket
+    /// only with other unconfigured drivers (same type), NOT with real keys.
+    /// Ollama (which has no api_key) overrides with a hash of `base_url`.
+    fn credential_fingerprint(&self) -> u64 {
+        u64::MAX
+    }
 }
 
 /// Provider-level error — concrete variants, no blanket `#[from]`.

@@ -343,6 +343,13 @@ impl CapabilityRegistryAdapter {
         Ok(self.tokens.revoke_all(spirit_pid))
     }
 
+    /// Story 6.4 — return `true` if the spirit holds at least one active
+    /// (non-revoked, non-expired) token. Used by ScheduleWatchdog for the
+    /// principal-revocability gate.
+    pub fn has_active_tokens_for_pid(&self, spirit_pid: u32) -> bool {
+        self.tokens.has_active_tokens_for_spirit(spirit_pid)
+    }
+
     #[cfg(any(test, feature = "test-introspection"))]
     pub fn list_active_tokens(&self) -> Vec<TokenId> {
         self.tokens.list_active()

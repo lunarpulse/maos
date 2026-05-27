@@ -63,6 +63,15 @@ impl CapShard {
         count
     }
 
+    /// Return `true` if this shard holds at least one non-revoked token
+    /// for the given `spirit_pid`.
+    pub fn has_active_tokens_for_spirit(&self, spirit_pid: u32) -> bool {
+        let guard = self.inner.read();
+        guard.values().any(|state| {
+            state.spirit_pid == spirit_pid && !state.revoked.load(Ordering::Acquire)
+        })
+    }
+
     /// Evict expired tokens from this shard. Returns the number evicted.
     /// Called periodically from a maintenance sweep.
     pub fn evict_expired(&self, now_ns: u64) -> usize {

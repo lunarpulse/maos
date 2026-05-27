@@ -58,7 +58,7 @@ pub struct FrameAddress {
     pub role: Option<SpiritRole>,
 }
 
-/// Payload carrier — one variant per `FrameKind` (0..=6).
+/// Payload carrier — one variant per routed `FrameKind`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FramePayload {
     TaskAssign(TaskAssignPayload),
@@ -68,6 +68,10 @@ pub enum FramePayload {
     TelemetryEvent(TelemetryEventPayload),
     ConsentRequest(ConsentRequestPayload),
     Retract(RetractPayload),
+    /// Story 6.4 — ADR-034 binding-v0.9: partial-consent rupture event.
+    ConsentRupture(ConsentRupturePayload),
+    /// Story 6.4 — NFR-Scale-4: per-(provider, credential) bucket-exhaustion event.
+    RateLimited(RateLimitedPayload),
 }
 
 /// FR14: natural-language task assignment payload.
@@ -330,6 +334,69 @@ impl RetractPayload {
             original_kind,
         })
     }
+}
+
+/// Story 6.4 / ADR-034 binding-v0.9 — ConsentRupture payload.
+///
+/// Emitted to the SENDER on receiver-side partial consent rejection.
+/// `accepted` recipients received the original frame; `rejected` recipients
+/// did NOT (their slice is quarantined in the Transparency Log, not delivered).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ConsentRupturePayload {
+    /// ULID for cross-system correlation.
+    pub rupture_id: [u8; 16],
+    /// The frame whose consent fractured.
+    pub original_frame_id: [u8; 16],
+    /// The original frame's kind — preserved so receivers can disposition the
+    /// rupture without re-querying the TL row (which may be redacted).
+    pub original_kind: maos_spirit_abi::identity::FrameKind,
+    pub accepted: Vec<FrameAddress>,
+    pub rejected: Vec<RuptureRejection>,
+    pub ruptured_at_ns: u64,
+}
+
+/// One rejection slice of a `ConsentRupturePayload`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RuptureRejection {
+    pub address: FrameAddress,
+    pub reason: RuptureReason,
+}
+
+/// Why a recipient rejected — the typed third failure-class alongside
+/// ADR-022 crash detection + `task.orphaned`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum RuptureReason {
+    /// Receiver's intent allowlist excludes the frame's `intent`.
+    IntentAllowlistMismatch,
+    /// Receiver's posture shifted between sender's send-decision and
+    /// receiver's accept-evaluation (e.g., autonomous → cautious mid-frame).
+    PostureShiftedDuringTransmission,
+    /// Receiver's capability token was revoked between send and accept.
+    TokenRevoked,
+    /// Receiver's principal_id has an active revocation.
+    PrincipalRevoked,
+    /// Receiver's mailbox channel is closed (Spirit unloaded mid-frame).
+    RecipientUnloaded,
+}
+
+/// Story 6.4 / NFR-Scale-4 — RateLimited payload.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RateLimitedPayload {
+    pub provider_id: String,
+    /// SHA-256 hex (8-byte prefix) of the credential bytes for cross-credential
+    /// disambiguation in logs; full credential never logged.
+    pub credential_fingerprint_prefix_hex: String,
+    pub retry_after_ms: u64,
+    /// Bucket state at exhaustion time (for client-side back-off planning).
+    pub bucket_remaining: u32,
+    pub bucket_capacity: u32,
+    pub refill_per_sec: u32,
+    /// Optional schedule_id when the rate-limit fires under a scheduled
+    /// invocation context (cross-link to AC2).
+    #[serde(default)]
+    pub schedule_id: Option<String>,
 }
 
 /// Consent envelope for ADR-012 — v0.3 skeleton; Story 6.3 ADR-012

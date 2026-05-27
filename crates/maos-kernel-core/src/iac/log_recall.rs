@@ -121,6 +121,8 @@ impl LogRecallAdapter {
             FrameKind::SpiritAdmitted => DomainFrameKindLabel::SpiritAdmitted,
             FrameKind::RegistryYank => DomainFrameKindLabel::RegistryYank,
             FrameKind::CliSubprocessOutput => DomainFrameKindLabel::CliSubprocessOutput,
+            FrameKind::ConsentRupture => DomainFrameKindLabel::ConsentRupture,
+            FrameKind::RateLimited => DomainFrameKindLabel::RateLimited,
         }
     }
 
