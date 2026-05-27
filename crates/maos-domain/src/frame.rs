@@ -332,12 +332,25 @@ impl RetractPayload {
     }
 }
 
-/// Consent envelope for ADR-012 — None at v0.3 (Story 6.3).
+/// Consent envelope for ADR-012 — v0.3 skeleton; Story 6.3 ADR-012
+/// binding-v0.9 adds the typed-intent + expiry projection.
+///
+/// The new fields are `#[serde(default)]` so v0.3-era wire payloads still
+/// deserialize correctly (ABI-additive contract).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ConsentEnvelope {
     pub consent_id: [u8; 16],
     pub granter: FrameAddress,
     pub timestamp_ns: u64,
+    /// Story 6.3 / ADR-012 binding-v0.9 — typed-intent for cross-Host consent.
+    /// Filled by the sender's A2A outbound path; verified by the receiver's
+    /// A2A intake. Same-Host frames use `None`.
+    #[serde(default)]
+    pub intent_class: Option<crate::invariants::i8::A2AIntent>,
+    /// Story 6.3 — consent envelope expiry. Receiver rejects with
+    /// `A2AError::ConsentExpired` if `now > valid_until_ns`. `None` = open-ended.
+    #[serde(default)]
+    pub valid_until_ns: Option<u64>,
 }
 
 #[cfg(test)]

@@ -27,6 +27,7 @@ use maos_domain::frame::IacFrame;
 use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i2::LogBeforeDeliver;
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::ports::a2a::A2ARouter; // Story 6.3
 use maos_domain::ports::IacBusPort;
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 
@@ -38,12 +39,26 @@ use crate::telemetry::iac_rt::IacRtMetrics;
 #[maos_attrs::i9_exempt(
     reason = "per-Spirit mailbox router; DashMap holds transient per-process mpsc senders, not persistent state"
 )]
-#[derive(Debug)]
 pub struct Mailbox {
     mpsc_senders: DashMap<(String, FrameKind), mpsc::Sender<IacFrame>>,
     broadcast_sender: broadcast::Sender<IacFrame>,
     metrics: Arc<IacRtMetrics>,
     scbs: Mutex<Option<Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>>>,
+    /// Story 6.3 — A2A router installed at composition root. `None` means
+    /// no peer is configured; cross-host frames fire `CrossHostNotConfigured`.
+    a2a_router: Option<Arc<dyn A2ARouter>>,
+}
+
+impl std::fmt::Debug for Mailbox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Mailbox")
+            .field("mpsc_senders", &self.mpsc_senders)
+            .field("broadcast_sender", &self.broadcast_sender)
+            .field("metrics", &self.metrics)
+            .field("scbs", &self.scbs)
+            .field("a2a_router_present", &self.a2a_router.is_some())
+            .finish()
+    }
 }
 
 impl Mailbox {
@@ -54,6 +69,7 @@ impl Mailbox {
             broadcast_sender,
             metrics,
             scbs: Mutex::new(None),
+            a2a_router: None,
         }
     }
 
@@ -67,7 +83,15 @@ impl Mailbox {
             broadcast_sender,
             metrics,
             scbs: Mutex::new(Some(scbs)),
+            a2a_router: None,
         }
+    }
+
+    /// Story 6.3 — install the A2A router at composition root. Returns
+    /// `self` to allow chained builders.
+    pub fn with_a2a_router(mut self, router: Arc<dyn A2ARouter>) -> Self {
+        self.a2a_router = Some(router);
+        self
     }
 
     pub fn register_spirit(&self, spirit_id: &str) -> Result<SpiritMailboxHandle, IacBusError> {
@@ -119,18 +143,24 @@ impl Mailbox {
             return Ok(LogBeforeDeliver::new(()));
         }
 
-        // Phase 1: Validate all recipients exist
+        // Phase 1: Partition recipients into same-host and cross-host.
+        // Story 6.3 — cross-host frames route via the installed A2ARouter;
+        // when no router is installed, fire `CrossHostNotConfigured`.
+        let mut cross_host_targets: Vec<maos_spirit_abi::identity::HostId> = Vec::new();
         for addr in &frame.to {
             let spirit_id = addr.spirit_id.as_str().to_string();
-            if addr.host_id.is_some() {
-                return Err(IacBusError::CrossHostUnsupported);
+            if let Some(host_id) = &addr.host_id {
+                cross_host_targets.push(host_id.clone());
+                continue; // same-host validation skipped for cross-host addresses
             }
             if !self.mpsc_senders.contains_key(&(spirit_id.clone(), kind)) {
                 return Err(IacBusError::UnknownSpirit(spirit_id));
             }
         }
 
-        // Phase 2: Send to all validated recipients (backpressure via send().await)
+        // Phase 2: Deliver to same-host recipients FIRST (independent from
+        // cross-host). Per D3: cross-host failures MUST NOT block same-host
+        // delivery — these are separate concerns.
         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
 
         // Story 5.3 — update sender's last_progress_iac_ns for spirit-origin frames.
@@ -153,6 +183,11 @@ impl Mailbox {
         }
 
         for addr in &frame.to {
+            // Story 6.3 — cross-host addresses are routed in Phase 3; skip
+            // the same-host mailbox path for those.
+            if addr.host_id.is_some() {
+                continue;
+            }
             let spirit_id = addr.spirit_id.as_str().to_string();
             let sender = self
                 .mpsc_senders
@@ -185,6 +220,34 @@ impl Mailbox {
                     }
                     return Err(IacBusError::ChannelClosed(spirit_id, kind));
                 }
+            }
+        }
+
+        // Phase 3: Route cross-host frames through the A2A router.
+        // Per-architecture §7.2 + AC2/AC3: cross-host delivery is independent
+        // from same-host; same-host recipients already got their copy above.
+        // Per-target error collection: deliver to all reachable peers, return
+        // the first error (or Ok if all succeed).
+        if !cross_host_targets.is_empty() {
+            let router = self.a2a_router.as_ref().ok_or_else(|| {
+                IacBusError::CrossHostNotConfigured {
+                    host_id: cross_host_targets
+                        .iter()
+                        .map(|h| h.as_str().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                }
+            })?;
+            let mut first_err: Option<IacBusError> = None;
+            for host_id in &cross_host_targets {
+                if let Err(e) = router.route_outbound(frame.clone(), host_id).await {
+                    if first_err.is_none() {
+                        first_err = Some(e);
+                    }
+                }
+            }
+            if let Some(e) = first_err {
+                return Err(e);
             }
         }
 
@@ -456,13 +519,65 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn cross_host_addressing_rejected() {
+    async fn cross_host_addressing_rejected_when_no_router_configured() {
+        // Story 6.3 AC2 — replaces `CrossHostUnsupported` blanket reject with
+        // `CrossHostNotConfigured` for the operator-not-configured case.
         let metrics = Arc::new(IacRtMetrics::new());
         let mailbox = Mailbox::new(metrics);
         let _handle = mailbox.register_spirit("test-spirit").unwrap();
         let mut frame = make_test_frame();
         frame.to[0].host_id = Some(HostId("remote".into()));
         let result = mailbox.deliver(frame).await;
-        assert!(matches!(result, Err(IacBusError::CrossHostUnsupported)));
+        assert!(
+            matches!(
+                result,
+                Err(IacBusError::CrossHostNotConfigured { ref host_id }) if host_id == "remote"
+            ),
+            "expected CrossHostNotConfigured, got {result:?}"
+        );
+    }
+
+    /// Story 6.3 AC2 — when the A2A router IS installed, cross-host frames
+    /// route through it. The test fixture's router is a stub that records the
+    /// outbound call and returns `Ok`; verify the router is consulted and
+    /// no `CrossHostNotConfigured` error fires.
+    #[tokio::test]
+    async fn cross_host_routes_through_installed_a2a_router() {
+        use async_trait::async_trait;
+        use maos_domain::ports::a2a::A2ARouter;
+
+        // Initialize the monotonic clock base (kernel-core's runtime
+        // invariant; the production path initializes at composition root).
+        crate::capability::cap_tokens::init_monotonic_base();
+
+        struct StubRouter {
+            calls: tokio::sync::Mutex<Vec<String>>,
+        }
+        #[async_trait]
+        impl A2ARouter for StubRouter {
+            async fn route_outbound(
+                &self,
+                _frame: IacFrame,
+                peer: &HostId,
+            ) -> Result<(), IacBusError> {
+                let mut g = self.calls.lock().await;
+                g.push(peer.as_str().to_string());
+                Ok(())
+            }
+        }
+
+        let metrics = Arc::new(IacRtMetrics::new());
+        let stub = Arc::new(StubRouter {
+            calls: tokio::sync::Mutex::new(Vec::new()),
+        });
+        let mailbox = Mailbox::new(metrics).with_a2a_router(stub.clone());
+        let _handle = mailbox.register_spirit("test-spirit").unwrap();
+        let mut frame = make_test_frame();
+        frame.to[0].host_id = Some(HostId("remote-peer".into()));
+        let result = mailbox.deliver(frame).await;
+        assert!(result.is_ok(), "expected Ok, got {result:?}");
+        let calls = stub.calls.lock().await;
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "remote-peer");
     }
 }

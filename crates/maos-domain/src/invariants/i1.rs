@@ -121,6 +121,18 @@ impl IntentClass {
             IntentClass::Readonly => "Readonly",
         }
     }
+
+    /// A2A consent intent string — stable lowercase projection for ADR-012
+    /// send/accept allowlist matching. This is the canonical A2A-intent
+    /// surface, not the Debug representation, so allowlist matching is
+    /// stable across Rust version upgrades and variant renames.
+    pub fn a2a_consent_intent_str(&self) -> &'static str {
+        match self {
+            IntentClass::HighPrivilege => "highprivilege",
+            IntentClass::Standard => "standard",
+            IntentClass::Readonly => "readonly",
+        }
+    }
 }
 
 /// Capability token — short-lived authorization to invoke a specific

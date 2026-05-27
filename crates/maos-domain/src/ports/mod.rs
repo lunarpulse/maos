@@ -29,6 +29,7 @@
 //! doc lacks a `/// Class:` line, OR carries a class not in the three-element
 //! set, defaults to `other` and fails the surface gate.
 
+pub mod a2a; // NEW — Story 6.3 A2ARouter port per ADR-003 + ADR-012
 pub mod capability;
 pub mod distillation; // NEW — Story 4.4 DistillationPort per AC2
 pub mod iac_bus;
@@ -46,6 +47,7 @@ pub mod telemetry; // NEW — Story 5.3 in-flight task assignment record
 
 pub mod crypto; // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 / §8.6
 
+pub use a2a::A2ARouter; // NEW — Story 6.3
 pub use capability::CapabilityRegistryPort;
 pub use crypto::{CryptoError, CryptoProvider};
 pub use distillation::DistillationPort; // NEW — Story 4.4

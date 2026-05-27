@@ -22,8 +22,52 @@ pub enum IacBusError {
     ChannelClosed(String, FrameKind),
     #[error("frame serialization failed: {0}")]
     SerializationFailed(String),
-    #[error("cross-host routing unsupported at v0.3-β (Story 6.3)")]
-    CrossHostUnsupported,
+    /// Story 6.3 — cross-host routing requested but no A2A peer configured
+    /// for the named `host_id`. Replaces the v0.3-β `CrossHostUnsupported`
+    /// blanket reject — the kernel-core mailbox now routes through the
+    /// composition-root-installed `A2ARouter` when one is present, and only
+    /// fires this variant when the operator has not declared a peer.
+    #[error("cross-host routing requires an A2A peer configured for host_id {host_id}")]
+    CrossHostNotConfigured { host_id: String },
+    /// Story 6.3 — ADR-012 typed-intent consent denied by the A2A router
+    /// (send-side or accept-side). The direction distinguishes SENDER-side
+    /// outbound rejection from RECEIVER-side intake rejection.
+    #[error("cross-host intent denied ({direction:?}): {intent} for peer {peer}")]
+    CrossHostIntentDenied {
+        peer: String,
+        intent: String,
+        direction: CrossHostIntentDirection,
+    },
+    /// Story 6.3 — TOFU pin mismatch or not-pinned on cross-host delivery.
+    #[error("cross-host pin mismatch for peer {peer}: {detail}")]
+    CrossHostPinMismatch { peer: String, detail: String },
+    /// Story 6.3 — consent envelope expired on cross-host delivery.
+    #[error("cross-host consent expired for peer {peer} at {expired_at_ns} (now {now_ns})")]
+    CrossHostConsentExpired {
+        peer: String,
+        expired_at_ns: u64,
+        now_ns: u64,
+    },
+    /// Story 6.3 — outbound timed out awaiting receiver ACK — partition
+    /// behavior per architecture §7.2.
+    #[error("cross-host partition timeout for peer {peer} after {timeout_secs}s (frame {frame_id:?})")]
+    CrossHostPartitionTimeout {
+        peer: String,
+        frame_id: [u8; 16],
+        timeout_secs: u64,
+    },
+    /// Story 6.3 — cross-host transport failure (serialization / I/O / framing).
+    #[error("cross-host transport failure for peer {peer}: {detail}")]
+    CrossHostTransportFailure { peer: String, detail: String },
+    /// Story 6.3 — the A2A router returned a failure when routing a
+    /// cross-host frame (intent denied / TOFU mismatch / partition / etc.).
+    /// String-bearing per ADR-010 hexagonal layering (maos-domain MUST NOT
+    /// depend on maos-a2a; the maos-a2a adapter formats `A2AError` into the
+    /// string carrier when constructing this variant).
+    /// DEPRECATED — use the typed sub-variants above instead. This variant
+    /// is retained for backward compatibility with existing test stubs.
+    #[error("cross-host A2A route failed: {0}")]
+    CrossHostRouteFailure(String),
     #[error("channel full for spirit {0} kind {1:?} — backpressure")]
     QueueFull(String, FrameKind),
     #[error("spirit {0} is already registered — deregister before re-registering")]
@@ -57,6 +101,13 @@ pub enum IacBusError {
         orchestrator: String,
         task_id: String,
     },
+}
+
+/// Direction context for cross-host intent denial — per ADR-012 defense-in-depth.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CrossHostIntentDirection {
+    Send,
+    Accept,
 }
 
 /// Outcome of a `retract` operation — Story 6.1.

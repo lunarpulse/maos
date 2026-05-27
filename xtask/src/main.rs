@@ -325,13 +325,19 @@ enum Commands {
     /// Story 6.1 AC1 — Epic 6 bridge precondition gate (9 mechanical checks).
     /// Story 6.2 AC1 — extended with `--story 6.2` flag adding 6.2-specific rows
     /// (D-2.10 retract-corpus, D-4.* iac-routing-budget, D-3.7/3.8 DRR fairness,
-    /// D-5.1/5.2 smoke-iac-bus-6, §A4-Debt-2c hook-count drift). When the flag
-    /// is set, blocking_6_2 rows must clear before the command exits 0.
+    /// D-5.1/5.2 smoke-iac-bus-6, §A4-Debt-2c hook-count drift).
+    /// Story 6.3 AC1 — extended with `--story 6.3` flag adding 10 6.3-specific
+    /// row classifications (§A3/§A5/§A6 gate-exists, 6.2 smoke-arm, iac-routing
+    /// budget, retract-corpus, DRR carry-forward, cli_wrapper bench carry-forward,
+    /// §A2 backfill carry-forward, 6.2 RF count, smoke-iac-bus chain, maos-a2a
+    /// baseline). When `--story 6.X` is set, blocking_6_X rows must clear before
+    /// the command exits 0.
     #[command(name = "check-epic-6-bridge")]
     CheckEpic6Bridge {
         #[arg(long)]
         json: bool,
-        /// Story scope — if set to "6.2", extends the gate with Story 6.2 rows.
+        /// Story scope — "6.2" extends with Story 6.2 rows; "6.3" extends with
+        /// Story 6.3 rows. Unset = Story 6.1 legacy 9-check semantics.
         #[arg(long)]
         story: Option<String>,
     },

@@ -903,8 +903,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-epic-6-bridge
+      - name: Run check-epic-6-bridge (6.1 legacy)
         run: cargo run -p xtask -- check-epic-6-bridge --json
+      - name: Run check-epic-6-bridge --story 6.2
+        run: cargo run -p xtask -- check-epic-6-bridge --story 6.2 --json
+      - name: Run check-epic-6-bridge --story 6.3
+        run: cargo run -p xtask -- check-epic-6-bridge --story 6.3 --json
 
   # Story 6.1 — retract corpus integration tests (AC2)
   retract-corpus-tests:
@@ -1015,9 +1019,66 @@ jobs:
           MAOS_ONE_SHOT: smoke-orchestrator-fanout-6-2
         run: ./target/release/maos-bin
 
+  # Story 6.3 AC7 — smoke-a2a-loopback-6-3 A2A wedge demo.
+  smoke-a2a-loopback-6-3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build maos-bin
+        run: cargo build -p maos-bin --release --features fixture_replay
+      - name: Run smoke-a2a-loopback-6-3
+        env:
+          MAOS_ONE_SHOT: smoke-a2a-loopback-6-3
+        run: ./target/release/maos-bin
+
+  # Story 6.3 AC2 — FR23a + NFR-Sec-11/12 corpus + cross-Host AC3 + NFR-Rel-6 + chaos + churn
+  a2a-loopback-corpus-v0:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run maos-a2a unit tests (74 tests)
+        run: cargo test -p maos-a2a --lib --locked
+      - name: Run AC3 cross-host consent v1 integration test
+        run: cargo test -p maos-a2a --test cross_host_consent_v1 --locked
+      - name: Run AC4 NFR-Rel-6 restart-pin integration test
+        run: cargo test -p maos-a2a --test restart_invalidates_pin_nfr_rel_6 --locked
+      - name: Run AC5 NFR-Sec-13 cert rotation chaos test
+        run: cargo test -p maos-a2a --test cert_rotation_chaos_3_host --locked
+      - name: Run AC6 NFR-Rel-7 churn scaffold test
+        run: cargo test -p maos-a2a --test churn_3_host_scaffold --locked
+
+  # Story 6.3 Task 6 — verify Story 6.2's lineage corpus loads the 20 NEW A2A scenarios.
+  intent-lineage-a2a-extension-6-3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run intent_lineage_corpus_load
+        run: cargo test -p maos-eval --test intent_lineage_corpus_load --locked
+
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3]
     if: always()
     permissions:
       pull-requests: write

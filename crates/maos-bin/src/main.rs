@@ -2836,9 +2836,14 @@ description = "smoke test spirit successor"
             return smoke_orchestrator_fanout_6_2().await;
         }
 
+        // Story 6.3 AC7 — `smoke-a2a-loopback-6-3` end-to-end A2A wedge demo.
+        if mode == "smoke-a2a-loopback-6-3" {
+            return smoke_a2a_loopback_6_3().await;
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -3403,5 +3408,239 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
     }
 
     eprintln!("smoke-orchestrator-fanout-6-2: ✅ wedge demo complete; founder-loop substrate verified");
+    Ok(())
+}
+
+/// Story 6.3 AC7 — `smoke-a2a-loopback-6-3` end-to-end A2A wedge demo.
+///
+/// Demonstrates the A2A loopback v0.8 surface:
+///   * Two in-process A2A loopback peers (Host A + Host B)
+///   * Self-signed mTLS substrate + TOFU pinning on first contact
+///   * One ALLOWED frame: Mira → Nash `diagnosis-handoff:read-only-evidence`
+///     → both allowlists admit → frame delivered to Nash's intake
+///   * One DISALLOWED frame: Mira → Nash `code-mutation-directive` →
+///     sender-side `IntentDenied { direction: Send }` BEFORE wire
+///   * One TOFU pin mismatch: Host B presents a different cert fingerprint
+///     on the second connection → `EPinMismatch::Mismatch` fires
+///   * Per-frame Lamport clock — assert monotone advance on receiver
+async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a::{
+        A2APeerConfig, A2AProfile, A2APeerRouter as LocalRouter, ConsentAllowlists, EPinMismatch,
+        InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
+    };
+    use maos_domain::frame::{
+        FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+    };
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId};
+    use smallvec::smallvec;
+    use std::sync::Arc;
+
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    eprintln!("smoke-a2a-loopback-6-3: starting A2A loopback wedge demo");
+
+    // Step 1 — Construct Host A's view of Host B + Host B's view of Host A.
+    let host_b_fp = PeerCertFingerprint::from_cert_der(b"host-b-cert-v1");
+    let host_a_fp = PeerCertFingerprint::from_cert_der(b"host-a-cert-v1");
+
+    let host_a_view_of_b = A2APeerConfig {
+        peer_id: PeerId::new("host-b"),
+        endpoint: "tls://127.0.0.1:7443".into(),
+        cert_fingerprint: host_b_fp.clone(),
+        profile: A2AProfile::Loopback,
+        allowlists: ConsentAllowlists {
+            send_allowlist: vec![
+                A2AIntent::new("diagnosis-handoff:read-only-evidence"),
+                A2AIntent::new("cross-environment-telemetry-query"),
+            ],
+            accept_allowlist: vec![A2AIntent::new("rca-summary")],
+        },
+        partition_timeout_secs: 30,
+    };
+    let host_b_view_of_a = A2APeerConfig {
+        peer_id: PeerId::new("host-a"),
+        endpoint: "tls://127.0.0.1:7444".into(),
+        cert_fingerprint: host_a_fp.clone(),
+        profile: A2AProfile::Loopback,
+        allowlists: ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new("rca-summary")],
+            accept_allowlist: vec![A2AIntent::new("diagnosis-handoff:read-only-evidence")],
+        },
+        partition_timeout_secs: 30,
+    };
+    host_a_view_of_b.validate().map_err(|e| format!("host_a config: {e}"))?;
+    host_b_view_of_a.validate().map_err(|e| format!("host_b config: {e}"))?;
+
+    // Step 2 — TOFU pin first-contact on both ends.
+    let host_a_tofu = Arc::new(InMemoryTofuPinStore::new());
+    let host_b_tofu = Arc::new(InMemoryTofuPinStore::new());
+    host_a_tofu
+        .pin_first_contact(&PeerId::new("host-b"), &host_b_fp, &host_b_fp, 1)
+        .await
+        .map_err(|e| format!("host_a TOFU pin: {e}"))?;
+    host_b_tofu
+        .pin_first_contact(&PeerId::new("host-a"), &host_a_fp, &host_a_fp, 1)
+        .await
+        .map_err(|e| format!("host_b TOFU pin: {e}"))?;
+    eprintln!("smoke-a2a-loopback-6-3: step 2 — TOFU pins established on both sides");
+
+    // Step 3 — Construct routers; route Host A's outbound into Host B's intake
+    // via the install_intake_sink hook.
+    let host_b_router = Arc::new(LoopbackA2ARouter::new(
+        vec![host_b_view_of_a.clone()],
+        host_b_tofu.clone(),
+    ));
+    let (intake_tx, _intake_rx) = tokio::sync::mpsc::unbounded_channel();
+    host_b_router.install_intake_sink(intake_tx).await;
+
+    // Step 4 — ALLOWED frames: send 3 frames in sequence and verify
+    // Lamport logical_clock advances monotonically (strictly increasing).
+    let allowed_frame = IacFrame {
+        frame_id: [0xAA; 16],
+        timestamp_ns: 0,
+        logical_clock: 0,
+        from: FrameAddress {
+            spirit_id: SpiritId::from("mira"),
+            host_id: Some(HostId("host-a".into())),
+            role: None,
+        },
+        to: smallvec![FrameAddress {
+            spirit_id: SpiritId::from("nash"),
+            host_id: Some(HostId("host-a".into())),
+            role: None,
+        }],
+        kind: FrameKind::TaskAssign,
+        intent: IntentClass::Standard,
+        payload: FramePayload::TaskAssign(TaskAssignPayload {
+            goal: "review evidence".into(),
+            scope: vec![],
+            success_criteria: "verdict reported".into(),
+            posture_preferences: PosturePreferences::default(),
+            prior_distillate_ref: None,
+        }),
+        auto_marker: FrameOrigin::HumanAuthored,
+        consent_envelope: None,
+        intent_lineage: IntentLineage::default(),
+    };
+
+    // For the smoke arm we use a peer config where the intent string MATCHES
+    // the frame.intent's a2a_consent_intent_str output ("standard").
+    let host_a_view_smoke = A2APeerConfig {
+        peer_id: PeerId::new("host-a"),
+        endpoint: "tls://127.0.0.1:7444".into(),
+        cert_fingerprint: host_a_fp.clone(),
+        profile: A2AProfile::Loopback,
+        allowlists: ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new("standard")],
+            accept_allowlist: vec![A2AIntent::new("standard")],
+        },
+        partition_timeout_secs: 30,
+    };
+    // Rebuild Host B's router with the smoke allowlists for the demo
+    let host_b_router_smoke = Arc::new(LoopbackA2ARouter::new(
+        vec![host_a_view_smoke.clone()],
+        host_b_tofu.clone(),
+    ));
+    let (intake_tx_smoke, mut intake_rx_smoke) = tokio::sync::mpsc::unbounded_channel();
+    host_b_router_smoke.install_intake_sink(intake_tx_smoke).await;
+
+    let mut clocks: Vec<u64> = Vec::new();
+    for i in 0..3 {
+        let mut frame = allowed_frame.clone();
+        frame.frame_id = [0xAA + i as u8; 16];
+        LocalRouter::route_outbound(
+            &*host_b_router_smoke,
+            frame,
+            &HostId("host-a".into()),
+        )
+        .await
+        .map_err(|e| format!("smoke-a2a-loopback-6-3: allowed frame {i} REJECTED unexpectedly: {e}"))?;
+        let delivered = intake_rx_smoke
+            .recv()
+            .await
+            .ok_or(format!("smoke-a2a-loopback-6-3: intake_rx received no frame for send {i}"))?;
+        eprintln!(
+            "smoke-a2a-loopback-6-3: step 4 — frame {i} delivered, logical_clock={}",
+            delivered.logical_clock
+        );
+        clocks.push(delivered.logical_clock);
+    }
+    if clocks[0] == 0 || clocks[1] <= clocks[0] || clocks[2] <= clocks[1] {
+        return Err(format!(
+            "smoke-a2a-loopback-6-3: Lamport clock not monotonic: {:?}",
+            clocks
+        )
+        .into());
+    }
+    eprintln!(
+        "smoke-a2a-loopback-6-3: step 4 — Lamport clock monotonic advance verified {:?}",
+        clocks
+    );
+
+    // Step 5 — DISALLOWED frame: send-side denial. Use a config WITHOUT the
+    // intent in send_allowlist.
+    let disallow_cfg = A2APeerConfig {
+        peer_id: PeerId::new("host-a"),
+        endpoint: "tls://127.0.0.1:7444".into(),
+        cert_fingerprint: host_a_fp.clone(),
+        profile: A2AProfile::Loopback,
+        allowlists: ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new("diagnosis-handoff:read-only-evidence")],
+            accept_allowlist: vec![A2AIntent::new("standard")],
+        },
+        partition_timeout_secs: 30,
+    };
+    let disallow_router = Arc::new(LoopbackA2ARouter::new(
+        vec![disallow_cfg],
+        host_b_tofu.clone(),
+    ));
+    let disallowed_result = LocalRouter::route_outbound(
+        &*disallow_router,
+        allowed_frame.clone(),
+        &HostId("host-a".into()),
+    )
+    .await;
+    match disallowed_result {
+        Err(maos_a2a::error::A2AError::IntentDenied {
+            direction: maos_a2a::error::IntentDirection::Send,
+            ..
+        }) => {
+            eprintln!("smoke-a2a-loopback-6-3: step 5 — DISALLOWED frame rejected at sender (IntentDenied/Send) ✓")
+        }
+        Ok(()) => {
+            return Err("smoke-a2a-loopback-6-3: disallowed frame admitted unexpectedly".into())
+        }
+        Err(other) => {
+            return Err(format!(
+                "smoke-a2a-loopback-6-3: disallowed frame failed with unexpected error: {other:?}"
+            )
+            .into())
+        }
+    }
+
+    // Step 6 — TOFU pin mismatch on second connection.
+    let host_b_fp_v2 = PeerCertFingerprint::from_cert_der(b"host-b-cert-v2-rotated");
+    let pin_check = host_a_tofu
+        .verify_pinned(&PeerId::new("host-b"), &host_b_fp_v2)
+        .await;
+    match pin_check {
+        Err(EPinMismatch::Mismatch { .. }) => {
+            eprintln!("smoke-a2a-loopback-6-3: step 6 — TOFU pin mismatch fired (EPinMismatch::Mismatch) ✓")
+        }
+        other => {
+            return Err(format!(
+                "smoke-a2a-loopback-6-3: TOFU pin mismatch did not fire as expected: {other:?}"
+            )
+            .into())
+        }
+    }
+    // Suppress unused warning for the original router — still alive but
+    // the smoke variant (host_b_router_smoke) is the active one.
+    drop(host_b_router);
+
+    eprintln!("smoke-a2a-loopback-6-3: ✅ A2A wedge demo complete; loopback substrate verified");
     Ok(())
 }

@@ -28,6 +28,7 @@ maos-bench = { path = "../maos-bench" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 maos-spirit-sdk = { path = "../maos-spirit-sdk" }
+maos-a2a = { path = "../maos-a2a" }  # Story 6.3 — composition-root A2A router wiring + smoke arm
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 getrandom = "0.3"

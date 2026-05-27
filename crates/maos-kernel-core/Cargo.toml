@@ -87,6 +87,8 @@ fixture_replay = ["maos-mcp/fixture_replay", "maos-providers/fixture_replay"]
 # Enable test-introspection methods from maos-capability in kernel-core tests
 maos-capability = { path = "../maos-capability", features = ["test-introspection"] }
 tempfile = "3"
+# Story 6.3 — needed for the cross-host router stub in mailbox tests.
+async-trait = "0.1"
 criterion = "0.5"
 tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time"] }
 # Story 5.1 review backfill — `mock` feature enabled for tests only.

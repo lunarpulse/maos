@@ -1,0 +1,412 @@
+//! TOFU (Trust On First Use) pin store + re-pin protocol.
+//!
+//! Per architecture §7.2: "First-contact TOFU pinning verifies the configured
+//! fingerprint; subsequent connections re-verify against the pinned cert."
+//!
+//! Per NFR-Rel-6 (Story 6.3 AC4): "Spirit-restart invalidates prior A2A TOFU
+//! pins; re-pin protocol with consent confirmation."
+
+use crate::error::A2AError;
+use crate::identity::{PeerCertFingerprint, PeerId};
+use async_trait::async_trait;
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+
+/// A TOFU pin record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TofuPin {
+    pub peer: PeerId,
+    pub fingerprint: PeerCertFingerprint,
+    /// Spirit boot_nonce captured at pin time. NFR-Rel-6: when a new
+    /// boot_nonce arrives for the same `(peer, spirit_id)`, the pin is
+    /// invalidated and re-pin consent is required.
+    pub boot_nonce: u64,
+    /// Monotonic time at pin (used for staleness diagnostics; NOT a TTL).
+    pub pinned_at_ns: u64,
+    /// When the pin was invalidated; `None` = active.
+    pub invalidated: Option<Invalidated>,
+    /// Approval id of the operator consent that re-pinned this record.
+    /// `None` for the first-contact pin; populated by re-pin approval.
+    pub repin_approval_id: Option<[u8; 16]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Invalidated {
+    SpiritRestarted { prior_boot_nonce: u64 },
+    Manual,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum EPinMismatch {
+    #[error("TOFU pin mismatch for peer {peer}: pinned {pinned} observed {observed}")]
+    Mismatch {
+        peer: String,
+        pinned: String,
+        observed: String,
+    },
+    #[error("no TOFU pin recorded for peer {0} — first-contact not yet attempted")]
+    NotPinned(String),
+    #[error("TOFU pin invalidated for peer {peer}: {reason}")]
+    Invalidated {
+        peer: String,
+        reason: String,
+    },
+}
+
+/// Operator decision on a re-pin request.
+///
+/// Story 6.3 AC4: re-pin requires explicit consent confirmation via the
+/// Approval Decision Log (the existing `interactive` prompt-class surface
+/// from architecture §8.3). The decision is recorded by `approval_id`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RePinDecision {
+    AcceptedByOperator { approval_id: [u8; 16] },
+    RejectedByOperator { reason: String },
+    TimedOut,
+}
+
+/// TOFU pin store trait — the persistence-backed implementation lives in
+/// `maos-persistence` (existing crate boundary). For v0.5 the in-memory
+/// impl below is the default; the persistence-backed impl can ship in a
+/// follow-up without changing the trait surface.
+#[async_trait]
+pub trait TofuPinStore: Send + Sync {
+    /// First-contact pin recording. The operator config's declared fingerprint
+    /// is matched against the observed cert fingerprint; mismatch fires
+    /// `EPinMismatch::Mismatch` at first contact (the strict-binding semantic
+    /// from architecture §7.2).
+    async fn pin_first_contact(
+        &self,
+        peer: &PeerId,
+        observed: &PeerCertFingerprint,
+        declared: &PeerCertFingerprint,
+        boot_nonce: u64,
+    ) -> Result<TofuPin, EPinMismatch>;
+
+    /// Re-verify: every subsequent connection compares the observed cert to
+    /// the pinned fingerprint. NFR-Sec-12: 100% pin-mismatch detected.
+    async fn verify_pinned(
+        &self,
+        peer: &PeerId,
+        observed: &PeerCertFingerprint,
+    ) -> Result<(), EPinMismatch>;
+
+    /// NFR-Rel-6: Spirit-restart invalidates prior A2A TOFU pins. Called
+    /// from `LifecycleHooks::on_restart_observed_at_peer`; the pin is
+    /// marked `Invalidated::SpiritRestarted` and re-pin consent is required.
+    async fn invalidate_for_restart(
+        &self,
+        peer: &PeerId,
+        prior_boot_nonce: u64,
+    ) -> Result<(), A2AError>;
+
+    /// Await operator re-pin consent decision. Returns the decision recorded
+    /// in the Approval Decision Log. On acceptance, materializes a new pin
+    /// with the supplied `new_boot_nonce`.
+    async fn await_repin_consent(
+        &self,
+        peer: &PeerId,
+        new_observed: &PeerCertFingerprint,
+        new_boot_nonce: u64,
+    ) -> RePinDecision;
+
+    /// Read the current pin (if any) — used by the chaos harness + diagnostics.
+    async fn get_pin(&self, peer: &PeerId) -> Option<TofuPin>;
+}
+
+/// Default in-memory TOFU pin store. Per architecture I9 ("Empty kernel") the
+/// production impl is persistence-backed at `maos-persistence`; this default
+/// is the v0.5 scaffold + test fixture.
+pub struct InMemoryTofuPinStore {
+    pins: Arc<DashMap<String, TofuPin>>,
+    /// Optional hook to drive `await_repin_consent` deterministically from
+    /// tests; production path defers to the Approval Decision Log (which is
+    /// out-of-band and not modeled in this crate's surface).
+    test_repin_hook: Arc<dyn Fn(&PeerId, &PeerCertFingerprint, u64) -> RePinDecision + Send + Sync>,
+}
+
+impl Default for InMemoryTofuPinStore {
+    fn default() -> Self {
+        Self {
+            pins: Arc::new(DashMap::new()),
+            test_repin_hook: Arc::new(|_, _, _| RePinDecision::TimedOut),
+        }
+    }
+}
+
+impl InMemoryTofuPinStore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Install a re-pin hook for deterministic tests of NFR-Rel-6 AC4.
+    pub fn with_repin_hook<F>(mut self, hook: F) -> Self
+    where
+        F: Fn(&PeerId, &PeerCertFingerprint, u64) -> RePinDecision + Send + Sync + 'static,
+    {
+        self.test_repin_hook = Arc::new(hook);
+        self
+    }
+}
+
+#[async_trait]
+impl TofuPinStore for InMemoryTofuPinStore {
+    async fn pin_first_contact(
+        &self,
+        peer: &PeerId,
+        observed: &PeerCertFingerprint,
+        declared: &PeerCertFingerprint,
+        boot_nonce: u64,
+    ) -> Result<TofuPin, EPinMismatch> {
+        // Guard against double-pin: if a pin already exists for this peer,
+        // reject — first-contact is a one-time operation. Re-pin goes
+        // through `await_repin_consent`.
+        if self.pins.contains_key(peer.as_str()) {
+            return Err(EPinMismatch::Invalidated {
+                peer: peer.as_str().to_string(),
+                reason: "pin already exists — use re-pin consent path".into(),
+            });
+        }
+        if observed != declared {
+            return Err(EPinMismatch::Mismatch {
+                peer: peer.as_str().to_string(),
+                pinned: declared.wire(),
+                observed: observed.wire(),
+            });
+        }
+        let pin = TofuPin {
+            peer: peer.clone(),
+            fingerprint: observed.clone(),
+            boot_nonce,
+            pinned_at_ns: now_ns(),
+            invalidated: None,
+            repin_approval_id: None,
+        };
+        self.pins.insert(peer.as_str().to_string(), pin.clone());
+        Ok(pin)
+    }
+
+    async fn verify_pinned(
+        &self,
+        peer: &PeerId,
+        observed: &PeerCertFingerprint,
+    ) -> Result<(), EPinMismatch> {
+        let pin = self
+            .pins
+            .get(peer.as_str())
+            .map(|r| r.value().clone())
+            .ok_or_else(|| EPinMismatch::NotPinned(peer.as_str().to_string()))?;
+        if pin.invalidated.is_some() {
+            let reason = match &pin.invalidated {
+                Some(Invalidated::SpiritRestarted { prior_boot_nonce }) => {
+                    format!("Spirit restarted (prior boot_nonce={prior_boot_nonce})")
+                }
+                Some(Invalidated::Manual) => "manually invalidated".to_string(),
+                None => unreachable!(),
+            };
+            return Err(EPinMismatch::Invalidated {
+                peer: peer.as_str().to_string(),
+                reason,
+            });
+        }
+        if &pin.fingerprint == observed {
+            Ok(())
+        } else {
+            Err(EPinMismatch::Mismatch {
+                peer: peer.as_str().to_string(),
+                pinned: pin.fingerprint.wire(),
+                observed: observed.wire(),
+            })
+        }
+    }
+
+    async fn invalidate_for_restart(
+        &self,
+        peer: &PeerId,
+        prior_boot_nonce: u64,
+    ) -> Result<(), A2AError> {
+        let mut entry = self
+            .pins
+            .get_mut(peer.as_str())
+            .ok_or_else(|| A2AError::PinInvalidated {
+                peer: peer.as_str().to_string(),
+                awaiting_repin: false,
+            })?;
+        entry.invalidated = Some(Invalidated::SpiritRestarted { prior_boot_nonce });
+        Ok(())
+    }
+
+    async fn await_repin_consent(
+        &self,
+        peer: &PeerId,
+        new_observed: &PeerCertFingerprint,
+        new_boot_nonce: u64,
+    ) -> RePinDecision {
+        let decision = (self.test_repin_hook)(peer, new_observed, new_boot_nonce);
+        if let RePinDecision::AcceptedByOperator { approval_id } = &decision {
+            // Materialize the re-pin record so verify_pinned succeeds again,
+            // carrying the actual boot_nonce from the re-pin observation.
+            let new_pin = TofuPin {
+                peer: peer.clone(),
+                fingerprint: new_observed.clone(),
+                boot_nonce: new_boot_nonce,
+                pinned_at_ns: now_ns(),
+                invalidated: None,
+                repin_approval_id: Some(*approval_id),
+            };
+            self.pins.insert(peer.as_str().to_string(), new_pin);
+        }
+        decision
+    }
+
+    async fn get_pin(&self, peer: &PeerId) -> Option<TofuPin> {
+        self.pins.get(peer.as_str()).map(|r| r.value().clone())
+    }
+}
+
+/// Monotonic counter for diagnostic timestamps (NOT a TTL).
+/// Uses a simple atomic increment — wall-time is not needed for the
+/// pin staleness diagnostic timeline, and monotonicity (never going
+/// backwards) is more important than correlation with real clocks.
+fn now_ns() -> u64 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fp(s: &str) -> PeerCertFingerprint {
+        PeerCertFingerprint::from_cert_der(s.as_bytes())
+    }
+
+    #[tokio::test]
+    async fn first_contact_pins_match() {
+        let store = InMemoryTofuPinStore::new();
+        let peer = PeerId::new("p");
+        let observed = fp("cert-A");
+        let pin = store
+            .pin_first_contact(&peer, &observed, &observed, 1)
+            .await
+            .expect("pin");
+        assert_eq!(pin.boot_nonce, 1);
+        assert_eq!(pin.fingerprint, observed);
+    }
+
+    #[tokio::test]
+    async fn first_contact_mismatch_fires() {
+        let store = InMemoryTofuPinStore::new();
+        let peer = PeerId::new("p");
+        let observed = fp("cert-A");
+        let declared = fp("cert-B");
+        let err = store
+            .pin_first_contact(&peer, &observed, &declared, 1)
+            .await
+            .expect_err("must mismatch");
+        assert!(matches!(err, EPinMismatch::Mismatch { .. }));
+    }
+
+    #[tokio::test]
+    async fn verify_pinned_succeeds_after_pin() {
+        let store = InMemoryTofuPinStore::new();
+        let peer = PeerId::new("p");
+        let observed = fp("cert-A");
+        store
+            .pin_first_contact(&peer, &observed, &observed, 1)
+            .await
+            .expect("pin");
+        store.verify_pinned(&peer, &observed).await.expect("verify");
+    }
+
+    #[tokio::test]
+    async fn verify_pinned_mismatch_fires() {
+        let store = InMemoryTofuPinStore::new();
+        let peer = PeerId::new("p");
+        let observed = fp("cert-A");
+        store
+            .pin_first_contact(&peer, &observed, &observed, 1)
+            .await
+            .expect("pin");
+        let other = fp("cert-B");
+        let err = store
+            .verify_pinned(&peer, &other)
+            .await
+            .expect_err("must mismatch");
+        assert!(matches!(err, EPinMismatch::Mismatch { .. }));
+    }
+
+    #[tokio::test]
+    async fn verify_pinned_returns_not_pinned_when_absent() {
+        let store = InMemoryTofuPinStore::new();
+        let peer = PeerId::new("p");
+        let observed = fp("cert-A");
+        let err = store
+            .verify_pinned(&peer, &observed)
+            .await
+            .expect_err("must be not pinned");
+        assert!(matches!(err, EPinMismatch::NotPinned(_)));
+    }
+
+    #[tokio::test]
+    async fn invalidate_for_restart_marks_pin() {
+        let store = InMemoryTofuPinStore::new();
+        let peer = PeerId::new("p");
+        let observed = fp("cert-A");
+        store
+            .pin_first_contact(&peer, &observed, &observed, 1)
+            .await
+            .expect("pin");
+        store
+            .invalidate_for_restart(&peer, 1)
+            .await
+            .expect("invalidate");
+        let err = store
+            .verify_pinned(&peer, &observed)
+            .await
+            .expect_err("must be invalidated post-invalidate");
+        assert!(matches!(err, EPinMismatch::Invalidated { .. }));
+    }
+
+    #[tokio::test]
+    async fn await_repin_consent_accept_path() {
+        let approval_id = [42u8; 16];
+        let new_boot = 5u64;
+        let store = InMemoryTofuPinStore::new().with_repin_hook(
+            move |_, _, _| RePinDecision::AcceptedByOperator { approval_id },
+        );
+        let peer = PeerId::new("p");
+        let new_fp = fp("cert-B");
+        let decision = store.await_repin_consent(&peer, &new_fp, new_boot).await;
+        assert!(matches!(
+            decision,
+            RePinDecision::AcceptedByOperator { .. }
+        ));
+        // Re-pin materialized — verify_pinned should now pass against new_fp.
+        let pin = store.get_pin(&peer).await.expect("pin exists");
+        assert_eq!(pin.boot_nonce, new_boot);
+        store.verify_pinned(&peer, &new_fp).await.expect("verify");
+    }
+
+    #[tokio::test]
+    async fn await_repin_consent_reject_path() {
+        let store = InMemoryTofuPinStore::new().with_repin_hook(|_, _, _| {
+            RePinDecision::RejectedByOperator {
+                reason: "no thanks".into(),
+            }
+        });
+        let peer = PeerId::new("p");
+        let new_fp = fp("cert-B");
+        let decision = store.await_repin_consent(&peer, &new_fp, 0).await;
+        assert!(matches!(decision, RePinDecision::RejectedByOperator { .. }));
+        // No pin materialized.
+        let err = store
+            .verify_pinned(&peer, &new_fp)
+            .await
+            .expect_err("must be not pinned");
+        assert!(matches!(err, EPinMismatch::NotPinned(_)));
+    }
+}

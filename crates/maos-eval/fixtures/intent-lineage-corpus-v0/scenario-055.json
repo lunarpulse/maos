@@ -1,0 +1,13 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_a2a_loopback-055",
+  "class": "lineage_chain_uninterrupted",
+  "description": "Story 6.3 — cross-Host frame via A2A loopback profile (127.0.0.1 mTLS+TOFU); single-hop HumanAuthored→SpiritAuto re-emission across loopback peer preserves originating intent through IacBusAdapter::deliver_typed intake path",
+  "originating_intent": "diagnosis-handoff",
+  "hop_count": 1,
+  "origin": "spirit_auto",
+  "secondary_intent": null,
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": ["diagnosis-handoff"]
+  }
+}

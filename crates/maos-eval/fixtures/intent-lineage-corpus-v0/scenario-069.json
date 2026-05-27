@@ -1,0 +1,13 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_a2a_cross_host-069",
+  "class": "lineage_chain_uninterrupted",
+  "description": "Story 6.3 — cross-Host frame via A2A cross-Host profile (operator-managed PKI + JSON-RPC mTLS); single-hop HumanAuthored→SpiritAuto re-emission across cross-host peer preserves originating intent through IacBusAdapter::deliver_typed intake path",
+  "originating_intent": "cross-environment-telemetry-query",
+  "hop_count": 1,
+  "origin": "spirit_auto",
+  "secondary_intent": null,
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": ["cross-environment-telemetry-query"]
+  }
+}
