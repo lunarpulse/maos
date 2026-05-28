@@ -32,6 +32,7 @@ mod check_serde_error_handling;
 mod check_review_findings_resolved;
 mod check_dev_record_completeness;
 mod check_epic_6_bridge;
+mod check_manifest_schema_version;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -357,6 +358,14 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Epic 6 §A4 (retro 2026-05-28) — keep MANIFEST_SCHEMA_VERSION + MIN/MAX
+    /// constants self-consistent and ban hardcoded `manifest_schema_version`
+    /// comparisons in `maos-manifest` production code.
+    #[command(name = "check-manifest-schema-version")]
+    CheckManifestSchemaVersion {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -556,6 +565,9 @@ fn main() {
         }
         Commands::CheckDevRecordCompleteness { stories_dir, sprint_status, check_git_diff, json } => {
             check_dev_record_completeness::run(&stories_dir, &sprint_status, check_git_diff, json)
+        }
+        Commands::CheckManifestSchemaVersion { json } => {
+            check_manifest_schema_version::run(json)
         }
     };
     if let Err(e) = result {

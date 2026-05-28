@@ -249,12 +249,23 @@ impl RawClassSection {
                 &format!("v0.1-β only accepts \"1.0\", got {}", self.abi),
             )));
         }
-        // manifest_schema_version: v0.1-β only accepts 1.
-        if self.manifest_schema_version != 1 {
+        // manifest_schema_version: must fall within the kernel's accepted
+        // range. The bounds are sourced from `maos-spirit-abi` so the kernel
+        // build, the manifest validator, and the `xtask
+        // check-manifest-schema-version` gate all agree on the window.
+        //
+        // Epic 6 §A4 (retro 2026-05-28) bumped MAX from 1 → 2 to track the
+        // four additive sections landed across Stories 6.2 / 6.4 / 6.5:
+        // `[[cli_wrapper]]`, `[[schedules]]`, `[gateways]`, plus the
+        // ConsentEnvelope.intent_class + valid_until_ns additive fields.
+        // MIN remains at 1 — v1 (Epic 1b baseline) manifests still load.
+        const MIN: u32 = maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+        const MAX: u32 = maos_spirit_abi::MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+        if self.manifest_schema_version < MIN || self.manifest_schema_version > MAX {
             return Err(ManifestError::Toml(validation_msg(
                 "class.manifest_schema_version",
                 &format!(
-                    "v0.1-β only accepts 1, got {}",
+                    "kernel accepts {MIN}..={MAX}, got {}",
                     self.manifest_schema_version
                 ),
             )));
@@ -2124,6 +2135,41 @@ description = "MAOS reference Spirit"
     fn class_section_rejects_zero_schema_version() {
         let s =
             class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 0");
+        let err = ClassSection::from_toml_str(&s).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.manifest_schema_version"))
+        );
+    }
+
+    // Epic 6 §A4 (retro 2026-05-28) — manifest_schema_version range widened to
+    // accept v1 (Epic 1b baseline) ∪ v2 (Epic 6 additive sections). The three
+    // tests below pin the contract Story 7.5a will consume for the N-1 / N-2
+    // ABI Stability Triple policy.
+
+    #[test]
+    fn class_section_accepts_v2_schema_version() {
+        // v2 is the current kernel-emitted version (post Epic 6 §A4 bump).
+        let s =
+            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 2");
+        let c = ClassSection::from_toml_str(&s).unwrap();
+        assert_eq!(c.manifest_schema_version, 2);
+    }
+
+    #[test]
+    fn class_section_still_accepts_v1_schema_version() {
+        // v1 (Epic 1b baseline) must still load on a v2 kernel — N-1 supported
+        // is the Story 7.5a contract floor. `class_toml_full` is authored at
+        // v1 so this is the canonical regression guard.
+        let c = ClassSection::from_toml_str(&class_toml_full()).unwrap();
+        assert_eq!(c.manifest_schema_version, 1);
+    }
+
+    #[test]
+    fn class_section_rejects_above_max_schema_version() {
+        // Anything beyond MAX_SUPPORTED is hard-rejected — the kernel does not
+        // gamble on future schemas it has not been compiled against.
+        let s =
+            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 3");
         let err = ClassSection::from_toml_str(&s).unwrap_err();
         assert!(
             matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.manifest_schema_version"))

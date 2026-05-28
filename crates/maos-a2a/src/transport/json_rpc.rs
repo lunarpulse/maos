@@ -8,9 +8,11 @@
 //! Error code mapping (per AC3):
 //!   * `-32700` JSON-RPC parse error (malformed payload)
 //!   * `-32600` invalid request (missing `jsonrpc` / `method` / `params`)
+//!   * `-32601` method not found
 //!   * `-32001` `EIntentDenied`
 //!   * `-32002` TOFU `EPinMismatch::NotPinned`
 //!   * `-32003` Consent envelope expired
+//!   * `-32004` `SpiritRestartDetected` — peer's `boot_nonce` rolled (NFR-Rel-6)
 //!   * `-32099` Other A2AError catch-all (with the variant's message)
 
 use maos_domain::frame::IacFrame;
@@ -28,6 +30,10 @@ pub const CODE_METHOD_NOT_FOUND: i32 = -32601;
 pub const CODE_INTENT_DENIED: i32 = -32001;
 pub const CODE_PIN_MISMATCH_NOT_PINNED: i32 = -32002;
 pub const CODE_CONSENT_EXPIRED: i32 = -32003;
+/// Story 6.3 §A1 P6 (Epic 6 retro 2026-05-28) — peer's Spirit `boot_nonce`
+/// has rolled relative to the stored TOFU pin; the receiver MUST invalidate
+/// the prior pin and refuse the frame. NFR-Rel-6 detection floor.
+pub const CODE_SPIRIT_RESTART_DETECTED: i32 = -32004;
 pub const CODE_INTERNAL: i32 = -32099;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,6 +42,14 @@ pub struct A2AJsonRpcRequest {
     pub method: String,
     pub params: IacFrame,
     pub id: u64,
+    /// Sender's Spirit `boot_nonce` at send time. `0` = unspecified
+    /// (backward-compat with v0.5-α loopback callers that pre-date this
+    /// field — they admit without restart-detection). Cross-Host v0.7+ MUST
+    /// populate from `Spirit::boot_nonce()`; receivers compare against
+    /// `TofuPin.boot_nonce` and fire `CODE_SPIRIT_RESTART_DETECTED` on
+    /// mismatch. Added in Story 6.3 §A1 P6 (Epic 6 retro 2026-05-28).
+    #[serde(default)]
+    pub boot_nonce: u64,
 }
 
 /// JSON-RPC 2.0 response. Untagged (field-based) deserialization
@@ -86,6 +100,51 @@ impl A2AJsonRpcRequest {
             method: method.to_string(),
             params,
             id,
+            boot_nonce: 0,
+        }
+    }
+
+    /// Set the sender's Spirit `boot_nonce`. Cross-Host v0.7+ callers MUST
+    /// invoke this with the live nonce so receivers can detect Spirit
+    /// restarts (NFR-Rel-6). v0.5-α loopback callers may leave the default
+    /// `0` — the receiver treats it as "unspecified" and skips the
+    /// restart-detection check.
+    pub fn with_boot_nonce(mut self, boot_nonce: u64) -> Self {
+        self.boot_nonce = boot_nonce;
+        self
+    }
+
+    /// Story 6.3 §A1 P7 (Epic 6 retro 2026-05-28) — parse a raw byte slice
+    /// into an `A2AJsonRpcRequest`, emitting a JSON-RPC-compliant
+    /// `CODE_PARSE_ERROR (-32700)` NACK on `serde_json::from_slice` failure.
+    ///
+    /// Cross-Host v0.7+ TCP transports MUST funnel inbound bytes through
+    /// this helper before invoking `handle_intake`; the helper guarantees
+    /// that malformed JSON yields a structured NACK (with `id = 0` per
+    /// JSON-RPC 2.0 §5.1 since the offending request had no parseable id)
+    /// rather than a raw `serde_json::Error` propagating up the stack.
+    ///
+    /// Loopback v0.5-α deliberately bypasses byte-level framing (the
+    /// router routes typed values via `tokio::sync::mpsc`), so this helper
+    /// is exercised by unit tests at v0.5 and by the cross-Host TCP
+    /// connector at v0.7.
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, NackResponse> {
+        match serde_json::from_slice::<A2AJsonRpcRequest>(bytes) {
+            Ok(req) => Ok(req),
+            Err(e) => Err(NackResponse {
+                jsonrpc: JSONRPC_VERSION.to_string(),
+                error: NackError {
+                    code: CODE_PARSE_ERROR,
+                    message: format!("JSON parse error: {e}"),
+                    data: None,
+                },
+                // JSON-RPC 2.0 §5.1: id is null when not parseable from
+                // request. We use `0` as the typed-zero sentinel since
+                // `id: u64`. Transports concerned with strict spec
+                // compliance should map this back to JSON `null` on the
+                // outbound wire.
+                id: 0,
+            }),
         }
     }
 

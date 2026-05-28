@@ -10,10 +10,11 @@ description = "MAOS spirit manifest parsing and validation"
 [dependencies]
 maos-domain = { path = "../maos-domain" }
 maos-attrs = { path = "../maos-attrs" }
+# Direct dep added in Epic 6 §A4 (retro 2026-05-28) so that ClassSection
+# validation can read MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION and
+# MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION from the single authoritative source.
+maos-spirit-abi = { path = "../maos-spirit-abi" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
 thiserror = "2.0"
-
-[dev-dependencies]
-maos-spirit-abi = { path = "../maos-spirit-abi" }

@@ -13,6 +13,7 @@ use crate::tofu::TofuPinStore;
 use crate::transport::json_rpc::{
     A2AJsonRpcRequest, A2AJsonRpcResponse, AckBody, CODE_CONSENT_EXPIRED,
     CODE_INTENT_DENIED, CODE_INTERNAL, CODE_PIN_MISMATCH_NOT_PINNED,
+    CODE_SPIRIT_RESTART_DETECTED,
 };
 use crate::transport::logical_clock::LamportClock;
 use async_trait::async_trait;
@@ -24,10 +25,18 @@ use std::sync::Arc;
 
 /// Monotonic nanosecond counter — used for consent envelope expiry checks
 /// when the kernel-core monotonic source is not accessible (hexagonal layering).
+///
+/// Returns strictly positive values on every call. The counter starts at `1`
+/// (not `0`) so that envelopes with `valid_until_ns = 0` are correctly
+/// classified as expired on first check — Story 6.3 §A1 P2 regression fix
+/// (Epic 6 retro 2026-05-28). A counter that returns `0` on its first
+/// observation would silently admit a `valid_until_ns = 0` envelope because
+/// `0 > 0` is false; the production hot path failed open for that
+/// configuration before this fix.
 fn monotonic_now_ns() -> u64 {
     use std::sync::atomic::{AtomicU64, Ordering};
     static COUNTER: AtomicU64 = AtomicU64::new(0);
-    COUNTER.fetch_add(1, Ordering::Relaxed)
+    COUNTER.fetch_add(1, Ordering::Relaxed).saturating_add(1)
 }
 
 /// Internal A2A peer router trait — the loopback/cross-host routing surface.
@@ -363,6 +372,54 @@ impl A2APeerRouter for LoopbackA2ARouter {
                 CODE_PIN_MISMATCH_NOT_PINNED,
                 format!("TOFU pin verify failed: {e}"),
             );
+        }
+
+        // (1.5) Story 6.3 §A1 P6 — Spirit-restart detection via wire-carried
+        // `boot_nonce` (NFR-Rel-6 detection floor). `boot_nonce == 0` is the
+        // v0.5-α "unspecified" sentinel: backward-compat with loopback
+        // callers that pre-date the wire field. Cross-Host v0.7+ callers
+        // MUST populate the field; receivers compare against the stored
+        // `TofuPin.boot_nonce`. Mismatch → `invalidate_for_restart` + NACK.
+        if request.boot_nonce != 0 {
+            if let Some(pin) = self.tofu.get_pin(&peer_cfg.peer_id).await {
+                if request.boot_nonce != pin.boot_nonce {
+                    // Boot nonce rolled — the Spirit has restarted (or an
+                    // attacker is racing the legitimate Spirit). Invalidate
+                    // the prior pin and refuse the frame; the operator must
+                    // approve a re-pin via `await_repin_consent` before
+                    // further A2A traffic resumes.
+                    let prior = pin.boot_nonce;
+                    let observed = request.boot_nonce;
+                    if let Err(e) = self
+                        .tofu
+                        .invalidate_for_restart(&peer_cfg.peer_id, prior)
+                        .await
+                    {
+                        // Invalidation itself failed — surface as INTERNAL.
+                        return A2AJsonRpcResponse::nack(
+                            request.id,
+                            CODE_INTERNAL,
+                            format!("invalidate_for_restart failed: {e}"),
+                        );
+                    }
+                    let data = serde_json::json!({
+                        "prior_boot_nonce": prior,
+                        "observed_boot_nonce": observed,
+                    });
+                    let mut resp = A2AJsonRpcResponse::nack(
+                        request.id,
+                        CODE_SPIRIT_RESTART_DETECTED,
+                        format!(
+                            "Spirit restart detected on peer {}: prior_boot_nonce={prior} observed_boot_nonce={observed}",
+                            peer_cfg.peer_id.as_str()
+                        ),
+                    );
+                    if let A2AJsonRpcResponse::Nack(ref mut n) = resp {
+                        n.error.data = Some(data);
+                    }
+                    return resp;
+                }
+            }
         }
 
         // (2) ADR-012 accept-allowlist check.

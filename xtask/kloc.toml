@@ -79,5 +79,5 @@ _aggregate_hardfail = 20000
 [in_progress_decomposition]
 phase_1 = { target = "maos-iac + maos-manifest", status = "done", epic = "6.5", notes = "maos-iac: 13 files, 4834 code lines; maos-manifest: 1 file, ~3800 code lines (extracted from security/manifest.rs)" }
 phase_2 = { target = "maos-capability", status = "done", epic = "6.1", notes = "CORRECTED 2026-05-25: extracted ~1,271 LOC of pure surface; cross-cutting orchestration remains in kernel-core" }
-phase_3 = { target = "security/* residual", status = "pending", epic = "7.2" }
-phase_4 = { target = "maos-scheduler + maos-memory + maos-hot-swap + maos-supervision", status = "pending", epic = "7.x" }
+phase_3 = { target = "security/* residual", status = "pending", epic = "7.2", notes = "type-only refactor; no new port trait — re-homes ~1,000 LOC into maos-manifest + maos-capability per existing classifier" }
+phase_4 = { target = "maos-scheduler + maos-memory + maos-hot-swap + maos-supervision", status = "pending", epic = "7.x", notes = "ADR-041 (Epic 6 retro §A3 2026-05-28) — trait-boundary refactor via SpiritSchedulerPort + MemoryManagerPort + HotSwapPort (NEW in this ADR PR) + SupervisionPort (consumes existing SpiritSchedulerPort). Story 7.5a STABILITY.md draft DOES NOT publish until this phase closes." }

@@ -38,6 +38,7 @@ pub mod io_subsystem;
 pub mod log_recall; // NEW — Story 4.4 LogRecallPort per AC1
 pub mod mcp; // NEW — Story 5.5c McpClientPort + domain types
 pub mod registry; // NEW — Story 5.5d SpiritRegistryClient port + domain types
+pub mod hot_swap; // NEW — ADR-041 (Epic 6 retro §A3 2026-05-28) Phase-4 extraction prep
 pub mod memory;
 pub mod scheduler;
 pub mod security;
@@ -61,6 +62,7 @@ pub use registry::{
     SignedManifest, SignedPackage, SpiritRegistryClient, YankEntry, YankList, YankReason,
     YankReceipt,
 }; // NEW — Story 5.5d
+pub use hot_swap::HotSwapPort; // NEW — ADR-041 Phase-4 extraction prep
 pub use memory::MemoryManagerPort;
 pub use scheduler::SpiritSchedulerPort;
 pub use security::SecurityManagerPort;
