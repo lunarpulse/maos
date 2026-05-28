@@ -25,6 +25,7 @@ extern crate alloc;
 pub mod cancellation;
 pub mod compliance;
 pub mod ctx;
+pub mod gateway;
 pub mod identity;
 pub mod lifecycle;
 

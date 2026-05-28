@@ -1,0 +1,15 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_gateway_inbound-110",
+  "class": "lineage_via_gateway_inbound",
+  "description": "gateway inbound to revoked spirit",
+  "originating_intent": "gateway_inbound",
+  "hop_count": 1,
+  "origin": "gateway",
+  "secondary_intent": "revoked_spirit",
+  "expected_outcome": {
+    "accepted": false,
+    "expected_lineage_intents": [
+      "gateway_inbound"
+    ]
+  }
+}

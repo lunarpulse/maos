@@ -43,6 +43,15 @@ pub enum FrameKind {
     /// is NOT a stalled call; the inference router returns
     /// `InferenceError::RateLimited { retry_after_ms }` simultaneously.
     RateLimited = 23,
+    /// Story 6.5 — FR54. Inbound message from an external gateway (Telegram,
+    /// Slack, Discord, Signal, Email). The payload carries the external
+    /// sender id + opaque message bytes. Routed to the Spirit's `on_frame`
+    /// hook (or custom hook per manifest).
+    GatewayInbound = 24,
+    /// Story 6.5 — FR54. Outbound message to an external gateway. The
+    /// payload carries the recipient address + opaque message bytes. Gated
+    /// by `Scope::GatewaySend` cap-token verification.
+    GatewayOutbound = 25,
 }
 
 impl FrameKind {
@@ -61,6 +70,8 @@ impl FrameKind {
             21 => Some(Self::CliSubprocessOutput),
             22 => Some(Self::ConsentRupture),
             23 => Some(Self::RateLimited),
+            24 => Some(Self::GatewayInbound),
+            25 => Some(Self::GatewayOutbound),
             _ => None,
         }
     }

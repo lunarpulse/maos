@@ -19,7 +19,7 @@ use crate::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapte
 use crate::journal::JournalAdapter;
 use crate::scheduler::control_block::SpiritManifestBundle;
 use crate::scheduler::SpiritSchedulerAdapter;
-use crate::security::manifest::ClassSection;
+use crate::security::manifest::{ClassSection, GatewaysSection};
 use crate::telemetry::iac_rt::{IacRtMetrics, Outcome, Service};
 use maos_domain::invariants::i3::FrameOrigin;
 
@@ -405,6 +405,18 @@ fn load_bundle_from_file(
         }
     };
 
+    // Story 6.5 — `[[gateway]]` array-of-tables. Same pattern as `[[schedule]]`.
+    let gateways = match root.get("gateway") {
+        None => GatewaysSection::default(),
+        Some(value) => {
+            let mut wrapper = toml::value::Table::new();
+            wrapper.insert("gateway".into(), value.clone());
+            let wrapper_str = toml::to_string(&toml::Value::Table(wrapper))
+                .map_err(|e| ManifestError::Toml(format!("serialize [[gateway]]: {e}")))?;
+            GatewaysSection::from_toml_str(&wrapper_str)?
+        }
+    };
+
     Ok(SpiritManifestBundle {
         scheduling,
         lifecycle,
@@ -416,5 +428,6 @@ fn load_bundle_from_file(
         on_revocation,
         supervision,
         schedules,
+        gateways,
     })
 }

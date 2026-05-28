@@ -73,6 +73,10 @@ pub enum FrameKindLabel {
     ConsentRupture,
     /// Story 6.4 — NFR-Scale-4: per-(provider, credential) rate-limit event.
     RateLimited,
+    /// Story 6.5 — FR54: inbound message from external gateway.
+    GatewayInbound,
+    /// Story 6.5 — FR54: outbound message to external gateway.
+    GatewayOutbound,
 }
 
 impl LogRecallFilter {

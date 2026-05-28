@@ -455,6 +455,12 @@ impl IacBusAdapter {
             maos_spirit_abi::identity::FrameKind::RateLimited => {
                 transparency_log::FrameKind::RateLimited
             }
+            maos_spirit_abi::identity::FrameKind::GatewayInbound => {
+                transparency_log::FrameKind::GatewayInbound
+            }
+            maos_spirit_abi::identity::FrameKind::GatewayOutbound => {
+                transparency_log::FrameKind::GatewayOutbound
+            }
         };
 
         // Story 6.2 AC4 — populate the frame_lineage_cache so retract() can

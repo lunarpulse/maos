@@ -17,9 +17,13 @@
 //! CLI surface that enqueues into this buffer via `MAOS_ONE_SHOT=orchestrator-queue`.
 
 pub mod buffer;
+pub mod echo_gateway;
+pub mod gateway_dispatcher;
 pub mod registry;
 
 pub use buffer::{OrchestratorBuffer, OrchestratorBufferError};
+pub use echo_gateway::{EchoGatewayFactory, EchoGatewaySubmodule};
+pub use gateway_dispatcher::{GatewayDispatcher, GatewayInstance, GatewaySubmoduleFactory, GatewaySubmoduleRegistry};
 pub use registry::OrchestratorBufferRegistry;
 
 use crate::iac::transparency_log::TransparencyLogAdapter;

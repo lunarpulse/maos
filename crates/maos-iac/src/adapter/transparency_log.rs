@@ -84,6 +84,10 @@ pub enum FrameKind {
     ConsentRupture = 22,
     /// Story 6.4 — NFR-Scale-4: per-(provider, credential) bucket-exhaustion event.
     RateLimited = 23,
+    /// Story 6.5 — FR54: inbound message from external gateway.
+    GatewayInbound = 24,
+    /// Story 6.5 — FR54: outbound message to external gateway.
+    GatewayOutbound = 25,
 }
 
 impl FrameKind {
@@ -114,6 +118,8 @@ impl FrameKind {
             21 => Some(Self::CliSubprocessOutput),
             22 => Some(Self::ConsentRupture),
             23 => Some(Self::RateLimited),
+            24 => Some(Self::GatewayInbound),
+            25 => Some(Self::GatewayOutbound),
             _ => None,
         }
     }

@@ -1,0 +1,15 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_gateway_outbound-116",
+  "class": "lineage_via_gateway_outbound",
+  "description": "outbound to multiple gateway recipients",
+  "originating_intent": "gateway_outbound",
+  "hop_count": 1,
+  "origin": "spirit",
+  "secondary_intent": "multi_gateway",
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": [
+      "gateway_outbound"
+    ]
+  }
+}

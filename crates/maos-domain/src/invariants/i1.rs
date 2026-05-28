@@ -100,6 +100,12 @@ pub enum Scope {
         argv_prefix_hash: [u8; 32],
         output_shape_version: String,
     },
+    /// Story 6.5 — FR54: send an outbound message through a gateway
+    /// sub-module. Scoped to `(gateway_id, recipient)` where `gateway_id`
+    /// matches a `[[gateway]]` entry in the Spirit's manifest and
+    /// `recipient` is an external address (opaque to kernel).
+    /// TTL: 300s (Standard intent_class) per ADR-023.
+    GatewaySend { gateway_id: String, recipient: String },
 }
 
 /// Intent classification for approval policy.

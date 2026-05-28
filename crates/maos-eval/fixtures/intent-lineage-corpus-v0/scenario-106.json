@@ -1,0 +1,15 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_gateway_inbound-106",
+  "class": "lineage_via_gateway_inbound",
+  "description": "gateway inbound with max-size payload",
+  "originating_intent": "gateway_inbound",
+  "hop_count": 1,
+  "origin": "gateway",
+  "secondary_intent": "large_payload",
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": [
+      "gateway_inbound"
+    ]
+  }
+}

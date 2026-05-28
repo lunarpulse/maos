@@ -15,6 +15,7 @@ members = [
     "crates/maos-capability",
     "crates/maos-iac",
     "crates/maos-kernel-core",
+    "crates/maos-manifest",
     "crates/maos-mcp",
     "crates/maos-registry",
     "crates/maos-persistence",

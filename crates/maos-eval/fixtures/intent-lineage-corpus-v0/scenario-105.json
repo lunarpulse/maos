@@ -1,0 +1,15 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_gateway_inbound-105",
+  "class": "lineage_via_gateway_inbound",
+  "description": "gateway inbound with corrupted gateway_id anchor",
+  "originating_intent": "gateway_inbound",
+  "hop_count": 1,
+  "origin": "gateway",
+  "secondary_intent": "corrupted_anchor",
+  "expected_outcome": {
+    "accepted": false,
+    "expected_lineage_intents": [
+      "gateway_inbound"
+    ]
+  }
+}

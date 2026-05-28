@@ -1,0 +1,15 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_gateway_outbound-113",
+  "class": "lineage_via_gateway_outbound",
+  "description": "outbound without valid cap-token",
+  "originating_intent": "gateway_outbound",
+  "hop_count": 1,
+  "origin": "spirit",
+  "secondary_intent": "cap_token_missing",
+  "expected_outcome": {
+    "accepted": false,
+    "expected_lineage_intents": [
+      "gateway_outbound"
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_gateway_outbound-120",
+  "class": "lineage_via_gateway_outbound",
+  "description": "outbound cap-token scope mismatch",
+  "originating_intent": "gateway_outbound",
+  "hop_count": 1,
+  "origin": "spirit",
+  "secondary_intent": "scope_mismatch",
+  "expected_outcome": {
+    "accepted": false,
+    "expected_lineage_intents": [
+      "gateway_outbound"
+    ]
+  }
+}

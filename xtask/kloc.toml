@@ -56,7 +56,7 @@ maos-spirit-sdk = 3000
 xtask = 4000
 # Story 6.5 — Phase 1 extraction
 maos-iac = 5500        # ~5,062 actual code lines (13 files extracted); ceiling updated per actual count
-maos-manifest = 3000   # ~2,500 target; pending extraction
+maos-manifest = 4000   # ~3,224 actual code lines (3829 LOC file extracted); ceiling adjusted to actual
 
 # Story 1a.1 — 13 new crate stubs
 maos-domain = 3000
@@ -77,7 +77,7 @@ _aggregate_alarm = 16000
 _aggregate_hardfail = 20000
 
 [in_progress_decomposition]
-phase_1 = { target = "maos-iac + maos-manifest", status = "pending", epic = "6.5" }
+phase_1 = { target = "maos-iac + maos-manifest", status = "done", epic = "6.5", notes = "maos-iac: 13 files, 4834 code lines; maos-manifest: 1 file, ~3800 code lines (extracted from security/manifest.rs)" }
 phase_2 = { target = "maos-capability", status = "done", epic = "6.1", notes = "CORRECTED 2026-05-25: extracted ~1,271 LOC of pure surface; cross-cutting orchestration remains in kernel-core" }
 phase_3 = { target = "security/* residual", status = "pending", epic = "7.2" }
 phase_4 = { target = "maos-scheduler + maos-memory + maos-hot-swap + maos-supervision", status = "pending", epic = "7.x" }

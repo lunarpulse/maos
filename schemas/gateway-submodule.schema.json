@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://maos.dev/schemas/gateway-submodule.schema.json",
+  "title": "MAOS Gateway Sub-Module Declaration (FR54 / ADR-029)",
+  "type": "object",
+  "required": ["id", "type", "auth_secret_ref"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+    },
+    "type": {
+      "enum": ["telegram", "slack", "discord", "signal", "email", "echo"]
+    },
+    "auth_secret_ref": {
+      "type": "string",
+      "pattern": "^secret:[a-z][a-z0-9_-]*:[A-Za-z0-9_-]{1,256}$"
+    },
+    "inbound_allowlist": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "outbound_allowlist": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "on_inbound": {
+      "enum": ["on_frame"]
+    },
+    "reconnect_backoff_secs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3600
+    },
+    "max_message_bytes": {
+      "type": "integer",
+      "minimum": 256,
+      "maximum": 1048576
+    }
+  },
+  "additionalProperties": false
+}

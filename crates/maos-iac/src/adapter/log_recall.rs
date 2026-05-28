@@ -123,6 +123,8 @@ impl LogRecallAdapter {
             FrameKind::CliSubprocessOutput => DomainFrameKindLabel::CliSubprocessOutput,
             FrameKind::ConsentRupture => DomainFrameKindLabel::ConsentRupture,
             FrameKind::RateLimited => DomainFrameKindLabel::RateLimited,
+            FrameKind::GatewayInbound => DomainFrameKindLabel::GatewayInbound,
+            FrameKind::GatewayOutbound => DomainFrameKindLabel::GatewayOutbound,
         }
     }
 
@@ -157,6 +159,10 @@ impl LogRecallAdapter {
             DomainFrameKindLabel::SpiritAdmitted => Some(FrameKind::SpiritAdmitted),
             DomainFrameKindLabel::RegistryYank => Some(FrameKind::RegistryYank),
             DomainFrameKindLabel::CliSubprocessOutput => Some(FrameKind::CliSubprocessOutput),
+            DomainFrameKindLabel::ConsentRupture => Some(FrameKind::ConsentRupture),
+            DomainFrameKindLabel::RateLimited => Some(FrameKind::RateLimited),
+            DomainFrameKindLabel::GatewayInbound => Some(FrameKind::GatewayInbound),
+            DomainFrameKindLabel::GatewayOutbound => Some(FrameKind::GatewayOutbound),
             other => {
                 eprintln!(
                     "maos: warning: unmapped FrameKindLabel {:?} in to_kernel_kind \

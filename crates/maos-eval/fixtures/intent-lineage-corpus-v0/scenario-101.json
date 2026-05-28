@@ -1,0 +1,15 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_gateway_inbound-101",
+  "class": "lineage_via_gateway_inbound",
+  "description": "inbound message arrives with empty intent_lineage",
+  "originating_intent": "gateway_inbound",
+  "hop_count": 1,
+  "origin": "gateway",
+  "secondary_intent": "missing_lineage",
+  "expected_outcome": {
+    "accepted": false,
+    "expected_lineage_intents": [
+      "gateway_inbound"
+    ]
+  }
+}

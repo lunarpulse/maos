@@ -34,6 +34,10 @@ pub const CHANNEL_CLASSES: &[(FrameKind, ChannelClass, usize)] = &[
     // Story 6.4 — NFR-Scale-4: per-(provider, credential) rate-limit event.
     // §7.1.1 cardinality matches `consent.request` (1:1 sender ← bus).
     (FrameKind::RateLimited, ChannelClass::Mpsc, 32),
+    // Story 6.5 — FR54: gateway inbound/outbound messaging. Both are Mpsc
+    // 1:1 channels matching external messaging cardinality.
+    (FrameKind::GatewayInbound, ChannelClass::Mpsc, 64),
+    (FrameKind::GatewayOutbound, ChannelClass::Mpsc, 64),
 ];
 
 /// Look up the channel class and capacity floor for a given frame kind.
@@ -71,6 +75,8 @@ mod tests {
             (FrameKind::Retract, ChannelClass::Mpsc, 32),
             (FrameKind::ConsentRupture, ChannelClass::Mpsc, 32),
             (FrameKind::RateLimited, ChannelClass::Mpsc, 32),
+            (FrameKind::GatewayInbound, ChannelClass::Mpsc, 64),
+            (FrameKind::GatewayOutbound, ChannelClass::Mpsc, 64),
         ];
 
         assert_eq!(
@@ -141,6 +147,8 @@ mod tests {
             FrameKind::Retract,
             FrameKind::ConsentRupture,
             FrameKind::RateLimited,
+            FrameKind::GatewayInbound,
+            FrameKind::GatewayOutbound,
         ] {
             assert!(
                 channel_class_for(*kind).is_some(),

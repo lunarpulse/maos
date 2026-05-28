@@ -1343,53 +1343,57 @@ fn check_6_5_a2_backfill_carry_forward() -> Result<CheckResult, std::io::Error> 
     })
 }
 
-/// 6.5-MAOS-IAC-BASELINE (blocking_6_5) — assert maos-iac/ does NOT yet exist and all 13 IAC source files exist.
+/// 6.5-MAOS-IAC-BASELINE (blocking_6_5) — assert maos-iac/ EXISTS and all 13 IAC source files were extracted.
 fn check_6_5_iac_baseline() -> Result<CheckResult, std::io::Error> {
     let id = "6.5-IAC-BASELINE".to_string();
     let maos_iac_exists = Path::new("crates/maos-iac").exists();
-    let expected_files = [
-        "crates/maos-kernel-core/src/iac/mailbox.rs",
-        "crates/maos-kernel-core/src/iac/mailbox_stub.rs",
-        "crates/maos-kernel-core/src/iac/mod.rs",
-        "crates/maos-kernel-core/src/iac/channels.rs",
-        "crates/maos-kernel-core/src/iac/transparency_log.rs",
-        "crates/maos-kernel-core/src/iac/frame.rs",
-        "crates/maos-kernel-core/src/iac/payload.rs",
-        "crates/maos-kernel-core/src/iac/distillate.rs",
-        "crates/maos-kernel-core/src/iac/orchestrator_dispatch.rs",
-        "crates/maos-kernel-core/src/iac/drr_scheduler.rs",
-        "crates/maos-kernel-core/src/iac/decision_logger.rs",
-        "crates/maos-kernel-core/src/iac/redaction.rs",
-        "crates/maos-kernel-core/src/iac/log_recall.rs",
+    // Post-extraction: files moved to maos-iac/src/adapter/; old location has shim or is gone
+    let new_files = [
+        "crates/maos-iac/src/adapter.rs",
+        "crates/maos-iac/src/adapter/mailbox.rs",
+        "crates/maos-iac/src/adapter/mailbox_stub.rs",
+        "crates/maos-iac/src/adapter/channels.rs",
+        "crates/maos-iac/src/adapter/transparency_log.rs",
+        "crates/maos-iac/src/adapter/frame.rs",
+        "crates/maos-iac/src/adapter/payload.rs",
+        "crates/maos-iac/src/adapter/distillate.rs",
+        "crates/maos-iac/src/adapter/orchestrator_dispatch.rs",
+        "crates/maos-iac/src/adapter/drr_scheduler.rs",
+        "crates/maos-iac/src/adapter/decision_logger.rs",
+        "crates/maos-iac/src/adapter/redaction.rs",
+        "crates/maos-iac/src/adapter/log_recall.rs",
     ];
-    let all_present = expected_files.iter().all(|f| Path::new(f).exists());
-    let total_loc: usize = expected_files.iter()
+    let all_extracted = new_files.iter().all(|f| Path::new(f).exists());
+    let total_loc: usize = new_files.iter()
         .map(|f| fs::read_to_string(f).unwrap_or_default().lines().count())
         .sum();
-    let passed = !maos_iac_exists && all_present;
+    let passed = maos_iac_exists && all_extracted;
     Ok(CheckResult {
         id,
         passed,
-        message: format!("blocking_6_5: maos-iac exists={} (must be false) all_13_files={} total_loc={} → passed={}", maos_iac_exists, all_present, total_loc, passed),
+        message: format!("blocking_6_5: maos-iac exists={} (must be true) all_13_extracted={} total_loc={} → passed={}", maos_iac_exists, all_extracted, total_loc, passed),
     })
 }
 
-/// 6.5-MAOS-MANIFEST-BASELINE (blocking_6_5) — assert maos-manifest/ does NOT yet exist and manifest.rs exists.
+/// 6.5-MAOS-MANIFEST-BASELINE (blocking_6_5) — assert maos-manifest/ EXISTS and manifest.rs was extracted.
 fn check_6_5_manifest_baseline() -> Result<CheckResult, std::io::Error> {
     let id = "6.5-MANIFEST-BASELINE".to_string();
     let maos_manifest_exists = Path::new("crates/maos-manifest").exists();
-    let manifest_path = "crates/maos-kernel-core/src/security/manifest.rs";
-    let manifest_exists = Path::new(manifest_path).exists();
-    let loc = if manifest_exists { fs::read_to_string(manifest_path)?.lines().count() } else { 0 };
-    let passed = !maos_manifest_exists && manifest_exists;
+    let new_manifest_path = "crates/maos-manifest/src/manifest.rs";
+    let new_manifest_exists = Path::new(new_manifest_path).exists();
+    let new_loc = if new_manifest_exists { fs::read_to_string(new_manifest_path)?.lines().count() } else { 0 };
+    // Old location should now be a small shim (< 20 lines)
+    let old_manifest_path = "crates/maos-kernel-core/src/security/manifest.rs";
+    let old_loc = if Path::new(old_manifest_path).exists() { fs::read_to_string(old_manifest_path)?.lines().count() } else { 0 };
+    let passed = maos_manifest_exists && new_manifest_exists && new_loc > 3000 && old_loc < 20;
     Ok(CheckResult {
         id,
         passed,
-        message: format!("blocking_6_5: maos-manifest exists={} (must be false) manifest.rs exists={} loc={} → passed={}", maos_manifest_exists, manifest_exists, loc, passed),
+        message: format!("blocking_6_5: maos-manifest exists={} (must be true) new_manifest.rs exists={} new_loc={} old_shim_loc={} → passed={}", maos_manifest_exists, new_manifest_exists, new_loc, old_loc, passed),
     })
 }
 
-/// 6.5-GATEWAY-BASELINE (blocking_6_5) — assert gateway surfaces are absent (canvas clean).
+/// 6.5-GATEWAY-BASELINE (blocking_6_5) — assert gateway surfaces are present (post-implementation).
 fn check_6_5_gateway_baseline() -> Result<CheckResult, std::io::Error> {
     let id = "6.5-GATEWAY-BASELINE".to_string();
     let gateway_rs = Path::new("crates/maos-spirit-abi/src/gateway.rs").exists();
@@ -1402,19 +1406,19 @@ fn check_6_5_gateway_baseline() -> Result<CheckResult, std::io::Error> {
     let has_gateway_outbound = if Path::new(identity_path).exists() {
         fs::read_to_string(identity_path)?.contains("GatewayOutbound")
     } else { false };
-    let d24_free = if Path::new(identity_path).exists() {
-        !fs::read_to_string(identity_path)?.contains("= 24,")
-    } else { true };
-    let d25_free = if Path::new(identity_path).exists() {
-        !fs::read_to_string(identity_path)?.contains("= 25,")
-    } else { true };
-    let passed = !gateway_rs && !dispatcher_rs && !schema_json && !has_gateway_inbound && !has_gateway_outbound && d24_free && d25_free;
+    let d24_present = if Path::new(identity_path).exists() {
+        fs::read_to_string(identity_path)?.contains("= 24,")
+    } else { false };
+    let d25_present = if Path::new(identity_path).exists() {
+        fs::read_to_string(identity_path)?.contains("= 25,")
+    } else { false };
+    let passed = gateway_rs && dispatcher_rs && schema_json && has_gateway_inbound && has_gateway_outbound && d24_present && d25_present;
     Ok(CheckResult {
         id,
         passed,
         message: format!(
-            "blocking_6_5: gateway.rs={} dispatcher.rs={} schema.json={} GatewayInbound={} GatewayOutbound={} d24_free={} d25_free={} → passed={}",
-            gateway_rs, dispatcher_rs, schema_json, has_gateway_inbound, has_gateway_outbound, d24_free, d25_free, passed
+            "blocking_6_5: gateway.rs={} dispatcher.rs={} schema.json={} GatewayInbound={} GatewayOutbound={} d24_present={} d25_present={} → passed={}",
+            gateway_rs, dispatcher_rs, schema_json, has_gateway_inbound, has_gateway_outbound, d24_present, d25_present, passed
         ),
     })
 }

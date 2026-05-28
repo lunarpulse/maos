@@ -1,0 +1,4 @@
+[[rules]]
+tag = "claim.x"
+action = "halt"
+on_confidence_below = 1.5

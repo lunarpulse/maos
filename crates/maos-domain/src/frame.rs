@@ -420,6 +420,144 @@ pub struct ConsentEnvelope {
     pub valid_until_ns: Option<u64>,
 }
 
+// ------------------------------------------------------------------
+// Story 6.5 — Gateway frame types (FR54 / ADR-029)
+// ------------------------------------------------------------------
+
+/// Story 6.5 / FR54 — GatewayInbound payload. Carried on
+/// `IacFrame { kind: FrameKind::GatewayInbound, ... }` routed from the
+/// kernel-hosted gateway dispatcher to the Spirit's mailbox.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GatewayInboundFrame {
+    pub gateway_id: String,
+    /// External recipient identifier (e.g. "chat_id:123456789").
+    pub external_recipient_id: String,
+    /// External sender identifier.
+    pub sender_id: String,
+    /// Raw message bytes; capped by max_message_bytes.
+    pub payload: Vec<u8>,
+    pub timestamp_ns: u64,
+}
+
+/// Story 6.5 — Outbound message to an external gateway.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GatewayOutboundFrame {
+    pub gateway_id: String,
+    pub recipient: String,
+    pub payload_bytes: Vec<u8>,
+}
+
+/// Story 6.5 — GatewayInbound TL row. Mirrors the inbound frame shape
+/// but adds the receiving Spirit's id (for cross-Spirit audit queries).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GatewayInboundRecord {
+    pub receiving_spirit_id: String,
+    pub gateway_id: String,
+    pub gateway_type: String,
+    pub external_recipient_id: String,
+    pub sender_id: String,
+    /// Raw payload NEVER written; redacted length only per §4.4 redaction policy.
+    pub payload_redacted_len: u32,
+    pub timestamp_ns: u64,
+}
+
+/// Story 6.5 — GatewayOutbound TL row. Records the cap-token-authorized
+/// send. Provenance points to the invoking Spirit via `sending_spirit_id`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GatewayOutboundRecord {
+    pub sending_spirit_id: String,
+    pub gateway_id: String,
+    pub gateway_type: String,
+    pub external_recipient_id: String,
+    /// The cap-token traversed for this send.
+    pub cap_token_id: [u8; 16],
+    pub payload_redacted_len: u32,
+    pub timestamp_ns: u64,
+    pub send_outcome: GatewaySendOutcome,
+}
+
+/// Story 6.5 — Outcome of an outbound gateway send.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum GatewaySendOutcome {
+    Delivered,
+    DeniedByCapability,
+    DeniedByOutboundAllowlist,
+    UpstreamFailed(String),
+}
+
+/// Story 6.5 — GatewayLifecycle TL row.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GatewayLifecycleRecord {
+    pub spirit_id: String,
+    pub gateway_id: String,
+    pub gateway_type: String,
+    pub event: GatewayLifecycleEvent,
+    pub timestamp_ns: u64,
+}
+
+/// Story 6.5 — Gateway lifecycle events.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum GatewayLifecycleEvent {
+    Connected,
+    Disconnected,
+    FailedToConnect(String),
+    BackoffScheduled { retry_at_ns: u64 },
+}
+
+/// Gateway lifecycle event — connect / disconnect / error (payload frame).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GatewayLifecycleFrame {
+    pub gateway_id: String,
+    pub event_type: String,
+    pub payload: Option<String>,
+}
+
+// ------------------------------------------------------------------
+// Story 6.5 — Gateway uninstall types (FR65 v0.5 / AC6)
+// ------------------------------------------------------------------
+
+/// Per-gateway disconnect outcome during Spirit uninstall.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum DisconnectOutcome {
+    Clean,
+    Timeout,
+    Failed(String),
+}
+
+/// Single gateway entry in the uninstall record.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GatewayUninstallEntry {
+    pub gateway_id: String,
+    pub gateway_type: String,
+    /// Addresses of every principal-namespace key under
+    /// `principal:<spirit_principal_id>:gateway:<gateway_id>:*`.
+    pub principal_ns_keys_removed: Vec<String>,
+    /// Cap-tokens revoked for Scope::GatewaySend.
+    pub revoked_cap_token_ids: Vec<[u8; 16]>,
+    /// Opaque connection id from implementor.
+    pub terminated_connection_id: Option<String>,
+    /// Outcome of the on_disconnect call.
+    pub disconnect_outcome: DisconnectOutcome,
+}
+
+/// Record of gateway uninstall operations for a Spirit.
+/// Story 9.2 layers the Merkle proof on top of this record shape.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GatewayUninstallRecord {
+    pub spirit_id: String,
+    pub spirit_pid: u32,
+    pub uninstalled_at_ns: u64,
+    /// One entry per gateway that was registered under the Spirit's
+    /// principal namespace at uninstall time.
+    pub gateways: Vec<GatewayUninstallEntry>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

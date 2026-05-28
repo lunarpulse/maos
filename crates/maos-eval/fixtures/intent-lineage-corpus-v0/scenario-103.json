@@ -1,0 +1,15 @@
+{
+  "scenario_id": "intent-lineage-lineage_via_gateway_inbound-103",
+  "class": "lineage_via_gateway_inbound",
+  "description": "gateway inbound forwarded through orchestrator to worker, hop=2",
+  "originating_intent": "gateway_inbound",
+  "hop_count": 1,
+  "origin": "gateway",
+  "secondary_intent": "multi_hop",
+  "expected_outcome": {
+    "accepted": true,
+    "expected_lineage_intents": [
+      "gateway_inbound"
+    ]
+  }
+}

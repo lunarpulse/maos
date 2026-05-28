@@ -11,6 +11,8 @@ description = "MAOS kernel core — capability mediation, IAC bus, journal"
 maos-domain = { path = "../maos-domain" }
 # Story 6.5 — Phase 1 maos-iac extraction
 maos-iac = { path = "../maos-iac" }
+# Story 6.5 — Phase 1 maos-manifest extraction
+maos-manifest = { path = "../maos-manifest" }
 # Story 6.1 — Phase 2 maos-capability extraction (Epic 5 retro §A4 Debt 3)
 maos-capability = { path = "../maos-capability" }
 # Story 5.1 review backfill — `mock` feature moved to dev-dependencies so

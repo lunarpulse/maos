@@ -37,6 +37,7 @@ pub fn handle_subprocess_death(
             RecoveryAction::Respawn { transfer_context: false, exit_code }
         }
         CliWrapperRecoveryPolicy::Escalate => RecoveryAction::Escalate { exit_code },
+        _ => RecoveryAction::Escalate { exit_code },
     }
 }
 
