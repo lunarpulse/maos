@@ -59,12 +59,22 @@ it into the vtable automatically.
 | Story 7.1 (v0.5+) | Per-language templates (TypeScript / Python / Go), full per-language SDK |
 | Story 7.5b | NFR-Onb-1 30-Min First Spirit Validation Gate execution (against Butler from Story 8.1) |
 
+## Author your first Spirit — v0.5 path
+
+```bash
+# Scaffold a new Rust Spirit from this template:
+cargo generate --git https://github.com/your-org/maos templates/spirit-rust --name my-spirit
+
+# The v0.5 assertion macros are the canonical author-facing shape:
+#   spirit_test::assert!(condition, "diagnostic")
+#   spirit_test::expect_frame!(report, kind = ..., bytes_matches = ...)
+#   spirit_test::expect_halt!(report, halt_id = ..., kind_matches = ...)
+# See `crates/maos-spirit-sdk/src/spirit_test/assert.rs` for full reference.
+```
+
 ## Status of this template
 
-**v0.3 prerequisite per Story 2.3.** Rust-only at this stage. Full
-per-language template support (TypeScript / Python / Go) ships in Story
-7.1 at v0.5+. The NFR-Onb-1 30-Min First Spirit Validation Gate
-(N=12 stratified; median ≤45 min, p95 ≤90 min, ≥10/12 succeed per PRD
-line 122) executes at Story 7.5b against the Butler reference Spirit
-shipped by Story 8.1. This template is the SUBSTRATE for that gate, not
-the gate itself.
+**v0.5 binding per Story 7.1.** Rust + TypeScript templates ship at v0.5.
+Python deferred to v1.0; Go deferred to v1.5. The NFR-Onb-1 30-Min First
+Spirit Validation Gate executes at Story 7.5b against the Butler reference
+Spirit shipped by Story 8.1. This template is the SUBSTRATE for that gate.

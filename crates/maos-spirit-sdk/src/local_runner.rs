@@ -35,6 +35,9 @@ pub struct LocalRunnerFixture {
     pub swap_in_payloads: Vec<Vec<u8>>,
     /// Each entry fires one `on_consolidate` invocation.
     pub consolidate_payloads: Vec<Vec<u8>>,
+    /// Story 7.1 v0.5 binding — warnings to inject into the mock Ctx.
+    /// The runner deduplicates across hook fires by full 4-tuple.
+    pub deprecation_warnings: Vec<maos_spirit_abi::DeprecationWarning>,
 }
 
 /// Forward-anchor type for Story 2.4 full spirit-test SDK. At v0.3
@@ -66,6 +69,8 @@ pub struct RunReport {
     pub mock_bus_frames: Vec<MockBusFrame>,
     /// hook-name → elapsed wall-clock for that hook's invocations.
     pub elapsed_per_hook: BTreeMap<String, Duration>,
+    /// Story 7.1 v0.5 binding — deprecation warnings surfaced during the run.
+    pub deprecation_warnings_surfaced: Vec<maos_spirit_abi::DeprecationWarning>,
 }
 
 /// The local runner — instantiate with no arguments (it's stateless).
@@ -81,7 +86,11 @@ impl LocalRunner {
         fixture: &LocalRunnerFixture,
     ) -> RunReport {
         let mut report = RunReport::default();
-        let mut ctx = Ctx::mock();
+        let mut ctx = if fixture.deprecation_warnings.is_empty() {
+            Ctx::mock()
+        } else {
+            Ctx::mock_with_deprecation_warnings(fixture.deprecation_warnings.clone())
+        };
 
         macro_rules! fire {
             ($name:expr, $expr:expr) => {{
@@ -93,6 +102,17 @@ impl LocalRunner {
                     .elapsed_per_hook
                     .entry($name.to_string())
                     .or_insert(Duration::ZERO) += elapsed;
+                // Story 7.1 v0.5 binding — aggregate deprecation warnings from ctx
+                for warning in ctx.deprecation_warnings() {
+                    if !report.deprecation_warnings_surfaced.iter().any(|w| {
+                        w.surface == warning.surface
+                            && w.since_version == warning.since_version
+                            && w.planned_removal == warning.planned_removal
+                            && w.migration_hint == warning.migration_hint
+                    }) {
+                        report.deprecation_warnings_surfaced.push(warning.clone());
+                    }
+                }
             }};
         }
 

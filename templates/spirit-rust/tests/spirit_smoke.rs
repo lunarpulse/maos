@@ -1,18 +1,18 @@
-//! Smoke test for {{class_name}} — fires `on_idle` through the local_runner
-//! and asserts the hook fired exactly once.
+//! Smoke test for {{class_name}} — fires `on_idle` through the SpiritTest
+//! harness and asserts the hook fired exactly once using the v0.5 binding macros.
 
 use {{crate_name | snake_case}}::{{class_name}};
 use {{crate_name | snake_case}}::__maos_spirit_vtable_{{class_name}};
-use maos_spirit_sdk::local_runner::{LocalRunner, LocalRunnerFixture};
+use maos_spirit_sdk::spirit_test::{SpiritTest, assert, assert_no_deprecations};
 
 #[test]
 fn on_idle_fires_once() {
     let spirit = {{class_name}};
     let vtable = __maos_spirit_vtable_{{class_name}}();
-    let fixture = LocalRunnerFixture {
-        invoke_on_idle: true,
-        ..Default::default()
-    };
-    let report = LocalRunner::run(&spirit, vtable, &fixture);
-    assert_eq!(report.hooks_fired.get("on_idle").copied().unwrap_or(0), 1);
+    let mut harness = SpiritTest::new(&spirit, &vtable);
+    harness.fixture_mut().invoke_on_idle = true;
+    let report = harness.run();
+    assert!(report.base.hooks_fired.get("on_idle").copied().unwrap_or(0) == 1,
+        "on_idle should fire exactly once during a default fixture run");
+    assert_no_deprecations!(report);
 }

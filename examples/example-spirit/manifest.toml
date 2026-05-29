@@ -31,3 +31,14 @@ tier = "T0"
 
 [author]
 name = "TODO: your name"
+
+[author.support]
+# contact = "support@example.com"     # v0.5 — optional Spirit-author support contact
+# docs_url = "https://example.com/spirit-docs"  # v0.5 — optional docs URL
+
+# [[gateway]]
+# id = "my-telegram-1"
+# type = "echo"   # use "echo" for in-tree dev; "telegram"/"slack"/"discord"/"signal"/"email" for production (FR54)
+# auth_secret_ref = "secret:telegram:bot-token"
+# inbound_allowlist = ["chat_id:123456789"]
+# outbound_allowlist = ["chat_id:123456789"]

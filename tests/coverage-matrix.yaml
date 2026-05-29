@@ -1120,18 +1120,53 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Test-3:
-    gates: []
+    gates: [coverage-matrix-nfr-test-3]
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    measurement_method: "manifest_capability_set_reachability"
+    floor_target_pct: 80
+    floor_enforcement: "soft_at_v05_hard_at_v1.0"
+    reference_spirits:
+      hello-spirit:
+        path: "crates/maos-spirit-hello"
+        ships_at: "v0.1"
+        coverage_pct: 100
+        last_measured_at: "2026-05-29"
+        third_party: false
+      example-spirit:
+        path: "examples/example-spirit"
+        ships_at: "v0.3"
+        coverage_pct: 100
+        last_measured_at: "2026-05-29"
+        third_party: false
+      example-spirit-ts:
+        path: "examples/example-spirit-ts"
+        ships_at: "v0.5"
+        coverage_pct: 100
+        last_measured_at: "2026-05-29"
+        third_party: false
+      butler:
+        path: "crates/maos-spirit-butler"
+        ships_at: "v0.3"
+        coverage_pct: null
+        last_measured_at: null
+        third_party: false
+      researcher:
+        path: "crates/maos-spirit-researcher"
+        ships_at: "v0.5"
+        coverage_pct: null
+        last_measured_at: null
+        third_party: false
     notes: |
-      Story 2.4 ships the spirit-test SDK seed (5 assertion macros + IAC
-      frame I/O capture + halt resolution simulator + manifest self-check +
-      class-specific regression corpus skeleton + cross-Spirit isolation
-      framework hooks) at `crates/maos-spirit-sdk/src/spirit_test/`. The
-      SDK seed counts toward the ≥80% coverage floor measured at Story 7.5b
-      (NFR-Onb-1 N=12 stratified gate) + Story 10.2 (third-party trial N=12
-      at v1.5 per NFR-Test-8).
+      Story 7.1 v0.5 binding ships the structural surface: 5-Spirit table +
+      mechanical measurement walker + soft-floor reporting. Floor is target
+      ≥80% per declared-cap reachability via SDK fixtures. At v0.5 the 3
+      MAOS-team-authored Spirits populate; butler + researcher slots populate
+      at Stories 8.1 + 8.2. Story 7.5b N=12 stratified cohort populates
+      THIRD-PARTY measurement at v0.3 gate execution; Story 10.2 N=12 v1.5
+      trial fills the third_party=true requirement at ship-gate hardening.
+      Floor flips to hard-fail at Story 7.5a v1.0 STABILITY.md publication.
   NFR-Test-4:
     gates: []
     corpora: []

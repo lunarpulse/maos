@@ -19,7 +19,9 @@ mod check_workspace_count;
 mod corpus_staleness;
 mod corpus_types;
 mod coverage_matrix;
+mod coverage_matrix_nfr_test_3;
 mod example_spirit_regen;
+mod templates_regen;
 mod fs_walk;
 mod gen_isolation_corpus;
 mod gen_termination_corpus;
@@ -33,6 +35,7 @@ mod check_review_findings_resolved;
 mod check_dev_record_completeness;
 mod check_epic_6_bridge;
 mod check_manifest_schema_version;
+mod check_deprecations_declared;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -188,6 +191,15 @@ enum Commands {
         gate_registry: String,
         #[arg(long)]
         json: bool,
+        /// Story 7.1 — Measure NFR-Test-3 coverage floor.
+        #[arg(long)]
+        measure_nfr_test_3: bool,
+        /// Filter to a single Spirit name (requires --measure-nfr-test-3).
+        #[arg(long)]
+        spirit: Option<String>,
+        /// Report without writing back to YAML.
+        #[arg(long)]
+        dry_run: bool,
     },
     /// AC5 — Corpus staleness `valid_until` enforcement (NFR-Meta-2).
     CorpusStaleness {
@@ -233,7 +245,17 @@ enum Commands {
         json: bool,
     },
     /// Story 2.3 — Template-to-example drift detector and regenerator.
+    /// DEPRECATED: use `templates-regen` instead.
     ExampleSpiritRegen {
+        #[arg(long)]
+        check: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 7.1 — Generalized template-to-example regenerator (Rust + TS).
+    TemplatesRegen {
+        #[arg(long)]
+        lang: Option<String>,
         #[arg(long)]
         check: bool,
         #[arg(long)]
@@ -366,6 +388,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 7.1 — assert ZERO deprecation annotations at v0.5 HEAD.
+    #[command(name = "check-deprecations-declared")]
+    CheckDeprecationsDeclared {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -474,7 +502,16 @@ fn main() {
             manifest,
             gate_registry,
             json,
-        } => coverage_matrix::run(&config, &phase_config, &manifest, &gate_registry, json),
+            measure_nfr_test_3,
+            spirit,
+            dry_run,
+        } => {
+            if measure_nfr_test_3 {
+                coverage_matrix_nfr_test_3::run(&config, spirit.as_deref(), dry_run, json)
+            } else {
+                coverage_matrix::run(&config, &phase_config, &manifest, &gate_registry, json)
+            }
+        }
         Commands::CorpusStaleness {
             config,
             manifest,
@@ -514,8 +551,20 @@ fn main() {
             json,
         ),
         Commands::ExampleSpiritRegen { check, json } => {
+            eprintln!("WARN: example-spirit-regen is deprecated; use templates-regen --lang rust instead");
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
-            example_spirit_regen::run(&workspace_root, check, json)
+            templates_regen::run(&workspace_root, Some(templates_regen::Language::Rust), check, json)
+        }
+        Commands::TemplatesRegen { lang, check, json } => {
+            let workspace_root = std::env::current_dir().expect("failed to get current dir");
+            let lang = match lang.as_deref().map(|s| s.parse()).transpose() {
+                Ok(l) => l,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    std::process::exit(1);
+                }
+            };
+            templates_regen::run(&workspace_root, lang, check, json)
         }
         Commands::CheckWorkspaceCount {
             cargo_toml,
@@ -568,6 +617,9 @@ fn main() {
         }
         Commands::CheckManifestSchemaVersion { json } => {
             check_manifest_schema_version::run(json)
+        }
+        Commands::CheckDeprecationsDeclared { json } => {
+            check_deprecations_declared::run(json)
         }
     };
     if let Err(e) = result {

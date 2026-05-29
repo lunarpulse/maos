@@ -1,0 +1,37 @@
+[class]
+name = "{{crate_name}}"
+version = "0.1.0"
+abi = "1.0"
+manifest_schema_version = 2
+min_substrate_version = "0.5.0"
+forms = ["ts-inproc"]
+trust_tier = "local"
+description = "A MAOS Spirit scaffolded from templates/spirit-ts."
+
+[capabilities.required]
+provider.complete = ["anthropic.claude-3-haiku-20240307"]
+
+[posture]
+default = "assistive"
+allowed_max = "assistive"
+
+[output_shape]
+required_fields = ["introduction"]
+
+[budget]
+context_window_size = 4096
+time_cap_seconds = 30
+
+[resources]
+cpu_max_pct = 10
+memory_max_mb = 64
+
+[sandbox]
+tier = "T0"
+
+[author]
+name = "TODO: your name"
+
+[author.support]
+# contact = "support@example.com"
+# docs_url = "https://example.com/spirit-docs"

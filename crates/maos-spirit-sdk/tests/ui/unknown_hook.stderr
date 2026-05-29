@@ -1,4 +1,4 @@
-error: unknown hook `on_idel` — must be one of: on_load, on_start, on_frame, on_idle, on_telemetry_event, on_schedule, on_swap_in, on_pause, on_resume, on_unload, on_consolidate
+error: unknown hook `on_idel` — must be one of: on_load, on_start, on_frame, on_idle, on_telemetry_event, on_schedule, on_swap_in, on_pause, on_resume, on_unload, on_consolidate, on_swap_out, snapshot, migrate
  --> tests/ui/unknown_hook.rs:7:8
   |
 7 |     fn on_idel(&self) {}

@@ -61,6 +61,7 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
     let is_story_6_3 = matches!(story_arg, Some("6.3"));
     let is_story_6_4 = matches!(story_arg, Some("6.4"));
     let is_story_6_5 = matches!(story_arg, Some("6.5"));
+    let is_story_7_1 = matches!(story_arg, Some("7.1"));
     if is_story_6_2 {
         results.push(check_6_2_d_2_10());
         results.push(check_6_2_d_4());
@@ -110,6 +111,26 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
         results.push(check_6_5_kloc_ownership().map_err(|e| format!("6.5-KLOC error: {}", e))?);
         results.push(check_6_5_review_findings_status().map_err(|e| format!("6.5-RF error: {}", e))?);
     }
+    if is_story_7_1 {
+        // 17 row classifications per Story 7.1 AC1.
+        results.push(check_7_1_a1_p1_p5().map_err(|e| format!("7.1-A1 error: {}", e))?);
+        results.push(check_7_1_a2_step1());
+        results.push(check_7_1_a2_step2().map_err(|e| format!("7.1-A2 error: {}", e))?);
+        results.push(check_7_1_a3());
+        results.push(check_7_1_a4());
+        results.push(check_7_1_6_5_rf().map_err(|e| format!("7.1-6.5-RF error: {}", e))?);
+        results.push(check_7_1_6_5_framekind().map_err(|e| format!("7.1-6.5-FK error: {}", e))?);
+        results.push(check_7_1_6_5_iac().map_err(|e| format!("7.1-6.5-IAC error: {}", e))?);
+        results.push(check_7_1_6_5_manifest().map_err(|e| format!("7.1-6.5-MANIFEST error: {}", e))?);
+        results.push(check_7_1_6_5_crate_count().map_err(|e| format!("7.1-6.5-CRATE error: {}", e))?);
+        results.push(check_7_1_sdk_baseline());
+        results.push(check_7_1_rust_template_baseline());
+        results.push(check_7_1_ts_template_baseline());
+        results.push(check_7_1_coverage_matrix_baseline().map_err(|e| format!("7.1-CM error: {}", e))?);
+        results.push(check_7_1_ctx_deprecation_baseline());
+        results.push(check_7_1_discipline_job_count());
+        results.push(check_7_1_rf_status().map_err(|e| format!("7.1-RF error: {}", e))?);
+    }
 
     // 6.1 rows: failure on any 6.1 row blocks the gate (legacy behavior).
     // 6.2 extension rows: only blocking_6_2 rows (D-2.10, D-4, A3 blocking) gate
@@ -118,7 +139,29 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
     // 6.3 extension rows: only blocking_6_3 rows gate. Per Story 6.3 AC1 §Bridge-Preconditions:
     //   blocking_6_3 = §A3/§A5/§A6 gates SHIPPED (existence). All other 6.3 rows are
     //   verify-only / carry-forward per the table.
-    let all_pass = if is_story_6_5 {
+    let all_pass = if is_story_7_1 {
+        // Story 7.1 spec: command exits 0 only if every `blocking_7_1` row has cleared.
+        // Blocking rows:
+        //   * 7.1-SDK-BASELINE
+        //   * 7.1-RUST-TEMPLATE-BASELINE
+        //   * 7.1-TS-TEMPLATE-BASELINE
+        //   * 7.1-COVERAGE-MATRIX-BASELINE
+        //   * 7.1-CTX-DEPRECATION-BASELINE
+        results.iter().all(|r: &CheckResult| {
+            if matches!(
+                r.id.as_str(),
+                "7.1-SDK-BASELINE"
+                    | "7.1-RUST-TEMPLATE-BASELINE"
+                    | "7.1-TS-TEMPLATE-BASELINE"
+                    | "7.1-COVERAGE-MATRIX-BASELINE"
+                    | "7.1-CTX-DEPRECATION-BASELINE"
+            ) {
+                r.passed
+            } else {
+                true // informational — never gates 7.1
+            }
+        })
+    } else if is_story_6_5 {
         // Story 6.5 spec: command exits 0 only if every `blocking_6_5` row has cleared.
         // Blocking rows:
         //   * 6.5-MAOS-IAC-BASELINE (canvas clean for extraction)
@@ -1483,6 +1526,390 @@ fn check_6_5_review_findings_status() -> Result<CheckResult, std::io::Error> {
                 id,
                 passed: true,
                 message: format!("verify-only: Story 6.5 Review Findings section={} open Critical/High={} (checked at done transition)", has_review_section, open_critical_high),
+            })
+        }
+    }
+}
+
+// ─── Story 7.1 AC1 row classifiers ─────────────────────────────────────────────
+
+fn check_7_1_a1_p1_p5() -> Result<CheckResult, std::io::Error> {
+    let id = "7.1-A1-P1-P5".to_string();
+    // Verify Story 6.3 P1-P5 closed by checking for closed_at_HEAD markers
+    match find_story_file("6-3") {
+        None => Ok(CheckResult {
+            id,
+            passed: true,
+            message: "verify-only: Story 6.3 file not found — Story 7.1 is INDEPENDENT per Epic 6 retro".into(),
+        }),
+        Some(path) => {
+            let content = fs::read_to_string(&path)?;
+            let p_closed = ["P1", "P2", "P3", "P4", "P5"].iter()
+                .filter(|p| content.contains(&format!("{} closed", p)) || content.contains(&format!("{}: closed", p)) || content.contains(&format!("{} — closed", p)) || content.contains(&format!("closed_at_HEAD: yes")))
+                .count();
+            Ok(CheckResult {
+                id,
+                passed: true, // verify-only — does NOT block 7.1
+                message: format!("verify-only: Story 6.3 P1-P5 closed markers={}/5 — Story 7.1 is INDEPENDENT per Epic 6 retro line 252", p_closed),
+            })
+        }
+    }
+}
+
+fn check_7_1_a2_step1() -> CheckResult {
+    let id = "7.1-A2-STEP1".to_string();
+    let job1 = discipline_yml_has_step("check-review-findings-resolved");
+    let job2 = discipline_yml_has_step("check-dev-record-completeness");
+    CheckResult {
+        id,
+        passed: true, // verify-only — does NOT block 7.1
+        message: format!("verify: check-review-findings-resolved={} check-dev-record-completeness={} — continue-on-error may be true during backfill", job1, job2),
+    }
+}
+
+fn check_7_1_a2_step2() -> Result<CheckResult, std::io::Error> {
+    let id = "7.1-A2-STEP2".to_string();
+    let stories = ["5-1", "5-2", "5-5a", "5-5b"];
+    let mut populated = 0;
+    let mut placeholder = 0;
+    for prefix in &stories {
+        if let Some(path) = find_story_file(prefix) {
+            let content = fs::read_to_string(&path)?;
+            if content.contains("### Review Findings") {
+                if content.contains("_No review findings._") {
+                    placeholder += 1;
+                } else {
+                    populated += 1;
+                }
+            }
+        }
+    }
+    Ok(CheckResult {
+        id,
+        passed: true, // verify-only — does NOT block 7.1
+        message: format!("carry-forward: §A2 backfill — populated={}/4 placeholder={}/4 (does NOT block 7.1)", populated, placeholder),
+    })
+}
+
+fn check_7_1_a3() -> CheckResult {
+    let id = "7.1-A3".to_string();
+    // Check for ADR-041 or Phase 3 architecture decision
+    let adr_exists = Path::new("docs/adrs/adr-041.md").exists()
+        || Path::new("_bmad-output/planning-artifacts/architecture-maos-minimal-opus/12-architecture-decision-records.md").exists();
+    CheckResult {
+        id,
+        passed: true, // verify-only — does NOT block 7.1
+        message: format!("verify: Phase 3 architecture decision documented={} — Story 7.1 is independent per Epic 6 retro line 257", adr_exists),
+    }
+}
+
+fn check_7_1_a4() -> CheckResult {
+    let id = "7.1-A4".to_string();
+    let version_path = "crates/maos-spirit-abi/src/version.rs";
+    let manifest_version_ok = if Path::new(version_path).exists() {
+        match fs::read_to_string(version_path) {
+            Ok(c) => c.contains("MAOS_MANIFEST_SCHEMA_VERSION") && (c.contains("= 2") || c.contains("= 3") || c.contains("= 4") || c.contains("= 5")),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    let job1 = discipline_yml_has_step("check-manifest-schema-version");
+    let job2 = discipline_yml_has_step("manifest-n-minus-1-test");
+    CheckResult {
+        id,
+        passed: true, // verify-only — does NOT block 7.1
+        message: format!("verify: manifest_schema_version≥2={} check-manifest-schema-version={} manifest-n-minus-1-test={}", manifest_version_ok, job1, job2),
+    }
+}
+
+fn check_7_1_6_5_rf() -> Result<CheckResult, std::io::Error> {
+    let id = "7.1-6.5-RF".to_string();
+    match find_story_file("6-5") {
+        None => Ok(CheckResult {
+            id,
+            passed: true,
+            message: "verify-only: Story 6.5 file not found (does NOT block 7.1)".into(),
+        }),
+        Some(path) => {
+            let content = fs::read_to_string(&path)?;
+            let open_critical_high = content
+                .lines()
+                .filter(|line| {
+                    let lower = line.to_lowercase();
+                    (lower.contains("critical") || lower.contains("high"))
+                        && lower.contains("**open**")
+                })
+                .count();
+            Ok(CheckResult {
+                id,
+                passed: true, // verify-only
+                message: format!("verify-only: Story 6.5 has {} open Critical/High findings", open_critical_high),
+            })
+        }
+    }
+}
+
+fn check_7_1_6_5_framekind() -> Result<CheckResult, std::io::Error> {
+    let id = "7.1-6.5-FRAMEKIND".to_string();
+    let path = "crates/maos-spirit-abi/src/identity.rs";
+    if !Path::new(path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "verify: maos-spirit-abi identity.rs not found".into(),
+        });
+    }
+    let src = fs::read_to_string(path)?;
+    let has_gateway_inbound = src.contains("GatewayInbound = 24") || src.contains("GatewayInbound =24");
+    let has_gateway_outbound = src.contains("GatewayOutbound = 25") || src.contains("GatewayOutbound =25");
+    Ok(CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!("verify: GatewayInbound=24 present={} GatewayOutbound=25 present={}", has_gateway_inbound, has_gateway_outbound),
+    })
+}
+
+fn check_7_1_6_5_iac() -> Result<CheckResult, std::io::Error> {
+    let id = "7.1-6.5-IAC".to_string();
+    let maos_iac_exists = Path::new("crates/maos-iac").exists();
+    let test_pass = if maos_iac_exists {
+        run_xtask_gate("test -p maos-iac")
+    } else {
+        false
+    };
+    Ok(CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!("verify: maos-iac exists={} tests pass={}", maos_iac_exists, test_pass),
+    })
+}
+
+fn check_7_1_6_5_manifest() -> Result<CheckResult, std::io::Error> {
+    let id = "7.1-6.5-MANIFEST".to_string();
+    let maos_manifest_exists = Path::new("crates/maos-manifest").exists();
+    let test_pass = if maos_manifest_exists {
+        run_xtask_gate("test -p maos-manifest")
+    } else {
+        false
+    };
+    Ok(CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!("verify: maos-manifest exists={} tests pass={}", maos_manifest_exists, test_pass),
+    })
+}
+
+fn check_7_1_6_5_crate_count() -> Result<CheckResult, std::io::Error> {
+    let id = "7.1-6.5-CRATE-COUNT".to_string();
+    let output = std::process::Command::new("cargo")
+        .args(["run", "-p", "xtask", "--", "check-workspace-count"])
+        .output();
+    let (pass, msg) = match output {
+        Ok(o) => {
+            let stdout = String::from_utf8_lossy(&o.stdout);
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            let combined = format!("{} {}", stdout, stderr);
+            let has_27 = combined.contains("27");
+            (has_27, format!("workspace count reports 27={} (Story 7.1 keeps 27 — adds 0 Cargo crates)", has_27))
+        }
+        Err(e) => (false, format!("failed to run check-workspace-count: {}", e)),
+    };
+    Ok(CheckResult {
+        id,
+        passed: true, // verify-only
+        message: msg,
+    })
+}
+
+fn check_7_1_sdk_baseline() -> CheckResult {
+    let id = "7.1-SDK-BASELINE".to_string();
+    let assert_rs = Path::new("crates/maos-spirit-sdk/src/spirit_test/assert.rs").exists();
+    let cargo_toml = Path::new("crates/maos-spirit-sdk/Cargo.toml").exists();
+    let has_spirit_test_feature = if cargo_toml {
+        match fs::read_to_string("crates/maos-spirit-sdk/Cargo.toml") {
+            Ok(c) => c.contains("spirit_test"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    let has_macros = if assert_rs {
+        match fs::read_to_string("crates/maos-spirit-sdk/src/spirit_test/assert.rs") {
+            Ok(c) => {
+                c.contains("macro_rules! assert_emits_frame")
+                    && c.contains("macro_rules! assert_halts_with")
+                    && c.contains("macro_rules! assert_hook_fired")
+                    && c.contains("macro_rules! assert_no_capability_invocation")
+                    && c.contains("macro_rules! assert_manifest_well_formed")
+            }
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    let passed = assert_rs && has_spirit_test_feature && has_macros;
+    CheckResult {
+        id,
+        passed,
+        message: format!("blocking_7_1: assert.rs={} spirit_test_feature={} 5_macros={} → {}", assert_rs, has_spirit_test_feature, has_macros, if passed { "PASS" } else { "FAIL — substrate missing" }),
+    }
+}
+
+fn check_7_1_rust_template_baseline() -> CheckResult {
+    let id = "7.1-RUST-TEMPLATE-BASELINE".to_string();
+    let cargo_generate = Path::new("templates/spirit-rust/cargo-generate.toml").exists();
+    let lib_rs = Path::new("templates/spirit-rust/src/lib.rs").exists();
+    let has_class_name = if lib_rs {
+        match fs::read_to_string("templates/spirit-rust/src/lib.rs") {
+            Ok(c) => c.contains("{{class_name}}"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    let example_cargo = Path::new("examples/example-spirit/Cargo.toml").exists();
+    let passed = cargo_generate && lib_rs && has_class_name && example_cargo;
+    CheckResult {
+        id,
+        passed,
+        message: format!("blocking_7_1: cargo-generate.toml={} lib.rs={} class_name_placeholder={} example-spirit/Cargo.toml={} → {}", cargo_generate, lib_rs, has_class_name, example_cargo, if passed { "PASS" } else { "FAIL" }),
+    }
+}
+
+fn check_7_1_ts_template_baseline() -> CheckResult {
+    let id = "7.1-TS-TEMPLATE-BASELINE".to_string();
+    // Post-impl regression guard: verifies Story 7.1 deliverables exist at HEAD.
+    // Originally a blocking_7_1 canvas-cleanliness check (pre-impl: directories MUST NOT exist).
+    // Post-impl: directories MUST exist — serves as a regression guard.
+    let ts_template = Path::new("templates/spirit-ts").exists();
+    let ts_example = Path::new("examples/example-spirit-ts").exists();
+    let ts_sdk = Path::new("sdks/spirit-ts").exists();
+    let passed = ts_template && ts_example && ts_sdk;
+    CheckResult {
+        id,
+        passed,
+        message: format!("blocking_7_1 (regression): templates/spirit-ts exists={} examples/example-spirit-ts exists={} sdks/spirit-ts exists={} → {}", ts_template, ts_example, ts_sdk, if passed { "PASS" } else { "FAIL" }),
+    }
+}
+
+fn check_7_1_coverage_matrix_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "7.1-COVERAGE-MATRIX-BASELINE".to_string();
+    // Post-impl regression guard: verifies NFR-Test-3 reference_spirits block exists.
+    // Originally blocking_7_1: reference_spirits MUST NOT exist (pre-impl canvas clean).
+    let cm_path = "tests/coverage-matrix.yaml";
+    if !Path::new(cm_path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "blocking_7_1 (regression): tests/coverage-matrix.yaml not found".into(),
+        });
+    }
+    let content = fs::read_to_string(cm_path)?;
+    let has_nfr_test3 = content.contains("NFR-Test-3:");
+    let has_reference_spirits = content.contains("reference_spirits:");
+    let passed = has_nfr_test3 && has_reference_spirits;
+    Ok(CheckResult {
+        id,
+        passed,
+        message: format!("blocking_7_1 (regression): NFR-Test-3 row={} reference_spirits present={} → {}", has_nfr_test3, has_reference_spirits, if passed { "PASS" } else { "FAIL" }),
+    })
+}
+
+fn check_7_1_ctx_deprecation_baseline() -> CheckResult {
+    let id = "7.1-CTX-DEPRECATION-BASELINE".to_string();
+    // Post-impl regression guard: verifies deprecation channel surface exists.
+    // Originally blocking_7_1: deprecation_warnings MUST NOT exist (pre-impl canvas clean).
+    let ctx_path = "crates/maos-spirit-abi/src/ctx.rs";
+    let lib_path = "crates/maos-spirit-abi/src/lib.rs";
+    let has_deprecation_in_ctx = if Path::new(ctx_path).exists() {
+        match fs::read_to_string(ctx_path) {
+            Ok(c) => c.contains("deprecation_warnings"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    let has_deprecation_warning_struct = if Path::new(lib_path).exists() {
+        match fs::read_to_string(lib_path) {
+            Ok(c) => c.contains("DeprecationWarning"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    let passed = has_deprecation_in_ctx && has_deprecation_warning_struct;
+    CheckResult {
+        id,
+        passed,
+        message: format!("blocking_7_1 (regression): deprecation_warnings in ctx.rs={} DeprecationWarning in lib.rs={} → {}", has_deprecation_in_ctx, has_deprecation_warning_struct, if passed { "PASS" } else { "FAIL" }),
+    }
+}
+
+
+fn check_7_1_discipline_job_count() -> CheckResult {
+    let id = "7.1-DISCIPLINE-JOB-COUNT".to_string();
+    let path = ".github/workflows/discipline.yml";
+    let count = if Path::new(path).exists() {
+        match fs::read_to_string(path) {
+            Ok(c) => {
+                // Count job-level entries: lines that start with two spaces and a job name followed by colon
+                c.lines().filter(|l| {
+                    let trimmed = l.trim_start();
+                    trimmed.len() > 2
+                        && trimmed.chars().next().map(|c| c.is_ascii_lowercase()).unwrap_or(false)
+                        && trimmed.ends_with(':')
+                        && !trimmed.starts_with("uses:")
+                        && !trimmed.starts_with("with:")
+                        && !trimmed.starts_with("steps:")
+                        && !trimmed.starts_with("needs:")
+                        && !trimmed.starts_with("runs-on:")
+                        && !trimmed.starts_with("if:")
+                        && !trimmed.starts_with("env:")
+                        && !trimmed.starts_with("defaults:")
+                        && !trimmed.starts_with("strategy:")
+                        && !trimmed.starts_with("outputs:")
+                        && !trimmed.starts_with("services:")
+                        && !trimmed.starts_with("container:")
+                        && !trimmed.starts_with("permissions:")
+                        && !trimmed.starts_with("concurrency:")
+                }).count()
+            }
+            Err(_) => 0,
+        }
+    } else {
+        0
+    };
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!("verify: discipline.yml job-level entries ≈{} (Story 7.1 raises to 77)", count),
+    }
+}
+
+fn check_7_1_rf_status() -> Result<CheckResult, std::io::Error> {
+    let id = "7.1-RF-STATUS".to_string();
+    match find_story_file("7-1") {
+        None => Ok(CheckResult {
+            id,
+            passed: true,
+            message: "verify-only: Story 7.1 file not found (checked at done transition)".into(),
+        }),
+        Some(path) => {
+            let content = fs::read_to_string(&path)?;
+            let has_review_section = content.contains("### Review Findings");
+            let open_critical_high = content
+                .lines()
+                .filter(|line| {
+                    let lower = line.to_lowercase();
+                    (lower.contains("critical") || lower.contains("high"))
+                        && lower.contains("**open**")
+                })
+                .count();
+            Ok(CheckResult {
+                id,
+                passed: true, // verify-only
+                message: format!("verify-only: Story 7.1 Review Findings section={} open Critical/High={} (checked at done transition)", has_review_section, open_critical_high),
             })
         }
     }

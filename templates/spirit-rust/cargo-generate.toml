@@ -5,3 +5,12 @@ ignore = []
 [placeholders]
 crate_name = { type = "string", prompt = "Spirit crate name (kebab-case, e.g., 'my-spirit')", regex = "^[a-z][a-z0-9-]+$" }
 class_name = { type = "string", prompt = "Spirit struct name (PascalCase, e.g., 'MySpirit')", regex = "^[A-Z][a-zA-Z0-9]+$" }
+
+[hooks]
+post = ["post-generate.rhai"]
+
+[template.scripts]
+post-generate = '''
+print("✅ Spirit scaffolded successfully!");
+print("   Next: cd {{crate_name}} && cargo test --features maos-spirit-sdk/spirit_test");
+'''

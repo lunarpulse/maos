@@ -2871,9 +2871,14 @@ description = "smoke test spirit successor"
             return smoke_schedule_6_4().await;
         }
 
+        // Story 7.1 AC6 — smoke-spirit-author-7-1: full author-side path
+        if mode == "smoke-spirit-author-7-1" {
+            return smoke_spirit_author_7_1().await;
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -3882,5 +3887,77 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     eprintln!("smoke-schedule-6-4: ✅ wedge demo complete; all four surfaces verified");
+    Ok(())
+}
+
+/// Story 7.1 AC6 — `smoke-spirit-author-7-1` end-to-end author path demo.
+async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
+    use std::process::Command;
+    let workspace_root = std::env::current_dir()?;
+    let tmpdir = workspace_root.join("target/smoke-7-1-tmp");
+    if tmpdir.exists() {
+        let _ = std::fs::remove_dir_all(&tmpdir);
+    }
+    std::fs::create_dir_all(&tmpdir)?;
+    eprintln!("[smoke-7.1] tmpdir={}", tmpdir.display());
+
+    // Step 1: scaffold a Rust Spirit
+    let rust_dir = tmpdir.join("smoke-rust-spirit");
+    let status = Command::new("cargo")
+        .args(["generate", "--git", ".", "templates/spirit-rust",
+               "--name", "smoke-rust-spirit",
+               "--define", "class_name=SmokeRustSpirit"])
+        .current_dir(&workspace_root)
+        .status()?;
+    if !status.success() {
+        return Err("cargo-generate rust failed".into());
+    }
+
+    // Step 2: cargo test the scaffolded Rust Spirit
+    let status = Command::new("cargo")
+        .args(["test", "--features", "maos-spirit-sdk/spirit_test"])
+        .current_dir(&rust_dir)
+        .status()?;
+    if !status.success() {
+        return Err("cargo test rust failed".into());
+    }
+
+    // Step 3: scaffold a TS Spirit
+    let ts_dir = tmpdir.join("smoke-ts-spirit");
+    let status = Command::new("cargo")
+        .args(["generate", "--git", ".", "templates/spirit-ts",
+               "--name", "smoke-ts-spirit",
+               "--define", "class_name=SmokeTsSpirit",
+               "--define", "package_name=@local/smoke-ts-spirit"])
+        .current_dir(&workspace_root)
+        .status()?;
+    if !status.success() {
+        return Err("cargo-generate ts failed".into());
+    }
+
+    // Step 4: npm test the scaffolded TS Spirit
+    let status = Command::new("npm").args(["ci"]).current_dir(&ts_dir).status()?;
+    if !status.success() {
+        return Err("npm ci ts failed".into());
+    }
+    let status = Command::new("npm").args(["test"]).current_dir(&ts_dir).status()?;
+    if !status.success() {
+        return Err("npm test ts failed".into());
+    }
+
+    // Step 5: NFR-Test-3 coverage measurement on the 3 v0.5-shipped Spirits
+    let status = Command::new("cargo")
+        .args(["run", "-p", "xtask", "--", "coverage-matrix", "--measure-nfr-test-3",
+               "--spirit", "hello-spirit",
+               "--spirit", "example-spirit",
+               "--spirit", "example-spirit-ts",
+               "--dry-run"])
+        .current_dir(&workspace_root)
+        .status()?;
+    if !status.success() {
+        return Err("coverage measurement failed".into());
+    }
+
+    println!("{{\"smoke\":\"7-1\",\"status\":\"ok\",\"steps\":[\"scaffold-rust\",\"test-rust\",\"scaffold-ts\",\"test-ts\",\"coverage-3-spirits\"]}}");
     Ok(())
 }

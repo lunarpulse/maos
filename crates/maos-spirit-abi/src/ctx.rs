@@ -8,6 +8,8 @@
 //! per I1, Spirits cannot bypass the Capability Registry.
 
 use crate::cancellation::CancellationSignal;
+use crate::deprecation::DeprecationWarning;
+use alloc::vec::Vec;
 
 /// Opaque handle to a capability token held kernel-side.
 ///
@@ -34,11 +36,12 @@ pub struct MailboxHandle(pub u64);
 /// the kernel owns the underlying signal (e.g., an `Arc<AtomicBool>`)
 /// and ensures it outlives all Spirit hook invocations. This avoids
 /// lifetime parameters on the vtable dispatch functions.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Ctx {
     pub(crate) cancellation: &'static dyn CancellationSignal,
     pub(crate) capability_handle: CapabilityHandle,
     pub(crate) mailbox_handle: MailboxHandle,
+    pub(crate) deprecation_warnings: Vec<DeprecationWarning>,
 }
 
 impl Ctx {
@@ -56,6 +59,13 @@ impl Ctx {
     pub fn mailbox(&self) -> MailboxHandle {
         self.mailbox_handle
     }
+
+    /// Story 7.1 v0.5 binding — observe any deprecated ABI surfaces the
+    /// Spirit code has used during the current hook fire. Returns an empty
+    /// slice at v0.5 because the v0.5 ABI has no deprecations.
+    pub fn deprecation_warnings(&self) -> &[DeprecationWarning] {
+        &self.deprecation_warnings
+    }
 }
 
 impl Ctx {
@@ -71,6 +81,23 @@ impl Ctx {
             cancellation: &NEVER,
             capability_handle: CapabilityHandle(0),
             mailbox_handle: MailboxHandle(0),
+            deprecation_warnings: Vec::new(),
+        }
+    }
+
+    /// Construct a mock `Ctx` with pre-populated deprecation warnings.
+    ///
+    /// Story 7.1 v0.5 binding — used by `spirit-test` to verify the
+    /// deprecation channel surfaces correctly even though the v0.5 ABI
+    /// has no real deprecations.
+    #[cfg(any(test, feature = "mock"))]
+    pub fn mock_with_deprecation_warnings(warnings: Vec<DeprecationWarning>) -> Self {
+        static NEVER: crate::cancellation::NeverCancel = crate::cancellation::NeverCancel;
+        Self {
+            cancellation: &NEVER,
+            capability_handle: CapabilityHandle(0),
+            mailbox_handle: MailboxHandle(0),
+            deprecation_warnings: warnings,
         }
     }
 
@@ -99,6 +126,7 @@ impl Ctx {
             cancellation: &NEVER,
             capability_handle,
             mailbox_handle,
+            deprecation_warnings: Vec::new(),
         }
     }
 }
@@ -116,6 +144,7 @@ impl core::fmt::Debug for Ctx {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     #[test]
     fn ctx_mock_has_cancellation_not_cancelled() {
@@ -139,9 +168,25 @@ mod tests {
     }
 
     #[test]
-    fn ctx_is_copy() {
+    fn ctx_is_clone() {
         let ctx = Ctx::mock();
-        let ctx2 = ctx;
+        let ctx2 = ctx.clone();
         assert_eq!(ctx.capability(), ctx2.capability());
+    }
+
+    #[test]
+    fn ctx_mock_deprecation_warnings_empty() {
+        let ctx = Ctx::mock();
+        assert!(ctx.deprecation_warnings().is_empty());
+    }
+
+    #[test]
+    fn ctx_mock_with_deprecation_warnings() {
+        let warnings = vec![
+            DeprecationWarning::new("Test::api", "0.5", "1.0", "use Test::new_api"),
+        ];
+        let ctx = Ctx::mock_with_deprecation_warnings(warnings.clone());
+        assert_eq!(ctx.deprecation_warnings().len(), 1);
+        assert_eq!(ctx.deprecation_warnings()[0].surface, "Test::api");
     }
 }

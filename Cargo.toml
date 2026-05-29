@@ -31,7 +31,7 @@ members = [
     "examples/example-spirit",
 ]
 default-members = []
-exclude = ["templates"]
+exclude = ["templates", "templates/spirit-ts"]
 
 [workspace.package]
 version = "0.1.0-alpha"

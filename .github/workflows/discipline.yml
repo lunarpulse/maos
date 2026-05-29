@@ -539,8 +539,65 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run example-spirit drift check (template vs. baked output sync)
-        run: cargo run -p xtask -- example-spirit-regen --check --json
+      - name: Run template drift check (Rust + TS)
+        run: cargo run -p xtask -- templates-regen --check --json
+
+  example-spirit-ts-tests:
+    runs-on: ubuntu-latest
+    needs: [reproducible-build, check-workspace-count]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build TS SDK
+        run: cd sdks/spirit-ts && npm ci && npm run build
+      - name: Run example-spirit-ts tests
+        run: cd examples/example-spirit-ts && npm ci && npm test --silent
+
+  coverage-matrix-nfr-test-3:
+    runs-on: ubuntu-latest
+    needs: [check-corpus]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Measure NFR-Test-3 coverage floor
+        run: cargo run -p xtask -- coverage-matrix --measure-nfr-test-3 --dry-run
+      - name: Report soft floor status
+        run: |
+          echo "v0.5 soft floor: NFR-Test-3 reported via --dry-run above"
+
+  smoke-spirit-author-7-1:
+    runs-on: ubuntu-latest
+    needs: [reproducible-build, check-workspace-count]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Install cargo-generate
+        run: cargo install cargo-generate --locked || true
+      - name: Build TS SDK
+        run: cd sdks/spirit-ts && npm ci && npm run build
+      - name: Run smoke-spirit-author-7-1
+        run: MAOS_ONE_SHOT=smoke-spirit-author-7-1 cargo run --release -p maos-bin
 
   spirit-test-tests:
     runs-on: ubuntu-latest
@@ -1256,7 +1313,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1]
     if: always()
     permissions:
       pull-requests: write
@@ -1289,7 +1346,10 @@ jobs:
           echo "onb=${{ needs.onb-nfr2-timing.result }}" >> $GITHUB_OUTPUT
           echo "est=${{ needs.example-spirit-tests.result }}" >> $GITHUB_OUTPUT
           echo "esd=${{ needs.example-spirit-drift.result }}" >> $GITHUB_OUTPUT
+          echo "estts=${{ needs.example-spirit-ts-tests.result }}" >> $GITHUB_OUTPUT
           echo "stt=${{ needs.spirit-test-tests.result }}" >> $GITHUB_OUTPUT
+          echo "cmn3=${{ needs.coverage-matrix-nfr-test-3.result }}" >> $GITHUB_OUTPUT
+          echo "s71=${{ needs.smoke-spirit-author-7-1.result }}" >> $GITHUB_OUTPUT
           echo "lct=${{ needs.lcas-corpus-tests.result }}" >> $GITHUB_OUTPUT
           echo "ift=${{ needs.isolation-framework-tests.result }}" >> $GITHUB_OUTPUT
           echo "cm=${{ needs.coverage-matrix.result }}" >> $GITHUB_OUTPUT
@@ -1339,7 +1399,10 @@ jobs:
             const onb = '${{ needs.onb-nfr2-timing.result }}';
             const est = '${{ needs.example-spirit-tests.result }}';
             const esd = '${{ needs.example-spirit-drift.result }}';
+            const estts = '${{ needs.example-spirit-ts-tests.result }}';
             const stt = '${{ needs.spirit-test-tests.result }}';
+            const cmn3 = '${{ needs.coverage-matrix-nfr-test-3.result }}';
+            const s71 = '${{ needs.smoke-spirit-author-7-1.result }}';
             const lct = '${{ needs.lcas-corpus-tests.result }}';
             const ift = '${{ needs.isolation-framework-tests.result }}';
             const cm = '${{ needs.coverage-matrix.result }}';
@@ -1383,7 +1446,10 @@ jobs:
             | onb-nfr2-timing | ${icon(onb)} ${onb} |
             | example-spirit-tests | ${icon(est)} ${est} |
             | example-spirit-drift | ${icon(esd)} ${esd} |
+            | example-spirit-ts-tests | ${icon(estts)} ${estts} |
             | spirit-test-tests | ${icon(stt)} ${stt} |
+            | coverage-matrix-nfr-test-3 | ${icon(cmn3)} ${cmn3} |
+            | smoke-spirit-author-7-1 | ${icon(s71)} ${s71} |
             | lcas-corpus-tests | ${icon(lct)} ${lct} |
             | isolation-framework-tests | ${icon(ift)} ${ift} |
             | coverage-matrix | ${icon(cm)} ${cm} |

@@ -433,6 +433,7 @@ mod tests {
             cancellation: &NEVER,
             capability_handle: crate::ctx::CapabilityHandle(0),
             mailbox_handle: crate::ctx::MailboxHandle(0),
+            deprecation_warnings: Vec::new(),
         }
     }
 

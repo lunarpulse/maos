@@ -83,13 +83,20 @@ maos/
 │                                       #          (check-empty-kernel, check-service-boundary, abi-diff,
 │                                       #           invariant-lock, manifest-field-coverage, etc.)
 ├── spirits/                            # Reference Spirit crates (in-process)
-├── templates/                          # Spirit-author scaffolding (Story 2.3)
-│   └── spirit-rust/                    # Thin cargo-generate template (Rust-only at v0.3;
-│                                       # per-language TS/Python/Go at Story 7.1 v0.5+).
-│                                       # Excluded from workspace via [workspace] exclude.
+├── templates/                          # Spirit-author scaffolding (Story 2.3 → 7.1)
+│   ├── spirit-rust/                    # Thin cargo-generate template (Rust-only at v0.3;
+│   │                                   # per-language TS/Python/Go at Story 7.1 v0.5+).
+│   │                                   # Excluded from workspace via [workspace] exclude.
+│   └── spirit-ts/                      # Story 7.1 v0.5 — TypeScript cargo-generate template.
+│                                       # Parallel structure to spirit-rust. Excluded from workspace.
 ├── examples/                           # Workspace-member example Spirits (NOT kernel substrate)
-│   └── example-spirit/                 # Baked output of templates/spirit-rust (Story 2.3).
-│                                       # Drift-detected via `xtask example-spirit-regen --check`.
+│   ├── example-spirit/                 # Baked output of templates/spirit-rust (Story 2.3).
+│   │                                   # Drift-detected via `xtask example-spirit-regen --check`.
+│   └── example-spirit-ts/              # Story 7.1 v0.5 — baked TypeScript template output.
+│                                       # Node project (npm ci && npm test), NOT a Cargo workspace member.
+├── sdks/                               # Story 7.1 v0.5 — language-specific SDK packages
+│   └── spirit-ts/                      # @maos/spirit-ts — TypeScript SDK shim (test harness only,
+│                                       # not a kernel runtime per ADR-002). Built via tsc. NOT a Cargo member.
 ├── schemas/                            # JSON Schema + CBOR schemas
 │   ├── trace-shape.schema.json
 │   ├── halt-registry/<spirit-class>.toml
@@ -102,7 +109,7 @@ Dependencies point inward (adapter ring → kernel services → domain core), wi
 
 **Workspace member count (post Story 1b.6):** 18 library/binary crates + xtask = **19 workspace members**. Added since the original §4.0.2 description: `maos-audit` (Story 1b.1 — read-side audit query adapter), `maos-attrs` (Story 1b.3 — `#[i9_exempt]` proc-macro), `maos-corpus-gen` (Epic 0 — deterministic corpus generators). `default-members = []` in the workspace root forces every cargo invocation to be `-p`-explicit (Story 1b.6 retro action A7).
 
-**Workspace member count (post Story 6.1):**<!-- workspace-count-authoritative --> 23 library/binary crates + xtask + `crates/maos-bench` + `examples/example-spirit` = **26 workspace members**. Story 5.5e added `maos-bench` (§13.1 measurement gate) as the 25th member. Story 6.1 added `maos-capability` (Phase 2 decomposition per Epic 5 retro §A4 Debt 3) as the 26th member.
+**Workspace member count (post Story 7.1):**<!-- workspace-count-authoritative --> Story 7.1 adds `templates/spirit-ts/` (excluded from `[workspace] members` per Story 2.3 precedent), `examples/example-spirit-ts/` (Node project, NOT a Cargo workspace member), and `sdks/spirit-ts/` (Node package, NOT a Cargo workspace member). The Cargo workspace member count stays at **27** (post-Epic-6.5 baseline). Story 7.1 introduces non-Cargo workspace members built via `tsc`; the `check-workspace-count` gate stays at 27.
 
 **`spirit_test` feature on `maos-spirit-sdk` (post Story 2.4):** The crate gains an opt-in `spirit_test` cargo feature (depends on `local_runner` + `std` + `mock`) gating a new `crates/maos-spirit-sdk/src/spirit_test/` module that ships the SDK seed (assertion macros + IAC frame I/O capture + halt resolution simulator + manifest self-check + class-specific regression corpus skeleton + cross-Spirit isolation framework hooks). Workspace member count stays at **21** — the new module is feature-gated inside the existing crate, not a new workspace member.
 
