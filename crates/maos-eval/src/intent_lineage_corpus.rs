@@ -24,6 +24,8 @@ pub enum IntentLineageClass {
     LineageUnionViaDistillate,
     LineageBrokenSpiritAutoStripsField,
     LineageContinuityAcrossRetract,
+    LineageViaGatewayInbound,
+    LineageViaGatewayOutbound,
 }
 
 /// One scenario in the intent lineage corpus.

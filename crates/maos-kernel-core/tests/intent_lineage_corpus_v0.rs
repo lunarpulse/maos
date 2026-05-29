@@ -57,6 +57,7 @@ fn origin_for(label: &str) -> FrameOrigin {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn nfr_aud_14_intent_lineage_corpus_100_percent_coverage() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let dir = corpus_dir();
     let corpus = IntentLineageCorpus::load_from(&dir).expect("corpus load");
 
@@ -171,6 +172,10 @@ async fn run_scenario(s: &IntentLineageScenario) -> Result<(), String> {
         }
         IntentLineageClass::LineageContinuityAcrossRetract => {
             assert_retract_continuity(s).await
+        }
+        IntentLineageClass::LineageViaGatewayInbound
+        | IntentLineageClass::LineageViaGatewayOutbound => {
+            assert_chain_uninterrupted(s).await
         }
     }
 }

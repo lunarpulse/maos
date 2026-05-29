@@ -104,6 +104,7 @@ fn make_frame_for_scenario(
 
 #[tokio::test]
 async fn retract_corpus_fixtures() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let corpus_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()

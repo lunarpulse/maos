@@ -35,6 +35,7 @@ fn test_scb() -> SpiritControlBlock {
 
 #[tokio::test]
 async fn default_on_swap_out_fires_noop() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let dispatcher = test_dispatcher();
     let scb = test_scb();
     let outcome = dispatcher.fire_on_swap_out(&scb).await;
@@ -46,6 +47,7 @@ async fn default_on_swap_out_fires_noop() {
 
 #[tokio::test]
 async fn default_snapshot_returns_empty_vec() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let dispatcher = test_dispatcher();
     let scb = test_scb();
     let result = dispatcher.fire_snapshot(&scb).await;
@@ -55,6 +57,7 @@ async fn default_snapshot_returns_empty_vec() {
 
 #[tokio::test]
 async fn default_migrate_returns_not_implemented() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let dispatcher = test_dispatcher();
     let scb = test_scb();
     let result = dispatcher.fire_migrate(&scb, b"test-payload").await;

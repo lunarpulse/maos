@@ -125,7 +125,7 @@ impl McpClientPort for McpClientAdapter {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "fixture_replay"))]
 mod tests {
     use super::*;
     use crate::capability::cap_policy::PolicyTable;

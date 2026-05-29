@@ -2,6 +2,10 @@
 //!
 //! Per AC4: spawns the arm, asserts exit 0, asserts stderr contains 5 JSON lines,
 //! asserts `tests/reports/section-13-1-smoke.json` was written with valid BenchReport shape.
+//!
+//! Requires `--features fixture_replay` at compile time.
+
+#![cfg(feature = "fixture_replay")]
 
 use std::process::Command;
 
@@ -10,7 +14,6 @@ fn smoke_bench_5e_exits_zero_and_outputs_5_json_lines() {
     let bin = env!("CARGO_BIN_EXE_maos-bin");
     let output = Command::new(bin)
         .env("MAOS_ONE_SHOT", "smoke-bench-5e")
-        .args(["--features", "fixture_replay"])
         .output()
         .expect("failed to execute maos-bin");
 

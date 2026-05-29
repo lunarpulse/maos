@@ -284,6 +284,9 @@ impl TransparencyLogAdapter {
         let _ = conn.execute_batch(
             "ALTER TABLE transparency_log ADD COLUMN to_spirit_id TEXT NOT NULL DEFAULT '';",
         );
+        let _ = conn.execute_batch(
+            "ALTER TABLE transparency_log ADD COLUMN from_spirit_id TEXT NOT NULL DEFAULT '';",
+        );
         Ok(Self {
             inner: Mutex::new(TransparencyLogInner {
                 conn,
@@ -1146,8 +1149,8 @@ mod tests {
             .collect();
         assert_eq!(
             tables,
-            vec!["approval_decision_log", "transparency_log"],
-            "expected exactly two tables"
+            vec!["approval_decision_log", "transparency_log", "transparency_log_retractions"],
+            "expected exactly three tables"
         );
 
         // 2. No foreign keys on transparency_log

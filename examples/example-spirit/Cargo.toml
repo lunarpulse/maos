@@ -16,4 +16,4 @@ maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_ru
 maos-spirit-abi = { path = "../../crates/maos-spirit-abi" }
 
 [dev-dependencies]
-maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner", "mock", "spirit_test"] }
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner", "mock"] }

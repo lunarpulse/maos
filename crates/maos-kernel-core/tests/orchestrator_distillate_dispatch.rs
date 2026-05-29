@@ -115,6 +115,7 @@ fn write_distillate_row(tl: &Arc<TransparencyLogAdapter>) -> [u8; 16] {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ac2_scenario_2_1_first_dispatch_no_predecessor_accepted() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let (_tl, adapter) = fresh_adapter();
     let _worker = adapter
         .register_spirit_typed(&SpiritId::from("worker"))
@@ -131,6 +132,7 @@ async fn ac2_scenario_2_1_first_dispatch_no_predecessor_accepted() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ac2_scenario_2_2_follow_up_with_distillate_ref_accepted() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let (tl, adapter) = fresh_adapter();
     let _worker = adapter
         .register_spirit_typed(&SpiritId::from("worker"))
@@ -172,6 +174,7 @@ async fn ac2_scenario_2_2_follow_up_with_distillate_ref_accepted() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ac2_scenario_2_3_follow_up_none_after_complete_rejected() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let (_tl, adapter) = fresh_adapter();
     let _worker = adapter
         .register_spirit_typed(&SpiritId::from("worker"))
@@ -206,6 +209,7 @@ async fn ac2_scenario_2_3_follow_up_none_after_complete_rejected() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ac2_scenario_2_4_follow_up_pointing_at_raw_task_complete_rejected() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let (tl, adapter) = fresh_adapter();
     let _worker = adapter
         .register_spirit_typed(&SpiritId::from("worker"))

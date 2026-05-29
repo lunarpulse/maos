@@ -66,6 +66,7 @@ fn make_scb(enabled_hooks: Vec<String>) -> Arc<SpiritControlBlock> {
 
 #[tokio::test]
 async fn manifest_gate_skips_disabled_hook() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let dispatcher = make_dispatcher();
     // enabled_hooks is empty → "on_load" is allowed (kernel_invocation_allowed(&[], _) → true)
     // Wait, actually empty means all allowed. Let's explicitly NOT include on_load.
@@ -81,6 +82,7 @@ async fn manifest_gate_skips_disabled_hook() {
 
 #[tokio::test]
 async fn hook_fires_within_budget() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let dispatcher = make_dispatcher();
     let scb = make_scb(vec!["on_load".into()]);
 
@@ -98,6 +100,7 @@ async fn hook_fires_within_budget() {
 
 #[tokio::test]
 async fn hook_exceeds_budget_and_returns_budget_exceeded() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let dispatcher = make_dispatcher();
     // Set a very short time cap so the hook always exceeds.
     let mut dispatcher = dispatcher;

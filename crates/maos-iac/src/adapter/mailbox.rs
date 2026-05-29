@@ -707,6 +707,7 @@ mod tests {
 
     #[tokio::test]
     async fn deliver_to_unregistered_spirit_fails() {
+        maos_capability::cap_tokens::init_monotonic_base();
         let metrics = Arc::new(IacRtMetrics::new());
         let mailbox = Mailbox::new(metrics);
         let frame = make_test_frame();
@@ -716,6 +717,7 @@ mod tests {
 
     #[tokio::test]
     async fn deliver_and_receive_round_trip() {
+        maos_capability::cap_tokens::init_monotonic_base();
         let metrics = Arc::new(IacRtMetrics::new());
         let mailbox = Mailbox::new(metrics);
         let mut handle = mailbox.register_spirit("test-spirit").unwrap();
@@ -728,6 +730,7 @@ mod tests {
 
     #[tokio::test]
     async fn telemetry_event_uses_broadcast() {
+        maos_capability::cap_tokens::init_monotonic_base();
         let metrics = Arc::new(IacRtMetrics::new());
         let mailbox = Mailbox::new(metrics);
         let mut sub = mailbox.subscribe_telemetry();
@@ -744,6 +747,7 @@ mod tests {
 
     #[tokio::test]
     async fn broadcast_slow_subscriber_sees_lagged() {
+        maos_capability::cap_tokens::init_monotonic_base();
         let metrics = Arc::new(IacRtMetrics::new());
         let mailbox = Mailbox::new(metrics);
         let mut sub = mailbox.subscribe_telemetry();
@@ -778,6 +782,7 @@ mod tests {
 
     #[tokio::test]
     async fn cross_host_addressing_rejected_when_no_router_configured() {
+        maos_capability::cap_tokens::init_monotonic_base();
         // Story 6.3 AC2 — replaces `CrossHostUnsupported` blanket reject with
         // `CrossHostNotConfigured` for the operator-not-configured case.
         let metrics = Arc::new(IacRtMetrics::new());

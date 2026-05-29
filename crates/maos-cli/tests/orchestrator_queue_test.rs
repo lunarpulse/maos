@@ -181,7 +181,7 @@ fn orchestrator_queue_writes_adl_row_with_correct_content() {
     );
 
     let mut stmt = conn.prepare(
-        "SELECT capability, intent, reasoning FROM approval_decision_log ORDER BY id DESC LIMIT 1"
+        "SELECT capability, intent, reasoning FROM approval_decision_log ORDER BY decision_id DESC LIMIT 1"
     ).unwrap();
     let row: (String, String, Option<String>) = stmt
         .query_row([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))

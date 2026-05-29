@@ -41,6 +41,7 @@ fn make_adapter_with_trust_floors() -> (SecurityManagerAdapter, JournalAdapter, 
 fn empty_caps_required() -> CapabilitiesRequired {
     CapabilitiesRequired {
         provider: maos_kernel_core::security::ProviderCapabilities { complete: vec![] },
+        mcp: maos_kernel_core::security::manifest::McpCapabilities { servers: vec![] },
     }
 }
 

@@ -12,6 +12,7 @@ use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, TaskAssignPayload
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_capability::cap_tokens::init_monotonic_base;
 use maos_iac::adapter::mailbox::Mailbox;
 use maos_iac::adapter::transparency_log::TransparencyLogAdapter;
 use maos_iac::adapter::IacRtMetrics;
@@ -20,6 +21,7 @@ use smallvec::smallvec;
 
 #[tokio::test]
 async fn i2_log_before_deliver_invariant_delivery_panics_before_receiver_sees_frame() {
+    init_monotonic_base();
     let metrics = Arc::new(IacRtMetrics::new());
     let mailbox = Arc::new(Mailbox::new(metrics));
 
@@ -73,6 +75,7 @@ async fn i2_log_before_deliver_invariant_delivery_panics_before_receiver_sees_fr
 
 #[tokio::test]
 async fn log_before_deliver_adapter_panics_on_broken_log() {
+    init_monotonic_base();
     // Use an in-memory log but verify the adapter's deliver_typed
     // calls insert_frame_event (which panics on SQLite write failure
     // per the I2 discipline at transparency_log.rs:296-307).

@@ -96,6 +96,7 @@ fn make_scheduler() -> Arc<SpiritSchedulerAdapter> {
 
 #[tokio::test]
 async fn same_major_swap_happy_path() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let scheduler = make_scheduler();
     let predecessor = SnapshotSpirit::default();
     let manifest = SpiritManifestBundle {

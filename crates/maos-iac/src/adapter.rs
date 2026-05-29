@@ -763,8 +763,10 @@ mod decision_audit_tests {
     use std::sync::Arc;
 
     fn make_decision_frame(decision_id: u64) -> IacFrame {
+        let mut fid = [0u8; 16];
+        fid[..8].copy_from_slice(&decision_id.to_le_bytes());
         IacFrame {
-            frame_id: [0u8; 16],
+            frame_id: fid,
             timestamp_ns: decision_id,
             logical_clock: decision_id,
             from: FrameAddress {

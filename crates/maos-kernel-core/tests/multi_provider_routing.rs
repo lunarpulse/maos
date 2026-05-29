@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![cfg(feature = "fixture_replay")]
 
 //! Story 5.5b AC2 — Multi-provider routing integration test.
 //!

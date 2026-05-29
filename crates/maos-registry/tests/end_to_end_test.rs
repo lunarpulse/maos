@@ -5,6 +5,8 @@
 //!
 //! Run with: `cargo test -p maos-registry --features fixture_replay`
 
+#![cfg(feature = "fixture_replay")]
+
 use maos_domain::ports::registry::{
     PublishReceipt, SearchQuery, SignedPackage, SpiritId, SpiritRegistryClient, YankReason,
 };

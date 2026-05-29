@@ -36,13 +36,16 @@ fn run_maosctl(env: &[(&str, &str)], args: &[&str]) -> std::process::Output {
         cmd.env(k, v);
     }
     cmd.args(args);
+    cmd.current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
     cmd.output().expect("spawn maosctl")
 }
 
 #[test]
 fn posture_shift_cautious_exits_zero() {
+    let tmp = TempDir::new().expect("temp dir");
     let out = run_maosctl(
         &[
+            ("HOME", tmp.path().to_str().unwrap()),
             ("MAOS_ONE_SHOT", "posture-shift"),
             ("MAOS_SPIRIT_ID", "hello-spirit"),
             ("MAOS_POSTURE", "cautious"),

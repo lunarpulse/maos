@@ -16,10 +16,10 @@ use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::ports::IacBusPort;
+use maos_capability::cap_tokens::init_monotonic_base;
 use maos_iac::adapter::{IacBusAdapter, Mailbox, TransparencyLogAdapter};
 use maos_iac::adapter::IacRtMetrics;
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
-use smallvec::smallvec;
 
 fn make_frame(from: &str, to: &[&str], origin: FrameOrigin) -> IacFrame {
     let addresses: smallvec::SmallVec<[FrameAddress; 1]> = to
@@ -57,6 +57,7 @@ fn make_frame(from: &str, to: &[&str], origin: FrameOrigin) -> IacFrame {
 
 #[tokio::test]
 async fn human_authored_cross_spirit_auto_populates_lineage() {
+    init_monotonic_base();
     let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
     let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
     let adapter = IacBusAdapter::new(mailbox.clone(), log);
@@ -93,6 +94,7 @@ async fn spirit_auto_cross_spirit_empty_lineage_rejected() {
 
 #[tokio::test]
 async fn spirit_auto_cross_spirit_with_lineage_succeeds() {
+    init_monotonic_base();
     let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
     let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
     let adapter = IacBusAdapter::new(mailbox.clone(), log);
@@ -108,6 +110,7 @@ async fn spirit_auto_cross_spirit_with_lineage_succeeds() {
 
 #[tokio::test]
 async fn same_spirit_empty_lineage_succeeds() {
+    init_monotonic_base();
     let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
     let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
     let adapter = IacBusAdapter::new(mailbox.clone(), log);
@@ -122,6 +125,7 @@ async fn same_spirit_empty_lineage_succeeds() {
 
 #[tokio::test]
 async fn broadcast_empty_to_succeeds() {
+    init_monotonic_base();
     let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
     let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
     let adapter = IacBusAdapter::new(mailbox.clone(), log);
@@ -133,6 +137,7 @@ async fn broadcast_empty_to_succeeds() {
 
 #[tokio::test]
 async fn re_emission_preserves_lineage() {
+    init_monotonic_base();
     let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
     let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
     let adapter = IacBusAdapter::new(mailbox.clone(), log);

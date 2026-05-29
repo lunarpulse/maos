@@ -129,6 +129,9 @@ fn parse_tier(s: &str) -> TrustTier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn defaults_are_local_tier() {
@@ -142,6 +145,7 @@ mod tests {
 
     #[test]
     fn resolve_from_defaults_when_no_env() {
+        let _guard = ENV_LOCK.lock().unwrap();
         let section = RegistrySection::resolve_from_env_and_disk();
         assert!(section.allow_unsigned_local);
     }
@@ -157,6 +161,7 @@ mod tests {
 
     #[test]
     fn env_overrides_disk_config() {
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var("MAOS_REGISTRY_URI", "env://override");
         std::env::set_var("MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED", "true");
         std::env::set_var("MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL", "false");
@@ -173,6 +178,7 @@ mod tests {
 
     #[test]
     fn env_allows_negating_bools() {
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var("MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED", "false");
         std::env::set_var("MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL", "true");
 

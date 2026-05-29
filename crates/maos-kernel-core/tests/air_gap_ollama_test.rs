@@ -9,7 +9,7 @@
 //!
 //! Run with: `cargo test -p maos-kernel-core --features "io_call_journal" --test air_gap_ollama_test`
 
-#![cfg(all(feature = "io_call_journal"))]
+#![cfg(all(feature = "io_call_journal", feature = "fixture_replay"))]
 
 use std::sync::Arc;
 

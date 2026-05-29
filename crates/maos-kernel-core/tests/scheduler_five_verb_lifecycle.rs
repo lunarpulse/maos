@@ -110,6 +110,7 @@ fn make_scheduler() -> Arc<SpiritSchedulerAdapter> {
 
 #[tokio::test]
 async fn five_verb_lifecycle_routes_through_scheduler() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let scheduler = make_scheduler();
     let spirit = TestSpirit::default();
     let manifest = SpiritManifestBundle {
@@ -155,6 +156,7 @@ async fn five_verb_lifecycle_routes_through_scheduler() {
 
 #[tokio::test]
 async fn unload_is_idempotent() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let scheduler = make_scheduler();
     let spirit = TestSpirit::default();
     let manifest = SpiritManifestBundle::default();
@@ -173,6 +175,7 @@ async fn unload_is_idempotent() {
 
 #[tokio::test]
 async fn invalid_state_transition_rejected() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let scheduler = make_scheduler();
     let spirit = TestSpirit::default();
     let manifest = SpiritManifestBundle::default();

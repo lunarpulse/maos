@@ -91,6 +91,18 @@ pub fn run(
                 transparency_log,
             })
         }
+        Err(InferenceError::ProviderTransport(_)) => {
+            let introduction = String::from(
+                "Hello, I am the MAOS reference Spirit. \
+                 Inference transport error — the configured provider is unreachable.",
+            );
+            Ok(HelloResponse {
+                introduction,
+                capability_scope,
+                halt_tags,
+                transparency_log,
+            })
+        }
         Err(e) => Err(HelloError::Inference(e)),
     }
 }

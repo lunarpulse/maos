@@ -56,6 +56,7 @@ fn make_frame(from: &str, to: &str, payload_size: usize) -> IacFrame {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn drr_basic_two_spirits_fair() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
     let mailbox = Arc::new(Mailbox::new(Arc::new(
         maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new(),
@@ -86,6 +87,7 @@ async fn drr_basic_two_spirits_fair() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
     let mailbox = Arc::new(Mailbox::new(Arc::new(
         maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new(),
@@ -133,6 +135,7 @@ async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn drr_batch_flush_on_interval() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
     let mailbox = Arc::new(Mailbox::new(Arc::new(
         maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new(),

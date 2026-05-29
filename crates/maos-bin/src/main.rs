@@ -226,7 +226,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let log_recall_adapter = Arc::new(maos_kernel_core::iac::log_recall::LogRecallAdapter::new(
         Arc::clone(&transparency_log),
     ));
-    let memory_any: Arc<dyn std::any::Any + Send + Sync> = memory;
+    let memory_any: Arc<dyn std::any::Any + Send + Sync> = Arc::clone(&memory) as Arc<dyn std::any::Any + Send + Sync>;
     let distillate_writer = Arc::new(maos_kernel_core::iac::distillate::DistillateWriter::new(
         Arc::clone(&transparency_log),
         memory_any,
@@ -476,7 +476,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn the audit writer task (Story 1b.2). Held by name so the one-shot
     // exit path (Story 1b.5b) can drain the cap-audit channel deterministically
     // before process exit — `drop(audit_tx); drop(...senders); audit_writer.await.ok();`.
-    let audit_writer = maos_kernel_core::capability::cap_audit::CapAuditWriter::spawn(
+    let mut audit_writer = maos_kernel_core::capability::cap_audit::CapAuditWriter::spawn(
         audit_rx,
         Arc::clone(&transparency_log),
     );
@@ -512,14 +512,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let ollama_url =
             std::env::var("MAOS_OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".into());
-        if let Ok(provider) = maos_providers::OllamaProvider::new(
-            Arc::clone(&io_arc),
-            ollama_url,
-            "llama3.1:8b".into(),
-        ) {
-            providers_map.insert("ollama".into(), Arc::new(provider));
-            default_id.get_or_insert_with(|| "ollama".into());
-            eprintln!("maos: Ollama provider registered");
+        if !ollama_url.is_empty() && ollama_url != "skip" {
+            if let Ok(provider) = maos_providers::OllamaProvider::new(
+                Arc::clone(&io_arc),
+                ollama_url,
+                "llama3.1:8b".into(),
+            ) {
+                providers_map.insert("ollama".into(), Arc::new(provider));
+                default_id.get_or_insert_with(|| "ollama".into());
+                eprintln!("maos: Ollama provider registered");
+            }
         }
     }
 
@@ -1017,8 +1019,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
 
             eprintln!(
@@ -1124,8 +1128,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
 
             eprintln!(
@@ -1175,8 +1181,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
 
             eprintln!("maos: revoked token {token_id_hex}");
@@ -1381,8 +1389,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
 
             eprintln!("maos: smoke-epic-4 complete — all 6 surfaces exercised");
@@ -1536,8 +1546,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
 
             eprintln!("maos: smoke-spirit-5 complete — 11 hooks exercised (5 fired, 6 deferred)");
@@ -1583,8 +1595,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
 
             eprintln!("maos: hot-swap-precheck {spirit_id} ({from_version} -> {to_manifest}) — verdict = {:?}", verdict.verdict);
@@ -1798,8 +1812,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
 
             eprintln!("maos: smoke-supervision-5 complete — 4 supervision surfaces exercised");
@@ -1826,8 +1842,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
             eprintln!("maos: spirit-upgrade {spirit_id} (policy: {policy_str}, completed)");
             return Ok(());
@@ -1863,8 +1881,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
             eprintln!("maos: revocations-import {crl_path_str} — matched {} spirits, revoked {}, halt_receipts_produced {}",
                 report.matched_count, report.revoked_count, report.halt_receipts_produced);
@@ -1879,8 +1899,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             drop(audit_tx);
             drop(inference);
             drop(capability);
-            if let Err(e) = audit_writer.await {
-                eprintln!("maos: audit writer task failed during drain: {e}");
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
             }
             eprintln!("maos: revocations-list complete");
             return Ok(());
@@ -2205,6 +2227,7 @@ description = "smoke test spirit successor"
             return Ok(());
         }
 
+        #[cfg(feature = "fixture_replay")]
         if mode == "smoke-multi-provider-5" {
             use std::sync::Arc;
             use maos_domain::ports::inference::{
@@ -2297,7 +2320,13 @@ description = "smoke test spirit successor"
             eprintln!("maos: smoke-multi-provider-5 complete — 6 surfaces exercised");
             return Ok(());
         }
+        #[cfg(not(feature = "fixture_replay"))]
+        if mode == "smoke-multi-provider-5" {
+            eprintln!("maos: smoke-multi-provider-5 requires --features fixture_replay");
+            std::process::exit(1);
+        }
 
+        #[cfg(feature = "fixture_replay")]
         if mode == "smoke-mcp-acp-5" {
             use std::collections::BTreeMap;
             use std::sync::Arc;
@@ -2491,7 +2520,13 @@ description = "smoke test spirit successor"
             server.run(std::io::stdin(), std::io::stdout())?;
             return Ok(());
         }
+        #[cfg(not(feature = "fixture_replay"))]
+        if mode == "smoke-mcp-acp-5" {
+            eprintln!("maos: smoke-mcp-acp-5 requires --features fixture_replay");
+            std::process::exit(1);
+        }
 
+        #[cfg(feature = "fixture_replay")]
         if mode == "smoke-registry-5d" {
             use maos_domain::ports::registry::{SearchQuery, SignedPackage, SpiritId, SpiritRegistryClient, TrustTier, YankReason, YankList};
             use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
@@ -2718,6 +2753,11 @@ description = "smoke test spirit successor"
             eprintln!("maos: smoke-registry-5d complete — 7 surfaces exercised");
             return Ok(());
         }
+        #[cfg(not(feature = "fixture_replay"))]
+        if mode == "smoke-registry-5d" {
+            eprintln!("maos: smoke-registry-5d requires --features fixture_replay");
+            std::process::exit(1);
+        }
 
         if mode == "registry-server" {
             use maos_registry::SpiritRegistryServer;
@@ -2729,6 +2769,7 @@ description = "smoke test spirit successor"
             return Ok(());
         }
 
+        #[cfg(feature = "fixture_replay")]
         if mode == "smoke-bench-5e" {
             use maos_bench::fixture_replay::FixtureReplayBenchRunner;
             use maos_bench::decision::decide;
@@ -2788,6 +2829,11 @@ description = "smoke test spirit successor"
 
             eprintln!("maos: smoke-bench-5e complete — 5 surfaces exercised (fixture-replay)");
             return Ok(());
+        }
+        #[cfg(not(feature = "fixture_replay"))]
+        if mode == "smoke-bench-5e" {
+            eprintln!("maos: smoke-bench-5e requires --features fixture_replay");
+            std::process::exit(1);
         }
 
         if mode == "bench-section-13-1" {
@@ -2867,8 +2913,14 @@ description = "smoke test spirit successor"
         // Story 6.4 AC5 — `smoke-schedule-6-4` end-to-end wedge demo
         // (ScheduleWatchdog firing + per-schedule rate-limit cap + ConsentRupture +
         // RateLimited frame emission).
+        #[cfg(feature = "smoke_schedule")]
         if mode == "smoke-schedule-6-4" {
             return smoke_schedule_6_4().await;
+        }
+        #[cfg(not(feature = "smoke_schedule"))]
+        if mode == "smoke-schedule-6-4" {
+            eprintln!("maos: smoke-schedule-6-4 requires --features smoke_schedule (tokio test-util)");
+            std::process::exit(1);
         }
 
         // Story 7.1 AC6 — smoke-spirit-author-7-1: full author-side path
@@ -3001,11 +3053,15 @@ description = "smoke test spirit successor"
         // Initialize monotonic counter for token issuance
 
         // Issue a valid capability token for the in-process hello-Spirit
+        let token_provider_id = router
+            .default_id()
+            .unwrap_or("anthropic")
+            .to_string();
         let token = capability
             .issue_with_mediation(
                 0,
                 Scope::ProviderInfer {
-                    provider: "anthropic".into(),
+                    provider: token_provider_id,
                 },
                 60,
                 [0u8; 32],
@@ -3049,8 +3105,10 @@ description = "smoke test spirit successor"
         drop(lifecycle_resolver);
         // `transparency_log` is moved into the writer task's closure (Arc), so
         // awaiting the writer drains the queue and releases its Arc clone.
-        if let Err(e) = audit_writer.await {
-            eprintln!("maos: audit writer task failed during drain: {e}");
+        match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+            Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
         }
 
         eprintln!("maos: one-shot complete — exiting cleanly");
@@ -3708,6 +3766,7 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
 ///   3. ConsentRupture partial-consent failure event (ADR-034 binding-v0.9)
 ///   4. RateLimited frame emission on per-(provider, credential) bucket exhaustion
 ///      (NFR-Scale-4)
+#[cfg(feature = "smoke_schedule")]
 async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     use maos_domain::frame::{
         ConsentRupturePayload, FrameAddress, FramePayload, IacFrame, RuptureReason,

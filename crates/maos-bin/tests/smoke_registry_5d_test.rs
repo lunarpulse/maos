@@ -1,6 +1,9 @@
 //! Smoke test for `MAOS_ONE_SHOT=smoke-registry-5d`.
 //!
 //! Mirrors `smoke_mcp_acp_test.rs` shape exactly (process-based integration test).
+//! Requires `--features fixture_replay` at compile time.
+
+#![cfg(feature = "fixture_replay")]
 
 use std::process::Command;
 

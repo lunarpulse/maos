@@ -33,6 +33,7 @@ fn journal_append_p99_measurement() {
             timestamp: i as u64,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: format!("warmup-{i}"),
+            payload: None,
             effective_sandbox_tier: None,
         });
         journal.append_transition(entry);
@@ -45,6 +46,7 @@ fn journal_append_p99_measurement() {
             timestamp: (warmup + i) as u64,
             lifecycle_event: LifecycleEvent::Start,
             spirit_id: format!("spirit-{i}"),
+            payload: None,
             effective_sandbox_tier: None,
         });
         let start = Instant::now();

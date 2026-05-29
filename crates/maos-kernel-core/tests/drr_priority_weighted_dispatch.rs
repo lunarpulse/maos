@@ -42,6 +42,7 @@ fn mock_scb(pid: u32, weight: u8) -> Arc<SpiritControlBlock> {
 
 #[test]
 fn drr_highest_weight_dominates() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let scbs = vec![mock_scb(1, 50), mock_scb(2, 100), mock_scb(3, 200)];
     let mut counts = [0u32; 4];
 
@@ -65,6 +66,7 @@ fn drr_highest_weight_dominates() {
 
 #[test]
 fn drr_equal_weights_rotate() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let scbs = vec![mock_scb(1, 64), mock_scb(2, 64), mock_scb(3, 64)];
     let mut counts = [0u32; 4];
 
@@ -92,6 +94,7 @@ fn drr_equal_weights_rotate() {
 
 #[test]
 fn drr_skips_non_running_spirits() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let running = mock_scb(1, 100);
     let paused = mock_scb(2, 100);
     paused

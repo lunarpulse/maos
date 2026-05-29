@@ -345,7 +345,7 @@ impl SpiritRegistryClient for NullSpiritRegistryClient {
 // Tests
 // ---------------------------------------------------------------------------
 
-#[cfg(test)]
+#[cfg(all(test, feature = "fixture_replay"))]
 mod tests {
     use super::*;
     use maos_mcp::fixture_replay::FixtureReplayMcpServer;

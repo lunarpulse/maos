@@ -52,6 +52,7 @@ fn setup_ring() -> CapTokensShardRing {
 
 #[test]
 fn nfr_rel_9_1000_token_revoke_latency_v03_scaffold() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     const N: usize = 1000;
     let ring = setup_ring();
 

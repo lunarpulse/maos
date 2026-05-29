@@ -6,6 +6,8 @@
 //!
 //! Run with: `cargo test -p maos-registry --features fixture_replay`
 
+#![cfg(feature = "fixture_replay")]
+
 use std::path::{Path, PathBuf};
 
 use maos_domain::ports::registry::{SearchQuery, SignedPackage, SpiritId, SpiritRegistryClient};

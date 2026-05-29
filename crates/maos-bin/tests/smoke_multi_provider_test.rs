@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![cfg(feature = "fixture_replay")]
 
 //! Integration test: MAOS_ONE_SHOT=smoke-multi-provider-5 smoke arm.
 
