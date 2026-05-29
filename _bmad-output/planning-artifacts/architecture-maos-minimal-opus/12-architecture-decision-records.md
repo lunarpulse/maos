@@ -528,3 +528,9 @@ Sorted by Status (binding-v0.1 first), then by ADR number. Reviewers triaging "w
 **Alternatives considered.** Combined corpus (rejected: dilutes coverage of either attack class).
 
 **What would force a revisit.** A third attack class emerges that does not fit either category.
+
+---
+
+**§A2 step 3 closure — Story 7.1.5 (2026-05-29):**
+
+(1) Soft-fail → hard-fail flip rationale: `continue-on-error: true` on `check-review-findings-resolved` and `check-dev-record-completeness` was a temporary measure during the Epic 5/6 backfill window; with 17-story RF backfill + 25-story (actual: 27) dev_model_used backfill complete, both gates now hard-fail in CI. (2) 17-story RF backfill scope: Epic 2 prep × 1 + Epic 3 × 4 + Epic 4 × 3 + Epic 5 × 4 + Epic 6 × 5 stories received populated `### Review Findings` tables. (3) 25-story dev_model_used backfill scope: Epic 0/1a/1b/2 bootstrap-era stories (`claude-opus-4-5`) + Epic 3/5/6 post-convention stories (`claude-opus-4-7` / `deepseek-v4-pro` / `glm-5.1` / `k2p6`). (4) 2 new permanent gates: `check-bare-review-findings` + `check-dev-model-used-populated` wired as discipline jobs. (5) Cross-reference: Epic 6 retro §A2 closure receipt — `[[project_epic_6_retro_outcomes]]` line 100-106.

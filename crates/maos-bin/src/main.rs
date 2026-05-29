@@ -2928,9 +2928,14 @@ description = "smoke test spirit successor"
             return smoke_spirit_author_7_1().await;
         }
 
+        // Story 7.1.5 AC5 — smoke-discipline-7-1-5: run all four §A2-family gates
+        if mode == "smoke-discipline-7-1-5" {
+            return smoke_discipline_7_1_5().await;
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -4018,5 +4023,43 @@ async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("{{\"smoke\":\"7-1\",\"status\":\"ok\",\"steps\":[\"scaffold-rust\",\"test-rust\",\"scaffold-ts\",\"test-ts\",\"coverage-3-spirits\"]}}");
+    Ok(())
+}
+
+/// Story 7.1.5 AC5 — `smoke-discipline-7-1-5` runs all four §A2-family gates.
+async fn smoke_discipline_7_1_5() -> Result<(), Box<dyn std::error::Error>> {
+    use std::process::Command;
+    use std::time::Duration;
+    let workspace_root = std::env::current_dir()?;
+
+    let gates = [
+        "check-review-findings-resolved",
+        "check-dev-record-completeness",
+        "check-bare-review-findings",
+        "check-dev-model-used-populated",
+    ];
+
+    for gate in &gates {
+        eprintln!("[smoke-7.1.5] Running gate: {}", gate);
+        let gate_owned = gate.to_string();
+        let dir = workspace_root.clone();
+        let status = tokio::time::timeout(
+            Duration::from_secs(30),
+            tokio::task::spawn_blocking(move || {
+                Command::new("cargo")
+                    .args(["run", "-q", "-p", "xtask", "--", &gate_owned, "--json"])
+                    .current_dir(&dir)
+                    .status()
+            }),
+        )
+        .await
+        .map_err(|_| format!("gate {} TIMED OUT after 30s", gate))??
+        .map_err(|e| format!("gate {} spawn failed: {}", gate, e))?;
+        if !status.success() {
+            return Err(format!("gate {} FAILED", gate).into());
+        }
+    }
+
+    println!(r#"{{"smoke":"7-1-5","status":"ok","gates":["check-review-findings-resolved","check-dev-record-completeness","check-bare-review-findings","check-dev-model-used-populated"]}}"#);
     Ok(())
 }

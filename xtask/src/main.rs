@@ -36,6 +36,8 @@ mod check_dev_record_completeness;
 mod check_epic_6_bridge;
 mod check_manifest_schema_version;
 mod check_deprecations_declared;
+mod check_bare_review_findings;
+mod check_dev_model_used_populated;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -394,6 +396,18 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 7.1.5 — assert ZERO bare `_No review findings._` placeholders remain.
+    #[command(name = "check-bare-review-findings")]
+    CheckBareReviewFindings {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 7.1.5 — assert every story file has a populated `dev_model_used:` frontmatter field.
+    #[command(name = "check-dev-model-used-populated")]
+    CheckDevModelUsedPopulated {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -620,6 +634,12 @@ fn main() {
         }
         Commands::CheckDeprecationsDeclared { json } => {
             check_deprecations_declared::run(json)
+        }
+        Commands::CheckBareReviewFindings { json } => {
+            check_bare_review_findings::run(json)
+        }
+        Commands::CheckDevModelUsedPopulated { json } => {
+            check_dev_model_used_populated::run(json)
         }
     };
     if let Err(e) = result {

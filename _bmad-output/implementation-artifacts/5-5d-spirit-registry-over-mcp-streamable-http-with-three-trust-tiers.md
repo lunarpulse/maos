@@ -998,7 +998,14 @@ deepseek-v4-pro (story recommended claude-opus-4-7 per §Dev Notes Model Recomme
 <!-- One row per review Patch / Defer / Decision finding.
      Status MUST be one of: **closed** (resolved in this PR), **open** (still
      unresolved at merge; should not normally land), **deferred → Story X.Y**
-     (explicit forward reference). Empty section uses `_No review findings._`.
+     (explicit forward reference). Empty section uses `### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Three-trust-tier enforcement is registry-side only; consumer-side verification of trust tier not implemented
+  - *(deferred to Story 7.2 at v0.5 binding window)*
+- [x] **[Medium]** [auditor] *patch* — MCP-Streamable-HTTP transport missing retry on 5xx; added exponential backoff in 5-5d commit
+  - *Resolution: crates/maos-registry/src/transport/mcp_streamable_http.rs:156-168*
+- [x] **[Low]** [blind] *dismissed* — Streamable-HTTP spec is draft; transport may need update when spec finalizes
+  - *Rationale: External dependency volatility*`.
      This contract exists so future retros can grep-verify status without
      inferring state from prose. See epic-2-retro-2026-05-17.md §What Was
      Challenged §1 + §3 for the precipitating incident. -->

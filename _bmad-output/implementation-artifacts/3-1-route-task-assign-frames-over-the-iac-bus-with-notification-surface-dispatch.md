@@ -1,6 +1,3 @@
----
-dev_model_used: <set by dev at story start>
----
 
 # Story 3.1: Route `task.assign` Frames Over the IAC Bus with Notification Surface Dispatch
 
@@ -889,7 +886,15 @@ deepseek-v4-pro (deepseek/deepseek-v4-pro)
 <!-- One row per review Patch / Defer / Decision finding.
      Status MUST be one of: **closed** (resolved in this PR), **open** (still
      unresolved at merge; should not normally land), **deferred → Story X.Y**
-     (explicit forward reference). Empty section uses `_No review findings._`.
+     (explicit forward reference). Empty section uses `### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Task.assign frame routing does not validate spirit capability tokens before dispatch; potential confused-deputy if compromised spirit injects frames
+  - *(deferred to Story 4.1 at v0.3 binding window)*
+- [x] **[Medium]** [auditor] *patch* — Notification surface dispatch missing rate-limiting on error-path retries; added backoff in 3-1 commit
+  - *Resolution: crates/maos-kernel-core/src/iac/notification.rs:142-158*
+- [ ] **[Medium]** [test-infra] *defer* — Frame routing bench (NFR-Perf-1) not wired in CI; bench exists but no discipline job enforces P99 <2ms
+- [x] **[Low]** [blind] *dismissed* — Notification dispatcher uses unbounded channel; acceptable at v0.1-α per ADR-011 bounded-mailbox deferred to v0.3
+  - *Rationale: ADR-011 deferred work*`.
      This contract exists so future retros can grep-verify status without
      inferring state from prose. See epic-2-retro-2026-05-17.md §What Was
      Challenged §1 + §3 for the precipitating incident. -->

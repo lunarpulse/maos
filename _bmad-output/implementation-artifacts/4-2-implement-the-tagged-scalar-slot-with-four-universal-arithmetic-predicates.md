@@ -156,7 +156,13 @@ on_value_above = { threshold = 0.8 }
   - [x] 9.1 Architecture doc updates (additive only):
     - `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md` — extend §4.6.1 (line 401+) with a short subsection §4.6.1.1 "Scalar slot + predicate runtime — Story 4.2 wiring" describing the kernel-side flow: `set_scalar → WorkingMemoryStore → policy_runtime::evaluate → invoke_halt` (≤200 words; reference Story 4.2 by name).
     - `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/5-spirit-abi.md` (if it exists in the sharded directory) — document the kernel-side handling of the manifest's four predicate forms; clarify that v0.3 manifests can use either the legacy `on_confidence_below` OR the four-predicate forms (additive).
-  - [x] 9.2 Dev Record (Dev Agent Record section at the bottom of this file): include `Agent Model Used`, `Completion Notes List` (per-task summary), `File List` (separate NEW vs MODIFIED), `Review Findings` table seeded with `_No review findings._` row.
+  - [x] 9.2 Dev Record (Dev Agent Record section at the bottom of this file): include `Agent Model Used`, `Completion Notes List` (per-task summary), `File List` (separate NEW vs MODIFIED), `Review Findings` table seeded with `### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — Tagged scalar slot overflow behavior undefined for >64-bit values; needs explicit saturation or error mode
+- [x] **[Medium]** [auditor] *patch* — Four predicates missing property-based test coverage for edge cases (NaN, infinity, subnormal); added proptest suite in 4-2 commit
+  - *Resolution: crates/maos-kernel-core/src/memory/tagged_scalar.rs:312-340*
+- [x] **[Low]** [blind] *dismissed* — Epistemic policy binding is schema-only at v0.3; runtime enforcement deferred per ADR-022
+  - *Rationale: ADR-022 deferred work*` row.
   - [x] 9.3 Update `_bmad-output/implementation-artifacts/sprint-status.yaml`:
     - Set `development_status[4-2-implement-the-tagged-scalar-slot-with-four-universal-arithmetic-predicates]` from `backlog` → `ready-for-dev` (done by the create-story workflow at Step 6).
     - Post-dev (after `dev-story` completes): flip to `in-review`, then `done` via `code-review`.
@@ -372,7 +378,13 @@ _No debug log entries._
 <!-- One row per review Patch / Defer / Decision finding.
      Status MUST be one of: **closed** (resolved in this PR), **open** (still
      unresolved at merge; should not normally land), **deferred → Story X.Y**
-     (explicit forward reference). Empty section uses `_No review findings._`.
+     (explicit forward reference). Empty section uses `### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — Tagged scalar slot overflow behavior undefined for >64-bit values; needs explicit saturation or error mode
+- [x] **[Medium]** [auditor] *patch* — Four predicates missing property-based test coverage for edge cases (NaN, infinity, subnormal); added proptest suite in 4-2 commit
+  - *Resolution: crates/maos-kernel-core/src/memory/tagged_scalar.rs:312-340*
+- [x] **[Low]** [blind] *dismissed* — Epistemic policy binding is schema-only at v0.3; runtime enforcement deferred per ADR-022
+  - *Rationale: ADR-022 deferred work*`.
      This contract exists so future retros can grep-verify status without
      inferring state from prose. See epic-2-retro-2026-05-17.md §What Was
      Challenged §1 + §3 for the precipitating incident. -->

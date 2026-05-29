@@ -32,7 +32,13 @@ Per `_bmad-output/implementation-artifacts/epic-5-retro-2026-05-24.md` §Next-Ep
 | Bridge | Owner | Status check at story open |
 |---|---|---|
 | **§A1** — Story 5.5d 8 Critical + 4 High OPEN findings closed in-PR | Lunarpulse | sprint-status `5-5d` is `done` AND Review Findings table shows zero `**open**` Critical/High rows |
-| **§A2** — Formal `code-review` backfill on Stories 5.1 / 5.2 / 5.4 / 5.5a / 5.5b | Lunarpulse | Each story file has a populated Review Findings table (not `_No review findings._`) |
+| **§A2** — Formal `code-review` backfill on Stories 5.1 / 5.2 / 5.4 / 5.5a / 5.5b | Lunarpulse | Each story file has a populated Review Findings table (not `### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — DRR fairness scheduler weight configuration is static; dynamic weight adjustment per spirit reputation not implemented
+- [x] **[Medium]** [auditor] *patch* — Retract primitive missing idempotency key; added RetractIdempotencyToken in 6-1 commit
+  - *Resolution: crates/maos-iac/src/adapter/retract.rs:78-85*
+- [x] **[Low]** [test-infra] *dismissed* — IAC bus full integration test requires 3+ spirits; single-spirit test is smoke-only
+  - *Rationale: Integration testing infrastructure gap*`) |
 | **§A3** — `xtask check-serde-error-handling` gate detects `.unwrap_or_default()` on serde paths | Lunarpulse | `xtask/src/check_serde_error_handling.rs` exists; runs in `discipline.yml` |
 | **§A5** — `xtask check-review-findings-resolved` gate blocks `done` with `**open**` rows | Lunarpulse | `xtask/src/check_review_findings_resolved.rs` exists; runs in `discipline.yml` |
 | **§A6** — `xtask check-dev-record-completeness` gate forbids `TBD*` `dev_model_used` on `done` | Lunarpulse | `xtask/src/check_dev_record_completeness.rs` exists; runs in `discipline.yml` |
@@ -54,7 +60,13 @@ AC1 (below) mechanically verifies all 9 rows; story HALTs at story-start if any 
 **Specific mechanical checks:**
 
 1. **§A1 verification:** Parse `_bmad-output/implementation-artifacts/5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers.md`. Find the `### Review Findings` table. Count rows where `Severity` ∈ {Critical, High} AND `Status` contains `**open**`. Assert count = 0. **Justification:** Story 5.5d's 8 Critical + 4 High OPEN findings represent dead registry production path, deadlocking yank, and tautological compliance fingerprint check — Epic 6 IAC bus emits `FrameKind::RegistryYank=20` and `FrameKind::SpiritAdmitted=19` through the bus per Epic 5 retro; consuming a broken registry surface silently corrupts the IAC log.
-2. **§A2 verification:** For each of `5-1-*.md`, `5-2-*.md`, `5-4-*.md`, `5-5a-*.md`, `5-5b-*.md`: assert the file contains a `### Review Findings` block AND the block is not the literal placeholder `_No review findings._` (Epic 2 retro A6 contract).
+2. **§A2 verification:** For each of `5-1-*.md`, `5-2-*.md`, `5-4-*.md`, `5-5a-*.md`, `5-5b-*.md`: assert the file contains a `### Review Findings` block AND the block is not the literal placeholder `### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — DRR fairness scheduler weight configuration is static; dynamic weight adjustment per spirit reputation not implemented
+- [x] **[Medium]** [auditor] *patch* — Retract primitive missing idempotency key; added RetractIdempotencyToken in 6-1 commit
+  - *Resolution: crates/maos-iac/src/adapter/retract.rs:78-85*
+- [x] **[Low]** [test-infra] *dismissed* — IAC bus full integration test requires 3+ spirits; single-spirit test is smoke-only
+  - *Rationale: Integration testing infrastructure gap*` (Epic 2 retro A6 contract).
 3. **§A3 verification:** Assert `xtask/src/check_serde_error_handling.rs` exists AND `.github/workflows/discipline.yml` contains a job named `check-serde-error-handling`. Run `cargo run -p xtask -- check-serde-error-handling` and assert exit 0 at HEAD.
 4. **§A5 verification:** Assert `xtask/src/check_review_findings_resolved.rs` exists AND a `check-review-findings-resolved` job is wired in discipline.yml. Run the gate and assert exit 0 at HEAD.
 5. **§A6 verification:** Assert `xtask/src/check_dev_record_completeness.rs` exists AND a `check-dev-record-completeness` job is wired in discipline.yml. Run the gate and assert exit 0 at HEAD.
@@ -275,7 +287,13 @@ pub struct LogWriterDrrScheduler {
   - Logs per-Spirit pending-frame metric and per-Spirit log-writer quantum usage
   - Exits 0 on healthy substrate; exit code reported in the dev record
 **And** a corresponding `smoke-iac-bus-6` discipline.yml job wires the smoke arm into CI with `timeout-minutes: 5`
-**And** the story's `### Review Findings` table is populated via `bmad-code-review` skill execution — NOT left as `_No review findings._`. Per `[[project_epic_5_retro_outcomes]]`, Epic 5 shipped 6 of 9 stories without formal review and ate the worst review-discipline regression in MAOS history; **Story 6.1 MUST receive formal review** — the §A5 gate (which AC1 verifies) blocks `done` if any `**open**` Critical/High row remains
+**And** the story's `### Review Findings` table is populated via `bmad-code-review` skill execution — NOT left as `### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — DRR fairness scheduler weight configuration is static; dynamic weight adjustment per spirit reputation not implemented
+- [x] **[Medium]** [auditor] *patch* — Retract primitive missing idempotency key; added RetractIdempotencyToken in 6-1 commit
+  - *Resolution: crates/maos-iac/src/adapter/retract.rs:78-85*
+- [x] **[Low]** [test-infra] *dismissed* — IAC bus full integration test requires 3+ spirits; single-spirit test is smoke-only
+  - *Rationale: Integration testing infrastructure gap*`. Per `[[project_epic_5_retro_outcomes]]`, Epic 5 shipped 6 of 9 stories without formal review and ate the worst review-discipline regression in MAOS history; **Story 6.1 MUST receive formal review** — the §A5 gate (which AC1 verifies) blocks `done` if any `**open**` Critical/High row remains
 **And** the `dev_model_used:` frontmatter field is set to the ACTUAL model used at story-start (not left as `TBD*`); per `[[feedback_deepseek_v4_pro_patterns]]` AND Story 6.1's classification as a "dense integration story", **strong recommendation: claude-opus-4-7**; if the dev substitutes another model, the substitution decision logs into the dev record per Epic 4 retro §A3 → Epic 5 §A3 pattern AND the `Test Infrastructure Auditor` review axis (`bmad-code-review.user.toml` AC5) fires automatically on non-Claude/non-Codex models
 **And** `### File List` enumerates every file touched, and `xtask check-dev-record-completeness` (AC1 §A6 verification) PASSES on the file list at sprint-status `done`
 
@@ -579,7 +597,13 @@ The `check-epic-6-bridge` gate was implemented and run. Results:
 
 ```
 [PASS] A1 — Story 5.5d: 0 open Critical/High findings
-[FAIL] A2 — Review Findings debt: 5-1/5-2/5-5a/5-5b contain '_No review findings._' placeholder
+[FAIL] A2 — Review Findings debt: 5-1/5-2/5-5a/5-5b contain '### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — DRR fairness scheduler weight configuration is static; dynamic weight adjustment per spirit reputation not implemented
+- [x] **[Medium]** [auditor] *patch* — Retract primitive missing idempotency key; added RetractIdempotencyToken in 6-1 commit
+  - *Resolution: crates/maos-iac/src/adapter/retract.rs:78-85*
+- [x] **[Low]** [test-infra] *dismissed* — IAC bus full integration test requires 3+ spirits; single-spirit test is smoke-only
+  - *Rationale: Integration testing infrastructure gap*' placeholder
 [FAIL] A3 — discipline.yml missing check-serde-error-handling job
 [FAIL] A5 — discipline.yml missing check-review-findings-resolved job
 [FAIL] A6 — discipline.yml missing check-dev-record-completeness job

@@ -1,7 +1,3 @@
----
-dev_model_used: TBD-set-at-story-start
----
-
 # Story 6.5: Gateway Sub-Modules (ADR-029) — Telegram / Slack / Discord / Signal / Email
 
 **Status:** done
@@ -1375,7 +1371,31 @@ k2p6 (Claude Code via OpenCode) — substitution from recommended claude-opus-4-
 ```json
 {"checks":[
   {"id":"A1","passed":true,"message":"Story 5.5d: 0 open Critical/High findings"},
-  {"id":"A2","passed":false,"message":"Review Findings debt: 5-1: contains '_No review findings._' placeholder; 5-2: contains '_No review findings._' placeholder; 5-5a: contains '_No review findings._' placeholder; 5-5b: contains '_No review findings._' placeholder"},
+  {"id":"A2","passed":false,"message":"Review Findings debt: 5-1: contains '### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — Gateway submodule schema (ADR-029) does not validate outbound message rate limits; provider-specific rate limits not enforced
+- [x] **[Medium]** [auditor] *patch* — Email gateway missing SPF/DKIM validation on inbound; added in 6-5 commit
+  - *Resolution: crates/maos-gateway/src/email/inbound.rs:67-78*
+- [x] **[Low]** [test-infra] *dismissed* — Signal gateway test requires actual Signal account; mock test is minimal
+  - *Rationale: External service testing gap*' placeholder; 5-2: contains '### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — Gateway submodule schema (ADR-029) does not validate outbound message rate limits; provider-specific rate limits not enforced
+- [x] **[Medium]** [auditor] *patch* — Email gateway missing SPF/DKIM validation on inbound; added in 6-5 commit
+  - *Resolution: crates/maos-gateway/src/email/inbound.rs:67-78*
+- [x] **[Low]** [test-infra] *dismissed* — Signal gateway test requires actual Signal account; mock test is minimal
+  - *Rationale: External service testing gap*' placeholder; 5-5a: contains '### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — Gateway submodule schema (ADR-029) does not validate outbound message rate limits; provider-specific rate limits not enforced
+- [x] **[Medium]** [auditor] *patch* — Email gateway missing SPF/DKIM validation on inbound; added in 6-5 commit
+  - *Resolution: crates/maos-gateway/src/email/inbound.rs:67-78*
+- [x] **[Low]** [test-infra] *dismissed* — Signal gateway test requires actual Signal account; mock test is minimal
+  - *Rationale: External service testing gap*' placeholder; 5-5b: contains '### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — Gateway submodule schema (ADR-029) does not validate outbound message rate limits; provider-specific rate limits not enforced
+- [x] **[Medium]** [auditor] *patch* — Email gateway missing SPF/DKIM validation on inbound; added in 6-5 commit
+  - *Resolution: crates/maos-gateway/src/email/inbound.rs:67-78*
+- [x] **[Low]** [test-infra] *dismissed* — Signal gateway test requires actual Signal account; mock test is minimal
+  - *Rationale: External service testing gap*' placeholder"},
   {"id":"A3","passed":true,"message":"check-serde-error-handling.rs exists and wired in discipline.yml"},
   {"id":"A5","passed":false,"message":"discipline.yml missing check-review-findings-resolved job"},
   {"id":"A6","passed":false,"message":"discipline.yml missing check-dev-record-completeness job"},

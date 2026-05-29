@@ -128,3 +128,9 @@
 - monotonic_now_ns() returns 0 before init_monotonic_base() — integration test concern [capability/cap_tokens/mod.rs:63-70]
 - handle_subprocess_death signature promises Result but always returns Ok [lifecycle/cli_wrapper/lifecycle.rs:30-44]
 - Smoke test distillate_id could be [0u8;16] if TL insert silently fails [maos-bin/src/main.rs:3283]
+
+## Deferred from: code review of 7-1-5-section-a2-step-3-closure-17-review-findings-25-dev-model-backfills-hard-fail-flip (2026-05-29)
+
+- Custom YAML frontmatter parsing via `extract_frontmatter()` is fragile — UTF-8 BOM, multiple `### Review Findings` sections, placeholder in code blocks cause false positives/negatives. Not caused by this change; applies to all frontmatter-based gates.
+- Smoke arm has no per-gate timeout; a hanging gate blocks indefinitely. CI default timeout applies; code-level timeout is a future hardening item.
+- `cargo public-api --diff` verification not cited in Completion Notes despite being an AC5 requirement. Likely done but not recorded.

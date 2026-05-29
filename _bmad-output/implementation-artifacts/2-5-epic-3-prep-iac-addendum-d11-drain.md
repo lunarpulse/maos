@@ -94,7 +94,13 @@ So that Story 3.1's `task.assign` non-one-shot routing path is auditable end-to-
 | <one-line description> | Patch / Defer / Decision | **closed** / **open** / **deferred → Story X.Y** | <file:line OR justification> |
 ```
 
-**And** the template documents that the section MUST be present (even if empty: `_No review findings._`) so future retros can grep-check `Status:` columns rather than infer state from prose
+**And** the template documents that the section MUST be present (even if empty: `### Review Findings
+
+- [ ] **[Medium]** [auditor] *defer* — D11 server-exit drain implementation lacks integration test with actual SIGTERM handler; verify drain completes within 5s under load
+- [x] **[Low]** [blind] *dismissed* — xtask workspace-count guard is minimal (≤20 lines); sufficient for v0.1-α but needs expansion when workspace >30 crates
+  - *Rationale: Scope-appropriate for prep story*
+- [x] **[Info]** [test-infra] *dismissed* — IAC bus Mailbox addendum is additive-only; no regression risk to existing mailbox surface
+  - *Rationale: Additive-only change*`) so future retros can grep-check `Status:` columns rather than infer state from prose
 **And** the change is delivered as a **user override** at `_bmad/custom/bmad-create-story.user.toml` (overriding the persistent-facts loader) OR as a direct edit to the project-tracked `.claude/skills/bmad-create-story/template.md` — whichever the dev judges cleaner per the bmad-customize skill's guidance
 **And** the change is documented in the bridge story dev record + cited from this AC
 
@@ -105,7 +111,7 @@ So that Story 3.1's `task.assign` non-one-shot routing path is auditable end-to-
 **When** the dev runs `code-review` on a story whose dev pass was performed by a model **other than** Claude (`anthropic.*`) or Codex (`openai.codex.*`)
 **Then** the review skill's checklist contains an additional review axis: **"Test infrastructure correctness — verify assertion wiring, capture-surface plumbing, validation depth, fixture authoring methodology. Treat test code with the same correctness scrutiny as production code."**
 **And** the amendment is delivered via `_bmad/custom/bmad-code-review.user.toml` (or `.toml` if team-wide) per the bmad-customize skill's user-vs-team-override conventions
-**And** the dev-model detection mechanism is documented in the bmad-code-review customization file (read from story frontmatter `dev_model_used:` field, with a fallback path if absent)
+**And** the dev-model detection mechanism is documented in the bmad-code-review customization file (read from story frontmatter `dev_model_used: claude-opus-4-5
 **And** the new axis is invoked as a no-op when `dev_model_used` is Claude or Codex (zero-overhead for the steady-state model choice)
 
 ### AC6 — Sprint-status entry renamed + retro cross-reference
@@ -207,14 +213,26 @@ The story template at `.claude/skills/bmad-create-story/template.md` is currentl
 <!-- One row per review Patch / Defer / Decision finding.
      Status MUST be one of: **closed** (resolved in this PR), **open** (still
      unresolved at merge; should not normally land), **deferred → Story X.Y**
-     (explicit forward reference). Empty section uses `_No review findings._`.
+     (explicit forward reference). Empty section uses `### Review Findings
+
+- [ ] **[Medium]** [auditor] *defer* — D11 server-exit drain implementation lacks integration test with actual SIGTERM handler; verify drain completes within 5s under load
+- [x] **[Low]** [blind] *dismissed* — xtask workspace-count guard is minimal (≤20 lines); sufficient for v0.1-α but needs expansion when workspace >30 crates
+  - *Rationale: Scope-appropriate for prep story*
+- [x] **[Info]** [test-infra] *dismissed* — IAC bus Mailbox addendum is additive-only; no regression risk to existing mailbox surface
+  - *Rationale: Additive-only change*`.
      This contract exists so future retros can grep-verify status without
      inferring state from prose. See epic-2-retro-2026-05-17.md §What Was
      Challenged §1 + §3 for the precipitating incident. -->
 
 | Finding | Severity | Status | Resolution |
 |---|---|---|---|
-| _No review findings._ |  |  |  |
+| ### Review Findings
+
+- [ ] **[Medium]** [auditor] *defer* — D11 server-exit drain implementation lacks integration test with actual SIGTERM handler; verify drain completes within 5s under load
+- [x] **[Low]** [blind] *dismissed* — xtask workspace-count guard is minimal (≤20 lines); sufficient for v0.1-α but needs expansion when workspace >30 crates
+  - *Rationale: Scope-appropriate for prep story*
+- [x] **[Info]** [test-infra] *dismissed* — IAC bus Mailbox addendum is additive-only; no regression risk to existing mailbox surface
+  - *Rationale: Additive-only change* |  |  |  |
 ```
 
 The dev decides whether to land this as a direct template edit (project-tracked, applies to all team members) or a user override (`_bmad/custom/bmad-create-story.user.toml`). Direct template edit is recommended — the discipline is project-wide, not personal preference.

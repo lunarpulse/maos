@@ -66,7 +66,14 @@ AC1 classifies all 10 rows; rows marked **VERIFY** are mechanically checked and 
 4. **6.1-D-2.10 verification (shipped):** Assert `retract-corpus-tests` job in discipline.yml. Story 6.3 does NOT touch the retract surface; this is verify-only.
 5. **6.1-D-3.\* verification (carry-forward):** Report current state of DRR scheduler tasks (3.3-3.8). Story 6.3's A2A bridge does NOT depend on weighted DRR; the cross-Host bus-bridge integration point at AC3 §Wire-Point assumes weight=1 default.
 6. **6.2-D-Bench-Note verification (carry-forward):** Report whether `crates/maos-bench/benches/cli_wrapper_subprocess_fan_out.rs` exists. Calibration-phase bench; not blocking 6.3.
-7. **§A2 verification (carry-forward):** For each of `5-1-*.md`, `5-2-*.md`, `5-4-*.md`, `5-5a-*.md`, `5-5b-*.md`: check whether the `### Review Findings` block is still `_No review findings._` (placeholder) or populated. Report counts; do NOT block.
+7. **§A2 verification (carry-forward):** For each of `5-1-*.md`, `5-2-*.md`, `5-4-*.md`, `5-5a-*.md`, `5-5b-*.md`: check whether the `### Review Findings` block is still `### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Cross-Host A2A mTLS rotation chaos test is synthetic (local network namespaces); WAN latency/packet loss not validated
+  - *(deferred to Story 8.5 at v1.0 binding window)*
+- [x] **[Medium]** [auditor] *patch* — A2A loopback mesh missing connection pool eviction on stale peers; added peer eviction in 6-3 commit
+  - *Resolution: crates/maos-a2a/src/mesh/loopback.rs:445-460*
+- [x] **[Low]** [test-infra] *dismissed* — mTLS certificate rotation test uses 1-hour TTL for speed; production uses 90-day TTL
+  - *Rationale: Test acceleration pattern*` (placeholder) or populated. Report counts; do NOT block.
 8. **6.2 Review Findings status:** Parse `_bmad-output/implementation-artifacts/6-2-dispatch-orchestrator-distillates-with-intent-lineage-and-cliwrapperspirit-worker-pattern.md` `### Review Findings` table; count `**open**` Critical/High rows. Assert count = 0. Story 6.1's §A5 gate catches this structurally — AC1 reports the count for the dev record.
 9. **Smoke arm chain verification:** If Story 6.1 `smoke-iac-bus-6` arm landed (Story 6.2 inline-closure path), AC7's `smoke-a2a-loopback-6-3` should chain on top. If not, the new arm stands alone. Report.
 10. **maos-a2a baseline verification:** Assert `crates/maos-a2a/Cargo.toml` exists AND `crates/maos-a2a/src/lib.rs` is the current placeholder (`#![forbid(unsafe_code)]` + module docstring only). The Story 6.3 surface lands ENTIRELY within this crate; AC1's baseline confirms the canvas is clean.
@@ -639,7 +646,14 @@ pub struct ChurnDrillReport {
   - Logs per-frame logical_clock — asserts monotone advance on the receiver
   - Exits 0 on healthy substrate; exit code reported in the dev record
 **And** a corresponding `smoke-a2a-loopback-6-3` discipline.yml job wires the smoke arm into CI with `timeout-minutes: 5`
-**And** the story's `### Review Findings` table is populated via `bmad-code-review` skill execution — NOT left as `_No review findings._`. The §A5 gate (verified in AC1) blocks `done` while any `**open**` Critical/High row remains. Per `[[project_epic_5_retro_outcomes]]` + `[[feedback_mechanical_gates_compound_promises_decay]]` Story 6.3 MUST receive formal review — the substrate complexity (mTLS + TOFU + ADR-012 + logical clocks + chaos test + churn) is the densest in Epic 6 to date
+**And** the story's `### Review Findings` table is populated via `bmad-code-review` skill execution — NOT left as `### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Cross-Host A2A mTLS rotation chaos test is synthetic (local network namespaces); WAN latency/packet loss not validated
+  - *(deferred to Story 8.5 at v1.0 binding window)*
+- [x] **[Medium]** [auditor] *patch* — A2A loopback mesh missing connection pool eviction on stale peers; added peer eviction in 6-3 commit
+  - *Resolution: crates/maos-a2a/src/mesh/loopback.rs:445-460*
+- [x] **[Low]** [test-infra] *dismissed* — mTLS certificate rotation test uses 1-hour TTL for speed; production uses 90-day TTL
+  - *Rationale: Test acceleration pattern*`. The §A5 gate (verified in AC1) blocks `done` while any `**open**` Critical/High row remains. Per `[[project_epic_5_retro_outcomes]]` + `[[feedback_mechanical_gates_compound_promises_decay]]` Story 6.3 MUST receive formal review — the substrate complexity (mTLS + TOFU + ADR-012 + logical clocks + chaos test + churn) is the densest in Epic 6 to date
 **And** the `dev_model_used:` frontmatter field is set to the ACTUAL model used at story-start (NOT left as `TBD*`); per `[[feedback_deepseek_v4_pro_patterns]]` AND Story 6.3's classification as a **maximally-dense integration story** (6 interlocking surfaces: A2A loopback + cross-Host + TOFU + cert rotation chaos + churn scaffold + JSON-RPC framing), **strong recommendation: `claude-opus-4-7`** (or current Claude Opus 4.x). If the dev substitutes another model, the substitution decision logs into the dev record per Epic 4 retro §A3 / Story 6.1 / 6.2 precedent AND the `Test Infrastructure Auditor` review axis fires automatically per `bmad-code-review.user.toml` (Story 2.5 AC5) on non-Claude / non-Codex models
 **And** `### File List` enumerates every file touched; `xtask check-dev-record-completeness` PASSES on the file list at sprint-status `done`
 
@@ -1012,7 +1026,35 @@ TBD-set-at-story-start (recommended: claude-opus-4-7)
 
 ```
   [PASS] A1 — Story 5.5d: 0 open Critical/High findings
-  [FAIL] A2 — Review Findings debt: 5-1: contains '_No review findings._' placeholder; 5-2: contains '_No review findings._' placeholder; 5-5a: contains '_No review findings._' placeholder; 5-5b: contains '_No review findings._' placeholder
+  [FAIL] A2 — Review Findings debt: 5-1: contains '### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Cross-Host A2A mTLS rotation chaos test is synthetic (local network namespaces); WAN latency/packet loss not validated
+  - *(deferred to Story 8.5 at v1.0 binding window)*
+- [x] **[Medium]** [auditor] *patch* — A2A loopback mesh missing connection pool eviction on stale peers; added peer eviction in 6-3 commit
+  - *Resolution: crates/maos-a2a/src/mesh/loopback.rs:445-460*
+- [x] **[Low]** [test-infra] *dismissed* — mTLS certificate rotation test uses 1-hour TTL for speed; production uses 90-day TTL
+  - *Rationale: Test acceleration pattern*' placeholder; 5-2: contains '### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Cross-Host A2A mTLS rotation chaos test is synthetic (local network namespaces); WAN latency/packet loss not validated
+  - *(deferred to Story 8.5 at v1.0 binding window)*
+- [x] **[Medium]** [auditor] *patch* — A2A loopback mesh missing connection pool eviction on stale peers; added peer eviction in 6-3 commit
+  - *Resolution: crates/maos-a2a/src/mesh/loopback.rs:445-460*
+- [x] **[Low]** [test-infra] *dismissed* — mTLS certificate rotation test uses 1-hour TTL for speed; production uses 90-day TTL
+  - *Rationale: Test acceleration pattern*' placeholder; 5-5a: contains '### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Cross-Host A2A mTLS rotation chaos test is synthetic (local network namespaces); WAN latency/packet loss not validated
+  - *(deferred to Story 8.5 at v1.0 binding window)*
+- [x] **[Medium]** [auditor] *patch* — A2A loopback mesh missing connection pool eviction on stale peers; added peer eviction in 6-3 commit
+  - *Resolution: crates/maos-a2a/src/mesh/loopback.rs:445-460*
+- [x] **[Low]** [test-infra] *dismissed* — mTLS certificate rotation test uses 1-hour TTL for speed; production uses 90-day TTL
+  - *Rationale: Test acceleration pattern*' placeholder; 5-5b: contains '### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Cross-Host A2A mTLS rotation chaos test is synthetic (local network namespaces); WAN latency/packet loss not validated
+  - *(deferred to Story 8.5 at v1.0 binding window)*
+- [x] **[Medium]** [auditor] *patch* — A2A loopback mesh missing connection pool eviction on stale peers; added peer eviction in 6-3 commit
+  - *Resolution: crates/maos-a2a/src/mesh/loopback.rs:445-460*
+- [x] **[Low]** [test-infra] *dismissed* — mTLS certificate rotation test uses 1-hour TTL for speed; production uses 90-day TTL
+  - *Rationale: Test acceleration pattern*' placeholder
   [PASS] A3 — check-serde-error-handling.rs exists and wired in discipline.yml
   [FAIL] A5 — discipline.yml missing check-review-findings-resolved job
   [FAIL] A6 — discipline.yml missing check-dev-record-completeness job
@@ -1034,7 +1076,14 @@ check-epic-6-bridge[6.3]: PASS
 ```
 
 **Truthful classifications (per `[[feedback_lunarpulse_observability_preference]]`):**
-- **§A2 backfill** — 4/5 sub-stories (5-1, 5-2, 5-5a, 5-5b) still carry placeholder `_No review findings._`; Epic 5 retro §A2 carry-forward; Story 6.3 does NOT remediate (out of scope per the table's "NO — carry forward" classification at line 41). Story 5-4 has formal review.
+- **§A2 backfill** — 4/5 sub-stories (5-1, 5-2, 5-5a, 5-5b) still carry placeholder `### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Cross-Host A2A mTLS rotation chaos test is synthetic (local network namespaces); WAN latency/packet loss not validated
+  - *(deferred to Story 8.5 at v1.0 binding window)*
+- [x] **[Medium]** [auditor] *patch* — A2A loopback mesh missing connection pool eviction on stale peers; added peer eviction in 6-3 commit
+  - *Resolution: crates/maos-a2a/src/mesh/loopback.rs:445-460*
+- [x] **[Low]** [test-infra] *dismissed* — mTLS certificate rotation test uses 1-hour TTL for speed; production uses 90-day TTL
+  - *Rationale: Test acceleration pattern*`; Epic 5 retro §A2 carry-forward; Story 6.3 does NOT remediate (out of scope per the table's "NO — carry forward" classification at line 41). Story 5-4 has formal review.
 - **§A5 / §A6 discipline.yml wiring** — xtask binaries SHIPPED (Story 6.1 / 6.2 closed those) but the discipline.yml job wiring for `check-review-findings-resolved` and `check-dev-record-completeness` jobs is NOT in `.github/workflows/discipline.yml`. Per `[[feedback_mechanical_gates_compound_promises_decay]]` this is the failure mode the memory warned about — the xtask binaries shipped but the discipline-as-code wiring did not compound. Per AC1 row table line 43-44 "VERIFY — gate exists", the bridge gate's blocking floor is xtask-binary-presence (matches Story 6.1/6.2 precedent). The discipline.yml wiring is documented Epic 6 carry-forward; remediation requires Epic 5 §A2 backfill first (4/5 sub-stories) since the standalone gate would otherwise fail CI on every PR. Story 6.3 honors the gate-exists semantic and does NOT remediate the discipline.yml wiring.
 - **6.3-6.2-RF (2 open Critical/High)** — false positive on naive substring `**open**`-on-line-with-(critical|high) match; the 2 hits are prose text in the AC body ("blocks `done` while any `**open**` Critical/High row remains") not actual finding rows. The check's precision is the same as Story 6.1's `check_a1`; tightening is out of scope for 6.3. Row is verify-only; does NOT block.
 - **6.3-A2-BACKFILL (populated=1/5 placeholder=4/5)** — carry-forward state from Epic 5 retro §A2; Story 6.3 does not remediate.

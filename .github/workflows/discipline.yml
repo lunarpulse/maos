@@ -1255,23 +1255,11 @@ jobs:
       - name: Run maos-manifest v1-load-on-current-kernel compat tests
         run: cargo test -p maos-manifest --test manifest_n_minus_1_compat --locked
 
-  # Epic 5 retro §A5 — open Review Findings rows MUST block sprint-status
-  # `done`; closed rows MUST reference a File List entry. Closes the
-  # "Critical-findings-closed-by-scope-reduction" antipattern discovered in
-  # Story 5.5d. Wired Epic 6 §A2 (retro 2026-05-28); `continue-on-error: true`
-  # during the Epic 5 §A2 backfill window on Stories 5.1 / 5.2 / 5.5a / 5.5b.
-  #
-  # §A2 step 2 BACKFILL COMPLETE (2026-05-28): Stories 5.1 / 5.2 / 5.5a /
-  # 5.5b all have populated Review Findings tables (99 findings across the 4
-  # stories). 5.1 / 5.2 / 5.5a flipped to sprint-status `in-review` per Rule 1
-  # (Critical/High opens warrant code-work follow-up); 5.5b stays `done` (0 opens).
-  # §A2 step 3 FLIP to hard-fail BLOCKED on broader Epic 5 carry-forward —
-  # 17 other-story violations remain (3.1 / 3.3 / 3.4 / 4.1 / 4.2 / 5.3 /
-  # 5.5c / 5.5d / 5.5e / 6.2 / 6.4 / 2.5 + scope-reduction-closure rows in
-  # 5.2 / 5.5a). Flip when carry-forward closes (target: Epic 7 retro window).
+  # §A2 step 3 split-flip — new gates hard-fail; existing gates soft-fail until pre-existing
+  # violations remediated in follow-up story (scope-reduction-closures in 4-1/4-2/5-2/5-3/5-5a/5-5d/6-2)
   check-review-findings-resolved:
     runs-on: ubuntu-latest
-    continue-on-error: true  # §A2 step 3 flip BLOCKED on broader Epic 5 carry-forward (~17 stories)
+    continue-on-error: true  # split-flip: soft-fail until pre-existing violations closed
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
@@ -1283,23 +1271,11 @@ jobs:
       - name: Run check-review-findings-resolved
         run: cargo run -p xtask -- check-review-findings-resolved --json
 
-  # Epic 5 retro §A6 (closes Epic 4 retro §A7) — `done` stories MUST have
-  # non-TBD model + non-empty Agent Model Used / Completion Notes / File List
-  # sections. Wired Epic 6 §A2 (retro 2026-05-28); `continue-on-error: true`
-  # during the Epic 5 §A2 backfill window. `--check-git-diff` is NOT enabled
-  # at v0.5-α — that flag adds the dev-record-fabrication detector which is
-  # deferred to Story 9.1 territory.
-  #
-  # §A2 step 2 BACKFILL COMPLETE (2026-05-28): 4 backfilled stories now pass
-  # the dev-record gate. §A2 step 3 FLIP to hard-fail BLOCKED on Epic 0 /
-  # Epic 1a / Epic 1b bootstrap stories with empty `dev_model_used` fields
-  # (these substantially pre-date the gate's invention). Bootstrap-era stories
-  # need either a `dev_model_used` retro-fill OR a bootstrap-allowlist
-  # extension in `xtask/src/check_dev_record_completeness.rs`. Target: Epic 7
-  # retro window.
+  # §A2 step 3 split-flip — new gates hard-fail; existing gates soft-fail until pre-existing
+  # violations remediated in follow-up story (dev-record gaps across bootstrap-era stories)
   check-dev-record-completeness:
     runs-on: ubuntu-latest
-    continue-on-error: true  # §A2 step 3 flip BLOCKED on bootstrap-era empty dev_model_used (~40 stories)
+    continue-on-error: true  # split-flip: soft-fail until pre-existing violations closed
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
@@ -1311,9 +1287,50 @@ jobs:
       - name: Run check-dev-record-completeness
         run: cargo run -p xtask -- check-dev-record-completeness --json
 
+  # Story 7.1.5 — assert ZERO bare `_No review findings._` placeholders remain
+  check-bare-review-findings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-bare-review-findings
+        run: cargo run -p xtask -- check-bare-review-findings --json
+
+  # Story 7.1.5 — assert every story file has a populated `dev_model_used:` frontmatter field
+  check-dev-model-used-populated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-dev-model-used-populated
+        run: cargo run -p xtask -- check-dev-model-used-populated --json
+
+  smoke-discipline-7-1-5:
+    runs-on: ubuntu-latest
+    needs: [check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - run: MAOS_ONE_SHOT=smoke-discipline-7-1-5 cargo run --release -p maos-bin
+
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1, smoke-discipline-7-1-5]
     if: always()
     permissions:
       pull-requests: write
@@ -1361,6 +1378,9 @@ jobs:
           echo "ccrc=${{ needs.check-composition-root-completeness.result }}" >> $GITHUB_OUTPUT
           echo "ceb=${{ needs.check-epic-6-bridge.result }}" >> $GITHUB_OUTPUT
           echo "rct=${{ needs.retract-corpus-tests.result }}" >> $GITHUB_OUTPUT
+          echo "cbrf=${{ needs.check-bare-review-findings.result }}" >> $GITHUB_OUTPUT
+          echo "cdmu=${{ needs.check-dev-model-used-populated.result }}" >> $GITHUB_OUTPUT
+          echo "sd715=${{ needs.smoke-discipline-7-1-5.result }}" >> $GITHUB_OUTPUT
       - name: Check for failures
         id: status
         run: |
@@ -1414,6 +1434,9 @@ jobs:
             const ccrc = '${{ needs.check-composition-root-completeness.result }}';
             const ceb = '${{ needs.check-epic-6-bridge.result }}';
             const rct = '${{ needs.retract-corpus-tests.result }}';
+            const cbrf = '${{ needs.check-bare-review-findings.result }}';
+            const cdmu = '${{ needs.check-dev-model-used-populated.result }}';
+            const sd715 = '${{ needs.smoke-discipline-7-1-5.result }}';
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
             const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
 
@@ -1461,6 +1484,9 @@ jobs:
             | check-composition-root-completeness | ${icon(ccrc)} ${ccrc} |
             | check-epic-6-bridge | ${icon(ceb)} ${ceb} |
             | retract-corpus-tests | ${icon(rct)} ${rct} |
+            | check-bare-review-findings | ${icon(cbrf)} ${cbrf} |
+            | check-dev-model-used-populated | ${icon(cdmu)} ${cdmu} |
+            | smoke-discipline-7-1-5 | ${icon(sd715)} ${sd715} |
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 
             ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).

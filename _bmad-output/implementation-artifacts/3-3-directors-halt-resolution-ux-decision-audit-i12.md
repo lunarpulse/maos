@@ -1147,7 +1147,13 @@ discipline)
         parallel to existing `CaptureChannel` exemption).
   - [x] T8.6 Updated `xtask/kernel-api-classes.toml` — classified
         new public symbols (halt mechanism → supervision, decision logger → data-movement).
-  - [x] T8.7 Review Findings table preserved (empty `_No review findings._` row).
+  - [x] T8.7 Review Findings table preserved (empty `### Review Findings
+
+- [ ] **[Medium]** [auditor] *defer* — Decision audit I12 capture does not redact PII from working_memory_digest_refs; GDPR Article 17 cascade needs redaction pass
+- [x] **[Medium]** [blind] *patch* — Halt resolution UX missing keyboard navigation for accessibility; added ARIA labels in 3-3 commit
+  - *Resolution: crates/maos-director-surface/src/ux/halt_resolution.rs:203-217*
+- [x] **[Low]** [edge] *dismissed* — I12 audit chain verification test is 2-phase (write then read); single-phase atomic test deferred to test-infra improvements
+  - *Rationale: Epic 4 retro test pattern*` row).
   - [x] T8.8 Used proven capture-surface patterns (CaptureChannel shape,
         MockHaltResolver shape) rather than hand-rolling new mocks.
 
@@ -1694,7 +1700,13 @@ _No debug log references for this session._
 <!-- One row per review Patch / Defer / Decision finding.
      Status MUST be one of: **closed** (resolved in this PR), **open** (still
      unresolved at merge; should not normally land), **deferred → Story X.Y**
-     (explicit forward reference). Empty section uses `_No review findings._`.
+     (explicit forward reference). Empty section uses `### Review Findings
+
+- [ ] **[Medium]** [auditor] *defer* — Decision audit I12 capture does not redact PII from working_memory_digest_refs; GDPR Article 17 cascade needs redaction pass
+- [x] **[Medium]** [blind] *patch* — Halt resolution UX missing keyboard navigation for accessibility; added ARIA labels in 3-3 commit
+  - *Resolution: crates/maos-director-surface/src/ux/halt_resolution.rs:203-217*
+- [x] **[Low]** [edge] *dismissed* — I12 audit chain verification test is 2-phase (write then read); single-phase atomic test deferred to test-infra improvements
+  - *Rationale: Epic 4 retro test pattern*`.
      This contract exists so future retros can grep-verify status without
      inferring state from prose. See epic-2-retro-2026-05-17.md §What Was
      Challenged §1 + §3 for the precipitating incident. -->

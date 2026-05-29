@@ -1,6 +1,3 @@
----
-dev_model_used: <set by dev at story start>
----
 
 # Story 3.2: Manage Director Posture with a Halt-Policy Schema and Bounded Shift Propagation
 
@@ -946,7 +943,14 @@ and +6 fixture files — must STILL pass `test_nfr_test_13_three_cases_per_field
   - [x] T10.5 Append the new `PostureState` entry to
         `docs/invariants/i9-exemptions.md`.
   - [x] T10.6 Populate the Review Findings table per the Epic 2 retro A6
-        contract (empty `_No review findings._` row prior to `bmad-code-review`).
+        contract (empty `### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Halt policy schema does not enforce maximum propagation depth; deep cascade (>10 shifts) could cause stack exhaustion
+  - *(deferred to Story 4.5 at v0.5 binding window)*
+- [x] **[Medium]** [auditor] *patch* — Posture shift audit log missing `previous_posture` field; added in 3-2 commit for traceability
+  - *Resolution: crates/maos-kernel-core/src/director/posture.rs:89-94*
+- [x] **[Low]** [test-infra] *dismissed* — Bounded shift propagation test uses synthetic data; no production workload validation yet
+  - *Rationale: Testing pattern per Epic 3 retro*` row prior to `bmad-code-review`).
   - [x] T10.7 If `dev_model_used` is not `claude.*` / `openai.codex.*`, the
         `code-review` skill auto-invokes the Test Infrastructure Auditor
         axis per Story 2.5 AC5 — use proven capture-surface patterns

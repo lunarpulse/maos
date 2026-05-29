@@ -771,7 +771,13 @@ Each top-level task carries `(AC: #)` mapping. **Sub-tasks preserve order.** Sel
     - [ ] Confirmed Lunarpulse can run `MAOS_ONE_SHOT=smoke-spirit-5 cargo run -p maos-bin` and OBSERVE all 11 hooks fire (or be explicitly deferred) — closes the Epic 4 retro §7 "substrate-shipped-without-Spirit-side observability gap" concern.
     - [ ] Confirmed the dev_model_used: claude frontmatter (per Epic 4 retro §A3); if substituted, the substitution is logged in Completion Notes.
     - [ ] Confirmed each AC has at least one integration test exercising it end-to-end.
-    - [ ] Confirmed the Review Findings table is initialized to `_No review findings._` (per Epic 2 retro §A6 status-column discipline).
+    - [ ] Confirmed the Review Findings table is initialized to `### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — Priority-weighted scheduling uses fixed weights (1-5); dynamic weight adjustment based on historical success rate not implemented
+- [x] **[Medium]** [auditor] *patch* — Lifecycle verb `on_unload` missing graceful timeout; added 30s drain timeout in 5-1 commit
+  - *Resolution: crates/maos-kernel-core/src/scheduler/lifecycle.rs:445-452*
+- [x] **[Low]** [test-infra] *dismissed* — 11-trigger integration test is synthetic (mock spirits); e2e test with real subprocess spirits deferred
+  - *Rationale: Testing infrastructure gap*` (per Epic 2 retro §A6 status-column discipline).
     - [ ] Confirmed Epic 4 retro Action Items §A4 + §A5 are landed alongside this story (the two xtask gates ran for the first time at this commit).
   - [ ] 12.4 "What did NOT happen this story" section (per Epic 1a §A4) — grep-verified anti-claims for: NO hot-swap state transfer (Story 5.2), NO crash detection / NACK timing / halt-receipt 99.9% on unplanned termination (Story 5.3 — the planned-termination path stays on Story 4.1's halt-receipt logic), NO `maosctl spirit upgrade` verb (Story 5.4), NO signed CRL propagation (Story 5.4), NO subprocess-form wire protocol (Story 5.5x), NO ACP server (Story 5.5c), NO operator HTTP API body (Story 5.4 / 9.4), NO Tier-T3 container isolation (Story 5.5a), NO multi-provider CI matrix (Story 5.5b), NO §13.1 measurement gate ADR (Story 5.5e), NO Butler anticipatory-reasoning body (Story 8.1 — Story 5.1 ships the on_idle substrate only).
   - [ ] 12.5 (Optional but recommended) — drain `deferred-work.md` of any Story-5.1-deferred items (none expected; if any surface during dev, append per the existing Story-by-Story sections).

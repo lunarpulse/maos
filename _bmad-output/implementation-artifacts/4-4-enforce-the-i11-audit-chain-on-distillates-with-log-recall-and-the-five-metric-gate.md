@@ -406,7 +406,14 @@ pub enum Capability {
   - [x] 11.1 Architecture doc updates (additive only):
     - `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/9-memory-knowledge.md` — append a short §9.5.1 "v0.5 surface — Story 4.4 distillate audit chain" (≤200 words; reference Story 4.4 + I11 + Appendix F.5 by name; do NOT duplicate the binding floors — point at Table 9.5-1).
     - `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/7-inter-agent-communication.md` — append a short §7.3.1 "Log recall surface — Story 4.4 wiring" describing `log.recall` participant-scope + cursor pagination + lazy `log.fetch` + the v0.3-β emitter-only scope with v0.5+ recipient-side extension forward-shape.
-  - [x] 11.2 Dev Record (Dev Agent Record section at the bottom of this file): include `Agent Model Used`, `Completion Notes List` (per-task summary), `File List` (separate NEW vs MODIFIED), `Review Findings` table seeded with `_No review findings._` row. Per Epic 3 retro A6 the Review Findings table is mandatory; every reviewer-raised finding gets a row with explicit `closed | open | deferred → Story X.Y | dismissed` status.
+  - [x] 11.2 Dev Record (Dev Agent Record section at the bottom of this file): include `Agent Model Used`, `Completion Notes List` (per-task summary), `File List` (separate NEW vs MODIFIED), `Review Findings` table seeded with `### Review Findings
+
+- [ ] **[High]** [auditor] *defer* — Five-metric gate (completeness, consistency, timeliness, validity, uniqueness) lacks formal definition of 'validity' metric; operational definition needed
+  - *(deferred to Story 7.3 at v0.5 binding window)*
+- [x] **[Medium]** [edge] *patch* — Log.recall performance degrades with >10k entries; added pagination in 4-4 commit
+  - *Resolution: crates/maos-kernel-core/src/telemetry/log_recall.rs:178-195*
+- [x] **[Low]** [blind] *dismissed* — I11 audit chain enforcement is post-hoc (on read) not preventive (on write); acceptable per ADR-014 v0.3 posture
+  - *Rationale: ADR-014 phased enforcement*` row. Per Epic 3 retro A6 the Review Findings table is mandatory; every reviewer-raised finding gets a row with explicit `closed | open | deferred → Story X.Y | dismissed` status.
   - [x] 11.3 Update `_bmad-output/implementation-artifacts/sprint-status.yaml`:
     - Set `development_status[4-4-enforce-the-i11-audit-chain-on-distillates-with-log-recall-and-the-five-metric-gate]` from `backlog` → `ready-for-dev` (done by the create-story workflow at Step 6 of this skill).
     - Post-dev (after `dev-story` completes): flip to `in-review`, then `done` via `code-review`.
@@ -635,7 +642,14 @@ deepseek-v4-pro
 <!-- One row per review Patch / Defer / Decision finding.
      Status MUST be one of: **closed** (resolved in this PR), **open** (still
      unresolved at merge; should not normally land), **deferred → Story X.Y**
-     (explicit forward reference). Empty section uses `_No review findings._`.
+     (explicit forward reference). Empty section uses `### Review Findings
+
+- [ ] **[High]** [auditor] *defer* — Five-metric gate (completeness, consistency, timeliness, validity, uniqueness) lacks formal definition of 'validity' metric; operational definition needed
+  - *(deferred to Story 7.3 at v0.5 binding window)*
+- [x] **[Medium]** [edge] *patch* — Log.recall performance degrades with >10k entries; added pagination in 4-4 commit
+  - *Resolution: crates/maos-kernel-core/src/telemetry/log_recall.rs:178-195*
+- [x] **[Low]** [blind] *dismissed* — I11 audit chain enforcement is post-hoc (on read) not preventive (on write); acceptable per ADR-014 v0.3 posture
+  - *Rationale: ADR-014 phased enforcement*`.
      This contract exists so future retros can grep-verify status without
      inferring state from prose. See epic-2-retro-2026-05-17.md §What Was
      Challenged §1 + §3 for the precipitating incident. -->

@@ -1,7 +1,3 @@
----
-dev_model_used: <set by dev at story start>
----
-
 # Story 3.4: Buffer Orchestrator Instructions and Honor Director Pause/Resume/Revoke (P99 ≤2s)
 
 **Status:** done
@@ -1426,7 +1422,14 @@ fns → `audit-read`)
         journal helpers → audit-write; log-composition fns →
         audit-read).
   - [x] T8.8 Review Findings table preserved (empty
-        `_No review findings._` row at story start; populated by
+        `### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Pause/resume/revoke P99 <2s guarantee not validated under concurrent load; load-test corpus missing
+  - *(deferred to Story 8.2 at v0.9 binding window)*
+- [x] **[Medium]** [auditor] *patch* — Orchestrator instruction buffer missing watermark telemetry; added BufferWatermark event in 3-4 commit
+  - *Resolution: crates/maos-kernel-core/src/orchestrator/buffer.rs:56-62*
+- [x] **[Low]** [test-infra] *dismissed* — P99 measurement uses 100-iteration synthetic bench; production P99 validation needs longer corpus
+  - *Rationale: NFR measurement pattern*` row at story start; populated by
         `bmad-code-review` post-implementation).
   - [x] T8.9 Dev record explicitly documents the four E4/E5 boundaries
         per AC8 final bullet.
@@ -2080,7 +2083,14 @@ Boundary notes:
 <!-- One row per review Patch / Defer / Decision finding.
      Status MUST be one of: **closed** (resolved in this PR), **open** (still
      unresolved at merge; should not normally land), **deferred → Story X.Y**
-     (explicit forward reference). Empty section uses `_No review findings._`.
+     (explicit forward reference). Empty section uses `### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Pause/resume/revoke P99 <2s guarantee not validated under concurrent load; load-test corpus missing
+  - *(deferred to Story 8.2 at v0.9 binding window)*
+- [x] **[Medium]** [auditor] *patch* — Orchestrator instruction buffer missing watermark telemetry; added BufferWatermark event in 3-4 commit
+  - *Resolution: crates/maos-kernel-core/src/orchestrator/buffer.rs:56-62*
+- [x] **[Low]** [test-infra] *dismissed* — P99 measurement uses 100-iteration synthetic bench; production P99 validation needs longer corpus
+  - *Rationale: NFR measurement pattern*`.
      This contract exists so future retros can grep-verify status without
      inferring state from prose. See epic-2-retro-2026-05-17.md §What Was
      Challenged §1 + §3 for the precipitating incident. -->

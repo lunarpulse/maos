@@ -1097,7 +1097,14 @@ Each top-level task carries `(AC: #)` mapping. **Sub-tasks preserve order.** Sel
     - [ ] Confirmed Lunarpulse can run `MAOS_ONE_SHOT=smoke-supervision-5 cargo run -p maos-bin` and OBSERVE the 4 supervision surfaces firing with magnitude (≥1 halt receipt, ≥1 task.orphaned, ≥1 task.stalled, ≥1 silent_failure_suspect, ≥1 in-flight recovery) — closes the Epic 4 retro §7 + Story 5.1 deferred §1 "observable behavior beats coverage%" concern via [[feedback_lunarpulse_observability_preference]].
     - [ ] Confirmed the `dev_model_used: claude` frontmatter per Epic 4 retro §A3; if substituted, the substitution is logged in Completion Notes per `[[feedback_deepseek_v4_pro_patterns]]`.
     - [ ] Confirmed each AC has at least one integration test exercising it end-to-end.
-    - [ ] Confirmed the Review Findings table is initialized to `_No review findings._` (per Epic 2 retro §A6 status-column discipline).
+    - [ ] Confirmed the Review Findings table is initialized to `### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Halt-receipt 99.9% guarantee not validated under Host memory pressure (OOMkiller scenario); survival test missing
+  - *(deferred to Story 8.4 at v1.0 binding window)*
+- [x] **[Medium]** [auditor] *patch* — Silent failure detector has false-positive rate ~2% on slow-startup spirits; added startup grace period in 5-3 commit
+  - *Resolution: crates/maos-kernel-core/src/supervision/silent_failure.rs:89-101*
+- [x] **[Low]** [blind] *dismissed* — Crash detection relies on SIGCHLD; inproc spirits (v0.9+) need alternative detection mechanism
+  - *Rationale: ADR-002 inproc deferred work*` (per Epic 2 retro §A6 status-column discipline).
     - [ ] Confirmed Story 4.1 deferred §1 (`drain_for_spirit` per-PID) is CLOSED inline; verify by `grep -rn "Story 5.3 wires per-pid filtering\|Story 5.3 refines" crates/` returns ≤2 hits (the closure docstrings, not the placeholder bodies).
     - [ ] Confirmed Story 4.1 deferred §6 (test PID collision) is CLOSED via Task 7.5/8.2 changes.
     - [ ] Confirmed Story 5.1 deferred §1 (smoke_epic_4.sh magnitude) is CLOSED via smoke-supervision-5's magnitude assertions in `smoke_supervision_5.sh`.
@@ -1323,7 +1330,14 @@ Key files modified/created (per `git diff --name-only`):
 <!-- One row per review Patch / Defer / Decision finding.
      Status MUST be one of: **closed** (resolved in this PR), **open** (still
      unresolved at merge; should not normally land), **deferred → Story X.Y**
-     (explicit forward reference). Empty section uses `_No review findings._`.
+     (explicit forward reference). Empty section uses `### Review Findings
+
+- [ ] **[High]** [edge] *defer* — Halt-receipt 99.9% guarantee not validated under Host memory pressure (OOMkiller scenario); survival test missing
+  - *(deferred to Story 8.4 at v1.0 binding window)*
+- [x] **[Medium]** [auditor] *patch* — Silent failure detector has false-positive rate ~2% on slow-startup spirits; added startup grace period in 5-3 commit
+  - *Resolution: crates/maos-kernel-core/src/supervision/silent_failure.rs:89-101*
+- [x] **[Low]** [blind] *dismissed* — Crash detection relies on SIGCHLD; inproc spirits (v0.9+) need alternative detection mechanism
+  - *Rationale: ADR-002 inproc deferred work*`.
      This contract exists so future retros can grep-verify status without
      inferring state from prose. See epic-2-retro-2026-05-17.md §What Was
      Challenged §1 + §3 for the precipitating incident. -->

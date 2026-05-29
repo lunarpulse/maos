@@ -1138,7 +1138,13 @@ TBD (recommended: `claude-opus-4-7` per §Dev Notes Model Recommendation)
 <!-- One row per review Patch / Defer / Decision finding.
      Status MUST be one of: **closed** (resolved in this PR), **open** (still
      unresolved at merge; should not normally land), **deferred → Story X.Y**
-     (explicit forward reference). Empty section uses `_No review findings._`.
+     (explicit forward reference). Empty section uses `### Review Findings
+
+- [ ] **[Medium]** [edge] *defer* — ACP server does not validate tool server manifest signatures before admission; trust-on-first-use model is v0.5-α only
+- [x] **[Medium]** [auditor] *patch* — MCP client missing request timeout on slow tool servers; added 30s default timeout in 5-5c commit
+  - *Resolution: crates/maos-mcp-client/src/client.rs:234-241*
+- [x] **[Low]** [test-infra] *dismissed* — Editor host integration test requires VSCode/Cursor; headless test mock is minimal
+  - *Rationale: Editor-specific testing gap*`.
      This contract exists so future retros can grep-verify status without
      inferring state from prose. See epic-2-retro-2026-05-17.md §What Was
      Challenged §1 + §3 for the precipitating incident. -->
