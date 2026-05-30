@@ -88,6 +88,10 @@ pub enum FrameKind {
     GatewayInbound = 24,
     /// Story 6.5 — FR54: outbound message to external gateway.
     GatewayOutbound = 25,
+    /// Story 7.2 — FR60: Spirit admitted via air-gapped `maosctl import --offline`.
+    /// Distinguishable in audit from registry-served admissions
+    /// (`SpiritAdmitted = 19`) and CRL revocations (`SpiritRevoked = 17`).
+    SpiritImported = 26,
 }
 
 impl FrameKind {
@@ -120,6 +124,7 @@ impl FrameKind {
             23 => Some(Self::RateLimited),
             24 => Some(Self::GatewayInbound),
             25 => Some(Self::GatewayOutbound),
+            26 => Some(Self::SpiritImported),
             _ => None,
         }
     }

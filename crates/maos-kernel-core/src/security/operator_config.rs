@@ -18,6 +18,10 @@ pub struct RegistrySection {
     pub allow_unsigned_local: bool,
     #[doc = "Construct via [`RegistrySection::new`] — Ed25519 public key the registry-side org-internal anchor signs with."]
     pub org_signing_pubkey: Option<[u8; 32]>,
+    #[doc = "Story 7.2 — reject manifests that lack server-reported tier + signature."]
+    pub require_server_tier_signature: bool,
+    #[doc = "Story 7.2 — allow `maosctl import --force-tier` to override tier for air-gapped imports."]
+    pub allow_force_tier_at_import: bool,
 }
 
 impl RegistrySection {
@@ -27,6 +31,8 @@ impl RegistrySection {
         t3_for_public_untrusted: bool,
         allow_unsigned_local: bool,
         org_signing_pubkey: Option<[u8; 32]>,
+        require_server_tier_signature: bool,
+        allow_force_tier_at_import: bool,
     ) -> Self {
         Self {
             uri,
@@ -34,6 +40,8 @@ impl RegistrySection {
             t3_for_public_untrusted,
             allow_unsigned_local,
             org_signing_pubkey,
+            require_server_tier_signature,
+            allow_force_tier_at_import,
         }
     }
 
@@ -71,6 +79,12 @@ impl RegistrySection {
                                     }
                                 }
                             }
+                            if let Some(b) = registry_table.get("require_server_tier_signature").and_then(|v| v.as_bool()) {
+                                section.require_server_tier_signature = b;
+                            }
+                            if let Some(b) = registry_table.get("allow_force_tier_at_import").and_then(|v| v.as_bool()) {
+                                section.allow_force_tier_at_import = b;
+                            }
                         }
                     }
                 }
@@ -97,6 +111,12 @@ impl RegistrySection {
                 }
             }
         }
+        if let Ok(v) = std::env::var("MAOS_REGISTRY_REQUIRE_SERVER_TIER_SIGNATURE") {
+            section.require_server_tier_signature = v == "true" || v == "1";
+        }
+        if let Ok(v) = std::env::var("MAOS_REGISTRY_ALLOW_FORCE_TIER_AT_IMPORT") {
+            section.allow_force_tier_at_import = v == "true" || v == "1";
+        }
 
         section
     }
@@ -109,6 +129,8 @@ impl RegistrySection {
             t3_for_public_untrusted: false,
             allow_unsigned_local: true,
             org_signing_pubkey: None,
+            require_server_tier_signature: false,
+            allow_force_tier_at_import: false,
         }
     }
 }

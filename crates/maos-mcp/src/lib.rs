@@ -18,5 +18,34 @@ pub mod client;
 pub mod fixture_replay;
 pub mod transport;
 
-pub use client::{McpClient, McpServerEntry};
+// Re-export the trait (primary port abstraction) and the concrete impl.
+pub use client::{McpClientImpl, McpServerEntry};
 pub use transport::{McpTransport, McpTransportError};
+
+/// Story 7.2 (closes 5.5d Medium #23) — `McpClient` trait abstraction.
+///
+/// The concrete `client::McpClientImpl` struct gets a blanket impl of
+/// `McpClient` so all existing call sites keep working; consumers should
+/// migrate to `Arc<dyn McpClient + Send + Sync>` for new code. The
+/// minimal trait surface lifts ONLY the `call` method — wider MCP port
+/// refactor (streaming, batching, server-side abstractions) is v0.7+ scope
+/// per the Story 5.5d remediation #21 deferral.
+pub trait McpClient: Send + Sync {
+    fn call(
+        &self,
+        server_name: &str,
+        tool: &str,
+        args: serde_json::Value,
+    ) -> Result<maos_domain::ports::mcp::McpCallResponse, maos_domain::ports::mcp::McpError>;
+}
+
+impl McpClient for client::McpClientImpl {
+    fn call(
+        &self,
+        server_name: &str,
+        tool: &str,
+        args: serde_json::Value,
+    ) -> Result<maos_domain::ports::mcp::McpCallResponse, maos_domain::ports::mcp::McpError> {
+        client::McpClientImpl::call(self, server_name, tool, args)
+    }
+}

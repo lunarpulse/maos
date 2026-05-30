@@ -134,3 +134,12 @@
 - Custom YAML frontmatter parsing via `extract_frontmatter()` is fragile — UTF-8 BOM, multiple `### Review Findings` sections, placeholder in code blocks cause false positives/negatives. Not caused by this change; applies to all frontmatter-based gates.
 - Smoke arm has no per-gate timeout; a hanging gate blocks indefinitely. CI default timeout applies; code-level timeout is a future hardening item.
 - `cargo public-api --diff` verification not cited in Completion Notes despite being an AC5 requirement. Likely done but not recorded.
+
+## Deferred from: code review of 7-2-ship-end-to-end-registry-publish-install-yank-and-air-gapped-import (2026-05-29)
+
+- W1: Test temp files never cleaned up in 4 test files under `crates/maos-spirit-cli/tests/` — test-only, no production impact, follows existing codebase pattern
+- W2: `extract_toml_kv` prefix match latent fragility in `signing.rs` — currently safe due to `=` check, would only matter if manifest keys share prefixes
+- W3: `epoch_to_components` month overflow with extreme timestamps in `yank.rs` — theoretical, can't happen with valid SystemTime values
+- W4: `yank_cursor_persistence_test.rs` as separate file vs inline — behavioral coverage exists inline in `yank.rs::cursor_tests`, file placement is cosmetic
+- W5: `cargo public-api --diff` not run — verification step, not a code issue (already captured as dev RF-9)
+- W6: Unrecognized tar entries silently discarded without warning in `import.rs` — minor, matches common tar tooling behavior

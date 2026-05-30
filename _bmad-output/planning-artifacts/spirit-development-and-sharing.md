@@ -1463,3 +1463,19 @@ If the Spirit you want to build doesn't exist yet, that's the best reason to bui
 Ship something small this week. Tune it next week. Publish it when you're ready.
 
 — *Paige*
+
+---
+
+## Appendix — Story 7.2 v1.0 binding (publish → install → yank → air-gap import)
+
+The v1.0 binding ships the full Spirit-author → operator round-trip as four pieces that compose:
+
+1. **`maos-spirit publish --tier=<tier>` (FR35).** The author-side CLI lives at `crates/maos-spirit-cli/`. It reads the manifest + artifact, signs `sha256(manifest_toml || artifact_bytes)` with the publisher's Ed25519 key (loaded via `--signing-key <pem-or-hex-path>`, `--signing-key-env <var>`, or `~/.config/maos/spirit-signing.key`), auto-populates a self-attested ComplianceClaim envelope from the manifest's structural fields (override with `--compliance-claim <cbor-or-json>`), and dispatches `registry.publish` via the operator-configured registry URI. `--dry-run` prints the would-be SignedPackage JSON without dispatching — useful for CI testing. Tier must be `local | org_internal | public_untrusted`; `public_vetted` is rejected per FR37 v2.5 deferral.
+
+2. **`maos-cli registry install` (FR36, Story 5.5d).** Operators install signed Spirits via the kernel-side `admit_spirit` path. Story 7.2 makes the consumer side cross-verify the registry's reported trust tier against the manifest-declared tier (closes the Story 5.5d High `[edge]` carry-forward): `SignedManifest.server_reported_tier` + `server_signature_on_tier` are additive `Option` fields; operators flip `[registry].require_server_tier_signature = true` to enforce strict cross-verification.
+
+3. **FR59 ≤5min yank propagation.** The `YankPoller` (`crates/maos-registry/src/yank.rs`) polls `registry.yanks_since` on a configurable 5-min cadence (`MAOS_REGISTRY_YANK_POLL_INTERVAL_S`, clamped `[30s, 3600s]`). Story 7.2 adds the production loop body `yank_poller_production_loop` (feature-gated `production_yank_poller`), cross-restart cursor persistence (`~/.local/share/maos/registry/yank_cursor.json` — closes 5.5d Low #32), and a mechanical FR59 latency assertion test that drives the poller against a virtual clock.
+
+4. **`maosctl import --offline <signed-bundle.tar>` (FR60).** Air-gapped operators import via a tar bundle carrying `signed-package.json` (authoritative) + `manifest.toml` (operator-inspection extract) + `artifact.bin` (operator-inspection extract) + optional `vetter-attestations/` + `compliance-claims/` directories. The import path verifies per-file consistency (rejects with `EImportBundleInconsistent { file }` on divergence) and admits the bundle through the SAME `admit_spirit` code path network installs use, emitting `FrameKind::SpiritImported = 26` for audit distinguishability. `--force-tier` requires `[registry].allow_force_tier_at_import = true`; `--dry-run` prints the admission decision without persisting.
+
+The Layer-1.5 observability bridge is the `MAOS_ONE_SHOT=smoke-registry-7-2` arm at `crates/maos-bin/src/main.rs` — a runnable 9-step JSON-line demonstration of the v1.0 round-trip. CI gates `smoke-registry-7-2`, `fr59-yank-propagation-5min`, and `air-gap-import-corpus` enforce the binding on every PR.

@@ -77,6 +77,8 @@ pub enum FrameKindLabel {
     GatewayInbound,
     /// Story 6.5 — FR54: outbound message to external gateway.
     GatewayOutbound,
+    /// Story 7.2 — FR60: Spirit admitted via air-gapped `maosctl import --offline`.
+    SpiritImported,
 }
 
 impl LogRecallFilter {

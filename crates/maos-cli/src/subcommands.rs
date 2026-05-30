@@ -7,9 +7,10 @@ use std::process::ExitCode;
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
-    AuditFormat, AuditQuery, HaltArgs, HaltOp, InstallArgs, OrchestratorArgs, OrchestratorOp,
-    PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs, RevocationsArgs,
-    RevocationsOp, RevokeTokenArgs, RunArgs, SpiritArgs, SpiritOp, Subcommand, UpgradePolicyArg,
+    AuditFormat, AuditQuery, HaltArgs, HaltOp, ImportArgs, InstallArgs, OrchestratorArgs,
+    OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs,
+    RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SpiritArgs, SpiritOp, Subcommand,
+    UpgradePolicyArg,
 };
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
@@ -29,7 +30,125 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::RevokeToken(args) => dispatch_revoke_token(args, color),
         Subcommand::Spirit(args) => dispatch_spirit(args, color),
         Subcommand::Revocations(args) => dispatch_revocations(args, color),
+        Subcommand::Import(args) => dispatch_import(args, color),
     }
+}
+
+fn dispatch_import(args: &ImportArgs, _color: ColorChoice) -> ExitCode {
+    // TODO: registry_uri is parsed by clap but not yet wired to storage location.
+    // The LocalFsRegistryStorage uses a fixed default path; custom URI override
+    // is deferred to v0.7+. Log a warning if the user provided one.
+    if args.registry_uri.is_some() {
+        eprintln!("maosctl import: warning: --registry-uri is not yet implemented ( Story 7.2 v1.0); ignored");
+    }
+    use maos_registry::admission::{admit_spirit, AdmissionConfig};
+    use maos_registry::import;
+    use maos_registry::origin::RegistryOrigin;
+    use maos_registry::storage::{LocalFsRegistryStorage, RegistryStorage};
+    use maos_registry::TrustTier;
+
+    // 1. Extract bundle.
+    let bundle = match import::extract_bundle(&args.offline) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("maosctl import: extract failed: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    // 2. Verify per-file consistency.
+    if let Err(e) = import::verify_bundle_consistency(&bundle) {
+        eprintln!("maosctl import: bundle inconsistent: {e}");
+        return ExitCode::from(1);
+    }
+
+    // 3. Build admission config.
+    // Air-gapped imports default to Local tier unless --force-tier is used
+    // and the operator policy allows it.
+    let registry_origin_tier = if let Some(tier_str) = &args.force_tier {
+        // Verify operator policy allows force-tier override.
+        let policy_ok = std::env::var("MAOS_REGISTRY_ALLOW_FORCE_TIER_AT_IMPORT")
+            .map(|v| v.to_lowercase() == "true" || v == "1")
+            .unwrap_or(false);
+        if !policy_ok {
+            eprintln!("maosctl import: --force-tier requires MAOS_REGISTRY_ALLOW_FORCE_TIER_AT_IMPORT=true");
+            return ExitCode::from(1);
+        }
+        match tier_str.as_str() {
+            "local" => TrustTier::Local,
+            "org_internal" => TrustTier::OrgInternal,
+            "public_untrusted" => TrustTier::PublicUntrusted,
+            other => {
+                eprintln!("maosctl import: unrecognized tier '{other}'");
+                return ExitCode::from(1);
+            }
+        }
+    } else {
+        TrustTier::Local // FR60: air-gapped imports are local-tier
+    };
+
+    let op_cfg = AdmissionConfig {
+        tier_floor: TrustTier::Local,
+        registry_origin_tier,
+        t3_for_public_untrusted: false,
+        allow_unsigned_local: true,
+        org_signing_pubkey: None,
+    };
+
+    // 4. Admit the Spirit.
+    let decision = match admit_spirit(&bundle.signed_package, &op_cfg) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("maosctl import: admission failed: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    // 5. Persist to local storage.
+    if !args.dry_run {
+        let storage = match LocalFsRegistryStorage::new() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("maosctl import: storage init failed: {e}");
+                return ExitCode::from(1);
+            }
+        };
+        let origin = RegistryOrigin::Imported {
+            bundle_sha256: bundle.bundle_sha256.clone(),
+        };
+        if let Err(e) = storage.publish_with_origin(
+            &bundle.signed_package.spirit_id,
+            &bundle.signed_package.version,
+            &bundle.signed_package,
+            &origin,
+        ) {
+            eprintln!("maosctl import: persist failed: {e}");
+            return ExitCode::from(1);
+        }
+    }
+
+    let summary = serde_json::json!({
+        "outcome": if args.dry_run { "dry_run" } else { "imported" },
+        "spirit_id": bundle.signed_package.spirit_id.as_str(),
+        "version": bundle.signed_package.version,
+        "bundle_sha256": bundle.bundle_sha256,
+        "manifest_bytes": bundle.signed_package.manifest_toml.len(),
+        "artifact_bytes": bundle.signed_package.artifact_bytes.len(),
+        "vetter_attestations": bundle.vetter_attestations.len(),
+        "supplementary_claims": bundle.supplementary_claims.len(),
+        "force_tier": args.force_tier,
+        "registry_uri": args.registry_uri,
+        "effective_tier": format!("{:?}", decision.effective_tier),
+        "sandbox_tier_floor": format!("{:?}", decision.sandbox_tier_floor),
+    });
+    println!(
+        "{}",
+        serde_json::to_string(&summary).unwrap_or_else(|e| {
+            eprintln!("maosctl import: failed to serialize summary: {e}");
+            "{}".into()
+        })
+    );
+    ExitCode::SUCCESS
 }
 
 fn run(args: &RunArgs, _color: ColorChoice) -> ExitCode {

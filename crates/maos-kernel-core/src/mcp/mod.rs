@@ -21,7 +21,7 @@ use crate::telemetry::iac_rt::{IacRtMetrics, Outcome, Service};
     reason = "mcp-client adapter aggregate; holds Arc references to wire-level client + audit infrastructure"
 )]
 pub struct McpClientAdapter {
-    client: Arc<maos_mcp::McpClient>,
+    client: Arc<dyn maos_mcp::McpClient + Send + Sync>,
     capability: Arc<CapabilityRegistryAdapter>,
     transparency_log: Arc<TransparencyLogAdapter>,
     telemetry: Arc<IacRtMetrics>,
@@ -29,7 +29,7 @@ pub struct McpClientAdapter {
 
 impl McpClientAdapter {
     pub fn new(
-        client: Arc<maos_mcp::McpClient>,
+        client: Arc<dyn maos_mcp::McpClient + Send + Sync>,
         capability: Arc<CapabilityRegistryAdapter>,
         transparency_log: Arc<TransparencyLogAdapter>,
         telemetry: Arc<IacRtMetrics>,
@@ -203,7 +203,7 @@ mod tests {
         );
 
         let client = Arc::new(
-            maos_mcp::McpClient::new(
+            maos_mcp::McpClientImpl::new(
                 transports,
                 maos_domain::ports::mcp::McpTransportId::StreamableHttp,
                 servers,
@@ -347,7 +347,7 @@ mod tests {
             },
         );
         let client = Arc::new(
-            maos_mcp::McpClient::new(
+            maos_mcp::McpClientImpl::new(
                 transports,
                 maos_domain::ports::mcp::McpTransportId::StreamableHttp,
                 servers,

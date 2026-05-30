@@ -133,6 +133,15 @@ impl SearchResults {
 }
 
 /// Signed manifest fetched from the registry.
+///
+/// Story 7.2 (closes 5.5d High [edge] `defer`) added the optional
+/// `server_reported_tier` + `server_signature_on_tier` fields so the
+/// kernel-side caller can cross-verify the manifest-declared trust tier
+/// against the server's reported tier. Both fields are `Option` and
+/// `#[serde(default)]` so the v0.5→v1.0 migration window tolerates servers
+/// that have not yet been upgraded — when operators flip
+/// `[registry].require_server_tier_signature = true` the caller treats
+/// missing fields as `RegistryError::ServerTierSignatureRequired`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignedManifest {
     #[doc = "Construct via [`SignedManifest::new`]."]
@@ -145,6 +154,10 @@ pub struct SignedManifest {
     pub signature: [u8; 64],
     #[doc = "Construct via [`SignedManifest::new`] — signer's Ed25519 public key (32 bytes)."]
     pub signer_pubkey: [u8; 32],
+    #[doc = "Story 7.2 (additive) — server-reported trust tier for consumer-side cross-verification."]
+    pub server_reported_tier: Option<TrustTier>,
+    #[doc = "Story 7.2 (additive) — server's Ed25519 signature over `(spirit_id || version || tier_byte)`."]
+    pub server_signature_on_tier: Option<[u8; 64]>,
 }
 
 impl SignedManifest {
@@ -161,7 +174,22 @@ impl SignedManifest {
             manifest_toml,
             signature,
             signer_pubkey,
+            server_reported_tier: None,
+            server_signature_on_tier: None,
         }
+    }
+
+    /// Story 7.2 — construct a SignedManifest WITH the server-reported tier
+    /// metadata populated. Server-side handlers (registry.manifest) call
+    /// this; client-side cross-verification consumes the populated fields.
+    pub fn with_server_tier(
+        mut self,
+        server_reported_tier: TrustTier,
+        server_signature_on_tier: [u8; 64],
+    ) -> Self {
+        self.server_reported_tier = Some(server_reported_tier);
+        self.server_signature_on_tier = Some(server_signature_on_tier);
+        self
     }
 }
 
@@ -391,6 +419,32 @@ pub enum RegistryError {
 
     #[error("public_vetted trust tier deferred per FR37 to v2.5")]
     PublicVettedDeferred,
+
+    #[error(
+        "consumer-side trust-tier server-side cross-check failed: manifest='{manifest_tier:?}', server-reported='{server_reported_tier:?}'"
+    )]
+    TrustTierServerMismatch {
+        manifest_tier: TrustTier,
+        server_reported_tier: TrustTier,
+    },
+
+    #[error(
+        "consumer-side trust-tier server-side signature missing or invalid: {reason} (operator requires `[registry].require_server_tier_signature=true`)"
+    )]
+    ServerTierSignatureRequired {
+        reason: String,
+    },
+
+    #[error(
+        "server-reported tier '{server_reported:?}' exceeds operator floor '{operator_floor:?}'"
+    )]
+    TierFloorViolation {
+        server_reported: TrustTier,
+        operator_floor: TrustTier,
+    },
+
+    #[error("server tier signature invalid — possible tampering or wrong org key")]
+    ServerTierSignatureInvalid,
 }
 
 // ---------------------------------------------------------------------------
@@ -401,12 +455,18 @@ pub enum RegistryError {
 impl serde::Serialize for SignedManifest {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("SignedManifest", 5)?;
+        let mut state = serializer.serialize_struct("SignedManifest", 7)?;
         state.serialize_field("spirit_id", &self.spirit_id)?;
         state.serialize_field("version", &self.version)?;
         state.serialize_field("manifest_toml", &self.manifest_toml)?;
         state.serialize_field("signature", &hex::encode(&self.signature[..]))?;
         state.serialize_field("signer_pubkey", &hex::encode(&self.signer_pubkey[..]))?;
+        state.serialize_field("server_reported_tier", &self.server_reported_tier)?;
+        let server_sig_hex = self
+            .server_signature_on_tier
+            .as_ref()
+            .map(|s| hex::encode(&s[..]));
+        state.serialize_field("server_signature_on_tier", &server_sig_hex)?;
         state.end()
     }
 }
@@ -414,12 +474,17 @@ impl serde::Serialize for SignedManifest {
 impl<'de> serde::Deserialize<'de> for SignedManifest {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct Helper {
             spirit_id: SpiritId,
             version: String,
             manifest_toml: Vec<u8>,
             signature: String,
             signer_pubkey: String,
+            #[serde(default)]
+            server_reported_tier: Option<TrustTier>,
+            #[serde(default)]
+            server_signature_on_tier: Option<String>,
         }
         let h = Helper::deserialize(deserializer)?;
         let signature = hex::decode(&h.signature)
@@ -440,12 +505,41 @@ impl<'de> serde::Deserialize<'de> for SignedManifest {
                     v.len()
                 ))
             })?;
+        // Enforce invariant: both server_reported_tier and server_signature_on_tier
+        // must be present together, or both absent.
+        let server_signature_on_tier = match (h.server_reported_tier, h.server_signature_on_tier) {
+            (None, None) => None,
+            (Some(_), None) => {
+                return Err(serde::de::Error::custom(
+                    "server_reported_tier present but server_signature_on_tier absent — pair must be provided together"
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(serde::de::Error::custom(
+                    "server_signature_on_tier present but server_reported_tier absent — pair must be provided together"
+                ));
+            }
+            (Some(_), Some(s)) => {
+                let bytes = hex::decode(&s).map_err(|e| {
+                    serde::de::Error::custom(format!("server_signature_on_tier hex decode: {e}"))
+                })?;
+                let arr: [u8; 64] = bytes.try_into().map_err(|v: Vec<u8>| {
+                    serde::de::Error::custom(format!(
+                        "expected 64-byte server_signature_on_tier, got {} bytes",
+                        v.len()
+                    ))
+                })?;
+                Some(arr)
+            }
+        };
         Ok(SignedManifest {
             spirit_id: h.spirit_id,
             version: h.version,
             manifest_toml: h.manifest_toml,
             signature,
             signer_pubkey,
+            server_reported_tier: h.server_reported_tier,
+            server_signature_on_tier,
         })
     }
 }

@@ -111,6 +111,8 @@ Dependencies point inward (adapter ring → kernel services → domain core), wi
 
 **Workspace member count (post Story 7.1):**<!-- workspace-count-authoritative --> Story 7.1 adds `templates/spirit-ts/` (excluded from `[workspace] members` per Story 2.3 precedent), `examples/example-spirit-ts/` (Node project, NOT a Cargo workspace member), and `sdks/spirit-ts/` (Node package, NOT a Cargo workspace member). The Cargo workspace member count stays at **27** (post-Epic-6.5 baseline). Story 7.1 introduces non-Cargo workspace members built via `tsc`; the `check-workspace-count` gate stays at 27.
 
+**Workspace member count (post Story 7.2):** Story 7.2 adds `crates/maos-spirit-cli/` (the FR35 producer-side publish CLI binary). The Cargo workspace member count moves to **29** (the pre-Story-7.1 baseline 27 + `examples/example-spirit` confirmed counted = 28 → +1 for `maos-spirit-cli` = 29). The `check-workspace-count` gate floor moves to 29.
+
 **`spirit_test` feature on `maos-spirit-sdk` (post Story 2.4):** The crate gains an opt-in `spirit_test` cargo feature (depends on `local_runner` + `std` + `mock`) gating a new `crates/maos-spirit-sdk/src/spirit_test/` module that ships the SDK seed (assertion macros + IAC frame I/O capture + halt resolution simulator + manifest self-check + class-specific regression corpus skeleton + cross-Spirit isolation framework hooks). Workspace member count stays at **21** — the new module is feature-gated inside the existing crate, not a new workspace member.
 
 ### 4.0.3 Service dependency map

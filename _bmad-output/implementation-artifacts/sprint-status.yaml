@@ -1,4 +1,4 @@
-last_updated: '2026-05-29T00:00:00Z+7-1-5-code-review-complete-split-flip'
+last_updated: '2026-05-29T00:00:00Z+7-2-implementation-landed-review'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -70,7 +70,7 @@ development_status:
   epic-7: in-progress
   7-1-full-cargo-generate-per-language-full-spirit-test-sdk-with-assertion-macros: done
   7-1-5-section-a2-step-3-closure-17-review-findings-25-dev-model-backfills-hard-fail-flip: done
-  7-2-ship-end-to-end-registry-publish-install-yank-and-air-gapped-import: backlog
+  7-2-ship-end-to-end-registry-publish-install-yank-and-air-gapped-import: done
   7-3-verify-complianceclaim-envelopes-at-admission-with-the-ccac-n-600-ship-gate: backlog
   7-4-author-skills-and-propose-revisions-with-output-shape-fail-loud: backlog
   7-5a-publish-and-enforce-v1-0-abi-stability-commitments: backlog

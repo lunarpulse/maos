@@ -222,7 +222,10 @@ fn strictest_of(
 }
 
 /// Extract the trust tier declared in a manifest TOML.
-fn extract_manifest_tier(manifest_toml: &[u8]) -> TrustTier {
+///
+/// Story 7.2 made this `pub` for `maos-spirit-cli` to use during the
+/// `publish --tier` flag's manifest-tier cross-check.
+pub fn extract_manifest_tier(manifest_toml: &[u8]) -> TrustTier {
     let text = String::from_utf8_lossy(manifest_toml);
     for line in text.lines() {
         let trimmed = line.trim();
@@ -243,13 +246,17 @@ fn extract_manifest_tier(manifest_toml: &[u8]) -> TrustTier {
     TrustTier::Local
 }
 
-/// Verify the publisher's Ed25519 signature over `sha256(manifest_toml || artifact_bytes)`.
-fn verify_publisher_sig(pkg: &SignedPackage) -> bool {
+/// Verify the publisher's Ed25519 signature over `sha256(manifest_len_u64 || manifest_toml || artifact_len_u64 || artifact_bytes)`.
+/// Domain-separated to prevent collision attacks (Story 7.2 fix).
+/// Uses u64::to_le_bytes for cross-arch compatibility.
+pub fn verify_publisher_sig(pkg: &SignedPackage) -> bool {
     use ring::signature::{UnparsedPublicKey, ED25519};
     use sha2::Digest;
 
     let mut hasher = sha2::Sha256::new();
+    hasher.update(&(pkg.manifest_toml.len() as u64).to_le_bytes());
     hasher.update(&pkg.manifest_toml);
+    hasher.update(&(pkg.artifact_bytes.len() as u64).to_le_bytes());
     hasher.update(&pkg.artifact_bytes);
     let msg = hasher.finalize();
 
@@ -438,7 +445,9 @@ mod tests {
     }
 
     /// Build a SignedPackage with a real Ed25519 signature over
-    /// sha256(manifest_toml || artifact_bytes).
+    /// sha256(manifest_len_u64 || manifest_toml || artifact_len_u64 || artifact_bytes).
+    /// Domain-separated to prevent collision attacks (Story 7.2 fix).
+    /// Uses u64::to_le_bytes for cross-arch compatibility.
     fn signed_pkg_with(
         spirit_id: &str,
         version: &str,
@@ -453,7 +462,10 @@ mod tests {
         );
         let artifact = b"binary".to_vec();
         let mut hasher = sha2::Sha256::new();
-        hasher.update(manifest.as_bytes());
+        let manifest_bytes = manifest.as_bytes();
+        hasher.update(&(manifest_bytes.len() as u64).to_le_bytes());
+        hasher.update(manifest_bytes);
+        hasher.update(&(artifact.len() as u64).to_le_bytes());
         hasher.update(&artifact);
         let msg = hasher.finalize();
         let sig = keypair.sign(&msg);
@@ -528,9 +540,13 @@ mod tests {
             signing_alg: SigningAlg::Ed25519,
         };
 
-        // Package signature over sha256(manifest || artifact)
+        // Package signature over sha256(manifest_len_u64 || manifest || artifact_len_u64 || artifact)
+        // Domain-separated to prevent collision attacks (Story 7.2 fix).
         let mut h = sha2::Sha256::new();
-        h.update(manifest.as_bytes());
+        let manifest_bytes = manifest.as_bytes();
+        h.update(&(manifest_bytes.len() as u64).to_le_bytes());
+        h.update(manifest_bytes);
+        h.update(&(artifact.len() as u64).to_le_bytes());
         h.update(&artifact);
         let msg = h.finalize();
         let pkg_sig = keypair.sign(&msg);
@@ -669,9 +685,11 @@ mod tests {
             signing_alg: SigningAlg::Ed25519,
         };
 
-        // Valid pkg signature
+        // Valid pkg signature (domain-separated hash per Story 7.2 fix)
         let mut h = sha2::Sha256::new();
+        h.update(&(manifest.len() as u64).to_le_bytes());
         h.update(manifest);
+        h.update(&(artifact.len() as u64).to_le_bytes());
         h.update(&artifact);
         let msg = h.finalize();
         let pkg_sig = kp.sign(&msg);

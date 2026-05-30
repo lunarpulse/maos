@@ -49,6 +49,15 @@ pub trait RegistryStorage: Send + Sync {
 
     /// List yanks since a given monotonic timestamp.
     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError>;
+
+    /// Story 7.2 — store a signed package with origin metadata.
+    fn publish_with_origin(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+        pkg: &SignedPackage,
+        origin: &crate::origin::RegistryOrigin,
+    ) -> Result<(), StorageError>;
 }
 
 /// Filesystem-backed registry storage using `~/.local/share/maos/registry/`.
@@ -136,6 +145,22 @@ impl LocalFsRegistryStorage {
     }
 }
 
+impl LocalFsRegistryStorage {
+    fn write_origin(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+        origin: &crate::origin::RegistryOrigin,
+    ) -> Result<(), StorageError> {
+        let vdir = self.version_dir(spirit_id, version);
+        let origin_json = serde_json::to_vec_pretty(origin)
+            .map_err(|e| StorageError::Serde(e.to_string()))?;
+        fs::write(vdir.join("origin.json"), &origin_json)
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        Ok(())
+    }
+}
+
 impl RegistryStorage for LocalFsRegistryStorage {
     fn put(&self, spirit_id: &SpiritId, version: &str, pkg: &SignedPackage) -> Result<(), StorageError> {
         let vdir = self.version_dir(spirit_id, version);
@@ -155,7 +180,7 @@ impl RegistryStorage for LocalFsRegistryStorage {
 
         // Update index
         let index_snapshot = {
-            let mut idx = self.index.lock().unwrap();
+            let mut idx = self.index.lock().map_err(|e| StorageError::Io(format!("index lock poisoned: {e}")))?;
             let items = idx
                 .entry(spirit_id.as_str().to_string())
                 .or_default();
@@ -170,6 +195,17 @@ impl RegistryStorage for LocalFsRegistryStorage {
         Self::save_index_data(&self.root, &index_snapshot);
 
         Ok(())
+    }
+
+    fn publish_with_origin(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+        pkg: &SignedPackage,
+        origin: &crate::origin::RegistryOrigin,
+    ) -> Result<(), StorageError> {
+        self.put(spirit_id, version, pkg)?;
+        self.write_origin(spirit_id, version, origin)
     }
 
     fn get_manifest(&self, spirit_id: &SpiritId, version: &str) -> Result<SignedManifest, StorageError> {
@@ -214,31 +250,38 @@ impl RegistryStorage for LocalFsRegistryStorage {
     }
 
     fn search(&self, q: &SearchQuery) -> Result<SearchResults, StorageError> {
-        let idx = self.index.lock().unwrap();
         let query_lower = q.text.to_lowercase();
-
         if query_lower.is_empty() {
             return Ok(SearchResults::new(Vec::new()));
         }
 
-        // Collect matching items across all spirits
+        // Story 7.2 (closes 5.5d Low #28) — snapshot yanks ONCE outside the index
+        // lock so we don't re-acquire the yanks Mutex inside the index walk.
+        // Pre-7.2: holding `idx` while repeatedly locking `yanks` produced O(N×M)
+        // contention; the snapshot reduces it to O(N) + O(1) yanks lock acquisitions.
+        let yanks_snapshot: Vec<YankEntry> = if !q.include_yanked {
+            self.yanks.lock().map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?.clone()
+        } else {
+            Vec::new()
+        };
+
+        let idx = self.index.lock().map_err(|e| StorageError::Io(format!("index lock poisoned: {e}")))?.clone();
         let mut all_items: Vec<SearchResultItem> = Vec::new();
         for items in idx.values() {
             for item in items {
                 let matches = item.spirit_id.as_str().to_lowercase().contains(&query_lower);
-                if matches {
-                    // Check if yanked
-                    if !q.include_yanked {
-                        let yanks = self.yanks.lock().unwrap();
-                        let is_yanked = yanks.iter().any(|y| {
-                            y.spirit_id == item.spirit_id && y.version == item.version
-                        });
-                        if is_yanked {
-                            continue;
-                        }
-                    }
-                    all_items.push(item.clone());
+                if !matches {
+                    continue;
                 }
+                if !q.include_yanked {
+                    let is_yanked = yanks_snapshot
+                        .iter()
+                        .any(|y| y.spirit_id == item.spirit_id && y.version == item.version);
+                    if is_yanked {
+                        continue;
+                    }
+                }
+                all_items.push(item.clone());
             }
         }
 
@@ -258,7 +301,7 @@ impl RegistryStorage for LocalFsRegistryStorage {
         );
 
         let yanks_snapshot = {
-            let mut yanks = self.yanks.lock().unwrap();
+            let mut yanks = self.yanks.lock().map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?;
             yanks.push(entry);
             yanks.clone()
         };
@@ -268,7 +311,7 @@ impl RegistryStorage for LocalFsRegistryStorage {
     }
 
     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError> {
-        let yanks = self.yanks.lock().unwrap();
+        let yanks = self.yanks.lock().map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?;
         let entries: Vec<YankEntry> = yanks
             .iter()
             .filter(|e| e.yanked_at_ns >= since_ns)

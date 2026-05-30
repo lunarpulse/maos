@@ -52,6 +52,8 @@ pub struct SpiritRegistryServer {
     storage: Arc<dyn RegistryStorage>,
     listen_addr: String,
     org_pubkey: Option<[u8; 32]>,
+    /// Story 7.2 — Ed25519 signing key for server-side tier attestation.
+    server_signing_key: Option<[u8; 32]>,
     shutdown: AtomicBool,
 }
 
@@ -66,8 +68,15 @@ impl SpiritRegistryServer {
             storage,
             listen_addr,
             org_pubkey,
+            server_signing_key: None,
             shutdown: AtomicBool::new(false),
         }
+    }
+
+    /// Story 7.2 — attach an Ed25519 signing key for server-side tier attestation.
+    pub fn with_server_signing_key(mut self, key: [u8; 32]) -> Self {
+        self.server_signing_key = Some(key);
+        self
     }
 
     /// Block on the HTTP listener.  On SIGTERM, clean exit.
@@ -78,6 +87,7 @@ impl SpiritRegistryServer {
         eprintln!("maos-registry: listening on {}", addr);
 
         let storage = self.storage;
+        let server_signing_key = self.server_signing_key;
         let _ = &self.org_pubkey;
 
         listener.set_nonblocking(true).ok();
@@ -91,7 +101,7 @@ impl SpiritRegistryServer {
                 Ok((stream, _)) => {
                     let s = Arc::clone(&storage);
                     handles.push(thread::spawn(move || {
-                        let _ = handle_connection(s, stream);
+                        let _ = handle_connection(s, server_signing_key, stream);
                     }));
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -114,6 +124,7 @@ impl SpiritRegistryServer {
 /// Handle a single TCP connection — read one JSON-RPC request, dispatch, respond.
 fn handle_connection(
     storage: Arc<dyn RegistryStorage>,
+    server_signing_key: Option<[u8; 32]>,
     mut stream: TcpStream,
 ) -> Result<(), Box<dyn std::error::Error>> {
     stream
@@ -215,7 +226,7 @@ fn handle_connection(
             "registry.manifest" => {
                 let args: ManifestArgs = serde_json::from_value(params.clone())
                     .map_err(|e| format!("invalid params: {e}"))?;
-                handlers::manifest::handle_manifest(&storage, &args)
+                handlers::manifest::handle_manifest(&storage, &args, server_signing_key.as_ref())
             }
             "registry.artifact" => {
                 let args: ArtifactArgs = serde_json::from_value(params.clone())

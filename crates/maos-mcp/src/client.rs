@@ -17,13 +17,13 @@ use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse
 use crate::transport::{McpTransport, McpTransportError};
 
 /// MCP client — holds a map of transports and a map of server entries.
-pub struct McpClient {
+pub struct McpClientImpl {
     transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>>,
     default_transport: McpTransportId,
     servers: BTreeMap<String, McpServerEntry>,
 }
 
-impl std::fmt::Debug for McpClient {
+impl std::fmt::Debug for McpClientImpl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("McpClient")
             .field("default_transport", &self.default_transport)
@@ -40,8 +40,8 @@ pub struct McpServerEntry {
     pub fallback_transport: Option<McpTransportId>,
 }
 
-impl McpClient {
-    #[doc = "Construct a new [`McpClient`] with the given transports, default transport, and server entries."]
+impl McpClientImpl {
+    #[doc = "Construct a new [`McpClientImpl`] with the given transports, default transport, and server entries."]
     pub fn new(
         transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>>,
         default_transport: McpTransportId,
@@ -148,9 +148,9 @@ mod tests {
     fn build_client(
         servers: BTreeMap<String, McpServerEntry>,
         transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>>,
-    ) -> McpClient {
+    ) -> McpClientImpl {
         let default = transports.keys().next().cloned().unwrap();
-        McpClient::new(transports, default, servers).unwrap()
+        McpClientImpl::new(transports, default, servers).unwrap()
     }
 
     #[test]
@@ -321,7 +321,7 @@ mod tests {
         let mut transports = BTreeMap::new();
         transports.insert(McpTransportId::StreamableHttp, t as Arc<dyn McpTransport>);
 
-        let client = McpClient::new(transports, McpTransportId::StreamableHttp, servers).unwrap();
+        let client = McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers).unwrap();
         let err = client.call("svc", "echo", json!({})).unwrap_err();
         assert!(matches!(err, McpError::Transport(_)));
         assert!(err.to_string().contains("not registered"));
@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn call_with_unconfigured_transport_returns_unconfigured() {
-        let err = McpClient::new(
+        let err = McpClientImpl::new(
             BTreeMap::new(),
             McpTransportId::StreamableHttp,
             BTreeMap::new(),

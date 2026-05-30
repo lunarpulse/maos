@@ -97,6 +97,11 @@ pub enum Subcommand {
     Spirit(SpiritArgs),
     /// Revocation management — import signed CRLs, list applied CRLs (Story 5.4).
     Revocations(RevocationsArgs),
+    /// Story 7.2 (FR60) — import a signed Spirit bundle from offline media
+    /// (air-gapped operator path). Verifies the Ed25519 signing chain and
+    /// admits the Spirit through the same Story 5.5d admission code path
+    /// network installs use.
+    Import(ImportArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -339,6 +344,31 @@ pub enum UpgradePolicyArg {
     HotSwap,
     ColdSwap,
     Migrator,
+}
+
+/// Story 7.2 (FR60) — `maosctl import --offline` subcommand args.
+#[derive(clap::Args, Debug)]
+pub struct ImportArgs {
+    /// Path to the `.tar` offline bundle produced by `maos-spirit publish
+    /// --offline-bundle` (uncompressed tar; gzip/zstd is v0.7+).
+    #[arg(long)]
+    pub offline: std::path::PathBuf,
+
+    /// Override the default registry URI. The admission decision targets
+    /// local storage regardless; this only customizes where the import is
+    /// recorded for downstream tooling.
+    #[arg(long)]
+    pub registry_uri: Option<String>,
+
+    /// Force the effective trust tier. Requires
+    /// `[registry].allow_force_tier_at_import = true` in operator.toml
+    /// (default false).
+    #[arg(long)]
+    pub force_tier: Option<String>,
+
+    /// Verify-only mode: print the would-be admission decision and exit.
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
 }
 
 /// Revocations subcommands.

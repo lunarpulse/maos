@@ -143,6 +143,29 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
         results.push(check_7_1_5_xtask_check_dmu_absent());
         results.push(check_7_1_5_discipline_job_count());
     }
+    let is_story_7_2 = matches!(story_arg, Some("7.2"));
+    if is_story_7_2 {
+        // 19 row classifications per Story 7.2 AC1 §Bridge-Preconditions.
+        results.push(check_7_2_7_1_done());
+        results.push(check_7_2_7_1_5_done());
+        results.push(check_7_2_a1_p1_p5().map_err(|e| format!("7.2-A1 error: {}", e))?);
+        results.push(check_7_2_a2_step3_hard_fail());
+        results.push(check_7_2_a3());
+        results.push(check_7_2_a4());
+        results.push(check_7_2_5_5d_inventory().map_err(|e| format!("7.2-5.5d-INV error: {}", e))?);
+        results.push(check_7_2_5_5d_rf_23_closure());
+        results.push(check_7_2_5_5d_rf_28_closure());
+        results.push(check_7_2_5_5d_rf_32_closure());
+        results.push(check_7_2_5_5d_rf_high_edge_closure());
+        results.push(check_7_2_maos_registry_baseline().map_err(|e| format!("7.2-MR-BASELINE error: {}", e))?);
+        results.push(check_7_2_maos_spirit_cli_baseline());
+        results.push(check_7_2_maosctl_import_baseline());
+        results.push(check_7_2_framekind_spirit_imported_baseline().map_err(|e| format!("7.2-FK-BASELINE error: {}", e))?);
+        results.push(check_7_2_yank_poller_not_wired_baseline().map_err(|e| format!("7.2-YP-BASELINE error: {}", e))?);
+        results.push(check_7_2_workspace_count());
+        results.push(check_7_2_discipline_job_count());
+        results.push(check_7_2_cargo_public_api_clean());
+    }
 
     // 6.1 rows: failure on any 6.1 row blocks the gate (legacy behavior).
     // 6.2 extension rows: only blocking_6_2 rows (D-2.10, D-4, A3 blocking) gate
@@ -151,7 +174,35 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
     // 6.3 extension rows: only blocking_6_3 rows gate. Per Story 6.3 AC1 §Bridge-Preconditions:
     //   blocking_6_3 = §A3/§A5/§A6 gates SHIPPED (existence). All other 6.3 rows are
     //   verify-only / carry-forward per the table.
-    let all_pass = if is_story_7_1_5 {
+    let all_pass = if is_story_7_2 {
+        // Story 7.2 spec: command exits 0 only if every `blocking_7_2` row has cleared.
+        // Blocking rows (substrate canvas confirmations):
+        //   * 7.2-7.1-DONE
+        //   * 7.2-7.1.5-DONE
+        //   * 7.2-MAOS-REGISTRY-BASELINE
+        //   * 7.2-MAOS-SPIRIT-CLI-BASELINE
+        //   * 7.2-MAOSCTL-IMPORT-BASELINE
+        //   * 7.2-FRAMEKIND-SPIRIT-IMPORTED-BASELINE
+        //   * 7.2-YANK-POLLER-NOT-WIRED-BASELINE
+        // blocking_7_2_closure rows (5.5d carry-forwards closed BY AC4/AC5) are
+        // tracked as verify-only at AC1 open — they clear at AC4/AC5 land.
+        results.iter().all(|r: &CheckResult| {
+            if matches!(
+                r.id.as_str(),
+                "7.2-7.1-DONE"
+                    | "7.2-7.1.5-DONE"
+                    | "7.2-MAOS-REGISTRY-BASELINE"
+                    | "7.2-MAOS-SPIRIT-CLI-BASELINE"
+                    | "7.2-MAOSCTL-IMPORT-BASELINE"
+                    | "7.2-FRAMEKIND-SPIRIT-IMPORTED-BASELINE"
+                    | "7.2-YANK-POLLER-NOT-WIRED-BASELINE"
+            ) {
+                r.passed
+            } else {
+                true // informational — never gates 7.2
+            }
+        })
+    } else if is_story_7_1_5 {
         // Story 7.1.5 spec: command exits 0 only if every `blocking_7_1_5` row has cleared.
         // Blocking rows:
         //   * 7.1.5-7.1-DONE
@@ -2279,5 +2330,602 @@ fn check_7_1_5_discipline_job_count() -> CheckResult {
         id,
         passed: true, // verify-only
         message: format!("verify: discipline.yml job-level entries ≈{} (Story 7.1.5 raises to 79)", count),
+    }
+}
+
+// ─── Story 7.2 AC1 row classifiers ─────────────────────────────────────────────
+//
+// 19 row classifications per Story 7.2 AC1 §Bridge-Preconditions:
+//   * 7 blocking_7_2 rows (substrate canvas confirmations) — gate exits 0 only
+//     when all clear
+//   * 4 blocking_7_2_closure rows (5.5d carry-forward closures — verify-only at
+//     AC1 open; AC4/AC5 land them)
+//   * 8 verify-only rows (§A1 / §A2 step 3 / §A3 / §A4 closure + workspace +
+//     discipline job count + cargo public-api)
+
+fn check_7_2_7_1_done() -> CheckResult {
+    let id = "7.2-7.1-DONE".to_string();
+    let sprint_status = Path::new("_bmad-output/implementation-artifacts/sprint-status.yaml");
+    let mut found_done = false;
+    if sprint_status.exists() {
+        if let Ok(content) = fs::read_to_string(sprint_status) {
+            for line in content.lines() {
+                if line.contains("7-1-full-cargo-generate") {
+                    found_done = line.contains("done");
+                    break;
+                }
+            }
+        }
+    }
+    CheckResult {
+        id,
+        passed: found_done,
+        message: format!(
+            "blocking_7_2: Story 7.1 status=done → {}",
+            if found_done { "PASS" } else { "FAIL — Story 7.1 not done" }
+        ),
+    }
+}
+
+fn check_7_2_7_1_5_done() -> CheckResult {
+    let id = "7.2-7.1.5-DONE".to_string();
+    let sprint_status = Path::new("_bmad-output/implementation-artifacts/sprint-status.yaml");
+    let mut found_done = false;
+    if sprint_status.exists() {
+        if let Ok(content) = fs::read_to_string(sprint_status) {
+            for line in content.lines() {
+                if line.contains("7-1-5-section-a2-step-3-closure") {
+                    found_done = line.contains("done");
+                    break;
+                }
+            }
+        }
+    }
+    CheckResult {
+        id,
+        passed: found_done,
+        message: format!(
+            "blocking_7_2: Story 7.1.5 status=done → {}",
+            if found_done { "PASS" } else { "FAIL — Story 7.1.5 not done" }
+        ),
+    }
+}
+
+fn check_7_2_a1_p1_p5() -> Result<CheckResult, std::io::Error> {
+    let id = "7.2-§A1".to_string();
+    match find_story_file("6-3") {
+        None => Ok(CheckResult {
+            id,
+            passed: true,
+            message: "verify-only: Story 6.3 file not found".into(),
+        }),
+        Some(path) => {
+            let content = fs::read_to_string(&path)?;
+            let open_critical_high = content
+                .lines()
+                .filter(|line| {
+                    let lower = line.to_lowercase();
+                    (lower.contains("critical") || lower.contains("high"))
+                        && lower.contains("**open**")
+                })
+                .count();
+            Ok(CheckResult {
+                id,
+                passed: true, // verify-only
+                message: format!(
+                    "verify-only: §A1 Story 6.3 P1-P5 — open Critical/High={} (target 0; closed per memory commit 79fc591)",
+                    open_critical_high
+                ),
+            })
+        }
+    }
+}
+
+fn check_7_2_a2_step3_hard_fail() -> CheckResult {
+    let id = "7.2-§A2-STEP3".to_string();
+    let path = ".github/workflows/discipline.yml";
+    let mut hard_fail_correct = false;
+    let mut bare_rf_present = false;
+    let mut dmu_present = false;
+    if Path::new(path).exists() {
+        if let Ok(content) = fs::read_to_string(path) {
+            let lines: Vec<&str> = content.lines().collect();
+            let core_gates = [
+                "check-review-findings-resolved:",
+                "check-dev-record-completeness:",
+            ];
+            // Story 7.1.5 step 3 flipped these gates to hard-fail (removed continue-on-error: true)
+            hard_fail_correct = core_gates
+                .iter()
+                .all(|gate| !job_has_continue_on_error(&lines, gate));
+            bare_rf_present = content.contains("check-bare-review-findings:");
+            dmu_present = content.contains("check-dev-model-used-populated:");
+        }
+    }
+    let passed = hard_fail_correct && bare_rf_present && dmu_present;
+    CheckResult {
+        id,
+        passed: true, // verify-only — does NOT block 7.2
+        message: format!(
+            "verify: §A2 step 3 hard-fail flip — core_gates_hard_fail={} bare-rf job present={} dev-model-used job present={} → {}",
+            hard_fail_correct, bare_rf_present, dmu_present,
+            if passed { "CLOSED" } else { "DEGRADED" }
+        ),
+    }
+}
+
+fn check_7_2_a3() -> CheckResult {
+    let id = "7.2-§A3".to_string();
+    let adr_exists = Path::new(
+        "_bmad-output/planning-artifacts/architecture-maos-minimal-opus/12-architecture-decision-records.md"
+    ).exists();
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: §A3 Phase 3 architecture decision documented={}",
+            adr_exists
+        ),
+    }
+}
+
+fn check_7_2_a4() -> CheckResult {
+    let id = "7.2-§A4".to_string();
+    let version_path = "crates/maos-spirit-abi/src/version.rs";
+    let manifest_version_ok = if Path::new(version_path).exists() {
+        match fs::read_to_string(version_path) {
+            Ok(c) => {
+                c.contains("MAOS_MANIFEST_SCHEMA_VERSION")
+                    && (c.contains("= 2") || c.contains("= 3") || c.contains("= 4") || c.contains("= 5"))
+            }
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    let job_present = discipline_yml_has_step("check-manifest-schema-version");
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: §A4 manifest_schema_version≥2={} check-manifest-schema-version job={}",
+            manifest_version_ok, job_present
+        ),
+    }
+}
+
+fn check_7_2_5_5d_inventory() -> Result<CheckResult, std::io::Error> {
+    let id = "7.2-5.5d-INVENTORY".to_string();
+    match find_story_file("5-5d") {
+        None => Ok(CheckResult {
+            id,
+            passed: false,
+            message: "verify: Story 5.5d file not found".into(),
+        }),
+        Some(path) => {
+            let content = fs::read_to_string(&path)?;
+            let count_deferred_to_7_2 = content
+                .lines()
+                .filter(|line| {
+                    line.contains("**deferred → Story 7.2**")
+                        || line.contains("deferred to Story 7.2")
+                })
+                .count();
+            let count_closed_via_7_2 = content
+                .lines()
+                .filter(|line| line.contains("**closed (via Story 7.2"))
+                .count();
+            // Pre-AC4/AC5: ≥4 deferred rows.
+            // Post-AC4/AC5: closures replaced ≥3 deferred markers with closure receipts,
+            //   so the union (deferred + closed) must still equal ≥4.
+            let union = count_deferred_to_7_2 + count_closed_via_7_2;
+            Ok(CheckResult {
+                id,
+                passed: union >= 4,
+                message: format!(
+                    "verify: 5.5d Review Findings rows deferred-to-7.2={} closed-via-7.2={} union={} (expected ≥4)",
+                    count_deferred_to_7_2, count_closed_via_7_2, union
+                ),
+            })
+        }
+    }
+}
+
+fn check_7_2_5_5d_rf_23_closure() -> CheckResult {
+    // blocking_7_2_closure — verify-only at AC1 open; AC5 closes it.
+    let id = "7.2-5.5d-RF-23".to_string();
+    let mcp_lib_has_trait = Path::new("crates/maos-mcp/src/lib.rs")
+        .exists()
+        && match fs::read_to_string("crates/maos-mcp/src/lib.rs") {
+            Ok(c) => c.contains("pub trait McpClient") && c.contains("fn call("),
+            Err(_) => false,
+        };
+    CheckResult {
+        id,
+        passed: true, // verify-only at AC1 open — AC5 closes
+        message: format!(
+            "verify (closure target for AC5): 5.5d #23 Arc<dyn McpClient> — trait present in maos-mcp/src/lib.rs={} (PRE-AC5: expected false; POST-AC5: expected true)",
+            mcp_lib_has_trait
+        ),
+    }
+}
+
+fn check_7_2_5_5d_rf_28_closure() -> CheckResult {
+    // blocking_7_2_closure — verify-only at AC1 open; AC5 closes it.
+    let id = "7.2-5.5d-RF-28".to_string();
+    let storage_path = "crates/maos-registry/src/storage.rs";
+    let search_snapshots_yanks = if Path::new(storage_path).exists() {
+        match fs::read_to_string(storage_path) {
+            Ok(c) => {
+                // POST-AC5 marker: search() clones yanks vec inside scoped block then drops.
+                // PRE-AC5: search holds both locks simultaneously.
+                c.contains("yanks_snapshot") || c.contains("yanks.lock") && c.contains("drop(")
+            }
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    CheckResult {
+        id,
+        passed: true, // verify-only at AC1 open — AC5 closes
+        message: format!(
+            "verify (closure target for AC5): 5.5d #28 search-lock contention — yanks_snapshot pattern present in storage.rs={}",
+            search_snapshots_yanks
+        ),
+    }
+}
+
+fn check_7_2_5_5d_rf_32_closure() -> CheckResult {
+    // blocking_7_2_closure — verify-only at AC1 open; AC5 closes it.
+    let id = "7.2-5.5d-RF-32".to_string();
+    let yank_rs = "crates/maos-registry/src/yank.rs";
+    let cursor_persistence_present = if Path::new(yank_rs).exists() {
+        match fs::read_to_string(yank_rs) {
+            Ok(c) => c.contains("yank_cursor.json") || c.contains("last_seen_iso8601"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    CheckResult {
+        id,
+        passed: true, // verify-only at AC1 open — AC5 closes
+        message: format!(
+            "verify (closure target for AC5): 5.5d #32 monotonic_now_ns persistence — cursor file pattern present in yank.rs={}",
+            cursor_persistence_present
+        ),
+    }
+}
+
+fn check_7_2_5_5d_rf_high_edge_closure() -> CheckResult {
+    // blocking_7_2_closure — verify-only at AC1 open; AC4 closes it.
+    let id = "7.2-5.5d-RF-HIGH-EDGE".to_string();
+    let registry_ports = "crates/maos-domain/src/ports/registry.rs";
+    let server_tier_field_present = if Path::new(registry_ports).exists() {
+        match fs::read_to_string(registry_ports) {
+            Ok(c) => c.contains("server_reported_tier") && c.contains("server_signature_on_tier"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    CheckResult {
+        id,
+        passed: true, // verify-only at AC1 open — AC4 closes
+        message: format!(
+            "verify (closure target for AC4): 5.5d High [edge] consumer-side tier verification — SignedManifest.server_reported_tier/server_signature_on_tier additive fields present={}",
+            server_tier_field_present
+        ),
+    }
+}
+
+fn check_7_2_maos_registry_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "7.2-MAOS-REGISTRY-BASELINE".to_string();
+    let lib_path = "crates/maos-registry/src/lib.rs";
+    let lib_exists = Path::new(lib_path).exists();
+    if !lib_exists {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "blocking_7_2: crates/maos-registry/src/lib.rs not found".into(),
+        });
+    }
+    let lib = fs::read_to_string(lib_path)?;
+    // 5.5d module list: admission, client, compliance_verify, fixture_replay,
+    // handlers, lib, operations, server, storage, yank
+    let required_modules = [
+        "admission",
+        "client",
+        "compliance_verify",
+        "handlers",
+        "operations",
+        "server",
+        "storage",
+        "yank",
+    ];
+    let missing: Vec<&&str> = required_modules
+        .iter()
+        .filter(|m| !lib.contains(&format!("mod {}", m)) && !lib.contains(&format!("pub mod {}", m)))
+        .collect();
+    let passed = missing.is_empty();
+    Ok(CheckResult {
+        id,
+        passed,
+        message: format!(
+            "blocking_7_2: maos-registry/src/lib.rs has {} of {} 5.5d modules declared; missing={:?}",
+            required_modules.len() - missing.len(),
+            required_modules.len(),
+            missing
+        ),
+    })
+}
+
+fn check_7_2_maos_spirit_cli_baseline() -> CheckResult {
+    let id = "7.2-MAOS-SPIRIT-CLI-BASELINE".to_string();
+    // PRE-AC2: crates/maos-spirit-cli/ does NOT exist (canvas clean).
+    // POST-AC2: crates/maos-spirit-cli/ EXISTS with publish binary.
+    let crate_exists = Path::new("crates/maos-spirit-cli").exists();
+    let bin_present = Path::new("crates/maos-spirit-cli/src/bin/maos-spirit.rs").exists();
+    let cargo_present = Path::new("crates/maos-spirit-cli/Cargo.toml").exists();
+    // The blocking semantics flip with AC2: at AC1 open the canvas SHOULD be
+    // clean (crate absent), at AC2 close the canvas SHOULD be populated. To
+    // serve as a regression guard after AC2 lands, we accept either:
+    //   (a) crate absent AND bin absent AND Cargo.toml absent (pre-AC2 canvas clean)
+    //   (b) crate present AND bin present AND Cargo.toml present (post-AC2 substrate complete)
+    let consistent = match (crate_exists, bin_present, cargo_present) {
+        (false, false, false) => true, // pre-AC2 canvas clean
+        (true, true, true) => true,    // post-AC2 substrate shipped
+        _ => false,                    // partial scaffold — STOP and surface
+    };
+    CheckResult {
+        id,
+        passed: consistent,
+        message: format!(
+            "blocking_7_2: crates/maos-spirit-cli/ exists={} bin present={} Cargo.toml present={} → consistent={}",
+            crate_exists, bin_present, cargo_present, consistent
+        ),
+    }
+}
+
+fn check_7_2_maosctl_import_baseline() -> CheckResult {
+    let id = "7.2-MAOSCTL-IMPORT-BASELINE".to_string();
+    let cli_path = "crates/maos-cli/src/cli.rs";
+    let subcommands_path = "crates/maos-cli/src/subcommands.rs";
+    let has_import_variant = if Path::new(cli_path).exists() {
+        match fs::read_to_string(cli_path) {
+            Ok(c) => {
+                // Look for `Import {` or `Import(` style enum variant.
+                let lines: Vec<&str> = c.lines().collect();
+                let mut in_subcommand_enum = false;
+                let mut found = false;
+                for line in &lines {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("pub enum Subcommand") {
+                        in_subcommand_enum = true;
+                        continue;
+                    }
+                    if in_subcommand_enum {
+                        if trimmed == "}" {
+                            break;
+                        }
+                        if trimmed.starts_with("Import {") || trimmed.starts_with("Import(") {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                found
+            }
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    let has_import_handler = if Path::new(subcommands_path).exists() {
+        match fs::read_to_string(subcommands_path) {
+            // Story 7.2 dev shipped the dispatcher as `fn dispatch_import`
+            // — the spec narrative called it `handle_import` but both names
+            // are workable per the spec §3 alternative naming clause.
+            Ok(c) => c.contains("fn handle_import") || c.contains("fn dispatch_import"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    // Pre-AC3: both absent. Post-AC3: both present. Partial → fail.
+    let consistent = has_import_variant == has_import_handler;
+    CheckResult {
+        id,
+        passed: consistent,
+        message: format!(
+            "blocking_7_2: Subcommand::Import variant present={} handle_import fn present={} → consistent={}",
+            has_import_variant, has_import_handler, consistent
+        ),
+    }
+}
+
+fn check_7_2_framekind_spirit_imported_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "7.2-FRAMEKIND-SPIRIT-IMPORTED-BASELINE".to_string();
+    let path = "crates/maos-iac/src/adapter/transparency_log.rs";
+    if !Path::new(path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "blocking_7_2: transparency_log.rs not found".into(),
+        });
+    }
+    let src = fs::read_to_string(path)?;
+    let has_spirit_admitted = src.contains("SpiritAdmitted = 19") || src.contains("SpiritAdmitted =19");
+    let has_registry_yank = src.contains("RegistryYank = 20") || src.contains("RegistryYank =20");
+    // Story 7.2 AC3 picked the next-available slot at HEAD; slots 21-25 are
+    // already gateway/consent/rate-limited frames, so SpiritImported = 26 was
+    // the actual available slot. Accept either the spec's narrative 21 or the
+    // dev's chosen 26 — both are recorded in the dev record.
+    let has_spirit_imported = src.contains("SpiritImported = 21")
+        || src.contains("SpiritImported =21")
+        || src.contains("SpiritImported = 26")
+        || src.contains("SpiritImported =26");
+    // Pre-AC3: SpiritImported absent. Post-AC3: SpiritImported present.
+    let pre_ac3 = has_spirit_admitted && has_registry_yank && !has_spirit_imported;
+    let post_ac3 = has_spirit_admitted && has_registry_yank && has_spirit_imported;
+    let consistent = pre_ac3 || post_ac3;
+    Ok(CheckResult {
+        id,
+        passed: consistent,
+        message: format!(
+            "blocking_7_2: SpiritAdmitted=19={} RegistryYank=20={} SpiritImported(21 or 26)={} → consistent={}",
+            has_spirit_admitted, has_registry_yank, has_spirit_imported, consistent
+        ),
+    })
+}
+
+fn check_7_2_yank_poller_not_wired_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "7.2-YANK-POLLER-NOT-WIRED-BASELINE".to_string();
+    let main_path = "crates/maos-bin/src/main.rs";
+    if !Path::new(main_path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "blocking_7_2: crates/maos-bin/src/main.rs not found".into(),
+        });
+    }
+    let src = fs::read_to_string(main_path)?;
+    // Pre-AC4: yank_poller_production_loop NOT spawned in main composition root.
+    // Post-AC4: yank_poller_production_loop IS spawned, with shutdown discipline.
+    // Either is consistent. Partial state (e.g., partial wiring, panicking spawn)
+    // would surface as test failure, not this check.
+    let production_loop_present = src.contains("yank_poller_production_loop");
+    let alternate_loop_present = src.contains("yank_poller_loop");
+    let wired = production_loop_present || alternate_loop_present;
+    Ok(CheckResult {
+        id,
+        passed: wired,
+        message: format!(
+            "blocking_7_2: production yank-poller wiring — yank_poller_production_loop in main.rs={} yank_poller_loop in main.rs={} (must be true post-AC4)",
+            production_loop_present, alternate_loop_present
+        ),
+    })
+}
+
+fn check_7_2_workspace_count() -> CheckResult {
+    let id = "7.2-WORKSPACE-COUNT".to_string();
+    let cargo_toml = "Cargo.toml";
+    let count = if Path::new(cargo_toml).exists() {
+        match fs::read_to_string(cargo_toml) {
+            Ok(c) => {
+                let mut in_members = false;
+                let mut n = 0;
+                for line in c.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("members =") || trimmed == "members = [" {
+                        in_members = true;
+                        continue;
+                    }
+                    if in_members {
+                        if trimmed.starts_with("]") {
+                            break;
+                        }
+                        if trimmed.starts_with("\"") && trimmed.contains("\",") {
+                            n += 1;
+                        } else if trimmed.starts_with("\"") && trimmed.ends_with("\"") {
+                            n += 1;
+                        }
+                    }
+                }
+                n
+            }
+            Err(_) => 0,
+        }
+    } else {
+        0
+    };
+    let has_spirit_cli = if Path::new(cargo_toml).exists() {
+        match fs::read_to_string(cargo_toml) {
+            Ok(c) => c.contains("crates/maos-spirit-cli"),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: workspace_members count={} maos-spirit-cli listed={} (pre-AC2: 28, post-AC2: 29)",
+            count, has_spirit_cli
+        ),
+    }
+}
+
+fn check_7_2_discipline_job_count() -> CheckResult {
+    let id = "7.2-DISCIPLINE-JOB-COUNT".to_string();
+    let path = ".github/workflows/discipline.yml";
+    let count = if Path::new(path).exists() {
+        match fs::read_to_string(path) {
+            Ok(c) => {
+                c.lines()
+                    .filter(|l| {
+                        let trimmed = l.trim_start();
+                        trimmed.len() > 2
+                            && trimmed
+                                .chars()
+                                .next()
+                                .map(|c| c.is_ascii_lowercase())
+                                .unwrap_or(false)
+                            && trimmed.ends_with(':')
+                            && !trimmed.starts_with("uses:")
+                            && !trimmed.starts_with("with:")
+                            && !trimmed.starts_with("steps:")
+                            && !trimmed.starts_with("needs:")
+                            && !trimmed.starts_with("runs-on:")
+                            && !trimmed.starts_with("if:")
+                            && !trimmed.starts_with("env:")
+                            && !trimmed.starts_with("defaults:")
+                            && !trimmed.starts_with("strategy:")
+                            && !trimmed.starts_with("outputs:")
+                            && !trimmed.starts_with("services:")
+                            && !trimmed.starts_with("container:")
+                            && !trimmed.starts_with("permissions:")
+                            && !trimmed.starts_with("concurrency:")
+                    })
+                    .count()
+            }
+            Err(_) => 0,
+        }
+    } else {
+        0
+    };
+    let has_smoke_7_2 = discipline_yml_has_step("smoke-registry-7-2");
+    let has_fr59 = discipline_yml_has_step("fr59-yank-propagation-5min");
+    let has_air_gap = discipline_yml_has_step("air-gap-import-corpus");
+    let new_count = has_smoke_7_2 as usize + has_fr59 as usize + has_air_gap as usize;
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: discipline.yml job-level entries ≈{} (pre-AC6: 79; post-AC6: 82); new 7.2 jobs present: smoke-registry-7-2={} fr59-yank-propagation-5min={} air-gap-import-corpus={} → {}/3",
+            count, has_smoke_7_2, has_fr59, has_air_gap, new_count
+        ),
+    }
+}
+
+fn check_7_2_cargo_public_api_clean() -> CheckResult {
+    let id = "7.2-CARGO-PUBLIC-API-CLEAN".to_string();
+    // Verify-only: do not invoke cargo-public-api here (multi-minute build cost
+    // in the gate context). Caller is expected to run the diff out-of-band and
+    // confirm Added-only delta. Report whether the tool is installed.
+    let tool_installed = std::process::Command::new("cargo")
+        .args(["public-api", "--version"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: cargo-public-api tool installed={} (run `cargo public-api --diff` out-of-band; expect Added-only delta)",
+            tool_installed
+        ),
     }
 }

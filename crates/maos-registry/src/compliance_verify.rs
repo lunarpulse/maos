@@ -26,15 +26,18 @@ pub enum VerificationResult {
     },
 }
 
-struct ManifestFingerprintFields {
-    trust_tier: TrustTier,
-    sandbox_tier: SandboxTier,
-    capability_scope: std::collections::BTreeSet<CapabilityId>,
-    provider_endpoint: ProviderEndpointPin,
-    crypto_provider: CryptoProviderId,
+/// Manifest-derived fingerprint fields used during both verification and
+/// `maos-spirit publish --compliance-claim` auto-population (Story 7.2 AC2).
+pub struct ManifestFingerprintFields {
+    pub trust_tier: TrustTier,
+    pub sandbox_tier: SandboxTier,
+    pub capability_scope: std::collections::BTreeSet<CapabilityId>,
+    pub provider_endpoint: ProviderEndpointPin,
+    pub crypto_provider: CryptoProviderId,
 }
 
-fn extract_manifest_fingerprint_fields(manifest_toml: &[u8]) -> ManifestFingerprintFields {
+/// Story 7.2 — made `pub` for `maos-spirit-cli` auto-population.
+pub fn extract_manifest_fingerprint_fields(manifest_toml: &[u8]) -> ManifestFingerprintFields {
     let text = String::from_utf8_lossy(manifest_toml);
     let mut trust_tier = TrustTier::Local;
     let mut sandbox_tier = SandboxTier::T0;

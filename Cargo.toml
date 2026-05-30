@@ -28,6 +28,7 @@ members = [
     "crates/maos-spirit-derive",
     "crates/maos-eval",
     "crates/maos-bench",
+    "crates/maos-spirit-cli",
     "examples/example-spirit",
 ]
 default-members = []

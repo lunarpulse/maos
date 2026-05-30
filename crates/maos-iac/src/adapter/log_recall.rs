@@ -125,6 +125,7 @@ impl LogRecallAdapter {
             FrameKind::RateLimited => DomainFrameKindLabel::RateLimited,
             FrameKind::GatewayInbound => DomainFrameKindLabel::GatewayInbound,
             FrameKind::GatewayOutbound => DomainFrameKindLabel::GatewayOutbound,
+            FrameKind::SpiritImported => DomainFrameKindLabel::SpiritImported,
         }
     }
 
@@ -163,6 +164,7 @@ impl LogRecallAdapter {
             DomainFrameKindLabel::RateLimited => Some(FrameKind::RateLimited),
             DomainFrameKindLabel::GatewayInbound => Some(FrameKind::GatewayInbound),
             DomainFrameKindLabel::GatewayOutbound => Some(FrameKind::GatewayOutbound),
+            DomainFrameKindLabel::SpiritImported => Some(FrameKind::SpiritImported),
             other => {
                 eprintln!(
                     "maos: warning: unmapped FrameKindLabel {:?} in to_kernel_kind \
