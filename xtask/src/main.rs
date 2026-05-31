@@ -12,6 +12,7 @@ mod check_deprecations_declared;
 mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
 mod check_empty_kernel;
+mod check_skill_schema;
 mod check_epic_6_bridge;
 mod check_fr47;
 mod check_judge_config;
@@ -408,6 +409,13 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 7.4 — assert the maos.skill.v1 schema posture: valid round-trip +
+    /// deny_unknown_fields (UnknownField, not a silent default) + semver validation.
+    #[command(name = "check-skill-schema")]
+    CheckSkillSchema {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 7.1.5 — assert every story file has a populated `dev_model_used:` frontmatter field.
     #[command(name = "check-dev-model-used-populated")]
     CheckDevModelUsedPopulated {
@@ -648,6 +656,7 @@ fn main() {
         Commands::CheckManifestSchemaVersion { json } => check_manifest_schema_version::run(json),
         Commands::CheckDeprecationsDeclared { json } => check_deprecations_declared::run(json),
         Commands::CheckBareReviewFindings { json } => check_bare_review_findings::run(json),
+        Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
     };
     if let Err(e) = result {

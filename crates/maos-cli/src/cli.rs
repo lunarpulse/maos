@@ -102,6 +102,42 @@ pub enum Subcommand {
     /// admits the Spirit through the same Story 5.5d admission code path
     /// network installs use.
     Import(ImportArgs),
+    /// Story 7.4 (FR39) — the skill ecosystem operator surface. `list`
+    /// discovers `maos.skill.v1` skills on the conventional search path and
+    /// shows their admission state; `approve`/`reject` give the pending
+    /// operator-admission queue its exit (no skill activates without `approve`).
+    Skills(SkillsArgs),
+}
+
+/// Story 7.4 — `maosctl skills <list|approve|reject>`.
+#[derive(clap::Args, Debug)]
+pub struct SkillsArgs {
+    #[command(subcommand)]
+    pub op: SkillsOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum SkillsOp {
+    /// Discover skills on the conventional `[skills.search_path]` roots and
+    /// render each with its admission state (all freshly-discovered skills are
+    /// `Pending` — discovery never auto-admits).
+    List {
+        /// Override the search roots (repeatable). Defaults to the three
+        /// conventional paths (`~/.maos/skills/`, `_bmad/skills/`,
+        /// `/usr/share/maos/skills/`).
+        #[arg(long)]
+        root: Vec<String>,
+    },
+    /// Operator-admit a pending skill by id (FR39 admission exit).
+    Approve {
+        /// The skill id (`maosctl skills list` shows ids).
+        skill_id: String,
+    },
+    /// Operator-reject a pending skill by id (FR39 admission exit).
+    Reject {
+        /// The skill id (`maosctl skills list` shows ids).
+        skill_id: String,
+    },
 }
 
 #[derive(clap::Args, Debug)]

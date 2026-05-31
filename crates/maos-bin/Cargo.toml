@@ -33,6 +33,7 @@ maos-a2a = { path = "../maos-a2a" }  # Story 6.3 — composition-root A2A router
 maos-compliance = { path = "../maos-compliance" }   # Story 7.3 — v0.9-binding evaluator (smoke-compliance-7-3)
 maos-spirit-cli = { path = "../maos-spirit-cli" }   # Story 7.3 — REAL producer round-trip in the smoke arm
 maos-corpus-gen = { path = "../maos-corpus-gen" }   # Story 7.3 — CCAC slice replay + reference contexts
+maos-skill = { path = "../maos-skill" }   # Story 7.4 — skill ecosystem (smoke-skill-7-4)
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 getrandom = "0.3"

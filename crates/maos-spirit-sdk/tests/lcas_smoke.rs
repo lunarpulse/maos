@@ -3,12 +3,15 @@
 //! LCAS smoke test — parses tests/corpora/lcas-v0.3.jsonl, verifies the
 //! SHA-256 against MANIFEST.toml, and asserts each item is well-formed.
 //!
-//! Story 2.4 ships the 70-item clearly-decidable bucket. Story 8.x at
-//! v0.8 ships the remaining 140 items (genuinely-ambiguous + adversarially-
-//! misleading). Full N=210 at v0.5 per PRD line 80.
+//! Story 2.4 shipped the 70-item clearly-decidable bucket. **Story 7.4** (NOT
+//! "Story 8.x" — reconciled per epic-7.md:164-170) extends the corpus to the
+//! full **N=210** by adding 70 genuinely-ambiguous + 70 adversarially-misleading
+//! items via the deterministic `maos-corpus-gen::lcas` generator. Full N=210 at
+//! the v0.5 ship gate per PRD line 80.
 
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -40,17 +43,60 @@ fn manifest_path() -> PathBuf {
         .join("MANIFEST.toml")
 }
 
+/// The three LCAS buckets and the id-prefix + class each uses.
+const BUCKETS: &[(&str, &str)] = &[
+    ("lcas-cd-", "clearly_decidable"),
+    ("lcas-ga-", "genuinely_ambiguous"),
+    ("lcas-am-", "adversarially_misleading"),
+];
+
+fn items() -> Vec<LcasItem> {
+    let text = fs::read_to_string(corpus_path()).expect("read lcas-v0.3.jsonl");
+    text.lines()
+        .enumerate()
+        .map(|(i, line)| {
+            serde_json::from_str::<LcasItem>(line)
+                .unwrap_or_else(|e| panic!("line {} parse error: {e}", i + 1))
+        })
+        .collect()
+}
+
 #[test]
-fn lcas_corpus_item_count_is_70() {
+fn lcas_corpus_item_count_is_210() {
     let bytes = fs::read(corpus_path()).expect("read lcas-v0.3.jsonl");
     let count = bytes
         .split(|&b| b == b'\n')
         .filter(|line| !line.is_empty())
         .count();
     assert_eq!(
-        count, 70,
-        "Story 2.4 LCAS clearly-decidable bucket must be exactly 70 items"
+        count, 210,
+        "Story 7.4 LCAS full N=210 (clearly_decidable 70 + genuinely_ambiguous 70 + adversarially_misleading 70)"
     );
+}
+
+#[test]
+fn lcas_corpus_three_buckets_70_each() {
+    let items = items();
+    let mut by_class: BTreeMap<&str, usize> = BTreeMap::new();
+    for it in &items {
+        *by_class.entry(it.class.as_str()).or_default() += 1;
+    }
+    assert_eq!(
+        by_class.get("clearly_decidable").copied(),
+        Some(70),
+        "clearly_decidable bucket must be 70"
+    );
+    assert_eq!(
+        by_class.get("genuinely_ambiguous").copied(),
+        Some(70),
+        "genuinely_ambiguous bucket must be 70"
+    );
+    assert_eq!(
+        by_class.get("adversarially_misleading").copied(),
+        Some(70),
+        "adversarially_misleading bucket must be 70"
+    );
+    assert_eq!(by_class.len(), 3, "exactly three buckets");
 }
 
 #[test]
@@ -77,19 +123,24 @@ fn lcas_corpus_sha256_matches_manifest() {
 
 #[test]
 fn lcas_corpus_well_formed_schema() {
-    let text = fs::read_to_string(corpus_path()).expect("read lcas-v0.3.jsonl");
-    for (i, line) in text.lines().enumerate() {
-        let item: LcasItem = serde_json::from_str(line)
-            .unwrap_or_else(|e| panic!("line {} parse error: {e}", i + 1));
-        assert_eq!(
-            item.class, "clearly_decidable",
-            "v0.3 ships clearly-decidable bucket only"
+    for item in items() {
+        // Class must be one of the three buckets, and the id prefix must match.
+        let (prefix, _) = BUCKETS
+            .iter()
+            .find(|(_, class)| *class == item.class)
+            .unwrap_or_else(|| panic!("unknown class {} for id {}", item.class, item.id));
+        assert!(
+            item.id.starts_with(prefix),
+            "id {} does not match its class {} prefix {}",
+            item.id,
+            item.class,
+            prefix
         );
-        assert!(item.id.starts_with("lcas-cd-"), "id pattern: {}", item.id);
         assert!(
             ["halt", "continue"].contains(&item.gold_label.as_str()),
-            "gold_label must be halt or continue: {}",
-            item.gold_label
+            "gold_label must be halt or continue: {} ({})",
+            item.gold_label,
+            item.id
         );
         assert!(
             item.trajectory_text.len() >= 4096,
@@ -118,6 +169,14 @@ fn lcas_corpus_well_formed_schema() {
             assert!(
                 !item.expected_signals.is_empty(),
                 "halt items must have non-empty expected_signals: {}",
+                item.id
+            );
+        }
+        // adversarially_misleading items surface a quiet planted claim → halt.
+        if item.class == "adversarially_misleading" {
+            assert_eq!(
+                item.gold_label, "halt",
+                "adversarially_misleading items must halt: {}",
                 item.id
             );
         }

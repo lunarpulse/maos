@@ -92,6 +92,15 @@ pub enum FrameKind {
     /// Distinguishable in audit from registry-served admissions
     /// (`SpiritAdmitted = 19`) and CRL revocations (`SpiritRevoked = 17`).
     SpiritImported = 26,
+    /// Story 7.4 — FR40 "full": a CliWrapperSpirit admission was REFUSED because
+    /// the observed CLI output shape did not match the declared
+    /// `output_shape_version` (ADR-021 `EOutputShapeAdapterMismatch`). The
+    /// payload carries `{cli, declared, observed}` so the refusal is auditable.
+    /// The probe logic is UNCHANGED (Story 6.2); this row makes the refusal —
+    /// previously a returned-but-unjournaled error — appear in the Transparency
+    /// Log before the kernel returns, per ADR-021's "audit drift is the failure
+    /// mode the substrate cannot tolerate".
+    CliWrapperShapeMismatch = 27,
 }
 
 impl FrameKind {
@@ -125,6 +134,7 @@ impl FrameKind {
             24 => Some(Self::GatewayInbound),
             25 => Some(Self::GatewayOutbound),
             26 => Some(Self::SpiritImported),
+            27 => Some(Self::CliWrapperShapeMismatch),
             _ => None,
         }
     }

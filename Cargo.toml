@@ -21,6 +21,7 @@ members = [
     "crates/maos-persistence",
     "crates/maos-providers",
     "crates/maos-secrets",
+    "crates/maos-skill",
     "crates/maos-spirit-abi",
     "crates/maos-spirit-hello",
     "crates/maos-spirit-sdk",

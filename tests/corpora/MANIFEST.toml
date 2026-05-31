@@ -43,13 +43,13 @@ description = "v0.1-α adversarial-Spirit red-team corpus 640 items deterministi
 # judge_id omitted
 
 [corpus."lcas-v0.3"]
-sha256 = "ef7c7a6d7317cbabaf3d15a7707b930401051da0461432647fa3c619d1e7666a"
+sha256 = "d18b8aeb774262adeeca1824bf7826d53c1d1ad13636d2ae6880d7778a289aad"
 schema_version = 1
-item_count = 70
-valid_until = "2027-05-16"
+item_count = 210
+valid_until = "2027-05-31"
 prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
-description = "Story 2.4 LCAS (Long-context Ambiguity Stress) clearly-decidable bucket 70/210 — exercises NFR-Test-6 halt-recall + halt-precision measurement substrate. Each item carries gold_label (halt|continue), trajectory_text (4096-16384 chars), planted_claim (unambiguous load-bearing claim), expected_signals (halt tags the well-behaved Spirit emits). The remaining 140 items (genuinely-ambiguous n=70 + adversarially-misleading n=70) land at Story 8.x at v0.8 (require A2A scenarios from E6 to be valid). Full N=210 at v0.5 ship gate per PRD line 80. Gate-verified by structural assertion at v0.3 (gold_label matches Spirit's halt/continue decision); judge-LLM agreement layer is Story 7.1 + Story 8.x at v0.5+."
-# judge_id omitted at v0.3 — Story 7.1 / Story 8.x adds when judge-LLM agreement layer ships
+description = "LCAS (Long-context Ambiguity Stress) full N=210 — exercises NFR-Test-6 halt-recall + halt-precision measurement substrate. Three buckets of 70: clearly_decidable (Story 2.4, hand-authored, lcas-cd-*), genuinely_ambiguous (Story 7.4, generator-driven via maos-corpus-gen::lcas, lcas-ga-*), adversarially_misleading (Story 7.4, generator-driven, lcas-am-*). RECONCILIATION (Story 7.4 AC5): the round-3 extension of the remaining 140 items — once deferred to 'Story 8.x at v0.8' — is OWNED BY Story 7.4 per epic-7.md:164-170 (epic-authoritative; the prior Story-8.x note is superseded). The adversarially_misleading bucket exercises A2A scenarios (Story 6.3 LoopbackA2ARouter substrate) with a quiet load-bearing planted_claim contradicting louder repeated claims. 6-field schema reused (schema_version stays 1): gold_label (halt|continue), trajectory_text (4096-16384 chars), planted_claim, expected_signals; genuinely_ambiguous uses the class label as the ambiguity signal with gold_label recording the marginally-preferred action (no defensible_labels field needed). Generator-driven items are deterministic + SHA-pinned (re-run `maos-corpus-gen lcas-extend` reproduces byte-identically). Gate-verified by structural assertion (gold_label match + per-bucket count); judge-LLM agreement layer is a later story."
+# judge_id omitted — gate is structural (per-bucket count + gold_label match). Judge-LLM agreement layer ships in a later story.
 
 [corpus."ccac-v1.0"]
 sha256 = "9dcd3a23f8be79a6d074336f08adb1d3cd93fb774cb75507b911f025dc263869"

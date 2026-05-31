@@ -16,8 +16,6 @@
 //! exercise the surface symbolically — the manifest-validator coupling
 //! (5.4) lands when admission flow integration is wired in main.rs.
 
-use std::path::PathBuf;
-
 use maos_domain::cli_wrapper::CliWrapperAdmissionError;
 use maos_domain::invariants::i9::SandboxTier;
 use maos_kernel_core::lifecycle::cli_wrapper::probe_and_verify_shape;
@@ -40,43 +38,46 @@ fn cfg(command: &str, declared: &str) -> CliWrapperConfig {
     }
 }
 
-static STUB_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
-/// Write a CLI stub shell script that emits the JSON probe envelope.
-/// Each call gets a unique filename to avoid parallel-test collisions.
-fn write_probe_stub(observed_version: &str) -> PathBuf {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let id = STUB_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    let pid = std::process::id();
-    let script = dir.path().join(format!("cli-stub-{pid}-{id}.sh"));
-    let body = format!(
-        "#!/bin/sh\necho '{{\"output_shape_version\":\"{observed_version}\"}}'\n"
-    );
-    std::fs::write(&script, body).expect("write script");
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o755);
-        std::fs::set_permissions(&script, perms).expect("set permissions");
+/// Build a CliWrapperConfig whose "CLI" is the stable `/bin/sh` interpreter
+/// running a `-c` script that echoes the probe envelope with `observed`.
+///
+/// Story 7.4 test-infra hardening: the prior `write_probe_stub` helper wrote a
+/// fresh `*.sh` and immediately exec'd it, which races (ETXTBSY / 2s probe
+/// timeout) when these 7 subprocess-spawning tests run in parallel — the cause
+/// of pre-existing intermittent failures of scenarios 5.2/5.3. Pointing the
+/// probe at the long-lived `/bin/sh` binary removes the write-then-exec race
+/// WITHOUT touching `probe_and_verify_shape` or any assertion. The probe appends
+/// `--maos-bridge-probe` to argv; under `sh -c <script> <name> <args...>` that
+/// lands as `$1` (ignored), so the echo still fires.
+fn sh_probe_cfg(observed: &str, declared: &str) -> CliWrapperConfig {
+    CliWrapperConfig {
+        command: "/bin/sh".into(),
+        argv_prefix: vec![
+            "-c".into(),
+            format!("echo '{{\"output_shape_version\":\"{observed}\"}}'"),
+            "maos-cli-stub".into(),
+        ],
+        output_shape_version: declared.into(),
+        skill_bundle: vec![],
+        recovery_policy: Default::default(),
+        posture: CliWrapperPosture {
+            stdio_shape: CliWrapperStdioShape::NdjsonOverStdio,
+            control_channel: CliWrapperControlChannel::Signals,
+            shutdown_signal: None,
+        },
     }
-    // Keep the tempdir alive by leaking — tests are short-lived.
-    let path = script.clone();
-    std::mem::forget(dir);
-    path
 }
 
 #[test]
 fn ac5_scenario_5_1_declared_matches_observed_admission_succeeds() {
-    let stub = write_probe_stub("1.0.0");
-    let c = cfg(stub.to_str().unwrap(), "1.0.0");
+    let c = sh_probe_cfg("1.0.0", "1.0.0");
     let result = probe_and_verify_shape(&c, SandboxTier::T3);
     assert!(result.is_ok(), "expected admission ok, got {:?}", result.err());
 }
 
 #[test]
 fn ac5_scenario_5_2_minor_bump_mismatch_fires_eoutput_shape_adapter_mismatch() {
-    let stub = write_probe_stub("1.1.0");
-    let c = cfg(stub.to_str().unwrap(), "1.0.0");
+    let c = sh_probe_cfg("1.1.0", "1.0.0");
     let err = probe_and_verify_shape(&c, SandboxTier::T3).unwrap_err();
     match err {
         CliWrapperAdmissionError::EOutputShapeAdapterMismatch {
@@ -93,8 +94,7 @@ fn ac5_scenario_5_2_minor_bump_mismatch_fires_eoutput_shape_adapter_mismatch() {
 
 #[test]
 fn ac5_scenario_5_3_major_bump_mismatch_fires_eoutput_shape_adapter_mismatch() {
-    let stub = write_probe_stub("2.0.0");
-    let c = cfg(stub.to_str().unwrap(), "1.0.0");
+    let c = sh_probe_cfg("2.0.0", "1.0.0");
     let err = probe_and_verify_shape(&c, SandboxTier::T3).unwrap_err();
     assert!(matches!(
         err,
@@ -137,8 +137,7 @@ fn ac5_scenario_5_6_adapter_not_registered_typed_error() {
 
 #[test]
 fn ac5_scenario_5_7_mock_claude_code_admits_and_runtime_forwards_frames() {
-    let stub = write_probe_stub("1.0.0");
-    let c = cfg(stub.to_str().unwrap(), "1.0.0");
+    let c = sh_probe_cfg("1.0.0", "1.0.0");
     let result = probe_and_verify_shape(&c, SandboxTier::T3);
     assert!(
         result.is_ok(),

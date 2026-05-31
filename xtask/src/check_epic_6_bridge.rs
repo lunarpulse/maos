@@ -226,6 +226,29 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
         results.push(check_7_3_cargo_public_api_clean());
     }
 
+    let is_story_7_4 = matches!(story_arg, Some("7.4"));
+    if is_story_7_4 {
+        // 13 row classifications per Story 7.4 AC1 §Bridge-Preconditions.
+        results.push(check_7_4_7_3_done());
+        results.push(check_7_4_a2_a5_hard_fail());
+        results.push(check_7_4_7_3_rf_inventory().map_err(|e| format!("7.4-7.3-RF error: {}", e))?);
+        results.push(check_7_4_maos_skill_baseline());
+        results.push(check_7_4_skill_scope_baseline().map_err(|e| format!("7.4-SCOPE error: {}", e))?);
+        results.push(
+            check_7_4_cli_wrapper_baseline().map_err(|e| format!("7.4-CLIWRAPPER error: {}", e))?,
+        );
+        results.push(
+            check_7_4_self_telemetry_baseline()
+                .map_err(|e| format!("7.4-SELFTEL error: {}", e))?,
+        );
+        results.push(check_7_4_lcas_baseline().map_err(|e| format!("7.4-LCAS error: {}", e))?);
+        results.push(check_7_4_abi_frozen().map_err(|e| format!("7.4-ABI-FROZEN error: {}", e))?);
+        results.push(check_7_4_a2a_loopback_available());
+        results.push(check_7_4_workspace_count());
+        results.push(check_7_4_discipline_job_count());
+        results.push(check_7_4_cargo_public_api_clean());
+    }
+
     // 6.1 rows: failure on any 6.1 row blocks the gate (legacy behavior).
     // 6.2 extension rows: only blocking_6_2 rows (D-2.10, D-4, A3 blocking) gate
     // the run when --story 6.2; verify-only rows (D-3.7/3.8, D-5.1/5.2, A4-Debt-2c-relaxed)
@@ -233,7 +256,34 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
     // 6.3 extension rows: only blocking_6_3 rows gate. Per Story 6.3 AC1 §Bridge-Preconditions:
     //   blocking_6_3 = §A3/§A5/§A6 gates SHIPPED (existence). All other 6.3 rows are
     //   verify-only / carry-forward per the table.
-    let all_pass = if is_story_7_3 {
+    let all_pass = if is_story_7_4 {
+        // Story 7.4 spec: command exits 0 only if every `blocking_7_4` row has cleared.
+        // Blocking rows (7.3 done + the six substrate-canvas confirmations):
+        //   * 7.4-7.3-DONE
+        //   * 7.4-MAOS-SKILL-BASELINE       (absent at open; present+member at close)
+        //   * 7.4-SKILL-SCOPE-BASELINE      (Scope::SkillAuthorSelf absent at open; present at close)
+        //   * 7.4-CLIWRAPPER-BASELINE       (Story 6.2 probe + error variant present)
+        //   * 7.4-SELF-TELEMETRY-BASELINE   (Story 4.3 report + port present)
+        //   * 7.4-LCAS-BASELINE             (70-item bucket at open; 210 at close)
+        //   * 7.4-ABI-FROZEN                (compliance.rs frozen markers + ABI_VERSION=1)
+        // All other rows are verify-only and never gate 7.4.
+        results.iter().all(|r: &CheckResult| {
+            if matches!(
+                r.id.as_str(),
+                "7.4-7.3-DONE"
+                    | "7.4-MAOS-SKILL-BASELINE"
+                    | "7.4-SKILL-SCOPE-BASELINE"
+                    | "7.4-CLIWRAPPER-BASELINE"
+                    | "7.4-SELF-TELEMETRY-BASELINE"
+                    | "7.4-LCAS-BASELINE"
+                    | "7.4-ABI-FROZEN"
+            ) {
+                r.passed
+            } else {
+                true // informational — never gates 7.4
+            }
+        })
+    } else if is_story_7_3 {
         // Story 7.3 spec: command exits 0 only if every `blocking_7_3` row has cleared.
         // Blocking rows (7.2 done + the four substrate-canvas confirmations):
         //   * 7.3-7.2-DONE
@@ -3615,6 +3665,469 @@ fn check_7_2_cargo_public_api_clean() -> CheckResult {
         passed: true, // verify-only
         message: format!(
             "verify: cargo-public-api tool installed={} (run `cargo public-api --diff` out-of-band; expect Added-only delta)",
+            tool_installed
+        ),
+    }
+}
+
+// ─── Story 7.4 AC1 row classifiers ─────────────────────────────────────────────
+
+/// Count `[workspace] members` entries in Cargo.toml (one quoted path per line).
+fn workspace_member_count() -> usize {
+    let cargo_toml = "Cargo.toml";
+    if !Path::new(cargo_toml).exists() {
+        return 0;
+    }
+    let Ok(c) = fs::read_to_string(cargo_toml) else {
+        return 0;
+    };
+    let mut in_members = false;
+    let mut n = 0;
+    for line in c.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("members =") || trimmed == "members = [" {
+            in_members = true;
+            continue;
+        }
+        if in_members {
+            if trimmed.starts_with(']') {
+                break;
+            }
+            if trimmed.starts_with('"') {
+                n += 1;
+            }
+        }
+    }
+    n
+}
+
+/// Count job-level entries in discipline.yml — lines matching the canonical
+/// `^  [a-z][a-z0-9-]*:$` pattern (EXACTLY 2-space indent, lowercase key,
+/// bare colon, no trailing content). This is the authoritative job-count grep
+/// used throughout Epic 7 bridge rows (84 at HEAD post-7.3).
+fn discipline_job_count() -> usize {
+    let path = ".github/workflows/discipline.yml";
+    if !Path::new(path).exists() {
+        return 0;
+    }
+    let Ok(c) = fs::read_to_string(path) else {
+        return 0;
+    };
+    c.lines()
+        .filter(|l| {
+            // Exactly two leading spaces, then a lowercase identifier, then `:` at EOL.
+            let Some(rest) = l.strip_prefix("  ") else {
+                return false;
+            };
+            if rest.starts_with(' ') {
+                return false; // deeper indent — not job-level
+            }
+            let Some(key) = rest.strip_suffix(':') else {
+                return false;
+            };
+            !key.is_empty()
+                && key
+                    .chars()
+                    .next()
+                    .map(|c| c.is_ascii_lowercase())
+                    .unwrap_or(false)
+                && key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        })
+        .count()
+}
+
+/// Read the `item_count` recorded in the MANIFEST `[corpus."lcas-v0.3"]` block.
+fn lcas_manifest_item_count() -> Option<u64> {
+    let path = "tests/corpora/MANIFEST.toml";
+    let content = fs::read_to_string(path).ok()?;
+    let mut in_block = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("[corpus.") {
+            in_block = trimmed.contains("\"lcas-v0.3\"");
+            continue;
+        }
+        if in_block {
+            if trimmed.starts_with("item_count") {
+                return trimmed.split('=').nth(1)?.trim().parse::<u64>().ok();
+            }
+            if trimmed.starts_with('[') {
+                break;
+            }
+        }
+    }
+    None
+}
+
+/// 7.4-7.3-DONE (blocking) — Story 7.3 status=done in sprint-status.yaml.
+fn check_7_4_7_3_done() -> CheckResult {
+    let id = "7.4-7.3-DONE".to_string();
+    let sprint_status = Path::new("_bmad-output/implementation-artifacts/sprint-status.yaml");
+    let mut found_done = false;
+    if sprint_status.exists() {
+        if let Ok(content) = fs::read_to_string(sprint_status) {
+            for line in content.lines() {
+                if line.contains("7-3-verify-complianceclaim-envelopes") {
+                    found_done = line.contains("done");
+                    break;
+                }
+            }
+        }
+    }
+    CheckResult {
+        id,
+        passed: found_done,
+        message: format!(
+            "blocking_7_4: Story 7.3 status=done → {}",
+            if found_done {
+                "PASS"
+            } else {
+                "FAIL — Story 7.3 not done"
+            }
+        ),
+    }
+}
+
+/// 7.4-§A2-§A5-HARD-FAIL (verify) — re-verify the 7.3 RF#4 DEGRADED claim.
+/// `check-review-findings-resolved` + `check-dev-record-completeness` are
+/// EXPECTED to STILL carry `continue-on-error: true` (soft-fail on ~42
+/// pre-existing historical violations); `check-bare-review-findings` +
+/// `check-dev-model-used-populated` are EXPECTED hard-fail. Story 7.4 does
+/// NOT flip §A2 (out of greenfield scope). Verify-only — never gates 7.4.
+fn check_7_4_a2_a5_hard_fail() -> CheckResult {
+    let id = "7.4-§A2-§A5-HARD-FAIL".to_string();
+    let path = ".github/workflows/discipline.yml";
+    let mut core_soft_fail = false;
+    let mut bare_rf_hard_fail = false;
+    let mut dmu_hard_fail = false;
+    if Path::new(path).exists() {
+        if let Ok(content) = fs::read_to_string(path) {
+            let lines: Vec<&str> = content.lines().collect();
+            // The two §A2 split-flip gates are EXPECTED to still soft-fail.
+            core_soft_fail = job_has_continue_on_error(&lines, "check-review-findings-resolved:")
+                && job_has_continue_on_error(&lines, "check-dev-record-completeness:");
+            // The two §A5 hard-fail gates are EXPECTED to NOT carry continue-on-error.
+            bare_rf_hard_fail = content.contains("check-bare-review-findings:")
+                && !job_has_continue_on_error(&lines, "check-bare-review-findings:");
+            dmu_hard_fail = content.contains("check-dev-model-used-populated:")
+                && !job_has_continue_on_error(&lines, "check-dev-model-used-populated:");
+        }
+    }
+    let degraded = core_soft_fail;
+    CheckResult {
+        id,
+        passed: true, // verify-only — does NOT block 7.4
+        message: format!(
+            "verify: §A2 split-flip — resolved+completeness soft-fail(continue-on-error)={} → {}; §A5 hard-fail: bare-review-findings={} dev-model-used-populated={} (7.4 does NOT flip §A2; 7.4's own dev record satisfies the two hard-fail gates)",
+            core_soft_fail,
+            if degraded { "STILL DEGRADED (matches 7.3 RF#4)" } else { "CLOSED" },
+            bare_rf_hard_fail, dmu_hard_fail
+        ),
+    }
+}
+
+/// 7.4-7.3-RF-INVENTORY (verify→classify) — parse Story 7.3's two finding
+/// tables; enumerate deferred rows; report substrate-adjacency to 7.4
+/// (expected: none of 7.3's deferred rows touch 7.4's substrate).
+fn check_7_4_7_3_rf_inventory() -> Result<CheckResult, std::io::Error> {
+    let id = "7.4-7.3-RF-INVENTORY".to_string();
+    match find_story_file("7-3") {
+        None => Ok(CheckResult {
+            id,
+            passed: true, // verify-only
+            message: "verify: Story 7.3 file not found".into(),
+        }),
+        Some(path) => {
+            let content = fs::read_to_string(&path)?;
+            let open_rows = content.lines().filter(|l| l.contains("**open**")).count();
+            let deferred_rows = content
+                .lines()
+                .filter(|l| {
+                    let lower = l.to_lowercase();
+                    lower.contains("deferred") && lower.contains("remediation")
+                })
+                .count();
+            let open_critical_high = content
+                .lines()
+                .filter(|line| {
+                    let lower = line.to_lowercase();
+                    (lower.contains("critical") || lower.contains("high"))
+                        && lower.contains("**open**")
+                })
+                .count();
+            // 7.4 substrate canvas: maos-skill [new], maos-cli, cap_policy,
+            // cli_wrapper, transparency_log, LCAS corpus. None of 7.3's
+            // compliance/admission deferred rows touch these → still_deferred.
+            Ok(CheckResult {
+                id,
+                passed: true, // verify-only — does NOT block 7.4
+                message: format!(
+                    "verify→classify: Story 7.3 RF tables — open={} deferred-to-remediation={} open-Critical/High={}; 7.3's deferred rows are compliance/admission (do NOT touch 7.4 substrate: maos-skill/cap_policy/cli_wrapper/transparency_log/LCAS) → classify still_deferred (informational)",
+                    open_rows, deferred_rows, open_critical_high
+                ),
+            })
+        }
+    }
+}
+
+/// 7.4-MAOS-SKILL-BASELINE (blocking) — at AC1 open `crates/maos-skill/` is
+/// ABSENT and NOT a workspace member (catch pre-staging). At Task 7 review
+/// re-run the crate is PRESENT and a member (post-AC2 substrate). Dual-state
+/// consistent per the 7.2-spirit-cli precedent; a partial scaffold fails.
+fn check_7_4_maos_skill_baseline() -> CheckResult {
+    let id = "7.4-MAOS-SKILL-BASELINE".to_string();
+    let crate_dir = Path::new("crates/maos-skill").exists();
+    let cargo = Path::new("crates/maos-skill/Cargo.toml").exists();
+    let lib = Path::new("crates/maos-skill/src/lib.rs").exists();
+    let is_member = fs::read_to_string("Cargo.toml")
+        .map(|c| c.contains("crates/maos-skill"))
+        .unwrap_or(false);
+    let all_absent = !crate_dir && !cargo && !lib && !is_member;
+    let all_present = crate_dir && cargo && lib && is_member;
+    let consistent = all_absent || all_present;
+    CheckResult {
+        id,
+        passed: consistent,
+        message: format!(
+            "blocking_7_4: maos-skill canvas — dir={} Cargo.toml={} lib.rs={} workspace-member={} → {} (consistent={})",
+            crate_dir, cargo, lib, is_member,
+            if all_absent { "PRE-AC2 clean" } else if all_present { "POST-AC2 shipped" } else { "PARTIAL — surface" },
+            consistent
+        ),
+    }
+}
+
+/// 7.4-SKILL-SCOPE-BASELINE (blocking) — at AC1 open the `Scope` enum has NO
+/// `SkillAuthorSelf` variant (catch pre-staging). At review re-run it IS
+/// present (post-AC2). Dual-state consistent — never partial.
+fn check_7_4_skill_scope_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "7.4-SKILL-SCOPE-BASELINE".to_string();
+    let path = "crates/maos-domain/src/invariants/i1.rs";
+    if !Path::new(path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "blocking_7_4: i1.rs (Scope enum) not found".into(),
+        });
+    }
+    let src = fs::read_to_string(path)?;
+    let scope_variant_present = src.contains("SkillAuthorSelf");
+    // Policy wiring must move together with the scope variant.
+    let policy_wired = fs::read_to_string("crates/maos-kernel-core/src/capability/cap_policy/mod.rs")
+        .map(|c| c.contains("SkillAuthorSelf"))
+        .unwrap_or(false);
+    let all_absent = !scope_variant_present && !policy_wired;
+    let all_present = scope_variant_present && policy_wired;
+    let consistent = all_absent || all_present;
+    Ok(CheckResult {
+        id,
+        passed: consistent,
+        message: format!(
+            "blocking_7_4: Scope::SkillAuthorSelf canvas — variant in i1.rs={} cap_policy wired={} → {} (consistent={})",
+            scope_variant_present, policy_wired,
+            if all_absent { "PRE-AC2 clean" } else if all_present { "POST-AC2 shipped" } else { "PARTIAL — surface" },
+            consistent
+        ),
+    })
+}
+
+/// 7.4-CLIWRAPPER-BASELINE (blocking) — Story 6.2 substrate Story 7.4 EXTENDS
+/// (journal + resumption), not rebuilds: `EOutputShapeAdapterMismatch` +
+/// `probe_and_verify_shape` present. The dev runs `cargo test -p
+/// maos-kernel-core cli_wrapper` out-of-band (heavy build cost in gate context).
+fn check_7_4_cli_wrapper_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "7.4-CLIWRAPPER-BASELINE".to_string();
+    let err_path = "crates/maos-domain/src/cli_wrapper.rs";
+    let admission_path = "crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs";
+    let err_present = Path::new(err_path).exists()
+        && fs::read_to_string(err_path)
+            .map(|c| c.contains("EOutputShapeAdapterMismatch"))
+            .unwrap_or(false);
+    let probe_present = Path::new(admission_path).exists()
+        && fs::read_to_string(admission_path)
+            .map(|c| c.contains("fn probe_and_verify_shape"))
+            .unwrap_or(false);
+    let passed = err_present && probe_present;
+    Ok(CheckResult {
+        id,
+        passed,
+        message: format!(
+            "blocking_7_4: CliWrapper baseline — EOutputShapeAdapterMismatch={} probe_and_verify_shape={} (dev runs `cargo test -p maos-kernel-core cli_wrapper` out-of-band; expect PASS) → {}",
+            err_present, probe_present,
+            if passed { "PASS — extend, not rebuild" } else { "FAIL — baseline missing" }
+        ),
+    })
+}
+
+/// 7.4-SELF-TELEMETRY-BASELINE (blocking) — Story 4.3 FR56 substrate the FR57
+/// proposal consumes: `SelfTelemetryReport` + `SelfTelemetryPort` present.
+fn check_7_4_self_telemetry_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "7.4-SELF-TELEMETRY-BASELINE".to_string();
+    let report_path = "crates/maos-domain/src/self_telemetry.rs";
+    let port_path = "crates/maos-domain/src/ports/self_telemetry.rs";
+    let report_present = Path::new(report_path).exists()
+        && fs::read_to_string(report_path)
+            .map(|c| c.contains("pub struct SelfTelemetryReport"))
+            .unwrap_or(false);
+    let port_present = Path::new(port_path).exists()
+        && fs::read_to_string(port_path)
+            .map(|c| c.contains("trait SelfTelemetryPort"))
+            .unwrap_or(false);
+    let passed = report_present && port_present;
+    Ok(CheckResult {
+        id,
+        passed,
+        message: format!(
+            "blocking_7_4: self-telemetry baseline — SelfTelemetryReport={} SelfTelemetryPort={} (dev runs `cargo test -p maos-domain self_telemetry` out-of-band; expect PASS) → {}",
+            report_present, port_present,
+            if passed { "PASS — consume FR56" } else { "FAIL — baseline missing" }
+        ),
+    })
+}
+
+/// 7.4-LCAS-BASELINE (blocking) — the bucket Story 7.4 extends 70→210. At AC1
+/// open the corpus = 70 items + MANIFEST item_count=70. At review re-run it =
+/// 210 + MANIFEST item_count=210. Dual-state consistent; partial fails.
+fn check_7_4_lcas_baseline() -> Result<CheckResult, std::io::Error> {
+    let id = "7.4-LCAS-BASELINE".to_string();
+    let corpus = "tests/corpora/lcas-v0.3.jsonl";
+    if !Path::new(corpus).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "blocking_7_4: lcas-v0.3.jsonl not found".into(),
+        });
+    }
+    let bytes = fs::read(corpus)?;
+    let line_count = bytes
+        .split(|&b| b == b'\n')
+        .filter(|l| !l.is_empty())
+        .count();
+    let manifest_count = lcas_manifest_item_count().unwrap_or(0);
+    let pre = line_count == 70 && manifest_count == 70;
+    let post = line_count == 210 && manifest_count == 210;
+    let consistent = pre || post;
+    Ok(CheckResult {
+        id,
+        passed: consistent,
+        message: format!(
+            "blocking_7_4: LCAS baseline — jsonl lines={} MANIFEST item_count={} → {} (consistent={}; dev runs `cargo run -p xtask -- check-corpus` out-of-band, expect PASS)",
+            line_count, manifest_count,
+            if pre { "PRE-AC5 (70)" } else if post { "POST-AC5 (210)" } else { "PARTIAL — surface" },
+            consistent
+        ),
+    })
+}
+
+/// 7.4-ABI-FROZEN (blocking) — `compliance.rs` frozen markers present +
+/// ABI_VERSION=1 unchanged. Mirrors the 7.3 ABI-frozen check.
+fn check_7_4_abi_frozen() -> Result<CheckResult, std::io::Error> {
+    let id = "7.4-ABI-FROZEN".to_string();
+    let path = "crates/maos-spirit-abi/src/compliance.rs";
+    if !Path::new(path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "blocking_7_4: compliance.rs (frozen ABI) not found".into(),
+        });
+    }
+    let src = fs::read_to_string(path)?;
+    let markers = [
+        "pub struct ComplianceClaimEnvelope",
+        "pub struct ExecutionContextFingerprint",
+        "pub enum SigningAlg",
+        "pub enum TrustTier",
+        "pub enum SandboxTier",
+        "pub struct Claim",
+        "pub enum Verdict",
+    ];
+    let missing: Vec<&&str> = markers.iter().filter(|m| !src.contains(**m)).collect();
+    let version_path = "crates/maos-spirit-abi/src/lib.rs";
+    let abi_version_1 = Path::new(version_path).exists()
+        && fs::read_to_string(version_path)
+            .map(|c| c.contains("pub const ABI_VERSION: u32 = 1"))
+            .unwrap_or(false);
+    let passed = missing.is_empty() && abi_version_1;
+    Ok(CheckResult {
+        id,
+        passed,
+        message: format!(
+            "blocking_7_4: ABI frozen — {} of {} frozen markers present (missing={:?}); ABI_VERSION=1={} (dev runs `abi-diff` out-of-band; new Scope/FrameKind variants must be Added-only)",
+            markers.len() - missing.len(), markers.len(), missing, abi_version_1
+        ),
+    })
+}
+
+/// 7.4-A2A-LOOPBACK-AVAILABLE (verify) — Story 6.3 substrate the adversarially-
+/// misleading LCAS bucket exercises: `LoopbackA2ARouter` + `A2AProfile::Loopback`.
+fn check_7_4_a2a_loopback_available() -> CheckResult {
+    let id = "7.4-A2A-LOOPBACK-AVAILABLE".to_string();
+    let lib_has_router = fs::read_to_string("crates/maos-a2a/src/lib.rs")
+        .map(|c| c.contains("LoopbackA2ARouter"))
+        .unwrap_or(false);
+    let cfg_has_loopback = fs::read_to_string("crates/maos-a2a/src/config.rs")
+        .map(|c| c.contains("Loopback"))
+        .unwrap_or(false);
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: maos-a2a exports LoopbackA2ARouter={} A2AProfile::Loopback={} (adversarially-misleading LCAS bucket substrate available)",
+            lib_has_router, cfg_has_loopback
+        ),
+    }
+}
+
+/// 7.4-WORKSPACE-COUNT (verify → will change) — 29 at HEAD; →30 at done.
+fn check_7_4_workspace_count() -> CheckResult {
+    let id = "7.4-WORKSPACE-COUNT".to_string();
+    let count = workspace_member_count();
+    let has_skill = fs::read_to_string("Cargo.toml")
+        .map(|c| c.contains("crates/maos-skill"))
+        .unwrap_or(false);
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: workspace_members count={} maos-skill listed={} (pre-AC2: 29; post-AC2: 30 — Story 7.4 adds the ONE maos-skill crate)",
+            count, has_skill
+        ),
+    }
+}
+
+/// 7.4-DISCIPLINE-JOB-COUNT (verify) — 84 at HEAD; +2 at done
+/// (smoke-skill-7-4 + check-skill-schema).
+fn check_7_4_discipline_job_count() -> CheckResult {
+    let id = "7.4-DISCIPLINE-JOB-COUNT".to_string();
+    let count = discipline_job_count();
+    let has_smoke = discipline_yml_has_step("smoke-skill-7-4");
+    let has_skill_schema = discipline_yml_has_step("check-skill-schema");
+    let new_count = has_smoke as usize + has_skill_schema as usize;
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: discipline.yml job-level entries={} (pre-AC6: 84; post-AC6: 86); new 7.4 jobs present: smoke-skill-7-4={} check-skill-schema={} → {}/2",
+            count, has_smoke, has_skill_schema, new_count
+        ),
+    }
+}
+
+/// 7.4-CARGO-PUBLIC-API-CLEAN (verify) — report tool installed; dev runs the
+/// diff out-of-band (multi-minute build cost). New maos-skill API + Scope +
+/// FrameKind variants must extend Added, not Removed/Changed.
+fn check_7_4_cargo_public_api_clean() -> CheckResult {
+    let id = "7.4-CARGO-PUBLIC-API-CLEAN".to_string();
+    let tool_installed = std::process::Command::new("cargo")
+        .args(["public-api", "--version"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: cargo-public-api installed={} (run `cargo public-api --diff` out-of-band; expect Added-only — maos-skill types + Scope::SkillAuthorSelf + FrameKind::CliWrapperShapeMismatch)",
             tool_installed
         ),
     }

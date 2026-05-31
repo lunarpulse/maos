@@ -32,4 +32,4 @@ pub mod admission;
 pub mod lifecycle;
 pub mod runtime;
 
-pub use admission::probe_and_verify_shape;
+pub use admission::{admit_cli_wrapper_journaled, probe_and_verify_shape};

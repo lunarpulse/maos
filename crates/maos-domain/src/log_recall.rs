@@ -79,6 +79,10 @@ pub enum FrameKindLabel {
     GatewayOutbound,
     /// Story 7.2 — FR60: Spirit admitted via air-gapped `maosctl import --offline`.
     SpiritImported,
+    /// Story 7.4 — FR40 "full": a CliWrapperSpirit admission refused on an
+    /// output-shape mismatch (ADR-021), journaled with the `{cli, declared,
+    /// observed}` version diff.
+    CliWrapperShapeMismatch,
 }
 
 impl LogRecallFilter {

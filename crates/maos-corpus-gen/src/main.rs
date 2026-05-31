@@ -51,6 +51,19 @@ enum Commands {
         #[arg(long)]
         seeds_fixture: Option<String>,
     },
+
+    /// Story 7.4 — extend the LCAS corpus 70 → 210 IN-PLACE: preserve the
+    /// existing clearly-decidable lines verbatim, append the 140 generated
+    /// genuinely-ambiguous + adversarially-misleading items, and write the
+    /// merged corpus sorted by id (deterministic; re-running is byte-stable).
+    LcasExtend {
+        /// Path to the existing 70-item `lcas-v0.3.jsonl` (lines preserved verbatim).
+        #[arg(long)]
+        existing: String,
+        /// Output path for the merged 210-item corpus.
+        #[arg(long)]
+        out: String,
+    },
 }
 
 fn main() {
@@ -65,6 +78,12 @@ fn main() {
             marker_namespace,
         } => {
             if let Err(e) = run_generate(&corpus, &mode, &out, rng_seed, marker_namespace) {
+                eprintln!("{}", e);
+                std::process::exit(1);
+            }
+        }
+        Commands::LcasExtend { existing, out } => {
+            if let Err(e) = run_lcas_extend(&existing, &out) {
                 eprintln!("{}", e);
                 std::process::exit(1);
             }
@@ -213,6 +232,54 @@ fn run_coverage_with_fixture(
             other
         )),
     }
+}
+
+/// Story 7.4 — merge the existing clearly-decidable LCAS lines (verbatim) with
+/// the 140 generated genuinely-ambiguous + adversarially-misleading items,
+/// sorted by id, written `\n`-terminated. Deterministic: same inputs → same
+/// bytes (the SHA-pin discipline).
+fn run_lcas_extend(existing_path: &str, out_path: &str) -> Result<(), String> {
+    // (id, json_line) pairs. Existing lines are preserved BYTE-FOR-BYTE.
+    let mut rows: Vec<(String, String)> = Vec::new();
+
+    let existing = std::fs::read_to_string(existing_path)
+        .map_err(|e| format!("cannot read existing corpus {existing_path}: {e}"))?;
+    for line in existing.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let v: serde_json::Value = serde_json::from_str(line)
+            .map_err(|e| format!("existing corpus line is not valid JSON: {e}"))?;
+        let id = v
+            .get("id")
+            .and_then(|i| i.as_str())
+            .ok_or_else(|| "existing corpus line missing string `id`".to_string())?
+            .to_string();
+        rows.push((id, line.to_string()));
+    }
+
+    for item in maos_corpus_gen::lcas::generate_extension() {
+        let line = serde_json::to_string(&item)
+            .map_err(|e| format!("serialization error: {e}"))?;
+        rows.push((item.id.clone(), line));
+    }
+
+    // Sort by id ascending; ids are unique across the three buckets.
+    rows.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut buf = String::new();
+    for (_, line) in &rows {
+        buf.push_str(line);
+        buf.push('\n');
+    }
+    std::fs::write(out_path, buf).map_err(|e| format!("I/O error writing {out_path}: {e}"))?;
+    eprintln!(
+        "lcas-extend: wrote {} items ({} existing + 140 generated) to {}",
+        rows.len(),
+        rows.len() - 140,
+        out_path
+    );
+    Ok(())
 }
 
 fn write_jsonl<I: serde::Serialize>(path: &str, items: &[I]) -> Result<(), String> {

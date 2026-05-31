@@ -3173,9 +3173,14 @@ description = "smoke test spirit successor"
             return smoke_compliance_7_3().await;
         }
 
+        // Story 7.4 AC6 — smoke-skill-7-4: skill-ecosystem observability demo.
+        if mode == "smoke-skill-7-4" {
+            return smoke_skill_7_4().await;
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -4847,6 +4852,148 @@ async fn smoke_import_7_2() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         r#"{{"smoke":"7-2-import","status":"ok","surface":"maosctl import --offline","frame_kind":"SpiritImported"}}"#
     );
+    Ok(())
+}
+
+/// Story 7.4 AC6 — `MAOS_ONE_SHOT=smoke-skill-7-4`: the v0.5 skill-ecosystem
+/// observability demo. Six deterministic JSON lines, no network, <30s:
+///   1. parse + validate a `maos.skill.v1` document;
+///   2. discover skills from a temp search-path root;
+///   3. dynamic-write a skill via `skill.author.self` → lands Pending (NOT admitted);
+///   4. build a `SkillRevisionProposal` from a real `SelfTelemetryReport` → enters queue;
+///   5. probe a CliWrapper whose observed shape != declared → refuse + journaled version diff;
+///   6. load the LCAS corpus → count=210 across the three 70-item buckets.
+async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
+    use maos_domain::invariants::i9::SandboxTier;
+    use maos_domain::self_telemetry::SelfTelemetryReport;
+    use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
+    use maos_kernel_core::lifecycle::cli_wrapper::admit_cli_wrapper_journaled;
+    use maos_kernel_core::security::manifest::{
+        CliWrapperConfig, CliWrapperControlChannel, CliWrapperPosture, CliWrapperStdioShape,
+    };
+    use maos_skill::{
+        build_proposal, parse_skill, SkillAdmissionState, SkillEntryPath, SkillId, SkillVersion,
+    };
+
+    fn emit(v: serde_json::Value) {
+        println!("{v}");
+    }
+
+    const VALID_SKILL: &str = "---\nid = \"smoke.reviewer\"\nversion = \"1.0.0\"\nname = \"Smoke Reviewer\"\ndescription = \"A skill authored in the 7.4 smoke demo.\"\n---\n# Smoke Reviewer\n\nReview the diff for correctness, then idiom.\n";
+
+    // ── Step 1 — parse + validate a maos.skill.v1 document ──────────────────
+    let skill = parse_skill(VALID_SKILL)?;
+    emit(serde_json::json!({
+        "step": 1, "surface": "skill_schema", "outcome": "valid", "id": skill.manifest.id
+    }));
+
+    // ── Step 2 — discover skills from a temp search-path root ────────────────
+    let root = std::env::temp_dir().join(format!("maos-smoke-skill-7-4-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root)?;
+    std::fs::write(root.join("a.md"), VALID_SKILL)?;
+    std::fs::write(
+        root.join("b.md"),
+        "---\nid = \"smoke.planner\"\nversion = \"0.2.0\"\nname = \"Smoke Planner\"\ndescription = \"second discovered skill\"\n---\nPlan the work.\n",
+    )?;
+    let discovered = maos_skill::discover_skills(&[root.clone()]);
+    emit(serde_json::json!({
+        "step": 2, "surface": "discover", "count": discovered.len()
+    }));
+
+    // ── Step 3 — dynamic-write via skill.author.self → Pending (NOT admitted) ─
+    let mut queue = maos_skill::SkillAdmissionQueue::new();
+    let id = queue.enqueue_skill(skill.clone(), SkillEntryPath::AuthorSelf, "spirit:1").map_err(|e| format!("step3: {e}"))?;
+    let state = queue.state_of(&id);
+    if state != Some(SkillAdmissionState::Pending) {
+        return Err(format!("step3: skill.author.self skill must land Pending, got {state:?}").into());
+    }
+    emit(serde_json::json!({
+        "step": 3, "surface": "author_self", "state": "pending"
+    }));
+
+    // ── Step 4 — revision proposal from a REAL SelfTelemetryReport ──────────
+    let report = SelfTelemetryReport::new(7, 0, 10_000, 100, 13, 0, 0, 0, vec![], vec![], 10_500)?;
+    let has_evidence = report.success_count + report.failure_count > 0;
+    let proposal = build_proposal(
+        SkillId::from("smoke.reviewer"),
+        SkillVersion::from("1.0.0"),
+        "--- a/skill.md\n+++ b/skill.md\n@@\n-be terse\n+be terse and cite evidence\n".into(),
+        report,
+    )?;
+    let pid = queue.enqueue_proposal(proposal, "spirit:7").map_err(|e| format!("step4: {e}"))?;
+    if queue.state_of(&pid) != Some(SkillAdmissionState::Pending) {
+        return Err("step4: revision proposal must land Pending".into());
+    }
+    emit(serde_json::json!({
+        "step": 4, "surface": "revision_proposal", "state": "pending", "has_evidence": has_evidence
+    }));
+
+    // ── Step 5 — CliWrapper output-shape mismatch → refuse + journaled diff ──
+    // The "CLI" is the stable `/bin/sh` interpreter echoing the probe envelope
+    // (declared 1.0.0 ; observed 2.0.0) — avoids the write-then-exec ETXTBSY
+    // race of a freshly-written script without touching the Story 6.2 probe.
+    let log = TransparencyLogAdapter::open_in_memory(0x7404);
+    let cfg = CliWrapperConfig {
+        command: "/bin/sh".into(),
+        argv_prefix: vec![
+            "-c".into(),
+            "echo '{\"output_shape_version\":\"2.0.0\"}'".into(),
+            "maos-cli-stub".into(),
+        ],
+        output_shape_version: "1.0.0".into(),
+        skill_bundle: vec![],
+        recovery_policy: Default::default(),
+        posture: CliWrapperPosture {
+            stdio_shape: CliWrapperStdioShape::NdjsonOverStdio,
+            control_channel: CliWrapperControlChannel::Signals,
+            shutdown_signal: None,
+        },
+    };
+    let err = admit_cli_wrapper_journaled(&cfg, SandboxTier::T3, 1, &log)
+        .expect_err("step5: stale declared shape must refuse");
+    let (declared, observed) = match err {
+        maos_domain::cli_wrapper::CliWrapperAdmissionError::EOutputShapeAdapterMismatch {
+            declared,
+            observed,
+            ..
+        } => (declared, observed),
+        other => return Err(format!("step5: expected shape mismatch, got {other:?}").into()),
+    };
+    let journaled = !log
+        .query_frames(FrameFilter {
+            kind: Some(FrameKind::CliWrapperShapeMismatch),
+            ..Default::default()
+        })?
+        .is_empty();
+    emit(serde_json::json!({
+        "step": 5, "surface": "output_shape_mismatch", "outcome": "refuse",
+        "declared": declared, "observed": observed, "journaled": journaled
+    }));
+
+    // ── Step 6 — LCAS corpus at N=210 across the three buckets ───────────────
+    let corpus = std::fs::read_to_string("tests/corpora/lcas-v0.3.jsonl")
+        .map_err(|e| format!("step6: cannot read tests/corpora/lcas-v0.3.jsonl: {e}"))?;
+    let mut cd = 0usize;
+    let mut ga = 0usize;
+    let mut am = 0usize;
+    for line in corpus.lines().filter(|l| !l.is_empty()) {
+        let v: serde_json::Value = serde_json::from_str(line)?;
+        match v.get("class").and_then(|c| c.as_str()) {
+            Some("clearly_decidable") => cd += 1,
+            Some("genuinely_ambiguous") => ga += 1,
+            Some("adversarially_misleading") => am += 1,
+            other => return Err(format!("step6: unknown LCAS class {other:?}").into()),
+        }
+    }
+    let total = cd + ga + am;
+    emit(serde_json::json!({
+        "step": 6, "surface": "lcas", "total": total,
+        "clearly_decidable": cd, "genuinely_ambiguous": ga, "adversarially_misleading": am
+    }));
+
+    // Best-effort cleanup of the temp scratch.
+    let _ = std::fs::remove_dir_all(&root);
     Ok(())
 }
 

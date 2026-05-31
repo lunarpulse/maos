@@ -20,6 +20,7 @@ include!(concat!(env!("OUT_DIR"), "/sha_check_rt.rs"));
 include!(concat!(env!("OUT_DIR"), "/sha_check_ccac.rs"));
 
 pub mod ccac;
+pub mod lcas;
 pub mod red_team;
 pub mod secret_redaction;
 

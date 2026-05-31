@@ -1,0 +1,21 @@
+[package]
+name = "maos-skill"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS skill ecosystem — kernel-mediated maos.skill.v1 schema, filesystem discovery, operator-admission queue, and FR57 revision proposals (Story 7.4). Kernel validates schema + manages admission/audit only; the skill body is opaque markdown (§4.0.7)."
+
+[dependencies]
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+maos-domain = { path = "../maos-domain" }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+semver = "1"
+thiserror = "2.0"
+tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3"
+serde_json = "1.0"

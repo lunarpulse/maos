@@ -334,10 +334,17 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   FR39:
-    gates: []
+    gates: [check-skill-schema, smoke-skill-7-4]
     corpora: []
     phase: v0.5
-    valid_until: '2027-05-12'
+    valid_until: '2027-05-31'
+    notes: |
+      Story 7.4 stands up the skill ecosystem in the new maos-skill crate:
+      maos.skill.v1 schema (deny_unknown_fields), filesystem discovery, and the
+      operator-admission queue with three entry paths (package-shipped,
+      skill.author.self, FR57 revision proposal). Every path lands Pending — no
+      auto-admit. check-skill-schema asserts the schema posture; smoke-skill-7-4
+      demonstrates discovery + capability-gated authoring into the pending queue.
   FR4:
     gates:
       - audit_spine_integration
@@ -352,10 +359,18 @@ coverage:
       boot_nonce + timestamp + intent. Story 1b.2 lands the cap-tokens runtime
       (issue/verify/revoke) and the FR4 1000-call fixture.
   FR40:
-    gates: []
+    gates: [smoke-skill-7-4]
     corpora: []
     phase: v0.5
-    valid_until: '2027-05-12'
+    valid_until: '2027-05-31'
+    notes: |
+      Story 6.2 shipped the CliWrapper output-shape probe (probe_and_verify_shape
+      + EOutputShapeAdapterMismatch, binding-v0.9). Story 7.4 completes FR40 to
+      "full": admit_cli_wrapper_journaled journals the refusal as a new additive
+      FrameKind::CliWrapperShapeMismatch frame carrying {cli, declared, observed}
+      and the no-silent-restart resumption gate is explicit (stale config re-fails
+      + re-journals; corrected config admits). smoke-skill-7-4 step 5 demonstrates
+      the journaled refusal.
   FR41:
     gates: []
     corpora: []
@@ -459,10 +474,18 @@ coverage:
     phase: v0.8
     valid_until: '2027-05-12'
   FR57:
-    gates: []
+    gates: [smoke-skill-7-4]
     corpora: []
-    phase: v0.8
-    valid_until: '2027-05-12'
+    phase: v0.5
+    valid_until: '2027-05-31'
+    notes: |
+      Story 7.4 delivers FR57 (reconciled forward from v0.8): a Spirit reads its
+      OWN telemetry via the existing Story 4.3 SelfTelemetryPort/SelfTelemetryReport
+      and emits a SkillRevisionProposal carrying (a) target skill id+version,
+      (b) proposed diff, (c) telemetry evidence. The proposal enters the SAME
+      operator-admission queue (FR39) under the same vetting/audit obligations.
+      No new telemetry plumbing — Story 7.4 CONSUMES FR56. smoke-skill-7-4 step 4
+      demonstrates the proposal entering the queue Pending with evidence.
   FR58:
     gates:
     - check-service-boundary
@@ -1193,15 +1216,20 @@ coverage:
     gates: [lcas-corpus-tests]
     corpora: [lcas-v0.3]
     phase: v0.5
-    valid_until: '2027-05-16'
+    valid_until: '2027-05-31'
     notes: |
-      Story 2.4 ships the LCAS clearly-decidable 70-item bucket at
-      `tests/corpora/lcas-v0.3.jsonl`; genuinely-ambiguous (n=70) + adversarially-
-      misleading (n=70) buckets land at Story 8.x at v0.8 (require A2A
-      scenarios from E6 to be valid per Epic 2 line 22 + Epic 8 line 23).
-      Full N=210 ship-gate execution at v0.5 per PRD line 80. Gate-verified
-      by structural assertion at v0.3 (gold_label matches Spirit's halt/continue
-      decision); judge-LLM agreement layer is Story 7.1 + Story 8.x at v0.5+.
+      Story 2.4 shipped the LCAS clearly-decidable 70-item bucket at
+      `tests/corpora/lcas-v0.3.jsonl`. RECONCILIATION (Story 7.4 AC5): the
+      genuinely-ambiguous (n=70) + adversarially-misleading (n=70) buckets —
+      once deferred to "Story 8.x at v0.8" — are OWNED BY Story 7.4 per
+      epic-7.md:164-170 (epic-authoritative; that Story-8.x note is superseded).
+      The adversarially-misleading bucket exercises A2A scenarios on the
+      Story 6.3 LoopbackA2ARouter substrate (now shipped). Full N=210 is the
+      v0.5 ship-gate substrate per PRD line 80, generated deterministically via
+      `maos-corpus-gen::lcas` (SHA-pinned, lcas-corpus-tests asserts 210 across
+      the three 70-item buckets). Gate-verified by structural assertion
+      (gold_label match + per-bucket count); judge-LLM agreement layer is a
+      later story.
   NFR-Test-7:
     gates: []
     corpora: []

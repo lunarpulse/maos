@@ -106,6 +106,14 @@ pub enum Scope {
     /// `recipient` is an external address (opaque to kernel).
     /// TTL: 300s (Standard intent_class) per ADR-023.
     GatewaySend { gateway_id: String, recipient: String },
+    /// Story 7.4 — FR39/FR57 `skill.author.self`: authorize a Spirit to WRITE
+    /// a `maos.skill.v1` skill (or an FR57 revision proposal) into the pending
+    /// operator-admission queue at runtime. UNLIKE `SelfTelemetryRead`
+    /// (always-allow), this is NOT a top-level always-allow — the Spirit must
+    /// DECLARE `skill.author.self` in its manifest scopes, and the capability
+    /// grants ONLY the write-to-queue; activation still requires the FR39
+    /// operator-admission path (the kernel does not auto-admit the skill).
+    SkillAuthorSelf,
 }
 
 /// Intent classification for approval policy.

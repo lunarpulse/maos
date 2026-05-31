@@ -132,6 +132,19 @@ impl PolicyTable {
                 // Normal admission — halt protocol is enforced at the caller layer.
                 // Falls through to Allow below.
             }
+            Scope::SkillAuthorSelf => {
+                // Story 7.4 — FR39/FR57 `skill.author.self`. This arm is reached
+                // ONLY after the scope-match above confirmed the Spirit DECLARES
+                // `skill.author.self` in its manifest scopes — i.e. UNLIKE
+                // `SelfTelemetryRead` (the top-of-function always-allow), this
+                // capability is NOT always-allow: a Spirit that does not declare
+                // it is denied at the scope-match gate. The capability grants ONLY
+                // the write-to-queue (a Spirit may author a skill into the PENDING
+                // operator-admission queue); it does NOT auto-admit the skill.
+                // Activation still requires the FR39 operator-admission path
+                // (`SkillAdmissionQueue::approve`). Falls through to Allow below
+                // (the write is permitted; the queue gates activation).
+            }
             _ => {}
         }
 
@@ -448,6 +461,56 @@ mod tests {
 
         writer.join().unwrap();
         reader.join().unwrap();
+    }
+
+    #[test]
+    fn skill_author_self_requires_manifest_declaration_not_always_allow() {
+        use maos_domain::invariants::i1::Scope;
+        let table = PolicyTable::new();
+        let mut inner = PolicyTableInner::default();
+        // Spirit 7 DECLARES skill.author.self; Spirit 8 declares only FsRead.
+        inner.manifest_scopes.insert(
+            7,
+            ManifestCapabilityScope {
+                scopes: vec![Scope::SkillAuthorSelf],
+                declared_tier: SandboxTier(0),
+                trust_tier: TrustTier::Verified,
+            },
+        );
+        inner.manifest_scopes.insert(
+            8,
+            ManifestCapabilityScope {
+                scopes: vec![Scope::FsRead {
+                    subtree: "/tmp".into(),
+                }],
+                declared_tier: SandboxTier(0),
+                trust_tier: TrustTier::Verified,
+            },
+        );
+        table.update(inner);
+
+        let cap = Capability {
+            scope: Scope::SkillAuthorSelf,
+        };
+        let intent = Intent::FsRead {
+            subtree: "n/a".into(),
+        };
+
+        // Declaring Spirit → Allow: the write-to-queue is authorized.
+        assert_eq!(table.evaluate(7, &cap, &intent), PolicyDecision::Allow);
+        // Non-declaring Spirit → Deny: scope-match fails.
+        assert_eq!(table.evaluate(8, &cap, &intent), PolicyDecision::Deny);
+        // Unknown Spirit → Deny. CRITICAL contrast with SelfTelemetryRead, which
+        // is always-allow EVEN for an unknown Spirit: SkillAuthorSelf is NOT
+        // always-allow — it is fail-closed and requires manifest declaration.
+        assert_eq!(table.evaluate(999, &cap, &intent), PolicyDecision::Deny);
+        let self_tel = Capability {
+            scope: Scope::SelfTelemetryRead,
+        };
+        assert_eq!(
+            table.evaluate(999, &self_tel, &intent),
+            PolicyDecision::Allow
+        );
     }
 
     #[test]

@@ -1038,6 +1038,7 @@ dependencies = [
  "maos-mcp",
  "maos-providers",
  "maos-registry",
+ "maos-skill",
  "maos-spirit-abi",
  "maos-spirit-cli",
  "maos-spirit-hello",
@@ -1077,6 +1078,7 @@ dependencies = [
  "clap",
  "maos-audit",
  "maos-registry",
+ "maos-skill",
  "rusqlite",
  "serde_json",
  "tempfile",
@@ -1295,6 +1297,21 @@ dependencies = [
 [[package]]
 name = "maos-secrets"
 version = "0.1.0-alpha"
+
+[[package]]
+name = "maos-skill"
+version = "0.1.0-alpha"
+dependencies = [
+ "maos-domain",
+ "maos-spirit-abi",
+ "semver",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "toml 0.8.23",
+ "tracing",
+]
 
 [[package]]
 name = "maos-spirit-abi"
@@ -3009,6 +3026,7 @@ version = "0.1.0-alpha"
 dependencies = [
  "chrono",
  "clap",
+ "maos-skill",
  "proc-macro2",
  "quote",
  "regex",

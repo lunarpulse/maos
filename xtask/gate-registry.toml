@@ -36,4 +36,6 @@ gates = [
     "check-dev-record-completeness",
     # Story 7.3 NFR-Aud-9 — CCAC N=600 ship gate (ccac-n600-ship-gate discipline job).
     "ccac-ship-gate",
+    # Story 7.4 AC6 — maos.skill.v1 schema round-trip + deny_unknown_fields + semver posture.
+    "check-skill-schema",
 ]

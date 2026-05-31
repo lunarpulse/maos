@@ -27,8 +27,10 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use maos_domain::cli_wrapper::CliWrapperAdmissionError;
+use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i9::SandboxTier;
 
+use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::security::manifest::CliWrapperConfig;
 
 /// Probe-result envelope returned by the CLI's `--maos-bridge-probe` handler.
@@ -153,6 +155,74 @@ pub fn probe_and_verify_shape(
     }
 
     Ok(())
+}
+
+/// Story 7.4 AC4 — FR40 "full": the JOURNALED admission path.
+///
+/// Calls the EXISTING Story 6.2 [`probe_and_verify_shape`] (the probe logic —
+/// the spawn, the 2s timeout, the semver compare at `admission.rs:~147`, the
+/// T3 requirement — is UNCHANGED; this wrapper does NOT re-implement it). On an
+/// [`CliWrapperAdmissionError::EOutputShapeAdapterMismatch`] it writes a
+/// `FrameKind::CliWrapperShapeMismatch` Transparency-Log frame carrying the
+/// `{cli, declared, observed}` version diff BEFORE returning the error, so the
+/// refusal is AUDITABLE (ADR-021: "catch it at startup, not after a corrupted
+/// IAC frame lands in the Transparency Log" — and the refusal itself must be
+/// journaled). The Spirit does NOT transition to `Loaded`.
+///
+/// Other admission errors (`ECliWrapperRequiresT3`, `ECliBinaryNotFound`,
+/// `ECliProbeFailed`, …) are returned UNJOURNALED-by-this-frame — they are
+/// distinct failure modes; only the output-shape mismatch is the FR40-"full"
+/// auditable-refusal surface.
+///
+/// ## No-silent-restart resumption gate
+///
+/// This is the single journaled-admission entry point and holds NO cached
+/// "half-admitted" state. A restart re-runs the probe and re-fails IDENTICALLY
+/// (re-journaling a fresh row) for as long as the operator's published
+/// `output_shape_version` diverges from the observed shape. Admission succeeds
+/// ONLY when the operator publishes a CORRECTED configuration whose declared
+/// version matches the observed shape — there is no code path that silently
+/// retries into a started state. (Tested in
+/// `tests/cli_wrapper_shape_mismatch_journal_7_4.rs`.)
+pub fn admit_cli_wrapper_journaled(
+    config: &CliWrapperConfig,
+    sandbox_tier: SandboxTier,
+    spirit_pid: u32,
+    journal: &TransparencyLogAdapter,
+) -> Result<(), CliWrapperAdmissionError> {
+    match probe_and_verify_shape(config, sandbox_tier) {
+        Ok(()) => Ok(()),
+        Err(CliWrapperAdmissionError::EOutputShapeAdapterMismatch {
+            cli,
+            declared,
+            observed,
+        }) => {
+            // Journal the refusal with the version diff BEFORE returning.
+            // I2 binding: insert_frame_event PANICS on write failure (architecture
+            // §7.3) — the audit record is either written or the kernel halts.
+            // There is no silent-failure path.
+            let payload = serde_json::json!({
+                "event": "cli_wrapper_output_shape_mismatch",
+                "cli": cli,
+                "declared": declared,
+                "observed": observed,
+            });
+            let _frame = journal.insert_frame_event(
+                FrameKind::CliWrapperShapeMismatch,
+                spirit_pid,
+                None,
+                "admission.cli_wrapper.output_shape_mismatch",
+                payload.to_string().as_bytes(),
+                FrameOrigin::Kernel,
+            );
+            Err(CliWrapperAdmissionError::EOutputShapeAdapterMismatch {
+                cli,
+                declared,
+                observed,
+            })
+        }
+        Err(other) => Err(other),
+    }
 }
 
 /// Resolve the command — accepts either an absolute path or a bare name; in

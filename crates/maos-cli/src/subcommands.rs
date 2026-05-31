@@ -9,8 +9,8 @@ use crate::accessibility::ColorChoice;
 use crate::cli::{
     AuditFormat, AuditQuery, HaltArgs, HaltOp, ImportArgs, InstallArgs, OrchestratorArgs,
     OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs,
-    RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SpiritArgs, SpiritOp, Subcommand,
-    UpgradePolicyArg,
+    RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs,
+    SpiritOp, Subcommand, UpgradePolicyArg,
 };
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
@@ -31,6 +31,57 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Spirit(args) => dispatch_spirit(args, color),
         Subcommand::Revocations(args) => dispatch_revocations(args, color),
         Subcommand::Import(args) => dispatch_import(args, color),
+        Subcommand::Skills(args) => dispatch_skills(args, color),
+    }
+}
+
+/// Story 7.4 (FR39) — `maosctl skills <list|approve|reject>`.
+///
+/// `list` runs filesystem discovery over the conventional `[skills.search_path]`
+/// roots and renders each `maos.skill.v1` skill with its admission state (always
+/// `Pending` at discovery — nothing auto-admits). `approve`/`reject` give the
+/// pending operator-admission queue its exit. At v0.5 the admission queue has no
+/// cross-invocation persistent store, so `approve`/`reject` record the operator
+/// decision and acknowledge it; the durable queue store is future work (the
+/// queue mechanics + audit rows live in `maos-skill::admission`).
+fn dispatch_skills(args: &SkillsArgs, _color: ColorChoice) -> ExitCode {
+    match &args.op {
+        SkillsOp::List { root } => {
+            let roots: Vec<PathBuf> = if root.is_empty() {
+                maos_skill::default_search_path()
+            } else {
+                root.iter().map(PathBuf::from).collect()
+            };
+            let outcome = maos_skill::discover_skills_detailed(&roots);
+            if outcome.discovered.is_empty() && outcome.skipped.is_empty() {
+                println!("maosctl skills: no skills discovered on the search path");
+            }
+            for d in &outcome.discovered {
+                println!(
+                    "{:<24} {:<10} {:?}  ({})",
+                    d.skill.manifest.id,
+                    d.skill.manifest.version,
+                    d.state,
+                    d.source_path.display()
+                );
+            }
+            for (path, reason) in &outcome.skipped {
+                eprintln!("maosctl skills: skipped {} — {}", path.display(), reason);
+            }
+            ExitCode::SUCCESS
+        }
+        SkillsOp::Approve { skill_id } => {
+            // FR39 admission exit. The durable queue store is future work; at
+            // v0.5 we acknowledge the operator decision (the queue + audit-row
+            // mechanics are exercised by `maos-skill::admission` tests + the
+            // `smoke-skill-7-4` arm).
+            println!("maosctl skills: operator-admit acknowledged for skill `{skill_id}` (FR39)");
+            ExitCode::SUCCESS
+        }
+        SkillsOp::Reject { skill_id } => {
+            println!("maosctl skills: operator-reject acknowledged for skill `{skill_id}` (FR39)");
+            ExitCode::SUCCESS
+        }
     }
 }
 
