@@ -44,7 +44,10 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
 
         if let Some(rf_start) = content.find("\n### Review Findings") {
             let rf_section = &content[rf_start..];
-            let rf_end = rf_section[1..].find("\n## ").map(|i| i + 1).unwrap_or(rf_section.len());
+            let rf_end = rf_section[1..]
+                .find("\n## ")
+                .map(|i| i + 1)
+                .unwrap_or(rf_section.len());
             let rf_content = &rf_section[..rf_end];
             if rf_content.contains(PLACEHOLDER) {
                 bare_files.push(name);
@@ -65,7 +68,10 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
         if passed {
             eprintln!("check-bare-review-findings: PASS — 0 bare placeholders found");
         } else {
-            eprintln!("check-bare-review-findings: FAIL — {} bare placeholder(s) found:", bare_files.len());
+            eprintln!(
+                "check-bare-review-findings: FAIL — {} bare placeholder(s) found:",
+                bare_files.len()
+            );
             for f in &bare_files {
                 eprintln!("  - {}", f);
             }
@@ -75,7 +81,10 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
     if passed {
         Ok(())
     } else {
-        Err(format!("{} stories still have bare review findings", bare_files.len()))
+        Err(format!(
+            "{} stories still have bare review findings",
+            bare_files.len()
+        ))
     }
 }
 
@@ -94,7 +103,11 @@ mod tests {
     #[test]
     fn test_zero_placeholders_exit_0() {
         let dir = TempDir::new().unwrap();
-        write_story(&dir, "1-1-test.md", "---\ndev_model_used: test\n---\n\n### Review Findings\n\n- [x] Finding 1");
+        write_story(
+            &dir,
+            "1-1-test.md",
+            "---\ndev_model_used: test\n---\n\n### Review Findings\n\n- [x] Finding 1",
+        );
         let result = run_with_dir(false, dir.path().to_str().unwrap());
         assert!(result.is_ok());
     }
@@ -102,7 +115,11 @@ mod tests {
     #[test]
     fn test_one_placeholder_exit_1() {
         let dir = TempDir::new().unwrap();
-        write_story(&dir, "1-1-test.md", format!("---\n---\n\n### Review Findings\n\n{}", PLACEHOLDER).as_str());
+        write_story(
+            &dir,
+            "1-1-test.md",
+            format!("---\n---\n\n### Review Findings\n\n{}", PLACEHOLDER).as_str(),
+        );
         let result = run_with_dir(false, dir.path().to_str().unwrap());
         assert!(result.is_err());
     }
@@ -110,8 +127,16 @@ mod tests {
     #[test]
     fn test_template_excluded() {
         let dir = TempDir::new().unwrap();
-        write_story(&dir, "1-1-test.md", format!("---\n---\n\n### Review Findings\n\n{}", PLACEHOLDER).as_str());
-        write_story(&dir, "template-story.md", format!("---\n---\n\n### Review Findings\n\n{}", PLACEHOLDER).as_str());
+        write_story(
+            &dir,
+            "1-1-test.md",
+            format!("---\n---\n\n### Review Findings\n\n{}", PLACEHOLDER).as_str(),
+        );
+        write_story(
+            &dir,
+            "template-story.md",
+            format!("---\n---\n\n### Review Findings\n\n{}", PLACEHOLDER).as_str(),
+        );
         let result = run_with_dir(false, dir.path().to_str().unwrap());
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("1 stories"));
@@ -121,7 +146,11 @@ mod tests {
     fn test_multiple_placeholders_full_list() {
         let dir = TempDir::new().unwrap();
         for i in 1..=3 {
-            write_story(&dir, format!("1-{}-test.md", i).as_str(), format!("---\n---\n\n### Review Findings\n\n{}", PLACEHOLDER).as_str());
+            write_story(
+                &dir,
+                format!("1-{}-test.md", i).as_str(),
+                format!("---\n---\n\n### Review Findings\n\n{}", PLACEHOLDER).as_str(),
+            );
         }
         let result = run_with_dir(false, dir.path().to_str().unwrap());
         assert!(result.is_err());

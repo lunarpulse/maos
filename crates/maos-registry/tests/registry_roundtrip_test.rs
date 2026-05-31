@@ -64,18 +64,19 @@ fn b64_to_vec(b64: &str) -> Vec<u8> {
 }
 
 fn load_fixture(path: &Path) -> Fixture {
-    let content = std::fs::read_to_string(path).unwrap_or_else(|e| {
-        panic!("failed to read fixture {}: {e}", path.display())
-    });
-    serde_json::from_str(&content).unwrap_or_else(|e| {
-        panic!("failed to parse fixture {}: {e}", path.display())
-    })
+    let content = std::fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("failed to read fixture {}: {e}", path.display()));
+    serde_json::from_str(&content)
+        .unwrap_or_else(|e| panic!("failed to parse fixture {}: {e}", path.display()))
 }
 
 fn build_signed_package(f: &Fixture) -> Result<SignedPackage, String> {
     let sig_bytes = hex::decode(&f.signature_hex).map_err(|e| format!("signature hex: {e}"))?;
     if sig_bytes.len() != 64 {
-        return Err(format!("signature is {} bytes, expected 64", sig_bytes.len()));
+        return Err(format!(
+            "signature is {} bytes, expected 64",
+            sig_bytes.len()
+        ));
     }
     let signature: [u8; 64] = sig_bytes.try_into().unwrap();
 
@@ -88,14 +89,20 @@ fn build_signed_package(f: &Fixture) -> Result<SignedPackage, String> {
     let env_sig_bytes = hex::decode(&f.compliance_envelope.signature_hex)
         .map_err(|e| format!("envelope sig hex: {e}"))?;
     if env_sig_bytes.len() != 64 {
-        return Err(format!("envelope signature is {} bytes, expected 64", env_sig_bytes.len()));
+        return Err(format!(
+            "envelope signature is {} bytes, expected 64",
+            env_sig_bytes.len()
+        ));
     }
     let envelope_signature: [u8; 64] = env_sig_bytes.try_into().unwrap();
 
     let env_pk_bytes = hex::decode(&f.compliance_envelope.attester_pubkey_hex)
         .map_err(|e| format!("envelope pubkey hex: {e}"))?;
     if env_pk_bytes.len() != 32 {
-        return Err(format!("envelope pubkey is {} bytes, expected 32", env_pk_bytes.len()));
+        return Err(format!(
+            "envelope pubkey is {} bytes, expected 32",
+            env_pk_bytes.len()
+        ));
     }
     let attester_pubkey: [u8; 32] = env_pk_bytes.try_into().unwrap();
 
@@ -123,8 +130,7 @@ fn build_signed_package(f: &Fixture) -> Result<SignedPackage, String> {
 }
 
 fn fixture_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/registry-roundtrip-v05")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/registry-roundtrip-v05")
 }
 
 fn collect_fixtures(subdir: &str) -> Vec<(String, Fixture)> {
@@ -135,11 +141,7 @@ fn collect_fixtures(subdir: &str) -> Vec<(String, Fixture)> {
     let mut entries: Vec<_> = std::fs::read_dir(&dir)
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .is_some_and(|ext| ext == "json")
-        })
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
         .collect();
     entries.sort_by_key(|e| e.file_name());
     entries
@@ -158,7 +160,11 @@ fn well_formed_fixtures_admit_or_error_as_expected() {
     use maos_spirit_abi::compliance::TrustTier;
 
     let fixtures = collect_fixtures("well-formed");
-    assert!(fixtures.len() >= 10, "expected >= 10 well-formed fixtures, got {}", fixtures.len());
+    assert!(
+        fixtures.len() >= 10,
+        "expected >= 10 well-formed fixtures, got {}",
+        fixtures.len()
+    );
 
     for (name, f) in &fixtures {
         let pkg = match build_signed_package(f) {
@@ -219,7 +225,11 @@ fn malformed_fixtures_rejected_with_typed_error() {
     use maos_spirit_abi::compliance::TrustTier;
 
     let fixtures = collect_fixtures("malformed-rejected");
-    assert!(fixtures.len() >= 8, "expected >= 8 malformed fixtures, got {}", fixtures.len());
+    assert!(
+        fixtures.len() >= 8,
+        "expected >= 8 malformed fixtures, got {}",
+        fixtures.len()
+    );
 
     for (name, f) in &fixtures {
         let pkg = match build_signed_package(f) {
@@ -241,19 +251,24 @@ fn malformed_fixtures_rejected_with_typed_error() {
         if let Some(expected) = &f.expected_admission {
             match result {
                 Ok(decision) => {
-                    assert_eq!(decision.admit, expected.admit,
-                        "[{name}] admit mismatch");
+                    assert_eq!(decision.admit, expected.admit, "[{name}] admit mismatch");
                 }
                 Err(e) => {
                     if let Some(err_var) = &expected.error_variant {
                         let err_str = format!("{e:?}");
-                        assert!(err_str.contains(err_var),
-                            "[{name}] error does not contain '{err_var}': {err_str}");
+                        assert!(
+                            err_str.contains(err_var),
+                            "[{name}] error does not contain '{err_var}': {err_str}"
+                        );
                     }
                 }
             }
         } else {
-            assert!(result.is_err(), "[{name}] expected error but got Ok: {:?}", result.unwrap());
+            assert!(
+                result.is_err(),
+                "[{name}] expected error but got Ok: {:?}",
+                result.unwrap()
+            );
 
             if let Some(expected_err) = &f.expected_error {
                 let err_str = format!("{:?}", result.unwrap_err());
@@ -268,15 +283,13 @@ fn malformed_fixtures_rejected_with_typed_error() {
 
 #[test]
 fn fixture_replay_search_roundtrip() {
-    let client = FixtureReplaySpiritRegistryClient::new(vec![
-        Ok(serde_json::json!({
-            "items": [{
-                "spirit_id": "spirit-local-unsigned-001",
-                "version": "0.1.0",
-                "summary": "test spirit"
-            }]
-        })),
-    ]);
+    let client = FixtureReplaySpiritRegistryClient::new(vec![Ok(serde_json::json!({
+        "items": [{
+            "spirit_id": "spirit-local-unsigned-001",
+            "version": "0.1.0",
+            "summary": "test spirit"
+        }]
+    }))]);
 
     let q = SearchQuery::new("spirit-local".into(), false, 10);
     let results = client.search(&q).unwrap();
@@ -285,13 +298,11 @@ fn fixture_replay_search_roundtrip() {
 
 #[test]
 fn fixture_replay_publish_roundtrip() {
-    let client = FixtureReplaySpiritRegistryClient::new(vec![
-        Ok(serde_json::json!({
-            "publish_id": "pub-001",
-            "spirit_id": "test-spirit",
-            "version": "0.1.0"
-        })),
-    ]);
+    let client = FixtureReplaySpiritRegistryClient::new(vec![Ok(serde_json::json!({
+        "publish_id": "pub-001",
+        "spirit_id": "test-spirit",
+        "version": "0.1.0"
+    }))]);
 
     let fixtures = collect_fixtures("well-formed");
     let (_name, f) = fixtures.first().expect("at least one well-formed fixture");

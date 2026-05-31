@@ -606,10 +606,21 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Aud-9:
-    gates: []
-    corpora: []
+    gates:
+    - ccac-ship-gate
+    corpora:
+    - ccac-v1.0
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: Story 7.3 ships the CCAC N=640 corpus (= 200 well-formed + 440 malformed)
+      via maos-corpus-gen::ccac and the ccac-n600-ship-gate (P0 ship-blocker, NON
+      continue-on-error). Per-class floor ≥27/30; exactly 140 context-drift envelopes
+      (7 DriftField families × 2 templates × 10 variations) all reject with EComplianceContextDrift
+      naming the divergent field (140/140); ManifestHash/SpiritVersion drift surfaces
+      as FingerprintHash per the evaluator's catch-all. ±2% cross-validation across
+      3 reference Spirit contexts (hello / template-7-1 / synth-pu). Gate replays the
+      SHA-pinned corpus through the maos-compliance v0.9-binding evaluator (signature
+      + canonical-CBOR + runtime execution-context match). FR38 v1.0 binding.
   NFR-Comp-1:
     gates: []
     corpora: []

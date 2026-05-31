@@ -10,9 +10,11 @@
 //!    `PublicVetted` (rejected per FR37).
 
 use maos_domain::ports::registry::{SignedPackage, TrustTier};
-use maos_spirit_abi::compliance::SandboxTier;
+use maos_spirit_abi::compliance::{CryptoProviderId, ProviderEndpointPin, SandboxTier};
 
-use crate::compliance_verify::{self, VerificationResult};
+use crate::compliance_verify::extract_manifest_fingerprint_fields;
+use maos_compliance::evaluator::{evaluate_envelope, ComplianceVerdict, EComplianceRejection};
+use maos_compliance::RuntimeExecutionContext;
 
 /// Admission decision returned by `admit_spirit`.
 #[derive(Debug, Clone)]
@@ -39,10 +41,14 @@ pub enum AdmissionError {
     #[error("publisher Ed25519 signature verification failed on artifact bytes")]
     PublisherSignatureInvalid,
 
-    #[error("ComplianceClaim execution-context fingerprint drift — actual={actual_hex}, claimed={claimed_hex}")]
+    #[error(
+        "ComplianceClaim execution-context drift on {field} — actual={actual}, claimed={claimed}"
+    )]
     ComplianceContextDrift {
-        actual_hex: String,
-        claimed_hex: String,
+        /// Which fingerprint field drifted (or "MalformedClaim" / "ExpiredClaim").
+        field: String,
+        actual: String,
+        claimed: String,
     },
 
     #[error("operator-policy unsigned_local rejected — operator must set allow_unsigned_local=true to admit unsigned local Spirits")]
@@ -57,6 +63,14 @@ pub struct AdmissionConfig {
     pub t3_for_public_untrusted: bool,
     pub allow_unsigned_local: bool,
     pub org_signing_pubkey: Option<[u8; 32]>,
+    /// Story 7.3 (FR38 v1.0): the operator's resolved RUNTIME provider endpoint.
+    /// `None` defaults to the manifest-derived value so v0.5-α manifest-matching
+    /// fixtures keep admitting; `Some` exercises the v1.0 runtime drift check.
+    pub runtime_provider_endpoint: Option<ProviderEndpointPin>,
+    /// Story 7.3 (FR38 v1.0): the composition-root crypto-provider identity
+    /// (`"ring"` for `RingCryptoProvider`). `None` defaults to the
+    /// manifest-derived value.
+    pub runtime_crypto_provider: Option<CryptoProviderId>,
 }
 
 /// Three-trust-tier strictest-of-floor admission per ADR-009.
@@ -69,7 +83,11 @@ pub fn admit_spirit(
 
     // 2. Compute effective_tier = strictest_of(manifest, registry_origin, op_cfg.tier_floor).
     let registry_origin_tier = op_cfg.registry_origin_tier;
-    let effective_tier = strictest_of(manifest_declared_tier, registry_origin_tier, op_cfg.tier_floor);
+    let effective_tier = strictest_of(
+        manifest_declared_tier,
+        registry_origin_tier,
+        op_cfg.tier_floor,
+    );
 
     // 3. Branch on effective_tier.
     match effective_tier {
@@ -85,29 +103,68 @@ pub fn admit_spirit(
                 return Err(AdmissionError::PublisherSignatureInvalid);
             }
 
-            // Step b: Structural ComplianceClaim verification
-            let verification = compliance_verify::verify_envelope_structural(
-                &pkg.compliance_envelope,
+            // Step b: v1.0 semantic ComplianceClaim verification against the
+            // RUNTIME execution context (FR38 §8.5 upgrade). The claim is
+            // compared against the kernel's ACTUAL runtime context — the
+            // strictest-of effective trust tier (NOT the manifest-declared
+            // tier), the operator-resolved provider endpoint, and the
+            // composition-root crypto provider — rather than the manifest alone.
+            let manifest_fields = extract_manifest_fingerprint_fields(&pkg.manifest_toml);
+            let runtime_provider = op_cfg
+                .runtime_provider_endpoint
+                .clone()
+                .unwrap_or_else(|| manifest_fields.provider_endpoint.clone());
+            let runtime_crypto = op_cfg
+                .runtime_crypto_provider
+                .clone()
+                .unwrap_or_else(|| manifest_fields.crypto_provider.clone());
+            // NOTE (boundary documentation — team consensus Decision #1):
+            // Compliance attests the manifest-declared sandbox tier. The effective
+            // runtime sandbox floor (e.g. T3 when t3_for_public_untrusted=true) is
+            // computed and enforced DOWNSTREAM at lines ~163-167 — it is a separate
+            // enforcement layer, not a compliance concern. These are intentionally
+            // two distinct questions: (1) "does the claim match the manifest?" and
+            // (2) "does the runtime floor meet operator policy?" The v1.0 "runtime >
+            // manifest" principle applies to fields where the runtime value EXISTS at
+            // compliance time (trust_tier, provider_endpoint, crypto_provider). For
+            // sandbox_tier the effective value has not been computed yet.
+            let runtime_ctx = RuntimeExecutionContext::from_admission(
+                effective_tier,               // strictest-of result (v1.0 upgrade)
+                manifest_fields.sandbox_tier, // manifest-declared; runtime floor enforced downstream
                 pkg,
+                &runtime_provider,
+                &runtime_crypto,
             );
-            match verification {
-                VerificationResult::Ok => {}
-                VerificationResult::SignatureInvalid => {
+            match evaluate_envelope(&pkg.compliance_envelope, &runtime_ctx) {
+                ComplianceVerdict::Admit => {}
+                ComplianceVerdict::Reject(EComplianceRejection::SignatureInvalid) => {
                     return Err(AdmissionError::PublisherSignatureInvalid);
                 }
-                VerificationResult::ClaimDecodeFailure(msg) => {
+                ComplianceVerdict::Reject(EComplianceRejection::ContextDrift {
+                    field,
+                    actual,
+                    claimed,
+                }) => {
                     return Err(AdmissionError::ComplianceContextDrift {
-                        actual_hex: String::new(),
-                        claimed_hex: format!("decode failure: {msg}"),
+                        field: format!("{field:?}"),
+                        actual,
+                        claimed,
                     });
                 }
-                VerificationResult::Drift {
-                    actual_hex,
-                    claimed_hex,
-                } => {
+                ComplianceVerdict::Reject(EComplianceRejection::MalformedClaim(m)) => {
                     return Err(AdmissionError::ComplianceContextDrift {
-                        actual_hex,
-                        claimed_hex,
+                        field: "MalformedClaim".into(),
+                        actual: String::new(),
+                        claimed: m,
+                    });
+                }
+                ComplianceVerdict::Reject(EComplianceRejection::ExpiredClaim {
+                    expired_at_unix_ms,
+                }) => {
+                    return Err(AdmissionError::ComplianceContextDrift {
+                        field: "ExpiredClaim".into(),
+                        actual: String::new(),
+                        claimed: format!("expired_at_unix_ms={expired_at_unix_ms}"),
                     });
                 }
             }
@@ -132,7 +189,9 @@ pub fn admit_spirit(
         }
         TrustTier::OrgInternal => {
             // REQUIRE: publisher_pubkey == op_cfg.org_signing_pubkey
-            let org_key = op_cfg.org_signing_pubkey.ok_or(AdmissionError::OrgSignatureInvalid)?;
+            let org_key = op_cfg
+                .org_signing_pubkey
+                .ok_or(AdmissionError::OrgSignatureInvalid)?;
             if pkg.publisher_pubkey != org_key {
                 return Err(AdmissionError::OrgSignatureInvalid);
             }
@@ -306,6 +365,8 @@ mod tests {
             t3_for_public_untrusted: false,
             allow_unsigned_local: true,
             org_signing_pubkey: None,
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         }
     }
 
@@ -316,9 +377,12 @@ mod tests {
             t3_for_public_untrusted: false,
             allow_unsigned_local: false,
             org_signing_pubkey: None,
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         }
     }
 
+    #[allow(dead_code)]
     fn public_untrusted_origin_cfg() -> AdmissionConfig {
         AdmissionConfig {
             tier_floor: TrustTier::Local,
@@ -326,6 +390,8 @@ mod tests {
             t3_for_public_untrusted: false,
             allow_unsigned_local: true,
             org_signing_pubkey: None,
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         }
     }
 
@@ -390,13 +456,34 @@ mod tests {
         // Test the core strictest_of function directly
         use maos_domain::ports::registry::TrustTier as T;
         assert_eq!(strictest_of(T::Local, T::Local, T::Local), T::Local);
-        assert_eq!(strictest_of(T::Local, T::Local, T::OrgInternal), T::OrgInternal);
-        assert_eq!(strictest_of(T::Local, T::Local, T::PublicUntrusted), T::PublicUntrusted);
-        assert_eq!(strictest_of(T::Local, T::OrgInternal, T::Local), T::OrgInternal);
-        assert_eq!(strictest_of(T::OrgInternal, T::OrgInternal, T::OrgInternal), T::OrgInternal);
-        assert_eq!(strictest_of(T::Local, T::PublicUntrusted, T::Local), T::PublicUntrusted);
-        assert_eq!(strictest_of(T::PublicUntrusted, T::Local, T::Local), T::PublicUntrusted);
-        assert_eq!(strictest_of(T::PublicUntrusted, T::PublicUntrusted, T::PublicUntrusted), T::PublicUntrusted);
+        assert_eq!(
+            strictest_of(T::Local, T::Local, T::OrgInternal),
+            T::OrgInternal
+        );
+        assert_eq!(
+            strictest_of(T::Local, T::Local, T::PublicUntrusted),
+            T::PublicUntrusted
+        );
+        assert_eq!(
+            strictest_of(T::Local, T::OrgInternal, T::Local),
+            T::OrgInternal
+        );
+        assert_eq!(
+            strictest_of(T::OrgInternal, T::OrgInternal, T::OrgInternal),
+            T::OrgInternal
+        );
+        assert_eq!(
+            strictest_of(T::Local, T::PublicUntrusted, T::Local),
+            T::PublicUntrusted
+        );
+        assert_eq!(
+            strictest_of(T::PublicUntrusted, T::Local, T::Local),
+            T::PublicUntrusted
+        );
+        assert_eq!(
+            strictest_of(T::PublicUntrusted, T::PublicUntrusted, T::PublicUntrusted),
+            T::PublicUntrusted
+        );
     }
 
     #[test]
@@ -406,7 +493,8 @@ mod tests {
             t3_for_public_untrusted: true,
             ..permissive_cfg()
         };
-        let manifest = "[spirit]\nname=\"test\"\nversion=\"0.1.0\"\ntrust_tier=\"public_untrusted\"\n";
+        let manifest =
+            "[spirit]\nname=\"test\"\nversion=\"0.1.0\"\ntrust_tier=\"public_untrusted\"\n";
         let pkg = SignedPackage::new(
             SpiritId::from("test"),
             "0.1.0".into(),
@@ -491,8 +579,8 @@ mod tests {
     ) -> SignedPackage {
         use crate::compliance_verify::compute_fingerprint_hash;
         use maos_spirit_abi::compliance::{
-            CapabilityId, CryptoProviderId, ExecutionContextFingerprint,
-            ProviderEndpointPin, SandboxTier as Sb, TrustTier as Tt,
+            CapabilityId, CryptoProviderId, ExecutionContextFingerprint, ProviderEndpointPin,
+            SandboxTier as Sb, TrustTier as Tt,
         };
         use sha2::Digest;
         use std::collections::BTreeSet;
@@ -577,6 +665,8 @@ mod tests {
             allow_unsigned_local: false,
             // Operator-configured org key matches publisher.
             org_signing_pubkey: Some(pk),
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         };
 
         let decision = admit_spirit(&pkg, &cfg).expect("expected admit");
@@ -591,7 +681,13 @@ mod tests {
         let (kp_publisher, pk_publisher) = seeded_keypair(0x150C04A5);
         let (_kp_org, pk_org) = seeded_keypair(0xDEADBEEF); // different seed
 
-        let pkg = signed_pkg_with("org-spirit", "0.1.0", "org_internal", &kp_publisher, pk_publisher);
+        let pkg = signed_pkg_with(
+            "org-spirit",
+            "0.1.0",
+            "org_internal",
+            &kp_publisher,
+            pk_publisher,
+        );
 
         let cfg = AdmissionConfig {
             tier_floor: TrustTier::Local,
@@ -599,6 +695,8 @@ mod tests {
             t3_for_public_untrusted: false,
             allow_unsigned_local: false,
             org_signing_pubkey: Some(pk_org),
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         };
 
         let err = admit_spirit(&pkg, &cfg).unwrap_err();
@@ -618,6 +716,8 @@ mod tests {
             t3_for_public_untrusted: false,
             allow_unsigned_local: true,
             org_signing_pubkey: None,
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         };
 
         let decision = admit_spirit(&pkg, &cfg).expect("expected admit");
@@ -633,7 +733,8 @@ mod tests {
         let (kp_tamper, _pk_tamper) = seeded_keypair(0xC0FFEE00);
 
         // Start from a valid envelope, then tamper its signature
-        let mut pkg = public_untrusted_pkg_with_valid_envelope("pub-spirit", "0.1.0", &kp_pub, pk_pub);
+        let mut pkg =
+            public_untrusted_pkg_with_valid_envelope("pub-spirit", "0.1.0", &kp_pub, pk_pub);
         // Re-sign claim_bytes with a DIFFERENT key but keep the attester_pubkey
         // pointing at the original publisher → signature won't verify.
         let bad_sig = kp_tamper.sign(&pkg.compliance_envelope.claim_bytes);
@@ -645,6 +746,8 @@ mod tests {
             t3_for_public_untrusted: false,
             allow_unsigned_local: true,
             org_signing_pubkey: None,
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         };
 
         let err = admit_spirit(&pkg, &cfg).unwrap_err();
@@ -711,6 +814,8 @@ mod tests {
             t3_for_public_untrusted: false,
             allow_unsigned_local: true,
             org_signing_pubkey: None,
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         };
 
         let err = admit_spirit(&pkg, &cfg).unwrap_err();

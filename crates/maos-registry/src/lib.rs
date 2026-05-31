@@ -36,6 +36,6 @@ pub mod storage;
 pub mod yank;
 
 pub use client::McpSpiritRegistryClient;
+pub use maos_domain::ports::registry::TrustTier;
 pub use operations::RegistryOperation;
 pub use server::SpiritRegistryServer;
-pub use maos_domain::ports::registry::TrustTier;

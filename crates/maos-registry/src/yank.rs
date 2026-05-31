@@ -78,7 +78,9 @@ impl YankPoller {
     /// Called every 5 min by the kernel's polling task.
     /// Returns the number of new yank entries observed.
     pub fn poll_once(&self) -> Result<usize, RegistryError> {
-        let since_ns = self.cache.lock()
+        let since_ns = self
+            .cache
+            .lock()
             .map_err(|e| RegistryError::Transport(format!("yank cache lock poisoned: {e}")))?
             .last_seen_ns;
         let list = self.source.fetch_yanks(since_ns)?;
@@ -88,7 +90,8 @@ impl YankPoller {
             self.observer.on_yank(entry);
         }
 
-        self.cache.lock()
+        self.cache
+            .lock()
             .map_err(|e| RegistryError::Transport(format!("yank cache lock poisoned: {e}")))?
             .apply(&list);
         Ok(count)
@@ -96,9 +99,7 @@ impl YankPoller {
 
     /// Expose the cache's `last_seen_ns` for testing.
     pub fn last_seen_ns(&self) -> u64 {
-        self.cache.lock()
-            .map(|g| g.last_seen_ns)
-            .unwrap_or(0)
+        self.cache.lock().map(|g| g.last_seen_ns).unwrap_or(0)
     }
 
     /// Seed the cache from a persisted cursor file.
@@ -113,9 +114,7 @@ impl YankPoller {
     pub fn load_cursor(&self) {
         if let Some(cursor) = load_cursor() {
             if let Ok(mut guard) = self.cache.lock() {
-                let remapped_ns = remap_cursor_to_current_monotonic(&cursor,
-                    guard.last_seen_ns
-                );
+                let remapped_ns = remap_cursor_to_current_monotonic(&cursor, guard.last_seen_ns);
                 guard.last_seen_ns = remapped_ns;
             }
         }
@@ -240,8 +239,7 @@ pub fn cursor_file_path() -> std::path::PathBuf {
         return std::path::PathBuf::from(p);
     }
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    std::path::PathBuf::from(home)
-        .join(".local/share/maos/registry/yank_cursor.json")
+    std::path::PathBuf::from(home).join(".local/share/maos/registry/yank_cursor.json")
 }
 
 /// Save the cursor to disk. Stamps `last_saved_iso8601` with the current UTC
@@ -342,10 +340,7 @@ fn parse_iso8601_to_ns(s: &str) -> Option<u64> {
     }
     days += (day - 1) as i64;
 
-    let total_secs = days * 86400
-        + (hour as i64) * 3600
-        + (min as i64) * 60
-        + (sec as i64);
+    let total_secs = days * 86400 + (hour as i64) * 3600 + (min as i64) * 60 + (sec as i64);
     Some((total_secs as u64) * 1_000_000_000 + (ms as u64) * 1_000_000)
 }
 
@@ -407,7 +402,20 @@ fn is_leap_year(y: i64) -> bool {
 }
 
 fn month_days(leap: bool) -> [u32; 12] {
-    [31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    [
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ]
 }
 
 #[cfg(test)]
@@ -444,7 +452,10 @@ mod cursor_tests {
     fn missing_cursor_returns_none() {
         let _guard = ENV_LOCK.lock().unwrap();
         let mut tmp = std::env::temp_dir();
-        tmp.push(format!("maos-yank-cursor-missing-{}.json", std::process::id()));
+        tmp.push(format!(
+            "maos-yank-cursor-missing-{}.json",
+            std::process::id()
+        ));
         let _ = std::fs::remove_file(&tmp);
         std::env::set_var("MAOS_REGISTRY_YANK_CURSOR_PATH", &tmp);
         assert!(load_cursor().is_none());
@@ -523,8 +534,18 @@ mod tests {
     #[test]
     fn poll_once_with_two_yanks_emits_two_tl_rows() {
         let entries = vec![
-            YankEntry::new(SpiritId::from("s1"), "1.0.0".into(), 100, "critical vuln".into()),
-            YankEntry::new(SpiritId::from("s2"), "2.0.0".into(), 200, "data loss bug".into()),
+            YankEntry::new(
+                SpiritId::from("s1"),
+                "1.0.0".into(),
+                100,
+                "critical vuln".into(),
+            ),
+            YankEntry::new(
+                SpiritId::from("s2"),
+                "2.0.0".into(),
+                200,
+                "data loss bug".into(),
+            ),
         ];
         let source = Arc::new(FixedYankSource::new(entries.clone()));
         let observer = Arc::new(TestObserver::new());

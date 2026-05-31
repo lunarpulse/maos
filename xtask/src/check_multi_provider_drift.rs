@@ -3,7 +3,10 @@ use std::path::Path;
 
 pub fn run(report: &Path, threshold: f64, strict: bool, json: bool) -> i32 {
     if !report.exists() {
-        eprintln!("check-multi-provider-drift: report not found: {}", report.display());
+        eprintln!(
+            "check-multi-provider-drift: report not found: {}",
+            report.display()
+        );
         return 1;
     }
 
@@ -135,7 +138,10 @@ pub fn run(report: &Path, threshold: f64, strict: bool, json: bool) -> i32 {
             threshold
         );
     } else {
-        println!("check-multi-provider-drift: {} outlier(s) detected:", outliers.len());
+        println!(
+            "check-multi-provider-drift: {} outlier(s) detected:",
+            outliers.len()
+        );
         for outlier in &outliers {
             match serde_json::to_string(outlier) {
                 Ok(s) => println!("  - {s}"),

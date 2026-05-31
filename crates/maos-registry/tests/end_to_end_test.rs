@@ -13,11 +13,11 @@ use maos_domain::ports::registry::{
 use maos_registry::admission::{admit_spirit, AdmissionConfig, AdmissionDecision};
 use maos_registry::compliance_verify;
 use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
-use maos_spirit_abi::compliance::{
-    ComplianceClaimEnvelope, CryptoProviderId, ExecutionContextFingerprint,
-    ProviderEndpointPin, SandboxTier, SigningAlg, TrustTier,
-};
 use maos_registry::storage::{LocalFsRegistryStorage, RegistryStorage};
+use maos_spirit_abi::compliance::{
+    ComplianceClaimEnvelope, CryptoProviderId, ExecutionContextFingerprint, ProviderEndpointPin,
+    SandboxTier, SigningAlg, TrustTier,
+};
 use std::collections::BTreeSet;
 
 fn make_keypair() -> (ring::signature::Ed25519KeyPair, [u8; 32]) {
@@ -115,16 +115,27 @@ fn local_config() -> AdmissionConfig {
         t3_for_public_untrusted: false,
         allow_unsigned_local: true,
         org_signing_pubkey: None,
+        runtime_provider_endpoint: None,
+        runtime_crypto_provider: None,
     }
 }
 
 #[test]
 fn e2e_local_tier_admit_unsigned() {
-    let manifest = b"[spirit]\nname = \"local-spirit\"\nversion = \"0.1.0\"\ntrust_tier = \"local\"\n";
+    let manifest =
+        b"[spirit]\nname = \"local-spirit\"\nversion = \"0.1.0\"\ntrust_tier = \"local\"\n";
     let artifact = b"local-binary".to_vec();
 
     let (kp, pubkey) = make_keypair();
-    let pkg = make_signed_package("local-spirit", "0.1.0", manifest, &artifact, TrustTier::Local, &kp, &pubkey);
+    let pkg = make_signed_package(
+        "local-spirit",
+        "0.1.0",
+        manifest,
+        &artifact,
+        TrustTier::Local,
+        &kp,
+        &pubkey,
+    );
 
     let decision = admit_spirit(&pkg, &local_config()).unwrap();
     assert!(decision.admit);
@@ -137,7 +148,15 @@ fn e2e_public_untrusted_admit_with_valid_compliance() {
     let artifact = b"pub-binary".to_vec();
 
     let (kp, pubkey) = make_keypair();
-    let pkg = make_signed_package("pub-spirit", "0.1.0", manifest, &artifact, TrustTier::PublicUntrusted, &kp, &pubkey);
+    let pkg = make_signed_package(
+        "pub-spirit",
+        "0.1.0",
+        manifest,
+        &artifact,
+        TrustTier::PublicUntrusted,
+        &kp,
+        &pubkey,
+    );
 
     let decision = admit_spirit(&pkg, &local_config()).unwrap();
     assert!(decision.admit);
@@ -150,7 +169,15 @@ fn e2e_public_vetted_always_rejected() {
     let artifact = b"vetted-binary".to_vec();
 
     let (kp, pubkey) = make_keypair();
-    let pkg = make_signed_package("vetted-spirit", "0.1.0", manifest, &artifact, TrustTier::PublicVetted, &kp, &pubkey);
+    let pkg = make_signed_package(
+        "vetted-spirit",
+        "0.1.0",
+        manifest,
+        &artifact,
+        TrustTier::PublicVetted,
+        &kp,
+        &pubkey,
+    );
 
     let result = admit_spirit(&pkg, &local_config());
     assert!(result.is_err());
@@ -163,7 +190,15 @@ fn e2e_strictest_of_three_sources() {
     let manifest = b"[spirit]\nname = \"test\"\nversion = \"0.1.0\"\ntrust_tier = \"local\"\n";
     let artifact = b"bin".to_vec();
     let (kp, pubkey) = make_keypair();
-    let pkg = make_signed_package("test", "0.1.0", manifest, &artifact, TrustTier::Local, &kp, &pubkey);
+    let pkg = make_signed_package(
+        "test",
+        "0.1.0",
+        manifest,
+        &artifact,
+        TrustTier::Local,
+        &kp,
+        &pubkey,
+    );
 
     let cfg = AdmissionConfig {
         tier_floor: TrustTier::Local,
@@ -171,6 +206,8 @@ fn e2e_strictest_of_three_sources() {
         t3_for_public_untrusted: false,
         allow_unsigned_local: true,
         org_signing_pubkey: None,
+        runtime_provider_endpoint: None,
+        runtime_crypto_provider: None,
     };
 
     let result = admit_spirit(&pkg, &cfg);
@@ -190,14 +227,28 @@ fn e2e_storage_publish_and_retrieve() {
     let manifest = b"[spirit]\nname = \"stored\"\nversion = \"1.0.0\"\ntrust_tier = \"local\"\n";
     let artifact = b"stored-binary".to_vec();
     let (kp, pubkey) = make_keypair();
-    let pkg = make_signed_package("stored-spirit", "1.0.0", manifest, &artifact, TrustTier::Local, &kp, &pubkey);
+    let pkg = make_signed_package(
+        "stored-spirit",
+        "1.0.0",
+        manifest,
+        &artifact,
+        TrustTier::Local,
+        &kp,
+        &pubkey,
+    );
 
-    storage.put(&SpiritId::from("stored-spirit"), "1.0.0", &pkg).unwrap();
+    storage
+        .put(&SpiritId::from("stored-spirit"), "1.0.0", &pkg)
+        .unwrap();
 
-    let retrieved = storage.get_manifest(&SpiritId::from("stored-spirit"), "1.0.0").unwrap();
+    let retrieved = storage
+        .get_manifest(&SpiritId::from("stored-spirit"), "1.0.0")
+        .unwrap();
     assert_eq!(retrieved.manifest_toml, manifest.to_vec());
 
-    let artifact_out = storage.get_artifact(&SpiritId::from("stored-spirit"), "1.0.0").unwrap();
+    let artifact_out = storage
+        .get_artifact(&SpiritId::from("stored-spirit"), "1.0.0")
+        .unwrap();
     assert_eq!(artifact_out.artifact_bytes, artifact);
 }
 
@@ -206,11 +257,22 @@ fn e2e_storage_search() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = LocalFsRegistryStorage::at_path(tmp.path().to_path_buf()).unwrap();
 
-    let manifest = b"[spirit]\nname = \"searchable\"\nversion = \"0.1.0\"\ntrust_tier = \"local\"\n";
+    let manifest =
+        b"[spirit]\nname = \"searchable\"\nversion = \"0.1.0\"\ntrust_tier = \"local\"\n";
     let artifact = b"bin".to_vec();
     let (kp, pubkey) = make_keypair();
-    let pkg = make_signed_package("searchable", "0.1.0", manifest, &artifact, TrustTier::Local, &kp, &pubkey);
-    storage.put(&SpiritId::from("searchable"), "0.1.0", &pkg).unwrap();
+    let pkg = make_signed_package(
+        "searchable",
+        "0.1.0",
+        manifest,
+        &artifact,
+        TrustTier::Local,
+        &kp,
+        &pubkey,
+    );
+    storage
+        .put(&SpiritId::from("searchable"), "0.1.0", &pkg)
+        .unwrap();
 
     let q = SearchQuery::new("search".into(), false, 10);
     let results = storage.search(&q).unwrap();
@@ -263,7 +325,10 @@ fn e2e_compliance_fingerprint_mismatch_rejected() {
     let result = admit_spirit(&pkg, &local_config());
     assert!(result.is_err());
     let err = format!("{:?}", result.unwrap_err());
-    assert!(err.contains("ComplianceContextDrift"), "expected drift error, got: {err}");
+    assert!(
+        err.contains("ComplianceContextDrift"),
+        "expected drift error, got: {err}"
+    );
 }
 
 #[test]
@@ -272,7 +337,15 @@ fn e2e_t3_sandbox_for_public_untrusted() {
     let artifact = b"t3-bin".to_vec();
 
     let (kp, pubkey) = make_keypair();
-    let pkg = make_signed_package("t3-test", "0.1.0", manifest, &artifact, TrustTier::PublicUntrusted, &kp, &pubkey);
+    let pkg = make_signed_package(
+        "t3-test",
+        "0.1.0",
+        manifest,
+        &artifact,
+        TrustTier::PublicUntrusted,
+        &kp,
+        &pubkey,
+    );
 
     let cfg = AdmissionConfig {
         tier_floor: TrustTier::Local,
@@ -280,6 +353,8 @@ fn e2e_t3_sandbox_for_public_untrusted() {
         t3_for_public_untrusted: true,
         allow_unsigned_local: true,
         org_signing_pubkey: None,
+        runtime_provider_endpoint: None,
+        runtime_crypto_provider: None,
     };
 
     let decision = admit_spirit(&pkg, &cfg).unwrap();

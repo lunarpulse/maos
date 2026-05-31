@@ -118,8 +118,13 @@ fn run_generate(
             let items = gen.expand(640);
             write_jsonl(out_path, &items)
         }
+        "ccac-600" => {
+            let gen = maos_corpus_gen::ccac::CcacGenerator::new();
+            let items = gen.expand(maos_corpus_gen::ccac::CORPUS_SIZE);
+            write_jsonl(out_path, &items)
+        }
         other => Err(format!(
-            "unknown corpus name; supported: secret-redaction-1e4, red-team-640\n  got: {}",
+            "unknown corpus name; supported: secret-redaction-1e4, red-team-640, ccac-600\n  got: {}",
             other
         )),
     }
@@ -136,8 +141,9 @@ fn run_coverage(corpus: &str, json: bool, seeds_fixture: Option<&str>) -> Result
             maos_corpus_gen::secret_redaction::run_coverage("secret-redaction-1e4", json)
         }
         "red-team-640" => maos_corpus_gen::red_team::run_coverage("red-team-640", json),
+        "ccac-600" => maos_corpus_gen::ccac::run_coverage("ccac-600", json),
         other => Err(format!(
-            "unknown corpus name; supported: secret-redaction-1e4, red-team-640\n  got: {}",
+            "unknown corpus name; supported: secret-redaction-1e4, red-team-640, ccac-600\n  got: {}",
             other
         )),
     }
@@ -198,6 +204,9 @@ fn run_coverage_with_fixture(
                 maos_corpus_gen::red_team::print_text_report(&report);
             }
             Ok(())
+        }
+        "ccac-600" => {
+            maos_corpus_gen::ccac::run_coverage_with_fixture("ccac-600", json, fixture_path)
         }
         other => Err(format!(
             "unknown corpus name; supported: secret-redaction-1e4, red-team-640\n  got: {}",

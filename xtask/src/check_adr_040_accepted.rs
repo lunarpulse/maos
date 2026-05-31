@@ -65,8 +65,7 @@ fn check(path: &str) -> Result<Report, String> {
         });
     }
 
-    let content = fs::read_to_string(adr_path)
-        .map_err(|e| format!("cannot read {path}: {e}"))?;
+    let content = fs::read_to_string(adr_path).map_err(|e| format!("cannot read {path}: {e}"))?;
 
     let status = match parse_frontmatter_status(&content) {
         Some(s) => s,

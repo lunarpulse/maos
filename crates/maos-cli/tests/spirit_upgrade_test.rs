@@ -92,7 +92,9 @@ description = "test successor"
         "upgrade",
         "hello-spirit",
         "--to",
-        &std::fs::canonicalize(&manifest_path).unwrap().to_string_lossy(),
+        &std::fs::canonicalize(&manifest_path)
+            .unwrap()
+            .to_string_lossy(),
     ]);
     let out = cmd.output().expect("spawn maosctl");
 
@@ -135,7 +137,9 @@ fn spirit_upgrade_parses_cold_swap_policy() {
         "upgrade",
         "hello-spirit",
         "--to",
-        &std::fs::canonicalize(&manifest_path).unwrap().to_string_lossy(),
+        &std::fs::canonicalize(&manifest_path)
+            .unwrap()
+            .to_string_lossy(),
         "--policy",
         "cold-swap",
     ]);
@@ -176,7 +180,9 @@ fn spirit_upgrade_parses_migrator_policy() {
         "upgrade",
         "hello-spirit",
         "--to",
-        &std::fs::canonicalize(&manifest_path).unwrap().to_string_lossy(),
+        &std::fs::canonicalize(&manifest_path)
+            .unwrap()
+            .to_string_lossy(),
         "--policy",
         "migrator",
     ]);

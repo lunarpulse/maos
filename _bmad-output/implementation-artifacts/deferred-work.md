@@ -143,3 +143,16 @@
 - W4: `yank_cursor_persistence_test.rs` as separate file vs inline — behavioral coverage exists inline in `yank.rs::cursor_tests`, file placement is cosmetic
 - W5: `cargo public-api --diff` not run — verification step, not a code issue (already captured as dev RF-9)
 - W6: Unrecognized tar entries silently discarded without warning in `import.rs` — minor, matches common tar tooling behavior
+
+## Deferred from: code review of 7-3-verify-complianceclaim-envelopes-at-admission-with-the-ccac-n-600-ship-gate (2026-05-31)
+
+- D1: Legacy shim `verify_envelope_structural` passes `now=0`, disabling expiry — pre-existing design for backward compat, v0.5-α path intentionally weaker (`compliance_verify.rs:655`)
+- D2: `run_coverage_with_fixture` skips total/drift-count validation — **closed**: added drift count to fixture coverage path
+- D3: `build_malformed`/`mutate_field` panic on unknown seed ops — **closed**: refactored to return `Result`/`Option`
+- D4: `extract_manifest_fingerprint_fields` still silently defaults unknown enums — pre-existing from v0.5-α lift; `parse_claim_strict` (v1.0 path) correctly rejects
+- D5: Empty string `CryptoProviderId`/`ProviderEndpointPin` bypass drift — frozen ABI types; empty strings are default for manifests without these fields
+- D6: `deny_unknown_fields` may not be enforced by `serde_cbor` 0.11 — `serde_cbor` 0.11 does support the attribute; corpus malformed seeds would catch any failure
+- D7: `serde_cbor` determinism not pinned to exact patch version — Cargo.lock pins exact version; dev record documents trade-off
+- D8: No test for simultaneous multi-field drift — **closed**: added `multi_field_drift_names_first_divergent_field` test
+- D9: `drift_count()` builds full corpus just to count drift items — **closed**: arithmetic count from seeds (`seeds.filter × VARIATIONS_PER_SEED`)
+- D10: `reference_context` hardcoded values must match manifest strings — shared builder produces both from same parameters; ship gate validates round-trip

@@ -11,6 +11,7 @@ description = "MAOS Spirit Registry — MCP-Streamable-HTTP server + kernel-side
 maos-domain = { path = "../maos-domain" }
 maos-mcp = { path = "../maos-mcp" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
+maos-compliance = { path = "../maos-compliance" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"

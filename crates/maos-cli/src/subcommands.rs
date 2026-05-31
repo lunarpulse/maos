@@ -93,6 +93,8 @@ fn dispatch_import(args: &ImportArgs, _color: ColorChoice) -> ExitCode {
         t3_for_public_untrusted: false,
         allow_unsigned_local: true,
         org_signing_pubkey: None,
+        runtime_provider_endpoint: None,
+        runtime_crypto_provider: None,
     };
 
     // 4. Admit the Spirit.

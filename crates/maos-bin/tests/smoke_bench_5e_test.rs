@@ -44,8 +44,9 @@ fn smoke_bench_5e_exits_zero_and_outputs_5_json_lines() {
     );
 
     for (i, line) in json_lines.iter().enumerate() {
-        let val: serde_json::Value = serde_json::from_str(line)
-            .unwrap_or_else(|e| panic!("line {} is not valid JSON: {} (error: {})", i + 1, line, e));
+        let val: serde_json::Value = serde_json::from_str(line).unwrap_or_else(|e| {
+            panic!("line {} is not valid JSON: {} (error: {})", i + 1, line, e)
+        });
         assert!(
             val.get("step").is_some(),
             "line {} missing 'step' key: {}",

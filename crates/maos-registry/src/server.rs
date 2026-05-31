@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::thread;
 
 use crate::handlers;
-use crate::operations::{DeprecateArgs, ManifestArgs, ArtifactArgs, SearchArgs, YanksSinceArgs};
+use crate::operations::{ArtifactArgs, DeprecateArgs, ManifestArgs, SearchArgs, YanksSinceArgs};
 use crate::storage::RegistryStorage;
 
 use maos_domain::ports::registry::SignedPackage;
@@ -81,9 +81,10 @@ impl SpiritRegistryServer {
 
     /// Block on the HTTP listener.  On SIGTERM, clean exit.
     pub fn run(self) -> Result<(), String> {
-        let listener =
-            TcpListener::bind(&self.listen_addr).map_err(|e| format!("bind: {e}"))?;
-        let addr = listener.local_addr().map_err(|e| format!("local_addr: {e}"))?;
+        let listener = TcpListener::bind(&self.listen_addr).map_err(|e| format!("bind: {e}"))?;
+        let addr = listener
+            .local_addr()
+            .map_err(|e| format!("local_addr: {e}"))?;
         eprintln!("maos-registry: listening on {}", addr);
 
         let storage = self.storage;
@@ -171,7 +172,10 @@ fn handle_connection(
 
     const MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
     if content_length > MAX_BODY_SIZE {
-        let _ = write!(stream, "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\n\r\n");
+        let _ = write!(
+            stream,
+            "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\n\r\n"
+        );
         return Ok(());
     }
 
@@ -203,7 +207,10 @@ fn handle_connection(
                 Vec::new()
             });
             if resp_json.is_empty() {
-                let _ = write!(stream, "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n");
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n"
+                );
                 return Ok(());
             }
             let response = format!(
@@ -216,7 +223,9 @@ fn handle_connection(
         }
     };
 
-    let handle_result = |method: &str, params: &serde_json::Value| -> Result<serde_json::Value, String> {
+    let handle_result = |method: &str,
+                         params: &serde_json::Value|
+     -> Result<serde_json::Value, String> {
         match method {
             "registry.search" => {
                 let args: SearchArgs = serde_json::from_value(params.clone())
@@ -277,7 +286,10 @@ fn handle_connection(
         Vec::new()
     });
     if resp_json.is_empty() {
-        let _ = write!(stream, "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n");
+        let _ = write!(
+            stream,
+            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n"
+        );
         return Ok(());
     }
     let http_response = format!(
@@ -300,7 +312,8 @@ mod tests {
     use std::time::Duration;
 
     fn temp_storage() -> Arc<dyn RegistryStorage> {
-        let dir = std::env::temp_dir().join(format!("maos-registry-server-test-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("maos-registry-server-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let s = LocalFsRegistryStorage::at_path(dir).unwrap();
         Arc::new(s)

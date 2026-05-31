@@ -89,7 +89,9 @@ fn revocations_import_parses_and_dispatches() {
     // At v0.3-β without trust anchor configured, this may fail —
     // the test verifies the CLI parses and dispatches correctly.
     assert!(
-        stderr.contains("revocations-import") || stderr.contains("trust anchor") || stderr.contains("CRL"),
+        stderr.contains("revocations-import")
+            || stderr.contains("trust anchor")
+            || stderr.contains("CRL"),
         "expected revocation dispatch diagnostic, got stderr: {stderr}"
     );
     drop(tmp);
@@ -116,13 +118,20 @@ fn revocations_import_with_force_flag_parses() {
     cmd.env("MAOS_JOURNAL_PATH", &journal_path);
     cmd.env("XDG_DATA_HOME", &xdg);
     cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    cmd.args(["revocations", "import", crl_path.to_str().unwrap(), "--force"]);
+    cmd.args([
+        "revocations",
+        "import",
+        crl_path.to_str().unwrap(),
+        "--force",
+    ]);
     let out = cmd.output().expect("spawn maosctl");
 
     // Force flag should be accepted; actual result depends on backend state
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("revocations-import") || stderr.contains("trust anchor") || stderr.contains("parse"),
+        stderr.contains("revocations-import")
+            || stderr.contains("trust anchor")
+            || stderr.contains("parse"),
         "expected force-flag dispatch, got stderr: {stderr}"
     );
     drop(tmp);
@@ -179,10 +188,15 @@ fn revocations_import_missing_file_rejected() {
     cmd.args(["revocations", "import", "/nonexistent/crl.json"]);
     let out = cmd.output().expect("spawn maosctl");
 
-    assert!(!out.status.success(), "missing file should result in non-zero exit");
+    assert!(
+        !out.status.success(),
+        "missing file should result in non-zero exit"
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("No such file") || stderr.contains("not found") || stderr.contains("read CRL"),
+        stderr.contains("No such file")
+            || stderr.contains("not found")
+            || stderr.contains("read CRL"),
         "expected missing-file diagnostic, got: {stderr}"
     );
     drop(tmp);
@@ -213,7 +227,13 @@ fn revocations_no_color_zero_ansi() {
     let mut child = cmd.spawn().expect("spawn maosctl");
     std::thread::sleep(std::time::Duration::from_millis(500));
     let _ = child.kill();
-    let out = child.wait_with_output().unwrap_or_else(|_| std::process::Output { status: std::process::ExitStatus::default(), stdout: vec![], stderr: vec![] });
+    let out = child
+        .wait_with_output()
+        .unwrap_or_else(|_| std::process::Output {
+            status: std::process::ExitStatus::default(),
+            stdout: vec![],
+            stderr: vec![],
+        });
 
     let stderr = out.stderr;
     let esc_count = stderr.iter().filter(|b| **b == 0x1b).count();

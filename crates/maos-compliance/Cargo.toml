@@ -5,6 +5,22 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "MAOS compliance — attestation, claim verification, and policy enforcement"
+description = "MAOS compliance — v0.9-binding ComplianceClaim semantic evaluator + runtime execution-context drift (Story 7.3)"
 
 [dependencies]
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+maos-domain = { path = "../maos-domain" }
+ring = "0.17"
+sha2 = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_cbor = "0.11"
+serde_json = "1.0"
+hex = "0.4"
+thiserror = "2.0"
+tracing = "0.1"
+
+[dev-dependencies]
+# The CCAC ship gate (tests/ccac_ship_gate_test.rs) replays the corpus the
+# generator emits. dev-dependency cycle (maos-corpus-gen normal-deps
+# maos-compliance) is permitted by cargo.
+maos-corpus-gen = { path = "../maos-corpus-gen" }

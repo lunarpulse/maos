@@ -55,9 +55,7 @@ pub enum ImportError {
     #[error("signed-package.json parse failure: {0}")]
     SignedPackageParseFailure(String),
 
-    #[error(
-        "bundle file '{file}' diverges from signed-package.json — corrupted or tampered"
-    )]
+    #[error("bundle file '{file}' diverges from signed-package.json — corrupted or tampered")]
     InconsistentExtract { file: String },
 
     #[error("vetter attestation parse failure: {0}")]
@@ -113,7 +111,7 @@ pub fn extract_bundle(tar_path: &Path) -> Result<ImportedBundle, ImportError> {
             .map_err(|e| ImportError::TarParse(e.to_string()))?
             .into_owned();
         let path_str = path.to_string_lossy().to_string();
-        
+
         // Check entry size before reading.
         let entry_size = entry.size();
         if entry_size > MAX_ENTRY_SIZE {
@@ -122,7 +120,7 @@ pub fn extract_bundle(tar_path: &Path) -> Result<ImportedBundle, ImportError> {
                 path_str, entry_size, MAX_ENTRY_SIZE
             )));
         }
-        
+
         let mut buf = Vec::new();
         use std::io::Read;
         entry
@@ -153,24 +151,24 @@ pub fn extract_bundle(tar_path: &Path) -> Result<ImportedBundle, ImportError> {
                 }
                 artifact_bytes = Some(buf);
             }
-            other if other.starts_with("vetter-attestations/")
-                || other.starts_with("./vetter-attestations/") =>
+            other
+                if other.starts_with("vetter-attestations/")
+                    || other.starts_with("./vetter-attestations/") =>
             {
                 if !buf.is_empty() {
                     vetter_attestations.push(buf);
                 }
             }
-            other if other.starts_with("compliance-claims/")
-                || other.starts_with("./compliance-claims/") =>
+            other
+                if other.starts_with("compliance-claims/")
+                    || other.starts_with("./compliance-claims/") =>
             {
                 if buf.is_empty() {
                     continue;
                 }
                 let env = serde_cbor::from_slice::<ComplianceClaimEnvelope>(&buf)
                     .or_else(|_| serde_json::from_slice::<ComplianceClaimEnvelope>(&buf))
-                    .map_err(|e| {
-                        ImportError::SupplementaryClaimParse(format!("{other}: {e}"))
-                    })?;
+                    .map_err(|e| ImportError::SupplementaryClaimParse(format!("{other}: {e}")))?;
                 supplementary_claims.push(env);
             }
             // Directory entries and tar-house-keeping files are tolerated.
@@ -183,10 +181,8 @@ pub fn extract_bundle(tar_path: &Path) -> Result<ImportedBundle, ImportError> {
     let signed_package_raw = signed_package_bytes.ok_or_else(|| {
         ImportError::SignedPackageParseFailure("signed-package.json missing from bundle".into())
     })?;
-    let signed_package: SignedPackage =
-        serde_json::from_slice(&signed_package_raw).map_err(|e| {
-            ImportError::SignedPackageParseFailure(format!("JSON decode: {e}"))
-        })?;
+    let signed_package: SignedPackage = serde_json::from_slice(&signed_package_raw)
+        .map_err(|e| ImportError::SignedPackageParseFailure(format!("JSON decode: {e}")))?;
 
     Ok(ImportedBundle {
         bundle_sha256,
@@ -242,7 +238,9 @@ pub fn scratch_dir_for(bundle_sha256: &str) -> PathBuf {
         return PathBuf::from(root).join(bundle_sha256);
     }
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    PathBuf::from(home).join(".cache/maos/import").join(bundle_sha256)
+    PathBuf::from(home)
+        .join(".cache/maos/import")
+        .join(bundle_sha256)
 }
 
 fn sha256_hash(data: &[u8]) -> [u8; 32] {
@@ -355,10 +353,7 @@ trust_tier = "local"
 
     #[test]
     fn missing_signed_package_json_rejects() {
-        let tar_bytes = write_tar(&[
-            ("manifest.toml", b"x" as &[u8]),
-            ("artifact.bin", b"y"),
-        ]);
+        let tar_bytes = write_tar(&[("manifest.toml", b"x" as &[u8]), ("artifact.bin", b"y")]);
         let mut tmp = std::env::temp_dir();
         tmp.push(format!(
             "maos-import-test-missing-pkg-{}.tar",

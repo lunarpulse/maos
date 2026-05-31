@@ -74,7 +74,7 @@ maos/
 │   ├── maos-a2a/                       # v0.9    Bilateral A2A peer module (loopback at v0.9, cross-Host at v1.0)
 │   ├── maos-persistence/               # v0.1    SQLite at v0.1; Postgres+pgvector (Loom-lite) at v1.5
 │   ├── maos-secrets/                   # v0.1    OS keyring adapter
-│   ├── maos-compliance/                # v0.9 🔒  Semantic evaluator + N=600 corpus (App-E)
+│   ├── maos-compliance/                # v0.9 🔒  Semantic evaluator + N=600 corpus (App-E) — Story 7.3: placeholder → v0.9-binding evaluator (evaluate_envelope + RuntimeExecutionContext + canonical_cbor; admission consumes it; CCAC N=600 ship gate). Workspace count UNCHANGED at 29.
 │   ├── maos-control/                   # v0.5    Control-plane HTTP API
 │   ├── maos-cli/                       # v0.1    maosctl
 │   ├── maos-director-surface/          # v0.3-β  Kernel-adjacent notification dispatcher (Story 3.1); terminal/ACP/mobile-push channels
@@ -109,9 +109,9 @@ Dependencies point inward (adapter ring → kernel services → domain core), wi
 
 **Workspace member count (post Story 1b.6):** 18 library/binary crates + xtask = **19 workspace members**. Added since the original §4.0.2 description: `maos-audit` (Story 1b.1 — read-side audit query adapter), `maos-attrs` (Story 1b.3 — `#[i9_exempt]` proc-macro), `maos-corpus-gen` (Epic 0 — deterministic corpus generators). `default-members = []` in the workspace root forces every cargo invocation to be `-p`-explicit (Story 1b.6 retro action A7).
 
-**Workspace member count (post Story 7.1):**<!-- workspace-count-authoritative --> Story 7.1 adds `templates/spirit-ts/` (excluded from `[workspace] members` per Story 2.3 precedent), `examples/example-spirit-ts/` (Node project, NOT a Cargo workspace member), and `sdks/spirit-ts/` (Node package, NOT a Cargo workspace member). The Cargo workspace member count stays at **27** (post-Epic-6.5 baseline). Story 7.1 introduces non-Cargo workspace members built via `tsc`; the `check-workspace-count` gate stays at 27.
+**Workspace member count (post Story 7.1):** Story 7.1 adds `templates/spirit-ts/` (excluded from `[workspace] members` per Story 2.3 precedent), `examples/example-spirit-ts/` (Node project, NOT a Cargo workspace member), and `sdks/spirit-ts/` (Node package, NOT a Cargo workspace member). The Cargo workspace member count stays at **27** (post-Epic-6.5 baseline). Story 7.1 introduces non-Cargo workspace members built via `tsc`; the `check-workspace-count` gate stays at 27.
 
-**Workspace member count (post Story 7.2):** Story 7.2 adds `crates/maos-spirit-cli/` (the FR35 producer-side publish CLI binary). The Cargo workspace member count moves to **29** (the pre-Story-7.1 baseline 27 + `examples/example-spirit` confirmed counted = 28 → +1 for `maos-spirit-cli` = 29). The `check-workspace-count` gate floor moves to 29.
+**Workspace member count (post Story 7.2):**<!-- workspace-count-authoritative --> Story 7.2 adds `crates/maos-spirit-cli/` (the FR35 producer-side publish CLI binary), moving the count to **29 workspace members** (the pre-Story-7.1 baseline 27 + `examples/example-spirit` confirmed counted = 28 → +1 for `maos-spirit-cli` = 29). The `check-workspace-count` gate floor moves to 29. (Story 7.3 note: 7.2 moved the prose to 29 but left the `workspace-count-authoritative` sentinel on the stale post-7.1 line — Story 7.3 relocates the sentinel here so the gate reads 29; Story 7.3 adds NO new crate, `maos-compliance` was already counted.)
 
 **`spirit_test` feature on `maos-spirit-sdk` (post Story 2.4):** The crate gains an opt-in `spirit_test` cargo feature (depends on `local_runner` + `std` + `mock`) gating a new `crates/maos-spirit-sdk/src/spirit_test/` module that ships the SDK seed (assertion macros + IAC frame I/O capture + halt resolution simulator + manifest self-check + class-specific regression corpus skeleton + cross-Spirit isolation framework hooks). Workspace member count stays at **21** — the new module is feature-gated inside the existing crate, not a new workspace member.
 

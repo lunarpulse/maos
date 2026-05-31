@@ -30,6 +30,9 @@ maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 maos-spirit-sdk = { path = "../maos-spirit-sdk" }
 maos-a2a = { path = "../maos-a2a" }  # Story 6.3 — composition-root A2A router wiring + smoke arm
+maos-compliance = { path = "../maos-compliance" }   # Story 7.3 — v0.9-binding evaluator (smoke-compliance-7-3)
+maos-spirit-cli = { path = "../maos-spirit-cli" }   # Story 7.3 — REAL producer round-trip in the smoke arm
+maos-corpus-gen = { path = "../maos-corpus-gen" }   # Story 7.3 — CCAC slice replay + reference contexts
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 getrandom = "0.3"
@@ -40,5 +43,6 @@ crossbeam-channel = "0.5"
 hex = "0.4"
 sha2 = "0.10"
 ring = "0.17"
+serde_cbor = "0.11"
 tar = { version = "0.4", default-features = false }
 smallvec = { version = "1", features = ["serde"] }

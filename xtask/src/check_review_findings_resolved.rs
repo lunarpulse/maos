@@ -29,16 +29,7 @@ use std::path::{Path, PathBuf};
 
 const TERMINAL_STATUSES: &[&str] = &["done"];
 const BOOTSTRAP_ALLOWLIST: &[&str] = &[
-    "0-1-",
-    "0-2-",
-    "0-3-",
-    "0-4-",
-    "0-5-",
-    "1a-1-",
-    "1a-2-",
-    "1a-3-",
-    "1a-4-",
-    "1a-5-",
+    "0-1-", "0-2-", "0-3-", "0-4-", "0-5-", "1a-1-", "1a-2-", "1a-3-", "1a-4-", "1a-5-",
 ];
 
 #[derive(Debug, Clone)]
@@ -224,11 +215,7 @@ fn is_bootstrap_story(story_key: &str) -> bool {
     BOOTSTRAP_ALLOWLIST.iter().any(|p| story_key.starts_with(p))
 }
 
-pub fn run(
-    stories_dir: &str,
-    sprint_status_path: &str,
-    json: bool,
-) -> Result<(), String> {
+pub fn run(stories_dir: &str, sprint_status_path: &str, json: bool) -> Result<(), String> {
     let sprint_status = load_sprint_status(sprint_status_path);
     let dir = Path::new(stories_dir);
     if !dir.is_dir() {
@@ -289,7 +276,10 @@ pub fn run(
         });
         println!("{}", payload);
         if !violations.is_empty() {
-            return Err(format!("check-review-findings-resolved failed: {} violations", violations.len()));
+            return Err(format!(
+                "check-review-findings-resolved failed: {} violations",
+                violations.len()
+            ));
         }
         return Ok(());
     }
@@ -309,7 +299,10 @@ pub fn run(
         violations.len(),
         reviews.len(),
     );
-    Err(format!("check-review-findings-resolved failed: {} violations", violations.len()))
+    Err(format!(
+        "check-review-findings-resolved failed: {} violations",
+        violations.len()
+    ))
 }
 
 #[cfg(test)]
@@ -333,11 +326,7 @@ mod tests {
             "# Story\n### File List\n- crates/foo/bar.rs\n\n### Review Findings\n| # | Finding | Severity | Status | Resolution |\n|---|---|---|---|---|\n| 1 | Test | Low | **closed** | Fixed in crates/foo/bar.rs |\n",
         );
         let sprint = dir.path().join("sprint.yaml");
-        fs::write(
-            &sprint,
-            "development_status:\n  5-1-foo: done\n",
-        )
-        .unwrap();
+        fs::write(&sprint, "development_status:\n  5-1-foo: done\n").unwrap();
         assert!(run(
             dir.path().to_str().unwrap(),
             sprint.to_str().unwrap(),
@@ -355,11 +344,7 @@ mod tests {
             "### File List\n- crates/x/y.rs\n\n### Review Findings\n| # | Finding | Severity | Status | Resolution |\n|---|---|---|---|---|\n| 1 | Bug | Critical | **open** | TBD |\n",
         );
         let sprint = dir.path().join("sprint.yaml");
-        fs::write(
-            &sprint,
-            "development_status:\n  5-2-bad: done\n",
-        )
-        .unwrap();
+        fs::write(&sprint, "development_status:\n  5-2-bad: done\n").unwrap();
         assert!(run(
             dir.path().to_str().unwrap(),
             sprint.to_str().unwrap(),
@@ -377,11 +362,7 @@ mod tests {
             "### File List\n- crates/a/b.rs\n\n### Review Findings\n| # | Finding | Severity | Status | Resolution |\n|---|---|---|---|---|\n| 1 | Bug | Critical | **open** | TBD |\n",
         );
         let sprint = dir.path().join("sprint.yaml");
-        fs::write(
-            &sprint,
-            "development_status:\n  5-3-wip: in-review\n",
-        )
-        .unwrap();
+        fs::write(&sprint, "development_status:\n  5-3-wip: in-review\n").unwrap();
         assert!(run(
             dir.path().to_str().unwrap(),
             sprint.to_str().unwrap(),
@@ -399,11 +380,7 @@ mod tests {
             "### File List\n- crates/real/file.rs\n\n### Review Findings\n| # | Finding | Severity | Status | Resolution |\n|---|---|---|---|---|\n| 1 | Bug | Critical | **closed** | Will fix in 6.1 |\n",
         );
         let sprint = dir.path().join("sprint.yaml");
-        fs::write(
-            &sprint,
-            "development_status:\n  5-4-scope: done\n",
-        )
-        .unwrap();
+        fs::write(&sprint, "development_status:\n  5-4-scope: done\n").unwrap();
         assert!(run(
             dir.path().to_str().unwrap(),
             sprint.to_str().unwrap(),
@@ -421,11 +398,7 @@ mod tests {
             "<!-- code-review-deferred: bootstrap PR; review scheduled in §A2 -->\n### File List\n- crates/z/w.rs\n\n### Review Findings\n_No review findings._\n",
         );
         let sprint = dir.path().join("sprint.yaml");
-        fs::write(
-            &sprint,
-            "development_status:\n  5-5-marker: done\n",
-        )
-        .unwrap();
+        fs::write(&sprint, "development_status:\n  5-5-marker: done\n").unwrap();
         assert!(run(
             dir.path().to_str().unwrap(),
             sprint.to_str().unwrap(),
@@ -443,11 +416,7 @@ mod tests {
             "### File List\n- crates/a/b.rs\n\n### Review Findings\n_No review findings._\n",
         );
         let sprint = dir.path().join("sprint.yaml");
-        fs::write(
-            &sprint,
-            "development_status:\n  0-1-bootstrap: done\n",
-        )
-        .unwrap();
+        fs::write(&sprint, "development_status:\n  0-1-bootstrap: done\n").unwrap();
         assert!(run(
             dir.path().to_str().unwrap(),
             sprint.to_str().unwrap(),

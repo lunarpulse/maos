@@ -4,15 +4,25 @@ use std::process;
 
 mod abi_diff;
 mod calibrate;
+mod check_adr_040_accepted;
+mod check_bare_review_findings;
 mod check_composition_root_completeness;
 mod check_corpus;
+mod check_deprecations_declared;
+mod check_dev_model_used_populated;
+mod check_dev_record_completeness;
 mod check_empty_kernel;
+mod check_epic_6_bridge;
 mod check_fr47;
 mod check_judge_config;
 mod check_loom;
+mod check_manifest_schema_version;
 pub mod check_mock_not_in_release;
+mod check_multi_provider_drift;
 mod check_pub_field_constructors;
+mod check_review_findings_resolved;
 mod check_security_md;
+mod check_serde_error_handling;
 mod check_service_boundary;
 mod check_unsafe;
 mod check_workspace_count;
@@ -21,23 +31,13 @@ mod corpus_types;
 mod coverage_matrix;
 mod coverage_matrix_nfr_test_3;
 mod example_spirit_regen;
-mod templates_regen;
 mod fs_walk;
 mod gen_isolation_corpus;
 mod gen_termination_corpus;
 mod invariant_lock;
 mod kloc_check;
 mod rebaseline_check;
-mod check_multi_provider_drift;
-mod check_adr_040_accepted;
-mod check_serde_error_handling;
-mod check_review_findings_resolved;
-mod check_dev_record_completeness;
-mod check_epic_6_bridge;
-mod check_manifest_schema_version;
-mod check_deprecations_declared;
-mod check_bare_review_findings;
-mod check_dev_model_used_populated;
+mod templates_regen;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -342,7 +342,10 @@ enum Commands {
     CheckReviewFindingsResolved {
         #[arg(long, default_value = "_bmad-output/implementation-artifacts")]
         stories_dir: String,
-        #[arg(long, default_value = "_bmad-output/implementation-artifacts/sprint-status.yaml")]
+        #[arg(
+            long,
+            default_value = "_bmad-output/implementation-artifacts/sprint-status.yaml"
+        )]
         sprint_status: String,
         #[arg(long)]
         json: bool,
@@ -375,7 +378,10 @@ enum Commands {
     CheckDevRecordCompleteness {
         #[arg(long, default_value = "_bmad-output/implementation-artifacts")]
         stories_dir: String,
-        #[arg(long, default_value = "_bmad-output/implementation-artifacts/sprint-status.yaml")]
+        #[arg(
+            long,
+            default_value = "_bmad-output/implementation-artifacts/sprint-status.yaml"
+        )]
         sprint_status: String,
         #[arg(long, default_value_t = false)]
         check_git_diff: bool,
@@ -565,9 +571,16 @@ fn main() {
             json,
         ),
         Commands::ExampleSpiritRegen { check, json } => {
-            eprintln!("WARN: example-spirit-regen is deprecated; use templates-regen --lang rust instead");
+            eprintln!(
+                "WARN: example-spirit-regen is deprecated; use templates-regen --lang rust instead"
+            );
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
-            templates_regen::run(&workspace_root, Some(templates_regen::Language::Rust), check, json)
+            templates_regen::run(
+                &workspace_root,
+                Some(templates_regen::Language::Rust),
+                check,
+                json,
+            )
         }
         Commands::TemplatesRegen { lang, check, json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
@@ -605,42 +618,37 @@ fn main() {
             strict,
             json,
         } => {
-            let exit_code = check_multi_provider_drift::run(
-                Path::new(&report),
-                threshold,
-                strict,
-                json,
-            );
+            let exit_code =
+                check_multi_provider_drift::run(Path::new(&report), threshold, strict, json);
             if exit_code != 0 {
                 process::exit(exit_code);
             }
             Ok(())
         }
         Commands::CheckAdr040Accepted { json } => check_adr_040_accepted::run(json),
-        Commands::CheckSerdeErrorHandling { path, allowlist, json } => {
-            check_serde_error_handling::run(&path, &allowlist, json)
-        }
-        Commands::CheckReviewFindingsResolved { stories_dir, sprint_status, json } => {
-            check_review_findings_resolved::run(&stories_dir, &sprint_status, json)
-        }
+        Commands::CheckSerdeErrorHandling {
+            path,
+            allowlist,
+            json,
+        } => check_serde_error_handling::run(&path, &allowlist, json),
+        Commands::CheckReviewFindingsResolved {
+            stories_dir,
+            sprint_status,
+            json,
+        } => check_review_findings_resolved::run(&stories_dir, &sprint_status, json),
         Commands::CheckEpic6Bridge { json, story } => {
             check_epic_6_bridge::run_with_story(json, story.as_deref())
         }
-        Commands::CheckDevRecordCompleteness { stories_dir, sprint_status, check_git_diff, json } => {
-            check_dev_record_completeness::run(&stories_dir, &sprint_status, check_git_diff, json)
-        }
-        Commands::CheckManifestSchemaVersion { json } => {
-            check_manifest_schema_version::run(json)
-        }
-        Commands::CheckDeprecationsDeclared { json } => {
-            check_deprecations_declared::run(json)
-        }
-        Commands::CheckBareReviewFindings { json } => {
-            check_bare_review_findings::run(json)
-        }
-        Commands::CheckDevModelUsedPopulated { json } => {
-            check_dev_model_used_populated::run(json)
-        }
+        Commands::CheckDevRecordCompleteness {
+            stories_dir,
+            sprint_status,
+            check_git_diff,
+            json,
+        } => check_dev_record_completeness::run(&stories_dir, &sprint_status, check_git_diff, json),
+        Commands::CheckManifestSchemaVersion { json } => check_manifest_schema_version::run(json),
+        Commands::CheckDeprecationsDeclared { json } => check_deprecations_declared::run(json),
+        Commands::CheckBareReviewFindings { json } => check_bare_review_findings::run(json),
+        Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

@@ -114,8 +114,9 @@ pub fn run(
                 }
                 let dest = example_dir.join(rel_path);
                 if let Some(parent) = dest.parent() {
-                    std::fs::create_dir_all(parent)
-                        .map_err(|e| format!("failed to create directory {}: {e}", parent.display()))?;
+                    std::fs::create_dir_all(parent).map_err(|e| {
+                        format!("failed to create directory {}: {e}", parent.display())
+                    })?;
                 }
                 std::fs::write(&dest, content)
                     .map_err(|e| format!("failed to write {}: {e}", dest.display()))?;
@@ -162,8 +163,8 @@ fn read_template_files_recursive(
     dir: &Path,
     out: &mut BTreeMap<String, String>,
 ) -> Result<(), String> {
-    for entry in std::fs::read_dir(dir)
-        .map_err(|e| format!("failed to read dir {}: {e}", dir.display()))?
+    for entry in
+        std::fs::read_dir(dir).map_err(|e| format!("failed to read dir {}: {e}", dir.display()))?
     {
         let entry = entry.map_err(|e| format!("dir entry error: {e}"))?;
         let path = entry.path();
@@ -201,10 +202,13 @@ fn render_template(
 
         // Handle cargo-generate filter expressions
         substituted = substituted.replace("{{crate_name | snake_case}}", "example_spirit");
-        substituted = substituted.replace("{{class_name}}", match language {
-            Language::Rust => "ExampleSpirit",
-            Language::TypeScript => "ExampleTsSpirit",
-        });
+        substituted = substituted.replace(
+            "{{class_name}}",
+            match language {
+                Language::Rust => "ExampleSpirit",
+                Language::TypeScript => "ExampleTsSpirit",
+            },
+        );
 
         if rel_path == "Cargo.toml" && language == Language::Rust {
             substituted = rewrite_git_deps_to_path(&substituted);
@@ -265,13 +269,17 @@ mod tests {
         let mut files = BTreeMap::new();
         read_template_files(&template, &mut files).unwrap();
         let rendered = render_template(
-            &files, &vec![
+            &files,
+            &vec![
                 ("{{crate_name}}", "example-spirit"),
                 ("{{class_name}}", "ExampleSpirit"),
             ],
             Language::Rust,
         );
-        assert!(rendered.get("lib.rs").unwrap().contains("pub struct ExampleSpirit;"));
+        assert!(rendered
+            .get("lib.rs")
+            .unwrap()
+            .contains("pub struct ExampleSpirit;"));
     }
 
     #[test]
@@ -279,23 +287,44 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let template = dir.path().join("templates/spirit-ts");
         std::fs::create_dir_all(template.join("src")).unwrap();
-        std::fs::write(template.join("src/index.ts"), "export class {{class_name}} {}").unwrap();
-        std::fs::write(template.join("package.json"), "{\"name\":\"{{package_name}}\"}").unwrap();
+        std::fs::write(
+            template.join("src/index.ts"),
+            "export class {{class_name}} {}",
+        )
+        .unwrap();
+        std::fs::write(
+            template.join("package.json"),
+            "{\"name\":\"{{package_name}}\"}",
+        )
+        .unwrap();
 
         let mut files = BTreeMap::new();
         read_template_files(&template, &mut files).unwrap();
         let rendered = render_template(
-            &files, &vec![
+            &files,
+            &vec![
                 ("{{crate_name}}", "example-spirit-ts"),
                 ("{{class_name}}", "ExampleTsSpirit"),
                 ("{{package_name}}", "@local/example-spirit-ts"),
             ],
             Language::TypeScript,
         );
-        let index_ts = rendered.get("src/index.ts").expect("src/index.ts should be in rendered map");
-        assert!(index_ts.contains("export class ExampleTsSpirit {}"), "got: {}", index_ts);
-        let pkg_json = rendered.get("package.json").expect("package.json should be in rendered map");
-        assert!(pkg_json.contains("@local/example-spirit-ts"), "got: {}", pkg_json);
+        let index_ts = rendered
+            .get("src/index.ts")
+            .expect("src/index.ts should be in rendered map");
+        assert!(
+            index_ts.contains("export class ExampleTsSpirit {}"),
+            "got: {}",
+            index_ts
+        );
+        let pkg_json = rendered
+            .get("package.json")
+            .expect("package.json should be in rendered map");
+        assert!(
+            pkg_json.contains("@local/example-spirit-ts"),
+            "got: {}",
+            pkg_json
+        );
     }
 
     #[test]
@@ -348,11 +377,19 @@ mod tests {
     fn cross_template_field_consistency() {
         // Both Rust and TS templates should declare the same capabilities.required shape
         let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let rust_manifest = std::fs::read_to_string(workspace_root.join("templates/spirit-rust/manifest.toml"))
-            .unwrap_or_default();
-        let ts_manifest = std::fs::read_to_string(workspace_root.join("templates/spirit-ts/manifest.toml"))
-            .unwrap_or_default();
-        assert!(rust_manifest.contains("provider.complete"), "Rust manifest missing provider.complete");
-        assert!(ts_manifest.contains("provider.complete"), "TS manifest missing provider.complete");
+        let rust_manifest =
+            std::fs::read_to_string(workspace_root.join("templates/spirit-rust/manifest.toml"))
+                .unwrap_or_default();
+        let ts_manifest =
+            std::fs::read_to_string(workspace_root.join("templates/spirit-ts/manifest.toml"))
+                .unwrap_or_default();
+        assert!(
+            rust_manifest.contains("provider.complete"),
+            "Rust manifest missing provider.complete"
+        );
+        assert!(
+            ts_manifest.contains("provider.complete"),
+            "TS manifest missing provider.complete"
+        );
     }
 }

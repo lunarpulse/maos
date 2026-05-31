@@ -23,6 +23,13 @@ serde_json = "1.0"
 sha2 = "0.10"
 toml = "0.8"
 walkdir = "2.5"
+# Story 7.3 CCAC generator — build REAL envelopes against the frozen schema
+# using the SAME canonical encoder the admission evaluator uses.
+maos-compliance = { path = "../maos-compliance" }
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+ring = "0.17"
+hex = "0.4"
+serde_cbor = "0.11"
 
 [build-dependencies]
 sha2 = "0.10"

@@ -26,26 +26,44 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use maos_domain::ports::registry::{
-    SearchQuery, SearchResultItem, SearchResults, SignedArtifact,
-    SignedManifest, SignedPackage, SpiritId, YankEntry, YankList, YankReason, YankReceipt,
+    SearchQuery, SearchResultItem, SearchResults, SignedArtifact, SignedManifest, SignedPackage,
+    SpiritId, YankEntry, YankList, YankReason, YankReceipt,
 };
 
 /// Persistent storage for the Spirit Registry.
 pub trait RegistryStorage: Send + Sync {
     /// Store a signed package.
-    fn put(&self, spirit_id: &SpiritId, version: &str, pkg: &SignedPackage) -> Result<(), StorageError>;
+    fn put(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+        pkg: &SignedPackage,
+    ) -> Result<(), StorageError>;
 
     /// Retrieve a signed manifest.
-    fn get_manifest(&self, spirit_id: &SpiritId, version: &str) -> Result<SignedManifest, StorageError>;
+    fn get_manifest(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+    ) -> Result<SignedManifest, StorageError>;
 
     /// Retrieve a signed artifact.
-    fn get_artifact(&self, spirit_id: &SpiritId, version: &str) -> Result<SignedArtifact, StorageError>;
+    fn get_artifact(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+    ) -> Result<SignedArtifact, StorageError>;
 
     /// Search the registry index.
     fn search(&self, q: &SearchQuery) -> Result<SearchResults, StorageError>;
 
     /// Yank (deprecate) a version.
-    fn yank(&self, spirit_id: &SpiritId, version: &str, reason: &YankReason) -> Result<YankReceipt, StorageError>;
+    fn yank(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+        reason: &YankReason,
+    ) -> Result<YankReceipt, StorageError>;
 
     /// List yanks since a given monotonic timestamp.
     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError>;
@@ -71,7 +89,11 @@ impl LocalFsRegistryStorage {
     /// Construct storage rooted at `~/.local/share/maos/registry/`.
     pub fn new() -> Result<Self, io::Error> {
         let home = dirs_fallback();
-        let root = home.join(".local").join("share").join("maos").join("registry");
+        let root = home
+            .join(".local")
+            .join("share")
+            .join("maos")
+            .join("registry");
         fs::create_dir_all(root.join("spirits"))?;
         let index = Self::load_index(&root);
         let yanks = Self::load_yanks(&root);
@@ -97,7 +119,10 @@ impl LocalFsRegistryStorage {
     fn load_index(root: &Path) -> BTreeMap<String, Vec<SearchResultItem>> {
         let path = root.join("index.json");
         if path.exists() {
-            match fs::read_to_string(&path).ok().and_then(|s| serde_json::from_str(&s).ok()) {
+            match fs::read_to_string(&path)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+            {
                 Some(idx) => idx,
                 None => {
                     eprintln!("maos-registry: warning: failed to load index.json, starting with empty index");
@@ -112,7 +137,10 @@ impl LocalFsRegistryStorage {
     fn load_yanks(root: &Path) -> Vec<YankEntry> {
         let path = root.join("yanks.json");
         if path.exists() {
-            match fs::read_to_string(&path).ok().and_then(|s| serde_json::from_str(&s).ok()) {
+            match fs::read_to_string(&path)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+            {
                 Some(yanks) => yanks,
                 None => {
                     eprintln!("maos-registry: warning: failed to load yanks.json, starting with empty yank list");
@@ -153,8 +181,8 @@ impl LocalFsRegistryStorage {
         origin: &crate::origin::RegistryOrigin,
     ) -> Result<(), StorageError> {
         let vdir = self.version_dir(spirit_id, version);
-        let origin_json = serde_json::to_vec_pretty(origin)
-            .map_err(|e| StorageError::Serde(e.to_string()))?;
+        let origin_json =
+            serde_json::to_vec_pretty(origin).map_err(|e| StorageError::Serde(e.to_string()))?;
         fs::write(vdir.join("origin.json"), &origin_json)
             .map_err(|e| StorageError::Io(e.to_string()))?;
         Ok(())
@@ -162,7 +190,12 @@ impl LocalFsRegistryStorage {
 }
 
 impl RegistryStorage for LocalFsRegistryStorage {
-    fn put(&self, spirit_id: &SpiritId, version: &str, pkg: &SignedPackage) -> Result<(), StorageError> {
+    fn put(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+        pkg: &SignedPackage,
+    ) -> Result<(), StorageError> {
         let vdir = self.version_dir(spirit_id, version);
         fs::create_dir_all(&vdir).map_err(|e| StorageError::Io(e.to_string()))?;
 
@@ -173,17 +206,18 @@ impl RegistryStorage for LocalFsRegistryStorage {
         fs::write(vdir.join("artifact.bin"), &pkg.artifact_bytes)
             .map_err(|e| StorageError::Io(e.to_string()))?;
         // Write signed_package.json
-        let pkg_json = serde_json::to_vec_pretty(pkg)
-            .map_err(|e| StorageError::Serde(e.to_string()))?;
+        let pkg_json =
+            serde_json::to_vec_pretty(pkg).map_err(|e| StorageError::Serde(e.to_string()))?;
         fs::write(vdir.join("signed_package.json"), &pkg_json)
             .map_err(|e| StorageError::Io(e.to_string()))?;
 
         // Update index
         let index_snapshot = {
-            let mut idx = self.index.lock().map_err(|e| StorageError::Io(format!("index lock poisoned: {e}")))?;
-            let items = idx
-                .entry(spirit_id.as_str().to_string())
-                .or_default();
+            let mut idx = self
+                .index
+                .lock()
+                .map_err(|e| StorageError::Io(format!("index lock poisoned: {e}")))?;
+            let items = idx.entry(spirit_id.as_str().to_string()).or_default();
             items.retain(|i| i.version != version);
             items.push(SearchResultItem::new(
                 spirit_id.clone(),
@@ -208,18 +242,22 @@ impl RegistryStorage for LocalFsRegistryStorage {
         self.write_origin(spirit_id, version, origin)
     }
 
-    fn get_manifest(&self, spirit_id: &SpiritId, version: &str) -> Result<SignedManifest, StorageError> {
+    fn get_manifest(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+    ) -> Result<SignedManifest, StorageError> {
         let vdir = self.version_dir(spirit_id, version);
-        let manifest_toml = fs::read(vdir.join("manifest.toml"))
-            .map_err(|_| StorageError::VersionNotFound {
+        let manifest_toml =
+            fs::read(vdir.join("manifest.toml")).map_err(|_| StorageError::VersionNotFound {
                 spirit_id: spirit_id.as_str().to_string(),
                 version: version.to_string(),
             })?;
         // Reconstruct from stored files.  Signature data is in signed_package.json.
         let pkg_json = fs::read_to_string(vdir.join("signed_package.json"))
             .map_err(|e| StorageError::Io(e.to_string()))?;
-        let pkg: SignedPackage = serde_json::from_str(&pkg_json)
-            .map_err(|e| StorageError::Serde(e.to_string()))?;
+        let pkg: SignedPackage =
+            serde_json::from_str(&pkg_json).map_err(|e| StorageError::Serde(e.to_string()))?;
         Ok(SignedManifest::new(
             spirit_id.clone(),
             version.to_string(),
@@ -229,17 +267,21 @@ impl RegistryStorage for LocalFsRegistryStorage {
         ))
     }
 
-    fn get_artifact(&self, spirit_id: &SpiritId, version: &str) -> Result<SignedArtifact, StorageError> {
+    fn get_artifact(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+    ) -> Result<SignedArtifact, StorageError> {
         let vdir = self.version_dir(spirit_id, version);
-        let artifact_bytes = fs::read(vdir.join("artifact.bin"))
-            .map_err(|_| StorageError::VersionNotFound {
+        let artifact_bytes =
+            fs::read(vdir.join("artifact.bin")).map_err(|_| StorageError::VersionNotFound {
                 spirit_id: spirit_id.as_str().to_string(),
                 version: version.to_string(),
             })?;
         let pkg_json = fs::read_to_string(vdir.join("signed_package.json"))
             .map_err(|e| StorageError::Io(e.to_string()))?;
-        let pkg: SignedPackage = serde_json::from_str(&pkg_json)
-            .map_err(|e| StorageError::Serde(e.to_string()))?;
+        let pkg: SignedPackage =
+            serde_json::from_str(&pkg_json).map_err(|e| StorageError::Serde(e.to_string()))?;
         Ok(SignedArtifact::new(
             spirit_id.clone(),
             version.to_string(),
@@ -260,16 +302,27 @@ impl RegistryStorage for LocalFsRegistryStorage {
         // Pre-7.2: holding `idx` while repeatedly locking `yanks` produced O(N×M)
         // contention; the snapshot reduces it to O(N) + O(1) yanks lock acquisitions.
         let yanks_snapshot: Vec<YankEntry> = if !q.include_yanked {
-            self.yanks.lock().map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?.clone()
+            self.yanks
+                .lock()
+                .map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?
+                .clone()
         } else {
             Vec::new()
         };
 
-        let idx = self.index.lock().map_err(|e| StorageError::Io(format!("index lock poisoned: {e}")))?.clone();
+        let idx = self
+            .index
+            .lock()
+            .map_err(|e| StorageError::Io(format!("index lock poisoned: {e}")))?
+            .clone();
         let mut all_items: Vec<SearchResultItem> = Vec::new();
         for items in idx.values() {
             for item in items {
-                let matches = item.spirit_id.as_str().to_lowercase().contains(&query_lower);
+                let matches = item
+                    .spirit_id
+                    .as_str()
+                    .to_lowercase()
+                    .contains(&query_lower);
                 if !matches {
                     continue;
                 }
@@ -291,7 +344,12 @@ impl RegistryStorage for LocalFsRegistryStorage {
         Ok(SearchResults::new(all_items))
     }
 
-    fn yank(&self, spirit_id: &SpiritId, version: &str, reason: &YankReason) -> Result<YankReceipt, StorageError> {
+    fn yank(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+        reason: &YankReason,
+    ) -> Result<YankReceipt, StorageError> {
         let yank_id = format!("yank-{}", monotonic_now_ns());
         let entry = YankEntry::new(
             spirit_id.clone(),
@@ -301,17 +359,27 @@ impl RegistryStorage for LocalFsRegistryStorage {
         );
 
         let yanks_snapshot = {
-            let mut yanks = self.yanks.lock().map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?;
+            let mut yanks = self
+                .yanks
+                .lock()
+                .map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?;
             yanks.push(entry);
             yanks.clone()
         };
         Self::save_yanks_data(&self.root, &yanks_snapshot);
 
-        Ok(YankReceipt::new(yank_id, spirit_id.clone(), version.to_string()))
+        Ok(YankReceipt::new(
+            yank_id,
+            spirit_id.clone(),
+            version.to_string(),
+        ))
     }
 
     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError> {
-        let yanks = self.yanks.lock().map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?;
+        let yanks = self
+            .yanks
+            .lock()
+            .map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?;
         let entries: Vec<YankEntry> = yanks
             .iter()
             .filter(|e| e.yanked_at_ns >= since_ns)
@@ -344,7 +412,8 @@ fn extract_summary(manifest_toml: &[u8]) -> String {
         }
     }
     for line in text.lines() {
-        if !line.trim().is_empty() && !line.trim().starts_with('[') && !line.trim().starts_with('#') {
+        if !line.trim().is_empty() && !line.trim().starts_with('[') && !line.trim().starts_with('#')
+        {
             let s = line.trim().to_string();
             if s.len() <= 120 {
                 return s;
@@ -377,10 +446,7 @@ pub enum StorageError {
     #[error("serde error: {0}")]
     Serde(String),
     #[error("version '{version}' not found for spirit '{spirit_id}'")]
-    VersionNotFound {
-        spirit_id: String,
-        version: String,
-    },
+    VersionNotFound { spirit_id: String, version: String },
 }
 
 // ---------------------------------------------------------------------------
@@ -421,11 +487,8 @@ mod tests {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-        let dir = std::env::temp_dir().join(format!(
-            "maos-registry-test-{}-{}",
-            std::process::id(),
-            n
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("maos-registry-test-{}-{}", std::process::id(), n));
         let _ = fs::remove_dir_all(&dir);
         LocalFsRegistryStorage::at_path(dir).unwrap()
     }

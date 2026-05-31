@@ -57,10 +57,8 @@ fn strip_line_comment(line: &str) -> &str {
 fn forbidden_suffix_re() -> &'static regex::Regex {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        regex::Regex::new(
-            r"\.\s*(unwrap_or_default|unwrap_or_else|unwrap_or|unwrap|expect)\s*\(",
-        )
-        .unwrap()
+        regex::Regex::new(r"\.\s*(unwrap_or_default|unwrap_or_else|unwrap_or|unwrap|expect)\s*\(")
+            .unwrap()
     })
 }
 
@@ -243,10 +241,7 @@ mod tests {
     use std::io::Write;
 
     fn tmp_file(content: &str) -> tempfile::NamedTempFile {
-        let mut f = tempfile::Builder::new()
-            .suffix(".rs")
-            .tempfile()
-            .unwrap();
+        let mut f = tempfile::Builder::new().suffix(".rs").tempfile().unwrap();
         f.write_all(content.as_bytes()).unwrap();
         f
     }

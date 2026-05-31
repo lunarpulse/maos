@@ -14,6 +14,7 @@ use std::path::PathBuf;
 fn main() {
     println!("cargo:rerun-if-changed=seeds/secret-redaction-seeds-v0.1.toml");
     println!("cargo:rerun-if-changed=seeds/red-team-seeds-v0.1.toml");
+    println!("cargo:rerun-if-changed=seeds/ccac-seeds-v1.0.toml");
 
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let out_dir = std::env::var("OUT_DIR").unwrap();
@@ -58,6 +59,27 @@ fn main() {
         println!("cargo:warning={}", msg);
     } else {
         std::fs::write(&rt_gen_path, "const _RT_CHECK_OK: () = ();\n").unwrap();
+    }
+
+    // --- ccac (Story 7.3) ---
+    let ccac_path = manifest_dir.join("seeds/ccac-seeds-v1.0.toml");
+    let ccac_data = std::fs::read(&ccac_path).expect("failed to read ccac seeds");
+    let ccac_actual = hex::encode(Sha256::digest(&ccac_data));
+    let ccac_pinned = "700d294661d0375138e84fe2f8e7ac50dd46172425f25f777a60445d529e28ee";
+
+    let ccac_gen_path = PathBuf::from(&out_dir).join("sha_check_ccac.rs");
+    if ccac_actual != ccac_pinned {
+        let msg = format!(
+            "seed-file SHA mismatch: src/ccac/mod.rs pins {} but \
+             seeds/ccac-seeds-v1.0.toml hashes to {} — update \
+             CCAC_SEED_FILE_SHA256, regenerate tests/corpora/ccac-v1.0-<sha>.jsonl, \
+             and update MANIFEST.toml",
+            ccac_pinned, ccac_actual
+        );
+        std::fs::write(&ccac_gen_path, format!("compile_error!(\"{}\");", msg)).unwrap();
+        println!("cargo:warning={}", msg);
+    } else {
+        std::fs::write(&ccac_gen_path, "const _CCAC_CHECK_OK: () = ();\n").unwrap();
     }
 
     println!("cargo:rustc-cfg=sha_check_done");

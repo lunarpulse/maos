@@ -25,17 +25,27 @@ fn smoke_multi_provider_5_exercises_6_surfaces() {
     );
 
     let lines: Vec<&str> = stdout.lines().collect();
-    assert!(lines.len() >= 6, "expected >= 6 JSON lines, got {}: {stdout}", lines.len());
+    assert!(
+        lines.len() >= 6,
+        "expected >= 6 JSON lines, got {}: {stdout}",
+        lines.len()
+    );
 
     let steps: Vec<serde_json::Value> = lines
         .iter()
         .filter_map(|l| serde_json::from_str(l).ok())
         .collect();
 
-    assert!(steps.len() >= 6, "expected >= 6 parseable JSON steps, got {}", steps.len());
+    assert!(
+        steps.len() >= 6,
+        "expected >= 6 parseable JSON steps, got {}",
+        steps.len()
+    );
 
     for i in 1..=6u64 {
-        let found = steps.iter().any(|s| s.get("step").and_then(|v| v.as_u64()) == Some(i));
+        let found = steps
+            .iter()
+            .any(|s| s.get("step").and_then(|v| v.as_u64()) == Some(i));
         assert!(found, "missing step {i} in output: {stdout}");
     }
 

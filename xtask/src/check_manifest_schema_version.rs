@@ -110,9 +110,7 @@ fn scan_hardcoded_comparisons(path: &Path) -> Vec<(usize, String)> {
                 continue;
             }
             // Strip the operator and any whitespace.
-            let after_op = after
-                .trim_start_matches(['=', '!', '<', '>'])
-                .trim_start();
+            let after_op = after.trim_start_matches(['=', '!', '<', '>']).trim_start();
             // If the next chars are a digit, it's a hardcoded magic number.
             if after_op.chars().next().is_some_and(|c| c.is_ascii_digit()) {
                 violations.push((i + 1, raw_line.trim().to_string()));
@@ -126,16 +124,18 @@ pub fn run(json: bool) -> Result<(), String> {
     let mut violations = Vec::new();
 
     // Step 1 — parse the spirit-abi constants.
-    let abi_source = fs::read_to_string(SPIRIT_ABI_LIB)
-        .map_err(|e| format!("read {SPIRIT_ABI_LIB}: {e}"))?;
+    let abi_source =
+        fs::read_to_string(SPIRIT_ABI_LIB).map_err(|e| format!("read {SPIRIT_ABI_LIB}: {e}"))?;
     let current = parse_const(&abi_source, "MANIFEST_SCHEMA_VERSION")
         .ok_or_else(|| format!("{SPIRIT_ABI_LIB}: MANIFEST_SCHEMA_VERSION not found"))?;
-    let min = parse_const(&abi_source, "MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION").ok_or_else(
-        || format!("{SPIRIT_ABI_LIB}: MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION not found"),
-    )?;
-    let max = parse_const(&abi_source, "MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION").ok_or_else(
-        || format!("{SPIRIT_ABI_LIB}: MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION not found"),
-    )?;
+    let min =
+        parse_const(&abi_source, "MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION").ok_or_else(|| {
+            format!("{SPIRIT_ABI_LIB}: MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION not found")
+        })?;
+    let max =
+        parse_const(&abi_source, "MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION").ok_or_else(|| {
+            format!("{SPIRIT_ABI_LIB}: MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION not found")
+        })?;
 
     // Step 2 — window invariants.
     if min == 0 {
@@ -187,9 +187,7 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     if violations.is_empty() {
-        println!(
-            "check-manifest-schema-version: PASSED (current={current}, min={min}, max={max})"
-        );
+        println!("check-manifest-schema-version: PASSED (current={current}, min={min}, max={max})");
         return Ok(());
     }
 

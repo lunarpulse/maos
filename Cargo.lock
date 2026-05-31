@@ -1030,6 +1030,8 @@ dependencies = [
  "maos-acp",
  "maos-audit",
  "maos-bench",
+ "maos-compliance",
+ "maos-corpus-gen",
  "maos-director-surface",
  "maos-domain",
  "maos-kernel-core",
@@ -1037,10 +1039,12 @@ dependencies = [
  "maos-providers",
  "maos-registry",
  "maos-spirit-abi",
+ "maos-spirit-cli",
  "maos-spirit-hello",
  "maos-spirit-sdk",
  "parking_lot",
  "ring",
+ "serde_cbor",
  "serde_json",
  "sha2",
  "smallvec",
@@ -1081,6 +1085,19 @@ dependencies = [
 [[package]]
 name = "maos-compliance"
 version = "0.1.0-alpha"
+dependencies = [
+ "hex",
+ "maos-corpus-gen",
+ "maos-domain",
+ "maos-spirit-abi",
+ "ring",
+ "serde",
+ "serde_cbor",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "tracing",
+]
 
 [[package]]
 name = "maos-control"
@@ -1091,7 +1108,12 @@ name = "maos-corpus-gen"
 version = "0.1.0-alpha"
 dependencies = [
  "clap",
+ "hex",
+ "maos-compliance",
+ "maos-spirit-abi",
+ "ring",
  "serde",
+ "serde_cbor",
  "serde_json",
  "sha2",
  "tempfile",
@@ -1254,6 +1276,7 @@ version = "0.1.0-alpha"
 dependencies = [
  "base64",
  "hex",
+ "maos-compliance",
  "maos-domain",
  "maos-mcp",
  "maos-spirit-abi",

@@ -32,8 +32,10 @@ impl ControlledSource {
 impl YankSource for ControlledSource {
     fn fetch_yanks(&self, since_ns: u64) -> Result<YankList, RegistryError> {
         let pending = self.pending.lock().unwrap().clone();
-        let entries: Vec<YankEntry> =
-            pending.into_iter().filter(|e| e.yanked_at_ns > since_ns).collect();
+        let entries: Vec<YankEntry> = pending
+            .into_iter()
+            .filter(|e| e.yanked_at_ns > since_ns)
+            .collect();
         Ok(YankList::new(entries))
     }
 }

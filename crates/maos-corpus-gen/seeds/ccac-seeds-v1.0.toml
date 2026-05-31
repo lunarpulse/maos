@@ -1,0 +1,391 @@
+# CCAC (ComplianceClaim Adversarial Corpus) Seed Corpus v1.0 — Story 7.3 / NFR-Aud-9.
+# 64 SHA-pinned seed templates × 10 deterministic variations = N=640 envelopes.
+#   * 20 well-formed templates (5 classes × 4)        → 200 admit envelopes
+#   * 44 malformed templates                          → 440 reject envelopes
+#       - 10 non-drift malformed classes × 3 templates × 10 = 300
+#       - context_drift: 14 templates × 10             = 140 (exactly)
+#         (7 DriftField families × 2 templates each)
+# Per-class floor >=30 members; gate floor >=27/30 (>=90% expected verdict).
+# Each envelope is bound to one of 3 reference Spirit contexts (hello / template-7-1 / synth-pu),
+# rotated by variation index for the +-2% cross-validation gate.
+# SHA-pinned; any edit requires updating CCAC_SEED_FILE_SHA256 + regenerating the JSONL.
+# See: crates/maos-corpus-gen/src/ccac/mod.rs
+
+[[seeds]]
+id = "wf_public_untrusted-01"
+class = "wf_public_untrusted"
+kind = "well_formed"
+rationale = "well-formed public_untrusted envelope admits against its reference context"
+[[seeds]]
+id = "wf_public_untrusted-02"
+class = "wf_public_untrusted"
+kind = "well_formed"
+rationale = "well-formed public_untrusted envelope admits against its reference context"
+[[seeds]]
+id = "wf_public_untrusted-03"
+class = "wf_public_untrusted"
+kind = "well_formed"
+rationale = "well-formed public_untrusted envelope admits against its reference context"
+[[seeds]]
+id = "wf_public_untrusted-04"
+class = "wf_public_untrusted"
+kind = "well_formed"
+rationale = "well-formed public_untrusted envelope admits against its reference context"
+[[seeds]]
+id = "wf_local-01"
+class = "wf_local"
+kind = "well_formed"
+rationale = "well-formed local-tier envelope admits"
+[[seeds]]
+id = "wf_local-02"
+class = "wf_local"
+kind = "well_formed"
+rationale = "well-formed local-tier envelope admits"
+[[seeds]]
+id = "wf_local-03"
+class = "wf_local"
+kind = "well_formed"
+rationale = "well-formed local-tier envelope admits"
+[[seeds]]
+id = "wf_local-04"
+class = "wf_local"
+kind = "well_formed"
+rationale = "well-formed local-tier envelope admits"
+[[seeds]]
+id = "wf_org_internal-01"
+class = "wf_org_internal"
+kind = "well_formed"
+rationale = "well-formed org_internal envelope admits"
+[[seeds]]
+id = "wf_org_internal-02"
+class = "wf_org_internal"
+kind = "well_formed"
+rationale = "well-formed org_internal envelope admits"
+[[seeds]]
+id = "wf_org_internal-03"
+class = "wf_org_internal"
+kind = "well_formed"
+rationale = "well-formed org_internal envelope admits"
+[[seeds]]
+id = "wf_org_internal-04"
+class = "wf_org_internal"
+kind = "well_formed"
+rationale = "well-formed org_internal envelope admits"
+[[seeds]]
+id = "wf_caps_provider-01"
+class = "wf_caps_provider"
+kind = "well_formed"
+rationale = "well-formed envelope with varied capability scope + provider admits"
+[[seeds]]
+id = "wf_caps_provider-02"
+class = "wf_caps_provider"
+kind = "well_formed"
+rationale = "well-formed envelope with varied capability scope + provider admits"
+[[seeds]]
+id = "wf_caps_provider-03"
+class = "wf_caps_provider"
+kind = "well_formed"
+rationale = "well-formed envelope with varied capability scope + provider admits"
+[[seeds]]
+id = "wf_caps_provider-04"
+class = "wf_caps_provider"
+kind = "well_formed"
+rationale = "well-formed envelope with varied capability scope + provider admits"
+[[seeds]]
+id = "wf_sandbox-01"
+class = "wf_sandbox"
+kind = "well_formed"
+rationale = "well-formed envelope across sandbox tiers admits"
+[[seeds]]
+id = "wf_sandbox-02"
+class = "wf_sandbox"
+kind = "well_formed"
+rationale = "well-formed envelope across sandbox tiers admits"
+[[seeds]]
+id = "wf_sandbox-03"
+class = "wf_sandbox"
+kind = "well_formed"
+rationale = "well-formed envelope across sandbox tiers admits"
+[[seeds]]
+id = "wf_sandbox-04"
+class = "wf_sandbox"
+kind = "well_formed"
+rationale = "well-formed envelope across sandbox tiers admits"
+[[seeds]]
+id = "truncated_signature-01"
+class = "truncated_signature"
+kind = "malformed"
+malform = "truncated_signature"
+rationale = "corrupted Ed25519 signature -> SignatureInvalid"
+[[seeds]]
+id = "truncated_signature-02"
+class = "truncated_signature"
+kind = "malformed"
+malform = "truncated_signature"
+rationale = "corrupted Ed25519 signature -> SignatureInvalid"
+[[seeds]]
+id = "truncated_signature-03"
+class = "truncated_signature"
+kind = "malformed"
+malform = "truncated_signature"
+rationale = "corrupted Ed25519 signature -> SignatureInvalid"
+[[seeds]]
+id = "wrong_attester_pubkey-01"
+class = "wrong_attester_pubkey"
+kind = "malformed"
+malform = "wrong_attester_pubkey"
+rationale = "signature by a different key than attester_pubkey -> SignatureInvalid"
+[[seeds]]
+id = "wrong_attester_pubkey-02"
+class = "wrong_attester_pubkey"
+kind = "malformed"
+malform = "wrong_attester_pubkey"
+rationale = "signature by a different key than attester_pubkey -> SignatureInvalid"
+[[seeds]]
+id = "wrong_attester_pubkey-03"
+class = "wrong_attester_pubkey"
+kind = "malformed"
+malform = "wrong_attester_pubkey"
+rationale = "signature by a different key than attester_pubkey -> SignatureInvalid"
+[[seeds]]
+id = "garbage_cbor-01"
+class = "garbage_cbor"
+kind = "malformed"
+malform = "garbage_cbor"
+rationale = "claim_bytes are non-decodable garbage -> MalformedClaim"
+[[seeds]]
+id = "garbage_cbor-02"
+class = "garbage_cbor"
+kind = "malformed"
+malform = "garbage_cbor"
+rationale = "claim_bytes are non-decodable garbage -> MalformedClaim"
+[[seeds]]
+id = "garbage_cbor-03"
+class = "garbage_cbor"
+kind = "malformed"
+malform = "garbage_cbor"
+rationale = "claim_bytes are non-decodable garbage -> MalformedClaim"
+[[seeds]]
+id = "missing_required_field-01"
+class = "missing_required_field"
+kind = "malformed"
+malform = "missing_trust_tier"
+rationale = "claim omits trust_tier -> MalformedClaim"
+[[seeds]]
+id = "missing_required_field-02"
+class = "missing_required_field"
+kind = "malformed"
+malform = "missing_trust_tier"
+rationale = "claim omits trust_tier -> MalformedClaim"
+[[seeds]]
+id = "missing_required_field-03"
+class = "missing_required_field"
+kind = "malformed"
+malform = "missing_trust_tier"
+rationale = "claim omits trust_tier -> MalformedClaim"
+[[seeds]]
+id = "truncated_fingerprint_hash-01"
+class = "truncated_fingerprint_hash"
+kind = "malformed"
+malform = "truncated_fingerprint_hash"
+rationale = "fingerprint_hash != 32 bytes -> MalformedClaim"
+[[seeds]]
+id = "truncated_fingerprint_hash-02"
+class = "truncated_fingerprint_hash"
+kind = "malformed"
+malform = "truncated_fingerprint_hash"
+rationale = "fingerprint_hash != 32 bytes -> MalformedClaim"
+[[seeds]]
+id = "truncated_fingerprint_hash-03"
+class = "truncated_fingerprint_hash"
+kind = "malformed"
+malform = "truncated_fingerprint_hash"
+rationale = "fingerprint_hash != 32 bytes -> MalformedClaim"
+[[seeds]]
+id = "unknown_trust_tier_enum-01"
+class = "unknown_trust_tier_enum"
+kind = "malformed"
+malform = "unknown_trust_tier"
+rationale = "unknown trust_tier enum value -> MalformedClaim (no silent default)"
+[[seeds]]
+id = "unknown_trust_tier_enum-02"
+class = "unknown_trust_tier_enum"
+kind = "malformed"
+malform = "unknown_trust_tier"
+rationale = "unknown trust_tier enum value -> MalformedClaim (no silent default)"
+[[seeds]]
+id = "unknown_trust_tier_enum-03"
+class = "unknown_trust_tier_enum"
+kind = "malformed"
+malform = "unknown_trust_tier"
+rationale = "unknown trust_tier enum value -> MalformedClaim (no silent default)"
+[[seeds]]
+id = "unknown_sandbox_tier_enum-01"
+class = "unknown_sandbox_tier_enum"
+kind = "malformed"
+malform = "unknown_sandbox_tier"
+rationale = "unknown sandbox_tier enum value -> MalformedClaim (no silent default)"
+[[seeds]]
+id = "unknown_sandbox_tier_enum-02"
+class = "unknown_sandbox_tier_enum"
+kind = "malformed"
+malform = "unknown_sandbox_tier"
+rationale = "unknown sandbox_tier enum value -> MalformedClaim (no silent default)"
+[[seeds]]
+id = "unknown_sandbox_tier_enum-03"
+class = "unknown_sandbox_tier_enum"
+kind = "malformed"
+malform = "unknown_sandbox_tier"
+rationale = "unknown sandbox_tier enum value -> MalformedClaim (no silent default)"
+[[seeds]]
+id = "expired_claim-01"
+class = "expired_claim"
+kind = "malformed"
+malform = "expired_claim"
+rationale = "claim expires_at_unix_ms in the past -> ExpiredClaim"
+[[seeds]]
+id = "expired_claim-02"
+class = "expired_claim"
+kind = "malformed"
+malform = "expired_claim"
+rationale = "claim expires_at_unix_ms in the past -> ExpiredClaim"
+[[seeds]]
+id = "expired_claim-03"
+class = "expired_claim"
+kind = "malformed"
+malform = "expired_claim"
+rationale = "claim expires_at_unix_ms in the past -> ExpiredClaim"
+[[seeds]]
+id = "missing_provider_or_crypto-01"
+class = "missing_provider_or_crypto"
+kind = "malformed"
+malform = "missing_crypto_provider"
+rationale = "claim omits crypto_provider -> MalformedClaim"
+[[seeds]]
+id = "missing_provider_or_crypto-02"
+class = "missing_provider_or_crypto"
+kind = "malformed"
+malform = "missing_crypto_provider"
+rationale = "claim omits crypto_provider -> MalformedClaim"
+[[seeds]]
+id = "missing_provider_or_crypto-03"
+class = "missing_provider_or_crypto"
+kind = "malformed"
+malform = "missing_crypto_provider"
+rationale = "claim omits crypto_provider -> MalformedClaim"
+[[seeds]]
+id = "empty_claim_bytes-01"
+class = "empty_claim_bytes"
+kind = "malformed"
+malform = "empty_claim_bytes"
+rationale = "empty claim_bytes -> MalformedClaim"
+[[seeds]]
+id = "empty_claim_bytes-02"
+class = "empty_claim_bytes"
+kind = "malformed"
+malform = "empty_claim_bytes"
+rationale = "empty claim_bytes -> MalformedClaim"
+[[seeds]]
+id = "empty_claim_bytes-03"
+class = "empty_claim_bytes"
+kind = "malformed"
+malform = "empty_claim_bytes"
+rationale = "empty claim_bytes -> MalformedClaim"
+[[seeds]]
+id = "drift_trusttier-01"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "TrustTier"
+rationale = "claim attests a trust_tier that drifts from runtime -> ContextDrift{TrustTier} (S8.5 attack row 3)"
+[[seeds]]
+id = "drift_trusttier-02"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "TrustTier"
+rationale = "claim attests a trust_tier that drifts from runtime -> ContextDrift{TrustTier} (S8.5 attack row 3)"
+[[seeds]]
+id = "drift_sandboxtier-01"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "SandboxTier"
+rationale = "claim attests a sandbox_tier that drifts from runtime -> ContextDrift{SandboxTier}"
+[[seeds]]
+id = "drift_sandboxtier-02"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "SandboxTier"
+rationale = "claim attests a sandbox_tier that drifts from runtime -> ContextDrift{SandboxTier}"
+[[seeds]]
+id = "drift_capabilityscope-01"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "CapabilityScope"
+rationale = "claim attests a capability_scope that drifts from runtime -> ContextDrift{CapabilityScope}"
+[[seeds]]
+id = "drift_capabilityscope-02"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "CapabilityScope"
+rationale = "claim attests a capability_scope that drifts from runtime -> ContextDrift{CapabilityScope}"
+[[seeds]]
+id = "drift_providerendpoint-01"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "ProviderEndpoint"
+rationale = "claim attests a provider_endpoint that drifts from runtime -> ContextDrift{ProviderEndpoint} (S8.5 attack row 6)"
+[[seeds]]
+id = "drift_providerendpoint-02"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "ProviderEndpoint"
+rationale = "claim attests a provider_endpoint that drifts from runtime -> ContextDrift{ProviderEndpoint} (S8.5 attack row 6)"
+[[seeds]]
+id = "drift_cryptoprovider-01"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "CryptoProvider"
+rationale = "claim attests a crypto_provider that drifts from runtime -> ContextDrift{CryptoProvider} (S8.5 attack row 7)"
+[[seeds]]
+id = "drift_cryptoprovider-02"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "CryptoProvider"
+rationale = "claim attests a crypto_provider that drifts from runtime -> ContextDrift{CryptoProvider} (S8.5 attack row 7)"
+[[seeds]]
+id = "drift_manifesthash-01"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "ManifestHash"
+rationale = "claim attests a manifest_hash that drifts from runtime -> ContextDrift{FingerprintHash} (manifest_hash encoded in fingerprint, not compared as discrete field)"
+[[seeds]]
+id = "drift_manifesthash-02"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "ManifestHash"
+rationale = "claim attests a manifest_hash that drifts from runtime -> ContextDrift{FingerprintHash} (manifest_hash encoded in fingerprint, not compared as discrete field)"
+[[seeds]]
+id = "drift_spiritversion-01"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "SpiritVersion"
+rationale = "claim attests a spirit_version that drifts from runtime -> ContextDrift{FingerprintHash} (spirit_version encoded in fingerprint, not compared as discrete field)"
+[[seeds]]
+id = "drift_spiritversion-02"
+class = "context_drift"
+kind = "malformed"
+malform = "context_drift"
+drift_field = "SpiritVersion"
+rationale = "claim attests a spirit_version that drifts from runtime -> ContextDrift{FingerprintHash} (spirit_version encoded in fingerprint, not compared as discrete field)"

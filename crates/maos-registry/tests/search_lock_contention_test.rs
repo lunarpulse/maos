@@ -58,11 +58,8 @@ fn search_acquires_yanks_lock_once() {
     s.put(&sid, "0.1.0", &pkg).unwrap();
 
     // Yank it so the search path must consult the yanks list.
-    s.yank(&sid,
-        "0.1.0",
-        &YankReason::new("contention-test".into()),
-    )
-    .unwrap();
+    s.yank(&sid, "0.1.0", &YankReason::new("contention-test".into()))
+        .unwrap();
 
     // Search with include_yanked=false must check yanks.
     let q = SearchQuery::new("hello".into(), false, 50);
@@ -95,12 +92,8 @@ fn yank_visibility_preserved_after_contention_fix() {
     assert_eq!(results.items.len(), 1);
 
     // Yank it.
-    s.yank(
-        &sid,
-        "0.1.0",
-        &YankReason::new("contention-test".into()),
-    )
-    .unwrap();
+    s.yank(&sid, "0.1.0", &YankReason::new("contention-test".into()))
+        .unwrap();
 
     // Post-yank: default search hides it.
     let results = s.search(&q).unwrap();

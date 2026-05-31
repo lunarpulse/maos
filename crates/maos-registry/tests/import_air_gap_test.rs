@@ -3,10 +3,10 @@
 use std::io::Write;
 use std::path::PathBuf;
 
-use maos_registry::import::{extract_bundle, verify_bundle_consistency, ImportError};
-use maos_registry::storage::{LocalFsRegistryStorage, RegistryStorage};
-use maos_registry::origin::RegistryOrigin;
 use maos_domain::ports::registry::SpiritId;
+use maos_registry::import::{extract_bundle, verify_bundle_consistency, ImportError};
+use maos_registry::origin::RegistryOrigin;
+use maos_registry::storage::{LocalFsRegistryStorage, RegistryStorage};
 
 fn write_tar(files: &[(&str, &[u8])]) -> Vec<u8> {
     let mut buf = Vec::new();
@@ -64,7 +64,11 @@ trust_tier = "local"
         ("signed-package.json", pkg_json.as_bytes()),
     ]);
     let mut tmp = std::env::temp_dir();
-    tmp.push(format!("maos-import-test-{}-{}.tar", std::process::id(), unique_id()));
+    tmp.push(format!(
+        "maos-import-test-{}-{}.tar",
+        std::process::id(),
+        unique_id()
+    ));
     std::fs::File::create(&tmp)
         .unwrap()
         .write_all(&tar_bytes)
@@ -99,8 +103,15 @@ fn divergent_manifest_rejects() {
         ("signed-package.json", pkg_json.as_bytes()),
     ]);
     let mut tmp = std::env::temp_dir();
-    tmp.push(format!("maos-import-divergent-{}-{}.tar", std::process::id(), unique_id()));
-    std::fs::File::create(&tmp).unwrap().write_all(&tar_bytes).unwrap();
+    tmp.push(format!(
+        "maos-import-divergent-{}-{}.tar",
+        std::process::id(),
+        unique_id()
+    ));
+    std::fs::File::create(&tmp)
+        .unwrap()
+        .write_all(&tar_bytes)
+        .unwrap();
     let bundle = extract_bundle(&tmp).unwrap();
     let err = verify_bundle_consistency(&bundle).unwrap_err();
     assert!(matches!(err, ImportError::InconsistentExtract { file } if file == "manifest.toml"));
@@ -108,13 +119,17 @@ fn divergent_manifest_rejects() {
 
 #[test]
 fn missing_signed_package_rejects() {
-    let tar_bytes = write_tar(&[
-        ("manifest.toml", b"x" as &[u8]),
-        ("artifact.bin", b"y"),
-    ]);
+    let tar_bytes = write_tar(&[("manifest.toml", b"x" as &[u8]), ("artifact.bin", b"y")]);
     let mut tmp = std::env::temp_dir();
-    tmp.push(format!("maos-import-missing-pkg-{}-{}.tar", std::process::id(), unique_id()));
-    std::fs::File::create(&tmp).unwrap().write_all(&tar_bytes).unwrap();
+    tmp.push(format!(
+        "maos-import-missing-pkg-{}-{}.tar",
+        std::process::id(),
+        unique_id()
+    ));
+    std::fs::File::create(&tmp)
+        .unwrap()
+        .write_all(&tar_bytes)
+        .unwrap();
     let err = extract_bundle(&tmp).unwrap_err();
     assert!(matches!(err, ImportError::SignedPackageParseFailure(_)));
 }
@@ -147,8 +162,12 @@ fn publish_with_origin_persists_origin_file() {
         .join("0.1.0")
         .join("origin.json");
     assert!(origin_path.exists(), "origin.json should be written");
-    let origin_json: serde_json::Value = serde_json::from_slice(&std::fs::read(&origin_path).unwrap()).unwrap();
-    assert_eq!(origin_json["Imported"]["bundle_sha256"], bundle.bundle_sha256);
+    let origin_json: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&origin_path).unwrap()).unwrap();
+    assert_eq!(
+        origin_json["Imported"]["bundle_sha256"],
+        bundle.bundle_sha256
+    );
 }
 
 #[test]
@@ -165,6 +184,8 @@ fn admit_spirit_local_unsigned_passes() {
         t3_for_public_untrusted: false,
         allow_unsigned_local: true,
         org_signing_pubkey: None,
+        runtime_provider_endpoint: None,
+        runtime_crypto_provider: None,
     };
 
     let decision = admit_spirit(&bundle.signed_package, &op_cfg).expect("admission should pass");
@@ -188,8 +209,15 @@ trust_tier = "public_untrusted"
         ("signed-package.json", pkg_json.as_bytes()),
     ]);
     let mut tmp = std::env::temp_dir();
-    tmp.push(format!("maos-import-pubunt-{}-{}.tar", std::process::id(), unique_id()));
-    std::fs::File::create(&tmp).unwrap().write_all(&tar_bytes).unwrap();
+    tmp.push(format!(
+        "maos-import-pubunt-{}-{}.tar",
+        std::process::id(),
+        unique_id()
+    ));
+    std::fs::File::create(&tmp)
+        .unwrap()
+        .write_all(&tar_bytes)
+        .unwrap();
     let bundle = extract_bundle(&tmp).unwrap();
 
     let op_cfg = AdmissionConfig {
@@ -198,12 +226,15 @@ trust_tier = "public_untrusted"
         t3_for_public_untrusted: false,
         allow_unsigned_local: true,
         org_signing_pubkey: None,
+        runtime_provider_endpoint: None,
+        runtime_crypto_provider: None,
     };
 
     // The synthetic package has a zeroed signature, so verification will fail.
     let err = admit_spirit(&bundle.signed_package, &op_cfg).unwrap_err();
     assert!(
-        err.to_string().contains("PublisherSignatureInvalid") || err.to_string().contains("signature"),
+        err.to_string().contains("PublisherSignatureInvalid")
+            || err.to_string().contains("signature"),
         "expected signature failure, got: {err}"
     );
 }
@@ -233,7 +264,10 @@ fn published_origin_persists_without_origin_file() {
         .join("import-spirit")
         .join("0.1.0")
         .join("origin.json");
-    assert!(origin_path.exists(), "origin.json should be written for Published too");
+    assert!(
+        origin_path.exists(),
+        "origin.json should be written for Published too"
+    );
 }
 
 #[test]

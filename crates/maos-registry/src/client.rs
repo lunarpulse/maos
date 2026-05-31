@@ -12,8 +12,7 @@ use std::sync::Arc;
 use maos_domain::ports::mcp::McpError;
 use maos_domain::ports::registry::{
     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
-    SignedPackage, SpiritId, SpiritRegistryClient, TrustTier, YankList, YankReason,
-    YankReceipt,
+    SignedPackage, SpiritId, SpiritRegistryClient, TrustTier, YankList, YankReason, YankReceipt,
 };
 use maos_mcp::McpClient;
 
@@ -60,17 +59,11 @@ impl McpSpiritRegistryClient {
 
     /// Fetch yanks since a given monotonic timestamp.
     /// Not part of the `SpiritRegistryClient` trait — used internally by YankPoller.
-    pub fn yanks_since(&self,
-        since_ns: u64,
-    ) -> Result<YankList, RegistryError> {
+    pub fn yanks_since(&self, since_ns: u64) -> Result<YankList, RegistryError> {
         let args = serde_json::json!({"since_ns": since_ns});
         let resp = self
             .mcp_client
-            .call(
-                &self.registry_server_name,
-                "registry.yanks_since",
-                args,
-            )
+            .call(&self.registry_server_name, "registry.yanks_since", args)
             .map_err(map_mcp_err)?;
         if resp.is_error {
             return Err(decode_typed_error(&resp.content));
@@ -103,11 +96,7 @@ impl SpiritRegistryClient for McpSpiritRegistryClient {
         });
         let resp = self
             .mcp_client
-            .call(
-                &self.registry_server_name,
-                "registry.manifest",
-                args,
-            )
+            .call(&self.registry_server_name, "registry.manifest", args)
             .map_err(map_mcp_err)?;
         if resp.is_error {
             return Err(decode_typed_error(&resp.content));
@@ -119,17 +108,20 @@ impl SpiritRegistryClient for McpSpiritRegistryClient {
         // If the server provides tier data, verify it regardless of require flag.
         // If require flag is set but data is missing, fail.
         match (
-            manifest.server_reported_tier, manifest.server_signature_on_tier) {
+            manifest.server_reported_tier,
+            manifest.server_signature_on_tier,
+        ) {
             (Some(server_tier), Some(server_sig)) => {
                 // Server provided tier data — verify signature and cross-check manifest.
-                let manifest_tier = crate::admission::extract_manifest_tier(&manifest.manifest_toml);
+                let manifest_tier =
+                    crate::admission::extract_manifest_tier(&manifest.manifest_toml);
                 if manifest_tier != server_tier {
                     return Err(RegistryError::TrustTierServerMismatch {
                         manifest_tier,
                         server_reported_tier: server_tier,
                     });
                 }
-                
+
                 if let Some(pubkey) = self.config.org_signing_pubkey {
                     let msg = server_tier_signature_msg(spirit_id.as_str(), version, server_tier);
                     let pk = ring::signature::UnparsedPublicKey::new(
@@ -144,7 +136,7 @@ impl SpiritRegistryClient for McpSpiritRegistryClient {
                         reason: "require_server_tier_signature=true but org_signing_pubkey is not configured".into(),
                     });
                 }
-                
+
                 // Apply tier floor check.
                 if (server_tier as u8) > (self.config.tier_floor as u8) {
                     return Err(RegistryError::TierFloorViolation {
@@ -188,11 +180,7 @@ impl SpiritRegistryClient for McpSpiritRegistryClient {
         });
         let resp = self
             .mcp_client
-            .call(
-                &self.registry_server_name,
-                "registry.artifact",
-                args,
-            )
+            .call(&self.registry_server_name, "registry.artifact", args)
             .map_err(map_mcp_err)?;
         if resp.is_error {
             return Err(decode_typed_error(&resp.content));
@@ -200,18 +188,12 @@ impl SpiritRegistryClient for McpSpiritRegistryClient {
         serde_json::from_value(resp.content).map_err(|e| RegistryError::Transport(e.to_string()))
     }
 
-    fn publish(
-        &self,
-        pkg: &SignedPackage,
-    ) -> Result<PublishReceipt, RegistryError> {
-        let args = serde_json::to_value(pkg).map_err(|e| RegistryError::Transport(e.to_string()))?;
+    fn publish(&self, pkg: &SignedPackage) -> Result<PublishReceipt, RegistryError> {
+        let args =
+            serde_json::to_value(pkg).map_err(|e| RegistryError::Transport(e.to_string()))?;
         let resp = self
             .mcp_client
-            .call(
-                &self.registry_server_name,
-                "registry.publish",
-                args,
-            )
+            .call(&self.registry_server_name, "registry.publish", args)
             .map_err(map_mcp_err)?;
         if resp.is_error {
             return Err(decode_typed_error(&resp.content));
@@ -272,5 +254,53 @@ fn decode_typed_error(content: &serde_json::Value) -> RegistryError {
         }
     } else {
         RegistryError::Transport(format!("registry error: {content}"))
+    }
+}
+
+/// No-op registry client used when no `MAOS_REGISTRY_URI` is configured (or a
+/// `file://` / `stub` URI is requested without the `fixture_replay` feature).
+///
+/// Every operation returns [`RegistryError::Unconfigured`] so the kernel boots
+/// cleanly without a registry. The composition root (`maos-bin`) falls back to
+/// this when there is no reachable registry.
+///
+/// (Story 7.3: this stub was referenced by `maos-bin`'s composition root since
+/// Story 7.2 but never defined — `maos-bin` did not compile at HEAD. Added here
+/// as the single home for the no-op client; see the Story 7.3 Review Findings.)
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NullSpiritRegistryClient;
+
+impl SpiritRegistryClient for NullSpiritRegistryClient {
+    fn search(&self, _q: &SearchQuery) -> Result<SearchResults, RegistryError> {
+        Err(RegistryError::Unconfigured)
+    }
+
+    fn manifest(
+        &self,
+        _spirit_id: &SpiritId,
+        _version: &str,
+    ) -> Result<SignedManifest, RegistryError> {
+        Err(RegistryError::Unconfigured)
+    }
+
+    fn artifact(
+        &self,
+        _spirit_id: &SpiritId,
+        _version: &str,
+    ) -> Result<SignedArtifact, RegistryError> {
+        Err(RegistryError::Unconfigured)
+    }
+
+    fn publish(&self, _pkg: &SignedPackage) -> Result<PublishReceipt, RegistryError> {
+        Err(RegistryError::Unconfigured)
+    }
+
+    fn deprecate(
+        &self,
+        _spirit_id: &SpiritId,
+        _version: &str,
+        _reason: &YankReason,
+    ) -> Result<YankReceipt, RegistryError> {
+        Err(RegistryError::Unconfigured)
     }
 }

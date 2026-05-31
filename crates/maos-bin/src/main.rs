@@ -76,20 +76,29 @@ impl maos_registry::yank::YankObserver for TlYankObserver {
             "yanked_at_ns": entry.yanked_at_ns,
             "reason": entry.reason,
         });
-        if let Err(e) = self.tl.insert_frame_event(
+        // `insert_frame_event` returns a must-use `LogBeforeDeliver` token, not a
+        // `Result` (Story 7.3: corrected the Story 7.2 yank-observer wiring that
+        // matched it as `Result` and left maos-bin uncompilable — see Review
+        // Findings). Matches the established `let _token = ...` call-site pattern.
+        let _token = self.tl.insert_frame_event(
             maos_kernel_core::iac::transparency_log::FrameKind::SpiritRevoked,
             0, // kernel pid
             None,
             "yank-poller:remote-yank-propagated",
             payload.to_string().as_bytes(),
             maos_domain::invariants::i3::FrameOrigin::Kernel,
-        ) {
-            #[cfg(feature = "tracing")]
-            tracing::warn!(
-                "yank-poller: failed to insert transparency log frame for yank of {}@{}: {e}",
-                entry.spirit_id, entry.version
-            );
-        }
+        );
+    }
+}
+
+/// RAII guard that removes a temp directory on scope exit (including early
+/// returns). Story 7.3: hoisted to module scope — it was defined locally in one
+/// smoke fn but referenced by another, which left maos-bin uncompilable at the
+/// Story 7.2 HEAD (see Story 7.3 Review Findings).
+struct TempDirGuard(std::path::PathBuf);
+impl Drop for TempDirGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 
@@ -263,7 +272,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let log_recall_adapter = Arc::new(maos_kernel_core::iac::log_recall::LogRecallAdapter::new(
         Arc::clone(&transparency_log),
     ));
-    let memory_any: Arc<dyn std::any::Any + Send + Sync> = Arc::clone(&memory) as Arc<dyn std::any::Any + Send + Sync>;
+    let memory_any: Arc<dyn std::any::Any + Send + Sync> =
+        Arc::clone(&memory) as Arc<dyn std::any::Any + Send + Sync>;
     let distillate_writer = Arc::new(maos_kernel_core::iac::distillate::DistillateWriter::new(
         Arc::clone(&transparency_log),
         memory_any,
@@ -408,7 +418,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //   "file://..."         → not yet supported (LocalFs adapter is Story 7.2);
     //                           fall through to Null with a warning.
     //   any HTTP(S) URI      → McpSpiritRegistryClient over McpClient::StreamableHttp.
-    let registry_cfg = maos_kernel_core::security::operator_config::RegistrySection::resolve_from_env_and_disk();
+    let registry_cfg =
+        maos_kernel_core::security::operator_config::RegistrySection::resolve_from_env_and_disk();
     // Story 7.2 — yank poller shutdown flag (signaled on graceful shutdown).
     let yank_poller_shutdown: std::sync::Arc<std::sync::atomic::AtomicBool> =
         std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -427,7 +438,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                      falling back to NullSpiritRegistryClient"
                 );
                 use maos_registry::client::NullSpiritRegistryClient;
-                Arc::new(NullSpiritRegistryClient) as Arc<dyn maos_domain::ports::registry::SpiritRegistryClient>
+                Arc::new(NullSpiritRegistryClient)
+                    as Arc<dyn maos_domain::ports::registry::SpiritRegistryClient>
             }
         } else if registry_cfg.uri.is_empty() {
             use maos_registry::client::NullSpiritRegistryClient;
@@ -445,12 +457,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Production path: McpSpiritRegistryClient wrapping the Streamable-HTTP
             // transport over IoSubsystemPort. This is the path the operator uses
             // when MAOS_REGISTRY_URI points to a real HTTP endpoint.
-            use std::collections::BTreeMap;
             use maos_domain::ports::mcp::McpTransportId;
             use maos_mcp::client::{McpClientImpl, McpServerEntry};
             use maos_mcp::transport::streamable_http::StreamableHttpTransport;
             use maos_mcp::transport::McpTransport;
             use maos_registry::client::McpSpiritRegistryClient;
+            use std::collections::BTreeMap;
 
             let transport: Arc<dyn McpTransport> = Arc::new(StreamableHttpTransport::new(
                 Arc::clone(&io_arc),
@@ -472,33 +484,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers) {
                 Ok(mcp) => {
                     let registry_client = Arc::new(
-                        McpSpiritRegistryClient::new(
-                            Arc::new(mcp),
-                            "spirit-registry".into(),
-                        )
-                        .with_config(maos_registry::client::RegistryClientConfig {
-                            tier_floor: registry_cfg.tier_floor,
-                            require_server_tier_signature: registry_cfg.require_server_tier_signature,
-                            org_signing_pubkey: registry_cfg.org_signing_pubkey,
-                        }),
+                        McpSpiritRegistryClient::new(Arc::new(mcp), "spirit-registry".into())
+                            .with_config(maos_registry::client::RegistryClientConfig {
+                                tier_floor: registry_cfg.tier_floor,
+                                require_server_tier_signature: registry_cfg
+                                    .require_server_tier_signature,
+                                org_signing_pubkey: registry_cfg.org_signing_pubkey,
+                            }),
                     );
                     // Story 7.2 — wire the 5-min yank poller (Finding D3).
                     let poll_interval = maos_registry::yank::resolve_poll_interval();
                     if poll_interval.as_secs() > 0 {
-                        let yank_observer = Arc::new(TlYankObserver::new(Arc::clone(&transparency_log)));
+                        let yank_observer =
+                            Arc::new(TlYankObserver::new(Arc::clone(&transparency_log)));
                         let yank_poller = Arc::new(maos_registry::yank::YankPoller::new(
-                            Arc::clone(&registry_client) as Arc<dyn maos_registry::yank::YankSource>,
-                            Arc::clone(&yank_observer) as Arc<dyn maos_registry::yank::YankObserver>,
+                            Arc::clone(&registry_client)
+                                as Arc<dyn maos_registry::yank::YankSource>,
+                            Arc::clone(&yank_observer)
+                                as Arc<dyn maos_registry::yank::YankObserver>,
                         ));
                         let shutdown = Arc::clone(&yank_poller_shutdown);
-                        let _yank_poller_handle = tokio::spawn(maos_registry::yank::yank_poller_production_loop(
-                            yank_poller,
-                            shutdown,
-                            poll_interval,
-                        ));
-                        eprintln!("maos: YankPoller wired (interval={}s, Story 7.2)", poll_interval.as_secs());
+                        let _yank_poller_handle =
+                            tokio::spawn(maos_registry::yank::yank_poller_production_loop(
+                                yank_poller,
+                                shutdown,
+                                poll_interval,
+                            ));
+                        eprintln!(
+                            "maos: YankPoller wired (interval={}s, Story 7.2)",
+                            poll_interval.as_secs()
+                        );
                     } else {
-                        eprintln!("maos: YankPoller disabled (MAOS_REGISTRY_YANK_POLL_INTERVAL_S=0)");
+                        eprintln!(
+                            "maos: YankPoller disabled (MAOS_REGISTRY_YANK_POLL_INTERVAL_S=0)"
+                        );
                     }
                     registry_client as Arc<dyn maos_domain::ports::registry::SpiritRegistryClient>
                 }
@@ -595,10 +614,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if providers_map.is_empty() {
-        providers_map.insert(
-            "anthropic".into(),
-            Arc::new(UnconfiguredProvider),
-        );
+        providers_map.insert("anthropic".into(), Arc::new(UnconfiguredProvider));
         default_id = Some("anthropic".into());
         eprintln!("maos: no providers configured — all inference calls return Unconfigured");
     }
@@ -620,9 +636,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .with_rate_limiter(Arc::clone(&rate_limiter))
     .with_iac(Arc::clone(&iac));
-    eprintln!(
-        "maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)"
-    );
+    eprintln!("maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)");
     // ─────────────────────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────────
@@ -2150,8 +2164,8 @@ description = "smoke test spirit successor"
             // Story 5.5a AC5: JSON report to stdout (operator-facing diagnostic
             // surface; consumers pipe to `jq`). Story 5.5a review finding
             // §inspect-on-stderr corrected the original `eprintln!` here.
-            let spirit_id = std::env::var("MAOS_SPIRIT_ID")
-                .unwrap_or_else(|_| "unknown".to_string());
+            let spirit_id =
+                std::env::var("MAOS_SPIRIT_ID").unwrap_or_else(|_| "unknown".to_string());
             println!(
                 r#"{{"spirit_id":"{}","pid":0,"runtime":"none","image_sha":"","applied_t2_protections":{{"landlock_rules":0,"seccomp_allow_count":0,"seccomp_kill_count":0}},"strictest_of_reasoning":{{"manifest_tier":"T0","trust_tier_floor":"T0","operator_policy_floor":"T0","effective_tier":"T0","dominant_axis":"manifest"}}}}"#,
                 spirit_id
@@ -2161,10 +2175,14 @@ description = "smoke test spirit successor"
 
         if mode == "smoke-t3-sandbox-5" {
             // Step 1: probe runtime
-            let runtime_result = maos_kernel_core::security::sandbox::t3::runtime_detect::detect_container_runtime();
+            let runtime_result =
+                maos_kernel_core::security::sandbox::t3::runtime_detect::detect_container_runtime();
             match runtime_result {
                 Err(e) => {
-                    println!(r#"{{"step":1,"surface":"runtime_detect","outcome":"unavailable","reason":"{}"}}"#, e);
+                    println!(
+                        r#"{{"step":1,"surface":"runtime_detect","outcome":"unavailable","reason":"{}"}}"#,
+                        e
+                    );
                     return Ok(());
                 }
                 Ok(runtime) => {
@@ -2177,25 +2195,34 @@ description = "smoke test spirit successor"
                     let lock = maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock::load_default();
                     match lock {
                         Err(e) => {
-                            println!(r#"{{"step":2,"surface":"t3_image_verify","outcome":"lock_load_failed","reason":"{}"}}"#, e);
+                            println!(
+                                r#"{{"step":2,"surface":"t3_image_verify","outcome":"lock_load_failed","reason":"{}"}}"#,
+                                e
+                            );
                         }
                         Ok(_lock) => {
-                            println!(r#"{{"step":2,"surface":"t3_image_verify","outcome":"lock_loaded"}}"#);
+                            println!(
+                                r#"{{"step":2,"surface":"t3_image_verify","outcome":"lock_loaded"}}"#
+                            );
                         }
                     }
 
                     // Step 3: smoke spawn (if busybox available)
                     let busybox_path = std::path::Path::new("/usr/bin/busybox");
                     if busybox_path.exists() {
+                        use maos_domain::invariants::i9::SandboxTier;
                         use maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext;
                         use maos_kernel_core::security::sandbox::SandboxSpec;
-                        use maos_domain::invariants::i9::SandboxTier;
 
                         let spec = SandboxSpec::new_for_test(SandboxTier::T3);
                         let ctx = T3SpawnContext {
                             spirit_binary_path: busybox_path.to_path_buf(),
-                            boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
-                            container_name: format!("maos-smoke-t3-{}", maos_kernel_core::capability::cap_tokens::monotonic_now_ns()),
+                            boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(
+                            ),
+                            container_name: format!(
+                                "maos-smoke-t3-{}",
+                                maos_kernel_core::capability::cap_tokens::monotonic_now_ns()
+                            ),
                         };
 
                         match maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock::load_default() {
@@ -2239,21 +2266,27 @@ description = "smoke test spirit successor"
                             }
                         }
                     } else {
-                        println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"unavailable","reason":"busybox not at /usr/bin/busybox"}}"#);
+                        println!(
+                            r#"{{"step":3,"surface":"t3_spawn","outcome":"unavailable","reason":"busybox not at /usr/bin/busybox"}}"#
+                        );
                     }
 
                     // Step 4: adversarial subcommand — assert escape blocked.
                     let busybox_attack = std::path::Path::new("/usr/bin/busybox");
                     if busybox_attack.exists() {
+                        use maos_domain::invariants::i9::SandboxTier;
                         use maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext;
                         use maos_kernel_core::security::sandbox::SandboxSpec;
-                        use maos_domain::invariants::i9::SandboxTier;
 
                         let attack_spec = SandboxSpec::new_for_test(SandboxTier::T3);
                         let attack_ctx = T3SpawnContext {
                             spirit_binary_path: busybox_attack.to_path_buf(),
-                            boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns() + 1,
-                            container_name: format!("maos-smoke-t3-attack-{}", maos_kernel_core::capability::cap_tokens::monotonic_now_ns()),
+                            boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(
+                            ) + 1,
+                            container_name: format!(
+                                "maos-smoke-t3-attack-{}",
+                                maos_kernel_core::capability::cap_tokens::monotonic_now_ns()
+                            ),
                         };
 
                         match maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock::load_default() {
@@ -2288,7 +2321,9 @@ description = "smoke test spirit successor"
                             }
                         }
                     } else {
-                        println!(r#"{{"step":4,"surface":"t3_escape_block","outcome":"unavailable","reason":"busybox not available"}}"#);
+                        println!(
+                            r#"{{"step":4,"surface":"t3_escape_block","outcome":"unavailable","reason":"busybox not available"}}"#
+                        );
                     }
                 }
             }
@@ -2298,22 +2333,25 @@ description = "smoke test spirit successor"
 
         #[cfg(feature = "fixture_replay")]
         if mode == "smoke-multi-provider-5" {
-            use std::sync::Arc;
+            use maos_domain::invariants::i1::{CapabilityToken, TokenId};
             use maos_domain::ports::inference::{
                 InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution,
                 StopReason, TokenUsage,
             };
-            use maos_domain::invariants::i1::{CapabilityToken, TokenId};
             use maos_kernel_core::inference::router::MultiProviderRouter;
             use maos_kernel_core::io::take_io_journal;
             use maos_providers::fixture_replay::FixtureReplayProvider;
             use maos_providers::Provider;
+            use std::sync::Arc;
 
             fn ok_response(provider: &str, n: usize) -> InferenceResponse {
                 InferenceResponse {
                     text: format!("{provider}-reply-{n}"),
                     stop_reason: StopReason::StopSequence,
-                    usage: TokenUsage { input_tokens: 10, output_tokens: 20 },
+                    usage: TokenUsage {
+                        input_tokens: 10,
+                        output_tokens: 20,
+                    },
                     provider_attribution: ProviderAttribution {
                         provider_id: provider.into(),
                         endpoint_url: format!("http://{provider}.test"),
@@ -2334,21 +2372,24 @@ description = "smoke test spirit successor"
             }
 
             // Step 1: Construct router with 3 providers
-            let anthropic = Arc::new(FixtureReplayProvider::new(vec![
-                Ok(ok_response("anthropic", 0)),
-            ]));
-            let openai = Arc::new(FixtureReplayProvider::new(vec![
-                Ok(ok_response("openai", 0)),
-            ]));
-            let ollama = Arc::new(FixtureReplayProvider::new(vec![
-                Ok(ok_response("ollama", 0)),
-            ]));
+            let anthropic = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
+                "anthropic",
+                0,
+            ))]));
+            let openai = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
+                "openai", 0,
+            ))]));
+            let ollama = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
+                "ollama", 0,
+            ))]));
             let mut providers = std::collections::BTreeMap::new();
             providers.insert("anthropic".into(), anthropic as Arc<dyn Provider>);
             providers.insert("openai".into(), openai as Arc<dyn Provider>);
             providers.insert("ollama".into(), ollama as Arc<dyn Provider>);
             let router = MultiProviderRouter::new(providers, Some("anthropic".into()));
-            println!(r#"{{"step":1,"surface":"router_construction","providers":3,"default":"anthropic"}}"#);
+            println!(
+                r#"{{"step":1,"surface":"router_construction","providers":3,"default":"anthropic"}}"#
+            );
 
             // Step 2: Dispatch to default provider
             let req = make_req(1, None);
@@ -2366,22 +2407,25 @@ description = "smoke test spirit successor"
 
             // Step 4: Fallback chain
             let req = make_req(3, Some("openai"));
-            let resp = router.dispatch_with_fallback(
-                "openai",
-                &["anthropic".into(), "ollama".into()],
-                &req,
-            ).unwrap();
+            let resp = router
+                .dispatch_with_fallback("openai", &["anthropic".into(), "ollama".into()], &req)
+                .unwrap();
             assert_eq!(resp.provider_attribution.provider_id, "openai");
             println!(r#"{{"step":4,"surface":"fallback_chain","provider":"openai"}}"#);
 
             // Step 5: ProviderSwitched lifecycle event — structural fixture-replay path.
             // Full SecurityManager journal verification requires kernel bootstrap;
             // smoke arm exercises the router surface, not the admission path.
-            println!(r#"{{"step":5,"surface":"provider_switched_event","outcome":"fixture_replay_path","note":"structural verification of router dispatch — admission journal validation deferred to integration tests"}}"#);
+            println!(
+                r#"{{"step":5,"surface":"provider_switched_event","outcome":"fixture_replay_path","note":"structural verification of router dispatch — admission journal validation deferred to integration tests"}}"#
+            );
 
             // Step 6 (AC4): Air-gapped validation — assert zero outbound IO journal entries
             let journal = take_io_journal();
-            assert!(journal.is_empty(), "smoke: IO journal must be empty in fixture-replay mode");
+            assert!(
+                journal.is_empty(),
+                "smoke: IO journal must be empty in fixture-replay mode"
+            );
             println!(r#"{{"step":6,"surface":"air_gap_validation","outbound_calls":0}}"#);
 
             drop(inference);
@@ -2397,17 +2441,17 @@ description = "smoke test spirit successor"
 
         #[cfg(feature = "fixture_replay")]
         if mode == "smoke-mcp-acp-5" {
-            use std::collections::BTreeMap;
-            use std::sync::Arc;
-            use maos_domain::invariants::i1::{CapabilityToken, TokenId};
-            use maos_domain::ports::mcp::McpTransportId;
-            use maos_mcp::fixture_replay::FixtureReplayMcpServer;
-            use maos_mcp::{McpClientImpl, McpServerEntry, McpTransport};
             use maos_acp::fixture_replay::FixtureReplayAcpClient;
             use maos_acp::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
             use maos_acp::AcpServer;
-            use maos_domain::lifecycle::LifecycleResolver;
             use maos_domain::halt::HaltResolver;
+            use maos_domain::invariants::i1::{CapabilityToken, TokenId};
+            use maos_domain::lifecycle::LifecycleResolver;
+            use maos_domain::ports::mcp::McpTransportId;
+            use maos_mcp::fixture_replay::FixtureReplayMcpServer;
+            use maos_mcp::{McpClientImpl, McpServerEntry, McpTransport};
+            use std::collections::BTreeMap;
+            use std::sync::Arc;
 
             eprintln!("maos: smoke-mcp-acp-5 — MCP + ACP smoke arm");
 
@@ -2415,13 +2459,21 @@ description = "smoke test spirit successor"
             {
                 let t1 = Arc::new(FixtureReplayMcpServer::new(vec![], McpTransportId::Stdio));
                 let t2 = Arc::new(FixtureReplayMcpServer::new(vec![], McpTransportId::Sse));
-                let t3 = Arc::new(FixtureReplayMcpServer::new(vec![], McpTransportId::StreamableHttp));
-                let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> = BTreeMap::new();
+                let t3 = Arc::new(FixtureReplayMcpServer::new(
+                    vec![],
+                    McpTransportId::StreamableHttp,
+                ));
+                let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> =
+                    BTreeMap::new();
                 transports.insert(McpTransportId::Stdio, t1 as Arc<dyn McpTransport>);
                 transports.insert(McpTransportId::Sse, t2 as Arc<dyn McpTransport>);
                 transports.insert(McpTransportId::StreamableHttp, t3 as Arc<dyn McpTransport>);
-                let _client = McpClientImpl::new(transports, McpTransportId::StreamableHttp, BTreeMap::new()).unwrap();
-                println!(r#"{{"step":1,"surface":"mcp_client_init","transports":["stdio","sse","streamable_http"],"default":"streamable_http"}}"#);
+                let _client =
+                    McpClientImpl::new(transports, McpTransportId::StreamableHttp, BTreeMap::new())
+                        .unwrap();
+                println!(
+                    r#"{{"step":1,"surface":"mcp_client_init","transports":["stdio","sse","streamable_http"],"default":"streamable_http"}}"#
+                );
             }
 
             // Step 2: mcp_call
@@ -2430,24 +2482,37 @@ description = "smoke test spirit successor"
                     serde_json::json!({"result": "echo-ok"}),
                     false,
                     maos_domain::ports::mcp::McpAttribution::new(
-                        "test-server".into(), McpTransportId::Stdio, "echo".into(),
+                        "test-server".into(),
+                        McpTransportId::Stdio,
+                        "echo".into(),
                     ),
                 );
                 let t = Arc::new(FixtureReplayMcpServer::new(
-                    vec![Ok(fake_resp)], McpTransportId::Stdio,
+                    vec![Ok(fake_resp)],
+                    McpTransportId::Stdio,
                 ));
-                let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> = BTreeMap::new();
+                let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> =
+                    BTreeMap::new();
                 transports.insert(McpTransportId::Stdio, t as Arc<dyn McpTransport>);
                 let mut servers = BTreeMap::new();
-                servers.insert("test-server".into(), McpServerEntry {
-                    name: "test-server".into(),
-                    transport: McpTransportId::Stdio,
-                    fallback_transport: None,
-                });
-                let client = McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers).unwrap();
-                let resp = client.call("test-server", "echo", serde_json::json!({"msg":"hello"})).unwrap();
+                servers.insert(
+                    "test-server".into(),
+                    McpServerEntry {
+                        name: "test-server".into(),
+                        transport: McpTransportId::Stdio,
+                        fallback_transport: None,
+                    },
+                );
+                let client =
+                    McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers)
+                        .unwrap();
+                let resp = client
+                    .call("test-server", "echo", serde_json::json!({"msg":"hello"}))
+                    .unwrap();
                 assert!(!resp.is_error);
-                println!(r#"{{"step":2,"surface":"mcp_call","outcome":"ok","server":"test-server","tool":"echo"}}"#);
+                println!(
+                    r#"{{"step":2,"surface":"mcp_call","outcome":"ok","server":"test-server","tool":"echo"}}"#
+                );
             }
 
             // Step 3: mcp_fallback
@@ -2460,32 +2525,54 @@ description = "smoke test spirit successor"
                     serde_json::json!({"result": "fallback-ok"}),
                     false,
                     maos_domain::ports::mcp::McpAttribution::new(
-                        "fb-srv".into(), McpTransportId::Stdio, "echo".into(),
+                        "fb-srv".into(),
+                        McpTransportId::Stdio,
+                        "echo".into(),
                     ),
                 );
                 let fallback = Arc::new(FixtureReplayMcpServer::new(
-                    vec![Ok(fake_resp)], McpTransportId::Stdio,
+                    vec![Ok(fake_resp)],
+                    McpTransportId::Stdio,
                 ));
-                let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> = BTreeMap::new();
-                transports.insert(McpTransportId::StreamableHttp, primary as Arc<dyn McpTransport>);
+                let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> =
+                    BTreeMap::new();
+                transports.insert(
+                    McpTransportId::StreamableHttp,
+                    primary as Arc<dyn McpTransport>,
+                );
                 transports.insert(McpTransportId::Stdio, fallback as Arc<dyn McpTransport>);
                 let mut servers = BTreeMap::new();
-                servers.insert("fb-srv".into(), McpServerEntry {
-                    name: "fb-srv".into(),
-                    transport: McpTransportId::StreamableHttp,
-                    fallback_transport: Some(McpTransportId::Stdio),
-                });
-                let client = McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers).unwrap();
-                let resp = client.call("fb-srv", "echo", serde_json::json!({})).unwrap();
+                servers.insert(
+                    "fb-srv".into(),
+                    McpServerEntry {
+                        name: "fb-srv".into(),
+                        transport: McpTransportId::StreamableHttp,
+                        fallback_transport: Some(McpTransportId::Stdio),
+                    },
+                );
+                let client =
+                    McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers)
+                        .unwrap();
+                let resp = client
+                    .call("fb-srv", "echo", serde_json::json!({}))
+                    .unwrap();
                 assert_eq!(resp.attribution.transport_id, McpTransportId::Stdio);
-                println!(r#"{{"step":3,"surface":"mcp_fallback","outcome":"ok","primary":"streamable_http","fallback_used":"stdio"}}"#);
+                println!(
+                    r#"{{"step":3,"surface":"mcp_fallback","outcome":"ok","primary":"streamable_http","fallback_used":"stdio"}}"#
+                );
             }
 
             // Step 4: acp_session
             struct MockLifecycleResolver;
             impl LifecycleResolver for MockLifecycleResolver {
-                fn resolve_verb(&self, _spirit_id: &str, verb: maos_domain::lifecycle::LifecycleVerb)
-                    -> Result<maos_domain::lifecycle::LifecycleReceipt, maos_domain::lifecycle::LifecycleError> {
+                fn resolve_verb(
+                    &self,
+                    _spirit_id: &str,
+                    verb: maos_domain::lifecycle::LifecycleVerb,
+                ) -> Result<
+                    maos_domain::lifecycle::LifecycleReceipt,
+                    maos_domain::lifecycle::LifecycleError,
+                > {
                     Ok(maos_domain::lifecycle::LifecycleReceipt {
                         spirit_pid: 42,
                         verb,
@@ -2496,14 +2583,17 @@ description = "smoke test spirit successor"
             }
             struct MockHaltResolver;
             impl HaltResolver for MockHaltResolver {
-                fn resolve(&self, _halt_id: &maos_domain::halt::HaltId, _resolution: maos_domain::halt::Resolution)
-                    -> Result<(), maos_domain::halt::ResolveError> { Ok(()) }
+                fn resolve(
+                    &self,
+                    _halt_id: &maos_domain::halt::HaltId,
+                    _resolution: maos_domain::halt::Resolution,
+                ) -> Result<(), maos_domain::halt::ResolveError> {
+                    Ok(())
+                }
             }
             {
-                let server = AcpServer::new(
-                    Arc::new(MockLifecycleResolver),
-                    Arc::new(MockHaltResolver),
-                );
+                let server =
+                    AcpServer::new(Arc::new(MockLifecycleResolver), Arc::new(MockHaltResolver));
                 let sessions = server.session_registry();
                 let mut server = maos_acp::AcpServer {
                     lifecycle: Arc::new(MockLifecycleResolver),
@@ -2526,11 +2616,14 @@ description = "smoke test spirit successor"
                 let channel = maos_acp::AcpEditorChannelImpl::new(Arc::clone(&sessions));
 
                 let (tx, rx) = crossbeam_channel::bounded::<AcpFrameOut>(4);
-                sessions.lock().unwrap().push(maos_acp::notification_channel::AcpOutboundHandle {
-                    session_id: [1u8; 16],
-                    outbound: tx,
-                    started_at_ns: 0,
-                });
+                sessions
+                    .lock()
+                    .unwrap()
+                    .push(maos_acp::notification_channel::AcpOutboundHandle {
+                        session_id: [1u8; 16],
+                        outbound: tx,
+                        started_at_ns: 0,
+                    });
 
                 let event_json = serde_json::json!({"TaskAssigned": {"frame_id": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], "from": "director", "goal": "test"}});
                 let n = channel.dispatch_event(event_json, "immediate").unwrap();
@@ -2543,15 +2636,15 @@ description = "smoke test spirit successor"
                     }
                     _ => panic!("expected NotificationDispatch"),
                 }
-                println!(r#"{{"step":5,"surface":"acp_notification","outcome":"ok","level":"immediate","event_kind":"TaskAssigned"}}"#);
+                println!(
+                    r#"{{"step":5,"surface":"acp_notification","outcome":"ok","level":"immediate","event_kind":"TaskAssigned"}}"#
+                );
             }
 
             // Step 6: acp_halt_resolve
             {
-                let server = AcpServer::new(
-                    Arc::new(MockLifecycleResolver),
-                    Arc::new(MockHaltResolver),
-                );
+                let server =
+                    AcpServer::new(Arc::new(MockLifecycleResolver), Arc::new(MockHaltResolver));
                 let sessions = server.session_registry();
                 let mut server = maos_acp::AcpServer {
                     lifecycle: Arc::new(MockLifecycleResolver),
@@ -2565,7 +2658,9 @@ description = "smoke test spirit successor"
                 let out = String::from_utf8(output).unwrap();
                 assert!(out.contains("halt_receipt"));
                 assert!(out.contains("resolved"));
-                println!(r#"{{"step":6,"surface":"acp_halt_resolve","outcome":"ok","resolution":"approve"}}"#);
+                println!(
+                    r#"{{"step":6,"surface":"acp_halt_resolve","outcome":"ok","resolution":"approve"}}"#
+                );
             }
 
             return Ok(());
@@ -2575,17 +2670,31 @@ description = "smoke test spirit successor"
             use maos_acp::AcpServer;
             struct StubLifecycleResolver;
             impl maos_domain::lifecycle::LifecycleResolver for StubLifecycleResolver {
-                fn resolve_verb(&self, spirit_id: &str, _verb: maos_domain::lifecycle::LifecycleVerb)
-                    -> Result<maos_domain::lifecycle::LifecycleReceipt, maos_domain::lifecycle::LifecycleError> {
-                    Err(maos_domain::lifecycle::LifecycleError::NotLoaded { spirit_id: spirit_id.into() })
+                fn resolve_verb(
+                    &self,
+                    spirit_id: &str,
+                    _verb: maos_domain::lifecycle::LifecycleVerb,
+                ) -> Result<
+                    maos_domain::lifecycle::LifecycleReceipt,
+                    maos_domain::lifecycle::LifecycleError,
+                > {
+                    Err(maos_domain::lifecycle::LifecycleError::NotLoaded {
+                        spirit_id: spirit_id.into(),
+                    })
                 }
             }
             struct StubHaltResolver;
             impl maos_domain::halt::HaltResolver for StubHaltResolver {
-                fn resolve(&self, _halt_id: &maos_domain::halt::HaltId, _resolution: maos_domain::halt::Resolution)
-                    -> Result<(), maos_domain::halt::ResolveError> { Ok(()) }
+                fn resolve(
+                    &self,
+                    _halt_id: &maos_domain::halt::HaltId,
+                    _resolution: maos_domain::halt::Resolution,
+                ) -> Result<(), maos_domain::halt::ResolveError> {
+                    Ok(())
+                }
             }
-            let mut server = AcpServer::new(Arc::new(StubLifecycleResolver), Arc::new(StubHaltResolver));
+            let mut server =
+                AcpServer::new(Arc::new(StubLifecycleResolver), Arc::new(StubHaltResolver));
             server.run(std::io::stdin(), std::io::stdout())?;
             return Ok(());
         }
@@ -2597,7 +2706,10 @@ description = "smoke test spirit successor"
 
         #[cfg(feature = "fixture_replay")]
         if mode == "smoke-registry-5d" {
-            use maos_domain::ports::registry::{SearchQuery, SignedPackage, SpiritId, SpiritRegistryClient, TrustTier, YankReason, YankList};
+            use maos_domain::ports::registry::{
+                SearchQuery, SignedPackage, SpiritId, SpiritRegistryClient, TrustTier, YankList,
+                YankReason,
+            };
             use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
             use maos_spirit_abi::compliance::{ComplianceClaimEnvelope, SigningAlg};
             use ring::signature::KeyPair;
@@ -2605,7 +2717,9 @@ description = "smoke test spirit successor"
             eprintln!("maos: smoke-registry-5d — Spirit Registry smoke arm");
 
             // Step 1: registry_init
-            println!(r#"{{"step":1,"surface":"registry_init","tier_floor":"public_untrusted","t3_for_public_untrusted":false}}"#);
+            println!(
+                r#"{{"step":1,"surface":"registry_init","tier_floor":"public_untrusted","t3_for_public_untrusted":false}}"#
+            );
 
             // Step 2: registry_publish
             {
@@ -2623,19 +2737,21 @@ description = "smoke test spirit successor"
                         signing_alg: SigningAlg::Ed25519,
                     },
                 );
-                let client = FixtureReplaySpiritRegistryClient::new(vec![
-                    Ok(serde_json::json!({"publish_id": "pub-1", "spirit_id": "hello-spirit", "version": "0.1.0"})),
-                ]);
+                let client = FixtureReplaySpiritRegistryClient::new(vec![Ok(
+                    serde_json::json!({"publish_id": "pub-1", "spirit_id": "hello-spirit", "version": "0.1.0"}),
+                )]);
                 let receipt = client.publish(&pkg).unwrap();
                 assert!(!receipt.publish_id.is_empty());
-                println!(r#"{{"step":2,"surface":"registry_publish","outcome":"ok","tier":"local","spirit_id":"hello-spirit","version":"0.1.0"}}"#);
+                println!(
+                    r#"{{"step":2,"surface":"registry_publish","outcome":"ok","tier":"local","spirit_id":"hello-spirit","version":"0.1.0"}}"#
+                );
             }
 
             // Step 3: registry_search
             {
-                let client = FixtureReplaySpiritRegistryClient::new(vec![
-                    Ok(serde_json::json!({"items": [{"spirit_id": "hello-spirit", "version": "0.1.0", "summary": "hello"}]})),
-                ]);
+                let client = FixtureReplaySpiritRegistryClient::new(vec![Ok(
+                    serde_json::json!({"items": [{"spirit_id": "hello-spirit", "version": "0.1.0", "summary": "hello"}]}),
+                )]);
                 let q = SearchQuery::new("hello-spirit".into(), false, 50);
                 let results = client.search(&q).unwrap();
                 assert_eq!(results.items.len(), 1);
@@ -2645,13 +2761,19 @@ description = "smoke test spirit successor"
             // Step 4: registry_install (manifest + artifact)
             {
                 let client = FixtureReplaySpiritRegistryClient::new(vec![
-                    Ok(serde_json::json!({"spirit_id": "hello-spirit", "version": "0.1.0", "manifest_toml": [98,105,110], "signature": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "signer_pubkey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"})),
-                    Ok(serde_json::json!({"spirit_id": "hello-spirit", "version": "0.1.0", "artifact_bytes": [98,105,110], "signature": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "signer_pubkey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"})),
+                    Ok(
+                        serde_json::json!({"spirit_id": "hello-spirit", "version": "0.1.0", "manifest_toml": [98,105,110], "signature": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "signer_pubkey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}),
+                    ),
+                    Ok(
+                        serde_json::json!({"spirit_id": "hello-spirit", "version": "0.1.0", "artifact_bytes": [98,105,110], "signature": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "signer_pubkey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}),
+                    ),
                 ]);
                 let sid = SpiritId::from("hello-spirit");
                 let _manifest = client.manifest(&sid, "0.1.0").unwrap();
                 let _artifact = client.artifact(&sid, "0.1.0").unwrap();
-                println!(r#"{{"step":4,"surface":"registry_install","outcome":"ok","tier":"local","spirit_id":"hello-spirit"}}"#);
+                println!(
+                    r#"{{"step":4,"surface":"registry_install","outcome":"ok","tier":"local","spirit_id":"hello-spirit"}}"#
+                );
             }
 
             // Step 5: admission_public_untrusted (well-formed)
@@ -2659,8 +2781,8 @@ description = "smoke test spirit successor"
                 use maos_registry::admission::{admit_spirit, AdmissionConfig};
                 use maos_registry::compliance_verify::compute_fingerprint_hash;
                 use maos_spirit_abi::compliance::{
-                    CryptoProviderId, ExecutionContextFingerprint,
-                    ProviderEndpointPin, SandboxTier, TrustTier,
+                    CryptoProviderId, ExecutionContextFingerprint, ProviderEndpointPin,
+                    SandboxTier, TrustTier,
                 };
                 use ring::rand::SystemRandom;
                 use ring::signature::Ed25519KeyPair;
@@ -2735,17 +2857,21 @@ description = "smoke test spirit successor"
                     t3_for_public_untrusted: false,
                     allow_unsigned_local: true,
                     org_signing_pubkey: None,
+                    runtime_provider_endpoint: None,
+                    runtime_crypto_provider: None,
                 };
 
                 let decision = admit_spirit(&pkg, &cfg).unwrap();
                 assert!(decision.admit);
-                println!(r#"{{"step":5,"surface":"admission_public_untrusted","outcome":"ok","fingerprint_match":true}}"#);
+                println!(
+                    r#"{{"step":5,"surface":"admission_public_untrusted","outcome":"ok","fingerprint_match":true}}"#
+                );
             }
 
             // Step 6: admission_compliance_drift
             {
-                use maos_registry::admission::{admit_spirit, AdmissionConfig};
                 use maos_registry::admission::AdmissionError;
+                use maos_registry::admission::{admit_spirit, AdmissionConfig};
                 use ring::rand::SystemRandom;
                 use ring::signature::Ed25519KeyPair;
 
@@ -2798,25 +2924,37 @@ description = "smoke test spirit successor"
                     t3_for_public_untrusted: false,
                     allow_unsigned_local: true,
                     org_signing_pubkey: None,
+                    runtime_provider_endpoint: None,
+                    runtime_crypto_provider: None,
                 };
 
                 let err = admit_spirit(&pkg, &cfg).unwrap_err();
                 assert!(matches!(err, AdmissionError::ComplianceContextDrift { .. }));
-                println!(r#"{{"step":6,"surface":"admission_compliance_drift","outcome":"rejected","error":"EComplianceContextDrift"}}"#);
+                println!(
+                    r#"{{"step":6,"surface":"admission_compliance_drift","outcome":"rejected","error":"EComplianceContextDrift"}}"#
+                );
             }
 
             // Step 7: registry_yank_propagate
             {
                 let client = FixtureReplaySpiritRegistryClient::new(vec![
-                    Ok(serde_json::json!({"yank_id": "yank-1", "spirit_id": "hello-spirit", "version": "0.1.0"})),
-                    Ok(serde_json::json!({"entries": [{"spirit_id": "hello-spirit", "version": "0.1.0", "yanked_at_ns": 1, "reason": "smoke test"}]})),
+                    Ok(
+                        serde_json::json!({"yank_id": "yank-1", "spirit_id": "hello-spirit", "version": "0.1.0"}),
+                    ),
+                    Ok(
+                        serde_json::json!({"entries": [{"spirit_id": "hello-spirit", "version": "0.1.0", "yanked_at_ns": 1, "reason": "smoke test"}]}),
+                    ),
                 ]);
                 let sid = SpiritId::from("hello-spirit");
-                let receipt = client.deprecate(&sid, "0.1.0", &YankReason::new("smoke test".into())).unwrap();
+                let receipt = client
+                    .deprecate(&sid, "0.1.0", &YankReason::new("smoke test".into()))
+                    .unwrap();
                 assert_eq!(receipt.yank_id, "yank-1");
                 let list = client.yanks_since(0).unwrap();
                 assert_eq!(list.entries.len(), 1);
-                println!(r#"{{"step":7,"surface":"registry_yank_propagate","outcome":"ok","yanked":1}}"#);
+                println!(
+                    r#"{{"step":7,"surface":"registry_yank_propagate","outcome":"ok","yanked":1}}"#
+                );
             }
 
             eprintln!("maos: smoke-registry-5d complete — 7 surfaces exercised");
@@ -2829,8 +2967,8 @@ description = "smoke test spirit successor"
         }
 
         if mode == "registry-server" {
-            use maos_registry::SpiritRegistryServer;
             use maos_registry::storage::LocalFsRegistryStorage;
+            use maos_registry::SpiritRegistryServer;
             eprintln!("maos: registry-server mode — starting SpiritRegistryServer");
             let storage = std::sync::Arc::new(LocalFsRegistryStorage::new()?);
             let server = SpiritRegistryServer::new(storage, "127.0.0.1:6789".into(), None);
@@ -2840,8 +2978,8 @@ description = "smoke test spirit successor"
 
         #[cfg(feature = "fixture_replay")]
         if mode == "smoke-bench-5e" {
-            use maos_bench::fixture_replay::FixtureReplayBenchRunner;
             use maos_bench::decision::decide;
+            use maos_bench::fixture_replay::FixtureReplayBenchRunner;
             use maos_bench::harness;
             use maos_bench::report::BenchReport;
 
@@ -2849,8 +2987,10 @@ description = "smoke test spirit successor"
 
             // Step 1: init
             let mut bench_harness = harness::BenchHarness::new();
-            eprintln!(r#"{{"step":1,"surface":"bench_init","run_id":"{}","git_sha":"{}"}}"#,
-                bench_harness.run_id, bench_harness.git_sha);
+            eprintln!(
+                r#"{{"step":1,"surface":"bench_init","run_id":"{}","git_sha":"{}"}}"#,
+                bench_harness.run_id, bench_harness.git_sha
+            );
 
             // Step 2: J1 fixture-replay measurement (50 invocations)
             {
@@ -2858,8 +2998,10 @@ description = "smoke test spirit successor"
                 let j1 = runner.run().unwrap();
                 assert_eq!(j1.invocation_count, 50);
                 assert!(j1.p95_us > 0);
-                eprintln!(r#"{{"step":2,"surface":"j1_fixture_replay","invocations":50,"p50_us":{},"p95_us":{},"budget_met":{}}}"#,
-                    j1.p50_us, j1.p95_us, j1.budget_met);
+                eprintln!(
+                    r#"{{"step":2,"surface":"j1_fixture_replay","invocations":50,"p50_us":{},"p95_us":{},"budget_met":{}}}"#,
+                    j1.p50_us, j1.p95_us, j1.budget_met
+                );
                 bench_harness.add_journey(j1.clone());
             }
 
@@ -2869,8 +3011,10 @@ description = "smoke test spirit successor"
                 let j4 = runner.run().unwrap();
                 assert_eq!(j4.invocation_count, 50);
                 assert!(j4.p95_us > 0);
-                eprintln!(r#"{{"step":3,"surface":"j4_fixture_replay","invocations":50,"p50_us":{},"p95_us":{},"budget_met":{}}}"#,
-                    j4.p50_us, j4.p95_us, j4.budget_met);
+                eprintln!(
+                    r#"{{"step":3,"surface":"j4_fixture_replay","invocations":50,"p50_us":{},"p95_us":{},"budget_met":{}}}"#,
+                    j4.p50_us, j4.p95_us, j4.budget_met
+                );
                 bench_harness.add_journey(j4.clone());
             }
 
@@ -2878,8 +3022,10 @@ description = "smoke test spirit successor"
             let j1 = &bench_harness.journey_results[0];
             let j4 = &bench_harness.journey_results[1];
             let decision = decide(j1, j4);
-            eprintln!(r#"{{"step":4,"surface":"decision","outcome":"{}","j1_p95_met":{},"j4_p95_met":{}}}"#,
-                decision.outcome, decision.j1_p95_met, decision.j4_p95_met);
+            eprintln!(
+                r#"{{"step":4,"surface":"decision","outcome":"{}","j1_p95_met":{},"j4_p95_met":{}}}"#,
+                decision.outcome, decision.j1_p95_met, decision.j4_p95_met
+            );
 
             // Step 5: write smoke report
             let report = BenchReport::new(
@@ -2890,11 +3036,13 @@ description = "smoke test spirit successor"
                 decision,
             );
             let _ = std::fs::create_dir_all("tests/reports");
-            let json = serde_json::to_vec_pretty(&report)
-                .map_err(|e| format!("serialization: {e}"))?;
+            let json =
+                serde_json::to_vec_pretty(&report).map_err(|e| format!("serialization: {e}"))?;
             std::fs::write("tests/reports/section-13-1-smoke.json", &json)
                 .map_err(|e| format!("write smoke report: {e}"))?;
-            eprintln!(r#"{{"step":5,"surface":"report_write","path":"tests/reports/section-13-1-smoke.json"}}"#);
+            eprintln!(
+                r#"{{"step":5,"surface":"report_write","path":"tests/reports/section-13-1-smoke.json"}}"#
+            );
 
             eprintln!("maos: smoke-bench-5e complete — 5 surfaces exercised (fixture-replay)");
             return Ok(());
@@ -2906,10 +3054,10 @@ description = "smoke test spirit successor"
         }
 
         if mode == "bench-section-13-1" {
+            use maos_bench::decision::decide;
             use maos_bench::harness;
             use maos_bench::harness::j1::J1Config;
             use maos_bench::harness::j4::J4Config;
-            use maos_bench::decision::decide;
             use maos_bench::report::BenchReport;
 
             let invocation_count: u64 = std::env::var("MAOS_BENCH_INVOCATIONS")
@@ -2917,7 +3065,10 @@ description = "smoke test spirit successor"
                 .parse()
                 .map_err(|e| format!("invalid MAOS_BENCH_INVOCATIONS: {e}"))?;
 
-            eprintln!("maos: bench-section-13-1 — §13.1 real measurement (N={})", invocation_count);
+            eprintln!(
+                "maos: bench-section-13-1 — §13.1 real measurement (N={})",
+                invocation_count
+            );
 
             let mut bench_harness = harness::BenchHarness::new();
             let git_sha = bench_harness.git_sha.clone();
@@ -2932,9 +3083,7 @@ description = "smoke test spirit successor"
             bench_harness.add_journey(j1.clone());
 
             // J4 measurement
-            let j4_config = J4Config {
-                invocation_count,
-            };
+            let j4_config = J4Config { invocation_count };
             let j4 = harness::j4::run_j4_measurement(&j4_config)
                 .map_err(|e| format!("J4 measurement failed: {e}"))?;
             bench_harness.add_journey(j4.clone());
@@ -2950,13 +3099,11 @@ description = "smoke test spirit successor"
             );
 
             // Write report
-            std::fs::create_dir_all("tests/reports")
-                .map_err(|e| format!("create dir: {e}"))?;
+            std::fs::create_dir_all("tests/reports").map_err(|e| format!("create dir: {e}"))?;
             let report_path = format!("tests/reports/section-13-1-{}.json", git_sha);
-            let json = serde_json::to_vec_pretty(&report)
-                .map_err(|e| format!("serialization: {e}"))?;
-            std::fs::write(&report_path, &json)
-                .map_err(|e| format!("write report: {e}"))?;
+            let json =
+                serde_json::to_vec_pretty(&report).map_err(|e| format!("serialization: {e}"))?;
+            std::fs::write(&report_path, &json).map_err(|e| format!("write report: {e}"))?;
 
             println!(
                 "bench-section-13-1 complete: J1 P95={}us (budget 25000us, met={}); J4 P95={}us (budget 10000us, met={}); decision={}; report={}",
@@ -2988,7 +3135,9 @@ description = "smoke test spirit successor"
         }
         #[cfg(not(feature = "smoke_schedule"))]
         if mode == "smoke-schedule-6-4" {
-            eprintln!("maos: smoke-schedule-6-4 requires --features smoke_schedule (tokio test-util)");
+            eprintln!(
+                "maos: smoke-schedule-6-4 requires --features smoke_schedule (tokio test-util)"
+            );
             std::process::exit(1);
         }
 
@@ -3006,7 +3155,10 @@ description = "smoke test spirit successor"
         if mode == "smoke-registry-7-2" {
             // D4 remediation: fast path (in-process, <100ms) by default;
             // slow path (live binary spawn) only when MAOS_SMOKE_SLOW=1.
-            if std::env::var("MAOS_SMOKE_SLOW").map(|v| v == "1" || v == "true").unwrap_or(false) {
+            if std::env::var("MAOS_SMOKE_SLOW")
+                .map(|v| v == "1" || v == "true")
+                .unwrap_or(false)
+            {
                 return smoke_registry_7_2_slow().await;
             } else {
                 return smoke_registry_7_2_fast().await;
@@ -3016,9 +3168,14 @@ description = "smoke test spirit successor"
             return smoke_import_7_2().await;
         }
 
+        // Story 7.3 AC6 — smoke-compliance-7-3: v1.0 admission-verification demo.
+        if mode == "smoke-compliance-7-3" {
+            return smoke_compliance_7_3().await;
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -3141,10 +3298,7 @@ description = "smoke test spirit successor"
         // Initialize monotonic counter for token issuance
 
         // Issue a valid capability token for the in-process hello-Spirit
-        let token_provider_id = router
-            .default_id()
-            .unwrap_or("anthropic")
-            .to_string();
+        let token_provider_id = router.default_id().unwrap_or("anthropic").to_string();
         let token = capability
             .issue_with_mediation(
                 0,
@@ -3409,8 +3563,7 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
         .register_spirit_typed(&SpiritId::from("worker-cli-stub"))
         .expect("register worker-cli-stub");
 
-    let originating_lineage =
-        IntentLineage::new(vec![A2AIntent::new("smoke-founder-loop-wedge")]);
+    let originating_lineage = IntentLineage::new(vec![A2AIntent::new("smoke-founder-loop-wedge")]);
 
     let make_frame = |seq: u64, prior: Option<PriorDistillateRef>, target: &str| -> IacFrame {
         let mut id = [0u8; 16];
@@ -3510,7 +3663,9 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
     eprintln!("smoke-orchestrator-fanout-6-2: dispatch #2 → worker-b accepted (with distillate)");
 
     // 5. Demonstrate ONE rejected dispatch — FR21 closing the loophole.
-    let rejected = adapter.deliver_typed(make_frame(4, None, "worker-cli-stub")).await;
+    let rejected = adapter
+        .deliver_typed(make_frame(4, None, "worker-cli-stub"))
+        .await;
     match rejected {
         Err(IacBusError::EOrchestratorDispatchRawOutput { .. }) => {
             eprintln!("smoke-orchestrator-fanout-6-2: dispatch #3 REJECTED with EOrchestratorDispatchRawOutput (FR21 expected behavior)");
@@ -3610,7 +3765,9 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
         .into());
     }
 
-    eprintln!("smoke-orchestrator-fanout-6-2: ✅ wedge demo complete; founder-loop substrate verified");
+    eprintln!(
+        "smoke-orchestrator-fanout-6-2: ✅ wedge demo complete; founder-loop substrate verified"
+    );
     Ok(())
 }
 
@@ -3628,7 +3785,7 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
 ///   * Per-frame Lamport clock — assert monotone advance on receiver
 async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a::{
-        A2APeerConfig, A2AProfile, A2APeerRouter as LocalRouter, ConsentAllowlists, EPinMismatch,
+        A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile, ConsentAllowlists, EPinMismatch,
         InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
     };
     use maos_domain::frame::{
@@ -3674,8 +3831,12 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
         },
         partition_timeout_secs: 30,
     };
-    host_a_view_of_b.validate().map_err(|e| format!("host_a config: {e}"))?;
-    host_b_view_of_a.validate().map_err(|e| format!("host_b config: {e}"))?;
+    host_a_view_of_b
+        .validate()
+        .map_err(|e| format!("host_a config: {e}"))?;
+    host_b_view_of_a
+        .validate()
+        .map_err(|e| format!("host_b config: {e}"))?;
 
     // Step 2 — TOFU pin first-contact on both ends.
     let host_a_tofu = Arc::new(InMemoryTofuPinStore::new());
@@ -3748,23 +3909,22 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
         host_b_tofu.clone(),
     ));
     let (intake_tx_smoke, mut intake_rx_smoke) = tokio::sync::mpsc::unbounded_channel();
-    host_b_router_smoke.install_intake_sink(intake_tx_smoke).await;
+    host_b_router_smoke
+        .install_intake_sink(intake_tx_smoke)
+        .await;
 
     let mut clocks: Vec<u64> = Vec::new();
     for i in 0..3 {
         let mut frame = allowed_frame.clone();
         frame.frame_id = [0xAA + i as u8; 16];
-        LocalRouter::route_outbound(
-            &*host_b_router_smoke,
-            frame,
-            &HostId("host-a".into()),
-        )
-        .await
-        .map_err(|e| format!("smoke-a2a-loopback-6-3: allowed frame {i} REJECTED unexpectedly: {e}"))?;
-        let delivered = intake_rx_smoke
-            .recv()
+        LocalRouter::route_outbound(&*host_b_router_smoke, frame, &HostId("host-a".into()))
             .await
-            .ok_or(format!("smoke-a2a-loopback-6-3: intake_rx received no frame for send {i}"))?;
+            .map_err(|e| {
+                format!("smoke-a2a-loopback-6-3: allowed frame {i} REJECTED unexpectedly: {e}")
+            })?;
+        let delivered = intake_rx_smoke.recv().await.ok_or(format!(
+            "smoke-a2a-loopback-6-3: intake_rx received no frame for send {i}"
+        ))?;
         eprintln!(
             "smoke-a2a-loopback-6-3: step 4 — frame {i} delivered, logical_clock={}",
             delivered.logical_clock
@@ -3879,11 +4039,7 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     // ─── Surface 1: ConsentRupture detection ─────────────────────────────
     struct AlwaysRejectB;
     impl ConsentGate for AlwaysRejectB {
-        fn evaluate(
-            &self,
-            _f: &IacFrame,
-            recipient: &FrameAddress,
-        ) -> Result<(), RuptureReason> {
+        fn evaluate(&self, _f: &IacFrame, recipient: &FrameAddress) -> Result<(), RuptureReason> {
             if recipient.spirit_id.as_str() == "b" {
                 Err(RuptureReason::TokenRevoked)
             } else {
@@ -3901,14 +4057,26 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     let mut a_handle = mailbox.register_spirit("a").unwrap();
     let _b_handle = mailbox.register_spirit("b").unwrap();
     let to: Vec<FrameAddress> = vec![
-        FrameAddress { spirit_id: SpiritId::from("a"), host_id: None, role: None },
-        FrameAddress { spirit_id: SpiritId::from("b"), host_id: None, role: None },
+        FrameAddress {
+            spirit_id: SpiritId::from("a"),
+            host_id: None,
+            role: None,
+        },
+        FrameAddress {
+            spirit_id: SpiritId::from("b"),
+            host_id: None,
+            role: None,
+        },
     ];
     let frame = IacFrame {
         frame_id: [9u8; 16],
         timestamp_ns: 0,
         logical_clock: 0,
-        from: FrameAddress { spirit_id: SpiritId::from("sender"), host_id: None, role: None },
+        from: FrameAddress {
+            spirit_id: SpiritId::from("sender"),
+            host_id: None,
+            role: None,
+        },
         to: to.into(),
         kind: FrameKind::TaskAssign,
         intent: IntentClass::Standard,
@@ -3943,12 +4111,15 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     let mut cfg = ProviderRateLimitConfig {
         per_provider: std::collections::HashMap::new(),
     };
-    cfg.per_provider.insert("anthropic", maos_providers::ProviderQuota { rpm: 2 });
+    cfg.per_provider
+        .insert("anthropic", maos_providers::ProviderQuota { rpm: 2 });
     let limiter = ProviderRateLimiter::new(cfg);
     let key = BucketKey::new("anthropic", 0xdead_beef);
     assert!(limiter.try_consume(key).is_ok(), "first consume");
     assert!(limiter.try_consume(key).is_ok(), "second consume");
-    let err = limiter.try_consume(key).expect_err("third consume MUST be RateLimited");
+    let err = limiter
+        .try_consume(key)
+        .expect_err("third consume MUST be RateLimited");
     eprintln!(
         "smoke-schedule-6-4: ✅ RateLimited surface — bucket exhausted; retry_after_ms={}",
         err.retry_after_ms
@@ -3956,7 +4127,9 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
 
     // ─── Surface 3: ScheduleWatchdog firing + rate-limit cap ────────────
     use maos_kernel_core::scheduler::{
-        control_block::{make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle},
+        control_block::{
+            make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle,
+        },
         hook_dispatch::HookDispatcher,
         schedule_watchdog::ScheduleWatchdog,
     };
@@ -3965,9 +4138,15 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::RwLock;
 
-    struct CountingSpirit { counter: Arc<AtomicU32> }
+    struct CountingSpirit {
+        counter: Arc<AtomicU32>,
+    }
     impl maos_spirit_abi::lifecycle::Spirit for CountingSpirit {
-        fn on_schedule(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx, _p: &maos_spirit_abi::lifecycle::SchedulePayload<'_>) {
+        fn on_schedule(
+            &self,
+            _ctx: &mut maos_spirit_abi::ctx::Ctx,
+            _p: &maos_spirit_abi::lifecycle::SchedulePayload<'_>,
+        ) {
             self.counter.fetch_add(1, Ordering::SeqCst);
         }
     }
@@ -3982,18 +4161,25 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
         side_effect_scopes: vec![],
     };
     let manifest = SpiritManifestBundle {
-        lifecycle: LifecycleSection { enabled_hooks: vec!["on_schedule".into()] },
-        schedules: SchedulesSection { entries: vec![entry] },
+        lifecycle: LifecycleSection {
+            enabled_hooks: vec!["on_schedule".into()],
+        },
+        schedules: SchedulesSection {
+            entries: vec![entry],
+        },
         ..Default::default()
     };
     let scb = SpiritControlBlock::new(
         1,
         "butler".into(),
         manifest,
-        make_spirit_obj(CountingSpirit { counter: Arc::clone(&counter) }),
+        make_spirit_obj(CountingSpirit {
+            counter: Arc::clone(&counter),
+        }),
         0,
     );
-    scb.state.store(ScbLifecycleState::Running as u8, Ordering::Release);
+    scb.state
+        .store(ScbLifecycleState::Running as u8, Ordering::Release);
     let scbs = Arc::new(RwLock::new(BTreeMap::new()));
     scbs.write().unwrap().insert(1, Arc::new(scb));
     let tl2 = Arc::new(TransparencyLogAdapter::open_in_memory(0));
@@ -4032,7 +4218,8 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     })?;
     eprintln!(
         "smoke-schedule-6-4: TL state — {} schedule.fire row(s), {} ConsentRupture row(s)",
-        schedule_fire_count, rupture_rows.len()
+        schedule_fire_count,
+        rupture_rows.len()
     );
 
     eprintln!("smoke-schedule-6-4: ✅ wedge demo complete; all four surfaces verified");
@@ -4053,9 +4240,16 @@ async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
     // Step 1: scaffold a Rust Spirit
     let rust_dir = tmpdir.join("smoke-rust-spirit");
     let status = Command::new("cargo")
-        .args(["generate", "--git", ".", "templates/spirit-rust",
-               "--name", "smoke-rust-spirit",
-               "--define", "class_name=SmokeRustSpirit"])
+        .args([
+            "generate",
+            "--git",
+            ".",
+            "templates/spirit-rust",
+            "--name",
+            "smoke-rust-spirit",
+            "--define",
+            "class_name=SmokeRustSpirit",
+        ])
         .current_dir(&workspace_root)
         .status()?;
     if !status.success() {
@@ -4074,10 +4268,18 @@ async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
     // Step 3: scaffold a TS Spirit
     let ts_dir = tmpdir.join("smoke-ts-spirit");
     let status = Command::new("cargo")
-        .args(["generate", "--git", ".", "templates/spirit-ts",
-               "--name", "smoke-ts-spirit",
-               "--define", "class_name=SmokeTsSpirit",
-               "--define", "package_name=@local/smoke-ts-spirit"])
+        .args([
+            "generate",
+            "--git",
+            ".",
+            "templates/spirit-ts",
+            "--name",
+            "smoke-ts-spirit",
+            "--define",
+            "class_name=SmokeTsSpirit",
+            "--define",
+            "package_name=@local/smoke-ts-spirit",
+        ])
         .current_dir(&workspace_root)
         .status()?;
     if !status.success() {
@@ -4085,22 +4287,38 @@ async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Step 4: npm test the scaffolded TS Spirit
-    let status = Command::new("npm").args(["ci"]).current_dir(&ts_dir).status()?;
+    let status = Command::new("npm")
+        .args(["ci"])
+        .current_dir(&ts_dir)
+        .status()?;
     if !status.success() {
         return Err("npm ci ts failed".into());
     }
-    let status = Command::new("npm").args(["test"]).current_dir(&ts_dir).status()?;
+    let status = Command::new("npm")
+        .args(["test"])
+        .current_dir(&ts_dir)
+        .status()?;
     if !status.success() {
         return Err("npm test ts failed".into());
     }
 
     // Step 5: NFR-Test-3 coverage measurement on the 3 v0.5-shipped Spirits
     let status = Command::new("cargo")
-        .args(["run", "-p", "xtask", "--", "coverage-matrix", "--measure-nfr-test-3",
-               "--spirit", "hello-spirit",
-               "--spirit", "example-spirit",
-               "--spirit", "example-spirit-ts",
-               "--dry-run"])
+        .args([
+            "run",
+            "-p",
+            "xtask",
+            "--",
+            "coverage-matrix",
+            "--measure-nfr-test-3",
+            "--spirit",
+            "hello-spirit",
+            "--spirit",
+            "example-spirit",
+            "--spirit",
+            "example-spirit-ts",
+            "--dry-run",
+        ])
         .current_dir(&workspace_root)
         .status()?;
     if !status.success() {
@@ -4145,7 +4363,9 @@ async fn smoke_discipline_7_1_5() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!(r#"{{"smoke":"7-1-5","status":"ok","gates":["check-review-findings-resolved","check-dev-record-completeness","check-bare-review-findings","check-dev-model-used-populated"]}}"#);
+    println!(
+        r#"{{"smoke":"7-1-5","status":"ok","gates":["check-review-findings-resolved","check-dev-record-completeness","check-bare-review-findings","check-dev-model-used-populated"]}}"#
+    );
     Ok(())
 }
 
@@ -4171,25 +4391,23 @@ async fn smoke_registry_7_2_fast() -> Result<(), Box<dyn std::error::Error>> {
         }
         println!("{}", o);
     };
-    use std::process::Command;
     use std::io::Write;
+    use std::process::Command;
 
     let tmp = std::env::temp_dir().join(format!("maos-smoke-7-2-{}", std::process::id()));
     std::fs::create_dir_all(&tmp)?;
     // RAII guard: clean up temp directory on scope exit (including early returns).
-    struct TempDirGuard(std::path::PathBuf);
-    impl Drop for TempDirGuard {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
     let _tmp_guard = TempDirGuard(tmp.clone());
 
     // Step 1: author scaffold (demonstrated via Story 7.1 smoke arm)
-    json(1, "author_scaffold", serde_json::json!({
-        "note": "Story 7.1 template surface — cargo generate maos-spirit --lang rust --name smoke-spirit-7-2",
-        "status": "demonstrated_via_smoke_spirit_author_7_1"
-    }));
+    json(
+        1,
+        "author_scaffold",
+        serde_json::json!({
+            "note": "Story 7.1 template surface — cargo generate maos-spirit --lang rust --name smoke-spirit-7-2",
+            "status": "demonstrated_via_smoke_spirit_author_7_1"
+        }),
+    );
 
     // Step 2: publish — exercise maos-spirit publish --dry-run with live binary.
     let manifest_path = tmp.join("manifest.toml");
@@ -4208,46 +4426,68 @@ sandbox_tier = "t0"
     let publish_output = Command::new("maos-spirit")
         .args([
             "publish",
-            "--tier", "local",
-            "--manifest", manifest_path.to_string_lossy().as_ref(),
-            "--artifact", artifact_path.to_string_lossy().as_ref(),
-            "--signing-key", key_path.to_string_lossy().as_ref(),
+            "--tier",
+            "local",
+            "--manifest",
+            manifest_path.to_string_lossy().as_ref(),
+            "--artifact",
+            artifact_path.to_string_lossy().as_ref(),
+            "--signing-key",
+            key_path.to_string_lossy().as_ref(),
             "--dry-run",
         ])
         .output()?;
 
     let publish_ok = publish_output.status.success();
     let publish_stderr = String::from_utf8_lossy(&publish_output.stderr);
-    json(2, "publish", serde_json::json!({
-        "tier": "local",
-        "outcome": if publish_ok { "ok" } else { "failed" },
-        "dry_run": true,
-        "stderr_tail": publish_stderr.chars().rev().take(200).collect::<String>().chars().rev().collect::<String>()
-    }));
+    json(
+        2,
+        "publish",
+        serde_json::json!({
+            "tier": "local",
+            "outcome": if publish_ok { "ok" } else { "failed" },
+            "dry_run": true,
+            "stderr_tail": publish_stderr.chars().rev().take(200).collect::<String>().chars().rev().collect::<String>()
+        }),
+    );
 
     // Step 3: search — exercise registry search via in-memory fixture.
     let search_results = {
-        use maos_registry::client::NullSpiritRegistryClient;
         use maos_domain::ports::registry::{SearchQuery, SpiritRegistryClient};
+        use maos_registry::client::NullSpiritRegistryClient;
         let client = NullSpiritRegistryClient;
-        let q = SearchQuery { text: String::new(), include_yanked: false, limit: 10 };
-        client.search(&q).unwrap_or_else(|_| maos_domain::ports::registry::SearchResults { items: vec![] })
+        let q = SearchQuery {
+            text: String::new(),
+            include_yanked: false,
+            limit: 10,
+        };
+        client
+            .search(&q)
+            .unwrap_or_else(|_| maos_domain::ports::registry::SearchResults { items: vec![] })
     };
-    json(3, "search", serde_json::json!({
-        "outcome": "ok",
-        "results": search_results.items.len()
-    }));
+    json(
+        3,
+        "search",
+        serde_json::json!({
+            "outcome": "ok",
+            "results": search_results.items.len()
+        }),
+    );
 
     // Step 4: install — exercise McpSpiritRegistryClient::manifest with fixture replay.
-    json(4, "install", serde_json::json!({
-        "outcome": "ok",
-        "tier": "local"
-    }));
+    json(
+        4,
+        "install",
+        serde_json::json!({
+            "outcome": "ok",
+            "tier": "local"
+        }),
+    );
 
     // Step 5: admission — exercise admit_spirit on the synthetic package.
     let admission_outcome = {
-        use maos_registry::admission::{admit_spirit, AdmissionConfig};
         use maos_domain::ports::registry::SignedPackage;
+        use maos_registry::admission::{admit_spirit, AdmissionConfig};
         use maos_spirit_abi::compliance::TrustTier;
         let pkg = SignedPackage::new(
             maos_domain::ports::registry::SpiritId::from("smoke-spirit-7-2"),
@@ -4269,6 +4509,8 @@ sandbox_tier = "t0"
             t3_for_public_untrusted: false,
             allow_unsigned_local: true,
             org_signing_pubkey: None,
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         };
         match admit_spirit(&pkg, &op_cfg) {
             Ok(decision) => serde_json::json!({
@@ -4285,16 +4527,24 @@ sandbox_tier = "t0"
     json(5, "admission_public_untrusted", admission_outcome);
 
     // Step 6: yank propagation — exercise YankPoller in-memory.
-    json(6, "yank_propagation", serde_json::json!({
-        "outcome": "ok",
-        "latency_ms": 300000
-    }));
+    json(
+        6,
+        "yank_propagation",
+        serde_json::json!({
+            "outcome": "ok",
+            "latency_ms": 300000
+        }),
+    );
 
     // Step 7: audit query — exercise transparency log query.
-    json(7, "audit_query", serde_json::json!({
-        "outcome": "ok",
-        "yank_rows": 0
-    }));
+    json(
+        7,
+        "audit_query",
+        serde_json::json!({
+            "outcome": "ok",
+            "yank_rows": 0
+        }),
+    );
 
     // Step 8: air_gap_import — exercise maosctl import --offline with live binary.
     let import_tar_path = tmp.join("bundle.tar");
@@ -4306,12 +4556,20 @@ sandbox_tier = "t0"
             header.set_size(manifest_toml.len() as u64);
             header.set_mode(0o644);
             header.set_cksum();
-            builder.append_data(&mut header, "manifest.toml", std::io::Cursor::new(manifest_toml))?;
+            builder.append_data(
+                &mut header,
+                "manifest.toml",
+                std::io::Cursor::new(manifest_toml),
+            )?;
             let mut header2 = tar::Header::new_gnu();
             header2.set_size(13);
             header2.set_mode(0o644);
             header2.set_cksum();
-            builder.append_data(&mut header2, "artifact.bin", std::io::Cursor::new(b"smoke-artifact"))?;
+            builder.append_data(
+                &mut header2,
+                "artifact.bin",
+                std::io::Cursor::new(b"smoke-artifact"),
+            )?;
             let pkg_json = serde_json::json!({
                 "spirit_id": "smoke-spirit-7-2",
                 "version": "0.1.0",
@@ -4331,28 +4589,33 @@ sandbox_tier = "t0"
             header3.set_size(pkg_json_bytes.len() as u64);
             header3.set_mode(0o644);
             header3.set_cksum();
-            builder.append_data(&mut header3, "signed-package.json", std::io::Cursor::new(&pkg_json_bytes))?;
+            builder.append_data(
+                &mut header3,
+                "signed-package.json",
+                std::io::Cursor::new(&pkg_json_bytes),
+            )?;
             builder.finish()?;
         }
         std::fs::File::create(&import_tar_path)?.write_all(&buf)?;
     }
 
     let import_output = Command::new("maosctl")
-        .args([
-            "import",
-            "--offline", import_tar_path.to_str().unwrap(),
-        ])
+        .args(["import", "--offline", import_tar_path.to_str().unwrap()])
         .env("MAOS_REGISTRY_ALLOW_FORCE_TIER_AT_IMPORT", "true")
         .output()?;
 
     let import_ok = import_output.status.success();
     let import_stdout = String::from_utf8_lossy(&import_output.stdout);
     let import_stderr = String::from_utf8_lossy(&import_output.stderr);
-    json(8, "air_gap_import", serde_json::json!({
-        "outcome": if import_ok { "ok" } else { "failed" },
-        "stdout_tail": import_stdout.chars().rev().take(200).collect::<String>().chars().rev().collect::<String>(),
-        "stderr_tail": import_stderr.chars().rev().take(200).collect::<String>().chars().rev().collect::<String>()
-    }));
+    json(
+        8,
+        "air_gap_import",
+        serde_json::json!({
+            "outcome": if import_ok { "ok" } else { "failed" },
+            "stdout_tail": import_stdout.chars().rev().take(200).collect::<String>().chars().rev().collect::<String>(),
+            "stderr_tail": import_stderr.chars().rev().take(200).collect::<String>().chars().rev().collect::<String>()
+        }),
+    );
 
     // Step 9: corruption detection — exercise verify_bundle_consistency.
     let corruption_outcome = {
@@ -4375,14 +4638,16 @@ sandbox_tier = "t0"
 /// D4 remediation — SLOW path: exercises live `maos-spirit` and `maosctl`
 /// binaries via `std::process::Command`. Gated behind `MAOS_SMOKE_SLOW=1`.
 async fn smoke_registry_7_2_slow() -> Result<(), Box<dyn std::error::Error>> {
-    use std::process::Command;
     use std::io::Write;
+    use std::process::Command;
 
     let json = |step: u32, surface: &str, extra: serde_json::Value| {
         let mut o = serde_json::json!({"step": step, "surface": surface});
         if let Some(m) = o.as_object_mut() {
             if let Some(extra_map) = extra.as_object() {
-                for (k, v) in extra_map { m.insert(k.clone(), v.clone()); }
+                for (k, v) in extra_map {
+                    m.insert(k.clone(), v.clone());
+                }
             }
         }
         println!("{}", o);
@@ -4394,10 +4659,14 @@ async fn smoke_registry_7_2_slow() -> Result<(), Box<dyn std::error::Error>> {
     let _tmp_guard = TempDirGuard(tmp.clone());
 
     // Step 1: scaffold (same as fast)
-    json(1, "author_scaffold", serde_json::json!({
-        "note": "Story 7.1 template surface",
-        "status": "demonstrated_via_smoke_spirit_author_7_1"
-    }));
+    json(
+        1,
+        "author_scaffold",
+        serde_json::json!({
+            "note": "Story 7.1 template surface",
+            "status": "demonstrated_via_smoke_spirit_author_7_1"
+        }),
+    );
 
     // Step 2: publish — LIVE binary
     let manifest_path = tmp.join("manifest.toml");
@@ -4414,54 +4683,97 @@ sandbox_tier = "t0"
     std::fs::File::create(&key_path)?.write_all(&[0u8; 32])?;
 
     let publish_output = Command::new("maos-spirit")
-        .args(["publish", "--tier", "local",
-               "--manifest", manifest_path.to_str().unwrap(),
-               "--artifact", artifact_path.to_str().unwrap(),
-               "--signing-key", key_path.to_str().unwrap(),
-               "--dry-run"])
+        .args([
+            "publish",
+            "--tier",
+            "local",
+            "--manifest",
+            manifest_path.to_str().unwrap(),
+            "--artifact",
+            artifact_path.to_str().unwrap(),
+            "--signing-key",
+            key_path.to_str().unwrap(),
+            "--dry-run",
+        ])
         .output()?;
-    json(2, "publish", serde_json::json!({
-        "tier": "local",
-        "outcome": if publish_output.status.success() { "ok" } else { "failed" },
-        "dry_run": true
-    }));
+    json(
+        2,
+        "publish",
+        serde_json::json!({
+            "tier": "local",
+            "outcome": if publish_output.status.success() { "ok" } else { "failed" },
+            "dry_run": true
+        }),
+    );
 
     // Steps 3-7: same as fast path (in-process)
     let search_results = {
-        use maos_registry::client::NullSpiritRegistryClient;
         use maos_domain::ports::registry::{SearchQuery, SpiritRegistryClient};
-        NullSpiritRegistryClient.search(&SearchQuery { text: String::new(), include_yanked: false, limit: 10 })
+        use maos_registry::client::NullSpiritRegistryClient;
+        NullSpiritRegistryClient
+            .search(&SearchQuery {
+                text: String::new(),
+                include_yanked: false,
+                limit: 10,
+            })
             .unwrap_or_else(|_| maos_domain::ports::registry::SearchResults { items: vec![] })
     };
-    json(3, "search", serde_json::json!({"outcome": "ok", "results": search_results.items.len()}));
-    json(4, "install", serde_json::json!({"outcome": "ok", "tier": "local"}));
+    json(
+        3,
+        "search",
+        serde_json::json!({"outcome": "ok", "results": search_results.items.len()}),
+    );
+    json(
+        4,
+        "install",
+        serde_json::json!({"outcome": "ok", "tier": "local"}),
+    );
 
     let admission_outcome = {
-        use maos_registry::admission::{admit_spirit, AdmissionConfig};
         use maos_domain::ports::registry::SignedPackage;
+        use maos_registry::admission::{admit_spirit, AdmissionConfig};
         use maos_spirit_abi::compliance::TrustTier;
         let pkg = SignedPackage::new(
             maos_domain::ports::registry::SpiritId::from("smoke-spirit-7-2"),
-            "0.1.0".into(), manifest_toml.to_vec(), b"smoke-artifact".to_vec(),
-            [0u8; 64], [0u8; 32],
+            "0.1.0".into(),
+            manifest_toml.to_vec(),
+            b"smoke-artifact".to_vec(),
+            [0u8; 64],
+            [0u8; 32],
             maos_spirit_abi::compliance::ComplianceClaimEnvelope {
-                signature: [0u8; 64], attester_pubkey: [0u8; 32],
+                signature: [0u8; 64],
+                attester_pubkey: [0u8; 32],
                 claim_bytes: vec![0xA1u8, 0x01, 0x02],
                 signing_alg: maos_spirit_abi::compliance::SigningAlg::Ed25519,
             },
         );
         let op_cfg = AdmissionConfig {
-            tier_floor: TrustTier::Local, registry_origin_tier: TrustTier::Local,
-            t3_for_public_untrusted: false, allow_unsigned_local: true, org_signing_pubkey: None,
+            tier_floor: TrustTier::Local,
+            registry_origin_tier: TrustTier::Local,
+            t3_for_public_untrusted: false,
+            allow_unsigned_local: true,
+            org_signing_pubkey: None,
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         };
         match admit_spirit(&pkg, &op_cfg) {
-            Ok(d) => serde_json::json!({"outcome": "ok", "effective_tier": format!("{:?}", d.effective_tier), "admit": d.admit}),
+            Ok(d) => {
+                serde_json::json!({"outcome": "ok", "effective_tier": format!("{:?}", d.effective_tier), "admit": d.admit})
+            }
             Err(e) => serde_json::json!({"outcome": "rejected", "error": e.to_string()}),
         }
     };
     json(5, "admission_public_untrusted", admission_outcome);
-    json(6, "yank_propagation", serde_json::json!({"outcome": "ok", "latency_ms": 300000}));
-    json(7, "audit_query", serde_json::json!({"outcome": "ok", "yank_rows": 0}));
+    json(
+        6,
+        "yank_propagation",
+        serde_json::json!({"outcome": "ok", "latency_ms": 300000}),
+    );
+    json(
+        7,
+        "audit_query",
+        serde_json::json!({"outcome": "ok", "yank_rows": 0}),
+    );
 
     // Step 8: import — LIVE binary
     let import_tar_path = tmp.join("bundle.tar");
@@ -4469,10 +4781,20 @@ sandbox_tier = "t0"
         let mut buf = Vec::new();
         {
             let mut builder = tar::Builder::new(&mut buf);
-            let mut h = tar::Header::new_gnu(); h.set_size(manifest_toml.len() as u64); h.set_mode(0o644); h.set_cksum();
+            let mut h = tar::Header::new_gnu();
+            h.set_size(manifest_toml.len() as u64);
+            h.set_mode(0o644);
+            h.set_cksum();
             builder.append_data(&mut h, "manifest.toml", std::io::Cursor::new(manifest_toml))?;
-            let mut h2 = tar::Header::new_gnu(); h2.set_size(13); h2.set_mode(0o644); h2.set_cksum();
-            builder.append_data(&mut h2, "artifact.bin", std::io::Cursor::new(b"smoke-artifact"))?;
+            let mut h2 = tar::Header::new_gnu();
+            h2.set_size(13);
+            h2.set_mode(0o644);
+            h2.set_cksum();
+            builder.append_data(
+                &mut h2,
+                "artifact.bin",
+                std::io::Cursor::new(b"smoke-artifact"),
+            )?;
             let pkg_json = serde_json::json!({
                 "spirit_id": "smoke-spirit-7-2", "version": "0.1.0",
                 "manifest_toml": manifest_toml.to_vec(), "artifact_bytes": b"smoke-artifact".to_vec(),
@@ -4480,7 +4802,10 @@ sandbox_tier = "t0"
                 "compliance_envelope": {"signature": vec![0u8; 64], "attester_pubkey": vec![1u8; 32], "claim_bytes": vec![0xA1u8, 0x01, 0x02], "signing_alg": "ed25519"}
             });
             let b = serde_json::to_vec(&pkg_json)?;
-            let mut h3 = tar::Header::new_gnu(); h3.set_size(b.len() as u64); h3.set_mode(0o644); h3.set_cksum();
+            let mut h3 = tar::Header::new_gnu();
+            h3.set_size(b.len() as u64);
+            h3.set_mode(0o644);
+            h3.set_cksum();
             builder.append_data(&mut h3, "signed-package.json", std::io::Cursor::new(&b))?;
             builder.finish()?;
         }
@@ -4488,12 +4813,20 @@ sandbox_tier = "t0"
     }
 
     let import_output = Command::new("maosctl")
-        .args(["import", "--offline", import_tar_path.to_string_lossy().as_ref()])
+        .args([
+            "import",
+            "--offline",
+            import_tar_path.to_string_lossy().as_ref(),
+        ])
         .env("MAOS_REGISTRY_ALLOW_FORCE_TIER_AT_IMPORT", "true")
         .output()?;
-    json(8, "air_gap_import", serde_json::json!({
-        "outcome": if import_output.status.success() { "ok" } else { "failed" }
-    }));
+    json(
+        8,
+        "air_gap_import",
+        serde_json::json!({
+            "outcome": if import_output.status.success() { "ok" } else { "failed" }
+        }),
+    );
 
     let corruption_outcome = {
         use maos_registry::import::{extract_bundle, verify_bundle_consistency};
@@ -4511,6 +4844,152 @@ sandbox_tier = "t0"
 
 /// Story 7.2 AC3 + AC6 — focused air-gap-only smoke arm.
 async fn smoke_import_7_2() -> Result<(), Box<dyn std::error::Error>> {
-    println!(r#"{{"smoke":"7-2-import","status":"ok","surface":"maosctl import --offline","frame_kind":"SpiritImported"}}"#);
+    println!(
+        r#"{{"smoke":"7-2-import","status":"ok","surface":"maosctl import --offline","frame_kind":"SpiritImported"}}"#
+    );
+    Ok(())
+}
+
+/// Story 7.3 AC6 — `MAOS_ONE_SHOT=smoke-compliance-7-3`: the v1.0
+/// admission-verification observability demo. Six deterministic JSON lines,
+/// no network, <30s:
+///   1. admit a well-formed self-attested envelope (REAL `maos-spirit-cli`
+///      producer → evaluator round-trip);
+///   2. trust-tier drift rejects (operator policy forces a stricter tier);
+///   3. crypto-provider drift rejects (composition-root differs);
+///   4. malformed (truncated-signature) rejects with SignatureInvalid;
+///   5. a 30-envelope CCAC slice replays 30/30 verdict-match;
+///   6. measured P99 evaluator latency vs the 10ms budget.
+#[allow(deprecated)]
+async fn smoke_compliance_7_3() -> Result<(), Box<dyn std::error::Error>> {
+    #[allow(deprecated)]
+    use maos_compliance::builder::seeded_keypair;
+    use maos_compliance::canonical_cbor::sha256;
+    use maos_compliance::evaluator::{
+        evaluate_envelope_at, ComplianceVerdict, EComplianceRejection,
+    };
+    use maos_compliance::runtime_context::extract_manifest_fingerprint_fields;
+    use maos_compliance::RuntimeExecutionContext;
+    use maos_spirit_abi::compliance::{CryptoProviderId, TrustTier};
+
+    const NOW_MS: u64 = 1_900_000_000_000;
+    fn emit(v: serde_json::Value) {
+        println!("{v}");
+    }
+    fn verdict_str(v: &ComplianceVerdict) -> &'static str {
+        match v {
+            ComplianceVerdict::Admit => "admit",
+            ComplianceVerdict::Reject(_) => "reject",
+        }
+    }
+
+    // A local-tier manifest so step 2 can force a STRICTER effective tier.
+    let manifest: &[u8] = b"[spirit]\nname = \"smoke-compliance\"\nversion = \"1.0.0\"\ntrust_tier = \"local\"\nsandbox_tier = \"t1\"\nprovider_id = \"anthropic\"\nendpoint_url = \"https://api.anthropic.com\"\ncrypto_provider = \"ring\"\n";
+    let fields = extract_manifest_fingerprint_fields(manifest);
+    let (kp, pk) = seeded_keypair(0x5A0C_0001);
+
+    // REAL producer: maos-spirit-cli auto-populates the self-attested envelope.
+    let envelope = maos_spirit_cli::compliance_claim::auto_populate(manifest, "1.0.0", &pk, &kp)?;
+
+    // The manifest-derived runtime context a well-formed claim matches.
+    let base_ctx = RuntimeExecutionContext {
+        manifest_hash: sha256(manifest),
+        spirit_version: "1.0.0".into(),
+        effective_trust_tier: fields.trust_tier,
+        effective_sandbox_tier: fields.sandbox_tier,
+        runtime_provider_endpoint: fields.provider_endpoint.clone(),
+        runtime_crypto_provider: fields.crypto_provider.clone(),
+        capability_scope: fields.capability_scope.clone(),
+    };
+
+    // Step 1 — admit well-formed (producer → evaluator round-trip).
+    let v1 = evaluate_envelope_at(&envelope, &base_ctx, NOW_MS);
+    if v1 != ComplianceVerdict::Admit {
+        return Err(format!("step1: expected admit, got {v1:?}").into());
+    }
+    emit(serde_json::json!({"step":1,"surface":"admit_wellformed","outcome":"admit"}));
+
+    // Step 2 — trust-tier drift: operator policy forces a stricter effective tier.
+    let mut ctx2 = base_ctx.clone();
+    ctx2.effective_trust_tier = TrustTier::PublicUntrusted;
+    match evaluate_envelope_at(&envelope, &ctx2, NOW_MS) {
+        ComplianceVerdict::Reject(EComplianceRejection::ContextDrift { field, .. })
+            if format!("{field:?}") == "TrustTier" =>
+        {
+            emit(
+                serde_json::json!({"step":2,"surface":"trust_tier_drift","outcome":"reject","field":"trust_tier"}),
+            );
+        }
+        other => return Err(format!("step2: expected TrustTier drift, got {other:?}").into()),
+    }
+
+    // Step 3 — crypto-provider drift: composition root differs from the claim.
+    let mut ctx3 = base_ctx.clone();
+    ctx3.runtime_crypto_provider = CryptoProviderId("fips-module".into());
+    match evaluate_envelope_at(&envelope, &ctx3, NOW_MS) {
+        ComplianceVerdict::Reject(EComplianceRejection::ContextDrift { field, .. })
+            if format!("{field:?}") == "CryptoProvider" =>
+        {
+            emit(
+                serde_json::json!({"step":3,"surface":"crypto_provider_drift","outcome":"reject","field":"crypto_provider"}),
+            );
+        }
+        other => return Err(format!("step3: expected CryptoProvider drift, got {other:?}").into()),
+    }
+
+    // Step 4 — malformed (truncated signature) → SignatureInvalid.
+    let mut bad = envelope.clone();
+    for b in bad.signature.iter_mut().take(8) {
+        *b ^= 0xFF;
+    }
+    match evaluate_envelope_at(&bad, &base_ctx, NOW_MS) {
+        ComplianceVerdict::Reject(EComplianceRejection::SignatureInvalid) => {
+            emit(
+                serde_json::json!({"step":4,"surface":"malformed_signature","outcome":"reject","kind":"SignatureInvalid"}),
+            );
+        }
+        other => return Err(format!("step4: expected SignatureInvalid, got {other:?}").into()),
+    }
+
+    // Step 5 — replay a 30-envelope CCAC slice (first 30 lines) through the evaluator.
+    let corpus = std::fs::read_to_string("tests/corpora/ccac-v1.0.jsonl")
+        .map_err(|e| format!("step5: cannot read tests/corpora/ccac-v1.0.jsonl: {e}"))?;
+    let mut verdict_match = 0usize;
+    let mut checked = 0usize;
+    for line in corpus.lines().take(30) {
+        let item: maos_corpus_gen::ccac::CcacItem = serde_json::from_str(line)?;
+        let bytes = hex::decode(&item.envelope_cbor_hex)?;
+        let env: maos_spirit_abi::compliance::ComplianceClaimEnvelope =
+            serde_cbor::from_slice(&bytes)?;
+        let (_m, ctx) = maos_corpus_gen::ccac::reference_context(&item.reference_spirit)?;
+        let v = evaluate_envelope_at(&env, &ctx, NOW_MS);
+        if verdict_str(&v) == item.expected_verdict {
+            verdict_match += 1;
+        }
+        checked += 1;
+    }
+    if verdict_match != checked || checked != 30 {
+        return Err(format!(
+            "step5: CCAC slice {verdict_match}/{checked} matched (expected 30/30)"
+        )
+        .into());
+    }
+    emit(
+        serde_json::json!({"step":5,"surface":"ccac_slice","envelopes":30,"verdict_match":verdict_match}),
+    );
+
+    // Step 6 — measured P99 evaluator latency vs the 10ms budget.
+    const N: usize = 1000;
+    let mut durations = Vec::with_capacity(N);
+    for _ in 0..N {
+        let t = std::time::Instant::now();
+        let _ = evaluate_envelope_at(&envelope, &base_ctx, NOW_MS);
+        durations.push(t.elapsed());
+    }
+    durations.sort();
+    let p99 = durations[(N as f64 * 0.99) as usize - 1];
+    let p99_ms = (p99.as_secs_f64() * 1000.0 * 1000.0).round() / 1000.0;
+    emit(serde_json::json!({"step":6,"surface":"latency_p99","p99_ms":p99_ms,"budget_ms":10}));
+
     Ok(())
 }

@@ -6,7 +6,7 @@ use crate::admission::extract_manifest_tier;
 use crate::operations::ManifestArgs;
 use crate::storage::RegistryStorage;
 
-use maos_domain::ports::registry::{SpiritId, SignedManifest, TrustTier};
+use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
 
 /// Compute the server tier signature message using domain-separated hashing.
 /// Format: sha256(spirit_id_len_u64 || spirit_id || version_len_u64 || version || tier_byte)

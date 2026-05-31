@@ -30,11 +30,15 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "deprecation_annotations_found": hits.len(),
-            "hits": hits,
-            "v05_status": if hits.is_empty() { "clean" } else { "unexpected_deprecations" }
-        })).unwrap());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "deprecation_annotations_found": hits.len(),
+                "hits": hits,
+                "v05_status": if hits.is_empty() { "clean" } else { "unexpected_deprecations" }
+            }))
+            .unwrap()
+        );
     }
 
     if hits.is_empty() {

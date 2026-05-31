@@ -27,10 +27,7 @@ fn smoke_registry_5d_exits_zero_and_outputs_7_json_lines() {
     );
 
     // Collect JSON lines (non-empty, non-comment)
-    let lines: Vec<&str> = stdout
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .collect();
+    let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
 
     assert!(
         lines.len() >= 7,
@@ -41,8 +38,11 @@ fn smoke_registry_5d_exits_zero_and_outputs_7_json_lines() {
 
     // Verify each line is valid JSON with expected keys
     for (i, line) in lines.iter().enumerate() {
-        let val: serde_json::Value =
-            serde_json::from_str(line).expect(&format!("line {} is not valid JSON: {}", i + 1, line));
+        let val: serde_json::Value = serde_json::from_str(line).expect(&format!(
+            "line {} is not valid JSON: {}",
+            i + 1,
+            line
+        ));
         assert!(
             val.get("step").is_some(),
             "line {} missing 'step' key: {}",

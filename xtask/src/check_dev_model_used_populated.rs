@@ -80,7 +80,9 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
                     kind: ViolationKind::Empty,
                     value: Some(value),
                 });
-            } else if trimmed == "TBD-set-at-story-start" || trimmed == "<set by dev at story start>" {
+            } else if trimmed == "TBD-set-at-story-start"
+                || trimmed == "<set by dev at story start>"
+            {
                 violations.push(DmuViolation {
                     file: name,
                     kind: ViolationKind::TbdPlaceholder,
@@ -131,16 +133,28 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
     } else {
         if passed {
             if violations.is_empty() {
-                eprintln!("check-dev-model-used-populated: PASS — all stories have valid dev_model_used");
+                eprintln!(
+                    "check-dev-model-used-populated: PASS — all stories have valid dev_model_used"
+                );
             } else {
                 let warn_count = violations.len();
-                eprintln!("check-dev-model-used-populated: PASS (with {} warning(s)):", warn_count);
+                eprintln!(
+                    "check-dev-model-used-populated: PASS (with {} warning(s)):",
+                    warn_count
+                );
                 for v in &violations {
-                    eprintln!("  [WARN] {} — unknown model: {}", v.file, v.value.as_deref().unwrap_or("N/A"));
+                    eprintln!(
+                        "  [WARN] {} — unknown model: {}",
+                        v.file,
+                        v.value.as_deref().unwrap_or("N/A")
+                    );
                 }
             }
         } else {
-            eprintln!("check-dev-model-used-populated: FAIL — {} hard failure(s):", hard_failures.len());
+            eprintln!(
+                "check-dev-model-used-populated: FAIL — {} hard failure(s):",
+                hard_failures.len()
+            );
             for v in &hard_failures {
                 match v.kind {
                     ViolationKind::Missing => {
@@ -205,7 +219,11 @@ mod tests {
     #[test]
     fn test_all_populated_exit_0() {
         let dir = TempDir::new().unwrap();
-        write_story(&dir, "1-1-test.md", "---\ndev_model_used: claude-opus-4-7\n---\n# Story");
+        write_story(
+            &dir,
+            "1-1-test.md",
+            "---\ndev_model_used: claude-opus-4-7\n---\n# Story",
+        );
         let result = run_with_dir(false, dir.path().to_str().unwrap());
         assert!(result.is_ok());
     }
@@ -229,7 +247,11 @@ mod tests {
     #[test]
     fn test_tbd_placeholder_exit_1() {
         let dir = TempDir::new().unwrap();
-        write_story(&dir, "1-1-test.md", "---\ndev_model_used: TBD-set-at-story-start\n---\n# Story");
+        write_story(
+            &dir,
+            "1-1-test.md",
+            "---\ndev_model_used: TBD-set-at-story-start\n---\n# Story",
+        );
         let result = run_with_dir(false, dir.path().to_str().unwrap());
         assert!(result.is_err());
     }

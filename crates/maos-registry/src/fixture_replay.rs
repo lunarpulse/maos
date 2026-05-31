@@ -40,7 +40,11 @@ impl FixtureReplaySpiritRegistryClient {
         self.calls.lock().unwrap().drain(..).collect()
     }
 
-    fn pop(&self, method: &str, args: serde_json::Value) -> Result<serde_json::Value, RegistryError> {
+    fn pop(
+        &self,
+        method: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, RegistryError> {
         self.calls.lock().unwrap().push(RegistryCall {
             method: method.to_string(),
             args_json: args.to_string(),
@@ -59,8 +63,9 @@ impl FixtureReplaySpiritRegistryClient {
 impl SpiritRegistryClient for FixtureReplaySpiritRegistryClient {
     fn search(&self, q: &SearchQuery) -> Result<SearchResults, RegistryError> {
         let args = serde_json::json!({"text": q.text, "include_yanked": q.include_yanked, "limit": q.limit});
-        self.pop("registry.search", args)
-            .and_then(|v| serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string())))
+        self.pop("registry.search", args).and_then(|v| {
+            serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string()))
+        })
     }
 
     fn manifest(
@@ -69,8 +74,9 @@ impl SpiritRegistryClient for FixtureReplaySpiritRegistryClient {
         version: &str,
     ) -> Result<SignedManifest, RegistryError> {
         let args = serde_json::json!({"spirit_id": spirit_id.as_str(), "version": version});
-        self.pop("registry.manifest", args)
-            .and_then(|v| serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string())))
+        self.pop("registry.manifest", args).and_then(|v| {
+            serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string()))
+        })
     }
 
     fn artifact(
@@ -79,14 +85,16 @@ impl SpiritRegistryClient for FixtureReplaySpiritRegistryClient {
         version: &str,
     ) -> Result<SignedArtifact, RegistryError> {
         let args = serde_json::json!({"spirit_id": spirit_id.as_str(), "version": version});
-        self.pop("registry.artifact", args)
-            .and_then(|v| serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string())))
+        self.pop("registry.artifact", args).and_then(|v| {
+            serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string()))
+        })
     }
 
     fn publish(&self, pkg: &SignedPackage) -> Result<PublishReceipt, RegistryError> {
         let args = serde_json::json!({"spirit_id": pkg.spirit_id.as_str(), "version": pkg.version});
-        self.pop("registry.publish", args)
-            .and_then(|v| serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string())))
+        self.pop("registry.publish", args).and_then(|v| {
+            serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string()))
+        })
     }
 
     fn deprecate(
@@ -100,8 +108,9 @@ impl SpiritRegistryClient for FixtureReplaySpiritRegistryClient {
             "version": version,
             "reason": reason.summary,
         });
-        self.pop("registry.deprecate", args)
-            .and_then(|v| serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string())))
+        self.pop("registry.deprecate", args).and_then(|v| {
+            serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string()))
+        })
     }
 }
 
@@ -110,8 +119,9 @@ impl FixtureReplaySpiritRegistryClient {
     /// Internal yanks_since op.
     pub fn yanks_since(&self, since_ns: u64) -> Result<YankList, RegistryError> {
         let args = serde_json::json!({"since_ns": since_ns});
-        self.pop("registry.yanks_since", args)
-            .and_then(|v| serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string())))
+        self.pop("registry.yanks_since", args).and_then(|v| {
+            serde_json::from_value(v).map_err(|e| RegistryError::Transport(e.to_string()))
+        })
     }
 }
 
@@ -121,9 +131,8 @@ mod tests {
 
     #[test]
     fn fixture_search_returns_queued_response() {
-        let client = FixtureReplaySpiritRegistryClient::new(vec![
-            Ok(serde_json::json!({"items": []})),
-        ]);
+        let client =
+            FixtureReplaySpiritRegistryClient::new(vec![Ok(serde_json::json!({"items": []}))]);
         let q = SearchQuery::new("test".into(), false, 50);
         let result = client.search(&q).unwrap();
         assert!(result.items.is_empty());
@@ -131,9 +140,8 @@ mod tests {
 
     #[test]
     fn fixture_records_calls() {
-        let client = FixtureReplaySpiritRegistryClient::new(vec![
-            Ok(serde_json::json!({"items": []})),
-        ]);
+        let client =
+            FixtureReplaySpiritRegistryClient::new(vec![Ok(serde_json::json!({"items": []}))]);
         let q = SearchQuery::new("test".into(), false, 50);
         let _ = client.search(&q).unwrap();
         let calls = client.take_calls();
@@ -151,9 +159,9 @@ mod tests {
 
     #[test]
     fn fixture_errors_propagate() {
-        let client = FixtureReplaySpiritRegistryClient::new(vec![
-            Err(RegistryError::UnknownSpirit("notfound".into())),
-        ]);
+        let client = FixtureReplaySpiritRegistryClient::new(vec![Err(
+            RegistryError::UnknownSpirit("notfound".into()),
+        )]);
         let q = SearchQuery::new("test".into(), false, 50);
         let err = client.search(&q).unwrap_err();
         assert!(matches!(err, RegistryError::UnknownSpirit(_)));

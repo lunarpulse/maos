@@ -34,4 +34,6 @@ gates = [
     "check-review-findings-resolved",
     # Epic 5 retro §A6 — closes Epic 4 retro §A7 (dev-record completeness + TBD-placeholder catch).
     "check-dev-record-completeness",
+    # Story 7.3 NFR-Aud-9 — CCAC N=600 ship gate (ccac-n600-ship-gate discipline job).
+    "ccac-ship-gate",
 ]

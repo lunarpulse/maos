@@ -100,12 +100,13 @@ fn extract_exercised_caps(
         r"(LocalRunnerFixture|SpiritTest|SpiritTestFixture|expectFrame|expect_frame!|assert_no_capability_invocation)"
     ).unwrap();
 
-    let cap_ref_patterns = regex::Regex::new(
-        r#"(?m)(?:"([^"]+)"|'([^']+)')"#
-    ).unwrap();
+    let cap_ref_patterns = regex::Regex::new(r#"(?m)(?:"([^"]+)"|'([^']+)')"#).unwrap();
 
     let mut has_fixture = false;
-    for entry in walkdir::WalkDir::new(tests_dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in walkdir::WalkDir::new(tests_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if ext != "rs" && ext != "ts" && !ext.ends_with("test.ts") && !ext.ends_with(".test.ts") {
@@ -166,10 +167,14 @@ pub fn run(
     let mut updated = Vec::new();
     let mut skipped = Vec::new();
 
-    let nfr_test_3 = coverage.coverage.get_mut("NFR-Test-3")
+    let nfr_test_3 = coverage
+        .coverage
+        .get_mut("NFR-Test-3")
         .ok_or("NFR-Test-3 row not found in coverage-matrix.yaml")?;
 
-    let reference_spirits = nfr_test_3.reference_spirits.as_mut()
+    let reference_spirits = nfr_test_3
+        .reference_spirits
+        .as_mut()
         .ok_or("NFR-Test-3 missing reference_spirits block")?;
 
     for (name, spirit) in reference_spirits {
@@ -201,7 +206,10 @@ pub fn run(
 
     if !skipped.is_empty() {
         for name in &skipped {
-            eprintln!("measure-nfr-test-3: {} — not_yet_shipped (coverage_pct: null)", name);
+            eprintln!(
+                "measure-nfr-test-3: {} — not_yet_shipped (coverage_pct: null)",
+                name
+            );
         }
     }
 
@@ -213,7 +221,8 @@ pub fn run(
 
     if !dry_run && !updated.is_empty() {
         return Err(
-            "write-back not yet supported at v0.5: serde_yaml destroys comments. Use --dry-run.".to_string()
+            "write-back not yet supported at v0.5: serde_yaml destroys comments. Use --dry-run."
+                .to_string(),
         );
     }
 
@@ -246,9 +255,13 @@ mod tests {
     fn t5_1_hello_spirit_reports_100() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path().join("hello-spirit");
-        setup_spirit(&dir,
+        setup_spirit(
+            &dir,
             "[capabilities.required]\nprovider.complete = [\"anthropic.claude-3-haiku\"]\n",
-            &[("smoke.rs", "use SpiritTest;\nfn test() { let harness = SpiritTest::new(); }\n")]
+            &[(
+                "smoke.rs",
+                "use SpiritTest;\nfn test() { let harness = SpiritTest::new(); }\n",
+            )],
         );
         let result = compute_coverage(&dir).unwrap();
         assert_eq!(result, Some(100));
@@ -258,9 +271,10 @@ mod tests {
     fn t5_2_example_spirit_reports_100() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path().join("example-spirit");
-        setup_spirit(&dir,
+        setup_spirit(
+            &dir,
             "[capabilities.required]\nprovider.complete = [\"anthropic.claude-3-haiku\"]\n",
-            &[("smoke.rs", "use LocalRunnerFixture;\nfn test() {}\n")]
+            &[("smoke.rs", "use LocalRunnerFixture;\nfn test() {}\n")],
         );
         let result = compute_coverage(&dir).unwrap();
         assert_eq!(result, Some(100));
@@ -270,9 +284,13 @@ mod tests {
     fn t5_3_example_spirit_ts_reports_100() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path().join("example-spirit-ts");
-        setup_spirit(&dir,
+        setup_spirit(
+            &dir,
             "[capabilities.required]\nprovider.complete = [\"anthropic.claude-3-haiku\"]\n",
-            &[("spirit.test.ts", "import { SpiritTest } from '@maos/spirit-ts/spirit_test';\n")]
+            &[(
+                "spirit.test.ts",
+                "import { SpiritTest } from '@maos/spirit-ts/spirit_test';\n",
+            )],
         );
         let result = compute_coverage(&dir).unwrap();
         assert_eq!(result, Some(100));
@@ -283,9 +301,11 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path().join("butler");
         fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("manifest.toml"),
-            "[capabilities.required]\nprovider.complete = [\"anthropic.claude-3-haiku\"]\n"
-        ).unwrap();
+        fs::write(
+            dir.join("manifest.toml"),
+            "[capabilities.required]\nprovider.complete = [\"anthropic.claude-3-haiku\"]\n",
+        )
+        .unwrap();
         // No tests directory
         let result = compute_coverage(&dir).unwrap();
         // No tests → 0 exercised → 0% (but the caller skips via coverage_pct: null in YAML)
@@ -327,12 +347,7 @@ coverage:
         fs::write(&yaml_path, yaml).unwrap();
 
         // Run without filter — should process hello-spirit (has coverage_pct), skip butler (null)
-        let result = run(
-            yaml_path.to_str().unwrap(),
-            None,
-            true,
-            false,
-        );
+        let result = run(yaml_path.to_str().unwrap(), None, true, false);
         // Will fail because the actual spirit paths don't exist, but the YAML parse + filter logic works
         // The important thing: butler should be skipped (coverage_pct: null)
         assert!(result.is_err() || result.is_ok());
@@ -384,7 +399,11 @@ fn test_partial() {
         // With the v0.5 heuristic: fixture pattern found → all declared caps exercised → 100%
         // But if we add specific cap-reference detection, this could return 50%
         // For now, v0.5 fixture-presence heuristic returns 100% when fixture found
-        assert!(result == Some(100) || result == Some(50), "got {:?}", result);
+        assert!(
+            result == Some(100) || result == Some(50),
+            "got {:?}",
+            result
+        );
     }
 
     #[test]
