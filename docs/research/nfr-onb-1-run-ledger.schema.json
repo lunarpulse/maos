@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://maos.dev/schemas/nfr-onb-1-run-ledger.schema.json",
+  "title": "NFR-Onb-4 Run-Ledger Entry",
+  "description": "One line of the NFR-Onb-4 cadence run-ledger (run-ledger.jsonl, private). Appended by maos_eval::onboarding_gate_corpus::CadenceMachine. 3 consecutive misses raise EscalateReleaseReview; a PASS resets the consecutive-miss counter.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "passed"],
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "passed": { "type": "boolean", "description": "Did this gate run meet the NFR-Onb-1 floor?" },
+    "directive": {
+      "type": "string",
+      "description": "Surfaced only on a miss: 'run a fresh 6-author cohort within 2 weeks'."
+    }
+  }
+}

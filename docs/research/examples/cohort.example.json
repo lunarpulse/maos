@@ -1,0 +1,17 @@
+{
+  "cohort_id": "nfr-onb-1-v0.3-example",
+  "participants": [
+    { "participant_id": "P00", "no_prior_maos_contribution": true,  "never_wrote_rust_spirit": true,  "never_wrote_rust": true,  "non_english_native": false, "offline_only": false },
+    { "participant_id": "P01", "no_prior_maos_contribution": true,  "never_wrote_rust_spirit": true,  "never_wrote_rust": true,  "non_english_native": false, "offline_only": false },
+    { "participant_id": "P02", "no_prior_maos_contribution": true,  "never_wrote_rust_spirit": true,  "never_wrote_rust": true,  "non_english_native": false, "offline_only": false },
+    { "participant_id": "P03", "no_prior_maos_contribution": true,  "never_wrote_rust_spirit": true,  "never_wrote_rust": false, "non_english_native": false, "offline_only": false },
+    { "participant_id": "P04", "no_prior_maos_contribution": true,  "never_wrote_rust_spirit": true,  "never_wrote_rust": false, "non_english_native": false, "offline_only": false },
+    { "participant_id": "P05", "no_prior_maos_contribution": true,  "never_wrote_rust_spirit": false, "never_wrote_rust": false, "non_english_native": false, "offline_only": false },
+    { "participant_id": "P06", "no_prior_maos_contribution": false, "never_wrote_rust_spirit": false, "never_wrote_rust": false, "non_english_native": false, "offline_only": false },
+    { "participant_id": "P07", "no_prior_maos_contribution": false, "never_wrote_rust_spirit": false, "never_wrote_rust": false, "non_english_native": false, "offline_only": false },
+    { "participant_id": "P08", "no_prior_maos_contribution": false, "never_wrote_rust_spirit": false, "never_wrote_rust": false, "non_english_native": false, "offline_only": false },
+    { "participant_id": "P09", "no_prior_maos_contribution": false, "never_wrote_rust_spirit": false, "never_wrote_rust": false, "non_english_native": true,  "offline_only": false },
+    { "participant_id": "P10", "no_prior_maos_contribution": false, "never_wrote_rust_spirit": false, "never_wrote_rust": false, "non_english_native": true,  "offline_only": false },
+    { "participant_id": "P11", "no_prior_maos_contribution": false, "never_wrote_rust_spirit": false, "never_wrote_rust": false, "non_english_native": true,  "offline_only": true  }
+  ]
+}

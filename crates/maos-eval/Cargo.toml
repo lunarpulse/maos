@@ -14,7 +14,13 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 walkdir = "2"
+# Story 7.5b — SHA-256 pinning of the Butler-class fixture corpus (the resolver
+# logs which corpus + digest it scored against; mirrors xtask's sha2 usage).
+sha2 = "0.10"
 
 [dev-dependencies]
 maos-kernel-core = { path = "../maos-kernel-core" }
 tempfile = "3"
+# Story 7.5b AC8 — the dry-run self-trial runs a real Spirit through LocalRunner
+# and scores it via this crate's harness (tests/onb_1_self_trial.rs).
+maos-spirit-sdk = { path = "../maos-spirit-sdk", features = ["local_runner"] }

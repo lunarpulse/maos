@@ -1,3 +1,10 @@
+## Deferred from: code review of 7-5b-execute-nfr-onb-1-30-minute-first-spirit-validation-gate-at-v0-3 (2026-06-01)
+
+- Fragile `LocalRunner` string-contains heuristic in `classify_prerequisites` — greps source for `"impl LocalRunner"` (matches comments/doc comments). Test-only prereq check; works for current codebase. `crates/maos-eval/src/onboarding_gate_corpus.rs:1211-1214`
+- `participant_id` schema pattern `^P[0-9]{2,}$` not enforced by Rust code — `ParticipantRecord` accepts any `String`. Schema is the validation boundary. `crates/maos-eval/src/onboarding_gate_corpus.rs:611`
+- ~~`CorpusLine` uses `#[serde(untagged)]` producing poor error messages on malformed fixture lines.~~ — FIXED: replaced untagged with manual dispatch on `stand_in_for` key. `crates/maos-eval/src/onboarding_gate_corpus.rs`
+- `workspace_root()` in test helpers relies on CWD being crate directory — pre-existing project convention. `crates/maos-eval/src/onboarding_gate_corpus.rs`
+
 ## Deferred from: code review of 7-5a-publish-and-enforce-v1-0-abi-stability-commitments (2026-05-31)
 
 - ColdSwap/HotSwap upgrade paths bypass `admit_spirit` entirely — directly insert successor SCB without ABI version checks. Pre-existing gap (Story 5.x). Story 5.5x tracks the fix. `crates/maos-kernel-core/src/lifecycle/upgrade.rs:131-171`

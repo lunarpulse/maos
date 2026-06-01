@@ -42,4 +42,7 @@ gates = [
     "stability-matrix",
     # Story 7.5a AC3 — BREAKING.md dated-entry + Migration taxonomy CI-grep-enforced (NFR-Maint-7).
     "breaking-md",
+    # Story 7.5b AC9 — NFR-Onb-1 30-min first-Spirit gate: stratification + cohort
+    # evaluator + Butler-corpus seam over committed example artifacts (provisional).
+    "nfr-onb-1-gate",
 ]

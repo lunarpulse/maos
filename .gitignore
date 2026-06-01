@@ -9,3 +9,7 @@ archives
 xtask/tests/fixtures/abi-diff/*/baseline/Cargo.lock
 xtask/tests/fixtures/abi-diff/*/modified/Cargo.lock
 xtask/tests/fixtures/abi-diff/*/modified-removed/Cargo.lock
+# Story 7.5b — NFR-Onb-1 private human-research artifacts (recruitment log, live
+# outcomes, run-ledger). Only schemas + redacted examples under docs/research/
+# are committed; participant data NEVER enters the repo.
+_research/

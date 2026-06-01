@@ -38,6 +38,7 @@ mod gen_isolation_corpus;
 mod gen_termination_corpus;
 mod invariant_lock;
 mod kloc_check;
+mod nfr_onb_1_gate;
 mod rebaseline_check;
 mod stability_matrix;
 mod templates_regen;
@@ -439,6 +440,16 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 7.5b — NFR-Onb-1 30-Minute First Spirit Validation Gate discipline
+    /// rail: stratification + cohort evaluator + Butler-corpus seam over the
+    /// committed example cohort/outcomes/self-trial; FAILs loudly on drift.
+    #[command(name = "nfr-onb-1-gate")]
+    NfrOnb1Gate {
+        #[arg(long)]
+        check: bool,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -680,6 +691,10 @@ fn main() {
             stability_matrix::run(&workspace_root, check, json)
         }
         Commands::CheckBreakingMd { json } => check_breaking_md::run(json),
+        Commands::NfrOnb1Gate { check, json } => {
+            let workspace_root = std::env::current_dir().expect("failed to get current dir");
+            nfr_onb_1_gate::run(&workspace_root, check, json)
+        }
     };
     if let Err(e) = result {
         eprintln!("{e}");

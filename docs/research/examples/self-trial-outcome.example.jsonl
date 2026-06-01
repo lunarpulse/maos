@@ -1,0 +1,1 @@
+{"participant_id":"self-trial-7-5b","corpus_source":"fixture","corpus_sha256":"1a5b0738e959b537f1dd07993ed0d9978c889e1348d20a2007a03235d03d9110","compiles_against_abi":true,"corpus_pass":true,"halt_recall_calendar_conflict":1.0,"halt_precision_overall":0.9090909090909091,"time_to_success_min":12.0,"within_window":true,"succeed":true,"provisional":true}

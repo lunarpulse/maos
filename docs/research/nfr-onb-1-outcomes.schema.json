@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://maos.dev/schemas/nfr-onb-1-outcomes.schema.json",
+  "title": "NFR-Onb-1 Candidate Outcome",
+  "description": "One scored candidate Spirit — a single line of outcomes.jsonl. Emitted by maos_eval::onboarding_gate_corpus::score_candidate. `provisional` is true whenever scored against the fixture corpus.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "participant_id",
+    "corpus_source",
+    "corpus_sha256",
+    "compiles_against_abi",
+    "corpus_pass",
+    "halt_recall_calendar_conflict",
+    "halt_precision_overall",
+    "time_to_success_min",
+    "within_window",
+    "succeed",
+    "provisional"
+  ],
+  "properties": {
+    "participant_id": { "type": "string", "minLength": 1 },
+    "corpus_source": {
+      "type": "string",
+      "enum": ["butler", "fixture"],
+      "description": "Which corpus the resolver landed on. `fixture` => provisional."
+    },
+    "corpus_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of the corpus the candidate was scored against (recorded for tamper-evidence)."
+    },
+    "compiles_against_abi": { "type": "boolean", "description": "NFR-Onb-1 (a)." },
+    "corpus_pass": { "type": "boolean", "description": "NFR-Onb-1 (b): a decision produced for all 30 scenarios." },
+    "halt_recall_calendar_conflict": {
+      "type": "number", "minimum": 0, "maximum": 1,
+      "description": "NFR-Onb-1 (c): recall on the calendar-conflict subset (floor >= 0.90)."
+    },
+    "halt_precision_overall": {
+      "type": "number", "minimum": 0, "maximum": 1,
+      "description": "NFR-Onb-1 (d): precision overall (floor >= 0.85)."
+    },
+    "time_to_success_min": { "type": "number", "minimum": 0 },
+    "within_window": { "type": "boolean", "description": "Completed within the 14-day window." },
+    "succeed": {
+      "type": "boolean",
+      "description": "The NFR-Onb-1 conjunction: (a) AND (b) AND (c)>=0.90 AND (d)>=0.85, within the window."
+    },
+    "provisional": { "type": "boolean", "description": "True iff scored against the fixture corpus (never the live gate)." }
+  }
+}

@@ -799,16 +799,21 @@ coverage:
       Story 1b.1 lands the Approval Decision Log as a distinct SQLite table.
       Full v0.3 surface lands in Story 3.3 and Story 1b.3.
   NFR-Onb-1:
-    gates: [example-spirit-tests, example-spirit-drift]
+    gates: [example-spirit-tests, example-spirit-drift, nfr-onb-1-gate]
     corpora: []
     phase: v0.3
     valid_until: '2027-05-12'
     notes: |
       Story 2.3 ships PREREQUISITES (cargo-generate template + local_runner
-      SDK + ≥1 example Spirit with passing CI). Full N=12 stratified
-      30-Min First Spirit Validation Gate executes at Story 7.5b against
-      the Butler reference Spirit shipped by Story 8.1 (per dependency-dag.md
-      line 25).
+      SDK + ≥1 example Spirit with passing CI). Story 7.5b ships the
+      30-Min First Spirit Validation Gate EXECUTION INFRASTRUCTURE
+      (nfr-onb-1-gate: stratification validator + outcome-scoring harness +
+      cohort gate evaluator + NFR-Onb-4 cadence + smoke-onb-1-7-5b self-trial),
+      scored against a SHA-pinned Butler-class FIXTURE stand-in (verdicts
+      stamped provisional) until Story 8.1 lands the canonical
+      spirits/butler/.../calendar-comms-v0.3.jsonl corpus, which the resolver
+      auto-prefers. The live N=12 / 14-day human trial runs out-of-band against
+      these artifacts (per dependency-dag.md line 25).
   NFR-Onb-2:
     gates: []
     corpora: []
