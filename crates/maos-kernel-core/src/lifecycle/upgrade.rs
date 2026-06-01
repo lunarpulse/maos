@@ -354,11 +354,15 @@ fn load_bundle_from_file(
 
     let scheduling = SchedulingSection::from_toml_str(&extract("scheduling")?)?;
     let lifecycle = LifecycleSection::from_toml_str(&extract("lifecycle")?)?;
-    let class = root
-        .get("class")
-        .and_then(|v| toml::to_string(v).ok())
-        .map(|s| ClassSection::from_toml_str(&s))
-        .transpose()?;
+    // Story 7.5a — `[class]` is REQUIRED at parse time. A manifest without
+    // `[class]` is malformed: the ABI Stability Triple (min_substrate_version,
+    // manifest_schema_version) is part of the admission contract and cannot
+    // be silently skipped. Belt-and-suspenders: `admit_spirit` also rejects
+    // `class: None` with `SecurityError::EClassRequired`.
+    let class = {
+        let s = extract("class")?;
+        Some(ClassSection::from_toml_str(&s)?)
+    };
     let hot_swap = root
         .get("hot_swap")
         .and_then(|v| toml::to_string(v).ok())

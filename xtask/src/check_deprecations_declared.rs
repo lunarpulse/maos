@@ -23,6 +23,17 @@ pub fn run(json: bool) -> Result<(), String> {
         }
         let content = std::fs::read_to_string(path).unwrap_or_default();
         for line in content.lines() {
+            // Story 7.5a fix — skip comment lines. A real attribute annotation
+            // is `#[maos_attrs::deprecated_since(...)]` at line start (after
+            // indentation); a `///`/`//` line that merely SHOWS the attribute in
+            // documentation (e.g. deprecation.rs:19's usage example) is NOT a
+            // live annotation. The prior `contains`-style match false-positived
+            // on that doc comment, so the gate failed at HEAD despite ZERO real
+            // annotations. (This gate is the NFR-Maint-3/5 deprecation rail —
+            // owned by 7.5a — and must correctly assert empty-present.)
+            if line.trim_start().starts_with("//") {
+                continue;
+            }
             if pattern.is_match(line) {
                 hits.push(format!("{}: {}", path.display(), line.trim()));
             }

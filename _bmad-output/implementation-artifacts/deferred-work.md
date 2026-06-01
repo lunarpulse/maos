@@ -1,3 +1,8 @@
+## Deferred from: code review of 7-5a-publish-and-enforce-v1-0-abi-stability-commitments (2026-05-31)
+
+- ColdSwap/HotSwap upgrade paths bypass `admit_spirit` entirely — directly insert successor SCB without ABI version checks. Pre-existing gap (Story 5.x). Story 5.5x tracks the fix. `crates/maos-kernel-core/src/lifecycle/upgrade.rs:131-171`
+- ~~`POST_V1_SCHEMA_SECTIONS` must be manually maintained on future schema bumps~~ — FIXED: `check-manifest-schema-version` Step 5 now gates the constant; future bumps that forget it fail CI.
+
 ## Deferred from: code review of 7-4-author-skills-and-propose-revisions-with-output-shape-fail-loud (2026-05-31)
 
 - `maosctl skills approve/reject` are acknowledgement-only stubs (no real queue interaction) — acknowledged v0.5 limitation; queue logic IS tested in-unit. Persistent queue store is future work.

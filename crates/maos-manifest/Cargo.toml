@@ -18,3 +18,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
 thiserror = "2.0"
+# Story 7.5a (NFR-Maint-9) — WARN-level degradation notes on the N-1 manifest
+# load path. `tracing 0.1` is already in the build graph (maos-skill,
+# maos-registry, maos-compliance); adds no new crate to the lock.
+tracing = "0.1"

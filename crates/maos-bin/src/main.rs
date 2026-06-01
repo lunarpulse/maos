@@ -803,6 +803,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
                 .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
 
+            // Story 7.5a — parse the `[class]` section so the ABI Stability
+            // Triple (min_substrate_version + manifest_schema_version) is
+            // enforced on the posture-shift admission path.
+            let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
+                &extract_section(&manifest_root, "class")?,
+            )?;
+
             let security =
                 maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy));
             let _spec = security.admit_spirit(
@@ -820,6 +827,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 None,
                 None,
                 None,
+                Some(&class_section),
             )?;
 
             // Perform the posture shift
@@ -3178,9 +3186,14 @@ description = "smoke test spirit successor"
             return smoke_skill_7_4().await;
         }
 
+        // Story 7.5a AC6 — smoke-abi-7-5a: ABI Stability Triple observability demo.
+        if mode == "smoke-abi-7-5a" {
+            return smoke_abi_7_5a().await;
+        }
+
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -3244,6 +3257,13 @@ description = "smoke test spirit successor"
             let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
                 &extract_section(&manifest_root, "output_shape")?,
             )?;
+            // Story 7.5a — parse the `[class]` section so the ABI Stability
+            // Triple is enforced on the hello-spirit admission path. The
+            // reference manifest declares manifest_schema_version = 1 (N-1) and
+            // min_substrate_version = "0.1.0-alpha" → admits with an N-1 WARN.
+            let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
+                &extract_section(&manifest_root, "class")?,
+            )?;
 
             // Open the Lifecycle Journal for admission (the Load event).
             let journal_path = maos_audit::default_journal_path();
@@ -3294,6 +3314,7 @@ description = "smoke test spirit successor"
                 None,
                 None,
                 None,
+                Some(&class_section),
             )?;
 
             // Drop the journal adapter (fsync + drain).
@@ -4994,6 +5015,187 @@ async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
 
     // Best-effort cleanup of the temp scratch.
     let _ = std::fs::remove_dir_all(&root);
+    Ok(())
+}
+
+/// Story 7.5a AC6 — `MAOS_ONE_SHOT=smoke-abi-7-5a`: the ABI Stability Triple
+/// observability demo (the Layer-1.5 bridge per `feedback_lunarpulse_observability_preference`).
+/// Five deterministic JSON lines, no network, <30s:
+///   1. admit a Spirit whose `min_substrate_version` is ABOVE the running kernel
+///      → refuse with typed `ESubstrateTooOld`;
+///   2. admit an N-1 manifest (`manifest_schema_version = MIN_SUPPORTED`) → admit
+///      with WARN-level degradation (`degraded: true`);
+///   3. admit an N-2 manifest (`manifest_schema_version < MIN_SUPPORTED`) → refuse
+///      with typed `EAbiTooOld`;
+///   4. assert the committed STABILITY.md carries the LIVE triple (in_sync);
+///   5. assert the BREAKING.md dated-entry gate passes.
+async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
+    use maos_domain::invariants::i9::SandboxTier;
+    use maos_kernel_core::capability::cap_policy::{
+        decision::TrustTier, PolicyTable, PolicyTableInner,
+    };
+    use maos_kernel_core::journal::JournalAdapter;
+    use maos_kernel_core::security::{
+        CapabilitiesRequired, ClassSection, EpistemicPolicySection, PostureSection,
+        ProviderCapabilities, ResourceCaps, SandboxConfig, SecurityError, SecurityManagerAdapter,
+    };
+
+    fn emit(v: serde_json::Value) {
+        println!("{v}");
+    }
+
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+    // Adapter with a Verified→T0 floor so the positive (N-1) case admits.
+    let policy = Arc::new(PolicyTable::new());
+    let mut inner = PolicyTableInner::default();
+    inner
+        .trust_tier_floor
+        .insert(TrustTier::Verified, SandboxTier::T0);
+    policy.update(inner);
+    let adapter = SecurityManagerAdapter::new(policy);
+
+    let journal_path =
+        std::env::temp_dir().join(format!("maos-smoke-abi-7-5a-{}.ndjson", std::process::id()));
+    let _ = std::fs::remove_file(&journal_path);
+    struct JournalGuard {
+        path: std::path::PathBuf,
+    }
+    impl Drop for JournalGuard {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+    let _guard = JournalGuard { path: journal_path.clone() };
+    let journal = JournalAdapter::open(&journal_path)?;
+
+    let kernel_version = env!("CARGO_PKG_VERSION");
+    let abi = maos_spirit_abi::ABI_VERSION;
+    let current_schema = maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
+    let min_supported = maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+
+    let class = |min_substrate: &str, schema: u32| ClassSection {
+        name: "smoke-abi".into(),
+        version: "0.1.0".into(),
+        abi: "1.0".into(),
+        manifest_schema_version: schema,
+        min_substrate_version: min_substrate.into(),
+        forms: vec!["rust-inproc".into()],
+        trust_tier: "local".into(),
+        description: "ABI stability smoke Spirit".into(),
+    };
+    let empty_caps = CapabilitiesRequired {
+        provider: ProviderCapabilities { complete: vec![] },
+        mcp: maos_kernel_core::security::manifest::McpCapabilities { servers: vec![] },
+    };
+    let posture =
+        PostureSection::from_toml_str("default = \"assistive\"\nallowed_max = \"assistive\"")?;
+    let epistemic = EpistemicPolicySection::default_open_fail();
+
+    let admit = |pid: u32, c: &ClassSection| -> Result<(), SecurityError> {
+        adapter
+            .admit_spirit(
+                pid,
+                "smoke-abi",
+                &SandboxConfig {
+                    tier: SandboxTier::T0,
+                    image_pin: None,
+                },
+                &ResourceCaps::default(),
+                &empty_caps,
+                None,
+                &journal,
+                &posture,
+                Some(&epistemic),
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(c),
+            )
+            .map(|_| ())
+    };
+
+    // ── Step 1 — min_substrate_version ABOVE kernel → ESubstrateTooOld ───────
+    let c1 = class("99.0.0", current_schema);
+    match admit(1, &c1) {
+        Err(SecurityError::ESubstrateTooOld { .. }) => {}
+        other => return Err(format!("step 1: expected ESubstrateTooOld, got {other:?}").into()),
+    }
+    emit(serde_json::json!({
+        "step": 1, "surface": "min_substrate_version", "outcome": "refuse",
+        "error": "ESubstrateTooOld", "declared": "99.0.0", "kernel": kernel_version
+    }));
+
+    // ── Step 2 — N-1 manifest → admit with degradation WARN ──────────────────
+    let c2 = class(kernel_version, min_supported);
+    admit(2, &c2).map_err(|e| format!("step 2: N-1 manifest must admit, got {e:?}"))?;
+    let degraded = min_supported < current_schema;
+    emit(serde_json::json!({
+        "step": 2, "surface": "manifest_n_minus_1", "outcome": "admit",
+        "schema": min_supported, "degraded": degraded
+    }));
+
+    // ── Step 3 — N-2 manifest (schema below MIN_SUPPORTED) → EAbiTooOld ───────
+    let c3 = class(kernel_version, min_supported.saturating_sub(1));
+    match admit(3, &c3) {
+        Err(SecurityError::EAbiTooOld { .. }) => {}
+        other => return Err(format!("step 3: expected EAbiTooOld, got {other:?}").into()),
+    }
+    emit(serde_json::json!({
+        "step": 3, "surface": "manifest_n_minus_2", "outcome": "refuse", "error": "EAbiTooOld"
+    }));
+
+    // ── Step 4 — STABILITY.md carries the LIVE triple (in_sync) ──────────────
+    let stability = std::fs::read_to_string("STABILITY.md")
+        .map_err(|e| format!("step 4: STABILITY.md not readable: {e}"))?;
+    let kernel_row = format!("| `kernel_version` | `{kernel_version}` |");
+    let abi_row = format!("| `abi_version` | `{abi}` |");
+    let schema_row = format!("| `manifest_schema_version` (current) | `{current_schema}` |");
+    if !(stability.contains(&kernel_row)
+        && stability.contains(&abi_row)
+        && stability.contains(&schema_row))
+    {
+        return Err("step 4: STABILITY.md does not carry the live triple — regenerate with `cargo run -p xtask -- stability-matrix`".into());
+    }
+    emit(serde_json::json!({
+        "step": 4, "surface": "stability_matrix", "outcome": "in_sync",
+        "kernel": kernel_version, "abi": abi, "manifest_schema": current_schema
+    }));
+
+    // ── Step 5 — BREAKING.md dated-entry gate passes ─────────────────────────
+    let breaking = std::fs::read_to_string("BREAKING.md")
+        .map_err(|e| format!("step 5: BREAKING.md not readable: {e}"))?;
+    let entries = breaking
+        .lines()
+        .filter(|l| {
+            l.strip_prefix("## ").map(str::trim).is_some_and(|d| {
+                let b = d.as_bytes();
+                b.len() >= 10
+                    && b[0].is_ascii_digit()
+                    && b[1].is_ascii_digit()
+                    && b[2].is_ascii_digit()
+                    && b[3].is_ascii_digit()
+                    && b[4] == b'-'
+                    && b[5].is_ascii_digit()
+                    && b[6].is_ascii_digit()
+                    && b[7] == b'-'
+                    && b[8].is_ascii_digit()
+                    && b[9].is_ascii_digit()
+            })
+        })
+        .count();
+    let has_migration = breaking
+        .lines()
+        .any(|l| l.trim_start().starts_with("**Migration:**"));
+    if entries == 0 || !has_migration {
+        return Err("step 5: BREAKING.md gate would fail (need ≥1 dated entry with a **Migration:** line)".into());
+    }
+    emit(serde_json::json!({
+        "step": 5, "surface": "breaking_md", "outcome": "pass", "entries": entries
+    }));
+
     Ok(())
 }
 

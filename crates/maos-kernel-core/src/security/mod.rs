@@ -74,6 +74,42 @@ pub enum SecurityError {
     PolicyLookup { spirit_pid: u32 },
     #[error("T3 admission failed: {0}")]
     T3AdmissionFailed(String),
+    // ----- Story 7.5a — ABI Stability Triple enforcement (additive; kernel-internal,
+    // NOT an ABI surface). The `E`-prefix follows the `CliWrapperAdmissionError`
+    // taxonomy. Raised at the TOP of `admit_spirit`, before any policy-table
+    // mutation — fail-loud before half-admitted state. -----
+    /// FR8 — the running kernel is older than the Spirit's declared
+    /// `min_substrate_version`. Raised whenever the kernel version
+    /// (`env!("CARGO_PKG_VERSION")`) does NOT satisfy `>={declared_min}`, OR the
+    /// declared minimum is unparseable (fail-loud, never a silent admit).
+    #[error("substrate too old: spirit '{spirit_id}' requires kernel >= {declared_min}, running kernel is {kernel_version}")]
+    ESubstrateTooOld {
+        spirit_id: String,
+        declared_min: String,
+        kernel_version: String,
+    },
+    /// N-2 manifest schema — `manifest_schema_version < MIN_SUPPORTED`. Promotes
+    /// the existing stringly below-window rejection (`manifest.rs`) to a typed
+    /// error at the admission chokepoint (`ManifestError` stays frozen).
+    #[error("manifest schema too old: declared schema {declared_schema} < min supported {min_supported} (N-2 hard refusal)")]
+    EAbiTooOld {
+        declared_schema: u32,
+        min_supported: u32,
+    },
+    /// Forward/future manifest schema — `manifest_schema_version > MAX_SUPPORTED`.
+    /// Fail-closed per the §LOCKED Design Decision (NO warn-and-ignore window):
+    /// a future Spirit is told it needs a newer kernel, never silently admitted.
+    #[error("manifest schema too new: declared schema {declared_schema} > max supported {max_supported} (kernel upgrade required)")]
+    EAbiTooNew {
+        declared_schema: u32,
+        max_supported: u32,
+    },
+    /// Belt-and-suspenders gate: `admit_spirit` received `class: None`. The
+    /// `[class]` section is required at parse time (`load_bundle_from_file`)
+    /// AND at admission — a Spirit reaching admission without a class section
+    /// indicates a malformed manifest or a code path circumventing the parser.
+    #[error("spirit '{spirit_id}' admitted without required [class] section — manifest is malformed or admission path bypassed parser")]
+    EClassRequired { spirit_id: String },
 }
 
 /// Adapter — implements `SecurityManagerPort` with sandbox tier
@@ -137,7 +173,79 @@ impl SecurityManagerAdapter {
          _on_crash: Option<&OnCrashSection>,
          _supervision: Option<&SupervisionSection>,
          providers: Option<&ProvidersSection>,
+          // Story 7.5a — the `[class]` section carries the ABI Stability Triple
+          // legs enforced at load: `min_substrate_version` (vs running kernel)
+          // and `manifest_schema_version` (vs the kernel's supported window).
+          // Required at parse time AND admission — None is rejected with
+          // EClassRequired (no silent bypass).
+          class: Option<&ClassSection>,
      ) -> Result<SandboxSpec, SecurityError> {
+        // ---- Story 7.5a (AC2) — ABI Stability Triple enforcement.
+        // Runs at the TOP of admit, BEFORE any policy-table mutation below, so a
+        // rejected Spirit leaves NO half-admitted state. Reuses the hand-rolled
+        // `maos_domain::revocation::semver_range_contains` comparator (no `semver`
+        // crate dep) and the `maos-spirit-abi` schema-window constants.
+        //
+        // Belt-and-suspenders: `[class]` is required at parse time
+        // (`load_bundle_from_file`), so production paths should never reach here
+        // with None. If they do, it's a malformed manifest or a code path
+        // circumventing the parser — reject loudly, never silently admit.
+        let class = class.ok_or_else(|| SecurityError::EClassRequired {
+            spirit_id: spirit_id.into(),
+        })?;
+
+        // Leg 1 — kernel_version vs declared min_substrate_version (FR8).
+        // env!("CARGO_PKG_VERSION") inside kernel-core IS the kernel leg
+        // (all crates share [workspace.package].version).
+        let kernel_version = env!("CARGO_PKG_VERSION");
+        let declared_min = class.min_substrate_version.clone();
+        // Fail-loud on BOTH "too old" (Ok(false)) and "unparseable" (Err):
+        // a version we cannot prove compatible is refused, never silently
+        // admitted. No `unwrap_or_default()` — a silent default here would
+        // admit a too-old kernel (a correctness/security bug).
+        let satisfies_min = maos_domain::revocation::semver_range_contains(
+            kernel_version,
+            &format!(">={declared_min}"),
+        )
+        .map_err(|_| SecurityError::ESubstrateTooOld {
+            spirit_id: spirit_id.into(),
+            declared_min: declared_min.clone(),
+            kernel_version: kernel_version.into(),
+        })?;
+        if !satisfies_min {
+            return Err(SecurityError::ESubstrateTooOld {
+                spirit_id: spirit_id.into(),
+                declared_min,
+                kernel_version: kernel_version.into(),
+            });
+        }
+
+        // Leg 2 — manifest_schema_version vs the kernel's supported window.
+        // Fail-closed in BOTH directions per the §LOCKED Design Decision:
+        // below MIN → EAbiTooOld (N-2 hard refusal); above MAX → EAbiTooNew
+        // (forward case; NO warn-and-ignore window). The manifest parser
+        // keeps its shape-only window check as defense-in-depth.
+        let declared_schema = class.manifest_schema_version;
+        let min_supported = maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+        let max_supported = maos_spirit_abi::MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+        if declared_schema < min_supported {
+            return Err(SecurityError::EAbiTooOld {
+                declared_schema,
+                min_supported,
+            });
+        }
+        if declared_schema > max_supported {
+            return Err(SecurityError::EAbiTooNew {
+                declared_schema,
+                max_supported,
+            });
+        }
+        // N-1 (declared < CURRENT but within window) — admit with documented
+        // WARN-level degradation paths (NFR-Maint-9). The WARN emission lives
+        // in maos-manifest so the same code path is exercised by the
+        // manifest N-1 field-coverage test (AC4).
+        let _degraded = maos_manifest::warn_n_minus_1_degradations(declared_schema);
+
         {
             let declared_scopes = capabilities_required_to_scopes(caps_required);
             let inner = self.policy.inner().load_full();

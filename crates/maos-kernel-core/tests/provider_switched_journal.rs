@@ -1,7 +1,7 @@
 use maos_kernel_core::security::manifest::{
-    CapabilitiesRequired, OnCrashSection, OnRevocationSection, OutputShape, PostureSection,
-    ProviderCapabilities, ProvidersSection, ResourceCaps, SandboxConfig, SchedulingSection,
-    SupervisionSection, LifecycleSection,
+    CapabilitiesRequired, ClassSection, OnCrashSection, OnRevocationSection, OutputShape,
+    PostureSection, ProviderCapabilities, ProvidersSection, ResourceCaps, SandboxConfig,
+    SchedulingSection, SupervisionSection, LifecycleSection,
 };
 use maos_kernel_core::security::SecurityManagerAdapter;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
@@ -79,6 +79,16 @@ fn admit_with_provider(
             None,
             None,
             providers,
+            Some(&ClassSection {
+                name: "test-spirit".into(),
+                version: "0.1.0".into(),
+                abi: "1.0".into(),
+                manifest_schema_version: maos_spirit_abi::MANIFEST_SCHEMA_VERSION,
+                min_substrate_version: "0.0.1".into(),
+                forms: vec!["rust-inproc".into()],
+                trust_tier: "local".into(),
+                description: "test".into(),
+            }),
         )
         .unwrap();
 }

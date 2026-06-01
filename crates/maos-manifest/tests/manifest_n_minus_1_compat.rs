@@ -15,7 +15,7 @@
 //! - A `[class]` section below `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` MUST
 //!   be rejected with the same error class.
 
-use maos_manifest::{ClassSection, ManifestError};
+use maos_manifest::{warn_n_minus_1_degradations, ClassSection, ManifestError};
 use maos_spirit_abi::{
     MANIFEST_SCHEMA_VERSION, MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION,
     MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION,
@@ -77,6 +77,51 @@ fn zero_schema_version_rejected() {
     assert!(
         matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.manifest_schema_version")),
         "expected class.manifest_schema_version validation error, got {err:?}",
+    );
+}
+
+#[test]
+fn n_minus_1_load_covers_every_class_field() {
+    // Story 7.5a (AC4) — V→V-1 field-by-field coverage. A manifest authored at
+    // the N-1 floor (`MIN_SUPPORTED`) with EVERY `[class]` field present loads
+    // and every field round-trips to its declared value. This is the NFR-Maint-9
+    // "manifest N-1 compatibility proven field-by-field" commitment in
+    // operational form (closing the ADR-025 NFR-coverage gap with a real V→V-1
+    // load rather than a constant-invariant placeholder).
+    let toml = class_toml_with_schema_version(MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION);
+    let c = ClassSection::from_toml_str(&toml)
+        .expect("N-1 field-complete manifest must load on the current kernel");
+    assert_eq!(c.name, "hello-spirit");
+    assert_eq!(c.version, "0.1.0");
+    assert_eq!(c.abi, "1.0");
+    assert_eq!(c.manifest_schema_version, MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION);
+    assert_eq!(c.min_substrate_version, "0.1.0-alpha");
+    assert_eq!(c.forms, vec!["rust-inproc".to_string()]);
+    assert_eq!(c.trust_tier, "local");
+    assert_eq!(c.description, "MAOS reference Spirit");
+}
+
+#[test]
+fn n_minus_1_emits_warn_degradation_per_post_v1_section() {
+    // Story 7.5a (AC4) — the documented WARN-level degradation paths. At the N-1
+    // floor the post-v1 sections ([[cli_wrapper]], [[schedule]], [gateway]) are
+    // absent and default via `#[serde(default)]`; `warn_n_minus_1_degradations`
+    // names each (one WARN per defaulted section). This is the SAME code the
+    // admission chokepoint calls, so the WARN path is exercised here and in prod.
+    let degraded = warn_n_minus_1_degradations(MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION);
+    if MANIFEST_SCHEMA_VERSION > MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION {
+        assert!(
+            !degraded.is_empty(),
+            "an N-1 manifest must report ≥1 defaulted post-v1 section"
+        );
+        assert!(degraded.contains(&"cli_wrapper"));
+        assert!(degraded.contains(&"schedule"));
+        assert!(degraded.contains(&"gateway"));
+    }
+    // The current schema degrades nothing — it is not N-1.
+    assert!(
+        warn_n_minus_1_degradations(MANIFEST_SCHEMA_VERSION).is_empty(),
+        "current schema must NOT report degradations"
     );
 }
 

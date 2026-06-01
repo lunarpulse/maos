@@ -22,4 +22,5 @@ pub use manifest::{
     OutputShapeViolation, Posture, PostureSection, ProviderCapabilities, ProviderConfig, ProvidersSection,
     ResolvedCaps, ResourceCaps, SandboxConfig, ScalarPredicate, ScheduleEntry, SchedulingSection,
     SchedulesSection, SupervisionSection, capabilities_required_to_scopes, resolve_caps,
+    warn_n_minus_1_degradations,
 };

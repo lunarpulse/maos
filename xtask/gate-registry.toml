@@ -38,4 +38,8 @@ gates = [
     "ccac-ship-gate",
     # Story 7.4 AC6 — maos.skill.v1 schema round-trip + deny_unknown_fields + semver posture.
     "check-skill-schema",
+    # Story 7.5a AC3 — STABILITY.md generated-from-workspace; --check fails on drift (NFR-Maint-4).
+    "stability-matrix",
+    # Story 7.5a AC3 — BREAKING.md dated-entry + Migration taxonomy CI-grep-enforced (NFR-Maint-7).
+    "breaking-md",
 ]

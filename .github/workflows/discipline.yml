@@ -980,6 +980,8 @@ jobs:
         run: cargo run -p xtask -- check-epic-6-bridge --story 7.3 --json
       - name: Run check-epic-6-bridge --story 7.4
         run: cargo run -p xtask -- check-epic-6-bridge --story 7.4 --json
+      - name: Run check-epic-6-bridge --story 7.5a
+        run: cargo run -p xtask -- check-epic-6-bridge --story 7.5a --json
 
   # Story 6.1 — retract corpus integration tests (AC2)
   retract-corpus-tests:
@@ -1445,9 +1447,59 @@ jobs:
       - name: Run check-skill-schema
         run: cargo run -p xtask -- check-skill-schema --json
 
+  # Story 7.5a AC6 — ABI Stability Triple observability smoke (5 deterministic JSON lines)
+  smoke-abi-7-5a:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo build -p maos-bin
+      - name: Run smoke-abi-7-5a and assert 5 JSON lines + exit 0
+        run: |
+          out="$(MAOS_ONE_SHOT=smoke-abi-7-5a cargo run -q -p maos-bin)"
+          echo "$out"
+          lines="$(printf '%s\n' "$out" | grep -c '"step"')"
+          test "$lines" -eq 5 || { echo "expected 5 JSON step lines, got $lines"; exit 1; }
+          printf '%s\n' "$out" | grep -q '"error":"ESubstrateTooOld"' || { echo "missing ESubstrateTooOld refusal"; exit 1; }
+          printf '%s\n' "$out" | grep -q '"error":"EAbiTooOld"' || { echo "missing EAbiTooOld refusal"; exit 1; }
+          printf '%s\n' "$out" | grep -q '"outcome":"in_sync"' || { echo "STABILITY.md not in sync"; exit 1; }
+
+  # Story 7.5a AC3 — STABILITY.md generated-from-workspace; --check fails on drift (NFR-Maint-4)
+  check-stability-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run stability-matrix --check
+        run: cargo run -p xtask -- stability-matrix --check --json
+
+  # Story 7.5a AC3 — BREAKING.md dated-entry + Migration taxonomy CI-grep-enforced (NFR-Maint-7)
+  check-breaking-md:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-breaking-md
+        run: cargo run -p xtask -- check-breaking-md --json
+
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md]
     if: always()
     permissions:
       pull-requests: write

@@ -214,6 +214,11 @@ impl SpiritSchedulerAdapter {
                     manifest.on_crash.as_ref(),
                     manifest.supervision.as_ref(),
                     None,
+                    // Story 7.5a — ABI Stability Triple enforcement at admit.
+                    // The bundle already carries the parsed `[class]` section
+                    // (control_block.rs); thread it so min_substrate_version +
+                    // manifest_schema_version are enforced on this load path.
+                    manifest.class.as_ref(),
                 )
                 .map_err(|e| LifecycleError::Admission(e.to_string()))?;
         } else {

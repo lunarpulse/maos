@@ -15,7 +15,7 @@ The manifest is a TOML file declaring everything the kernel needs to load, sandb
 name = "code-reviewer-pro"
 version = "1.2.0"
 abi = "1.0"
-manifest_schema_version = 1
+manifest_schema_version = 2
 min_substrate_version = "1.0.0"     # kernel rejects load if its own version is below this
 forms = ["subprocess"]               # which Spirit forms this class ships in: rust-inproc | subprocess
 trust_tier = "public-untrusted"      # local | org-internal | public-untrusted
@@ -113,6 +113,8 @@ homepage = "https://github.com/diego/code-reviewer-pro"
 ```
 
 The schema is versioned (`manifest_schema_version`) independently of the kernel and ABI; the kernel ships a compatibility matrix in `STABILITY.md`.
+
+> **v1.0 binding — ABI Stability Triple enforcement (Story 7.5a):** The triple `(kernel_version, abi_version, manifest_schema_version)` is now an ENFORCED load-time contract at the admission chokepoint `SecurityManagerAdapter::admit_spirit`, not a parsed-but-ignored declaration. (1) `min_substrate_version` is COMPARED against the running kernel (`env!("CARGO_PKG_VERSION")`, reusing `maos_domain::revocation::semver_range_contains` — no new `semver` dep); a too-old kernel is refused with typed `SecurityError::ESubstrateTooOld` (FR8). (2) The `manifest_schema_version` window is **fail-closed in BOTH directions**: below `MIN_SUPPORTED` → typed `EAbiTooOld` (N-2 hard refusal); above `MAX_SUPPORTED` → typed `EAbiTooNew` (a future Spirit is told to upgrade the kernel — NO warn-and-ignore window, because a manifest is a security artifact and a silent ignore is fail-open). N-1 (`= MIN_SUPPORTED`) loads with WARN-level degradation notes (NFR-Maint-9). (3) `STABILITY.md` (generated from workspace state) and `BREAKING.md` (CI-grep-enforced dated entries) are published; the deprecation rail (NFR-Maint-3/5) cross-checks `#[maos_attrs::deprecated_since]` surfaces ↔ STABILITY.md ↔ BREAKING.md (vacuous at v1.0's zero deprecations). LTS is **1 year at v1.0** (NFR-Maint-6; 2-year deferred to v1.5). Constants unchanged (`ABI_VERSION = 1`, `MANIFEST_SCHEMA_VERSION = 2`); the new `SecurityError` variants are kernel-internal (additive, not ABI surface).
 
 ## 5.2 Spirit Wire Protocol (subprocess form)
 

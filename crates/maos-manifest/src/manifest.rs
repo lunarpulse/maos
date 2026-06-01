@@ -197,6 +197,42 @@ impl ClassSection {
     }
 }
 
+/// Schema sections added AFTER `manifest_schema_version = 1` (Epic 6 §A4 bump,
+/// retro 2026-05-28): `[[cli_wrapper]]`, `[[schedule]]`, `[gateway]`. A manifest
+/// authored at the N-1 floor omits these; they default via `#[serde(default)]`.
+const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway"];
+
+/// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
+/// newer-than-declared schema section that an N-1 manifest omits (and thus
+/// defaults). Returns the list of degraded section names (empty when the
+/// declared schema is current/ahead — nothing degrades).
+///
+/// This is the kernel's "documented degradation paths emitted to tracing at
+/// WARN" commitment in operational form: the operator sees, per defaulted
+/// section, exactly which newer surface the V-1 manifest predates. Called from
+/// the admission chokepoint (`SecurityManagerAdapter::admit_spirit`) AND
+/// exercised directly by the manifest N-1 field-coverage test, so the WARN
+/// path is the SAME code in production and test.
+///
+/// Fail-closed boundaries (`< MIN_SUPPORTED` / `> MAX_SUPPORTED`) are NOT this
+/// function's concern — they are rejected with typed `EAbiTooOld`/`EAbiTooNew`
+/// before this is reached. This only handles the *supported* N-1 degradation.
+pub fn warn_n_minus_1_degradations(declared_schema: u32) -> Vec<&'static str> {
+    if declared_schema >= maos_spirit_abi::MANIFEST_SCHEMA_VERSION {
+        return Vec::new();
+    }
+    for section in POST_V1_SCHEMA_SECTIONS {
+        tracing::warn!(
+            declared_schema,
+            current_schema = maos_spirit_abi::MANIFEST_SCHEMA_VERSION,
+            section = *section,
+            "manifest N-1 degradation: section '[{section}]' absent in V-{} manifest — defaulted via serde(default)",
+            maos_spirit_abi::MANIFEST_SCHEMA_VERSION - declared_schema,
+        );
+    }
+    POST_V1_SCHEMA_SECTIONS.to_vec()
+}
+
 #[maos_attrs::i9_exempt(
     reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
 )]
@@ -270,7 +306,10 @@ impl RawClassSection {
                 ),
             )));
         }
-        // min_substrate_version: best-effort semver-ish (allow pre-release suffix).
+        // min_substrate_version: semver with numeric parts (allow pre-release suffix).
+        // Each dot-separated segment (before any '-' pre-release) must start with
+        // an ASCII digit — rejects wildcards like "*.*.*" that would bypass the
+        // substrate version gate via lexicographic comparison.
         let prefix = self
             .min_substrate_version
             .split('-')
@@ -281,6 +320,17 @@ impl RawClassSection {
                 "class.min_substrate_version",
                 &format!("not semver: {}", self.min_substrate_version),
             )));
+        }
+        for segment in prefix.split('.') {
+            if segment.is_empty() || !segment.bytes().next().map_or(false, |b| b.is_ascii_digit()) {
+                return Err(ManifestError::Toml(validation_msg(
+                    "class.min_substrate_version",
+                    &format!(
+                        "non-numeric segment '{}' in {}",
+                        segment, self.min_substrate_version
+                    ),
+                )));
+            }
         }
         // forms: non-empty + every value ∈ {rust-inproc, subprocess}.
         if self.forms.is_empty() {

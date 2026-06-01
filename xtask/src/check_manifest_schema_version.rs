@@ -35,7 +35,10 @@ use std::path::Path;
 const SPIRIT_ABI_LIB: &str = "crates/maos-spirit-abi/src/lib.rs";
 const MANIFEST_VALIDATION: &str = "crates/maos-manifest/src/manifest.rs";
 
-fn parse_const(source: &str, name: &str) -> Option<u32> {
+/// Parse `pub const NAME: u32 = N;` (or an alias to another such const) from a
+/// Rust source string. Reused by `stability_matrix` (Story 7.5a) to source the
+/// ABI Stability Triple legs from the single authoritative constants file.
+pub fn parse_const(source: &str, name: &str) -> Option<u32> {
     for line in source.lines() {
         let trimmed = line.trim_start();
         let prefix = format!("pub const {name}: u32 = ");
@@ -80,25 +83,16 @@ fn scan_hardcoded_comparisons(path: &Path) -> Vec<(usize, String)> {
             break;
         }
         let trimmed = raw_line.trim_start();
-        // Skip comments + doc lines + empty.
         if trimmed.is_empty() || trimmed.starts_with("//") || trimmed.starts_with("/*") {
             continue;
         }
-        // Skip lines that reference the canonical constant — those are the
-        // approved pattern.
         if trimmed.contains("MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION")
             || trimmed.contains("MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION")
         {
             continue;
         }
-        // Look for `manifest_schema_version <OP> <number>` where OP is a
-        // comparison operator. String literals inside TOML test fixtures
-        // include this pattern legitimately (`manifest_schema_version = 1`),
-        // so we require an actual comparison operator (`==`, `!=`, `<`, `>`,
-        // `<=`, `>=`) before the numeric literal.
         if let Some(idx) = trimmed.find("manifest_schema_version") {
             let after = &trimmed[idx + "manifest_schema_version".len()..];
-            // Strip whitespace, then check if next chars form a comparison op.
             let after = after.trim_start();
             let is_cmp = after.starts_with("==")
                 || after.starts_with("!=")
@@ -109,15 +103,35 @@ fn scan_hardcoded_comparisons(path: &Path) -> Vec<(usize, String)> {
             if !is_cmp {
                 continue;
             }
-            // Strip the operator and any whitespace.
             let after_op = after.trim_start_matches(['=', '!', '<', '>']).trim_start();
-            // If the next chars are a digit, it's a hardcoded magic number.
             if after_op.chars().next().is_some_and(|c| c.is_ascii_digit()) {
                 violations.push((i + 1, raw_line.trim().to_string()));
             }
         }
     }
     violations
+}
+
+/// Parse the `POST_V1_SCHEMA_SECTIONS: &[&str] = &["a", "b", ...];` constant
+/// from manifest.rs, returning the list of section name strings.
+fn parse_post_v1_sections(source: &str) -> Option<Vec<String>> {
+    let line = source.lines().find(|l| {
+        l.contains("POST_V1_SCHEMA_SECTIONS")
+            && l.contains("&[")
+            && l.contains("]")
+    })?;
+    let eq_idx = line.find("= &[")? + 4;
+    let end = line.rfind("]")?;
+    let inner = &line[eq_idx..end];
+    let entries = inner
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            s.strip_prefix('"').and_then(|s| s.strip_suffix('"'))
+                .map(String::from)
+        })
+        .collect::<Vec<_>>();
+    Some(entries)
 }
 
 pub fn run(json: bool) -> Result<(), String> {
@@ -165,6 +179,41 @@ pub fn run(json: bool) -> Result<(), String> {
         violations.push(format!(
             "{MANIFEST_VALIDATION}:{line_no}: hardcoded manifest_schema_version comparison — use maos_spirit_abi::{{MIN,MAX}}_SUPPORTED_MANIFEST_SCHEMA_VERSION: `{snippet}`"
         ));
+    }
+
+    // Step 5 — POST_V1_SCHEMA_SECTIONS constant in manifest.rs stays in sync.
+    // When MANIFEST_SCHEMA_VERSION is bumped, this constant must be updated to
+    // include the new post-v1 sections. Each entry must appear as a parseable
+    // section key in the manifest parser.
+    if current >= 2 {
+        let manifest_src = fs::read_to_string(MANIFEST_VALIDATION)
+            .map_err(|e| format!("read {MANIFEST_VALIDATION}: {e}"))?;
+        let post_v1_entries = parse_post_v1_sections(&manifest_src);
+        match post_v1_entries {
+            None => {
+                violations.push(format!(
+                    "{MANIFEST_VALIDATION}: POST_V1_SCHEMA_SECTIONS constant not found or empty — \
+                     must list sections added after schema v1 for N-1 WARN degradation"
+                ));
+            }
+            Some(entries) if entries.is_empty() => {
+                violations.push(format!(
+                    "{MANIFEST_VALIDATION}: POST_V1_SCHEMA_SECTIONS is empty but MANIFEST_SCHEMA_VERSION={current} >= 2 — \
+                     every section added after schema v1 must be listed"
+                ));
+            }
+            Some(entries) => {
+                for section in &entries {
+                    let section_key = format!("\"{section}\"");
+                    if !manifest_src.contains(&section_key) {
+                        violations.push(format!(
+                            "{MANIFEST_VALIDATION}: POST_V1_SCHEMA_SECTIONS entry '{section}' \
+                             not found as a string literal in manifest.rs — stale or phantom entry"
+                        ));
+                    }
+                }
+            }
+        }
     }
 
     if json {
@@ -279,5 +328,25 @@ fn validate(v: u32) {
         let f = tmp(src);
         let v = scan_hardcoded_comparisons(f.path());
         assert!(v.is_empty(), "expected zero, got: {v:?}");
+    }
+
+    #[test]
+    fn parse_post_v1_sections_extracts_entries() {
+        let src = r#"const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway"];"#;
+        let entries = parse_post_v1_sections(src).unwrap();
+        assert_eq!(entries, vec!["cli_wrapper", "schedule", "gateway"]);
+    }
+
+    #[test]
+    fn parse_post_v1_sections_returns_empty_vec() {
+        let src = r#"const POST_V1_SCHEMA_SECTIONS: &[&str] = &[];"#;
+        let entries = parse_post_v1_sections(src).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn parse_post_v1_sections_returns_none_on_missing() {
+        let src = "no such constant here";
+        assert!(parse_post_v1_sections(src).is_none());
     }
 }

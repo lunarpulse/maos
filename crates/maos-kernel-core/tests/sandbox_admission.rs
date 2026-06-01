@@ -10,9 +10,22 @@ use maos_kernel_core::capability::cap_policy::{
 use maos_kernel_core::capability::cap_tokens;
 use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::security::{
-    CapabilitiesRequired, EpistemicPolicySection, OutputShape, PostureSection, ResourceCaps,
-    SandboxConfig, SecurityError, SecurityManagerAdapter,
+    CapabilitiesRequired, ClassSection, EpistemicPolicySection, OutputShape, PostureSection,
+    ResourceCaps, SandboxConfig, SecurityError, SecurityManagerAdapter,
 };
+
+fn test_class() -> ClassSection {
+    ClassSection {
+        name: "test-spirit".into(),
+        version: "0.1.0".into(),
+        abi: "1.0".into(),
+        manifest_schema_version: maos_spirit_abi::MANIFEST_SCHEMA_VERSION,
+        min_substrate_version: "0.0.1".into(),
+        forms: vec!["rust-inproc".into()],
+        trust_tier: "local".into(),
+        description: "test".into(),
+    }
+}
 
 fn make_adapter_with_trust_floors() -> (SecurityManagerAdapter, JournalAdapter, tempfile::TempDir) {
     cap_tokens::init_monotonic_base();
@@ -102,6 +115,7 @@ fn strictest_of_manifest_trust_operator() {
             None,
             None,
             None,
+            Some(&test_class()), // Story 7.5a — class required at admit (EClassRequired)
         )
         .unwrap();
 
@@ -151,6 +165,7 @@ fn t3_effective_tier_admitted() {
             None,
             None,
             None,
+            Some(&test_class()), // Story 7.5a — class required at admit (EClassRequired)
         )
         .unwrap();
 
@@ -200,6 +215,7 @@ fn t4_effective_tier_rejected() {
             None,
             None,
             None,
+            Some(&test_class()), // Story 7.5a — class required at admit (EClassRequired)
         )
         .unwrap_err();
 
@@ -247,6 +263,7 @@ fn t1_effective_tier_rejected() {
             None,
             None,
             None,
+            Some(&test_class()), // Story 7.5a — class required at admit (EClassRequired)
         )
         .unwrap_err();
 
@@ -290,6 +307,7 @@ fn effective_tier_is_journaled() {
             None,
             None,
             None,
+            Some(&test_class()), // Story 7.5a — class required at admit (EClassRequired)
         )
         .unwrap();
 

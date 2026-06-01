@@ -61,8 +61,10 @@ fn check(cargo_toml_path: &str, kernel_design_path: &str) -> Result<Report, Stri
     })
 }
 
-/// Count `[workspace] members` array entries in `Cargo.toml`.
-fn count_cargo_toml_members(path: &Path) -> Result<usize, String> {
+/// Count `[workspace] members` array entries in `Cargo.toml`. Reused by
+/// `stability_matrix` (Story 7.5a) so the published matrix sources the crate
+/// count from the same authoritative place this gate does.
+pub fn count_cargo_toml_members(path: &Path) -> Result<usize, String> {
     let src =
         fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     let root: toml::Value =

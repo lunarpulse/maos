@@ -1,4 +1,4 @@
-last_updated: '2026-05-31T00:00:00Z+7-4-done'
+last_updated: '2026-05-31T00:00:00Z+7-5a-review-done'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -73,7 +73,7 @@ development_status:
   7-2-ship-end-to-end-registry-publish-install-yank-and-air-gapped-import: done
   7-3-verify-complianceclaim-envelopes-at-admission-with-the-ccac-n-600-ship-gate: done
   7-4-author-skills-and-propose-revisions-with-output-shape-fail-loud: done
-  7-5a-publish-and-enforce-v1-0-abi-stability-commitments: backlog
+  7-5a-publish-and-enforce-v1-0-abi-stability-commitments: done
   7-5b-execute-nfr-onb-1-30-minute-first-spirit-validation-gate-at-v0-3: backlog
   epic-7-retrospective: optional
   epic-8: backlog

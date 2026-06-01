@@ -6,13 +6,13 @@ mod abi_diff;
 mod calibrate;
 mod check_adr_040_accepted;
 mod check_bare_review_findings;
+mod check_breaking_md;
 mod check_composition_root_completeness;
 mod check_corpus;
 mod check_deprecations_declared;
 mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
 mod check_empty_kernel;
-mod check_skill_schema;
 mod check_epic_6_bridge;
 mod check_fr47;
 mod check_judge_config;
@@ -25,6 +25,7 @@ mod check_review_findings_resolved;
 mod check_security_md;
 mod check_serde_error_handling;
 mod check_service_boundary;
+mod check_skill_schema;
 mod check_unsafe;
 mod check_workspace_count;
 mod corpus_staleness;
@@ -38,6 +39,7 @@ mod gen_termination_corpus;
 mod invariant_lock;
 mod kloc_check;
 mod rebaseline_check;
+mod stability_matrix;
 mod templates_regen;
 
 #[derive(Parser)]
@@ -422,6 +424,21 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 7.5a — generate (or `--check`) repo-root STABILITY.md from live
+    /// workspace state (ABI Stability Triple + LTS + compliance/export STUBs).
+    #[command(name = "stability-matrix")]
+    StabilityMatrix {
+        #[arg(long)]
+        check: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 7.5a — enforce BREAKING.md dated-entry taxonomy (NFR-Maint-7).
+    #[command(name = "check-breaking-md")]
+    CheckBreakingMd {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -658,6 +675,11 @@ fn main() {
         Commands::CheckBareReviewFindings { json } => check_bare_review_findings::run(json),
         Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
+        Commands::StabilityMatrix { check, json } => {
+            let workspace_root = std::env::current_dir().expect("failed to get current dir");
+            stability_matrix::run(&workspace_root, check, json)
+        }
+        Commands::CheckBreakingMd { json } => check_breaking_md::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

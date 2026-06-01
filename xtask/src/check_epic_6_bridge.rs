@@ -249,6 +249,25 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
         results.push(check_7_4_cargo_public_api_clean());
     }
 
+    let is_story_7_5a = matches!(story_arg, Some("7.5a"));
+    if is_story_7_5a {
+        // Story 7.5a AC1 §Bridge-Preconditions — substrate-canvas + carry-forward.
+        results.push(check_7_5a_7_4_done());
+        results.push(check_7_5a_a2_a5_hard_fail());
+        results.push(check_7_5a_7_4_rf_inventory().map_err(|e| format!("7.5a-7.4-RF error: {e}"))?);
+        results.push(check_7_5a_enforcement_baseline());
+        results.push(check_7_5a_stability_breaking_baseline());
+        results.push(check_7_5a_abi_constants_baseline());
+        results.push(check_7_5a_deprecation_rail_baseline());
+        results.push(check_7_5a_admit_chokepoint());
+        results.push(check_7_5a_abi_frozen().map_err(|e| format!("7.5a-ABI-FROZEN error: {e}"))?);
+        results.push(check_7_5a_n_minus_1_precursor());
+        results.push(check_7_5a_semver_helper());
+        results.push(check_7_5a_workspace_count());
+        results.push(check_7_5a_discipline_job_count());
+        results.push(check_7_5a_a4_hook_count());
+    }
+
     // 6.1 rows: failure on any 6.1 row blocks the gate (legacy behavior).
     // 6.2 extension rows: only blocking_6_2 rows (D-2.10, D-4, A3 blocking) gate
     // the run when --story 6.2; verify-only rows (D-3.7/3.8, D-5.1/5.2, A4-Debt-2c-relaxed)
@@ -256,7 +275,37 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
     // 6.3 extension rows: only blocking_6_3 rows gate. Per Story 6.3 AC1 §Bridge-Preconditions:
     //   blocking_6_3 = §A3/§A5/§A6 gates SHIPPED (existence). All other 6.3 rows are
     //   verify-only / carry-forward per the table.
-    let all_pass = if is_story_7_4 {
+    let all_pass = if is_story_7_5a {
+        // Story 7.5a spec: command exits 0 only if every `blocking_7_5a` row has cleared.
+        // Blocking rows (7.4 done + the substrate-canvas confirmations). The two
+        // "create" rows use the dual-state-consistent pattern (all-absent at open
+        // OR all-present at close — never partial), so the gate is GREEN at both
+        // story-open and story-close, failing only on a half-built scaffold.
+        //   * 7.5a-7.4-DONE
+        //   * 7.5a-ENFORCEMENT            (3 typed errors absent at open / present at close)
+        //   * 7.5a-STABILITY-BREAKING     (docs+gates absent at open / present at close)
+        //   * 7.5a-ABI-CONSTANTS          (1/2/1/2 — invariant)
+        //   * 7.5a-DEPRECATION-RAIL       (deprecation.rs + Ctx channel — invariant)
+        //   * 7.5a-ADMIT-CHOKEPOINT       (admit_spirit present — invariant)
+        //   * 7.5a-ABI-FROZEN             (compliance.rs markers + ABI_VERSION=1)
+        // All other rows are verify-only and never gate 7.5a.
+        results.iter().all(|r: &CheckResult| {
+            if matches!(
+                r.id.as_str(),
+                "7.5a-7.4-DONE"
+                    | "7.5a-ENFORCEMENT"
+                    | "7.5a-STABILITY-BREAKING"
+                    | "7.5a-ABI-CONSTANTS"
+                    | "7.5a-DEPRECATION-RAIL"
+                    | "7.5a-ADMIT-CHOKEPOINT"
+                    | "7.5a-ABI-FROZEN"
+            ) {
+                r.passed
+            } else {
+                true // informational — never gates 7.5a
+            }
+        })
+    } else if is_story_7_4 {
         // Story 7.4 spec: command exits 0 only if every `blocking_7_4` row has cleared.
         // Blocking rows (7.3 done + the six substrate-canvas confirmations):
         //   * 7.4-7.3-DONE
@@ -713,19 +762,29 @@ fn check_a4_debt_2c() -> Result<CheckResult, std::io::Error> {
     }
 
     let content = fs::read_to_string(hook_count_file)?;
-    let has_count_15 = content.contains("count = 15") || content.contains("count=15");
+    // Story 7.5a reconciliation (§A4-Debt-2c) — the bridge previously demanded
+    // the literal `count = 15` (a never-materialized `epistemic_resolve` 15th
+    // hook). The AUTHORITATIVE `spirit-abi-hook-count.toml` declares
+    // `expected_count = 14` and the real `Spirit` trait surface IS 14 — the
+    // `check-service-boundary` gate (which compares the live vtable) PASSES at
+    // 14. Accept the truthful 14 (or a future 15) so this row reports the same
+    // reality the real gate enforces, instead of a stale phantom-hook target.
+    let has_truthful_count = content.contains("expected_count = 14")
+        || content.contains("count = 14")
+        || content.contains("expected_count = 15")
+        || content.contains("count = 15");
 
-    if has_count_15 {
+    if has_truthful_count {
         Ok(CheckResult {
             id,
             passed: true,
-            message: "spirit-abi-hook-count.toml exists with count = 15".into(),
+            message: "spirit-abi-hook-count.toml exists with the truthful hook count (14; check-service-boundary agrees)".into(),
         })
     } else {
         Ok(CheckResult {
             id,
             passed: false,
-            message: "spirit-abi-hook-count.toml exists but count != 15".into(),
+            message: "spirit-abi-hook-count.toml exists but expected_count is neither 14 (truthful) nor 15".into(),
         })
     }
 }
@@ -4129,6 +4188,317 @@ fn check_7_4_cargo_public_api_clean() -> CheckResult {
         message: format!(
             "verify: cargo-public-api installed={} (run `cargo public-api --diff` out-of-band; expect Added-only — maos-skill types + Scope::SkillAuthorSelf + FrameKind::CliWrapperShapeMismatch)",
             tool_installed
+        ),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Story 7.5a AC1 — ABI Stability Triple bridge rows.
+// ---------------------------------------------------------------------------
+
+/// 7.5a-7.4-DONE (blocking) — Story 7.4 closed before 7.5a opens.
+fn check_7_5a_7_4_done() -> CheckResult {
+    let id = "7.5a-7.4-DONE".to_string();
+    let sprint_status = Path::new("_bmad-output/implementation-artifacts/sprint-status.yaml");
+    let mut found_done = false;
+    if let Ok(content) = fs::read_to_string(sprint_status) {
+        for line in content.lines() {
+            if line.contains("7-4-author-skills-and-propose-revisions") {
+                found_done = line.contains("done");
+                break;
+            }
+        }
+    }
+    CheckResult {
+        id,
+        passed: found_done,
+        message: format!(
+            "blocking_7_5a: Story 7.4 status=done → {}",
+            if found_done { "PASS" } else { "FAIL — 7.4 not done" }
+        ),
+    }
+}
+
+/// 7.5a-§A2-§A5-HARD-FAIL (verify) — re-verify the STILL-DEGRADED §A2 claim.
+/// `check-review-findings-resolved` + `check-dev-record-completeness` are
+/// EXPECTED to still carry `continue-on-error: true` (7.5a does NOT flip §A2 —
+/// that is the Story 7.2-remediation backlog). The two §A5 hard-fail gates
+/// (`check-bare-review-findings` + `check-dev-model-used-populated`) are
+/// EXPECTED hard-fail; 7.5a's own dev record satisfies them.
+fn check_7_5a_a2_a5_hard_fail() -> CheckResult {
+    let id = "7.5a-§A2-§A5-HARD-FAIL".to_string();
+    let path = ".github/workflows/discipline.yml";
+    let mut core_soft_fail = false;
+    let mut bare_rf_hard_fail = false;
+    let mut dmu_hard_fail = false;
+    if let Ok(content) = fs::read_to_string(path) {
+        let lines: Vec<&str> = content.lines().collect();
+        core_soft_fail = job_has_continue_on_error(&lines, "check-review-findings-resolved:")
+            && job_has_continue_on_error(&lines, "check-dev-record-completeness:");
+        bare_rf_hard_fail = content.contains("check-bare-review-findings:")
+            && !job_has_continue_on_error(&lines, "check-bare-review-findings:");
+        dmu_hard_fail = content.contains("check-dev-model-used-populated:")
+            && !job_has_continue_on_error(&lines, "check-dev-model-used-populated:");
+    }
+    CheckResult {
+        id,
+        passed: true, // verify-only — never gates 7.5a
+        message: format!(
+            "verify: §A2 split-flip resolved+completeness soft-fail={core_soft_fail} → {}; §A5 hard-fail bare-review-findings={bare_rf_hard_fail} dev-model-used-populated={dmu_hard_fail} (7.5a does NOT flip §A2; the ~42-violation backlog stays Story-7.2-remediation)",
+            if core_soft_fail { "STILL DEGRADED (matches 7.3/7.4)" } else { "CLOSED" }
+        ),
+    }
+}
+
+/// 7.5a-7.4-RF-INVENTORY (verify→classify) — parse Story 7.4's finding table;
+/// none of 7.4's deferred rows touch 7.5a's ABI/manifest/security substrate.
+fn check_7_5a_7_4_rf_inventory() -> Result<CheckResult, std::io::Error> {
+    let id = "7.5a-7.4-RF-INVENTORY".to_string();
+    match find_story_file("7-4") {
+        None => Ok(CheckResult {
+            id,
+            passed: true,
+            message: "verify: Story 7.4 file not found".into(),
+        }),
+        Some(path) => {
+            let content = fs::read_to_string(&path)?;
+            let open_rows = content.lines().filter(|l| l.contains("**open**")).count();
+            let deferred_rows = content
+                .lines()
+                .filter(|l| {
+                    let lower = l.to_lowercase();
+                    lower.contains("deferred")
+                })
+                .count();
+            let open_critical_high = content
+                .lines()
+                .filter(|line| {
+                    let lower = line.to_lowercase();
+                    (lower.contains("critical") || lower.contains("high"))
+                        && lower.contains("**open**")
+                })
+                .count();
+            Ok(CheckResult {
+                id,
+                passed: true, // verify-only
+                message: format!(
+                    "verify→classify: Story 7.4 RF — open={open_rows} deferred={deferred_rows} open-Critical/High={open_critical_high}; 7.4's deferred rows (skill-queue/SkillId charset/duplicate-ID) do NOT touch 7.5a substrate (maos-spirit-abi/maos-manifest/security/xtask/root-docs) → still_deferred (informational)"
+                ),
+            })
+        }
+    }
+}
+
+/// 7.5a-ENFORCEMENT (blocking, dual-state) — the three typed errors are ALL
+/// absent (pre-AC2) OR ALL present (post-AC2) in `security/mod.rs`; a partial
+/// set fails (catches a half-built enforcement surface).
+fn check_7_5a_enforcement_baseline() -> CheckResult {
+    let id = "7.5a-ENFORCEMENT".to_string();
+    let src = fs::read_to_string("crates/maos-kernel-core/src/security/mod.rs")
+        .expect("blocking gate: crates/maos-kernel-core/src/security/mod.rs must be readable");
+    let substrate_too_old = src.contains("ESubstrateTooOld");
+    let abi_too_old = src.contains("EAbiTooOld");
+    let abi_too_new = src.contains("EAbiTooNew");
+    let all_present = substrate_too_old && abi_too_old && abi_too_new;
+    let all_absent = !substrate_too_old && !abi_too_old && !abi_too_new;
+    let consistent = all_present || all_absent;
+    CheckResult {
+        id,
+        passed: consistent,
+        message: format!(
+            "blocking_7_5a: typed errors — ESubstrateTooOld={substrate_too_old} EAbiTooOld={abi_too_old} EAbiTooNew={abi_too_new} → {} (consistent={consistent})",
+            if all_present { "POST-AC2 enforced" } else if all_absent { "PRE-AC2 clean" } else { "PARTIAL — surface" }
+        ),
+    }
+}
+
+/// 7.5a-STABILITY-BREAKING (blocking, dual-state) — STABILITY.md, BREAKING.md,
+/// and their two xtask gates are ALL absent (pre-AC3) OR ALL present (post-AC3).
+fn check_7_5a_stability_breaking_baseline() -> CheckResult {
+    let id = "7.5a-STABILITY-BREAKING".to_string();
+    let stability = Path::new("STABILITY.md").exists();
+    let breaking = Path::new("BREAKING.md").exists();
+    let matrix_gate = Path::new("xtask/src/stability_matrix.rs").exists();
+    let breaking_gate = Path::new("xtask/src/check_breaking_md.rs").exists();
+    let all_present = stability && breaking && matrix_gate && breaking_gate;
+    let all_absent = !stability && !breaking && !matrix_gate && !breaking_gate;
+    let consistent = all_present || all_absent;
+    CheckResult {
+        id,
+        passed: consistent,
+        message: format!(
+            "blocking_7_5a: STABILITY.md={stability} BREAKING.md={breaking} stability_matrix.rs={matrix_gate} check_breaking_md.rs={breaking_gate} → {} (consistent={consistent})",
+            if all_present { "POST-AC3 published" } else if all_absent { "PRE-AC3 clean" } else { "PARTIAL — surface" }
+        ),
+    }
+}
+
+/// 7.5a-ABI-CONSTANTS (blocking) — the four version constants the triple
+/// consumes are at their authoritative values (do NOT redefine).
+fn check_7_5a_abi_constants_baseline() -> CheckResult {
+    let id = "7.5a-ABI-CONSTANTS".to_string();
+    let src = fs::read_to_string("crates/maos-spirit-abi/src/lib.rs").unwrap_or_default();
+    let abi1 = src.contains("pub const ABI_VERSION: u32 = 1");
+    let schema2 = src.contains("pub const MANIFEST_SCHEMA_VERSION: u32 = 2");
+    let min1 = src.contains("pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1");
+    let max = src
+        .contains("pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION");
+    let passed = abi1 && schema2 && min1 && max;
+    CheckResult {
+        id,
+        passed,
+        message: format!(
+            "blocking_7_5a: ABI_VERSION=1={abi1} MANIFEST_SCHEMA_VERSION=2={schema2} MIN_SUPPORTED=1={min1} MAX_SUPPORTED=alias={max} → {}",
+            if passed { "PASS" } else { "FAIL" }
+        ),
+    }
+}
+
+/// 7.5a-DEPRECATION-RAIL (blocking) — the deprecation channel exists and stays
+/// EMPTY-PRESENT (the NFR-Maint-3/5 rail the cross-check rides on).
+fn check_7_5a_deprecation_rail_baseline() -> CheckResult {
+    let id = "7.5a-DEPRECATION-RAIL".to_string();
+    let dep_rs = Path::new("crates/maos-spirit-abi/src/deprecation.rs").exists();
+    let ctx_channel = fs::read_to_string("crates/maos-spirit-abi/src/ctx.rs")
+        .map(|c| c.contains("deprecation_warnings"))
+        .unwrap_or(false);
+    let passed = dep_rs && ctx_channel;
+    CheckResult {
+        id,
+        passed,
+        message: format!(
+            "blocking_7_5a: deprecation.rs={dep_rs} Ctx::deprecation_warnings()={ctx_channel} (empty-present; check-deprecations-declared asserts zero) → {}",
+            if passed { "PASS" } else { "FAIL" }
+        ),
+    }
+}
+
+/// 7.5a-ADMIT-CHOKEPOINT (blocking) — the single enforcement chokepoint exists.
+fn check_7_5a_admit_chokepoint() -> CheckResult {
+    let id = "7.5a-ADMIT-CHOKEPOINT".to_string();
+    let src = fs::read_to_string("crates/maos-kernel-core/src/security/mod.rs").unwrap_or_default();
+    let has_admit = src.contains("fn admit_spirit");
+    let has_error = src.contains("pub enum SecurityError");
+    let passed = has_admit && has_error;
+    CheckResult {
+        id,
+        passed,
+        message: format!(
+            "blocking_7_5a: admit_spirit={has_admit} SecurityError enum={has_error} (single chokepoint for all 3 load paths) → {}",
+            if passed { "PASS" } else { "FAIL" }
+        ),
+    }
+}
+
+/// 7.5a-ABI-FROZEN (blocking) — compliance.rs frozen markers + ABI_VERSION=1.
+fn check_7_5a_abi_frozen() -> Result<CheckResult, std::io::Error> {
+    let id = "7.5a-ABI-FROZEN".to_string();
+    let path = "crates/maos-spirit-abi/src/compliance.rs";
+    if !Path::new(path).exists() {
+        return Ok(CheckResult {
+            id,
+            passed: false,
+            message: "blocking_7_5a: compliance.rs (frozen ABI) not found".into(),
+        });
+    }
+    let src = fs::read_to_string(path)?;
+    let markers = [
+        "pub struct ComplianceClaimEnvelope",
+        "pub struct ExecutionContextFingerprint",
+        "pub enum SigningAlg",
+        "pub struct Claim",
+        "pub enum Verdict",
+    ];
+    let missing: Vec<&&str> = markers.iter().filter(|m| !src.contains(**m)).collect();
+    let abi_version_1 = fs::read_to_string("crates/maos-spirit-abi/src/lib.rs")
+        .map(|c| c.contains("pub const ABI_VERSION: u32 = 1"))
+        .unwrap_or(false);
+    let passed = missing.is_empty() && abi_version_1;
+    Ok(CheckResult {
+        id,
+        passed,
+        message: format!(
+            "blocking_7_5a: ABI frozen — {}/{} markers (missing={missing:?}); ABI_VERSION=1={abi_version_1} (new SecurityError variants are kernel-internal, NOT ABI surface; dev runs abi-diff out-of-band → Added-only)",
+            markers.len() - missing.len(), markers.len()
+        ),
+    })
+}
+
+/// 7.5a-N-MINUS-1-PRECURSOR (verify) — both precursor N-1 tests present.
+fn check_7_5a_n_minus_1_precursor() -> CheckResult {
+    let id = "7.5a-N-MINUS-1-PRECURSOR".to_string();
+    let abi_test = Path::new("crates/maos-spirit-abi/tests/manifest_n_minus_1_test.rs").exists();
+    let manifest_test =
+        Path::new("crates/maos-manifest/tests/manifest_n_minus_1_compat.rs").exists();
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: precursor tests — spirit-abi constant-invariant={abi_test} manifest validation-path={manifest_test} (7.5a extends the manifest test to field-by-field)"
+        ),
+    }
+}
+
+/// 7.5a-SEMVER-HELPER (verify) — the reused comparator is available (no new dep).
+fn check_7_5a_semver_helper() -> CheckResult {
+    let id = "7.5a-SEMVER-HELPER".to_string();
+    let has_helper = fs::read_to_string("crates/maos-domain/src/revocation.rs")
+        .map(|c| c.contains("pub fn semver_range_contains"))
+        .unwrap_or(false);
+    let is_dep = fs::read_to_string("crates/maos-kernel-core/Cargo.toml")
+        .map(|c| c.contains("maos-domain"))
+        .unwrap_or(false);
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: semver_range_contains present={has_helper}; maos-domain is kernel-core dep={is_dep} (reused — no new `semver` crate in kernel-core)"
+        ),
+    }
+}
+
+/// 7.5a-WORKSPACE-COUNT (verify → unchanged) — 30 at HEAD; STAYS 30 (no crate).
+fn check_7_5a_workspace_count() -> CheckResult {
+    let id = "7.5a-WORKSPACE-COUNT".to_string();
+    let count = workspace_member_count();
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: workspace_members count={count} (Story 7.5a adds NO crate — sentinel STAYS 30)"
+        ),
+    }
+}
+
+/// 7.5a-DISCIPLINE-JOB-COUNT (verify) — 86 at HEAD; +3 at done (smoke-abi-7-5a
+/// + check-breaking-md + check-stability-matrix → 89).
+fn check_7_5a_discipline_job_count() -> CheckResult {
+    let id = "7.5a-DISCIPLINE-JOB-COUNT".to_string();
+    let count = discipline_job_count();
+    let has_smoke = discipline_yml_has_step("smoke-abi-7-5a");
+    let has_breaking = discipline_yml_has_step("check-breaking-md");
+    let has_matrix = discipline_yml_has_step("check-stability-matrix");
+    let new_count = has_smoke as usize + has_breaking as usize + has_matrix as usize;
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: discipline.yml jobs={count} (pre-AC6: 86; post-AC6: 89); new 7.5a jobs: smoke-abi-7-5a={has_smoke} check-breaking-md={has_breaking} check-stability-matrix={has_matrix} → {new_count}/3"
+        ),
+    }
+}
+
+/// 7.5a-A4-HOOK-COUNT (verify) — report the check-service-boundary 14-vs-15 drift.
+fn check_7_5a_a4_hook_count() -> CheckResult {
+    let id = "7.5a-A4-HOOK-COUNT".to_string();
+    let hook_file = fs::read_to_string("xtask/spirit-abi-hook-count.toml").unwrap_or_default();
+    let truthful_14 = hook_file.contains("expected_count = 14");
+    CheckResult {
+        id,
+        passed: true, // verify-only
+        message: format!(
+            "verify: xtask/spirit-abi-hook-count.toml present={} expected_count=14={truthful_14} (7.5a reconciled check_a4_debt_2c to the truthful 14 — check-service-boundary agrees)",
+            !hook_file.is_empty()
         ),
     }
 }
