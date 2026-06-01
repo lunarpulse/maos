@@ -45,6 +45,9 @@ use super::state_codec::{self, SchemaCompat};
 ///
 /// Constructed exactly once at the composition root. Holds Arc handles
 /// to all shared adapters — no second instance per §A5 gate.
+#[maos_attrs::i9_exempt(
+    reason = "composition-root singleton holding Arc handles to already-exempt kernel adapters for hot-swap coordination; supervised transient state per I9, recreated on kernel restart, no cross-key aggregation (Story 7.1.7 baseline-reset)"
+)]
 pub struct HotSwapCoordinator {
     spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
     journal: Arc<JournalAdapter>,

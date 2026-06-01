@@ -1,0 +1,917 @@
+# Frozen serde-error-handling baseline allowlist.
+#
+# FROZEN at Story 7.1.7 (baseline-reset bridge); N=300 sites across 83 files.
+# Posture decision (AC5): FREEZE-and-gate-NEW. Remediating all 300
+# `serde_json::{from_str,to_string,to_vec,...}` + `.unwrap()/.expect()/.unwrap_or_*()`
+# sites across 83 files (a large share in test/corpus code) exceeds the bridge
+# budget, so the current sites are frozen and the gate now hard-fails ONLY on
+# NEW violations beyond this set (continue-on-error removed from discipline.yml).
+#
+# Full remediation to `.map_err(|e| <CrateError>::Serialize(e.to_string()))?`
+# propagation is tracked as a FOLLOW-UP: Story 8.x serde-error-handling remediation
+# (convert the frozen sites crate-by-crate, shrinking this allowlist to empty).
+#
+# Each entry is a `location = "<file>:<line>"` matched verbatim by
+# `xtask/src/check_serde_error_handling.rs::load_allowlist`. New code MUST NOT add
+# entries here — fix the propagation instead.
+
+[[allow]]
+location = "crates/maos-a2a/src/consent.rs:127"
+
+[[allow]]
+location = "crates/maos-a2a/src/consent.rs:128"
+
+[[allow]]
+location = "crates/maos-a2a/src/transport/json_rpc.rs:245"
+
+[[allow]]
+location = "crates/maos-a2a/src/transport/json_rpc.rs:246"
+
+[[allow]]
+location = "crates/maos-a2a/src/transport/json_rpc.rs:279"
+
+[[allow]]
+location = "crates/maos-a2a/src/transport/json_rpc.rs:280"
+
+[[allow]]
+location = "crates/maos-a2a/src/transport/json_rpc.rs:293"
+
+[[allow]]
+location = "crates/maos-a2a/src/transport/json_rpc.rs:294"
+
+[[allow]]
+location = "crates/maos-a2a/src/transport/json_rpc.rs:307"
+
+[[allow]]
+location = "crates/maos-a2a/tests/a1_security_regression_guards.rs:338"
+
+[[allow]]
+location = "crates/maos-acp/src/frame.rs:100"
+
+[[allow]]
+location = "crates/maos-acp/src/frame.rs:102"
+
+[[allow]]
+location = "crates/maos-acp/src/frame.rs:114"
+
+[[allow]]
+location = "crates/maos-acp/src/frame.rs:115"
+
+[[allow]]
+location = "crates/maos-acp/src/frame.rs:125"
+
+[[allow]]
+location = "crates/maos-acp/src/frame.rs:143"
+
+[[allow]]
+location = "crates/maos-audit/src/lib.rs:803"
+
+[[allow]]
+location = "crates/maos-audit/src/lib.rs:856"
+
+[[allow]]
+location = "crates/maos-audit/tests/fr4_full_mediation_test.rs:38"
+
+[[allow]]
+location = "crates/maos-audit/tests/i12_decision_audit_test.rs:45"
+
+[[allow]]
+location = "crates/maos-audit/tests/i12_decision_audit_test.rs:99"
+
+[[allow]]
+location = "crates/maos-audit/tests/i12_decision_audit_test.rs:122"
+
+[[allow]]
+location = "crates/maos-audit/tests/i12_decision_audit_test.rs:159"
+
+[[allow]]
+location = "crates/maos-audit/tests/query_schema_test.rs:144"
+
+[[allow]]
+location = "crates/maos-bench/benches/iac_routing_budget.rs:167"
+
+[[allow]]
+location = "crates/maos-bench/benches/orchestrator_fanout_nfr_perf_8.rs:245"
+
+[[allow]]
+location = "crates/maos-bench/src/report.rs:160"
+
+[[allow]]
+location = "crates/maos-bench/src/report.rs:161"
+
+[[allow]]
+location = "crates/maos-bin/src/main.rs:1934"
+
+[[allow]]
+location = "crates/maos-bin/src/main.rs:1973"
+
+[[allow]]
+location = "crates/maos-bin/src/main.rs:2844"
+
+[[allow]]
+location = "crates/maos-bin/src/main.rs:2911"
+
+[[allow]]
+location = "crates/maos-bin/tests/one_shot_hello.rs:41"
+
+[[allow]]
+location = "crates/maos-bin/tests/smoke_bench_5e_test.rs:47"
+
+[[allow]]
+location = "crates/maos-bin/tests/smoke_bench_5e_test.rs:58"
+
+[[allow]]
+location = "crates/maos-bin/tests/smoke_bench_5e_test.rs:62"
+
+[[allow]]
+location = "crates/maos-bin/tests/smoke_registry_5d_test.rs:41"
+
+[[allow]]
+location = "crates/maos-bin/tests/smoke_registry_5d_test.rs:61"
+
+[[allow]]
+location = "crates/maos-bin/tests/smoke_registry_5d_test.rs:65"
+
+[[allow]]
+location = "crates/maos-capability/src/cap_tokens/body.rs:47"
+
+[[allow]]
+location = "crates/maos-cli/src/subcommands.rs:199"
+
+[[allow]]
+location = "crates/maos-compliance/src/builder.rs:85"
+
+[[allow]]
+location = "crates/maos-compliance/src/canonical_cbor.rs:41"
+
+[[allow]]
+location = "crates/maos-compliance/tests/ccac_ship_gate_test.rs:36"
+
+[[allow]]
+location = "crates/maos-compliance/tests/ccac_ship_gate_test.rs:58"
+
+[[allow]]
+location = "crates/maos-compliance/tests/evaluator_test.rs:138"
+
+[[allow]]
+location = "crates/maos-compliance/tests/evaluator_test.rs:159"
+
+[[allow]]
+location = "crates/maos-compliance/tests/evaluator_test.rs:176"
+
+[[allow]]
+location = "crates/maos-compliance/tests/evaluator_test.rs:194"
+
+[[allow]]
+location = "crates/maos-corpus-gen/src/ccac/expansion.rs:63"
+
+[[allow]]
+location = "crates/maos-corpus-gen/src/ccac/expansion.rs:212"
+
+[[allow]]
+location = "crates/maos-corpus-gen/tests/determinism_integration.rs:33"
+
+[[allow]]
+location = "crates/maos-corpus-gen/tests/determinism_integration.rs:63"
+
+[[allow]]
+location = "crates/maos-corpus-gen/tests/determinism_integration.rs:64"
+
+[[allow]]
+location = "crates/maos-corpus-gen/tests/determinism_integration.rs:89"
+
+[[allow]]
+location = "crates/maos-corpus-gen/tests/determinism_integration.rs:90"
+
+[[allow]]
+location = "crates/maos-domain/src/distillation.rs:204"
+
+[[allow]]
+location = "crates/maos-domain/src/distillation.rs:205"
+
+[[allow]]
+location = "crates/maos-domain/src/distillation.rs:213"
+
+[[allow]]
+location = "crates/maos-domain/src/distillation.rs:214"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:596"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:611"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:612"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:626"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:643"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:644"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:660"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:661"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:680"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:681"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:693"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:694"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:710"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:711"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:736"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:737"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:794"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:811"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:812"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:829"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:830"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:842"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:858"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:859"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:874"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:875"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:896"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:897"
+
+[[allow]]
+location = "crates/maos-domain/src/frame.rs:917"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:357"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:358"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:422"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:423"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:432"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:433"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:444"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:445"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:488"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:489"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:503"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:504"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:536"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:537"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:581"
+
+[[allow]]
+location = "crates/maos-domain/src/halt.rs:582"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i1.rs:249"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i1.rs:250"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:220"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:241"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:243"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:263"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:264"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:273"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:274"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:281"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:282"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:289"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:290"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:320"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:321"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:328"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:329"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:343"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:344"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:357"
+
+[[allow]]
+location = "crates/maos-domain/src/invariants/i10.rs:358"
+
+[[allow]]
+location = "crates/maos-domain/src/lifecycle.rs:209"
+
+[[allow]]
+location = "crates/maos-domain/src/lifecycle.rs:210"
+
+[[allow]]
+location = "crates/maos-domain/src/log_recall.rs:297"
+
+[[allow]]
+location = "crates/maos-domain/src/log_recall.rs:298"
+
+[[allow]]
+location = "crates/maos-domain/src/log_recall.rs:340"
+
+[[allow]]
+location = "crates/maos-domain/src/log_recall.rs:341"
+
+[[allow]]
+location = "crates/maos-domain/src/log_recall.rs:357"
+
+[[allow]]
+location = "crates/maos-domain/src/log_recall.rs:358"
+
+[[allow]]
+location = "crates/maos-domain/src/memory.rs:407"
+
+[[allow]]
+location = "crates/maos-domain/src/memory.rs:408"
+
+[[allow]]
+location = "crates/maos-domain/src/memory.rs:545"
+
+[[allow]]
+location = "crates/maos-domain/src/memory.rs:546"
+
+[[allow]]
+location = "crates/maos-domain/src/memory.rs:556"
+
+[[allow]]
+location = "crates/maos-domain/src/memory.rs:557"
+
+[[allow]]
+location = "crates/maos-domain/src/orchestrator.rs:98"
+
+[[allow]]
+location = "crates/maos-domain/src/orchestrator.rs:100"
+
+[[allow]]
+location = "crates/maos-domain/src/orchestrator.rs:109"
+
+[[allow]]
+location = "crates/maos-domain/src/orchestrator.rs:114"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/mcp.rs:156"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/mcp.rs:158"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/mcp.rs:171"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/mcp.rs:172"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/mcp.rs:181"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/mcp.rs:182"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/mcp.rs:190"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/mcp.rs:191"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:698"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:699"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:706"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:723"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:724"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:746"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:747"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:764"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:765"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:781"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:782"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:791"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:792"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:799"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:800"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:807"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:808"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:815"
+
+[[allow]]
+location = "crates/maos-domain/src/ports/registry.rs:816"
+
+[[allow]]
+location = "crates/maos-domain/src/revocation.rs:597"
+
+[[allow]]
+location = "crates/maos-domain/src/revocation.rs:598"
+
+[[allow]]
+location = "crates/maos-domain/src/sandbox.rs:494"
+
+[[allow]]
+location = "crates/maos-domain/src/sandbox.rs:495"
+
+[[allow]]
+location = "crates/maos-domain/src/sandbox.rs:528"
+
+[[allow]]
+location = "crates/maos-domain/src/sandbox.rs:529"
+
+[[allow]]
+location = "crates/maos-domain/src/self_telemetry.rs:185"
+
+[[allow]]
+location = "crates/maos-domain/src/self_telemetry.rs:186"
+
+[[allow]]
+location = "crates/maos-domain/src/self_telemetry.rs:209"
+
+[[allow]]
+location = "crates/maos-domain/src/self_telemetry.rs:210"
+
+[[allow]]
+location = "crates/maos-domain/src/self_telemetry.rs:252"
+
+[[allow]]
+location = "crates/maos-domain/src/self_telemetry.rs:254"
+
+[[allow]]
+location = "crates/maos-domain/src/supervision.rs:262"
+
+[[allow]]
+location = "crates/maos-domain/src/supervision.rs:263"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:490"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:496"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:509"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:537"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:541"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:545"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:568"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:573"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:577"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:595"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:616"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:620"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:624"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:645"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:649"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:671"
+
+[[allow]]
+location = "crates/maos-eval/src/isolation_corpus.rs:677"
+
+[[allow]]
+location = "crates/maos-eval/tests/hsis_runner.rs:69"
+
+[[allow]]
+location = "crates/maos-iac/src/adapter.rs:478"
+
+[[allow]]
+location = "crates/maos-iac/src/adapter.rs:826"
+
+[[allow]]
+location = "crates/maos-iac/src/adapter.rs:889"
+
+[[allow]]
+location = "crates/maos-iac/src/adapter/mailbox.rs:337"
+
+[[allow]]
+location = "crates/maos-iac/src/adapter/payload.rs:38"
+
+[[allow]]
+location = "crates/maos-iac/src/adapter/payload.rs:39"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/bin/assert-revocation-p99-floor.rs:69"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/capability/cap_audit/writer_task.rs:45"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/compliance/mod.rs:144"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/compliance/mod.rs:202"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/compliance/mod.rs:220"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/compliance/mod.rs:238"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/compliance/mod.rs:255"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/compliance/mod.rs:301"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/compliance/mod.rs:310"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/compliance/mod.rs:319"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/compliance/mod.rs:329"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/journal/mod.rs:166"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/lifecycle/upgrade.rs:216"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/revocation/parser.rs:118"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/revocation/parser.rs:127"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/revocation/parser.rs:138"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/revocation/parser.rs:146"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/supervision/crash_detector.rs:168"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/supervision/progress_watchdog.rs:128"
+
+[[allow]]
+location = "crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:125"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs:57"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs:58"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs:63"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs:64"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/cli_wrapper_shape_mismatch_journal_7_4.rs:73"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/consent_rupture_adr_034.rs:355"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/consent_rupture_adr_034.rs:356"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/distillation_i11_audit_chain.rs:233"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/distillation_i11_audit_chain.rs:251"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/drr_scheduler.rs:110"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/gateway_uninstall_fr65_v05.rs:147"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/gateway_uninstall_fr65_v05.rs:148"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/memory_md_opaque_write.rs:71"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/on_revocation_three_actions.rs:22"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/on_revocation_three_actions.rs:23"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/on_revocation_three_actions.rs:32"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/on_revocation_three_actions.rs:36"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/on_revocation_three_actions.rs:40"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/revocation_applier_pipeline.rs:23"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/revocation_applier_pipeline.rs:24"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/schedule_watchdog_fr26.rs:305"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/spirit_boundary_invariants.rs:81"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/upgrade_migrator_cross_major.rs:44"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/upgrade_migrator_cross_major.rs:45"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/upgrade_migrator_cross_major.rs:54"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/upgrade_migrator_cross_major.rs:55"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/upgrade_orchestrator_three_policies.rs:21"
+
+[[allow]]
+location = "crates/maos-kernel-core/tests/upgrade_orchestrator_three_policies.rs:22"
+
+[[allow]]
+location = "crates/maos-providers/src/anthropic.rs:257"
+
+[[allow]]
+location = "crates/maos-providers/src/anthropic.rs:296"
+
+[[allow]]
+location = "crates/maos-providers/src/ollama.rs:248"
+
+[[allow]]
+location = "crates/maos-providers/src/ollama.rs:270"
+
+[[allow]]
+location = "crates/maos-providers/src/openai.rs:266"
+
+[[allow]]
+location = "crates/maos-providers/src/openai.rs:302"
+
+[[allow]]
+location = "crates/maos-providers/tests/multi_provider_matrix.rs:86"
+
+[[allow]]
+location = "crates/maos-providers/tests/multi_provider_matrix.rs:179"
+
+[[allow]]
+location = "crates/maos-providers/tests/multi_provider_matrix.rs:201"
+
+[[allow]]
+location = "crates/maos-registry/src/admission.rs:622"
+
+[[allow]]
+location = "crates/maos-registry/src/admission.rs:781"
+
+[[allow]]
+location = "crates/maos-registry/src/compliance_verify.rs:139"
+
+[[allow]]
+location = "crates/maos-registry/src/import.rs:298"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:133"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:137"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:152"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:153"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:160"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:161"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:168"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:169"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:176"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:177"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:184"
+
+[[allow]]
+location = "crates/maos-registry/src/operations.rs:185"
+
+[[allow]]
+location = "crates/maos-registry/src/server.rs:205"
+
+[[allow]]
+location = "crates/maos-registry/src/server.rs:284"
+
+[[allow]]
+location = "crates/maos-registry/tests/end_to_end_test.rs:90"
+
+[[allow]]
+location = "crates/maos-registry/tests/end_to_end_test.rs:305"
+
+[[allow]]
+location = "crates/maos-registry/tests/import_air_gap_test.rs:45"
+
+[[allow]]
+location = "crates/maos-registry/tests/import_air_gap_test.rs:166"
+
+[[allow]]
+location = "crates/maos-registry/tests/registry_roundtrip_test.rs:69"
+
+[[allow]]
+location = "crates/maos-spirit-cli/tests/compliance_claim_autopopulate_test.rs:113"
+
+[[allow]]
+location = "crates/maos-spirit-cli/tests/publish_happy_path_test.rs:138"
+
+[[allow]]
+location = "crates/maos-spirit-hello/src/bin/hello_spirit_bench.rs:48"
+
+[[allow]]
+location = "crates/maos-spirit-hello/src/lib.rs:204"
+
+[[allow]]
+location = "crates/maos-spirit-hello/src/lib.rs:205"
+
+[[allow]]
+location = "crates/maos-spirit-hello/src/lib.rs:236"
+
+[[allow]]
+location = "crates/maos-spirit-hello/tests/frame_roundtrip.rs:25"
+
+[[allow]]
+location = "crates/maos-spirit-hello/tests/frame_roundtrip.rs:52"
+
+[[allow]]
+location = "crates/maos-spirit-hello/tests/frame_roundtrip.rs:83"
+
+[[allow]]
+location = "crates/maos-spirit-hello/tests/frame_roundtrip.rs:105"
+
+[[allow]]
+location = "crates/maos-spirit-sdk/tests/lcas_smoke.rs:58"
+

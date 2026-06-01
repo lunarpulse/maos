@@ -1,4 +1,4 @@
-last_updated: '2026-06-01T00:00:00Z+epic-7-retrospective-done'
+last_updated: '2026-06-01T00:00:00Z+story-7-1-7-done'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -75,6 +75,9 @@ development_status:
   7-4-author-skills-and-propose-revisions-with-output-shape-fail-loud: done
   7-5a-publish-and-enforce-v1-0-abi-stability-commitments: done
   7-5b-execute-nfr-onb-1-30-minute-first-spirit-validation-gate-at-v0-3: done
+  # Epic 7 retro (2026-06-01) §A1/§A2 bridge phase — green-at-HEAD prerequisite for Epic 8 Story 8.1
+  7-1-6-section-a2-full-flip-clear-9-review-findings-and-44-dev-record-violations-hard-fail-both-gates: backlog
+  7-1-7-baseline-reset-service-boundary-101-stale-plus-72-boundary-and-serde-300-green-at-head: done
   epic-7-retrospective: done
   epic-8: backlog
   8-1-butler-v0-3-on-idle-anticipatory-reasoning-morning-digest-spirit-side: backlog

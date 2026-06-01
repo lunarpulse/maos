@@ -11,6 +11,9 @@ use std::time::{Duration, Instant};
 
 /// Snapshot of invariants taken at swap commit.
 #[derive(Debug, Clone)]
+#[maos_attrs::i9_exempt(
+    reason = "immutable invariant snapshot captured at swap commit; Vec<String> of pre-swap halt-ids / frame-shapes is bounded structural state per I9, no parameter drift (Story 7.1.7 baseline-reset)"
+)]
 pub struct PostSwapInvariantSnapshot {
     pub pre_swap_halt_ids: Vec<String>,
     pub pid: u32,
@@ -22,6 +25,9 @@ pub struct PostSwapInvariantSnapshot {
 pub use maos_domain::hot_swap::PostSwapInvariantViolation;
 
 /// Monitor task that watches for post-swap invariant violations.
+#[maos_attrs::i9_exempt(
+    reason = "post-swap invariant monitor holding Arc to the already-exempt HotSwapCoordinator + invariant snapshot; supervised transient task state per I9 (Story 7.1.7 baseline-reset)"
+)]
 pub struct PostSwapMonitor {
     pub coordinator: Arc<super::coordinator::HotSwapCoordinator>,
     pub spirit_pid: u32,

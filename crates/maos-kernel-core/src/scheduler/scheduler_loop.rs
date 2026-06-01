@@ -66,6 +66,9 @@ pub fn pick_next_spirit_from_slice(scbs: &[Arc<SpiritControlBlock>]) -> Option<u
 }
 
 /// The Spirit Scheduler — kernel-side supervisor.
+#[maos_attrs::i9_exempt(
+    reason = "kernel-side Spirit scheduler / supervisor; owns the supervised Spirit-control-block set under the supervision tree (P3 supervisor-exception per §4.0.8) — structural-state per I9, keyed by spirit_pid (Story 7.1.7 baseline-reset)"
+)]
 pub struct SpiritSchedulerAdapter {
     spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
     tl: Arc<TransparencyLogAdapter>,

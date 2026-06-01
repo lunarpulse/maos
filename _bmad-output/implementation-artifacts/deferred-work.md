@@ -175,3 +175,15 @@
 - D8: No test for simultaneous multi-field drift — **closed**: added `multi_field_drift_names_first_divergent_field` test
 - D9: `drift_count()` builds full corpus just to count drift items — **closed**: arithmetic count from seeds (`seeds.filter × VARIATIONS_PER_SEED`)
 - D10: `reference_context` hardcoded values must match manifest strings — shared builder produces both from same parameters; ship gate validates round-trip
+
+## Deferred from: code review of 7-1-7-baseline-reset-service-boundary-101-stale-plus-72-boundary-and-serde-300-green-at-head (2026-06-01)
+
+- `McpClientAdapter` exemption documents admitted architectural gap — exemption itself says "deferred tidy-up" with no automated escalation. Pre-existing belt-and-suspenders pattern; the exemption is honestly documented and tracked. `xtask/src/check_service_boundary.rs:78-81`
+- `// p1-allow:` magic-string comment convention — no compiler enforcement; a typo silently disables the exemption. Spec-chosen mechanism for P1 false-positive resolution; the gate-correctness fix was agreed design. `xtask/src/check_service_boundary.rs:594,599`
+- `ADAPTER_PORT_EXEMPTIONS` third field is free-form text — mixes `"N/A"` sentinels with narratives in a `(&str, &str, &str)` tuple with no enum. Pre-existing pattern established in prior stories. `xtask/src/check_service_boundary.rs:40-83`
+- `serde-error-allowlist.toml` line-number entries have zero staleness detection — any line insertion above a frozen site shifts its number, silently dropping the allowlist entry and causing CI hard-fail. Known FREEZE posture tradeoff; follow-up Story 8.x full remediation will empty the allowlist. `xtask/serde-error-allowlist.toml`
+- Frozen allowlist ratchet can only grow — the gate hard-fails on NEW violations but has no content-digest for existing entries; stale entries produce false-positive CI failures. Story 8.x serde-remediation follow-up tracked in allowlist header. `xtask/serde-error-allowlist.toml`
+- `// p1-allow:` marker context-free — bare substring match on constructor line or line above can match unrelated `// p1-allow:` comment, silently exempting a different construction. Accepted risk in gating-correctness decision. `xtask/src/check_service_boundary.rs:593-600`
+- `infer_module_path` hardcodes crate name `"maos_kernel_core"` — if check is re-used for another kernel crate, exemption documentation cross-check would fail. Pre-existing; single-kernel-crate workspace layout makes this benign. `xtask/src/check_empty_kernel.rs:222`
+- `MockLifecycleResolver` is pub, not `#[cfg(test)]`-gated — `pub mod test_double` compiles into production binaries; `#[i9_exempt]` masks it from I9. Protected by separate `check-mock-not-in-release` gate. `crates/maos-kernel-core/src/scheduler/verb_resolver.rs:131-142`
+- Serde hard-fail flip unconditional on line-number-based allowlist — removing `continue-on-error` makes all serde violations blocking; false positives from line drift can block CI. Accepted FREEZE posture tradeoff; mitigation = Story 8.x follow-up. `.github/workflows/discipline.yml:1008`

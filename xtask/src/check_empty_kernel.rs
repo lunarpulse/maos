@@ -105,8 +105,26 @@ pub(crate) fn run_silent(
     let mut violations = Vec::new();
     let mut exemption_sites = Vec::new();
 
+    // I9 governs PRODUCTION kernel state only. Scope the scan to the crate's
+    // `src/` tree — integration tests (`tests/`) and benchmarks (`benches/`)
+    // compile as separate targets and are never linked into the shipped kernel,
+    // so their test-double structs (mocks, fixtures) are not I9-bearing.
+    // (Story 7.1.7 baseline-reset: gate-correctness fix — these were
+    // false-positive boundary violations.)
+    let scan_root = kernel_path.join("src");
+    let scan_root = if scan_root.is_dir() {
+        scan_root
+    } else {
+        eprintln!(
+            "warning: check-empty-kernel: {} has no src/ directory; \
+             scanning entire crate root (tests/ and benches/ included, \
+             may produce false-positive I9 violations)",
+            kernel_path.display()
+        );
+        kernel_path.to_path_buf()
+    };
     let mut rs_files = Vec::new();
-    fs_walk::collect_rs_files(kernel_path, &mut rs_files);
+    fs_walk::collect_rs_files(&scan_root, &mut rs_files);
 
     for file in &rs_files {
         let src =
@@ -199,6 +217,12 @@ struct EmptyKernelVisitor<'a> {
 
 impl<'a> Visit<'_> for EmptyKernelVisitor<'a> {
     fn visit_item_struct(&mut self, node: &syn::ItemStruct) {
+        // Skip `#[cfg(test)]`-gated structs (consistent with visit_item_mod):
+        // test-only structs never link into the production kernel per I9.
+        if has_cfg_test(&node.attrs) {
+            return;
+        }
+
         let struct_name = node.ident.to_string();
         let line = node.ident.span().start().line;
 
@@ -239,6 +263,62 @@ impl<'a> Visit<'_> for EmptyKernelVisitor<'a> {
 
         syn::visit::visit_item_struct(self, node);
     }
+
+    fn visit_item_mod(&mut self, node: &syn::ItemMod) {
+        // Skip `#[cfg(test)]` modules: their structs are unit-test doubles that
+        // never link into the production kernel, so they are not I9-bearing.
+        // (Story 7.1.7 baseline-reset: gate-correctness fix.)
+        if has_cfg_test(&node.attrs) {
+            return;
+        }
+        syn::visit::visit_item_mod(self, node);
+    }
+}
+
+/// True if the attribute list contains a `#[cfg(test)]` or a compound cfg gate
+/// (e.g. `#[cfg(all(test, …))]`, `#[cfg(any(test, …))]`) that includes `test`
+/// as a bare ident — marking the item as test-only per I9.
+///
+/// Does NOT match `#[cfg(not(test))]` (production-only code) or
+/// `#[cfg(feature = "test")]` (where `"test"` is a string literal, not an ident).
+fn has_cfg_test(attrs: &[syn::Attribute]) -> bool {
+    attrs.iter().any(|attr| {
+        attr.path().is_ident("cfg") && cfg_meta_has_test_ident(&attr.meta)
+    })
+}
+
+/// Walk a `#[cfg(…)]` meta and return true if `test` appears as a positive ident
+/// (i.e. NOT inside a `not(…)` wrapper where it would mean "compile when NOT testing").
+fn cfg_meta_has_test_ident(meta: &syn::Meta) -> bool {
+    match meta {
+        // `#[cfg(test)]` — direct path
+        syn::Meta::Path(path) => path.is_ident("test"),
+        // `#[cfg(all(test, …))]`, `#[cfg(any(test, …))]`, `#[cfg(not(test))]`
+        syn::Meta::List(list) => cfg_tokens_have_unnegated_test(&list.tokens),
+        _ => false,
+    }
+}
+
+fn cfg_tokens_have_unnegated_test(tokens: &proc_macro2::TokenStream) -> bool {
+    let mut iter = tokens.clone().into_iter();
+    while let Some(tt) = iter.next() {
+        match tt {
+            // `test` as a bare ident → positive match
+            proc_macro2::TokenTree::Ident(ref ident) if ident == "test" => return true,
+            // `not(…)` → recurse; if `test` is inside a `not(…)` group, the
+            // cfg is NOT a test-only gate (it's production-only). An inner
+            // `test` Ident therefore counts as a NEGATIVE signal — skip it.
+            proc_macro2::TokenTree::Ident(ref ident) if ident == "not" => {
+                if let Some(proc_macro2::TokenTree::Group(group)) = iter.next() {
+                    if cfg_tokens_have_unnegated_test(&group.stream()) {
+                        return false;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 fn has_i9_exempt(attrs: &[syn::Attribute]) -> bool {
@@ -252,7 +332,9 @@ fn has_i9_exempt(attrs: &[syn::Attribute]) -> bool {
         if is_i9_exempt {
             if let Ok(meta) = attr.meta.require_list() {
                 let tokens = meta.tokens.to_string();
-                return tokens.contains("reason");
+                return tokens.contains("reason")
+                    || tokens.contains("rationale")
+                    || tokens.contains("justification");
             }
         }
         false

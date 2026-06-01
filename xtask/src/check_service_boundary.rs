@@ -40,6 +40,44 @@ const ADAPTER_PORT_EXEMPTIONS: &[(&str, &str, &str)] = &[
         "N/A",
         "Story 1b.1 audit-side adapter; no Port trait at v0.1-β — exemption per §4.0.8 supervisor-exception-shaped rationale",
     ),
+    // Story 7.1.7 baseline-reset (P2 triage): the following api::* re-exports are
+    // NOT adapter↔port pairs and so have no Port trait to require. Each carries a
+    // written rationale per the AC3 escape-hatch discipline.
+    (
+        "IacBusAdapter",
+        "IacBusPort",
+        "Story 7.1.7: the IAC bus is a module inside maos-kernel-core (`crate::iac`), not a standalone `iac/` service-dir, at the v0.1-β services-as-modules layout. The IacBusPort trait lives in maos-domain::ports and is consumed directly; no in-crate `iac/` service module re-export exists by design.",
+    ),
+    (
+        "take_io_journal",
+        "N/A",
+        "Story 7.1.7: free function (io-journal drain accessor) re-exported via api::io for operator tooling — not an Adapter, so no Port trait pairing applies.",
+    ),
+    (
+        "SetScalarError",
+        "N/A",
+        "Story 7.1.7: error type re-exported via api::capability — not an Adapter, so no Port trait pairing applies.",
+    ),
+    (
+        "WorkingMemorySlot",
+        "N/A",
+        "Story 7.1.7: working-memory value type re-exported via api::capability — not an Adapter; its port surface is the CapabilityRegistryPort, no dedicated WorkingMemorySlotPort exists.",
+    ),
+    (
+        "WorkingMemoryStore",
+        "N/A",
+        "Story 7.1.7: working-memory store type re-exported via api::capability — not an Adapter; its port surface is the CapabilityRegistryPort, no dedicated WorkingMemoryStorePort exists.",
+    ),
+    (
+        "HotSwapCoordinator",
+        "N/A",
+        "Story 7.1.7: kernel-internal hot-swap supervisor composite re-exported via api::hot_swap for the composition root — it IS the orchestrator and has no consumer-facing Port trait (supervisor-exception per §4.0.8).",
+    ),
+    (
+        "McpClientAdapter",
+        "McpClientPort",
+        "Story 7.1.7: MCP client adapter re-exported via api::mcp; the McpClientPort trait is consumed from maos-domain::ports directly and is not re-exported through the in-crate `mcp/` service module at v0.1-β. Port-pairing re-export tracked as deferred tidy-up.",
+    ),
 ];
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -545,9 +583,48 @@ fn check_p1_single_owner(main_rs: &Path) -> Result<Vec<Violation>, String> {
     };
     visitor.visit_file(&ast);
 
+    // Inline `// p1-allow:` markers exempt a single construction site that is NOT
+    // the supervised composition-root owner (e.g. a one-shot manifest-admission
+    // probe inside the CLI dispatcher). The marker may sit on the construction
+    // line or the line directly above it. (Story 7.1.7 baseline-reset.)
+    let src_lines: Vec<&str> = src.lines().collect();
+    let is_p1_allowed = |ln: usize| -> bool {
+        // Check the constructor line itself.
+        let on_line = src_lines
+            .get(ln.saturating_sub(1))
+            .map(|l| l.contains("// p1-allow:"))
+            .unwrap_or(false);
+        if on_line {
+            return true;
+        }
+        // Scan backward through blank/whitespace lines to find the
+        // `// p1-allow:` marker — resilient to blank-line insertion
+        // between the marker and the construction site.
+        let mut offset = 2;
+        while ln >= offset {
+            let prev = src_lines.get(ln.saturating_sub(offset));
+            match prev {
+                Some(l) if l.trim().is_empty() => {
+                    offset += 1;
+                    continue;
+                }
+                Some(l) => return l.contains("// p1-allow:"),
+                None => break,
+            }
+        }
+        false
+    };
+
     let mut violations = Vec::new();
     for (_, adapter) in SERVICE_ADAPTERS {
-        let lines = visitor.counts.get(*adapter).cloned().unwrap_or_default();
+        let lines: Vec<usize> = visitor
+            .counts
+            .get(*adapter)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|&ln| !is_p1_allowed(ln))
+            .collect();
         if lines.len() > 1 {
             violations.push(Violation {
                 file: main_rs.display().to_string(),
@@ -570,6 +647,23 @@ struct P1OwnerVisitor {
 }
 
 impl<'ast> syn::visit::Visit<'ast> for P1OwnerVisitor {
+    fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
+        // `smoke_*` functions are standalone CLI smoke-subcommand handlers — each
+        // is its own isolated mini-root that legitimately builds a throwaway
+        // adapter for one scenario. They are NOT the production composition root,
+        // so their constructions must not count toward single-owner P1.
+        // (Story 7.1.7 baseline-reset: gate-correctness fix.)
+        //
+        // NOTE: This skip affects ONLY the P1OwnerVisitor. Future visitor
+        // extensions should be added in separate visitor structs or `impl`
+        // blocks — not appended to this one — so they are not blocked by this
+        // smoke-function subtree skip.
+        if node.sig.ident.to_string().starts_with("smoke_") {
+            return;
+        }
+        syn::visit::visit_item_fn(self, node);
+    }
+
     fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
         if let syn::Expr::Path(path_expr) = &*node.func {
             let path_str = quote::quote!(#path_expr).to_string().replace(' ', "");

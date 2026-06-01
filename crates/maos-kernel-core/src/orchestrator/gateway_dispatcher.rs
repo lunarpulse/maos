@@ -26,6 +26,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 /// Per-gateway running state.
+#[maos_attrs::i9_exempt(
+    reason = "per-gateway running state; Arc<dyn GatewaySubmodule> + Arc<AtomicBool> cancel flag are per-process transient task state per I9, recreated on kernel restart (Story 7.1.7 baseline-reset)"
+)]
 pub struct GatewayInstance {
     /// The gateway submodule (Arc-shared so on_disconnect can be called).
     pub submodule: Arc<dyn GatewaySubmodule>,
@@ -382,6 +385,9 @@ pub trait GatewaySubmoduleFactory: Send + Sync {
 // Stub implementations for v0.5 (Task 5 wires real handles).
 // ------------------------------------------------------------------
 
+#[maos_attrs::i9_exempt(
+    reason = "gateway cancel handle; Arc<AtomicBool> cancel flag is per-process transient state per I9, recreated on kernel restart (Story 7.1.7 baseline-reset)"
+)]
 struct GatewayCancelHandle {
     flag: Arc<AtomicBool>,
 }

@@ -28,6 +28,9 @@ use crate::security::manifest::EpistemicPolicySection;
 /// Holds the capability registry and halt registry. The transparency log
 /// and journal are passed by reference because `JournalAdapter` owns a
 /// file handle and does not implement `Clone`.
+#[maos_attrs::i9_exempt(
+    reason = "working-memory orchestrator holding Arc handles to the already-exempt capability + halt registries; supervised composite per I9, no parameter drift (Story 7.1.7 baseline-reset)"
+)]
 pub struct WorkingMemoryOrchestrator {
     capability: Arc<CapabilityRegistryAdapter>,
     halt_registry: Arc<HaltRegistry>,

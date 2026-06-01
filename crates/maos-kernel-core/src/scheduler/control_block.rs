@@ -231,6 +231,9 @@ impl Default for SpiritManifestBundle {
 }
 
 /// Per-Spirit kernel-side control block — the PCB analog.
+#[maos_attrs::i9_exempt(
+    reason = "per-Spirit kernel control block (PCB analog); supervised single-owner runtime state held under the scheduler supervisor per §4.0.8 — structural-state per I9, bounded by Spirit lifetime, keyed by spirit_id, no parameter drift (Story 7.1.7 baseline-reset)"
+)]
 pub struct SpiritControlBlock {
     pub pid: u32,
     pub spirit_id: String,

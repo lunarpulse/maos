@@ -4,28 +4,8 @@
   "items": [
     {
       "kind": "const",
-      "path": "maos_kernel_core::capability::cap_audit::AUDIT_CHANNEL_DEPTH",
-      "signature_hash": "55b9cfe8480a631b3d35ea669cd675c1513217b3a069db09b8edc6ef9ea47c76"
-    },
-    {
-      "kind": "const",
-      "path": "maos_kernel_core::capability::cap_quota::EXHAUSTED_THRESHOLD",
-      "signature_hash": "4107e093f8f09845592efdefceb32c14b229616c36461e06dfe845a0e23ed532"
-    },
-    {
-      "kind": "const",
-      "path": "maos_kernel_core::capability::cap_quota::LIMIT_THRESHOLD",
-      "signature_hash": "cbc8f8416769a9a2dc8d503387744d169da02731a31f1448f1b2a99fdae96494"
-    },
-    {
-      "kind": "const",
-      "path": "maos_kernel_core::capability::cap_quota::PRESSURE_THRESHOLD",
-      "signature_hash": "5ba0203166813ffb4a9ec56f470c06717c48e0f53399ad4aae27782fbaa446dd"
-    },
-    {
-      "kind": "const",
-      "path": "maos_kernel_core::capability::cap_tokens::shard::SHARD_COUNT",
-      "signature_hash": "7d315a3f07b5fc2a4dd51d742e5396cc109ee316bb78aa868349f091ca81ab8a"
+      "path": "maos_kernel_core::scheduler::scheduler_loop::SCHEDULER_QUANTUM",
+      "signature_hash": "36cd0a0ce8204756ff6a7c8326539fce44416b2d42c0c7b69c3fdf88b2052783"
     },
     {
       "kind": "const",
@@ -34,18 +14,8 @@
     },
     {
       "kind": "const",
-      "path": "maos_kernel_core::telemetry::iac_rt::IAC_RT_BUCKETS_US",
-      "signature_hash": "b217ac64726dd0b136cd7570a3ee7f27701ccb3a0b21919b67a640125103f21e"
-    },
-    {
-      "kind": "enum",
-      "path": "maos_kernel_core::capability::cap_audit::CapAuditEvent",
-      "signature_hash": "dd35d570ac67baab38d796bc50675e9e1e801d5d9f0d96f01d85012324acd907"
-    },
-    {
-      "kind": "enum",
-      "path": "maos_kernel_core::capability::cap_audit::VerifyOutcome",
-      "signature_hash": "5243159a36f43c8e0db82ce642f0d72742292e95268a159d1c9d66e716a5187f"
+      "path": "maos_kernel_core::security::posture::POSTURE_APPROVAL_MATRIX",
+      "signature_hash": "44caee00b1ae3a7c9d207aaaa520e3c68b357e2ad39fdce886c51a745b111575"
     },
     {
       "kind": "enum",
@@ -55,7 +25,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::capability::cap_policy::decision::Intent",
-      "signature_hash": "c79e246484170a1c1480a35633978fbe519e1573276d5a3ef547b5800e9b5e02"
+      "signature_hash": "c1aec1b4560df26de0ad530417695d703308a02d3a7caf5274e4a052e0d8c08d"
     },
     {
       "kind": "enum",
@@ -69,28 +39,48 @@
     },
     {
       "kind": "enum",
-      "path": "maos_kernel_core::capability::cap_quota::QuotaState",
-      "signature_hash": "a7446765df02616a3fac54092a23fe01ed5089973164f1e5514353d89cbc8d33"
-    },
-    {
-      "kind": "enum",
-      "path": "maos_kernel_core::capability::cap_tokens::RevokeReason",
-      "signature_hash": "d0841812d85350e4d5653c25eb220299852bbc8a9b224993ee95f612660ed15e"
-    },
-    {
-      "kind": "enum",
       "path": "maos_kernel_core::compliance::ComplianceValidationError",
       "signature_hash": "e1b8db9e91bb6bed689197701f85d50277d384095fccf50620b083d044240ffa"
     },
     {
       "kind": "enum",
-      "path": "maos_kernel_core::iac::transparency_log::AuditError",
-      "signature_hash": "df790d34660e428cbf432fe28db46f7393c04716fc937d36af182819dfa999ef"
+      "path": "maos_kernel_core::halt::ResolveStateError",
+      "signature_hash": "d67141ea535910a021dd31f1e25b0aab3528a1634dd91a26cd636aa095daee8c"
     },
     {
       "kind": "enum",
-      "path": "maos_kernel_core::iac::transparency_log::FrameKind",
-      "signature_hash": "dd34dcd3c49670ffa19dab38c2a5794008d6c2530f970135453aa3723e007bd2"
+      "path": "maos_kernel_core::halt::SwapVerdict",
+      "signature_hash": "489a254fba38c636b84c434cde5980ad4a2ce9cb520949cf74be36b11e9eb99b"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::hot_swap::archive::ArchiveError",
+      "signature_hash": "ccea0ab475f9b9d9ee617fafd95f3ddc7903b9bc19f657fa3d53a5af63745940"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::hot_swap::saga::SagaCompensation",
+      "signature_hash": "3263bb2da7af9167d49e4b34834b1bd8755a20af2525d073292d7a8beb22197b"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::hot_swap::saga::SagaPhase",
+      "signature_hash": "21dff135c0abf8067d5e051984cbff700ef7eac3c4082d9aa52e7106a325c89f"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::hot_swap::state_codec::StateCodecError",
+      "signature_hash": "d4c882296e8e0967067a77fdc989aa1b2f4337daf11dd27e3c6b0548332e64f9"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::inference::router::RouterError",
+      "signature_hash": "fe2b26514b1e62ff1501c46da7fcb8b2ebacc29de3b55e7d899d8c7836ec56af"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::isolation::runner::IsolationCorpusError",
+      "signature_hash": "fabbf6d5bf7b6e665b8f1070d6a3e2cf2173f79c567a7e2cb2337476e95f285c"
     },
     {
       "kind": "enum",
@@ -99,8 +89,53 @@
     },
     {
       "kind": "enum",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::lifecycle::RecoveryAction",
+      "signature_hash": "f2c978cb0658e5161e27c0679093920ad2718fbe16f6ba80ff83862e989c6051"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::lifecycle::upgrade::UpgradeError",
+      "signature_hash": "8692fc521ee773ea495a7b1bf1f62a894e0297f441bf34cfd26265b863c3332c"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::lifecycle::upgrade::UpgradeOutcome",
+      "signature_hash": "1d8e90cf2b4d1dc807e585554065e82a1fba4ca2d41a128c1af34e850a87f1c8"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::lifecycle::upgrade::UpgradePolicy",
+      "signature_hash": "1ee6a8c9ad65235ee5c5dc6202d9375f2355610100f7660c9aaaa130b9e3e014"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBufferError",
+      "signature_hash": "c8b994d0791687357c8a6a6aa7a62a379ffd0bd360fa9d8da6d298df246b74e6"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::scheduler::control_block::ScbLifecycleState",
+      "signature_hash": "60cce97ca1e5c596a02908dbeb4c6b94ea41efa16e219c5d5b08e8bbd6c733bb"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::scheduler::control_block::StateTransitionError",
+      "signature_hash": "4964b3da244926841dc2a2bb41887c27a5469e95d98f1f892e24d19698399dc1"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::scheduler::hook_dispatch::HookOutcome",
+      "signature_hash": "9074ed9362898aa0e7b4afa0b173351b1657e2950785814a8865c9df8d5414af"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::scheduler::resource_ceiling::IoError",
+      "signature_hash": "d03987c48b050caa7fc2fb19f98b172612ffa7ee3a613b67e2be1ebcf1e899e0"
+    },
+    {
+      "kind": "enum",
       "path": "maos_kernel_core::security::SecurityError",
-      "signature_hash": "513f139200afa150f583812fa7e9454fa55ce268b1b48063ff3c2dbd152c2a1a"
+      "signature_hash": "afa1bd710262f366cae16e34b9e7b5e126af4e7a2358a4c19a3f0a3828459932"
     },
     {
       "kind": "enum",
@@ -109,53 +144,23 @@
     },
     {
       "kind": "enum",
-      "path": "maos_kernel_core::security::manifest::ManifestError",
-      "signature_hash": "6a52157fdfdddec014da4af0e1b3ef1d3691e1aca71727732bd67b8d74d0b163"
-    },
-    {
-      "kind": "enum",
-      "path": "maos_kernel_core::security::manifest::OutputShapeViolation",
-      "signature_hash": "e7867fd3f5307e2bc2a36b8ade8dad44a15db3211e9963b05113e4ba43a142a4"
-    },
-    {
-      "kind": "enum",
-      "path": "maos_kernel_core::security::manifest::Posture",
-      "signature_hash": "873c9e0b4ab77b5810a13c77ab5c0a76a808f7e3b3b8471ae844b0d03d73ec59"
+      "path": "maos_kernel_core::security::posture::PostureError",
+      "signature_hash": "0376cd4487c87fa5d19fd9d58a3f8d3d5ad39dd81d7acbfc83d3ed42435b898e"
     },
     {
       "kind": "enum",
       "path": "maos_kernel_core::security::sandbox::SpawnError",
-      "signature_hash": "00252f51822cf12f6035205d36a6f9f5eb8b6e31142a9494dff15ac08ca726db"
+      "signature_hash": "6182c758a4b859a08a1d549aa3e685f39a51c95666fd7ddf519134895987bfdb"
     },
     {
       "kind": "enum",
-      "path": "maos_kernel_core::telemetry::iac_rt::ErrorKind",
-      "signature_hash": "4966433470c4705ca5fd41896db653abdccf7086f87d3ceea38f8a33155cf6c4"
+      "path": "maos_kernel_core::security::sandbox::t3::quarantine::QuarantineOutcome",
+      "signature_hash": "8104cf95397ae4b090a5dbb5bc56d9438ed415b00db4f547939caa4ee7f7272e"
     },
     {
       "kind": "enum",
-      "path": "maos_kernel_core::telemetry::iac_rt::Outcome",
-      "signature_hash": "911ea6b65cb3580c3c01500751d0e2842a588c3ab1f384c49b5320577086ed58"
-    },
-    {
-      "kind": "enum",
-      "path": "maos_kernel_core::telemetry::iac_rt::Service",
-      "signature_hash": "7d3a4e316b59a85c54dbc3d1c83b28e04e5289302d3badb559367c0d86c4fc91"
-    },
-    {
-      "kind": "fn",
-      "path": "maos_kernel_core::capability::cap_audit::audit_drop_count",
-      "signature_hash": "bc4fff30ae5cdff1c546650d3bbfecc33eccff7905eec87949529b0598fcbe71"
-    },
-    {
-      "kind": "fn",
-      "path": "maos_kernel_core::capability::cap_audit::channel",
-      "signature_hash": "201aa026d80e3435662ccdcb6629e197a195aed9b86b3d90e47a8b59a164760a"
-    },
-    {
-      "kind": "fn",
-      "path": "maos_kernel_core::capability::cap_audit::record_drop",
-      "signature_hash": "0b33e06031e1f4f41d2e2bd71590918aca2c4edef013971d64cb44773e4a7157"
+      "path": "maos_kernel_core::supervision::cold_restart::DrainError",
+      "signature_hash": "d03369ad04896d0b208dbd56a123bcf1bdf025c3b67bb192c12c859bf6041737"
     },
     {
       "kind": "fn",
@@ -164,28 +169,128 @@
     },
     {
       "kind": "fn",
-      "path": "maos_kernel_core::capability::cap_tokens::body::scope_hash",
-      "signature_hash": "6c41955b00d52293326ed7a3221c46999f6dfedaec58c5f9c5b5d19e9f2faa4c"
-    },
-    {
-      "kind": "fn",
-      "path": "maos_kernel_core::capability::cap_tokens::init_monotonic_base",
-      "signature_hash": "3d2471bb3b8fe2a261687c7a14a9c7fbeccfc1ff39dfea025aa69985493b3a2c"
-    },
-    {
-      "kind": "fn",
-      "path": "maos_kernel_core::capability::cap_tokens::monotonic_now_ns",
-      "signature_hash": "2f7d1c9c9863526a2463ac7df49342317c475406ce933d7ba38ea18452d54469"
-    },
-    {
-      "kind": "fn",
-      "path": "maos_kernel_core::capability::cap_tokens::shard::hash_token_id",
-      "signature_hash": "99a13ab5706506d53dae897b45f17a9bea1d8944587d1068ad0b56b58a82122b"
-    },
-    {
-      "kind": "fn",
       "path": "maos_kernel_core::compliance::validate_envelope",
-      "signature_hash": "92fb4c62c71fa3ea08f0970573024bf1cafc43d5adb3a855b21340cfb6bac98e"
+      "signature_hash": "371863fce8034c603147c30dbd4b4a0c08b42a4e8f55291b27a97606790da21e"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::halt::invoke_halt",
+      "signature_hash": "03ebf41abd307f707654e46563ef1d78ad20b160c2207729d6ce1542dd429f8c"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::halt::journal_halt_resolution",
+      "signature_hash": "313f082c57af1fd0cbb44ddf4babd6e7205bd6f739a49bc08ccc1bc92f7f39b7"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::halt::termination::terminate_spirit",
+      "signature_hash": "b0c5c1bfacdd36c213bb08668db908bc6da7de8de45460c73ee98f37ec18ee65"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::halt::validate_halt_set",
+      "signature_hash": "1e5ce813fd279b55c591bc3ef5fc7dee3567c95ed6cef4d2e3cfefa69b7ac004"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::halt::validate_swap_halt_continuity",
+      "signature_hash": "bd0aca3fba2babcfcd0139e55a53d5d8ea4f7280472f78587860cc633a6a3892"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::hot_swap::migrator::matches_version_pattern",
+      "signature_hash": "b64daab3822bf6b28692abd7780ea0e3e0038e2c7fa2ff7d0f75c646badb18ae"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::hot_swap::migrator::run_migrator",
+      "signature_hash": "0610e2900349941d3903ed37b8bd92036e228a009b2685009373ed81b3301d74"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::hot_swap::state_codec::decode",
+      "signature_hash": "794bf77912cbaf6e9483c1e899369bf5dc341b8c48fd78eabedb7745214c3629"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::hot_swap::state_codec::detect_compat",
+      "signature_hash": "faa9d4aa5e798be654a83af298055a393814f18a12ce89ab61ef5460c7d1f39d"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::hot_swap::state_codec::encode",
+      "signature_hash": "c4652857895c6b63745fb05173d4b05a309dab99caaa64d4276cf5761de64b7e"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::io::take_io_journal",
+      "signature_hash": "8e6d07b7b3f61c3da2b3449226a59b57d9f050a19b5e91ee8102cc2eafbc452b"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::io::take_io_journal",
+      "signature_hash": "da8f3551cdc7396837f3ea4b03363bf9929c23d83204c1ce98959fa21056933b"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::admission::admit_cli_wrapper_journaled",
+      "signature_hash": "e1beb6e477393788d2105e4e0b7fc289c1f99129594c6b87229a5e04f3f15e39"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::admission::probe_and_verify_shape",
+      "signature_hash": "d4f9c16b3cdfb1bdea113658ebda791b639758e3482f52e884fcdec3754d19d8"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::lifecycle::handle_subprocess_death",
+      "signature_hash": "7f5d94510225130876612a7ebae71c66a40fb52a03334c92b37866097fd30c44"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::argv_prefix_hash",
+      "signature_hash": "4c6ad64994ae35b7545338d540e8f7e7b4db094aaf5e116a6aa15cf72049d140"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::orchestrator::journal_director_lifecycle_action",
+      "signature_hash": "e998afa3191530d4f135c0ce849851157159a93900c261396aa26123929f11a4"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::orchestrator::journal_orchestrator_queue",
+      "signature_hash": "aab2f6ec33ba241a392eeb5e0e2286ed3fe7022cfd20aae7c73f8de7cda9d095"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::orchestrator::journal_token_revocation",
+      "signature_hash": "ee31723a4d17fcc60cfbd8c4a1af32d7c3d1648c8bb8516cbe9a7a199f7b6c60"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::revocation::parser::parse_signed_crl",
+      "signature_hash": "6130c2f93e6459a6e00a216d1cc5b6bb6b90b1920f707ad2cbbc300510e6bb3b"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::scheduler::control_block::make_spirit_obj",
+      "signature_hash": "a78a598b461830e0c620f0fed17117c29709c2f1e069db9736b57a3896162907"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::scheduler::idle_watchdog::pick_poll_interval",
+      "signature_hash": "4267eac86d830a59d3c751d1ec0e18044f8df9669f48043ff2d3828700b03ae4"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::scheduler::resource_ceiling::apply_resource_ceiling",
+      "signature_hash": "d9c5b076400c6a5fdb713cdabb16e95397007eeafe4a960bce7d46e70fb20a86"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::scheduler::scheduler_loop::pick_next_spirit_from_slice",
+      "signature_hash": "69a0d02e61254e95f2116ab633d270543f2cb9f838ee1dd738edb28ac9aba444"
     },
     {
       "kind": "fn",
@@ -194,13 +299,13 @@
     },
     {
       "kind": "fn",
-      "path": "maos_kernel_core::security::manifest::capabilities_required_to_scopes",
-      "signature_hash": "2bc7ca314e104728f624a71cfc6579b74af6a4e6f996251dad547b17c67cfddd"
+      "path": "maos_kernel_core::security::posture::journal_posture_shift",
+      "signature_hash": "a4a1957a0777b4bfcdcf9289c1f5eb043b83a34d0a74ac8a06a0ee5dc3739ac9"
     },
     {
       "kind": "fn",
-      "path": "maos_kernel_core::security::manifest::resolve_caps",
-      "signature_hash": "9b70301a934284f89ab5f22f6e54db317852ab6d9241de2d0bcf760dadb6d8a8"
+      "path": "maos_kernel_core::security::posture::posture_requires_approval",
+      "signature_hash": "8fc80f7bc734faf2d621cd6b30bea9002057b597f13419d6ddd853020a70be08"
     },
     {
       "kind": "fn",
@@ -220,7 +325,67 @@
     {
       "kind": "fn",
       "path": "maos_kernel_core::security::sandbox::spawn_sandboxed",
-      "signature_hash": "b549c7bd63f3773b6a29eddfc131c91191efdbb132ab5e824bbda69f66bc340f"
+      "signature_hash": "e1f9e9ee0ab40079d30835b2512ddc33ef65a6558c60af2949c07f1e6dd0e3fe"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::argv::build_runtime_argv",
+      "signature_hash": "4595b8d83c7bd1f295488b5486bdcd065fd6f84b34f87e0f39064298b6284d94"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::cap_audit_bridge::emit_t3_escape_block",
+      "signature_hash": "05569126fa81ee7d2d3c3be3799e2484cbc20eb6a33d7e7d5bbc31d6c79c86e9"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::cap_audit_bridge::emit_t3_escape_block_probe",
+      "signature_hash": "36ff6435824524fca85cfc38da6c4b47fdd84e5df0addbc301b48ae3ec6ad4c4"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::image_lock::get_default_image",
+      "signature_hash": "11830ac7d40f51dd78db99cc54761bdbe906ea6686027900de34a1a568e2da5e"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::image_lock::load_and_verify_lock",
+      "signature_hash": "0e4fdeb4bde9a70e17722d1cd0d3629f59e4d10853704f30ae2d3f20b085ccd4"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::image_verify::inspect_image_sha",
+      "signature_hash": "d1f97853b5c00a4a1c84bc6aeacb1e5b6aa0b017a31c389776a3a66d48305c4d"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::image_verify::parse_signed_image_attestation",
+      "signature_hash": "f7770f73b1cff5699e97f503dedbeb36e9b890921a60aecd8a6c969227b8e795"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::image_verify::read_trust_anchor_pub",
+      "signature_hash": "a3ad75e3b129af5667b5c75127a20d8173f572b9a4c38db5f514793251a36ccc"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::image_verify::verify_image_attestation",
+      "signature_hash": "67a13bb8cfe9d9b453995820ca1fb670844d6e27af2eb031975eb4af10ecb15b"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::quarantine::quarantine_spirit",
+      "signature_hash": "2d9fa17e73b32792bcb17777b0bb48218043251d6b717b6526bfd758d058a6b9"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::runtime_detect::detect_container_runtime",
+      "signature_hash": "a6d9c601d9be1fcd4c28925da27860a99d144e0473c069b6a4cd7a66f794a906"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::spawn::spawn_t3",
+      "signature_hash": "ff80e28eb50573b5102078dc4b2184d270ce919477143bce04848e278e34b8f0"
     },
     {
       "kind": "fn",
@@ -233,14 +398,24 @@
       "signature_hash": "58caa4fdc8f53d5e9e6c88721fd048835e830fc0572ed15977b576578e76289c"
     },
     {
-      "kind": "struct",
-      "path": "maos_kernel_core::capability::CapabilityRegistryAdapter",
-      "signature_hash": "e2d86b1a51a6a966c5040c797ed59f94dbf5a06f807bb70f4145610354486744"
+      "kind": "fn",
+      "path": "maos_kernel_core::supervision::cold_restart::graceful_drain",
+      "signature_hash": "dc62cf69fe4ff7764847744cb8bc48ad18c1fd325c5d25685bee2930a343a69a"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::supervision::cold_restart::hard_kill_drain",
+      "signature_hash": "d651025f1f403a8300328eebffc1d64b35640423ec4eec84d8d1ee1b6e76371a"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::supervision::disposition::enforce_disposition",
+      "signature_hash": "156e92b5aaf3aca39063298139b2b182a1f517d734c0abcb827e48c2e74fe694"
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::capability::cap_audit::writer_task::CapAuditWriter",
-      "signature_hash": "68cc0970c4b0d20a483ce91fe0d82b982ac1f5f66cd361abde93151b08f9e3dd"
+      "path": "maos_kernel_core::capability::CapabilityRegistryAdapter",
+      "signature_hash": "71181e3ba32e3563f384179570df43de607906a49bdd0f60f98d3bc050396fa0"
     },
     {
       "kind": "struct",
@@ -260,7 +435,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::capability::cap_policy::PolicyTableInner",
-      "signature_hash": "a4c67c4ba1e5214fd11ca0583daecb2207318de558990df2a332140dafe4ec35"
+      "signature_hash": "22ca77706ae597cf1733c3eec89f49d8d1d598cd4682b942496dd18e2869ad2c"
     },
     {
       "kind": "struct",
@@ -269,83 +444,118 @@
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::capability::cap_quota::CapQuotaTracker",
-      "signature_hash": "14afbd0656f55eb12def3172bb224808b5b39e52be7acc9625a3f4177d1fc72c"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::capability::cap_tokens::CapTokensShardRing",
-      "signature_hash": "ca38bbb39a3dd9d4c9a2330ad9996ff06df220987febfced01eb76bf98977928"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::capability::cap_tokens::body::CapTokenBody",
-      "signature_hash": "f39972bfa7629c5b098ece62011c16e91e2344fe7b4e6c025b4d23a7514f509f"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::capability::cap_tokens::key::Ed25519SigningKey",
-      "signature_hash": "ad31cb358d759d523b58b81d87d83389b4f72b15b6db4f695e498831eaf1f245"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::capability::cap_tokens::shard::CapShard",
-      "signature_hash": "ef95d4e2a45ce1b65c0ca5c2f34721608a640e81a81683d41d0123314d7c362c"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::capability::cap_tokens::shard::TokenState",
-      "signature_hash": "2570bde8dc309919aacf548217d4502f61220c61959b41daeca8bf0d61b0600c"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::capability::cap_tokens::shard::TokenStateSnapshot",
-      "signature_hash": "3b644a8a3f817e7118e74f0921a15a564af80c4795b06ae3252ee1271a37469b"
-    },
-    {
-      "kind": "struct",
       "path": "maos_kernel_core::compliance::ValidatedClaim",
       "signature_hash": "713cc2820dfec8cbe9eed3704844bac7e8aae2c95a89d87f94d87cecb5761a87"
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::iac::IacBusAdapter",
-      "signature_hash": "09c207e330378ced583804f0c25b91bd7b772d9f586d161cb253105b73836311"
+      "path": "maos_kernel_core::halt::HaltRegistry",
+      "signature_hash": "e9937d14a7b757d982587b02e907dd3385da7622ffc9b5b25144a4d762faf0b9"
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::iac::mailbox_stub::MailboxStub",
-      "signature_hash": "43f0e58eb4cfa21447fd7effcdf8a1347df48bc8c581dacaaf10e17fdb214722"
+      "path": "maos_kernel_core::halt::PendingHaltMetadata",
+      "signature_hash": "36292337a1aed2f647a40a8cf87a788ade0086f0185cc5cdf8a0082201c7f933"
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::iac::redaction::CorpusBackedRedactionPolicy",
-      "signature_hash": "e5007da81735127ae1a2dd4e75999e2d624bc74542c4b85a28af709ab1812104"
+      "path": "maos_kernel_core::halt::output_markers::OutputMarkerRegistry",
+      "signature_hash": "ff52e4e2b78eaeebbd063e6281ed90b60b3b92640cab16c0bb0b75689fb1537e"
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::iac::transparency_log::FrameFilter",
-      "signature_hash": "7ff2a2ce3686afe6f49fa0cf60e084f92cdbbfdf56b5000a16692c9d0c3efb04"
+      "path": "maos_kernel_core::halt::resolver::FailingHaltResolver",
+      "signature_hash": "c2fdc5c47758ec5d963cc8c79583783023f9b8c7545dcb3cbd5cce64c57f111e"
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::iac::transparency_log::TransparencyLogAdapter",
-      "signature_hash": "e2ca3872249153eda103227e8395a9c25abac15377e6ad6aaa7931134c5e5987"
+      "path": "maos_kernel_core::halt::resolver::KernelHaltResolver",
+      "signature_hash": "9909c4a824bc0af03e3f8675b37d062fc6701cdb97a12f7ae9ba816ef2227da7"
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::iac::transparency_log::TransparencyLogEntry",
-      "signature_hash": "c0a954a36636e49b813a88ae02d8a8fb67d0485bafc77ead9e8ed0ee37539ca1"
+      "path": "maos_kernel_core::halt::resolver::MockHaltResolver",
+      "signature_hash": "b93fa6f78ae183d984ef715947af6cfcf525acb9405a1f0398d4b74bc9f6b7ed"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::hot_swap::archive::SpiritArchive",
+      "signature_hash": "f246778e4f40d3f0d32e717e623ca6dd029e58d4d63af7f74236efd74b8f09b5"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::hot_swap::coordinator::HotSwapCoordinator",
+      "signature_hash": "c0cdcfcae2f6e1b94e3ca127c75314e34d3e8647a2f391ced68955da52f9459e"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::hot_swap::post_swap_monitor::PostSwapInvariantSnapshot",
+      "signature_hash": "3874ad9d22c6c4d3ecd03dd8a9eeae61408e5c6203a0c5377037c8814ea07c27"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::hot_swap::post_swap_monitor::PostSwapMonitor",
+      "signature_hash": "e679e5f2ca5910e29779736a4db1e019680f29547b3708942ccc059d8b52c3fe"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::hot_swap::precheck::HotSwapPrecheck",
+      "signature_hash": "83b7e9ba8e606cadfb165e0930fe08c3033b94e1039dc3506c6d7bab84032b90"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::hot_swap::precheck::PrecheckVerdict",
+      "signature_hash": "d098fad7c7bbc2c845ad92b88a86508806367dcd907a8d1deb01d0b668e8c45a"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::hot_swap::saga::HotSwapSaga",
+      "signature_hash": "d1e422b5890ebb954bca345e53d6e402e3d3a866ca018a791d177ea56f46620a"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::hot_swap::state_codec::StateCodec",
+      "signature_hash": "29608095256d9ef78e9d690ed05549810458575168288b59b2e1ba43269b1af6"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::hot_swap::state_codec::StateEnvelope",
+      "signature_hash": "0330a1bb8291cd8c2452b5fa526b06246c6cae9396ee7ebf8b6164731fae2beb"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::iac::ScbTracker",
+      "signature_hash": "361bd076d2e1f9a4a21f6c66b7bc85ecd60719669bb023bee95efc8deebf7e64"
     },
     {
       "kind": "struct",
       "path": "maos_kernel_core::inference::InferencePortAdapter",
-      "signature_hash": "bb7564dc4cb8cbc801a8701edfc6b55dd0037119a7ddd5af2450e0fedde28bf0"
+      "signature_hash": "cccb8505cccb67f22e4412a627dd03652e391c328b52e0b8b24018bd0bc8c787"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::inference::router::MultiProviderRouter",
+      "signature_hash": "f7a88a7bfe723756177d40a2bec64073946a84cab5b52ac4e7966cec0232223f"
     },
     {
       "kind": "struct",
       "path": "maos_kernel_core::io::IoSubsystemAdapter",
-      "signature_hash": "7c2dfb608a91df250ab05773979a26c904dee87ed275adf814a9f3e682d76e11"
+      "signature_hash": "48293107fcbe446968bbd6b9d2a0c6389838507e9a5a4e40852e73764818d78a"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::isolation::runner::IsolationCorpusReport",
+      "signature_hash": "d783032c2fdd86730e8a6cb36fe0ee5d0d8a5928902f94936bd506045c2c5208"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::isolation::runner::IsolationCorpusRunner",
+      "signature_hash": "5c242737ab5e76af435b76fb46112215dcf167c4fd181af667f5a414aec675f6"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::isolation::runner::ScenarioOutcome",
+      "signature_hash": "bda48e22274010a91865146a311ff998fb01da15931a464597d44ddbc3d29f16"
     },
     {
       "kind": "struct",
@@ -354,18 +564,158 @@
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::memory::MemoryManagerAdapter",
-      "signature_hash": "de6191a63245cf56aacbdcf1046dff3a4f517d4372e7efb2e99625a035712c47"
+      "path": "maos_kernel_core::journal::RecoveryReport",
+      "signature_hash": "6ac57ed36e0a848190720336b3b6dfed579d83d65f241c46c356ecb1942ec39e"
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::scheduler::SpiritSchedulerAdapter",
-      "signature_hash": "c37dcc42e04791296df45eea15034bb02521274319ae0e15542bb2ff16b1dd20"
+      "path": "maos_kernel_core::lifecycle::upgrade::UpgradeOrchestrator",
+      "signature_hash": "664e9b230972e4e6b0d4ce2dd3c9e7200f236e60946d7f502156a8eb27fed56b"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::lifecycle::upgrade::UpgradeReport",
+      "signature_hash": "3c97786867081168e2102fcd2c5d9f818949f35461730728dc7b95fc3b80fea0"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::mcp::McpClientAdapter",
+      "signature_hash": "9930696fff6d521a297f2eb050d5bbbfac3272482fa71880a946cfef9cc2a9b2"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::memory::MemoryManagerAdapter",
+      "signature_hash": "92e71542bcaf9624b00b5e342721eb665546d0411e678b1db88713d33d725012"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::memory::for_spirit::SpiritMemoryView",
+      "signature_hash": "2887fedd6c0ee29e2a105a586ae5b52b4f25bc2c5456312031174221d4c8aa91"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::memory::principal::PrincipalNamespaceIndex",
+      "signature_hash": "cdea73efbe799780b9c0d7628a588150db94227eba713983c266edf1716720bf"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::memory::private::PrivateMemoryStore",
+      "signature_hash": "12baa5f3c27a9dcc9577b7769d4d20882181d343d06dd7b16471ef44d0e7c5d0"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::memory::self_telemetry::SelfTelemetryAggregator",
+      "signature_hash": "31eda5fc0b954876d715b3a232f3182522ad2050eeddc70d233131aed88e382f"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::memory::shared::SharedMemoryStore",
+      "signature_hash": "87d09d95fb316f474e216d58ee54b54f7d77fc3a005eda0a42d5d703128431cf"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBuffer",
+      "signature_hash": "bc5b5f303fe4765e66a12d42d0c6c697e04eab465f0cc910e2c8093347be9bbf"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewayFactory",
+      "signature_hash": "e3769402e7b1b6cb88c505ff6818b2ac8c7196a95f6ffb07606263075340584e"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewaySubmodule",
+      "signature_hash": "aa247fcdefe027b99769dd34f4fb6be50bd27e04dda381bad68320534f9fcb36"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayDispatcher",
+      "signature_hash": "8a7d5f9f3805981bfbbcadde402bf4c74a37796356dba00595749bd7f2d6a33b"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayInstance",
+      "signature_hash": "e43084217a651985c1297473c5d2d0af16d0d8ef57507684914e52fe7ec0e399"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleRegistry",
+      "signature_hash": "b54ebaebf55bff796bffe1ef09b478e95f3fe5c2476224e45d2552a88b40756a"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry",
+      "signature_hash": "feef140f5b1435c62d2f8887f9f55eb5b2daa9606908259cb43ca4ed83b62dd7"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::revocation::applier::RevocationApplier",
+      "signature_hash": "f30abaeeff0dc925045a9528d4860e7b51283c9df36d88c2bc1362dd40c5fb39"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::revocation::poller::RevocationPoller",
+      "signature_hash": "9d784772dfe3d37f5e33dfd9b17aff1a464b017441b54ff1bc11582f607e0abf"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::control_block::SpiritControlBlock",
+      "signature_hash": "749702389be6166622ee617cf17bf198afe5014d5341f6b311592daefaab7590"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::control_block::SpiritManifestBundle",
+      "signature_hash": "fc8a5e4128a4cf5448d3d79ae71535dba9b2f84dafd51ee2538ccd3468cd4d11"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::hook_dispatch::HookDispatcher",
+      "signature_hash": "119bb753db73e97a9aadb9f37ede768b97ef9c3a723ad1a912d260d27827b890"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::idle_watchdog::IdleWatchdog",
+      "signature_hash": "1eb641c01618e82c76ba699c7493f8ab5a71931b9bfdd554fef5bb430648d6cb"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::kernel_ctx::KernelCtx",
+      "signature_hash": "2c9c0343bc0b3c183063d031aaec37673fca7fca2e10aa4600d3606ca112adcf"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::resource_ceiling::ResourceCeilingHandle",
+      "signature_hash": "59e08f41b30dbe375527a39021e9f2c031d7bf3d8be2324562f326c9cc4bf20b"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::schedule_watchdog::ScheduleWatchdog",
+      "signature_hash": "67c22544eabde3cddeda1c1ebfe43b42bef951fef958d8d7d2c63f78962af6a9"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
+      "signature_hash": "620c2619b47bbf3ee947e2c42da8814f4cb8fe03435addf24a10ae522e5ae876"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::verb_resolver::KernelLifecycleResolver",
+      "signature_hash": "8edf4d29cfa991900214608aca3e195907a63d4a6162a5436ec3f3576b94e7ba"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::scheduler::verb_resolver::test_double::MockLifecycleResolver",
+      "signature_hash": "a63602c9e9de433c1bd342935e555f3f43ea807a949ee1fdcd9348e3e0a663b9"
     },
     {
       "kind": "struct",
       "path": "maos_kernel_core::security::SecurityManagerAdapter",
-      "signature_hash": "9c46ea669d144419c96b1c5b74371fae55c2fc276fda36b4af8dba03631c0f00"
+      "signature_hash": "0bb714f5c17b24130ee64ec757c865435b9f2b86b7a5de0d0ac8eea9a676d477"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::approval::ApprovalManager",
+      "signature_hash": "87f1c1debc4b9e91d5a085c213fe257cceb383899818dfc97c949869342eda12"
     },
     {
       "kind": "struct",
@@ -379,58 +729,13 @@
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::Author",
-      "signature_hash": "1e8df48f380eef22e5d083ee46415bed3ae848a9cf943d1e7c74e7daf0c0fa53"
+      "path": "maos_kernel_core::security::operator_config::RegistrySection",
+      "signature_hash": "7e39521a33a0f56b47a5ec4030cdab57353c5932f623e02a9d98186c77509a1f"
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::Budget",
-      "signature_hash": "67b85761a02a8d2cb932672149307d250ca6556391fb83d626f65f6c0d7a830f"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::CapabilitiesRequired",
-      "signature_hash": "b99057be7e03503907d0ee2c3395008a436a4428111609ab2025b0ce52ccfe27"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::ClassSection",
-      "signature_hash": "6d152996e6f03fca6adb4303d275e8697abfa381c8ef87bafaefc6b00b52cfc3"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::OutputShape",
-      "signature_hash": "83c5d23a2ff679503e569429b9788f3394e7325249e6c2a6f34de1990cce8e98"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::OutputShapePredicate",
-      "signature_hash": "8d53193715c1d2f50d386adb21da9a6bb023e2c16061812c91587cb6ed9a2efb"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::PostureSection",
-      "signature_hash": "ffab9f21b83edc00692307e37d2c90b551474b133814290d397b9f70aff390b5"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::ProviderCapabilities",
-      "signature_hash": "96af8b5f2756e3b56d6101b24de21fe2152b2aedf62859b5abbd966eae8545d6"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::ResolvedCaps",
-      "signature_hash": "ed475dc4080503a8f3dd635402cf0f10886d8fb65dcce8929d92d1edc637d22b"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::ResourceCaps",
-      "signature_hash": "4d7bb98eb8d83022d371a0762968f35ae51948159dc9875bf4afc261d45e6452"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::security::manifest::SandboxConfig",
-      "signature_hash": "cdf5d1b5a04637050a93c3d4b40f9167bf005de4ad30f69a3a6fb574e3df4301"
+      "path": "maos_kernel_core::security::posture::PostureState",
+      "signature_hash": "e8d423d61b6920ea389d504daa9331300b4aa452dcddf767a9947ef97e6188e0"
     },
     {
       "kind": "struct",
@@ -449,33 +754,98 @@
     },
     {
       "kind": "struct",
+      "path": "maos_kernel_core::security::sandbox::t3::child::SandboxedContainerChild",
+      "signature_hash": "5cc573428750aa7fa9a7da4644aceeb58ae312c007b1229c22454c928d5c8087"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock",
+      "signature_hash": "f8bf31220c05602a0c4c2253aff03aa65df70d6e83eced7930d303c2fdfcc946"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::sandbox::t3::quarantine::QuarantineReport",
+      "signature_hash": "57c0634de6b10938f9c222fa3e58e7f52ed126a6d7c9c170b06f7b430a04f3cd"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::sandbox::t3::runtime_detect::ContainerRuntime",
+      "signature_hash": "bb1eee3a255f5598d5382282d1a3ef8877199c83b9955bd7f153e30a02f7f39f"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext",
+      "signature_hash": "c350940715074ce75bcf1654ba1316c0ca2883951a8ab122b80b688012c03967"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::supervision::cold_restart::DrainReport",
+      "signature_hash": "5f8c5625f211339417b76ab537d06bfab149e90606c32ea10fd36b27bfae195f"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::supervision::crash_detector::CrashDetector",
+      "signature_hash": "7d61949c233868cbd574a02b35a2493f24ce76ece5fe78d0ef430d0b42ce2cb5"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::supervision::progress_watchdog::ProgressWatchdog",
+      "signature_hash": "b6f125d153d58e26f7732259d4fd8aec2837475dbb00d6704410cb032136a81e"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::supervision::silent_failure_detector::SilentFailureDetector",
+      "signature_hash": "b8b79cb1b8c27effd08980c598c22544b1abd4d0e1940e751e35705de97d56bc"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::supervision::test_double::SimulatedChildSupervisor",
+      "signature_hash": "02db5fe0c0f32ef2658a87a09de62424a28ff97dce81a277a43be84c1626f8ca"
+    },
+    {
+      "kind": "struct",
       "path": "maos_kernel_core::telemetry::TelemetryStreamAdapter",
-      "signature_hash": "d527b6aaacbcd693005a6be1c19453953b22857ca41edeaf2d6ddcdb2d8ad6b1"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::telemetry::iac_rt::IacRtMetrics",
-      "signature_hash": "6b25112cca4dabcd024fced1f34cddb30b14b2d3c9d4c8cd469167c6f4ec33f8"
-    },
-    {
-      "kind": "struct",
-      "path": "maos_kernel_core::telemetry::iac_rt::InflightGuard",
-      "signature_hash": "1ca559ce232ff135d34d0012c8a41fd5bb4ee586abaaa025ee6dcb54105ace0a"
+      "signature_hash": "bc543918b6b996150990e3a9f5cdc125a8bac7ba912708c725599cc9645a11aa"
     },
     {
       "kind": "trait",
-      "path": "maos_kernel_core::iac::redaction::RedactionPolicy",
-      "signature_hash": "397c9c314f2d33a093f7c61719405e8ae65eb5a68eb2dfa5e9aeb221544d6bd3"
+      "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleFactory",
+      "signature_hash": "19c1df3624f8bcf8faefab71a30ed3eb372b5d7adce95ac6919e083f54a3afc3"
     },
     {
-      "kind": "type",
-      "path": "maos_kernel_core::capability::cap_audit::Sender",
-      "signature_hash": "02a17ddb9a115080f38e81ae3d23ea39840b585549ddb475c1a48cdc9de4172c"
+      "kind": "trait",
+      "path": "maos_kernel_core::scheduler::control_block::AnySpiritObj",
+      "signature_hash": "11fa92af548d211c71ea5aedc3d991466eaa91f416335ffe5e418e857f8bcb3a"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::api::crate::capability::CapabilityRegistryAdapter",
       "signature_hash": "8ae7a3fcb072975428bea5ab9b3e4eecab0678f822cb8bf715cae7ada2f45b52"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::capability::SetScalarError",
+      "signature_hash": "7012a6be8fc3535203543cf46403c6c0119ac441114303e0bd991ad822890114"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::capability::WorkingMemorySlot",
+      "signature_hash": "ae7f9e53bd9549f351db47ddb7bd6509adb3357b911ad2a667195989b3e8bbc1"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::capability::WorkingMemoryStore",
+      "signature_hash": "019051f244eec002c418d15e77153b9da0917c2b7d63e44c883dd77c8b9f8861"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator",
+      "signature_hash": "a21d69b78352a60e5f4b5a59c80fe1d8908a2b7be8d65c06d4fb65dff5cea80a"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::hot_swap::HotSwapCoordinator",
+      "signature_hash": "cdfd10e7493e66d6ab4786d50cb6382682daac7c98c3e99db481b65c69ad9334"
     },
     {
       "kind": "use",
@@ -489,8 +859,23 @@
     },
     {
       "kind": "use",
+      "path": "maos_kernel_core::api::crate::iac::distillate::DistillateWriter",
+      "signature_hash": "09079c32f4df17c45357780984159124285e1113fb913b70f11d49db0c1d8460"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::iac::log_recall::LogRecallAdapter",
+      "signature_hash": "8a6bb9a5b43ad263bb95186d7c6ab82b03b80d16e83d212edbb168c5080438d2"
+    },
+    {
+      "kind": "use",
       "path": "maos_kernel_core::api::crate::io::IoSubsystemAdapter",
       "signature_hash": "38602532d7d94f03a63b3beec18eb03a4c83dd09abd60d5e769996eb2c6152aa"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::io::take_io_journal",
+      "signature_hash": "8c6fd6087181d909cf63fbc177907146e80f5bb55b6a552f3333ddc8cbd1ea6f"
     },
     {
       "kind": "use",
@@ -499,8 +884,38 @@
     },
     {
       "kind": "use",
+      "path": "maos_kernel_core::api::crate::mcp::McpClientAdapter",
+      "signature_hash": "954af2340569bf738891fc1a4771b6f07042438d9e736aed6508bc013d4736a3"
+    },
+    {
+      "kind": "use",
       "path": "maos_kernel_core::api::crate::memory::MemoryManagerAdapter",
       "signature_hash": "f7af5394b7ca4dd41c4cf6ed408907068ed6560550a7ceac4f4fac3240ab79e9"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::memory::for_spirit::SpiritMemoryView",
+      "signature_hash": "e6281fa4a010a6cf772494eeeeae8d2ce975481296a24945a1f1940431a0f67f"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::memory::principal::PrincipalNamespaceIndex",
+      "signature_hash": "9705d9586c0fb8ccf935a5925eb7239cb17f299f065c47e3164db70a8a5a66d2"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::memory::private::PrivateMemoryStore",
+      "signature_hash": "85d8f696d7806e50ae7f7732263076e00c77f89d98b9bf40bade269e59082ccd"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::memory::self_telemetry::SelfTelemetryAggregator",
+      "signature_hash": "7ab998e756d0113310c89a84945d8c8f20aba7971e815ddf49ba4952a7e6e9a8"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::crate::memory::shared::SharedMemoryStore",
+      "signature_hash": "05826cc7be3b2121c472b91d2971f4ec77cb793291bbd1fb8bb82f101fabcb8e"
     },
     {
       "kind": "use",
@@ -519,8 +934,23 @@
     },
     {
       "kind": "use",
+      "path": "maos_kernel_core::api::crate::security::manifest::ScalarPredicate",
+      "signature_hash": "62cc13c61c87b824c7ded3355ae478f8d895c94c8d31834dfb239d2809f92684"
+    },
+    {
+      "kind": "use",
       "path": "maos_kernel_core::api::crate::telemetry::TelemetryStreamAdapter",
       "signature_hash": "8826d9df3c7ee51f5fcc548c20905cd095c59260265384a5646364e5474b78e0"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::api::maos_domain::ports::McpClientPort",
+      "signature_hash": "4894c3e747357e1bb07cd1125cb1765c02c10b11a4758178eab4e54ecab83088"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::cap_audit::maos_capability::cap_audit::*",
+      "signature_hash": "99bf30e0310018eb8394d487722cdfe84bf09c95becbab801bc4b9db4dce6fe7"
     },
     {
       "kind": "use",
@@ -529,38 +959,13 @@
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::capability::cap_tokens::body::CapTokenBody",
-      "signature_hash": "4faf75f3370ff0f9d65af161c8aa5a86b6fd0f2b86c7238ecae14d3054577683"
+      "path": "maos_kernel_core::capability::maos_capability::cap_quota",
+      "signature_hash": "ec9d2e42c93b5ced7faf65b24fc090a6b37db00e97f8d7772f50171ae1d73aef"
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::capability::cap_tokens::body::scope_hash",
-      "signature_hash": "4faf75f3370ff0f9d65af161c8aa5a86b6fd0f2b86c7238ecae14d3054577683"
-    },
-    {
-      "kind": "use",
-      "path": "maos_kernel_core::capability::cap_tokens::key::Ed25519SigningKey",
-      "signature_hash": "3f5116e03ef4afe49f3ae2b6cc87a2d5276747926529ac611c4c30caafacc729"
-    },
-    {
-      "kind": "use",
-      "path": "maos_kernel_core::capability::cap_tokens::shard::CapShard",
-      "signature_hash": "d21e1fd2c344d422fd9b477118f8f13ab663a89c565d67cead019a6ff238012c"
-    },
-    {
-      "kind": "use",
-      "path": "maos_kernel_core::capability::cap_tokens::shard::SHARD_COUNT",
-      "signature_hash": "d21e1fd2c344d422fd9b477118f8f13ab663a89c565d67cead019a6ff238012c"
-    },
-    {
-      "kind": "use",
-      "path": "maos_kernel_core::capability::cap_tokens::shard::TokenState",
-      "signature_hash": "d21e1fd2c344d422fd9b477118f8f13ab663a89c565d67cead019a6ff238012c"
-    },
-    {
-      "kind": "use",
-      "path": "maos_kernel_core::capability::cap_tokens::shard::TokenStateSnapshot",
-      "signature_hash": "d21e1fd2c344d422fd9b477118f8f13ab663a89c565d67cead019a6ff238012c"
+      "path": "maos_kernel_core::capability::maos_capability::cap_tokens",
+      "signature_hash": "320cfb8d2563428dce39f10fa1c54a2dd71a2c684d81e2a03e020dbdd8df2b40"
     },
     {
       "kind": "use",
@@ -574,48 +979,173 @@
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::iac::mailbox_stub::MailboxStub",
-      "signature_hash": "a6423943f96ec6fa37a435667d787280e0df9865a836f03183e4fe8ba20798f5"
+      "path": "maos_kernel_core::capability::working_memory::SetScalarError",
+      "signature_hash": "f8b502ad7c49b9bf79ed53b9993818488eebd902282213089ed3508e187e4af6"
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::iac::maos_domain::ports::IacBusPort",
-      "signature_hash": "8ebddd67ed06dca7db0de2a3d99533803a84905c13df6730409ab0d7d0bec352"
+      "path": "maos_kernel_core::capability::working_memory::WorkingMemorySlot",
+      "signature_hash": "f8b502ad7c49b9bf79ed53b9993818488eebd902282213089ed3508e187e4af6"
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::iac::redaction::CorpusBackedRedactionPolicy",
-      "signature_hash": "3cd781bae79b2e422b9f111025a937f01f714b5ed7a903a6ac2a9098a4ca388d"
+      "path": "maos_kernel_core::capability::working_memory::maos_capability::working_memory::*",
+      "signature_hash": "b6fae8e4f8ce1890fab2f94c4dbae730dcf0311b35f84bceeaa0279059f17b8a"
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::iac::redaction::RedactionPolicy",
-      "signature_hash": "3cd781bae79b2e422b9f111025a937f01f714b5ed7a903a6ac2a9098a4ca388d"
+      "path": "maos_kernel_core::capability::working_memory::store::WorkingMemoryStore",
+      "signature_hash": "411ad28b7e0a525b1ac76612d6a59cc14891d21e89e9e05aa7a8f0e07685f8f5"
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::iac::transparency_log::AuditError",
-      "signature_hash": "64a3cb90eab60353546ae1f6303c2e09fc3c8f6dcf3a73bbb7839a3159ca9a5c"
+      "path": "maos_kernel_core::halt::maos_domain::halt::HaltResolver",
+      "signature_hash": "8511c2077fd501034e5a8284a3dd604b3a35d93846ad1e2181e9c6a84b57866d"
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::iac::transparency_log::FrameFilter",
-      "signature_hash": "64a3cb90eab60353546ae1f6303c2e09fc3c8f6dcf3a73bbb7839a3159ca9a5c"
+      "path": "maos_kernel_core::halt::maos_domain::halt::ResolveError",
+      "signature_hash": "8511c2077fd501034e5a8284a3dd604b3a35d93846ad1e2181e9c6a84b57866d"
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::iac::transparency_log::FrameKind",
-      "signature_hash": "64a3cb90eab60353546ae1f6303c2e09fc3c8f6dcf3a73bbb7839a3159ca9a5c"
+      "path": "maos_kernel_core::halt::output_markers::OutputMarkerRegistry",
+      "signature_hash": "2a796714d4fca31efdbc680f3e29bc6be4dbd7f73cac8a4c42f9b7d94aef4352"
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::iac::transparency_log::TransparencyLogAdapter",
-      "signature_hash": "64a3cb90eab60353546ae1f6303c2e09fc3c8f6dcf3a73bbb7839a3159ca9a5c"
+      "path": "maos_kernel_core::halt::resolver::FailingHaltResolver",
+      "signature_hash": "89463413daab11e0f699aeec5636959477e9255aa2cbb50ef628327293a9958a"
     },
     {
       "kind": "use",
-      "path": "maos_kernel_core::iac::transparency_log::TransparencyLogEntry",
-      "signature_hash": "64a3cb90eab60353546ae1f6303c2e09fc3c8f6dcf3a73bbb7839a3159ca9a5c"
+      "path": "maos_kernel_core::halt::resolver::KernelHaltResolver",
+      "signature_hash": "89463413daab11e0f699aeec5636959477e9255aa2cbb50ef628327293a9958a"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::halt::resolver::MockHaltResolver",
+      "signature_hash": "89463413daab11e0f699aeec5636959477e9255aa2cbb50ef628327293a9958a"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::halt::termination::terminate_spirit",
+      "signature_hash": "192aeb7433bc8255b45b021a164e92e07214155d4dceb344e1acd7eb40b39a1c"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::archive::ArchiveError",
+      "signature_hash": "cbde66c352fb2dab90610acd50edad0dccbc12af9215285ccdf153dae0bf570c"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::archive::SpiritArchive",
+      "signature_hash": "cbde66c352fb2dab90610acd50edad0dccbc12af9215285ccdf153dae0bf570c"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::coordinator::HotSwapCoordinator",
+      "signature_hash": "6162ab9a6e7e4994a2d9f9556533e48c667d7fd54312005c7e68e69a1c77b7d8"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::migrator::matches_version_pattern",
+      "signature_hash": "440b168a9a29d974a84618fa26a4241d9c05acf4c5b0ad72b82659f5d0e71dd3"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::migrator::run_migrator",
+      "signature_hash": "440b168a9a29d974a84618fa26a4241d9c05acf4c5b0ad72b82659f5d0e71dd3"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::post_swap_monitor::PostSwapInvariantSnapshot",
+      "signature_hash": "3ba773d498c9e29d64bf790ace42746d9fa8b124bc0761e99031d5386df33ac8"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::post_swap_monitor::PostSwapInvariantViolation",
+      "signature_hash": "3ba773d498c9e29d64bf790ace42746d9fa8b124bc0761e99031d5386df33ac8"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::post_swap_monitor::PostSwapMonitor",
+      "signature_hash": "3ba773d498c9e29d64bf790ace42746d9fa8b124bc0761e99031d5386df33ac8"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::post_swap_monitor::maos_domain::hot_swap::PostSwapInvariantViolation",
+      "signature_hash": "24ef96fa993bd5c927e2c8cc05d8965e44061be0ee143e6e2689cfe521deff5e"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::precheck::HotSwapPrecheck",
+      "signature_hash": "97a457a69c3d55bd6328a8b0a025a7a03b384719e65c9888492e1852e55d00cc"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::precheck::PrecheckOutcome",
+      "signature_hash": "8dc83d8e389ae0bc6b7a6a0b4d2b1b5f1db1dc959227a74a746b5e13d2b0c463"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::precheck::PrecheckVerdict",
+      "signature_hash": "97a457a69c3d55bd6328a8b0a025a7a03b384719e65c9888492e1852e55d00cc"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::precheck::SchemaCompat",
+      "signature_hash": "8dc83d8e389ae0bc6b7a6a0b4d2b1b5f1db1dc959227a74a746b5e13d2b0c463"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::precheck::maos_domain::hot_swap::PrecheckOutcome",
+      "signature_hash": "a2dbd3ddd4dfc2f18f2f9b1ac9303e36c39617a1e1feea8e961de5b36351cfe0"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::precheck::maos_domain::hot_swap::SchemaCompat",
+      "signature_hash": "6c613e4aabf532d6b6ac2a725434253015e1da9e2ccd0bf3c6215198a9ddd0dd"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::saga::HotSwapSaga",
+      "signature_hash": "b96d64fe7094b3109fcb26fae2f0495c8c7461925c2c8fb7963a0c5cf8a29e61"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::saga::SagaCompensation",
+      "signature_hash": "b96d64fe7094b3109fcb26fae2f0495c8c7461925c2c8fb7963a0c5cf8a29e61"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::saga::SagaPhase",
+      "signature_hash": "b96d64fe7094b3109fcb26fae2f0495c8c7461925c2c8fb7963a0c5cf8a29e61"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::state_codec::StateCodec",
+      "signature_hash": "88d625c8254543fef4d2b75fa0bd5b6ec0c87cfb5bb8028219c726f190b60183"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::state_codec::StateCodecError",
+      "signature_hash": "88d625c8254543fef4d2b75fa0bd5b6ec0c87cfb5bb8028219c726f190b60183"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::state_codec::StateEnvelope",
+      "signature_hash": "88d625c8254543fef4d2b75fa0bd5b6ec0c87cfb5bb8028219c726f190b60183"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::hot_swap::state_codec::maos_domain::hot_swap::SchemaCompat",
+      "signature_hash": "6c613e4aabf532d6b6ac2a725434253015e1da9e2ccd0bf3c6215198a9ddd0dd"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::iac::maos_iac::*",
+      "signature_hash": "1ab6b8ecfd64fbd492d90cb2dc86a1c46b0a555b0534772e20a44dee704ef2e0"
     },
     {
       "kind": "use",
@@ -624,13 +1154,238 @@
     },
     {
       "kind": "use",
+      "path": "maos_kernel_core::isolation::runner::IsolationCorpusError",
+      "signature_hash": "aafc7c95adda6610ac14ef83f9fd4aa99914565f21d7072607bcd7f40fc386c9"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::isolation::runner::IsolationCorpusReport",
+      "signature_hash": "aafc7c95adda6610ac14ef83f9fd4aa99914565f21d7072607bcd7f40fc386c9"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::isolation::runner::IsolationCorpusRunner",
+      "signature_hash": "aafc7c95adda6610ac14ef83f9fd4aa99914565f21d7072607bcd7f40fc386c9"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::isolation::runner::ScenarioOutcome",
+      "signature_hash": "aafc7c95adda6610ac14ef83f9fd4aa99914565f21d7072607bcd7f40fc386c9"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::admission::admit_cli_wrapper_journaled",
+      "signature_hash": "768b153db7feb32c46fd87593358dbf1d1f7096b8e0404bdfadfaf056df1a20d"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::admission::probe_and_verify_shape",
+      "signature_hash": "768b153db7feb32c46fd87593358dbf1d1f7096b8e0404bdfadfaf056df1a20d"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::lifecycle::upgrade::UpgradeError",
+      "signature_hash": "7e6f8164cb3d2019ca49fd23dc007a125e8befce2b481b6154826c8c892b10fc"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::lifecycle::upgrade::UpgradeOrchestrator",
+      "signature_hash": "7e6f8164cb3d2019ca49fd23dc007a125e8befce2b481b6154826c8c892b10fc"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::lifecycle::upgrade::UpgradeOutcome",
+      "signature_hash": "7e6f8164cb3d2019ca49fd23dc007a125e8befce2b481b6154826c8c892b10fc"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::lifecycle::upgrade::UpgradePolicy",
+      "signature_hash": "7e6f8164cb3d2019ca49fd23dc007a125e8befce2b481b6154826c8c892b10fc"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::lifecycle::upgrade::UpgradeReport",
+      "signature_hash": "7e6f8164cb3d2019ca49fd23dc007a125e8befce2b481b6154826c8c892b10fc"
+    },
+    {
+      "kind": "use",
       "path": "maos_kernel_core::memory::maos_domain::ports::MemoryManagerPort",
       "signature_hash": "7eb744620740514bca7f8dfb78a7639f1a4dcfbdb4d41de35943d04e1e86ba8b"
     },
     {
       "kind": "use",
+      "path": "maos_kernel_core::memory::principal::PrincipalNamespaceIndex",
+      "signature_hash": "deea5a58e33316629686d97f1fa5b1f1079d7ac59cd2b5b9810157c212fd2730"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::memory::private::PrivateMemoryStore",
+      "signature_hash": "631679032118ab643d2d0be0c2a82bf28ef6cf97902fa6c226be9bcbb1dc54bd"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::memory::self_telemetry::SelfTelemetryAggregator",
+      "signature_hash": "d1cb970d735281cce66fbfd5877024332dfcb4ee336d53ee7379dbb8484d8a3c"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::memory::shared::SharedMemoryStore",
+      "signature_hash": "af10df6be8aecde31a78c002dcaeecfa4ce9e62d14c2d63b387a91d2e1e688ab"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBuffer",
+      "signature_hash": "41b87c8ca18a49bb269788611244faacb407b588cb958f65b8501ad7d786d165"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBufferError",
+      "signature_hash": "41b87c8ca18a49bb269788611244faacb407b588cb958f65b8501ad7d786d165"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewayFactory",
+      "signature_hash": "8a32e4afb77ff7e6c21e21414e82f44d8e4c35860058b298f2231f5af95852d4"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewaySubmodule",
+      "signature_hash": "8a32e4afb77ff7e6c21e21414e82f44d8e4c35860058b298f2231f5af95852d4"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayDispatcher",
+      "signature_hash": "bdbd81ac7cde35f83234c4e8816fa2f063cb26def48601a50474b4238f18bc95"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayInstance",
+      "signature_hash": "bdbd81ac7cde35f83234c4e8816fa2f063cb26def48601a50474b4238f18bc95"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleFactory",
+      "signature_hash": "bdbd81ac7cde35f83234c4e8816fa2f063cb26def48601a50474b4238f18bc95"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleRegistry",
+      "signature_hash": "bdbd81ac7cde35f83234c4e8816fa2f063cb26def48601a50474b4238f18bc95"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry",
+      "signature_hash": "136cb7646c09195c8af524f9a57334a61658ed9e9ecbca5334f801733da4a64b"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::revocation::applier::RevocationApplier",
+      "signature_hash": "601cf32e30f70dc986c7c1bee4ff4268494a5eac3b9f27b68b0488a9deb8a2d7"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::revocation::maos_domain::revocation::ApplyEntry",
+      "signature_hash": "9e044fb9a72698104246f8ab9a494c7d8f1ee66f8a822183bcaa668ce39fbc27"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::revocation::maos_domain::revocation::ApplyReport",
+      "signature_hash": "9e044fb9a72698104246f8ab9a494c7d8f1ee66f8a822183bcaa668ce39fbc27"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::revocation::parser::parse_signed_crl",
+      "signature_hash": "c4a5a0138c5f626014e7e476d160296d066fb042b8768ed3a5f3fc2779160c0f"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::revocation::poller::RevocationPoller",
+      "signature_hash": "6e176c4caf4bbdc58c6deab830fdb03b368c998f352fb20ba98f5b70c865bb83"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::revocation::version_match::maos_domain::revocation::parse_range",
+      "signature_hash": "d2ea773ebce59e9cf4b89a923064921e96f3c6231ae907a3490b882b77661661"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::revocation::version_match::maos_domain::revocation::semver_range_contains",
+      "signature_hash": "d2ea773ebce59e9cf4b89a923064921e96f3c6231ae907a3490b882b77661661"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::revocation::version_match::semver_range_contains",
+      "signature_hash": "c669cd5e51220c0ab010b0372ee894b2b9a46a5675ffde43ef35aba6ee34795d"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::control_block::AnySpiritObj",
+      "signature_hash": "f28cfcf979f5672f177d0e49481eb22b3df92e0a3ed249ee54abb38a8ae45280"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::control_block::SpiritControlBlock",
+      "signature_hash": "f28cfcf979f5672f177d0e49481eb22b3df92e0a3ed249ee54abb38a8ae45280"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::control_block::SpiritManifestBundle",
+      "signature_hash": "f28cfcf979f5672f177d0e49481eb22b3df92e0a3ed249ee54abb38a8ae45280"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::control_block::make_spirit_obj",
+      "signature_hash": "f28cfcf979f5672f177d0e49481eb22b3df92e0a3ed249ee54abb38a8ae45280"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::hook_dispatch::HookDispatcher",
+      "signature_hash": "93c5edd51cb4fd6642017d8b404d8e7bb648e9ef120814bc98d45c608732f2a1"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::hook_dispatch::HookOutcome",
+      "signature_hash": "93c5edd51cb4fd6642017d8b404d8e7bb648e9ef120814bc98d45c608732f2a1"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::idle_watchdog::IdleWatchdog",
+      "signature_hash": "6840a31d0859d85d34e735a691bff174e0244a40c131cc302655d890fd0407dd"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::kernel_ctx::KernelCtx",
+      "signature_hash": "8d527f64a62319a8a2b607c49ad1caa31e6cdabdf52a49b9c27ecf151a116ec9"
+    },
+    {
+      "kind": "use",
       "path": "maos_kernel_core::scheduler::maos_domain::ports::SpiritSchedulerPort",
       "signature_hash": "a3f16ba06e4e33bb402d7e31c9ded087ef32d9de7ca926fc1a3a1ce2f9712c1c"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::schedule_watchdog::ScheduleWatchdog",
+      "signature_hash": "ef5d366c15818ed031e309a29001325637935d825e40e1bf0753b9afed550006"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::scheduler_loop::SCHEDULER_QUANTUM",
+      "signature_hash": "226aa9053a2665d4c35ae9da8a3484ed0f8fb5d16039d706ab426c6b6eb3a428"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
+      "signature_hash": "226aa9053a2665d4c35ae9da8a3484ed0f8fb5d16039d706ab426c6b6eb3a428"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::scheduler_loop::pick_next_spirit_from_slice",
+      "signature_hash": "226aa9053a2665d4c35ae9da8a3484ed0f8fb5d16039d706ab426c6b6eb3a428"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::scheduler::verb_resolver::KernelLifecycleResolver",
+      "signature_hash": "56f036d31292b52807720940a855dcde8fadf1329e1a8eb5b3be66c709458a4e"
     },
     {
       "kind": "use",
@@ -640,12 +1395,12 @@
     {
       "kind": "use",
       "path": "maos_kernel_core::security::drift::DriftEvent",
-      "signature_hash": "a566ed555e6e0d4d9697aab3eadc6ac8cb871ce4be6b670125dd56d2e2268208"
+      "signature_hash": "64a12020167fb979dc1962536e055cc1d7ca1c86c7bf18a57802fef6996e6b3b"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::drift::make_drift_channel",
-      "signature_hash": "a566ed555e6e0d4d9697aab3eadc6ac8cb871ce4be6b670125dd56d2e2268208"
+      "signature_hash": "64a12020167fb979dc1962536e055cc1d7ca1c86c7bf18a57802fef6996e6b3b"
     },
     {
       "kind": "use",
@@ -669,8 +1424,53 @@
     },
     {
       "kind": "use",
+      "path": "maos_kernel_core::security::manifest::EpistemicAction",
+      "signature_hash": "91e58ecb3a45d0dd9d4d4ab0b5ac3194d040e48157b060ad819f54e2ba169ca1"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::EpistemicPolicyRule",
+      "signature_hash": "91e58ecb3a45d0dd9d4d4ab0b5ac3194d040e48157b060ad819f54e2ba169ca1"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::EpistemicPolicySection",
+      "signature_hash": "91e58ecb3a45d0dd9d4d4ab0b5ac3194d040e48157b060ad819f54e2ba169ca1"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::LifecycleSection",
+      "signature_hash": "93b51f72ac95dd545941788b12b774994658b6274a8b057c10073370842d541a"
+    },
+    {
+      "kind": "use",
       "path": "maos_kernel_core::security::manifest::ManifestError",
-      "signature_hash": "b6012e1f7a1884f0a2fd2cc2b93deb6910028c3cace8e4f278662f32bbd4b8f8"
+      "signature_hash": "a3e06cf57c143fd4054274f92d424efc4c0b60420c1f58b8617c43fa610bb79f"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::McpCapabilities",
+      "signature_hash": "3cc16bd13ec1198bee9e4cbac29e39cef9030d3fefb0635751a03093029b54a0"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::McpCapabilityServerEntry",
+      "signature_hash": "3cc16bd13ec1198bee9e4cbac29e39cef9030d3fefb0635751a03093029b54a0"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::McpSection",
+      "signature_hash": "3cc16bd13ec1198bee9e4cbac29e39cef9030d3fefb0635751a03093029b54a0"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::McpServerEntry",
+      "signature_hash": "3cc16bd13ec1198bee9e4cbac29e39cef9030d3fefb0635751a03093029b54a0"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::OnCrashSection",
+      "signature_hash": "09baf362cf3e87247266b984749268a4a4e9dc7b5431efa507b1f954cc013db8"
     },
     {
       "kind": "use",
@@ -680,12 +1480,12 @@
     {
       "kind": "use",
       "path": "maos_kernel_core::security::manifest::OutputShapePredicate",
-      "signature_hash": "773b8e81ca6d0406470f36a08e1ee5bbac07cfd8d106ea3362d6f004b76acf98"
+      "signature_hash": "6f79ec9873e953063c88c7c28d5c7c04f87f1d56365361adcd0283c60f969de5"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::manifest::OutputShapeViolation",
-      "signature_hash": "773b8e81ca6d0406470f36a08e1ee5bbac07cfd8d106ea3362d6f004b76acf98"
+      "signature_hash": "6f79ec9873e953063c88c7c28d5c7c04f87f1d56365361adcd0283c60f969de5"
     },
     {
       "kind": "use",
@@ -704,28 +1504,58 @@
     },
     {
       "kind": "use",
+      "path": "maos_kernel_core::security::manifest::ProviderConfig",
+      "signature_hash": "3218af09880cbf9e43315a3a2d419a88909521797afa81a8f64e9696beb49e18"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::ProvidersSection",
+      "signature_hash": "3218af09880cbf9e43315a3a2d419a88909521797afa81a8f64e9696beb49e18"
+    },
+    {
+      "kind": "use",
       "path": "maos_kernel_core::security::manifest::ResolvedCaps",
-      "signature_hash": "b6012e1f7a1884f0a2fd2cc2b93deb6910028c3cace8e4f278662f32bbd4b8f8"
+      "signature_hash": "a3e06cf57c143fd4054274f92d424efc4c0b60420c1f58b8617c43fa610bb79f"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::manifest::ResourceCaps",
-      "signature_hash": "b6012e1f7a1884f0a2fd2cc2b93deb6910028c3cace8e4f278662f32bbd4b8f8"
+      "signature_hash": "a3e06cf57c143fd4054274f92d424efc4c0b60420c1f58b8617c43fa610bb79f"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::manifest::SandboxConfig",
-      "signature_hash": "b6012e1f7a1884f0a2fd2cc2b93deb6910028c3cace8e4f278662f32bbd4b8f8"
+      "signature_hash": "a3e06cf57c143fd4054274f92d424efc4c0b60420c1f58b8617c43fa610bb79f"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::ScalarPredicate",
+      "signature_hash": "91e58ecb3a45d0dd9d4d4ab0b5ac3194d040e48157b060ad819f54e2ba169ca1"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::SchedulingSection",
+      "signature_hash": "93b51f72ac95dd545941788b12b774994658b6274a8b057c10073370842d541a"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::SupervisionSection",
+      "signature_hash": "09baf362cf3e87247266b984749268a4a4e9dc7b5431efa507b1f954cc013db8"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::manifest::capabilities_required_to_scopes",
-      "signature_hash": "773b8e81ca6d0406470f36a08e1ee5bbac07cfd8d106ea3362d6f004b76acf98"
+      "signature_hash": "6f79ec9873e953063c88c7c28d5c7c04f87f1d56365361adcd0283c60f969de5"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::manifest::maos_manifest::*",
+      "signature_hash": "d0b3ece4163493aa3cdcdc41798db2be9adf26d8a12a67780cd51d2c6b5d62a9"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::manifest::resolve_caps",
-      "signature_hash": "b6012e1f7a1884f0a2fd2cc2b93deb6910028c3cace8e4f278662f32bbd4b8f8"
+      "signature_hash": "a3e06cf57c143fd4054274f92d424efc4c0b60420c1f58b8617c43fa610bb79f"
     },
     {
       "kind": "use",
@@ -739,38 +1569,98 @@
     },
     {
       "kind": "use",
+      "path": "maos_kernel_core::security::posture::PostureError",
+      "signature_hash": "df32bd22236288ba8883bb88e2db011dec4b35224ddb677eb35635f6dcdbe2ef"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::posture::PostureState",
+      "signature_hash": "df32bd22236288ba8883bb88e2db011dec4b35224ddb677eb35635f6dcdbe2ef"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::security::posture::maos_domain::notification::ApprovalClass",
+      "signature_hash": "a12333fd90a92695124ef02daa73afee3ed9b03dc5bda26bb4049f0e85e4897b"
+    },
+    {
+      "kind": "use",
       "path": "maos_kernel_core::security::sandbox::SandboxSpec",
-      "signature_hash": "0e62d2ff9138d294de3f732c88f2ac5e505ba048e2033bc00cf41bb11cbbdd8c"
+      "signature_hash": "963a2216bb2483e00b48c4efd3b1b779c2119c17980e9509c91032f006207f9b"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::sandbox::SandboxViolation",
-      "signature_hash": "0e62d2ff9138d294de3f732c88f2ac5e505ba048e2033bc00cf41bb11cbbdd8c"
+      "signature_hash": "963a2216bb2483e00b48c4efd3b1b779c2119c17980e9509c91032f006207f9b"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::sandbox::SandboxedChild",
-      "signature_hash": "0e62d2ff9138d294de3f732c88f2ac5e505ba048e2033bc00cf41bb11cbbdd8c"
+      "signature_hash": "963a2216bb2483e00b48c4efd3b1b779c2119c17980e9509c91032f006207f9b"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::sandbox::SpawnError",
-      "signature_hash": "0e62d2ff9138d294de3f732c88f2ac5e505ba048e2033bc00cf41bb11cbbdd8c"
+      "signature_hash": "963a2216bb2483e00b48c4efd3b1b779c2119c17980e9509c91032f006207f9b"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::sandbox::classify_exit",
-      "signature_hash": "0e62d2ff9138d294de3f732c88f2ac5e505ba048e2033bc00cf41bb11cbbdd8c"
+      "signature_hash": "963a2216bb2483e00b48c4efd3b1b779c2119c17980e9509c91032f006207f9b"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::security::sandbox::spawn_sandboxed",
-      "signature_hash": "0e62d2ff9138d294de3f732c88f2ac5e505ba048e2033bc00cf41bb11cbbdd8c"
+      "signature_hash": "963a2216bb2483e00b48c4efd3b1b779c2119c17980e9509c91032f006207f9b"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::supervision::cold_restart::DrainError",
+      "signature_hash": "e3a0a64dcd746c98e110a849fca8e202f5fa24c4eb8720e4db445b44a6bf0200"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::supervision::cold_restart::DrainReport",
+      "signature_hash": "e3a0a64dcd746c98e110a849fca8e202f5fa24c4eb8720e4db445b44a6bf0200"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::supervision::cold_restart::graceful_drain",
+      "signature_hash": "e3a0a64dcd746c98e110a849fca8e202f5fa24c4eb8720e4db445b44a6bf0200"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::supervision::cold_restart::hard_kill_drain",
+      "signature_hash": "e3a0a64dcd746c98e110a849fca8e202f5fa24c4eb8720e4db445b44a6bf0200"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::supervision::crash_detector::CrashDetector",
+      "signature_hash": "a1d38404096143d1193e1f0f7c81b728387dc039f6916f4e177a82d693633ae0"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::supervision::disposition::enforce_disposition",
+      "signature_hash": "94bb737a0f2cf398137b05897966cadf7ca5e9b6c67fa1d0a69e5d296805da41"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::supervision::progress_watchdog::ProgressWatchdog",
+      "signature_hash": "ab424b914434b5af56517141a71ae122a2d4551609d085e5502208832da57090"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::supervision::silent_failure_detector::SilentFailureDetector",
+      "signature_hash": "191306500ff11dae1f4208c2bf6b2aa25654b3d760da800bf70be6144892f7dd"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::telemetry::maos_domain::ports::TelemetryStreamPort",
       "signature_hash": "88b6c1fb997484cd68e39aa0708bb6e3317e6cd61c5f3e2eb33f3e2d7680a056"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::telemetry::maos_iac::metrics (as iac_rt)",
+      "signature_hash": "f76509cb67f8d14cfd007356708ef18679d39c1bded0a164c623a492173c93ee"
     }
   ]
 }

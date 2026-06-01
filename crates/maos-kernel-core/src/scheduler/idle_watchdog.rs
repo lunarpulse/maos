@@ -19,6 +19,9 @@ use crate::scheduler::kernel_ctx::KernelCtx;
 
 /// Per-Spirit idle watchdog — fires `on_idle` when the Spirit is
 /// Running AND (now - last_inbound_frame_ns) > idle_window_ms.
+#[maos_attrs::i9_exempt(
+    reason = "per-Spirit idle watchdog holding Arc handles to the supervised SCB set + hook dispatcher (already-exempt); supervised transient state per I9, keyed by spirit_pid (Story 7.1.7 baseline-reset)"
+)]
 pub struct IdleWatchdog {
     scbs: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
     dispatcher: Arc<HookDispatcher>,

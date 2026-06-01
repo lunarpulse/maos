@@ -20,6 +20,9 @@ const DEFAULT_LOCK_PATH: &str = concat!(
 
 /// Loaded T3 image lock file.
 #[derive(Debug, Clone)]
+#[maos_attrs::i9_exempt(
+    reason = "loaded T3 image lock config; Vec<T3ImageAttestation> is bounded structural config state per I9, keyed by image digest, no parameter drift (Story 7.1.7 baseline-reset)"
+)]
 pub struct T3ImageLock {
     attestations: Vec<T3ImageAttestation>,
 }

@@ -13,6 +13,9 @@ use crate::scheduler::scheduler_loop::SpiritSchedulerAdapter;
 
 /// Kernel-side lifecycle resolver — routes operator verbs through
 /// the Spirit Scheduler and journals FR42 director-action audit rows.
+#[maos_attrs::i9_exempt(
+    reason = "kernel lifecycle verb resolver holding Arc handles to the already-exempt scheduler + transparency-log adapters; supervised composite per I9 (Story 7.1.7 baseline-reset)"
+)]
 pub struct KernelLifecycleResolver {
     scheduler: Arc<SpiritSchedulerAdapter>,
     transparency_log: Arc<TransparencyLogAdapter>,
@@ -131,6 +134,9 @@ pub mod test_double {
     use super::*;
     use std::sync::Mutex;
 
+    #[maos_attrs::i9_exempt(
+        reason = "public test double (director-surface test support, intentionally not #[cfg(test)]-gated so external tests can consume it); the Mutex<Vec<(String, LifecycleVerb)>> captures resolve_verb calls for assertions — test-only capture state, never production runtime state, per I9 (Story 7.1.7 baseline-reset)"
+    )]
     pub struct MockLifecycleResolver {
         calls: Mutex<Vec<(String, LifecycleVerb)>>,
     }

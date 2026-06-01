@@ -1,0 +1,48 @@
+# maos-spirit-hello — reference Spirit acknowledgement manifest (FR58).
+#
+# Authored at Story 7.1.7 (baseline-reset bridge): the `coverage-matrix-nfr-test-3`
+# gate references this manifest at `crates/maos-spirit-hello` but it had never been
+# committed, so the gate errored with "manifest not found" (a real exit-1 blocker
+# in the CI hard-gate, not the benign shell error the retro assumed).
+#
+# The v0.1-α hello-Spirit ships as a pure acknowledgement loop: `hello-spirit-bench`
+# reads `task.assign` frames over the Content-Length stdio protocol and replies
+# `task.complete` with `response: "ok"`. It calls NO inference provider, tool,
+# memory, or gateway capability — so `[capabilities.required]` is intentionally
+# empty. With zero declared capabilities the NFR-Test-3 reachability gate reports
+# 100% coverage (nothing to exercise), matching the recorded coverage_pct: 100.
+
+[class]
+name = "hello-spirit"
+version = "0.1.0"
+abi = "1.0"
+manifest_schema_version = 1
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "MAOS hello-spirit — reference Spirit acknowledgement (FR58); pure echo, no capabilities."
+
+# No required capabilities: the acknowledgement loop neither calls a provider nor
+# touches tool/memory/gateway surfaces. (See the bench at src/bin/hello_spirit_bench.rs.)
+[capabilities.required]
+
+[posture]
+default = "assistive"
+allowed_max = "assistive"
+
+[output_shape]
+required_fields = ["kind"]
+
+[budget]
+context_window_size = 4096
+time_cap_seconds = 30
+
+[resources]
+cpu_max_pct = 10
+memory_max_mb = 64
+
+[sandbox]
+tier = "T0"
+
+[author]
+name = "MAOS reference"

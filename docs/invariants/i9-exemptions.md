@@ -400,3 +400,119 @@ refill; the `parking_lot::Mutex<f64> tokens` carries the current token balance.
 Both fields are transient per-process state OWNED by the
 `ScheduleWatchdog::rate_limits` DashMap (already I9-exempt). Bucket lifetime
 matches its parent watchdog; entries drop on Spirit unload. No persistence.
+
+<!-- ============================================================= -->
+<!-- Story 7.1.7 baseline-reset — I9 exemptions for supervised      -->
+<!-- kernel state-holders (the 13 production P3 structs) plus the   -->
+<!-- previously-undocumented GatewayDispatcher. These are genuine   -->
+<!-- supervision-tree state owners (the scheduler is the supervisor -->
+<!-- per §4.0.8); their persistent-typed fields are structural per  -->
+<!-- I9 (bounded, keyed, no parameter drift, recreated on restart). -->
+<!-- The 19 former test-double "violations" (mocks in #[cfg(test)]  -->
+<!-- mods + tests/ + benches/) are NOT exempted here — they were    -->
+<!-- gate over-reach and are fixed at root by scoping the I9 walker  -->
+<!-- to src/ and skipping #[cfg(test)] modules.                     -->
+<!-- ============================================================= -->
+
+### `SpiritControlBlock` — `crates/maos-kernel-core/src/scheduler/control_block.rs`
+
+**Reason:** per-Spirit kernel-side control block (the PCB analog). Supervised
+single-owner runtime state held under the Spirit Scheduler supervisor per
+§4.0.8. The atomics (`state`, `deficit_counter`, the `last_*_ns` timestamps),
+the `Arc<dyn AnySpiritObj>` spirit handle, and the `Mutex<Vec<TaskAssignmentRecord>>`
+in-flight set are structural runtime state per I9 — bounded by Spirit lifetime,
+keyed by `spirit_id`, no parameter drift, recreated on kernel restart.
+
+### `SpiritSchedulerAdapter` — `crates/maos-kernel-core/src/scheduler/scheduler_loop.rs`
+
+**Reason:** the kernel-side Spirit Scheduler — the supervision-tree supervisor
+itself (P3 supervisor-exception per §4.0.8). Owns the supervised SCB index
+(`Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>`) plus `Arc` handles to the
+already-exempt transparency-log adapter, hook dispatcher, capability/memory/iac
+adapters and halt registry. Structural runtime state per I9, keyed by `spirit_pid`.
+
+### `HotSwapCoordinator` — `crates/maos-kernel-core/src/hot_swap/coordinator.rs`
+
+**Reason:** composition-root singleton coordinating hot-swap. Holds `Arc` handles
+to the supervised SCB set and to already-exempt kernel adapters (journal,
+transparency log, halt registry, capability, iac, hook dispatcher, iac-rt
+metrics) plus the `active_monitors` / `pending_reverts` maps. Supervised
+transient state per I9, recreated on kernel restart, no cross-key aggregation.
+
+### `PostSwapMonitor` — `crates/maos-kernel-core/src/hot_swap/post_swap_monitor.rs`
+
+**Reason:** post-swap invariant monitor task. Holds `Arc` to the already-exempt
+`HotSwapCoordinator` and to the `PostSwapInvariantSnapshot`. Supervised transient
+task state per I9; the monitor task is dropped on graceful shutdown.
+
+### `PostSwapInvariantSnapshot` — `crates/maos-kernel-core/src/hot_swap/post_swap_monitor.rs`
+
+**Reason:** immutable invariant snapshot captured at swap commit. The
+`Vec<String>` of pre-swap halt-ids and frame-shapes is bounded structural state
+per I9 (sized by the live Spirit's halt/frame set), no parameter drift.
+
+### `KernelLifecycleResolver` — `crates/maos-kernel-core/src/scheduler/verb_resolver.rs`
+
+**Reason:** kernel lifecycle verb resolver routing operator verbs through the
+Spirit Scheduler and journaling FR42 director-action rows. Holds `Arc` handles to
+the already-exempt scheduler and transparency-log adapters. Supervised composite
+per I9.
+
+### `IdleWatchdog` — `crates/maos-kernel-core/src/scheduler/idle_watchdog.rs`
+
+**Reason:** per-Spirit idle watchdog firing `on_idle`. Holds `Arc` handles to the
+supervised SCB set and the already-exempt hook dispatcher. Supervised transient
+state per I9, keyed by `spirit_pid`; dropped on graceful shutdown via the
+`CancellationToken` pattern shared with `ScheduleWatchdog`.
+
+### `HookDispatcher` — `crates/maos-kernel-core/src/scheduler/hook_dispatch.rs`
+
+**Reason:** lifecycle-hook dispatcher enforcing manifest gates and budget
+envelopes. Holds `Arc` handles to the already-exempt transparency-log adapter and
+iac-rt metrics. Supervised composite per I9.
+
+### `WorkingMemoryOrchestrator` — `crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs`
+
+**Reason:** working-memory orchestrator holding `Arc` handles to the already-exempt
+capability registry and halt registry. Supervised composite per I9, no parameter
+drift.
+
+### `GatewayDispatcher` — `crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs`
+
+**Reason:** dispatcher managing gateway submodules for all Spirits. Holds per-process
+transient state (`Arc<DashMap<(u32, String), GatewayInstance>>` of running gateway
+tasks plus the factory registry); recreated on kernel restart — structural-state
+caching per I9. (Carried an `#[i9_exempt]` since Story 6.5 but was undocumented
+here; documented at Story 7.1.7 baseline-reset.)
+
+### `GatewayInstance` — `crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs`
+
+**Reason:** per-gateway running state owned by `GatewayDispatcher.gateways`. The
+`Arc<dyn GatewaySubmodule>` submodule handle and `Arc<AtomicBool>` cancel flag are
+per-process transient task state per I9, recreated on kernel restart.
+
+### `GatewayCancelHandle` — `crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs`
+
+**Reason:** gateway cancel handle. The `Arc<AtomicBool>` cancel flag is per-process
+transient cooperative-cancellation state per I9, recreated on kernel restart.
+
+### `T3ImageLock` — `crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs`
+
+**Reason:** loaded T3 image lock config. The `Vec<T3ImageAttestation>` attestation
+list is bounded structural config state per I9, keyed by image digest, no
+parameter drift.
+
+### `ScbTracker` — `crates/maos-kernel-core/src/iac.rs`
+
+**Reason:** std-wrapper exposing the iac Spirit-control-block index to the
+maos-iac trait. The `Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>` is the
+supervisor-owned SCB map per I9, keyed by `spirit_pid` — the same supervised state
+owned by the scheduler, surfaced here only because neither std's `RwLock<BTreeMap>`
+nor the maos-iac trait is local to maos-kernel-core without a wrapper struct.
+
+### `MockLifecycleResolver` — `crates/maos-kernel-core/src/scheduler/verb_resolver.rs`
+
+**Reason:** public test double in `mod test_double` (intentionally NOT
+`#[cfg(test)]`-gated so director-surface tests in other crates can consume it).
+The `Mutex<Vec<(String, LifecycleVerb)>>` captures every `resolve_verb` call for
+test assertions — test-only capture state, never production runtime state, per I9.

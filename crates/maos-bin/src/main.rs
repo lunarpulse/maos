@@ -810,8 +810,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &extract_section(&manifest_root, "class")?,
             )?;
 
+            // One-shot manifest-admission probe (validate path), not the supervised
+            // SecurityManagerAdapter singleton — see check-service-boundary P1 (Story 7.1.7).
             let security =
-                maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy));
+                maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy)); // p1-allow: transient admission probe
             let _spec = security.admit_spirit(
                 0,
                 &spirit_id,

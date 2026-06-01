@@ -45,6 +45,9 @@ pub enum HookOutcome {
 /// Dispatches lifecycle hooks through the Spirit's AnySpiritObj,
 /// enforcing manifest gates and budget envelopes.
 #[derive(Clone)]
+#[maos_attrs::i9_exempt(
+    reason = "lifecycle-hook dispatcher holding Arc handles to the already-exempt transparency-log adapter + iac-rt metrics; supervised composite per I9 (Story 7.1.7 baseline-reset)"
+)]
 pub struct HookDispatcher {
     tl: Arc<TransparencyLogAdapter>,
     pub metrics: Arc<IacRtMetrics>,

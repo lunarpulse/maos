@@ -24,6 +24,9 @@ use maos_iac::mailbox::SpiritActivityTracker;
 /// This wrapper is needed because `RwLock<BTreeMap<...>>` is from std
 /// and the trait is from maos-iac — neither is local to maos-kernel-core
 /// without a wrapper struct.
+#[maos_attrs::i9_exempt(
+    reason = "std-wrapper for the iac Spirit-control-block index; RwLock<BTreeMap<u32, Arc<SCB>>> is the supervisor-owned SCB map per I9, keyed by spirit_pid (Story 7.1.7 baseline-reset)"
+)]
 pub struct ScbTracker {
     inner: Arc<RwLock<BTreeMap<u32, Arc<crate::scheduler::control_block::SpiritControlBlock>>>>,
 }

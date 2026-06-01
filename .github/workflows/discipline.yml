@@ -1005,7 +1005,10 @@ jobs:
   check-serde-error-handling:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true  # calibration phase per Epic 5 §A3 — flip to hard-fail post Story 6.3
+    # HARD-FAIL since Story 7.1.7 (baseline-reset). The 300 pre-existing sites are
+    # FROZEN in xtask/serde-error-allowlist.toml; the gate now fails only on NEW
+    # `serde_json::*` + `.unwrap()/.expect()/.unwrap_or_*()` sites beyond that set.
+    # Full remediation of the frozen sites is tracked as a follow-up (Story 8.x).
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
