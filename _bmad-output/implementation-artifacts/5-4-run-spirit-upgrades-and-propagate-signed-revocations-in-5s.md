@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # Story 5.4: Run Spirit Upgrades and Propagate Signed Revocations in ≤5s
 
 Status: done

@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1b.5b: `maosctl audit query` + FR4 100%-Mediation Mechanical Verification
 
 Status: done

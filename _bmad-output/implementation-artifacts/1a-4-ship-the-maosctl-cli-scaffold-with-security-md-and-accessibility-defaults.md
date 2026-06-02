@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1a.4: Ship the maosctl CLI Scaffold with SECURITY.md and Accessibility Defaults
 
 Status: done

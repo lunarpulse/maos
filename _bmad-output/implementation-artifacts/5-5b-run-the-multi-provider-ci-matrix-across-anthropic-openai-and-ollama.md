@@ -1,3 +1,7 @@
+---
+dev_model_used: glm-5.1
+---
+
 # Story 5.5b: Run the Multi-Provider CI Matrix Across Anthropic, OpenAI, and Ollama
 
 Status: done

@@ -1,3 +1,7 @@
+---
+dev_model_used: deepseek-v4-pro
+---
+
 # Story 4.2: Implement the Tagged-Scalar Slot with Four Universal-Arithmetic Predicates
 
 Status: review
@@ -308,6 +312,7 @@ _No debug log entries._
 - `crates/maos-kernel-core/src/capability/working_memory/mod.rs`
 - `crates/maos-kernel-core/src/capability/working_memory/store.rs`
 - `crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs`
+- `crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs`
 - `crates/maos-kernel-core/tests/scalar_slot_set_and_tap.rs`
 - `crates/maos-kernel-core/tests/scalar_policy_runtime_test.rs`
 - `crates/maos-kernel-core/tests/scalar_predicate_to_halt_integration.rs`
@@ -391,28 +396,30 @@ _No debug log entries._
 
 | Finding | Severity | Status | Resolution |
 |---|---|---|---|
-| TelemetryStreamAdapter Clone/Copy removal — ABI break or acceptable placeholder→real transition? | HIGH | closed | Team decision: manual Clone impl (resets drop_count), document Copy removal as ZST→real transition |
-| CapabilityRegistryAdapter::set_scalar omits telemetry publish | HIGH | closed | patch |
-| WorkingMemoryOrchestrator atomic entry point missing | HIGH | closed | patch |
-| Composition root omits TelemetryStreamAdapter construction | HIGH | closed | patch |
-| timestamp_ns stores milliseconds not nanoseconds | MEDIUM | closed | patch |
-| Telemetry broadcast send failures silently discarded | MEDIUM | closed | patch |
-| Integration test omits Journal/payload-tag/VerbalizeOnly assertions | MEDIUM | closed | patch |
-| simulate_predicate silently defaults missing bounds | MEDIUM | closed | patch |
-| A3 constructor convention violated in tests | LOW | closed | patch |
-| Corpus README FP count exceeds stated floor | LOW | closed | patch |
-| Malformed API classifier paths embed crate:: syntax | MEDIUM | closed | patch |
-| Duplicate misaligned doc comment in capability/mod.rs | LOW | closed | patch |
-| scalar_tap_subscriber tests manual publish not production path | MEDIUM | closed | patch |
-| RwLock guard poison causes panic on poisoned lock | MEDIUM | closed | patch |
-| Zero capacity argument panics in broadcast constructor | LOW | closed | patch |
-| Infinite value not rejected by set_scalar | MEDIUM | closed | patch |
-| NaN value silently skips predicate rules in evaluator | LOW | closed | patch |
-| NaN threshold in programmatic ScalarPredicate silently disables rule | LOW | closed | patch |
-| TestPort re-implements predicate logic instead of production | LOW | closed | patch |
-| Non-firing test cases missing for three predicates | LOW | closed | patch |
-| Telemetry inline tests never assert event receipt | LOW | closed | patch |
-| SetScalarError::OverflowingPersistence is untested dead code | LOW | closed | patch |
-| Manifest inline tests incomplete NaN/bounds coverage | LOW | closed | patch |
-| scalar_tap_subscriber contradicts per-Spirit subscribe contract | MEDIUM | closed | patch |
-| set_scalar_flag_action test lacks negative side-effect assertions | LOW | closed | patch |
+| TelemetryStreamAdapter Clone/Copy removal — ABI break or acceptable placeholder→real transition? | HIGH | closed | fixed in `crates/maos-kernel-core/src/telemetry/mod.rs` |
+| CapabilityRegistryAdapter::set_scalar omits telemetry publish | HIGH | closed | fixed in `crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs` |
+| WorkingMemoryOrchestrator atomic entry point missing | HIGH | closed | fixed in `crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs` |
+| Composition root omits TelemetryStreamAdapter construction | HIGH | closed | fixed in `crates/maos-bin/src/main.rs` |
+| timestamp_ns stores milliseconds not nanoseconds | MEDIUM | closed | fixed in `crates/maos-kernel-core/src/capability/working_memory/store.rs` |
+| Telemetry broadcast send failures silently discarded | MEDIUM | closed | fixed in `crates/maos-kernel-core/src/telemetry/mod.rs` |
+| Integration test omits Journal/payload-tag/VerbalizeOnly assertions | MEDIUM | closed | fixed in `crates/maos-kernel-core/tests/scalar_predicate_to_halt_integration.rs` |
+| simulate_predicate silently defaults missing bounds | MEDIUM | closed | fixed in `crates/maos-eval/tests/halt_recall_floor.rs` |
+| A3 constructor convention violated in tests | LOW | closed | fixed in `crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs` |
+| Corpus README FP count exceeds stated floor | LOW | closed | fixed in `crates/maos-eval/fixtures/halt-corpus-v0/README.md` |
+| Malformed API classifier paths embed crate:: syntax | MEDIUM | closed | fixed in `xtask/kernel-api-classes.toml` |
+| Duplicate misaligned doc comment in capability/mod.rs | LOW | closed | fixed in `crates/maos-kernel-core/src/capability/mod.rs` |
+| scalar_tap_subscriber tests manual publish not production path | MEDIUM | closed | fixed in `crates/maos-kernel-core/tests/scalar_tap_subscriber.rs` |
+| RwLock guard poison causes panic on poisoned lock | MEDIUM | closed | fixed in `crates/maos-kernel-core/src/capability/working_memory/store.rs` |
+| Zero capacity argument panics in broadcast constructor | LOW | closed | fixed in `crates/maos-kernel-core/src/telemetry/mod.rs` |
+| Infinite value not rejected by set_scalar | MEDIUM | closed | fixed in `crates/maos-kernel-core/src/capability/working_memory/mod.rs` |
+| NaN value silently skips predicate rules in evaluator | LOW | closed | fixed in `crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs` |
+| NaN threshold in programmatic ScalarPredicate silently disables rule | LOW | closed | fixed in `crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs` |
+| TestPort re-implements predicate logic instead of production | LOW | closed | fixed in `crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs` |
+| Non-firing test cases missing for three predicates | LOW | closed | fixed in `crates/maos-kernel-core/tests/scalar_policy_runtime_test.rs` |
+| Telemetry inline tests never assert event receipt | LOW | closed | fixed in `crates/maos-kernel-core/src/telemetry/mod.rs` |
+| SetScalarError::OverflowingPersistence is untested dead code | LOW | closed | fixed in `crates/maos-kernel-core/src/capability/working_memory/mod.rs` |
+| Manifest inline tests incomplete NaN/bounds coverage | LOW | closed | fixed in `crates/maos-kernel-core/src/security/manifest.rs` |
+| scalar_tap_subscriber contradicts per-Spirit subscribe contract | MEDIUM | closed | fixed in `crates/maos-kernel-core/tests/scalar_tap_subscriber.rs` |
+| set_scalar_flag_action test lacks negative side-effect assertions | LOW | closed | fixed in `crates/maos-kernel-core/tests/scalar_predicate_to_halt_integration.rs` |
+
+- `crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs`

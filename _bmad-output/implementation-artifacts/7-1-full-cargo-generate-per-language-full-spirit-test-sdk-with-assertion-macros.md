@@ -1002,6 +1002,56 @@ check-epic-6-bridge[7.1]: PASS
 ```
 All 5 `blocking_7_1` rows cleared. Proceeding to Task 1.
 
+### File List
+
+Reconstructed from commit `99d5cb0` (`git diff-tree --name-only`):
+
+- .github/workflows/discipline.yml
+- Cargo.toml
+- crates/maos-bin/src/main.rs
+- crates/maos-spirit-abi/src/ctx.rs
+- crates/maos-spirit-abi/src/deprecation.rs
+- crates/maos-spirit-abi/src/lib.rs
+- crates/maos-spirit-abi/src/lifecycle.rs
+- crates/maos-spirit-sdk/src/local_runner.rs
+- crates/maos-spirit-sdk/src/spirit_test/assert.rs
+- crates/maos-spirit-sdk/src/spirit_test/mod.rs
+- crates/maos-spirit-sdk/tests/deprecation_warnings_smoke.rs
+- crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs
+- crates/maos-spirit-sdk/tests/ui/unknown_hook.stderr
+- examples/example-spirit-ts/manifest.toml
+- examples/example-spirit-ts/package.json
+- examples/example-spirit-ts/src/index.ts
+- examples/example-spirit-ts/tests/spirit.test.ts
+- examples/example-spirit-ts/tsconfig.json
+- examples/example-spirit/Cargo.toml
+- examples/example-spirit/manifest.toml
+- examples/example-spirit/tests/spirit_smoke.rs
+- sdks/spirit-ts/package.json
+- sdks/spirit-ts/src/ctx.ts
+- sdks/spirit-ts/src/halt.ts
+- sdks/spirit-ts/src/identity.ts
+- sdks/spirit-ts/src/index.ts
+- sdks/spirit-ts/src/spirit.ts
+- sdks/spirit-ts/src/spirit_test/index.ts
+- sdks/spirit-ts/src/spirit_test/types.ts
+- sdks/spirit-ts/tests/sdk.test.ts
+- sdks/spirit-ts/tsconfig.json
+- templates/spirit-rust/cargo-generate.toml
+- templates/spirit-rust/manifest.toml
+- templates/spirit-rust/tests/spirit_smoke.rs
+- templates/spirit-ts/cargo-generate.toml
+- templates/spirit-ts/manifest.toml
+- templates/spirit-ts/package.json
+- templates/spirit-ts/src/index.ts
+- templates/spirit-ts/tests/spirit.test.ts
+- templates/spirit-ts/tsconfig.json
+- xtask/src/check_deprecations_declared.rs
+- xtask/src/check_epic_6_bridge.rs
+- xtask/src/coverage_matrix_nfr_test_3.rs
+- xtask/src/main.rs
+- xtask/src/templates_regen.rs
+
 ### Review Findings
 
 - [x] [Review][Patch] **Ctx loses `Copy` trait — team consensus: accept break, update spec claim** — Team roundtable (Winston, Amelia, Murat) concluded 2-1 to accept the `Copy` → `Clone` downgrade. The ABI contract is `&Ctx` (reference is always Copy), not owned `Ctx`. Updated spec AC6 paragraph to acknowledge the trait bound change. [blind → resolved to patch]

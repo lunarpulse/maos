@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # Story 7.1.5: §A2-Step-3 Closure — 17 Review-Findings Backfill + 25 `dev_model_used` Backfill + Hard-Fail Flip
 
 **Status:** done

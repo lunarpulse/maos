@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # Story 6.5: Gateway Sub-Modules (ADR-029) — Telegram / Slack / Discord / Signal / Email
 
 **Status:** done

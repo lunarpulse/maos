@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1b.5a: Ship hello-Spirit Reference Binary and Hit NFR-Onb-2 5-Minute Evaluator Path
 
 Status: review

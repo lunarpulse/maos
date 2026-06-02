@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1b.4: Freeze the ComplianceClaim Schema and Wire the Inference Port + IAC Telemetry
 
 Status: done

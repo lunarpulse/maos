@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # mTLS Rotation Chaos — Calibration Reports (v0.5)
 
 Per architecture §7.2.1.b — at v0.5 the harness operates in **calibration

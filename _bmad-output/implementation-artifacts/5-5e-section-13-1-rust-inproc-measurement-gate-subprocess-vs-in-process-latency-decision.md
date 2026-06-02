@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # Story 5.5e: §13.1 rust-inproc Measurement Gate — Subprocess vs In-Process Latency Decision
 
 Status: done

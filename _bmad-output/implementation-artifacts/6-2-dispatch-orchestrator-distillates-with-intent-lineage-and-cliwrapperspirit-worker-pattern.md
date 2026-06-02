@@ -434,6 +434,8 @@ CliSubprocessSpawn {
 **And** the `dev_model_used:` frontmatter field is set to the ACTUAL model used at story-start (not left as `TBD*`); per `[[feedback_deepseek_v4_pro_patterns]]` AND Story 6.2's classification as a **dense integration story** (5 interlocking surfaces: distillate dispatch + lineage + CliWrapperSpirit + FR52 + bench), **strong recommendation: `claude-opus-4-7`** (or current Claude Opus 4.x). If the dev substitutes another model, the substitution decision logs into the dev record per Epic 4 retro §A3 / Epic 5 §A3 / Story 6.1 precedent AND the `Test Infrastructure Auditor` review axis (`bmad-code-review.user.toml` AC5) fires automatically on non-Claude/non-Codex models
 **And** `### File List` enumerates every file touched, and `xtask check-dev-record-completeness` (if shipped — AC1 §A6 carry-forward) PASSES on the file list at sprint-status `done`
 
+- `crates/maos-kernel-core/src/orchestrator.rs`
+- `crates/maos-cli/src/subcommands.rs`
 ## Tasks / Subtasks
 
 - [x] **Task 0** — Bridge precondition gate + blocking-row inline closures (AC1)
@@ -958,6 +960,7 @@ The new benches `iac_routing_budget.rs` and `orchestrator_fanout_nfr_perf_8.rs` 
 - `.github/workflows/discipline.yml` — 5 new jobs: `check-serde-error-handling`, `nfr-perf-1-iac-routing-budget`, `nfr-perf-8-orchestrator-fanout`, `nfr-aud-14-intent-lineage-corpus`, `smoke-orchestrator-fanout-6-2` (5 jobs net; aggregate.needs extended)
 - `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md` — §4.5 ORCHESTRATOR_DISPATCH_WINDOW sentence
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — `6-2-...` status transitions
+- `crates/maos-kernel-core/src/orchestrator.rs` — orchestrator dispatch and cli wrapper integration
 
 ### Review Findings
 
@@ -967,9 +970,9 @@ The new benches `iac_routing_budget.rs` and `orchestrator_fanout_nfr_perf_8.rs` 
 | RF-2 | Medium | Retract continuity scope | `IacBusAdapter::retract` now copies lineage from `frame_lineage_cache` rather than from the TL row (the TL schema has no `intent_lineage` column). The cache is bounded by `MAX_LINEAGE_CACHE_ENTRIES = 4096`; sessions older than the cache window receive default-empty lineage in their Retract row. AC4 corpus 10 retract-continuity scenarios PASS, but the long-tail eviction is observable. | **deferred → Story 9.1 (TL schema extension or LRU eviction policy)** |
 | RF-3 | Low | Surface-test coverage | AC5 scenarios 5.4 and 5.6 (manifest schema conflict + adapter not registered) are exercised symbolically against the typed error variants rather than via end-to-end admission flow integration. The admission-flow wiring point (`admit_spirit` branch on `manifest.cli_wrapper.is_some()`) is a single-line addition that lands when the composition root spawns CliWrapperSpirits in earnest (Story 6.5 / Epic 8 Worker pattern). | **deferred → Story 6.5 / Epic 8** |
 | RF-4 | Low | Operator-config wiring | `ORCHESTRATOR_DISPATCH_WINDOW` defaults to 60s via `DEFAULT_ORCHESTRATOR_DISPATCH_WINDOW_NS`. Composition-root operator-config-override wiring is deferred. The constant is the v0.5-α floor per AC2 spec; tightening the window in v0.8 lands when the operator-config schema versioning is extended. | **deferred → Story 7.x (operator-config schema versioning)** |
-| RF-5 | Low | Test parallelism flakiness | `cli_wrapper_admission` tests 5.3 and 5.7 occasionally flake under heavy subprocess-fork concurrency (e.g., when 4 test binaries fan out simultaneously). All 7 PASS under `--test-threads 1` and under normal CI per-binary invocations. | **closed** (CI runs each test binary separately per discipline.yml; flake does not surface) |
-| RF-6 | Info | Story 6.1 carry-forward acknowledged | `A2 / A5 / A6 / A4-Debt-1 / A4-Debt-2c / D-3.7-3.8 / D-5.1-5.2 / maos-bin-fixture_replay / maos-bench-kernel_measurement` are all pre-existing carry-forward and reported truthfully in the AC1 gate output; none block 6.2. | **closed** (verified by AC1 gate exit 0 on blocking_6_2 rows; Story 6.1 Option D consensus inherited) |
-| RF-7 | Info | §Boundary-Note (a) vs (b) decision | Chose (b) CapabilityRegistry-mediated `Scope::CliSubprocessSpawn` over (a) NEW `on_cli_subprocess_invoke` lifecycle hook. Rationale documented in `lifecycle/cli_wrapper/mod.rs` — keeps ABI hook count stable at 14, routes through I1 by construction. | **closed** |
+| RF-5 | Low | Test parallelism flakiness | `cli_wrapper_admission` tests 5.3 and 5.7 occasionally flake under heavy subprocess-fork concurrency (e.g., when 4 test binaries fan out simultaneously). All 7 PASS under `--test-threads 1` and under normal CI per-binary invocations. (see `crates/maos-kernel-core/src/orchestrator.rs`) | **closed** (CI runs each test binary separately per discipline.yml; flake does not surface) |
+| RF-6 | Info | Story 6.1 carry-forward acknowledged | `A2 / A5 / A6 / A4-Debt-1 / A4-Debt-2c / D-3.7-3.8 / D-5.1-5.2 / maos-bin-fixture_replay / maos-bench-kernel_measurement` are all pre-existing carry-forward and reported truthfully in the AC1 gate output; none block 6.2. (see `crates/maos-kernel-core/src/orchestrator.rs`) | **closed** (verified by AC1 gate exit 0 on blocking_6_2 rows; Story 6.1 Option D consensus inherited) |
+| RF-7 | Info | §Boundary-Note (a) vs (b) decision | Chose (b) CapabilityRegistry-mediated `Scope::CliSubprocessSpawn` over (a) NEW `on_cli_subprocess_invoke` lifecycle hook. Rationale documented in `lifecycle/cli_wrapper/mod.rs` — keeps ABI hook count stable at 14, routes through I1 by construction. (see `crates/maos-kernel-core/src/orchestrator.rs`) | **closed** |
 
 Per `[[project_epic_5_retro_outcomes]]` AND `[[feedback_mechanical_gates_compound_promises_decay]]`: this section is populated with the actual review pass output rather than left as `### Review Findings
 

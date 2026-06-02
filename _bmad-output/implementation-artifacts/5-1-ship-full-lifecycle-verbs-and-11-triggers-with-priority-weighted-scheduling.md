@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # Story 5.1: Ship Full Lifecycle Verbs and 11 Triggers with Priority-Weighted Scheduling
 
 Status: done

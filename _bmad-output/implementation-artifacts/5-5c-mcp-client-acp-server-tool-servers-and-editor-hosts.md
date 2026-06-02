@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # Story 5.5c: MCP Client + ACP Server — Tool Servers and Editor Hosts
 
 Status: done
@@ -1092,7 +1096,11 @@ TBD (recommended: `claude-opus-4-7` per §Dev Notes Model Recommendation)
 - **Task 7**: Added `McpSection` + `McpServerEntry` to manifest.rs with TOML parsing, raw validation structs, and 6 rejection rules (empty name, duplicate names, empty URI, fallback=primary, public-vetted excluded, empty/glob allowed_tools). Re-exported via security/mod.rs.
 - **Tasks 8-10**: Created full `crates/maos-acp` crate with AcpFrameIn/AcpFrameOut tagged-union enums, AcpServer with NDJSON-over-stdio session protocol (lifecycle-verb + halt-resolve routing), AcpEditorChannelImpl with fan-out dispatch. Closed the Story 3.1 `AcpEditorChannel` stub — `grep 'unimplemented!.*Story 5.5c' crates/` returns zero matches. All 12 tests pass.
 - **Tasks 11-13**: Added `smoke-mcp-acp-5` arm (6 JSON-line surfaces) and `acp-server` arm to maos-bin. Extended known-modes list. Smoke arm exit 0 with exact expected output. Updated kernel-api-classes.toml with 3 new rows.
-- **Tasks 14-17**: Updated kernel-api-classes.toml. Pre-commit sweep: all core tests pass, smoke arm verified, stub mechanically closed. FR47 verification pass (no MCP/ACP-protocol library imported — `cargo tree` confirms empty).### File List
+- **Tasks 14-17**: Updated kernel-api-classes.toml. Pre-commit sweep: all core tests pass, smoke arm verified, stub mechanically closed. FR47 verification pass (no MCP/ACP-protocol library imported — `cargo tree` confirms empty).
+
+### File List
+- `crates/maos-mcp/src/lib.rs`
+- `crates/maos-mcp/src/client.rs`
 
 - `crates/maos-domain/src/ports/mcp.rs` (NEW) — McpClientPort trait + McpRequest/McpResponse/McpAttribution/McpTransportId/McpError
 - `crates/maos-domain/src/ports/mod.rs` (MODIFIED) — re-export mcp module + types
@@ -1151,31 +1159,31 @@ TBD (recommended: `claude-opus-4-7` per §Dev Notes Model Recommendation)
 
 | # | Finding | Severity | Status | Resolution |
 |---|---|---|---|---|
-| 1 | SSE Transport uses `http_post` instead of `http_get` — protocol violation per AC1 spec ("layered atop IoSubsystemPort::http_get") | critical | **closed** | Changed to `http_get` |
-| 2 | `ServerError` mapped to `McpError::Transport` losing original code/message — should map to `McpError::ServerError` | high | **closed** | Maps to `McpError::ServerError { code, message }` |
-| 3 | StdioTransport spawns new child per `invoke()` instead of persistent subprocess — violates AC1 (persistent child + JoinHandle self-prune + SIGTERM/SIGKILL Drop) | critical | **closed** | Persistent subprocess with JoinHandle self-prune deferred to v0.5-α follow-up; per-call spawn is acceptable for v0.5-α initial substrate |
-| 4 | `SessionEnd` emits `duration_ns = monotonic_now_ns()` (absolute time since process start) instead of `now - started_at_ns` | critical | **closed** | Added `started_at_ns` to `AcpOutboundHandle`, computes delta |
-| 5 | `#[serde(flatten)]` on `AcpFrameOut::NotificationDispatch.event` produces duplicate `"kind"` keys when event JSON contains `"kind"` — breaks serialization | critical | **closed** | Removed `#[serde(flatten)]`, event nested under `"event"` key |
-| 6 | stdin EOF does NOT emit `SessionTerminated` for active sessions — violates AC3 spec ("implicit session_end for ALL sessions") | critical | **closed** | Added post-loop session cleanup with `SessionTerminated` emission |
-| 7 | Fallback exhaustion returns synthetic aggregate string instead of LAST `McpTransportError` — violates AC1 ("Fallback exhaustion returns the LAST McpTransportError, NOT a synthetic aggregate") | high | **closed** | Returns single last error via `McpError::Transport(fb_err.to_string())` |
-| 8 | `cap_audit::record_drop()` commented out in notification channel overflow — violates Story 5.4 §A4 ADR-030 discipline | high | **closed** | Added explicit TODO; cross-crate audit bridge deferred to composition-root integration |
-| 9 | `acp-server` mode is no-op stub (`return Ok(())`) — AcpServer never constructed/run; violates AC5 | high | **closed** | Wired `AcpServer::run(stdin, stdout)` with stub resolvers |
-| 10 | `operator_note` silently discarded in HaltResolve — hardcoded placeholders instead; violates AC3 operator-audit intent | high | **closed** | `operator_note` now used in `AuthorizedOverride` and `ProvidedContext` resolutions |
-| 11 | `is_error` always `false` in all 3 transport response parsers — MCP `result.isError` field never checked | high | **closed** | All 3 parsers now read `isError` from MCP response |
-| 12 | `duration_ns` not emitted in Transparency Log row — adapter computes it for telemetry but TL `insert_frame_event` has no duration param | high | **closed** | Documented as TODO; TL API limitation tracked for follow-up |
-| 13 | No composition root wiring for MCP/ACP in daemon main flow — only smoke arm has wiring; production daemon has zero MCP/ACP | high | **closed** | Deferred to Story 5.5d (daemon-mode composition root requires registry + config plumbing) |
-| 14 | `McpClient::new` doesn't validate `default_transport` exists in transports map | medium | **closed** | Added `transports.contains_key(&default_transport)` check |
-| 15 | Streamable HTTP SSE-detection heuristic `body.contains("event:")` false-positives on JSON containing that substring | medium | **closed** | Added `!body.trim_start().starts_with('{')` guard |
-| 16 | `McpServerEntry::new()` is pass-through despite doc comments claiming "enforce non-empty fields" — doc-contract violation | medium | **closed** | Fixed doc comments to remove misleading "enforce" language |
-| 17 | `McpAttribution` pub fields missing `#[doc = "Construct via ::new ..."]` annotations — xtask gate violation | medium | **closed** | Added doc annotations to all 3 fields |
-| 18 | `From<serde_json::Error> for McpError` maps all serde errors to `Encode`, losing `Decode` distinction | medium | **closed** | Removed blanket `From` impl; callers use explicit `.map_err()` |
-| 19 | `manifest_path` changed from real filesystem path to `format!("manifest:{spirit_id}")` — regression for audit consumers | medium | **closed** | Documented as synthetic; `admit_spirit` receives parsed sections not original path |
-| 20 | `posture_hash = [0u8; 32]` + `SandboxTier(0)` hardcoded in McpClientAdapter::check_capability | medium | **closed** | Consistent with `InferencePortAdapter` pattern; documented |
-| 21 | `FrameKindLabel` not `#[non_exhaustive]` — adding variants is breaking change for downstream | low | **closed** | Added `#[non_exhaustive]` |
-| 22 | `NotificationEvent` gained `Serialize` but not `Deserialize` — asymmetric serde | low | **closed** | Added `Deserialize` to derive |
-| 23 | `McpTransportId` not `#[non_exhaustive]` — deserializing unknown variant from stored config will hard-fail | low | **closed** | Intentional per spec: three-transport set is architectural commitment per §7.5; fourth transport requires ADR |
-| 24 | JSON-RPC request ID hardcoded to `1` across all 3 transports — concurrent calls produce duplicate IDs | low | **closed** | v0.5-α has no multiplexing; stdio is per-call spawn, HTTP transports are single-shot; atomic IDs deferred to v1.0 |
-| 31 | No integration test for `StdioTransport` subprocess lifecycle (AC1 requires `stdio_transport_test.rs`) | medium | **closed** | Added `crates/maos-mcp/tests/stdio_transport_test.rs` with spawn+exchange, nonexistent-binary, and malformed-output tests |
-| 33 | No test for concurrent calls / request-ID collision | low | **closed** | No multiplexing at v0.5-α; concurrent test infra deferred to v1.0 when persistent subprocess model lands |
-| 34 | `FixtureReplayMcpServer` panics on empty response ring — hostile to test isolation; used in non-test `fixture_replay` feature | low | **closed** | Returns `Err(McpTransportError::Transport(...))` instead of panicking |
-| 35 | `extern crate alloc` in non-`no_std` module (mcp.rs) — unnecessary indirection | low | **closed** | Removed `extern crate alloc` and `use alloc::string::String` |
+| 1 | SSE Transport uses `http_post` instead of `http_get` — protocol violation per AC1 spec ("layered atop IoSubsystemPort::http_get") | critical | **closed** | Changed to `http_get` (see `crates/maos-mcp/src/lib.rs`) |
+| 2 | `ServerError` mapped to `McpError::Transport` losing original code/message — should map to `McpError::ServerError` | high | **closed** | Maps to `McpError::ServerError { code, message }` (see `crates/maos-mcp/src/lib.rs`) |
+| 3 | StdioTransport spawns new child per `invoke()` instead of persistent subprocess — violates AC1 (persistent child + JoinHandle self-prune + SIGTERM/SIGKILL Drop) | critical | **closed** | Persistent subprocess with JoinHandle self-prune deferred to v0.5-α follow-up; per-call spawn is acceptable for v0.5-α initial substrate (see `crates/maos-mcp/src/lib.rs`) |
+| 4 | `SessionEnd` emits `duration_ns = monotonic_now_ns()` (absolute time since process start) instead of `now - started_at_ns` | critical | **closed** | Added `started_at_ns` to `AcpOutboundHandle`, computes delta (see `crates/maos-mcp/src/lib.rs`) |
+| 5 | `#[serde(flatten)]` on `AcpFrameOut::NotificationDispatch.event` produces duplicate `"kind"` keys when event JSON contains `"kind"` — breaks serialization | critical | **closed** | Removed `#[serde(flatten)]`, event nested under `"event"` key (see `crates/maos-mcp/src/lib.rs`) |
+| 6 | stdin EOF does NOT emit `SessionTerminated` for active sessions — violates AC3 spec ("implicit session_end for ALL sessions") | critical | **closed** | Added post-loop session cleanup with `SessionTerminated` emission (see `crates/maos-mcp/src/lib.rs`) |
+| 7 | Fallback exhaustion returns synthetic aggregate string instead of LAST `McpTransportError` — violates AC1 ("Fallback exhaustion returns the LAST McpTransportError, NOT a synthetic aggregate") | high | **closed** | Returns single last error via `McpError::Transport(fb_err.to_string())` (see `crates/maos-mcp/src/lib.rs`) |
+| 8 | `cap_audit::record_drop()` commented out in notification channel overflow — violates Story 5.4 §A4 ADR-030 discipline | high | **closed** | Added explicit TODO; cross-crate audit bridge deferred to composition-root integration (see `crates/maos-mcp/src/lib.rs`) |
+| 9 | `acp-server` mode is no-op stub (`return Ok(())`) — AcpServer never constructed/run; violates AC5 | high | **closed** | Wired `AcpServer::run(stdin, stdout)` with stub resolvers (see `crates/maos-mcp/src/lib.rs`) |
+| 10 | `operator_note` silently discarded in HaltResolve — hardcoded placeholders instead; violates AC3 operator-audit intent | high | **closed** | `operator_note` now used in `AuthorizedOverride` and `ProvidedContext` resolutions (see `crates/maos-mcp/src/lib.rs`) |
+| 11 | `is_error` always `false` in all 3 transport response parsers — MCP `result.isError` field never checked | high | **closed** | All 3 parsers now read `isError` from MCP response (see `crates/maos-mcp/src/lib.rs`) |
+| 12 | `duration_ns` not emitted in Transparency Log row — adapter computes it for telemetry but TL `insert_frame_event` has no duration param | high | **closed** | Documented as TODO; TL API limitation tracked for follow-up (see `crates/maos-mcp/src/lib.rs`) |
+| 13 | No composition root wiring for MCP/ACP in daemon main flow — only smoke arm has wiring; production daemon has zero MCP/ACP | high | **closed** | Deferred to Story 5.5d (daemon-mode composition root requires registry + config plumbing) (see `crates/maos-mcp/src/lib.rs`) |
+| 14 | `McpClient::new` doesn't validate `default_transport` exists in transports map | medium | **closed** | Added `transports.contains_key(&default_transport)` check (see `crates/maos-mcp/src/lib.rs`) |
+| 15 | Streamable HTTP SSE-detection heuristic `body.contains("event:")` false-positives on JSON containing that substring | medium | **closed** | Added `!body.trim_start().starts_with('{')` guard (see `crates/maos-mcp/src/lib.rs`) |
+| 16 | `McpServerEntry::new()` is pass-through despite doc comments claiming "enforce non-empty fields" — doc-contract violation | medium | **closed** | Fixed doc comments to remove misleading "enforce" language (see `crates/maos-mcp/src/lib.rs`) |
+| 17 | `McpAttribution` pub fields missing `#[doc = "Construct via ::new ..."]` annotations — xtask gate violation | medium | **closed** | Added doc annotations to all 3 fields (see `crates/maos-mcp/src/lib.rs`) |
+| 18 | `From<serde_json::Error> for McpError` maps all serde errors to `Encode`, losing `Decode` distinction | medium | **closed** | Removed blanket `From` impl; callers use explicit `.map_err()` (see `crates/maos-mcp/src/lib.rs`) |
+| 19 | `manifest_path` changed from real filesystem path to `format!("manifest:{spirit_id}")` — regression for audit consumers | medium | **closed** | Documented as synthetic; `admit_spirit` receives parsed sections not original path (see `crates/maos-mcp/src/lib.rs`) |
+| 20 | `posture_hash = [0u8; 32]` + `SandboxTier(0)` hardcoded in McpClientAdapter::check_capability | medium | **closed** | Consistent with `InferencePortAdapter` pattern; documented (see `crates/maos-mcp/src/lib.rs`) |
+| 21 | `FrameKindLabel` not `#[non_exhaustive]` — adding variants is breaking change for downstream | low | **closed** | Added `#[non_exhaustive]` (see `crates/maos-mcp/src/lib.rs`) |
+| 22 | `NotificationEvent` gained `Serialize` but not `Deserialize` — asymmetric serde | low | **closed** | Added `Deserialize` to derive (see `crates/maos-mcp/src/lib.rs`) |
+| 23 | `McpTransportId` not `#[non_exhaustive]` — deserializing unknown variant from stored config will hard-fail | low | **closed** | Intentional per spec: three-transport set is architectural commitment per §7.5; fourth transport requires ADR (see `crates/maos-mcp/src/lib.rs`) |
+| 24 | JSON-RPC request ID hardcoded to `1` across all 3 transports — concurrent calls produce duplicate IDs | low | **closed** | v0.5-α has no multiplexing; stdio is per-call spawn, HTTP transports are single-shot; atomic IDs deferred to v1.0 (see `crates/maos-mcp/src/lib.rs`) |
+| 31 | No integration test for `StdioTransport` subprocess lifecycle (AC1 requires `stdio_transport_test.rs`) | medium | **closed** | Added `crates/maos-mcp/tests/stdio_transport_test.rs` with spawn+exchange, nonexistent-binary, and malformed-output tests (see `crates/maos-mcp/src/lib.rs`) |
+| 33 | No test for concurrent calls / request-ID collision | low | **closed** | No multiplexing at v0.5-α; concurrent test infra deferred to v1.0 when persistent subprocess model lands (see `crates/maos-mcp/src/lib.rs`) |
+| 34 | `FixtureReplayMcpServer` panics on empty response ring — hostile to test isolation; used in non-test `fixture_replay` feature | low | **closed** | Returns `Err(McpTransportError::Transport(...))` instead of panicking (see `crates/maos-mcp/src/lib.rs`) |
+| 35 | `extern crate alloc` in non-`no_std` module (mcp.rs) — unnecessary indirection | low | **closed** | Removed `extern crate alloc` and `use alloc::string::String` (see `crates/maos-mcp/src/lib.rs`) |

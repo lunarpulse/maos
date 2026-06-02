@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1b.6: Epic 2 Prep Bundle — D9 SandboxTier reconciliation + D10 arch-doc catch-up + Doc3 unsafe ADR
 
 **Status:** done
@@ -114,3 +118,15 @@ Conversion lives in `maos-domain` (orphan rules: `From<ForeignType> for LocalTyp
 - `docs/adr/ADR-037-constitutional-amendment-process.md` — amendment process for allowlist additions
 - `docs/adr/ADR-039-per-module-unsafe-code-policy.md` — this story's primary deliverable
 - `docs/invariants/i9-exemptions.md` — parallel discipline pattern for I9 state-exempt registrations
+### Agent Model Used
+
+The story was implemented using `claude-opus-4-5`.
+
+### Completion Notes List
+
+D9: Dual SandboxTier reconciled via `From<ABI> for Domain` impl + `Domain::to_abi() -> Option<ABI>` inherent method. D10: Architecture doc §4.0.2 updated with maos-audit, maos-attrs, maos-corpus-gen, xtask. Doc3: ADR-039 formalizes per-module `#![forbid(unsafe_code)]` policy. Verified: check-empty-kernel PASS, check-service-boundary PASS, cap_registry_smoke PASS, maos-domain lib i9 tests 9/9 pass. `git_log: commit 1bfcc1a author Myoungki Jung date 2026-05-16`
+
+### File List
+
+`git_log: commit 1bfcc1a` — `Cargo.lock`, `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md`, `crates/maos-domain/Cargo.toml`, `crates/maos-domain/src/invariants/i9.rs`, `docs/adr/ADR-039-per-module-unsafe-code-policy.md`, `docs/adr/index.md`
+- `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md`

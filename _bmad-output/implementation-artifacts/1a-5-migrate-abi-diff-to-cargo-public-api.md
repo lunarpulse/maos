@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1a.5: Migrate `xtask abi-diff` from Bespoke syn+quote Walker to `cargo-public-api`
 
 **Status:** done
@@ -398,6 +402,20 @@ Status: **review**
 - `xtask/tests/fixtures/abi-diff/pub-use-reexport/{baseline,modified,modified-removed}/` — fixture crates + EXPECTED.txt
 - `xtask/tests/fixtures/abi-diff/generic-bound-reorder/{baseline,modified}/` — fixture crates + EXPECTED.txt
 - `xtask/tests/fixtures/abi-diff/inline-mod-items/{baseline,modified}/` — fixture crates + EXPECTED.txt
+
+### Agent Model Used
+
+The story was implemented using `claude-opus-4-5`.
+
+### Completion Notes List
+
+Rewrote `xtask/src/abi_diff.rs` from 298 LOC bespoke syn+quote walker to 99 LOC `cargo-public-api` wrapper. Two diff modes: file-based (line comparison) and git-ref-based (`cargo public-api diff`). Generated new text baseline (67 lines canonical output). Removed old bespoke JSON baseline. KLOC aggregate: 5,268 (down from ~5,451). Tasks 0–6 complete; Task 7 (PR opening) pending. `git_log: commit 0a3b90c author Myoungki Jung date 2026-05-13`
+
+### File List
+- `xtask/src/main.rs`
+- `Cargo.toml`
+
+`git_log: commit 0a3b90c` — `.github/workflows/discipline.yml`, `.gitignore`, `abi-baseline/v0.1-alpha-pre-abi-freeze.txt`, `docs/dev-discipline/abi-diff-migration.md`, `xtask/src/abi_diff.rs`, `xtask/tests/abi_diff_integration.rs`, 16 fixture crate files
 
 ### Review Findings
 

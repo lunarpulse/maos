@@ -1,3 +1,7 @@
+---
+dev_model_used: deepseek-v4-pro
+---
+
 # Story 4.5: Author the Cross-Spirit Isolation 200-Corpus and Enforce I14 Halt-Continuity in Hot-Swap
 
 Status: done
@@ -523,20 +527,20 @@ if is_cross_spirit {
 | D2 | decision-needed | LOW | **Directory convention: snake_case vs kebab-case** — AC1 spec diagram uses kebab-case (`namespace-enumeration/`); implementation uses snake_case (`namespace_enumeration/`). Both xtask generator and on-disk fixtures use snake_case. | gen_isolation_corpus.rs, corpus dirs | closed → snake_case canonical | Team: snake_case matches serde `rename_all` and Rust enum conventions. Spec diagram was illustrative. |
 | D3 | decision-needed | MEDIUM | **SwapVerdict lacks Serialize/Deserialize** — Only derives Debug/Clone/PartialEq/Eq. When Story 5.2 wires the Hot-Swap Coordinator, `SafeMigrated` verdicts cannot cross the swap protocol boundary. | halt/mod.rs:355 | closed → patch applied | Team: add serde now (forward-compat, zero cost, prevents future ABI churn). |
 | D4 | decision-needed | LOW | **Missing abi-diff baseline regeneration** — `IacFrame::intent_lineage` field addition is the single non-trivial abi-diff signal per spec AC6. No abi-baseline files appear in the diff. | xtask/abi-baseline/ | closed → baseline regenerated | `abi-baseline/v1-pre-bump.txt` regenerated from current `cargo public-api` output. abi-diff now passes. |
-| P1 | patch | HIGH | **Cross-Spirit detection checks only to.first()** — `matches!(frame.to.first(), ...)` only inspects the first recipient. A frame to `[spirit-a, spirit-b]` from `spirit-a` would bypass lineage enforcement for `spirit-b`. Must use `frame.to.iter().any(\|addr\| addr.spirit_id != frame.from.spirit_id)`. | iac/mod.rs:176 | closed | Fixed: changed to `frame.to.iter().any(...)`. |
-| P2 | patch | HIGH | **CI test silently skips if corpus fixture missing** — `if !corpus_path.exists() { eprintln!("Skipping..."); return; }` exits with zero assertions. Must use `expect()` or `assert!()` to fail-loud. Also applies to `hot_swap_halt_continuity_corpus_integration.rs`. | nfr_sec_14_cross_spirit_isolation.rs | closed | Fixed: both tests now use `assert!(corpus_path.exists(), ...)`. |
-| P3 | patch | MEDIUM | **Enum exhaustiveness: FrameOrigin::Kernel silently rejected** — Wildcard `_ =>` arm at line 191 catches `FrameOrigin::Kernel` and `SpiritDraftedHumanApproved` in the lineage rejection path. Kernel-generated frames (audit telemetry, capability mediation) should not be rejected as "consent-laundering." Add explicit arms; no test coverage for either variant. | iac/mod.rs:191 | closed | Fixed: `SpiritDraftedHumanApproved` auto-populates lineage (human reviewed); `Kernel` accepted with empty lineage (internal infra). |
+| P1 | patch | HIGH | **Cross-Spirit detection checks only to.first()** — `matches!(frame.to.first(), ...)` only inspects the first recipient. A frame to `[spirit-a, spirit-b]` from `spirit-a` would bypass lineage enforcement for `spirit-b`. Must use `frame.to.iter().any(\|addr\| addr.spirit_id != frame.from.spirit_id)`. | iac/mod.rs:176 | closed | Fixed in `crates/maos-kernel-core/src/iac/mod.rs`: changed to `frame.to.iter().any(...)`. |
+| P2 | patch | HIGH | **CI test silently skips if corpus fixture missing** — `if !corpus_path.exists() { eprintln!("Skipping..."); return; }` exits with zero assertions. Must use `expect()` or `assert!()` to fail-loud. Also applies to `hot_swap_halt_continuity_corpus_integration.rs`. | crates/maos-kernel-core/tests/nfr_sec_14_cross_spirit_isolation.rs | closed | Fixed: both tests now use `assert!(corpus_path.exists(), ...)`. |
+| P3 | patch | MEDIUM | **Enum exhaustiveness: FrameOrigin::Kernel silently rejected** — Wildcard `_ =>` arm at line 191 catches `FrameOrigin::Kernel` and `SpiritDraftedHumanApproved` in the lineage rejection path. Kernel-generated frames (audit telemetry, capability mediation) should not be rejected as "consent-laundering." Add explicit arms; no test coverage for either variant. | iac/mod.rs:191 | closed | Fixed in `crates/maos-kernel-core/src/iac/mod.rs` — Fixed: `SpiritDraftedHumanApproved` auto-populates lineage (human reviewed); `Kernel` accepted with empty lineage (internal infra). |
 | P4 | patch | MEDIUM | **CI job missing -- --include-ignored flag** — Spec AC2 line 205 requires `cargo test ... -- --include-ignored`. Current job in discipline.yml runs without it. | .github/workflows/discipline.yml | closed | Fixed: added `-- --include-ignored` to CI job. |
-| P5 | patch | MEDIUM | **main.rs constructs dead hook-bearing adapters** — `_halt_registry_with_hook` and `_distillate_writer_with_hook` are separate instances from the production adapters, wired with hooks then dropped. The `_isolation_hook` Arc is never passed to `IacBusAdapter::with_isolation_hook`. Either wire all five or remove the dead code path. | main.rs:244-258 | closed | Fixed: removed dead spirit_test block; hooks are constructed by integration tests. |
+| P5 | patch | MEDIUM | **main.rs constructs dead hook-bearing adapters** — `_halt_registry_with_hook` and `_distillate_writer_with_hook` are separate instances from the production adapters, wired with hooks then dropped. The `_isolation_hook` Arc is never passed to `IacBusAdapter::with_isolation_hook`. Either wire all five or remove the dead code path. | main.rs:244-258 | closed | Fixed in `crates/maos-bin/src/main.rs` — Fixed: removed dead spirit_test block; hooks are constructed by integration tests. |
 | P6 | patch | MEDIUM | **Tests use direct insert_pending instead of invoke_halt** — AC3 line 279 and dev notes line 650 require production-path `invoke_halt` for seeding halts. Inline tests use `insert_pending` directly. | halt/mod.rs:516 | closed → documented | v0.3-β limitation documented in `swap_continuity_tests` module doc: `invoke_halt` requires full TL+Journal setup disproportionate for unit tests; integration test uses production path. |
-| P7 | patch | MEDIUM | **Empty match arm silently ignores SafeMigrated/Violation verdicts** — When a corpus scenario specifies `SafeMigrated` or `Violation`, the match arm was empty. | hot_swap_halt_continuity_corpus_integration.rs | closed | Fixed: arm now asserts wrapper returns SafeDrained at v0.3-β; no silent skip. |
+| P7 | patch | MEDIUM | **Empty match arm silently ignores SafeMigrated/Violation verdicts** — When a corpus scenario specifies `SafeMigrated` or `Violation`, the match arm was empty. | hot_swap_halt_continuity_corpus_integration.rs | closed | Fixed in `crates/maos-kernel-core/tests/hot_swap_halt_continuity_corpus_integration.rs` — Fixed: arm now asserts wrapper returns SafeDrained at v0.3-β; no silent skip. |
 | P8 | patch | MEDIUM | **Missing architecture documentation updates (Task 7)** — Spec requires §8.1.1 append to `8-security-approval-model.md` (≤250 words) and §7.3.2 append to `7-inter-agent-communication.md` (≤200 words). | _bmad-output/planning-artifacts/... | closed → false alarm | Both sections ARE present in the diff (§7.3.2 + §8.1.1). Task 7 was completed. |
-| P9 | patch | LOW | **drain_for_spirit return value never read** — `let drained = registry.drain_for_spirit(...)` binds the result but never inspects it. | halt/mod.rs:326 | closed | Fixed: `let _drained = ...` to suppress unused binding warning. |
+| P9 | patch | LOW | **drain_for_spirit return value never read** — `let drained = registry.drain_for_spirit(...)` binds the result but never inspects it. | halt/mod.rs:326 | closed | Fixed in `crates/maos-kernel-core/src/halt/mod.rs` — Fixed: `let _drained = ...` to suppress unused binding warning. |
 | P10 | patch | LOW | **_outcome parameter ignored in fire_isolation_hooks (3 sites)** — The `IsolationHookOutcome` parameter (Abort vs Continue) was prefixed `_outcome` and unused. | halt/mod.rs:150, distillate.rs:81, iac/mod.rs:80 | closed | Fixed: renamed to `outcome` at all 3 sites; forward-shaped for v0.5+ when observation pipeline is wired. |
-| P11 | patch | LOW | **Manual Debug impl uses finish_non_exhaustive() unconditionally** — In non-spirit_test builds all fields are shown but `..` is still printed, implying hidden state that doesn't exist. | halt/mod.rs:129 | closed | Fixed: Debug impl now conditionally includes `isolation_hook` under `#[cfg(spirit_test)]`. |
-| P12 | patch | LOW | **Silent skipping of unreadable read_dir entries** — `filter_map(\|e\| e.ok())` silently drops IO errors (permissions, broken symlinks). | isolation_corpus.rs:235,260 | closed | Fixed: both `read_dir` call sites now `eprintln!` on errors before filtering silently. |
-| P13 | patch | LOW | **Duplicate snake_case conversion maps** — Two independent manual match blocks mapping `IsolationAttackCategory` → string. | isolation_corpus.rs, nfr_sec_14_... | closed | Fixed: `serde_variant::to_snake_case` made `pub`; integration test imports it instead of duplicating. |
-| P14 | patch | LOW | **Missing DistillateWriter::with_isolation_hook classifier** — AC6 line 455 requires `maos_kernel_core::iac::distillate::DistillateWriter::with_isolation_hook = "data-movement"` in kernel-api-classes.toml. | kernel-api-classes.toml | closed | Fixed: entry added to Story 4.5 classification block. |
+| P11 | patch | LOW | **Manual Debug impl uses finish_non_exhaustive() unconditionally** — In non-spirit_test builds all fields are shown but `..` is still printed, implying hidden state that doesn't exist. | halt/mod.rs:129 | closed | Fixed in `crates/maos-kernel-core/src/halt/mod.rs` — Fixed: Debug impl now conditionally includes `isolation_hook` under `#[cfg(spirit_test)]`. |
+| P12 | patch | LOW | **Silent skipping of unreadable read_dir entries** — `filter_map(\|e\| e.ok())` silently drops IO errors (permissions, broken symlinks). | isolation_corpus.rs:235,260 | closed | Fixed in `crates/maos-eval/src/isolation_corpus.rs`: both `read_dir` call sites now `eprintln!` on errors before filtering silently. |
+| P13 | patch | LOW | **Duplicate snake_case conversion maps** — Two independent manual match blocks mapping `IsolationAttackCategory` → string. | isolation_corpus.rs, nfr_sec_14_... | closed | Fixed in `crates/maos-eval/src/isolation_corpus.rs` — Fixed: `serde_variant::to_snake_case` made `pub`; integration test imports it instead of duplicating. |
+| P14 | patch | LOW | **Missing DistillateWriter::with_isolation_hook classifier** — AC6 line 455 requires `maos_kernel_core::iac::distillate::DistillateWriter::with_isolation_hook = "data-movement"` in kernel-api-classes.toml. | kernel-api-classes.toml | closed | Fixed in `xtask/kernel-api-classes.toml` — Fixed: entry added to Story 4.5 classification block. |
 
 **defer (5):**
 
@@ -572,3 +576,33 @@ if is_cross_spirit {
 ---
 
 **Aggregate density (post-review):** 25 findings (4 decision, 14 patch, 5 defer, 3 dismiss). All 4 decisions resolved. 13 of 14 patches applied inline; 1 false alarm (P8). abi-diff baseline regenerated. Story 4.4 had 40 findings (0 decision, 37 patch, 2 defer, 1 dismiss). The lower count is consistent with a narrower surface — Story 4.5's real code surface is ~1,800 LOC vs Story 4.4's ~3,000 LOC. Finding density per KLOC is comparable (~14 findings/KLOC for 4.5, ~13 for 4.4). Pre-existing xtask gate failures (kloc-check, check-service-boundary, check-empty-kernel) are carryover from Stories 4.1-4.4 and are not Story 4.5 regressions.
+
+### Agent Model Used
+
+The story was implemented using `deepseek-v4-pro`.
+
+### Completion Notes List
+
+Cross-Spirit isolation 200-corpus authored (Sec-14a: 100 same-Host + Sec-14b: 100 cross-Host, 8 categories). I14 hot-swap enforcement `validate_swap_halt_continuity` added with `SwapVerdict` drain-or-migrate semantics. IAC bus intent-lineage propagation: `IacFrame.intent_lineage` field added. Isolation corpus runner + 5 isolation hook integrations wired. 25 review findings (4 decision, 14 patch, 5 defer, 3 dismiss). `git_log: commit e14910d author Myoungki Jung date 2026-05-20`
+
+### File List
+
+`git_log: commit e14910d` — 200 scenario JSONs + attestations in `crates/maos-eval/fixtures/isolation-corpus-v0/`
+- `crates/maos-bin/src/main.rs`
+- `crates/maos-domain/src/frame.rs`
+- `crates/maos-domain/src/iac_bus_types.rs`
+- `crates/maos-domain/src/invariants/i13.rs`
+- `crates/maos-eval/src/isolation_corpus.rs`
+- `crates/maos-eval/src/lib.rs`
+- `crates/maos-kernel-core/src/halt/mod.rs`
+- `crates/maos-kernel-core/src/iac/mailbox.rs`
+- `crates/maos-kernel-core/src/iac/mod.rs`
+- `crates/maos-kernel-core/src/isolation/mod.rs`
+- `crates/maos-kernel-core/src/isolation/runner.rs`
+- `crates/maos-kernel-core/src/lib.rs`
+- `crates/maos-kernel-core/tests/hot_swap_halt_continuity_corpus_integration.rs`
+- `crates/maos-kernel-core/tests/nfr_sec_14_cross_spirit_isolation.rs`
+- `xtask/kernel-api-classes.toml`
+- `xtask/src/main.rs`
+- `.github/workflows/discipline.yml`
+- `distillate.rs`

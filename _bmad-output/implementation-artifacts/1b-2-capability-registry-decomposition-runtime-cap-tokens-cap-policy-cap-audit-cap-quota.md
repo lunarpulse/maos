@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1b.2: Capability Registry Decomposition Runtime — cap-tokens / cap-policy / cap-audit / cap-quota
 
 Status: done

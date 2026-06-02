@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1a.1: Initialize 17-Crate Cargo Workspace + Frozen ABI Types (Starter Template)
 
 Status: done

@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1b.1: Three Audit Logs — Transparency / Approval Decision / Lifecycle Journal
 
 Status: done

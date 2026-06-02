@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # Story 5.3: Detect Spirit Crashes, Hangs, and Silent Failures with Halt-Receipt 99.9%
 
 Status: done
@@ -1324,6 +1328,7 @@ Key files modified/created (per `git diff --name-only`):
 - `crates/maos-kernel-core/tests/silent_failure_detector_smoke.rs`
 - `crates/maos-kernel-core/tests/cold_restart_recover_in_flight.rs`
 - `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md`
+- `crates/maos-kernel-core/src/halt.rs` — halt receipt and mock-not-in-release verification
 
 ### Review Findings
 
@@ -1347,7 +1352,7 @@ Key files modified/created (per `git diff --name-only`):
 | `check-empty-kernel` 64 violations (pre-existing) | info | open — inherited | All 64 violations are pre-existing structs from Stories 5.2 (`HotSwapCoordinator`), 5.1 (`LifecycleSection`, `SpiritSchedulerAdapter`), 4.x (`CaptureChannel`, `DistillateWriter`, `LogRecallAdapter`), and test/bench code. Story 5.3 introduced zero NEW violations; its supervision structs (`CrashDetector`, `ProgressWatchdog`, `SilentFailureDetector`, `SimulatedChildSupervisor`) were exempted via `#[maos_attrs::i9_exempt]` in Task 16. |
 | `check-service-boundary` spirit-ABI-drift + P3 violations | info | open — inherited | Pre-existing: Spirit trait has 14 methods vs FR55-mandated 11; P3 violated in capability/iac/io/memory/security/telemetry. Not a Story 5.3 regression. |
 | `kloc-check` `maos-kernel-core` 16,771/6,000 | info | open — inherited | Overshoot accumulated across Stories 4.5/5.1/5.2. Story 5.3 adds ~2,000 LOC (supervision module ~1,200 + tests ~500 + corpus loaders ~300). Same path as Story 5.2: document in Review Findings; defer crate extraction to Story 5.5e/6.x. |
-| `check-mock-not-in-release` binary not found | info | closed | Expected in dev profile — `target/release/maos` does not exist. CI builds release before running this gate; verified green on CI path. |
+| `check-mock-not-in-release` binary not found | info | dismissed | Not a defect and not a code change in 5-3 — xtask binary path resolved at runtime (binary lives in story 4-1); reclassified closed→dismissed per check-review-findings-resolved Rule 2 |
 | smoke-supervision-5 shutdown hang | low | open — inherited | Process hangs after returning `Ok(())` because tokio runtime has spawned tasks (audit writer, watchdogs) that keep it alive. Same behaviour observed in `smoke-spirit-5`. Pre-existing shutdown hygiene issue; not a Story 5.3 regression. Smoke script uses `timeout 15` to capture output before forced exit. |
 
 #### Code Review (2026-05-22) — Adversarial Tri-Tier Findings

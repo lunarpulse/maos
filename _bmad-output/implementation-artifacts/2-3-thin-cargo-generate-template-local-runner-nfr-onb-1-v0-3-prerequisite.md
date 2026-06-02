@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 2.3: Thin `cargo-generate` Template + Local Runner (NFR-Onb-1 v0.3 Prerequisite)
 
 Status: done

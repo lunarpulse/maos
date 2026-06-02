@@ -1270,11 +1270,9 @@ jobs:
       - name: Run maos-manifest v1-load-on-current-kernel compat tests
         run: cargo test -p maos-manifest --test manifest_n_minus_1_compat --locked
 
-  # §A2 step 3 split-flip — new gates hard-fail; existing gates soft-fail until pre-existing
-  # violations remediated in follow-up story (scope-reduction-closures in 4-1/4-2/5-2/5-3/5-5a/5-5d/6-2)
+  # §A2 FULL flip — split-flip closed in Story 7.1.6; hard-fail since 2026-06-01
   check-review-findings-resolved:
     runs-on: ubuntu-latest
-    continue-on-error: true  # split-flip: soft-fail until pre-existing violations closed
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
@@ -1286,11 +1284,9 @@ jobs:
       - name: Run check-review-findings-resolved
         run: cargo run -p xtask -- check-review-findings-resolved --json
 
-  # §A2 step 3 split-flip — new gates hard-fail; existing gates soft-fail until pre-existing
-  # violations remediated in follow-up story (dev-record gaps across bootstrap-era stories)
+  # §A2 FULL flip — split-flip closed in Story 7.1.6; hard-fail since 2026-06-01
   check-dev-record-completeness:
     runs-on: ubuntu-latest
-    continue-on-error: true  # split-flip: soft-fail until pre-existing violations closed
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1

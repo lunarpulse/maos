@@ -1,3 +1,7 @@
+---
+dev_model_used: deepseek-v4-pro
+---
+
 # Story 4.4: Enforce the I11 Audit Chain on Distillates with `log.recall` and the Five-Metric Gate
 
 Status: review

@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 2.5: Epic 3 Prep Bundle — D11 server-exit drain + IAC bus Mailbox addendum + xtask workspace-count guard + dev-record/review-checklist discipline
 
 **Status:** done

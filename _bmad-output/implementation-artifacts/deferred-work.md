@@ -1,3 +1,11 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
+## Deferred from: code review of 7-1-6-section-a2-full-flip (2026-06-02)
+
+- `cargo public-api --diff` skipped instead of run (AC6) — spec requires running the command but story is discipline-substrate only (.md + discipline.yml); zero ABI impact expected. Spec deviation acknowledged.
+
 ## Deferred from: code review of 7-5b-execute-nfr-onb-1-30-minute-first-spirit-validation-gate-at-v0-3 (2026-06-01)
 
 - Fragile `LocalRunner` string-contains heuristic in `classify_prerequisites` — greps source for `"impl LocalRunner"` (matches comments/doc comments). Test-only prereq check; works for current codebase. `crates/maos-eval/src/onboarding_gate_corpus.rs:1211-1214`

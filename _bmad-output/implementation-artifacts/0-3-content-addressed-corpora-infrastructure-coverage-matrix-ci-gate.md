@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 0.3: Content-Addressed Corpora Infrastructure + Coverage Matrix CI Gate
 
 Status: review

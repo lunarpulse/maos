@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1b.3: Sandbox Tier T0/T1/T2 Enforcement + Per-Spirit Resource Caps
 
 Status: complete (all review findings resolved, all tests green)

@@ -1,3 +1,7 @@
+---
+dev_model_used: deepseek-v4-pro
+---
+
 # Story 4.3: Provide Three Memory Tiers with Principal Namespace and Spirit Self-Telemetry
 
 Status: done

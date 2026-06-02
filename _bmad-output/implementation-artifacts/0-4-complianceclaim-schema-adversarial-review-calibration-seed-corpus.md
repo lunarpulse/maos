@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 0.4: ComplianceClaim Schema Adversarial Review + Calibration Seed Corpus
 
 Status: review

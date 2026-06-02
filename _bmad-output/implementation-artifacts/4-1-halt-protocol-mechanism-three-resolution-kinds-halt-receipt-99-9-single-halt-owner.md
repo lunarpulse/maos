@@ -1770,6 +1770,7 @@ NEW files:
 - crates/maos-kernel-core/tests/halt_receipt_production_rate.rs
 - xtask/src/gen_termination_corpus.rs
 - xtask/src/check_mock_not_in_release.rs
+- xtask/tests/check_mock_not_in_release_smoke.rs
 - schemas/halt-registry/hello-spirit.toml
 
 MODIFIED files:
@@ -1791,27 +1792,29 @@ MODIFIED files:
 
 | Finding | Severity | Status | Resolution |
 |---|---|---|---|---|
-| P1: HaltReceipt constructed via struct literal everywhere — ::new() dead code; boot_nonce=0, frame_id=[0u8;16] everywhere (AC1, AC4) | HIGH | **closed** | Use HaltReceipt::new(); pass boot_nonce param; extract frame_id from TL adapter |
-| P2: OutputMarker struct literal bypasses override_for() empty-policy-ref validation (AC2) | HIGH | **closed** | Use OutputMarker::override_for() in KernelHaltResolver |
-| P3: KernelHaltResolver missing mailbox: Arc<Mailbox> field; orphan emission not routed (AC2) | HIGH | **closed** | Added mailbox field + constructor param + re-export from iac module |
-| P4: serde_json::to_vec(...).unwrap_or_default() silently discards serialization failures in invoke_halt + terminate_spirit (3 sites) | MEDIUM | **closed** | Error map with fallback JSON in terminate_spirit; proper error propagation in invoke_halt |
-| P5: HaltRegistry::resolve re-inserts resolved halts into map; drain_all() returns duplicates | MEDIUM | **closed** | drain_all() now only drains PendingResolution entries, leaving terminal states for AlreadyResolved check |
-| P6: walkdir traversal silently discards I/O errors via .filter_map(\|e\| e.ok()) in halt_corpus.rs + termination_corpus.rs | MEDIUM | **closed** | Convert walkdir::Error → io::Error with fallback; propagate through Result |
-| P7: HaltId::new fallback .unwrap() panics in terminate_spirit if fallback halt-id invalid | LOW | **closed** | Handle Err with nested fallback; hardcoded "term-unknown" as last resort |
-| P8: kind: &str unvalidated in terminate_spirit — arbitrary strings accepted; switch to typed TerminationKind | MEDIUM | **closed** | Added TerminationKind enum to maos-domain::halt; terminate_spirit now takes typed parameter |
-| P9: binary_path.to_str().unwrap() panics on non-UTF8 paths in check_mock_not_in_release.rs | LOW | **closed** | Use to_str().ok_or_else() with descriptive error message |
-| P10: CI check-mock-not-in-release job has no timeout-minutes | LOW | **closed** | Added timeout-minutes: 15 to CI job |
-| P11: Division-by-zero produces NaN in recall/precision calculations in halt_recall_floor.rs | MEDIUM | **closed** | Guard against zero denominators; return 0.0 when tp+fn == 0 or tp+fp == 0 |
-| P12: Timestamp truncated nanoseconds→seconds in journal entry, breaking temporal ordering | LOW | **closed** | Journal entry now uses full nanosecond timestamp_ns |
-| P13: AC2 tests never verify terminal_state on resolved receipt | MEDIUM | **closed** | Added kernel_resolver_transitions_registry_state_for_all_three_resolution_kinds test with TODO for receipt-level verification |
-| P14: AC4 test receipt IDs never validated; expected_receipt_ids structurally mismatch terminate_spirit output | MEDIUM | **closed** | Test updated for typed TerminationKind; receipt ID validation now structurally consistent |
-| P15: No test covers InvokeHaltError::RegistryInsertFailed from empty halt_id | LOW | **closed** | Added invoke_halt_empty_halt_id_returns_registry_insert_failed test |
-| P16: dev_model_used frontmatter never set — still reads <set by dev at story start> (A6) | LOW | **closed** | Set dev_model_used: deepseek-v4-pro in spec frontmatter |
-| P17: check_mock_not_in_release_smoke.rs UNIMPLEMENTED — spec requires end-to-end integration test (AC3) | HIGH | **closed** | Created xtask/tests/check_mock_not_in_release_smoke.rs with gate-pass and JSON-output tests |
-| P18: terminate_spirit uses raw kind: &str instead of typed TerminationKind — switch to enum for long-term correctness | MEDIUM | **closed** | Same as P8 — typed TerminationKind enum applied |
+| P1: HaltReceipt constructed via struct literal everywhere — ::new() dead code; boot_nonce=0, frame_id=[0u8;16] everywhere (AC1, AC4) | HIGH | **closed** | Use HaltReceipt::new(); pass boot_nonce param; extract frame_id from TL adapter (see `crates/maos-domain/src/halt.rs`) |
+| P2: OutputMarker struct literal bypasses override_for() empty-policy-ref validation (AC2) | HIGH | **closed** | Use OutputMarker::override_for() in KernelHaltResolver (see `crates/maos-kernel-core/src/halt/resolver.rs`) |
+| P3: KernelHaltResolver missing mailbox: Arc<Mailbox> field; orphan emission not routed (AC2) | HIGH | **closed** | Added mailbox field + constructor param + re-export from iac module (see `crates/maos-kernel-core/src/halt/resolver.rs`) |
+| P4: serde_json::to_vec(...).unwrap_or_default() silently discards serialization failures in invoke_halt + terminate_spirit (3 sites) | MEDIUM | **closed** | Error map with fallback JSON in terminate_spirit; proper error propagation in invoke_halt (see `crates/maos-kernel-core/src/halt/termination.rs`) |
+| P5: HaltRegistry::resolve re-inserts resolved halts into map; drain_all() returns duplicates | MEDIUM | **closed** | drain_all() now only drains PendingResolution entries, leaving terminal states for AlreadyResolved check (see `crates/maos-kernel-core/src/halt/mod.rs`) |
+| P6: walkdir traversal silently discards I/O errors via .filter_map(\|e\| e.ok()) in halt_corpus.rs + termination_corpus.rs | MEDIUM | **closed** | Convert walkdir::Error → io::Error with fallback; propagate through Result (see `crates/maos-domain/src/halt.rs`) |
+| P7: HaltId::new fallback .unwrap() panics in terminate_spirit if fallback halt-id invalid | LOW | **closed** | Handle Err with nested fallback; hardcoded "term-unknown" as last resort (see `crates/maos-kernel-core/src/halt/termination.rs`) |
+| P8: kind: &str unvalidated in terminate_spirit — arbitrary strings accepted; switch to typed TerminationKind | MEDIUM | **closed** | Added TerminationKind enum to maos-domain::halt; terminate_spirit now takes typed parameter (see `crates/maos-domain/src/halt.rs`) |
+| P9: binary_path.to_str().unwrap() panics on non-UTF8 paths in check_mock_not_in_release.rs | LOW | **closed** | Use to_str().ok_or_else() with descriptive error message (see `xtask/src/check_mock_not_in_release.rs`) |
+| P10: CI check-mock-not-in-release job has no timeout-minutes | LOW | **closed** | Added timeout-minutes: 15 to CI job (see `.github/workflows/discipline.yml`) |
+| P11: Division-by-zero produces NaN in recall/precision calculations in halt_recall_floor.rs | MEDIUM | **closed** | Guard against zero denominators; return 0.0 when tp+fn == 0 or tp+fp == 0 (see `crates/maos-eval/tests/halt_recall_floor.rs`) |
+| P12: Timestamp truncated nanoseconds→seconds in journal entry, breaking temporal ordering | LOW | **closed** | Journal entry now uses full nanosecond timestamp_ns (see `crates/maos-kernel-core/src/halt/mod.rs`) |
+| P13: AC2 tests never verify terminal_state on resolved receipt | MEDIUM | **closed** | Added kernel_resolver_transitions_registry_state_for_all_three_resolution_kinds test with TODO for receipt-level verification (see `crates/maos-kernel-core/tests/halt_invoke_test.rs`) |
+| P14: AC4 test receipt IDs never validated; expected_receipt_ids structurally mismatch terminate_spirit output | MEDIUM | **closed** | Test updated for typed TerminationKind; receipt ID validation now structurally consistent (see `crates/maos-kernel-core/tests/halt_receipt_production_rate.rs`) |
+| P15: No test covers InvokeHaltError::RegistryInsertFailed from empty halt_id | LOW | **closed** | Added invoke_halt_empty_halt_id_returns_registry_insert_failed test (see `crates/maos-kernel-core/tests/halt_invoke_test.rs`) |
+| P16: dev_model_used frontmatter never set — still reads <set by dev at story start> (A6) | LOW | **dismissed** | Story-metadata finding, not a code change — dev_model_used backfilled in frontmatter; no File List path applies, reclassified closed→dismissed per check-review-findings-resolved Rule 2 |
+| P17: check_mock_not_in_release_smoke.rs UNIMPLEMENTED — spec requires end-to-end integration test (AC3) | HIGH | **closed** | Created xtask/tests/check_mock_not_in_release_smoke.rs with gate-pass and JSON-output tests (see `xtask/tests/check_mock_not_in_release_smoke.rs`) |
+| P18: terminate_spirit uses raw kind: &str instead of typed TerminationKind — switch to enum for long-term correctness | MEDIUM | **closed** | Same as P8 — typed TerminationKind enum applied (see `crates/maos-domain/src/halt.rs`) |
 | DF1: drain_for_spirit ignores spirit_pid, drains all halts globally — v0.3-β placeholder (Story 5.3 refines) | LOW | deferred → Story 5.3 | |
 | DF2: ProvidedContext resolution arm is no-op — intended placeholder (Story 4.3 wires working-memory write) | LOW | deferred → Story 4.3 | |
 | DF3: simulate_predicate handles only 2 of 4 universal-arithmetic predicates — remaining 2 land in Story 4.2 | LOW | deferred → Story 4.2 | |
 | DF4: HaltCorpus + TerminationCorpus loaders are structural copy-paste — refactor to shared CorpusLoader<T> when bandwidth allows | LOW | deferred | |
 | DF5: Termination corpus mechanically generated, not hand-authored — deferred to Story 4.5 per spec contract | LOW | deferred → Story 4.5 | |
 | DF6: Test PID collision risk (seed % 1000) — harmless now but will break when Story 5.3 adds per-Spirit filtering | LOW | deferred → Story 5.3 | |
+
+- `crates/maos-eval/src/halt_recall_floor.rs`

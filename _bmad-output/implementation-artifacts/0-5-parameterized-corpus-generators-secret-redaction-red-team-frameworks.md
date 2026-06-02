@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 0.5: Parameterized Corpus Generators — Secret-Redaction + Red-Team Frameworks
 
 Status: done

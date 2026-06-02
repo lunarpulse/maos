@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 0.2: Enforce Empty-Kernel Invariants via Structural CI Lints
 
 Status: done

@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 2.1: Ship the Full Spirit ABI with `#[spirit]` Proc-Macro and 11 Lifecycle Hooks
 
 Status: done
@@ -403,43 +407,41 @@ deepseek-v4-pro (via opencode)
 
 ### File List
 
-| File | Operation |
-|---|---|
-| `crates/maos-spirit-abi/src/lib.rs` | UPDATE |
-| `crates/maos-spirit-abi/src/cancellation.rs` | NEW |
-| `crates/maos-spirit-abi/src/lifecycle.rs` | NEW |
-| `crates/maos-spirit-abi/src/ctx.rs` | NEW |
-| `crates/maos-spirit-abi/Cargo.toml` | UPDATE |
-| `crates/maos-spirit-derive/Cargo.toml` | NEW |
-| `crates/maos-spirit-derive/src/lib.rs` | NEW |
-| `crates/maos-spirit-sdk/src/lib.rs` | UPDATE |
-| `crates/maos-spirit-sdk/src/cancellation.rs` | NEW |
-| `crates/maos-spirit-sdk/Cargo.toml` | UPDATE |
-| `crates/maos-spirit-sdk/tests/spirit_macro_smoke.rs` | NEW |
-| `crates/maos-spirit-sdk/tests/no_std_smoke.rs` | NEW |
-| `crates/maos-spirit-sdk/tests/spirit_macro_errors.rs` | NEW |
-| `crates/maos-spirit-sdk/tests/ui/unknown_hook.rs` | NEW |
-| `crates/maos-spirit-sdk/tests/ui/unknown_hook.stderr` | NEW |
-| `crates/maos-spirit-sdk/tests/ui/duplicate_hook.rs` | NEW |
-| `crates/maos-spirit-sdk/tests/ui/duplicate_hook.stderr` | NEW |
-| `crates/maos-spirit-sdk/tests/ui/non_impl_target.rs` | NEW |
-| `crates/maos-spirit-sdk/tests/ui/non_impl_target.stderr` | NEW |
-| `crates/maos-kernel-core/src/security/manifest.rs` | UPDATE |
-| `crates/maos-kernel-core/src/security/mod.rs` | UPDATE |
-| `crates/maos-kernel-core/src/security/drift.rs` | NEW |
-| `crates/maos-kernel-core/src/security/sandbox/mod.rs` | UPDATE |
-| `crates/maos-kernel-core/tests/sandbox_admission.rs` | UPDATE |
-| `crates/maos-kernel-core/tests/resource_caps_linux.rs` | UPDATE |
-| `crates/maos-kernel-core/tests/sandbox_enforcement_linux.rs` | UPDATE |
-| `crates/maos-bin/src/main.rs` | UPDATE |
-| `crates/maos-bin/Cargo.toml` | UPDATE |
-| `Cargo.toml` (workspace root) | UPDATE |
-| `abi-baseline/v1-pre-bump.txt` | UPDATE |
-| `docs/ci-baselines/kernel-surface-v0.1-beta.json` | UPDATE |
-| `docs/invariants/i9-exemptions.md` | UPDATE |
-| `xtask/kernel-api-classes.toml` | UPDATE |
-| `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md` | UPDATE |
-| `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/5-spirit-abi.md` | UPDATE |
+- `crates/maos-spirit-abi/src/lib.rs` — UPDATE
+- `crates/maos-spirit-abi/src/cancellation.rs` — NEW
+- `crates/maos-spirit-abi/src/lifecycle.rs` — NEW
+- `crates/maos-spirit-abi/src/ctx.rs` — NEW
+- `crates/maos-spirit-abi/Cargo.toml` — UPDATE
+- `crates/maos-spirit-derive/Cargo.toml` — NEW
+- `crates/maos-spirit-derive/src/lib.rs` — NEW
+- `crates/maos-spirit-sdk/src/lib.rs` — UPDATE
+- `crates/maos-spirit-sdk/src/cancellation.rs` — NEW
+- `crates/maos-spirit-sdk/Cargo.toml` — UPDATE
+- `crates/maos-spirit-sdk/tests/spirit_macro_smoke.rs` — NEW
+- `crates/maos-spirit-sdk/tests/no_std_smoke.rs` — NEW
+- `crates/maos-spirit-sdk/tests/spirit_macro_errors.rs` — NEW
+- `crates/maos-spirit-sdk/tests/ui/unknown_hook.rs` — NEW
+- `crates/maos-spirit-sdk/tests/ui/unknown_hook.stderr` — NEW
+- `crates/maos-spirit-sdk/tests/ui/duplicate_hook.rs` — NEW
+- `crates/maos-spirit-sdk/tests/ui/duplicate_hook.stderr` — NEW
+- `crates/maos-spirit-sdk/tests/ui/non_impl_target.rs` — NEW
+- `crates/maos-spirit-sdk/tests/ui/non_impl_target.stderr` — NEW
+- `crates/maos-kernel-core/src/security/manifest.rs` — UPDATE
+- `crates/maos-kernel-core/src/security/mod.rs` — UPDATE
+- `crates/maos-kernel-core/src/security/drift.rs` — NEW
+- `crates/maos-kernel-core/src/security/sandbox/mod.rs` — UPDATE
+- `crates/maos-kernel-core/tests/sandbox_admission.rs` — UPDATE
+- `crates/maos-kernel-core/tests/resource_caps_linux.rs` — UPDATE
+- `crates/maos-kernel-core/tests/sandbox_enforcement_linux.rs` — UPDATE
+- `crates/maos-bin/src/main.rs` — UPDATE
+- `crates/maos-bin/Cargo.toml` — UPDATE
+- `Cargo.toml` (workspace root) — UPDATE
+- `abi-baseline/v1-pre-bump.txt` — UPDATE
+- `docs/ci-baselines/kernel-surface-v0.1-beta.json` — UPDATE
+- `docs/invariants/i9-exemptions.md` — UPDATE
+- `xtask/kernel-api-classes.toml` — UPDATE
+- `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md` — UPDATE
+- `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/5-spirit-abi.md` — UPDATE
 
 ### Change Log
 

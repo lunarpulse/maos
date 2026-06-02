@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # A2A Churn — Calibration Reports (v0.5)
 
 Per NFR-Rel-7 — at v0.5 the harness ships the **3-host compressed scaffold**;

@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 2.4: Seed the spirit-test SDK with LCAS Framework and Cross-Spirit Isolation Hooks
 
 Status: done

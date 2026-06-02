@@ -1,3 +1,7 @@
+---
+dev_model_used: deepseek-v4-pro
+---
+
 # Story 3.4: Buffer Orchestrator Instructions and Honor Director Pause/Resume/Revoke (P99 ≤2s)
 
 **Status:** done
@@ -2053,6 +2057,8 @@ Boundary notes:
 - 5.4 owns full NFR-Rel-9 10^4 corpus — 3.4 scaffolds v0.3-beta 1000-token baseline
 
 ### File List
+- `crates/maos-kernel-core/src/orchestrator/mod.rs`
+- `crates/maos-kernel-core/src/orchestrator/buffer.rs`
 
 | Path | Change |
 |------|--------|
@@ -2097,27 +2103,27 @@ Boundary notes:
 
 | Finding | Severity | Status | Resolution |
 |---|---|---|---|
-| Spirit filter on Transparency Log broken — removed hard-coded `hello-spirit` bypass [`log_composition.rs`] | CRITICAL | closed | Fixed: TL entries now pass through regardless of spirit_filter (no spirit_id column) |
-| Range boundary fixed to half-open `[since, until)` per spec [`log_composition.rs`] | CRITICAL | closed | Fixed: SQL `<`, journal `>=`, boundary tests added |
-| Hex validation now rejects uppercase (A-F) per spec [`subcommands.rs`, `main.rs`] | HIGH | closed | Fixed: `is_ascii_digit() \|\| ('a'..='f')` |
-| `enqueue` gracefully recovers from poisoned mutex [`buffer.rs`] | HIGH | closed | Fixed: `unwrap_or_else(\|e\| e.into_inner())` |
-| NFR-Rel-9 test now measures actual revocation+verify through CapTokensShardRing [`nfr_rel_9_revoke_latency.rs`] | HIGH | closed | Fixed: Full revoke→verify→Err(Revoked) cycle |
-| TerminalChannel anomaly render tests added (AC6) [`notification.rs::tests`] | HIGH | closed | Fixed: render + zero-ANSI tests added |
-| FR51 c unit test added — recall-then-re-enqueue round-trip (E2E deferred to Story 5.1) | HIGH | closed | Fixed: `recall_and_re_enqueue_preserves_instructions` test |
-| Resume re-enqueue now surfaces errors instead of `let _ =` [`main.rs`] | HIGH | closed | Fixed: `if let Err(e)` with stderr diagnostic |
-| `ranged_count` docstring updated — materializes via `ranged_recall` at v0.3-β [`log_composition.rs`] | MEDIUM | closed | Fixed: docstring corrected |
-| Confidence validated to [0.0, 1.0] range — `ConfidenceOutOfRange` error [`notification.rs`] | MEDIUM | closed | Fixed: boundary + out-of-range tests added |
-| `orchestrator-status` single DashMap lookup [`main.rs`] | MEDIUM | closed | Fixed: consolidated to one `get` |
-| Lifecycle Journal malformed timestamp now skips entry [`log_composition.rs`] | MEDIUM | closed | Fixed: `as_u64() → None → continue` |
-| Registry uses typed `SpiritId` per AC1 spec [`registry.rs`] | MEDIUM | closed | Fixed: `&SpiritId` API, callers updated |
-| Log-composition tests: half-open boundary + spirit_filter scoping added [`log_composition.rs::tests`] | MEDIUM | closed | Fixed: 2 new tests |
-| CLI integration test verifies ADL row content (capability/intent/reasoning) [`orchestrator_queue_test.rs`] | MEDIUM | closed | Fixed: `orchestrator_queue_writes_adl_row_with_correct_content` |
-| `xtask/kernel-api-classes.toml` updated with Story 3.4 symbols (AC8) | MEDIUM | closed | Fixed: orchestrator + log_composition entries added |
-| `list_active_tokens` debug API implemented, cfg-gated [`capability/mod.rs`, `shard.rs`] | MEDIUM | closed | Fixed: `#[cfg(test)]` on adapter + shard |
-| Hex uppercase rejection test + ADL content verification cover fail-closed discipline | LOW | closed | Fixed: `hex_validation_rejects_uppercase` test |
-| Duplicate `MAOS_AUDIT_DB` env var removed [`orchestrator_queue_test.rs`] | LOW | closed | Fixed: single `cmd.env` call |
-| Typo `maos_audeit` → `maos_audit` in completion notes | LOW | closed | Fixed |
-| `append_transition` error allegedly swallowed — FALSE POSITIVE: returns `()`, panics on write failure | HIGH | closed | Dismissed: function returns `()` and panics internally |
+| Spirit filter on Transparency Log broken — removed hard-coded `hello-spirit` bypass [`log_composition.rs`] | CRITICAL | closed | Fixed: TL entries now pass through regardless of spirit_filter (no spirit_id column) (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| Range boundary fixed to half-open `[since, until)` per spec [`log_composition.rs`] | CRITICAL | closed | Fixed: SQL `<`, journal `>=`, boundary tests added (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| Hex validation now rejects uppercase (A-F) per spec [`subcommands.rs`, `main.rs`] | HIGH | closed | Fixed: `is_ascii_digit() \|\| ('a'..='f')` (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| `enqueue` gracefully recovers from poisoned mutex [`buffer.rs`] | HIGH | closed | Fixed: `unwrap_or_else(\|e\| e.into_inner())` (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| NFR-Rel-9 test now measures actual revocation+verify through CapTokensShardRing [`nfr_rel_9_revoke_latency.rs`] | HIGH | closed | Fixed: Full revoke→verify→Err(Revoked) cycle (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| TerminalChannel anomaly render tests added (AC6) [`notification.rs::tests`] | HIGH | closed | Fixed: render + zero-ANSI tests added (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| FR51 c unit test added — recall-then-re-enqueue round-trip (E2E deferred to Story 5.1) | HIGH | closed | Fixed: `recall_and_re_enqueue_preserves_instructions` test (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| Resume re-enqueue now surfaces errors instead of `let _ =` [`main.rs`] | HIGH | closed | Fixed: `if let Err(e)` with stderr diagnostic (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| `ranged_count` docstring updated — materializes via `ranged_recall` at v0.3-β [`log_composition.rs`] | MEDIUM | closed | Fixed: docstring corrected (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| Confidence validated to [0.0, 1.0] range — `ConfidenceOutOfRange` error [`notification.rs`] | MEDIUM | closed | Fixed: boundary + out-of-range tests added (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| `orchestrator-status` single DashMap lookup [`main.rs`] | MEDIUM | closed | Fixed: consolidated to one `get` (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| Lifecycle Journal malformed timestamp now skips entry [`log_composition.rs`] | MEDIUM | closed | Fixed: `as_u64() → None → continue` (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| Registry uses typed `SpiritId` per AC1 spec [`registry.rs`] | MEDIUM | closed | Fixed: `&SpiritId` API, callers updated (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| Log-composition tests: half-open boundary + spirit_filter scoping added [`log_composition.rs::tests`] | MEDIUM | closed | Fixed: 2 new tests (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| CLI integration test verifies ADL row content (capability/intent/reasoning) [`orchestrator_queue_test.rs`] | MEDIUM | closed | Fixed: `orchestrator_queue_writes_adl_row_with_correct_content` (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| `xtask/kernel-api-classes.toml` updated with Story 3.4 symbols (AC8) | MEDIUM | closed | Fixed: orchestrator + log_composition entries added (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| `list_active_tokens` debug API implemented, cfg-gated [`capability/mod.rs`, `shard.rs`] | MEDIUM | closed | Fixed: `#[cfg(test)]` on adapter + shard (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| Hex uppercase rejection test + ADL content verification cover fail-closed discipline | LOW | closed | Fixed: `hex_validation_rejects_uppercase` test (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| Duplicate `MAOS_AUDIT_DB` env var removed [`orchestrator_queue_test.rs`] | LOW | closed | Fixed: single `cmd.env` call (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| Typo `maos_audeit` → `maos_audit` in completion notes | LOW | closed | Fixed (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
+| `append_transition` error allegedly swallowed — FALSE POSITIVE: returns `()`, panics on write failure | HIGH | closed | Dismissed: function returns `()` and panics internally (see `crates/maos-kernel-core/src/orchestrator/buffer.rs`) |
 | u64 → i64 cast in SQL params — pre-existing SQLite limitation | LOW | deferred | Pre-existing; timestamps won't exceed i64::MAX for centuries |
 | `NotificationEvent::AnomalyFlagged` pub fields bypass validation — Rust enum design limitation | LOW | deferred | Pre-existing crate-wide pub-field convention |
 | `with_capacity(0)` no minimum guard — edge case | LOW | deferred | `new()` hardcodes 32; not caused by this change |

@@ -1,3 +1,7 @@
+---
+dev_model_used: deepseek-v4-pro
+---
+
 
 # Story 3.2: Manage Director Posture with a Halt-Policy Schema and Bounded Shift Propagation
 

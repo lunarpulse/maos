@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 1a.2: Wire the Five-Service Kernel Skeleton with a Multi-Threaded Tokio Composition Root
 
 Status: done

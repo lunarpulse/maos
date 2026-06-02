@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 2.2: `xtask check-service-boundary` P1–P4 Full Implementation + Spirit-Boundary Invariant Cases
 
 Status: done

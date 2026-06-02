@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # NFR-Perf-8 — Orchestrator fan-out budget report
 
 Story 6.2 AC3 — sustained 50 concurrent Worker Spirits / 10 tasks/sec / 1h /

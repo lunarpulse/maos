@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-7
+---
+
 # NFR-Aud-14 intent-lineage corpus coverage
 
 

@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-5
+---
+
 # Story 0.1: Workspace CI Pipeline + Build Discipline Gates
 
 Status: done

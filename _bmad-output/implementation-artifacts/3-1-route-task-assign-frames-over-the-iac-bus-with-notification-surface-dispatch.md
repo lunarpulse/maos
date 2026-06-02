@@ -1,3 +1,7 @@
+---
+dev_model_used: deepseek-v4-pro
+---
+
 
 # Story 3.1: Route `task.assign` Frames Over the IAC Bus with Notification Surface Dispatch
 
@@ -849,6 +853,9 @@ deepseek-v4-pro (deepseek/deepseek-v4-pro)
 - **AC10**: check-empty-kernel PASS, check-workspace-count PASS. check-service-boundary: IacBusAdapter+IacRtMetrics signature-hash reclassifications documented. All tests pass (pre-existing manifest_field_coverage + kloc_check known issues documented).
 
 ### File List
+- `crates/maos-domain/src/frame.rs`
+- `crates/maos-kernel-core/src/iac/mailbox.rs`
+- `crates/maos-bin/src/main.rs`
 
 | Path | New/Update | Rationale |
 |---|---|---|
@@ -901,28 +908,28 @@ deepseek-v4-pro (deepseek/deepseek-v4-pro)
 
 | # | Finding | Severity | Status | Resolution |
 |---|---|---|---|---|
-| 1 | I2 log-before-deliver invariant untested | Critical | **closed** | Rewritten with async adapter test; TODO: mock-based catch_unwind for panic path |
-| 2 | recv() starves all frame kinds except receivers[0] | Critical | **closed** | Replaced with fair round-robin try_recv + yield_now across all receivers |
-| 3 | TrySendError::Full mislabeled as ChannelClosed | High | **closed** | Added QueueFull variant to IacBusError |
-| 4 | dec_pending uses fetch_sub (wrapping) not saturating | High | **closed** | Replaced with CAS-based saturating subtraction loop |
-| 5 | Raw-byte paths hardcode FrameKind::TaskAssign | High | **closed** | Added TODO; raw-byte path is legacy, deliver() is the typed path |
-| 6 | approval_prompt_e2e registers zero capture channels | High | **closed** | Added CaptureChannel impl; test now verifies notification event content |
-| 7 | broadcast_slow_subscriber_sees_lagged tautological | High | **closed** | Rewritten to assert Ok(frame) or Err(Lagged(n)) |
-| 8 | AC8 pending-frame gauge has zero tests | High | **closed** | Added 3 tests: round-trip, saturation, error-path |
-| 9+10 | deliver() async + two-phase validate-then-send | High | **closed** | Made deliver async across IacBusPort→Mailbox→Adapter; send().await for backpressure |
-| 11 | Only TaskAssign serde round-trip tested | Medium | **closed** | Added 6 round-trip tests for all FramePayload variants |
-| 12 | TelemetryEvent not tracked in pending_frames | Medium | **closed** | Added inc_pending for broadcast path with TODO for dec on subscriber drain |
-| 13 | maos-director-surface direct version pins | Medium | **closed** | Changed to workspace=true references |
-| 14 | register_spirit silently clobbers | Medium | **closed** | Added AlreadyRegistered guard |
-| 15 | Vec vs SmallVec | Medium | **closed** | Added smallvec dep; changed to SmallVec<[FrameAddress; 1]> |
+| 1 | I2 log-before-deliver invariant untested | Critical | **closed** | Rewritten with async adapter test; TODO: mock-based catch_unwind for panic path (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 2 | recv() starves all frame kinds except receivers[0] | Critical | **closed** | Replaced with fair round-robin try_recv + yield_now across all receivers (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 3 | TrySendError::Full mislabeled as ChannelClosed | High | **closed** | Added QueueFull variant to IacBusError (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 4 | dec_pending uses fetch_sub (wrapping) not saturating | High | **closed** | Replaced with CAS-based saturating subtraction loop (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 5 | Raw-byte paths hardcode FrameKind::TaskAssign | High | **closed** | Added TODO; raw-byte path is legacy, deliver() is the typed path (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 6 | approval_prompt_e2e registers zero capture channels | High | **closed** | Added CaptureChannel impl; test now verifies notification event content (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 7 | broadcast_slow_subscriber_sees_lagged tautological | High | **closed** | Rewritten to assert Ok(frame) or Err(Lagged(n)) (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 8 | AC8 pending-frame gauge has zero tests | High | **closed** | Added 3 tests: round-trip, saturation, error-path (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 9+10 | deliver() async + two-phase validate-then-send | High | **closed** | Made deliver async across IacBusPort→Mailbox→Adapter; send().await for backpressure (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 11 | Only TaskAssign serde round-trip tested | Medium | **closed** | Added 6 round-trip tests for all FramePayload variants (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 12 | TelemetryEvent not tracked in pending_frames | Medium | **closed** | Added inc_pending for broadcast path with TODO for dec on subscriber drain (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 13 | maos-director-surface direct version pins | Medium | **closed** | Changed to workspace=true references (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 14 | register_spirit silently clobbers | Medium | **closed** | Added AlreadyRegistered guard (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 15 | Vec vs SmallVec | Medium | **closed** | Added smallvec dep; changed to SmallVec<[FrameAddress; 1]> (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
 | 16 | FrameKind duplication | Medium | **deferred → arch spike** | Team consensus: debt + drift guard + arch spike for shared-kernel crate |
 | 17 | Type placement in maos-domain | Medium | **deferred → arch spike** | Team consensus: same spike as F16 |
-| 18 | approval_prompt_auto_allows_and_logs test misleading | Medium | **closed** | Now queries Approval Decision Log and asserts capability + decision |
-| 19 | deliver_typed discards log result | Medium | **closed** | Added explicit I2 contract comment; insert_frame_event panics on failure |
-| 20 | recv() abandons receivers[1..5] on disconnect | Medium | **closed** | Fixed with F2: drain remaining receivers before returning None |
+| 18 | approval_prompt_auto_allows_and_logs test misleading | Medium | **closed** | Now queries Approval Decision Log and asserts capability + decision (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 19 | deliver_typed discards log result | Medium | **closed** | Added explicit I2 contract comment; insert_frame_event panics on failure (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
+| 20 | recv() abandons receivers[1..5] on disconnect | Medium | **closed** | Fixed with F2: drain remaining receivers before returning None (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
 | 21 | mpsc_senders keyed by String not SpiritId | Medium | **deferred → cleanup** | Circular dep workaround; SpiritId newtype flattened at routing boundary |
 | 22 | IacBusPort undocumented assoc type | Medium | **deferred → cleanup** | Associated type needed because Rust 1.94 lacks assoc type defaults |
-| 23 | approval_decision_id_increments test weak | Low | **closed** | Now asserts 2 distinct decisions logged via query_approvals |
+| 23 | approval_decision_id_increments test weak | Low | **closed** | Now asserts 2 distinct decisions logged via query_approvals (see `crates/maos-kernel-core/src/iac/mailbox.rs`) |
 | 24 | pending_frames DashMap entries never removed on gauge=0 — bounded growth | Low | **deferred → Story 6.1** | Cardinality bounded by Spirit_count×6; cleanup with deregister in 6.1 |
 | 25 | TerminalChannel silently swallows write errors | Low | **deferred** | Best-effort stderr by design; matches maos-cli accessibility pattern |
 | 26 | NotificationDispatcher::dispatch always returns Ok — Result<_,NotificationError> never Err | Low | **deferred → Story 3.3** | Per-channel isolation by design; 3.3 adds halt surface that may need Err |
