@@ -1,6 +1,6 @@
 # 6. Reference Spirits
 
-Five reference Spirit classes ship in the kernel binary, plus three skill-package overlays for the founder loop. The reference Spirits prove the substrate; third-party authors ship their own classes via the Spirit registry.
+Five reference Spirit classes ship with the substrate, plus three skill-package overlays for the founder loop. The reference Spirits prove the substrate; third-party authors ship their own classes via the Spirit registry. **Reference Spirits are sibling workspace crates under `spirits/`, NOT compiled into the `maos-bin` kernel binary** — they compile against the published Spirit ABI exactly like `examples/example-spirit`, keeping kernel KLOC at zero (epic-8 mandate; ADR-002 / Decision A, ratified §12 Story-8.1 block). Butler (§6.1) is the first, landed at `spirits/butler/` (Story 8.1, workspace count → 31).
 
 ## 6.1 Butler — Proactive Personal Agent
 
@@ -10,7 +10,7 @@ Five reference Spirit classes ship in the kernel binary, plus three skill-packag
 
 **Memory scope:** Per-user private memory. Episodic tier for the `notification_acceptance_log` (feeds future POMDP refinement across sessions). Optional shared scope on a single Host (the Butler can subscribe to other Spirits' "what are you working on" telemetry).
 
-**Capabilities:** Calendar read (Google Calendar / Outlook via MCP), Slack read + draft (write gated by approval), Linear write (gated), Figma read, browser read.
+**Capabilities:** Calendar read (Google Calendar / Outlook via MCP), Slack read + draft (write gated by approval), Linear write (gated), Figma read, browser read. **At v0.3 these are declared as `Scope::McpCall` capability scopes and validated by fixture-replay of scenario inputs — live external drivers are application-layer and land at v0.5+/Epic 9** (ADR-005 / Decision B, ratified §12 Story-8.1 block). The kernel-mediated capability path is exercised and audited at v0.3; only the provider wire behavior is deferred.
 
 **Posture:** `assistive` by default. Notifies, but does not act unsupervised. The user can shift to `cautious` (every notification prompts) or `autonomous-with-halt` (Butler may schedule small reversible actions, halts on uncertainty).
 

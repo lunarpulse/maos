@@ -1,4 +1,4 @@
-last_updated: '2026-06-02T00:00:00Z+story-7-1-6-green-at-head'
+last_updated: '2026-06-02T00:00:00Z+story-8-1-done'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -79,8 +79,8 @@ development_status:
   7-1-6-section-a2-full-flip-clear-9-review-findings-and-44-dev-record-violations-hard-fail-both-gates: done
   7-1-7-baseline-reset-service-boundary-101-stale-plus-72-boundary-and-serde-300-green-at-head: done
   epic-7-retrospective: done
-  epic-8: backlog
-  8-1-butler-v0-3-on-idle-anticipatory-reasoning-morning-digest-spirit-side: backlog
+  epic-8: in-progress
+  8-1-butler-v0-3-on-idle-anticipatory-reasoning-morning-digest-spirit-side: done
   8-2-ship-the-researcher-reference-spirit-with-distillation-pattern-and-log-recall-walker: backlog
   8-3-observer-v0-5-telemetry-stream-subscriber-pre-halt-scalar-drift-watchdog: backlog
   8-4-ship-the-founder-loop-wedge-spirits-orchestrator-workers-architect-reviewer: backlog

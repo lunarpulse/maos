@@ -1186,33 +1186,46 @@ mod tests {
         assert!(report.local_runner_present);
         assert!(report.example_spirit_present);
         assert!(report.corpus_harness_present);
-        // At v0.3 the Butler corpus is absent → seam active, fixture source.
-        assert!(report.butler_corpus_absent);
-        assert!(report.seam_active);
-        assert_eq!(report.corpus_source, "fixture");
+        // Story 8.1 LANDED the canonical Butler corpus → seam CLOSED, butler source.
+        // (Updated from the 7.5b seam-active expectation; see Story 8.1 AC4.)
+        assert!(!report.butler_corpus_absent);
+        assert!(!report.seam_active);
+        assert_eq!(report.corpus_source, "butler");
         assert!(report.all_prereqs_present);
     }
 
     #[test]
-    fn ac4_fixture_corpus_loads_and_resolves() {
+    fn ac4_butler_corpus_resolves_and_fixture_remains_a_valid_fallback() {
+        // Story 8.1: the resolver now prefers the canonical Butler corpus the
+        // instant it exists. (Renamed/updated from the 7.5b
+        // `ac4_fixture_corpus_loads_and_resolves` which asserted the seam-active
+        // Fixture state; see Story 8.1 AC4 — this is the documented maos-eval
+        // test edit, justified by the seam closing.)
         let root = workspace_root();
         let resolved = resolve_corpus(&root).expect("resolve");
-        // Butler absent → fixture source.
-        assert_eq!(resolved.source, CorpusSource::Fixture);
+        assert_eq!(resolved.source, CorpusSource::Butler);
         assert_eq!(resolved.sha256.len(), 64, "sha-256 hex is 64 chars");
-        let corpus = OnboardingCorpus::load_jsonl(&resolved.path).expect("load fixture");
+        let corpus = OnboardingCorpus::load_jsonl(&resolved.path).expect("load butler corpus");
         assert_eq!(
             corpus.scenarios.len(),
             CORPUS_SCENARIO_COUNT,
-            "fixture must carry exactly 30 scenarios"
+            "Butler corpus must carry exactly 30 scenarios"
         );
         assert!(
-            corpus.meta.is_some(),
-            "fixture must carry a STAND-IN meta header"
+            corpus.meta.is_none(),
+            "real Butler corpus carries NO stand_in_for meta line (Decision D)"
         );
         assert!(
             corpus.calendar_conflict_subset().count() > 0,
-            "fixture must carry a calendar-conflict subset"
+            "Butler corpus must carry a calendar-conflict subset"
         );
+
+        // The 7.5b fixture remains a valid SHA-pinned fallback (its drift
+        // assertion still guards it): loading it directly still yields 30
+        // scenarios with the STAND-IN meta header.
+        let fixture = OnboardingCorpus::load_jsonl(&root.join(FIXTURE_CORPUS_REL))
+            .expect("load fixture fallback");
+        assert_eq!(fixture.scenarios.len(), CORPUS_SCENARIO_COUNT);
+        assert!(fixture.meta.is_some(), "fixture keeps its STAND-IN meta header");
     }
 }

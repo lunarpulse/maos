@@ -11,8 +11,9 @@
 use std::time::Instant;
 
 use maos_eval::onboarding_gate_corpus::{
-    evaluate_cohort, resolve_corpus, score_candidate, validate_corpus_size, CandidateInput,
-    CorpusSource, OnboardingCorpus, CORPUS_SCENARIO_COUNT,
+    evaluate_cohort, resolve_corpus, score_candidate, sha256_hex, validate_corpus_size,
+    CandidateInput, CorpusSource, OnboardingCorpus, ResolvedCorpus, CORPUS_SCENARIO_COUNT,
+    FIXTURE_CORPUS_REL,
 };
 use maos_spirit_sdk::local_runner::{LocalRunner, LocalRunnerFixture};
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
@@ -32,7 +33,15 @@ impl SelfTrialSpirit {
 }
 
 #[test]
-fn smoke_onb_1_7_5b_self_trial_is_wired_and_provisional() {
+fn smoke_onb_1_self_trial_seam_closed_butler_nonprovisional() {
+    // Story 8.1 update of the 7.5b `smoke-onb-1-7-5b` self-trial: now that the
+    // canonical Butler corpus exists, the resolver prefers it and the live
+    // self-trial is NON-provisional (AC4 "any new Butler-sourced self-trial is
+    // non-provisional"). The 7.5b FIXTURE dry-run remains valid + provisional —
+    // asserted directly at the end of this test (AC4 "the 7.5b self-trial
+    // artifacts remain valid as the documented dry-run"). This is the
+    // documented maos-eval TEST edit (not a public-surface edit) for AC4.
+    //
     // Integration tests run with CWD = crate dir (crates/maos-eval); the
     // workspace root is two levels up.
     let workspace_root = std::env::current_dir()
@@ -43,15 +52,15 @@ fn smoke_onb_1_7_5b_self_trial_is_wired_and_provisional() {
         .unwrap()
         .to_path_buf();
 
-    // 1. Resolve the corpus via the seam. Butler absent at v0.3 → fixture.
+    // 1. Resolve the corpus via the seam. Butler PRESENT (Story 8.1) → butler.
     let resolved = resolve_corpus(&workspace_root).expect("resolve corpus");
     assert_eq!(
         resolved.source,
-        CorpusSource::Fixture,
-        "Story 8.1 Butler corpus is absent at v0.3 → the seam must fall back to the fixture"
+        CorpusSource::Butler,
+        "Story 8.1 landed the Butler corpus → the resolver must prefer it (seam closed)"
     );
     eprintln!(
-        "smoke-onb-1-7-5b: scoring against corpus_source={} sha256={} path={}",
+        "smoke-onb-1: scoring against corpus_source={} sha256={} path={}",
         resolved.source.as_str(),
         resolved.sha256,
         resolved.path.display()
@@ -103,30 +112,24 @@ fn smoke_onb_1_7_5b_self_trial_is_wired_and_provisional() {
     std::fs::write(&outcomes_path, format!("{row}\n")).expect("write outcomes.jsonl");
     eprintln!("smoke-onb-1-7-5b: emitted outcome → {}", row);
 
-    // The self-trial candidate succeeds against the fixture (recall 1.0,
-    // precision ≈0.909) — but the verdict below must still be provisional.
+    // The self-trial candidate succeeds against the Butler corpus (recall 1.0,
+    // precision 1.0) and — because the source is now Butler — is NON-provisional.
+    assert!(outcome.succeed, "butler self-trial candidate should succeed");
     assert!(
-        outcome.succeed,
-        "fixture self-trial candidate should succeed"
+        !outcome.provisional,
+        "Butler-sourced outcome must NOT be provisional (seam closed)"
     );
-    assert!(
-        outcome.provisional,
-        "fixture-scored outcome must be provisional"
-    );
-    assert_eq!(outcome.corpus_source, "fixture");
+    assert_eq!(outcome.corpus_source, "butler");
 
-    // 5. Run the gate evaluator on the N=1 sample. It must NOT panic and the
-    //    verdict must be provisional. N=1 < 10 → the verdict is necessarily a
-    //    FAIL on success-count, which is exactly why this can't pose as the
-    //    real N=12 gate.
+    // 5. Run the gate evaluator on the N=1 sample. It must NOT panic; with a
+    //    Butler source the verdict is non-provisional, and N=1 < 10 → it still
+    //    necessarily FAILS the success-count floor, so a green self-trial can
+    //    never pose as the real N=12 gate.
     let outcomes = vec![outcome];
     let verdict = evaluate_cohort(&outcomes);
 
     assert_eq!(outcomes.len(), 1, "self-trial is N=1, NOT the N=12 gate");
-    assert!(
-        verdict.provisional,
-        "verdict must be provisional on the fixture"
-    );
+    assert!(!verdict.provisional, "Butler-sourced verdict is non-provisional");
     assert!(
         !verdict.passed,
         "an N=1 sample can never pass the ≥10/12 cohort floor — guards against \
@@ -134,5 +137,34 @@ fn smoke_onb_1_7_5b_self_trial_is_wired_and_provisional() {
     );
     assert_eq!(verdict.cohort_size, 1);
     assert_eq!(verdict.success_count, 1);
-    eprintln!("smoke-onb-1-7-5b: N=1 provisional verdict = {:?}", verdict);
+    eprintln!("smoke-onb-1: N=1 non-provisional verdict = {:?}", verdict);
+
+    // 6. AC4 — the 7.5b FIXTURE dry-run remains a valid, provisional artifact.
+    //    Score the same candidate directly against the fixture (bypassing the
+    //    resolver, which now prefers Butler) and assert it is still provisional.
+    let fixture_path = workspace_root.join(FIXTURE_CORPUS_REL);
+    let fixture_bytes = std::fs::read(&fixture_path).expect("read fixture");
+    let fixture_resolved = ResolvedCorpus {
+        source: CorpusSource::Fixture,
+        path: fixture_path.clone(),
+        sha256: sha256_hex(&fixture_bytes),
+    };
+    let fixture_corpus = OnboardingCorpus::load_jsonl(&fixture_path).expect("load fixture");
+    let fixture_outcome = score_candidate(
+        &fixture_corpus,
+        &fixture_resolved,
+        &CandidateInput {
+            participant_id: "self-trial-fixture-dry-run".into(),
+            compiles_against_abi: true,
+            time_to_success_min: elapsed_min,
+            within_window: true,
+        },
+        None,
+    );
+    assert!(
+        fixture_outcome.provisional,
+        "the documented 7.5b fixture dry-run must remain provisional"
+    );
+    assert_eq!(fixture_outcome.corpus_source, "fixture");
+    eprintln!("smoke-onb-1: fixture dry-run remains provisional (7.5b artifact preserved)");
 }

@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! section_13_1 — Criterion benchmark for §13.1 J1 + J4 measurement journeys.
+//! section_13_1 — Criterion benchmark for §13.1 J0 + J1 + J4 measurement journeys.
 //!
 //! Run via:
 //!   cargo bench -p maos-bench --bench section_13_1
@@ -14,6 +14,21 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::time::Duration;
+
+fn bench_j0(c: &mut Criterion) {
+    let mut group = c.benchmark_group("section_13_1_j0");
+    group.sample_size(10);
+    group.warm_up_time(Duration::from_secs(1));
+    group.measurement_time(Duration::from_secs(30));
+
+    group.bench_function("j0_butler_conversational_and_inproc", |b| {
+        b.iter(|| {
+            let _ = maos_bench::harness::j0::run_j0_measurement();
+        });
+    });
+
+    group.finish();
+}
 
 fn bench_j1(c: &mut Criterion) {
     let mut group = c.benchmark_group("section_13_1_j1");
@@ -49,5 +64,5 @@ fn bench_j4(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_j1, bench_j4);
+criterion_group!(benches, bench_j0, bench_j1, bench_j4);
 criterion_main!(benches);

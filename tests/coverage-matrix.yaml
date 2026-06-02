@@ -811,8 +811,12 @@ coverage:
       cohort gate evaluator + NFR-Onb-4 cadence + smoke-onb-1-7-5b self-trial),
       scored against a SHA-pinned Butler-class FIXTURE stand-in (verdicts
       stamped provisional) until Story 8.1 lands the canonical
-      spirits/butler/.../calendar-comms-v0.3.jsonl corpus, which the resolver
-      auto-prefers. The live N=12 / 14-day human trial runs out-of-band against
+      spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl corpus, which the
+      resolver auto-prefers. Story 8.1 LANDED that corpus (30 scenarios, SHA-256
+      89c073353f8697159c61794f6fd59546933eb5d79d6c2891e090483960d2f3ad, pinned by
+      the spirits/butler corpus_pin drift test); resolve_corpus now returns
+      CorpusSource::Butler and Butler-sourced verdicts are non-provisional.
+      The live N=12 / 14-day human trial runs out-of-band against
       these artifacts (per dependency-dag.md line 25).
   NFR-Onb-2:
     gates: []
@@ -1186,10 +1190,10 @@ coverage:
         last_measured_at: "2026-05-29"
         third_party: false
       butler:
-        path: "crates/maos-spirit-butler"
+        path: "spirits/butler"
         ships_at: "v0.3"
         coverage_pct: null
-        last_measured_at: null
+        last_measured_at: "2026-06-02"
         third_party: false
       researcher:
         path: "crates/maos-spirit-researcher"

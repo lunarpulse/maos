@@ -13,19 +13,24 @@ maos-spirit-abi = { path = "../maos-spirit-abi" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
-maos-kernel-core = { path = "../maos-kernel-core", optional = true }
-tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time"], optional = true }
+maos-kernel-core = { path = "../maos-kernel-core" }
+butler = { path = "../../spirits/butler" }
+tempfile = "3"
 
 [dev-dependencies]
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 criterion = "0.5"
-tempfile = "3"
 smallvec = { version = "1", features = ["serde"] }
 parking_lot = "0.12"
 
 [features]
 fixture_replay = []
-kernel_measurement = ["maos-kernel-core", "tokio"]
+kernel_measurement = ["tokio"]
+
+[dependencies.tokio]
+version = "1"
+features = ["sync", "rt", "macros", "rt-multi-thread", "time"]
+optional = true
 
 [[bin]]
 name = "section_13_1_run"

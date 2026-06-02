@@ -1,0 +1,37 @@
+[package]
+name = "butler"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "MAOS Butler v0.3 — first cognitive reference Spirit: on_idle anticipatory reasoning (calendar-conflict detection + comms triage) + FR17 morning digest. Story 8.1."
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+# Spirit-side surface ONLY (zero kernel KLOC, Story 0.2 invariant): the SDK +
+# ABI for the #[spirit] macro/hook, the audit free-fns (ranged_recall / query)
+# Butler reads digests from, and the pure domain distillation/notification types.
+# NONE of these is `maos-kernel-core`; Butler cognition never reaches into the kernel.
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner"] }
+maos-spirit-abi = { path = "../../crates/maos-spirit-abi" }
+maos-audit = { path = "../../crates/maos-audit" }
+maos-domain = { path = "../../crates/maos-domain" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+# Test-only kernel adapters used to PROVE the integration (halt receipt, I11
+# distillate chain) against the real substrate. Dev-deps do not affect the
+# `check-service-boundary` kernel surface (that gate inspects maos-kernel-core
+# only — see Story 8.1 Dev Agent Record).
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner", "mock", "spirit_test"] }
+maos-kernel-core = { path = "../../crates/maos-kernel-core" }
+maos-manifest = { path = "../../crates/maos-manifest" }
+maos-eval = { path = "../../crates/maos-eval" }
+tempfile = "3"
+sha2 = "0.10"
+toml = "0.8"
+# Seed a deterministic Transparency Log (explicit frame ids + timestamps) for
+# the AC6 hallucination corpus — same SQLite schema maos-audit reads.
+rusqlite = { version = "0.31", features = ["bundled"] }

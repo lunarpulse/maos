@@ -1,0 +1,76 @@
+# MAOS Butler v0.3 — first cognitive reference Spirit (Story 8.1).
+#
+# Anticipatory single-Spirit (architecture §6.1): fires `on_idle`, detects
+# calendar conflicts + triages comms, writes an uncertainty scalar whose
+# `[epistemic_policy]` rule the kernel evaluates (universal-arithmetic) into a
+# halt. Calendar/comms inputs are MOCKED via fixture-replay (Decision B); the
+# `[capabilities.required.mcp]` block declares the McpCall scopes Butler WOULD
+# use against real Calendar/Slack drivers (deferred to v0.5+/E9).
+
+[class]
+name = "butler"
+version = "0.3.0"
+abi = "1.0"
+manifest_schema_version = 2
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "MAOS Butler v0.3 reference Spirit — on_idle anticipatory reasoning (calendar-conflict detection + comms triage) and FR17 morning digest composed from the kernel log-composition primitives."
+
+[capabilities.required]
+# Inference Port — Butler reasons over scenario world-state with the provider.
+provider.complete = ["anthropic.claude-3-haiku-20240307"]
+
+# Decision B — declare the McpCall { server, tool } capability scopes Butler
+# exercises. At v0.3 the calendar/comms inputs are served by the fixture-replay
+# MCP provider (no real drivers). Each (server, tool) becomes a Scope::McpCall.
+[[capabilities.required.mcp.servers]]
+name = "calendar"
+allowed_tools = ["list_events", "get_event"]
+
+[[capabilities.required.mcp.servers]]
+name = "slack"
+allowed_tools = ["list_messages", "get_thread"]
+
+[posture]
+default = "assistive"
+allowed_max = "assistive"
+
+[output_shape]
+# Butler's notification output shape (architecture §6.1). The kernel rejects
+# emits missing any of these top-level fields.
+required_fields = ["pattern", "confidence", "evidence", "options"]
+
+[budget]
+context_window_size = 8192
+# FR17 morning-digest 30-second generation budget == the on_idle time cap.
+time_cap_seconds = 30
+
+[resources]
+cpu_max_pct = 15
+memory_max_mb = 128
+
+[sandbox]
+tier = "T2"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"
+
+# Architecture §6.1 Butler epistemic policy. The Spirit computes its own
+# variance/drift proxies; the kernel performs the universal-arithmetic
+# comparison and fires the halt.
+[epistemic_policy]
+default_action = "verbalize_only"
+
+# Halt when belief variance over an unresolved calendar conflict is high.
+[[epistemic_policy.rules]]
+tag = "belief_variance"
+action = "halt"
+on_value_above = { threshold = 0.7 }
+
+# Halt when comms triage indicates the director's preferences have drifted.
+[[epistemic_policy.rules]]
+tag = "user_preference_drift"
+action = "halt"
+on_value_below = { threshold = 0.6 }

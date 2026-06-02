@@ -154,6 +154,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
 
 [[package]]
+name = "butler"
+version = "0.1.0"
+dependencies = [
+ "maos-audit",
+ "maos-domain",
+ "maos-eval",
+ "maos-kernel-core",
+ "maos-manifest",
+ "maos-spirit-abi",
+ "maos-spirit-sdk",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "toml 0.8.23",
+]
+
+[[package]]
 name = "bytes"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1005,6 +1024,7 @@ dependencies = [
 name = "maos-bench"
 version = "0.1.0-alpha"
 dependencies = [
+ "butler",
  "criterion",
  "maos-domain",
  "maos-kernel-core",
