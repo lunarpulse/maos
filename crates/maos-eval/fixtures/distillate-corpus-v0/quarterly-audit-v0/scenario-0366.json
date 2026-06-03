@@ -1,0 +1,52 @@
+{
+  "digest_payload": "[QUARTERLY HEDGE] Results are possibly indicative but the authors caution the estimate may be confounded; confidence is tentative.",
+  "distillation_depth": 1,
+  "expected_faithfulness": 0.995,
+  "expected_hedge_preservation": 0.96,
+  "expected_recall": 0.93,
+  "intent_lineage_expected": [
+    "consult",
+    "coordinate",
+    "delegate",
+    "inform",
+    "verify"
+  ],
+  "planted_secrets": [],
+  "scenario_id": "scenario-0366",
+  "source_log_ref": [
+    "000000000000000000000000000016d0",
+    "000000000000000000000000000016d1",
+    "000000000000000000000000000016d2",
+    "000000000000000000000000000016d3",
+    "000000000000000000000000000016d4"
+  ],
+  "source_raw_frames": [
+    {
+      "frame_id_hex": "000000000000000000000000000016d0",
+      "intent": "inform",
+      "payload_summary": "Quarterly raw frame 1 of scenario 366"
+    },
+    {
+      "frame_id_hex": "000000000000000000000000000016d1",
+      "intent": "consult",
+      "payload_summary": "Quarterly raw frame 2 of scenario 366"
+    },
+    {
+      "frame_id_hex": "000000000000000000000000000016d2",
+      "intent": "coordinate",
+      "payload_summary": "Quarterly raw frame 3 of scenario 366"
+    },
+    {
+      "frame_id_hex": "000000000000000000000000000016d3",
+      "intent": "verify",
+      "payload_summary": "Quarterly raw frame 4 of scenario 366"
+    },
+    {
+      "frame_id_hex": "000000000000000000000000000016d4",
+      "intent": "delegate",
+      "payload_summary": "Quarterly raw frame 5 of scenario 366"
+    }
+  ],
+  "spirit_class": "researcher",
+  "tag": "quarterly-v0"
+}

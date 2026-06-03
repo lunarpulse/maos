@@ -1,0 +1,52 @@
+{
+  "digest_payload": "[QUARTERLY] The review finds the primary effect is likely present with moderate confidence; tail risks remain uncertain pending replication.",
+  "distillation_depth": 1,
+  "expected_faithfulness": 0.995,
+  "expected_hedge_preservation": 0.97,
+  "expected_recall": 0.97,
+  "intent_lineage_expected": [
+    "consult",
+    "coordinate",
+    "delegate",
+    "inform",
+    "verify"
+  ],
+  "planted_secrets": [],
+  "scenario_id": "scenario-0050",
+  "source_log_ref": [
+    "00000000000000000000000000000310",
+    "00000000000000000000000000000311",
+    "00000000000000000000000000000312",
+    "00000000000000000000000000000313",
+    "00000000000000000000000000000314"
+  ],
+  "source_raw_frames": [
+    {
+      "frame_id_hex": "00000000000000000000000000000310",
+      "intent": "delegate",
+      "payload_summary": "Quarterly raw frame 1 of scenario 50"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000311",
+      "intent": "inform",
+      "payload_summary": "Quarterly raw frame 2 of scenario 50"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000312",
+      "intent": "consult",
+      "payload_summary": "Quarterly raw frame 3 of scenario 50"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000313",
+      "intent": "coordinate",
+      "payload_summary": "Quarterly raw frame 4 of scenario 50"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000000314",
+      "intent": "verify",
+      "payload_summary": "Quarterly raw frame 5 of scenario 50"
+    }
+  ],
+  "spirit_class": "researcher",
+  "tag": "quarterly-v0"
+}

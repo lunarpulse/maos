@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
-//! section_13_1 — Criterion benchmark for §13.1 J0 + J1 + J4 measurement journeys.
+//! section_13_1 — Criterion benchmark for §13.1 J0 + J1 + J4 + J-Researcher
+//! measurement journeys.
 //!
 //! Run via:
 //!   cargo bench -p maos-bench --bench section_13_1
@@ -64,5 +65,20 @@ fn bench_j4(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_j0, bench_j1, bench_j4);
+fn bench_j_researcher(c: &mut Criterion) {
+    let mut group = c.benchmark_group("section_13_1_j_researcher");
+    group.sample_size(10);
+    group.warm_up_time(Duration::from_secs(1));
+    group.measurement_time(Duration::from_secs(30));
+
+    group.bench_function("j_researcher_distillation_step", |b| {
+        b.iter(|| {
+            let _ = maos_bench::harness::j_researcher::run_j_researcher_measurement_smoke();
+        });
+    });
+
+    group.finish();
+}
+
+criterion_group!(benches, bench_j0, bench_j1, bench_j4, bench_j_researcher);
 criterion_main!(benches);

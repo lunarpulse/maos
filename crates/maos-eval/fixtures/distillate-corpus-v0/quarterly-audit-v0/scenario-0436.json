@@ -1,0 +1,52 @@
+{
+  "digest_payload": "[QUARTERLY CONTRADICTION] Source A reports a positive effect while Source B reports none; the digest preserves both rather than collapsing them.",
+  "distillation_depth": 1,
+  "expected_faithfulness": 0.985,
+  "expected_hedge_preservation": 0.97,
+  "expected_recall": 0.93,
+  "intent_lineage_expected": [
+    "consult",
+    "coordinate",
+    "delegate",
+    "inform",
+    "verify"
+  ],
+  "planted_secrets": [],
+  "scenario_id": "scenario-0436",
+  "source_log_ref": [
+    "00000000000000000000000000001b30",
+    "00000000000000000000000000001b31",
+    "00000000000000000000000000001b32",
+    "00000000000000000000000000001b33",
+    "00000000000000000000000000001b34"
+  ],
+  "source_raw_frames": [
+    {
+      "frame_id_hex": "00000000000000000000000000001b30",
+      "intent": "inform",
+      "payload_summary": "Quarterly raw frame 1 of scenario 436"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000001b31",
+      "intent": "consult",
+      "payload_summary": "Quarterly raw frame 2 of scenario 436"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000001b32",
+      "intent": "coordinate",
+      "payload_summary": "Quarterly raw frame 3 of scenario 436"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000001b33",
+      "intent": "verify",
+      "payload_summary": "Quarterly raw frame 4 of scenario 436"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000001b34",
+      "intent": "delegate",
+      "payload_summary": "Quarterly raw frame 5 of scenario 436"
+    }
+  ],
+  "spirit_class": "researcher",
+  "tag": "quarterly-v0"
+}

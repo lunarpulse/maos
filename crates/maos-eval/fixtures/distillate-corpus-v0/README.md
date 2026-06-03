@@ -18,9 +18,11 @@
 ## IAA
 
 v0.3-β: solo project, single annotator, self-attested at κ=0.85 floor.
-v1.0+: ≥2 annotators per Appendix F.5 (lands in Story 8.2 with Researcher Spirit).
+v1.0+: ≥2 annotators per Appendix F.5 — LANDED in Story 8.2 (`quarterly-audit-v0/`
+has 2 annotators, κ=0.87).
 
 ## Corpus Growth
 
 - v0.3-β: N=100 per-commit slice (this directory)
-- v1.0 quarterly: N=500 quarterly audit slice (`quarterly-audit-v0/` — lands Story 8.2)
+- v1.0 quarterly: N=500 quarterly audit slice (`quarterly-audit-v0/` — LANDED in
+  Story 8.2; `test_distillate_corpus_quarterly_audit_shape` now enforced)

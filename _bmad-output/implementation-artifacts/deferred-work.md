@@ -195,3 +195,11 @@ dev_model_used: claude-opus-4-7
 - `infer_module_path` hardcodes crate name `"maos_kernel_core"` — if check is re-used for another kernel crate, exemption documentation cross-check would fail. Pre-existing; single-kernel-crate workspace layout makes this benign. `xtask/src/check_empty_kernel.rs:222`
 - `MockLifecycleResolver` is pub, not `#[cfg(test)]`-gated — `pub mod test_double` compiles into production binaries; `#[i9_exempt]` masks it from I9. Protected by separate `check-mock-not-in-release` gate. `crates/maos-kernel-core/src/scheduler/verb_resolver.rs:131-142`
 - Serde hard-fail flip unconditional on line-number-based allowlist — removing `continue-on-error` makes all serde violations blocking; false positives from line drift can block CI. Accepted FREEZE posture tradeoff; mitigation = Story 8.x follow-up. `.github/workflows/discipline.yml:1008`
+
+## Deferred from: code review of 8-2-ship-the-researcher-reference-spirit-with-distillation-pattern-and-log-recall-walker (2026-06-03)
+
+- No runtime enforcement of manifest budgets — `time_cap_seconds` and `memory_max_mb` are declarative only with no timer, frame-count limit, or allocation tracker in `survey`. Pre-existing pattern shared with Butler and other Spirits.
+- `on_idle` cannot consume `pending` frames / architecturally disconnected from `walk` — `pending` is a bare `Option<Vec<RecalledFrame>>` and `on_idle` takes `&self`; production path unclear. Design choice for test harness pattern; full lifecycle integration expected at v0.5+.
+- `incorporate_scalar` truncates precision via `event.value as f32` then stores back as `f64` — precision loss is acceptable for epistemic-policy scalar thresholds which operate at 0.1 granularity.
+- `bibliography` may contain duplicate entries — no deduplication on push; minor issue, same pattern as other Spirit outputs.
+- Aggregate `needs` array continues unmaintainable growth — appending `researcher-tests` to 80+ item single-line `needs` array. Pre-existing CI pattern across all workflow jobs.

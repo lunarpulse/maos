@@ -1,0 +1,54 @@
+{
+  "digest_payload": "[QUARTERLY SECRET] Integration uses key sk-ant-api03-9fc38017a11000000000000000000000 for auth; the redaction filter MUST scrub this before persistence.",
+  "distillation_depth": 1,
+  "expected_faithfulness": 0.995,
+  "expected_hedge_preservation": 0.97,
+  "expected_recall": 0.94,
+  "intent_lineage_expected": [
+    "consult",
+    "coordinate",
+    "delegate",
+    "inform",
+    "verify"
+  ],
+  "planted_secrets": [
+    "sk-ant-api03-9fc38017a11000000000000000000000"
+  ],
+  "scenario_id": "scenario-0458",
+  "source_log_ref": [
+    "00000000000000000000000000001c90",
+    "00000000000000000000000000001c91",
+    "00000000000000000000000000001c92",
+    "00000000000000000000000000001c93",
+    "00000000000000000000000000001c94"
+  ],
+  "source_raw_frames": [
+    {
+      "frame_id_hex": "00000000000000000000000000001c90",
+      "intent": "coordinate",
+      "payload_summary": "Quarterly raw frame 1 of scenario 458"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000001c91",
+      "intent": "verify",
+      "payload_summary": "Quarterly raw frame 2 of scenario 458"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000001c92",
+      "intent": "delegate",
+      "payload_summary": "Quarterly raw frame 3 of scenario 458"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000001c93",
+      "intent": "inform",
+      "payload_summary": "Quarterly raw frame 4 of scenario 458"
+    },
+    {
+      "frame_id_hex": "00000000000000000000000000001c94",
+      "intent": "consult",
+      "payload_summary": "Quarterly raw frame 5 of scenario 458"
+    }
+  ],
+  "spirit_class": "researcher",
+  "tag": "quarterly-v0"
+}

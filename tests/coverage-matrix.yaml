@@ -126,10 +126,15 @@ coverage:
     - calibrate
     corpora:
     - calibration-seed-v0.1
+    - quarterly-audit-v0
     phase: v0.5
     valid_until: '2027-05-11'
     notes: per-commit calibration N=100 lands with corpus in Story 0.4; quarterly
-      N=500 at v1.0
+      N=500 distillate audit slice (distillate-corpus-v0/quarterly-audit-v0/,
+      tag=quarterly-v0, IAA kappa=0.87) LANDED in Story 8.2 alongside Researcher,
+      flipping test_distillate_corpus_quarterly_audit_shape from ignored to
+      enforced. SHA-pinned by maos-eval distillate_corpus_quarterly_pin.rs
+      (PIN 225184b3-a7d41); regenerate via quarterly-audit-v0/generate.py.
   FR1:
     gates:
     - reproducible-build
@@ -1196,10 +1201,13 @@ coverage:
         last_measured_at: "2026-06-02"
         third_party: false
       researcher:
-        path: "crates/maos-spirit-researcher"
+        # Story 8.2 Decision A — Researcher is a workspace member at
+        # spirits/researcher (mirrors spirits/butler), NOT crates/maos-spirit-researcher.
+        # Reference producer for the five-metric distillation gate (NFR-Aud-7).
+        path: "spirits/researcher"
         ships_at: "v0.5"
         coverage_pct: null
-        last_measured_at: null
+        last_measured_at: "2026-06-02"
         third_party: false
     notes: |
       Story 7.1 v0.5 binding ships the structural surface: 5-Spirit table +

@@ -1,0 +1,114 @@
+# MAOS Researcher v0.5 — second cognitive reference Spirit and the primary
+# reference implementation of the §9.5 distillation pattern (Story 8.2).
+#
+# Researcher is the first Spirit on the PARTICIPANT-SCOPED read path: it walks
+# the Transparency Log via the Story 4.4 `LogRecallPort` (kernel-scoped to its
+# own emitter frames; `LogRecallError::ScopeViolation` on a cross-Spirit fetch),
+# compresses the recalled frames Spirit-side, and persists the digest through
+# the kernel-enforced I11 audit chain (`DistillateWriter`). This is the explicit
+# 8.1→8.2 contract — Butler used the UNscoped `ranged_recall`; Researcher uses
+# the SCOPED `LogRecallPort`.
+#
+# COGNITIVE POSTURE (architecture §6.2): survey-mode (exploratory, reactive,
+# divergent). hypothesize-mode (the ILP+LLM hybrid) is declared in Researcher's
+# posture-set but ships fully at v1.0 (Decision C) — only survey-mode ships here.
+# NOTE: the manifest `[posture]` section below is the *autonomy spectrum*
+# (cautious/assistive/…), NOT the survey/hypothesize cognitive posture-set
+# (which `maos-manifest` does not parse and `deny_unknown_fields` would reject).
+# The cognitive posture-set is realized Spirit-side (`ResearcherPosture`) and is
+# documented here as intent. (Flagged for Winston — Dev Agent Record.)
+#
+# LOG-RECALL CAPABILITY: `Scope::LogRecall`/`Scope::LogFetch`/`Scope::DistillateWrite`
+# are NOT manifest-declarable capability fields today (`capabilities_required_to_scopes`
+# derives only ProviderInfer + McpCall). They are granted at the kernel capability
+# layer; the enforced LogRecall path is exercised by the walker driving the real
+# `LogRecallAdapter` (which emits the CapabilityInvocation audit row) in tests.
+
+[class]
+name = "researcher"
+version = "0.5.0"
+abi = "1.0"
+manifest_schema_version = 2
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "MAOS Researcher v0.5 reference Spirit — survey-mode distillation over a participant-scoped log.recall walker (Story 4.4 LogRecallPort) persisted through the kernel-enforced I11 audit chain; the primary reference producer for the five-metric distillation gate (NFR-Aud-7). hypothesize-mode declared (posture-set) but ships at v1.0."
+
+[capabilities.required]
+# Inference Port — the Spirit-side compressor. App F.4: ≥Sonnet-tier (70B+),
+# temp ≤0.3. At v0.5 the compressor is seeded/mocked in CI (no live LLM); the
+# declared provider class is the production target.
+provider.complete = ["anthropic.claude-3-5-sonnet-20241022"]
+
+# Decision B — declare the McpCall { server, tool } capability scopes Researcher
+# WOULD exercise against real web/arXiv/GitHub/citation-graph drivers. At v0.5
+# the research inputs are served by the fixture-replay MCP provider (no real
+# drivers). Each (server, tool) becomes a Scope::McpCall.
+[[capabilities.required.mcp.servers]]
+name = "web"
+allowed_tools = ["search", "fetch"]
+
+[[capabilities.required.mcp.servers]]
+name = "arxiv"
+allowed_tools = ["search", "get_paper"]
+
+[[capabilities.required.mcp.servers]]
+name = "github"
+allowed_tools = ["search_code", "get_repo"]
+
+[[capabilities.required.mcp.servers]]
+name = "citation-graph"
+allowed_tools = ["traverse", "get_citations"]
+
+[posture]
+# Autonomy spectrum (NOT the survey/hypothesize cognitive posture-set above).
+# Researcher surveys + surfaces findings for the director; it does not act
+# autonomously on contradictions — it halts (see [epistemic_policy]).
+default = "assistive"
+allowed_max = "assistive"
+
+[output_shape]
+# Architecture §6.2 Researcher output shape. The kernel rejects emits missing
+# any of these top-level fields.
+required_fields = ["findings", "open_questions", "confidence_map", "bibliography"]
+
+[budget]
+context_window_size = 16384
+# Survey generation budget. The §13.1 J-Researcher distillation STEP budget is
+# <100ms P95 (measured in maos-bench, AC7); this is the coarse FR time cap.
+time_cap_seconds = 60
+
+[resources]
+cpu_max_pct = 25
+memory_max_mb = 256
+
+[sandbox]
+# T2 for the rust-inproc reference/measurement form (testable). Production
+# survey-mode deploy targets T3 (containerized) per §13 — confirm with Winston.
+tier = "T2"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"
+
+# Architecture §6.2 Researcher epistemic policy. The Spirit computes its own
+# scalar proxies; the kernel performs the universal-arithmetic comparison and
+# fires the halt (Story 4.2 / 4.1). Manifest tags are BARE (the architecture's
+# `claim.` prefix is prose); predicate keys are on_value_above/on_value_below
+# (the only forms `maos-manifest` validates — confirmed against Butler 8.1).
+[epistemic_policy]
+default_action = "verbalize_only"
+
+# Halt when two papers report contradictory findings BOTH with strong
+# methodology (methodology-strength conflict). Researcher computes a
+# methodology_conflict scalar; the kernel halts when it crosses 0.7.
+[[epistemic_policy.rules]]
+tag = "methodology_conflict"
+action = "halt"
+on_value_above = { threshold = 0.7 }
+
+# Halt when a load-bearing claim's confidence falls below 0.7 (§6.2).
+[[epistemic_policy.rules]]
+tag = "load_bearing_confidence"
+action = "halt"
+on_value_below = { threshold = 0.7 }

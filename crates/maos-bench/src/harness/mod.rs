@@ -9,6 +9,7 @@
 pub mod j0;
 pub mod j1;
 pub mod j4;
+pub mod j_researcher;
 
 use crate::report::JourneyResult;
 use std::process::Command;
