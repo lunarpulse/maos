@@ -1,0 +1,71 @@
+# MAOS Observer v0.5 — third reference Spirit and the first READ-ONLY perceptual
+# Spirit (architecture §6.5). Story 8.3.
+#
+# Observer subscribes BROADLY to the Telemetry Stream (the `scalar.tap` channel,
+# I7 — runtime-operational at v0.5), watches peer scalars for PRE-HALT DRIFT, and
+# surfaces structural-anomaly suspects. It is read-only / write-restricted: the
+# ONLY thing Observer emits is an operator notification (`NotificationEvent::
+# AnomalyFlagged`, the §7.4 surface §6.5 grants Observer — kernel-rendered). It
+# emits NO IAC frames, halts NOTHING, and authors NO cognitive content; the
+# *interpretation* of drift/anomaly is Spirit-side, the kernel stays
+# non-interpretive (§4.0.7).
+#
+# MANIFEST SHAPE NOTES (Decision G — flagged for Winston):
+# - `[posture]` = the AUTONOMY spectrum (cautious/assistive/…), NOT the cognitive
+#   posture. `passive-observer` (silent allow on reads; no exec/mutate/control-
+#   plane, §6.5) maps to the most-restrictive autonomy `cautious`. The cognitive
+#   `passive-observer` posture is realized Spirit-side (`ObserverPosture`), as
+#   Researcher's survey/hypothesize posture-set is (`deny_unknown_fields` rejects
+#   a cognitive posture-set in `[posture]`).
+# - NO `[capabilities.required]`: Observer does NO inference at v0.5 (anomaly
+#   classification is deterministic, Spirit-side) and uses NO MCP drivers. The
+#   `scalar.tap` subscription scope is kernel-granted at the capability layer (it
+#   is not a manifest-declarable field — the same finding Researcher recorded for
+#   `Scope::LogRecall`).
+# - NO `[epistemic_policy]`: Observer emits no claims and never fires a halt of
+#   its own. The drift *watch* thresholds it monitors are Observer-side config
+#   (Decision D), NOT manifest epistemic-policy halt rules.
+
+[class]
+name = "observer"
+version = "0.5.0"
+abi = "1.0"
+manifest_schema_version = 2
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "MAOS Observer v0.5 reference Spirit — broad scalar.tap Telemetry-Stream subscriber (FR31 client-side principal-namespace filter), pre-halt scalar-drift watchdog, and structural-anomaly suspect path; surfaces drift early-warnings and structural_anomaly_suspect events to the operator via NotificationEvent::AnomalyFlagged (§6.5 notification-only authority). Read-only; zero kernel KLOC."
+
+[posture]
+# Autonomy spectrum (NOT the cognitive `passive-observer` posture above).
+# `cautious` is the most-restrictive autonomy — silent allow on reads, no exec,
+# no mutating, no control-plane (§6.5).
+default = "cautious"
+allowed_max = "cautious"
+
+[output_shape]
+# Observer's surface shape: every drift early-warning and structural-anomaly
+# suspect carries (subject, summary, confidence, anomaly_kind). These map onto
+# the NotificationEvent::AnomalyFlagged { subject, summary, confidence } fields
+# plus the kind discriminator.
+required_fields = ["subject", "summary", "confidence", "anomaly_kind"]
+
+[budget]
+context_window_size = 4096
+# A watchdog idle pass is fast — drift band-checks + structural classification
+# over a bounded batch.
+time_cap_seconds = 10
+
+[resources]
+# Read-only perceptual layer — a small envelope.
+cpu_max_pct = 10
+memory_max_mb = 64
+
+[sandbox]
+# T2 for the testable rust-inproc reference form (matches Butler/Researcher).
+# A read-only production Observer could tighten to T1 — flagged for Winston.
+tier = "T2"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"

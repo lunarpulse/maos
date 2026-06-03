@@ -1,0 +1,60 @@
+[
+  {
+    "name": "belief-variance-runup-warns-before-halt",
+    "note": "Butler-class belief_variance climbs toward its on_value_above 0.7 halt; Observer warns once, in-band, BEFORE the threshold crosses.",
+    "tag": "belief_variance",
+    "threshold": 0.7,
+    "direction": "above",
+    "warn_margin": 0.15,
+    "namespace": ["mira"],
+    "events": [
+      { "spirit_id": "mira", "tag": "belief_variance", "value": 0.40 },
+      { "spirit_id": "mira", "tag": "belief_variance", "value": 0.66 },
+      { "spirit_id": "mira", "tag": "belief_variance", "value": 0.78 }
+    ],
+    "expect_warnings": 1
+  },
+  {
+    "name": "flat-low-trajectory-no-warning",
+    "note": "A trajectory that never enters the watch-band produces no early-warning (negative).",
+    "tag": "belief_variance",
+    "threshold": 0.7,
+    "direction": "above",
+    "warn_margin": 0.15,
+    "namespace": ["mira"],
+    "events": [
+      { "spirit_id": "mira", "tag": "belief_variance", "value": 0.20 },
+      { "spirit_id": "mira", "tag": "belief_variance", "value": 0.25 },
+      { "spirit_id": "mira", "tag": "belief_variance", "value": 0.22 }
+    ],
+    "expect_warnings": 0
+  },
+  {
+    "name": "out-of-namespace-emitter-dropped",
+    "note": "FR31 client-side filter: an in-band value from an emitter outside Observer's principal scope is dropped (negative).",
+    "tag": "belief_variance",
+    "threshold": 0.7,
+    "direction": "above",
+    "warn_margin": 0.15,
+    "namespace": ["mira"],
+    "events": [
+      { "spirit_id": "stranger", "tag": "belief_variance", "value": 0.66 }
+    ],
+    "expect_warnings": 0
+  },
+  {
+    "name": "preference-drift-falling-toward-warns",
+    "note": "A below-direction halt (on_value_below 0.6): Observer warns as the scalar falls toward the threshold from above, before it crosses.",
+    "tag": "user_preference_drift",
+    "threshold": 0.6,
+    "direction": "below",
+    "warn_margin": 0.15,
+    "namespace": ["*"],
+    "events": [
+      { "spirit_id": "butler", "tag": "user_preference_drift", "value": 0.90 },
+      { "spirit_id": "butler", "tag": "user_preference_drift", "value": 0.66 },
+      { "spirit_id": "butler", "tag": "user_preference_drift", "value": 0.55 }
+    ],
+    "expect_warnings": 1
+  }
+]

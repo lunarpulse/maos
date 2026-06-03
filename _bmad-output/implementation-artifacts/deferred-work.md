@@ -196,6 +196,16 @@ dev_model_used: claude-opus-4-7
 - `MockLifecycleResolver` is pub, not `#[cfg(test)]`-gated — `pub mod test_double` compiles into production binaries; `#[i9_exempt]` masks it from I9. Protected by separate `check-mock-not-in-release` gate. `crates/maos-kernel-core/src/scheduler/verb_resolver.rs:131-142`
 - Serde hard-fail flip unconditional on line-number-based allowlist — removing `continue-on-error` makes all serde violations blocking; false positives from line drift can block CI. Accepted FREEZE posture tradeoff; mitigation = Story 8.x follow-up. `.github/workflows/discipline.yml:1008`
 
+## Deferred from: code review of 8-3-observer-v0-5-telemetry-stream-subscriber-pre-halt-scalar-drift-watchdog (2026-06-03)
+
+- `WatchThreshold::new` accepts NaN/Inf threshold — silently disables drift detection. Code-constructed config; NaN is a programming error, not a runtime condition. `spirits/observer/src/lib.rs:742-758`
+- `CapturingChannel` test doubles use `.lock().unwrap()` — inconsistent with production poison-safe pattern. Test-only code; pre-existing pattern across Spirit test doubles. `spirits/observer/tests/drift_watchdog.rs:1386`
+- `StructuralSignal` has no constructor validation — magnitude outside `[0.0, 1.0]` silently clamped. Fixture-controlled at v0.5; the clamp is defensive. `spirits/observer/src/lib.rs:249-263`
+- Multiple watches for same tag — only first `find()` match used. Observer always constructed with unique tags; configuration correctness issue. `spirits/observer/src/lib.rs:458`
+- Empty `PrincipalScope` silently drops all events. Observer always constructed with at least one pattern. `spirits/observer/src/lib.rs:89-125`
+- Empty `observer`/`subject` strings not validated by `anomaly_flagged` constructor — pre-existing gap in `maos-domain`. `crates/maos-domain/src/notification.rs:81-103`
+- `NotificationEvent` `#[non_exhaustive]` wildcard branch in `TerminalChannel` is dead code — pre-existing, not Observer-introduced. `crates/maos-director-surface/src/notification.rs:226-228`
+
 ## Deferred from: code review of 8-2-ship-the-researcher-reference-spirit-with-distillation-pattern-and-log-recall-walker (2026-06-03)
 
 - No runtime enforcement of manifest budgets — `time_cap_seconds` and `memory_max_mb` are declarative only with no timer, frame-count limit, or allocation tracker in `survey`. Pre-existing pattern shared with Butler and other Spirits.

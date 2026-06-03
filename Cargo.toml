@@ -33,6 +33,7 @@ members = [
     "examples/example-spirit",
     "spirits/butler",
     "spirits/researcher",
+    "spirits/observer",
 ]
 default-members = []
 exclude = ["templates", "templates/spirit-ts"]

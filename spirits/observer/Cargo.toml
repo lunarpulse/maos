@@ -1,0 +1,36 @@
+[package]
+name = "observer"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "MAOS Observer v0.5 — third reference Spirit + first read-only perceptual Spirit: a broad scalar.tap Telemetry-Stream subscriber (FR31 client-side namespace filter) + a pre-halt scalar-drift watchdog + a structural-anomaly suspect path, all surfaced to the operator via the existing NotificationEvent::AnomalyFlagged path (Story 3.4). Story 8.3."
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+# Spirit-side surface ONLY (zero kernel KLOC, Story 0.2 invariant): the SDK +
+# ABI for the #[spirit] macro/hook, and the PURE `maos-domain` types Observer
+# composes — the i7 scalar.tap telemetry types, the §7.4 NotificationEvent
+# (the operator-surface §6.5 grants Observer), and the FrameKind discriminator.
+# NONE of these is `maos-kernel-core`/`maos-iac`/`maos-director-surface`;
+# Observer's watchdog cognition never reaches into the kernel.
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner"] }
+maos-spirit-abi = { path = "../../crates/maos-spirit-abi" }
+maos-domain = { path = "../../crates/maos-domain" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+# Test-only adapters used to PROVE the integration against the REAL substrate:
+# the real `TelemetryStreamAdapter` (the scalar.tap broadcast stream) and the
+# real `NotificationDispatcher` (operator-actionable surfacing). Dev-deps do not
+# affect the `check-service-boundary` kernel surface (that gate inspects
+# maos-kernel-core only — see Story 8.1/8.2 Dev Agent Record).
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner", "mock", "spirit_test"] }
+maos-kernel-core = { path = "../../crates/maos-kernel-core" }
+maos-director-surface = { path = "../../crates/maos-director-surface" }
+maos-manifest = { path = "../../crates/maos-manifest" }
+tokio = { version = "1", features = ["macros", "rt", "time", "sync"] }
+sha2 = "0.10"
+toml = "0.8"

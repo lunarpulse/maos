@@ -581,6 +581,29 @@ jobs:
       - name: Run §13.1 J-Researcher Criterion benchmark (AC7)
         run: cargo bench -p maos-bench --bench section_13_1 -- --test
 
+  observer-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build + spirit-test the Observer v0.5 reference Spirit (Story 8.3, AC8)
+        # Covers the on_idle watchdog pass + the read-only `cautious` manifest
+        # envelope vs the authoritative validators (spirit_smoke), the broad
+        # scalar.tap subscription + FR31 client-side namespace filter against the
+        # real TelemetryStreamAdapter (scalar_tap_subscribe), the pre-halt
+        # scalar-drift early-warning surfaced via the real NotificationDispatcher
+        # BEFORE the halt fires (drift_watchdog), the structural-anomaly suspect
+        # path over fixture-replayed SandboxBlock-shaped inputs (structural_anomaly),
+        # and the SHA-pinned fixtures (fixtures_pin). No bench job — Observer v0.5
+        # carries no §13.1 latency budget (J4 <10ms is v1.5; Decision F).
+        run: cargo test -p observer --locked
+
   example-spirit-drift:
     runs-on: ubuntu-latest
     steps:
@@ -1584,7 +1607,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b]
     if: always()
     permissions:
       pull-requests: write

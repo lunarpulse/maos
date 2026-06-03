@@ -1209,6 +1209,19 @@ coverage:
         coverage_pct: null
         last_measured_at: "2026-06-02"
         third_party: false
+      observer:
+        # Story 8.3 Decision A — Observer is a workspace member at spirits/observer
+        # (mirrors spirits/butler + spirits/researcher). The third reference Spirit
+        # and first read-only perceptual Spirit: broad scalar.tap subscriber +
+        # pre-halt scalar-drift watchdog + structural-anomaly suspect, surfaced via
+        # NotificationEvent::AnomalyFlagged. Fixtures SHA-pinned by the in-crate
+        # spirits/observer/tests/fixtures_pin.rs (PIN 1742ac1f-bb6b9dd2) over
+        # tests/fixtures/{drift-scenarios,structural-scenarios}.json.
+        path: "spirits/observer"
+        ships_at: "v0.5"
+        coverage_pct: null
+        last_measured_at: "2026-06-03"
+        third_party: false
     notes: |
       Story 7.1 v0.5 binding ships the structural surface: 5-Spirit table +
       mechanical measurement walker + soft-floor reporting. Floor is target

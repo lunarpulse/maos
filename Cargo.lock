@@ -1465,6 +1465,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "observer"
+version = "0.1.0"
+dependencies = [
+ "maos-director-surface",
+ "maos-domain",
+ "maos-kernel-core",
+ "maos-manifest",
+ "maos-spirit-abi",
+ "maos-spirit-sdk",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "toml 0.8.23",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

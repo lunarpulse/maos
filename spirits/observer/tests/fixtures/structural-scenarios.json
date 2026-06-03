@@ -1,0 +1,67 @@
+[
+  {
+    "name": "syscall-divergence-suspect",
+    "note": "NFR-Sec-3 syscall-pattern divergence (fixture-replayed at v0.5, shaped as FrameKind::SandboxBlock=8).",
+    "namespace": ["mira", "worker-*"],
+    "signal": {
+      "frame_kind": 8,
+      "subject": "mira",
+      "kind": "syscall-pattern-divergence",
+      "magnitude": 0.74,
+      "detail": "openat/connect pattern diverges from the manifest syscall profile"
+    },
+    "expect_suspect": true
+  },
+  {
+    "name": "fd-table-growth-suspect",
+    "note": "NFR-Sec-3 fd-table growth.",
+    "namespace": ["*"],
+    "signal": {
+      "frame_kind": 8,
+      "subject": "worker-7",
+      "kind": "fd-table-growth",
+      "magnitude": 0.88,
+      "detail": "fd count 412 vs declared cap 64"
+    },
+    "expect_suspect": true
+  },
+  {
+    "name": "unexpected-outbound-iac-suspect",
+    "note": "NFR-Sec-3 unexpected outbound IAC connection.",
+    "namespace": ["*"],
+    "signal": {
+      "frame_kind": 8,
+      "subject": "nash",
+      "kind": "unexpected-outbound-iac",
+      "magnitude": 0.61,
+      "detail": "outbound A2A to undeclared peer 10.0.0.9:8443"
+    },
+    "expect_suspect": true
+  },
+  {
+    "name": "benign-low-magnitude-no-suspect",
+    "note": "A sub-floor structural measurement is benign — Observer does not flood the operator (negative).",
+    "namespace": ["*"],
+    "signal": {
+      "frame_kind": 8,
+      "subject": "mira",
+      "kind": "syscall-pattern-divergence",
+      "magnitude": 0.08,
+      "detail": ""
+    },
+    "expect_suspect": false
+  },
+  {
+    "name": "out-of-namespace-subject-dropped",
+    "note": "FR31: a high-magnitude signal about a subject outside Observer's principal scope is dropped (negative).",
+    "namespace": ["mira"],
+    "signal": {
+      "frame_kind": 8,
+      "subject": "stranger",
+      "kind": "fd-table-growth",
+      "magnitude": 0.95,
+      "detail": ""
+    },
+    "expect_suspect": false
+  }
+]
