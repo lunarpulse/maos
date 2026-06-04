@@ -34,6 +34,10 @@ maos-compliance = { path = "../maos-compliance" }   # Story 7.3 — v0.9-binding
 maos-spirit-cli = { path = "../maos-spirit-cli" }   # Story 7.3 — REAL producer round-trip in the smoke arm
 maos-corpus-gen = { path = "../maos-corpus-gen" }   # Story 7.3 — CCAC slice replay + reference contexts
 maos-skill = { path = "../maos-skill" }   # Story 7.4 — skill ecosystem (smoke-skill-7-4)
+orchestrator = { path = "../../spirits/orchestrator" }   # Story 8.4 — founder-loop wedge (smoke-founder-loop-8-4)
+architect = { path = "../../spirits/architect" }   # Story 8.4 — founder-loop wedge
+reviewer = { path = "../../spirits/reviewer" }   # Story 8.4 — founder-loop wedge
+worker = { path = "../../spirits/worker" }   # Story 8.4 — founder-loop wedge (canned CLI output)
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 getrandom = "0.3"

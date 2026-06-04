@@ -1222,6 +1222,48 @@ coverage:
         coverage_pct: null
         last_measured_at: "2026-06-03"
         third_party: false
+      orchestrator:
+        # Story 8.4 Decision A — the founder-loop wedge coordinator (rust-inproc
+        # [class], posture autonomous-with-halt). Drains the real FR20
+        # OrchestratorBuffer at safe points + distillate-fed FR21 dispatch.
+        # Fixtures SHA-pinned by spirits/orchestrator/tests/fixtures_pin.rs over
+        # tests/fixtures/wedge-scenario.json.
+        path: "spirits/orchestrator"
+        ships_at: "v0.8"
+        coverage_pct: null
+        last_measured_at: "2026-06-03"
+        third_party: false
+      worker:
+        # Story 8.4 Decision B — the founder-loop CliWrapperSpirit ([cli_wrapper]
+        # manifest, T3 sandbox) wrapping the in-crate worker-cli-fixture binary.
+        # Exercises the real Story-6.2 admission/probe/shape-assertion/FR40 path.
+        # Fixtures SHA-pinned by spirits/worker/tests/fixtures_pin.rs over
+        # tests/fixtures/canned-cli-output.json.
+        path: "spirits/worker"
+        ships_at: "v0.8"
+        coverage_pct: null
+        last_measured_at: "2026-06-03"
+        third_party: false
+      architect:
+        # Story 8.4 Decision C/E — the founder-loop Architect (rust-inproc,
+        # SpiritRole::Worker; deterministic propose() at v0.8, no live LLM).
+        # Fixtures SHA-pinned by spirits/architect/tests/fixtures_pin.rs over
+        # tests/fixtures/design-specs.json.
+        path: "spirits/architect"
+        ships_at: "v0.8"
+        coverage_pct: null
+        last_measured_at: "2026-06-03"
+        third_party: false
+      reviewer:
+        # Story 8.4 Decision C/E — the founder-loop Reviewer (rust-inproc,
+        # SpiritRole::Worker; deterministic review() at v0.8, no live LLM).
+        # Fixtures SHA-pinned by spirits/reviewer/tests/fixtures_pin.rs over
+        # tests/fixtures/review-cases.json.
+        path: "spirits/reviewer"
+        ships_at: "v0.8"
+        coverage_pct: null
+        last_measured_at: "2026-06-03"
+        third_party: false
     notes: |
       Story 7.1 v0.5 binding ships the structural surface: 5-Spirit table +
       mechanical measurement walker + soft-floor reporting. Floor is target

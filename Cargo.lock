@@ -110,6 +110,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "architect"
+version = "0.1.0"
+dependencies = [
+ "maos-domain",
+ "maos-kernel-core",
+ "maos-manifest",
+ "maos-spirit-abi",
+ "maos-spirit-sdk",
+ "orchestrator",
+ "reviewer",
+ "serde",
+ "serde_json",
+ "sha2",
+ "smallvec",
+ "tokio",
+ "toml 0.8.23",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1044,6 +1063,7 @@ dependencies = [
 name = "maos-bin"
 version = "0.1.0-alpha"
 dependencies = [
+ "architect",
  "crossbeam-channel",
  "getrandom 0.3.4",
  "hex",
@@ -1064,7 +1084,9 @@ dependencies = [
  "maos-spirit-cli",
  "maos-spirit-hello",
  "maos-spirit-sdk",
+ "orchestrator",
  "parking_lot",
+ "reviewer",
  "ring",
  "serde_cbor",
  "serde_json",
@@ -1074,6 +1096,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml 0.8.23",
+ "worker",
 ]
 
 [[package]]
@@ -1500,6 +1523,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
+name = "orchestrator"
+version = "0.1.0"
+dependencies = [
+ "maos-domain",
+ "maos-kernel-core",
+ "maos-manifest",
+ "maos-spirit-abi",
+ "maos-spirit-sdk",
+ "serde",
+ "serde_json",
+ "sha2",
+ "smallvec",
+ "tokio",
+ "toml 0.8.23",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1759,6 +1799,20 @@ dependencies = [
  "tokio",
  "toml 0.8.23",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "reviewer"
+version = "0.1.0"
+dependencies = [
+ "maos-domain",
+ "maos-manifest",
+ "maos-spirit-abi",
+ "maos-spirit-sdk",
+ "serde",
+ "serde_json",
+ "sha2",
+ "toml 0.8.23",
 ]
 
 [[package]]
@@ -3078,6 +3132,20 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser",
+]
+
+[[package]]
+name = "worker"
+version = "0.1.0"
+dependencies = [
+ "maos-domain",
+ "maos-kernel-core",
+ "maos-manifest",
+ "maos-spirit-abi",
+ "serde",
+ "serde_json",
+ "sha2",
+ "toml 0.8.23",
 ]
 
 [[package]]

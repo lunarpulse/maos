@@ -1,0 +1,24 @@
+# MAOS Worker v0.8 — a CliWrapperSpirit. The `[cli_wrapper]` section is
+# mutually exclusive with `[class]` (a both-sections manifest is rejected with
+# `EManifestSchemaConflict`). Decision B refinement: `[sandbox] tier = "T3"` —
+# Story 6.2 AC6 admission rejects a CliWrapperSpirit below T3
+# (`ECliWrapperRequiresT3`). NO `[class]` section.
+
+[cli_wrapper]
+command = "worker-cli-fixture"
+argv_prefix = ["--maos-worker"]
+output_shape_version = "1.0.0"
+skill_bundle = ["maos-bridge"]
+recovery_policy = "respawn_with_context"
+
+[cli_wrapper.posture]
+stdio_shape = "ndjson_over_stdio"
+control_channel = "signals"
+shutdown_signal = "SIGTERM"
+
+[sandbox]
+tier = "T3"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"

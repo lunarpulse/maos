@@ -604,6 +604,101 @@ jobs:
         # carries no §13.1 latency budget (J4 <10ms is v1.5; Decision F).
         run: cargo test -p observer --locked
 
+  orchestrator-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build + spirit-test the Orchestrator v0.8 reference Spirit (Story 8.4, AC2/AC3)
+        # Covers the on_idle coordination pass + the autonomous-with-halt manifest
+        # envelope vs the authoritative validators (spirit_smoke), the FR20
+        # safe-point buffer drain against the real OrchestratorBuffer
+        # (orchestrator_buffer), the FR21 4-scenario distillate-dispatch matrix
+        # against the real IacBus gate + producer-side DistillateWriter
+        # (distillate_dispatch, Decision K), and the SHA-pinned wedge-scenario
+        # fixture (fixtures_pin).
+        run: cargo test -p orchestrator --locked
+
+  worker-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build + test the Worker v0.8 CliWrapperSpirit reference (Story 8.4, AC4)
+        # Covers the [cli_wrapper] (NOT [class]) + T3 manifest vs the authoritative
+        # validators (spirit_smoke), and the REAL Story-6.2 admission path over the
+        # in-crate worker-cli-fixture binary (cli_wrapper_admission): matching shape
+        # admits, mismatch fails loud + journals a CliWrapperShapeMismatch row, the
+        # resumption gate, the below-T3 rejection, the argv_prefix_hash TOCTOU bind,
+        # CliSubprocessOutput=21 provenance rows, and the EManifestSchemaConflict
+        # negative. Live multi-CLI stdio bridge is OUT OF SCOPE (Decision B).
+        run: cargo test -p worker --locked
+
+  architect-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build + spirit-test the Architect v0.8 reference Spirit (Story 8.4, AC5)
+        # Covers the assistive manifest envelope vs the authoritative validators
+        # (spirit_smoke), the deterministic/bit-identical propose() (lib + the
+        # SHA-pinned design-specs fixture), and the FR21-clean Architect→distill→
+        # Reviewer code-review loop against the real gate + DistillateWriter
+        # (code_review_loop). No live LLM in CI (Decision E).
+        run: cargo test -p architect --locked
+
+  reviewer-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build + spirit-test the Reviewer v0.8 reference Spirit (Story 8.4, AC5)
+        # Covers the assistive manifest envelope vs the authoritative validators
+        # (spirit_smoke), and the deterministic/bit-identical review() (lib + the
+        # SHA-pinned review-cases fixture). No live LLM in CI (Decision E).
+        run: cargo test -p reviewer --locked
+
+  founder-loop-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run §13.1 J1 founder-loop CliWrapper IPC benchmark (Story 8.4, AC7)
+        # Regression guard (mirrors researcher-bench --test). J1_P95_BUDGET_US=25_000.
+        # A budget breach at HEAD is the §13.1 / E5-5.5 rust-inproc-evaluation
+        # trigger, NOT a hard fail; the job fails on a regression vs. the baseline.
+        run: cargo bench -p maos-bench --bench section_13_1 -- --test
+
   example-spirit-drift:
     runs-on: ubuntu-latest
     steps:
@@ -1170,6 +1265,29 @@ jobs:
           MAOS_ONE_SHOT: smoke-orchestrator-fanout-6-2
         run: ./target/release/maos-bin
 
+  # Story 8.4 AC6 — smoke-founder-loop-8-4 end-to-end founder-loop wedge demo.
+  smoke-founder-loop-8-4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build maos-bin
+        run: cargo build -p maos-bin --release --features fixture_replay
+      - name: Run smoke-founder-loop-8-4
+        # 11pm assign → FR20 buffer drain → FR21 distillate-fed Architect→Reviewer
+        # loop → one deliberate EOrchestratorDispatchRawOutput rejection →
+        # halt-and-resume across the overnight pause (recall_all_pending +
+        # hot-swap state_codec) → 7am digest cites actual source_log_refs.
+        env:
+          MAOS_ONE_SHOT: smoke-founder-loop-8-4
+        run: ./target/release/maos-bin
+
   # Story 6.3 AC7 — smoke-a2a-loopback-6-3 A2A wedge demo.
   smoke-a2a-loopback-6-3:
     runs-on: ubuntu-latest
@@ -1607,7 +1725,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, orchestrator-tests, worker-tests, architect-tests, reviewer-tests, founder-loop-bench, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-founder-loop-8-4, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b]
     if: always()
     permissions:
       pull-requests: write

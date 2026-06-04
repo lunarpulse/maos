@@ -1,0 +1,9 @@
+{
+  "description": "Worker fixture-CLI canned output + probe shape (Story 8.4, Decision B). The fixture-CLI binary echoes these lines for a non-probe invocation and reports output_shape_version to --maos-bridge-probe. SHA-pinned by tests/fixtures_pin.rs.",
+  "output_shape_version": "1.0.0",
+  "canned_output_lines": [
+    "worker: received task assignment",
+    "worker: executing fixture-replayed work",
+    "worker: task complete"
+  ]
+}

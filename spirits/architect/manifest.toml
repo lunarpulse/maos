@@ -1,0 +1,31 @@
+[class]
+name = "architect"
+version = "0.8.0"
+abi = "1.0"
+manifest_schema_version = 2
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "MAOS Architect v0.8 reference Spirit — proposes a design from a task spec in the founder-loop code-review loop. Deterministic / seeded / bit-identical at v0.8 (no live LLM in CI; live generation is application-layer v0.9+/Epic 9 — Decision E). Maps to SpiritRole::Worker (Decision C); no new ABI variant."
+
+[posture]
+default = "assistive"
+allowed_max = "assistive"
+
+[output_shape]
+required_fields = ["components", "rationale", "interfaces", "risks"]
+
+[budget]
+context_window_size = 8192
+time_cap_seconds = 30
+
+[resources]
+cpu_max_pct = 15
+memory_max_mb = 128
+
+[sandbox]
+tier = "T2"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"

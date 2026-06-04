@@ -1,0 +1,8 @@
+{
+  "description": "Orchestrator founder-loop wedge scenario (Story 8.4). The ordered director instructions the Orchestrator drains from the FR20 buffer at safe sequence points. SHA-pinned by tests/fixtures_pin.rs.",
+  "instructions": [
+    { "id": 1, "goal": "design the overnight founder-loop task" },
+    { "id": 2, "goal": "review the proposed design" },
+    { "id": 3, "goal": "incorporate the review feedback" }
+  ]
+}

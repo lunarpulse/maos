@@ -1,0 +1,26 @@
+{
+  "description": "Reviewer deterministic critique fixtures (Story 8.4, Decision E). Each case is a design (components/interfaces/risks) + the expected verdict + severity. review() is seeded/bit-identical. SHA-pinned by tests/fixtures_pin.rs.",
+  "cases": [
+    {
+      "components": ["a-module", "b-module"],
+      "interfaces": ["a_port", "b_port"],
+      "risks": [],
+      "expected_verdict": "approve",
+      "expected_severity": "none"
+    },
+    {
+      "components": ["x-module"],
+      "interfaces": ["x_port"],
+      "risks": ["x: shared-state hazard"],
+      "expected_verdict": "changes-requested",
+      "expected_severity": "high"
+    },
+    {
+      "components": ["a-module", "b-module"],
+      "interfaces": ["a_port"],
+      "risks": [],
+      "expected_verdict": "changes-requested",
+      "expected_severity": "low"
+    }
+  ]
+}

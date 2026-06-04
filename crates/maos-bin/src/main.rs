@@ -3131,6 +3131,11 @@ description = "smoke test spirit successor"
             return smoke_orchestrator_fanout_6_2().await;
         }
 
+        // Story 8.4 AC6 — `smoke-founder-loop-8-4` end-to-end founder-loop wedge.
+        if mode == "smoke-founder-loop-8-4" {
+            return smoke_founder_loop_8_4().await;
+        }
+
         // Story 6.3 AC7 — `smoke-a2a-loopback-6-3` end-to-end A2A wedge demo.
         if mode == "smoke-a2a-loopback-6-3" {
             return smoke_a2a_loopback_6_3().await;
@@ -3195,7 +3200,7 @@ description = "smoke test spirit successor"
 
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-founder-loop-8-4"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -3621,7 +3626,7 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
                 posture_preferences: PosturePreferences::default(),
                 prior_distillate_ref: prior,
             }),
-            auto_marker: FrameOrigin::HumanAuthored,
+            auto_marker: FrameOrigin::SpiritAuto,
             consent_envelope: None,
             intent_lineage: originating_lineage.clone(),
         }
@@ -3795,6 +3800,379 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
 
     eprintln!(
         "smoke-orchestrator-fanout-6-2: ✅ wedge demo complete; founder-loop substrate verified"
+    );
+    Ok(())
+}
+
+/// Story 8.4 — a `SpiritRole::Worker` `task.complete` frame (Architect/Reviewer
+/// are specialized Workers — Decision C). Used by `smoke_founder_loop_8_4`.
+fn founder_loop_task_complete(
+    worker_id: &str,
+    seq: u64,
+    result: &str,
+    lineage: maos_domain::invariants::i13::IntentLineage,
+) -> maos_domain::frame::IacFrame {
+    use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, TaskCompletePayload};
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_spirit_abi::identity::{FrameKind, SpiritId, SpiritRole};
+
+    let mut frame_id = [0u8; 16];
+    frame_id[0..8].copy_from_slice(&(seq | (1u64 << 62)).to_le_bytes());
+    let mut to = smallvec::SmallVec::<[FrameAddress; 1]>::new();
+    to.push(FrameAddress {
+        spirit_id: SpiritId::from("orchestrator"),
+        host_id: None,
+        role: Some(SpiritRole::Orchestrator),
+    });
+    IacFrame {
+        frame_id,
+        timestamp_ns: seq,
+        logical_clock: seq,
+        from: FrameAddress {
+            spirit_id: SpiritId::from(worker_id),
+            host_id: None,
+            role: Some(SpiritRole::Worker),
+        },
+        to,
+        kind: FrameKind::TaskComplete,
+        intent: IntentClass::Standard,
+        payload: FramePayload::TaskComplete(TaskCompletePayload {
+            result: result.into(),
+        }),
+        auto_marker: FrameOrigin::HumanAuthored,
+        consent_envelope: None,
+        intent_lineage: lineage,
+    }
+}
+
+/// Story 8.4 — producer-side distillation (Decision K): the producing Spirit
+/// seeds its OWN output frame and distills it via the real `DistillateWriter`.
+/// Returns the `PriorDistillateRef` the Orchestrator references.
+fn founder_loop_producer_distill(
+    tl: &std::sync::Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
+    memory: &std::sync::Arc<dyn std::any::Any + Send + Sync>,
+    producer_pid: u32,
+    intent: &str,
+    digest: &str,
+) -> Result<maos_domain::frame::PriorDistillateRef, Box<dyn std::error::Error>> {
+    use maos_domain::distillation::{DigestPayload, DistillationRequest};
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::ports::DistillationPort;
+    use maos_kernel_core::iac::distillate::DistillateWriter;
+    use maos_kernel_core::iac::transparency_log::FrameKind as TlFrameKind;
+
+    let _ = tl.insert_frame_event(
+        TlFrameKind::InferenceCall,
+        producer_pid,
+        None,
+        intent,
+        digest.as_bytes(),
+        FrameOrigin::SpiritAuto,
+    );
+    let source = vec![tl.last_frame_id()];
+    let writer = DistillateWriter::new(std::sync::Arc::clone(tl), std::sync::Arc::clone(memory));
+    let req = DistillationRequest::new(source, 1, DigestPayload::Text(digest.to_string()), None)?;
+    let receipt = writer.write_distillate(producer_pid, req)?;
+    Ok(maos_domain::frame::PriorDistillateRef {
+        digest_frame_id: receipt.digest_frame_id,
+        distillation_depth: receipt.effective_distillation_depth,
+        intent_lineage: receipt.intent_lineage,
+    })
+}
+
+/// Story 8.4 AC6 — `smoke-founder-loop-8-4` end-to-end founder-loop wedge demo.
+///
+/// The runnable headline artifact (Decision G; mirrors
+/// `smoke-orchestrator-fanout-6-2`). Runs the full wedge at a COMPRESSED
+/// timeline — 11pm-assign → overnight distillate dispatch → halt-and-resume
+/// across the pause → 7am digest — over substrate that ALREADY exists (zero
+/// kernel KLOC):
+///
+/// 1. **FR20** — the director buffers instructions in the REAL
+///    [`OrchestratorBuffer`]; the Orchestrator drains them at safe sequence
+///    points and NEVER preempts an in-flight delegation.
+/// 2. **FR21** — every follow-up `task.assign` carries a producer-authored
+///    `PriorDistillateRef` (Decision K); a deliberate raw dispatch is REJECTED
+///    with `EOrchestratorDispatchRawOutput` (observable in the Transparency Log).
+/// 3. **Architect→Reviewer loop** — the Architect proposes (deterministic), the
+///    Reviewer critiques (deterministic); each distills its OWN output and the
+///    distillate flows through the Orchestrator.
+/// 4. **CliWrapper Worker** — the fixture-replayed canned output is captured as
+///    `FrameKind::CliSubprocessOutput=21` provenance rows (Decision B).
+/// 5. **Halt-and-resume-overnight** — the pause drains the buffer via
+///    `recall_all_pending()` and snapshots it through the hot-swap `state_codec`
+///    CBOR envelope (FR51/ADR-017); the resume re-enqueues, preserving the
+///    in-flight work (Decision I).
+/// 6. **Morning digest** — cites ACTUAL `source_log_ref`s (the I11 distillate
+///    chain) that resolve against the REAL Transparency Log (FR17 path,
+///    Decision H).
+async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
+    use std::sync::Arc;
+
+    use architect::Architect;
+    use orchestrator::Orchestrator;
+    use reviewer::{DesignUnderReview, Reviewer};
+
+    use maos_domain::iac_bus_types::IacBusError;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
+    use maos_kernel_core::hot_swap::state_codec;
+    use maos_kernel_core::iac::transparency_log::{
+        FrameFilter, FrameKind as TlFrameKind, TransparencyLogAdapter,
+    };
+    use maos_kernel_core::iac::{IacBusAdapter, Mailbox};
+    use maos_kernel_core::orchestrator::OrchestratorBuffer;
+    use maos_spirit_abi::identity::{SpiritId, SpiritRole};
+
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    eprintln!("smoke-founder-loop-8-4: 11pm — founder assigns the overnight task");
+
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
+    let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
+    let mailbox = Arc::new(Mailbox::new(metrics));
+    let adapter = IacBusAdapter::new(mailbox.clone(), tl.clone());
+
+    let _orch_reg = adapter
+        .register_spirit_typed(&SpiritId::from("orchestrator"))
+        .expect("register orchestrator");
+    let _arch_reg = adapter
+        .register_spirit_typed(&SpiritId::from("architect"))
+        .expect("register architect");
+    let _rev_reg = adapter
+        .register_spirit_typed(&SpiritId::from("reviewer"))
+        .expect("register reviewer");
+    let _worker_reg = adapter
+        .register_spirit_typed(&SpiritId::from("worker"))
+        .expect("register worker");
+
+    let orch = Orchestrator::new("orchestrator");
+    let architect = Architect::new("architect");
+    let reviewer = Reviewer::new("reviewer");
+    let lineage = IntentLineage::new(vec![A2AIntent::new("founder-loop-wedge")]);
+    let memory: Arc<dyn std::any::Any + Send + Sync> = Arc::new(0u8);
+
+    // ── 1. FR20: director buffers instructions; orchestrator drains at safe points.
+    let buffer = OrchestratorBuffer::new();
+    buffer.enqueue(OrchestratorInstruction::new(
+        OrchestratorInstructionId(1),
+        "design the overnight founder-loop task",
+        1,
+    )?)?;
+    buffer.enqueue(OrchestratorInstruction::new(
+        OrchestratorInstructionId(2),
+        "review the proposed design",
+        2,
+    )?)?;
+    eprintln!(
+        "smoke-founder-loop-8-4: FR20 buffer holds {} director instruction(s)",
+        buffer.pending_count()
+    );
+
+    let first = orch
+        .drain_next(|| buffer.dequeue_at_safe_point())
+        .ok_or("safe point must drain the first instruction")?;
+    eprintln!("smoke-founder-loop-8-4: orchestrator drained '{}'", first.goal);
+    orch.begin_delegation();
+    // FR20: while a delegation is in flight, the next instruction is NOT preempted.
+    if orch.drain_next(|| buffer.dequeue_at_safe_point()).is_some() {
+        return Err("FR20 violated: drained while a delegation was in flight".into());
+    }
+
+    // ── 2. FR21: dispatch the design task to the Architect (first dispatch — None accepted).
+    adapter
+        .deliver_typed(orch.first_dispatch(
+            10,
+            "architect",
+            SpiritRole::Worker,
+            &first.goal,
+            "sound component decomposition",
+            lineage.clone(),
+        ))
+        .await?;
+    eprintln!("smoke-founder-loop-8-4: dispatched design task → architect (FR21 first dispatch)");
+
+    // ── 3. Architect proposes (deterministic), completes, distills its OWN output.
+    let proposal = architect
+        .propose("parse director instruction; build task assignment; attach distillate ref");
+    adapter
+        .deliver_typed(founder_loop_task_complete(
+            "architect",
+            11,
+            &proposal.digest_text(),
+            lineage.clone(),
+        ))
+        .await?;
+    orch.complete_delegation();
+    let design_ref =
+        founder_loop_producer_distill(&tl, &memory, 30, "design-proposal", &proposal.digest_text())?;
+    eprintln!(
+        "smoke-founder-loop-8-4: architect proposed {} components; distilled → distillate {:02x?}…",
+        proposal.components.len(),
+        &design_ref.digest_frame_id[..4]
+    );
+
+    // Safe point re-opened — drain the second instruction.
+    let second = orch
+        .drain_next(|| buffer.dequeue_at_safe_point())
+        .ok_or("second instruction must drain after completion")?;
+    orch.begin_delegation();
+
+    // FR21: dispatch the review task to the Reviewer WITH the distillate (follow-up).
+    adapter
+        .deliver_typed(orch.followup_dispatch(
+            12,
+            "reviewer",
+            SpiritRole::Worker,
+            &second.goal,
+            "actionable critique",
+            design_ref.clone(),
+            lineage.clone(),
+        ))
+        .await?;
+    eprintln!("smoke-founder-loop-8-4: dispatched review task → reviewer (FR21 distillate-fed)");
+
+    // Reviewer critiques (deterministic), completes, distills its OWN critique.
+    let under_review = DesignUnderReview {
+        components: proposal.components.clone(),
+        interfaces: proposal.interfaces.clone(),
+        risks: proposal.risks.clone(),
+    };
+    let critique = reviewer.review(&under_review);
+    adapter
+        .deliver_typed(founder_loop_task_complete(
+            "reviewer",
+            13,
+            &critique.digest_text(),
+            lineage.clone(),
+        ))
+        .await?;
+    orch.complete_delegation();
+    let critique_ref = founder_loop_producer_distill(
+        &tl,
+        &memory,
+        31,
+        "design-critique",
+        &critique.digest_text(),
+    )?;
+    eprintln!(
+        "smoke-founder-loop-8-4: reviewer verdict '{}'; critique distilled → flows back through orchestrator",
+        critique.verdict
+    );
+
+    // ── 4. A deliberate raw dispatch (None after a completion) is REJECTED.
+    let raw_payload = orch.build_task_assign("sneak raw output past the gate", "x", None);
+    let raw_frame = orch.assign_frame(14, "architect", SpiritRole::Worker, raw_payload, lineage.clone());
+    match adapter.deliver_typed(raw_frame).await {
+        Err(IacBusError::EOrchestratorDispatchRawOutput { .. }) => eprintln!(
+            "smoke-founder-loop-8-4: deliberate raw dispatch REJECTED (EOrchestratorDispatchRawOutput) — FR21, observable in TL"
+        ),
+        other => {
+            return Err(format!(
+                "smoke-founder-loop-8-4: expected EOrchestratorDispatchRawOutput, got {other:?}"
+            )
+            .into())
+        }
+    }
+
+    // ── 5. CliWrapper Worker — fixture-replayed canned output → CliSubprocessOutput=21 provenance rows.
+    for (i, line) in worker::CANNED_OUTPUT_LINES.iter().enumerate() {
+        let _ = tl.insert_frame_event_with_sender(
+            TlFrameKind::CliSubprocessOutput,
+            0,
+            "worker",
+            "orchestrator",
+            None,
+            "cli.subprocess.output",
+            serde_json::json!({
+                "cli": "worker-cli-fixture",
+                "stream": "stdout",
+                "line": line,
+                "line_no": i + 1,
+            })
+            .to_string()
+            .as_bytes(),
+            FrameOrigin::Kernel,
+        );
+    }
+
+    // ── 6. Halt-and-resume-overnight: snapshot the in-flight buffer via the hot-swap codec.
+    buffer.enqueue(OrchestratorInstruction::new(
+        OrchestratorInstructionId(3),
+        "incorporate the review feedback",
+        3,
+    )?)?;
+    let pending = buffer.recall_all_pending();
+    let snapshot = serde_json::to_vec(&pending)?;
+    const FOUNDER_LOOP_SCHEMA: u32 = 0x0001_0000; // major=1
+    let blob = state_codec::encode(&snapshot, FOUNDER_LOOP_SCHEMA)?;
+    eprintln!(
+        "smoke-founder-loop-8-4: overnight pause — snapshotted {} pending instruction(s) ({} bytes CBOR)",
+        pending.len(),
+        blob.len()
+    );
+    // … the founder sleeps …
+    let envelope = state_codec::decode(&blob, FOUNDER_LOOP_SCHEMA)?;
+    let restored: Vec<OrchestratorInstruction> = serde_json::from_slice(&envelope.payload)?;
+    let resumed = OrchestratorBuffer::new();
+    for inst in &restored {
+        resumed.enqueue(inst.clone())?;
+    }
+    eprintln!(
+        "smoke-founder-loop-8-4: 7am resume — re-enqueued {} instruction(s); in-flight work preserved",
+        resumed.pending_count()
+    );
+    if resumed.pending_count() != pending.len() {
+        return Err("halt-and-resume did not preserve the buffered work".into());
+    }
+
+    // ── 7. Morning digest cites ACTUAL source_log_refs (FR17 path) resolving in the real TL.
+    let mut citations = Vec::new();
+    for r in [&design_ref, &critique_ref] {
+        let row = tl
+            .query_frame_by_id(r.digest_frame_id)?
+            .ok_or("a cited distillate must resolve against the real Transparency Log")?;
+        if !matches!(row.kind, TlFrameKind::Distillate) {
+            return Err("a citation must resolve to a real Distillate row, not a synthetic one".into());
+        }
+        citations.push(r.digest_frame_id);
+    }
+    eprintln!(
+        "smoke-founder-loop-8-4: morning digest cites {} distillate source_log_ref(s), all resolving against the real Transparency Log",
+        citations.len()
+    );
+
+    // ── Verify the Transparency-Log state.
+    let task_assigns = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::TaskAssign),
+        ..Default::default()
+    })?;
+    let distillates = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::Distillate),
+        ..Default::default()
+    })?;
+    let cli_rows = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::CliSubprocessOutput),
+        ..Default::default()
+    })?;
+    eprintln!(
+        "smoke-founder-loop-8-4: TL state — {} TaskAssign / {} Distillate / {} CliSubprocessOutput rows",
+        task_assigns.len(),
+        distillates.len(),
+        cli_rows.len()
+    );
+    if distillates.len() < 2 {
+        return Err(format!(
+            "smoke-founder-loop-8-4: expected ≥2 Distillate rows, got {}",
+            distillates.len()
+        )
+        .into());
+    }
+
+    eprintln!(
+        "smoke-founder-loop-8-4: ✅ founder-loop wedge complete — 11pm assign → overnight distillate dispatch → halt-and-resume → 7am digest cites real log refs"
     );
     Ok(())
 }

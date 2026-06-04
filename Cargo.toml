@@ -34,6 +34,10 @@ members = [
     "spirits/butler",
     "spirits/researcher",
     "spirits/observer",
+    "spirits/orchestrator",
+    "spirits/worker",
+    "spirits/architect",
+    "spirits/reviewer",
 ]
 default-members = []
 exclude = ["templates", "templates/spirit-ts"]

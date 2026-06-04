@@ -1,0 +1,25 @@
+{
+  "description": "Architect deterministic design-spec fixtures (Story 8.4, Decision E). Each case is a task spec + the expected component count + whether risks are flagged. propose() is seeded/bit-identical, so these are stable. SHA-pinned by tests/fixtures_pin.rs.",
+  "cases": [
+    {
+      "spec": "parse input; validate schema; persist record",
+      "expected_components": 3,
+      "expects_risks": false
+    },
+    {
+      "spec": "mutate global counter; read config",
+      "expected_components": 2,
+      "expects_risks": true
+    },
+    {
+      "spec": "design the founder loop",
+      "expected_components": 4,
+      "expects_risks": false
+    },
+    {
+      "spec": "",
+      "expected_components": 1,
+      "expects_risks": false
+    }
+  ]
+}

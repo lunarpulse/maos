@@ -1,0 +1,25 @@
+[package]
+name = "orchestrator"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "MAOS Orchestrator v0.8 — founder-loop wedge coordinator reference Spirit: drains the real FR20 OrchestratorBuffer at safe sequence points (never preempts an in-flight delegation), builds distillate-fed task.assign dispatches (FR21 — ALWAYS a PriorDistillateRef, NEVER raw output), and drives the Architect→Reviewer code-review loop. rust-inproc [class], posture autonomous-with-halt. Story 8.4."
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner"] }
+maos-spirit-abi = { path = "../../crates/maos-spirit-abi" }
+maos-domain = { path = "../../crates/maos-domain" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+smallvec = "1"
+
+[dev-dependencies]
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner", "mock", "spirit_test"] }
+maos-kernel-core = { path = "../../crates/maos-kernel-core" }
+maos-manifest = { path = "../../crates/maos-manifest" }
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time", "sync"] }
+sha2 = "0.10"
+toml = "0.8"

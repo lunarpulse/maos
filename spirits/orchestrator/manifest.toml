@@ -1,0 +1,48 @@
+[class]
+name = "orchestrator"
+version = "0.8.0"
+abi = "1.0"
+manifest_schema_version = 2
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "MAOS Orchestrator v0.8 reference Spirit — founder-loop wedge coordinator. Drains the FR20 OrchestratorBuffer at safe sequence points (never preempts an in-flight delegation) and dispatches distillate-fed task.assign frames (FR21: always a PriorDistillateRef, never raw output). Dispatch decision is Spirit-side; the kernel buffer + FR21 gate are consumed, not modified. Posture autonomous-with-halt, halt policy preferring recall over precision (§6.7)."
+
+[posture]
+default = "autonomous-with-halt"
+allowed_max = "autonomous-with-halt"
+
+[output_shape]
+required_fields = ["target_role", "goal", "has_distillate_ref", "distillation_depth"]
+
+[budget]
+context_window_size = 8192
+time_cap_seconds = 30
+
+[resources]
+cpu_max_pct = 15
+memory_max_mb = 128
+
+[sandbox]
+tier = "T2"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"
+
+# Halt policy preferring RECALL over precision (§6.7): the Orchestrator halts
+# readily (low ambiguity threshold) rather than dispatching on an uncertain
+# safe-point decision. No [capabilities.required] — dispatch is deterministic
+# (Decision E; provider.complete omitted, the halt path needs no inference).
+[epistemic_policy]
+default_action = "verbalize_only"
+
+[[epistemic_policy.rules]]
+tag = "dispatch_ambiguity"
+action = "halt"
+on_value_above = { threshold = 0.5 }
+
+[[epistemic_policy.rules]]
+tag = "delegation_confidence"
+action = "halt"
+on_value_below = { threshold = 0.6 }
