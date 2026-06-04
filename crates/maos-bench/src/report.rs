@@ -110,6 +110,8 @@ pub struct DecisionRecord {
     pub j1_p95_met: bool,
     #[doc = "Construct via [`DecisionRecord::new`]."]
     pub j4_p95_met: bool,
+    #[doc = "Construct via [`DecisionRecord::new`]."]
+    pub j6_p95_met: bool,
     #[doc = "Construct via [`DecisionRecord::new`] — human-readable explanation linking numbers to decision."]
     pub rationale: String,
     #[doc = "Construct via [`DecisionRecord::new`] — 'ADR-040'."]
@@ -121,6 +123,7 @@ impl DecisionRecord {
         outcome: String,
         j1_p95_met: bool,
         j4_p95_met: bool,
+        j6_p95_met: bool,
         rationale: String,
         adr_id: String,
     ) -> Self {
@@ -128,6 +131,7 @@ impl DecisionRecord {
             outcome,
             j1_p95_met,
             j4_p95_met,
+            j6_p95_met,
             rationale,
             adr_id,
         }
@@ -144,6 +148,7 @@ mod tests {
         let j4 = JourneyResult::new("J4".into(), 1000, 2000, 7000, 12000, 20000, 6000, 2000, true);
         let dr = DecisionRecord::new(
             "defer-rust-inproc-to-v2.0+".into(),
+            true,
             true,
             true,
             "both budgets met".into(),

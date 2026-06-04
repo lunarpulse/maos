@@ -1,0 +1,18 @@
+[
+  {
+    "subject": "checkout-api",
+    "metric": "error_rate",
+    "observed": 0.42,
+    "baseline": 0.30,
+    "detail": "error-rate spike following the 23:14 deploy; matches a known regression pattern",
+    "source_log_ref": "tl:row:1001"
+  },
+  {
+    "subject": "edge-cache",
+    "metric": "novel_entropy_drift",
+    "observed": 0.91,
+    "baseline": 0.10,
+    "detail": "unrecognised entropy drift on the prod-edge cache; no known diagnostic pattern — Mira's epistemic boundary",
+    "source_log_ref": "tl:row:2002"
+  }
+]

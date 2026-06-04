@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! section_13_1 — Criterion benchmark for §13.1 J0 + J1 + J4 + J-Researcher
+//! section_13_1 — Criterion benchmark for §13.1 J0 + J1 + J4 + J6 + J-Researcher
 //! measurement journeys.
 //!
 //! Run via:
@@ -65,6 +65,21 @@ fn bench_j4(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_j6(c: &mut Criterion) {
+    let mut group = c.benchmark_group("section_13_1_j6");
+    group.sample_size(10);
+    group.warm_up_time(Duration::from_secs(1));
+    group.measurement_time(Duration::from_secs(30));
+
+    group.bench_function("j6_diego_cold_start", |b| {
+        b.iter(|| {
+            let _ = maos_bench::harness::j6::run_j6_smoke();
+        });
+    });
+
+    group.finish();
+}
+
 fn bench_j_researcher(c: &mut Criterion) {
     let mut group = c.benchmark_group("section_13_1_j_researcher");
     group.sample_size(10);
@@ -80,5 +95,5 @@ fn bench_j_researcher(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_j0, bench_j1, bench_j4, bench_j_researcher);
+criterion_group!(benches, bench_j0, bench_j1, bench_j4, bench_j6, bench_j_researcher);
 criterion_main!(benches);

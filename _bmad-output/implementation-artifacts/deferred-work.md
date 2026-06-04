@@ -213,3 +213,14 @@ dev_model_used: claude-opus-4-7
 - `incorporate_scalar` truncates precision via `event.value as f32` then stores back as `f64` — precision loss is acceptable for epistemic-policy scalar thresholds which operate at 0.1 granularity.
 - `bibliography` may contain duplicate entries — no deduplication on push; minor issue, same pattern as other Spirit outputs.
 - Aggregate `needs` array continues unmaintainable growth — appending `researcher-tests` to 80+ item single-line `needs` array. Pre-existing CI pattern across all workflow jobs.
+
+## Deferred from: code review of 8-5-ship-the-mira-nash-diagnostic-architect-bilateral-pair-with-safety-critical-corpus (2026-06-04)
+
+- HaltFlow::submit_resolution partial failure (resolved-but-unjournaled) — If `resolver.resolve()` succeeds but `journal.journal_halt_resolution()` fails, halt is resolved in registry but has no audit journal row. `crates/maos-director-surface/src/halt_ui.rs:71-80` — pre-existing, not introduced by this change.
+- NotificationDispatcher swallows all channel errors — `dispatch()` counts `Err(_)` in `report.errors` but does not propagate, log, or identify which channel failed. `crates/maos-director-surface/src/notification.rs:62-81` — pre-existing, not introduced by this change.
+- A2A un-pinned peer path untested — `verify_pinned` returns `EPinMismatch::NotPinned` if peer never pinned. All new tests call `pin_first_contact` before routing. `crates/maos-a2a/src/tofu.rs:196-200` — pre-existing, not introduced by this change.
+- A2A timeout leaves handle_intake future dangling — `tokio::time::timeout(timeout, intake_fut).await` returns `PartitionTimeout` on expiry, but `handle_intake` may still be executing. `crates/maos-a2a/src/adapter.rs:289-298` — pre-existing, not introduced by this change.
+- install_intake_sink is racy with in-flight frames — Sink replaced under `tokio::sync::Mutex`, but frames already accepted by `handle_intake` and awaiting sink access could be dropped. `crates/maos-a2a/src/adapter.rs:115-121` — pre-existing, not introduced by this change.
+- LoopbackA2ARouter duplicate peer_id silently overwrites — `LoopbackA2ARouter::new` logs warning and overwrites on duplicate `peer_id`. `crates/maos-a2a/src/adapter.rs:97-102` — pre-existing, not introduced by this change.
+- A2A handle_intake boot_nonce restart detection races on invalidation — `invalidate_for_restart` called; if NACK lost, peer could retry with old boot_nonce. `crates/maos-a2a/src/adapter.rs:383-423` — pre-existing, not introduced by this change.
+- Consent intent taxonomy gap — `ConsentAllowlists` accepts free-form `A2AIntent` strings, but `frame_intent_str()` only projects to `"highprivilege"` / `"standard"` / `"readonly"`. Specific intent like `"diagnostic.advisory"` would silently never match. Acknowledged substrate gap in story doc Ruling 1.

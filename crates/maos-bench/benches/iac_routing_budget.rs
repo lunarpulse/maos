@@ -156,7 +156,8 @@ fn iac_routing_bench(c: &mut Criterion) {
         DecisionRecord::new(
             if journey.budget_met { "pass" } else { "soft-fail" }.into(),
             journey.budget_met,
-            true, // not relevant for this bench
+            true, // j4 not measured here
+            true, // j6 not measured here
             format!(
                 "iac-routing p95={}us budget={}us",
                 journey.p95_us, P95_BUDGET_US

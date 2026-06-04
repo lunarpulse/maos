@@ -1,0 +1,39 @@
+[package]
+name = "mira"
+version = "1.5.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "MAOS Mira v1.5 — prod-edge diagnostic reference Spirit and Host A of the Story 8.5 bilateral pair. A specialized Worker (SpiritRole::Worker) that diagnoses prod-edge anomalies deterministically, fires an epistemic halt at its diagnostic-confidence boundary, and informs Nash (Host B) via an A2A typed-intent advisory over the real LoopbackA2ARouter. Zero kernel KLOC."
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+# Spirit-side surface ONLY (Story 0.2 zero-kernel-KLOC invariant): the SDK + ABI
+# for the #[spirit] macro/hook, and the PURE `maos-domain` types Mira composes
+# (the §7.4 EpistemicHaltPayload it raises at its halt boundary). NONE of these is
+# `maos-kernel-core`/`maos-a2a`/`maos-director-surface`.
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner"] }
+maos-spirit-abi = { path = "../../crates/maos-spirit-abi" }
+maos-domain = { path = "../../crates/maos-domain" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+# Test-only adapters used to PROVE the integration against the REAL substrate:
+# the real LoopbackA2ARouter (A2A bilateral pairing + TOFU + ADR-012 consent),
+# the real NotificationDispatcher (halt → mobile-push surface), the real three-tap
+# HaltFlow + KernelHaltResolver (halt resolution + journal), and Nash (the Host B
+# peer). Dev-deps do NOT enter the `check-service-boundary` kernel surface (that
+# gate inspects maos-kernel-core only — Story 8.1–8.4 Dev Agent Record).
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner", "mock", "spirit_test"] }
+maos-kernel-core = { path = "../../crates/maos-kernel-core" }
+maos-director-surface = { path = "../../crates/maos-director-surface" }
+maos-a2a = { path = "../../crates/maos-a2a" }
+maos-manifest = { path = "../../crates/maos-manifest" }
+nash = { path = "../nash" }
+tokio = { version = "1", features = ["macros", "rt", "time", "sync"] }
+smallvec = "1"
+sha2 = "0.10"
+tempfile = "3"
+toml = "0.8"

@@ -52,7 +52,8 @@ E7 Spirit Ecosystem
 
 E8 Reference Spirits
 ├──→ E9 (audit queries validated against reference-Spirit production traces)
-└──→ E10 (Butler/Researcher/Orchestrator+Workers/Mira+Nash gate the v1.0 + v1.5 ship)
+├──→ E10 (Butler/Researcher/Orchestrator+Workers/Mira+Nash gate the v1.0 + v1.5 ship)
+└──→ Story 8.6 (live maos-a2a-tcp cross-Host transport, over a new maos-a2a-core seam; workspace 37→39) DEPENDS ON: Story 8.5 (loopback-simulated pair) + Story 6.3 (A2A mesh). Split from 8.5 (2026-06-04): live two-process mTLS/TCP transport, own security-critical risk class; introduces maos-a2a-core by extraction (resolves maos-a2a 1500-LOC overage + the transport-trait seam in one move).
 
 E9 Audit + Compliance + Operator Productionization
 └──→ E10 (multi-operator tenancy primitive-reservation declared here; full impl v1.5+ in Story 10.4)
@@ -67,4 +68,4 @@ E10 v1.0 Ship Gate + v1.5 Collective Tier
 2. **v0.5 sprint:** Stories 5.1–5.4 → Story 5.5e (§13.1 go/no-go) → Stories 8.2, 8.3 (Researcher, Observer)
 3. **v0.8/v0.9 sprint:** Story 5.2 (HSIS 200 corpus) → Stories 6.1–6.5 → Story 8.4 (Orchestrator + Workers)
 4. **v1.0 sprint:** Stories 7.1–7.5a → Story 7.3 (CCAC 600) → Story 9.6 (red-team 80→640 generator) → Story 10.1 (HSIS verification + CCAC cross-validation + pen-test) → Story 10.2 (third-party trial + adversarial red-team execution) → Story 10.3 (export-control + manifest fuzz + wire fuzz + Korean docs)
-5. **v1.5 sprint:** Story 10.4 (Postgres Loom-lite + Mira+Nash + SQLite→Postgres migration) → Story 10.5 (skill-format conformance + JetBrains + Windows + 2-year LTS + Japanese/CN-S i18n) → Story 8.5 (Mira+Nash safety-critical corpus 150 + κ≥0.7)
+5. **v1.5 sprint:** Story 10.4 (Postgres Loom-lite + Mira+Nash + SQLite→Postgres migration) → Story 10.5 (skill-format conformance + JetBrains + Windows + 2-year LTS + Japanese/CN-S i18n) → Story 8.5 (Mira+Nash safety-critical corpus 150 + κ≥0.7) → Story 8.6 (live maos-a2a-tcp cross-Host two-process mTLS/TCP transport)

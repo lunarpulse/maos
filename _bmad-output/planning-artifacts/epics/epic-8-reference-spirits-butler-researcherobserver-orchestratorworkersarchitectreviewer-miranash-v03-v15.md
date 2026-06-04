@@ -194,4 +194,137 @@ So that the v1.5 release ships the bilateral-pair user journey (J4) as a working
 **Then** the cold-load completes within 500ms
 **And** the budget is reported per release
 
+## Story 8.6: Ship the Live Cross-Host A2A TCP/mTLS Transport (`maos-a2a-tcp`)
+
+> **Split from Story 8.5 (2026-06-04); ACs hardened via architecture+test roundtable (2026-06-04).**
+> Story creation found the live `A2AProfile::CrossHost` transport FULLY ABSENT (`LoopbackA2ARouter`
+> is in-memory `mpsc` only; no socket code; the CrossHost enum is never dispatched; "v0.7 TCP
+> connector"/"deferred" markers in `maos-a2a`). Story 8.5 ships the **loopback-simulated** bilateral
+> pair (the cross-Host *protocol*: pre-paired fingerprints, TOFU, ADR-012 consent, rotation chaos);
+> this story ships the live two-process *transport* — a distinct, **security-critical networking**
+> risk class. Depends on Story 8.5 + Story 6.3.
+>
+> **Structural decision (LOCKED — Winston):** the seam is introduced by **extraction, not insertion**.
+> A new `maos-a2a-core` crate is carved out to own `trait A2ATransport` + the transport-agnostic
+> protocol substrate; `maos-a2a` keeps only `LoopbackA2ARouter` (re-exporting from core for
+> backward-compat); `maos-a2a-tcp` depends ONLY on `maos-a2a-core`. This resolves the `maos-a2a`
+> 1500-LOC ceiling overage (currently 2550) AND the in-memory-vs-wire seam in one move, and keeps the
+> wire crate's dep graph free of the loopback router. **Workspace count therefore moves 37 → 39**
+> (`maos-a2a-core` + `maos-a2a-tcp`), not 37 → 38.
+>
+> **OPEN FORK (flag for Winston at story-prep):** `ca_roots` posture (AC-A5). If `ca_roots = None`,
+> TOFU pinning is the *sole* trust anchor (pin-only); if `Some(bundle)`, it is CA-chain **plus** pin
+> (defense-in-depth). This is a security-posture decision, not a default — decide before red-phase.
+
+As a v1.5 operator running Mira and Nash on two separate Hosts,
+I want the live `A2AProfile::CrossHost` transport — a real TCP listener/dialer with operator-managed
+mTLS (custom TOFU-pinning cert verification), length-delimited JSON-RPC framing over the socket,
+handshake retry, and real partition-timeout behavior — shipped as a NEW `maos-a2a-tcp` crate over a
+freshly-extracted `maos-a2a-core` seam,
+So that the bilateral pair coordinates over a genuine two-process network connection (not the
+in-process loopback simulation Story 8.5 ships), realizing FR23b cross-Host at v1.5 with the TOFU
+security model actually enforced on the wire.
+
+### Architecture / Structure ACs (AC-A1–AC-A7 — Winston)
+
+**AC-A1 — Extract `maos-a2a-core`; define the transport seam there; resolve the ceiling by extraction**
+**Given** `maos-a2a` is at 2550 lines against its own 1500 ceiling and owns both protocol substrate and the in-memory router
+**When** Story 8.6 lands
+**Then** a NEW crate `maos-a2a-core` at `crates/maos-a2a-core/` owns the transport-agnostic surface: it declares `pub trait A2ATransport` with at minimum `async fn dispatch(&self, peer: PeerId, frame: A2AJsonRpcRequest) -> Result<A2ANack, TransportError>` and a `fn local_addr(&self) -> Option<SocketAddr>` readiness hook (signature confirmed against the real `CrossHost` dispatch match — cite the `maos-a2a` `adapter.rs` file:line and bind the trait method to it); it **moves (not copies)** the shared substrate (`A2AJsonRpcRequest::try_from_bytes`, `handle_intake` + its types, `HandshakeRetryPolicy`, `RotationDrillReport`, TOFU `verify_pinned` + `InMemoryTofuPinStore`, `boot_nonce`, `LamportClock`/`logical_clock`, the `CODE_PARSE_ERROR` constructor) — ALL `pub` at the core root (the surface ABOVE the seam)
+**And** `maos-a2a` retains ONLY `LoopbackA2ARouter` as `impl A2ATransport`, depends on `maos-a2a-core`, and `pub use`-re-exports the moved symbols so no downstream import path breaks
+**And** after extraction `kloc-check` is GREEN for BOTH `maos-a2a` (now < 1500) and `maos-a2a-core` (ceiling set in the kloc manifest; record the post-extraction count in evidence), with NO ceiling bump to any existing crate
+
+**AC-A2 — `maos-a2a-tcp` is the second `A2ATransport` impl; dependency arrow points only at core**
+**Given** the seam from AC-A1
+**When** the wire crate is created
+**Then** a NEW crate `maos-a2a-tcp` at `crates/maos-a2a-tcp/` declares `pub struct TcpA2ATransport` with `impl A2ATransport`, and its `Cargo.toml` lists `maos-a2a-core` (NOT `maos-a2a`, NOT `maos-kernel-core`) + `tokio`, `tokio-rustls`, `rustls`, `tokio-util` (codec feature) as its only first-party/transport deps
+**And** `maos-a2a-core` contains ZERO references to `TcpListener`/`TcpStream`/`tokio_util`/`tokio_rustls` (grep-asserted — interlocks with AC-T13)
+**And** the workspace member count moves **37 → 39** exactly (`cargo metadata` member-count assertion pinned), and `abi-diff` is **Added-only** (the AC-A1 `pub use` re-exports preserve symbol paths so nothing reads as Removed)
+
+**AC-A3 — `TofuPinningVerifier`: named deliverable bridging WebPKI into `verify_pinned`**
+**Given** stock `WebPkiServerVerifier`/`WebPkiClientVerifier` would terminate the cert decision without consulting the pin store
+**When** a live mTLS connection is established by `TcpA2ATransport`
+**Then** `maos-a2a-tcp` provides a NEW named type `TofuPinningVerifier` implementing `rustls::client::danger::ServerCertVerifier` (dialing side) AND a `rustls::server::danger::ClientCertVerifier` twin (listening side) — **both directions MUST pin**; each `verify_*_cert` FIRST performs WebPKI structural/chain validation (delegating to a wrapped stock verifier) and ONLY on success calls `maos_a2a_core::verify_pinned` against the leaf fingerprint + `InMemoryTofuPinStore`, returning `rustls::Error` on mismatch
+**And** it is wired via `.dangerous().with_custom_certificate_verifier(...)` so it runs on the REAL handshake (not post-connection), consuming the EXISTING `verify_pinned` signature unchanged (AC-A6)
+**And** the WebPKI-then-pin ordering is deliberate: an expired/malformed cert is rejected before the pin is consulted, preserving the `CERTIFICATE_EXPIRED` retry path (AC-T5)
+
+**AC-A4 — `LengthDelimitedCodec` framing between socket and `try_from_bytes`**
+**Given** TCP is a byte stream with no message boundaries and `try_from_bytes` expects one complete frame
+**When** `TcpA2ATransport` reads from / writes to a `tokio_rustls` stream
+**Then** it wraps the stream in `tokio_util::codec::Framed` with `LengthDelimitedCodec` (4-byte big-endian `u32` length prefix, explicit `max_frame_length` cap — name a concrete bound, e.g. 1 MiB); each inbound decoded frame is handed to `A2AJsonRpcRequest::try_from_bytes` → `handle_intake`; a frame that decodes structurally but fails JSON parse yields `CODE_PARSE_ERROR` (interlocks AC-T2)
+**And** length-prefix framing is the ONLY message-boundary mechanism — no newline-delimited or read-to-EOF fallback exists (grep-asserted)
+
+**AC-A5 — Cert/PKI provisioning, config schema, and `maos-bin` binding**
+**Given** v0.6 uses operator-supplied PEM (no embedded CA, no auto-issuance)
+**When** a `maos-bin` daemon enables the TCP transport
+**Then** a `TcpA2AConfig` struct (deserialized via the existing config layer) is defined with EXACTLY these fields: `listen_addr: SocketAddr` (`:0` in tests, readback via `local_addr` — AC-T/H3); `own_cert_chain: PathBuf` (PEM); `own_private_key: PathBuf` (PKCS#8 PEM); `peer_pins: Vec<PinnedFingerprint>` (pre-paired peer leaf-cert fingerprints loaded into `InMemoryTofuPinStore` at startup — this makes ADR-012 "pre-paired fingerprints" real); `handshake_timeout: Duration` (default 30s, MUST be injectable — AC-T/H5); `ca_roots: Option<PathBuf>` (WebPKI trust bundle; `None` ⇒ pinning is sole anchor — **OPEN FORK, see header**)
+**And** `maos-bin` gains a daemon-mode binding that, when `TcpA2AConfig` is present, constructs `TcpA2ATransport`, registers it as the `A2ATransport` for `CrossHost` dispatch, and binds the listener — with `maos-kernel-core` receiving NO new public fn (the registration reuses existing Spirit/router wiring); the AC names the `maos-bin` file where the binding lands
+
+**AC-A6 — No protocol-surface churn: 8.5's signatures consumed unchanged**
+**Given** Story 8.5 proved the cross-Host protocol in-memory and 8.6 must add "only the WIRE"
+**When** `maos-a2a-tcp` consumes the protocol substrate
+**Then** the 8.5-frozen signatures are called byte-identically (asserted by an `abi-diff` of `maos-a2a-core`'s public surface showing them **unchanged** — not Added/Removed/Modified): `verify_pinned(...)`; the ADR-012 consent fn (consent rides the EXISTING JSON-RPC field, NOT a new TCP-specific field); `handle_intake(...)` and `A2AJsonRpcRequest::try_from_bytes(...)`; `boot_nonce` + the Lamport `logical_clock` travel in the EXISTING JSON-RPC field where 8.5 placed them (cite the literal field name), with no re-wrapping
+**And** if any of these would require a signature change to make TCP work, that is a RED flag the seam (AC-A1) is misplaced — the change is rejected and the seam is moved instead
+
+> **Noted gap — consent vocabulary vs enforcement granularity (Winston, 2026-06-04; DEFERRED beyond 8.6's no-churn scope).** Story 8.5 surfaced that `ConsentAllowlists` holds a free-form `Vec<A2AIntent>` (open vocabulary) but the router enforces consent by matching only `frame.intent.a2a_consent_intent_str()` — the 3-value `IntentClass` projection `{highprivilege, standard, readonly}` (`maos-a2a/src/adapter.rs:144-164`). Consequence: an operator can write a specific intent like `A2AIntent::new("diagnosis-handoff:read-only-evidence")` or `"rca-summary"` into an allowlist (as the `smoke-a2a-loopback-6-3` arm aspirationally does) and it will **silently never match** — ADR-012 is, today, "typed-*class* consent," not fine-grained typed-intent consent. **This is NOT 8.6 work:** 8.6 is deliberately churn-free (AC-A6 — a consent-fn signature change is a RED flag), and `maos-a2a-core` must consume 8.5's signatures byte-identically. The note lives here because 8.6 is the moment the protocol crate reopens (`maos-a2a` → `maos-a2a-core` + `maos-a2a-tcp`), so a future **consent-vocabulary story** (widen the intent taxonomy, or match a real per-frame intent field instead of the 3-band projection — an ADR-012 refinement) should be scoped *after* 8.6 lands the seam, against `maos-a2a-core`. Until then the coarse 3-band gate is the accepted v1.5 behavior; mitigation is the clarifying note in Story 8.5's Dev Agent Record. **Recommended:** open this as a v1.5+ backlog story once 8.6 establishes `maos-a2a-core`.
+
+**AC-A7 — Kernel-KLOC zero-delta + doc reconciliation**
+**Given** the zero-kernel-KLOC mandate
+**When** 8.6 lands
+**Then** `maos-kernel-core` is **byte-identical** to its pre-story state (assert exact equality, as Story 8.4 did with 15505 — interlocks AC-T12); the kernel-KLOC sentinel is GREEN; `4-kernel-design.md` is reconciled to describe `maos-a2a-core` (protocol seam) + `maos-a2a-tcp` (live wire) with the dependency arrows `maos-a2a-tcp → maos-a2a-core ← maos-a2a` drawn explicitly; all discipline gates GREEN at HEAD (not flipped-while-red)
+
+### Test harness preconditions (H1–H6 — Murat; referenced by every AC-T below)
+
+- **H1 — Time-relative cert fixtures (rcgen, generated at setup, never committed).** A helper `mk_cert(role, not_before_offset, not_after_offset)` issues certs at test-setup via `rcgen`, offsets from a single `T0 = SystemTime::now()` captured once per test: at minimum `valid` (T0−1h..T0+1h), `expired` (T0−2h..T0−1h), `not_yet_valid` (T0+1h..T0+2h) issued by `ca_good`, plus an independent `ca_evil` root. **No dated `.pem` committed.** Guard: `git ls-files` under the test dir yields zero `*.pem`/`*.crt`/`*.key`.
+- **H2 — Single pinned clock.** TLS validation wall-clock and the rotation-drill injected clock are the SAME injected `Clock` (default `T0`). Guard: shared-`Arc` identity check; no test reads `SystemTime::now()` after `T0` for an expiry decision.
+- **H3 — Ephemeral port + readback.** Listeners bind `127.0.0.1:0`; the test reads `local_addr()` and dials THAT. Guard: no host:port literal in networking tests except `:0`.
+- **H4 — Readiness handshake, not sleep.** Server sends its resolved `SocketAddr` over a `oneshot` AFTER `local_addr()` succeeds; client awaits before dialing. Guard: zero `sleep` in setup paths (any present must be `tokio::time::advance` under `start_paused`).
+- **H5 — Injectable timeouts.** Intake/handshake/idle timeouts are constructor params with a `test_profile()` ≤ 250ms (the 30s prod default lives only behind the prod constructor); timeout-path tests complete `< 2s` wall.
+- **H6 — Deterministic teardown.** Every spawned process uses `Command::kill_on_drop(true)`; every spawned task is held by a `JoinHandle` aborted in a drop guard. Guard: a teardown-leak test spawns→drops→asserts the bound port is re-bindable within 250ms.
+
+### Test / Risk ACs (AC-T1–AC-T13 — Murat)
+
+**AC-T1 — Live mTLS round-trip over a real socket (happy path; replaces the AC3 intake half)**
+**Given** two endpoints bound `127.0.0.1:0` (H3), pre-paired fingerprints, `valid`/`ca_good` certs (H1) under the pinned clock (H2)
+**When** the client dials the readback address (H4), completes the mTLS handshake, sends one well-formed `CrossHost` consent frame (ADR-012)
+**Then** `handle_intake` returns ACK; the decoded frame's `boot_nonce` and Lamport timestamp are **byte-equal** to sent; the server-observed peer fingerprint equals the pinned fingerprint. **Oracle:** `ack.code == ACK`; `decoded.boot_nonce == sent.boot_nonce`; `decoded.lamport == sent.lamport`; `observed_fp == pinned_fp`. No latency assertion. First test exercising a real handshake — gates everything below.
+
+**AC-T2 — Malformed frame over a live, authenticated connection → typed NACK**
+**Given** an established mTLS connection (AC-T1) **When** the client sends bytes that fail `try_from_bytes` (induce: truncate a valid frame to half its length-delimited payload; variant 2: corrupted discriminant byte) **Then** the server replies `NACK{code: CODE_PARSE_ERROR}` and the connection stays open for a subsequent valid frame. **Oracle:** `nack.code == CODE_PARSE_ERROR` both variants; a follow-up valid frame on the same connection returns ACK (codec resynced / not poisoned).
+
+**AC-T3 — TOFU pin mismatch (valid cert, wrong identity) → handshake REJECTED *(MANDATORY — whole security model)***
+**Given** the server presents a `valid`/`ca_good` cert whose fingerprint is NOT pinned (pin `fp_A`, server presents `fp_B ≠ fp_A`) **When** the client dials and `TofuPinningVerifier` runs `verify_pinned` **Then** the handshake fails **before any application frame**, the client surfaces a pin-mismatch error, and `handle_intake` is never entered. **Oracle:** dial returns `Err` classified as TOFU pin mismatch (NOT generic IO); server `intake_entered: AtomicUsize == 0`; **no NACK frame** (rejection at TLS layer) — app read side observes connection-closed. Primary negative test for AC-A3's verifier.
+
+**AC-T4 — Wrong CA (valid-but-untrusted root) → handshake REJECTED**
+**Given** the server presents a `ca_evil`-issued cert, otherwise well-formed and in-validity **When** the client dials **Then** the WebPKI layer of `TofuPinningVerifier` rejects the chain before TOFU is consulted. **Oracle:** dial `Err` = bad-cert/untrusted-issuer; `intake_entered == 0`; connection-closed. Asserts WebPKI→TOFU ordering: untrusted-CA rejected even if a fingerprint were coincidentally pinned.
+
+**AC-T5 — Expired / not-yet-valid cert → REJECTED, retry policy engages on cert codes**
+**Given** the server presents `expired` (and case 2: `not_yet_valid`) under the pinned clock T0 (H2) **When** the client dials with `HandshakeRetryPolicy` (test_profile backoff, ≤3 attempts) **Then** the handshake fails with the cert-expiry/not-yet-valid code, `HandshakeRetryPolicy` retries (these ARE its codes), and after exhausting attempts the client surfaces a terminal cert error. **Oracle:** observed retries `== policy.max_attempts` (proves retry fired on `CERTIFICATE_EXPIRED`); terminal `Err` cert-class; `intake_entered == 0`. Pinned clock ⇒ no slow-runner flake.
+
+**AC-T6 — MITM cert-swap after pin (TOFU defends rotation) → REJECTED**
+**Given** the client has pinned `fp_A` from a prior connection (run AC-T1) **When** a new connection presents `fp_C ≠ fp_A` issued by `ca_good` **Then** `verify_pinned` rejects despite WebPKI success. **Oracle:** dial `Err` (TOFU mismatch); `intake_entered == 0`; pin store still holds `fp_A` (`store.get(peer_id) == fp_A` — not silently overwritten). Distinct from AC-T3: here a valid prior pin exists and must win.
+
+**AC-T7 — Slow-loris / stalling intake → bounded timeout, task does NOT hang *(MANDATORY — the test 8.5 deferred twice)***
+**Given** an authenticated connection (AC-T1) and intake timeout ≤ 250ms (H5) **When** the client (a) advertises N bytes and stalls after N−1; (b) sends zero application bytes; (c) dribbles one byte every 100ms past the idle timeout **Then** the server aborts intake within the timeout, replies `NACK{code: CODE_TIMEOUT}` (or closes if past handshake — per AC-A4 framing), and the intake task **completes** (not leaked). **Oracle:** whole test completes `< 2s` (H5); the server intake `JoinHandle::is_finished() == true` after the window; no growth in an active-intake gauge after teardown. **No third deferral.**
+
+**AC-T8 — Oversized / unbounded frame → rejected before allocation blow-up**
+**Given** an authenticated connection **When** the client advertises a length-delimited frame exceeding the codec cap (header claims `MAX+1`) **Then** the server rejects with `NACK{code: CODE_FRAME_TOO_LARGE}` (or AC-A4's codec cap error) without buffering the full payload. **Oracle:** `nack.code` is the cap code; peak intake buffer ≤ cap (test allocator counter, OR assert the reject fires after only the header is sent). No OOM, no hang.
+
+**AC-T9 — Plaintext client hits the TLS port → rejected, no panic, no hang**
+**Given** the server listening for mTLS **When** a raw `TcpStream` writes plaintext bytes (no ClientHello) **Then** the rustls handshake fails, the connection closes within the handshake timeout, `handle_intake` is never entered, and the server survives to accept a subsequent valid mTLS connection. **Oracle:** `intake_entered == 0`; a follow-up real mTLS connection on the same listener succeeds (accept loop didn't die); `< 2s`.
+
+**AC-T10 — Half-open connection (client drops mid-handshake / mid-frame) → cleaned up**
+**Given** the server listening **When** the client establishes TCP, begins TLS, then drops (`drop(stream)` after partial ClientHello) **Then** the per-connection task observes EOF/reset and terminates without leaking. **Oracle:** active-connection gauge returns to its pre-connection value within the timeout; accept loop still live (follow-up valid connection succeeds).
+
+**AC-T11 — REAL-socket cert-rotation chaos as its OWN AC (extracted from the old AC4)**
+**Given** a 3-endpoint topology (H3/H4) over **real sockets and real TLS handshakes** — explicitly NOT the synthetic `RotationDrillReport` timing model — under the single pinned clock (H2), with `mk_cert` issuing `fp_old`/`fp_new` at deterministic offsets **When** the drill rotates each endpoint's serving cert `fp_old → fp_new` while peers hold live pins and re-pin per the documented rotation protocol **Then** during the window each dial either succeeds against an already-re-pinned peer OR fails TOFU-mismatch and engages `HandshakeRetryPolicy`, and after the window all endpoints converge to `fp_new` pins with the connectivity matrix fully green. **Oracle:** final pin-store state on all 3 == `fp_new`; full NxN reachability ACK post-convergence; retry counters bounded by `max_attempts`; grep guard `RotationDrillReport` NOT referenced in this AC's module (it is the OLD class). **Scope note:** the synthetic `cert_rotation_chaos_3_host.rs` may remain as a fast smoke but MUST NOT be the evidence for this AC.
+
+**AC-T12 — Falsifiable absence-assertions (replaces old-AC4 "no kernel retry" / old-AC5 "kernel unchanged" prose)**
+**Given** the full live-transport suite **When** any cert/partition failure path executes (AC-T3..T11) **Then** (a) the kernel performs **zero** auto-retry — kernel-side retry counter `== 0` (the ONLY retrier is `HandshakeRetryPolicy` on the transport side); and (b) `maos-kernel-core` is **byte-identical** to its pre-story state. **Oracle:** (a) `kernel_retry_count: AtomicUsize == 0` (or a fail-on-call test double); (b) a checksum / `git diff --stat`-empty gate for the crate (analogous to Story 8.4's 15505 check). Prose is NOT acceptable evidence — the checksum/diff is.
+
+**AC-T13 — CI determinism conformance (the harness mandates, made gate-checkable)**
+**Given** the new `maos-a2a-tcp` integration test suite **When** CI runs it (plus a stress variant: 50× loop or `--test-threads=8`) **Then** the suite is hermetic: no hardcoded ports (H3), no fixed sleeps in setup (H4), injectable timeouts (H5), kill-on-drop teardown (H6), time-relative certs (H1) under one clock (H2). **Oracle:** the H1–H6 guard tests all pass AND a CI repeat-runner (looped 50× / nextest `--retries 0 --test-threads=8`) is **100% green** — any single flake fails the AC. This is the gate that prevents this security story becoming the next §A2-style CI-only-flake debt.
+
+> **Red-phase note for the dev:** start with the H1–H6 harness + AC-T1 (the only happy path); then AC-T3 and AC-T7 most change the security posture and most expose missing verifier/timeout wiring. AC-T3–T6 consume AC-A3's `TofuPinningVerifier` as the unit under test — coordinate its error taxonomy (concrete enum variants) so the "TOFU-mismatch vs bad-cert" oracles match. Two facts to cite from source before AC-A1 closes: the file:line of the `CrossHost` dispatch match the trait binds to, and the literal JSON-RPC field name carrying Lamport/`boot_nonce` in 8.5's source.
+
 ---

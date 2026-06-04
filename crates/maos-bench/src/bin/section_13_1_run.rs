@@ -2,7 +2,7 @@
 
 //! section_13_1_run — Operator-facing orchestrator binary.
 //!
-//! Runs the §13.1 J1 + J4 measurement journeys (real subprocess mode)
+//! Runs the §13.1 J1 + J4 + J6 measurement journeys (real subprocess mode)
 //! and writes a JSON report to `tests/reports/section-13-1-<sha>.json`.
 //!
 //! Environment variables:
@@ -61,8 +61,19 @@ fn run() -> Result<(), String> {
         j4.p50_us, j4.p95_us, j4.budget_met);
     harness.add_journey(j4.clone());
 
+    // J6 measurement (Story 8.5 — Diego cold-start; reported per release alongside
+    // J1/J4. Not part of the J1/J4 `decide` gate — it is recorded, breach or not,
+    // per the §13.1 "fix our code first; do not mask" semantics).
+    eprintln!("section_13_1_run: starting J6 cold-start measurement (N={})...", invocation_count);
+    let j6_config = harness::j6::J6Config { invocation_count };
+    let j6 = harness::j6::run_j6_measurement(&j6_config)
+        .map_err(|e| format!("J6 measurement failed: {}", e))?;
+    eprintln!("section_13_1_run: J6 complete — P50={}us P95={}us budget_met={}",
+        j6.p50_us, j6.p95_us, j6.budget_met);
+    harness.add_journey(j6.clone());
+
     // Decision
-    let decision = decide(&j1, &j4);
+    let decision = decide(&j1, &j4, Some(&j6));
     let report = BenchReport::new(
         harness.run_id,
         harness.started_at_ns,
@@ -84,9 +95,10 @@ fn run() -> Result<(), String> {
 
     // Print summary
     println!(
-        "bench-section-13-1 complete: J1 P95={}us (budget 25000us, met={}); J4 P95={}us (budget 10000us, met={}); decision={}; report={}",
+        "bench-section-13-1 complete: J1 P95={}us (budget 25000us, met={}); J4 P95={}us (budget 10000us, met={}); J6 P95={}us (budget 500000us, met={}); decision={}; report={}",
         j1.p95_us, j1.budget_met,
         j4.p95_us, j4.budget_met,
+        j6.p95_us, j6.budget_met,
         decision.outcome,
         report_path.display(),
     );

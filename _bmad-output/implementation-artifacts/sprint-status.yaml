@@ -1,4 +1,4 @@
-last_updated: '2026-06-03T00:00:00Z+story-8-4-review'
+last_updated: '2026-06-04T00:00:00Z+story-8-5-review'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -84,7 +84,11 @@ development_status:
   8-2-ship-the-researcher-reference-spirit-with-distillation-pattern-and-log-recall-walker: done
   8-3-observer-v0-5-telemetry-stream-subscriber-pre-halt-scalar-drift-watchdog: done
   8-4-ship-the-founder-loop-wedge-spirits-orchestrator-workers-architect-reviewer: done
-  8-5-ship-the-mira-nash-diagnostic-architect-bilateral-pair-with-safety-critical-corpus: backlog
+  8-5-ship-the-mira-nash-diagnostic-architect-bilateral-pair-with-safety-critical-corpus: done
+  # Story 8.6 (split from 8.5, 2026-06-04): live CrossHost TCP/mTLS transport is FULLY ABSENT (not scaffolding) — new maos-a2a-tcp crate (~1000+ LOC, security-critical), own risk class. 8.5 ships the loopback-simulated pair; 8.6 ships the live two-process transport.
+  8-6-ship-the-live-cross-host-a2a-tcp-mtls-transport-maos-a2a-tcp-two-process: backlog
+  # Story 8.7 (Winston ruling 2026-06-04, deferred from 8.5): ADR-012 fine-grained typed-intent consent. 8.5 surfaced that ConsentAllowlists holds a free-form Vec<A2AIntent> but the router enforces only the 3-band IntentClass projection {highprivilege,standard,readonly} (maos-a2a/src/adapter.rs:144-164) — so a specific intent string (e.g. "rca-summary") silently never matches. Widen the intent taxonomy / match a real per-frame intent field. DEPENDS ON 8.6 (must land against maos-a2a-core, NOT the over-budget maos-a2a; 8.6 is deliberately churn-free per epic-8 §AC-A6). v1.5+ refinement; not an 8.5/8.6 defect.
+  8-7-fine-grained-typed-intent-consent-vocabulary-over-maos-a2a-core: backlog
   epic-8-retrospective: optional
   epic-9: backlog
   9-1-ship-maosctl-audit-subcommands-query-subject-access-posture-delta-sealed-export: backlog

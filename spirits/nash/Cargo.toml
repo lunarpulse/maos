@@ -1,0 +1,29 @@
+[package]
+name = "nash"
+version = "1.5.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "MAOS Nash v1.5 — dev-environment Senior Architect reference Spirit and Host B of the Story 8.5 bilateral pair (architecture §6.4). A specialized Worker (SpiritRole::Worker) that receives Mira's cross-Host diagnostic advisory via A2A typed-intent consent and proposes a deterministic architecture fix. Zero kernel KLOC."
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+# Spirit-side surface ONLY (Story 0.2 zero-kernel-KLOC invariant). Nash composes
+# only the SDK/ABI + serde; it interprets Mira's advisory wire payload and
+# proposes an architecture, all Spirit-side.
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner"] }
+maos-spirit-abi = { path = "../../crates/maos-spirit-abi" }
+maos-domain = { path = "../../crates/maos-domain" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+# Test-only: the spirit-test harness + the authoritative manifest validators.
+# The cross-Host A2A / halt integration is proven in `spirits/mira/tests/`
+# (Mira is the protagonist of the J4 journey); Nash's own tests cover the
+# deterministic architect path + the manifest envelope.
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner", "mock", "spirit_test"] }
+maos-manifest = { path = "../../crates/maos-manifest" }
+sha2 = "0.10"
+toml = "0.8"

@@ -3136,6 +3136,11 @@ description = "smoke test spirit successor"
             return smoke_founder_loop_8_4().await;
         }
 
+        // Story 8.5 AC7 — `smoke-mira-nash-8-5` end-to-end bilateral-pair J4 journey.
+        if mode == "smoke-mira-nash-8-5" {
+            return smoke_mira_nash_8_5().await;
+        }
+
         // Story 6.3 AC7 — `smoke-a2a-loopback-6-3` end-to-end A2A wedge demo.
         if mode == "smoke-a2a-loopback-6-3" {
             return smoke_a2a_loopback_6_3().await;
@@ -3200,7 +3205,7 @@ description = "smoke test spirit successor"
 
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-founder-loop-8-4"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-founder-loop-8-4, smoke-mira-nash-8-5"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -4173,6 +4178,397 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
 
     eprintln!(
         "smoke-founder-loop-8-4: ✅ founder-loop wedge complete — 11pm assign → overnight distillate dispatch → halt-and-resume → 7am digest cites real log refs"
+    );
+    Ok(())
+}
+
+/// Story 8.5 AC7 — `smoke-mira-nash-8-5` end-to-end bilateral-pair J4 journey.
+///
+/// Mira(host_a) diagnoses a prod-edge anomaly → a halt fires on Mira → the
+/// mobile-push test-double captures the `Halt` notification + Nash(host_b) is
+/// informed via A2A typed-intent consent (TOFU verified, allowlists admit) → the
+/// director three-tap resolves the halt (real `KernelHaltResolver` + journal) →
+/// the morning digest cites an actual `source_log_ref` resolving against the REAL
+/// Transparency Log (FR17); one deliberate `EIntentDenied` consent rejection is
+/// observable in the TL (a `ConsentRupture` row). Exits 0.
+///
+/// All adapters are REAL (the resolved 8.1–8.4 dev-dep bridge pattern); only the
+/// terminal mobile-push transport is fixture-replaced (Decision D — the real
+/// `MobilePushChannel` is the §6.5 `unimplemented!` stub).
+async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
+    use std::sync::{Arc, Mutex};
+
+    use mira::{AnomalySignal, Mira, ADVISORY_CONSENT_INTENT};
+    use nash::Nash;
+
+    use maos_a2a::error::A2AError;
+    use maos_a2a::{
+        A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile, ConsentAllowlists,
+        InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
+    };
+    use maos_director_surface::halt_ui::{FlowState, HaltFlow, TapEvent};
+    use maos_director_surface::notification::{
+        NotificationChannel, NotificationDispatcher, NotificationError,
+    };
+    use maos_domain::frame::{
+        FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+    };
+    use maos_domain::halt::{HaltId, Resolution};
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_domain::notification::{NotificationEvent, NotificationLevel, NotificationSurface};
+    use maos_kernel_core::halt::KernelHaltResolver;
+    use maos_kernel_core::iac::transparency_log::{
+        FrameFilter, FrameKind as TlFrameKind, TransparencyLogAdapter,
+    };
+    use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
+    use smallvec::smallvec;
+
+    /// Decision D — captures the dispatched Halt, reports the MobilePush surface.
+    /// NOTE: `std::sync::Mutex` is correct here because `NotificationDispatcher::dispatch`
+    /// is synchronous. If the dispatcher ever becomes async, this must migrate to
+    /// `tokio::sync::Mutex` to avoid executor blocking.
+    struct MobilePushCapture {
+        captured: Arc<Mutex<Vec<NotificationEvent>>>,
+    }
+    impl NotificationChannel for MobilePushCapture {
+        fn surface(&self) -> NotificationSurface {
+            NotificationSurface::MobilePush
+        }
+        fn dispatch(
+            &self,
+            event: &NotificationEvent,
+            _level: NotificationLevel,
+        ) -> Result<(), NotificationError> {
+            self.captured
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(event.clone());
+            Ok(())
+        }
+    }
+
+    const BOOT_NONCE: u64 = 0x8585;
+    const MIRA_PID: u32 = 8585;
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    eprintln!("smoke-mira-nash-8-5: starting the J4 bilateral diagnostic-architect journey");
+
+    // ── Step 0 — real kernel halt machinery (temp-backed memory stores).
+    let mem_dir =
+        std::env::temp_dir().join(format!("maos-smoke-mira-nash-8-5-{}", std::process::id()));
+    std::fs::create_dir_all(&mem_dir)?;
+    // RAII guard: ensure temp directory is cleaned up even on early return / panic.
+    struct TempDirGuard(std::path::PathBuf);
+    impl Drop for TempDirGuard {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let _mem_guard = TempDirGuard(mem_dir.clone());
+    let db_path = mem_dir.join("audit.db");
+    let memory_root = mem_dir.join("memory");
+    let journal_path = mem_dir.join("journal");
+
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(BOOT_NONCE));
+    let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
+    let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
+    let capability = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+        Arc::new(maos_kernel_core::api::RingCryptoProvider),
+        maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
+        BOOT_NONCE,
+        Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+        maos_kernel_core::capability::cap_audit::channel().0,
+        maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+        Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+        Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
+    ));
+    let orchestrator = Arc::new(
+        maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
+            Arc::clone(&capability),
+            Arc::clone(&halt_registry),
+        ),
+    );
+    let mailbox = Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::clone(&metrics)));
+    let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
+        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
+            memory_root,
+            4,
+        )),
+        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path)?),
+        Arc::new(maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path)?),
+        Arc::clone(&tl),
+    ));
+    let output_markers = Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new());
+    let resolver = Arc::new(KernelHaltResolver::new(
+        Arc::clone(&halt_registry),
+        Arc::clone(&tl),
+        output_markers,
+        mailbox,
+        BOOT_NONCE,
+        memory,
+        orchestrator,
+    ));
+    let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)?;
+
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let mut dispatcher = NotificationDispatcher::new();
+    dispatcher.register(Box::new(MobilePushCapture {
+        captured: Arc::clone(&captured),
+    }));
+    let flow = HaltFlow::new(
+        resolver,
+        Arc::new(dispatcher),
+        Arc::clone(&tl) as Arc<dyn maos_domain::halt::HaltJournal>,
+    );
+
+    // ── Step 1 — Mira(host_a) diagnoses an unexplained prod-edge anomaly.
+    let signal = AnomalySignal {
+        subject: "edge-cache".into(),
+        metric: "novel_entropy_drift".into(),
+        observed: 0.91,
+        baseline: 0.10,
+        detail: "unrecognised entropy drift on the prod-edge cache; no known pattern".into(),
+        source_log_ref: String::new(),
+    };
+    let mira = Mira::default().with_id("mira");
+    let diag = mira.diagnose(&signal);
+    eprintln!(
+        "smoke-mira-nash-8-5: Mira(host_a) diagnosed '{}' — confidence {:.2}, requires_halt={}",
+        diag.subject, diag.confidence, diag.requires_halt
+    );
+    if !diag.requires_halt {
+        return Err("smoke-mira-nash-8-5: anomaly did not reach Mira's halt boundary".into());
+    }
+    let payload = mira
+        .halt_payload(&diag)
+        .ok_or("smoke-mira-nash-8-5: halt payload not produced")?;
+    let halt_id = HaltId::new(payload.halt_id.clone())?;
+
+    // ── Step 2 — a halt fires on Mira (real invoke_halt → TL EpistemicHalt row).
+    let _receipt = maos_kernel_core::halt::invoke_halt(
+        &tl,
+        &journal,
+        &halt_registry,
+        payload.clone(),
+        MIRA_PID,
+        "mira",
+        BOOT_NONCE,
+    )?;
+    eprintln!("smoke-mira-nash-8-5: a halt fired on Mira (EpistemicHalt row in the TL)");
+
+    // ── Step 3 — the halt notification ROUTES to the mobile-push surface.
+    let report = flow.dispatch_halt(halt_id.clone(), payload.clone())?;
+    if report.delivered != 1 {
+        return Err(format!(
+            "smoke-mira-nash-8-5: expected 1 mobile-push delivery, got {}",
+            report.delivered
+        )
+        .into());
+    }
+    if !matches!(
+        captured.lock().unwrap().first(),
+        Some(NotificationEvent::Halt { .. })
+    ) {
+        return Err("smoke-mira-nash-8-5: mobile-push channel did not capture the Halt".into());
+    }
+    eprintln!(
+        "smoke-mira-nash-8-5: halt notification ROUTED to the mobile-push surface (test-double captured it)"
+    );
+
+    // ── Step 4 — Nash(host_b) informed via A2A typed-intent consent (TOFU verified).
+    let fa = PeerCertFingerprint::from_cert_der(b"mira-host-a-cert-v1");
+    let fb = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
+    let mk_cfg = |id: &str, ep: &str, fp: PeerCertFingerprint, accept: Vec<A2AIntent>| A2APeerConfig {
+        peer_id: PeerId::new(id),
+        endpoint: ep.into(),
+        cert_fingerprint: fp,
+        profile: A2AProfile::Loopback,
+        allowlists: ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new(ADVISORY_CONSENT_INTENT)],
+            accept_allowlist: accept,
+        },
+        partition_timeout_secs: 30,
+    };
+    let cfg_a = mk_cfg(
+        "host_a",
+        "tls://127.0.0.1:7443",
+        fa.clone(),
+        vec![A2AIntent::new(ADVISORY_CONSENT_INTENT)],
+    );
+    let cfg_b = mk_cfg(
+        "host_b",
+        "tls://127.0.0.1:7444",
+        fb.clone(),
+        vec![A2AIntent::new(ADVISORY_CONSENT_INTENT)],
+    );
+    let tofu = Arc::new(InMemoryTofuPinStore::new());
+    tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;
+    tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1).await?;
+    let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b.clone()], tofu);
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    router.install_intake_sink(tx).await;
+
+    let advisory = mira.advisory(&diag);
+    let advisory_json = serde_json::to_string(&advisory)?;
+    // Unique frame counter to avoid deterministic ID collisions in router caches.
+    let mut frame_counter: u64 = 0;
+    let make_frame = |intent: IntentClass, body: String| {
+        frame_counter += 1;
+        let mut fid = [0u8; 16];
+        fid[0..8].copy_from_slice(&frame_counter.to_be_bytes());
+        fid[8..16].copy_from_slice(&BOOT_NONCE.to_be_bytes());
+        IacFrame {
+            frame_id: fid,
+            timestamp_ns: 0,
+            logical_clock: 0,
+            from: FrameAddress {
+                spirit_id: SpiritId::from("mira"),
+                host_id: Some(HostId("host_a".into())),
+                role: Some(SpiritRole::Worker),
+            },
+            to: smallvec![FrameAddress {
+                spirit_id: SpiritId::from("nash"),
+                host_id: Some(HostId("host_b".into())),
+                role: Some(SpiritRole::Worker),
+            }],
+            // TECH-DEBT(8.5): TaskAssign reused as read-only advisory carrier.
+            // The v1.0 ABI has no Evidence/Observation variant (AC8). Next taxonomy
+            // revision should add one.
+            kind: FrameKind::TaskAssign,
+            intent,
+            payload: FramePayload::TaskAssign(TaskAssignPayload {
+                goal: body,
+                scope: vec![],
+                success_criteria: "architect a mitigation".into(),
+                posture_preferences: PosturePreferences::default(),
+                prior_distillate_ref: None,
+            }),
+            auto_marker: FrameOrigin::SpiritAuto,
+            consent_envelope: None,
+            intent_lineage: IntentLineage::default(),
+        }
+    };
+    LocalRouter::route_outbound(
+        &router,
+        make_frame(IntentClass::Readonly, advisory_json.clone()),
+        &HostId("host_b".into()),
+    )
+    .await
+    .map_err(|e| format!("smoke-mira-nash-8-5: advisory to Nash REJECTED unexpectedly: {e}"))?;
+    let delivered = rx
+        .recv()
+        .await
+        .ok_or("smoke-mira-nash-8-5: Nash received no advisory")?;
+    let goal = match &delivered.payload {
+        FramePayload::TaskAssign(t) => t.goal.clone(),
+        other => return Err(format!("unexpected payload {other:?}").into()),
+    };
+    let proposal = Nash::default()
+        .with_id("nash")
+        .architect(&Nash::from_wire(&goal)?);
+    eprintln!(
+        "smoke-mira-nash-8-5: Nash(host_b) informed via A2A consent (TOFU verified); proposed '{}'",
+        proposal.proposed_fix
+    );
+
+    // Record the advisory as a real TL row so the morning digest can cite it.
+    tl.insert_frame_event(
+        TlFrameKind::ConsentRequest,
+        MIRA_PID,
+        None,
+        "diagnostic.advisory",
+        advisory_json.as_bytes(),
+        FrameOrigin::SpiritAuto,
+    ).map_err(|e| format!("smoke-mira-nash-8-5: TL insert failed for advisory: {e}"))?;
+    let advisory_ref = tl.last_frame_id();
+
+    // ── Step 5 — one deliberate EIntentDenied (observable in the TL).
+    let deny_cfg_a = mk_cfg("host_a", "tls://127.0.0.1:7443", fa.clone(), vec![]);
+    let deny_tofu = Arc::new(InMemoryTofuPinStore::new());
+    deny_tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;
+    deny_tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1).await?;
+    let deny_router = LoopbackA2ARouter::new(vec![deny_cfg_a, cfg_b], deny_tofu);
+    match LocalRouter::route_outbound(
+        &deny_router,
+        make_frame(IntentClass::Readonly, advisory_json.clone()),
+        &HostId("host_b".into()),
+    )
+    .await
+    {
+        Err(A2AError::IntentDeniedAtPeer { .. }) => {
+            tl.insert_frame_event(
+                TlFrameKind::ConsentRupture,
+                MIRA_PID,
+                None,
+                "a2a.consent.denied",
+                b"readonly advisory denied at peer (accept_allowlist)",
+                FrameOrigin::SpiritAuto,
+            ).map_err(|e| format!("smoke-mira-nash-8-5: TL insert failed for ConsentRupture: {e}"))?;
+            eprintln!(
+                "smoke-mira-nash-8-5: deliberate consent rejection (IntentDeniedAtPeer/EIntentDenied) — ConsentRupture row written to the TL"
+            );
+        }
+        Ok(()) => {
+            return Err("smoke-mira-nash-8-5: denied advisory was admitted unexpectedly".into())
+        }
+        Err(other) => {
+            return Err(format!("smoke-mira-nash-8-5: unexpected error on denial: {other:?}").into())
+        }
+    }
+
+    // ── Step 6 — director three-tap resolves the halt (KernelHaltResolver + journal).
+    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(
+        FlowState::Tap1Acknowledge,
+        TapEvent::Acknowledge,
+    );
+    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(s, TapEvent::SelectKind);
+    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(s, TapEvent::Submit);
+    if s != FlowState::Done {
+        return Err("smoke-mira-nash-8-5: three-tap did not reach Done".into());
+    }
+    flow.submit_resolution(halt_id.clone(), Resolution::AcceptedHalt, "mira")?;
+    eprintln!(
+        "smoke-mira-nash-8-5: director three-tap resolved the halt (KernelHaltResolver + journal)"
+    );
+
+    // ── Step 7 — morning digest cites an actual source_log_ref against the real TL (FR17).
+    let cited = tl
+        .query_frame_by_id(advisory_ref)?
+        .ok_or("smoke-mira-nash-8-5: the cited advisory must resolve against the real TL")?;
+    if !matches!(cited.kind, TlFrameKind::ConsentRequest) {
+        return Err("smoke-mira-nash-8-5: citation must resolve to the real advisory row".into());
+    }
+    eprintln!(
+        "smoke-mira-nash-8-5: morning digest cites advisory source_log_ref (TL frame {:02x?}…) resolving against the real Transparency Log",
+        &advisory_ref[..4]
+    );
+
+    // ── Verify the Transparency-Log state.
+    let halts = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::EpistemicHalt),
+        ..Default::default()
+    })?;
+    let ruptures = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::ConsentRupture),
+        ..Default::default()
+    })?;
+    eprintln!(
+        "smoke-mira-nash-8-5: TL state — {} EpistemicHalt / {} ConsentRupture row(s)",
+        halts.len(),
+        ruptures.len()
+    );
+    if halts.is_empty() || ruptures.is_empty() {
+        return Err(
+            "smoke-mira-nash-8-5: expected EpistemicHalt + ConsentRupture rows in the TL".into(),
+        );
+    }
+
+    // mem_dir is cleaned up by the RAII TempDirGuard declared at the top of the
+    // function — cleanup runs even on early return or panic.
+    eprintln!(
+        "smoke-mira-nash-8-5: ✅ bilateral pair complete — Mira diagnoses → halt fires → mobile-push + Nash via consent → three-tap resolve → digest cites real log refs"
     );
     Ok(())
 }

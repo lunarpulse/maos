@@ -235,6 +235,7 @@ fn fanout_bench(c: &mut Criterion) {
             if journey.budget_met { "pass" } else { "soft-fail" }.into(),
             journey.budget_met,
             dropped == 0,
+            true, // j6 not measured here
             format!(
                 "fanout p99={}us budget={}us dropped={}",
                 journey.p99_us, P99_BUDGET_US, dropped

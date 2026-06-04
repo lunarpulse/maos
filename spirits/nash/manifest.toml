@@ -1,0 +1,54 @@
+# MAOS Nash v1.5 — dev-environment Senior Architect reference Spirit and Host B
+# of the Story 8.5 bilateral diagnostic-architect pair (architecture §6.4).
+#
+# Nash is a specialized Worker (SpiritRole::Worker — Decision C; the role is set
+# in the FrameAddress.role at registration, NOT a manifest field). It receives
+# Mira's cross-Host diagnostic advisory via A2A typed-intent consent (ADR-012,
+# the `readonly` intent both sides admit) and proposes an architecture fix
+# DETERMINISTICALLY (Decision I — no live LLM at v1.5).
+#
+# MANIFEST SHAPE NOTES:
+# - NO `[epistemic_policy]`: UNLIKE Mira, Nash does not halt — it architects. It
+#   reasons about a fix and proposes; it reaches no epistemic boundary that fires
+#   a halt at v1.5.
+# - NO `[capabilities.required]` (Decision I): Nash does NO inference at v1.5
+#   (architecture proposal is deterministic, Spirit-side) and uses NO MCP drivers.
+# - The pre-paired A2A peer cert fingerprints + ConsentAllowlists are NOT manifest
+#   fields (Decision L — deployment-config layer, ADR-003).
+
+[class]
+name = "nash"
+version = "1.5.0"
+abi = "1.0"
+manifest_schema_version = 2
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "MAOS Nash v1.5 reference Spirit — dev-environment Senior Architect (Host B of the J4 bilateral pair). Receives Mira's cross-Host diagnostic advisory via A2A typed-intent consent over the real LoopbackA2ARouter and proposes a deterministic architecture fix. Zero kernel KLOC."
+
+[posture]
+# Autonomy spectrum. A Senior Architect proposes (assistive) rather than acting
+# autonomously.
+default = "assistive"
+allowed_max = "assistive"
+
+[output_shape]
+# Every architecture proposal carries (subject, proposed_fix, components,
+# confidence). The kernel rejects an emit missing any of these top-level fields.
+required_fields = ["subject", "proposed_fix", "components", "confidence"]
+
+[budget]
+context_window_size = 8192
+# An architecture pass is bounded deterministic compute over one advisory.
+time_cap_seconds = 15
+
+[resources]
+cpu_max_pct = 15
+memory_max_mb = 128
+
+[sandbox]
+tier = "T2"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"

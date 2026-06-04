@@ -1084,6 +1084,8 @@ dependencies = [
  "maos-spirit-cli",
  "maos-spirit-hello",
  "maos-spirit-sdk",
+ "mira",
+ "nash",
  "orchestrator",
  "parking_lot",
  "reviewer",
@@ -1461,6 +1463,41 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "mira"
+version = "1.5.0"
+dependencies = [
+ "maos-a2a",
+ "maos-director-surface",
+ "maos-domain",
+ "maos-kernel-core",
+ "maos-manifest",
+ "maos-spirit-abi",
+ "maos-spirit-sdk",
+ "nash",
+ "serde",
+ "serde_json",
+ "sha2",
+ "smallvec",
+ "tempfile",
+ "tokio",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "nash"
+version = "1.5.0"
+dependencies = [
+ "maos-domain",
+ "maos-manifest",
+ "maos-spirit-abi",
+ "maos-spirit-sdk",
+ "serde",
+ "serde_json",
+ "sha2",
+ "toml 0.8.23",
 ]
 
 [[package]]

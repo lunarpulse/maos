@@ -1,0 +1,16 @@
+[
+  {
+    "subject": "edge-cache",
+    "finding": "prod-edge anomaly on 'edge-cache': novel_entropy_drift = 0.910 vs baseline 0.100 (deviation 100.0%) — NO known diagnostic pattern",
+    "severity": 0.81,
+    "recommended_action": "architect a mitigation + add observability for 'edge-cache'",
+    "source_log_ref": "tl:row:2002"
+  },
+  {
+    "subject": "checkout-api",
+    "finding": "prod-edge anomaly on 'checkout-api': error_rate = 0.420 vs baseline 0.300 (deviation 40.0%) — matches a known diagnostic pattern",
+    "severity": 0.40,
+    "recommended_action": "architect a fix for the diagnosed anomaly on 'checkout-api'",
+    "source_log_ref": "tl:row:1001"
+  }
+]

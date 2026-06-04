@@ -1,0 +1,72 @@
+# MAOS Mira v1.5 — prod-edge diagnostic reference Spirit and Host A of the
+# Story 8.5 bilateral diagnostic-architect pair (architecture §6.4 / §13.1 J4).
+#
+# Mira is a specialized Worker (SpiritRole::Worker — Decision C; set in the
+# FrameAddress.role at registration, NOT a manifest field). It diagnoses
+# prod-edge anomalies DETERMINISTICALLY (Decision I — no live LLM at v1.5),
+# reaches its diagnostic-confidence epistemic boundary on an unexplained anomaly,
+# and FIRES A HALT there (the `[epistemic_policy]` rule below — the kernel
+# performs the universal-arithmetic comparison and fires the halt). On every
+# diagnosis it also informs Nash (Host B) via an A2A typed-intent advisory.
+#
+# MANIFEST SHAPE NOTES:
+# - Mira carries `[epistemic_policy]` (UNLIKE read-only Observer) because it
+#   halts at a diagnostic boundary. The rule mirrors Butler's universal-arithmetic
+#   shape: the Spirit computes the `diagnostic_confidence` scalar; the kernel
+#   compares it against the threshold and halts when confidence falls too low.
+# - NO `[capabilities.required]` (Decision I): Mira does NO inference at v1.5
+#   (diagnosis is deterministic, Spirit-side) and uses NO MCP drivers.
+# - The pre-paired A2A peer cert fingerprints + ConsentAllowlists are NOT manifest
+#   fields (Decision L — the manifest is deployment-topology-agnostic, ADR-003);
+#   they live in the per-side A2APeerConfig constructed in tests / the smoke.
+
+[class]
+name = "mira"
+version = "1.5.0"
+abi = "1.0"
+manifest_schema_version = 2
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "MAOS Mira v1.5 reference Spirit — prod-edge diagnostic (Host A of the J4 bilateral pair). Deterministic anomaly diagnosis; fires an epistemic halt at its diagnostic-confidence boundary; informs Nash (Host B) via A2A typed-intent consent over the real LoopbackA2ARouter. Zero kernel KLOC."
+
+[posture]
+# Autonomy spectrum. A prod-edge diagnostic acts cautiously — it surfaces and
+# halts rather than mutating.
+default = "cautious"
+allowed_max = "cautious"
+
+[output_shape]
+# Every diagnosis carries (subject, finding, severity, confidence). The kernel
+# rejects an emit missing any of these top-level fields.
+required_fields = ["subject", "finding", "severity", "confidence"]
+
+[budget]
+context_window_size = 4096
+# A diagnostic pass is fast — bounded deterministic compute over a signal batch.
+time_cap_seconds = 10
+
+[resources]
+cpu_max_pct = 15
+memory_max_mb = 64
+
+[sandbox]
+tier = "T2"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"
+
+# Mira's diagnostic-confidence epistemic policy (architecture §4.6 / §6.4). Mira
+# computes its own `diagnostic_confidence` scalar; the kernel performs the
+# universal-arithmetic comparison and fires the halt when confidence on an
+# unexplained prod-edge anomaly falls below the floor.
+[epistemic_policy]
+default_action = "verbalize_only"
+
+# Halt when Mira cannot confidently diagnose a prod-edge anomaly (its epistemic
+# boundary). `on_value_below` matches Butler's directional predicate shape.
+[[epistemic_policy.rules]]
+tag = "diagnostic_confidence"
+action = "halt"
+on_value_below = { threshold = 0.5 }
