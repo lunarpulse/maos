@@ -149,6 +149,76 @@ impl InMemoryTofuPinStore {
         self.test_repin_hook = Arc::new(hook);
         self
     }
+
+    /// Story 8.6 — synchronous pin lookup for the rustls verifier callback.
+    ///
+    /// rustls `ServerCertVerifier`/`ClientCertVerifier` callbacks are **sync**,
+    /// but [`TofuPinStore::verify_pinned`] is `async`. Rather than change that
+    /// frozen async signature (epic AC-A6), this additive inherent helper does
+    /// the pin comparison synchronously against the in-memory `DashMap`
+    /// (`verify_pinned`'s in-memory body is itself non-blocking; the `async` is
+    /// only the trait indirection — see Dev Notes "async verify_pinned inside a
+    /// sync rustls callback", bridge option (a)).
+    ///
+    /// Returns the [`PeerId`] whose **active** pin equals `observed`, or `None`
+    /// (unpinned / invalidated). This is the TOFU trust oracle the
+    /// `TofuPinningVerifier` consults after WebPKI succeeds.
+    pub fn find_active_pin_by_fingerprint(
+        &self,
+        observed: &PeerCertFingerprint,
+    ) -> Option<PeerId> {
+        self.pins.iter().find_map(|entry| {
+            let pin = entry.value();
+            if pin.invalidated.is_none() && &pin.fingerprint == observed {
+                Some(pin.peer.clone())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Story 8.6 — synchronous mirror of [`TofuPinStore::verify_pinned`] for the
+    /// sync rustls verifier callback (same semantics: `NotPinned` / `Invalidated`
+    /// / `Mismatch`). Additive; does NOT change the async trait surface.
+    pub fn verify_pinned_sync(
+        &self,
+        peer: &PeerId,
+        observed: &PeerCertFingerprint,
+    ) -> Result<(), EPinMismatch> {
+        let pin = self
+            .pins
+            .get(peer.as_str())
+            .map(|r| r.value().clone())
+            .ok_or_else(|| EPinMismatch::NotPinned(peer.as_str().to_string()))?;
+        if pin.invalidated.is_some() {
+            let reason = match &pin.invalidated {
+                Some(Invalidated::SpiritRestarted { prior_boot_nonce }) => {
+                    format!("Spirit restarted (prior boot_nonce={prior_boot_nonce})")
+                }
+                Some(Invalidated::Manual) => "manually invalidated".to_string(),
+                None => unreachable!(),
+            };
+            return Err(EPinMismatch::Invalidated {
+                peer: peer.as_str().to_string(),
+                reason,
+            });
+        }
+        if &pin.fingerprint == observed {
+            Ok(())
+        } else {
+            Err(EPinMismatch::Mismatch {
+                peer: peer.as_str().to_string(),
+                pinned: pin.fingerprint.wire(),
+                observed: observed.wire(),
+            })
+        }
+    }
+
+    /// Read the current pin (if any) synchronously — sync mirror of
+    /// [`TofuPinStore::get_pin`] for the verifier callback / teardown asserts.
+    pub fn get_pin_sync(&self, peer: &PeerId) -> Option<TofuPin> {
+        self.pins.get(peer.as_str()).map(|r| r.value().clone())
+    }
 }
 
 #[async_trait]

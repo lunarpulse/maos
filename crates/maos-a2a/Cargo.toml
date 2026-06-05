@@ -5,24 +5,17 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "MAOS A2A — Agent-to-Agent cross-Host bilateral communication (ADR-012)"
+description = "MAOS A2A — in-process loopback A2A router over the maos-a2a-core protocol substrate (ADR-012)"
 
 [dependencies]
+maos-a2a-core = { path = "../maos-a2a-core" }
 maos-domain = { path = "../maos-domain" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
-maos-capability = { path = "../maos-capability" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "2.0"
 async-trait = "0.1"
-tokio = { version = "1", features = ["net", "rt-multi-thread", "macros", "sync", "time", "io-util"] }
-tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-dashmap = "6.1"
-sha2 = "0.10"
-hex = "0.4"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync", "time"] }
 
 [dev-dependencies]
+serde_json = "1.0"
 rcgen = "0.13"
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util", "time"] }
@@ -32,4 +25,5 @@ toml = "0.8"
 [features]
 default = []
 # Calibration-phase mode for chaos + churn harnesses (v0.5 — report, do not enforce).
-calibration_phase = []
+# Forwarded to maos-a2a-core where the harness lives.
+calibration_phase = ["maos-a2a-core/calibration_phase"]

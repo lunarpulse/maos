@@ -65,6 +65,13 @@ maos-providers = 2000
 maos-mcp = 1000
 maos-acp = 1000
 maos-a2a = 1500
+# Story 8.6 — extraction of maos-a2a-core (transport-agnostic ADR-012 substrate)
+# from maos-a2a; resolves the maos-a2a 1500 overage by moving the bulk out.
+# Ceiling recorded post-extraction (actual count in the Dev Agent Record).
+maos-a2a-core = 3000
+# Story 8.6 — maos-a2a-tcp: live cross-Host TCP/mTLS transport (the second
+# A2ATransport impl). Socket + rustls + codec wiring + verifier.
+maos-a2a-tcp = 1500
 maos-persistence = 2000
 maos-secrets = 1000
 maos-compliance = 2000

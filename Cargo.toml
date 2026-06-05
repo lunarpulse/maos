@@ -3,6 +3,8 @@ resolver = "2"
 members = [
     "xtask",
     "crates/maos-a2a",
+    "crates/maos-a2a-core",
+    "crates/maos-a2a-tcp",
     "crates/maos-acp",
     "crates/maos-audit",
     "crates/maos-bin",

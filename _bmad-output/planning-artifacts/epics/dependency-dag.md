@@ -53,7 +53,7 @@ E7 Spirit Ecosystem
 E8 Reference Spirits
 ├──→ E9 (audit queries validated against reference-Spirit production traces)
 ├──→ E10 (Butler/Researcher/Orchestrator+Workers/Mira+Nash gate the v1.0 + v1.5 ship)
-└──→ Story 8.6 (live maos-a2a-tcp cross-Host transport, over a new maos-a2a-core seam; workspace 37→39) DEPENDS ON: Story 8.5 (loopback-simulated pair) + Story 6.3 (A2A mesh). Split from 8.5 (2026-06-04): live two-process mTLS/TCP transport, own security-critical risk class; introduces maos-a2a-core by extraction (resolves maos-a2a 1500-LOC overage + the transport-trait seam in one move).
+└──→ Story 8.6 (live maos-a2a-tcp cross-Host transport, over a new maos-a2a-core seam; workspace 39→41 — corrected 2026-06-04 from 37→39 pre-8.5-merge framing) DEPENDS ON: Story 8.5 (loopback-simulated pair) + Story 6.3 (A2A mesh). Split from 8.5 (2026-06-04): live two-process mTLS/TCP transport, own security-critical risk class; introduces maos-a2a-core by extraction (resolves maos-a2a 1500-LOC overage + the transport-trait seam in one move).
 
 E9 Audit + Compliance + Operator Productionization
 └──→ E10 (multi-operator tenancy primitive-reservation declared here; full impl v1.5+ in Story 10.4)

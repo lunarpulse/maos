@@ -209,12 +209,17 @@ So that the v1.5 release ships the bilateral-pair user journey (J4) as a working
 > protocol substrate; `maos-a2a` keeps only `LoopbackA2ARouter` (re-exporting from core for
 > backward-compat); `maos-a2a-tcp` depends ONLY on `maos-a2a-core`. This resolves the `maos-a2a`
 > 1500-LOC ceiling overage (currently 2550) AND the in-memory-vs-wire seam in one move, and keeps the
-> wire crate's dep graph free of the loopback router. **Workspace count therefore moves 37 → 39**
-> (`maos-a2a-core` + `maos-a2a-tcp`), not 37 → 38.
+> wire crate's dep graph free of the loopback router. **Workspace count therefore moves 39 → 41**
+> (`maos-a2a-core` + `maos-a2a-tcp`). *(Corrected 2026-06-04 at story-prep: this note was authored when 8.6 was scoped to follow Story 8.4 at 37 members; Story 8.5 then merged Mira+Nash, taking the workspace to 39 — verified via `cargo metadata --no-deps`. The invariant is `+2`; pin the live count at dev time.)*
 >
-> **OPEN FORK (flag for Winston at story-prep):** `ca_roots` posture (AC-A5). If `ca_roots = None`,
-> TOFU pinning is the *sole* trust anchor (pin-only); if `Some(bundle)`, it is CA-chain **plus** pin
-> (defense-in-depth). This is a security-posture decision, not a default — decide before red-phase.
+> **FORK RESOLVED (Option A — team consensus 2026-06-04: Winston + Murat + security red-team, unanimous):** `ca_roots`
+> posture (AC-A5) ships **BOTH** modes. Default `Some(bundle)` = CA-chain-to-root **then** TOFU pin (defense-in-depth),
+> which is the test/prod corpus default (and the only posture in which AC-T4's "untrusted-CA rejected *even if
+> coincidentally pinned*" oracle is constructible). `None` = pin-only (the FR23a self-signed bilateral posture) is kept
+> first-class and separately tested (AC-T4b), with the SAME ordered validity prelude (NOT a `danger_accept_any` noop) —
+> only the trusted-root chain step is gated on `ca_roots.is_some()`. Zero ABI churn: the fork lives only in
+> `maos-a2a-tcp`'s verifier construction; `verify_pinned` stays byte-identical (AC-A6-safe). Decided on spec-fidelity +
+> long-term-correctness. Full rationale in the Story 8.6 spec Dev Notes (`ca_roots security-posture fork` section).
 
 As a v1.5 operator running Mira and Nash on two separate Hosts,
 I want the live `A2AProfile::CrossHost` transport — a real TCP listener/dialer with operator-managed
@@ -230,7 +235,7 @@ security model actually enforced on the wire.
 **AC-A1 — Extract `maos-a2a-core`; define the transport seam there; resolve the ceiling by extraction**
 **Given** `maos-a2a` is at 2550 lines against its own 1500 ceiling and owns both protocol substrate and the in-memory router
 **When** Story 8.6 lands
-**Then** a NEW crate `maos-a2a-core` at `crates/maos-a2a-core/` owns the transport-agnostic surface: it declares `pub trait A2ATransport` with at minimum `async fn dispatch(&self, peer: PeerId, frame: A2AJsonRpcRequest) -> Result<A2ANack, TransportError>` and a `fn local_addr(&self) -> Option<SocketAddr>` readiness hook (signature confirmed against the real `CrossHost` dispatch match — cite the `maos-a2a` `adapter.rs` file:line and bind the trait method to it); it **moves (not copies)** the shared substrate (`A2AJsonRpcRequest::try_from_bytes`, `handle_intake` + its types, `HandshakeRetryPolicy`, `RotationDrillReport`, TOFU `verify_pinned` + `InMemoryTofuPinStore`, `boot_nonce`, `LamportClock`/`logical_clock`, the `CODE_PARSE_ERROR` constructor) — ALL `pub` at the core root (the surface ABOVE the seam)
+**Then** a NEW crate `maos-a2a-core` at `crates/maos-a2a-core/` owns the transport-agnostic surface: it declares `pub trait A2ATransport` bound to the real, frozen `A2APeerRouter` surface — `async fn route_outbound(&self, frame: IacFrame, peer: &HostId) -> Result<(), A2AError>` + `async fn handle_intake(&self, request: A2AJsonRpcRequest) -> A2AJsonRpcResponse` (`adapter.rs:37-70,255,334`) + a `fn local_addr(&self) -> Option<SocketAddr>` readiness hook *(Corrected 2026-06-04 at story-prep: the original sketch `dispatch(&self, peer: PeerId, frame: A2AJsonRpcRequest) -> Result<A2ANack, TransportError>` named types `A2ANack`/`TransportError` that do not exist — the real types are `NackResponse`/`A2AError`; and there is no literal `match A2AProfile::CrossHost` arm — `A2AProfile::CrossHost` is never dispatched on, so the new trait binds to the profile-agnostic `route_outbound`/`handle_intake` instead. If a `dispatch`/`A2ANack`/`TransportError` shape is preferred, add them as NEW core types, do not diverge from `A2AError`/`NackResponse`)*; it **moves (not copies)** the shared substrate (`A2AJsonRpcRequest::try_from_bytes`, `handle_intake` + its types, `HandshakeRetryPolicy`, `RotationDrillReport`, TOFU `verify_pinned` + `InMemoryTofuPinStore`, `boot_nonce`, `LamportClock`/`logical_clock`, the `CODE_PARSE_ERROR` constructor) — ALL `pub` at the core root (the surface ABOVE the seam)
 **And** `maos-a2a` retains ONLY `LoopbackA2ARouter` as `impl A2ATransport`, depends on `maos-a2a-core`, and `pub use`-re-exports the moved symbols so no downstream import path breaks
 **And** after extraction `kloc-check` is GREEN for BOTH `maos-a2a` (now < 1500) and `maos-a2a-core` (ceiling set in the kloc manifest; record the post-extraction count in evidence), with NO ceiling bump to any existing crate
 
@@ -239,7 +244,7 @@ security model actually enforced on the wire.
 **When** the wire crate is created
 **Then** a NEW crate `maos-a2a-tcp` at `crates/maos-a2a-tcp/` declares `pub struct TcpA2ATransport` with `impl A2ATransport`, and its `Cargo.toml` lists `maos-a2a-core` (NOT `maos-a2a`, NOT `maos-kernel-core`) + `tokio`, `tokio-rustls`, `rustls`, `tokio-util` (codec feature) as its only first-party/transport deps
 **And** `maos-a2a-core` contains ZERO references to `TcpListener`/`TcpStream`/`tokio_util`/`tokio_rustls` (grep-asserted — interlocks with AC-T13)
-**And** the workspace member count moves **37 → 39** exactly (`cargo metadata` member-count assertion pinned), and `abi-diff` is **Added-only** (the AC-A1 `pub use` re-exports preserve symbol paths so nothing reads as Removed)
+**And** the workspace member count moves **39 → 41** exactly (`cargo metadata --no-deps` member-count assertion pinned to the live count at dev time; *corrected 2026-06-04 from "37 → 39" — pre-8.5-merge framing; the `+2` invariant is unchanged*), and `abi-diff` is **Added-only** (the AC-A1 `pub use` re-exports preserve symbol paths so nothing reads as Removed)
 
 **AC-A3 — `TofuPinningVerifier`: named deliverable bridging WebPKI into `verify_pinned`**
 **Given** stock `WebPkiServerVerifier`/`WebPkiClientVerifier` would terminate the cert decision without consulting the pin store
@@ -257,7 +262,7 @@ security model actually enforced on the wire.
 **AC-A5 — Cert/PKI provisioning, config schema, and `maos-bin` binding**
 **Given** v0.6 uses operator-supplied PEM (no embedded CA, no auto-issuance)
 **When** a `maos-bin` daemon enables the TCP transport
-**Then** a `TcpA2AConfig` struct (deserialized via the existing config layer) is defined with EXACTLY these fields: `listen_addr: SocketAddr` (`:0` in tests, readback via `local_addr` — AC-T/H3); `own_cert_chain: PathBuf` (PEM); `own_private_key: PathBuf` (PKCS#8 PEM); `peer_pins: Vec<PinnedFingerprint>` (pre-paired peer leaf-cert fingerprints loaded into `InMemoryTofuPinStore` at startup — this makes ADR-012 "pre-paired fingerprints" real); `handshake_timeout: Duration` (default 30s, MUST be injectable — AC-T/H5); `ca_roots: Option<PathBuf>` (WebPKI trust bundle; `None` ⇒ pinning is sole anchor — **OPEN FORK, see header**)
+**Then** a `TcpA2AConfig` struct (deserialized via the existing config layer) is defined with EXACTLY these fields: `listen_addr: SocketAddr` (`:0` in tests, readback via `local_addr` — AC-T/H3); `own_cert_chain: PathBuf` (PEM); `own_private_key: PathBuf` (PKCS#8 PEM); `peer_pins: Vec<PinnedFingerprint>` (pre-paired peer leaf-cert fingerprints loaded into `InMemoryTofuPinStore` at startup — this makes ADR-012 "pre-paired fingerprints" real); `handshake_timeout: Duration` (default 30s, MUST be injectable — AC-T/H5); `ca_roots: Option<PathBuf>` (WebPKI trust bundle — **RESOLVED Option A, see header:** `Some(bundle)` ⇒ CA-chain-to-root **then** pin (default, defense-in-depth); `None` ⇒ pin-only FR23a self-signed posture, same ordered validity prelude, separately tested via AC-T4b)
 **And** `maos-bin` gains a daemon-mode binding that, when `TcpA2AConfig` is present, constructs `TcpA2ATransport`, registers it as the `A2ATransport` for `CrossHost` dispatch, and binds the listener — with `maos-kernel-core` receiving NO new public fn (the registration reuses existing Spirit/router wiring); the AC names the `maos-bin` file where the binding lands
 
 **AC-A6 — No protocol-surface churn: 8.5's signatures consumed unchanged**

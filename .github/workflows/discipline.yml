@@ -1428,6 +1428,54 @@ jobs:
           MAOS_ONE_SHOT: smoke-mira-nash-8-5
         run: ./target/release/maos-bin
 
+  # Story 8.6 AC-T13 — live cross-Host TCP/mTLS transport suite, hermetic + the
+  # CI determinism repeat-runner (50× / --test-threads=8 / --retries 0). Any
+  # single flake fails the AC; this is the gate that stops this security story
+  # becoming §A2-style CI-only-flake debt.
+  a2a-tcp-tests-8-6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build a2a-core + a2a-tcp tests
+        run: cargo test -p maos-a2a-core -p maos-a2a-tcp --locked --no-run
+      - name: Run a2a-core unit tests
+        run: cargo test -p maos-a2a-core --locked -- --test-threads=8
+      - name: Run a2a-tcp suite 50× (determinism — AC-T13)
+        run: |
+          for i in $(seq 1 50); do
+            echo "::group::a2a-tcp run $i/50"
+            cargo test -p maos-a2a-tcp --locked -- --test-threads=8 || { echo "FLAKE on run $i"; exit 1; }
+            echo "::endgroup::"
+          done
+
+  # Story 8.6 AC-T13/AC-A7 — smoke-a2a-tcp-8-6: live cross-Host Mira(host_a) →
+  # Nash(host_b) advisory over a REAL TCP/mTLS socket (genuine handshake + wire,
+  # NOT the in-process loopback shortcut).
+  smoke-a2a-tcp-8-6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build maos-bin
+        run: cargo build -p maos-bin --release --features fixture_replay
+      - name: Run smoke-a2a-tcp-8-6
+        env:
+          MAOS_ONE_SHOT: smoke-a2a-tcp-8-6
+        run: ./target/release/maos-bin
+
   # Story 6.3 AC2 — FR23a + NFR-Sec-11/12 corpus + cross-Host AC3 + NFR-Rel-6 + chaos + churn
   a2a-loopback-corpus-v0:
     runs-on: ubuntu-latest
@@ -1846,7 +1894,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, mira-tests, nash-tests, orchestrator-tests, worker-tests, architect-tests, reviewer-tests, founder-loop-bench, mira-nash-bench, safety-critical-corpus-8-5, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-founder-loop-8-4, smoke-mira-nash-8-5, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, mira-tests, nash-tests, orchestrator-tests, worker-tests, architect-tests, reviewer-tests, founder-loop-bench, mira-nash-bench, safety-critical-corpus-8-5, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-founder-loop-8-4, smoke-mira-nash-8-5, a2a-tcp-tests-8-6, smoke-a2a-tcp-8-6, smoke-a2a-loopback-6-3, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b]
     if: always()
     permissions:
       pull-requests: write

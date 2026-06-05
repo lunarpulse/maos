@@ -112,7 +112,23 @@ Dependencies point inward (adapter ring → kernel services → domain core), wi
 
 **Workspace member count (post Story 7.1):** Story 7.1 adds `templates/spirit-ts/` (excluded from `[workspace] members` per Story 2.3 precedent), `examples/example-spirit-ts/` (Node project, NOT a Cargo workspace member), and `sdks/spirit-ts/` (Node package, NOT a Cargo workspace member). The Cargo workspace member count stays at **27** (post-Epic-6.5 baseline). Story 7.1 introduces non-Cargo workspace members built via `tsc`; the `check-workspace-count` gate stays at 27.
 
-**Workspace member count (post Story 8.5):**<!-- workspace-count-authoritative --> Story 8.5 adds the two bilateral-pair reference Spirits — `spirits/mira/` (Host A, prod-edge diagnostic; rust-inproc Worker, halt-capable via `[epistemic_policy]`) and `spirits/nash/` (Host B, dev-environment Senior Architect; rust-inproc Worker; Decision A) — moving the count to **39 workspace members** (post-Story-8.4 baseline 37 + 2 = 39). The `check-workspace-count` gate floor moves to 39. (History: 27 pre-7.1 → 28 with `examples/example-spirit` → 29 with `maos-spirit-cli` (Story 7.2) → 30 with `maos-skill` (Story 7.4) → 31 with `spirits/butler` (Story 8.1) → 32 with `spirits/researcher` (Story 8.2) → 33 with `spirits/observer` (Story 8.3) → 37 with `spirits/{orchestrator,worker,architect,reviewer}` (Story 8.4) → 39 with `spirits/{mira,nash}` (Story 8.5).)
+**Workspace member count (post Story 8.6):**<!-- workspace-count-authoritative --> Story 8.6 extracts the transport-agnostic A2A protocol substrate into a NEW `crates/maos-a2a-core/` and ships the live cross-Host wire as a NEW `crates/maos-a2a-tcp/`, moving the count to **41 workspace members** (post-Story-8.5 baseline 39 + 2 = 41). The `check-workspace-count` gate floor moves to 41. (History: 27 pre-7.1 → 28 with `examples/example-spirit` → 29 with `maos-spirit-cli` (Story 7.2) → 30 with `maos-skill` (Story 7.4) → 31 with `spirits/butler` (Story 8.1) → 32 with `spirits/researcher` (Story 8.2) → 33 with `spirits/observer` (Story 8.3) → 37 with `spirits/{orchestrator,worker,architect,reviewer}` (Story 8.4) → 39 with `spirits/{mira,nash}` (Story 8.5) → 41 with `crates/{maos-a2a-core,maos-a2a-tcp}` (Story 8.6).)
+
+**A2A transport layering (post Story 8.6).** The A2A surface is now three crates with the dependency arrows drawn explicitly:
+
+```text
+  maos-a2a-tcp ──►  maos-a2a-core  ◄── maos-a2a
+  (TcpA2ATransport:   (A2ATransport seam,    (LoopbackA2ARouter:
+   live cross-Host     A2ARouterCore engine,  in-process A2AProfile::Loopback
+   TCP/mTLS wire,      verify_pinned/TOFU,    over the same engine)
+   FR23b v1.5)         JSON-RPC framing,
+                       Lamport clock, consent,
+                       config, identity, chaos)
+```
+
+- **`maos-a2a-core`** owns the transport-agnostic protocol substrate (the `A2ATransport` trait + the shared `A2ARouterCore` validation engine reused byte-for-byte by every transport; the TOFU pin store + `verify_pinned`; ADR-012 consent; the JSON-RPC framing + `try_from_bytes`; the `LamportClock`; the mTLS retry policy; the rotation/churn chaos harnesses; the operator config + peer identity + `A2AError`). It carries `rustls` only for verifier-driven config types and contains NO socket/codec/async-TLS wire mechanisms (epic AC-A2 grep-asserted).
+- **`maos-a2a-tcp`** is the live cross-Host `A2ATransport` impl: a real TCP listener/dialer with operator-managed mTLS (the `TofuPinningVerifier` bridging WebPKI-then-pin into `verify_pinned`), length-delimited JSON-RPC framing (1 MiB cap), handshake retry, and bounded intake/partition timeouts. It depends ONLY on `maos-a2a-core` (NOT `maos-a2a`, NOT `maos-kernel-core`) — the kernel performs ZERO A2A auto-retry; the only retrier is `HandshakeRetryPolicy` on the transport (AC-T12).
+- **`maos-a2a`** retains ONLY the in-process `LoopbackA2ARouter` (`A2AProfile::Loopback`) and `pub use`-re-exports the moved substrate so downstream import paths are unchanged. The extraction also resolved `maos-a2a`'s prior KLOC-ceiling overage (2550 → 202 by the tokei metric) with no ceiling bump.
 
 **`spirit_test` feature on `maos-spirit-sdk` (post Story 2.4):** The crate gains an opt-in `spirit_test` cargo feature (depends on `local_runner` + `std` + `mock`) gating a new `crates/maos-spirit-sdk/src/spirit_test/` module that ships the SDK seed (assertion macros + IAC frame I/O capture + halt resolution simulator + manifest self-check + class-specific regression corpus skeleton + cross-Spirit isolation framework hooks). Workspace member count stays at **21** — the new module is feature-gated inside the existing crate, not a new workspace member.
 

@@ -3098,8 +3098,10 @@ description = "smoke test spirit successor"
                 .map_err(|e| format!("J4 measurement failed: {e}"))?;
             bench_harness.add_journey(j4.clone());
 
-            // Decision
-            let decision = decide(&j1, &j4);
+            // Decision (J6 cold-start not measured in this arm → None;
+            // Story 8.6 pre-existing maos-bin compile-break fix: `decide` gained
+            // a third `j6: Option<&JourneyResult>` arg when Story 8.5 authored J6.)
+            let decision = decide(&j1, &j4, None);
             let report = BenchReport::new(
                 bench_harness.run_id,
                 bench_harness.started_at_ns,
@@ -3139,6 +3141,13 @@ description = "smoke test spirit successor"
         // Story 8.5 AC7 — `smoke-mira-nash-8-5` end-to-end bilateral-pair J4 journey.
         if mode == "smoke-mira-nash-8-5" {
             return smoke_mira_nash_8_5().await;
+        }
+
+        // Story 8.6 AC-T13/AC-A7 — `smoke-a2a-tcp-8-6`: live cross-Host
+        // Mira(host_a) → Nash(host_b) advisory over a REAL TCP/mTLS socket
+        // (two independent `TcpA2ATransport` endpoints, genuine handshake + wire).
+        if mode == "smoke-a2a-tcp-8-6" {
+            return smoke_a2a_tcp_8_6().await;
         }
 
         // Story 6.3 AC7 — `smoke-a2a-loopback-6-3` end-to-end A2A wedge demo.
@@ -3205,7 +3214,7 @@ description = "smoke test spirit successor"
 
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-founder-loop-8-4, smoke-mira-nash-8-5"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-founder-loop-8-4, smoke-mira-nash-8-5, smoke-a2a-tcp-8-6"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -4414,7 +4423,7 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     let advisory_json = serde_json::to_string(&advisory)?;
     // Unique frame counter to avoid deterministic ID collisions in router caches.
     let mut frame_counter: u64 = 0;
-    let make_frame = |intent: IntentClass, body: String| {
+    let mut make_frame = |intent: IntentClass, body: String| {
         frame_counter += 1;
         let mut fid = [0u8; 16];
         fid[0..8].copy_from_slice(&frame_counter.to_be_bytes());
@@ -4474,14 +4483,18 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Record the advisory as a real TL row so the morning digest can cite it.
-    tl.insert_frame_event(
+    // `insert_frame_event` returns a must-use `LogBeforeDeliver` token, not a
+    // `Result` (Story 8.6: pre-existing maos-bin compile break fixed to unblock
+    // the maos-a2a-core extraction's downstream compile — analogous to the
+    // 7.3/8.3 pre-existing maos-bin fixes).
+    let _advisory_token = tl.insert_frame_event(
         TlFrameKind::ConsentRequest,
         MIRA_PID,
         None,
         "diagnostic.advisory",
         advisory_json.as_bytes(),
         FrameOrigin::SpiritAuto,
-    ).map_err(|e| format!("smoke-mira-nash-8-5: TL insert failed for advisory: {e}"))?;
+    );
     let advisory_ref = tl.last_frame_id();
 
     // ── Step 5 — one deliberate EIntentDenied (observable in the TL).
@@ -4498,14 +4511,14 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     .await
     {
         Err(A2AError::IntentDeniedAtPeer { .. }) => {
-            tl.insert_frame_event(
+            let _rupture_token = tl.insert_frame_event(
                 TlFrameKind::ConsentRupture,
                 MIRA_PID,
                 None,
                 "a2a.consent.denied",
                 b"readonly advisory denied at peer (accept_allowlist)",
                 FrameOrigin::SpiritAuto,
-            ).map_err(|e| format!("smoke-mira-nash-8-5: TL insert failed for ConsentRupture: {e}"))?;
+            );
             eprintln!(
                 "smoke-mira-nash-8-5: deliberate consent rejection (IntentDeniedAtPeer/EIntentDenied) — ConsentRupture row written to the TL"
             );
@@ -4585,6 +4598,201 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
 ///   * One TOFU pin mismatch: Host B presents a different cert fingerprint
 ///     on the second connection → `EPinMismatch::Mismatch` fires
 ///   * Per-frame Lamport clock — assert monotone advance on receiver
+/// Story 8.6 AC-A5 — the daemon-mode binding for the live cross-Host transport.
+///
+/// When a `TcpA2AConfig` is present, the composition root calls this to
+/// construct a [`maos_a2a_tcp::TcpA2ATransport`], bind its listener, and obtain
+/// it as a `maos_domain::ports::a2a::A2ARouter` — the SAME port the kernel
+/// mailbox dyn-dispatches CrossHost frames through (so registering it for
+/// `CrossHost` dispatch is `let router: Arc<dyn A2ARouter> = build_a2a_tcp_daemon_router(...)?`).
+/// `maos-kernel-core` receives NO new public fn (this lives entirely in the
+/// composition root). Returns the concrete `Arc<TcpA2ATransport>` (which impls
+/// both `A2ARouter` and `A2ATransport`) so the caller can also read `local_addr`.
+async fn build_a2a_tcp_daemon_router(
+    tcp_config: maos_a2a_tcp::TcpA2AConfig,
+    peer_configs: Vec<maos_a2a_core::A2APeerConfig>,
+    own_boot_nonce: u64,
+) -> Result<std::sync::Arc<maos_a2a_tcp::TcpA2ATransport>, Box<dyn std::error::Error>> {
+    let transport = maos_a2a_tcp::TcpA2ATransport::bind(
+        tcp_config,
+        peer_configs,
+        own_boot_nonce,
+        maos_a2a_tcp::TcpTimeouts::production(std::time::Duration::from_secs(30)),
+        maos_a2a_core::HandshakeRetryPolicy::default(),
+        None, // production: validate cert validity against the live system clock
+    )
+    .await
+    .map_err(|e| format!("a2a-tcp daemon bind failed: {e}"))?;
+    Ok(std::sync::Arc::new(transport))
+}
+
+/// Story 8.6 AC-T13/AC-A7 — `smoke-a2a-tcp-8-6`: a live cross-Host advisory from
+/// Mira(host_a) to Nash(host_b) over a REAL TCP/mTLS socket. Two independent
+/// `TcpA2ATransport` endpoints (each via [`build_a2a_tcp_daemon_router`], the
+/// AC-A5 binding) perform a genuine mTLS handshake with TOFU pinning and a
+/// length-delimited JSON-RPC frame over the loopback wire — NOT the in-process
+/// loopback shortcut of `smoke-a2a-loopback-6-3`.
+async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a_core::router::A2ATransport;
+    use maos_a2a_core::{A2APeerConfig, A2AProfile, ConsentAllowlists, PeerCertFingerprint, PeerId};
+    use maos_a2a_tcp::{PinnedFingerprint, TcpA2AConfig};
+    use maos_domain::frame::{
+        FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+    };
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_domain::ports::a2a::A2ARouter;
+    use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId};
+    use smallvec::smallvec;
+
+    const MIRA_NONCE: u64 = 7;
+    const NASH_NONCE: u64 = 11;
+
+    eprintln!("smoke-a2a-tcp-8-6: starting live cross-Host TCP/mTLS advisory demo");
+
+    // ── Generate a CA + two leaves at runtime (no committed certs).
+    let ca_key = rcgen::KeyPair::generate()?;
+    let mut ca_params = rcgen::CertificateParams::new(vec!["ca-good".to_string()])?;
+    ca_params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+    let ca_cert = ca_params.self_signed(&ca_key)?;
+    let ca_pem = ca_cert.pem();
+
+    let mk_leaf = |ca_cert: &rcgen::Certificate,
+                   ca_key: &rcgen::KeyPair|
+     -> Result<(String, String, PeerCertFingerprint), Box<dyn std::error::Error>> {
+        let key = rcgen::KeyPair::generate()?;
+        let params = rcgen::CertificateParams::new(vec!["127.0.0.1".to_string()])?;
+        let cert = params.signed_by(&key, ca_cert, ca_key)?;
+        let fp = PeerCertFingerprint::from_cert_der(cert.der().as_ref());
+        Ok((cert.pem(), key.serialize_pem(), fp))
+    };
+    let (mira_cert_pem, mira_key_pem, mira_fp) = mk_leaf(&ca_cert, &ca_key)?;
+    let (nash_cert_pem, nash_key_pem, nash_fp) = mk_leaf(&ca_cert, &ca_key)?;
+
+    // ── Write PEM material to a temp dir.
+    let dir = std::env::temp_dir().join(format!("maos-smoke-a2a-tcp-8-6-{}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let write = |name: &str, body: &str| -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+        let p = dir.join(name);
+        std::fs::write(&p, body)?;
+        Ok(p)
+    };
+    let ca_path = write("ca.pem", &ca_pem)?;
+    let mira_cert = write("mira.cert.pem", &mira_cert_pem)?;
+    let mira_key = write("mira.key.pem", &mira_key_pem)?;
+    let nash_cert = write("nash.cert.pem", &nash_cert_pem)?;
+    let nash_key = write("nash.key.pem", &nash_key_pem)?;
+
+    let allow = |send: &[&str], accept: &[&str]| ConsentAllowlists {
+        send_allowlist: send.iter().map(|s| A2AIntent::new(*s)).collect(),
+        accept_allowlist: accept.iter().map(|s| A2AIntent::new(*s)).collect(),
+    };
+
+    // ── Nash (host_b) — the server. Pins mira, accepts `readonly` from host_a.
+    let nash_cfg = TcpA2AConfig {
+        listen_addr: "127.0.0.1:0".parse()?,
+        own_cert_chain: nash_cert,
+        own_private_key: nash_key,
+        peer_pins: vec![PinnedFingerprint {
+            peer_id: PeerId::new("host_a"),
+            fingerprint: mira_fp.clone(),
+            boot_nonce: MIRA_NONCE,
+        }],
+        handshake_timeout: std::time::Duration::from_secs(30),
+        ca_roots: Some(ca_path.clone()),
+    };
+    let nash_peers = vec![A2APeerConfig {
+        peer_id: PeerId::new("host_a"),
+        endpoint: "tls://127.0.0.1:0".into(),
+        cert_fingerprint: mira_fp.clone(),
+        profile: A2AProfile::CrossHost,
+        allowlists: allow(&[], &["readonly"]),
+        partition_timeout_secs: 30,
+    }];
+    let nash = build_a2a_tcp_daemon_router(nash_cfg, nash_peers, NASH_NONCE).await?;
+    let nash_addr = nash.local_addr().ok_or("nash failed to bind")?;
+    eprintln!("smoke-a2a-tcp-8-6: Nash(host_b) listening on {nash_addr} (real TCP/mTLS)");
+
+    // ── Mira (host_a) — the client. Pins nash, dials the readback addr.
+    let mira_cfg = TcpA2AConfig {
+        listen_addr: "127.0.0.1:0".parse()?,
+        own_cert_chain: mira_cert,
+        own_private_key: mira_key,
+        peer_pins: vec![PinnedFingerprint {
+            peer_id: PeerId::new("host_b"),
+            fingerprint: nash_fp.clone(),
+            boot_nonce: NASH_NONCE,
+        }],
+        handshake_timeout: std::time::Duration::from_secs(30),
+        ca_roots: Some(ca_path.clone()),
+    };
+    let mira_peers = vec![A2APeerConfig {
+        peer_id: PeerId::new("host_b"),
+        endpoint: format!("tls://{nash_addr}"),
+        cert_fingerprint: nash_fp.clone(),
+        profile: A2AProfile::CrossHost,
+        allowlists: allow(&["readonly"], &[]),
+        partition_timeout_secs: 30,
+    }];
+    let mira = build_a2a_tcp_daemon_router(mira_cfg, mira_peers, MIRA_NONCE).await?;
+
+    // ── Mira sends the read-only diagnostic advisory to Nash over the live wire,
+    // dispatched through the kernel-facing `A2ARouter` port (AC-A5 registration).
+    let advisory = IacFrame {
+        frame_id: [1u8; 16],
+        timestamp_ns: 0,
+        logical_clock: 0,
+        from: FrameAddress {
+            spirit_id: SpiritId::from("mira"),
+            host_id: Some(HostId("host_a".into())),
+            role: None,
+        },
+        to: smallvec![FrameAddress {
+            spirit_id: SpiritId::from("nash"),
+            host_id: Some(HostId("host_b".into())),
+            role: None,
+        }],
+        kind: FrameKind::TaskAssign,
+        intent: IntentClass::Readonly,
+        payload: FramePayload::TaskAssign(TaskAssignPayload {
+            goal: "cross-host diagnostic advisory".into(),
+            scope: vec![],
+            success_criteria: "ack".into(),
+            posture_preferences: PosturePreferences::default(),
+            prior_distillate_ref: None,
+        }),
+        auto_marker: FrameOrigin::SpiritAuto,
+        consent_envelope: None,
+        intent_lineage: IntentLineage::default(),
+    };
+
+    let router: std::sync::Arc<dyn A2ARouter> = mira.clone();
+    router
+        .route_outbound(advisory, &HostId("host_b".into()))
+        .await
+        .map_err(|e| format!("smoke-a2a-tcp-8-6: live advisory failed: {e:?}"))?;
+
+    let (boot, lamport) = nash
+        .last_intake_observed()
+        .ok_or("smoke-a2a-tcp-8-6: Nash did not observe the advisory")?;
+    if boot != MIRA_NONCE {
+        return Err(format!("smoke-a2a-tcp-8-6: boot_nonce mismatch on wire: {boot} != {MIRA_NONCE}").into());
+    }
+    eprintln!(
+        "smoke-a2a-tcp-8-6: Nash(host_b) ACKed the advisory over live mTLS \
+         (boot_nonce={boot}, lamport={lamport}, TOFU pin verified) ✓"
+    );
+
+    // ── Teardown (H6): dropping the transports aborts the accept loops.
+    drop(mira);
+    drop(nash);
+    let _ = std::fs::remove_dir_all(&dir);
+    eprintln!("smoke-a2a-tcp-8-6: ✅ live cross-Host TCP/mTLS transport verified");
+    Ok(())
+}
+
 async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a::{
         A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile, ConsentAllowlists, EPinMismatch,

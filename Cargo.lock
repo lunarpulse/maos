@@ -603,6 +603,7 @@ checksum = "389ca41296e6190b48053de0321d02a77f32f8a5d2461dd38762c0593805c6d6"
 dependencies = [
  "futures-core",
  "futures-macro",
+ "futures-sink",
  "futures-task",
  "pin-project-lite",
  "slab",
@@ -989,6 +990,22 @@ name = "maos-a2a"
 version = "0.1.0-alpha"
 dependencies = [
  "async-trait",
+ "maos-a2a-core",
+ "maos-domain",
+ "maos-spirit-abi",
+ "rcgen",
+ "serde_json",
+ "smallvec",
+ "tempfile",
+ "tokio",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "maos-a2a-core"
+version = "0.1.0-alpha"
+dependencies = [
+ "async-trait",
  "dashmap",
  "hex",
  "maos-capability",
@@ -1003,8 +1020,30 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
- "tokio-rustls",
  "toml 0.8.23",
+]
+
+[[package]]
+name = "maos-a2a-tcp"
+version = "0.1.0-alpha"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "maos-a2a-core",
+ "maos-domain",
+ "maos-spirit-abi",
+ "rcgen",
+ "rustls",
+ "rustls-pemfile",
+ "rustls-webpki",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "tempfile",
+ "time",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
 ]
 
 [[package]]
@@ -1068,6 +1107,8 @@ dependencies = [
  "getrandom 0.3.4",
  "hex",
  "maos-a2a",
+ "maos-a2a-core",
+ "maos-a2a-tcp",
  "maos-acp",
  "maos-audit",
  "maos-bench",
@@ -1088,6 +1129,7 @@ dependencies = [
  "nash",
  "orchestrator",
  "parking_lot",
+ "rcgen",
  "reviewer",
  "ring",
  "serde_cbor",
@@ -1906,6 +1948,15 @@ dependencies = [
  "rustls-webpki",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "rustls-pemfile"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dce314e5fee3f39953d46bb63bb8a46d40c2f8fb7cc5a3b6cab2bde9721d6e50"
+dependencies = [
+ "rustls-pki-types",
 ]
 
 [[package]]

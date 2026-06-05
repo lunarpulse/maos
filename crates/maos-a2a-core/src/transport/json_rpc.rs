@@ -34,6 +34,16 @@ pub const CODE_CONSENT_EXPIRED: i32 = -32003;
 /// has rolled relative to the stored TOFU pin; the receiver MUST invalidate
 /// the prior pin and refuse the frame. NFR-Rel-6 detection floor.
 pub const CODE_SPIRIT_RESTART_DETECTED: i32 = -32004;
+/// Story 8.6 (AC-T7) — the per-connection intake exceeded its bounded timeout
+/// (slow-loris / stalling-intake defense). The live TCP transport owns the read
+/// side, so it aborts the per-connection task on expiry rather than racing a
+/// dangling future (the exact gap Story 8.5 deferred twice). Additive constant;
+/// does not change any existing signature (AC-A6).
+pub const CODE_TIMEOUT: i32 = -32005;
+/// Story 8.6 (AC-T8) — an inbound length-delimited frame advertised a payload
+/// larger than the codec's `max_frame_length` cap (1 MiB); rejected before
+/// allocation blow-up. Additive constant (AC-A6-safe).
+pub const CODE_FRAME_TOO_LARGE: i32 = -32006;
 pub const CODE_INTERNAL: i32 = -32099;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
