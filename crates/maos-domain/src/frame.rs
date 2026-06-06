@@ -420,6 +420,37 @@ pub struct ConsentEnvelope {
     pub valid_until_ns: Option<u64>,
 }
 
+impl ConsentEnvelope {
+    /// Story 8.7 / AC2 — sender-side helper: build a per-frame consent envelope
+    /// carrying an explicit ADR-012 fine-grained typed intent.
+    ///
+    /// Cross-Host send paths attach this to `IacFrame.consent_envelope` so the
+    /// receiver matches the operator's fine-grained allowlist entry
+    /// (`diagnosis-handoff:read-only-evidence`) instead of the coarse 3-band
+    /// projection. `consent_id` is unspecified (`[0u8; 16]`) and the envelope is
+    /// open-ended (`valid_until_ns = None`) at v0.5; callers that need a real
+    /// consent id / expiry construct the struct directly.
+    pub fn with_fine_grained_intent(
+        granter: FrameAddress,
+        intent: crate::invariants::i8::A2AIntent,
+    ) -> Self {
+        // Generate a unique consent_id from a monotonic counter so downstream
+        // deduplication / audit correlation does not collapse all fine-grained
+        // consents into a single record (review finding).
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let mut consent_id = [0u8; 16];
+        consent_id[0..8].copy_from_slice(&n.to_be_bytes());
+        Self {
+            consent_id,
+            granter,
+            timestamp_ns: 0,
+            intent_class: Some(intent),
+            valid_until_ns: None,
+        }
+    }
+}
+
 // ------------------------------------------------------------------
 // Story 6.5 — Gateway frame types (FR54 / ADR-029)
 // ------------------------------------------------------------------

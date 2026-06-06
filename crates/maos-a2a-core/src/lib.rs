@@ -45,7 +45,8 @@ pub use chaos::rotation::{
     compute_t_grace, AgentRotationTimestamps, RotationDrillReport,
 };
 pub use config::{A2AConfig, A2APeerConfig, A2AProfile};
-pub use consent::{A2AConsentEnvelope, ConsentAllowlists, EIntentDenied};
+// Story 8.7 / AC2b — `A2AConsentEnvelope` was deleted (dead fail-open footgun).
+pub use consent::{ConsentAllowlists, EIntentDenied};
 pub use error::{A2AError, A2AResult};
 pub use identity::{PeerCertFingerprint, PeerId};
 pub use mtls::{HandshakeRetryPolicy, LoopbackTlsConfig};

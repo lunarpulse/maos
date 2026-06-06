@@ -25,6 +25,10 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 dashmap = "6.1"
 sha2 = "0.10"
 hex = "0.4"
+# Story 8.7 / AC5 — structured `warn!` for unreachable ADR-012 allowlist
+# entries (the "silent never-match" failure mode made loud). `tracing 0.1` is
+# the workspace-standard facade (maos-skill / maos-manifest / maos-registry).
+tracing = "0.1"
 
 [dev-dependencies]
 rcgen = "0.13"
@@ -32,6 +36,10 @@ tempfile = "3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util", "time"] }
 smallvec = "1"
 toml = "0.8"
+# Story 8.7 / AC5 — capture the unreachable-entry `warn!` so the diagnostic is
+# regression-pinned (Murat round-1 condition), using the already-vendored
+# `tracing-subscriber` (no new external crate) rather than `tracing-test`.
+tracing-subscriber = "0.3"
 
 [features]
 default = []

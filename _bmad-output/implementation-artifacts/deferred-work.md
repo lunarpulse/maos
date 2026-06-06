@@ -2,6 +2,11 @@
 dev_model_used: claude-opus-4-7
 ---
 
+## Deferred from: code review of 8-7-fine-grained-typed-intent-consent-vocabulary-over-maos-a2a-core (2026-06-06)
+
+- Consent envelope granter mismatch — replay attack [router.rs:250-257] — No validation that `consent_envelope.granter` matches `frame.from`. A stolen consent envelope could be replayed by a different sender. Pre-existing issue; not introduced by 8.7. `guard_snippet: if let Some(ref env) = frame.consent_envelope { if env.granter != frame.from { return Err(A2AError::ConsentGranterMismatch); } }`
+- Expired consent masked by intent-denial error [router.rs:497-534] — The accept-side check runs `accept_admits` before `is_expired`. If both fail, the intent-denial error masks the expired-consent error. Pre-existing ordering issue in `handle_intake`; not introduced by 8.7. `guard_snippet: // Move consent expiry check before accept_admits`
+
 ## Deferred from: code review of 7-1-6-section-a2-full-flip (2026-06-02)
 
 - `cargo public-api --diff` skipped instead of run (AC6) — spec requires running the command but story is discipline-substrate only (.md + discipline.yml); zero ABI impact expected. Spec deviation acknowledged.

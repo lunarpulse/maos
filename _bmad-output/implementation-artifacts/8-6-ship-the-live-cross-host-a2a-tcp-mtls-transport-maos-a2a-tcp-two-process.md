@@ -1,3 +1,6 @@
+---
+dev_model_used: claude-opus-4-8
+---
 # Story 8.6: Ship the Live Cross-Host A2A TCP/mTLS Transport (`maos-a2a-tcp`, two-process)
 
 Status: done

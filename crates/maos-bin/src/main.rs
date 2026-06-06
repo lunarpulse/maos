@@ -3031,7 +3031,12 @@ description = "smoke test spirit successor"
             // Step 4: decision
             let j1 = &bench_harness.journey_results[0];
             let j4 = &bench_harness.journey_results[1];
-            let decision = decide(j1, j4);
+            // Story 8.7 — fix a pre-existing maos-bin compile break: `decide`
+            // gained a 3rd `j6` arg in Story 8.5 (J6 cold-start) but this bench
+            // mode (j1/j4 only) was never updated. `None` = J6 not run here.
+            // (Same recurring break class the 7.3 / 8.6 stories fixed to unblock
+            // their downstream maos-bin smoke builds.)
+            let decision = decide(j1, j4, None);
             eprintln!(
                 r#"{{"step":4,"surface":"decision","outcome":"{}","j1_p95_met":{},"j4_p95_met":{}}}"#,
                 decision.outcome, decision.j1_p95_met, decision.j4_p95_met
@@ -3155,6 +3160,12 @@ description = "smoke test spirit successor"
             return smoke_a2a_loopback_6_3().await;
         }
 
+        // Story 8.7 AC6 — `smoke-a2a-consent-vocab-8-7` fine-grained typed-intent
+        // consent demo (one fine-grained admit + one fine-grained deny).
+        if mode == "smoke-a2a-consent-vocab-8-7" {
+            return smoke_a2a_consent_vocab_8_7().await;
+        }
+
         // Story 6.4 AC5 — `smoke-schedule-6-4` end-to-end wedge demo
         // (ScheduleWatchdog firing + per-schedule rate-limit cap + ConsentRupture +
         // RateLimited frame emission).
@@ -3214,7 +3225,7 @@ description = "smoke test spirit successor"
 
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-founder-loop-8-4, smoke-mira-nash-8-5, smoke-a2a-tcp-8-6"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-founder-loop-8-4, smoke-mira-nash-8-5, smoke-a2a-tcp-8-6, smoke-a2a-consent-vocab-8-7"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -4207,7 +4218,7 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
 async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     use std::sync::{Arc, Mutex};
 
-    use mira::{AnomalySignal, Mira, ADVISORY_CONSENT_INTENT};
+    use mira::{AnomalySignal, Mira, ADVISORY_FINE_GRAINED_INTENT};
     use nash::Nash;
 
     use maos_a2a::error::A2AError;
@@ -4220,7 +4231,7 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
         NotificationChannel, NotificationDispatcher, NotificationError,
     };
     use maos_domain::frame::{
-        FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
     };
     use maos_domain::halt::{HaltId, Resolution};
     use maos_domain::invariants::i1::IntentClass;
@@ -4389,13 +4400,15 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     // ── Step 4 — Nash(host_b) informed via A2A typed-intent consent (TOFU verified).
     let fa = PeerCertFingerprint::from_cert_der(b"mira-host-a-cert-v1");
     let fb = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
+    // Story 8.7 / AC2+AC6 — the reference pair consents on the FINE-GRAINED
+    // intent, not the coarse `readonly` band.
     let mk_cfg = |id: &str, ep: &str, fp: PeerCertFingerprint, accept: Vec<A2AIntent>| A2APeerConfig {
         peer_id: PeerId::new(id),
         endpoint: ep.into(),
         cert_fingerprint: fp,
         profile: A2AProfile::Loopback,
         allowlists: ConsentAllowlists {
-            send_allowlist: vec![A2AIntent::new(ADVISORY_CONSENT_INTENT)],
+            send_allowlist: vec![A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT)],
             accept_allowlist: accept,
         },
         partition_timeout_secs: 30,
@@ -4404,13 +4417,13 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
         "host_a",
         "tls://127.0.0.1:7443",
         fa.clone(),
-        vec![A2AIntent::new(ADVISORY_CONSENT_INTENT)],
+        vec![A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT)],
     );
     let cfg_b = mk_cfg(
         "host_b",
         "tls://127.0.0.1:7444",
         fb.clone(),
-        vec![A2AIntent::new(ADVISORY_CONSENT_INTENT)],
+        vec![A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT)],
     );
     let tofu = Arc::new(InMemoryTofuPinStore::new());
     tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;
@@ -4428,15 +4441,16 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
         let mut fid = [0u8; 16];
         fid[0..8].copy_from_slice(&frame_counter.to_be_bytes());
         fid[8..16].copy_from_slice(&BOOT_NONCE.to_be_bytes());
+        let from = FrameAddress {
+            spirit_id: SpiritId::from("mira"),
+            host_id: Some(HostId("host_a".into())),
+            role: Some(SpiritRole::Worker),
+        };
         IacFrame {
             frame_id: fid,
             timestamp_ns: 0,
             logical_clock: 0,
-            from: FrameAddress {
-                spirit_id: SpiritId::from("mira"),
-                host_id: Some(HostId("host_a".into())),
-                role: Some(SpiritRole::Worker),
-            },
+            from: from.clone(),
             to: smallvec![FrameAddress {
                 spirit_id: SpiritId::from("nash"),
                 host_id: Some(HostId("host_b".into())),
@@ -4455,7 +4469,12 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
                 prior_distillate_ref: None,
             }),
             auto_marker: FrameOrigin::SpiritAuto,
-            consent_envelope: None,
+            // Story 8.7 / AC2 — populate the fine-grained per-frame intent. No
+            // reference cross-Host frame leaves with `intent_class == None`.
+            consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(
+                from,
+                A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT),
+            )),
             intent_lineage: IntentLineage::default(),
         }
     };
@@ -4470,6 +4489,22 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
         .recv()
         .await
         .ok_or("smoke-mira-nash-8-5: Nash received no advisory")?;
+    // Story 8.7 / AC2 — assert no off-Host frame leaves with intent_class == None,
+    // and that the receiver sees the fine-grained intent end-to-end.
+    match delivered
+        .consent_envelope
+        .as_ref()
+        .and_then(|e| e.intent_class.as_ref())
+        .map(|i| i.as_str())
+    {
+        Some(s) if s == ADVISORY_FINE_GRAINED_INTENT => {}
+        other => {
+            return Err(format!(
+                "smoke-mira-nash-8-5: AC2 violated — off-Host advisory must carry fine-grained intent_class, got {other:?}"
+            )
+            .into())
+        }
+    }
     let goal = match &delivered.payload {
         FramePayload::TaskAssign(t) => t.goal.clone(),
         other => return Err(format!("unexpected payload {other:?}").into()),
@@ -4516,7 +4551,7 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
                 MIRA_PID,
                 None,
                 "a2a.consent.denied",
-                b"readonly advisory denied at peer (accept_allowlist)",
+                b"fine-grained advisory denied at peer (empty accept_allowlist)",
                 FrameOrigin::SpiritAuto,
             );
             eprintln!(
@@ -4799,7 +4834,7 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
         InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
     };
     use maos_domain::frame::{
-        FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
     };
     use maos_domain::invariants::i1::IntentClass;
     use maos_domain::invariants::i13::IntentLineage;
@@ -4808,6 +4843,10 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
     use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId};
     use smallvec::smallvec;
     use std::sync::Arc;
+
+    // Story 8.7 / AC2 — the fine-grained intent this wedge's cross-Host frames
+    // declare on `consent_envelope.intent_class`.
+    const FINE_INTENT: &str = "diagnosis-handoff:read-only-evidence";
 
     maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     eprintln!("smoke-a2a-loopback-6-3: starting A2A loopback wedge demo");
@@ -4872,15 +4911,16 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
 
     // Step 4 — ALLOWED frames: send 3 frames in sequence and verify
     // Lamport logical_clock advances monotonically (strictly increasing).
+    let frame_from = FrameAddress {
+        spirit_id: SpiritId::from("mira"),
+        host_id: Some(HostId("host-a".into())),
+        role: None,
+    };
     let allowed_frame = IacFrame {
         frame_id: [0xAA; 16],
         timestamp_ns: 0,
         logical_clock: 0,
-        from: FrameAddress {
-            spirit_id: SpiritId::from("mira"),
-            host_id: Some(HostId("host-a".into())),
-            role: None,
-        },
+        from: frame_from.clone(),
         to: smallvec![FrameAddress {
             spirit_id: SpiritId::from("nash"),
             host_id: Some(HostId("host-a".into())),
@@ -4896,20 +4936,25 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
             prior_distillate_ref: None,
         }),
         auto_marker: FrameOrigin::HumanAuthored,
-        consent_envelope: None,
+        // Story 8.7 / AC2 — this cross-Host frame declares its FINE-GRAINED intent;
+        // it no longer rides the coarse `"standard"` band fallback.
+        consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(
+            frame_from,
+            A2AIntent::new(FINE_INTENT),
+        )),
         intent_lineage: IntentLineage::default(),
     };
 
-    // For the smoke arm we use a peer config where the intent string MATCHES
-    // the frame.intent's a2a_consent_intent_str output ("standard").
+    // Story 8.7 / AC2+AC6 — the smoke arm consents on the FINE-GRAINED intent the
+    // frame actually carries (not the `"standard"` band projection).
     let host_a_view_smoke = A2APeerConfig {
         peer_id: PeerId::new("host-a"),
         endpoint: "tls://127.0.0.1:7444".into(),
         cert_fingerprint: host_a_fp.clone(),
         profile: A2AProfile::Loopback,
         allowlists: ConsentAllowlists {
-            send_allowlist: vec![A2AIntent::new("standard")],
-            accept_allowlist: vec![A2AIntent::new("standard")],
+            send_allowlist: vec![A2AIntent::new(FINE_INTENT)],
+            accept_allowlist: vec![A2AIntent::new(FINE_INTENT)],
         },
         partition_timeout_secs: 30,
     };
@@ -4935,8 +4980,23 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
         let delivered = intake_rx_smoke.recv().await.ok_or(format!(
             "smoke-a2a-loopback-6-3: intake_rx received no frame for send {i}"
         ))?;
+        // Story 8.7 / AC2 — no off-Host frame leaves with intent_class == None.
+        match delivered
+            .consent_envelope
+            .as_ref()
+            .and_then(|e| e.intent_class.as_ref())
+            .map(|x| x.as_str())
+        {
+            Some(s) if s == FINE_INTENT => {}
+            other => {
+                return Err(format!(
+                    "smoke-a2a-loopback-6-3: AC2 violated — delivered frame {i} missing fine-grained intent_class, got {other:?}"
+                )
+                .into())
+            }
+        }
         eprintln!(
-            "smoke-a2a-loopback-6-3: step 4 — frame {i} delivered, logical_clock={}",
+            "smoke-a2a-loopback-6-3: step 4 — frame {i} delivered (intent='{FINE_INTENT}'), logical_clock={}",
             delivered.logical_clock
         );
         clocks.push(delivered.logical_clock);
@@ -4953,16 +5013,17 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
         clocks
     );
 
-    // Step 5 — DISALLOWED frame: send-side denial. Use a config WITHOUT the
-    // intent in send_allowlist.
+    // Step 5 — DISALLOWED frame: send-side denial on the FINE-GRAINED key. Use a
+    // config whose send_allowlist holds a DIFFERENT fine-grained intent, so the
+    // frame's `diagnosis-handoff:read-only-evidence` is not admitted.
     let disallow_cfg = A2APeerConfig {
         peer_id: PeerId::new("host-a"),
         endpoint: "tls://127.0.0.1:7444".into(),
         cert_fingerprint: host_a_fp.clone(),
         profile: A2AProfile::Loopback,
         allowlists: ConsentAllowlists {
-            send_allowlist: vec![A2AIntent::new("diagnosis-handoff:read-only-evidence")],
-            accept_allowlist: vec![A2AIntent::new("standard")],
+            send_allowlist: vec![A2AIntent::new("rca-summary")],
+            accept_allowlist: vec![A2AIntent::new("rca-summary")],
         },
         partition_timeout_secs: 30,
     };
@@ -5015,6 +5076,175 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
     drop(host_b_router);
 
     eprintln!("smoke-a2a-loopback-6-3: ✅ A2A wedge demo complete; loopback substrate verified");
+    Ok(())
+}
+
+/// Story 8.7 AC6 — `smoke-a2a-consent-vocab-8-7` runnable headline.
+///
+/// Demonstrates ADR-012 fine-grained typed-intent consent end-to-end over the
+/// real `LoopbackA2ARouter`: Nash's `accept_allowlist` admits exactly
+/// `diagnosis-handoff:read-only-evidence`. One frame carrying that fine-grained
+/// intent is **delivered**; a second frame carrying `code-mutation-directive`
+/// (which projects to the SAME `readonly` band, so a band-only gate would admit
+/// it) is **denied** with `EIntentDenied`/`CODE_INTENT_DENIED` naming the literal
+/// directive — the confused-deputy gap closed at the real granularity. Both
+/// frames populate `consent_envelope.intent_class` (AC2: no off-Host frame leaves
+/// with `intent_class == None`). Exits `0`.
+async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a::error::A2AError;
+    use maos_a2a::{
+        A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile, ConsentAllowlists,
+        InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
+    };
+    use maos_domain::frame::{
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+    };
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
+    use smallvec::smallvec;
+    use std::sync::Arc;
+
+    const ADMIT_INTENT: &str = "diagnosis-handoff:read-only-evidence";
+    const DENY_INTENT: &str = "code-mutation-directive";
+
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    eprintln!("smoke-a2a-consent-vocab-8-7: ADR-012 fine-grained typed-intent consent demo");
+
+    // Nash (host_b) consents to send/accept ONLY the fine-grained advisory intent.
+    let fa = PeerCertFingerprint::from_cert_der(b"mira-host-a-cert-v1");
+    let fb = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
+    // Loopback enforcement model (`tests/a2a_pairing.rs`): `route_outbound`
+    // checks the DESTINATION's `send_allowlist`; `handle_intake` checks the
+    // SOURCE's `accept_allowlist`. To show Nash *accepting* the advisory but
+    // *rejecting* the directive at the fine granularity, host_b admits both on
+    // send while host_a accepts ONLY the advisory.
+    let cfg_b = A2APeerConfig {
+        peer_id: PeerId::new("host_b"),
+        endpoint: "tls://127.0.0.1:7444".into(),
+        cert_fingerprint: fb.clone(),
+        profile: A2AProfile::Loopback,
+        allowlists: ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new(ADMIT_INTENT), A2AIntent::new(DENY_INTENT)],
+            accept_allowlist: vec![A2AIntent::new(ADMIT_INTENT), A2AIntent::new(DENY_INTENT)],
+        },
+        partition_timeout_secs: 30,
+    };
+    let cfg_a = A2APeerConfig {
+        peer_id: PeerId::new("host_a"),
+        endpoint: "tls://127.0.0.1:7443".into(),
+        cert_fingerprint: fa.clone(),
+        profile: A2AProfile::Loopback,
+        allowlists: ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new(ADMIT_INTENT), A2AIntent::new(DENY_INTENT)],
+            // Nash accepts ONLY the read-only evidence advisory — the directive
+            // (same `readonly` band) is rejected on the fine-grained key.
+            accept_allowlist: vec![A2AIntent::new(ADMIT_INTENT)],
+        },
+        partition_timeout_secs: 30,
+    };
+    let tofu = Arc::new(InMemoryTofuPinStore::new());
+    tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;
+    tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1).await?;
+    let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b], tofu);
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    router.install_intake_sink(tx).await;
+
+    let make_frame = |seq: u64, intent: &str| {
+        let mut fid = [0u8; 16];
+        fid[0..8].copy_from_slice(&seq.to_be_bytes());
+        fid[8] = 0x87;
+        let from = FrameAddress {
+            spirit_id: SpiritId::from("mira"),
+            host_id: Some(HostId("host_a".into())),
+            role: Some(SpiritRole::Worker),
+        };
+        IacFrame {
+            frame_id: fid,
+            timestamp_ns: 0,
+            logical_clock: 0,
+            from: from.clone(),
+            to: smallvec![FrameAddress {
+                spirit_id: SpiritId::from("nash"),
+                host_id: Some(HostId("host_b".into())),
+                role: Some(SpiritRole::Worker),
+            }],
+            kind: FrameKind::TaskAssign,
+            // Both frames project to the SAME `readonly` band — only the
+            // fine-grained intent_class distinguishes them.
+            intent: IntentClass::Readonly,
+            payload: FramePayload::TaskAssign(TaskAssignPayload {
+                goal: "diagnostic evidence".into(),
+                scope: vec![],
+                success_criteria: "architect a fix".into(),
+                posture_preferences: PosturePreferences::default(),
+                prior_distillate_ref: None,
+            }),
+            auto_marker: FrameOrigin::SpiritAuto,
+            consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(
+                from,
+                A2AIntent::new(intent),
+            )),
+            intent_lineage: IntentLineage::default(),
+        }
+    };
+
+    // ── (1) fine-grained ADMITTED frame ──────────────────────────────────────
+    LocalRouter::route_outbound(&router, make_frame(1, ADMIT_INTENT), &HostId("host_b".into()))
+        .await
+        .map_err(|e| format!("smoke-a2a-consent-vocab-8-7: admitted frame REJECTED: {e}"))?;
+    let delivered = rx
+        .recv()
+        .await
+        .ok_or("smoke-a2a-consent-vocab-8-7: Nash received no admitted frame")?;
+    match delivered
+        .consent_envelope
+        .as_ref()
+        .and_then(|e| e.intent_class.as_ref())
+        .map(|i| i.as_str())
+    {
+        Some(s) if s == ADMIT_INTENT => eprintln!(
+            "smoke-a2a-consent-vocab-8-7: ✓ fine-grained '{ADMIT_INTENT}' delivered to Nash (intent_class populated)"
+        ),
+        other => {
+            return Err(format!(
+                "smoke-a2a-consent-vocab-8-7: AC2 violated — delivered frame intent_class = {other:?}"
+            )
+            .into())
+        }
+    }
+
+    // ── (2) fine-grained DENIED frame (confused-deputy directive) ────────────
+    match LocalRouter::route_outbound(&router, make_frame(2, DENY_INTENT), &HostId("host_b".into()))
+        .await
+    {
+        Err(A2AError::IntentDeniedAtPeer { message, .. }) => {
+            // The NACK message format is: "intent {intent} not in accept_allowlist for peer {peer}"
+            // We verify the prefix and suffix rather than substring-matching the intent,
+            // so formatting changes (quotes, capitalization) do not break the smoke.
+            let expected_prefix = format!("intent {DENY_INTENT} ");
+            let expected_suffix = "for peer loopback";
+            if !message.starts_with(&expected_prefix) || !message.ends_with(expected_suffix) {
+                return Err(format!(
+                    "smoke-a2a-consent-vocab-8-7: denial message format mismatch (expected '{expected_prefix}...{expected_suffix}'), got '{message}'"
+                )
+                .into());
+            }
+            eprintln!(
+                "smoke-a2a-consent-vocab-8-7: ✓ '{DENY_INTENT}' DENIED at Nash (EIntentDenied/-32001) — confused-deputy gap closed at fine granularity"
+            );
+        }
+        Ok(()) => {
+            return Err("smoke-a2a-consent-vocab-8-7: directive admitted unexpectedly (band collapse?)".into())
+        }
+        Err(other) => {
+            return Err(format!("smoke-a2a-consent-vocab-8-7: unexpected error on denial: {other:?}").into())
+        }
+    }
+
+    eprintln!("smoke-a2a-consent-vocab-8-7: ✅ fine-grained consent vocabulary verified end-to-end");
     Ok(())
 }
 

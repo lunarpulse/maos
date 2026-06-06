@@ -27,6 +27,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use maos_domain::frame::IacFrame;
 use maos_domain::iac_bus_types::IacBusError;
+use maos_domain::invariants::i8::A2AIntent;
 use maos_spirit_abi::identity::HostId;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -124,6 +125,10 @@ pub struct A2ARouterCore {
     /// consent-expiry tests (Story 8.6 review F2 fix — replaces the old call
     /// counter). Additive: `new()` defaults to `None`, so no caller changes.
     consent_now_ns: Option<u64>,
+    /// Deduplication set for AC5 unreachable-entry warnings. Each
+    /// `(peer_id, entry, direction)` tuple is warned once per router lifetime
+    /// to prevent DoS amplification on repeated denials (review finding).
+    warned_entries: Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
 }
 
 impl A2ARouterCore {
@@ -145,6 +150,7 @@ impl A2ARouterCore {
             intake_sink: Arc::new(tokio::sync::Mutex::new(None)),
             next_id: Arc::new(std::sync::atomic::AtomicU64::new(1)),
             consent_now_ns: None,
+            warned_entries: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
         }
     }
 
@@ -209,26 +215,114 @@ impl A2ARouterCore {
     /// Project the frame's `IntentClass` to a stable A2A consent intent string
     /// for ADR-012 allowlist matching. Uses `IntentClass::a2a_consent_intent_str()`
     /// — the canonical (not Debug-derived) lowercase projection.
+    ///
+    /// Story 8.7 — this is now the **band-fallback primitive** that
+    /// [`Self::consent_match_key`] calls when a frame declares no fine-grained
+    /// per-frame intent. It stays `pub` (part of `maos-a2a-core`'s public surface
+    /// since the 8.6 extraction); renaming it would register as an abi-diff
+    /// Removed, so the fine-grained logic was added alongside it rather than
+    /// replacing it.
     pub fn frame_intent_str(frame: &IacFrame) -> String {
         frame.intent.a2a_consent_intent_str().to_string()
     }
 
-    /// Send-allowlist enforcement. The peer's `send_allowlist` enumerates
-    /// `A2AIntent` strings the operator wills THIS Host to SEND to that peer.
-    fn send_admits(allow: &ConsentAllowlists, frame: &IacFrame) -> bool {
-        let s = Self::frame_intent_str(frame);
-        allow
-            .send_allowlist
-            .iter()
-            .any(|i| i.as_str().eq_ignore_ascii_case(&s))
+    /// Story 8.7 / AC1 — the single ADR-012 consent-match key for a frame.
+    ///
+    /// Precedence (this is what makes ADR-012 "typed-*intent* consent" rather
+    /// than "typed-*class* consent"):
+    ///
+    /// 1. **Fine-grained when present** — if the frame carries an explicit
+    ///    per-frame intent (`consent_envelope.intent_class`, the
+    ///    [`A2AIntent`](maos_domain::invariants::i8::A2AIntent) the sender fills
+    ///    and the receiver verifies), that literal string is the match key. So
+    ///    an operator's `diagnosis-handoff:read-only-evidence` allowlist entry
+    ///    matches the actual frame intent instead of silently collapsing to a
+    ///    coarse band — and `code-mutation-directive` is rejected even though
+    ///    both project to the `readonly`/`standard` band (ADR-012's worked
+    ///    confused-deputy example).
+    /// 2. **Band fallback otherwise** — same-Host frames, or legacy/unmigrated
+    ///    cross-Host frames that declare no fine-grained intent, fall back to the
+    ///    3-band `IntentClass` projection via [`Self::frame_intent_str`],
+    ///    preserving the pre-8.7 `readonly`/`standard`/`highprivilege` behaviour
+    ///    byte-for-byte (zero-regression — AC7).
+    ///
+    /// Used by BOTH `send_admits`/`accept_admits` AND the two
+    /// `EIntentDenied.intent` construction sites, so the key actually tested and
+    /// the key reported in a denial can never diverge.
+    ///
+    /// [Source: docs/adr/ADR-012-typed-intent-a2a-consent.md] — consent is
+    /// `(peer-identity, intent-class)` with an open intent vocabulary.
+    fn consent_match_key(frame: &IacFrame) -> String {
+        frame
+            .consent_envelope
+            .as_ref()
+            .and_then(|e| e.intent_class.as_ref())
+            .filter(|i| i.as_str().len() <= 1024) // sanity bound — oversized intents fall back to band
+            .map(|i| i.as_str().to_string())
+            .unwrap_or_else(|| Self::frame_intent_str(frame))
     }
 
-    fn accept_admits(allow: &ConsentAllowlists, frame: &IacFrame) -> bool {
-        let s = Self::frame_intent_str(frame);
-        allow
+    /// Story 8.7 / AC5 — make the "silent never-match" failure mode loud.
+    ///
+    /// Emits a `tracing::warn!` once per unique `(peer, entry, direction)` for
+    /// every allowlist entry that is neither a canonical fine-grained intent nor
+    /// one of the 3 band tokens. The raw intent string is NOT emitted as a
+    /// structured field to avoid leaking vocabulary to WARN-level log collectors
+    /// (review finding); it appears only in the human-readable message.
+    ///
+    /// Deduplication prevents DoS amplification: a flood of denied frames does
+    /// not produce unbounded log volume (review finding).
+    fn warn_unreachable_entries(
+        &self,
+        allowlist: &[A2AIntent],
+        direction: AllowlistDirection,
+        peer_id: &str,
+    ) {
+        let mut warned = self.warned_entries.lock().unwrap();
+        for entry in allowlist {
+            if !entry.is_canonical() {
+                let dedup_key = format!("{peer_id}:{direction:?}:{}", entry.as_str());
+                if warned.insert(dedup_key) {
+                    tracing::warn!(
+                        target: "maos_a2a_core::router",
+                        direction = ?direction,
+                        peer = peer_id,
+                        "ADR-012 consent allowlist holds a non-canonical intent that may not \
+                         match canonical frame intents (matching is case-insensitive, but the \
+                         canonical grammar is `namespace:verb` lowercase such as \
+                         `diagnosis-handoff:read-only-evidence`, or a band token); \
+                         entry={}",
+                        entry.as_str()
+                    );
+                }
+            }
+        }
+    }
+
+    /// Send-allowlist enforcement. The peer's `send_allowlist` enumerates
+    /// `A2AIntent` strings the operator wills THIS Host to SEND to that peer.
+    fn send_admits(&self, allow: &ConsentAllowlists, frame: &IacFrame, peer_id: &str) -> bool {
+        let s = Self::consent_match_key(frame);
+        let admitted = allow
+            .send_allowlist
+            .iter()
+            .any(|i| i.as_str().eq_ignore_ascii_case(&s));
+        if !admitted {
+            self.warn_unreachable_entries(&allow.send_allowlist, AllowlistDirection::Send, peer_id);
+        }
+        admitted
+    }
+
+    fn accept_admits(&self, allow: &ConsentAllowlists, frame: &IacFrame, peer_id: &str) -> bool {
+        let s = Self::consent_match_key(frame);
+        let admitted = allow
             .accept_allowlist
             .iter()
-            .any(|i| i.as_str().eq_ignore_ascii_case(&s))
+            .any(|i| i.as_str().eq_ignore_ascii_case(&s));
+        if !admitted {
+            self.warn_unreachable_entries(&allow.accept_allowlist, AllowlistDirection::Accept, peer_id);
+        }
+        admitted
     }
 
     /// Shared outbound preparation — steps (1)–(4) of `route_outbound`,
@@ -251,12 +345,14 @@ impl A2ARouterCore {
         let peer_cfg = self.lookup_peer(peer)?;
 
         // (1) ADR-012 send-allowlist check (defense-in-depth — sender side).
-        if !Self::send_admits(&peer_cfg.allowlists, &frame) {
+        if !self.send_admits(&peer_cfg.allowlists, &frame, peer_cfg.peer_id.as_str()) {
             return Err(A2AError::IntentDenied {
                 direction: IntentDirection::Send,
                 inner: EIntentDenied {
                     peer: peer.as_str().to_string(),
-                    intent: Self::frame_intent_str(&frame),
+                    // Story 8.7 — report the SAME key `send_admits` tested
+                    // (fine-grained when present), never a band token.
+                    intent: Self::consent_match_key(&frame),
                     direction: AllowlistDirection::Send,
                 },
             });
@@ -418,13 +514,14 @@ impl A2ARouterCore {
         }
 
         // (2) ADR-012 accept-allowlist check.
-        if !Self::accept_admits(&peer_cfg.allowlists, frame) {
+        if !self.accept_admits(&peer_cfg.allowlists, frame, peer_cfg.peer_id.as_str()) {
             return A2AJsonRpcResponse::nack(
                 request.id,
                 CODE_INTENT_DENIED,
                 format!(
                     "intent {} not in accept_allowlist for peer {}",
-                    Self::frame_intent_str(frame),
+                    // Story 8.7 — report the SAME key `accept_admits` tested.
+                    Self::consent_match_key(frame),
                     peer_cfg.peer_id.as_str()
                 ),
             );

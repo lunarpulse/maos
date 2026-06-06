@@ -32,8 +32,24 @@ pub struct InvariantI8;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub struct A2AIntent(String);
 
+/// Maximum byte length of a canonical A2A intent. ADR-012 keeps the intent
+/// vocabulary *open* but not unbounded; the canonical-form check rejects
+/// pathologically long strings (Story 8.7 / AC5).
+/// Maximum byte length of a canonical A2A intent string.
+///
+/// Chosen as 128 bytes (arbitrary but generous) to prevent unbounded memory
+/// pressure from malicious or misconfigured intent strings on the wire. The
+/// bound is documented here for operator visibility; operators with legitimate
+/// intents exceeding this should file an ADR-012 revisit request.
+pub const MAX_CANONICAL_INTENT_LEN: usize = 128;
+
 impl A2AIntent {
     /// Create a new A2A intent.
+    ///
+    /// **Free-form by design** — ADR-012 deliberately chooses an open
+    /// vocabulary, so this performs no validation. Use [`A2AIntent::parse`] on
+    /// paths that want fail-closed canonical-form validation, and
+    /// [`A2AIntent::is_canonical`] for hygiene checks.
     pub fn new(intent: impl Into<String>) -> Self {
         Self(intent.into())
     }
@@ -42,7 +58,91 @@ impl A2AIntent {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// Story 8.7 / AC5 — is this intent in **canonical fine-grained form**?
+    ///
+    /// Canonical form is the de-facto shape the reference fleet already uses —
+    /// `rca-summary`, `diagnosis-handoff:read-only-evidence`,
+    /// `code-mutation-directive` — formalized as the grammar
+    /// `^[a-z0-9]+(-[a-z0-9]+)*(:[a-z0-9]+(-[a-z0-9]+)*)?$`: an optional single
+    /// `namespace:verb` split, each side a `-`-joined run of non-empty
+    /// lowercase-alphanumeric segments, bounded to [`MAX_CANONICAL_INTENT_LEN`]
+    /// bytes.
+    ///
+    /// The 3 coarse band tokens (`highprivilege`/`standard`/`readonly`, the
+    /// `IntentClass::a2a_consent_intent_str` projection) are a subset of this
+    /// grammar, so a *canonical* intent is exactly the set that can ever match a
+    /// frame's consent key (fine-grained OR band-fallback). An allowlist entry
+    /// that is NOT canonical can never match any frame — `maos-a2a-core`'s router
+    /// emits a `tracing::warn!` for such unreachable entries so the original
+    /// "silent never-match" failure mode becomes loud.
+    pub fn is_canonical(&self) -> bool {
+        let s = self.0.as_str();
+        if s.is_empty() || s.len() > MAX_CANONICAL_INTENT_LEN {
+            return false;
+        }
+        // `[a-z0-9]+(-[a-z0-9]+)*` — a `-`-joined run of non-empty
+        // lowercase-alphanumeric segments.
+        fn is_segment_run(seg: &str) -> bool {
+            !seg.is_empty()
+                && seg.split('-').all(|run| {
+                    !run.is_empty()
+                        && run
+                            .bytes()
+                            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+                })
+        }
+        // At most one `namespace:verb` split.
+        let mut parts = s.split(':');
+        let namespace = parts.next().unwrap_or_default();
+        let verb = parts.next();
+        if parts.next().is_some() {
+            return false; // more than one ':'
+        }
+        if !is_segment_run(namespace) {
+            return false;
+        }
+        match verb {
+            None => true,
+            Some(v) => is_segment_run(v),
+        }
+    }
+
+    /// Story 8.7 / AC5 — parse a string into a **canonical** [`A2AIntent`],
+    /// rejecting non-canonical shapes with [`NonCanonicalIntent`].
+    ///
+    /// Use this on config-load paths that want fail-closed vocabulary
+    /// validation; [`A2AIntent::new`] remains the free-form constructor
+    /// ADR-012's open vocabulary requires.
+    pub fn parse(intent: impl Into<String>) -> Result<Self, NonCanonicalIntent> {
+        let candidate = Self(intent.into());
+        if candidate.is_canonical() {
+            Ok(candidate)
+        } else {
+            Err(NonCanonicalIntent(candidate.0))
+        }
+    }
 }
+
+/// Story 8.7 / AC5 — [`A2AIntent::parse`] rejection: the string is not in
+/// canonical fine-grained form
+/// (`^[a-z0-9]+(-[a-z0-9]+)*(:[a-z0-9]+(-[a-z0-9]+)*)?$`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NonCanonicalIntent(pub String);
+
+impl std::fmt::Display for NonCanonicalIntent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "non-canonical A2A intent {:?}: expected lowercase `namespace:verb` \
+             (e.g. `diagnosis-handoff:read-only-evidence`) or a band token \
+             (`highprivilege`/`standard`/`readonly`)",
+            self.0
+        )
+    }
+}
+
+impl std::error::Error for NonCanonicalIntent {}
 
 /// Typed allowlist wrapper around a set of A2A intents.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -85,5 +185,61 @@ mod tests {
         list.insert(A2AIntent::new("consult"));
         assert!(list.contains(&A2AIntent::new("consult")));
         assert!(!list.contains(&A2AIntent::new("delegate")));
+    }
+
+    // ── Story 8.7 / AC5 — canonical-form hygiene ──────────────────────────────
+
+    #[test]
+    fn is_canonical_accepts_reference_fleet_shapes() {
+        // The de-facto fleet vocabulary + the 3 band tokens.
+        for s in [
+            "rca-summary",
+            "diagnosis-handoff:read-only-evidence",
+            "code-mutation-directive",
+            "cross-environment-telemetry-query",
+            "highprivilege",
+            "standard",
+            "readonly",
+            "a",
+            "a1-b2:c3-d4",
+        ] {
+            assert!(A2AIntent::new(s).is_canonical(), "{s} should be canonical");
+        }
+    }
+
+    #[test]
+    fn is_canonical_rejects_typo_class() {
+        // Exactly the "silent never-match" class the warn must catch.
+        for s in [
+            "",                              // empty
+            "Diagnosis-Handoff",            // uppercase
+            "diagnosis handoff",            // space
+            "diagnosis-handoff:",           // trailing colon (empty verb)
+            ":read-only",                   // empty namespace
+            "diagnosis--handoff",           // empty segment between dashes
+            "-leading-dash",                // leading dash → empty segment
+            "trailing-dash-",               // trailing dash → empty segment
+            "ns:verb:extra",                // more than one colon
+            "snake_case",                   // underscore not allowed
+        ] {
+            assert!(
+                !A2AIntent::new(s).is_canonical(),
+                "{s:?} should NOT be canonical"
+            );
+        }
+        // Length bound.
+        let too_long = "a".repeat(MAX_CANONICAL_INTENT_LEN + 1);
+        assert!(!A2AIntent::new(too_long).is_canonical());
+    }
+
+    #[test]
+    fn parse_round_trips_canonical_and_rejects_non_canonical() {
+        let ok = A2AIntent::parse("diagnosis-handoff:read-only-evidence").expect("canonical");
+        assert_eq!(ok.as_str(), "diagnosis-handoff:read-only-evidence");
+
+        let err = A2AIntent::parse("Not Canonical").expect_err("must reject");
+        assert!(format!("{err}").contains("non-canonical"));
+        // `new` stays free-form (ADR-012 open vocabulary).
+        assert_eq!(A2AIntent::new("Not Canonical").as_str(), "Not Canonical");
     }
 }

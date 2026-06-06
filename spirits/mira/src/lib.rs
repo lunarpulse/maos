@@ -50,13 +50,25 @@ pub const DIAGNOSTIC_CONFIDENCE_TAG: &str = "diagnostic_confidence";
 /// Spirit-side halt decision in lock-step with the declared policy).
 pub const DIAGNOSTIC_CONFIDENCE_HALT_THRESHOLD: f64 = 0.5;
 
-/// The ADR-012 typed-intent string Mira's cross-Host advisory carries. Mira's
-/// advisory is **read-only** (it asks Nash to architect a fix; it mutates
-/// nothing), so the frame carries [`IntentClass::Readonly`](maos_domain::invariants::i1::IntentClass::Readonly),
-/// whose A2A consent projection is `"readonly"`. Both Mira's `send_allowlist`
-/// and Nash's `accept_allowlist` must admit this intent for the advisory to
-/// deliver (`tests/a2a_pairing.rs`).
+/// The coarse 3-band A2A consent projection of Mira's advisory. Mira's advisory
+/// is **read-only** (it asks Nash to architect a fix; it mutates nothing), so the
+/// frame carries [`IntentClass::Readonly`](maos_domain::invariants::i1::IntentClass::Readonly),
+/// whose A2A consent projection is `"readonly"`.
+///
+/// Retained for back-compat with the 3-band fallback path (Story 8.7 / AC7);
+/// the *fine-grained* cross-Host consent key Mira now declares is
+/// [`ADVISORY_FINE_GRAINED_INTENT`].
 pub const ADVISORY_CONSENT_INTENT: &str = "readonly";
+
+/// Story 8.7 / AC6 — the **fine-grained** ADR-012 typed-intent Mira's cross-Host
+/// advisory carries on `consent_envelope.intent_class`. This is the
+/// `(peer-identity, intent-class)` key the receiver actually matches: it is
+/// admissible at Nash, while `code-mutation-directive` (a frame projecting to the
+/// *same* `readonly` band) is rejected — ADR-012's worked confused-deputy
+/// example, now closed at the real granularity rather than collapsed to the
+/// coarse band ([`ADVISORY_CONSENT_INTENT`]). Both Mira's `send_allowlist` and
+/// Nash's `accept_allowlist` admit this exact string.
+pub const ADVISORY_FINE_GRAINED_INTENT: &str = "diagnosis-handoff:read-only-evidence";
 
 /// The prod-edge metrics Mira has a known diagnostic pattern for. An anomaly on a
 /// *known* metric is diagnosed confidently; an anomaly on an *unknown* metric is

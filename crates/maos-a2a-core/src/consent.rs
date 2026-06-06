@@ -6,39 +6,27 @@
 //! intent is not in the sender's send-allowlist or the receiver's
 //! accept-allowlist with `EIntentDenied`."
 
-use maos_domain::frame::FrameAddress;
 use maos_domain::invariants::i8::A2AIntent;
 use serde::{Deserialize, Serialize};
 
-/// Pre-frame consent envelope per ADR-012 binding-v0.9.
-///
-/// Extends the v0.3-β `maos_domain::frame::ConsentEnvelope` with the typed
-/// intent class (Story 6.3 fills in the ADR-012 hook). The original
-/// `ConsentEnvelope` is extended additively in `maos-domain` — this struct
-/// is the typed projection the A2A surface operates over (the conversion
-/// to/from the domain envelope is in `adapter.rs` via `From` impl below).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct A2AConsentEnvelope {
-    pub consent_id: [u8; 16],
-    pub granter: FrameAddress,
-    pub timestamp_ns: u64,
-    /// ADR-012 binding-v0.9 — typed-intent class for cross-Host consent.
-    pub intent_class: A2AIntent,
-    /// When the envelope expires. `None` = no expiry (open-ended consent at v0.5).
-    pub valid_until_ns: Option<u64>,
-}
-
-impl From<maos_domain::frame::ConsentEnvelope> for A2AConsentEnvelope {
-    fn from(env: maos_domain::frame::ConsentEnvelope) -> Self {
-        Self {
-            consent_id: env.consent_id,
-            granter: env.granter,
-            timestamp_ns: env.timestamp_ns,
-            intent_class: env.intent_class.unwrap_or_else(|| A2AIntent::new("standard")),
-            valid_until_ns: env.valid_until_ns,
-        }
-    }
-}
+// Story 8.7 / AC2b — the dead `A2AConsentEnvelope` struct + its
+// `From<ConsentEnvelope>` impl were DELETED here (Q5 team consensus, 2-1;
+// Winston + Security DELETE, Murat dissent on abi-discipline grounds).
+//
+// Rationale: the type had ZERO non-test callers (the router enforces over
+// `IacFrame.consent_envelope` directly, never via `A2AConsentEnvelope`), and
+// its `From` silently coerced a *missing* intent to the `"standard"` privilege
+// band (`intent_class: env.intent_class.unwrap_or_else(|| A2AIntent::new("standard"))`)
+// — a latent fail-open *privilege elevation* the instant anyone wired the type
+// onto the consent path. The team rejected "leave + doc-comment" as a
+// decaying-promise / loaded-gun pattern and removed the gun entirely.
+//
+// This is the ONE ratified exception to AC8's abi-diff Added-only discipline
+// (a maos-a2a-core public-surface Removed), flagged for Winston's sign-off at
+// review — mirroring the 8.6 `ca_roots` fail-closed flag. (Note: the mechanical
+// `abi-diff` discipline gate scans only `maos-spirit-abi`, which is untouched,
+// so the gate itself stays GREEN; the Removed is on `maos-a2a-core`'s
+// cargo-public-api surface.)
 
 /// Per-peer send/accept allowlists per ADR-012.
 ///

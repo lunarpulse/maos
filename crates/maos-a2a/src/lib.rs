@@ -49,7 +49,8 @@ pub use maos_a2a_core::{
 // plus the new `A2ATransport`/`A2ARouterCore`/`map_a2a_error_to_iac_bus` seam.
 pub use adapter::LoopbackA2ARouter;
 pub use maos_a2a_core::{
-    compute_t_grace, map_a2a_error_to_iac_bus, A2AConfig, A2AConsentEnvelope,
+    // Story 8.7 / AC2b — `A2AConsentEnvelope` removed (dead fail-open footgun).
+    compute_t_grace, map_a2a_error_to_iac_bus, A2AConfig,
     A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, A2APeerRouter,
     A2ARouterCore, A2AResult, A2ATransport, A2AProfile, AckBody, AgentRotationTimestamps,
     ChurnDrillReport, ChurnHarnessConfig, ConsentAllowlists, EIntentDenied,

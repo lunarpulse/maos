@@ -22,14 +22,19 @@ use maos_a2a::{
     InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
 };
 use maos_domain::frame::{
-    FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+    ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
 };
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
-use mira::{AnomalySignal, Mira, ADVISORY_CONSENT_INTENT};
+use mira::{AnomalySignal, Mira, ADVISORY_CONSENT_INTENT, ADVISORY_FINE_GRAINED_INTENT};
+
+/// Story 8.7 / AC6 — the deliberately-denied confused-deputy directive. It
+/// projects to the SAME `readonly` band as the advisory, so a band-only gate
+/// would admit it; the fine-grained gate rejects it.
+const DENIED_FINE_GRAINED_INTENT: &str = "code-mutation-directive";
 use nash::Nash;
 use smallvec::smallvec;
 use std::sync::Arc;
@@ -53,6 +58,11 @@ fn peer(peer_id: &str, fp: PeerCertFingerprint, send: &[&str], accept: &[&str]) 
 /// A cross-Host advisory frame carrying `advisory_json` from `from_host` →
 /// `to_host`. Spirit-authored frames carry `FrameOrigin::SpiritAuto` (the 8.4
 /// review patch) and `SpiritRole::Worker` (Decision C).
+///
+/// Story 8.7 / AC2 — `fine_intent` is the per-frame fine-grained ADR-012 intent
+/// the sender populates on `consent_envelope.intent_class`. Reference cross-Host
+/// frames pass `Some(..)` (the migrated path); `None` exercises the legacy 3-band
+/// fallback (AC7) for the band-based denial-mechanism tests.
 fn advisory_frame(
     from_spirit: &str,
     from_host: &str,
@@ -60,20 +70,22 @@ fn advisory_frame(
     to_host: &str,
     advisory_json: String,
     intent: IntentClass,
+    fine_intent: Option<&str>,
     seq: u64,
 ) -> IacFrame {
     let mut fid = [0u8; 16];
     fid[0..8].copy_from_slice(&seq.to_be_bytes());
     fid[8] = 0xA5; // test-namespace marker
+    let from = FrameAddress {
+        spirit_id: SpiritId::from(from_spirit),
+        host_id: Some(HostId(from_host.to_string())),
+        role: Some(SpiritRole::Worker),
+    };
     IacFrame {
         frame_id: fid,
         timestamp_ns: 0,
         logical_clock: 0,
-        from: FrameAddress {
-            spirit_id: SpiritId::from(from_spirit),
-            host_id: Some(HostId(from_host.to_string())),
-            role: Some(SpiritRole::Worker),
-        },
+        from: from.clone(),
         to: smallvec![FrameAddress {
             spirit_id: SpiritId::from(to_spirit),
             host_id: Some(HostId(to_host.to_string())),
@@ -89,7 +101,8 @@ fn advisory_frame(
             prior_distillate_ref: None,
         }),
         auto_marker: FrameOrigin::SpiritAuto,
-        consent_envelope: None,
+        consent_envelope: fine_intent
+            .map(|s| ConsentEnvelope::with_fine_grained_intent(from, A2AIntent::new(s))),
         intent_lineage: IntentLineage::default(),
     }
 }
@@ -108,19 +121,19 @@ async fn bilateral_pair_routes_advisory_over_real_loopback_with_tofu() {
     let host_a_fp = PeerCertFingerprint::from_cert_der(b"mira-host-a-cert-v1");
     let host_b_fp = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
 
-    // Per-side configs — pre-paired fingerprints (no discovery), both allowlists
-    // admit the `readonly` advisory intent.
+    // Per-side configs — pre-paired fingerprints (no discovery). Story 8.7 / AC6:
+    // both allowlists admit the FINE-GRAINED advisory intent (not the coarse band).
     let cfg_a = peer(
         "host_a",
         host_a_fp.clone(),
-        &[ADVISORY_CONSENT_INTENT],
-        &[ADVISORY_CONSENT_INTENT],
+        &[ADVISORY_FINE_GRAINED_INTENT],
+        &[ADVISORY_FINE_GRAINED_INTENT],
     );
     let cfg_b = peer(
         "host_b",
         host_b_fp.clone(),
-        &[ADVISORY_CONSENT_INTENT],
-        &[ADVISORY_CONSENT_INTENT],
+        &[ADVISORY_FINE_GRAINED_INTENT],
+        &[ADVISORY_FINE_GRAINED_INTENT],
     );
 
     // Pre-pin both peers' fingerprints (TOFU first-contact, declared == observed).
@@ -146,6 +159,7 @@ async fn bilateral_pair_routes_advisory_over_real_loopback_with_tofu() {
         "host_b",
         advisory_json.clone(),
         IntentClass::Readonly,
+        Some(ADVISORY_FINE_GRAINED_INTENT),
         1,
     );
     LocalRouter::route_outbound(&router, frame, &HostId("host_b".into()))
@@ -155,6 +169,17 @@ async fn bilateral_pair_routes_advisory_over_real_loopback_with_tofu() {
     assert_eq!(delivered.from.host_id, Some(HostId("host_a".into())));
     assert_eq!(delivered.to[0].host_id, Some(HostId("host_b".into())));
     assert_eq!(delivered.to[0].role, Some(SpiritRole::Worker));
+    // Story 8.7 / AC2 — the off-Host advisory carries the fine-grained intent
+    // end-to-end (NOT None, NOT collapsed to a band).
+    assert_eq!(
+        delivered
+            .consent_envelope
+            .as_ref()
+            .and_then(|e| e.intent_class.as_ref())
+            .map(|i| i.as_str()),
+        Some(ADVISORY_FINE_GRAINED_INTENT),
+        "Mira's advisory must ride with the fine-grained intent_class populated"
+    );
 
     // Nash deserializes the advisory off the wire and produces an architecture.
     let goal = match &delivered.payload {
@@ -178,6 +203,7 @@ async fn bilateral_pair_routes_advisory_over_real_loopback_with_tofu() {
         "host_a",
         serde_json::to_string(&proposal).unwrap(),
         IntentClass::Readonly,
+        Some(ADVISORY_FINE_GRAINED_INTENT),
         2,
     );
     LocalRouter::route_outbound(&router, reply, &HostId("host_a".into()))
@@ -221,13 +247,14 @@ async fn non_allowlisted_intent_denied_at_accepting_peer() {
     let host_b_fp = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
 
     // The source (host_a) config accepts NOTHING → the advisory is refused at
-    // intake even though the destination admits the send.
-    let cfg_a = peer("host_a", host_a_fp.clone(), &[ADVISORY_CONSENT_INTENT], &[]);
+    // intake even though the destination admits the send. Story 8.7 / AC4 — the
+    // denial is on the FINE-GRAINED key.
+    let cfg_a = peer("host_a", host_a_fp.clone(), &[ADVISORY_FINE_GRAINED_INTENT], &[]);
     let cfg_b = peer(
         "host_b",
         host_b_fp.clone(),
-        &[ADVISORY_CONSENT_INTENT],
-        &[ADVISORY_CONSENT_INTENT],
+        &[ADVISORY_FINE_GRAINED_INTENT],
+        &[ADVISORY_FINE_GRAINED_INTENT],
     );
     let tofu = Arc::new(InMemoryTofuPinStore::new());
     tofu.pin_first_contact(&PeerId::new("host_a"), &host_a_fp, &host_a_fp, 1)
@@ -245,6 +272,7 @@ async fn non_allowlisted_intent_denied_at_accepting_peer() {
         "host_b",
         mira_advisory_json(),
         IntentClass::Readonly,
+        Some(ADVISORY_FINE_GRAINED_INTENT),
         3,
     );
     let err = LocalRouter::route_outbound(&router, frame, &HostId("host_b".into()))
@@ -257,12 +285,81 @@ async fn non_allowlisted_intent_denied_at_accepting_peer() {
 }
 
 #[tokio::test]
-async fn send_side_denial_carries_eintentdenied() {
-    // The literal `EIntentDenied` rides the send-side denial: an intent not in
-    // the destination's send_allowlist is rejected before the wire.
+async fn confused_deputy_directive_denied_while_advisory_admitted() {
+    // Story 8.7 / AC3 + AC6 — ADR-012's worked example, now executable at the
+    // fine granularity. Nash accepts ONLY the read-only evidence advisory; the
+    // `code-mutation-directive` projects to the SAME `readonly` band but is
+    // rejected on the fine-grained key (a band-only gate would admit BOTH).
     let host_a_fp = PeerCertFingerprint::from_cert_der(b"mira-host-a-cert-v1");
     let host_b_fp = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
-    // host_b admits only `readonly` on send; a `standard` frame is denied.
+    let cfg_a = peer(
+        "host_a",
+        host_a_fp.clone(),
+        &[ADVISORY_FINE_GRAINED_INTENT, DENIED_FINE_GRAINED_INTENT],
+        &[ADVISORY_FINE_GRAINED_INTENT],
+    );
+    let cfg_b = peer(
+        "host_b",
+        host_b_fp.clone(),
+        &[ADVISORY_FINE_GRAINED_INTENT, DENIED_FINE_GRAINED_INTENT],
+        &[ADVISORY_FINE_GRAINED_INTENT],
+    );
+    let tofu = Arc::new(InMemoryTofuPinStore::new());
+    tofu.pin_first_contact(&PeerId::new("host_a"), &host_a_fp, &host_a_fp, 1)
+        .await
+        .unwrap();
+    tofu.pin_first_contact(&PeerId::new("host_b"), &host_b_fp, &host_b_fp, 1)
+        .await
+        .unwrap();
+    let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b], tofu);
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    router.install_intake_sink(tx).await;
+
+    // The read-only evidence advisory is admitted at Nash.
+    let admit = advisory_frame(
+        "mira",
+        "host_a",
+        "nash",
+        "host_b",
+        mira_advisory_json(),
+        IntentClass::Readonly,
+        Some(ADVISORY_FINE_GRAINED_INTENT),
+        5,
+    );
+    LocalRouter::route_outbound(&router, admit, &HostId("host_b".into()))
+        .await
+        .expect("read-only advisory admitted");
+    rx.recv().await.expect("Nash receives the advisory");
+
+    // The mutation directive — same band — is rejected at Nash's accept-allowlist.
+    let deny = advisory_frame(
+        "mira",
+        "host_a",
+        "nash",
+        "host_b",
+        mira_advisory_json(),
+        IntentClass::Readonly,
+        Some(DENIED_FINE_GRAINED_INTENT),
+        6,
+    );
+    let err = LocalRouter::route_outbound(&router, deny, &HostId("host_b".into()))
+        .await
+        .expect_err("mutation directive must be denied at the fine granularity");
+    assert!(
+        matches!(err, A2AError::IntentDeniedAtPeer { .. }),
+        "expected IntentDeniedAtPeer for code-mutation-directive, got {err:?}"
+    );
+}
+
+#[tokio::test]
+async fn send_side_denial_carries_eintentdenied() {
+    // The literal `EIntentDenied` rides the send-side denial: an intent not in
+    // the destination's send_allowlist is rejected before the wire. Story 8.7 /
+    // AC7 — this exercises the BAND-FALLBACK path (frame carries no fine-grained
+    // intent), proving the legacy 3-band denial still works byte-for-byte.
+    let host_a_fp = PeerCertFingerprint::from_cert_der(b"mira-host-a-cert-v1");
+    let host_b_fp = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
+    // host_b admits only `readonly` on send; a `standard` band frame is denied.
     let cfg_a = peer("host_a", host_a_fp.clone(), &["standard"], &["standard"]);
     let cfg_b = peer(
         "host_b",
@@ -286,6 +383,7 @@ async fn send_side_denial_carries_eintentdenied() {
         "host_b",
         mira_advisory_json(),
         IntentClass::Standard,
+        None, // band-fallback path (AC7)
         4,
     );
     let err = LocalRouter::route_outbound(&router, frame, &HostId("host_b".into()))

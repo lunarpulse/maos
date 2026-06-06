@@ -1,4 +1,4 @@
-last_updated: '2026-06-05T00:00:00Z+story-8-6-done'
+last_updated: '2026-06-06T00:00:00Z+story-8-7-review-complete'
 generated: 2026-05-11
 project: maos
 project_key: NOKEY
@@ -88,7 +88,9 @@ development_status:
   # Story 8.6 (split from 8.5, 2026-06-04): live CrossHost TCP/mTLS transport is FULLY ABSENT (not scaffolding) — new maos-a2a-tcp crate (~1000+ LOC, security-critical), own risk class. 8.5 ships the loopback-simulated pair; 8.6 ships the live two-process transport.
   8-6-ship-the-live-cross-host-a2a-tcp-mtls-transport-maos-a2a-tcp-two-process: done
   # Story 8.7 (Winston ruling 2026-06-04, deferred from 8.5): ADR-012 fine-grained typed-intent consent. 8.5 surfaced that ConsentAllowlists holds a free-form Vec<A2AIntent> but the router enforces only the 3-band IntentClass projection {highprivilege,standard,readonly} (maos-a2a/src/adapter.rs:144-164) — so a specific intent string (e.g. "rca-summary") silently never matches. Widen the intent taxonomy / match a real per-frame intent field. DEPENDS ON 8.6 (must land against maos-a2a-core, NOT the over-budget maos-a2a; 8.6 is deliberately churn-free per epic-8 §AC-A6). v1.5+ refinement; not an 8.5/8.6 defect.
-  8-7-fine-grained-typed-intent-consent-vocabulary-over-maos-a2a-core: ready-for-dev
+  8-7-fine-grained-typed-intent-consent-vocabulary-over-maos-a2a-core: done
+  # Story 8.8 (registered 2026-06-05 via Direct Adjustment sprint-change-proposal-2026-06-05.md): fail-closed-for-cross-Host A2A consent — DENY cross-Host frames with absent/unrecognized intent_class (vs 8.7's transitional fine-grained-when-present + band fallback). The committed long-term end-state from 8.7's Q2 team consensus (8.7 AC9). PRECONDITION: a NEW sender-completeness discipline gate GREEN-at-HEAD (1: no cross-Host send path reaches the router-entry seam with absent/unrecognized intent_class; 2: fail-closed-readiness — a1_security_regression_guards + routed scenarios + both smokes pass with the router toggled fail-closed). Never flipped-while-red. DEPENDS ON 8.7.
+  8-8-fail-closed-for-cross-host-a2a-consent: backlog
   epic-8-retrospective: optional
   epic-9: backlog
   9-1-ship-maosctl-audit-subcommands-query-subject-access-posture-delta-sealed-export: backlog

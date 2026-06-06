@@ -71,6 +71,14 @@ fn make_frame(host: &str) -> IacFrame {
 #[tokio::test]
 async fn scenario_3_1_send_side_intent_denied() {
     // Sender's intent `standard` NOT in peer's send_allowlist → outbound REJECTED.
+    //
+    // Story 8.7: this frame carries no `consent_envelope.intent_class`, so it
+    // exercises the 3-band FALLBACK path — the `standard` band projection is not
+    // in the allowlist (which holds only the fine-grained
+    // `diagnosis-handoff:read-only-evidence`), so it is denied. The *fine-grained*
+    // counterpart (a frame whose `intent_class` IS the specific string, matched
+    // truthfully against that allowlist entry) is in
+    // `maos-a2a-core/tests/cross_host_consent_v1_5.rs`.
     let allow = ConsentAllowlists {
         send_allowlist: vec![A2AIntent::new("diagnosis-handoff:read-only-evidence")],
         accept_allowlist: vec![A2AIntent::new("standard")],
