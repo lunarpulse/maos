@@ -114,6 +114,20 @@ pub trait TofuPinStore: Send + Sync {
 
     /// Read the current pin (if any) — used by the chaos harness + diagnostics.
     async fn get_pin(&self, peer: &PeerId) -> Option<TofuPin>;
+
+    /// Story 8.9 / AC6.3 (G5b) — ATOMIC compare-and-invalidate for Spirit-restart
+    /// detection. Reads the stored `boot_nonce` and, iff it differs from
+    /// `observed_boot_nonce`, marks the pin `Invalidated::SpiritRestarted` —
+    /// under ONE critical section so a concurrent intake cannot interleave
+    /// between the read and the invalidation (the prior `get_pin` + separate
+    /// `invalidate_for_restart` was a check-then-act TOCTOU). Returns
+    /// `Ok(Some(prior_boot_nonce))` when the pin was invalidated, `Ok(None)` when
+    /// the nonce matched (no-op) or no pin exists.
+    async fn invalidate_if_boot_nonce_differs(
+        &self,
+        peer: &PeerId,
+        observed_boot_nonce: u64,
+    ) -> Result<Option<u64>, A2AError>;
 }
 
 /// Default in-memory TOFU pin store. Per architecture I9 ("Empty kernel") the
@@ -334,6 +348,35 @@ impl TofuPinStore for InMemoryTofuPinStore {
     async fn get_pin(&self, peer: &PeerId) -> Option<TofuPin> {
         self.pins.get(peer.as_str()).map(|r| r.value().clone())
     }
+
+    /// Story 8.9 / AC6.3 (G5b) — truly-atomic override: the boot-nonce read and
+    /// the invalidation happen under a single `DashMap` `get_mut` entry lock, so
+    /// a concurrent intake racing the same peer cannot interleave between the
+    /// check and the act (the TOCTOU the router's prior `get_pin` + separate
+    /// `invalidate_for_restart` exposed).
+    async fn invalidate_if_boot_nonce_differs(
+        &self,
+        peer: &PeerId,
+        observed_boot_nonce: u64,
+    ) -> Result<Option<u64>, A2AError> {
+        if let Some(mut entry) = self.pins.get_mut(peer.as_str()) {
+            let prior = entry.boot_nonce;
+            if prior != observed_boot_nonce {
+                if entry.invalidated.is_none() {
+                    entry.invalidated = Some(Invalidated::SpiritRestarted {
+                        prior_boot_nonce: prior,
+                    });
+                    return Ok(Some(prior));
+                }
+                // Already invalidated — return the stored prior nonce so the
+                // router can build the NACK identically (preserves a1 P6).
+                if let Some(Invalidated::SpiritRestarted { prior_boot_nonce }) = entry.invalidated {
+                    return Ok(Some(prior_boot_nonce));
+                }
+            }
+        }
+        Ok(None)
+    }
 }
 
 /// Monotonic counter for diagnostic timestamps (NOT a TTL).
@@ -478,5 +521,55 @@ mod tests {
             .await
             .expect_err("must be not pinned");
         assert!(matches!(err, EPinMismatch::NotPinned(_)));
+    }
+    /// Story 8.9 / AC6.3 (G5b) — concurrent intakes racing the same peer MUST
+    /// NOT interleave between the boot-nonce read and the invalidation.
+    /// 50× stress: the pin is invalidated exactly once; no task panics;
+    /// all tasks that observed a mismatch can report the prior nonce.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+    async fn invalidate_if_boot_nonce_differs_is_atomic_under_race() {
+        let store = Arc::new(InMemoryTofuPinStore::new());
+        let peer = PeerId::new("p");
+        let observed = fp("cert-A");
+        store
+            .pin_first_contact(&peer, &observed, &observed, 1)
+            .await
+            .expect("pin");
+
+        let mut handles = vec![];
+        for _ in 0..50 {
+            let s = store.clone();
+            let p = peer.clone();
+            handles.push(tokio::spawn(async move {
+                s.invalidate_if_boot_nonce_differs(&p, 2).await
+            }));
+        }
+        let mut results: Vec<Result<Option<u64>, A2AError>> = vec![];
+        for h in handles {
+            results.push(h.await.expect("join"));
+        }
+
+        let ok_results: Vec<Option<u64>> = results.into_iter().map(|r| r.expect("ok")).collect();
+        // Every task that saw the mismatch must be able to report the prior nonce.
+        assert!(
+            ok_results.iter().all(|r| r.is_some()),
+            "all 50 tasks observed a mismatch and must report the prior nonce"
+        );
+
+        // The pin is invalidated exactly once (no TOCTOU race).
+        let pin = store.get_pin(&peer).await.expect("pin exists");
+        assert!(
+            pin.invalidated.is_some(),
+            "pin must be invalidated after the race"
+        );
+        assert_eq!(
+            pin.boot_nonce, 1,
+            "boot_nonce must be unchanged (the original value)"
+        );
+        if let Some(Invalidated::SpiritRestarted { prior_boot_nonce }) = pin.invalidated {
+            assert_eq!(prior_boot_nonce, 1, "prior_boot_nonce must match original");
+        } else {
+            panic!("invalidation must be SpiritRestarted");
+        }
     }
 }

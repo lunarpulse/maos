@@ -197,19 +197,26 @@ fn reject(tag: &str, detail: String) -> RustlsError {
     )))
 }
 
-/// Map a webpki error into a sentinel-tagged rustls error. Uses a `Debug`
-/// substring match so it is robust across rustls-webpki minor variant shapes.
+/// Map a webpki error into a sentinel-tagged rustls error.
+///
+/// Story 8.9 / AC6.1 (G4): classify on the `webpki::Error` TYPED variants, not a
+/// `format!("{e:?}").contains(...)` substring of the Debug rendering. The
+/// sentinel taxonomy (`CERT_EXPIRED` / `NOT_YET_VALID` / `UNTRUSTED_ISSUER` /
+/// `BAD_CERTIFICATE`) is preserved byte-for-byte so `classify_handshake`
+/// downstream — and the AC-T4/AC-T5 oracles — see the same classes. `Error` is
+/// `#[non_exhaustive]`; the wildcard maps any future/unhandled variant to the
+/// conservative `BAD_CERTIFICATE`.
 fn map_webpki_error(e: webpki::Error) -> RustlsError {
-    let dbg = format!("{e:?}");
-    if dbg.contains("Expired") {
-        reject("CERT_EXPIRED", dbg)
-    } else if dbg.contains("NotValidYet") || dbg.contains("NotYetValid") {
-        reject("NOT_YET_VALID", dbg)
-    } else if dbg.contains("UnknownIssuer") {
-        reject("UNTRUSTED_ISSUER", dbg)
-    } else {
-        reject("BAD_CERTIFICATE", dbg)
-    }
+    use webpki::Error as WE;
+    let tag = match e {
+        WE::CertExpired { .. } => "CERT_EXPIRED",
+        WE::CertNotValidYet { .. } => "NOT_YET_VALID",
+        // Untrusted/unknown issuer and a bad issuer signature are both chain-layer
+        // "this leaf does not chain to a trusted root" rejections (AC-T4).
+        WE::UnknownIssuer | WE::InvalidSignatureForPublicKey => "UNTRUSTED_ISSUER",
+        _ => "BAD_CERTIFICATE",
+    };
+    reject(tag, format!("{e:?}"))
 }
 
 impl rustls::client::danger::ServerCertVerifier for TofuPinningVerifier {

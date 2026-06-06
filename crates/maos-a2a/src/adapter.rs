@@ -138,6 +138,7 @@ mod tests {
             profile: A2AProfile::Loopback,
             allowlists,
             partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
         }
     }
 

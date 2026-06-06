@@ -55,6 +55,7 @@ fn peer_cfg(allowlists: ConsentAllowlists) -> A2APeerConfig {
         profile: A2AProfile::Loopback,
         allowlists,
         partition_timeout_secs: 30,
+        consent_ttl_secs: 300,
     }
 }
 
@@ -398,4 +399,198 @@ async fn case_insensitive_matching_for_fine_grained_intents() {
     core.prepare_outbound(f, &HostId("loopback".into()), 0)
         .await
         .expect("case-insensitive match must admit");
+}
+
+// ── Story 8.9 / AC2 (G1) — consent-envelope granter binding ───────────────────
+
+use maos_a2a_core::transport::json_rpc::{CODE_CONSENT_EXPIRED, CODE_CONSENT_GRANTER_MISMATCH};
+
+/// An honestly-built frame (granter == from), but with the granter overwritten to
+/// a FOREIGN address — the stolen-envelope replay shape. `valid_until` stays
+/// `None` so the expiry check passes and the GRANTER gate is what fires.
+fn frame_with_foreign_granter() -> IacFrame {
+    let mut f = frame(IntentClass::Readonly, Some(FINE_READONLY));
+    if let Some(env) = f.consent_envelope.as_mut() {
+        env.granter = FrameAddress {
+            spirit_id: SpiritId::from("attacker"),
+            host_id: Some(HostId("loopback".into())),
+            role: None,
+        };
+    }
+    f
+}
+
+#[tokio::test]
+async fn ac2_granter_mismatch_denied_on_intake() {
+    // Accept-allowlist HOLDS the intent — proving the granter gate (not the
+    // allowlist) is what denies the replayed envelope.
+    let core = pinned_core(allow(&[], &[FINE_READONLY])).await;
+    let req = A2AJsonRpcRequest::new(METHOD_IAC_DELIVER, frame_with_foreign_granter(), 1);
+    match core.handle_intake(req).await {
+        A2AJsonRpcResponse::Nack(n) => {
+            assert_eq!(n.error.code, CODE_CONSENT_GRANTER_MISMATCH, "must NACK -32008");
+            let data = n.error.data.expect("granter-mismatch NACK carries both addresses");
+            assert!(data.get("granter").is_some(), "NACK data names the granter");
+            assert!(data.get("frame_from").is_some(), "NACK data names the frame from");
+        }
+        other => panic!("expected granter-mismatch NACK, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn ac2_granter_match_admitted_on_intake() {
+    // `with_fine_grained_intent(from, …)` sets granter == from → admitted.
+    let core = pinned_core(allow(&[], &[FINE_READONLY])).await;
+    let req = A2AJsonRpcRequest::new(
+        METHOD_IAC_DELIVER,
+        frame(IntentClass::Readonly, Some(FINE_READONLY)),
+        1,
+    );
+    assert!(
+        matches!(core.handle_intake(req).await, A2AJsonRpcResponse::Ack(_)),
+        "granter == from must be admitted"
+    );
+}
+
+// ── Story 8.9 / AC4 (G2) — consent evaluated BEFORE the accept-allowlist ──────
+
+#[tokio::test]
+async fn ac4_expiry_wins_over_accept_allowlist_denial() {
+    // The accept_allowlist is EMPTY (the intent would be denied), AND the
+    // envelope is expired. Because the consent block now runs BEFORE the
+    // accept-allowlist, the EXPIRED code wins — proving the reorder.
+    const T0: u64 = 1_700_000_000_000_000_000;
+    let cfg = peer_cfg(allow(&[], &[]));
+    let tofu = Arc::new(InMemoryTofuPinStore::new());
+    tofu.pin_first_contact(
+        &PeerId::new("loopback"),
+        &cfg.cert_fingerprint,
+        &cfg.cert_fingerprint,
+        1,
+    )
+    .await
+    .expect("pin");
+    let core = A2ARouterCore::new(vec![cfg], tofu).with_pinned_consent_clock(T0);
+
+    let mut f = frame(IntentClass::Readonly, Some(FINE_READONLY)); // granter == from
+    if let Some(env) = f.consent_envelope.as_mut() {
+        env.valid_until_ns = Some(T0 - 1); // expired
+    }
+    let req = A2AJsonRpcRequest::new(METHOD_IAC_DELIVER, f, 1);
+    match core.handle_intake(req).await {
+        A2AJsonRpcResponse::Nack(n) => assert_eq!(
+            n.error.code, CODE_CONSENT_EXPIRED,
+            "expiry must be evaluated before the accept-allowlist (reorder)"
+        ),
+        other => panic!("expected CONSENT_EXPIRED, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn ac4_expired_but_allowlisted_still_rejected() {
+    // The accept_allowlist HOLDS the intent, AND the envelope is expired with
+    // granter == from. Because the consent block runs BEFORE the allowlist,
+    // EXPIRED wins even though the intent would have been admitted.
+    const T0: u64 = 1_700_000_000_000_000_000;
+    let cfg = peer_cfg(allow(&[], &[FINE_READONLY]));
+    let tofu = Arc::new(InMemoryTofuPinStore::new());
+    tofu.pin_first_contact(
+        &PeerId::new("loopback"),
+        &cfg.cert_fingerprint,
+        &cfg.cert_fingerprint,
+        1,
+    )
+    .await
+    .expect("pin");
+    let core = A2ARouterCore::new(vec![cfg], tofu).with_pinned_consent_clock(T0);
+
+    let mut f = frame(IntentClass::Readonly, Some(FINE_READONLY)); // granter == from
+    if let Some(env) = f.consent_envelope.as_mut() {
+        env.valid_until_ns = Some(T0 - 1); // expired
+    }
+    let req = A2AJsonRpcRequest::new(METHOD_IAC_DELIVER, f, 1);
+    match core.handle_intake(req).await {
+        A2AJsonRpcResponse::Nack(n) => assert_eq!(
+            n.error.code, CODE_CONSENT_EXPIRED,
+            "expiry must win over allowlisted intent (consent-before-allowlist)"
+        ),
+        other => panic!("expected CONSENT_EXPIRED, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn ac4_granter_mismatch_with_allowlisted_intent() {
+    // The accept_allowlist HOLDS the intent, AND the envelope has a wrong granter
+    // (foreign spirit). Because granter is checked BEFORE allowlist, GRANTER_MISMATCH wins.
+    let core = pinned_core(allow(&[], &[FINE_READONLY])).await;
+    let req = A2AJsonRpcRequest::new(METHOD_IAC_DELIVER, frame_with_foreign_granter(), 1);
+    match core.handle_intake(req).await {
+        A2AJsonRpcResponse::Nack(n) => assert_eq!(
+            n.error.code, CODE_CONSENT_GRANTER_MISMATCH,
+            "granter mismatch must win over allowlisted intent (consent-before-allowlist)"
+        ),
+        other => panic!("expected GRANTER_MISMATCH, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn ac2_granter_mismatch_host_id_only() {
+    // spirit_id matches, ONLY host_id differs. The granter binding compares BOTH
+    // fields, so a host_id mismatch alone fires GRANTER_MISMATCH.
+    let mut f = frame(IntentClass::Readonly, Some(FINE_READONLY));
+    if let Some(env) = f.consent_envelope.as_mut() {
+        // granter.spirit_id == from.spirit_id ("mira"), but host_id is different
+        env.granter = FrameAddress {
+            spirit_id: f.from.spirit_id.clone(),
+            host_id: Some(HostId("other-host".into())),
+            role: None,
+        };
+    }
+    let core = pinned_core(allow(&[], &[FINE_READONLY])).await;
+    let req = A2AJsonRpcRequest::new(METHOD_IAC_DELIVER, f, 1);
+    match core.handle_intake(req).await {
+        A2AJsonRpcResponse::Nack(n) => {
+            assert_eq!(n.error.code, CODE_CONSENT_GRANTER_MISMATCH);
+            let data = n.error.data.expect("granter-mismatch NACK carries addresses");
+            assert!(data.get("granter").is_some());
+            assert!(data.get("frame_from").is_some());
+        }
+        other => panic!("expected GRANTER_MISMATCH, got {other:?}"),
+    }
+}
+// ── Story 8.9 / AC5 (G9) — intent length bound unified to the canonical 128 ───
+
+#[tokio::test]
+async fn ac5_intent_length_bound_unified_to_canonical_128() {
+    // 129-byte intent_class exceeds the canonical bound → falls back to the band
+    // projection. The send_allowlist holds the `readonly` band → admitted.
+    let over = "a".repeat(129);
+    let core = pinned_core(allow(&["readonly"], &[])).await;
+    core.prepare_outbound(
+        frame(IntentClass::Readonly, Some(&over)),
+        &HostId("loopback".into()),
+        0,
+    )
+    .await
+    .expect("129-byte intent_class must fall back to the band projection");
+
+    // 128-byte intent_class is at the bound → used as the fine-grained key; a
+    // band-only allowlist must NOT match it (fine-grained supersedes the band).
+    let exact = "a".repeat(128);
+    let core2 = pinned_core(allow(&["readonly"], &[])).await;
+    let err = core2
+        .prepare_outbound(
+            frame(IntentClass::Readonly, Some(&exact)),
+            &HostId("loopback".into()),
+            0,
+        )
+        .await
+        .expect_err("128-byte intent_class is the fine-grained key (band allowlist must not match)");
+    assert!(matches!(
+        err,
+        A2AError::IntentDenied {
+            direction: IntentDirection::Send,
+            ..
+        }
+    ));
 }

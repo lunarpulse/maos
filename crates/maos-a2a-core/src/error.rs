@@ -50,6 +50,21 @@ pub enum A2AError {
     #[error("consent envelope expired at {expired_at_ns}; now is {now_ns}")]
     ConsentExpired { expired_at_ns: u64, now_ns: u64 },
 
+    /// Story 8.9 / G8 — the frame's self-asserted `from.host_id` does not match
+    /// the TLS-verified peer identity. The receiver binds intake to the
+    /// certificate-derived peer (NOT the attacker-controlled frame field), so a
+    /// peer holding any one validly-pinned leaf cannot act as a confused deputy
+    /// for another Host. `expected` is the TLS-verified peer; `asserted` is the
+    /// forged wire value.
+    #[error("peer identity mismatch: TLS-verified peer {expected}, frame asserted {asserted}")]
+    PeerIdentityMismatch { expected: String, asserted: String },
+
+    /// Story 8.9 / G1 — the consent envelope's `granter` does not match the
+    /// frame's own `from` address. Closes stolen-envelope replay: an envelope
+    /// granted by Host X, replayed inside a frame `from` Host Y, is denied.
+    #[error("consent granter mismatch: envelope granter {granter}, frame from {frame_from}")]
+    ConsentGranterMismatch { granter: String, frame_from: String },
+
     /// Outbound `route_outbound` timed out awaiting receiver ACK — partition
     /// behavior per architecture §7.2 "A2A in-flight frames during partition
     /// are NACKed after a configurable timeout (default 30s); the kernel does
@@ -66,8 +81,11 @@ pub enum A2AError {
     TransportFailed(String),
 
     /// mTLS handshake failed.
-    #[error("a2a handshake failed: {0}")]
-    HandshakeFailed(String),
+    #[error("a2a handshake failed: {class:?}: {message}")]
+    HandshakeFailed {
+        class: HandshakeFailureClass,
+        message: String,
+    },
 
     /// Spirit-restart-pin invalidation: caller attempted to use a pin record
     /// for a peer whose Spirit boot_nonce has rolled.
@@ -85,4 +103,16 @@ pub enum A2AError {
     /// Catch-all I/O error.
     #[error("a2a io error: {0}")]
     Io(String),
+}
+
+/// Typed classification for handshake failures — replaces stringly-matched
+/// sentinel tags with a compile-time discriminant (Story 8.9 / AC6.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HandshakeFailureClass {
+    CertExpired,
+    CertNotValidYet,
+    UnknownIssuer,
+    BadCertificate,
+    PinMismatch,
+    Other,
 }

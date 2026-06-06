@@ -44,6 +44,14 @@ pub const CODE_TIMEOUT: i32 = -32005;
 /// larger than the codec's `max_frame_length` cap (1 MiB); rejected before
 /// allocation blow-up. Additive constant (AC-A6-safe).
 pub const CODE_FRAME_TOO_LARGE: i32 = -32006;
+/// Story 8.9 (AC1 / G8) — the frame's self-asserted `from.host_id` does not
+/// match the TLS-verified peer identity (confused-deputy attempt). Additive
+/// constant; `A2AError::PeerIdentityMismatch` is the typed mirror.
+pub const CODE_PEER_IDENTITY_MISMATCH: i32 = -32007;
+/// Story 8.9 (AC2 / G1) — the consent envelope's `granter` does not match the
+/// frame's own `from` address (stolen-envelope replay). Additive constant;
+/// `A2AError::ConsentGranterMismatch` is the typed mirror.
+pub const CODE_CONSENT_GRANTER_MISMATCH: i32 = -32008;
 pub const CODE_INTERNAL: i32 = -32099;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

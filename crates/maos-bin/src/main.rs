@@ -4412,6 +4412,7 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
             accept_allowlist: accept,
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     };
     let cfg_a = mk_cfg(
         "host_a",
@@ -4655,6 +4656,7 @@ async fn build_a2a_tcp_daemon_router(
         maos_a2a_tcp::TcpTimeouts::production(std::time::Duration::from_secs(30)),
         maos_a2a_core::HandshakeRetryPolicy::default(),
         None, // production: validate cert validity against the live system clock
+        None, // production: consent expiry uses the real wall clock (Story 8.9 AC3)
     )
     .await
     .map_err(|e| format!("a2a-tcp daemon bind failed: {e}"))?;
@@ -4745,6 +4747,7 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
         profile: A2AProfile::CrossHost,
         allowlists: allow(&[], &["readonly"]),
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     }];
     let nash = build_a2a_tcp_daemon_router(nash_cfg, nash_peers, NASH_NONCE).await?;
     let nash_addr = nash.local_addr().ok_or("nash failed to bind")?;
@@ -4770,6 +4773,7 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
         profile: A2AProfile::CrossHost,
         allowlists: allow(&["readonly"], &[]),
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     }];
     let mira = build_a2a_tcp_daemon_router(mira_cfg, mira_peers, MIRA_NONCE).await?;
 
@@ -4868,6 +4872,7 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
             accept_allowlist: vec![A2AIntent::new("rca-summary")],
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     };
     let host_b_view_of_a = A2APeerConfig {
         peer_id: PeerId::new("host-a"),
@@ -4879,6 +4884,7 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
             accept_allowlist: vec![A2AIntent::new("diagnosis-handoff:read-only-evidence")],
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     };
     host_a_view_of_b
         .validate()
@@ -4957,6 +4963,7 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
             accept_allowlist: vec![A2AIntent::new(FINE_INTENT)],
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     };
     // Rebuild Host B's router with the smoke allowlists for the demo
     let host_b_router_smoke = Arc::new(LoopbackA2ARouter::new(
@@ -5026,6 +5033,7 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
             accept_allowlist: vec![A2AIntent::new("rca-summary")],
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     };
     let disallow_router = Arc::new(LoopbackA2ARouter::new(
         vec![disallow_cfg],
@@ -5131,6 +5139,7 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
             accept_allowlist: vec![A2AIntent::new(ADMIT_INTENT), A2AIntent::new(DENY_INTENT)],
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     };
     let cfg_a = A2APeerConfig {
         peer_id: PeerId::new("host_a"),
@@ -5144,6 +5153,7 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
             accept_allowlist: vec![A2AIntent::new(ADMIT_INTENT)],
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     };
     let tofu = Arc::new(InMemoryTofuPinStore::new());
     tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;

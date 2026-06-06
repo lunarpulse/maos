@@ -61,22 +61,27 @@ impl TcpTransportError {
     /// the cert-class errors (`BAD_CERTIFICATE` / `CERTIFICATE_EXPIRED`),
     /// preserving the AC-T5 retry path.
     pub fn to_a2a_error(&self) -> A2AError {
+        use maos_a2a_core::error::HandshakeFailureClass;
         match self {
-            // A TOFU pin mismatch is a VALID cert with the wrong identity —
-            // retrying cannot change the pinned identity, so it is deliberately
-            // NOT cert-class-retryable (no `BAD_CERTIFICATE`/`CERTIFICATE_EXPIRED`
-            // keyword): `HandshakeRetryPolicy::is_retryable` returns false here.
-            TcpTransportError::TofuPinMismatch(m) => {
-                A2AError::HandshakeFailed(format!("PIN_MISMATCH (TOFU): {m}"))
+            TcpTransportError::TofuPinMismatch(m) => A2AError::HandshakeFailed {
+                class: HandshakeFailureClass::PinMismatch,
+                message: m.clone(),
+            },
+            TcpTransportError::BadCertificate(m) => A2AError::HandshakeFailed {
+                class: HandshakeFailureClass::BadCertificate,
+                message: m.clone(),
+            },
+            TcpTransportError::CertExpired(m) => A2AError::HandshakeFailed {
+                class: HandshakeFailureClass::CertExpired,
+                message: m.clone(),
+            },
+            TcpTransportError::Handshake(m) => A2AError::HandshakeFailed {
+                class: HandshakeFailureClass::Other,
+                message: m.clone(),
+            },
+            TcpTransportError::Timeout(m) => {
+                A2AError::TransportFailed(format!("timeout: {m}"))
             }
-            TcpTransportError::BadCertificate(m) => {
-                A2AError::HandshakeFailed(format!("BAD_CERTIFICATE: {m}"))
-            }
-            TcpTransportError::CertExpired(m) => {
-                A2AError::HandshakeFailed(format!("CERTIFICATE_EXPIRED: {m}"))
-            }
-            TcpTransportError::Handshake(m) => A2AError::HandshakeFailed(m.clone()),
-            TcpTransportError::Timeout(m) => A2AError::TransportFailed(format!("timeout: {m}")),
             TcpTransportError::FrameTooLarge(m) => {
                 A2AError::TransportFailed(format!("frame too large: {m}"))
             }

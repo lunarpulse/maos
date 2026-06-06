@@ -280,6 +280,7 @@ async fn pinned_router(accept_a: &[&str]) -> Arc<LoopbackA2ARouter> {
             accept_allowlist: accept_a.iter().map(|s| A2AIntent::new(*s)).collect(),
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a::config::DEFAULT_CONSENT_TTL_SECS,
     };
     let cfg_b = A2APeerConfig {
         peer_id: PeerId::new("host_b"),
@@ -291,6 +292,7 @@ async fn pinned_router(accept_a: &[&str]) -> Arc<LoopbackA2ARouter> {
             accept_allowlist: vec![A2AIntent::new(ADVISORY_CONSENT_INTENT)],
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a::config::DEFAULT_CONSENT_TTL_SECS,
     };
     let tofu = Arc::new(InMemoryTofuPinStore::new());
     tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1)

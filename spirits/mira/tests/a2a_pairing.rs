@@ -52,6 +52,7 @@ fn peer(peer_id: &str, fp: PeerCertFingerprint, send: &[&str], accept: &[&str]) 
             accept_allowlist: accept.iter().map(|s| A2AIntent::new(*s)).collect(),
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a::config::DEFAULT_CONSENT_TTL_SECS,
     }
 }
 

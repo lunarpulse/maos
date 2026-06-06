@@ -35,6 +35,7 @@ fn make_peer(allow: ConsentAllowlists, timeout_secs: u64) -> A2APeerConfig {
         profile: A2AProfile::Loopback,
         allowlists: allow,
         partition_timeout_secs: timeout_secs,
+        consent_ttl_secs: maos_a2a::config::DEFAULT_CONSENT_TTL_SECS,
     }
 }
 

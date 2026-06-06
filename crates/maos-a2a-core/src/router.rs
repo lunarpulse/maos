@@ -16,10 +16,12 @@
 use crate::config::A2APeerConfig;
 use crate::consent::{AllowlistDirection, ConsentAllowlists, EIntentDenied};
 use crate::error::{A2AError, IntentDirection};
+use crate::identity::PeerId;
 use crate::tofu::TofuPinStore;
 use crate::transport::json_rpc::{
     A2AJsonRpcRequest, A2AJsonRpcResponse, AckBody, CODE_CONSENT_EXPIRED,
-    CODE_INTENT_DENIED, CODE_INTERNAL, CODE_PIN_MISMATCH_NOT_PINNED,
+    CODE_CONSENT_GRANTER_MISMATCH, CODE_INTENT_DENIED, CODE_INTERNAL,
+    CODE_PEER_IDENTITY_MISMATCH, CODE_PIN_MISMATCH_NOT_PINNED,
     CODE_SPIRIT_RESTART_DETECTED,
 };
 use crate::transport::logical_clock::LamportClock;
@@ -27,7 +29,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use maos_domain::frame::IacFrame;
 use maos_domain::iac_bus_types::IacBusError;
-use maos_domain::invariants::i8::A2AIntent;
+use maos_domain::invariants::i8::{A2AIntent, MAX_CANONICAL_INTENT_LEN};
 use maos_spirit_abi::identity::HostId;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -132,18 +134,27 @@ pub struct A2ARouterCore {
 }
 
 impl A2ARouterCore {
-    pub fn new(peer_configs: Vec<A2APeerConfig>, tofu: Arc<dyn TofuPinStore>) -> Self {
+    /// Story 8.9 / AC6.2 (G5b) — fallible constructor that HARD-FAILS on a
+    /// duplicate `peer_id` rather than silently letting "last wins" overwrite an
+    /// earlier peer's pin/allowlist binding (the prior `new` only `eprintln!`d).
+    /// `new` delegates here and panics on the error so existing infallible
+    /// callers keep compiling; cross-Host `TcpA2ATransport::bind` calls `try_new`
+    /// directly and surfaces `A2AError::ConfigInvalid` to the operator.
+    pub fn try_new(
+        peer_configs: Vec<A2APeerConfig>,
+        tofu: Arc<dyn TofuPinStore>,
+    ) -> Result<Self, A2AError> {
         let peers = Arc::new(DashMap::new());
         for cfg in peer_configs {
             let key = cfg.peer_id.as_str().to_string();
             if peers.contains_key(&key) {
-                // Duplicate peer_id — log warning but don't panic; last wins.
-                // Production operator config should be validated at admission.
-                eprintln!("maos-a2a: WARNING: duplicate peer config for peer_id {key}; overwriting");
+                return Err(A2AError::ConfigInvalid(format!(
+                    "duplicate peer config for peer_id {key}"
+                )));
             }
             peers.insert(key, cfg);
         }
-        Self {
+        Ok(Self {
             peers,
             tofu,
             clock: Arc::new(LamportClock::new()),
@@ -151,7 +162,12 @@ impl A2ARouterCore {
             next_id: Arc::new(std::sync::atomic::AtomicU64::new(1)),
             consent_now_ns: None,
             warned_entries: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
-        }
+        })
+    }
+
+    pub fn new(peer_configs: Vec<A2APeerConfig>, tofu: Arc<dyn TofuPinStore>) -> Self {
+        Self::try_new(peer_configs, tofu)
+            .expect("A2ARouterCore::new: duplicate peer_id — use try_new")
     }
 
     /// Pin the consent-expiry "now" clock to a fixed nanosecond value for
@@ -257,7 +273,11 @@ impl A2ARouterCore {
             .consent_envelope
             .as_ref()
             .and_then(|e| e.intent_class.as_ref())
-            .filter(|i| i.as_str().len() <= 1024) // sanity bound — oversized intents fall back to band
+            // Story 8.9 / AC5 (G9) — unify the length bound with the canonical
+            // intent bound (`A2AIntent::is_canonical` enforces the same 128) so an
+            // oversized intent_class falls back to the 3-band projection
+            // consistently; replaces the ad-hoc `<= 1024`.
+            .filter(|i| i.as_str().len() <= MAX_CANONICAL_INTENT_LEN)
             .map(|i| i.as_str().to_string())
             .unwrap_or_else(|| Self::frame_intent_str(frame))
     }
@@ -368,6 +388,25 @@ impl A2ARouterCore {
         // (3) Lamport send tick — stamp the frame.
         frame.logical_clock = self.clock.send_tick();
 
+        // (3.5) Story 8.9 / AC3 (G10) — stamp a bounded consent expiry on a
+        // present envelope that carries none. Before 8.9 `prepare_outbound`
+        // NEVER set `valid_until_ns` and `with_fine_grained_intent` builds it as
+        // `None`, so expiry was dead code on every real (non-hand-built) frame.
+        //
+        // TRANSITIONAL (Decision §D1): the AUTHORITATIVE expiry source is the
+        // consent grant itself populating `valid_until_ns` — so an envelope that
+        // ALREADY carries an explicit `Some(_)` is left untouched (the transport
+        // must never override the granter). The cross-Host
+        // fail-closed-on-absent-expiry end-state is owned by Story 8.8; 8.9 only
+        // makes expiry LIVE. `saturating_*` keeps a misconfigured-huge TTL from
+        // wrapping to a past instant (defense-in-depth; `validate()` caps it).
+        if let Some(env) = frame.consent_envelope.as_mut() {
+            if env.valid_until_ns.is_none() {
+                let ttl_ns = peer_cfg.consent_ttl_secs.saturating_mul(1_000_000_000);
+                env.valid_until_ns = Some(self.consent_now_ns().saturating_add(ttl_ns));
+            }
+        }
+
         // (4) Build JSON-RPC request.
         let id = self.alloc_id();
         let frame_id = frame.frame_id;
@@ -411,6 +450,34 @@ impl A2ARouterCore {
                         expired_at_ns,
                         now_ns,
                     })
+                }
+                CODE_PEER_IDENTITY_MISMATCH => {
+                    let (expected, asserted) = n
+                        .error
+                        .data
+                        .as_ref()
+                        .map(|d| {
+                            (
+                                d.get("expected").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+                                d.get("asserted").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+                            )
+                        })
+                        .unwrap_or_default();
+                    Err(A2AError::PeerIdentityMismatch { expected, asserted })
+                }
+                CODE_CONSENT_GRANTER_MISMATCH => {
+                    let (granter, frame_from) = n
+                        .error
+                        .data
+                        .as_ref()
+                        .map(|d| {
+                            (
+                                d.get("granter").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+                                d.get("frame_from").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+                            )
+                        })
+                        .unwrap_or_default();
+                    Err(A2AError::ConsentGranterMismatch { granter, frame_from })
                 }
                 _ => Err(A2AError::TransportFailed(n.error.message)),
             },
@@ -472,27 +539,18 @@ impl A2ARouterCore {
         // MUST populate the field; receivers compare against the stored
         // `TofuPin.boot_nonce`. Mismatch → `invalidate_for_restart` + NACK.
         if request.boot_nonce != 0 {
-            if let Some(pin) = self.tofu.get_pin(&peer_cfg.peer_id).await {
-                if request.boot_nonce != pin.boot_nonce {
-                    // Boot nonce rolled — the Spirit has restarted (or an
-                    // attacker is racing the legitimate Spirit). Invalidate
-                    // the prior pin and refuse the frame; the operator must
-                    // approve a re-pin via `await_repin_consent` before
-                    // further A2A traffic resumes.
-                    let prior = pin.boot_nonce;
+            // Story 8.9 / AC6.3 (G5b) — atomic compare-and-invalidate: the prior
+            // `get_pin` (read) → `invalidate_for_restart` (write) split was a
+            // check-then-act TOCTOU. `invalidate_if_boot_nonce_differs` performs
+            // the boot-nonce read and the invalidation under ONE pin-entry lock,
+            // returning the prior nonce iff it rolled.
+            match self
+                .tofu
+                .invalidate_if_boot_nonce_differs(&peer_cfg.peer_id, request.boot_nonce)
+                .await
+            {
+                Ok(Some(prior)) => {
                     let observed = request.boot_nonce;
-                    if let Err(e) = self
-                        .tofu
-                        .invalidate_for_restart(&peer_cfg.peer_id, prior)
-                        .await
-                    {
-                        // Invalidation itself failed — surface as INTERNAL.
-                        return A2AJsonRpcResponse::nack(
-                            request.id,
-                            CODE_INTERNAL,
-                            format!("invalidate_for_restart failed: {e}"),
-                        );
-                    }
                     let data = serde_json::json!({
                         "prior_boot_nonce": prior,
                         "observed_boot_nonce": observed,
@@ -510,10 +568,78 @@ impl A2ARouterCore {
                     }
                     return resp;
                 }
+                Ok(None) => { /* nonce matches (or no pin) — continue */ }
+                Err(e) => {
+                    return A2AJsonRpcResponse::nack(
+                        request.id,
+                        CODE_INTERNAL,
+                        format!("invalidate_for_restart failed: {e}"),
+                    );
+                }
             }
         }
 
-        // (2) ADR-012 accept-allowlist check.
+        // (2) Story 8.9 / AC4 (G2) — consent block, evaluated BEFORE the
+        // accept-allowlist so an expired or wrong-granter consent is rejected
+        // regardless of whether the intent is allowlisted.
+        //
+        // Ordering WITHIN the block: granter binding FIRST, then expiry.
+        // Per spec AC4.2. A stolen-but-unexpired envelope (the real G1 replay
+        // attack) fails closed at the granter gate. An expired envelope with a
+        // valid granter fails at expiry. Both are rejected before the allowlist.
+        if let Some(envelope) = &frame.consent_envelope {
+            // (2a) Story 8.9 / AC2 (G1) — granter binding: the envelope's granter
+            // MUST be the frame's own `from` (compare spirit_id AND host_id).
+            // Closes stolen-envelope replay (granted by X, replayed from Y).
+            if envelope.granter.spirit_id != frame.from.spirit_id
+                || envelope.granter.host_id != frame.from.host_id
+            {
+                let granter = format!(
+                    "{}@{}",
+                    envelope.granter.spirit_id.as_str(),
+                    envelope.granter.host_id.as_ref().map(|h| h.as_str()).unwrap_or("<none>")
+                );
+                let frame_from = format!(
+                    "{}@{}",
+                    frame.from.spirit_id.as_str(),
+                    frame.from.host_id.as_ref().map(|h| h.as_str()).unwrap_or("<none>")
+                );
+                let data = serde_json::json!({
+                    "granter": granter,
+                    "frame_from": frame_from,
+                });
+                let mut resp = A2AJsonRpcResponse::nack(
+                    request.id,
+                    CODE_CONSENT_GRANTER_MISMATCH,
+                    format!("consent granter {granter} does not match frame from {frame_from}"),
+                );
+                if let A2AJsonRpcResponse::Nack(ref mut n) = resp {
+                    n.error.data = Some(data);
+                }
+                return resp;
+            }
+            // (2b) Expiry (G2 — the existing check, moved ahead of the allowlist).
+            if let Some(valid_until_ns) = envelope.valid_until_ns {
+                let now_ns = self.consent_now_ns();
+                if now_ns > valid_until_ns {
+                    let data = serde_json::json!({
+                        "expired_at_ns": valid_until_ns,
+                        "now_ns": now_ns,
+                    });
+                    let mut resp = A2AJsonRpcResponse::nack(
+                        request.id,
+                        CODE_CONSENT_EXPIRED,
+                        format!("consent envelope expired at {valid_until_ns} (now {now_ns})"),
+                    );
+                    if let A2AJsonRpcResponse::Nack(ref mut n) = resp {
+                        n.error.data = Some(data);
+                    }
+                    return resp;
+                }
+            }
+        }
+
+        // (3) ADR-012 accept-allowlist check.
         if !self.accept_admits(&peer_cfg.allowlists, frame, peer_cfg.peer_id.as_str()) {
             return A2AJsonRpcResponse::nack(
                 request.id,
@@ -525,31 +651,6 @@ impl A2ARouterCore {
                     peer_cfg.peer_id.as_str()
                 ),
             );
-        }
-
-        // (3) Consent envelope expiry check.
-        if let Some(envelope) = &frame.consent_envelope {
-            if let Some(valid_until_ns) = envelope.valid_until_ns {
-                let now_ns = self.consent_now_ns();
-                if now_ns > valid_until_ns {
-                    let data = serde_json::json!({
-                        "expired_at_ns": valid_until_ns,
-                        "now_ns": now_ns,
-                    });
-                    let mut resp = A2AJsonRpcResponse::nack(
-                        request.id,
-                        CODE_CONSENT_EXPIRED,
-                        format!(
-                            "consent envelope expired at {valid_until_ns} (now {now_ns})"
-                        ),
-                    );
-                    // Attach timestamp data to the NACK.
-                    if let A2AJsonRpcResponse::Nack(ref mut n) = resp {
-                        n.error.data = Some(data);
-                    }
-                    return resp;
-                }
-            }
         }
 
         // (4) Lamport recv_advance.
@@ -569,6 +670,58 @@ impl A2ARouterCore {
                 receiver_logical_clock: new_clock,
             },
         )
+    }
+
+    /// Story 8.9 / AC1 (G8) — the CROSS-HOST verified intake entry point.
+    ///
+    /// The live mTLS handshake learns WHICH peer presented the (TOFU-pinned)
+    /// client leaf; `serve_connection` re-derives that `verified_peer` from the
+    /// post-handshake `peer_certificates()` and passes it here. Before any
+    /// trust-bearing work, the frame's self-asserted `from.host_id` MUST equal
+    /// the TLS-verified peer — otherwise a mesh peer holding any one validly
+    /// pinned leaf could forge `from.host_id` and act as a confused deputy for
+    /// another Host (the audit's headline G8 defect). On a match it delegates to
+    /// the shared [`Self::handle_intake`] body byte-for-byte; the loopback router
+    /// keeps calling `handle_intake` directly (no wire identity to bind).
+    ///
+    /// AC1.3: a frame with absent `from.host_id` mismatches the verified peer and
+    /// is rejected here, so the shared body's `None → HostId("loopback")`
+    /// fallback (still required by the in-process loopback router) is unreachable
+    /// on the wire.
+    /// Returns `(response, binding_passed)` so the transport layer can
+    /// decide whether to increment `intake_entered` without reverse-engineering
+    /// the NACK error code (Story 8.9 / AC1.2).
+    pub async fn handle_intake_verified(
+        &self,
+        request: A2AJsonRpcRequest,
+        verified_peer: &PeerId,
+    ) -> (A2AJsonRpcResponse, bool) {
+        // Bind the wire identity to the TLS-verified peer.
+        // Framing validation is performed by the shared `handle_intake` body;
+        // we check identity BEFORE delegating so a forged frame gets the
+        // identity NACK, not a loopback-shaped framing NACK.
+        let asserted = request.params.from.host_id.as_ref().map(|h| h.as_str());
+        if asserted != Some(verified_peer.as_str()) {
+            let data = serde_json::json!({
+                "expected": verified_peer.as_str(),
+                "asserted": asserted.unwrap_or("<none>"),
+            });
+            let mut resp = A2AJsonRpcResponse::nack(
+                request.id,
+                CODE_PEER_IDENTITY_MISMATCH,
+                format!(
+                    "frame.from.host_id {} does not match TLS-verified peer {}",
+                    asserted.unwrap_or("<none>"),
+                    verified_peer.as_str()
+                ),
+            );
+            if let A2AJsonRpcResponse::Nack(ref mut n) = resp {
+                n.error.data = Some(data);
+            }
+            return (resp, false);
+        }
+
+        (self.handle_intake(request).await, true)
     }
 }
 
@@ -628,7 +781,7 @@ pub fn map_a2a_error_to_iac_bus(err: A2AError, peer: &str) -> IacBusError {
         A2AError::TransportFailed(detail)
         | A2AError::DeserializationFailed(detail)
         | A2AError::Io(detail)
-        | A2AError::HandshakeFailed(detail) => {
+        | A2AError::HandshakeFailed { message: detail, .. } => {
             IacBusError::CrossHostTransportFailure {
                 peer: peer.to_string(),
                 detail,
@@ -640,6 +793,19 @@ pub fn map_a2a_error_to_iac_bus(err: A2AError, peer: &str) -> IacBusError {
         A2AError::SpiritRestartDetected { peer, prior_boot_nonce, observed_boot_nonce } => {
             IacBusError::CrossHostRouteFailure(format!(
                 "spirit restart detected on peer {peer}: prior={prior_boot_nonce} observed={observed_boot_nonce}"
+            ))
+        }
+        // Story 8.9 — trust-binding rejections map to the generic route-failure
+        // port type (no new kernel variant; `maos-kernel-core` stays
+        // byte-identical). Both carry the security-relevant addresses in the msg.
+        A2AError::PeerIdentityMismatch { expected, asserted } => {
+            IacBusError::CrossHostRouteFailure(format!(
+                "peer identity mismatch: TLS-verified peer {expected}, frame asserted {asserted}"
+            ))
+        }
+        A2AError::ConsentGranterMismatch { granter, frame_from } => {
+            IacBusError::CrossHostRouteFailure(format!(
+                "consent granter mismatch: envelope granter {granter}, frame from {frame_from}"
             ))
         }
     }
@@ -670,6 +836,7 @@ mod tests {
             profile: A2AProfile::Loopback,
             allowlists,
             partition_timeout_secs: 30,
+            consent_ttl_secs: crate::config::DEFAULT_CONSENT_TTL_SECS,
         }
     }
 
@@ -827,8 +994,11 @@ mod tests {
         let mut frame = make_frame(Some("loopback"));
         frame.consent_envelope = Some(maos_domain::frame::ConsentEnvelope {
             consent_id: [0u8; 16],
+            // Story 8.9 / AC2 — granter MUST equal the frame's `from` (spirit_id
+            // "a", host_id "loopback") so this fixture isolates the EXPIRY check;
+            // a granter≠from envelope would now also trip the granter-binding gate.
             granter: FrameAddress {
-                spirit_id: SpiritId::from("granter"),
+                spirit_id: SpiritId::from("a"),
                 host_id: Some(HostId("loopback".to_string())),
                 role: None,
             },
@@ -881,6 +1051,27 @@ mod tests {
         assert!(
             matches!(core.handle_intake(req).await, A2AJsonRpcResponse::Ack(_)),
             "F2 regression: an unexpired consent envelope was wrongly rejected"
+        );
+    }
+
+    /// Story 8.9 / AC3 — `prepare_outbound` leaves a frame with NO consent
+    /// envelope untouched (no panic, no accidental insertion).
+    #[tokio::test]
+    async fn prepare_outbound_leaves_none_envelope_unchanged() {
+        let allow = ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new("standard")],
+            accept_allowlist: vec![A2AIntent::new("standard")],
+        };
+        let core = pinned_core(allow).await;
+        let mut frame = make_frame(Some("loopback"));
+        frame.consent_envelope = None;
+        let (req, _, _) = core
+            .prepare_outbound(frame.clone(), &HostId("loopback".to_string()), 0)
+            .await
+            .expect("prepare_outbound must succeed");
+        assert!(
+            req.params.consent_envelope.is_none(),
+            "prepare_outbound must NOT insert a consent envelope when none was present"
         );
     }
 }

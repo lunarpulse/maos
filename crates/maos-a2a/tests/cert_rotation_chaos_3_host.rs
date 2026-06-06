@@ -112,12 +112,21 @@ fn scenario_5_5_retry_policy_correctness() {
 
 #[test]
 fn retry_policy_only_retries_bad_cert_or_expired_per_arch_7_2_1_a() {
-    use maos_a2a::error::A2AError;
+    use maos_a2a::error::{A2AError, HandshakeFailureClass};
     use maos_a2a::HandshakeRetryPolicy;
     let p = HandshakeRetryPolicy::default();
-    assert!(p.is_retryable(&A2AError::HandshakeFailed("BAD_CERTIFICATE".into())));
-    assert!(p.is_retryable(&A2AError::HandshakeFailed("CERTIFICATE_EXPIRED".into())));
+    assert!(p.is_retryable(&A2AError::HandshakeFailed {
+        class: HandshakeFailureClass::BadCertificate,
+        message: "leaf malformed".into(),
+    }));
+    assert!(p.is_retryable(&A2AError::HandshakeFailed {
+        class: HandshakeFailureClass::CertExpired,
+        message: "leaf expired".into(),
+    }));
     // Other handshake failures bubble up immediately per §7.2.1.a.
-    assert!(!p.is_retryable(&A2AError::HandshakeFailed("DECRYPT_ERROR".into())));
+    assert!(!p.is_retryable(&A2AError::HandshakeFailed {
+        class: HandshakeFailureClass::Other,
+        message: "DECRYPT_ERROR: alert".into(),
+    }));
     assert!(!p.is_retryable(&A2AError::TransportFailed("connection reset".into())));
 }

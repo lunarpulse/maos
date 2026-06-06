@@ -2,6 +2,35 @@
 dev_model_used: claude-opus-4-7
 ---
 
+## Deferred from: party-mode implementation audit of Epic 8 (2026-06-06)
+
+> Two-round adversarial audit (party-mode: John / Winston / Murat / Amelia + Mary) of whether Epic 8 delivers the PRD user journeys. Surfaced **NEW security/invariant defects not previously logged**. Each is now owned by a completion-delivery story (8.9–8.15), registered via `sprint-change-proposal-2026-06-06.md`. Listed here for canonical defect tracking.
+
+### Security — A2A cross-Host (closed by Story 8.9)
+- **G8 — peer-identity bypass (CRITICAL).** The live mTLS verifier learns the true peer (`crates/maos-a2a-tcp/src/verifier.rs:177` — `find_active_pin_by_fingerprint → Some(_peer)`) then discards it; `serve_connection` hands `handle_intake` the *request*, which re-derives identity from attacker-supplied `frame.from.host_id` (fallback `"loopback"`) at `crates/maos-a2a-core/src/router.rs:438-441`, and the intake `verify_pinned` compares the config fingerprint against itself (`X==X`). A mesh peer with any one validly-pinned leaf can set `frame.from.host_id="nash"` and inherit Nash's accept-allowlist — the confused-deputy J4 exists to prevent. `fix: thread the verified PeerId into handle_intake; reject frame.from != tls_verified_peer`.
+- **G1 — consent granter replay (HIGH).** No check that `consent_envelope.granter == frame.from` (`router.rs:531`); a leaked envelope can be replayed by a different sender (compounds with G8). `guard: if env.granter != frame.from { return Err(ConsentGranterMismatch) }`.
+- **G10 — consent-expiry dead code (HIGH).** 8.6 fixed the consent clock to fail-closed (`wall_now_ns`), but `prepare_outbound` (`router.rs:339-377`) never populates `consent_envelope.valid_until_ns`, so the `if let Some(valid_until_ns)` expiry check (`router.rs:531-534`) is unreachable on every real cross-Host frame. Production has NO consent-expiry enforcement; all "expiry" tests pass against hand-built unit envelopes.
+- **G2 — expired-consent masked by ordering (MEDIUM).** `accept_admits` runs before `is_expired` (`router.rs:517` before `:531`); an expired+denied frame reports intent-denial, masking expiry. Becomes a wrong-root-cause incident timeline once G10 is fixed.
+- **G9 — intent length-bound contradiction (MEDIUM).** Router accepts `intent.len() <= 1024` (`router.rs:260`) but canonical caps at `MAX_CANONICAL_INTENT_LEN = 128` (`crates/maos-domain/src/invariants/i8.rs:44`); a 129–1024-byte intent is used as the match key yet can never be canonical → guaranteed non-match + warn-dedup amplification.
+- **G4/G5/G6 (MEDIUM/LOW).** TOFU pin-store restart-TOCTOU + duplicate-peer silent overwrite (`router.rs:139-145,:474-514`); brittle webpki/io `Debug`-string error classification that can misclassify on dep wording drift (`verifier.rs:202`, `mtls.rs:63`); intake timeout covers only the socket read, not `handle_intake` + NACK write (`transport.rs:403,:433,:437`).
+
+### Invariant enforcement holes (closed by Story 8.10)
+- **I11 citer-authorization gap.** `write_distillate(spirit_pid, request)` (`crates/maos-iac/src/adapter/distillate.rs:289-369`) verifies cited frames EXIST but never that `spirit_pid` is authorized to cite them; Researcher forwards a caller-supplied pid (`spirits/researcher/src/lib.rs:528,533`). A Spirit can mint a digest whose lineage derives from another principal's raw frames. Compounded: `TransparencyLogAdapter::insert_frame_event` is `pub` and its doc admits direct `FrameKind::Distillate` inserts bypass the canonical producer (`transparency_log.rs:58`). `fix: gate insert_frame_event for Distillate to DistillateWriter; add principal-namespace citer check`.
+- **I12 records nothing (silent fail-open).** `decision_logger.rs` v0.3-β `digest_provider` returns an empty refs set; `frame_carries_i12_refs` returns `true` unconditionally (doc: "always-true; production SHOULD NOT branch"). NFR-Aud-5's "100%" is satisfied by shape, not content. `fix: wire the Memory-Manager digest source-of-truth (Story 4.3's deferred seam)`.
+- **Observer watchdog fails-open on NaN.** `spirits/observer/src/lib.rs:460,521` silently `return None` on NaN drift/structural magnitude → the safety watchdog goes quiet exactly when a Spirit emits garbage; `WatchThreshold::new` accepts NaN/Inf. `fix: reject-and-flag`.
+- **pub-field constructor bypass class.** `anomaly_flagged` / `EpistemicHaltPayload` / `StructuralSignal` / `DistillationRequest` allow NaN/empty via struct-literal, skipping the validating `new()`.
+
+### Story-correctness (closed by Story 8.10·AC1)
+- **Butler AC2 — production halt never fires (regression of a `done` story).** `spirits/butler/src/lib.rs:250-270` production `on_idle` computes the assessment and drops it — no scalar write, no halt. The scalar→policy→halt path runs only in `tests/corpus_halt.rs`. The 8.1 review marked the `[Patch]` "Must fix — test-only proof insufficient for v0.3" as applied `[x]`; the hook code was never changed.
+
+### Journey-presentability gaps (closed by Stories 8.11–8.14; asserted by harness 8.15)
+- **No live LLM path** — zero reference Spirit calls the Inference Port; all cognition is deterministic (→ 8.11).
+- **No runnable daemon** — `maos-bin` is 54 env-gated smoke arms, no serving loop (→ 8.11 + 8.14a).
+- **CliWrapper subprocess bridge unbuilt** — `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs` is `argv_prefix_hash` under a doc comment; Worker spawns no real CLI (→ 8.12).
+- **Live transport carries no Spirit traffic** — `smoke_a2a_tcp_8_6`'s `mira`/`nash` locals are router handles, not the cognitive structs; Mira/Nash cognition runs only on loopback (→ 8.13).
+- **MCP is fixture-replay** — `spirits/butler/src/lib.rs:76-77`; no real Calendar/Slack/arXiv drivers (→ 8.14b/c).
+- **`hello-spirit` is 0 LOC; no `maos init` / shell / `maos audit query`** (→ 8.14a).
+
 ## Deferred from: code review of 8-7-fine-grained-typed-intent-consent-vocabulary-over-maos-a2a-core (2026-06-06)
 
 - Consent envelope granter mismatch — replay attack [router.rs:250-257] — No validation that `consent_envelope.granter` matches `frame.from`. A stolen consent envelope could be replayed by a different sender. Pre-existing issue; not introduced by 8.7. `guard_snippet: if let Some(ref env) = frame.consent_envelope { if env.granter != frame.from { return Err(A2AError::ConsentGranterMismatch); } }`

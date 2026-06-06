@@ -4,7 +4,7 @@
 //! / 1000 ms across 3 attempts (4 total tries including the original)` with
 //! ±20% jitter; retries fire only on `BAD_CERTIFICATE` or `CERTIFICATE_EXPIRED`.
 
-use crate::error::A2AError;
+use crate::error::{A2AError, HandshakeFailureClass};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -60,14 +60,21 @@ impl HandshakeRetryPolicy {
     }
 
     /// Returns true if the failure class is retry-eligible per §7.2.1.a.
+    ///
+    /// Story 8.9 / AC6.1 (G4): classify on the STRUCTURED sentinel TAG the
+    /// transport's `TcpTransportError::to_a2a_error` emits as the leading
+    /// `WORD:` prefix (`BAD_CERTIFICATE:` / `CERTIFICATE_EXPIRED:` /
+    /// `PIN_MISMATCH (TOFU):`), NOT a fragile `to_lowercase().contains(...)`
+    /// substring of arbitrary rustls wording. The leading tag is the stable,
+    /// transport-owned discriminant; a TOFU pin mismatch is deliberately NOT
+    /// retry-eligible (retrying cannot change a pinned identity).
     pub fn is_retryable(&self, err: &A2AError) -> bool {
         match err {
-            A2AError::HandshakeFailed(s) => {
-                let lower = s.to_lowercase();
-                lower.contains("bad_certificate")
-                    || lower.contains("bad certificate")
-                    || lower.contains("certificate_expired")
-                    || lower.contains("certificate expired")
+            A2AError::HandshakeFailed { class, .. } => {
+                matches!(
+                    class,
+                    HandshakeFailureClass::BadCertificate | HandshakeFailureClass::CertExpired
+                )
             }
             _ => false,
         }
@@ -100,10 +107,10 @@ pub fn build_loopback_server_config(
     let provider = std::sync::Arc::new(rustls::crypto::ring::default_provider());
     let server_config = rustls::ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
-        .map_err(|e| A2AError::HandshakeFailed(format!("protocol_versions: {e}")))?
+        .map_err(|e| A2AError::HandshakeFailed { class: HandshakeFailureClass::Other, message: format!("protocol_versions: {e}") })?
         .with_client_cert_verifier(cfg.client_cert_verifier.clone())
         .with_single_cert(cert_chain, clone_key(&cfg.server_key))
-        .map_err(|e| A2AError::HandshakeFailed(format!("with_single_cert: {e}")))?;
+        .map_err(|e| A2AError::HandshakeFailed { class: HandshakeFailureClass::Other, message: format!("with_single_cert: {e}") })?;
     Ok(server_config)
 }
 
@@ -168,20 +175,41 @@ mod tests {
     #[test]
     fn is_retryable_bad_certificate() {
         let p = HandshakeRetryPolicy::default();
-        assert!(p.is_retryable(&A2AError::HandshakeFailed("alert BAD_CERTIFICATE".into())));
-        assert!(p.is_retryable(&A2AError::HandshakeFailed("bad certificate received".into())));
+        // Story 8.9 / G4 — classify on the structured `WORD:` sentinel tag the
+        // transport's `to_a2a_error` emits, not arbitrary substrings.
+        assert!(p.is_retryable(&A2AError::HandshakeFailed {
+            class: HandshakeFailureClass::BadCertificate,
+            message: "leaf malformed".into(),
+        }));
     }
-
     #[test]
     fn is_retryable_certificate_expired() {
         let p = HandshakeRetryPolicy::default();
-        assert!(p.is_retryable(&A2AError::HandshakeFailed("CERTIFICATE_EXPIRED".into())));
+        assert!(p.is_retryable(&A2AError::HandshakeFailed {
+            class: HandshakeFailureClass::CertExpired,
+            message: "leaf expired".into(),
+        }));
+    }
+
+    #[test]
+    fn is_retryable_pin_mismatch_not_retryable() {
+        // Story 8.9 / G4 — a TOFU pin mismatch is a valid cert with the wrong
+        // identity; retrying cannot change the pinned identity, so its
+        // `PIN_MISMATCH (TOFU):` tag must NOT be retry-eligible.
+        let p = HandshakeRetryPolicy::default();
+        assert!(!p.is_retryable(&A2AError::HandshakeFailed {
+            class: HandshakeFailureClass::PinMismatch,
+            message: "wrong identity".into(),
+        }));
     }
 
     #[test]
     fn is_retryable_other_failure_classes_not_retryable() {
         let p = HandshakeRetryPolicy::default();
-        assert!(!p.is_retryable(&A2AError::HandshakeFailed("DECRYPT_ERROR".into())));
+        assert!(!p.is_retryable(&A2AError::HandshakeFailed {
+            class: HandshakeFailureClass::Other,
+            message: "DECRYPT_ERROR: alert".into(),
+        }));
         assert!(!p.is_retryable(&A2AError::TransportFailed("connection reset".into())));
     }
 }

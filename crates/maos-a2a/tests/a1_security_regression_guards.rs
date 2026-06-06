@@ -49,6 +49,7 @@ fn make_peer_cfg(peer_id: &str, allowlists: ConsentAllowlists) -> A2APeerConfig 
         profile: A2AProfile::Loopback,
         allowlists,
         partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a::config::DEFAULT_CONSENT_TTL_SECS,
     }
 }
 
@@ -130,10 +131,11 @@ async fn p2_handle_intake_rejects_expired_consent_envelope() {
 
     let mut frame = make_frame_with_host(Some("loopback"));
     // valid_until_ns = 0 is in the past relative to any monotonic_now_ns() > 0.
+    // Granter MUST match from (AC2) so the expiry check is what fires.
     frame.consent_envelope = Some(ConsentEnvelope {
         consent_id: [0u8; 16],
         granter: FrameAddress {
-            spirit_id: SpiritId::from("granter"),
+            spirit_id: SpiritId::from("sender"),
             host_id: Some(HostId("loopback".to_string())),
             role: None,
         },

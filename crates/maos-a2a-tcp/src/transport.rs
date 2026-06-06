@@ -16,9 +16,11 @@ use crate::error::TcpTransportError;
 use crate::verifier::{TofuPinningVerifier, TrustPosture, VerifyDirection};
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
-use maos_a2a_core::identity::PeerId;
+use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::router::{A2APeerRouter, A2ARouterCore, A2ATransport};
-use maos_a2a_core::transport::json_rpc::{CODE_FRAME_TOO_LARGE, CODE_TIMEOUT};
+use maos_a2a_core::transport::json_rpc::{
+    CODE_FRAME_TOO_LARGE, CODE_TIMEOUT,
+};
 use maos_a2a_core::{
     A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, HandshakeRetryPolicy,
     InMemoryTofuPinStore, TofuPinStore,
@@ -142,15 +144,31 @@ impl TcpA2ATransport {
         timeouts: TcpTimeouts,
         retry_policy: HandshakeRetryPolicy,
         validation_time: Option<UnixTime>,
+        // Story 8.9 / AC3 — optional pinned consent-expiry clock (ns since epoch)
+        // for deterministic on-wire expiry tests. `None` in production (real wall
+        // clock). Threaded into the shared `A2ARouterCore` so both the sender's
+        // `prepare_outbound` stamp and the receiver's expiry check use it.
+        consent_now_ns: Option<u64>,
     ) -> Result<Self, TcpTransportError> {
         let pins = tcp_config.build_pin_store().await?;
         let posture = tcp_config.trust_posture()?;
         let (own_chain, own_key) = tcp_config.load_identity()?;
 
-        let core = Arc::new(A2ARouterCore::new(
+        // Story 8.9 / AC6.2 (G5a) — `try_new` HARD-FAILS on a duplicate `peer_id`
+        // instead of the prior silent "last wins" overwrite; surface it to the
+        // operator as a config error.
+        for cfg in &peer_configs {
+            cfg.validate().map_err(|e| TcpTransportError::Config(e.to_string()))?;
+        }
+        let mut core_inner = A2ARouterCore::try_new(
             peer_configs,
             pins.clone() as Arc<dyn TofuPinStore>,
-        ));
+        )
+        .map_err(|e| TcpTransportError::Config(e.to_string()))?;
+        if let Some(t) = consent_now_ns {
+            core_inner = core_inner.with_pinned_consent_clock(t);
+        }
+        let core = Arc::new(core_inner);
 
         let server_config = Arc::new(build_server_config(
             &own_chain,
@@ -184,6 +202,7 @@ impl TcpA2ATransport {
             listener,
             TlsAcceptor::from(server_config.clone()),
             core.clone(),
+            pins.clone(),
             timeouts,
             intake_entered.clone(),
             active_connections.clone(),
@@ -327,6 +346,7 @@ async fn accept_loop(
     listener: TcpListener,
     acceptor: TlsAcceptor,
     core: Arc<A2ARouterCore>,
+    pins: Arc<InMemoryTofuPinStore>,
     timeouts: TcpTimeouts,
     intake_entered: Arc<AtomicUsize>,
     active_connections: Arc<AtomicUsize>,
@@ -347,6 +367,7 @@ async fn accept_loop(
         };
         let acceptor = acceptor.clone();
         let core = core.clone();
+        let pins = pins.clone();
         let intake_entered = intake_entered.clone();
         let active_connections = active_connections.clone();
         let last_intake = last_intake.clone();
@@ -355,6 +376,7 @@ async fn accept_loop(
             tcp,
             acceptor,
             core,
+            pins,
             timeouts,
             intake_entered,
             active_connections,
@@ -382,6 +404,7 @@ async fn serve_connection(
     tcp: TcpStream,
     acceptor: TlsAcceptor,
     core: Arc<A2ARouterCore>,
+    pins: Arc<InMemoryTofuPinStore>,
     timeouts: TcpTimeouts,
     intake_entered: Arc<AtomicUsize>,
     active_connections: Arc<AtomicUsize>,
@@ -395,6 +418,19 @@ async fn serve_connection(
     let tls = match tokio::time::timeout(timeouts.handshake, acceptor.accept(tcp)).await {
         Ok(Ok(s)) => s,
         _ => return,
+    };
+
+    // Story 8.9 / AC1 (G8) — re-derive the TLS-VERIFIED peer identity from the
+    // negotiated client leaf (the handshake already ran the TOFU pin verifier;
+    // we resolve which peer that pinned leaf belongs to via the SAME oracle
+    // `verifier.rs` used). intake binds to THIS, never to `frame.from.host_id`.
+    // If no verified peer resolves, close without ever entering intake.
+    let verified_peer = match resolve_verified_peer(&tls, &pins) {
+        Some(p) => p,
+        None => {
+            tracing::warn!("resolve_verified_peer: no active pin for negotiated client cert — closing connection without intake");
+            return;
+        }
     };
 
     let mut framed = Framed::new(tls, length_delimited_codec());
@@ -420,28 +456,64 @@ async fn serve_connection(
                 return;
             }
             Ok(Some(Ok(buf))) => {
-                intake_entered.fetch_add(1, Ordering::SeqCst);
-                // Funnel raw bytes through the frozen `try_from_bytes` (AC-A4 /
-                // security boundary 5) — malformed JSON → CODE_PARSE_ERROR NACK.
-                let resp = match A2AJsonRpcRequest::try_from_bytes(&buf) {
-                    Ok(req) => {
-                        // AC-T1 wire round-trip observation: record the decoded
-                        // (boot_nonce, lamport) BEFORE intake processing.
-                        if let Ok(mut g) = last_intake.lock() {
-                            *g = Some((req.boot_nonce, req.params.logical_clock));
+                // Story 8.9 / AC6.4 (G6) — bound PROCESSING + the NACK WRITE under
+                // the idle timeout, not just the read above, so a slow processor
+                // or a stalled write cannot hang the per-connection task.
+                // Story 8.9 / AC6.4 (G6) — bound PROCESSING + the NACK WRITE under
+                // the intake timeout (not just the read above), so a slow processor
+                // or a stalled write cannot hang the per-connection task.
+                let handled = tokio::time::timeout(timeouts.intake, async {
+                    // Funnel raw bytes through the frozen `try_from_bytes` (AC-A4
+                    // / security boundary 5) — malformed JSON → CODE_PARSE_ERROR.
+                    let (resp, _binding_passed) = match A2AJsonRpcRequest::try_from_bytes(&buf) {
+                        Ok(req) => {
+                            let observed = (req.boot_nonce, req.params.logical_clock);
+                            // AC1: bind to the TLS-verified peer in the shared core.
+                            let (resp, binding_passed) =
+                                core.handle_intake_verified(req, &verified_peer).await;
+                            // AC1.2: count + observe ONLY a frame whose verified-peer
+                            // binding passed (a forged `from` → `intake_entered`
+                            // stays 0, `last_intake` is NOT recorded).
+                            if binding_passed {
+                                if let Ok(mut g) = last_intake.lock() {
+                                    *g = Some(observed);
+                                }
+                                intake_entered.fetch_add(1, Ordering::SeqCst);
+                            }
+                            (resp, binding_passed)
                         }
-                        core.handle_intake(req).await
-                    }
-                    Err(nack) => A2AJsonRpcResponse::Nack(nack),
-                };
-                if send_response(&mut framed, &resp).await.is_err() {
-                    return;
+                        Err(nack) => (A2AJsonRpcResponse::Nack(nack), true),
+                    };
+                    send_response(&mut framed, &resp).await
+                })
+                .await;
+                match handled {
+                    // Wrote the response — a follow-up valid frame on the SAME
+                    // connection is served (AC-T2 codec resync / not poisoned).
+                    Ok(Ok(())) => {}
+                    // Processing/write timed out, or the write errored — end task.
+                    _ => return,
                 }
-                // Loop continues — a follow-up valid frame on the SAME connection
-                // is served (AC-T2 codec resync / not poisoned).
             }
         }
     }
+}
+
+/// Story 8.9 / AC1 (G8) — resolve the TLS-verified peer from the listening
+/// side's negotiated client certificate. After `acceptor.accept` succeeds the
+/// `ServerConnection` (`get_ref().1`) carries the client chain (present because
+/// mTLS required a client cert — the verifier already enforced it). The leaf is
+/// hashed and looked up against the SAME active-pin oracle `verifier.rs:177`
+/// used, so the identity is re-derived deterministically with no frozen-signature
+/// change. Returns `None` if no cert / no active pin (close without intake).
+fn resolve_verified_peer(
+    tls: &tokio_rustls::server::TlsStream<TcpStream>,
+    pins: &InMemoryTofuPinStore,
+) -> Option<PeerId> {
+    let (_io, conn) = tls.get_ref();
+    let leaf = conn.peer_certificates()?.first()?;
+    let fp = PeerCertFingerprint::from_cert_der(leaf.as_ref());
+    pins.find_active_pin_by_fingerprint(&fp)
 }
 
 async fn send_response<S>(

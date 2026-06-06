@@ -250,6 +250,7 @@ pub fn peer_cfg(
             accept_allowlist: accept.iter().map(|s| A2AIntent::new(*s)).collect(),
         },
         partition_timeout_secs: 30,
+        consent_ttl_secs: 300,
     }
 }
 
@@ -313,9 +314,43 @@ pub async fn bind_endpoint(
         timeouts,
         retry,
         Some(clock.unix()),
+        None, // consent expiry: real wall clock unless a test pins it
     )
     .await
     .expect("bind endpoint")
+}
+
+/// Configuration for [`bind_endpoint_consent_pinned`].
+pub struct BindEndpointConfig<'a> {
+    pub own_leaf: &'a Leaf,
+    pub ca: Option<&'a Ca>,
+    pub own_boot_nonce: u64,
+    pub peer_pins: Vec<PinnedFingerprint>,
+    pub peer_configs: Vec<A2APeerConfig>,
+    pub clock: &'a Clock,
+    pub timeouts: TcpTimeouts,
+    pub retry: HandshakeRetryPolicy,
+    pub consent_now_ns: u64,
+}
+
+/// Story 8.9 / AC3 — like [`bind_endpoint`] but pins the shared router's
+/// consent-expiry clock to `consent_now_ns` so on-wire consent-expiry tests are
+/// deterministic (the sender stamps `valid_until = consent_now + ttl`; a
+/// receiver pinned past that rejects with `CODE_CONSENT_EXPIRED`).
+pub async fn bind_endpoint_consent_pinned(cfg: BindEndpointConfig<'_>) -> TcpA2ATransport {
+    let pems = write_pem(cfg.own_leaf, cfg.ca);
+    let tcp = tcp_config(&pems, cfg.peer_pins, Duration::from_secs(30));
+    TcpA2ATransport::bind(
+        tcp,
+        cfg.peer_configs,
+        cfg.own_boot_nonce,
+        cfg.timeouts,
+        cfg.retry,
+        Some(cfg.clock.unix()),
+        Some(cfg.consent_now_ns),
+    )
+    .await
+    .expect("bind endpoint (consent-pinned)")
 }
 
 /// Build a `CrossHost` advisory frame from `from_host` → `to_host` with the
