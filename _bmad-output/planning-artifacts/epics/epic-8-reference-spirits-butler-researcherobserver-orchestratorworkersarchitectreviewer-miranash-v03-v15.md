@@ -2,6 +2,8 @@
 
 **Goal:** Each phase release ships at least one production-quality reference Spirit anchoring a real user journey (J0 / J-Butler / J-Researcher / J1 founder loop / J4 Mira-Nash diagnostic-architect / J6 Diego cold-start) and validating the substrate end-to-end. **Zero kernel KLOC — all subprocess Spirit code in `spirits/` directory.** Reference Spirits are *deliverables* (operators expect them out-of-the-box) AND *validation fixtures* (they exercise NFR-Test-4 halt-recall floors, NFR-Rel-3 HSIS per Spirit class, NFR-Test-6 LCAS, NFR-Test-8 third-party trial benchmarks).
 
+> **⚙️ CHARTER AMENDMENT (2026-06-06) — "reference Spirits AND their live runtime."** The "Zero kernel KLOC" mandate above was correct for the reference-Spirit stories (8.1–8.7) — it made them tiny, pure, and byte-stable. But a two-round implementation audit (party-mode, 2026-06-06) established that **no PRD journey is presentable end-to-end to a real user** under that mandate: every Spirit is deterministic (zero live LLM); the live `maos-a2a-tcp` transport carries no real Mira/Nash traffic (loopback only); the CliWrapper subprocess bridge is unbuilt scaffolding (`runtime.rs` is a hash helper under a doc comment); and there is no runnable daemon (only 54 env-gated smoke arms). The hard integration work was disclosed-as-deferred at every story but **owned by no story** — the "homeless integration layer." The audit also surfaced **undisclosed security/invariant defects**: A2A confused-deputy peer-identity bypass (G8 — `verifier.rs:177` learns the TLS peer then discards it; intake re-derives identity from attacker-controlled `frame.from.host_id`); consent-expiry dead code (G10 — `prepare_outbound` never populates `valid_until_ns`); I12 records nothing (empty refs + tautological check); Observer watchdog fails-open on NaN; and Butler's production `on_idle` never fires its halt (a `done` story's review marked the fix applied — it was not). **Stories 8.9–8.14 below complete Epic 8's delivery:** they close the defects (8.9/8.10, charter-safe — protocol/IAC crates) and build the live runtime (8.11–8.14 — daemon + Inference Port + CLI bridge + Spirit↔wire binding + real MCP), which REQUIRES `maos-kernel-core` deltas. The zero-KLOC invariant is therefore **retired for 8.11/8.12**; each kernel-touching story records a NEW pinned `maos-kernel-core` byte baseline (replacing 8.4's 15505 assertion) and carries a FLAG-Winston note. Reference-Spirit stories 8.1–8.7 remain zero-KLOC and unchanged. Full audit evidence: party-mode session 2026-06-06.
+
 **Sub-stories per Spirit class anchored to release phase:**
 
 - **Butler v0.3** — `on_idle` substrate for anticipatory reasoning; calendar/comms 30-scenario regression corpus; halt-recall ≥0.90 on calendar-conflict subset; halt-precision ≥0.85 overall; bmad-eval baseline ≥0.85; **ships morning digest implementation (FR17 Spirit-side)** via §9.5 distillation pattern with hallucination floor 0/100 verified against actual Transparency Log; ≥95/100 digests must include all open halts and cite source log refs. **Drives NFR-Onb-1 v0.3 gate execution.**
@@ -271,7 +273,7 @@ security model actually enforced on the wire.
 **Then** the 8.5-frozen signatures are called byte-identically (asserted by an `abi-diff` of `maos-a2a-core`'s public surface showing them **unchanged** — not Added/Removed/Modified): `verify_pinned(...)`; the ADR-012 consent fn (consent rides the EXISTING JSON-RPC field, NOT a new TCP-specific field); `handle_intake(...)` and `A2AJsonRpcRequest::try_from_bytes(...)`; `boot_nonce` + the Lamport `logical_clock` travel in the EXISTING JSON-RPC field where 8.5 placed them (cite the literal field name), with no re-wrapping
 **And** if any of these would require a signature change to make TCP work, that is a RED flag the seam (AC-A1) is misplaced — the change is rejected and the seam is moved instead
 
-> **Noted gap — consent vocabulary vs enforcement granularity (Winston, 2026-06-04; DEFERRED beyond 8.6's no-churn scope).** Story 8.5 surfaced that `ConsentAllowlists` holds a free-form `Vec<A2AIntent>` (open vocabulary) but the router enforces consent by matching only `frame.intent.a2a_consent_intent_str()` — the 3-value `IntentClass` projection `{highprivilege, standard, readonly}` (`maos-a2a/src/adapter.rs:144-164`). Consequence: an operator can write a specific intent like `A2AIntent::new("diagnosis-handoff:read-only-evidence")` or `"rca-summary"` into an allowlist (as the `smoke-a2a-loopback-6-3` arm aspirationally does) and it will **silently never match** — ADR-012 is, today, "typed-*class* consent," not fine-grained typed-intent consent. **This is NOT 8.6 work:** 8.6 is deliberately churn-free (AC-A6 — a consent-fn signature change is a RED flag), and `maos-a2a-core` must consume 8.5's signatures byte-identically. The note lives here because 8.6 is the moment the protocol crate reopens (`maos-a2a` → `maos-a2a-core` + `maos-a2a-tcp`), so a future **consent-vocabulary story** (widen the intent taxonomy, or match a real per-frame intent field instead of the 3-band projection — an ADR-012 refinement) should be scoped *after* 8.6 lands the seam, against `maos-a2a-core`. Until then the coarse 3-band gate is the accepted v1.5 behavior; mitigation is the clarifying note in Story 8.5's Dev Agent Record. **Recommended:** open this as a v1.5+ backlog story once 8.6 establishes `maos-a2a-core`.
+> **Noted gap — consent vocabulary vs enforcement granularity (Winston, 2026-06-04; DEFERRED beyond 8.6's no-churn scope).** Story 8.5 surfaced that `ConsentAllowlists` holds a free-form `Vec<A2AIntent>` (open vocabulary) but the router enforces consent by matching only `frame.intent.a2a_consent_intent_str()` — the 3-value `IntentClass` projection `{highprivilege, standard, readonly}` (`maos-a2a/src/adapter.rs:144-164`). Consequence: an operator can write a specific intent like `A2AIntent::new("diagnosis-handoff:read-only-evidence")` or `"rca-summary"` into an allowlist (as the `smoke-a2a-loopback-6-3` arm aspirationally does) and it will **silently never match** — ADR-012 is, today, "typed-*class* consent," not fine-grained typed-intent consent. **This is NOT 8.6 work:** 8.6 is deliberately churn-free (AC-A6 — a consent-fn signature change is a RED flag), and `maos-a2a-core` must consume 8.5's signatures byte-identically. The note lives here because 8.6 is the moment the protocol crate reopens (`maos-a2a` → `maos-a2a-core` + `maos-a2a-tcp`), so a future **consent-vocabulary story** (widen the intent taxonomy, or match a real per-frame intent field instead of the 3-band projection — an ADR-012 refinement) should be scoped *after* 8.6 lands the seam, against `maos-a2a-core`. Until then the coarse 3-band gate is the accepted v1.5 behavior; mitigation is the clarifying note in Story 8.5's Dev Agent Record. **Recommended:** open this as a v1.5+ backlog story once 8.6 establishes `maos-a2a-core`. **✅ UPDATE (2026-06-05): RESOLVED — registered as `## Story 8.7` (fine-grained enforcement, ready-for-dev) + `## Story 8.8` (fail-closed end-state, backlog) below, via Direct Adjustment `sprint-change-proposal-2026-06-05.md`. Design forks decided by team consensus (Winston + Murat + security red-team).**
 
 **AC-A7 — Kernel-KLOC zero-delta + doc reconciliation**
 **Given** the zero-kernel-KLOC mandate
@@ -333,3 +335,184 @@ security model actually enforced on the wire.
 > **Red-phase note for the dev:** start with the H1–H6 harness + AC-T1 (the only happy path); then AC-T3 and AC-T7 most change the security posture and most expose missing verifier/timeout wiring. AC-T3–T6 consume AC-A3's `TofuPinningVerifier` as the unit under test — coordinate its error taxonomy (concrete enum variants) so the "TOFU-mismatch vs bad-cert" oracles match. Two facts to cite from source before AC-A1 closes: the file:line of the `CrossHost` dispatch match the trait binds to, and the literal JSON-RPC field name carrying Lamport/`boot_nonce` in 8.5's source.
 
 ---
+
+## Story 8.7: Fine-Grained Typed-Intent Consent Vocabulary over `maos-a2a-core`
+
+> **Registered 2026-06-05 (Direct Adjustment — `sprint-change-proposal-2026-06-05.md`); CLOSES the §AC-A6 "Noted gap" above.** Authored against that Noted-gap as authoritative scope; full spec at `_bmad-output/implementation-artifacts/8-7-fine-grained-typed-intent-consent-vocabulary-over-maos-a2a-core.md` (ready-for-dev). **DEPENDS ON Story 8.6 (done)** — lands in the extracted `maos-a2a-core`, NOT the over-budget `maos-a2a`. Zero new crate (workspace stays 41); `maos-kernel-core` byte-identical (15505). `frame_intent_str` became `pub` in the 8.6 extraction → must NOT be renamed (add a private `consent_match_key` instead).
+>
+> **Design forks resolved by team consensus (Winston + Murat + security red-team, 2026-06-05; criterion = spec-fidelity + long-term-correctness, the same trio/criterion that resolved the 8.6 `ca_roots` fork):** ship **fine-grained-when-present** as a *transitional* mechanism (enforcement reads the per-frame `IacFrame.consent_envelope.intent_class`, falling back to the 3-band projection ONLY for unmigrated band-only frames) **+** make `intent_class` population **hard-mandatory** for every reference cross-Host sender (Mira/Nash/`smoke-a2a-loopback-6-3`/`smoke-mira-nash-8-5`) **+** additive `A2AIntent::is_canonical`/`parse` **+** a `tracing::warn!` on unreachable allowlist entries (makes the "silent never-match" loud) **+** **DELETE** the dead `A2AConsentEnvelope` + its `From<ConsentEnvelope>` (a `None`→`"standard"` privilege-band discard = latent fail-open elevation; accept a justified abi-diff **Removed** — the ONE ratified exception to the Added-only discipline, flagged for Winston). The closed declared-intent **manifest registry** is DEFERRED — it is ADR-012's own "revisit when intent-class cardinality grows pathologically" trigger, not yet fired. Fail-closed-for-cross-Host is committed as the long-term end-state → **Story 8.8**.
+
+As a MAOS operator wiring cross-Host A2A consent (and the Spirit authors Mira and Nash who depend on it),
+I want the ADR-012 consent gate to enforce the actual fine-grained per-frame intent string an operator
+declares in a `ConsentAllowlists` (e.g. `diagnosis-handoff:read-only-evidence`, `rca-summary`) instead of
+silently collapsing every frame to one of the three coarse `IntentClass` bands `{highprivilege, standard, readonly}`,
+So that ADR-012 is the "typed-*intent* consent" it was decided to be — the confused-deputy gap (Mira admissibly
+handing Nash `diagnosis-handoff:read-only-evidence` while `code-mutation-directive` is rejected) is closed for
+real, and an allowlist entry an operator writes can no longer fail-open by silently never matching.
+
+## Story 8.8: Fail-Closed-for-Cross-Host A2A Consent
+
+> **Registered 2026-06-05 (Direct Adjustment — `sprint-change-proposal-2026-06-05.md`); NEW backlog story.** The committed long-term end-state from Story 8.7's Q2 team consensus (8.7 AC9). **DEPENDS ON Story 8.7.** Decisive enabling fact: the `prepare_outbound`/`handle_intake` enforcement path IS the cross-Host A2A router — same-Host IAC never traverses it (ADR-012: same-Host inherits process-internal trust), so fail-closed needs no in-band discriminator and leaves same-Host trust untouched by construction.
+>
+> **Precondition (LOCKED — must be GREEN-at-HEAD before the flip; never flipped-while-red):** a NEW sender-completeness discipline gate asserting (1) **sender-completeness** — no cross-Host send path reaches the A2A router-entry seam with an absent/unrecognized `intent_class` (static/build-time scan + a runtime assertion in every smoke arm that no off-Host frame leaves with `intent_class == None`); and (2) **fail-closed-readiness** — with the cross-Host router toggled to fail-closed mode, the FULL `a1_security_regression_guards` suite + all routed scenarios + both smoke arms still pass (the corpus is already B-clean), so the flip is mechanical. **Security invariant (non-negotiable, red-team):** the fail-closed flip must deny ONLY unclassified traffic and never silently downgrade.
+
+As a MAOS operator running Mira and Nash across two Hosts under ADR-012's confused-deputy threat model,
+I want a cross-Host A2A frame that carries no fine-grained typed intent (absent or unrecognized `intent_class`)
+to be DENIED at the router rather than falling back to the coarse 3-band gate,
+So that channel-consent can never masquerade as transaction-consent across the trust boundary — closing the
+confused-deputy gap completely, once every cross-Host sender is proven (by the gate above) to populate a
+well-typed intent.
+
+---
+
+# Epic 8 Completion Delivery — Stories 8.9–8.14 (registered 2026-06-06)
+
+> **Source:** party-mode implementation audit (2026-06-06), two rounds. **Goal:** take Epic 8 from "substrate proven against deterministic fixtures" to **complete journey delivery** — every PRD journey anchored in Epic 8 (J0 / J-Butler / J-Researcher / J1 / J4) presentable end-to-end to a real user, with every audited security/invariant defect closed. Authored under the Charter Amendment above. These are **story stubs** (goal + AC sketches); full ready-for-dev specs to be generated per-story via `bmad-create-story`.
+
+**Sequencing (3 phases):**
+
+```
+PHASE 1 — Trust restoration (charter-safe, contained, restores board credibility)
+  8.10·AC1 (Butler halt) ──┐   [P0 — land as immediate correct-course, even pre-story]
+  8.9  (A2A security) ─────┼──► 8.8 (fail-closed consent; backlog → unblocked by 8.9's G10 + sender-completeness)
+  8.10 (invariant closure)─┘
+
+PHASE 2 — Live runtime spine (charter-amended kernel deltas)
+  8.10 ──► 8.11 (daemon + Inference Port) ──► 8.12 (CLI bridge → J1)
+                     │
+                     └──► 8.13 (live pair + push → J4)   [also needs 8.9]
+
+PHASE 3 — Journey surface
+  8.11 ──► 8.14 (J0 hello-spirit + init + real MCP)   [also needs Epic 9.1 for `maos audit query`]
+```
+
+**Per-journey "presentable" gate:** J0 = 8.14 + Epic 9.1 · J-Butler = 8.10·AC1 + 8.11 + 8.14·AC3 · J-Researcher = 8.11 + 8.14·AC3 · J1 = 8.11 + 8.12 · J4 = 8.9 + 8.11 + 8.13. (J3/Reza/Diego remain correctly out of Epic 8 scope — v1.0–v2.0.)
+
+## Story 8.9: A2A Trust-Binding & Consent Integrity Hardening (security-critical)
+
+> Registered 2026-06-06 (party-mode audit). **Charter-safe** — lands in `maos-a2a-core` + `maos-a2a-tcp`, NO `maos-kernel-core` delta. UNBLOCKS Story 8.8 (its G10 + sender-completeness preconditions overlap). Closes audit gaps **G1, G2, G3, G4, G5, G6, G8, G9, G10**. Makes the J4 confused-deputy guarantee real on the live wire. **Phase 1.**
+
+As a v1.5 operator running Mira and Nash over the live `maos-a2a-tcp` transport,
+I want the router's peer identity bound to the TLS-verified certificate (not a self-asserted frame field) and the consent envelope's granter/expiry actually enforced,
+So that a mesh peer holding any one validly-pinned leaf cannot impersonate another Host, replay a stolen consent envelope, or bypass consent expiry — closing the confused-deputy class on the wire.
+
+**AC sketch:**
+- **AC1 (G8/G3):** Thread the TLS-verified `PeerId` from `verifier.rs:177` (`Some(_peer)`) through `serve_connection` into `handle_intake`; reject any frame where `frame.from.host_id != tls_verified_peer`; delete the `"loopback"` fallback on the cross-host path. NEW `g8_confused_deputy_negative` test (forged `from` on a validly-pinned connection → `EPeerIdentityMismatch`, `intake_entered==0`).
+- **AC2 (G1):** Enforce `consent_envelope.granter == frame.from` (`router.rs:531`); stolen-envelope replay → `ConsentGranterMismatch`.
+- **AC3 (G10):** `prepare_outbound` populates `consent_envelope.valid_until_ns`; integration test proves expiry fires on a real (non-hand-built) frame.
+- **AC4 (G2):** Reorder `is_expired` before `accept_admits` in `handle_intake`.
+- **AC5 (G9):** Unify the intent length bound — `router.rs:260` (`≤1024`) adopts `MAX_CANONICAL_INTENT_LEN=128` (`i8.rs:44`).
+- **AC6 (G4/G5/G6):** Typed-error classification (no webpki/io `Debug`-string matching at `verifier.rs:202`/`mtls.rs:63`); restart-TOCTOU atomicity + duplicate-peer-overwrite hard-fail (`router.rs:139,474`); intake timeout wraps `handle_intake` + NACK write.
+- **Gate:** `a1_security_regression_guards` + new negative tests GREEN; CI 50× stress holds; `maos-kernel-core` byte-identical asserted.
+
+## Story 8.10: Kernel-Enforced Invariant Closure + Butler AC2 Halt Remediation
+
+> Registered 2026-06-06 (party-mode audit). Touches `maos-iac` + `maos-domain` + `spirits/{butler,observer}`; verify `maos-kernel-core` stays byte-identical (`distillate.rs`/`decision_logger.rs` live in `maos-iac`, NOT kernel-core). Closes I11 citer-auth, I12-content, watchdog NaN fail-open, the pub-field bypass class, and the **Butler AC2 regression** (production `on_idle` never fires its halt — review marked applied, was not). **Phase 1.**
+
+As an auditor relying on MAOS's kernel-enforced invariants,
+I want I11 distillation citer-authorization, I12 decision-context content, and the Observer drift watchdog to enforce at runtime (not only inside well-behaved tests),
+So that a Spirit cannot forge cross-principal lineage, decision frames actually record what they reasoned over, and a NaN scalar cannot silently disable the safety watchdog.
+
+**AC sketch:**
+- **AC1 (P0 — Butler AC2):** Production `on_idle` (`spirits/butler/src/lib.rs:250-270`) writes the calendar-conflict scalar AND fires the halt via the policy path (not just stores the assessment). Land as immediate correct-course remediation of the `done` story.
+- **AC2 (I11):** Gate `TransparencyLogAdapter::insert_frame_event` so `FrameKind::Distillate` rows can only be written via `DistillateWriter`; add a principal-namespace citer-authorization check in `write_distillate` (closes cross-principal lineage forgery — `researcher/src/lib.rs:528,533`).
+- **AC3 (I12):** Wire the Memory-Manager digest source-of-truth (Story 4.3's deferred seam) into `decision_logger.rs` so `working_memory_digest_refs` is non-empty; replace the tautological `frame_carries_i12_refs` with a real non-empty assertion on `decision.*` frames.
+- **AC4 (watchdog):** Observer NaN/Inf (`observer/src/lib.rs:460,521`) → reject-and-flag (not silent `return None`); `WatchThreshold::new` rejects NaN/Inf at construction.
+- **AC5 (bypass class):** Validating-constructor enforcement for `anomaly_flagged` / `EpistemicHaltPayload` / `StructuralSignal` / `DistillationRequest`; ABI additive (warn, no churn of frozen types).
+
+## Story 8.11: Live Runtime Spine — Daemon Composition Root + Inference Port (keystone) ⚠ kernel
+
+> Registered 2026-06-06 (party-mode audit). **CHARTER-AMENDED kernel delta authorized** — record a NEW pinned `maos-kernel-core` byte baseline (retires 8.4's 15505 assertion for this story); FLAG-Winston. Keystone for J-Butler / J-Researcher / J1 / J4 presentability. Closes the homeless: serving daemon, live LLM path, runtime budget enforcement, 5-metric real scoring. **Phase 2; depends on 8.10.**
+
+As a director who installed MAOS,
+I want a real `maos run` serving loop that loads a Spirit, binds the substrate, and drives it against a live LLM provider within enforced budgets,
+So that the reference Spirits actually reason and run as a product — not only as env-gated smoke arms over deterministic fixtures.
+
+**AC sketch:**
+- **AC1:** `maos run <manifest>` serving loop — loads a Spirit, binds telemetry/halt/notification/router, drives `on_idle`/intake against real time; replaces the 54 `MAOS_SMOKE_*` arms as the production run surface.
+- **AC2:** Wire the frozen Inference Port (1b.4) to a real provider; ≥1 reference Spirit (Researcher recommended) produces a digest from a **live LLM call**, behind a `--live`/release-gate flag.
+- **AC3 (budget):** Thread manifest `time_cap_seconds` into the dispatcher (replace the hard-coded 30s at `hook_dispatch.rs:87`); wrap the Spirit's reasoning verb (not just hook dispatch); emit a real `BudgetWarning` at 80% from production code.
+- **AC4 (5-metric real):** With AC2 live, the NFR-Aud-7 gate scores Researcher's **actual** digest output for recall/faithfulness/hedge (not corpus-annotated `expected_*`).
+- **AC5 (run-surface seam for the journey harness):** Expose the `maos run` run-surface + injectable clock / Inference-provider / MCP-endpoint seams that **Story 8.15's** journey-acceptance harness drives. The harness itself + the Tier-1/Tier-2 suites are OWNED by **Story 8.15** (test track), not built here. 8.11 only guarantees the daemon is drivable headlessly with an injected virtual clock, a pluggable Inference provider, and pluggable MCP endpoints.
+
+## Story 8.12: Live CliWrapper Subprocess Bridge — Founder-Loop Over Real CLIs (J1) ⚠ kernel
+
+> Registered 2026-06-06 (party-mode audit). The story 8.4 explicitly deferred as "kernel work, not Spirit work" — now owned. **CHARTER-AMENDED kernel delta** in `lifecycle/cli_wrapper`; new pinned baseline + FLAG-Winston. **Phase 2; depends on 8.11.**
+
+As a founder running the overnight loop,
+I want the Worker to spawn a real `claude`/`opencode`/`gemini`/`kimi` CLI through a working stdio bridge,
+So that the J1 wedge demo runs my actual coding agents overnight and hands me an audit-traced result — not a canned-output fixture.
+
+**AC sketch:**
+- **AC1:** Implement `lifecycle/cli_wrapper/runtime.rs` — real `Command::spawn` + length-delimited/ndjson stdio bridge + control channel + recovery state machine (currently only `argv_prefix_hash`).
+- **AC2:** Worker spawns a real config-selected CLI; stdout/stderr → Transparency Log with provenance; `output_shape_version` mismatch fails loud (FR40).
+- **AC3:** Founder-loop runs as a real `maos run` (not a smoke arm hand-INSERTing `CliSubprocessOutput` rows): 11pm assign → real CLI workers → 7am digest cites real log refs.
+
+## Story 8.13: Cross-Host Live Pair — Spirit→TCP Binding + Mobile Push (J4 end-to-end)
+
+> Registered 2026-06-06 (party-mode audit). Composes 8.5 journey logic + 8.6 transport + 8.9 secure identity + 8.11 daemon. NEW `maos-notify-push` crate (pin workspace member delta at dev time). **Phase 2; depends on 8.9 + 8.11.**
+
+As a v1.5 operator deploying Mira (Host A) and Nash (Host B),
+I want Mira's real diagnosis to ride the live mTLS wire to Nash and a halt to reach my phone,
+So that the J4 incident journey runs across two real processes end-to-end — not loopback with a test-double push.
+
+**AC sketch:**
+- **AC1:** Compose `Mira::diagnose()`/`advisory()` output onto the `maos-a2a-tcp` wire via the daemon (the frame 8.6 sends as a hand-built literal now carries real cognition).
+- **AC2:** Runs over the 8.9-hardened TLS-verified peer binding.
+- **AC3:** Real mobile-push transport (`maos-notify-push`, HTTP) replacing `MobilePushCapture`; halt on Mira → operator's phone.
+- **AC4:** Integrated J4 smoke = `smoke-mira-nash-8-5` journey logic run over the **live TCP transport** (closes the "two halves never meet" gap).
+
+## Story 8.14a: J0 Evaluator Surface + Runtime CLI — hello-spirit + `maos init` + Shell + Audit Query
+
+> Registered 2026-06-06; **SPLIT from 8.14 (2026-06-06)** to shorten the Butler-experienceable path. NEW `maos-cli` crate (pin member delta at dev time). REFERENCES Epic 9.1 for `maos audit query`. **Phase 3; depends on 8.11.** Unblocks J0 AND provides the `maos spirit add` / `maos run` shell surface that J-Butler and J-Researcher both need.
+
+As an evaluator 4 minutes into `cargo install maos`,
+I want `maos init`, a working `@hello-spirit`, a kernel-rendered shell, and a queryable audit log,
+So that J0's honest-disclosure-in-6-minutes is presentable and the single-Spirit journeys have a real run surface.
+
+**AC sketch:**
+- **AC1:** `hello-spirit` real implementation (0 LOC today); `maos init` scaffolds `~/.maos` + default slots + BMAD skills; `@hello-spirit say hi` answers in the kernel-rendered shell with honest capability disclosure + halt-on-ambiguity (J0's minute-4 demo).
+- **AC2:** `maos audit query` satisfied via Epic 9.1 `maosctl audit subcommands` + this CLI surface (cross-epic dependency declared).
+- **AC3:** Clean uninstall (`cargo uninstall maos`); Transparency Log persists per retention config.
+
+## Story 8.14b: Butler MCP Driver Set — Calendar / Slack / Linear / Figma (completes J-Butler)
+
+> Registered 2026-06-06; **SPLIT from 8.14.** NEW `maos-mcp` crate (pin member delta). **Phase 3; depends on 8.11 + 8.14a.** With 8.10·AC1, this is the FINAL story on the **shortest J-Butler-experienceable path: 8.10·AC1 → 8.11 → 8.14a → 8.14b.**
+
+As Sandra running Butler against my real accounts,
+I want real Calendar (read) / Slack (read+draft) / Linear (write) / Figma (read) MCP drivers,
+So that Butler watches my actual day instead of a fixture scenario — J-Butler is experienceable end-to-end.
+
+**AC sketch:**
+- **AC1:** Real MCP drivers replace the fixture-replay provider (`butler/src/lib.rs:76-77`); capability scope enforced per manifest.
+- **AC2:** `maos run butler --live` notices a true calendar conflict on real data and writes a real Linear note; morning digest cites real `source_log_ref`.
+- **AC3:** Journey-acceptance test (Story 8.15 harness) green — mock-MCP + replay-LLM + virtual time; asserts the rendered notification + the self-tuning halt (8.10·AC1).
+
+## Story 8.14c: Researcher MCP Driver Set — web / arXiv / GitHub / citation-graph (completes J-Researcher)
+
+> Registered 2026-06-06; **SPLIT from 8.14.** Extends `maos-mcp`. **Phase 3; depends on 8.11 + 8.14a.** Completes the shortest **J-Researcher path: 8.11 → 8.14a → 8.14c.**
+
+As Hannah running a real survey,
+I want real `web.search` / `arxiv.search` / `github.search` / `citation_graph.traverse` MCP drivers with parallelism 8,
+So that Researcher surveys live literature instead of a pinned corpus — J-Researcher is experienceable end-to-end.
+
+**AC sketch:**
+- **AC1:** Real MCP drivers (extend `maos-mcp`); `[capabilities.parallelism]=8` honored.
+- **AC2:** `maos run researcher --live` fans out over real arXiv/web, distills with the I11 chain, halts on a real contradiction, validates `output_shape`; citations reachable.
+- **AC3:** Journey-acceptance test (Story 8.15 harness) green — mock-arXiv-MCP + replay-LLM + virtual budget clock asserting BudgetWarning@80% + the methodology halt + `log.recall` replay of a finding to its source fetch.
+
+## Story 8.15: Journey-Acceptance Test Harness + Red-Phase "Watch-It-Work" Suites
+
+> Registered 2026-06-06 (TEA test-design, Murat). **Test track for the whole completion delivery** — owns the hermetic journey-acceptance architecture for ALL Epic-8-anchored journeys (J0 / J-Butler / J-Researcher / J1 / J4). NEW dev-only crate `maos-journey-test` (pin member delta at dev time). **DEPENDS ON 8.11 (daemon run-surface seam, 8.11·AC5) + 8.14a (CLI/shell).** Per-journey suites flip green as each journey story lands (8.14b Butler, 8.14c Researcher, 8.12 J1, 8.13 J4). ATDD red-phase already authored: `_bmad-output/test-artifacts/atdd-checklist-8-14b-j-butler-acceptance.md` (Butler exemplar). Relocates the harness sub-AC formerly in 8.11·AC5. Place LAST in Epic 8, before Epic 9.
+
+As a quality owner who needs to SEE the journeys work without overnight waits,
+I want a hermetic, deterministic harness that drives the real `maos run` daemon in a PTY, virtualizes only the four nondeterministic externalities (clock, LLM, external SaaS, terminal), and asserts each PRD journey end-to-end in under 2 seconds,
+So that "can I actually watch it work" is an automated CI gate — not a manual demo — and the substrate's journey claims are continuously falsifiable.
+
+**AC sketch:**
+- **AC1 (harness):** NEW `crates/maos-journey-test` — `JourneyWorld` builder + `Pty` (`portable-pty`) + `Screen` (`vt100`, the Rust pyte-equivalent) + `ReplayInferenceProvider` (frozen Inference Port impl; cassette record/replay keyed by prompt-hash) + `MockMcp` (real MCP wire over the 5.5c/5.5d server scaffold) + a real temp `TransparencyLogAdapter` — all over `tokio` virtual time (`start_paused`/`advance`). Reuse the 8.6 H1–H6 guards (`maos-a2a-tcp/tests/h_guards.rs`).
+- **AC2 (Tier-1 acceptance suites):** per-journey hermetic suites assert the user-observable beats. J-Butler: `on_idle` notification render → option-(a) real Linear write + audit row → morning digest cites `source_log_ref` → self-tuning `belief_variance` halt (8.10·AC1). J-Researcher: fan-out → I11 distillation → `BudgetWarning`@80% → methodology halt → `output_shape` → `log.recall` replay. Each suite **<2 s** wall-clock; 50× burn-in 100% green (no §A2-style flake).
+- **AC3 (Tier-2 live drift guard):** a nightly `--live` re-record job runs the SAME suites against real LLM + real MCP, refreshes cassettes, and a **cassette-age gate** fails CI if any cassette exceeds 14 days without a successful Tier-2 run.
+- **AC4 (red-phase authored first):** suites are committed RED (`#[ignore = "RED: …"]`) ahead of implementation; **JB-3 (the 8.10·AC1 self-tuning-halt regression) is the first failing test** that pins the gap; each journey story flips its slice green.
+- **AC5 (coverage honesty):** the harness doc states the boundary — proves MAOS orchestration / audit / halt / budget / MCP / render correctness given recorded inputs; does NOT prove LLM reasoning quality (→ eval corpora) or live-API non-drift (→ Tier-2).
+- **AC6 (CI):** nextest burn-in job (`--retries 0 --test-threads=8`, 50×) wired into the discipline pipeline. NOTE: repo CI is GitHub Actions `discipline.yml`; tea config says `gitlab-ci` — reconcile at wire time.
