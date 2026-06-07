@@ -27,6 +27,10 @@ gates = [
     "isolation-framework-tests",
     "server-exit-drain",
     "check-workspace-count",
+    # Story 8.8 AC3 — cross-Host A2A sender-completeness (no unclassified
+    # consent_envelope reaches the router-entry seam); GREEN-at-HEAD precondition
+    # for the fail-closed flip (never flipped-while-red).
+    "check-a2a-sender-completeness",
     "check-adr040-accepted",
     # Epic 5 retro §A3 — closes Epic 4 retro §A6 (.unwrap_or_default on serde calls).
     "check-serde-error-handling",

@@ -40,15 +40,16 @@ fn make_peer(allow: ConsentAllowlists, timeout_secs: u64) -> A2APeerConfig {
 }
 
 fn make_frame(host: &str) -> IacFrame {
+    let from = FrameAddress {
+        spirit_id: SpiritId::from("mira"),
+        host_id: Some(HostId(host.to_string())),
+        role: None,
+    };
     IacFrame {
         frame_id: [1u8; 16],
         timestamp_ns: 0,
         logical_clock: 0,
-        from: FrameAddress {
-            spirit_id: SpiritId::from("mira"),
-            host_id: Some(HostId(host.to_string())),
-            role: None,
-        },
+        from: from.clone(),
         to: smallvec![FrameAddress {
             spirit_id: SpiritId::from("nash"),
             host_id: Some(HostId(host.to_string())),
@@ -64,22 +65,31 @@ fn make_frame(host: &str) -> IacFrame {
             prior_distillate_ref: None,
         }),
         auto_marker: FrameOrigin::HumanAuthored,
-        consent_envelope: None,
+        // Story 8.8 (Option 2) — fail-closed is unconditional; these 6.3 scenarios
+        // now route CLASSIFIED frames (canonical "standard" intent, granter == from).
+        // The send/accept-allowlist + lamport mechanics they assert are unchanged;
+        // the band→consent projection they originally exercised no longer exists
+        // (superseded by the fine-grained suite in cross_host_consent_v1_5).
+        consent_envelope: Some(maos_domain::frame::ConsentEnvelope {
+            consent_id: [0u8; 16],
+            granter: from,
+            timestamp_ns: 0,
+            intent_class: Some(A2AIntent::new("standard")),
+            valid_until_ns: None,
+        }),
         intent_lineage: IntentLineage::default(),
     }
 }
 
 #[tokio::test]
 async fn scenario_3_1_send_side_intent_denied() {
-    // Sender's intent `standard` NOT in peer's send_allowlist → outbound REJECTED.
+    // Sender's classified intent `standard` NOT in peer's send_allowlist → REJECTED.
     //
-    // Story 8.7: this frame carries no `consent_envelope.intent_class`, so it
-    // exercises the 3-band FALLBACK path — the `standard` band projection is not
-    // in the allowlist (which holds only the fine-grained
-    // `diagnosis-handoff:read-only-evidence`), so it is denied. The *fine-grained*
-    // counterpart (a frame whose `intent_class` IS the specific string, matched
-    // truthfully against that allowlist entry) is in
-    // `maos-a2a-core/tests/cross_host_consent_v1_5.rs`.
+    // Story 8.8 (Option 2): the frame carries the canonical classified intent
+    // `standard`; the send_allowlist holds only `diagnosis-handoff:read-only-evidence`,
+    // so the fine-grained key does not match → send-side `IntentDenied`. (Pre-8.8
+    // this asserted the 3-band fallback; that path no longer exists. The fully
+    // fine-grained matching suite is `maos-a2a-core/tests/cross_host_consent_v1_5.rs`.)
     let allow = ConsentAllowlists {
         send_allowlist: vec![A2AIntent::new("diagnosis-handoff:read-only-evidence")],
         accept_allowlist: vec![A2AIntent::new("standard")],

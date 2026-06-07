@@ -68,7 +68,19 @@ maos-a2a = 1500
 # Story 8.6 — extraction of maos-a2a-core (transport-agnostic ADR-012 substrate)
 # from maos-a2a; resolves the maos-a2a 1500 overage by moving the bulk out.
 # Ceiling recorded post-extraction (actual count in the Dev Agent Record).
-maos-a2a-core = 3000
+#
+# Story 8.8 — 3000 → 3050 (team consensus 2026-06-07: Winston + Murat + security
+# red-team, under the most-spec-faithful + long-term-correct criterion). AC6's
+# premise ("crate was 2644") was STALE: HEAD was 2942 (8.9 grew it), leaving 58
+# lines headroom. The fail-closed G7 closure (shared `consent_decision` seam + two
+# unconditional enforcement gates + response interpretation + error mapping)
+# necessarily exceeds that. Per consensus, the band-fallback toggle was DELETED
+# first (Option 2), then re-measured: actual = 3034. The ceiling is set to the
+# tight measured residual (3050, ~16-line margin) — NOT round headroom for code
+# we might add later. A submodule split was considered but does not reduce crate
+# kloc (tokei sums all src under the crate). Ratified bump to 3050 for the A2A
+# cross-Host security core.
+maos-a2a-core = 3050
 # Story 8.6 — maos-a2a-tcp: live cross-Host TCP/mTLS transport (the second
 # A2ATransport impl). Socket + rustls + codec wiring + verifier.
 maos-a2a-tcp = 1500

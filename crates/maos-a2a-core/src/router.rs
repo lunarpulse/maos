@@ -15,13 +15,13 @@
 
 use crate::config::A2APeerConfig;
 use crate::consent::{AllowlistDirection, ConsentAllowlists, EIntentDenied};
-use crate::error::{A2AError, IntentDirection};
+use crate::error::{A2AError, IntentDirection, UnclassifiedReason};
 use crate::identity::PeerId;
 use crate::tofu::TofuPinStore;
 use crate::transport::json_rpc::{
     A2AJsonRpcRequest, A2AJsonRpcResponse, AckBody, CODE_CONSENT_EXPIRED,
-    CODE_CONSENT_GRANTER_MISMATCH, CODE_INTENT_DENIED, CODE_INTERNAL,
-    CODE_PEER_IDENTITY_MISMATCH, CODE_PIN_MISMATCH_NOT_PINNED,
+    CODE_CONSENT_GRANTER_MISMATCH, CODE_CONSENT_UNCLASSIFIED, CODE_INTENT_DENIED,
+    CODE_INTERNAL, CODE_PEER_IDENTITY_MISMATCH, CODE_PIN_MISMATCH_NOT_PINNED,
     CODE_SPIRIT_RESTART_DETECTED,
 };
 use crate::transport::logical_clock::LamportClock;
@@ -103,6 +103,21 @@ pub trait A2ATransport: A2APeerRouter {
     fn local_addr(&self) -> Option<SocketAddr> {
         None
     }
+}
+
+/// Story 8.8 / AC2 — the result of the single shared consent-classification seam
+/// [`A2ARouterCore::consent_decision`]. Either a **Classified** frame (carrying
+/// the canonical fine-grained match key) or an **Unclassified** frame (carrying
+/// the precise reason it cannot be safely matched). Private — the public surface
+/// exposes only the typed `A2AError`/NACK consequences.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ConsentDecision {
+    /// A present, ≤128-byte, canonical `intent_class` — the match key for the
+    /// allowlist (fine-grained, never a band token).
+    Classified(String),
+    /// No safely-matchable fine-grained intent (absent / non-canonical /
+    /// oversized) — denied under fail-closed; band-projected under band-fallback.
+    Unclassified { reason: UnclassifiedReason },
 }
 
 /// A2A router core engine — `127.0.0.1`-bound endpoints with self-signed mTLS
@@ -231,13 +246,17 @@ impl A2ARouterCore {
     /// Project the frame's `IntentClass` to a stable A2A consent intent string
     /// for ADR-012 allowlist matching. Uses `IntentClass::a2a_consent_intent_str()`
     /// — the canonical (not Debug-derived) lowercase projection.
-    ///
-    /// Story 8.7 — this is now the **band-fallback primitive** that
-    /// [`Self::consent_match_key`] calls when a frame declares no fine-grained
-    /// per-frame intent. It stays `pub` (part of `maos-a2a-core`'s public surface
-    /// since the 8.6 extraction); renaming it would register as an abi-diff
-    /// Removed, so the fine-grained logic was added alongside it rather than
-    /// replacing it.
+    /// Story 8.7 — the 3-band projection primitive. **Story 8.8 (Option 2,
+    /// 2026-06-07):** the cross-Host router no longer band-downgrades unclassified
+    /// frames (they are denied fail-closed), so this is NO LONGER called by
+    /// [`Self::consent_match_key`]. It is retained `pub` and unchanged because
+    /// removing it would register as an abi-diff Removed (the 8.6/8.7 lesson) and
+    /// it remains a useful band-projection utility for external callers; it is NOT
+    /// a consent-enforcement path.
+    #[deprecated(
+        since = "8.8.0",
+        note = "band-projection is no longer on the consent-enforcement path; use fine-grained intent_class instead"
+    )]
     pub fn frame_intent_str(frame: &IacFrame) -> String {
         frame.intent.a2a_consent_intent_str().to_string()
     }
@@ -269,17 +288,56 @@ impl A2ARouterCore {
     /// [Source: docs/adr/ADR-012-typed-intent-a2a-consent.md] — consent is
     /// `(peer-identity, intent-class)` with an open intent vocabulary.
     fn consent_match_key(frame: &IacFrame) -> String {
-        frame
-            .consent_envelope
-            .as_ref()
-            .and_then(|e| e.intent_class.as_ref())
-            // Story 8.9 / AC5 (G9) — unify the length bound with the canonical
-            // intent bound (`A2AIntent::is_canonical` enforces the same 128) so an
-            // oversized intent_class falls back to the 3-band projection
-            // consistently; replaces the ad-hoc `<= 1024`.
-            .filter(|i| i.as_str().len() <= MAX_CANONICAL_INTENT_LEN)
-            .map(|i| i.as_str().to_string())
-            .unwrap_or_else(|| Self::frame_intent_str(frame))
+        match Self::consent_decision(frame) {
+            ConsentDecision::Classified(s) => s,
+            // Story 8.8 Option 2 (team consensus 2026-06-07: Winston + Murat +
+            // security red-team) — there is NO band-downgrade path. The
+            // unconditional fail-closed gate in `prepare_outbound` / `handle_intake`
+            // denies every unclassified frame BEFORE any allowlist match, so this
+            // arm is unreachable in production; it returns an empty key (matches no
+            // canonical allowlist entry — deny-shaped) rather than band-projecting,
+            // so no silent downgrade can ever occur even if a future caller reaches
+            // `consent_match_key` directly.
+            // Story 8.8 review fix — use an explicitly non-canonical sentinel
+            // (underscores violate the canonical grammar) instead of an empty
+            // string, so there is zero chance of an accidental allowlist match
+            // if a future caller reaches this arm directly.
+            ConsentDecision::Unclassified { .. } => "__UNREACHABLE_UNCLASSIFIED__".to_string(),
+        }
+    }
+
+    /// Story 8.8 / AC2 — the **single, shared** classification seam. Both the
+    /// allowlist callers (`send_admits`/`accept_admits` via [`Self::consent_match_key`])
+    /// AND the fail-closed deny-construction sites consult this one function, so
+    /// "the key tested == the key reported" (the 8.7 invariant) holds and send and
+    /// accept can never diverge on classification.
+    ///
+    /// A frame is **Classified** iff it carries an `intent_class` that is present,
+    /// ≤ [`MAX_CANONICAL_INTENT_LEN`] bytes, AND canonical
+    /// (`A2AIntent::is_canonical`). Otherwise it is **Unclassified**, carrying the
+    /// precise [`UnclassifiedReason`] (`Absent` / `Oversized` / `NonCanonical`).
+    ///
+    /// Note (AC1 widening): unlike the pre-8.8 `consent_match_key`, a
+    /// *present-but-non-canonical* `intent_class` is now **Unclassified**
+    /// (`NonCanonical`) rather than used verbatim as an unmatchable key — so under
+    /// fail-closed a garbage intent denies legibly instead of silently never
+    /// matching.
+    ///
+    /// [Source: docs/adr/ADR-012-typed-intent-a2a-consent.md] — consent is
+    /// `(peer-identity, intent-class)` with an open intent vocabulary.
+    fn consent_decision(frame: &IacFrame) -> ConsentDecision {
+        let Some(intent) = frame.consent_envelope.as_ref().and_then(|e| e.intent_class.as_ref())
+        else {
+            return ConsentDecision::Unclassified { reason: UnclassifiedReason::Absent };
+        };
+        let reason = if intent.as_str().len() > MAX_CANONICAL_INTENT_LEN {
+            UnclassifiedReason::Oversized
+        } else if !intent.is_canonical() {
+            UnclassifiedReason::NonCanonical
+        } else {
+            return ConsentDecision::Classified(intent.as_str().to_string());
+        };
+        ConsentDecision::Unclassified { reason }
     }
 
     /// Story 8.7 / AC5 — make the "silent never-match" failure mode loud.
@@ -363,6 +421,23 @@ impl A2ARouterCore {
         boot_nonce: u64,
     ) -> Result<(A2AJsonRpcRequest, A2APeerConfig, [u8; 16]), A2AError> {
         let peer_cfg = self.lookup_peer(peer)?;
+
+        // (0) Story 8.8 / AC1 (G7) — UNCONDITIONAL fail-closed cross-Host consent
+        // (team consensus 2026-06-07, Option 2: no band-fallback toggle exists).
+        // An unclassified frame (absent/non-canonical/oversized intent_class) is
+        // DENIED here, BEFORE the send-allowlist, and the frame NEVER leaves — it
+        // is NEVER silently downgraded to the 3-band projection (the red-team
+        // non-negotiable: "deny ONLY unclassified, never silently downgrade").
+        // This is also the runtime sender-completeness backstop (AC3, NON-
+        // exemptible): a reference sender that fails to populate a canonical
+        // intent_class gets `ConsentUnclassified { Send }` and the frame is not
+        // transmitted. Same-Host IAC never reaches this core (`iac_bus.rs`).
+        if let ConsentDecision::Unclassified { reason } = Self::consent_decision(&frame) {
+            return Err(A2AError::ConsentUnclassified {
+                direction: IntentDirection::Send,
+                reason,
+            });
+        }
 
         // (1) ADR-012 send-allowlist check (defense-in-depth — sender side).
         if !self.send_admits(&peer_cfg.allowlists, &frame, peer_cfg.peer_id.as_str()) {
@@ -479,6 +554,23 @@ impl A2ARouterCore {
                         .unwrap_or_default();
                     Err(A2AError::ConsentGranterMismatch { granter, frame_from })
                 }
+                // Story 8.8 / AC1 (G7) — the receiver fail-closed-denied an
+                // unclassified frame. Interpret it back into the distinct typed
+                // signal (NOT conflated with -32001 IntentDeniedAtPeer), carrying
+                // the reason so the sender can log/act on it legibly.
+                CODE_CONSENT_UNCLASSIFIED => {
+                    let reason = n
+                        .error
+                        .data
+                        .as_ref()
+                        .and_then(|d| d.get("reason"))
+                        .and_then(|v| serde_json::from_value::<UnclassifiedReason>(v.clone()).ok())
+                        .unwrap_or(UnclassifiedReason::Absent);
+                    Err(A2AError::ConsentUnclassifiedAtPeer {
+                        peer: peer.as_str().to_string(),
+                        reason,
+                    })
+                }
                 _ => Err(A2AError::TransportFailed(n.error.message)),
             },
         }
@@ -555,18 +647,15 @@ impl A2ARouterCore {
                         "prior_boot_nonce": prior,
                         "observed_boot_nonce": observed,
                     });
-                    let mut resp = A2AJsonRpcResponse::nack(
+                    return A2AJsonRpcResponse::nack_with_data(
                         request.id,
                         CODE_SPIRIT_RESTART_DETECTED,
                         format!(
                             "Spirit restart detected on peer {}: prior_boot_nonce={prior} observed_boot_nonce={observed}",
                             peer_cfg.peer_id.as_str()
                         ),
+                        data,
                     );
-                    if let A2AJsonRpcResponse::Nack(ref mut n) = resp {
-                        n.error.data = Some(data);
-                    }
-                    return resp;
                 }
                 Ok(None) => { /* nonce matches (or no pin) — continue */ }
                 Err(e) => {
@@ -608,15 +697,12 @@ impl A2ARouterCore {
                     "granter": granter,
                     "frame_from": frame_from,
                 });
-                let mut resp = A2AJsonRpcResponse::nack(
+                return A2AJsonRpcResponse::nack_with_data(
                     request.id,
                     CODE_CONSENT_GRANTER_MISMATCH,
                     format!("consent granter {granter} does not match frame from {frame_from}"),
+                    data,
                 );
-                if let A2AJsonRpcResponse::Nack(ref mut n) = resp {
-                    n.error.data = Some(data);
-                }
-                return resp;
             }
             // (2b) Expiry (G2 — the existing check, moved ahead of the allowlist).
             if let Some(valid_until_ns) = envelope.valid_until_ns {
@@ -626,17 +712,35 @@ impl A2ARouterCore {
                         "expired_at_ns": valid_until_ns,
                         "now_ns": now_ns,
                     });
-                    let mut resp = A2AJsonRpcResponse::nack(
+                    return A2AJsonRpcResponse::nack_with_data(
                         request.id,
                         CODE_CONSENT_EXPIRED,
                         format!("consent envelope expired at {valid_until_ns} (now {now_ns})"),
+                        data,
                     );
-                    if let A2AJsonRpcResponse::Nack(ref mut n) = resp {
-                        n.error.data = Some(data);
-                    }
-                    return resp;
                 }
             }
+        }
+
+        // (2.5) Story 8.8 / AC1 (G7) — UNCONDITIONAL fail-closed cross-Host consent
+        // (team consensus 2026-06-07, Option 2: no band-fallback toggle exists).
+        // Evaluated immediately BEFORE the accept-allowlist (it replaces the point
+        // where an unclassified frame would otherwise silently band-fall-back). The
+        // 8.9 consent block (granter → expiry) ran first, so a stolen/expired
+        // envelope already failed; here the WELL-FORMEDNESS of the classification is
+        // checked before allowlist matching. An unclassified frame is DENIED with
+        // the distinct CODE_CONSENT_UNCLASSIFIED (-32009) — NOT -32001 (which means
+        // classified-but-not-allowlisted) — and the NACK carries the peer + the
+        // reason so the deny is legible in the Transparency Log.
+        if let ConsentDecision::Unclassified { reason } = Self::consent_decision(frame) {
+            let peer = peer_cfg.peer_id.as_str();
+            let data = serde_json::json!({ "reason": reason, "peer": peer });
+            return A2AJsonRpcResponse::nack_with_data(
+                request.id,
+                CODE_CONSENT_UNCLASSIFIED,
+                format!("cross-Host consent unclassified ({reason}) from peer {peer} — fail-closed deny (no 3-band downgrade)"),
+                data,
+            );
         }
 
         // (3) ADR-012 accept-allowlist check.
@@ -706,7 +810,7 @@ impl A2ARouterCore {
                 "expected": verified_peer.as_str(),
                 "asserted": asserted.unwrap_or("<none>"),
             });
-            let mut resp = A2AJsonRpcResponse::nack(
+            let resp = A2AJsonRpcResponse::nack_with_data(
                 request.id,
                 CODE_PEER_IDENTITY_MISMATCH,
                 format!(
@@ -714,10 +818,8 @@ impl A2ARouterCore {
                     asserted.unwrap_or("<none>"),
                     verified_peer.as_str()
                 ),
+                data,
             );
-            if let A2AJsonRpcResponse::Nack(ref mut n) = resp {
-                n.error.data = Some(data);
-            }
             return (resp, false);
         }
 
@@ -808,6 +910,20 @@ pub fn map_a2a_error_to_iac_bus(err: A2AError, peer: &str) -> IacBusError {
                 "consent granter mismatch: envelope granter {granter}, frame from {frame_from}"
             ))
         }
+        // Story 8.8 — fail-closed unclassified-consent denials map to the generic
+        // route-failure port type (no new kernel variant; `maos-kernel-core` stays
+        // byte-identical — the 8.9 pattern). The reason + direction/peer are
+        // preserved in the message for the audit trail.
+        A2AError::ConsentUnclassified { direction, reason } => {
+            IacBusError::CrossHostRouteFailure(format!(
+                "cross-Host consent unclassified ({reason}) on {direction:?} — fail-closed deny for peer {peer}"
+            ))
+        }
+        A2AError::ConsentUnclassifiedAtPeer { peer: denied_peer, reason } => {
+            IacBusError::CrossHostRouteFailure(format!(
+                "cross-Host consent unclassified ({reason}) at peer {denied_peer} — fail-closed deny"
+            ))
+        }
     }
 }
 
@@ -841,15 +957,16 @@ mod tests {
     }
 
     fn make_frame(host_id: Option<&str>) -> IacFrame {
+        let from = FrameAddress {
+            spirit_id: SpiritId::from("a"),
+            host_id: host_id.map(|s| HostId(s.to_string())),
+            role: None,
+        };
         IacFrame {
             frame_id: [0u8; 16],
             timestamp_ns: 0,
             logical_clock: 0,
-            from: FrameAddress {
-                spirit_id: SpiritId::from("a"),
-                host_id: host_id.map(|s| HostId(s.to_string())),
-                role: None,
-            },
+            from: from.clone(),
             to: smallvec![FrameAddress {
                 spirit_id: SpiritId::from("b"),
                 host_id: host_id.map(|s| HostId(s.to_string())),
@@ -865,7 +982,17 @@ mod tests {
                 prior_distillate_ref: None,
             }),
             auto_marker: FrameOrigin::HumanAuthored,
-            consent_envelope: None,
+            // Story 8.8 (Option 2) — fail-closed is unconditional, so the plumbing
+            // tests use a CLASSIFIED frame (canonical "standard" intent, granter ==
+            // from). Tests asserting unclassified-deny set `consent_envelope = None`
+            // explicitly.
+            consent_envelope: Some(maos_domain::frame::ConsentEnvelope {
+                consent_id: [0u8; 16],
+                granter: from,
+                timestamp_ns: 0,
+                intent_class: Some(A2AIntent::new("standard")),
+                valid_until_ns: None,
+            }),
             intent_lineage: IntentLineage::default(),
         }
     }
@@ -881,6 +1008,9 @@ mod tests {
         )
         .await
         .expect("pin");
+        // Story 8.8 (Option 2) — fail-closed is unconditional; these plumbing tests
+        // use classified frames (`make_frame` populates a canonical `intent_class`).
+        // Fail-closed deny coverage lives in `tests/fail_closed_8_8.rs`.
         A2ARouterCore::new(vec![cfg], tofu)
     }
 
@@ -1054,10 +1184,13 @@ mod tests {
         );
     }
 
-    /// Story 8.9 / AC3 — `prepare_outbound` leaves a frame with NO consent
-    /// envelope untouched (no panic, no accidental insertion).
+    /// Story 8.8 (Option 2) — supersedes the 8.9 `prepare_outbound_leaves_none_
+    /// envelope_unchanged` passthrough test: under unconditional fail-closed, a
+    /// frame with NO consent envelope is DENIED at the send seam (it never reaches
+    /// the envelope-stamp step), so it cannot leave the Host. The 8.9 concern (no
+    /// accidental envelope insertion) is moot — None is rejected, not forwarded.
     #[tokio::test]
-    async fn prepare_outbound_leaves_none_envelope_unchanged() {
+    async fn prepare_outbound_denies_none_envelope_fail_closed() {
         let allow = ConsentAllowlists {
             send_allowlist: vec![A2AIntent::new("standard")],
             accept_allowlist: vec![A2AIntent::new("standard")],
@@ -1065,13 +1198,16 @@ mod tests {
         let core = pinned_core(allow).await;
         let mut frame = make_frame(Some("loopback"));
         frame.consent_envelope = None;
-        let (req, _, _) = core
-            .prepare_outbound(frame.clone(), &HostId("loopback".to_string()), 0)
+        let err = core
+            .prepare_outbound(frame, &HostId("loopback".to_string()), 0)
             .await
-            .expect("prepare_outbound must succeed");
-        assert!(
-            req.params.consent_envelope.is_none(),
-            "prepare_outbound must NOT insert a consent envelope when none was present"
-        );
+            .expect_err("fail-closed must deny a None-envelope cross-Host frame at the sender");
+        assert!(matches!(
+            err,
+            A2AError::ConsentUnclassified {
+                direction: IntentDirection::Send,
+                reason: UnclassifiedReason::Absent,
+            }
+        ));
     }
 }

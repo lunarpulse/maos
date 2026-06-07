@@ -361,7 +361,9 @@ pub fn make_frame(
     intent: maos_domain::invariants::i1::IntentClass,
     seq: u64,
 ) -> maos_domain::frame::IacFrame {
-    use maos_domain::frame::{FrameAddress, FramePayload, PosturePreferences, TaskAssignPayload};
+    use maos_domain::frame::{
+        ConsentEnvelope, FrameAddress, FramePayload, PosturePreferences, TaskAssignPayload,
+    };
     use maos_domain::invariants::i13::IntentLineage;
     use maos_domain::invariants::i3::FrameOrigin;
     use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId};
@@ -369,15 +371,25 @@ pub fn make_frame(
 
     let mut frame_id = [0u8; 16];
     frame_id[0..8].copy_from_slice(&seq.to_be_bytes());
+    let from = FrameAddress {
+        spirit_id: SpiritId::from("mira"),
+        host_id: Some(HostId(from_host.to_string())),
+        role: None,
+    };
+    // Story 8.8 — the live wire is fail-closed, so a cross-Host frame must carry a
+    // canonical `intent_class`. Use the canonical band token of `intent` (e.g.
+    // "readonly"), which is itself canonical and matches the band-token allowlists
+    // these tests already use — behaviorally identical to the pre-8.8 band
+    // fallback, just made explicit (B-clean). `with_fine_grained_intent` sets
+    // granter == from, satisfying the 8.9 granter binding. Tests that need a
+    // forged granter / absent host_id / explicit expiry override this envelope.
+    let canonical_intent =
+        maos_domain::invariants::i8::A2AIntent::new(intent.a2a_consent_intent_str());
     maos_domain::frame::IacFrame {
         frame_id,
         timestamp_ns: 0,
         logical_clock: 0,
-        from: FrameAddress {
-            spirit_id: SpiritId::from("mira"),
-            host_id: Some(HostId(from_host.to_string())),
-            role: None,
-        },
+        from: from.clone(),
         to: smallvec![FrameAddress {
             spirit_id: SpiritId::from("nash"),
             host_id: Some(HostId(to_host.to_string())),
@@ -393,7 +405,7 @@ pub fn make_frame(
             prior_distillate_ref: None,
         }),
         auto_marker: FrameOrigin::SpiritAuto,
-        consent_envelope: None,
+        consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(from, canonical_intent)),
         intent_lineage: IntentLineage::default(),
     }
 }

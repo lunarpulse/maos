@@ -23,7 +23,8 @@ mod support;
 use futures_util::{SinkExt, StreamExt};
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::transport::json_rpc::{
-    CODE_CONSENT_GRANTER_MISMATCH, CODE_INVALID_REQUEST, CODE_PEER_IDENTITY_MISMATCH,
+    CODE_CONSENT_GRANTER_MISMATCH, CODE_CONSENT_UNCLASSIFIED, CODE_INTENT_DENIED,
+    CODE_INVALID_REQUEST, CODE_PEER_IDENTITY_MISMATCH,
 };
 use maos_a2a_core::{
     A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2ARouterCore, InMemoryTofuPinStore,
@@ -411,4 +412,153 @@ async fn g1_stolen_envelope_granter_mismatch_on_wire() {
         other => panic!("G1: expected ConsentGranterMismatch NACK, got {other:?}"),
     }
     assert_eq!(nash.intake_entered(), 1, "G1: granter-mismatch frame passed identity binding, so it entered intake");
+}
+
+/// Story 8.8 / AC1 (G7) — an UNCLASSIFIED frame (no consent envelope) sent over
+/// the REAL wire to a fail-closed receiver gets `CODE_CONSENT_UNCLASSIFIED`
+/// (-32009) and is NOT delivered (the intake sink stays empty), even though its
+/// `from.host_id` is honest. Proves the fail-closed flip holds on the live
+/// transport (which is constructed fail-closed by default), not just in-process.
+#[tokio::test]
+async fn g7_unclassified_frame_denied_on_wire() {
+    let clock = Clock::capture();
+    let ca = mk_ca(&clock, "ca-good");
+    let mira = valid_leaf(&ca, &clock);
+    let nash_leaf = valid_leaf(&ca, &clock);
+    // Nash accepts the fine-grained intent — proving the deny is the UNCLASSIFIED
+    // gate, not an allowlist miss (which would be -32001).
+    let nash = bind_nash(&clock, &ca, &mira, &nash_leaf, &[FINE]).await;
+    let addr = nash.local_addr().unwrap();
+
+    // Observe deliveries: install a sink on the shared core; it must stay empty.
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    nash.core().install_intake_sink(tx).await;
+
+    let mut framed = raw_client_connect(addr, &mira, &nash_leaf.fingerprint, Some(&ca), &clock).await;
+
+    // Honest from.host_id (host_a == TLS-verified peer) but NO consent envelope.
+    let mut frame = make_frame("host_a", "host_b", IntentClass::Readonly, 1);
+    frame.consent_envelope = None;
+    let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1).with_boot_nonce(MIRA_NONCE);
+    match send_recv(&mut framed, &req).await {
+        A2AJsonRpcResponse::Nack(n) => assert_eq!(
+            n.error.code, CODE_CONSENT_UNCLASSIFIED,
+            "G7: an unclassified frame on the wire must be DENIED -32009 under fail-closed"
+        ),
+        other => panic!("G7: expected ConsentUnclassified NACK, got {other:?}"),
+    }
+    // Identity binding passed (honest host_a), so it entered intake...
+    assert_eq!(nash.intake_entered(), 1, "G7: honest-identity frame entered intake before the consent gate");
+    // ...but the fail-closed gate denied it before delivery: the sink is empty.
+    assert!(rx.try_recv().is_err(), "G7: an unclassified frame must NOT be delivered to the intake sink");
+}
+
+/// AC1 (G8) — envelope present but `intent_class` absent (None) is treated as
+/// unclassified on the wire. The receiver must return `CODE_CONSENT_UNCLASSIFIED`
+/// (-32009), proving the gate inspects `intent_class` presence, not just
+/// `consent_envelope` presence.
+#[tokio::test]
+async fn g8_present_but_empty_envelope_denied_on_wire() {
+    let clock = Clock::capture();
+    let ca = mk_ca(&clock, "ca-good");
+    let mira = valid_leaf(&ca, &clock);
+    let nash_leaf = valid_leaf(&ca, &clock);
+    let nash = bind_nash(&clock, &ca, &mira, &nash_leaf, &[FINE]).await;
+    let addr = nash.local_addr().unwrap();
+
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    nash.core().install_intake_sink(tx).await;
+
+    let mut framed = raw_client_connect(addr, &mira, &nash_leaf.fingerprint, Some(&ca), &clock).await;
+
+    // Honest from.host_id, consent_envelope present, but intent_class is None.
+    let mut frame = make_frame("host_a", "host_b", IntentClass::Readonly, 1);
+    if let Some(env) = frame.consent_envelope.as_mut() {
+        env.intent_class = None;
+    }
+    let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1).with_boot_nonce(MIRA_NONCE);
+    match send_recv(&mut framed, &req).await {
+        A2AJsonRpcResponse::Nack(n) => assert_eq!(
+            n.error.code, CODE_CONSENT_UNCLASSIFIED,
+            "G8: envelope present but intent_class absent must be denied -32009"
+        ),
+        other => panic!("G8: expected ConsentUnclassified NACK, got {other:?}"),
+    }
+    assert_eq!(nash.intake_entered(), 1, "G8: honest-identity frame entered intake before the consent gate");
+    assert!(rx.try_recv().is_err(), "G8: unclassified envelope must NOT be delivered to the intake sink");
+}
+
+/// AC1 (G9) — a classified frame whose `intent_class` is NOT in the peer's
+/// allowlist gets `-32001` (`CODE_INTENT_DENIED`), NOT `-32009`
+/// (`CODE_CONSENT_UNCLASSIFIED`). Proves non-conflation: the receiver distinguishes
+/// "classified-but-not-allowlisted" from "unclassified".
+#[tokio::test]
+async fn g9_classified_not_allowlisted_returns_32001_on_wire() {
+    let clock = Clock::capture();
+    let ca = mk_ca(&clock, "ca-good");
+    let mira = valid_leaf(&ca, &clock);
+    let nash_leaf = valid_leaf(&ca, &clock);
+    // Nash only accepts the fine-grained FINE intent — a valid coarse-band
+    // intent that is NOT in the allowlist triggers -32001.
+    let nash = bind_nash(&clock, &ca, &mira, &nash_leaf, &[FINE]).await;
+    let addr = nash.local_addr().unwrap();
+
+    let mut framed = raw_client_connect(addr, &mira, &nash_leaf.fingerprint, Some(&ca), &clock).await;
+
+    // Build a frame with a valid but non-allowlisted intent_class.
+    // Standard is a canonical 3-band intent that does NOT match the FINE entry.
+    let frame = make_frame("host_a", "host_b", IntentClass::Standard, 1);
+    let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1).with_boot_nonce(MIRA_NONCE);
+    match send_recv(&mut framed, &req).await {
+        A2AJsonRpcResponse::Nack(n) => {
+            assert_eq!(
+                n.error.code, CODE_INTENT_DENIED,
+                "G9: classified-but-not-allowlisted must be -32001, not -32009"
+            );
+            // Crucially NOT the unclassified code — proving non-conflation.
+            assert_ne!(
+                n.error.code, CODE_CONSENT_UNCLASSIFIED,
+                "G9: -32001 must not be conflated with -32009"
+            );
+        }
+        other => panic!("G9: expected IntentDenied NACK (-32001), got {other:?}"),
+    }
+    assert_eq!(nash.intake_entered(), 1, "G9: honest-identity frame entered intake before the allowlist gate");
+}
+
+/// AC1 (G10) — explicit test that `handle_intake_verified` delegates
+/// unclassified frames to `handle_intake`, which returns -32009. Mirrors G7
+/// but with a name that makes the delegation path explicit.
+#[tokio::test]
+async fn g10_handle_intake_verified_delegates_unclassified() {
+    let clock = Clock::capture();
+    let ca = mk_ca(&clock, "ca-good");
+    let mira = valid_leaf(&ca, &clock);
+    let nash_leaf = valid_leaf(&ca, &clock);
+    let nash = bind_nash(&clock, &ca, &mira, &nash_leaf, &[FINE]).await;
+    let addr = nash.local_addr().unwrap();
+
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    nash.core().install_intake_sink(tx).await;
+
+    let mut framed = raw_client_connect(addr, &mira, &nash_leaf.fingerprint, Some(&ca), &clock).await;
+
+    // No consent envelope at all — the most basic unclassified case.
+    let mut frame = make_frame("host_a", "host_b", IntentClass::Readonly, 1);
+    frame.consent_envelope = None;
+    let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1).with_boot_nonce(MIRA_NONCE);
+    match send_recv(&mut framed, &req).await {
+        A2AJsonRpcResponse::Nack(n) => {
+            assert_eq!(
+                n.error.code, CODE_CONSENT_UNCLASSIFIED,
+                "G10: handle_intake must deny unclassified with -32009"
+            );
+            // Verify the error carries the expected reason field.
+            let data = n.error.data.as_ref().expect("G10: unclassified NACK carries data");
+            assert!(data.get("reason").is_some(), "G10: NACK data must include 'reason'");
+        }
+        other => panic!("G10: expected ConsentUnclassified NACK, got {other:?}"),
+    }
+    assert_eq!(nash.intake_entered(), 1, "G10: identity binding passed, frame entered intake");
+    assert!(rx.try_recv().is_err(), "G10: unclassified frame must NOT be delivered");
 }

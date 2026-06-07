@@ -52,6 +52,14 @@ pub const CODE_PEER_IDENTITY_MISMATCH: i32 = -32007;
 /// frame's own `from` address (stolen-envelope replay). Additive constant;
 /// `A2AError::ConsentGranterMismatch` is the typed mirror.
 pub const CODE_CONSENT_GRANTER_MISMATCH: i32 = -32008;
+/// Story 8.8 (AC1 / G7) — a cross-Host frame carries NO well-typed fine-grained
+/// `intent_class` (absent, non-canonical, or oversized) and the router is in
+/// fail-closed mode, so it is DENIED rather than silently downgraded to the
+/// coarse 3-band projection. Distinct from `CODE_INTENT_DENIED` (-32001, which
+/// means *classified-but-not-allowlisted*); `A2AError::ConsentUnclassified` /
+/// `ConsentUnclassifiedAtPeer` are the typed mirrors. Additive constant
+/// (next after 8.9's -32008; AC6 abi-diff Added-only).
+pub const CODE_CONSENT_UNCLASSIFIED: i32 = -32009;
 pub const CODE_INTERNAL: i32 = -32099;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,6 +210,26 @@ impl A2AJsonRpcResponse {
                 code,
                 message: message.into(),
                 data: None,
+            },
+            id,
+        })
+    }
+
+    /// Story 8.8 review fix — construct a NACK with structured `data` directly,
+    /// avoiding the fragile `if let Nack(ref mut n) = resp` mutation pattern
+    /// that silently drops data if `nack()` ever returns a non-Nack variant.
+    pub fn nack_with_data(
+        id: u64,
+        code: i32,
+        message: impl Into<String>,
+        data: serde_json::Value,
+    ) -> Self {
+        A2AJsonRpcResponse::Nack(NackResponse {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            error: NackError {
+                code,
+                message: message.into(),
+                data: Some(data),
             },
             id,
         })

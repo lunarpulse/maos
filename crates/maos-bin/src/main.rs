@@ -3166,6 +3166,12 @@ description = "smoke test spirit successor"
             return smoke_a2a_consent_vocab_8_7().await;
         }
 
+        // Story 8.8 AC4 — `smoke-a2a-fail-closed-8-8` fail-closed cross-Host
+        // consent demo (classified admit + absent-deny + non-canonical-deny).
+        if mode == "smoke-a2a-fail-closed-8-8" {
+            return smoke_a2a_fail_closed_8_8().await;
+        }
+
         // Story 6.4 AC5 — `smoke-schedule-6-4` end-to-end wedge demo
         // (ScheduleWatchdog firing + per-schedule rate-limit cap + ConsentRupture +
         // RateLimited frame emission).
@@ -3225,7 +3231,7 @@ description = "smoke test spirit successor"
 
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-founder-loop-8-4, smoke-mira-nash-8-5, smoke-a2a-tcp-8-6, smoke-a2a-consent-vocab-8-7"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-founder-loop-8-4, smoke-mira-nash-8-5, smoke-a2a-tcp-8-6, smoke-a2a-consent-vocab-8-7, smoke-a2a-fail-closed-8-8"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -4745,7 +4751,8 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
         endpoint: "tls://127.0.0.1:0".into(),
         cert_fingerprint: mira_fp.clone(),
         profile: A2AProfile::CrossHost,
-        allowlists: allow(&[], &["readonly"]),
+        // Story 8.8 — accept the fine-grained advisory intent (fail-closed wire).
+        allowlists: allow(&[], &["diagnosis-handoff:read-only-evidence"]),
         partition_timeout_secs: 30,
         consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     }];
@@ -4771,7 +4778,8 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
         endpoint: format!("tls://{nash_addr}"),
         cert_fingerprint: nash_fp.clone(),
         profile: A2AProfile::CrossHost,
-        allowlists: allow(&["readonly"], &[]),
+        // Story 8.8 — send the fine-grained advisory intent (fail-closed wire).
+        allowlists: allow(&["diagnosis-handoff:read-only-evidence"], &[]),
         partition_timeout_secs: 30,
         consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     }];
@@ -4779,15 +4787,20 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── Mira sends the read-only diagnostic advisory to Nash over the live wire,
     // dispatched through the kernel-facing `A2ARouter` port (AC-A5 registration).
+    // Story 8.8 — the live wire is fail-closed, so the cross-Host frame MUST carry
+    // a canonical fine-grained `intent_class` (no band downgrade). Populated via
+    // `with_fine_grained_intent` (granter == from) so it satisfies the
+    // sender-completeness gate AND the 8.9 granter binding.
+    let advisory_from = FrameAddress {
+        spirit_id: SpiritId::from("mira"),
+        host_id: Some(HostId("host_a".into())),
+        role: None,
+    };
     let advisory = IacFrame {
         frame_id: [1u8; 16],
         timestamp_ns: 0,
         logical_clock: 0,
-        from: FrameAddress {
-            spirit_id: SpiritId::from("mira"),
-            host_id: Some(HostId("host_a".into())),
-            role: None,
-        },
+        from: advisory_from.clone(),
         to: smallvec![FrameAddress {
             spirit_id: SpiritId::from("nash"),
             host_id: Some(HostId("host_b".into())),
@@ -4803,7 +4816,10 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
             prior_distillate_ref: None,
         }),
         auto_marker: FrameOrigin::SpiritAuto,
-        consent_envelope: None,
+        consent_envelope: Some(maos_domain::frame::ConsentEnvelope::with_fine_grained_intent(
+            advisory_from,
+            A2AIntent::new("diagnosis-handoff:read-only-evidence"),
+        )),
         intent_lineage: IntentLineage::default(),
     };
 
@@ -5234,8 +5250,11 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
             // The NACK message format is: "intent {intent} not in accept_allowlist for peer {peer}"
             // We verify the prefix and suffix rather than substring-matching the intent,
             // so formatting changes (quotes, capitalization) do not break the smoke.
+            // Story 8.8 — fix a PRE-EXISTING (HEAD, story-neutral) assertion bug:
+            // the loopback intake NACK names the SOURCE peer (frame.from.host_id =
+            // "host_a"), not "loopback". Verified red at HEAD with changes stashed.
             let expected_prefix = format!("intent {DENY_INTENT} ");
-            let expected_suffix = "for peer loopback";
+            let expected_suffix = "for peer host_a";
             if !message.starts_with(&expected_prefix) || !message.ends_with(expected_suffix) {
                 return Err(format!(
                     "smoke-a2a-consent-vocab-8-7: denial message format mismatch (expected '{expected_prefix}...{expected_suffix}'), got '{message}'"
@@ -5255,6 +5274,239 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
     }
 
     eprintln!("smoke-a2a-consent-vocab-8-7: ✅ fine-grained consent vocabulary verified end-to-end");
+    Ok(())
+}
+
+/// Story 8.8 AC4 — `smoke-a2a-fail-closed-8-8` runnable headline.
+///
+/// Demonstrates the fail-closed cross-Host consent policy (closes audit G7) over
+/// the real `LoopbackA2ARouter` (constructed fail-closed by default): (1) a
+/// classified cross-Host frame (`intent_class = "diagnosis-handoff:read-only-evidence"`)
+/// is DELIVERED; (2) a frame with an ABSENT `intent_class` is DENIED with the
+/// distinct `CODE_CONSENT_UNCLASSIFIED` (-32009) at the receiver AND refused at
+/// the sender (`ConsentUnclassified{Send}` — the frame never leaves), NOT band-
+/// admitted; (3) a frame with a NON-CANONICAL `intent_class` (`"Diagnosis Handoff"`)
+/// is denied the same way. The deny code is distinct from `-32001`
+/// (classified-but-not-allowlisted), proving "deny ONLY unclassified, never
+/// silently downgrade". Exits `0`.
+async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a::error::A2AError;
+    use maos_a2a::{
+        A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile, ConsentAllowlists,
+        InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
+    };
+    use maos_domain::frame::{
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+    };
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
+    use smallvec::smallvec;
+    use std::sync::Arc;
+
+    const FINE_INTENT: &str = "diagnosis-handoff:read-only-evidence";
+
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    eprintln!("smoke-a2a-fail-closed-8-8: ADR-012 fail-closed cross-Host consent demo (closes G7)");
+
+    let fa = PeerCertFingerprint::from_cert_der(b"mira-host-a-cert-v1");
+    let fb = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
+    let cfg_b = A2APeerConfig {
+        peer_id: PeerId::new("host_b"),
+        endpoint: "tls://127.0.0.1:7444".into(),
+        cert_fingerprint: fb.clone(),
+        profile: A2AProfile::Loopback,
+        allowlists: ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new(FINE_INTENT)],
+            accept_allowlist: vec![A2AIntent::new(FINE_INTENT)],
+        },
+        partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
+    };
+    let cfg_a = A2APeerConfig {
+        peer_id: PeerId::new("host_a"),
+        endpoint: "tls://127.0.0.1:7443".into(),
+        cert_fingerprint: fa.clone(),
+        profile: A2AProfile::Loopback,
+        allowlists: ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new(FINE_INTENT)],
+            accept_allowlist: vec![A2AIntent::new(FINE_INTENT)],
+        },
+        partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
+    };
+    let tofu = Arc::new(InMemoryTofuPinStore::new());
+    tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;
+    tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1).await?;
+    // Fail-closed unconditionally (Option 2 — A2ARouterCore has no band-fallback toggle).
+    let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b], tofu);
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    router.install_intake_sink(tx).await;
+
+    let from = || FrameAddress {
+        spirit_id: SpiritId::from("mira"),
+        host_id: Some(HostId("host_a".into())),
+        role: Some(SpiritRole::Worker),
+    };
+    let base_frame = |seq: u64, envelope: Option<ConsentEnvelope>| {
+        let mut fid = [0u8; 16];
+        fid[0..8].copy_from_slice(&seq.to_be_bytes());
+        fid[8] = 0x88;
+        IacFrame {
+            frame_id: fid,
+            timestamp_ns: 0,
+            logical_clock: 0,
+            from: from(),
+            to: smallvec![FrameAddress {
+                spirit_id: SpiritId::from("nash"),
+                host_id: Some(HostId("host_b".into())),
+                role: Some(SpiritRole::Worker),
+            }],
+            kind: FrameKind::TaskAssign,
+            intent: IntentClass::Readonly,
+            payload: FramePayload::TaskAssign(TaskAssignPayload {
+                goal: "diagnostic evidence".into(),
+                scope: vec![],
+                success_criteria: "architect a fix".into(),
+                posture_preferences: PosturePreferences::default(),
+                prior_distillate_ref: None,
+            }),
+            auto_marker: FrameOrigin::SpiritAuto,
+            consent_envelope: envelope,
+            intent_lineage: IntentLineage::default(),
+        }
+    };
+
+    // ── (1) classified frame DELIVERED ───────────────────────────────────────
+    let classified = base_frame(
+        1,
+        Some(ConsentEnvelope::with_fine_grained_intent(from(), A2AIntent::new(FINE_INTENT))),
+    );
+    LocalRouter::route_outbound(&router, classified, &HostId("host_b".into()))
+        .await
+        .map_err(|e| format!("smoke-a2a-fail-closed-8-8: classified frame REJECTED: {e}"))?;
+    let delivered = rx
+        .recv()
+        .await
+        .ok_or("smoke-a2a-fail-closed-8-8: classified frame not delivered")?;
+    if delivered.consent_envelope.and_then(|e| e.intent_class).map(|i| i.as_str().to_string())
+        != Some(FINE_INTENT.to_string())
+    {
+        return Err("smoke-a2a-fail-closed-8-8: delivered frame missing fine-grained intent_class".into());
+    }
+    eprintln!("smoke-a2a-fail-closed-8-8: ✓ classified '{FINE_INTENT}' DELIVERED");
+
+    // Drive the accept side directly (a frame arriving from a non-compliant
+    // remote peer) and assert the distinct -32009 deny, NOT -32001/band-admit.
+    async fn assert_accept_denied(
+        router: &LoopbackA2ARouter,
+        frame: IacFrame,
+        label: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use maos_a2a::transport::json_rpc::{
+            A2AJsonRpcRequest, A2AJsonRpcResponse, CODE_CONSENT_UNCLASSIFIED, CODE_INTENT_DENIED,
+        };
+        let req = A2AJsonRpcRequest::new("iac.deliver", frame, 99);
+        match LocalRouter::handle_intake(router, req).await {
+            A2AJsonRpcResponse::Nack(n) if n.error.code == CODE_CONSENT_UNCLASSIFIED => {
+                eprintln!(
+                    "smoke-a2a-fail-closed-8-8: ✓ {label} DENIED at receiver with CODE_CONSENT_UNCLASSIFIED (-32009) — distinct from band-admit"
+                );
+                Ok(())
+            }
+            A2AJsonRpcResponse::Nack(n) if n.error.code == CODE_INTENT_DENIED => Err(format!(
+                "smoke-a2a-fail-closed-8-8: {label} got -32001 (classified-denied) — conflation defect"
+            )
+            .into()),
+            A2AJsonRpcResponse::Nack(n) => Err(format!(
+                "smoke-a2a-fail-closed-8-8: {label} got unexpected code {}",
+                n.error.code
+            )
+            .into()),
+            A2AJsonRpcResponse::Ack(_) => Err(format!(
+                "smoke-a2a-fail-closed-8-8: {label} was ADMITTED (band collapse?) — G7 still open"
+            )
+            .into()),
+        }
+    }
+
+    // ── (2) ABSENT intent_class DENIED -32009 (accept) + refused at sender ────
+    assert_accept_denied(&router, base_frame(2, None), "absent-intent frame").await?;
+    match LocalRouter::route_outbound(&router, base_frame(3, None), &HostId("host_b".into())).await {
+        Err(A2AError::ConsentUnclassified { direction: maos_a2a::error::IntentDirection::Send, .. }) => {
+            eprintln!("smoke-a2a-fail-closed-8-8: ✓ absent-intent frame REFUSED at sender (ConsentUnclassified{{Send}}) — never leaves the Host");
+        }
+        other => {
+            return Err(format!("smoke-a2a-fail-closed-8-8: sender backstop failed for absent intent: {other:?}").into());
+        }
+    }
+
+    // ── (3) NON-CANONICAL intent_class DENIED -32009 ─────────────────────────
+    let non_canonical_env = ConsentEnvelope {
+        consent_id: [0u8; 16],
+        granter: from(), // granter == from so the 8.9 granter gate passes first
+        timestamp_ns: 0,
+        intent_class: Some(A2AIntent::new("Diagnosis Handoff")), // spaces + caps
+        valid_until_ns: None,
+    };
+    assert_accept_denied(&router, base_frame(4, Some(non_canonical_env)), "non-canonical-intent frame").await?;
+
+    // ── (4) SENDER-SIDE non-canonical deny ────────────────────────────────────
+    let non_canonical_send_env = ConsentEnvelope {
+        consent_id: [0u8; 16],
+        granter: from(),
+        timestamp_ns: 0,
+        intent_class: Some(A2AIntent::new("!invalid")),
+        valid_until_ns: None,
+    };
+    match LocalRouter::route_outbound(
+        &router,
+        base_frame(5, Some(non_canonical_send_env)),
+        &HostId("host_b".into()),
+    )
+    .await
+    {
+        Err(A2AError::ConsentUnclassified {
+            direction: maos_a2a::error::IntentDirection::Send,
+            ..
+        }) => {
+            eprintln!("smoke-a2a-fail-closed-8-8: ✓ non-canonical-intent '!invalid' REFUSED at sender (ConsentUnclassified{{Send}})");
+        }
+        other => {
+            return Err(format!("smoke-a2a-fail-closed-8-8: sender non-canonical deny failed: {other:?}").into());
+        }
+    }
+
+    // ── (5) SENDER-SIDE oversized deny (129-byte intent_class) ───────────────
+    let oversized_intent: String = "a".repeat(129);
+    let oversized_env = ConsentEnvelope {
+        consent_id: [0u8; 16],
+        granter: from(),
+        timestamp_ns: 0,
+        intent_class: Some(A2AIntent::new(&oversized_intent)),
+        valid_until_ns: None,
+    };
+    match LocalRouter::route_outbound(
+        &router,
+        base_frame(6, Some(oversized_env)),
+        &HostId("host_b".into()),
+    )
+    .await
+    {
+        Err(A2AError::ConsentUnclassified {
+            direction: maos_a2a::error::IntentDirection::Send,
+            reason,
+        }) if reason == maos_a2a::error::UnclassifiedReason::Oversized => {
+            eprintln!("smoke-a2a-fail-closed-8-8: ✓ oversized intent (129 bytes) REFUSED at sender (ConsentUnclassified{{Send, Oversized}})");
+        }
+        other => {
+            return Err(format!("smoke-a2a-fail-closed-8-8: sender oversized deny failed: {other:?}").into());
+        }
+    }
+
+    eprintln!("smoke-a2a-fail-closed-8-8: ✅ fail-closed cross-Host consent verified end-to-end (G7 closed)");
     Ok(())
 }
 

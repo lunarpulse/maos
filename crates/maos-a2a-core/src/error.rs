@@ -19,6 +19,37 @@ pub enum IntentDirection {
     Accept,
 }
 
+/// Story 8.8 / AC1 (G7) — why a cross-Host frame is treated as **unclassified**
+/// (and therefore denied under fail-closed mode rather than silently downgraded
+/// to the coarse 3-band projection). Serialized into the `CODE_CONSENT_UNCLASSIFIED`
+/// NACK `data.reason` so an operator sees in the Transparency Log *why* a frame
+/// was rejected — fail-closed AND legible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UnclassifiedReason {
+    /// No `consent_envelope`, or an envelope whose `intent_class` is `None`.
+    Absent,
+    /// An `intent_class` present but failing the canonical grammar
+    /// `^[a-z0-9]+(-[a-z0-9]+)*(:[a-z0-9]+(-[a-z0-9]+)*)?$` (`!A2AIntent::is_canonical`).
+    NonCanonical,
+    /// An `intent_class` longer than `MAX_CANONICAL_INTENT_LEN` (128 bytes).
+    Oversized,
+}
+
+impl std::fmt::Display for UnclassifiedReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Story 8.8 — Display uses the SAME tokens as serde (snake_case) so
+        // operators comparing human-readable logs to structured log fields see
+        // identical tokens (was kebab-case, which caused a mismatch).
+        let s = match self {
+            UnclassifiedReason::Absent => "absent",
+            UnclassifiedReason::NonCanonical => "non_canonical",
+            UnclassifiedReason::Oversized => "oversized",
+        };
+        f.write_str(s)
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum A2AError {
@@ -64,6 +95,24 @@ pub enum A2AError {
     /// granted by Host X, replayed inside a frame `from` Host Y, is denied.
     #[error("consent granter mismatch: envelope granter {granter}, frame from {frame_from}")]
     ConsentGranterMismatch { granter: String, frame_from: String },
+
+    /// Story 8.8 / G7 — a cross-Host frame carries NO well-typed fine-grained
+    /// `intent_class` (the [`UnclassifiedReason`]) and the router is fail-closed,
+    /// so the send is REFUSED before the frame hits the wire. Distinct from
+    /// [`A2AError::IntentDenied`] (-32001, classified-but-not-allowlisted): this
+    /// is the never-silently-downgrade signal (the frame would otherwise have
+    /// collapsed to the coarse 3-band projection). `direction` is always `Send`.
+    #[error("cross-Host consent unclassified ({reason}) on {direction:?} — fail-closed deny")]
+    ConsentUnclassified {
+        direction: IntentDirection,
+        reason: UnclassifiedReason,
+    },
+
+    /// Story 8.8 / G7 — the receiver fail-closed-denied an unclassified frame
+    /// with `CODE_CONSENT_UNCLASSIFIED` (-32009); the sender reconstructs this
+    /// typed mirror from the NACK (NOT conflated with `IntentDeniedAtPeer`).
+    #[error("cross-Host consent unclassified ({reason}) at peer {peer} — fail-closed deny")]
+    ConsentUnclassifiedAtPeer { peer: String, reason: UnclassifiedReason },
 
     /// Outbound `route_outbound` timed out awaiting receiver ACK — partition
     /// behavior per architecture §7.2 "A2A in-flight frames during partition

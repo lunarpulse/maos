@@ -238,15 +238,16 @@ fn advisory_frame(intent: IntentClass) -> IacFrame {
     let mira = Mira::default();
     let diag = mira.diagnose(&signals[1]);
     let advisory_json = serde_json::to_string(&mira.advisory(&diag)).unwrap();
+    let from = FrameAddress {
+        spirit_id: SpiritId::from("mira"),
+        host_id: Some(HostId("host_a".into())),
+        role: Some(SpiritRole::Worker),
+    };
     IacFrame {
         frame_id: [9u8; 16],
         timestamp_ns: 0,
         logical_clock: 0,
-        from: FrameAddress {
-            spirit_id: SpiritId::from("mira"),
-            host_id: Some(HostId("host_a".into())),
-            role: Some(SpiritRole::Worker),
-        },
+        from: from.clone(),
         to: smallvec![FrameAddress {
             spirit_id: SpiritId::from("nash"),
             host_id: Some(HostId("host_b".into())),
@@ -262,7 +263,13 @@ fn advisory_frame(intent: IntentClass) -> IacFrame {
             prior_distillate_ref: None,
         }),
         auto_marker: FrameOrigin::SpiritAuto,
-        consent_envelope: None,
+        // Story 8.8 (Option 2) — fail-closed is unconditional; populate the
+        // canonical fine-grained intent (granter == from) so the cross-Host frame
+        // is classified. (Pre-8.8 this was `None`/band-fallback.)
+        consent_envelope: Some(maos_domain::frame::ConsentEnvelope::with_fine_grained_intent(
+            from,
+            A2AIntent::new(ADVISORY_CONSENT_INTENT),
+        )),
         intent_lineage: IntentLineage::default(),
     }
 }

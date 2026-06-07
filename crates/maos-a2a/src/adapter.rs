@@ -36,6 +36,11 @@ pub struct LoopbackA2ARouter {
 }
 
 impl LoopbackA2ARouter {
+    /// Story 8.8 / AC4 — the loopback router **simulates** cross-Host A2A, so it
+    /// enforces the cross-Host fail-closed posture: an unclassified cross-Host
+    /// frame is denied with `CODE_CONSENT_UNCLASSIFIED` (-32009), never
+    /// band-downgraded. Fail-closed is unconditional in `A2ARouterCore` (Option 2,
+    /// team consensus 2026-06-07 — no band-fallback toggle exists).
     pub fn new(peer_configs: Vec<A2APeerConfig>, tofu: Arc<dyn TofuPinStore>) -> Self {
         Self {
             core: A2ARouterCore::new(peer_configs, tofu),
@@ -143,15 +148,16 @@ mod tests {
     }
 
     fn make_frame(host_id: Option<&str>) -> IacFrame {
+        let from = FrameAddress {
+            spirit_id: SpiritId::from("a"),
+            host_id: host_id.map(|s| HostId(s.to_string())),
+            role: None,
+        };
         IacFrame {
             frame_id: [0u8; 16],
             timestamp_ns: 0,
             logical_clock: 0,
-            from: FrameAddress {
-                spirit_id: SpiritId::from("a"),
-                host_id: host_id.map(|s| HostId(s.to_string())),
-                role: None,
-            },
+            from: from.clone(),
             to: smallvec![FrameAddress {
                 spirit_id: SpiritId::from("b"),
                 host_id: host_id.map(|s| HostId(s.to_string())),
@@ -167,7 +173,15 @@ mod tests {
                 prior_distillate_ref: None,
             }),
             auto_marker: FrameOrigin::HumanAuthored,
-            consent_envelope: None,
+            // Story 8.8 (Option 2) — fail-closed is unconditional; loopback plumbing
+            // tests use a CLASSIFIED frame (canonical "standard" intent, granter == from).
+            consent_envelope: Some(maos_domain::frame::ConsentEnvelope {
+                consent_id: [0u8; 16],
+                granter: from,
+                timestamp_ns: 0,
+                intent_class: Some(A2AIntent::new("standard")),
+                valid_until_ns: None,
+            }),
             intent_lineage: IntentLineage::default(),
         }
     }

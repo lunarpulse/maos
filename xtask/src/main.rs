@@ -4,6 +4,7 @@ use std::process;
 
 mod abi_diff;
 mod calibrate;
+mod check_a2a_sender_completeness;
 mod check_adr_040_accepted;
 mod check_bare_review_findings;
 mod check_breaking_md;
@@ -264,6 +265,14 @@ enum Commands {
         lang: Option<String>,
         #[arg(long)]
         check: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 8.8 AC3 — cross-Host A2A sender-completeness gate: no reference
+    /// cross-Host sender builds a frame with an unclassified `consent_envelope`.
+    CheckA2aSenderCompleteness {
+        #[arg(long, default_value = ".")]
+        workspace_root: String,
         #[arg(long)]
         json: bool,
     },
@@ -629,6 +638,10 @@ fn main() {
             };
             templates_regen::run(&workspace_root, lang, check, json)
         }
+        Commands::CheckA2aSenderCompleteness {
+            workspace_root,
+            json,
+        } => check_a2a_sender_completeness::run(&workspace_root, json),
         Commands::CheckWorkspaceCount {
             cargo_toml,
             kernel_design,

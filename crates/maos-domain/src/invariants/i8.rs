@@ -76,6 +76,12 @@ impl A2AIntent {
     /// that is NOT canonical can never match any frame — `maos-a2a-core`'s router
     /// emits a `tracing::warn!` for such unreachable entries so the original
     /// "silent never-match" failure mode becomes loud.
+    ///
+    /// **Story 8.8 note:** an empty string (`A2AIntent::new("")`) fails this
+    /// check because the grammar requires at least one character (`+` quantifier).
+    /// In the fail-closed router (`A2ARouterCore::consent_decision`), empty
+    /// strings are therefore classified as `UnclassifiedReason::NonCanonical`,
+    /// NOT `Absent` — they are present-but-invalid, not missing.
     pub fn is_canonical(&self) -> bool {
         let s = self.0.as_str();
         if s.is_empty() || s.len() > MAX_CANONICAL_INTENT_LEN {

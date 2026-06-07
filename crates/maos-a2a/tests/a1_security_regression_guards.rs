@@ -297,7 +297,22 @@ async fn p6_zero_boot_nonce_is_unspecified_sentinel_and_admits() {
     .await
     .expect("pin");
     let router = LoopbackA2ARouter::new(vec![cfg], tofu);
-    let frame = make_frame_with_host(Some("loopback"));
+    // Story 8.8 — the loopback router is now fail-closed by default, so the frame
+    // must carry a canonical classified intent_class (granter == from) to be
+    // admitted. The point of THIS test (boot_nonce=0 ⇒ skip restart detection ⇒
+    // admit) is preserved; the frame is just made B-clean.
+    let mut frame = make_frame_with_host(Some("loopback"));
+    frame.consent_envelope = Some(ConsentEnvelope {
+        consent_id: [0u8; 16],
+        granter: FrameAddress {
+            spirit_id: SpiritId::from("sender"),
+            host_id: Some(HostId("loopback".to_string())),
+            role: None,
+        },
+        timestamp_ns: 0,
+        intent_class: Some(A2AIntent::new("standard")),
+        valid_until_ns: None,
+    });
     let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1); // boot_nonce = 0 by default
     let resp = router.handle_intake(req).await;
     assert!(

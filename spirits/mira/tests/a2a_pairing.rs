@@ -61,9 +61,10 @@ fn peer(peer_id: &str, fp: PeerCertFingerprint, send: &[&str], accept: &[&str]) 
 /// review patch) and `SpiritRole::Worker` (Decision C).
 ///
 /// Story 8.7 / AC2 — `fine_intent` is the per-frame fine-grained ADR-012 intent
-/// the sender populates on `consent_envelope.intent_class`. Reference cross-Host
-/// frames pass `Some(..)` (the migrated path); `None` exercises the legacy 3-band
-/// fallback (AC7) for the band-based denial-mechanism tests.
+/// the sender populates on `consent_envelope.intent_class`. Story 8.8 (Option 2):
+/// fail-closed is unconditional, so EVERY cross-Host frame passes `Some(..)`; a
+/// `None` (unclassified) frame is denied with `ConsentUnclassified` (the legacy
+/// 3-band fallback no longer exists).
 fn advisory_frame(
     from_spirit: &str,
     from_host: &str,
@@ -354,10 +355,13 @@ async fn confused_deputy_directive_denied_while_advisory_admitted() {
 
 #[tokio::test]
 async fn send_side_denial_carries_eintentdenied() {
-    // The literal `EIntentDenied` rides the send-side denial: an intent not in
-    // the destination's send_allowlist is rejected before the wire. Story 8.7 /
-    // AC7 — this exercises the BAND-FALLBACK path (frame carries no fine-grained
-    // intent), proving the legacy 3-band denial still works byte-for-byte.
+    // The literal `EIntentDenied` rides the send-side denial: a classified intent
+    // not in the destination's send_allowlist is rejected before the wire. Story
+    // 8.8 (Option 2, team consensus 2026-06-07): fail-closed is unconditional and
+    // the band-fallback path is deleted, so this routes a CLASSIFIED `standard`
+    // intent (not in host_b's `readonly` send_allowlist) → send-side `IntentDenied`
+    // carrying `EIntentDenied`. (An UNclassified frame would instead be denied with
+    // `ConsentUnclassified` — covered by `fail_closed_8_8`.)
     let host_a_fp = PeerCertFingerprint::from_cert_der(b"mira-host-a-cert-v1");
     let host_b_fp = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
     // host_b admits only `readonly` on send; a `standard` band frame is denied.
@@ -384,7 +388,7 @@ async fn send_side_denial_carries_eintentdenied() {
         "host_b",
         mira_advisory_json(),
         IntentClass::Standard,
-        None, // band-fallback path (AC7)
+        Some("standard"), // classified intent NOT in host_b's `readonly` send_allowlist
         4,
     );
     let err = LocalRouter::route_outbound(&router, frame, &HostId("host_b".into()))

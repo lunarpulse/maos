@@ -165,6 +165,9 @@ impl TcpA2ATransport {
             pins.clone() as Arc<dyn TofuPinStore>,
         )
         .map_err(|e| TcpTransportError::Config(e.to_string()))?;
+        // Story 8.8 — the live wire is genuine cross-Host → fail-closed is
+        // unconditional in `A2ARouterCore` (Option 2, no toggle). Unclassified
+        // frames are denied with CODE_CONSENT_UNCLASSIFIED (-32009).
         if let Some(t) = consent_now_ns {
             core_inner = core_inner.with_pinned_consent_clock(t);
         }

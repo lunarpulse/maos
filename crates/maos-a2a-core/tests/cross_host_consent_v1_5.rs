@@ -18,7 +18,7 @@
 //! (defense-in-depth both directions), AC5 (unreachable-entry `warn!`), AC7
 //! (band fallback preserved).
 
-use maos_a2a_core::error::{A2AError, IntentDirection};
+use maos_a2a_core::error::{A2AError, IntentDirection, UnclassifiedReason};
 use maos_a2a_core::transport::json_rpc::{
     A2AJsonRpcRequest, A2AJsonRpcResponse, CODE_INTENT_DENIED, METHOD_IAC_DELIVER,
 };
@@ -72,6 +72,7 @@ async fn pinned_core(allowlists: ConsentAllowlists) -> A2ARouterCore {
     .expect("pin");
     A2ARouterCore::new(vec![cfg], tofu)
 }
+
 
 /// `band_intent` is the coarse `IntentClass` (the band-fallback projection);
 /// `fine` is the optional per-frame fine-grained `A2AIntent` that, when present,
@@ -262,24 +263,18 @@ async fn intent_class_round_trips_byte_equal_through_wire() {
     );
 }
 
-// ── AC7 — band fallback preserved for frames with no fine-grained intent ───────
+// ── Story 8.8 (Option 2) — NO band fallback: a band allowlist never matches a
+// fine-grained frame, and an unclassified frame is denied (not band-projected) ──
 
 #[tokio::test]
-async fn band_fallback_preserved_when_no_fine_grained_intent() {
-    // consent_envelope == None → fall back to the 3-band projection. A `standard`
-    // band allowlist still admits a `Standard` frame byte-for-byte as pre-8.7.
-    let core = pinned_core(allow(&["standard"], &["standard"])).await;
-    core.prepare_outbound(
-        frame(IntentClass::Standard, None),
-        &HostId("loopback".into()),
-        0,
-    )
-    .await
-    .expect("band fallback still admits");
-
-    // And a band allowlist does NOT match a fine-grained frame (fine-grained wins).
-    let core2 = pinned_core(allow(&["standard"], &[])).await;
-    let err = core2
+async fn band_allowlist_does_not_match_fine_grained_frame() {
+    // A `standard` band-token allowlist does NOT match a fine-grained frame — the
+    // fine-grained key is the only key (no band collapse). (The pre-8.8 companion
+    // "band fallback admits a None frame" assertion is deleted: under Option 2 a
+    // None/unclassified frame is denied fail-closed, covered by
+    // `fail_closed_8_8::absent_envelope_denied_both_directions`.)
+    let core = pinned_core(allow(&["standard"], &[])).await;
+    let err = core
         .prepare_outbound(
             frame(IntentClass::Standard, Some(FINE_READONLY)),
             &HostId("loopback".into()),
@@ -333,13 +328,15 @@ fn warn_fires_on_unreachable_non_canonical_allowlist_entry() {
             .build()
             .unwrap();
         rt.block_on(async {
-            // A non-canonical typo entry that can never match any frame's key.
+            // A non-canonical typo ENTRY in the allowlist that can never match any
+            // frame's key. Story 8.8 (Option 2): a CLASSIFIED frame reaches the
+            // allowlist (the gate admits classified); its fine-grained key is not in
+            // the typo'd send_allowlist → miss → `warn_unreachable_entries` fires on
+            // the non-canonical entry.
             let core = pinned_core(allow(&["Not A Canonical Intent"], &[])).await;
-            // A band frame (no fine-grained intent) projects to `standard`, which
-            // is NOT in the typo'd send_allowlist → denial → warn fires.
             let _ = core
                 .prepare_outbound(
-                    frame(IntentClass::Standard, None),
+                    frame(IntentClass::Readonly, Some(FINE_READONLY)),
                     &HostId("loopback".into()),
                     0,
                 )
@@ -373,10 +370,13 @@ fn warn_fires_on_accept_side_unreachable_entry() {
             .build()
             .unwrap();
         rt.block_on(async {
+            // Story 8.8 (Option 2): a CLASSIFIED frame reaches the accept-allowlist
+            // (the gate admits classified); its key is not in the typo'd
+            // accept_allowlist → miss → `warn_unreachable_entries` fires.
             let core = pinned_core(allow(&[], &["Not A Canonical Intent"])).await;
             let req = A2AJsonRpcRequest::new(
                 METHOD_IAC_DELIVER,
-                frame(IntentClass::Standard, None),
+                frame(IntentClass::Readonly, Some(FINE_READONLY)),
                 1,
             );
             let _ = core.handle_intake(req).await;
@@ -562,17 +562,26 @@ async fn ac2_granter_mismatch_host_id_only() {
 
 #[tokio::test]
 async fn ac5_intent_length_bound_unified_to_canonical_128() {
-    // 129-byte intent_class exceeds the canonical bound → falls back to the band
-    // projection. The send_allowlist holds the `readonly` band → admitted.
+    // 129-byte intent_class exceeds the canonical bound → UNCLASSIFIED. Story 8.8
+    // (Option 2): under unconditional fail-closed it is DENIED (Oversized), NOT
+    // band-projected. (Pre-8.8 this asserted band fallback; that path is gone.)
     let over = "a".repeat(129);
     let core = pinned_core(allow(&["readonly"], &[])).await;
-    core.prepare_outbound(
-        frame(IntentClass::Readonly, Some(&over)),
-        &HostId("loopback".into()),
-        0,
-    )
-    .await
-    .expect("129-byte intent_class must fall back to the band projection");
+    let err = core
+        .prepare_outbound(
+            frame(IntentClass::Readonly, Some(&over)),
+            &HostId("loopback".into()),
+            0,
+        )
+        .await
+        .expect_err("129-byte intent_class is oversized → fail-closed deny");
+    assert!(matches!(
+        err,
+        A2AError::ConsentUnclassified {
+            direction: IntentDirection::Send,
+            reason: UnclassifiedReason::Oversized,
+        }
+    ));
 
     // 128-byte intent_class is at the bound → used as the fine-grained key; a
     // band-only allowlist must NOT match it (fine-grained supersedes the band).
