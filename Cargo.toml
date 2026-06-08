@@ -16,6 +16,7 @@ members = [
     "crates/maos-domain",
     "crates/maos-capability",
     "crates/maos-iac",
+    "crates/maos-journey-test",
     "crates/maos-kernel-core",
     "crates/maos-manifest",
     "crates/maos-mcp",

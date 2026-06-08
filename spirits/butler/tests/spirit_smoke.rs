@@ -74,7 +74,10 @@ fn manifest_self_check_is_well_formed() {
     assert_eq!(report.trust_tier, "local");
     assert_eq!(report.sandbox_tier, "T2");
     assert_eq!(report.posture_default, "assistive");
-    assert_eq!(report.posture_allowed_max, "assistive");
+    // Story 8.11 / AC6 FORK D — Butler's autonomy ceiling is `autonomous-with-halt`
+    // (it self-halts on belief_variance); this is the manifest-derived signal the
+    // daemon's boot-loud check keys on. See manifest.toml [posture].
+    assert_eq!(report.posture_allowed_max, "autonomous-with-halt");
     assert_eq!(report.budget_time_cap_seconds, Some(30));
     assert!(report.budget_context_window_size.is_some());
     assert!(report.resources_cpu_max_pct.is_some());

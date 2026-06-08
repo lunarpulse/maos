@@ -110,18 +110,31 @@ impl JournalAdapter {
                 .read_to_string(&mut content)
                 .map_err(JournalError::Read)?;
         }
+        let mut skipped_lines = 0;
         for (line_num, line) in content.lines().enumerate() {
             if line.is_empty() {
                 continue;
             }
-            let entry: JournalEntry =
-                serde_json::from_str(line).map_err(|e| JournalError::Parse {
-                    line: line_num + 1,
-                    source: e,
-                })?;
+            let entry: JournalEntry = match serde_json::from_str(line) {
+                Ok(e) => e,
+                Err(e) => {
+                    eprintln!(
+                        "journal: WARNING — skipping corrupted line {}: {e}",
+                        line_num + 1
+                    );
+                    skipped_lines += 1;
+                    continue;
+                }
+            };
             if let JournalEntry::Lifecycle(ref le) = entry {
                 most_recent.insert(le.spirit_id.clone(), le.lifecycle_event);
             }
+        }
+        if skipped_lines > 0 {
+            eprintln!(
+                "journal: WARNING — {skipped_lines} corrupted line(s) skipped during open; \
+                 the daemon may have crashed during a write. Consider rotating the journal."
+            );
         }
 
         let writer = Arc::new(Mutex::new(file));

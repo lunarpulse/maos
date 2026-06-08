@@ -1,0 +1,17 @@
+[package]
+name = "maos-journey-test"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS journey-acceptance test harness (Story 8.11 skeleton; bodies + Tier-1/Tier-2 suites + revert-to-red seal land in Story 8.15)"
+publish = false
+
+[dependencies]
+# The SHARED render-string / scalar-tag constants JB-3 binds to (AC5 f) — drift
+# between production and harness is a COMPILE error, not a silent body edit.
+butler = { path = "../../spirits/butler" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "time", "test-util"] }

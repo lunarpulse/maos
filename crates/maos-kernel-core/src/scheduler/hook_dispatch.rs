@@ -297,13 +297,25 @@ impl HookDispatcher {
             .await
     }
 
+    /// Story 8.11 / AC3 — the effective hook time cap for a Spirit: its declared
+    /// `[budget].time_cap_seconds` when present, else the dispatcher default
+    /// (`DEFAULT_TIME_CAP_SECONDS`). The kernel never learns what the budget
+    /// bounds — only that this Spirit's hooks must finish within it.
+    fn effective_cap_seconds(&self, scb: &SpiritControlBlock) -> u64 {
+        scb.manifest
+            .budget
+            .as_ref()
+            .map(|b| b.time_cap_seconds as u64)
+            .unwrap_or(self.time_cap_seconds)
+    }
+
     /// Story 5.2 — Fire the snapshot hook on the predecessor.
     /// Returns the CBOR-encoded state blob on success.
     pub async fn fire_snapshot(&self, scb: &SpiritControlBlock) -> Result<Vec<u8>, HookOutcome> {
         if !Self::hook_allowed(scb, "snapshot") {
             return Err(HookOutcome::SkippedManifest);
         }
-        let cap_seconds = self.time_cap_seconds;
+        let cap_seconds = self.effective_cap_seconds(scb);
         let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
         let spirit_obj = Arc::clone(&scb.spirit_obj);
 
@@ -385,7 +397,7 @@ impl HookDispatcher {
                 "manifest does not permit migrate hook",
             ));
         }
-        let cap_seconds = self.time_cap_seconds;
+        let cap_seconds = self.effective_cap_seconds(scb);
         let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
         let spirit_obj = Arc::clone(&scb.spirit_obj);
         let predecessor_state = predecessor_state.to_vec();
@@ -490,7 +502,7 @@ impl HookDispatcher {
             return HookOutcome::SkippedManifest;
         }
 
-        let cap_seconds = self.time_cap_seconds;
+        let cap_seconds = self.effective_cap_seconds(scb);
         let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
 
         let spirit_obj = Arc::clone(&scb.spirit_obj);
@@ -513,7 +525,8 @@ impl HookDispatcher {
             }),
         );
 
-        let warn_sleep = tokio::time::sleep(Duration::from_secs(cap_seconds * 4 / 5));
+        let warn_seconds = std::cmp::max(1, cap_seconds * 4 / 5);
+        let warn_sleep = tokio::time::sleep(Duration::from_secs(warn_seconds));
         tokio::pin!(hook_future);
         tokio::pin!(warn_sleep);
 

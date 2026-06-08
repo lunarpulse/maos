@@ -43,9 +43,11 @@ use unicode_segmentation::UnicodeSegmentation;
 use maos_domain::distillation::{
     DigestPayload, DistillationError, DistillationReceipt, DistillationRequest,
 };
+use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::invariants::i7::ScalarTapEvent;
 use maos_domain::log_recall::{LogRecallEntry, LogRecallError, LogRecallFilter};
-use maos_domain::ports::{DistillationPort, LogRecallPort};
+use maos_domain::ports::inference::{InferenceError, InferenceOptions, InferenceRequest};
+use maos_domain::ports::{DistillationPort, InferencePort, LogRecallPort};
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
 
@@ -222,6 +224,30 @@ impl std::error::Error for ResearcherError {}
 // The Researcher Spirit.
 // ───────────────────────────────────────────────────────────────────────────
 
+/// Story 8.11 / AC2 — the optional live-inference seam. When present, the
+/// finding-synthesis step calls the frozen Inference Port (ADR-010 sync) instead
+/// of the deterministic [`summarize`]. The token + pid are **daemon-issued**
+/// (`maos run` issues a `Scope::ProviderInfer` token and threads it here); the
+/// kernel never appears in this crate's API surface — only the pure domain port.
+#[derive(Clone)]
+struct LiveInference {
+    /// The frozen Inference Port adapter (real provider under `--live`, a
+    /// deterministic replay/stub otherwise — selected daemon-side).
+    port: Arc<dyn InferencePort + Send + Sync>,
+    /// The daemon-issued `Scope::ProviderInfer` capability token.
+    token: CapabilityToken,
+    /// The loaded Spirit's real pid (NOT a `Some(0)` placeholder).
+    spirit_pid: u32,
+}
+
+impl std::fmt::Debug for LiveInference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LiveInference")
+            .field("spirit_pid", &self.spirit_pid)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Researcher reference Spirit. Optionally holds the frames its `on_idle`
 /// survey reasons over (in production the walker seeds these from `log.recall`).
 #[derive(Debug, Clone)]
@@ -234,6 +260,11 @@ pub struct Researcher {
     /// The most recent survey output. `Arc<Mutex<...>>` so Researcher stays
     /// `Sync` as required by the `#[spirit]` macro.
     last_output: Arc<Mutex<Option<SurveyOutput>>>,
+    /// Story 8.11 / AC2 — `None` (the hermetic-CI default) ⇒ the deterministic
+    /// survey, byte-identical to v0.5. `Some` ⇒ live finding-synthesis through
+    /// the Inference Port. The walker, every cite, and the I11 chain are
+    /// unchanged in BOTH modes.
+    inference: Option<LiveInference>,
 }
 
 #[spirit]
@@ -263,6 +294,7 @@ impl Default for Researcher {
             posture_set: vec![ResearcherPosture::Survey, ResearcherPosture::Hypothesize],
             pending: None,
             last_output: Arc::new(Mutex::new(None)),
+            inference: None,
         }
     }
 }
@@ -279,6 +311,31 @@ impl Researcher {
             pending: Some(frames),
             ..Self::default()
         }
+    }
+
+    /// Story 8.11 / AC2 — wire the live finding-synthesis seam. `maos run`
+    /// supplies the frozen Inference Port, a daemon-issued `Scope::ProviderInfer`
+    /// token, and the loaded Spirit's real pid. With this set, the
+    /// finding-synthesis step calls `inference.complete(...)` instead of the
+    /// deterministic [`summarize`] — every cite, hedge, and the I11 chain are
+    /// unchanged. Without it, the survey is byte-identical to v0.5.
+    pub fn with_inference_port(
+        mut self,
+        port: Arc<dyn InferencePort + Send + Sync>,
+        token: CapabilityToken,
+        spirit_pid: u32,
+    ) -> Self {
+        self.inference = Some(LiveInference {
+            port,
+            token,
+            spirit_pid,
+        });
+        self
+    }
+
+    /// Whether the live-inference seam is wired (the `--live` path).
+    pub fn is_live(&self) -> bool {
+        self.inference.is_some()
     }
 
     /// The declared cognitive posture-set (§6.2).
@@ -379,7 +436,9 @@ impl Researcher {
                         // source statement, not the verbatim source — a digest is
                         // smaller than its inputs (§9.5). Hedges are preserved
                         // separately below, so summarizing never drops a hedge.
-                        statement: summarize(&claim.statement),
+                        // Story 8.11 / AC2 — live (Inference Port) when the seam
+                        // is wired, else the deterministic bounded summary.
+                        statement: self.synthesize(&claim.statement),
                         confidence,
                         hedges: claim.hedges,
                         source_log_ref: hex,
@@ -465,6 +524,56 @@ impl Researcher {
             confidence_map,
             bibliography,
             scalars,
+        }
+    }
+
+    /// Story 8.11 / AC2 — synthesize a finding statement from a source claim.
+    ///
+    /// - **Live** (the `--live` path, Inference Port wired): builds an
+    ///   [`InferenceRequest`] carrying the daemon-issued `Scope::ProviderInfer`
+    ///   token + real pid and calls [`InferencePort::complete`]; the model's text
+    ///   is bounded by [`summarize`] so the digest stays smaller than its inputs
+    ///   (§9.5) regardless of model verbosity. On a transient error the
+    ///   deterministic summary is the fail-safe so a finding is never dropped
+    ///   (the daemon fails boot LOUDLY on `Unconfigured` before a `--live` run,
+    ///   so this path is genuine degradation, not silent disablement).
+    /// - **Deterministic** (no seam): the v0.5 bounded summary, byte-for-byte.
+    fn synthesize(&self, statement: &str) -> String {
+        let Some(live) = &self.inference else {
+            return summarize(statement);
+        };
+        let req = InferenceRequest::new(
+            live.spirit_pid,
+            live.token.clone(),
+            format!(
+                "Summarize this research claim in one sentence for a digest. \
+                 Preserve any hedges; add no facts.\n\nClaim: {statement}"
+            ),
+            InferenceOptions {
+                max_tokens: 256,
+                temperature: Some(0.0),
+                model_id: None,
+            },
+            None,
+            Vec::new(),
+        );
+        match live.port.complete(req) {
+            Ok(resp) => summarize(&resp.text),
+            Err(ref e) => {
+                // Log non-transient errors so operators running --live can
+                // detect misconfiguration (e.g. missing API key) rather than
+                // silently degrading to the deterministic path.
+                match e {
+                    InferenceError::Unconfigured { .. }
+                    | InferenceError::CapabilityDenied { .. } => {
+                        eprintln!(
+                            "researcher: live inference failed with non-transient error                              ({e:?}) — falling back to deterministic summarize"
+                        );
+                    }
+                    _ => {}
+                }
+                summarize(statement)
+            }
         }
     }
 

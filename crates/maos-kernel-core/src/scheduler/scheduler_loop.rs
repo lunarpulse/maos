@@ -26,7 +26,7 @@ use maos_spirit_abi::lifecycle::Spirit;
 /// Quantum size for deficit round-robin scheduling.
 pub const SCHEDULER_QUANTUM: u32 = 64;
 
-static NEXT_SPIRIT_PID: AtomicU32 = AtomicU32::new(1);
+static NEXT_SPIRIT_PID: AtomicU32 = AtomicU32::new(0);
 
 pub(crate) fn allocate_pid() -> u32 {
     NEXT_SPIRIT_PID.fetch_add(1, Ordering::Relaxed)

@@ -1,3 +1,6 @@
+## ~~Deferred from: code review of 8-11-live-runtime-spine-daemon-composition-root-and-inference-port (2026-06-08)~~ **RESOLVED**
+
+- ~~`JournalAdapter::open` fails on first corrupted line with no recovery~~ — **FIXED 2026-06-08**: corrupted lines are now skipped with a warning instead of failing the entire open. A counter tracks how many lines were skipped, and a summary warning is emitted after the scan. The daemon boots resiliently even if the journal has trailing corruption from a crash. `crates/maos-kernel-core/src/journal/mod.rs:113-138`
 ---
 dev_model_used: claude-opus-4-7
 ---

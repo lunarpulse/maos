@@ -1,4 +1,4 @@
-last_updated: '2026-06-07T00:00:00Z+story-8-10-ready-for-dev'
+last_updated: '2026-06-08T00:00:00Z+story-8-11-review'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -96,7 +96,7 @@ development_status:
   8-9-a2a-trust-binding-and-consent-integrity-hardening: done
   8-10-kernel-enforced-invariant-closure-and-butler-ac2-remediation: done
   # Story 8.11 (Phase 2, KEYSTONE): live runtime spine — `maos run` daemon composition root + Inference Port live LLM path + runtime budget enforcement (time_cap threaded past the hard-coded 30s hook_dispatch.rs:87) + 5-metric real scoring. CHARTER-AMENDED kernel delta: record a NEW pinned maos-kernel-core baseline (retires 8.4's 15505 assertion); FLAG-Winston. Replaces the 54 env-gated smoke arms as the run surface. DEPENDS ON 8.10.
-  8-11-live-runtime-spine-daemon-composition-root-and-inference-port: backlog
+  8-11-live-runtime-spine-daemon-composition-root-and-inference-port: done
   # Story 8.12 (Phase 2): live CliWrapper subprocess stdio bridge — implement lifecycle/cli_wrapper/runtime.rs (today only argv_prefix_hash under a doc comment); Worker spawns real claude/opencode/gemini/kimi; founder-loop runs as real `maos run` (not a smoke arm hand-INSERTing CliSubprocessOutput rows). The bridge 8.4 deferred as "kernel work, not Spirit work". CHARTER-AMENDED kernel delta. DEPENDS ON 8.11.
   8-12-live-cliwrapper-subprocess-bridge-founder-loop-over-real-clis: backlog
   # Story 8.13 (Phase 2): cross-host live pair — Spirit→TCP binding + real mobile push (J4 end-to-end). Mira::diagnose()/advisory() output rides the live maos-a2a-tcp wire via the daemon (8.6 sends a hand-built literal today); real maos-notify-push HTTP transport replaces MobilePushCapture; integrated J4 smoke over the LIVE transport (8.5 logic + 8.6 wire never meet today). DEPENDS ON 8.9 + 8.11.

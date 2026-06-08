@@ -210,6 +210,11 @@ pub struct SpiritManifestBundle {
     /// Story 6.5 / FR54 — `[[gateway]]` entries declared at admission.
     /// Defaults to the empty section (no gateway sub-modules).
     pub gateways: GatewaysSection,
+    /// Story 8.11 / AC3 — the parsed `[budget]` section. `None` ⇒ the
+    /// dispatcher's `DEFAULT_TIME_CAP_SECONDS` governs this Spirit's hooks;
+    /// `Some` ⇒ `budget.time_cap_seconds` is the per-Spirit hook cap. The kernel
+    /// holds the value but never learns *what* the budget bounds (no LLM types).
+    pub budget: Option<crate::security::manifest::Budget>,
 }
 
 impl Default for SpiritManifestBundle {
@@ -226,6 +231,7 @@ impl Default for SpiritManifestBundle {
             supervision: None,
             schedules: SchedulesSection::default(),
             gateways: GatewaysSection::default(),
+            budget: None,
         }
     }
 }

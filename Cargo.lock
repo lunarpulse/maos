@@ -1106,6 +1106,7 @@ name = "maos-bin"
 version = "0.1.0-alpha"
 dependencies = [
  "architect",
+ "butler",
  "crossbeam-channel",
  "getrandom 0.3.4",
  "hex",
@@ -1133,6 +1134,7 @@ dependencies = [
  "orchestrator",
  "parking_lot",
  "rcgen",
+ "researcher",
  "reviewer",
  "ring",
  "serde_cbor",
@@ -1278,6 +1280,14 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "ulid",
+]
+
+[[package]]
+name = "maos-journey-test"
+version = "0.1.0-alpha"
+dependencies = [
+ "butler",
+ "tokio",
 ]
 
 [[package]]

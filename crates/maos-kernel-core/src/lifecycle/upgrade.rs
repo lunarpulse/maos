@@ -393,6 +393,13 @@ fn load_bundle_from_file(
         .and_then(|v| toml::to_string(v).ok())
         .map(|s| SupervisionSection::from_toml_str(&s))
         .transpose()?;
+    // Story 8.11 / AC3 — parse the `[budget]` section so the per-Spirit hook
+    // cap survives a hot-swap upgrade as well as the `maos run` admission path.
+    let budget = root
+        .get("budget")
+        .and_then(|v| toml::to_string(v).ok())
+        .map(|s| crate::security::manifest::Budget::from_toml_str(&s))
+        .transpose()?;
 
     // Story 6.4 — `[[schedule]]` array-of-tables. The raw section parser
     // reads the array under the `schedule` key; we synthesize a doc that
@@ -433,5 +440,6 @@ fn load_bundle_from_file(
         supervision,
         schedules,
         gateways,
+        budget,
     })
 }

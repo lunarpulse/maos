@@ -34,7 +34,18 @@ allowed_tools = ["list_messages", "get_thread"]
 
 [posture]
 default = "assistive"
-allowed_max = "assistive"
+# Story 8.11 / AC6 FORK D — Butler self-halts on its own belief-variance via the
+# synchronous EpistemicScalarPort (on_idle → write_scalar → kernel halt). Its
+# autonomy ceiling is therefore `autonomous-with-halt` (the tier that *names*
+# self-halting autonomy), which is the manifest-derived, posture-keyed signal the
+# `maos run` daemon uses to REQUIRE an EpistemicScalarPort at boot (boot-loud).
+# Researcher stays `assistive` (it surfaces findings for the director; it does
+# not self-act) → no port required → boots clean. NOTE (flag-Winston): the
+# autonomy spectrum and the epistemic-halt mechanism are architecturally
+# orthogonal axes; here the halt-set posture is reused as the port-requirement
+# signal because no other manifest field generically separates a synchronous
+# scalar-writer (Butler) from an async scalar-emitter (Researcher).
+allowed_max = "autonomous-with-halt"
 
 [output_shape]
 # Butler's notification output shape (architecture §6.1). The kernel rejects

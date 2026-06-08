@@ -8,7 +8,13 @@
 use maos_domain::ports::inference::{InferenceRequest, InferenceResponse};
 
 /// Provider driver trait — implemented by each LLM backend (Anthropic, OpenAI, …).
-pub trait Provider {
+///
+/// Story 8.11 — `Send + Sync` so an `Arc<dyn Provider>` (hence `MultiProviderRouter`
+/// and `InferencePortAdapter`) is `Send + Sync` and can be injected into a Spirit
+/// dispatched across the multi-threaded runtime (the Researcher live-inference
+/// seam). Every concrete driver is already thread-safe (stateless HTTP clients /
+/// `Mutex`-wrapped state), so this only makes the existing guarantee explicit.
+pub trait Provider: Send + Sync {
     /// Perform a single completion call.
     fn complete(&self, req: &InferenceRequest) -> Result<InferenceResponse, ProviderError>;
 

@@ -48,6 +48,22 @@ pub const BUTLER_SPIRIT_ID: &str = "butler";
 /// real per-Spirit pid through the production port.
 pub const BUTLER_SPIRIT_PID: u32 = 0;
 
+/// Story 8.11 AC5(f) — the scalar **tag** Butler writes for a calendar-conflict
+/// epistemic halt. This is the canary constant shared between the production
+/// daemon (`maos-bin`) and the JB-3 journey harness (`maos-journey-test`): JB-3
+/// references THIS constant, not a string literal, so any drift (the sketch's
+/// erroneous `self.belief_variance` → production `belief_variance`) is a COMPILE
+/// error, not a silent body edit (Story 8.11 corrected the sketch mismatch).
+pub const SCALAR_TAG_BELIEF_VARIANCE: &str = "belief_variance";
+
+/// Story 8.11 AC5(f) — the rendered halt screen-string the `maos run` daemon
+/// prints to stdout when an epistemic halt fires (`"halted on <tag>"`). The JB-3
+/// PTY screen assertion binds to THIS function output, so the production halt
+/// render-string and the harness assertion can never drift apart.
+pub fn halt_screen_line(tag: &str) -> String {
+    format!("halted on {tag}")
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Scenario world-state (the non-scored `input` object of each corpus row).
 // ───────────────────────────────────────────────────────────────────────────
@@ -144,7 +160,7 @@ impl Assessment {
                 .collect::<Vec<_>>()
                 .join(",");
             (
-                "belief_variance",
+                SCALAR_TAG_BELIEF_VARIANCE,
                 self.belief_variance as f64,
                 format!("calendar-conflict:{refs}"),
             )
@@ -156,7 +172,7 @@ impl Assessment {
             )
         } else {
             (
-                "belief_variance",
+                SCALAR_TAG_BELIEF_VARIANCE,
                 self.belief_variance as f64,
                 "no-conflict".to_string(),
             )

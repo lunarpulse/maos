@@ -115,6 +115,152 @@ impl maos_providers::Provider for UnconfiguredProvider {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Story 8.11 — `maos run <manifest> [--live] [--once]` production run surface.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Parsed `maos run` invocation. `None` (from [`parse_run_args`]) means no `run`
+/// subcommand was given → preserve the existing `MAOS_ONE_SHOT` / Spirit-less
+/// serving behavior.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RunArgs {
+    manifest_path: String,
+    /// `--live` → real Inference provider; absent → deterministic replay/stub.
+    live: bool,
+    /// `--once` → single `on_idle` pass + graceful drain (headless tests).
+    once: bool,
+}
+
+/// Parse `run <manifest-path> [--live] [--once]` from the process args (the args
+/// AFTER the binary name). Manual parsing — the binary has no clap dependency.
+/// Returns `None` when the first arg is not `run` (the env-gated paths win).
+fn parse_run_args<I: IntoIterator<Item = String>>(
+    args: I,
+) -> Result<Option<RunArgs>, String> {
+    let mut it = args.into_iter();
+    if it.next().as_deref() != Some("run") {
+        return Ok(None);
+    }
+    let mut manifest_path: Option<String> = None;
+    let mut live = false;
+    let mut once = false;
+    for a in it {
+        match a.as_str() {
+            "--live" => live = true,
+            "--once" => once = true,
+            // `--replay-llm` is the explicit hermetic flag JB-3's PTY command
+            // uses; it is the DEFAULT (no `--live`) and accepted as a no-op so
+            // the documented command string stays stable.
+            "--replay-llm" => live = false,
+            other if !other.starts_with("--") && manifest_path.is_none() => {
+                manifest_path = Some(other.to_string());
+            }
+            other => {
+                return Err(format!(
+                    "maos run: unknown argument '{}' — expected: <manifest> [--live] [--once]",
+                    other
+                ));
+            }
+        }
+    }
+    match manifest_path {
+        Some(manifest_path) => Ok(Some(RunArgs {
+            manifest_path,
+            live,
+            once,
+        })),
+        None => Err("maos run: missing manifest path — expected: maos run <manifest> [--live] [--once]".into()),
+    }
+}
+
+/// Which reference Spirit a manifest's `[class].name` selects. Construction is
+/// keyed by class (the daemon MUST build the right concrete Spirit type); the
+/// **port-requirement** decision is NOT keyed here (it is posture-derived — see
+/// [`requires_epistemic_halt_port`]) so adding a future halt-Spirit cannot
+/// re-ship the 8.1 bug by forgetting a name (FORK D guardrail).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LoadedSpiritKind {
+    Butler,
+    Researcher,
+}
+
+fn classify_spirit(class_name: &str) -> Option<LoadedSpiritKind> {
+    match class_name {
+        "butler" => Some(LoadedSpiritKind::Butler),
+        "researcher" => Some(LoadedSpiritKind::Researcher),
+        _ => None,
+    }
+}
+
+/// Story 8.11 / AC6 FORK D — the **posture-keyed** boot-loud predicate. A Spirit
+/// whose manifest declares a self-halting autonomy ceiling
+/// (`autonomous-with-halt` or higher) drives an epistemic halt via the
+/// synchronous [`EpistemicScalarPort`] and therefore REQUIRES that port wired at
+/// boot. Keyed on `manifest.posture`, never on the Spirit id — a name-keyed
+/// check would decapitate Researcher (assistive, async scalar-emitter, no port)
+/// and re-ship the 8.1 footgun for the next halt-Spirit.
+fn requires_epistemic_halt_port(posture: &maos_kernel_core::security::manifest::PostureSection) -> bool {
+    use maos_kernel_core::security::manifest::Posture;
+    matches!(
+        posture.allowed_max,
+        Posture::AutonomousWithHalt | Posture::Autonomous
+    )
+}
+
+/// Story 8.11 / AC6 — the **production** `EpistemicScalarPort` adapter. A local
+/// `maos-bin` newtype over the REAL `WorkingMemoryOrchestrator` `main()` already
+/// constructs (orphan-rule-legal). It carries ZERO halt logic and no canned
+/// receipt — the halt DECISION stays in kernel code (`process_scalar_write`);
+/// the adapter only forwards Butler's assessed scalar and records the receipt so
+/// the daemon can render the halt screen-string. `process_scalar_write` is
+/// `&self` (no `Mutex` around the orchestrator).
+struct ButlerOrchestratorAdapter {
+    orchestrator:
+        Arc<maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator>,
+    tl: Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
+    journal: Arc<maos_kernel_core::journal::JournalAdapter>,
+    policy: maos_kernel_core::security::manifest::EpistemicPolicySection,
+    boot_nonce: u64,
+    /// The receipt from the most recent halt-firing scalar write (daemon reads
+    /// this to render the halt screen-string).
+    last_receipt: Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>,
+}
+
+impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
+    fn write_scalar(
+        &self,
+        spirit_pid: u32,
+        spirit_id: &str,
+        tag: &str,
+        value: f64,
+        derived_from: &str,
+    ) -> Result<
+        Option<maos_domain::halt::HaltReceipt>,
+        maos_domain::ports::epistemic_scalar::ScalarPortError,
+    > {
+        let receipt = self
+            .orchestrator
+            .process_scalar_write(
+                &self.tl,
+                &self.journal,
+                spirit_pid,
+                spirit_id,
+                self.boot_nonce,
+                tag,
+                value,
+                derived_from,
+                &self.policy,
+            )
+            .map_err(|e| {
+                maos_domain::ports::epistemic_scalar::ScalarPortError::Backend(e.to_string())
+            })?;
+        *self.last_receipt.lock().expect(
+            "ButlerOrchestratorAdapter::write_scalar: poisoned mutex — a prior panic left the receipt state inconsistent"
+        ) = receipt.clone();
+        Ok(receipt)
+    }
+}
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cpus = worker_thread_count();
@@ -123,6 +269,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         env!("CARGO_PKG_VERSION"),
         cpus
     );
+
+    // Story 8.11 / AC1 — parse the `maos run <manifest> [--live] [--once]`
+    // production run surface FIRST. The action is dispatched after the full
+    // composition root is built (it reuses the root's scheduler/inference/etc.).
+    // When absent, the existing `MAOS_ONE_SHOT` / Spirit-less serving paths win.
+    let run_args = match parse_run_args(std::env::args().skip(1)) {
+        Ok(args) => args,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+    };
 
     // Construct the seven adapter shells.
     // Story 5.1 — `_scheduler` replaced with real Arc<SpiritSchedulerAdapter>
@@ -284,8 +442,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Story 8.10 AC3a — inject the REAL I12 digest provider backed by the
     // Story-4.3 Memory Manager, replacing the default empty-refs closure so a
     // `decision.*` frame records what the Spirit actually reasoned over. At
-    // v0.3-β the daemon is single-Spirit (pid 0, consistent with the rest of
-    // this composition root); Story 8.11 threads real per-Spirit pids.
+    // v0.3-β the daemon is single-Spirit (pid 0, the first scheduler-assigned
+    // pid — consistent with the rest of this composition root).
     let digest_memory: Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync> =
         Arc::clone(&memory) as Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync>;
     let iac = Arc::new(
@@ -648,6 +806,346 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_rate_limiter(Arc::clone(&rate_limiter))
     .with_iac(Arc::clone(&iac));
     eprintln!("maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)");
+    // ─────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────────────────────
+    // Story 8.11 / AC1 — `maos run <manifest> [--live] [--once]`.
+    //
+    // A thin manifest-driven front-end on the composition root above: admit the
+    // named Spirit, construct it with its injected ports (Butler → boot-loud
+    // EpistemicScalarPort; Researcher → InferencePort under `--live`), thread its
+    // per-Spirit `[budget]` into the dispatcher (via the SCB bundle), load+start
+    // it, then either drive a single `on_idle` pass (`--once`) or fall through to
+    // the existing serving loop so `on_idle` fires against real time.
+    if let Some(run) = run_args.clone() {
+        use maos_kernel_core::security::manifest::{
+            LifecycleSection, PostureSection, SchedulingSection,
+        };
+        use maos_kernel_core::scheduler::control_block::SpiritManifestBundle;
+
+        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+        // 1. Read + parse the manifest.
+        let manifest_path = std::path::PathBuf::from(&run.manifest_path);
+        let manifest_toml = std::fs::read_to_string(&manifest_path).map_err(|e| {
+            format!(
+                "maos run: failed to read manifest {}: {e}",
+                manifest_path.display()
+            )
+        })?;
+        let manifest_root: toml::Value = toml::from_str(&manifest_toml)
+            .map_err(|e| format!("maos run: manifest TOML parse error: {e}"))?;
+        let extract = |section: &str| -> Result<String, Box<dyn std::error::Error>> {
+            let v = manifest_root
+                .get(section)
+                .ok_or_else(|| format!("maos run: missing manifest section [{section}]"))?;
+            Ok(toml::to_string(v).map_err(|e| format!("serialize [{section}]: {e}"))?)
+        };
+        let opt_section = |section: &str| -> Option<String> {
+            manifest_root
+                .get(section)
+                .and_then(|v| toml::to_string(v).ok())
+        };
+
+        let class_section =
+            maos_kernel_core::security::ClassSection::from_toml_str(&extract("class")?)?;
+        let kind = classify_spirit(&class_section.name).ok_or_else(|| {
+            format!(
+                "maos run: unknown Spirit class '{}' (known: butler, researcher)",
+                class_section.name
+            )
+        })?;
+        let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(&extract(
+            "sandbox",
+        )?)?;
+        let resource_caps =
+            maos_kernel_core::security::ResourceCaps::from_toml_str(&extract("resources")?)?;
+        let caps_required = {
+            let v = manifest_root
+                .get("capabilities")
+                .and_then(|c| c.get("required"))
+                .ok_or("maos run: missing [capabilities.required]")?;
+            maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
+                &toml::to_string(v).map_err(|e| format!("serialize [capabilities.required]: {e}"))?,
+            )?
+        };
+        let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(&extract(
+            "output_shape",
+        )?)?;
+        let posture_section = PostureSection::from_toml_str(&extract("posture")?)
+            .map_err(|e| format!("posture parse: {e}"))?;
+        let epistemic_policy = opt_section("epistemic_policy")
+            .map(|s| {
+                maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
+                    .map_err(|e| format!("epistemic_policy parse: {e}"))
+            })
+            .transpose()?;
+        // The scheduling/lifecycle sections are optional for the reference
+        // cognitive Spirits (they fire on_idle, not scheduled hooks); default to
+        // the empty sections so `on_idle` is allowed (empty enabled_hooks = all).
+        let scheduling = match opt_section("scheduling") {
+            Some(s) => SchedulingSection::from_toml_str(&s)?,
+            None => SchedulingSection::default(),
+        };
+        let lifecycle = match opt_section("lifecycle") {
+            Some(s) => LifecycleSection::from_toml_str(&s)?,
+            None => LifecycleSection::default(),
+        };
+        // Story 8.11 / AC3 — the parsed `[budget]` (per-Spirit hook cap).
+        let budget = opt_section("budget")
+            .map(|s| {
+                maos_kernel_core::security::manifest::Budget::from_toml_str(&s)
+                    .map_err(|e| format!("budget parse: {e}"))
+            })
+            .transpose()?;
+
+        // 2. Admit through the canonical SecurityManagerAdapter path.
+        // Reuse the composition root's shared journal (Story 8.11 review patch:
+        // opening a second JournalAdapter at the same SQLite path risks
+        // concurrent-write corruption).
+        let journal = Arc::clone(&shared_journal);
+        let (drift_tx, drift_rx) = maos_kernel_core::security::make_drift_channel();
+        let _drift_guard = drift_rx; // hold the receiver for the daemon's lifetime
+        let security =
+            maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
+                .with_drift_sender(drift_tx);
+        let spirit_id = class_section.name.clone();
+        security
+            .admit_spirit(
+                0,
+                &spirit_id,
+                &sandbox_cfg,
+                &resource_caps,
+                &caps_required,
+                Some(&output_shape),
+                journal.as_ref(),
+                &posture_section,
+                epistemic_policy.as_ref(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(&class_section),
+            )
+            .map_err(|e| format!("maos run: admission failed: {e}"))?;
+
+        let bundle = SpiritManifestBundle {
+            scheduling,
+            lifecycle,
+            class: Some(class_section.clone()),
+            budget,
+            ..Default::default()
+        };
+
+        // 3. Construct the Spirit with its injected ports, then load + start.
+        //    `--once` test seam: `MAOS_TEST_ONLY_STRIP_SCALAR_PORT` forces the
+        //    port to `None` so the boot-loud guard can be proven RED (the
+        //    negative-boot test). It is NEVER set in production; if it is, a
+        //    loud warning is emitted and boot still proceeds (the override wins).
+        let strip_port = std::env::var_os("MAOS_TEST_ONLY_STRIP_SCALAR_PORT").is_some();
+        if strip_port {
+            eprintln!(
+                "maos run: WARNING — MAOS_TEST_ONLY_STRIP_SCALAR_PORT is set.                  This is a test-only seam and must NEVER be used in production."
+            );
+        }
+        let needs_port = requires_epistemic_halt_port(&posture_section);
+        let mut halt_receipt_handle: Option<
+            Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>,
+        > = None;
+
+        let pid = match kind {
+            LoadedSpiritKind::Butler => {
+                // Boot-loud: a halt-posture Spirit MUST have a production
+                // EpistemicScalarPort, or boot fails LOUDLY (the 8.1 None-footgun
+                // closed — "forgot to wire it" is now un-green).
+                let scalar_port: Option<Arc<dyn maos_domain::ports::EpistemicScalarPort>> =
+                    if strip_port {
+                        None
+                    } else {
+                        let last_receipt = Arc::new(std::sync::Mutex::new(None));
+                        halt_receipt_handle = Some(Arc::clone(&last_receipt));
+                        let adapter = Arc::new(ButlerOrchestratorAdapter {
+                            orchestrator: Arc::clone(&orchestrator),
+                            tl: Arc::clone(&transparency_log),
+                            journal: Arc::clone(&journal),
+                            policy: epistemic_policy.clone().ok_or(
+                                "maos run: butler manifest must declare [epistemic_policy]",
+                            )?,
+                            boot_nonce,
+                            last_receipt,
+                        });
+                        Some(adapter)
+                    };
+                if needs_port && scalar_port.is_none() {
+                    return Err(format!(
+                        "maos run: FATAL boot — Spirit '{spirit_id}' declares a self-halting \
+                         posture (allowed_max={:?}) but no EpistemicScalarPort could be wired \
+                         (the 8.1 None-footgun is fail-closed by construction). Serving loop NOT \
+                         entered.",
+                        posture_section.allowed_max
+                    )
+                    .into());
+                }
+                // Seed a calendar-conflict scenario (the fixture-replay MCP input
+                // seam): two overlapping Confirmed events → belief_variance 0.8
+                // (> the 0.7 [epistemic_policy] halt threshold).
+                let scenario = butler::ScenarioInput {
+                    calendar: vec![
+                        butler::CalendarEvent {
+                            id: "evt-a".into(),
+                            title: "Board review".into(),
+                            start_min: 540,
+                            end_min: 600,
+                            status: butler::EventStatus::Confirmed,
+                        },
+                        butler::CalendarEvent {
+                            id: "evt-b".into(),
+                            title: "Investor call".into(),
+                            start_min: 570,
+                            end_min: 630,
+                            status: butler::EventStatus::Confirmed,
+                        },
+                    ],
+                    comms: vec![],
+                    preference_alignment: None,
+                };
+                let mut butler = butler::Butler::with_scenario(scenario);
+                if let Some(port) = scalar_port {
+                    butler = butler.with_scalar_port(port);
+                }
+                scheduler
+                    .load(&spirit_id, bundle, butler, boot_nonce)
+                    .await
+                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?
+            }
+            LoadedSpiritKind::Researcher => {
+                if needs_port {
+                    // Defensive: a Researcher-shaped manifest in the halt-set is
+                    // a misconfiguration — fail loud rather than boot a deterministic
+                    // Spirit that silently can't honor its declared posture.
+                    return Err(format!(
+                        "maos run: FATAL boot — '{spirit_id}' declares a self-halting posture \
+                         but has no EpistemicScalarPort wiring"
+                    )
+                    .into());
+                }
+                let mut researcher = researcher::Researcher::new();
+                if run.live {
+                    // `--live` → real provider via a dedicated InferencePortAdapter
+                    // (built from the same shared Arcs; the main `inference` adapter
+                    // is left intact for the serving/drain paths).
+                    let provider = router.default_id().ok_or_else(|| {
+                        "maos run: --live requested but no inference provider is configured"
+                    })?.to_string();
+                    let token = capability
+                        .issue_with_mediation(
+                            0,
+                            Scope::ProviderInfer { provider },
+                            60,
+                            [0u8; 32],
+                            IntentClass::Standard,
+                        )
+                        .map_err(|e| format!("maos run: token issue failed: {e}"))?;
+                    let researcher_inference = InferencePortAdapter::new(
+                        Arc::clone(&router),
+                        Arc::clone(&capability),
+                        Arc::clone(&transparency_log),
+                        Arc::clone(&telemetry),
+                    )
+                    .with_rate_limiter(Arc::clone(&rate_limiter))
+                    .with_iac(Arc::clone(&iac));
+                    let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
+                        Arc::new(researcher_inference);
+                    researcher = researcher.with_inference_port(port, token, 0);
+                    eprintln!("maos run: researcher live-inference seam wired (--live)");
+                } else {
+                    eprintln!(
+                        "maos run: researcher deterministic survey (no --live; zero network)"
+                    );
+                }
+                scheduler
+                    .load(&spirit_id, bundle, researcher, boot_nonce)
+                    .await
+                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?
+            }
+        };
+        scheduler
+            .start(pid)
+            .await
+            .map_err(|e| format!("maos run: scheduler.start failed: {e}"))?;
+        println!(
+            "{}",
+            serde_json::json!({
+                "event": "spirit_loaded",
+                "spirit_id": spirit_id,
+                "pid": pid,
+                "live": run.live,
+                "boot_loud_port": needs_port && !strip_port,
+            })
+        );
+
+        if run.once {
+            // Drive a single on_idle pass through the dispatcher (per-Spirit
+            // budget applies via the SCB bundle), then render the halt + drain.
+            let scb = {
+                let scbs = scheduler.scbs();
+                let guard = scbs.read().unwrap();
+                guard.get(&pid).map(Arc::clone)
+            }
+            .ok_or("maos run: loaded SCB not found")?;
+            let outcome = scheduler.dispatcher_arc().fire_on_idle(&scb).await;
+            println!(
+                "{}",
+                serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
+            );
+            if let Some(handle) = &halt_receipt_handle {
+                if let Some(receipt) = handle.lock().unwrap_or_else(|e| e.into_inner()).clone() {
+                    // AC5(f) — render the halt screen-string from the SHARED
+                    // constants so production output and the JB-3 assertion can
+                    // never drift (compile-error on rename).
+                    let render = butler::halt_screen_line(butler::SCALAR_TAG_BELIEF_VARIANCE);
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "event": "halt",
+                            "render": render,
+                            "halt_id": format!("{:?}", receipt.halt_id),
+                            "spirit_pid": receipt.spirit_pid,
+                        })
+                    );
+                    eprintln!("maos run: {render}");
+                }
+            }
+            println!(
+                "{}",
+                serde_json::json!({ "event": "drain", "spirit_id": spirit_id })
+            );
+            // Deterministic drain (mirrors the one-shot arm): signal the yank
+            // poller to exit, then release every cap-audit sender so the writer
+            // task sees channel-close.
+            yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
+            drop(journal);
+            drop(audit_tx);
+            drop(inference);
+            drop(capability);
+            drop(orchestrator);
+            drop(scheduler);
+            drop(lifecycle_resolver);
+            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!("maos run: audit writer task failed during drain: {e}"),
+                Err(_) => eprintln!("maos run: audit writer drain timed out after 5s"),
+            }
+            eprintln!("maos run: --once complete — exiting cleanly");
+            return Ok(());
+        }
+
+        // Non-`--once`: fall through to the existing serving loop below so the
+        // IdleWatchdog drives on_idle against real time. `MAOS_ONE_SHOT` is unset
+        // on the `maos run` path, so the block below is skipped.
+        eprintln!("maos run: '{spirit_id}' loaded — entering serving loop");
+    }
     // ─────────────────────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────────
