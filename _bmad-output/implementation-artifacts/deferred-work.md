@@ -1,3 +1,18 @@
+## Deferred from: code review of 8-12-live-cliwrapper-subprocess-bridge-founder-loop-over-real-clis (2026-06-08)
+
+- No sandbox enforcement on hermetic path — Command spawn by design; live container = Tier-2. `runtime.rs:spawn_and_bridge`
+- Cap-token mediation failure continues to spawn — Layered security design; host-grant already passed; cap-token = Epic 9 operator policy enrichment. `main.rs:371-388`
+- on_pause/on_resume are documented v0.9 no-ops — Signals/NamedPipe emit advisory, not wired. `runtime.rs:692-700`
+- on_unload always SIGKILLs — `#![forbid(unsafe_code)]` prevents `libc::kill(pid, SIGTERM)`. `shutdown_signal` is dead config. `runtime.rs:722`
+- Recovery executor not wired in composition root — Tested in isolation; daemon-mode wiring is Epic 9. `runtime.rs:814-849`
+- argv_prefix_hash check is tautological — Re-derives from in-memory spec (same data used to issue token). Catches misconfiguration, not disk TOCTOU. `runtime.rs:398-400`
+- Backpressure::Block + slow journal stalls child — Design intent (backpressure), but slow journal write blocks child process. `runtime.rs:438-441`
+- recv_line doesn't filter by stream — J1 bench's sh echo never writes stderr, so no hang today. `runtime.rs:647-653`
+- No egress enforcement for live CLIs — `permitted_egress_destinations` declared but not kernel-enforced. `host_grant.rs`
+- wait_and_finalize exit row failure + cap-token revoke gap — If exit journal write fails, revoke still fires. Audit trail gap. `runtime.rs:607-618`
+- resolve_cli_binary no execute-permission check — Late failure at spawn time with cryptic OS error. `main.rs:246-268`
+- StaticHostGrantAllowlist self-grant (v0.9 seam) — Allowlist is self-constructed from manifest values; operator-managed source = Epic 9. Annotation added per team consensus (Winston + John). `main.rs:334-336`
+
 ## ~~Deferred from: code review of 8-11-live-runtime-spine-daemon-composition-root-and-inference-port (2026-06-08)~~ **RESOLVED**
 
 - ~~`JournalAdapter::open` fails on first corrupted line with no recovery~~ — **FIXED 2026-06-08**: corrupted lines are now skipped with a warning instead of failing the entire open. A counter tracks how many lines were skipped, and a summary warning is emitted after the scan. The daemon boots resiliently even if the journal has trailing corruption from a crash. `crates/maos-kernel-core/src/journal/mod.rs:113-138`

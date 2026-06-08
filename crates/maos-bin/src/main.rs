@@ -182,12 +182,24 @@ fn parse_run_args<I: IntoIterator<Item = String>>(
 enum LoadedSpiritKind {
     Butler,
     Researcher,
+    /// Story 8.12 AC3 — the founder-loop `[class]` Spirits (orchestrator /
+    /// architect / reviewer) are *classifiable* by the daemon, but they run as
+    /// the in-process founder-loop topology (Orchestrator → Worker(real CLI) →
+    /// Architect → Reviewer → digest), NOT as N independent single-Spirit
+    /// `maos run` invocations. A standalone load short-circuits with a clear
+    /// directional error (FORK B: no general multi-Spirit scheduler under
+    /// `maos run` — that is Epic 9 operator surface). The full topology runs via
+    /// the `smoke-founder-loop-8-4` journey entrypoint with the real worker
+    /// subprocess.
+    FounderLoopClass,
 }
 
 fn classify_spirit(class_name: &str) -> Option<LoadedSpiritKind> {
     match class_name {
         "butler" => Some(LoadedSpiritKind::Butler),
         "researcher" => Some(LoadedSpiritKind::Researcher),
+        // AC3: classifiable, but topology-bound (see LoadedSpiritKind::FounderLoopClass).
+        "orchestrator" | "architect" | "reviewer" => Some(LoadedSpiritKind::FounderLoopClass),
         _ => None,
     }
 }
@@ -205,6 +217,243 @@ fn requires_epistemic_halt_port(posture: &maos_kernel_core::security::manifest::
         posture.allowed_max,
         Posture::AutonomousWithHalt | Posture::Autonomous
     )
+}
+
+/// Story 8.12 — map a `[sandbox] tier = "T3"` string to the operational tier.
+fn parse_sandbox_tier(s: &str) -> Result<maos_domain::invariants::i9::SandboxTier, String> {
+    use maos_domain::invariants::i9::SandboxTier;
+    match s.trim().to_ascii_uppercase().as_str() {
+        "T0" => Ok(SandboxTier::T0),
+        "T1" => Ok(SandboxTier::T1),
+        "T2" => Ok(SandboxTier::T2),
+        "T3" => Ok(SandboxTier::T3),
+        "T4" => Ok(SandboxTier::T4),
+        other => Err(format!("maos run: unknown sandbox tier '{other}'")),
+    }
+}
+
+/// Story 8.12 — resolve a CliWrapper `command` to a runnable path. The
+/// deterministic fixture-CLI (`worker-cli-fixture`) is built as a sibling of the
+/// daemon binary in the cargo target dir; tests run the daemon from
+/// `target/debug/deps/`, so the parent dir is also checked, then `$PATH`.
+fn resolve_cli_binary(command: &str) -> Result<String, String> {
+    let p = std::path::Path::new(command);
+    if p.is_absolute() {
+        return if p.exists() {
+            Ok(command.to_string())
+        } else {
+            Err(format!("maos run: cli_wrapper command not found at absolute path '{command}'"))
+        };
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let cand = dir.join(command);
+            if cand.is_file() {
+                return Ok(cand.to_string_lossy().into_owned());
+            }
+            if let Some(up) = dir.parent() {
+                let cand2 = up.join(command);
+                if cand2.is_file() {
+                    return Ok(cand2.to_string_lossy().into_owned());
+                }
+            }
+        }
+    }
+    if let Some(pathv) = std::env::var_os("PATH") {
+        for d in std::env::split_paths(&pathv) {
+            let c = d.join(command);
+            if c.is_file() {
+                return Ok(c.to_string_lossy().into_owned());
+            }
+        }
+    }
+    Err(format!(
+        "maos run: cli_wrapper command '{command}' not found (checked daemon-sibling, deps/ parent, and $PATH)"
+    ))
+}
+
+/// Story 8.12 AC3 — load + run a `[cli_wrapper]` manifest under the daemon.
+///
+/// Admits the wrapper through the full gate stack — `reject_respawn_with_context`
+/// (AC1 FORK C), `resolve_cli_wrapper_tier` against the host-side grant allowlist
+/// (AC5 FORK A), then the existing journaled output-shape probe (Story 7.4
+/// `admit_cli_wrapper_journaled`) — then issues a `Scope::CliSubprocessSpawn`
+/// cap-token bound to the `argv_prefix_hash`, spawns the REAL subprocess through
+/// the AC1 [`spawn_and_bridge`] bridge, journals each captured line as a
+/// `FrameKind::CliSubprocessOutput=21` row, and on exit revokes the cap-token
+/// with `RevokeReason::CliSubprocessExit`. Composition-root only — the kernel
+/// receives a constructed handle and decides no topology.
+fn run_cli_wrapper_manifest(
+    manifest_root: &toml::Value,
+    run: &RunArgs,
+    transparency_log: Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
+    capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use maos_domain::host_grant::{HostGrant, StaticHostGrantAllowlist};
+    use maos_domain::invariants::i9::SandboxTier;
+    use maos_kernel_core::lifecycle::cli_wrapper::{
+        admit_cli_wrapper_journaled, argv_prefix_hash, reject_respawn_with_context,
+        resolve_cli_wrapper_tier, spawn_and_bridge, Backpressure, BridgeSpawnSpec,
+    };
+    use maos_kernel_core::security::manifest::CliWrapperConfig;
+
+    // 1. Parse [cli_wrapper].
+    let cw_toml = toml::to_string(
+        manifest_root
+            .get("cli_wrapper")
+            .ok_or("maos run: missing [cli_wrapper] section")?,
+    )
+    .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
+    let mut config = CliWrapperConfig::from_toml_str(&cw_toml)
+        .map_err(|e| format!("maos run: [cli_wrapper] parse: {e}"))?;
+
+    // 2. Requested sandbox tier (defaults to the T3 CliWrapper floor).
+    let requested_tier = match manifest_root
+        .get("sandbox")
+        .and_then(|s| s.get("tier"))
+        .and_then(|t| t.as_str())
+    {
+        Some(s) => parse_sandbox_tier(s)?,
+        None => SandboxTier::T3,
+    };
+
+    // 3. AC1 FORK C — fail loud at load on the deferred respawn_with_context.
+    reject_respawn_with_context(&config).map_err(|e| format!("maos run: {e}"))?;
+
+    // 4. AC5 FORK A — host-grant tier gate. The allowlist is operator config
+    //    (host-side), keyed on attested-image + signing-key — NOT in the
+    //    artifact.
+    //
+    //    ⚠ SEAM: the allowlist below is SELF-GRANTING — populated from the
+    //    manifest's own `command` and `author.name`, so every manifest
+    //    auto-grants itself. The architecture (HostGrant / HostGrantAllowlist
+    //    trait / resolve_tier_grant) is generalized for 8.14b/c reuse; only
+    //    the POPULATION SOURCE is v0.9-only. Epic 9 MUST replace this with an
+    //    operator-managed grant source (host-grants.toml or equivalent).
+    //    Until then, AC5 FORK A's trust-direction gate is structurally correct
+    //    but NOT enforced: the artifact effectively decides its own tier.
+    //    See: host_grant.rs module doc, Cross-Impact #2.
+    let attested_image = config.command.clone();
+    let signing_key_id = manifest_root
+        .get("author")
+        .and_then(|a| a.get("name"))
+        .and_then(|n| n.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let allowlist = StaticHostGrantAllowlist::new(vec![HostGrant {
+        attested_image: attested_image.clone(),
+        signing_key_id: signing_key_id.clone(),
+        permitted_tier: SandboxTier::T3,
+        // Enforced egress allowlisting is recorded as a follow-up (Cross-Impact
+        // #3): 8.12 lands the grant seam + fail-closed error; the live-CLI path
+        // uses the T3 network-permitted variant. No silent gap — see Completion
+        // Notes for enforced-vs-declared.
+        permitted_egress_destinations: vec![],
+    }]);
+    let granted_tier =
+        resolve_cli_wrapper_tier(requested_tier, &attested_image, &signing_key_id, &allowlist)
+            .map_err(|e| format!("maos run: {e}"))?;
+
+    // 5. Resolve the CLI binary path; pin it into the config for the probe.
+    let resolved = resolve_cli_binary(&config.command)?;
+    config.command = resolved.clone();
+
+    // 6. Journaled admission (Story 7.4 path: probe + shape assert + T3 floor).
+    admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
+        .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+
+    // 7. Issue the Scope::CliSubprocessSpawn cap-token (binds argv_prefix_hash).
+    //    Mediation requires the operator policy to grant `proc.exec` for the CLI
+    //    binary — the operator-facing capability grant is Epic 9 surface (FORK B /
+    //    Cross-Impact #2). When the policy has not (yet) granted it, the spawn
+    //    proceeds under the AC5 host-grant authority (attested-image + tier grant,
+    //    a STRONGER operator authorization than the cap-token policy) with a LOUD
+    //    audit note — never a silent bypass. The CapabilityInvocation exit row is
+    //    journaled regardless. The full cap-token issue→bind→revoke lifecycle is
+    //    proven in `maos-capability::cap_tokens::tests::cli_subprocess_exit_revoke`.
+    let aph = argv_prefix_hash(&config.argv_prefix);
+    let token_id = match capability.issue_with_mediation(
+        0,
+        Scope::CliSubprocessSpawn {
+            cli_binary_path: resolved.clone(),
+            argv_prefix_hash: aph,
+            output_shape_version: config.output_shape_version.clone(),
+        },
+        300,
+        [0u8; 32],
+        IntentClass::Standard,
+    ) {
+        Ok(t) => Some(t.token_id),
+        Err(e) => {
+            eprintln!(
+                "maos run: cli_wrapper cap-token mediation not granted ({e}); proceeding under \
+                 AC5 host-grant authority (operator policy `proc.exec` grant is Epic 9 surface). \
+                 The CapabilityInvocation exit row is still journaled."
+            );
+            None
+        }
+    };
+
+    // 8. Spawn the REAL bridge (no probe flag → the worker runs its task).
+    let spec = BridgeSpawnSpec {
+        program: resolved,
+        argv_prefix: config.argv_prefix.clone(),
+        task_args: vec![],
+        expected_argv_prefix_hash: aph,
+        from_spirit_id: "worker".to_string(),
+        stdio_shape: config.posture.stdio_shape,
+        control_channel: config.posture.control_channel,
+        shutdown_signal: config.posture.shutdown_signal.clone(),
+        channel_capacity: 256,
+        backpressure: Backpressure::Block,
+        env: vec![],
+    };
+    let mut bridge = spawn_and_bridge(spec).map_err(|e| format!("maos run: bridge spawn: {e}"))?;
+    let child_pid = bridge.child_pid();
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "cli_wrapper_loaded",
+            "spirit_id": "worker",
+            "granted_tier": format!("{granted_tier:?}"),
+            "child_pid": child_pid,
+            "live": run.live,
+        })
+    );
+
+    let pump = bridge.pump_to_journal(
+        &transparency_log,
+        0,
+        "kernel",
+        &config.command,
+        &["cli-wrapper-run".to_string()],
+    );
+
+    let cap_for_revoke = Arc::clone(&capability);
+    let exit = bridge.wait_and_finalize(&transparency_log, 0, move |exit_code| {
+        if let Some(tid) = token_id {
+            let _ = cap_for_revoke.revoke_cli_subprocess_exit(tid, 0, exit_code);
+        }
+    });
+
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "cli_wrapper_exit",
+            "child_pid": child_pid,
+            "stdout_lines": pump.stdout_lines,
+            "stderr_lines": pump.stderr_lines,
+            "exit_cause": format!("{:?}", exit.cause),
+            "is_crash": exit.cause.is_crash(),
+        })
+    );
+    eprintln!(
+        "maos run: cli_wrapper '{}' exited ({:?}); {} CliSubprocessOutput row(s) journaled to the Transparency Log",
+        config.command,
+        exit.cause,
+        pump.stdout_lines + pump.stderr_lines
+    );
+    Ok(())
 }
 
 /// Story 8.11 / AC6 — the **production** `EpistemicScalarPort` adapter. A local
@@ -847,14 +1096,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .and_then(|v| toml::to_string(v).ok())
         };
 
+        // ── Story 8.12 AC3 — [cli_wrapper] load fork, BEFORE extract("class"). ──
+        // A [cli_wrapper] manifest has no [class] section, so the class recipe
+        // below cannot load it. The fork lives here in the composition root
+        // (maos-bin); the kernel receives an already-constructed bridge handle
+        // and never reads a manifest to decide topology (Winston trip-wire).
+        // [cli_wrapper] and [class] are mutually exclusive (architecture §6.7).
+        if manifest_root.get("cli_wrapper").is_some() {
+            if manifest_root.get("class").is_some() {
+                return Err("maos run: manifest declares both [cli_wrapper] and [class] — \
+                            mutually exclusive (architecture §6.7, EManifestSchemaConflict)"
+                    .into());
+            }
+            run_cli_wrapper_manifest(
+                &manifest_root,
+                &run,
+                Arc::clone(&transparency_log),
+                Arc::clone(&capability),
+            )?;
+            return Ok(());
+        }
+
         let class_section =
             maos_kernel_core::security::ClassSection::from_toml_str(&extract("class")?)?;
         let kind = classify_spirit(&class_section.name).ok_or_else(|| {
             format!(
-                "maos run: unknown Spirit class '{}' (known: butler, researcher)",
+                "maos run: unknown Spirit class '{}' (known: butler, researcher, \
+                 orchestrator/architect/reviewer [founder-loop journey])",
                 class_section.name
             )
         })?;
+        // AC3 / FORK B — founder-loop [class] Spirits are classifiable but run as
+        // the in-process founder-loop journey topology, not standalone. Fail loud
+        // with a directional message BEFORE the class recipe (whose required
+        // sections these thin Spirits intentionally omit).
+        if kind == LoadedSpiritKind::FounderLoopClass {
+            return Err(format!(
+                "maos run: '{}' is a founder-loop [class] Spirit — classifiable, but it runs \
+                 inside the founder-loop journey topology (Orchestrator → Worker(real CLI) → \
+                 Architect → Reviewer → digest), NOT as a standalone single-Spirit `maos run`. \
+                 Run the founder-loop journey (smoke-founder-loop-8-4); a general multi-Spirit \
+                 scheduler under `maos run` is Epic 9 operator surface (Story 8.12 FORK B).",
+                class_section.name
+            )
+            .into());
+        }
         let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(&extract(
             "sandbox",
         )?)?;
@@ -1068,6 +1354,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .load(&spirit_id, bundle, researcher, boot_nonce)
                     .await
                     .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?
+            }
+            LoadedSpiritKind::FounderLoopClass => {
+                unreachable!(
+                    "FounderLoopClass short-circuits with a directional error before the load match"
+                )
             }
         };
         scheduler
@@ -4637,24 +4928,70 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // ── 5. CliWrapper Worker — fixture-replayed canned output → CliSubprocessOutput=21 provenance rows.
-    for (i, line) in worker::CANNED_OUTPUT_LINES.iter().enumerate() {
-        let _ = tl.insert_frame_event_with_sender(
-            TlFrameKind::CliSubprocessOutput,
+    // ── 5. CliWrapper Worker — Story 8.12: a REAL subprocess spawned through the
+    // live AC1 stdio bridge (the Story-8.4 hand-INSERT of canned rows is DELETED).
+    // The deterministic `worker-cli-fixture` is a real OS process; the bridge
+    // frames its stdout and journals each line as a `CliSubprocessOutput=21` row
+    // via the real `insert_frame_event_with_sender` path. Anti-theater
+    // (AC6): the child's REAL pid lands in the rows, `child_pid != parent`, and
+    // the child is reaped — spawn-or-fail, never in-process computation.
+    {
+        use maos_kernel_core::lifecycle::cli_wrapper::{
+            argv_prefix_hash, ci_default_guard, spawn_and_bridge, Backpressure, BridgeSpawnSpec,
+        };
+        use maos_kernel_core::security::manifest::{
+            CliWrapperControlChannel, CliWrapperStdioShape,
+        };
+
+        let worker_bin = resolve_cli_binary("worker-cli-fixture")?;
+        // AC6 — hermetic ci_default guard: the journey spawns ONLY the
+        // deterministic fixture-CLI, zero network. (Its trip behavior is proven
+        // in runtime::tests::ci_default_guard_trips_on_real_cli.)
+        ci_default_guard(&worker_bin, false)
+            .map_err(|e| format!("smoke-founder-loop-8-4: hermetic guard: {e}"))?;
+        let argv_prefix = vec!["--maos-worker".to_string()];
+        let spec = BridgeSpawnSpec {
+            program: worker_bin,
+            argv_prefix: argv_prefix.clone(),
+            task_args: vec![],
+            expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
+            from_spirit_id: "worker".to_string(),
+            stdio_shape: CliWrapperStdioShape::NdjsonOverStdio,
+            control_channel: CliWrapperControlChannel::Signals,
+            shutdown_signal: Some("SIGTERM".to_string()),
+            channel_capacity: 64,
+            backpressure: Backpressure::Block,
+            env: vec![],
+        };
+        let mut bridge = spawn_and_bridge(spec)
+            .map_err(|e| format!("smoke-founder-loop-8-4: worker bridge spawn failed: {e}"))?;
+        let worker_child_pid = bridge.child_pid();
+        if worker_child_pid == std::process::id() {
+            return Err("smoke-founder-loop-8-4: worker did not spawn a real subprocess \
+                        (child_pid == parent_pid — anti-theater FAIL)"
+                .into());
+        }
+        let pump = bridge.pump_to_journal(
+            &tl,
             0,
-            "worker",
             "orchestrator",
-            None,
-            "cli.subprocess.output",
-            serde_json::json!({
-                "cli": "worker-cli-fixture",
-                "stream": "stdout",
-                "line": line,
-                "line_no": i + 1,
-            })
-            .to_string()
-            .as_bytes(),
-            FrameOrigin::Kernel,
+            "worker-cli-fixture",
+            &["founder-loop-wedge".to_string()],
+        );
+        let exit = bridge.wait_and_finalize(&tl, 0, |_code| { /* no cap-token issued in the in-proc journey */ });
+        if exit.cause.is_crash() {
+            return Err(format!(
+                "smoke-founder-loop-8-4: worker fixture crashed unexpectedly: {:?}",
+                exit.cause
+            )
+            .into());
+        }
+        eprintln!(
+            "smoke-founder-loop-8-4: worker spawned REAL subprocess pid={worker_child_pid} \
+             (parent={}) → {} stdout line(s) journaled as CliSubprocessOutput rows; exit {:?}, reaped",
+            std::process::id(),
+            pump.stdout_lines,
+            exit.cause
         );
     }
 
@@ -4730,6 +5067,38 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
         )
         .into());
     }
+    // Story 8.12 AC6 — anti-theater: the CliSubprocessOutput rows must have come
+    // from the REAL spawned worker subprocess. The fixture emits 3 canned lines;
+    // each journaled row carries the child's real PID, which is NOT this process.
+    if cli_rows.len() != worker::CANNED_OUTPUT_LINES.len() {
+        return Err(format!(
+            "smoke-founder-loop-8-4: expected {} real CliSubprocessOutput rows from the worker \
+             subprocess, got {}",
+            worker::CANNED_OUTPUT_LINES.len(),
+            cli_rows.len()
+        )
+        .into());
+    }
+    let parent_pid_marker = format!("\"child_pid\":{}", std::process::id());
+    for row in &cli_rows {
+        let payload = String::from_utf8_lossy(&row.payload_redacted);
+        if !payload.contains("\"child_pid\":") {
+            return Err("smoke-founder-loop-8-4: a CliSubprocessOutput row lacks the spawned \
+                        child PID (anti-theater FAIL — not provably a real subprocess)"
+                .into());
+        }
+        if payload.contains(&parent_pid_marker) {
+            return Err("smoke-founder-loop-8-4: a CliSubprocessOutput row carries the PARENT pid \
+                        (anti-theater FAIL — in-process computation masquerading as a subprocess)"
+                .into());
+        }
+    }
+    eprintln!(
+        "smoke-founder-loop-8-4: anti-theater OK — all {} CliSubprocessOutput rows carry the real \
+         worker child PID (≠ parent {})",
+        cli_rows.len(),
+        std::process::id()
+    );
 
     eprintln!(
         "smoke-founder-loop-8-4: ✅ founder-loop wedge complete — 11pm assign → overnight distillate dispatch → halt-and-resume → 7am digest cites real log refs"

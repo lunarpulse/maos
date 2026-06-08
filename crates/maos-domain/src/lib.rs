@@ -18,6 +18,7 @@ pub mod cli_wrapper; // NEW — Story 6.2 AC5 CliWrapperSpirit admission errors
 pub mod distillation; // NEW — Story 4.4 distillation domain types
 pub mod frame;
 pub mod halt;
+pub mod host_grant; // NEW — Story 8.12 AC5 host-side capability/tier grant allowlist (FORK A)
 pub mod hot_swap;
 pub mod iac_bus_types;
 pub mod lifecycle; // NEW — Story 5.1 lifecycle types + LifecycleResolver trait

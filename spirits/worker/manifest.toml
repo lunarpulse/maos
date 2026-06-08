@@ -9,7 +9,10 @@ command = "worker-cli-fixture"
 argv_prefix = ["--maos-worker"]
 output_shape_version = "1.0.0"
 skill_bundle = ["maos-bridge"]
-recovery_policy = "respawn_with_context"
+# Story 8.12 AC2 / FORK C: the deferred `respawn_with_context` policy is not
+# declarable by the shipped demo (the bridge fails loud at admission on it). The
+# founder loop is fully demonstrable with `respawn_fresh` + `escalate`.
+recovery_policy = "respawn_fresh"
 
 [cli_wrapper.posture]
 stdio_shape = "ndjson_over_stdio"

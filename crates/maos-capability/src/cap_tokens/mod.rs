@@ -394,6 +394,43 @@ mod tests {
         assert!(ring.verify(&token, posture, SandboxTier(2)).is_ok());
     }
 
+    /// Story 8.12 AC2 / FR52 — issuing a `Scope::CliSubprocessSpawn` cap-token
+    /// (binding `argv_prefix_hash`) and revoking it with
+    /// `RevokeReason::CliSubprocessExit{exit_code}` on subprocess exit renders it
+    /// inactive. This is the lifecycle `CapabilityRegistryAdapter::revoke_cli_subprocess_exit`
+    /// drives at runtime when the bridge's `wait_and_finalize` fires.
+    #[test]
+    fn cli_subprocess_exit_revoke() {
+        init_monotonic_base();
+        let ring = test_ring();
+        let posture = [3u8; 32];
+        let token = ring
+            .issue(
+                42,
+                Scope::CliSubprocessSpawn {
+                    cli_binary_path: "/usr/local/bin/claude".into(),
+                    argv_prefix_hash: [9u8; 32],
+                    output_shape_version: "1.0.0".into(),
+                },
+                300,
+                posture,
+                IntentClass::Standard,
+            )
+            .unwrap();
+        assert!(ring.has_active_tokens_for_spirit(42));
+        ring.revoke(
+            token.token_id,
+            RevokeReason::CliSubprocessExit {
+                spirit_pid: 42,
+                exit_code: Some(0),
+            },
+        )
+        .unwrap();
+        // Revoked → no longer active; verify now fails.
+        assert!(!ring.has_active_tokens_for_spirit(42));
+        assert!(ring.verify(&token, posture, SandboxTier(3)).is_err());
+    }
+
     #[test]
     fn verify_rejects_wrong_posture() {
         init_monotonic_base();

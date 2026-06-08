@@ -87,6 +87,15 @@ fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
             server: server.clone(),
             tool: tool.clone(),
         },
+        // Story 8.12 AC2 / FR52 — a CliWrapperSpirit subprocess spawn IS a
+        // process exec under capability authority; map to the ProcExec intent
+        // keyed on the resolved CLI binary path (the argv_prefix_hash binding is
+        // asserted separately at the bridge, ADR-023). TTL is Standard (300s).
+        Scope::CliSubprocessSpawn {
+            cli_binary_path, ..
+        } => cap_policy::decision::Intent::ProcExec {
+            binary: cli_binary_path.clone(),
+        },
         _ => {
             panic!(
                 "scope_to_intent: unmapped Scope variant {:?} — add an explicit arm before calling this function",
@@ -341,6 +350,27 @@ impl CapabilityRegistryAdapter {
     /// Called by `SpiritSchedulerAdapter::unload` during graceful teardown.
     pub fn revoke_all_for_pid(&self, spirit_pid: u32) -> Result<usize, CapError> {
         Ok(self.tokens.revoke_all(spirit_pid))
+    }
+
+    /// Story 8.12 AC2 / FR52 — revoke the `Scope::CliSubprocessSpawn` cap-token
+    /// for an exited CLI subprocess with `RevokeReason::CliSubprocessExit`. The
+    /// audit row links the cap-token id to the `FrameKind::CapabilityInvocation`
+    /// exit record (the bridge journals that row; this revokes the grant). Unlike
+    /// the generic `revoke` (which records `RevokeReason::Operator`), this
+    /// preserves the exit-cause provenance in the cap-audit stream.
+    pub fn revoke_cli_subprocess_exit(
+        &self,
+        token_id: TokenId,
+        spirit_pid: u32,
+        exit_code: Option<i32>,
+    ) -> Result<(), CapError> {
+        self.tokens.revoke(
+            token_id,
+            cap_tokens::RevokeReason::CliSubprocessExit {
+                spirit_pid,
+                exit_code,
+            },
+        )
     }
 
     /// Story 6.4 — return `true` if the spirit holds at least one active

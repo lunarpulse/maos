@@ -166,9 +166,122 @@ pub fn run_j1_measurement(config: &J1Config) -> Result<JourneyResult, BenchError
     Ok(result)
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Story 8.12 AC4 — J1 measured THROUGH THE REAL `runtime.rs` bridge.
+//
+// The synthetic floor above (`run_j1_measurement` against `hello-spirit-bench`)
+// is retained. This variant drives a request→response round-trip through the
+// REAL `spawn_and_bridge` reader-thread framing path, against a deterministic
+// echo test-CLI doing ~zero work — so the measurement isolates the bridge IPC
+// overhead (stdin write + child echo + reader-thread frame + bounded-channel
+// deliver), NOT the agent's work and NOT the SQLite journal write.
+//
+// Polarity (Murat): on shared CI this is REPORTED Tier-2 evidence gated only on
+// a generous ceiling (2×budget = 50ms P95) to catch real regressions without
+// jitter-flake; the strict 25ms P95 is hard-gated on a pinned bench runner.
+// Warmup iterations are discarded; N ≥ 100 (200 preferred); P50/P95/P99/max.
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Generous CI ceiling (2× the §13.1 budget) — catches real regressions on a
+/// shared runner without jitter-flake. The strict `J1_P95_BUDGET_US` is the
+/// pinned-runner gate.
+pub const J1_CI_CEILING_US: u64 = 50_000;
+
+pub struct J1BridgeConfig {
+    pub iterations: u64,
+    pub warmup: u64,
+}
+
+impl Default for J1BridgeConfig {
+    fn default() -> Self {
+        Self {
+            iterations: 200,
+            warmup: 20,
+        }
+    }
+}
+
+/// Measure J1 IPC overhead through the real CliWrapper bridge. Returns the
+/// `JourneyResult` (gated by the caller against either the strict budget or the
+/// generous CI ceiling).
+pub fn run_j1_bridge_measurement(config: &J1BridgeConfig) -> Result<JourneyResult, BenchError> {
+    use maos_kernel_core::lifecycle::cli_wrapper::{
+        argv_prefix_hash, spawn_and_bridge, Backpressure, BridgeSpawnSpec,
+    };
+    use maos_kernel_core::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
+
+    // Deterministic echo test-CLI: read a line on stdin, echo it on stdout. Pure
+    // POSIX `sh`, zero work per iteration.
+    let argv_prefix = vec!["-c".to_string()];
+    let spec = BridgeSpawnSpec {
+        program: "sh".to_string(),
+        argv_prefix: argv_prefix.clone(),
+        task_args: vec!["while IFS= read -r line; do printf '%s\\n' \"$line\"; done".to_string()],
+        expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
+        from_spirit_id: "bench".to_string(),
+        stdio_shape: CliWrapperStdioShape::NdjsonOverStdio,
+        control_channel: CliWrapperControlChannel::StdinCommands,
+        shutdown_signal: None,
+        channel_capacity: 16,
+        backpressure: Backpressure::Block,
+        env: vec![],
+    };
+    let mut bridge =
+        spawn_and_bridge(spec).map_err(|e| BenchError::SubprocessCrash(format!("bridge: {e:?}")))?;
+
+    let total = config.warmup + config.iterations;
+    let mut samples_us: Vec<u64> = Vec::with_capacity(config.iterations as usize);
+
+    for i in 0..total {
+        let t0 = Instant::now();
+        bridge
+            .write_stdin_line(format!("ping:{i}").as_bytes())
+            .map_err(|e| BenchError::Io(e))?;
+        let line = bridge
+            .recv_line()
+            .ok_or_else(|| BenchError::SubprocessCrash("echo CLI closed mid-bench".into()))?;
+        let elapsed = t0.elapsed();
+        // Sanity: the echoed line round-tripped.
+        debug_assert!(!line.1.is_empty());
+        if i >= config.warmup {
+            samples_us.push(elapsed.as_micros() as u64);
+        }
+    }
+
+    // Clean shutdown (Drop kills+reaps; explicit unload closes stdin first).
+    let _ = bridge.on_unload();
+
+    Ok(build_journey_result(
+        "J1-bridge",
+        config.iterations,
+        &samples_us,
+        J1_P95_BUDGET_US,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn j1_bridge_overhead_within_ci_ceiling() {
+        // Tier-2 reported evidence gated on the generous CI ceiling (50ms P95).
+        let cfg = J1BridgeConfig {
+            iterations: 120,
+            warmup: 20,
+        };
+        let result = run_j1_bridge_measurement(&cfg).expect("bridge measurement");
+        let p95 = result.p95_us;
+        eprintln!(
+            "J1-bridge: P50={}us P95={}us P99={}us max={}us (N={})",
+            result.p50_us, result.p95_us, result.p99_us, result.max_us, cfg.iterations
+        );
+        assert!(
+            p95 < J1_CI_CEILING_US,
+            "J1 bridge IPC P95={p95}us exceeded the generous CI ceiling {J1_CI_CEILING_US}us \
+             (real regression — fix our code, do NOT migrate to in-process to mask it)"
+        );
+    }
 
     #[test]
     fn j1_config_defaults() {

@@ -32,4 +32,13 @@ pub mod admission;
 pub mod lifecycle;
 pub mod runtime;
 
-pub use admission::{admit_cli_wrapper_journaled, probe_and_verify_shape};
+pub use admission::{
+    admit_cli_wrapper_journaled, probe_and_verify_shape, reject_respawn_with_context,
+    resolve_cli_wrapper_tier,
+};
+pub use lifecycle::{handle_subprocess_death, RecoveryAction};
+pub use runtime::{
+    argv_prefix_hash, ci_default_guard, execute_recovery, spawn_and_bridge, Backpressure,
+    BridgeError, BridgeExit, BridgeSpawnSpec, ExitCause, PumpOutcome, RecoveryOutcome,
+    SpawnedBridge, SubStream,
+};

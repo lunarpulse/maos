@@ -27,11 +27,12 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use maos_domain::cli_wrapper::CliWrapperAdmissionError;
+use maos_domain::host_grant::{resolve_tier_grant, HostGrantAllowlist, TierGrantDecision};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i9::SandboxTier;
 
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
-use crate::security::manifest::CliWrapperConfig;
+use crate::security::manifest::{CliWrapperConfig, CliWrapperRecoveryPolicy};
 
 /// Probe-result envelope returned by the CLI's `--maos-bridge-probe` handler.
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -222,6 +223,72 @@ pub fn admit_cli_wrapper_journaled(
             })
         }
         Err(other) => Err(other),
+    }
+}
+
+/// Story 8.12 AC1 (FORK C) — fail-loud-at-admission gate for the deferred
+/// `RespawnWithContext` recovery policy.
+///
+/// `RespawnWithContext` needs a per-Spirit-class context-snapshot CBOR codec
+/// (I6/ADR-017 hot-swap state-transfer) that the bridge does not have at v0.9.
+/// Rather than silently downgrade the policy to `RespawnFresh`/`Escalate` (the
+/// no-silent-downgrade rule), admission/load fails LOUD with a typed error. The
+/// enum variant stays reserved; re-grant by publishing a corrected manifest.
+pub fn reject_respawn_with_context(
+    config: &CliWrapperConfig,
+) -> Result<(), CliWrapperAdmissionError> {
+    if matches!(
+        config.recovery_policy,
+        CliWrapperRecoveryPolicy::RespawnWithContext
+    ) {
+        return Err(CliWrapperAdmissionError::ERespawnWithContextUnsupported);
+    }
+    Ok(())
+}
+
+/// Story 8.12 AC5 (FORK A — Winston host-grant model) — resolve the manifest's
+/// **requested** sandbox tier against the host-side grant allowlist.
+///
+/// Trust-direction gate: the manifest REQUESTS a tier; the host GRANTS it via an
+/// operator-config allowlist keyed on attested-image + signing-key (NOT in the
+/// artifact). Fail-closed at every branch:
+///
+/// - requested tier below the CliWrapper T3 floor → `ECliWrapperRequiresT3`
+///   (default-deny semantics retained — a CLI subprocess cannot be contained
+///   below T3);
+/// - no matching host grant, or a request above the grant, or a platform that
+///   cannot enforce the tier (non-Linux) → `ECliWrapperTierNotGranted`
+///   (fail-closed, NO silent downgrade).
+///
+/// On success returns the granted tier (== requested). The deterministic
+/// fixture-CLI admission path passes a T3 request against a T3 grant and is
+/// unchanged in behavior.
+pub fn resolve_cli_wrapper_tier(
+    requested: SandboxTier,
+    attested_image: &str,
+    signing_key_id: &str,
+    allowlist: &dyn HostGrantAllowlist,
+) -> Result<SandboxTier, CliWrapperAdmissionError> {
+    // Default-deny floor: a CliWrapperSpirit cannot run below T3 (no T2
+    // scoped-egress mechanism exists in the kernel — verified). This keeps the
+    // existing `ECliWrapperRequiresT3` semantics.
+    if requested < SandboxTier::T3 {
+        return Err(CliWrapperAdmissionError::ECliWrapperRequiresT3 {
+            observed_tier: format!("{requested:?}"),
+        });
+    }
+    match resolve_tier_grant(requested, attested_image, signing_key_id, allowlist) {
+        TierGrantDecision::Granted { tier, .. } => Ok(tier),
+        TierGrantDecision::Denied {
+            requested,
+            permitted,
+            attested_image,
+            ..
+        } => Err(CliWrapperAdmissionError::ECliWrapperTierNotGranted {
+            requested: format!("{requested:?}"),
+            permitted: format!("{permitted:?}"),
+            attested_image,
+        }),
     }
 }
 
