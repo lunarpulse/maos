@@ -1122,6 +1122,7 @@ dependencies = [
  "maos-domain",
  "maos-kernel-core",
  "maos-mcp",
+ "maos-notify-push",
  "maos-providers",
  "maos-registry",
  "maos-skill",
@@ -1357,6 +1358,16 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "maos-notify-push"
+version = "0.1.0-alpha"
+dependencies = [
+ "maos-director-surface",
+ "maos-domain",
+ "serde_json",
+ "ureq",
 ]
 
 [[package]]

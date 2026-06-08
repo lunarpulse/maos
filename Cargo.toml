@@ -20,6 +20,7 @@ members = [
     "crates/maos-kernel-core",
     "crates/maos-manifest",
     "crates/maos-mcp",
+    "crates/maos-notify-push",
     "crates/maos-registry",
     "crates/maos-persistence",
     "crates/maos-providers",

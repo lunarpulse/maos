@@ -1,0 +1,17 @@
+[package]
+name = "maos-notify-push"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS generic HTTP mobile push notification adapter"
+
+[lib]
+name = "maos_notify_push"
+
+[dependencies]
+maos-director-surface = { path = "../maos-director-surface" }
+maos-domain = { path = "../maos-domain" }
+serde_json = "1"
+ureq = { version = "2", features = ["tls"] }

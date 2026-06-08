@@ -84,6 +84,9 @@ maos-a2a-core = 3050
 # Story 8.6 — maos-a2a-tcp: live cross-Host TCP/mTLS transport (the second
 # A2ATransport impl). Socket + rustls + codec wiring + verifier.
 maos-a2a-tcp = 1500
+# Story 8.13 — generic HTTP mobile-push adapter, intentionally small and
+# dependency-light (maos-director-surface + maos-domain + ureq only).
+maos-notify-push = 250
 maos-persistence = 2000
 maos-secrets = 1000
 maos-compliance = 2000

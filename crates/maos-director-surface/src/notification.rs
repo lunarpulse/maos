@@ -267,7 +267,11 @@ impl NotificationChannel for AcpEditorChannel {
     }
 }
 
-/// Stub mobile push channel — Story 6.5.
+/// Placeholder mobile-push channel.
+///
+/// Production mobile push lives in `maos-notify-push::MobilePushHttp`, which is
+/// wired by the host from operator config. This placeholder returns a typed
+/// error instead of panicking so no live dispatch path contains `unimplemented!()`.
 pub struct MobilePushChannel;
 
 impl NotificationChannel for MobilePushChannel {
@@ -280,7 +284,9 @@ impl NotificationChannel for MobilePushChannel {
         _event: &NotificationEvent,
         _level: NotificationLevel,
     ) -> Result<(), NotificationError> {
-        unimplemented!("Story 6.5 — mobile push via gateway sub-modules")
+        Err(NotificationError::Unavailable(
+            "mobile push channel requires maos-notify-push host wiring".into(),
+        ))
     }
 }
 

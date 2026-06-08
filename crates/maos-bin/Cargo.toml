@@ -22,6 +22,7 @@ maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-mcp = { path = "../maos-mcp" }
+maos-notify-push = { path = "../maos-notify-push" }
 maos-registry = { path = "../maos-registry" }
 maos-acp = { path = "../maos-acp" }
 maos-providers = { path = "../maos-providers" }

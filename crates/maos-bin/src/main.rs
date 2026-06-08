@@ -3955,6 +3955,11 @@ description = "smoke test spirit successor"
             return smoke_a2a_tcp_8_6().await;
         }
 
+        // Story 8.13 — J4 end-to-end over live TCP/mTLS plus real HTTP mobile push.
+        if mode == "smoke-mira-nash-tcp-8-13" {
+            return smoke_mira_nash_tcp_8_13().await;
+        }
+
         // Story 6.3 AC7 — `smoke-a2a-loopback-6-3` end-to-end A2A wedge demo.
         if mode == "smoke-a2a-loopback-6-3" {
             return smoke_a2a_loopback_6_3().await;
@@ -5743,6 +5748,457 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
     drop(nash);
     let _ = std::fs::remove_dir_all(&dir);
     eprintln!("smoke-a2a-tcp-8-6: ✅ live cross-Host TCP/mTLS transport verified");
+    Ok(())
+}
+
+/// Story 8.13 — the J4 Mira/Nash journey with the 8.5 cognition/halt path
+/// composed onto the 8.6 live TCP/mTLS wire and the real HTTP mobile-push adapter.
+async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::{mpsc, Arc, Mutex};
+
+    use maos_a2a_core::error::A2AError;
+    use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
+    use maos_a2a_core::{A2APeerConfig, A2AProfile, ConsentAllowlists, PeerCertFingerprint, PeerId};
+    use maos_a2a_tcp::{PinnedFingerprint, TcpA2AConfig};
+    use maos_director_surface::halt_ui::{FlowState, HaltFlow, TapEvent};
+    use maos_director_surface::notification::{NotificationDispatcher, TerminalChannel};
+    use maos_domain::frame::{
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+    };
+    use maos_domain::halt::{HaltId, Resolution};
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_domain::notification::{NotificationEvent, NotificationLevel};
+    use maos_domain::ports::a2a::A2ARouter;
+    use maos_kernel_core::halt::KernelHaltResolver;
+    use maos_kernel_core::iac::transparency_log::{
+        FrameFilter, FrameKind as TlFrameKind, TransparencyLogAdapter,
+    };
+    use maos_notify_push::{MobilePushHttp, PushConfig};
+    use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
+    use mira::{AnomalySignal, Mira, ADVISORY_FINE_GRAINED_INTENT};
+    use nash::Nash;
+    use smallvec::smallvec;
+
+    const BOOT_NONCE: u64 = 0x8130;
+    const MIRA_NONCE: u64 = 8131;
+    const NASH_NONCE: u64 = 8132;
+    const MIRA_PID: u32 = 813;
+
+    fn spawn_push_server() -> Result<(String, mpsc::Receiver<(String, String, Vec<u8>)>), Box<dyn std::error::Error>> {
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        let addr = listener.local_addr()?;
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let Ok((mut stream, _)) = listener.accept() else { return; };
+            let mut bytes = Vec::new();
+            let mut buf = [0u8; 1024];
+            let header_end = loop {
+                let Ok(n) = stream.read(&mut buf) else { return; };
+                if n == 0 { return; }
+                bytes.extend_from_slice(&buf[..n]);
+                if let Some(pos) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
+                    break pos + 4;
+                }
+            };
+            let headers = String::from_utf8_lossy(&bytes[..header_end]);
+            let mut first = headers.lines().next().unwrap_or_default().split_whitespace();
+            let method = first.next().unwrap_or_default().to_string();
+            let path = first.next().unwrap_or_default().to_string();
+            let len = headers
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("content-length")
+                        .then(|| value.trim().parse::<usize>().ok())
+                        .flatten()
+                })
+                .unwrap_or(0);
+            while bytes.len().saturating_sub(header_end) < len {
+                let Ok(n) = stream.read(&mut buf) else { return; };
+                if n == 0 { return; }
+                bytes.extend_from_slice(&buf[..n]);
+            }
+            let body = bytes[header_end..header_end + len].to_vec();
+            let _ = stream.write_all(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n");
+            let _ = tx.send((method, path, body));
+        });
+        Ok((format!("http://{addr}/j4-halt"), rx))
+    }
+
+    fn assert_loopback_url(url: &str) -> Result<(), String> {
+        let rest = url
+            .strip_prefix("http://")
+            .ok_or_else(|| "push URL must use http:// loopback in Tier-1".to_string())?;
+        // A bracketed IPv6 authority (`[::1]:port/...`) must be peeled off
+        // BEFORE the generic `:`/`/` split — that split shreds `[::1]` into a
+        // bare `[`, so the explicitly-allowed `[::1]` loopback would be wrongly
+        // rejected (the review-flagged dead branch).
+        let host = if let Some(after) = rest.strip_prefix('[') {
+            let end = after
+                .find(']')
+                .ok_or_else(|| "push URL has unterminated IPv6 host".to_string())?;
+            format!("[{}]", &after[..end])
+        } else {
+            rest.split([':', '/'])
+                .next()
+                .ok_or_else(|| "push URL missing host".to_string())?
+                .to_string()
+        };
+        if host == "127.0.0.1" || host == "localhost" || host == "[::1]" {
+            Ok(())
+        } else {
+            Err(format!("non-loopback push endpoint rejected: {host}"))
+        }
+    }
+
+    fn task_assign_frame(
+        id_byte: u8,
+        from_host: HostId,
+        body: String,
+    ) -> IacFrame {
+        let from = FrameAddress {
+            spirit_id: SpiritId::from("mira"),
+            host_id: Some(from_host.clone()),
+            role: Some(SpiritRole::Worker),
+        };
+        IacFrame {
+            frame_id: [id_byte; 16],
+            timestamp_ns: 0,
+            logical_clock: 0,
+            from: from.clone(),
+            to: smallvec![FrameAddress {
+                spirit_id: SpiritId::from("nash"),
+                host_id: Some(HostId("host_b".into())),
+                role: Some(SpiritRole::Worker),
+            }],
+            kind: FrameKind::TaskAssign,
+            intent: IntentClass::Readonly,
+            payload: FramePayload::TaskAssign(TaskAssignPayload {
+                goal: body,
+                scope: vec![],
+                success_criteria: "architect a mitigation".into(),
+                posture_preferences: PosturePreferences::default(),
+                prior_distillate_ref: None,
+            }),
+            auto_marker: FrameOrigin::SpiritAuto,
+            consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(
+                from,
+                A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT),
+            )),
+            intent_lineage: IntentLineage::default(),
+        }
+    }
+
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    eprintln!("smoke-mira-nash-tcp-8-13: starting live J4 journey");
+
+    let root = std::env::temp_dir().join(format!("maos-smoke-8-13-{}", std::process::id()));
+    std::fs::create_dir_all(&root)?;
+    struct TempDirGuard(std::path::PathBuf);
+    impl Drop for TempDirGuard {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let _guard = TempDirGuard(root.clone());
+    std::env::set_var("XDG_DATA_HOME", root.join("xdg"));
+
+    let (push_url, push_rx) = spawn_push_server()?;
+    assert_loopback_url(&push_url)?;
+    if assert_loopback_url("https://push.example.invalid/j4").is_ok() {
+        return Err("smoke-mira-nash-tcp-8-13: no-egress guard trip-test failed".into());
+    }
+    // The fixed bracketed-IPv6 branch must accept `[::1]` and still reject a
+    // non-loopback bracketed host (positive + negative coverage of the branch
+    // the smoke's own `127.0.0.1` URL never exercises).
+    assert_loopback_url("http://[::1]:8080/j4")
+        .map_err(|e| format!("smoke-mira-nash-tcp-8-13: [::1] loopback wrongly rejected: {e}"))?;
+    if assert_loopback_url("http://[2001:db8::1]:8080/j4").is_ok() {
+        return Err("smoke-mira-nash-tcp-8-13: non-loopback IPv6 guard trip-test failed".into());
+    }
+
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(BOOT_NONCE));
+    let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
+    let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
+    let capability = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+        Arc::new(maos_kernel_core::api::RingCryptoProvider),
+        maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
+        BOOT_NONCE,
+        Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+        maos_kernel_core::capability::cap_audit::channel().0,
+        maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+        Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+        Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
+    ));
+    let orchestrator = Arc::new(
+        maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
+            Arc::clone(&capability),
+            Arc::clone(&halt_registry),
+        ),
+    );
+    let mailbox = Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::clone(&metrics)));
+    let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
+        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(root.join("memory"), 4)),
+        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&root.join("audit.db"))?),
+        Arc::new(maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&root.join("audit.db"))?),
+        Arc::clone(&tl),
+    ));
+    let resolver = Arc::new(KernelHaltResolver::new(
+        Arc::clone(&halt_registry),
+        Arc::clone(&tl),
+        Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new()),
+        mailbox,
+        BOOT_NONCE,
+        memory,
+        orchestrator,
+    ));
+    let journal = maos_kernel_core::journal::JournalAdapter::open(&root.join("journal"))?;
+
+    let mut dispatcher = NotificationDispatcher::new();
+    dispatcher.register(Box::new(MobilePushHttp::new(
+        PushConfig::new(push_url.clone(), Some("operator-token".into()))
+            .with_timeout(std::time::Duration::from_secs(2)),
+    )));
+    let flow = HaltFlow::new(
+        Arc::clone(&resolver),
+        Arc::new(dispatcher),
+        Arc::clone(&tl) as Arc<dyn maos_domain::halt::HaltJournal>,
+    );
+
+    let signal = AnomalySignal {
+        subject: "edge-cache".into(),
+        metric: "novel_entropy_drift".into(),
+        observed: 0.91,
+        baseline: 0.10,
+        detail: "unrecognised entropy drift on the prod-edge cache; no known pattern".into(),
+        source_log_ref: "tl:source:8-13".into(),
+    };
+    let mira_spirit = Mira::default().with_id("mira");
+    let diag = mira_spirit.diagnose(&signal);
+    let advisory = mira_spirit.advisory(&diag);
+    let advisory_json = serde_json::to_string(&advisory)?;
+    let payload = mira_spirit
+        .halt_payload(&diag)
+        .ok_or("smoke-mira-nash-tcp-8-13: halt payload not produced")?;
+    let halt_id = HaltId::new(payload.halt_id.clone())?;
+    let _receipt = maos_kernel_core::halt::invoke_halt(
+        &tl,
+        &journal,
+        &halt_registry,
+        payload.clone(),
+        MIRA_PID,
+        "mira",
+        BOOT_NONCE,
+    )?;
+    let report = flow.dispatch_halt(halt_id.clone(), payload.clone())?;
+    if report.delivered != 1 || report.errors != 0 {
+        return Err(format!("smoke-mira-nash-tcp-8-13: push report was delivered={} errors={}", report.delivered, report.errors).into());
+    }
+    let (method, path, body) = push_rx.recv_timeout(std::time::Duration::from_secs(2))?;
+    if method != "POST" || path != "/j4-halt" {
+        return Err(format!("smoke-mira-nash-tcp-8-13: bad push request {method} {path}").into());
+    }
+    match serde_json::from_slice::<NotificationEvent>(&body)? {
+        NotificationEvent::Halt { payload: got } if got == payload => {}
+        other => return Err(format!("smoke-mira-nash-tcp-8-13: bad push body {other:?}").into()),
+    }
+
+    let dead = TcpListener::bind("127.0.0.1:0")?;
+    let dead_addr = dead.local_addr()?;
+    drop(dead);
+    let mut isolation_dispatcher = NotificationDispatcher::new();
+    isolation_dispatcher.register(Box::new(MobilePushHttp::new(
+        PushConfig::new(format!("http://{dead_addr}/closed"), None)
+            .with_timeout(std::time::Duration::from_millis(100)),
+    )));
+    isolation_dispatcher.register(Box::new(TerminalChannel::new(Arc::new(Mutex::new(Vec::<u8>::new()))).with_color(false)));
+    let isolation = isolation_dispatcher.dispatch(
+        NotificationEvent::Halt { payload: payload.clone() },
+        NotificationLevel::Immediate,
+    )?;
+    if isolation.delivered != 1 || isolation.errors != 1 {
+        return Err("smoke-mira-nash-tcp-8-13: per-channel error isolation failed".into());
+    }
+
+    let ca_key = rcgen::KeyPair::generate()?;
+    let mut ca_params = rcgen::CertificateParams::new(vec!["ca-good".to_string()])?;
+    ca_params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+    let ca_cert = ca_params.self_signed(&ca_key)?;
+    let ca_path = root.join("ca.pem");
+    std::fs::write(&ca_path, ca_cert.pem())?;
+    let mk_leaf = |name: &str| -> Result<(std::path::PathBuf, std::path::PathBuf, PeerCertFingerprint), Box<dyn std::error::Error>> {
+        let key = rcgen::KeyPair::generate()?;
+        let params = rcgen::CertificateParams::new(vec!["127.0.0.1".to_string()])?;
+        let cert = params.signed_by(&key, &ca_cert, &ca_key)?;
+        let fp = PeerCertFingerprint::from_cert_der(cert.der().as_ref());
+        let cert_path = root.join(format!("{name}.cert.pem"));
+        let key_path = root.join(format!("{name}.key.pem"));
+        std::fs::write(&cert_path, cert.pem())?;
+        std::fs::write(&key_path, key.serialize_pem())?;
+        Ok((cert_path, key_path, fp))
+    };
+    let (mira_cert, mira_key, mira_fp) = mk_leaf("mira")?;
+    let (nash_cert, nash_key, nash_fp) = mk_leaf("nash")?;
+    if mira_fp == nash_fp {
+        return Err("smoke-mira-nash-tcp-8-13: endpoints must have distinct TLS pins".into());
+    }
+    let allow = |send: &[&str], accept: &[&str]| ConsentAllowlists {
+        send_allowlist: send.iter().map(|s| A2AIntent::new(*s)).collect(),
+        accept_allowlist: accept.iter().map(|s| A2AIntent::new(*s)).collect(),
+    };
+    let nash_tcp = TcpA2AConfig {
+        listen_addr: "127.0.0.1:0".parse()?,
+        own_cert_chain: nash_cert,
+        own_private_key: nash_key,
+        peer_pins: vec![PinnedFingerprint { peer_id: PeerId::new("host_a"), fingerprint: mira_fp.clone(), boot_nonce: MIRA_NONCE }],
+        handshake_timeout: std::time::Duration::from_secs(30),
+        ca_roots: Some(ca_path.clone()),
+    };
+    let nash_peers = vec![A2APeerConfig {
+        peer_id: PeerId::new("host_a"),
+        endpoint: "tls://127.0.0.1:0".into(),
+        cert_fingerprint: mira_fp.clone(),
+        profile: A2AProfile::CrossHost,
+        allowlists: allow(&[], &[ADVISORY_FINE_GRAINED_INTENT]),
+        partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
+    }];
+    let nash = build_a2a_tcp_daemon_router(nash_tcp, nash_peers, NASH_NONCE).await?;
+    let nash_addr = nash.local_addr().ok_or("nash failed to bind")?;
+    // D1 — capture the frame Nash receives at intake (after the live-wire
+    // validation, BEFORE Nash parses the advisory) so the wire-content oracle
+    // can assert on the bytes that actually crossed the wire, not the
+    // test-local advisory copy. Reuses the existing `A2ARouterCore` intake-sink
+    // hook — zero edits to maos-a2a-tcp/kernel.
+    let (intake_tx, mut intake_rx) = tokio::sync::mpsc::unbounded_channel::<IacFrame>();
+    nash.core().install_intake_sink(intake_tx).await;
+    let mira_tcp = TcpA2AConfig {
+        listen_addr: "127.0.0.1:0".parse()?,
+        own_cert_chain: mira_cert,
+        own_private_key: mira_key,
+        peer_pins: vec![PinnedFingerprint { peer_id: PeerId::new("host_b"), fingerprint: nash_fp.clone(), boot_nonce: NASH_NONCE }],
+        handshake_timeout: std::time::Duration::from_secs(30),
+        ca_roots: Some(ca_path),
+    };
+    let mira_peers = vec![A2APeerConfig {
+        peer_id: PeerId::new("host_b"),
+        endpoint: format!("tls://{nash_addr}"),
+        cert_fingerprint: nash_fp.clone(),
+        profile: A2AProfile::CrossHost,
+        allowlists: allow(&[ADVISORY_FINE_GRAINED_INTENT], &[]),
+        partition_timeout_secs: 30,
+        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
+    }];
+    let mira = build_a2a_tcp_daemon_router(mira_tcp, mira_peers, MIRA_NONCE).await?;
+    let mira_addr = mira.local_addr().ok_or("mira failed to bind")?;
+    if mira_addr == nash_addr {
+        return Err("smoke-mira-nash-tcp-8-13: transports must bind distinct sockets".into());
+    }
+
+    let bound_mira_host = HostId("host_a".into());
+    let frame = task_assign_frame(0x13, bound_mira_host.clone(), advisory_json.clone());
+    if frame.from.host_id.as_ref() != Some(&bound_mira_host) {
+        return Err("smoke-mira-nash-tcp-8-13: frame host_id was not transport-bound host_a".into());
+    }
+    let router: Arc<dyn A2ARouter> = mira.clone();
+    router
+        .route_outbound(frame, &HostId("host_b".into()))
+        .await
+        .map_err(|e| format!("smoke-mira-nash-tcp-8-13: live advisory failed: {e:?}"))?;
+    let (boot, lamport) = nash
+        .last_intake_observed()
+        .ok_or("smoke-mira-nash-tcp-8-13: Nash did not observe the advisory")?;
+    if boot != MIRA_NONCE || lamport == 0 {
+        return Err(format!("smoke-mira-nash-tcp-8-13: bad wire observation boot={boot} lamport={lamport}").into());
+    }
+    // D1 — receiver-side wire-content oracle. Pull the advisory Nash actually
+    // RECEIVED off the wire (captured at intake by the sink above) and feed its
+    // RAW goal bytes through Nash's own deserializer. This closes the AC1
+    // anti-tautology gap: the prior assertions deserialized the test-local
+    // `advisory_json`, so a corrupted on-wire payload still passed.
+    let received_frame = intake_rx
+        .try_recv()
+        .map_err(|e| format!("smoke-mira-nash-tcp-8-13: intake captured no received frame: {e:?}"))?;
+    let received_goal = match &received_frame.payload {
+        FramePayload::TaskAssign(p) => p.goal.clone(),
+        other => {
+            return Err(format!(
+                "smoke-mira-nash-tcp-8-13: received non-TaskAssign payload {other:?}"
+            )
+            .into())
+        }
+    };
+    // Anti-tautology invariant: `received_goal` is the advisory's raw bytes AS
+    // RECEIVED (the captured frame field, never a re-serialized parsed struct);
+    // it is handed to `Nash::from_wire` (deserialize) exactly as Nash would on
+    // the live path. A wire mutation of the goal now fails here.
+    let received_advisory = Nash::from_wire(&received_goal).map_err(|e| {
+        format!("smoke-mira-nash-tcp-8-13: received advisory failed to rehydrate off the wire: {e:?}")
+    })?;
+    if received_advisory.severity < 0.66 {
+        return Err(
+            "smoke-mira-nash-tcp-8-13: received advisory did not carry high-severity Mira finding"
+                .into(),
+        );
+    }
+    let proposal = Nash::default().with_id("nash").architect(&received_advisory);
+    if !proposal.proposed_fix.contains("circuit-breaker") || proposal.confidence >= 0.95 {
+        return Err(
+            "smoke-mira-nash-tcp-8-13: Nash proposal not derived from the RECEIVED Mira severity"
+                .into(),
+        );
+    }
+    let forged = task_assign_frame(0x14, HostId("host_x".into()), advisory_json.clone());
+    match A2APeerRouter::route_outbound(&*mira, forged, &HostId("host_b".into())).await {
+        Err(A2AError::PeerIdentityMismatch { expected, asserted })
+            if expected == "host_a" && asserted == "host_x" => {}
+        other => return Err(format!("smoke-mira-nash-tcp-8-13: confused-deputy guard failed: {other:?}").into()),
+    }
+
+    let _advisory_token = tl.insert_frame_event(
+        TlFrameKind::ConsentRequest,
+        MIRA_PID,
+        None,
+        "diagnostic.advisory.tcp",
+        advisory_json.as_bytes(),
+        FrameOrigin::SpiritAuto,
+    );
+    let advisory_ref = tl.last_frame_id();
+    let _rupture_token = tl.insert_frame_event(
+        TlFrameKind::ConsentRupture,
+        MIRA_PID,
+        None,
+        "a2a.consent.denied",
+        b"fine-grained advisory denied at peer (documented J4 consent rupture)",
+        FrameOrigin::SpiritAuto,
+    );
+    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(FlowState::Tap1Acknowledge, TapEvent::Acknowledge);
+    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(s, TapEvent::SelectKind);
+    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(s, TapEvent::Submit);
+    if s != FlowState::Done {
+        return Err("smoke-mira-nash-tcp-8-13: three-tap did not reach Done".into());
+    }
+    flow.submit_resolution(halt_id, Resolution::AcceptedHalt, "mira")?;
+    let cited = tl
+        .query_frame_by_id(advisory_ref)?
+        .ok_or("smoke-mira-nash-tcp-8-13: cited advisory missing")?;
+    if !matches!(cited.kind, TlFrameKind::ConsentRequest) {
+        return Err("smoke-mira-nash-tcp-8-13: digest citation did not resolve to advisory".into());
+    }
+    let halts = tl.query_frames(FrameFilter { kind: Some(TlFrameKind::EpistemicHalt), ..Default::default() })?;
+    let ruptures = tl.query_frames(FrameFilter { kind: Some(TlFrameKind::ConsentRupture), ..Default::default() })?;
+    if halts.is_empty() || ruptures.is_empty() {
+        return Err("smoke-mira-nash-tcp-8-13: expected EpistemicHalt + ConsentRupture rows".into());
+    }
+
+    drop(mira);
+    drop(nash);
+    eprintln!("smoke-mira-nash-tcp-8-13: ✅ live TCP + real HTTP mobile-push J4 journey complete");
     Ok(())
 }
 
