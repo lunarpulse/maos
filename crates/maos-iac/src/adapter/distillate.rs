@@ -29,7 +29,9 @@ use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::ports::DistillationPort;
 
-use super::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
+use super::transparency_log::{
+    DistillateWriteToken, FrameFilter, FrameKind, TransparencyLogAdapter,
+};
 /// Stable intent string constant for `CapabilityInvocation` audit row.
 pub const DISTILLATE_WRITE_INTENT: &str = "distillate.write";
 
@@ -325,6 +327,37 @@ impl DistillationPort for DistillateWriter {
 
         let effective_depth = max_seen_depth.saturating_add(1);
 
+        // 2.5. Story 8.10 AC2(b) — I11 citer-authorization. The citing Spirit
+        // (`spirit_pid`) may only cite source frames within its own principal
+        // namespace; at this layer the writer's `spirit_pid` IS the principal
+        // proxy (each frame records its writer's pid). A cross-principal
+        // citation — e.g. Researcher-A citing Principal-B's frames
+        // (`researcher::to_distillation_request` forgery path) — is rejected
+        // BEFORE any Distillate row is written. The check runs over the
+        // FLATTENED refs so a digest-of-digest cannot launder a cross-principal
+        // raw frame through an intermediate hop.
+        for frame_id in &effective_refs {
+            let entry = self
+                .transparency_log
+                .query_frame_by_id(*frame_id)
+                .map_err(|e| DistillationError::Storage(e.to_string()))?;
+            match entry {
+                Some(e) if e.spirit_pid != spirit_pid => {
+                    return Err(DistillationError::CiterUnauthorized {
+                        citer_pid: spirit_pid,
+                        source_pid: e.spirit_pid,
+                        frame_id: *frame_id,
+                    });
+                }
+                Some(_) => {}
+                None => {
+                    return Err(DistillationError::SourceFrameNotFound {
+                        frame_id: *frame_id,
+                    });
+                }
+            }
+        }
+
         // 3. Compute intent lineage (I13 — kernel-computed, NEVER Spirit-supplied).
         let intent_lineage = self.compute_intent_lineage(&effective_refs)?;
 
@@ -346,10 +379,14 @@ impl DistillationPort for DistillateWriter {
         let payload_bytes =
             Self::serialize_receipt(&receipt_pre, &request.digest_payload, &request.segment_hint)?;
 
-        // 5. Insert FrameKind::Distillate row into Transparency Log.
-        let _token = self.transparency_log.insert_frame_event(
-            FrameKind::Distillate,
+        // 5. Insert FrameKind::Distillate row via the token-guarded path
+        // (Story 8.10 AC2a) — the ONLY sanctioned Distillate inserter.
+        let _token = self.transparency_log.insert_distillate_frame(
+            DistillateWriteToken::new(),
+            None,
             spirit_pid,
+            "",
+            "",
             None,
             DISTILLATE_WRITE_INTENT,
             &payload_bytes,
@@ -652,6 +689,80 @@ mod tests {
                 .iter()
                 .any(|r| r.intent == DISTILLATE_WRITE_INTENT),
             "expected CapabilityInvocation row with intent distillate.write"
+        );
+    }
+
+    // ── Story 8.10 AC2 — I11 citer-authorization ────────────────────────────
+
+    #[test]
+    fn cross_principal_citation_is_rejected_and_writes_no_row() {
+        // AC2(b): Researcher-A (pid 1) cites a frame owned by Principal-B (pid 2).
+        let (writer, tl, _tmp) = make_writer(0xC1A2);
+        let foreign_id = insert_raw_frame(&tl, 2, "delegate"); // owned by pid 2
+
+        let request = DistillationRequest::new(
+            vec![foreign_id],
+            1,
+            DigestPayload::Text("forged digest".into()),
+            None,
+        )
+        .unwrap();
+
+        let err = writer.write_distillate(1, request).unwrap_err();
+        match err {
+            DistillationError::CiterUnauthorized {
+                citer_pid,
+                source_pid,
+                frame_id,
+            } => {
+                assert_eq!(citer_pid, 1);
+                assert_eq!(source_pid, 2);
+                assert_eq!(frame_id, foreign_id);
+            }
+            other => panic!("expected CiterUnauthorized, got {other:?}"),
+        }
+
+        // No Distillate row was written (the forgery left no trace).
+        let distillates = tl
+            .query_frames(FrameFilter {
+                kind: Some(FrameKind::Distillate),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(distillates.is_empty(), "no Distillate row on a rejected forgery");
+    }
+
+    #[test]
+    fn same_principal_citation_still_succeeds() {
+        // AC2(c): the legitimate same-principal path is unaffected.
+        let (writer, tl, _tmp) = make_writer(0xC1A3);
+        let own_id = insert_raw_frame(&tl, 5, "consult");
+        let request =
+            DistillationRequest::new(vec![own_id], 1, DigestPayload::Text("ok".into()), None)
+                .unwrap();
+        let receipt = writer.write_distillate(5, request).unwrap();
+        assert!(!receipt.digest_frame_id.iter().all(|b| *b == 0));
+        let distillates = tl
+            .query_frames(FrameFilter {
+                kind: Some(FrameKind::Distillate),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(distillates.len(), 1, "the legitimate digest row is written");
+    }
+
+    #[test]
+    #[should_panic(expected = "MAOS I11 enforcement")]
+    fn direct_distillate_insert_is_rejected() {
+        // AC2(a): a non-writer path inserting FrameKind::Distillate panics.
+        let tl = TransparencyLogAdapter::open_in_memory(0xC1A4);
+        let _ = tl.insert_frame_event(
+            FrameKind::Distillate,
+            1,
+            None,
+            "smuggled-distillate",
+            b"{}",
+            FrameOrigin::SpiritAuto,
         );
     }
 

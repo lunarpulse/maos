@@ -1,4 +1,4 @@
-last_updated: '2026-06-07T00:00:00Z+story-8-8-review-complete'
+last_updated: '2026-06-07T00:00:00Z+story-8-10-ready-for-dev'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -94,7 +94,7 @@ development_status:
   # --- Epic 8 Completion Delivery (registered 2026-06-06 via party-mode implementation audit; CHARTER AMENDED to "reference Spirits AND their live runtime" — see epic-8 md). Goal: every Epic-8-anchored PRD journey (J0/J-Butler/J-Researcher/J1/J4) presentable end-to-end + all audited security/invariant defects closed. ---
   # Story 8.9 (Phase 1, charter-safe): A2A trust-binding & consent integrity hardening — closes G1/G2/G3/G4/G5/G6/G8/G9/G10. maos-a2a-core + maos-a2a-tcp, NO kernel-core delta. G8 = TLS-verified peer discarded (verifier.rs:177 Some(_peer)); intake re-derives identity from attacker-controlled frame.from.host_id → confused-deputy on the live wire. G10 = consent-expiry dead code (prepare_outbound never sets valid_until_ns). UNBLOCKS 8.8.
   8-9-a2a-trust-binding-and-consent-integrity-hardening: done
-  8-10-kernel-enforced-invariant-closure-and-butler-ac2-remediation: backlog
+  8-10-kernel-enforced-invariant-closure-and-butler-ac2-remediation: done
   # Story 8.11 (Phase 2, KEYSTONE): live runtime spine — `maos run` daemon composition root + Inference Port live LLM path + runtime budget enforcement (time_cap threaded past the hard-coded 30s hook_dispatch.rs:87) + 5-metric real scoring. CHARTER-AMENDED kernel delta: record a NEW pinned maos-kernel-core baseline (retires 8.4's 15505 assertion); FLAG-Winston. Replaces the 54 env-gated smoke arms as the run surface. DEPENDS ON 8.10.
   8-11-live-runtime-spine-daemon-composition-root-and-inference-port: backlog
   # Story 8.12 (Phase 2): live CliWrapper subprocess stdio bridge — implement lifecycle/cli_wrapper/runtime.rs (today only argv_prefix_hash under a doc comment); Worker spawns real claude/opencode/gemini/kimi; founder-loop runs as real `maos run` (not a smoke arm hand-INSERTing CliSubprocessOutput rows). The bridge 8.4 deferred as "kernel work, not Spirit work". CHARTER-AMENDED kernel delta. DEPENDS ON 8.11.

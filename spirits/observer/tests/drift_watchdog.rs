@@ -99,7 +99,8 @@ async fn drift_scenarios_warn_before_halt_via_the_real_dispatcher() {
                 sc.threshold,
                 sc.direction,
                 sc.warn_margin,
-            )],
+            )
+            .unwrap()],
         );
         telemetry.subscribe_topic(observer.observer_id(), &topic);
         let mut rx = telemetry.subscribe(&topic).expect("receiver");

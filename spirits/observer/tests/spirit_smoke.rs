@@ -31,7 +31,8 @@ fn on_idle_fires_once_and_surfaces_within_budget() {
             0.7,
             DriftDirection::Above,
             0.15,
-        )],
+        )
+        .unwrap()],
     )
     .with_pending_scalars(vec![ScalarTapEvent {
         spirit_id: "mira".into(),

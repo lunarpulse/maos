@@ -140,6 +140,27 @@ impl FrameKind {
     }
 }
 
+/// Capability token proving the caller is the `DistillateWriter` path
+/// (Story 8.10 AC2 — I11 citer-authorization gate).
+///
+/// Constructable only within `maos-iac` (`pub(crate)` ctor), so a
+/// `FrameKind::Distillate` row can **only** be inserted via
+/// [`TransparencyLogAdapter::insert_distillate_frame`], which the
+/// `DistillateWriter` holds. The public `insert_frame_event*` paths
+/// reject `FrameKind::Distillate` outright. Together these make the I11
+/// audit-chain validation in `write_distillate` unbypassable at runtime
+/// (previously "forbidden by convention" with zero enforcement).
+#[derive(Debug)]
+pub struct DistillateWriteToken(());
+
+impl DistillateWriteToken {
+    /// Mint the token. `pub(crate)` so only `maos-iac` internals (the
+    /// `DistillateWriter`) can authorize a `Distillate` insert.
+    pub(crate) fn new() -> Self {
+        Self(())
+    }
+}
+
 /// A single Transparency Log row — what `query_frames` returns.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransparencyLogEntry {
@@ -400,6 +421,78 @@ impl TransparencyLogAdapter {
     /// that must be retrievable by its original frame_id for retraction).
     /// Pass `None` for `frame_id` to auto-generate one.
     pub fn insert_frame_event_with_id(
+        &self,
+        frame_id: Option<[u8; 16]>,
+        kind: FrameKind,
+        spirit_pid: u32,
+        from_spirit_id: &str,
+        to_spirit_id: &str,
+        capability_token: Option<&[u8; 32]>,
+        intent: &str,
+        payload: &[u8],
+        origin: FrameOrigin,
+    ) -> LogBeforeDeliver<()> {
+        // Story 8.10 AC2 (I11 citer-authorization gate): a `Distillate` row may
+        // ONLY be inserted via `insert_distillate_frame` (which the
+        // `DistillateWriter` holds the `DistillateWriteToken` for). A direct
+        // public insert of a `Distillate` kind would bypass the I11 audit-chain
+        // validation + citer-auth check — forbidden at runtime, not just by
+        // convention. This is an enforcement panic in the I2 family.
+        if kind == FrameKind::Distillate {
+            panic!(
+                "MAOS I11 enforcement (Story 8.10 AC2): FrameKind::Distillate rows \
+                 may only be inserted via DistillateWriter (insert_distillate_frame); \
+                 a direct insert_frame_event(FrameKind::Distillate, …) bypasses the \
+                 I11 audit-chain + citer-authorization checks and is forbidden."
+            );
+        }
+        self.insert_frame_row(
+            frame_id,
+            kind,
+            spirit_pid,
+            from_spirit_id,
+            to_spirit_id,
+            capability_token,
+            intent,
+            payload,
+            origin,
+        )
+    }
+
+    /// Token-guarded `Distillate` inserter (Story 8.10 AC2). The ONLY path that
+    /// may write a `FrameKind::Distillate` row. The [`DistillateWriteToken`] is
+    /// `pub(crate)`-constructable, so only the `DistillateWriter` inside
+    /// `maos-iac` can reach this; external code paths cannot forge a token and
+    /// the public `insert_frame_event*` paths reject `Distillate`.
+    pub fn insert_distillate_frame(
+        &self,
+        _token: DistillateWriteToken,
+        frame_id: Option<[u8; 16]>,
+        spirit_pid: u32,
+        from_spirit_id: &str,
+        to_spirit_id: &str,
+        capability_token: Option<&[u8; 32]>,
+        intent: &str,
+        payload: &[u8],
+        origin: FrameOrigin,
+    ) -> LogBeforeDeliver<()> {
+        self.insert_frame_row(
+            frame_id,
+            FrameKind::Distillate,
+            spirit_pid,
+            from_spirit_id,
+            to_spirit_id,
+            capability_token,
+            intent,
+            payload,
+            origin,
+        )
+    }
+
+    /// Internal row writer (no FrameKind gating). Shared by the public
+    /// `insert_frame_event*` wrappers and the token-guarded distillate path.
+    #[allow(clippy::too_many_arguments)]
+    fn insert_frame_row(
         &self,
         frame_id: Option<[u8; 16]>,
         kind: FrameKind,

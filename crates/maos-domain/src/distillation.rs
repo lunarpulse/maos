@@ -152,6 +152,21 @@ pub enum DistillationError {
     #[error("source frame {frame_id:?} not found in transparency log")]
     SourceFrameNotFound { frame_id: [u8; 16] },
 
+    /// I11 citer-authorization (Story 8.10 AC2): the citing Spirit is not
+    /// permitted to reference one of the (flattened) source frames — a
+    /// cross-principal citation. The forged distillate is rejected and NO
+    /// `Distillate` row is written. Closes the `researcher::to_distillation_request`
+    /// forgery path.
+    #[error(
+        "E_DIGEST_CITER_UNAUTHORIZED — citer pid {citer_pid} may not cite frame \
+         {frame_id:?} owned by principal pid {source_pid}"
+    )]
+    CiterUnauthorized {
+        citer_pid: u32,
+        source_pid: u32,
+        frame_id: [u8; 16],
+    },
+
     /// SQLite or IO error during digest write or source-frame lookup.
     #[error("storage error: {0}")]
     Storage(String),

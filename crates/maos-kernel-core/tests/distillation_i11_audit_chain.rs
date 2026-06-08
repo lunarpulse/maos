@@ -215,25 +215,43 @@ fn cycle_detection() {
     );
     let _raw_id = tl.last_frame_id();
 
-    // Insert a Distillate frame with a placeholder source_log_ref
+    // Insert a poison Distillate frame DIRECTLY via raw SQL. Story 8.10 AC2
+    // gates the public `insert_frame_event(FrameKind::Distillate, …)` path
+    // (it panics) — but this adversarial fixture needs a malformed,
+    // self-referencing Distillate row the DistillateWriter would never produce,
+    // so we craft it at the storage layer (the same raw-SQL trick the
+    // self-reference UPDATE below already uses). This exercises the writer's
+    // cycle-detection SAFETY NET, not the public insert path.
     let placeholder = [0u8; 16];
     let placeholder_hex = format_frame_id_hex(&placeholder);
-    let poison_payload = serde_json::json!({
-        "kind": "distillate",
-        "source_log_ref": [placeholder_hex],
-        "distillation_depth": 1,
-        "intent_lineage": ["consult"],
-        "digest_frame_id": placeholder_hex,
-    });
-    let _token = tl.insert_frame_event(
-        FrameKind::Distillate,
-        99,
-        None,
-        "test.poison",
-        &serde_json::to_vec(&poison_payload).unwrap(),
-        FrameOrigin::SpiritAuto,
-    );
-    let poison_id = tl.last_frame_id();
+    let poison_id: [u8; 16] = [0xAB; 16];
+    {
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let poison_payload = serde_json::json!({
+            "kind": "distillate",
+            "source_log_ref": [placeholder_hex],
+            "distillation_depth": 1,
+            "intent_lineage": ["consult"],
+            "digest_frame_id": placeholder_hex,
+        });
+        conn.execute(
+            "INSERT INTO transparency_log
+                (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
+                 capability_token, kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, '', '', ?4, NULL, ?5, ?6, ?7, ?8)",
+            rusqlite::params![
+                &poison_id[..],
+                1_i64,
+                99_i64,
+                0xE418_i64,
+                FrameKind::Distillate as i64,
+                "test.poison",
+                serde_json::to_vec(&poison_payload).unwrap(),
+                FrameOrigin::SpiritAuto as i64,
+            ],
+        )
+        .unwrap();
+    }
 
     // Update the poison row so its source_log_ref points to itself
     {

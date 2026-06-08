@@ -98,19 +98,33 @@ fn worker_task_complete(seq: u64) -> IacFrame {
 }
 
 fn write_distillate_row(tl: &Arc<TransparencyLogAdapter>) -> [u8; 16] {
-    // Synthetic Distillate row inserted directly. The kernel-side
-    // DistillateWriter cycle is exercised in Story 4.4 tests; here we only
-    // need the row to exist with FrameKind::Distillate so the AC2 check
-    // resolves prior_distillate_ref correctly.
+    // Story 8.10 AC2: FrameKind::Distillate rows may ONLY be written via the
+    // DistillateWriter path (a direct insert now panics). Seed a raw source
+    // frame (owned by the same pid as the citer) and produce a REAL Distillate
+    // row through the writer — we only need the row to exist so the AC2
+    // prior_distillate_ref resolution succeeds.
+    use maos_domain::distillation::{DigestPayload, DistillationRequest};
+    use maos_domain::ports::DistillationPort;
+    use maos_kernel_core::iac::distillate::DistillateWriter;
+
     let _ = tl.insert_frame_event(
-        TlFrameKind::Distillate,
+        TlFrameKind::TaskComplete,
         0,
         None,
-        "distillate-stub",
-        b"{\"digest\":\"synthetic\"}",
+        "distillate-source",
+        b"worker-a output",
         FrameOrigin::Kernel,
     );
-    tl.last_frame_id()
+    let src = tl.last_frame_id();
+    let memory: Arc<dyn std::any::Any + Send + Sync> = Arc::new(0u8);
+    let writer = DistillateWriter::new(Arc::clone(tl), memory);
+    let request =
+        DistillationRequest::new(vec![src], 1, DigestPayload::Text("synthetic".into()), None)
+            .expect("valid request");
+    writer
+        .write_distillate(0, request)
+        .expect("synthetic distillate write")
+        .digest_frame_id
 }
 
 #[tokio::test(flavor = "multi_thread")]

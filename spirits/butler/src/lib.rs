@@ -33,9 +33,20 @@ use std::sync::Arc;
 use maos_audit::log_composition::{ranged_recall, ComposedPayload, LogRange, LogSource};
 use maos_audit::{query, AuditError, AuditFilter};
 use maos_domain::distillation::{DigestPayload, DistillationError, DistillationRequest};
+use maos_domain::halt::HaltReceipt;
 use maos_domain::notification::NotificationEvent;
+use maos_domain::ports::EpistemicScalarPort;
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
+
+/// Butler's own Spirit id — the `spirit_id` it writes scalars under and the id
+/// every digest cite / halt frame is attributed to.
+pub const BUTLER_SPIRIT_ID: &str = "butler";
+
+/// Butler's spirit_pid at v0.3-β. The daemon is single-Spirit (consistent with
+/// the rest of the composition root, which uses pid 0); Story 8.11 threads the
+/// real per-Spirit pid through the production port.
+pub const BUTLER_SPIRIT_PID: u32 = 0;
 
 // ───────────────────────────────────────────────────────────────────────────
 // Scenario world-state (the non-scored `input` object of each corpus row).
@@ -233,7 +244,7 @@ impl std::error::Error for ButlerError {}
 
 /// Butler reference Spirit. Optionally holds the scenario its `on_idle` pass
 /// reasons over (the kernel/fixture-replay seeds this in production).
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Butler {
     pending: Option<ScenarioInput>,
     /// The assessment from the most recent `on_idle` firing. Persists so the
@@ -241,6 +252,25 @@ pub struct Butler {
     /// Thread-safe (`Arc<Mutex<...>>`) so Butler remains `Sync` as required
     /// by the `#[spirit]` macro.
     last_assessment: Arc<std::sync::Mutex<Option<Assessment>>>,
+    /// Story 8.10 AC1 — the epistemic-scalar **write** port. When `Some`,
+    /// `on_idle` drives the assessed scalar through the kernel policy path so
+    /// the `[epistemic_policy]` halt can fire. `None` (the test/daemon default
+    /// pre-8.11) is store-only — the `None`-footgun closed by construction in
+    /// Story 8.11 (production port non-`Option` or boot-loud).
+    scalar_port: Option<Arc<dyn EpistemicScalarPort>>,
+    /// The `Option<HaltReceipt>` from the most recent `on_idle` scalar write, so
+    /// the firing is OBSERVABLE (not silently discarded). `None` when no port is
+    /// wired or no halt fired.
+    last_halt_receipt: Arc<std::sync::Mutex<Option<HaltReceipt>>>,
+}
+
+impl std::fmt::Debug for Butler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Butler")
+            .field("pending", &self.pending)
+            .field("has_scalar_port", &self.scalar_port.is_some())
+            .finish()
+    }
 }
 
 #[spirit]
@@ -253,17 +283,36 @@ impl Butler {
         }
         if let Some(scenario) = &self.pending {
             // Run the anticipatory reasoning and store the result so it is
-            // observable (not silently discarded). The scalar write / halt
-            // path is exercised via the capability/mailbox surface when the
-            // kernel provides one; storing the assessment ensures the hook
-            // has a production-visible effect even before that bridge lands.
+            // observable (not silently discarded).
             let assessment = self.assess(scenario);
-            // NOTE: In a full deployment the `primary_scalar` from the
-            // assessment would be written through the capability path to
-            // trigger the epistemic-policy halt. The current ABI `Ctx`
-            // exposes no scalar-write surface, so the halt is additionally
-            // proven in integration tests against the real kernel orchestrator.
-            // See `tests/corpus_halt.rs` for the kernel-orchestrated halt proof.
+
+            // Story 8.10 AC1 — when the epistemic-scalar port is wired, drive
+            // the assessed scalar through the kernel policy path so the
+            // `[epistemic_policy]` halt fires. The halt DECISION is the kernel's
+            // (universal-arithmetic over Butler's manifest policy); Butler only
+            // supplies its own assessed scalar. The `Option<HaltReceipt>` is
+            // stored so the firing is observable (proving `assessment → on_idle
+            // → port → halt`, the link Story 8.1 never exercised). With `port =
+            // None` this is store-only (the original v0.3-β behavior).
+            if let Some(port) = &self.scalar_port {
+                let (tag, value, derived_from) = assessment.primary_scalar();
+                let result = port.write_scalar(
+                    BUTLER_SPIRIT_PID,
+                    BUTLER_SPIRIT_ID,
+                    tag,
+                    value,
+                    &derived_from,
+                );
+                let mut guard = self
+                    .last_halt_receipt
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                match result {
+                    Ok(receipt) => *guard = receipt,
+                    Err(_) => *guard = None, // clear stale receipt on backend failure
+                }
+            }
+
             let mut guard = self.last_assessment.lock().unwrap();
             *guard = Some(assessment);
         }
@@ -275,6 +324,8 @@ impl Default for Butler {
         Self {
             pending: None,
             last_assessment: Arc::new(std::sync::Mutex::new(None)),
+            scalar_port: None,
+            last_halt_receipt: Arc::new(std::sync::Mutex::new(None)),
         }
     }
 }
@@ -290,12 +341,32 @@ impl Butler {
         Self {
             pending: Some(scenario),
             last_assessment: Arc::new(std::sync::Mutex::new(None)),
+            scalar_port: None,
+            last_halt_receipt: Arc::new(std::sync::Mutex::new(None)),
         }
+    }
+
+    /// Story 8.10 AC1 — inject the epistemic-scalar **write** port (test/daemon
+    /// builder). When set, `on_idle` drives the assessed scalar through the
+    /// kernel policy path so the `[epistemic_policy]` halt can fire.
+    pub fn with_scalar_port(mut self, port: Arc<dyn EpistemicScalarPort>) -> Self {
+        self.scalar_port = Some(port);
+        self
     }
 
     /// The assessment from the most recent `on_idle` firing, if any.
     pub fn last_assessment(&self) -> Option<Assessment> {
         self.last_assessment.lock().unwrap().clone()
+    }
+
+    /// Story 8.10 AC1 — the `HaltReceipt` from the most recent `on_idle` scalar
+    /// write, if a halt fired. `None` when no port is wired or no halt fired.
+    /// Makes the firing observable for the seam test.
+    pub fn last_halt_receipt(&self) -> Option<HaltReceipt> {
+        self.last_halt_receipt
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     /// Anticipatory reasoning over a scenario: calendar-conflict detection +

@@ -281,11 +281,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("maos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)");
 
     // Story 3.1 — wire IacBusAdapter with real Mailbox + Transparency Log.
-    let iac = Arc::new(IacBusAdapter::new(
-        Arc::clone(&mailbox),
-        Arc::clone(&transparency_log),
-    ));
-    eprintln!("maos: IAC Bus wired (Mailbox + Transparency Log, Story 3.1)");
+    // Story 8.10 AC3a — inject the REAL I12 digest provider backed by the
+    // Story-4.3 Memory Manager, replacing the default empty-refs closure so a
+    // `decision.*` frame records what the Spirit actually reasoned over. At
+    // v0.3-β the daemon is single-Spirit (pid 0, consistent with the rest of
+    // this composition root); Story 8.11 threads real per-Spirit pids.
+    let digest_memory: Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync> =
+        Arc::clone(&memory) as Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync>;
+    let iac = Arc::new(
+        IacBusAdapter::new(Arc::clone(&mailbox), Arc::clone(&transparency_log)).with_digest_provider(
+            maos_kernel_core::iac::decision_logger::memory_backed_digest_provider(
+                digest_memory,
+                |_sid| Some(0),
+            ),
+        ),
+    );
+    eprintln!("maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)");
 
     // Story 6.4 — install the TransparencyLogAdapter on the Mailbox so the
     // Phase 1.5 consent-rupture quarantine row can be written BEFORE the
@@ -3696,15 +3707,35 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
     tc_a.frame_id[0..8].copy_from_slice(&100u64.to_le_bytes());
     adapter.deliver_typed(tc_a).await?;
 
-    // 3. Synthetic distillate row (substrate for next dispatch's prior_distillate_ref).
-    let _ = tl.insert_frame_event(
-        TlFrameKind::Distillate,
-        0,
-        None,
-        "smoke-distillate",
-        b"{\"digest\":\"worker-a distilled\"}",
-        FrameOrigin::Kernel,
-    );
+    // 3. Distillate row (substrate for next dispatch's prior_distillate_ref).
+    // Story 8.10 AC2: Distillate rows may ONLY be written via the
+    // DistillateWriter (a direct insert now panics). Seed a raw source frame and
+    // produce a REAL distillate through the writer.
+    {
+        use maos_domain::distillation::{DigestPayload, DistillationRequest};
+        use maos_domain::ports::DistillationPort;
+        let _ = tl.insert_frame_event(
+            TlFrameKind::TaskComplete,
+            0,
+            None,
+            "smoke-distillate-source",
+            b"worker-a output",
+            FrameOrigin::Kernel,
+        );
+        let src = tl.last_frame_id();
+        let memory: std::sync::Arc<dyn std::any::Any + Send + Sync> = std::sync::Arc::new(0u8);
+        let writer = maos_kernel_core::iac::distillate::DistillateWriter::new(tl.clone(), memory);
+        let request = DistillationRequest::new(
+            vec![src],
+            1,
+            DigestPayload::Text("worker-a distilled".into()),
+            None,
+        )
+        .expect("valid distillation request");
+        writer
+            .write_distillate(0, request)
+            .expect("smoke distillate write");
+    }
     let distillate_id = tl.last_frame_id();
     assert_ne!(
         distillate_id,

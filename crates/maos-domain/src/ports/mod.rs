@@ -32,6 +32,7 @@
 pub mod a2a; // NEW — Story 6.3 A2ARouter port per ADR-003 + ADR-012
 pub mod capability;
 pub mod distillation; // NEW — Story 4.4 DistillationPort per AC2
+pub mod epistemic_scalar; // NEW — Story 8.10 AC1 cognitive-Spirit scalar-write port
 pub mod iac_bus;
 pub mod inference;
 pub mod io_subsystem;
@@ -52,6 +53,7 @@ pub use a2a::A2ARouter; // NEW — Story 6.3
 pub use capability::CapabilityRegistryPort;
 pub use crypto::{CryptoError, CryptoProvider};
 pub use distillation::DistillationPort; // NEW — Story 4.4
+pub use epistemic_scalar::{EpistemicScalarPort, ScalarPortError}; // NEW — Story 8.10 AC1
 pub use iac_bus::IacBusPort;
 pub use inference::InferencePort;
 pub use io_subsystem::IoSubsystemPort;

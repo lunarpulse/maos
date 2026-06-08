@@ -61,6 +61,12 @@ use serde::{Deserialize, Serialize};
 /// via [`maos_spirit_abi::identity::FrameKind::SandboxBlock`].
 pub const SANDBOX_BLOCK_FRAME_KIND: u8 = maos_spirit_abi::identity::FrameKind::SandboxBlock as u8;
 
+/// Confidence assigned to a reject-and-flag surface for a non-comparable
+/// (NaN/Inf) measurement (Story 8.10 AC4a). Maximal: an un-decidable
+/// measurement is treated as a definite anomaly so the watchdog raises rather
+/// than going dark. In `[0.0, 1.0]` so the `anomaly_flagged` constructor accepts it.
+pub const NON_COMPARABLE_FLAG_CONFIDENCE: f32 = 1.0;
+
 // ───────────────────────────────────────────────────────────────────────────
 // Cognitive posture (architecture §6.5). The manifest `[posture]` section is the
 // AUTONOMY spectrum (`cautious`); THIS is the Observer cognitive posture.
@@ -153,16 +159,45 @@ pub struct WatchThreshold {
     pub warn_margin: f64,
 }
 
+/// Construction error for [`WatchThreshold`] (Story 8.10 AC4b — Fork B `Result`
+/// shape, consistent with `EpistemicHaltPayload::new` / `DistillationRequest::new`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WatchThresholdError {
+    /// `threshold` was NaN or ±∞ — a non-comparable threshold would silently
+    /// disable the watch (the watchdog could never decide in/out of band).
+    NonFiniteThreshold,
+    /// `warn_margin` was NaN or ±∞ — a non-comparable band width.
+    NonFiniteWarnMargin,
+}
+
+impl std::fmt::Display for WatchThresholdError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NonFiniteThreshold => write!(f, "watch threshold must be finite (got NaN/Inf)"),
+            Self::NonFiniteWarnMargin => write!(f, "watch warn_margin must be finite (got NaN/Inf)"),
+        }
+    }
+}
+impl std::error::Error for WatchThresholdError {}
+
 impl WatchThreshold {
-    /// Construct a watch (clamps a non-positive margin to a tiny epsilon so the
-    /// band is always well-formed).
+    /// Construct a watch. Story 8.10 AC4b: **rejects** a NaN/Inf `threshold` or
+    /// `warn_margin` (a non-comparable bound would silently disable the
+    /// watchdog). A finite non-positive `warn_margin` is still clamped to a tiny
+    /// epsilon so the band is always well-formed.
     pub fn new(
         tag: impl Into<String>,
         threshold: f64,
         direction: DriftDirection,
         warn_margin: f64,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, WatchThresholdError> {
+        if !threshold.is_finite() {
+            return Err(WatchThresholdError::NonFiniteThreshold);
+        }
+        if !warn_margin.is_finite() {
+            return Err(WatchThresholdError::NonFiniteWarnMargin);
+        }
+        Ok(Self {
             tag: tag.into(),
             threshold,
             direction,
@@ -171,7 +206,7 @@ impl WatchThreshold {
             } else {
                 f64::EPSILON
             },
-        }
+        })
     }
 
     /// `[low, high)` bounds of the pre-halt watch-band for this watch.
@@ -256,10 +291,70 @@ pub struct StructuralSignal {
     /// Which structural divergence the kernel observed.
     pub kind: DivergenceKind,
     /// The structural measurement in `[0.0, 1.0]` (kernel-supplied, uninterpreted).
+    #[doc = "Construct via [`StructuralSignal::new`] to enforce validation; struct literals bypass magnitude-range / NaN-Inf / non-empty-subject checks."]
     pub magnitude: f64,
     /// A human-readable structural detail (e.g. `"fd count 412 vs declared 64"`).
     #[serde(default)]
     pub detail: String,
+}
+
+/// Construction error for [`StructuralSignal`] (Story 8.10 AC5 — validating
+/// constructor for the last invariant-bearing type lacking one).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StructuralSignalError {
+    /// `subject` was empty — a structural alarm with no subject is unactionable.
+    EmptySubject,
+    /// `magnitude` was NaN or ±∞ — a non-comparable structural measurement.
+    NonFiniteMagnitude,
+    /// `magnitude` was outside `[0.0, 1.0]`.
+    MagnitudeOutOfRange,
+}
+
+impl std::fmt::Display for StructuralSignalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptySubject => write!(f, "structural signal subject must be non-empty"),
+            Self::NonFiniteMagnitude => {
+                write!(f, "structural signal magnitude must be finite (got NaN/Inf)")
+            }
+            Self::MagnitudeOutOfRange => {
+                write!(f, "structural signal magnitude must be in [0.0, 1.0]")
+            }
+        }
+    }
+}
+impl std::error::Error for StructuralSignalError {}
+
+impl StructuralSignal {
+    /// Validated constructor (Story 8.10 AC5). Rejects an empty `subject`, a
+    /// NaN/Inf `magnitude`, and a `magnitude` outside `[0.0, 1.0]`. This is the
+    /// only path that enforces the invariants; the `pub` fields remain (no ABI
+    /// churn) but a struct literal is documented as bypass-prone.
+    pub fn new(
+        frame_kind: u8,
+        subject: impl Into<String>,
+        kind: DivergenceKind,
+        magnitude: f64,
+        detail: impl Into<String>,
+    ) -> Result<Self, StructuralSignalError> {
+        let subject = subject.into();
+        if subject.trim().is_empty() {
+            return Err(StructuralSignalError::EmptySubject);
+        }
+        if !magnitude.is_finite() {
+            return Err(StructuralSignalError::NonFiniteMagnitude);
+        }
+        if !(0.0..=1.0).contains(&magnitude) {
+            return Err(StructuralSignalError::MagnitudeOutOfRange);
+        }
+        Ok(Self {
+            frame_kind,
+            subject,
+            kind,
+            magnitude,
+            detail: detail.into(),
+        })
+    }
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -457,11 +552,23 @@ impl Observer {
         }
         let watch = self.watches.iter().find(|w| w.tag == event.tag)?;
 
-        let value = if event.value.is_nan() {
-            return None;
-        } else {
-            event.value
-        };
+        // Story 8.10 AC4a — a NaN/Inf scalar is ITSELF an anomaly: a
+        // non-comparable measurement on a watched tag would silently disable
+        // the watchdog (the old `return None` fail-open). Reject-and-flag so the
+        // watchdog raises rather than going dark.
+        if !event.value.is_finite() {
+            return Some(ObserverSurface {
+                subject: event.spirit_id.clone(),
+                summary: format!(
+                    "non-comparable scalar '{}' = {} (NaN/Inf) on watched tag — \
+                     watchdog cannot compare against threshold {:.3}; flagging",
+                    event.tag, event.value, watch.threshold
+                ),
+                confidence: NON_COMPARABLE_FLAG_CONFIDENCE,
+                anomaly_kind: AnomalyKind::DriftEarlyWarning,
+            });
+        }
+        let value = event.value;
         let key = (event.spirit_id.clone(), event.tag.clone());
 
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
@@ -518,11 +625,23 @@ impl Observer {
         if !self.in_namespace(&signal.subject) {
             return None;
         }
-        let magnitude = if signal.magnitude.is_nan() {
-            return None;
-        } else {
-            signal.magnitude
-        };
+        // Story 8.10 AC4a — a NaN/Inf magnitude is ITSELF an anomaly (the old
+        // `return None` fail-open silently disabled the structural watchdog).
+        // Reject-and-flag the non-comparable measurement.
+        if !signal.magnitude.is_finite() {
+            return Some(ObserverSurface {
+                subject: signal.subject.clone(),
+                summary: format!(
+                    "structural_anomaly_suspect: {} — non-comparable magnitude {} \
+                     (NaN/Inf); watchdog cannot compare, flagging",
+                    signal.kind.as_tag(),
+                    signal.magnitude
+                ),
+                confidence: NON_COMPARABLE_FLAG_CONFIDENCE,
+                anomaly_kind: AnomalyKind::StructuralAnomalySuspect,
+            });
+        }
+        let magnitude = signal.magnitude;
         let unexpected_kind = signal.frame_kind != SANDBOX_BLOCK_FRAME_KIND;
         if magnitude < Self::STRUCTURAL_SUSPECT_FLOOR && !unexpected_kind {
             return None; // benign — below the Spirit-side suspect floor.
@@ -572,7 +691,7 @@ mod unit_tests {
 
     fn belief_variance_watch() -> WatchThreshold {
         // Mirrors Butler's `belief_variance on_value_above 0.7`; band = [0.55, 0.7).
-        WatchThreshold::new("belief_variance", 0.7, DriftDirection::Above, 0.15)
+        WatchThreshold::new("belief_variance", 0.7, DriftDirection::Above, 0.15).unwrap()
     }
 
     fn obs() -> Observer {
@@ -634,7 +753,8 @@ mod unit_tests {
                 0.6,
                 DriftDirection::Below,
                 0.15,
-            )],
+            )
+            .unwrap()],
         );
         // Above band → no warning.
         assert!(o
@@ -757,17 +877,33 @@ mod unit_tests {
     }
 
     #[test]
-    fn nan_scalar_dropped_silently() {
+    fn nan_scalar_is_flagged_not_dropped() {
+        // Story 8.10 AC4a — a NaN scalar on a watched tag for an in-namespace
+        // subject is reject-and-flagged, NOT silently dropped (the old fail-open).
         let o = obs();
-        assert!(
-            o.observe_scalar(&scalar("mira", "belief_variance", f64::NAN))
-                .is_none(),
-            "NaN scalar values are silently dropped"
-        );
+        let s = o
+            .observe_scalar(&scalar("mira", "belief_variance", f64::NAN))
+            .expect("NaN scalar must surface a non-comparable anomaly flag");
+        assert_eq!(s.subject, "mira");
+        assert!(s.summary.contains("non-comparable"));
+        assert!(s.confidence.is_finite() && (0.0..=1.0).contains(&s.confidence));
+        // It must convert to a valid notification (NaN-confidence-rejecting ctor).
+        assert!(s.to_notification("observer").is_ok());
     }
 
     #[test]
-    fn nan_magnitude_dropped_silently() {
+    fn inf_scalar_is_flagged_not_dropped() {
+        // is_infinite() coverage (AC4a extends the guard beyond is_nan()).
+        let o = obs();
+        let s = o
+            .observe_scalar(&scalar("mira", "belief_variance", f64::INFINITY))
+            .expect("Inf scalar must surface a non-comparable anomaly flag");
+        assert!(s.summary.contains("non-comparable"));
+    }
+
+    #[test]
+    fn nan_magnitude_is_flagged_not_dropped() {
+        // Story 8.10 AC4a — a NaN magnitude is reject-and-flagged, not dropped.
         let o = obs();
         let sig = StructuralSignal {
             frame_kind: SANDBOX_BLOCK_FRAME_KIND,
@@ -776,10 +912,76 @@ mod unit_tests {
             magnitude: f64::NAN,
             detail: String::new(),
         };
-        assert!(
-            o.classify_signal(&sig).is_none(),
-            "NaN magnitude signals are silently dropped"
-        );
+        let s = o
+            .classify_signal(&sig)
+            .expect("NaN magnitude must surface a non-comparable structural suspect");
+        assert_eq!(s.anomaly_kind, AnomalyKind::StructuralAnomalySuspect);
+        assert!(s.summary.contains("non-comparable"));
+        assert!(s.to_notification("observer").is_ok());
+    }
+
+    #[test]
+    fn inf_magnitude_is_flagged_not_dropped() {
+        let o = obs();
+        let sig = StructuralSignal {
+            frame_kind: SANDBOX_BLOCK_FRAME_KIND,
+            subject: "mira".into(),
+            kind: DivergenceKind::FdTableGrowth,
+            magnitude: f64::NEG_INFINITY,
+            detail: String::new(),
+        };
+        let s = o
+            .classify_signal(&sig)
+            .expect("Inf magnitude must surface a non-comparable structural suspect");
+        assert!(s.summary.contains("non-comparable"));
+    }
+
+    #[test]
+    fn watch_threshold_new_rejects_nan_threshold() {
+        // Story 8.10 AC4b.
+        assert!(matches!(
+            WatchThreshold::new("belief_variance", f64::NAN, DriftDirection::Above, 0.15),
+            Err(WatchThresholdError::NonFiniteThreshold)
+        ));
+        assert!(matches!(
+            WatchThreshold::new("belief_variance", f64::INFINITY, DriftDirection::Above, 0.15),
+            Err(WatchThresholdError::NonFiniteThreshold)
+        ));
+        assert!(matches!(
+            WatchThreshold::new("belief_variance", 0.7, DriftDirection::Above, f64::NAN),
+            Err(WatchThresholdError::NonFiniteWarnMargin)
+        ));
+        // A finite non-positive margin is still clamped (not rejected).
+        let w = WatchThreshold::new("belief_variance", 0.7, DriftDirection::Above, -1.0)
+            .expect("finite non-positive margin clamps, not rejects");
+        assert!(w.warn_margin > 0.0);
+    }
+
+    #[test]
+    fn structural_signal_new_validates() {
+        // Story 8.10 AC5 — the validating constructor for StructuralSignal.
+        assert!(matches!(
+            StructuralSignal::new(SANDBOX_BLOCK_FRAME_KIND, "", DivergenceKind::FdTableGrowth, 0.5, ""),
+            Err(StructuralSignalError::EmptySubject)
+        ));
+        assert!(matches!(
+            StructuralSignal::new(SANDBOX_BLOCK_FRAME_KIND, "mira", DivergenceKind::FdTableGrowth, f64::NAN, ""),
+            Err(StructuralSignalError::NonFiniteMagnitude)
+        ));
+        assert!(matches!(
+            StructuralSignal::new(SANDBOX_BLOCK_FRAME_KIND, "mira", DivergenceKind::FdTableGrowth, 1.5, ""),
+            Err(StructuralSignalError::MagnitudeOutOfRange)
+        ));
+        let sig = StructuralSignal::new(
+            SANDBOX_BLOCK_FRAME_KIND,
+            "mira",
+            DivergenceKind::FdTableGrowth,
+            0.82,
+            "fd count 412 vs declared 64",
+        )
+        .expect("valid structural signal");
+        assert_eq!(sig.subject, "mira");
+        assert!((sig.magnitude - 0.82).abs() < 1e-9);
     }
 
     #[test]
@@ -820,7 +1022,8 @@ mod unit_tests {
                 0.6,
                 DriftDirection::Below,
                 0.15,
-            )],
+            )
+            .unwrap()],
         );
         // Safe (above band).
         assert!(o
@@ -855,7 +1058,8 @@ mod unit_tests {
                 0.6,
                 DriftDirection::Below,
                 0.15,
-            )],
+            )
+            .unwrap()],
         );
         let s = o
             .observe_scalar(&scalar("mira", "user_preference_drift", 0.66))
