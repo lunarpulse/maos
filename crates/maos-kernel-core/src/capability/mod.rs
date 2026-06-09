@@ -224,6 +224,7 @@ impl CapabilityRegistryAdapter {
         &self.working_memory
     }
 
+
     /// Verify and audit a capability token.
     pub fn verify_and_audit(
         &self,

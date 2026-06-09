@@ -530,6 +530,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
+    // Story 8.14a — dispatch `maos init`, `maos shell`, `maos audit query`.
+    let mut shell_mode = false;
+    let mut audit_spirit: Option<String> = None;
+    let mut audit_format = "plain".to_string();
+    let mut plain_flag = false;
+    {
+        let mut args = std::env::args().skip(1).peekable();
+        match args.next().as_deref() {
+            Some("init") => {
+                for a in args {
+                    if a == "--plain" { plain_flag = true; }
+                }
+                let color = maos_cli::accessibility::ColorChoice::resolve(
+                    plain_flag,
+                    &maos_cli::accessibility::RealEnv,
+                );
+                return maos_shell::run_init(color);
+            }
+            Some("audit") => {
+                // Expected: audit query [--spirit <name>] [--format ndjson|plain]
+                if args.next().as_deref() == Some("query") {
+                    while let Some(a) = args.next() {
+                        match a.as_str() {
+                            "--spirit" => { audit_spirit = args.next(); if audit_spirit.is_none() { return Err("--spirit requires a value".into()); } }
+                            "--format" => { if let Some(f) = args.next() { audit_format = f; } else { return Err("--format requires a value (ndjson|plain)".into()); } }
+                            "--plain" => { plain_flag = true; }
+                            _ => {}
+                        }
+                    }
+                    let color = maos_cli::accessibility::ColorChoice::resolve(
+                        plain_flag,
+                        &maos_cli::accessibility::RealEnv,
+                    );
+                    return maos_shell::run_audit_query(
+                        audit_spirit.as_deref(),
+                        &audit_format,
+                        color,
+                    );
+                } else {
+                    eprintln!("Usage: maos audit query [--spirit <name>] [--format ndjson|plain] [--plain]");
+                    return Err("expected subcommand: query".into());
+                }
+            }
+            Some("shell") => {
+                for a in args {
+                    if a == "--plain" { plain_flag = true; }
+                }
+                shell_mode = true;
+            }
+            Some(_) => { /* unknown subcommand, fall through to maos run */ }
+            None => {
+                // Only enter shell mode if MAOS_ONE_SHOT is not set
+                // (MAOS_ONE_SHOT invocations have no CLI args but should not enter shell).
+                if std::env::var("MAOS_ONE_SHOT").is_err() {
+                    shell_mode = true;
+                }
+            }
+        }
+    }
 
     // Construct the seven adapter shells.
     // Story 5.1 — `_scheduler` replaced with real Arc<SpiritSchedulerAdapter>
@@ -1055,6 +1114,82 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_rate_limiter(Arc::clone(&rate_limiter))
     .with_iac(Arc::clone(&iac));
     eprintln!("maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)");
+    // Story 8.14a — kernel-rendered shell dispatch.
+    if shell_mode {
+        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+        let color = maos_cli::accessibility::ColorChoice::resolve(
+            plain_flag,
+            &maos_cli::accessibility::RealEnv,
+        );
+        let default_provider = router.default_id().unwrap_or("anthropic");
+        // Admit hello-spirit through the canonical SecurityManagerAdapter path
+        // (replaces the reverted policy() back-channel per code review consensus).
+        {
+            let manifest_path = std::path::PathBuf::from("spirits/hello-spirit/manifest.toml");
+            let manifest_toml = std::fs::read_to_string(&manifest_path)
+                .map_err(|e| format!("shell: cannot read hello-spirit manifest: {e}"))?;
+            let manifest_root: toml::Value = manifest_toml.parse()
+                .map_err(|e| format!("shell: cannot parse hello-spirit manifest: {e}"))?;
+
+            let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
+                &toml::to_string(&manifest_root["sandbox"]).unwrap_or_default(),
+            )?;
+            let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
+                &toml::to_string(&manifest_root["resources"]).unwrap_or_default(),
+            )?;
+            let caps_required = maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
+                &toml::to_string(manifest_root.get("capabilities").and_then(|c| c.get("required")).ok_or("missing [capabilities.required]")?).map_err(|e| format!("caps: {e}"))?,
+            )?;
+            let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
+                &toml::to_string(&manifest_root["output_shape"]).unwrap_or_default(),
+            )?;
+            let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
+                &toml::to_string(&manifest_root["class"]).unwrap_or_default(),
+            )?;
+            let posture_section = maos_kernel_core::security::manifest::PostureSection::from_toml_str(
+                &toml::to_string(&manifest_root["posture"]).unwrap_or_default(),
+            )?;
+            let epistemic_policy = manifest_root.get("epistemic_policy")
+                .map(|v| {
+                    let s = toml::to_string(v)
+                        .map_err(|e| format!("epistemic_policy serialize: {e}"))?;
+                    maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
+                        .map_err(|e| format!("epistemic_policy parse: {e}"))
+                })
+                .transpose()?;
+
+            let (drift_tx, _drift_rx) = maos_kernel_core::security::make_drift_channel();
+            let security = maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
+                .with_drift_sender(drift_tx);
+
+            let journal_path = maos_audit::default_journal_path();
+            if let Some(parent) = journal_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+                .map_err(|e| format!("shell: cannot open journal: {e}"))?;
+
+            security.admit_spirit(
+                0, "hello-spirit",
+                &sandbox_cfg, &resource_caps, &caps_required,
+                Some(&output_shape), &journal, &posture_section,
+                epistemic_policy.as_ref(),
+                None, None, None, None, None,
+                Some(&class_section),
+            ).map_err(|e| format!("shell: hello-spirit admission failed: {e}"))?;
+            drop(journal);
+            eprintln!("maos: hello-spirit admitted via canonical path (shell mode)");
+        }
+
+        let inference_arc: Arc<dyn maos_domain::ports::inference::InferencePort + Send + Sync> =
+            Arc::new(inference);
+        return maos_shell::run_shell(
+            inference_arc,
+            Arc::clone(&capability),
+            color,
+            default_provider,
+        );
+    }
     // ─────────────────────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────────

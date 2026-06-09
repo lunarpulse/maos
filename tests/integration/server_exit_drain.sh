@@ -21,7 +21,7 @@ echo "::group::Build maos-bin (release, locked)"
 cargo build -p maos-bin --release --locked --quiet
 echo "::endgroup::"
 
-MAOS_BIN="${REPO_ROOT}/target/release/maos-bin"
+MAOS_BIN="${REPO_ROOT}/target/release/maos"
 
 # ── (A) One-shot drain: generate cap-audit rows, verify persistence ──
 echo "::group::(A) One-shot drain: hello-spirit -> verify cap-audit rows persist"

@@ -397,13 +397,22 @@ pub fn to_fr4_plain<W: Write>(
 /// duplicated across crates to prevent silent path-drift data loss.
 ///
 /// Precedence (highest → lowest):
-///   1. `MAOS_AUDIT_DB` env var (explicit override; used by tests and ops).
+///   1. `MAOS_HOME` env var (Story 8.14a FORK 5 — init'd home).
+///      If set, path = `$MAOS_HOME/audit/transparency.sqlite`.
+///   2. `MAOS_AUDIT_DB` env var (explicit override; used by tests and ops).
 ///      Empty-string is rejected — callers should exit with a diagnostic.
-///   2. `$XDG_DATA_HOME/maos/audit/transparency.sqlite`
-///   3. `$HOME/.local/share/maos/audit/transparency.sqlite`
-///   4. `/var/lib/maos/audit/transparency.sqlite` (last-resort fallback)
+///   3. `$XDG_DATA_HOME/maos/audit/transparency.sqlite`
+///   4. `$HOME/.local/share/maos/audit/transparency.sqlite`
+///   5. `/var/lib/maos/audit/transparency.sqlite` (last-resort fallback)
 pub fn default_transparency_log_path() -> std::path::PathBuf {
     use std::path::PathBuf;
+    if let Ok(home) = std::env::var("MAOS_HOME") {
+        if !home.is_empty() {
+            return PathBuf::from(home)
+                .join("audit")
+                .join("transparency.sqlite");
+        }
+    }
     if let Ok(p) = std::env::var("MAOS_AUDIT_DB") {
         if p.is_empty() {
             eprintln!("maos: MAOS_AUDIT_DB is set but empty — unset it or provide a path");
@@ -438,17 +447,26 @@ pub fn default_transparency_log_path() -> std::path::PathBuf {
 /// [`default_transparency_log_path`] (Story 1b.5b D2).
 ///
 /// Precedence (highest → lowest):
-///   1. `MAOS_JOURNAL_PATH` env var (explicit override; used by tests
+///   1. `MAOS_HOME` env var (Story 8.14a FORK 5 — init'd home).
+///      If set, path = `$MAOS_HOME/journal/lifecycle.ndjson`.
+///   2. `MAOS_JOURNAL_PATH` env var (explicit override; used by tests
 ///      and ops). Empty-string is rejected — callers exit 2 with a
 ///      diagnostic (same shape as [`default_transparency_log_path`]).
-///   2. `$XDG_DATA_HOME/maos/journal/lifecycle.ndjson`
-///   3. `$HOME/.local/share/maos/journal/lifecycle.ndjson`
-///   4. `/var/lib/maos/journal/lifecycle.ndjson` (last-resort fallback)
+///   3. `$XDG_DATA_HOME/maos/journal/lifecycle.ndjson`
+///   4. `$HOME/.local/share/maos/journal/lifecycle.ndjson`
+///   5. `/var/lib/maos/journal/lifecycle.ndjson` (last-resort fallback)
 ///
 /// File suffix is `.ndjson` to match the Journal's NDJSON-on-disk
 /// storage choice (Story 1b.1 / `journal/mod.rs` §"Storage choice").
 pub fn default_journal_path() -> std::path::PathBuf {
     use std::path::PathBuf;
+    if let Ok(home) = std::env::var("MAOS_HOME") {
+        if !home.is_empty() {
+            return PathBuf::from(home)
+                .join("journal")
+                .join("lifecycle.ndjson");
+        }
+    }
     if let Ok(p) = std::env::var("MAOS_JOURNAL_PATH") {
         if p.is_empty() {
             eprintln!("maos: MAOS_JOURNAL_PATH is set but empty — unset it or provide a path");

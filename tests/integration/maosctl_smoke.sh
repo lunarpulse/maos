@@ -46,7 +46,7 @@ cleanup() {
 trap cleanup EXIT
 
 MAOSCTL="${REPO_ROOT}/target/release/maosctl"
-MAOS_BIN="${REPO_ROOT}/target/release/maos-bin"
+MAOS_BIN="${REPO_ROOT}/target/release/maos"
 # `MAOS_BIN_PATH` lets maosctl find the colocated binary even when the
 # release target dir is non-standard.
 export MAOS_BIN_PATH="$MAOS_BIN"

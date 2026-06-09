@@ -25,7 +25,7 @@ fn maosctl_path() -> PathBuf {
 }
 
 fn maos_bin_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maos-bin") {
+    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maos") {
         return PathBuf::from(p);
     }
     if let Ok(exe) = std::env::current_exe() {

@@ -16,7 +16,7 @@ default = "assistive"
 allowed_max = "assistive"
 
 [output_shape]
-required_fields = ["introduction", "capability_scope", "halt_tags", "transparency_log"]
+required_fields = ["introduction", "capability_scope", "posture", "halt_tags", "transparency_log"]
 
 [budget]
 context_window_size = 4096

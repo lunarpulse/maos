@@ -18,7 +18,7 @@ echo "::group::Run MAOS_ONE_SHOT=smoke-epic-4"
 set +e
 OUTPUT="$(MAOS_ONE_SHOT=smoke-epic-4 \
     MAOS_AUDIT_DB="$(mktemp -u --suffix=.sqlite)" \
-    "${REPO_ROOT}/target/release/maos-bin" 2>/dev/null)"
+    "${REPO_ROOT}/target/release/maos" 2>/dev/null)"
 RC=$?
 set -e
 

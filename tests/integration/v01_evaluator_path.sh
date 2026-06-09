@@ -45,7 +45,7 @@ cleanup() { rm -f "$DB" "$JOURNAL"; }
 trap cleanup EXIT
 
 MAOSCTL="${REPO_ROOT}/target/release/maosctl"
-MAOS_BIN="${REPO_ROOT}/target/release/maos-bin"
+MAOS_BIN="${REPO_ROOT}/target/release/maos"
 export MAOS_BIN_PATH="$MAOS_BIN"
 
 # Helper: capture stdout into a tempfile, assert 0 ANSI bytes, then

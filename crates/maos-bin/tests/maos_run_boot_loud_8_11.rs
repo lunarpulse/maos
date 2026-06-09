@@ -45,7 +45,7 @@ fn isolated_data_home(tag: &str) -> IsolatedDataHome {
 /// (a) Halt-posture Spirit without a port → FATAL boot, serving loop never entered.
 #[test]
 fn halt_posture_spirit_without_port_fatally_fails_boot() {
-    let output = Command::new(env!("CARGO_BIN_EXE_maos-bin"))
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/butler/manifest.toml", "--once"])
         // The test seam that simulates "forgot to wire the port" — the 8.1 footgun.
         .env("MAOS_TEST_ONLY_STRIP_SCALAR_PORT", "1")
@@ -75,7 +75,7 @@ fn halt_posture_spirit_without_port_fatally_fails_boot() {
 /// (b) Deterministic-posture Spirit without a port → boots clean (the over-fire guard).
 #[test]
 fn deterministic_posture_spirit_without_port_boots_clean() {
-    let output = Command::new(env!("CARGO_BIN_EXE_maos-bin"))
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/researcher/manifest.toml", "--once"])
         .env("XDG_DATA_HOME", isolated_data_home("bootloud-b").path.clone())
         .current_dir(workspace_root())

@@ -1116,6 +1116,7 @@ dependencies = [
  "maos-acp",
  "maos-audit",
  "maos-bench",
+ "maos-cli",
  "maos-compliance",
  "maos-corpus-gen",
  "maos-director-surface",
@@ -1125,6 +1126,7 @@ dependencies = [
  "maos-notify-push",
  "maos-providers",
  "maos-registry",
+ "maos-shell",
  "maos-skill",
  "maos-spirit-abi",
  "maos-spirit-cli",
@@ -1412,6 +1414,24 @@ dependencies = [
 [[package]]
 name = "maos-secrets"
 version = "0.1.0-alpha"
+
+[[package]]
+name = "maos-shell"
+version = "0.1.0-alpha"
+dependencies = [
+ "maos-audit",
+ "maos-cli",
+ "maos-director-surface",
+ "maos-domain",
+ "maos-kernel-core",
+ "maos-providers",
+ "maos-skill",
+ "maos-spirit-hello",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
 
 [[package]]
 name = "maos-skill"

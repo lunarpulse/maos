@@ -30,8 +30,8 @@ jobs:
         run: |
           mkdir -p /tmp/build-artifacts-1
           find target/debug/deps/ -name '*.rlib' -exec sha256sum {} \; | sort > /tmp/build-artifacts-1/rlibs.sha256
-          if [ -f target/debug/maos-bin ]; then
-            sha256sum target/debug/maos-bin > /tmp/build-artifacts-1/bin.sha256
+          if [ -f target/debug/maos ]; then
+            sha256sum target/debug/maos > /tmp/build-artifacts-1/bin.sha256
           fi
       - name: Clean build artifacts
         run: cargo clean
@@ -41,8 +41,8 @@ jobs:
         run: |
           mkdir -p /tmp/build-artifacts-2
           find target/debug/deps/ -name '*.rlib' -exec sha256sum {} \; | sort > /tmp/build-artifacts-2/rlibs.sha256
-          if [ -f target/debug/maos-bin ]; then
-            sha256sum target/debug/maos-bin > /tmp/build-artifacts-2/bin.sha256
+          if [ -f target/debug/maos ]; then
+            sha256sum target/debug/maos > /tmp/build-artifacts-2/bin.sha256
           fi
       - name: Verify byte-identical artifacts
         run: |
@@ -1374,7 +1374,7 @@ jobs:
       - name: Run smoke-orchestrator-fanout-6-2
         env:
           MAOS_ONE_SHOT: smoke-orchestrator-fanout-6-2
-        run: ./target/release/maos-bin
+        run: ./target/release/maos
 
   # Story 8.4 AC6 — smoke-founder-loop-8-4 end-to-end founder-loop wedge demo.
   smoke-founder-loop-8-4:
@@ -1397,7 +1397,7 @@ jobs:
         # hot-swap state_codec) → 7am digest cites actual source_log_refs.
         env:
           MAOS_ONE_SHOT: smoke-founder-loop-8-4
-        run: ./target/release/maos-bin
+        run: ./target/release/maos
 
   # Story 6.3 AC7 — smoke-a2a-loopback-6-3 A2A wedge demo.
   smoke-a2a-loopback-6-3:
@@ -1416,7 +1416,7 @@ jobs:
       - name: Run smoke-a2a-loopback-6-3
         env:
           MAOS_ONE_SHOT: smoke-a2a-loopback-6-3
-        run: ./target/release/maos-bin
+        run: ./target/release/maos
 
   # Story 8.7 AC6 — smoke-a2a-consent-vocab-8-7 fine-grained typed-intent consent
   # demo (one fine-grained admit + one fine-grained code-mutation-directive deny).
@@ -1436,7 +1436,7 @@ jobs:
       - name: Run smoke-a2a-consent-vocab-8-7
         env:
           MAOS_ONE_SHOT: smoke-a2a-consent-vocab-8-7
-        run: ./target/release/maos-bin
+        run: ./target/release/maos
 
   # Story 8.8 AC4 — smoke-a2a-fail-closed-8-8: fail-closed cross-Host consent
   # demo (classified admit + absent-deny -32009 + non-canonical-deny -32009).
@@ -1456,7 +1456,7 @@ jobs:
       - name: Run smoke-a2a-fail-closed-8-8
         env:
           MAOS_ONE_SHOT: smoke-a2a-fail-closed-8-8
-        run: ./target/release/maos-bin
+        run: ./target/release/maos
 
   # Story 8.5 AC7 — smoke-mira-nash-8-5 bilateral-pair J4 journey.
   smoke-mira-nash-8-5:
@@ -1481,7 +1481,7 @@ jobs:
         # deliberate EIntentDenied consent rejection is observable (ConsentRupture).
         env:
           MAOS_ONE_SHOT: smoke-mira-nash-8-5
-        run: ./target/release/maos-bin
+        run: ./target/release/maos
 
   # Story 8.6 AC-T13 — live cross-Host TCP/mTLS transport suite, hermetic + the
   # CI determinism repeat-runner (50× / --test-threads=8 / --retries 0). Any
@@ -1529,7 +1529,7 @@ jobs:
       - name: Run smoke-a2a-tcp-8-6
         env:
           MAOS_ONE_SHOT: smoke-a2a-tcp-8-6
-        run: ./target/release/maos-bin
+        run: ./target/release/maos
 
   # Story 6.3 AC2 — FR23a + NFR-Sec-11/12 corpus + cross-Host AC3 + NFR-Rel-6 + chaos + churn
   a2a-loopback-corpus-v0:
@@ -1588,7 +1588,7 @@ jobs:
         env:
           MAOS_ONE_SHOT: smoke-schedule-6-4
           MAOS_SCHEDULE_FAST: "1"
-        run: ./target/release/maos-bin
+        run: ./target/release/maos
 
   # Story 6.4 AC2 — FR26 / ADR-025 schedule firing corpus (8 integration tests).
   fr26-schedule-firing-corpus:

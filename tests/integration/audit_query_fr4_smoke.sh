@@ -4,7 +4,7 @@
 # Runs the canonical FR4 verification path end-to-end:
 #   1. Build `maos-bin` and `maosctl` (release, locked).
 #   2. Point both at a fresh on-disk SQLite via `MAOS_AUDIT_DB`.
-#   3. Run `MAOS_ONE_SHOT=hello-spirit ./target/release/maos-bin` — this
+#   3. Run `MAOS_ONE_SHOT=hello-spirit ./target/release/maos` — this
 #      seeds the Transparency Log with one `inference.call` row (plus the
 #      capability-issue / capability-invocation rows the registry emits).
 #   4. Pipe `maosctl audit query --spirit hello-spirit --format ndjson`
@@ -46,7 +46,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "::group::Seed Transparency Log via one-shot hello-spirit"
-MAOS_ONE_SHOT=hello-spirit "${REPO_ROOT}/target/release/maos-bin" >/dev/null
+MAOS_ONE_SHOT=hello-spirit "${REPO_ROOT}/target/release/maos" >/dev/null
 echo "::endgroup::"
 
 echo "::group::maosctl audit query — FR4 NDJSON schema check"

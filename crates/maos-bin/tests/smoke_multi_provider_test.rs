@@ -8,7 +8,7 @@ use std::process::Command;
 #[test]
 fn smoke_multi_provider_5_exercises_6_surfaces() {
     let workspace_root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-    let output = Command::new(env!("CARGO_BIN_EXE_maos-bin"))
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .env("MAOS_ONE_SHOT", "smoke-multi-provider-5")
         .env("MAOS_SPIRIT_ABI_MOCK", "1")
         .current_dir(workspace_root)

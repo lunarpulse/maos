@@ -37,7 +37,7 @@ fn isolated_data_home(tag: &str) -> IsolatedDataHome {
 }
 
 fn run_once(manifest: &str) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_maos-bin"))
+    Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", manifest, "--once"])
         .env("XDG_DATA_HOME", isolated_data_home("smoke").path.clone())
         .current_dir(workspace_root())

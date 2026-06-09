@@ -19,7 +19,7 @@ set +e
 OUTPUT="$(MAOS_ONE_SHOT=smoke-spirit-5 \
     MAOS_IDLE_FAST=1 \
     MAOS_AUDIT_DB="$(mktemp -u --suffix=.sqlite)" \
-    "${REPO_ROOT}/target/release/maos-bin" 2>/dev/null)"
+    "${REPO_ROOT}/target/release/maos" 2>/dev/null)"
 RC=$?
 set -e
 

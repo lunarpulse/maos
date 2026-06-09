@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 fn one_shot_hello_spirit_produces_valid_json() {
     let workspace_root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
     let start = Instant::now();
-    let output = Command::new(env!("CARGO_BIN_EXE_maos-bin"))
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .env("MAOS_ONE_SHOT", "hello-spirit")
         .env("MAOS_OLLAMA_URL", "skip")
         .current_dir(workspace_root)

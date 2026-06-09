@@ -8,7 +8,7 @@ rust-version.workspace = true
 description = "MAOS binary — the maos Host executable (Story 1a.2)"
 
 [[bin]]
-name = "maos-bin"
+name = "maos"
 path = "src/main.rs"
 
 [features]
@@ -17,6 +17,8 @@ fixture_replay = ["maos-mcp/fixture_replay", "maos-acp/fixture_replay", "maos-pr
 smoke_schedule = ["tokio/test-util"]
 
 [dependencies]
+maos-shell = { path = "../maos-shell" }
+maos-cli = { path = "../maos-cli" }
 maos-audit = { path = "../maos-audit" }
 maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }

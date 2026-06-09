@@ -5,7 +5,7 @@ export MAOS_SUPERVISION_FAST=1
 # Use dev binary (faster than --release build) with a timeout.
 # Shutdown hang is a pre-existing tokio-runtime issue (smoke-spirit-5 has the same
 # behaviour); we capture output before the timeout and grep-assert.
-output=$(MAOS_ONE_SHOT=smoke-supervision-5 timeout 15 ./target/debug/maos-bin 2>&1 || true)
+output=$(MAOS_ONE_SHOT=smoke-supervision-5 timeout 15 ./target/debug/maos 2>&1 || true)
 echo "$output"
 
 echo "$output" | grep -q '"step": 1, "surface": "crash_detector"' || { echo "FAIL: step 1 crash_detector missing"; exit 1; }

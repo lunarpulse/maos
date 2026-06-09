@@ -41,7 +41,7 @@ fn isolated_data_home(tag: &str) -> IsolatedDataHome {
 /// wrongly selected the real driver, this would fail `Unconfigured` (no key).
 #[test]
 fn ci_default_uses_zero_network_deterministic_path() {
-    let output = Command::new(env!("CARGO_BIN_EXE_maos-bin"))
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/researcher/manifest.toml", "--once"])
         // Explicitly ensure no real provider is configured — the default path
         // must succeed regardless (it makes no network call).

@@ -18,7 +18,7 @@ echo "=== cap_registry_smoke: starting maos-bin ==="
 # within 8 seconds. We send SIGINT after 3 seconds to trigger
 # graceful shutdown.
 timeout 8s bash -c '
-    ./target/debug/maos-bin &
+    ./target/debug/maos &
     MAOS_PID=$!
     sleep 3
     kill -INT $MAOS_PID 2>/dev/null || true

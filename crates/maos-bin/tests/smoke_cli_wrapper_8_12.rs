@@ -43,7 +43,7 @@ fn isolated_data_home(tag: &str) -> IsolatedDataHome {
 #[test]
 fn maos_run_cli_wrapper_worker_spawns_real_subprocess() {
     let home = isolated_data_home("cw-run");
-    let output = Command::new(env!("CARGO_BIN_EXE_maos-bin"))
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/worker/manifest.toml", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
         .current_dir(workspace_root())
@@ -98,7 +98,7 @@ fn maos_run_cli_wrapper_worker_spawns_real_subprocess() {
 #[test]
 fn founder_loop_journey_runs_with_real_worker_subprocess() {
     let home = isolated_data_home("founder");
-    let output = Command::new(env!("CARGO_BIN_EXE_maos-bin"))
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .env("MAOS_ONE_SHOT", "smoke-founder-loop-8-4")
         .env("XDG_DATA_HOME", home.path.clone())
         .current_dir(workspace_root())

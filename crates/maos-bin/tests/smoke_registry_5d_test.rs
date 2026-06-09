@@ -9,7 +9,7 @@ use std::process::Command;
 
 #[test]
 fn smoke_registry_5d_exits_zero_and_outputs_7_json_lines() {
-    let bin = env!("CARGO_BIN_EXE_maos-bin");
+    let bin = env!("CARGO_BIN_EXE_maos");
     let output = Command::new(bin)
         .env("MAOS_ONE_SHOT", "smoke-registry-5d")
         .output()

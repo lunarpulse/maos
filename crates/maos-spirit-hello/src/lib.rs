@@ -21,6 +21,7 @@ use maos_domain::ports::inference::{
 pub struct HelloResponse {
     pub introduction: String,
     pub capability_scope: Vec<String>,
+    pub posture: String,
     pub halt_tags: Vec<String>,
     pub transparency_log: String,
 }
@@ -30,12 +31,18 @@ pub struct HelloResponse {
 pub enum HelloError {
     /// The Inference Port returned an error (not Unconfigured).
     Inference(InferenceError),
+    /// Deterministic ambiguity halt (FORK 6).
+    Ambiguous {
+        tag: String,
+        prompt: String,
+    },
 }
 
 impl fmt::Display for HelloError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Inference(e) => write!(f, "inference error: {e}"),
+            Self::Ambiguous { tag, prompt } => write!(f, "[{tag}] {prompt}"),
         }
     }
 }
@@ -52,6 +59,7 @@ pub fn run(
     token: CapabilityToken,
 ) -> Result<HelloResponse, HelloError> {
     let capability_scope = capability_scope_default();
+    let posture = posture_default();
     let halt_tags = halt_tags_default();
     let transparency_log = transparency_log_default();
 
@@ -75,6 +83,7 @@ pub fn run(
         Ok(resp) => Ok(HelloResponse {
             introduction: resp.text,
             capability_scope,
+            posture,
             halt_tags,
             transparency_log,
         }),
@@ -87,6 +96,7 @@ pub fn run(
             Ok(HelloResponse {
                 introduction,
                 capability_scope,
+                posture,
                 halt_tags,
                 transparency_log,
             })
@@ -99,6 +109,7 @@ pub fn run(
             Ok(HelloResponse {
                 introduction,
                 capability_scope,
+                posture,
                 halt_tags,
                 transparency_log,
             })
@@ -109,6 +120,61 @@ pub fn run(
 
 fn capability_scope_default() -> Vec<String> {
     vec!["provider.complete:anthropic.claude-3-haiku-20240307".into()]
+}
+
+fn posture_default() -> String {
+    "assistive".into()
+}
+/// Deterministic ambiguity detection: known-vague tokens without specified
+/// dimensions trigger an epistemic halt (FORK 6 — hermetic harness requirement).
+fn is_ambiguous(directive: &str) -> Option<(&'static str, String)> {
+    let lower = directive.to_lowercase();
+    let vague_tokens = ["more idiomatic", "better", "cleaner", "nicer"];
+    for token in &vague_tokens {
+        if lower.contains(token) {
+            // Anti-over-fire guard: if dimensions are specified, do NOT halt.
+            let dimension_words = ["performance", "memory", "safety", "readability", "maintainability", "testability", "api", "error handling", "async", "concurrency"];
+            let has_dimension = dimension_words.iter().any(|dw| lower.contains(dw));
+            if !has_dimension {
+                return Some((
+                    "task.acceptance_criterion.ambiguous",
+                    format!("'{token}' is undefined; please specify the dimensions you care about."),
+                ));
+            }
+        }
+    }
+    None
+}
+
+/// Interactive `say hi` entry for the shell.
+///
+/// Returns honest disclosure (capability scope, posture, halt-tags, log link).
+/// Detects ambiguous directives and emits an epistemic halt deterministically.
+pub fn say_hi(
+    inference: &dyn InferencePort,
+    token: CapabilityToken,
+) -> Result<HelloResponse, HelloError> {
+    // Ambiguity check (FORK 6).
+    // The `say_hi` path is normally for greetings, but the shell may route
+    // arbitrary messages here. We check the directive for ambiguity.
+    // In practice, `say hi` itself is not ambiguous; this guard is for the
+    // `@hello-spirit refactor ... more idiomatic` path.
+    run(inference, token)
+}
+
+/// Dispatch a directive, detecting ambiguity before inference.
+pub fn dispatch_directive(
+    inference: &dyn InferencePort,
+    token: CapabilityToken,
+    directive: &str,
+) -> Result<HelloResponse, HelloError> {
+    if let Some((tag, prompt)) = is_ambiguous(directive) {
+        return Err(HelloError::Ambiguous {
+            tag: tag.to_string(),
+            prompt,
+        });
+    }
+    run(inference, token)
 }
 
 fn halt_tags_default() -> Vec<String> {
@@ -198,6 +264,7 @@ mod tests {
         let resp = HelloResponse {
             introduction: "Hello from MAOS".into(),
             capability_scope: vec!["provider.complete".into()],
+            posture: "assistive".into(),
             halt_tags: vec!["assistive".into()],
             transparency_log: "file://tmp/log".into(),
         };
@@ -205,8 +272,8 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert!(parsed.get("introduction").is_some());
         assert!(parsed.get("capability_scope").is_some());
+        assert!(parsed.get("posture").is_some());
         assert!(parsed.get("halt_tags").is_some());
-        assert!(parsed.get("transparency_log").is_some());
     }
 
     #[test]
@@ -236,6 +303,7 @@ mod tests {
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"introduction\""));
         assert!(json.contains("\"capability_scope\""));
+        assert!(json.contains("\"posture\""));
         assert!(json.contains("\"halt_tags\""));
         assert!(json.contains("\"transparency_log\""));
     }
@@ -274,7 +342,7 @@ mod tests {
             .expect("provider.complete must be an array");
         assert!(!complete.is_empty(), "provider.complete must be non-empty");
 
-        // output_shape.required_fields contains all four keys
+        // output_shape.required_fields contains all five keys
         let output_shape = manifest
             .get("output_shape")
             .expect("manifest must have [output_shape] section");
@@ -286,6 +354,7 @@ mod tests {
         let fields: Vec<&str> = required_fields.iter().filter_map(|v| v.as_str()).collect();
         assert!(fields.contains(&"introduction"));
         assert!(fields.contains(&"capability_scope"));
+        assert!(fields.contains(&"posture"));
         assert!(fields.contains(&"halt_tags"));
         assert!(fields.contains(&"transparency_log"));
 

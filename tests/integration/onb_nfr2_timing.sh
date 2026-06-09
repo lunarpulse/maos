@@ -32,7 +32,7 @@ cargo build -p maos-bin --release --locked
 
 # Step 3: One-shot execution
 echo "--- Running hello-Spirit one-shot ---"
-output=$(MAOS_ONE_SHOT=hello-spirit NO_COLOR=1 ./target/release/maos-bin 2>/dev/null)
+output=$(MAOS_ONE_SHOT=hello-spirit NO_COLOR=1 ./target/release/maos 2>/dev/null)
 time_end=$(date +%s)
 elapsed=$((time_end - time_start))
 
@@ -56,8 +56,8 @@ fi
 
 # Step 5: Binary size gate — stripped maos-bin ≤10MB (AC4)
 echo "--- Checking binary size ---"
-strip target/release/maos-bin
-bin_size=$(stat -c%s target/release/maos-bin)
+strip target/release/maos
+bin_size=$(stat -c%s target/release/maos)
 max_size=10485760  # 10 MiB
 echo "maos-bin stripped size: ${bin_size} bytes (limit: ${max_size})"
 if [ "$bin_size" -gt "$max_size" ]; then

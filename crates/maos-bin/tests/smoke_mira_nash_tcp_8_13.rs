@@ -12,7 +12,7 @@ fn smoke_mira_nash_tcp_8_13_runs_with_isolated_xdg() {
     let _ = std::fs::remove_dir_all(&xdg);
     std::fs::create_dir_all(&xdg).expect("create isolated XDG_DATA_HOME");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_maos-bin"))
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .env("MAOS_ONE_SHOT", "smoke-mira-nash-tcp-8-13")
         .env("XDG_DATA_HOME", &xdg)
         .env("MAOS_OLLAMA_URL", "skip")
