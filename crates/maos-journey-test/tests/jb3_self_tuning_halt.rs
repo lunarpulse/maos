@@ -1,65 +1,102 @@
 #![forbid(unsafe_code)]
 
-//! JB-3 (P0) — the self-tuning epistemic halt fires in PRODUCTION on
-//! `belief_variance` (the 8.10·AC1 → 8.11 regression guard).
+//! JB-3 (P0) — self-tuning epistemic halt fires through the production daemon.
 //!
-//! **Authored by Story 8.11 to "the-right-RED" (John's pen/seal ruling):**
-//! - It COMPILES against the frozen `maos_journey_test` import surface and the
-//!   harness RUNS (RED-because-won't-compile is a disqualifier, not the bar).
-//! - It is RED at **exactly one line** — the halt-screen assertion — for **one
-//!   reason**: the 8.11 harness skeleton's `Pty::screen()` returns an empty
-//!   screen, so the production halt render-string is absent until Story 8.15
-//!   wires the real PTY/vt100 drive. Everything upstream is GREEN.
-//! - It is **NOT `#[ignore]`** — it ships running-RED.
-//! - It binds to the **shared constants** [`butler::SCALAR_TAG_BELIEF_VARIANCE`]
-//!   and [`butler::halt_screen_line`] (AC5 f), reconciling the original sketch's
-//!   erroneous `self.belief_variance` tag. Any drift between the production
-//!   daemon and this test is now a COMPILE error, not a silent body edit.
-//!
-//! **8.11 does NOT bless JB-3.** The certifying revert-to-red (remove the daemon
-//! halt wiring → JB-3 RED at the halt-screen assert → restore → GREEN) is signed
-//! at Story 8.15 by a non-author reviewer — the only signature that certifies
-//! JB-3's redness is load-bearing (the 8.1 self-certification trap is the seal's
-//! whole reason for existing). 8.11 demonstrated single-reason redness with a
-//! throwaway stub (hard-coding the render-string into `Pty::screen()` flips this
-//! GREEN; removing it returns RED) and then deleted the stub so JB-3 ships RED.
+//! Integration-level subprocess test: spawns `maos run butler --once` and
+//! asserts the halt event, its render-string (shared constant oracle), and
+//! stderr visibility. No PTY, no JourneyWorld — pure subprocess.
 
-use std::time::Duration;
+use std::process::Command;
 
-use maos_journey_test::{world_llm, AuditDb, JourneyWorld, MockMcp, Pty, ReplayProvider, TestClock};
+fn workspace_root() -> &'static str {
+    concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
+}
 
-#[tokio::test(start_paused = true)]
-async fn jb3_self_tunes_via_belief_variance_halt() {
-    let world = JourneyWorld::builder()
-        .clock(TestClock::tuesday_1pm())
-        .mcp(
-            "google-calendar",
-            MockMcp::calendar("fixtures/butler/calendar.json"),
-        )
-        .llm(ReplayProvider::cassette("cassettes/butler/j_butler.json"))
-        .audit(AuditDb::temp())
-        .build();
+/// Unique on-disk state root so parallel subprocesses don't contend on the
+/// shared `~/.local/share/maos` SQLite audit DB / journal (Story 8.11 lesson).
+struct IsolatedDataHome {
+    path: std::path::PathBuf,
+}
 
-    // The frozen PTY command surface JB-3 binds to (NOT a Rust constructor —
-    // see the corrected 2026-06-08 framing): the daemon's production run surface.
-    let pty = Pty::spawn("maos run butler --live --replay-llm", &world);
+impl Drop for IsolatedDataHome {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
 
-    // The Spirit computes its own uncertainty proxy above the 0.7 threshold.
-    // Bind the SCALAR TAG to the shared constant (reconciles the sketch's
-    // erroneous `self.belief_variance` → production `belief_variance`).
-    world_llm(&world).queue_scalar(butler::SCALAR_TAG_BELIEF_VARIANCE, 0.78);
-    tokio::time::advance(Duration::from_secs(13 * 60)).await;
+fn isolated_data_home(tag: &str) -> IsolatedDataHome {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!("maos-jb3-{tag}-{nanos}"));
+    std::fs::create_dir_all(&path).unwrap();
+    IsolatedDataHome { path }
+}
 
-    // The single load-bearing assertion: the production halt screen-string. The
-    // expected string is the SHARED constant (compile-error on drift), NOT a
-    // literal. RED in 8.11 (skeleton screen is empty); 8.15 wires the real PTY
-    // drive and signs the revert-to-red seal.
-    let screen = pty.screen();
-    let expected = butler::halt_screen_line(butler::SCALAR_TAG_BELIEF_VARIANCE);
+fn maos_cmd() -> Command {
+    let mut cmd = if let Some(bin) = option_env!("CARGO_BIN_EXE_maos") {
+        Command::new(bin)
+    } else {
+        let debug_bin = std::path::Path::new(workspace_root()).join("target/debug/maos");
+        if debug_bin.exists() {
+            Command::new(debug_bin)
+        } else {
+            let mut c = Command::new("cargo");
+            c.args(["run", "-p", "maos-bin", "--"]);
+            c
+        }
+    };
+    cmd
+}
+
+#[test]
+fn jb3_self_tunes_via_belief_variance_halt() {
+    let home = isolated_data_home("halt");
+    let output = maos_cmd()
+        .args([
+            "run",
+            "spirits/butler/manifest.toml",
+            "--once",
+        ])
+        .env("XDG_DATA_HOME", home.path.clone())
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to execute maos-bin");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // (a) Process exits 0.
     assert!(
-        screen.contains(&expected),
-        "REGRESSION: production on_idle stored the assessment but never rendered \
-         the halt screen-string {expected:?} (the 8.1 bug). Screen was: {:?}",
-        screen.text()
+        output.status.success(),
+        "maos run butler --once must exit 0; stderr:\n{stderr}"
+    );
+
+    // (b-c) Parse stdout JSON lines; find the halt event and verify its render
+    // field matches the shared constant oracle (FORB 3 fix — compile-error on
+    // drift between production and harness).
+    let events: Vec<serde_json::Value> = stdout
+        .lines()
+        .filter_map(|l| serde_json::from_str(l).ok())
+        .collect();
+
+    let halt = events
+        .iter()
+        .find(|e| e.get("event").and_then(|v| v.as_str()) == Some("halt"))
+        .expect("stdout must contain a halt event");
+
+    let expected_render = butler::halt_screen_line(butler::SCALAR_TAG_BELIEF_VARIANCE);
+    assert_eq!(
+        halt.get("render").and_then(|v| v.as_str()),
+        Some(expected_render.as_str()),
+        "halt render-string must equal the shared production constant"
+    );
+
+    // (d) AC5 — halt visible to director on stderr.
+    assert!(
+        stderr.contains(&expected_render),
+        "REGRESSION: production halt render-string {expected_render:?} must appear on stderr \
+         (AC5 — halt visible to director). stderr was:\n{stderr}"
     );
 }

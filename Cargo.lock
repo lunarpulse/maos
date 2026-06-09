@@ -176,6 +176,7 @@ checksum = "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
 name = "butler"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "maos-audit",
  "maos-domain",
  "maos-eval",
@@ -183,11 +184,14 @@ dependencies = [
  "maos-manifest",
  "maos-spirit-abi",
  "maos-spirit-sdk",
+ "parking_lot",
  "rusqlite",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
  "toml 0.8.23",
 ]
 
@@ -1106,6 +1110,7 @@ name = "maos-bin"
 version = "0.1.0-alpha"
 dependencies = [
  "architect",
+ "async-trait",
  "butler",
  "crossbeam-channel",
  "getrandom 0.3.4",
@@ -1290,6 +1295,12 @@ name = "maos-journey-test"
 version = "0.1.0-alpha"
 dependencies = [
  "butler",
+ "maos-audit",
+ "maos-bin",
+ "maos-domain",
+ "maos-kernel-core",
+ "serde_json",
+ "tempfile",
  "tokio",
 ]
 
@@ -1419,6 +1430,7 @@ version = "0.1.0-alpha"
 name = "maos-shell"
 version = "0.1.0-alpha"
 dependencies = [
+ "butler",
  "maos-audit",
  "maos-cli",
  "maos-director-surface",
@@ -1426,6 +1438,7 @@ dependencies = [
  "maos-kernel-core",
  "maos-providers",
  "maos-skill",
+ "maos-spirit-abi",
  "maos-spirit-hello",
  "serde",
  "serde_json",

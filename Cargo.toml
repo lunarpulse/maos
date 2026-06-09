@@ -55,3 +55,6 @@ edition = "2021"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/lunarpulse/maos"
 rust-version = "1.88"
+
+[workspace.dependencies]
+async-trait = "0.1"

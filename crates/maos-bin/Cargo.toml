@@ -48,6 +48,8 @@ mira = { path = "../../spirits/mira" }   # Story 8.5 — Mira+Nash bilateral pai
 nash = { path = "../../spirits/nash" }   # Story 8.5 — Mira+Nash bilateral pair
 butler = { path = "../../spirits/butler" }       # Story 8.11 — `maos run butler` daemon load + boot-loud EpistemicScalarPort
 researcher = { path = "../../spirits/researcher" }   # Story 8.11 — `maos run researcher` daemon load + live inference seam
+# Story 8.14b — async-trait for LiveButlerMcpPort (ButlerMcpPort impl in composition root).
+async-trait = { workspace = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 getrandom = "0.3"

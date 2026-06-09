@@ -35,9 +35,82 @@ use maos_audit::{query, AuditError, AuditFilter};
 use maos_domain::distillation::{DigestPayload, DistillationError, DistillationRequest};
 use maos_domain::halt::HaltReceipt;
 use maos_domain::notification::NotificationEvent;
+use maos_domain::ports::mcp::McpError;
 use maos_domain::ports::EpistemicScalarPort;
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
+
+// ───────────────────────────────────────────────────────────────────────────
+// Story 8.14b — ButlerMcpPort (FORK 1) + option-pick dispatch (FORK 2).
+// ───────────────────────────────────────────────────────────────────────────
+
+/// MCP error variants specific to Butler's domain port layer (FORK 1).
+/// Distinct from `ButlerError` (the digest path); this covers the MCP call
+/// + option-pick flow.
+#[derive(Debug, thiserror::Error)]
+pub enum ButlerMcpError {
+    /// An MCP tool call failed (transport, decode, or server error).
+    #[error("MCP call failed: {server}/{tool}: {cause}")]
+    CallFailed {
+        server: String,
+        tool: String,
+        cause: McpError,
+    },
+    /// Token issuance for the MCP call was denied by the capability registry.
+    #[error("token issuance failed for MCP call")]
+    TokenIssuanceFailed,
+    /// The MCP call was denied because the Spirit's manifest does not declare
+    /// the requested server/tool scope.
+    #[error("unauthorized MCP call: capability scope mismatch")]
+    Unauthorized,
+    /// `handle_option_pick` was called but no notification is pending.
+    #[error("no pending notification to pick from")]
+    NoPendingNotification,
+}
+
+/// Story 8.14b FORK 1 — the MCP domain port Butler's `on_idle` calls to
+/// fetch real calendar/comms data and write a Linear note on option pick.
+///
+/// `async-trait` in butler, no `spawn_blocking`, no tokio in `[dependencies]`.
+/// MCP calls are low-frequency (once per `on_idle` cycle), not inner loops.
+#[async_trait::async_trait]
+pub trait ButlerMcpPort: Send + Sync {
+    /// Fetch calendar events from the real Calendar MCP server.
+    async fn calendar_events(&self) -> Result<Vec<CalendarEvent>, ButlerMcpError>;
+    /// Fetch comms messages from the real Slack MCP server.
+    async fn comms_messages(&self) -> Result<Vec<CommsMessage>, ButlerMcpError>;
+    /// Write a Linear note (issue) with the given title and content.
+    async fn write_linear_note(&self, title: &str, content: &str) -> Result<(), ButlerMcpError>;
+    /// Fetch a Figma file summary (design context for future reasoning).
+    async fn fetch_figma_summary(&self) -> Result<serde_json::Value, ButlerMcpError>;
+}
+
+/// The notification payload Butler stores from its last `on_idle` pass, so
+/// `handle_option_pick` can dispatch the selected option. FORK 2 state.
+#[derive(Debug, Clone, Serialize)]
+pub struct NotificationPayload {
+    /// The pattern Butler detected (e.g. "calendar-conflict").
+    pub pattern: String,
+    /// Confidence in the detection [0.0, 1.0].
+    pub confidence: f32,
+    /// Human-readable evidence string.
+    pub evidence: String,
+    /// The conflict summary used as content for a Linear note (option a).
+    pub conflict_summary: String,
+}
+
+/// Outcome of a director option pick (FORK 2).
+#[derive(Debug, Clone, Serialize)]
+pub struct OptionPickOutcome {
+    /// true if a Linear note was written (option a).
+    pub linear_note_written: bool,
+    /// true if a Slack reminder was queued (option b — stub in 8.14b).
+    pub reminder_set: bool,
+    /// true if the notification was snoozed (option c — stub in 8.14b).
+    pub snoozed: bool,
+    /// Human-readable message for the shell to render.
+    pub message: String,
+}
 
 /// Butler's own Spirit id — the `spirit_id` it writes scalars under and the id
 /// every digest cite / halt frame is attributed to.
@@ -265,7 +338,7 @@ pub struct Butler {
     pending: Option<ScenarioInput>,
     /// The assessment from the most recent `on_idle` firing. Persists so the
     /// computation is observable (not silently discarded) and testable.
-    /// Thread-safe (`Arc<Mutex<...>>`) so Butler remains `Sync` as required
+    /// Thread-safe (`Arc<Mutex<..>>`) so Butler remains `Sync` as required
     /// by the `#[spirit]` macro.
     last_assessment: Arc<std::sync::Mutex<Option<Assessment>>>,
     /// Story 8.10 AC1 — the epistemic-scalar **write** port. When `Some`,
@@ -278,6 +351,15 @@ pub struct Butler {
     /// the firing is OBSERVABLE (not silently discarded). `None` when no port is
     /// wired or no halt fired.
     last_halt_receipt: Arc<std::sync::Mutex<Option<HaltReceipt>>>,
+    /// Story 8.14b FORK 1 — the MCP domain port for fetching real calendar/comms
+    /// data and writing Linear notes. When `Some`, `on_idle` calls it to build
+    /// the `ScenarioInput` from real data instead of using `self.pending`.
+    mcp_port: Option<Arc<dyn ButlerMcpPort>>,
+    /// Story 8.14b FORK 2 — the pending notification from the last `on_idle`,
+    /// so `handle_option_pick` can dispatch the selected option.
+    /// `parking_lot::Mutex` — Butler is `Send + Sync` behind `Arc`; `parking_lot`
+    /// preferred over `std::sync::Mutex` for non-poisoning behavior.
+    last_notification: Arc<parking_lot::Mutex<Option<NotificationPayload>>>,
 }
 
 impl std::fmt::Debug for Butler {
@@ -285,6 +367,7 @@ impl std::fmt::Debug for Butler {
         f.debug_struct("Butler")
             .field("pending", &self.pending)
             .field("has_scalar_port", &self.scalar_port.is_some())
+            .field("has_mcp_port", &self.mcp_port.is_some())
             .finish()
     }
 }
@@ -293,23 +376,75 @@ impl std::fmt::Debug for Butler {
 impl Butler {
     /// Anticipatory idle pass. Cancellation-aware; bounded (it does a single
     /// linear pass over the pending scenario, well within `time_cap_seconds`).
+    ///
+    /// Story 8.14b: when `mcp_port` is `Some`, fetches real calendar/comms
+    /// data via the MCP domain port and builds a live `ScenarioInput`. Falls
+    /// back to `self.pending` when `mcp_port` is `None` (backwards-compat
+    /// preserved — existing smoke tests unchanged).
     fn on_idle(&self, ctx: &mut Ctx) {
         if ctx.cancellation().is_cancelled() {
             return;
         }
-        if let Some(scenario) = &self.pending {
+
+        // Story 8.14b — build the scenario from real MCP data when the port
+        // is wired (--live), otherwise fall back to the injected pending
+        // scenario (fixture-replay / smoke tests).
+        let scenario = if let Some(mcp) = &self.mcp_port {
+            // MCP calls are low-frequency (once per on_idle cycle), not inner
+            // loops. block_on is safe here because on_idle runs inside
+            // spawn_blocking and the underlying MCP client is sync.
+            let calendar = match block_on_sync(mcp.calendar_events()) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("butler: calendar MCP fetch failed: {e}");
+                    vec![]
+                }
+            };
+            let comms = match block_on_sync(mcp.comms_messages()) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("butler: comms MCP fetch failed: {e}");
+                    vec![]
+                }
+            };
+            Some(ScenarioInput {
+                calendar,
+                comms,
+                preference_alignment: None,
+            })
+        } else {
+            self.pending.clone()
+        };
+
+        if let Some(scenario) = &scenario {
             // Run the anticipatory reasoning and store the result so it is
             // observable (not silently discarded).
             let assessment = self.assess(scenario);
 
+            // Story 8.14b FORK 2 — if there are conflicts, store a notification
+            // payload so handle_option_pick can dispatch options.
+            if !assessment.conflicts.is_empty() {
+                let conflict_summary = assessment
+                    .conflicts
+                    .iter()
+                    .map(|c| format!("{} ↔ {}", c.a, c.b))
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                let notification = NotificationPayload {
+                    pattern: "calendar-conflict".into(),
+                    confidence: assessment.belief_variance,
+                    evidence: format!(
+                        "{} unresolved calendar conflict(s)",
+                        assessment.conflicts.len()
+                    ),
+                    conflict_summary,
+                };
+                *self.last_notification.lock() = Some(notification);
+            }
+
             // Story 8.10 AC1 — when the epistemic-scalar port is wired, drive
             // the assessed scalar through the kernel policy path so the
-            // `[epistemic_policy]` halt fires. The halt DECISION is the kernel's
-            // (universal-arithmetic over Butler's manifest policy); Butler only
-            // supplies its own assessed scalar. The `Option<HaltReceipt>` is
-            // stored so the firing is observable (proving `assessment → on_idle
-            // → port → halt`, the link Story 8.1 never exercised). With `port =
-            // None` this is store-only (the original v0.3-β behavior).
+            // `[epistemic_policy]` halt fires.
             if let Some(port) = &self.scalar_port {
                 let (tag, value, derived_from) = assessment.primary_scalar();
                 let result = port.write_scalar(
@@ -325,7 +460,7 @@ impl Butler {
                     .unwrap_or_else(|e| e.into_inner());
                 match result {
                     Ok(receipt) => *guard = receipt,
-                    Err(_) => *guard = None, // clear stale receipt on backend failure
+                    Err(_) => *guard = None,
                 }
             }
 
@@ -342,6 +477,8 @@ impl Default for Butler {
             last_assessment: Arc::new(std::sync::Mutex::new(None)),
             scalar_port: None,
             last_halt_receipt: Arc::new(std::sync::Mutex::new(None)),
+            mcp_port: None,
+            last_notification: Arc::new(parking_lot::Mutex::new(None)),
         }
     }
 }
@@ -351,14 +488,14 @@ impl Butler {
     pub fn new() -> Self {
         Self::default()
     }
-
-    /// A Butler whose `on_idle` will reason over `scenario`.
     pub fn with_scenario(scenario: ScenarioInput) -> Self {
         Self {
             pending: Some(scenario),
             last_assessment: Arc::new(std::sync::Mutex::new(None)),
             scalar_port: None,
             last_halt_receipt: Arc::new(std::sync::Mutex::new(None)),
+            mcp_port: None,
+            last_notification: Arc::new(parking_lot::Mutex::new(None)),
         }
     }
 
@@ -368,6 +505,75 @@ impl Butler {
     pub fn with_scalar_port(mut self, port: Arc<dyn EpistemicScalarPort>) -> Self {
         self.scalar_port = Some(port);
         self
+    }
+
+    /// Story 8.14b FORK 1 — inject the MCP domain port. When set, `on_idle`
+    /// fetches real calendar/comms data via MCP instead of using `self.pending`.
+    pub fn with_mcp_port(mut self, port: Arc<dyn ButlerMcpPort>) -> Self {
+        self.mcp_port = Some(port);
+        self
+    }
+
+    /// Story 8.14b FORK 2 — handle a director's option pick on the pending
+    /// notification. Synchronous: the Linear write (option a) is delegated to
+    /// the caller via the returned `OptionPickOutcome::message` so the caller
+    /// can drive the async `mcp_port.write_linear_note()` in its own context.
+    ///
+    /// Returns `ButlerMcpError::NoPendingNotification` when no notification is
+    /// pending — never silently succeeds (FORK 2 constraint).
+    pub fn handle_option_pick(
+        &self,
+        option: char,
+        mcp_port: &dyn ButlerMcpPort,
+    ) -> Result<OptionPickOutcome, ButlerMcpError> {
+        let mut last_notif_guard = self.last_notification.lock();
+        let notification = last_notif_guard
+            .as_ref()
+            .ok_or(ButlerMcpError::NoPendingNotification)?;
+
+        match option {
+            'a' => {
+                let notification = last_notif_guard.take().unwrap();
+                block_on_sync(mcp_port.write_linear_note(
+                    &format!("Calendar conflict — {}", notification.conflict_summary),
+                    &notification.evidence,
+                ))?;
+                Ok(OptionPickOutcome {
+                    linear_note_written: true,
+                    reminder_set: false,
+                    snoozed: false,
+                    message: format!(
+                        "Linear note written: Calendar conflict — {}",
+                        notification.conflict_summary
+                    ),
+                })
+            }
+            'b' => {
+                let _ = last_notif_guard.take();
+                Ok(OptionPickOutcome {
+                    linear_note_written: false,
+                    reminder_set: true,
+                    snoozed: false,
+                    message: "Butler: Slack message queued for [partner] (live send v0.4)".into(),
+                })
+            }
+            'c' => {
+                let _ = last_notif_guard.take();
+                let snooze_until = chrono_stub_snooze_time();
+                Ok(OptionPickOutcome {
+                    linear_note_written: false,
+                    reminder_set: false,
+                    snoozed: true,
+                    message: format!("Butler: snoozed — will re-check at {snooze_until}"),
+                })
+            }
+            _ => Err(ButlerMcpError::NoPendingNotification),
+        }
+    }
+
+    /// The pending notification from the last `on_idle`, if any.
+    pub fn last_notification(&self) -> Option<NotificationPayload> {
+        self.last_notification.lock().clone()
     }
 
     /// The assessment from the most recent `on_idle` firing, if any.
@@ -566,6 +772,45 @@ impl Butler {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Story 8.14b — sync/async bridge + stub helpers.
+// ───────────────────────────────────────────────────────────────────────────
+
+/// Minimal single-threaded `block_on` for bridging async-trait futures inside
+/// `on_idle` (which runs in `spawn_blocking`). The underlying MCP calls are
+/// synchronous (`McpClientPort::call` is sync), so the future resolves
+/// immediately — no waker parking needed.
+fn block_on_sync<F: std::future::Future>(fut: F) -> F::Output {
+    use std::pin::pin;
+    use std::task::{Context, Poll, Waker};
+
+    let waker = Waker::noop();
+    let mut cx = Context::from_waker(&waker);
+    let mut fut = pin!(fut);
+    match fut.as_mut().poll(&mut cx) {
+        Poll::Ready(val) => val,
+        Poll::Pending => panic!(
+            "ButlerMcpPort future returned Pending — MCP calls must resolve immediately \
+             (sync McpClientPort under the hood)"
+        ),
+    }
+}
+
+/// Stub snooze-time computation (AC5). Returns a human-readable timestamp
+/// ~15 minutes from now. Real scheduling is v0.4.
+fn chrono_stub_snooze_time() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        + 15 * 60;
+    // Format as HH:MM (UTC) for the stub render.
+    let hours = (secs / 3600) % 24;
+    let minutes = (secs % 3600) / 60;
+    format!("{hours:02}:{minutes:02} UTC")
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // Pure helpers.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -708,5 +953,204 @@ mod unit_tests {
         let hex = id.iter().map(|b| format!("{b:02x}")).collect::<String>();
         assert_eq!(decode_frame_id_hex(&hex).unwrap(), id);
         assert!(decode_frame_id_hex("zz").is_err());
+    }
+}
+
+// Story 8.14b — FakeButlerMcpPort ships in the SAME commit as the trait (FORK 1 constraint).
+#[cfg(test)]
+pub mod test_support {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// A test double for `ButlerMcpPort` that returns canned data and records calls.
+    pub struct FakeButlerMcpPort {
+        pub calendar: Vec<CalendarEvent>,
+        pub comms: Vec<CommsMessage>,
+        pub write_linear_call_count: AtomicUsize,
+    }
+
+    impl FakeButlerMcpPort {
+        pub fn with_conflict() -> Self {
+            Self {
+                calendar: vec![
+                    CalendarEvent {
+                        id: "evt-a".into(),
+                        title: "Board review".into(),
+                        start_min: 540,
+                        end_min: 600,
+                        status: EventStatus::Confirmed,
+                    },
+                    CalendarEvent {
+                        id: "evt-b".into(),
+                        title: "Investor call".into(),
+                        start_min: 570,
+                        end_min: 630,
+                        status: EventStatus::Confirmed,
+                    },
+                ],
+                comms: vec![],
+                write_linear_call_count: AtomicUsize::new(0),
+            }
+        }
+
+        pub fn empty() -> Self {
+            Self {
+                calendar: vec![],
+                comms: vec![],
+                write_linear_call_count: AtomicUsize::new(0),
+            }
+        }
+
+        pub fn linear_writes(&self) -> usize {
+            self.write_linear_call_count.load(Ordering::SeqCst)
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ButlerMcpPort for FakeButlerMcpPort {
+        async fn calendar_events(&self) -> Result<Vec<CalendarEvent>, ButlerMcpError> {
+            Ok(self.calendar.clone())
+        }
+        async fn comms_messages(&self) -> Result<Vec<CommsMessage>, ButlerMcpError> {
+            Ok(self.comms.clone())
+        }
+        async fn write_linear_note(&self, _title: &str, _content: &str) -> Result<(), ButlerMcpError> {
+            self.write_linear_call_count.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+        async fn fetch_figma_summary(&self) -> Result<serde_json::Value, ButlerMcpError> {
+            Ok(serde_json::json!({"status": "mock"}))
+        }
+    }
+}
+
+#[cfg(test)]
+mod mcp_port_tests {
+    use super::*;
+    use super::test_support::FakeButlerMcpPort;
+
+    #[test]
+    fn on_idle_fetches_real_calendar_via_mcp_port() {
+        // AC3 test 1: TestButlerMcpPort feeds a conflict scenario;
+        // assert last_assessment().conflicts.len() == 1
+        let fake = Arc::new(FakeButlerMcpPort::with_conflict());
+        let butler = Butler::new().with_mcp_port(fake);
+
+        // Drive on_idle through the spirit hook (simulated).
+        let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
+            maos_spirit_abi::ctx::CapabilityHandle(0),
+            maos_spirit_abi::ctx::MailboxHandle(0),
+        );
+        butler.on_idle(&mut ctx);
+
+        let assessment = butler.last_assessment().expect("assessment should be stored");
+        assert_eq!(assessment.conflicts.len(), 1, "one conflict from MCP data");
+        assert!(assessment.belief_variance > 0.7, "conflict crosses halt floor");
+    }
+
+    #[test]
+    fn handle_option_a_calls_linear_write() {
+        // AC3 test 2: assert handle_option_pick('a') returns linear_note_written=true
+        let fake = Arc::new(FakeButlerMcpPort::with_conflict());
+        let butler = Butler::new().with_mcp_port(fake.clone());
+
+        let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
+            maos_spirit_abi::ctx::CapabilityHandle(0),
+            maos_spirit_abi::ctx::MailboxHandle(0),
+        );
+        butler.on_idle(&mut ctx);
+
+        // A notification should be pending after on_idle detected a conflict.
+        assert!(butler.last_notification().is_some(), "notification pending");
+
+        let outcome = butler.handle_option_pick('a', fake.as_ref()).expect("option a should succeed");
+        assert!(outcome.linear_note_written, "linear note written flag set");
+        assert_eq!(fake.linear_writes(), 1, "mcp_port.write_linear_note must be called");
+        assert!(outcome.message.contains("Linear note written"), "message confirms write");
+    }
+
+    #[test]
+    fn mcp_port_none_falls_back_to_pending_scenario() {
+        // AC3 test 3: mcp_port = None, pending = Some(scenario); assert on_idle
+        // uses the pending scenario (no panic, backwards-compatible).
+        let scenario = ScenarioInput {
+            calendar: vec![
+                CalendarEvent {
+                    id: "a".into(),
+                    title: "A".into(),
+                    start_min: 540,
+                    end_min: 600,
+                    status: EventStatus::Confirmed,
+                },
+                CalendarEvent {
+                    id: "b".into(),
+                    title: "B".into(),
+                    start_min: 570,
+                    end_min: 630,
+                    status: EventStatus::Confirmed,
+                },
+            ],
+            comms: vec![],
+            preference_alignment: None,
+        };
+        let butler = Butler::with_scenario(scenario);
+
+        let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
+            maos_spirit_abi::ctx::CapabilityHandle(0),
+            maos_spirit_abi::ctx::MailboxHandle(0),
+        );
+        butler.on_idle(&mut ctx);
+
+        let assessment = butler.last_assessment().expect("assessment from pending scenario");
+        assert_eq!(assessment.conflicts.len(), 1);
+    }
+
+    #[test]
+    fn handle_option_pick_no_pending_returns_error() {
+        let butler = Butler::new();
+        let fake = FakeButlerMcpPort::empty();
+        let result = butler.handle_option_pick('a', &fake);
+        assert!(result.is_err(), "no pending notification → error");
+    }
+
+    #[test]
+    fn halt_screen_line_contract() {
+        // FORK 3 companion unit test (Murat constraint).
+        assert_eq!(
+            halt_screen_line(SCALAR_TAG_BELIEF_VARIANCE),
+            "halted on belief_variance"
+        );
+    }
+
+    #[test]
+    fn option_b_stub_renders_message() {
+        let fake = Arc::new(FakeButlerMcpPort::with_conflict());
+        let butler = Butler::new().with_mcp_port(fake.clone());
+
+        let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
+            maos_spirit_abi::ctx::CapabilityHandle(0),
+            maos_spirit_abi::ctx::MailboxHandle(0),
+        );
+        butler.on_idle(&mut ctx);
+
+        let outcome = butler.handle_option_pick('b', fake.as_ref()).expect("option b should succeed");
+        assert!(outcome.reminder_set);
+        assert!(outcome.message.contains("Slack message queued"));
+    }
+
+    #[test]
+    fn option_c_stub_renders_snooze() {
+        let fake = Arc::new(FakeButlerMcpPort::with_conflict());
+        let butler = Butler::new().with_mcp_port(fake.clone());
+
+        let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
+            maos_spirit_abi::ctx::CapabilityHandle(0),
+            maos_spirit_abi::ctx::MailboxHandle(0),
+        );
+        butler.on_idle(&mut ctx);
+
+        let outcome = butler.handle_option_pick('c', fake.as_ref()).expect("option c should succeed");
+        assert!(outcome.snoozed);
+        assert!(outcome.message.contains("snoozed"));
     }
 }

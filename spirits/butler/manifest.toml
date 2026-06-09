@@ -3,9 +3,8 @@
 # Anticipatory single-Spirit (architecture §6.1): fires `on_idle`, detects
 # calendar conflicts + triages comms, writes an uncertainty scalar whose
 # `[epistemic_policy]` rule the kernel evaluates (universal-arithmetic) into a
-# halt. Calendar/comms inputs are MOCKED via fixture-replay (Decision B); the
-# `[capabilities.required.mcp]` block declares the McpCall scopes Butler WOULD
-# use against real Calendar/Slack drivers (deferred to v0.5+/E9).
+# halt. Calendar/comms inputs wired to real MCP drivers in v0.3; the
+# `[capabilities.required.mcp]` block declares the McpCall scopes Butler uses.
 
 [class]
 name = "butler"
@@ -30,7 +29,15 @@ allowed_tools = ["list_events", "get_event"]
 
 [[capabilities.required.mcp.servers]]
 name = "slack"
-allowed_tools = ["list_messages", "get_thread"]
+allowed_tools = ["list_messages", "get_thread", "send_message"]
+
+[[capabilities.required.mcp.servers]]
+name = "linear"
+allowed_tools = ["create_issue", "update_issue"]
+
+[[capabilities.required.mcp.servers]]
+name = "figma"
+allowed_tools = ["get_file", "get_node"]
 
 [posture]
 default = "assistive"

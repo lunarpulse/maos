@@ -19,6 +19,12 @@ maos-audit = { path = "../../crates/maos-audit" }
 maos-domain = { path = "../../crates/maos-domain" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Story 8.14b FORK 1 — async-trait for ButlerMcpPort; no tokio in [dependencies].
+# tokio BANNED in [dependencies]; permitted only in [dev-dependencies] for test harness.
+async-trait = { workspace = true }
+thiserror = "2.0"
+# Story 8.14b FORK 2 — parking_lot::Mutex for last_notification (Butler is Send+Sync behind Arc).
+parking_lot = "0.12"
 
 [dev-dependencies]
 # Test-only kernel adapters used to PROVE the integration (halt receipt, I11
@@ -35,3 +41,5 @@ toml = "0.8"
 # Seed a deterministic Transparency Log (explicit frame ids + timestamps) for
 # the AC6 hallucination corpus — same SQLite schema maos-audit reads.
 rusqlite = { version = "0.31", features = ["bundled"] }
+# Story 8.14b — tokio runtime for #[tokio::test] on async ButlerMcpPort tests.
+tokio = { version = "1", features = ["macros", "rt"] }

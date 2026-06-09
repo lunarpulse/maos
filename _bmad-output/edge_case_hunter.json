@@ -1,0 +1,32 @@
+[
+  {
+    "location": "spirits/butler/src/lib.rs:505-537",
+    "trigger_condition": "handle_option_pick called with any char not in {a,b,c}",
+    "guard_snippet": "let notification = self.last_notification.lock().take(); let guard = notification.as_ref().ok_or(ButlerMcpError::NoPendingNotification)?; match option { 'a'|'b'|'c' => { /* use notification */ }, _ => { *self.last_notification.lock() = notification; return Err(ButlerMcpError::NoPendingNotification); } }",
+    "potential_consequence": "notification consumed by .take() before match; unknown option permanently loses the pending notification"
+  },
+  {
+    "location": "spirits/butler/src/lib.rs:518-525",
+    "trigger_condition": "director picks option 'a' via handle_option_pick",
+    "guard_snippet": "if let Some(port) = &self.mcp_port { block_on_sync(port.write_linear_note(&notification.conflict_summary, &notification.evidence))?; }",
+    "potential_consequence": "OptionPickOutcome.linear_note_written set true but write_linear_note never called; consumer trusts stale flag"
+  },
+  {
+    "location": "crates/maos-bin/src/main.rs:555-557",
+    "trigger_condition": "--live flag passes; LiveButlerMcpPort constructed",
+    "guard_snippet": "let spirit_pid = loaded_pid; assert_ne!(spirit_pid, 0, \"spirit_pid must be a real scheduler PID\");",
+    "potential_consequence": "token issued for PID 0 won't match manifest scope; every MCP call fails TokenIssuanceFailed at runtime"
+  },
+  {
+    "location": "spirits/butler/src/lib.rs:394-397",
+    "trigger_condition": "MCP server unreachable or returns error during on_idle",
+    "guard_snippet": "match block_on_sync(mcp.calendar_events()) { Ok(v) => v, Err(e) => { eprintln!(\"butler: calendar MCP fetch failed: {e}\"); vec![] } }",
+    "potential_consequence": "unwrap_or_default() silently degrades to empty data; operator sees no error despite --live mode"
+  },
+  {
+    "location": "crates/maos-bin/src/main.rs:1540-1545",
+    "trigger_condition": "MAOS_MCP_SLACK_URI or MAOS_MCP_LINEAR_URI or MAOS_MCP_FIGMA_URI set without MAOS_MCP_CALENDAR_URI",
+    "guard_snippet": "if calendar_uri.is_empty() && (!_slack_uri.is_empty() || !_linear_uri.is_empty() || !_figma_uri.is_empty()) { eprintln!(\"maos run: warning \u2014 non-calendar MCP URIs set but no transport created without MAOS_MCP_CALENDAR_URI\"); }",
+    "potential_consequence": "4 servers registered against empty transport map; all MCP calls fail at transport resolution"
+  }
+]

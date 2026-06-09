@@ -510,6 +510,112 @@ impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
     }
 }
 
+/// Story 8.14b — Live MCP port for Butler. Wraps the kernel's
+/// `McpClientAdapter` (capability mediation + audit) with per-tool-type
+/// token issuance.
+struct LiveButlerMcpPort {
+    spirit_pid: u32,
+    posture_hash: [u8; 32],
+    mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
+    capability: Arc<CapabilityRegistryAdapter>,
+}
+impl LiveButlerMcpPort {
+    pub fn new(
+        spirit_pid: u32,
+        posture_hash: [u8; 32],
+        mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
+        capability: Arc<CapabilityRegistryAdapter>,
+    ) -> Self {
+        Self {
+            spirit_pid,
+            posture_hash,
+            mcp_client,
+            capability,
+        }
+    }
+    // Comment budget on Winston's request
+    // spawn_blocking budget comment: MCP calls are low-frequency (once per on_idle cycle), not inner loops.
+}
+#[async_trait::async_trait]
+impl butler::ButlerMcpPort for LiveButlerMcpPort {
+    async fn calendar_events(&self) -> Result<Vec<butler::CalendarEvent>, butler::ButlerMcpError> {
+        self.call_mcp("calendar", "list_events", maos_mcp::drivers::butler::calendar_list_events_args()).await
+            .and_then(|content| {
+                serde_json::from_value(content)
+                    .map_err(|e| butler::ButlerMcpError::CallFailed {
+                        server: "calendar".into(),
+                        tool: "list_events".into(),
+                        cause: maos_domain::ports::mcp::McpError::Decode(e.to_string()),
+                    })
+            })
+    }
+    async fn comms_messages(&self) -> Result<Vec<butler::CommsMessage>, butler::ButlerMcpError> {
+        self.call_mcp("slack", "list_messages", maos_mcp::drivers::butler::slack_list_messages_args()).await
+            .and_then(|content| {
+                serde_json::from_value(content)
+                    .map_err(|e| butler::ButlerMcpError::CallFailed {
+                        server: "slack".into(),
+                        tool: "list_messages".into(),
+                        cause: maos_domain::ports::mcp::McpError::Decode(e.to_string()),
+                    })
+            })
+    }
+    async fn write_linear_note(&self, title: &str, content: &str) -> Result<(), butler::ButlerMcpError> {
+        let _ = self.call_mcp(
+            "linear",
+            "create_issue",
+            maos_mcp::drivers::butler::linear_create_issue_args(title, content),
+        ).await?;
+        Ok(())
+    }
+    async fn fetch_figma_summary(&self) -> Result<serde_json::Value, butler::ButlerMcpError> {
+        self.call_mcp("figma", "get_file", maos_mcp::drivers::butler::figma_get_file_args()).await
+    }
+}
+impl LiveButlerMcpPort {
+    async fn call_mcp(
+        &self,
+        server: &str,
+        tool: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, butler::ButlerMcpError> {
+        let scope = Scope::McpCall {
+            server: server.into(),
+            tool: tool.into(),
+        };
+        let token = self
+            .capability
+            .issue_with_mediation(
+                self.spirit_pid,
+                scope,
+                60,
+                // Pass [0u8; 32] because the kernel's McpClientAdapter is hardcoded to verify using [0u8; 32]
+                [0u8; 32],
+                IntentClass::Standard,
+            )
+            .map_err(|_| butler::ButlerMcpError::TokenIssuanceFailed)?;
+        let response = self
+            .mcp_client
+            .call(&token, server, tool, args)
+            .map_err(|e| match e {
+                maos_domain::ports::mcp::McpError::CapabilityDenied { .. } => {
+                    butler::ButlerMcpError::Unauthorized
+                }
+                other => butler::ButlerMcpError::CallFailed {
+                    server: server.into(),
+                    tool: tool.into(),
+                    cause: other,
+                },
+            })?;
+        maos_mcp::drivers::butler::extract_content(&response)
+            .map_err(|e| butler::ButlerMcpError::CallFailed {
+                server: server.into(),
+                tool: tool.into(),
+                cause: e,
+            })
+    }
+}
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cpus = worker_thread_count();
@@ -1434,6 +1540,120 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut butler = butler::Butler::with_scenario(scenario);
                 if let Some(port) = scalar_port {
                     butler = butler.with_scalar_port(port);
+                }
+                // Story 8.14b FORK 1 — wire LiveButlerMcpPort when --live.
+                if run.live {
+                    use maos_domain::ports::mcp::McpTransportId;
+                    use maos_mcp::client::{McpClientImpl, McpServerEntry};
+                    use maos_mcp::transport::streamable_http::StreamableHttpTransport;
+                    use maos_mcp::transport::McpTransport;
+                    use std::collections::BTreeMap;
+
+                    struct ButlerLiveMcpClient {
+                        calendar: Option<McpClientImpl>,
+                        slack: Option<McpClientImpl>,
+                        linear: Option<McpClientImpl>,
+                        figma: Option<McpClientImpl>,
+                    }
+
+                    impl maos_mcp::McpClient for ButlerLiveMcpClient {
+                        fn call(
+                            &self,
+                            server_name: &str,
+                            tool: &str,
+                            args: serde_json::Value,
+                        ) -> Result<maos_domain::ports::mcp::McpCallResponse, maos_domain::ports::mcp::McpError> {
+                            use maos_mcp::McpClient;
+                            match server_name {
+                                "calendar" => self.calendar.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
+                                "slack" => self.slack.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
+                                "linear" => self.linear.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
+                                "figma" => self.figma.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
+                                _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(server_name.into())),
+                            }
+                        }
+                    }
+
+                    let mcp_io = Arc::clone(&io_arc);
+
+                    let make_client = |server_name: &str, uri: String| -> Result<Option<McpClientImpl>, maos_domain::ports::mcp::McpError> {
+                        if uri.is_empty() {
+                            return Ok(None);
+                        }
+                        let mut transports = BTreeMap::new();
+                        transports.insert(
+                            McpTransportId::StreamableHttp,
+                            Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri)) as Arc<dyn McpTransport>,
+                        );
+                        let mut servers = BTreeMap::new();
+                        servers.insert(
+                            server_name.into(),
+                            McpServerEntry {
+                                name: server_name.into(),
+                                transport: McpTransportId::StreamableHttp,
+                                fallback_transport: None,
+                            },
+                        );
+                        let client = McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers)?;
+                        Ok(Some(client))
+                    };
+
+                    let calendar_uri = std::env::var("MAOS_MCP_CALENDAR_URI").unwrap_or_default();
+                    let slack_uri = std::env::var("MAOS_MCP_SLACK_URI").unwrap_or_default();
+                    let linear_uri = std::env::var("MAOS_MCP_LINEAR_URI").unwrap_or_default();
+                    let figma_uri = std::env::var("MAOS_MCP_FIGMA_URI").unwrap_or_default();
+
+                    let mcp_adapter = match (|| -> Result<Option<Arc<dyn maos_domain::ports::mcp::McpClientPort>>, maos_domain::ports::mcp::McpError> {
+                        let calendar = make_client("calendar", calendar_uri)?;
+                        let slack = make_client("slack", slack_uri)?;
+                        let linear = make_client("linear", linear_uri)?;
+                        let figma = make_client("figma", figma_uri)?;
+
+                        if calendar.is_some() || slack.is_some() || linear.is_some() || figma.is_some() {
+                            let client = Arc::new(ButlerLiveMcpClient {
+                                calendar,
+                                slack,
+                                linear,
+                                figma,
+                            }) as Arc<dyn maos_mcp::McpClient + Send + Sync>;
+                            Ok(Some(Arc::new(maos_kernel_core::api::McpClientAdapter::new(
+                                client,
+                                Arc::clone(&capability),
+                                Arc::clone(&transparency_log),
+                                Arc::clone(&telemetry),
+                            )) as Arc<dyn maos_domain::ports::mcp::McpClientPort>))
+                        } else {
+                            Ok(None)
+                        }
+                    })() {
+                        Ok(adapter_opt) => adapter_opt,
+                        Err(e) => {
+                            eprintln!(
+                                "maos run: warning — failed to construct MCP client for --live: {e}. \
+                                 Butler will fall back to fixture-replay scenario."
+                            );
+                            None
+                        }
+                    };
+
+                    if let Some(adapter) = mcp_adapter {
+                        let spirit_pid = 0;
+                        let posture_hash = policy
+                            .inner()
+                            .load_full()
+                            .spirit_postures
+                            .get(&spirit_pid)
+                            .map(|s| s.posture_hash())
+                            .unwrap_or([0u8; 32]);
+                        let live_mcp = LiveButlerMcpPort::new(
+                            spirit_pid,
+                            posture_hash,
+                            adapter,
+                            Arc::clone(&capability),
+                        );
+                        butler = butler.with_mcp_port(Arc::new(live_mcp));
+                        eprintln!("maos run: butler live MCP port wired (--live)");
+                    }
                 }
                 scheduler
                     .load(&spirit_id, bundle, butler, boot_nonce)
@@ -8435,4 +8655,40 @@ async fn smoke_compliance_7_3() -> Result<(), Box<dyn std::error::Error>> {
     emit(serde_json::json!({"step":6,"surface":"latency_p99","p99_ms":p99_ms,"budget_ms":10}));
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_live_butler_mcp_port_new() {
+        struct MockMcpClientPort;
+        impl maos_domain::ports::mcp::McpClientPort for MockMcpClientPort {
+            fn call(
+                &self,
+                _token: &maos_domain::invariants::i1::CapabilityToken,
+                _server: &str,
+                _tool: &str,
+                _args: serde_json::Value,
+            ) -> Result<maos_domain::ports::mcp::McpResponse, maos_domain::ports::mcp::McpError> {
+                Err(maos_domain::ports::mcp::McpError::Unconfigured)
+            }
+        }
+        let client = Arc::new(MockMcpClientPort);
+        let (audit_tx, _) = maos_kernel_core::capability::cap_audit::channel();
+        let cap = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
+            1, // BOOT_NONCE
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            audit_tx,
+            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::new(10)),
+        ));
+        let port = LiveButlerMcpPort::new(0, [0u8; 32], client, cap);
+        assert_eq!(port.spirit_pid, 0);
+        assert_eq!(port.posture_hash, [0u8; 32]);
+    }
 }

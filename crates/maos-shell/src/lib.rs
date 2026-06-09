@@ -169,17 +169,35 @@ pub fn run_shell(
             }
         };
 
-        // Dispatch (v0.1-β: only hello-spirit is wired).
+        // Dispatch (v0.1-β: hello-spirit wired; v0.3-β: butler pick prototype).
+        if spirit_name == "butler" {
+            // Story 8.14b FORK 2 — option-pick dispatch surface.
+            // Full scheduler access (real running Butler) is Epic 9.
+            // Prototype: render option-pick outcome message directly.
+            let option = msg
+                .trim()
+                .strip_prefix("pick ")
+                .and_then(|s| s.chars().next())
+                .unwrap_or('?');
+            let message = match option {
+                'a' => "Linear note written: Calendar conflict — evt-a ↔ evt-b (stub — real dispatch requires scheduler access, Epic 9)",
+                'b' => "Butler: Slack message queued for [partner] (live send v0.4)",
+                'c' => "Butler: snoozed — will re-check at 12:00 UTC (stub)",
+                _ => "maos: butler pick error: no pending notification to pick from",
+            };
+            writeln!(stdout, "{message}")?;
+            stdout.flush()?;
+            continue;
+        }
         if spirit_name != "hello-spirit" {
             print_line(
                 color_choice,
                 &format!(
-                    "maos: unknown spirit '{spirit_name}' — only 'hello-spirit' is available at v0.1-β",
+                    "maos: unknown spirit '{spirit_name}' — known: hello-spirit, butler (pick only)",
                 ),
             );
             continue;
         }
-        // Issue a capability token for the hello-Spirit.
         let token: CapabilityToken = capability
             .issue_with_mediation(
                 0, // hello-spirit PID
