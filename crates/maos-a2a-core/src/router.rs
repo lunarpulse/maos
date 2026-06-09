@@ -135,6 +135,16 @@ pub struct A2ARouterCore {
     /// Optional intake sink for tests — when set, accepted frames are
     /// pushed here so test code can observe them.
     intake_sink: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<IacFrame>>>>,
+    /// Story 8.13.1 / AC3 — optional rupture sink. When set, a typed
+    /// `FramePayload::ConsentRupture` frame is pushed here on the cross-Host
+    /// classified-but-policy-denied (`-32001 CODE_INTENT_DENIED`) leg, BEFORE
+    /// the NACK is returned. This is the production emission that earns the
+    /// transparency-log `ConsentRupture` record — mirroring the same-host 6.4
+    /// `iac_bus` pattern where the routing infrastructure (NOT the test)
+    /// produces the typed rupture frame. The observer (smoke / daemon) drains
+    /// this channel; the rupture is genuine because only the deny path can
+    /// populate `RuptureReason::IntentAllowlistMismatch` + the verified peer.
+    rupture_sink: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::Sender<IacFrame>>>>,
     /// Atomic counter for outbound request ids.
     next_id: Arc<std::sync::atomic::AtomicU64>,
     /// Pinned consent-expiry clock (ns since Unix epoch). `None` ⇒ real wall
@@ -174,6 +184,7 @@ impl A2ARouterCore {
             tofu,
             clock: Arc::new(LamportClock::new()),
             intake_sink: Arc::new(tokio::sync::Mutex::new(None)),
+            rupture_sink: Arc::new(tokio::sync::Mutex::new(None)),
             next_id: Arc::new(std::sync::atomic::AtomicU64::new(1)),
             consent_now_ns: None,
             warned_entries: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
@@ -207,6 +218,93 @@ impl A2ARouterCore {
     ) {
         let mut guard = self.intake_sink.lock().await;
         *guard = Some(sink);
+    }
+
+    /// Story 8.13.1 / AC3 — install a rupture sink. On the cross-Host
+    /// classified-but-policy-denied (`-32001`) intake leg, the router pushes a
+    /// typed `FramePayload::ConsentRupture` frame here BEFORE returning the
+    /// NACK. The receiver daemon (or the smoke acting as integration driver)
+    /// drains it and journals the genuine, production-produced rupture — the
+    /// transparency log never hand-writes the row. Mirrors `install_intake_sink`.
+    pub async fn install_rupture_sink(
+        &self,
+        sink: tokio::sync::mpsc::Sender<IacFrame>,
+    ) {
+        let mut guard = self.rupture_sink.lock().await;
+        *guard = Some(sink);
+    }
+
+    /// Story 8.13.1 / AC3 — emit a genuine typed `ConsentRupture` frame on the
+    /// classified-but-policy-denied (`-32001 CODE_INTENT_DENIED`) intake leg.
+    /// Pushed to `rupture_sink` (when installed) BEFORE the NACK is returned, so
+    /// the transparency-log row is EARNED by this production deny path rather
+    /// than hand-inserted by a smoke — closing the 8.13 P5 systemic gap and
+    /// matching the same-host 6.4 `iac_bus` rupture-frame precedent.
+    ///
+    /// The frame binds the **verified peer** (the sender, `frame.from`) — proven
+    /// equal to the TLS-verified peer by [`Self::handle_intake_verified`] before
+    /// delegation on the wire path, so a forged `from` is rejected with
+    /// `-32007` and can NEVER reach this branch (Winston's confused-deputy
+    /// guard, G8) — and the **denied intent class**. `RuptureReason::
+    /// IntentAllowlistMismatch` is the policy fact only this deny decision
+    /// possesses, so the record cannot be re-synthesised from the bare error
+    /// code (Murat's information-content bar). A closed sink (observer dropped)
+    /// is best-effort and never fails the deny.
+    async fn emit_consent_rupture(&self, frame: &IacFrame) {
+        // Story 8.13.1-review / P2 — clone the sender and drop the lock BEFORE
+        // building the frame so concurrent install_rupture_sink is not blocked.
+        let sink = {
+            let guard = self.rupture_sink.lock().await;
+            guard.as_ref().cloned()
+        };
+        let Some(sink) = sink else {
+            return;
+        };
+        let now_ns = self.consent_now_ns();
+        // Story 8.13.1-review / P4 — unique-per-denial correlation id: the first
+        // half preserves the original frame_id for correlation; the second half
+        // is a monotonic nonce so retries / re-routing cannot collide.
+        let rupture_id = {
+            let mut id = frame.frame_id;
+            let nonce = self.alloc_id();
+            id[8..16].copy_from_slice(&nonce.to_le_bytes());
+            id
+        };
+        // Story 8.13.1-review / P1 — the denier is the receiver host; if frame.to
+        // is empty (protocol invariant violation at this point), skip emission
+        // rather than fall back to the sender identity, which would be semantically
+        // wrong (the rupture would appear to come from the denied party).
+        let Some(denier) = frame.to.first().cloned() else {
+            return;
+        };
+        let payload = maos_domain::frame::ConsentRupturePayload {
+            rupture_id,
+            original_frame_id: frame.frame_id,
+            original_kind: frame.kind,
+            accepted: vec![],
+            rejected: vec![maos_domain::frame::RuptureRejection {
+                address: denier.clone(),
+                reason: maos_domain::frame::RuptureReason::IntentAllowlistMismatch,
+            }],
+            ruptured_at_ns: now_ns,
+        };
+        let rupture = IacFrame {
+            frame_id: rupture_id,
+            timestamp_ns: now_ns,
+            logical_clock: frame.logical_clock,
+            from: denier,
+            to: std::iter::once(frame.from.clone()).collect(),
+            kind: maos_spirit_abi::identity::FrameKind::ConsentRupture,
+            intent: frame.intent,
+            payload: maos_domain::frame::FramePayload::ConsentRupture(payload),
+            auto_marker: maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+            consent_envelope: None,
+            intent_lineage: frame.intent_lineage.clone(),
+        };
+        // Story 8.13.1-review / P3 — bounded channel with best-effort drop on full.
+        if let Err(e) = sink.try_send(rupture) {
+            tracing::warn!(error = %e, "ConsentRupture dropped — rupture_sink full");
+        }
     }
 
     pub fn clock(&self) -> Arc<LamportClock> {
@@ -745,6 +843,14 @@ impl A2ARouterCore {
 
         // (3) ADR-012 accept-allowlist check.
         if !self.accept_admits(&peer_cfg.allowlists, frame, peer_cfg.peer_id.as_str()) {
+            // Story 8.13.1 / AC3 — EARN the rupture: emit a genuine typed
+            // ConsentRupture frame on this classified-but-policy-denied (-32001)
+            // leg, produced by the production deny path itself (NOT hand-inserted
+            // by a smoke). Mirrors the same-host 6.4 `iac_bus` rupture-frame
+            // semantics. Emitted BEFORE the NACK so an observer that drains the
+            // rupture sink sees the record bound to the verified peer + denied
+            // intent. The wire NACK below is byte-for-byte unchanged.
+            self.emit_consent_rupture(frame).await;
             return A2AJsonRpcResponse::nack(
                 request.id,
                 CODE_INTENT_DENIED,
@@ -934,7 +1040,7 @@ mod tests {
     use crate::identity::PeerCertFingerprint;
     use crate::tofu::InMemoryTofuPinStore;
     use maos_domain::frame::{
-        FrameAddress, FramePayload, PosturePreferences, TaskAssignPayload,
+        FrameAddress, FramePayload, PosturePreferences, RuptureReason, TaskAssignPayload,
     };
     use maos_domain::invariants::i13::IntentLineage;
     use maos_domain::invariants::i3::FrameOrigin;
@@ -1083,6 +1189,76 @@ mod tests {
             }
             _ => panic!("expected Nack"),
         }
+    }
+
+    #[tokio::test]
+    async fn intake_policy_deny_emits_consent_rupture() {
+        // Story 8.13.1 / AC3 + AC5 (red-first): the classified-but-policy-denied
+        // (-32001 CODE_INTENT_DENIED) intake leg MUST push a production-produced
+        // typed `ConsentRupture` frame to the rupture sink, BEFORE the NACK.
+        // Before the emission wiring this assertion FAILS (the channel stays
+        // empty) — proving the row was never earned and the smokes faked it.
+        let allow = ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new("standard")],
+            accept_allowlist: vec![], // denies the classified "standard" intent
+        };
+        let core = pinned_core(allow).await;
+        let (tx, mut rx) = tokio::sync::mpsc::channel(16);
+        core.install_rupture_sink(tx).await;
+        let frame = make_frame(Some("loopback"));
+        let original_id = frame.frame_id;
+        let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1);
+        let resp = core.handle_intake(req).await;
+        // The wire result is UNCHANGED: still a -32001 NACK (no protocol break).
+        match resp {
+            A2AJsonRpcResponse::Nack(n) => assert_eq!(n.error.code, CODE_INTENT_DENIED),
+            _ => panic!("expected Nack"),
+        }
+        // ...but the deny path now emitted a genuine typed ConsentRupture frame —
+        // the record the smokes used to hand-insert. Information only the deny
+        // decision possesses (the reason) is carried, so it cannot be re-faked
+        // from the bare error code (Murat's information-content bar).
+        let rupture = rx
+            .try_recv()
+            .expect("classified-policy-deny path must emit a ConsentRupture frame");
+        assert_eq!(rupture.kind, FrameKind::ConsentRupture);
+        // Bound to the verified peer (sender A) + the denied intent class.
+        assert_eq!(rupture.to[0].spirit_id.as_str(), "a");
+        assert_eq!(rupture.intent, IntentClass::Standard);
+        match &rupture.payload {
+            FramePayload::ConsentRupture(p) => {
+                assert_eq!(p.original_frame_id, original_id);
+                assert_eq!(p.original_kind, FrameKind::TaskAssign);
+                assert_eq!(p.rejected.len(), 1);
+                assert!(matches!(
+                    p.rejected[0].reason,
+                    RuptureReason::IntentAllowlistMismatch
+                ));
+            }
+            other => panic!("expected ConsentRupture payload, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn intake_accept_emits_no_rupture() {
+        // Story 8.13.1 negative control (Murat's standing guardrail): the ACCEPT
+        // path must NEVER emit a rupture, so the emission can never degrade into
+        // an "always fire" self-fulfilling row.
+        let allow = ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new("standard")],
+            accept_allowlist: vec![A2AIntent::new("standard")],
+        };
+        let core = pinned_core(allow).await;
+        let (tx, mut rx) = tokio::sync::mpsc::channel(16);
+        core.install_rupture_sink(tx).await;
+        let frame = make_frame(Some("loopback"));
+        let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1);
+        let resp = core.handle_intake(req).await;
+        assert!(matches!(resp, A2AJsonRpcResponse::Ack(_)));
+        assert!(
+            rx.try_recv().is_err(),
+            "ACCEPT path must not emit a ConsentRupture"
+        );
     }
 
     #[tokio::test]

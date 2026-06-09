@@ -80,7 +80,20 @@ maos-a2a = 1500
 # we might add later. A submodule split was considered but does not reduce crate
 # kloc (tokei sums all src under the crate). Ratified bump to 3050 for the A2A
 # cross-Host security core.
-maos-a2a-core = 3050
+#
+# Story 8.13.1 — 3050 → 3144 (SURFACED per AC6, NOT a silent bump). Option A
+# (receiver-side ConsentRupture emission) was ratified UNANIMOUSLY by party-mode
+# (Winston + Murat + Amelia + John, 2026-06-08) as the only home where genuine
+# `maos run` production code emits the cross-Host rupture (sender-side has no
+# production caller at HEAD). The emission seam (additive `rupture_sink` field +
+# `install_rupture_sink` + `emit_consent_rupture` building the typed
+# `FramePayload::ConsentRupture`) plus its red-first unit + negative-control tests
+# necessarily exceed the prior tight residual: measured 3041 → 3144. AC6 clause 2
+# explicitly anticipated this ("if Option A's emission would push maos-a2a-core
+# over a per-crate ceiling, that is a scope signal — surface it, do not bump
+# silently"). Per the 8.8 precedent: set to the tight measured residual (3144),
+# NOT round headroom. FLAG-Winston: ratify this surfaced bump in 8.13.1 review.
+maos-a2a-core = 3144
 # Story 8.6 — maos-a2a-tcp: live cross-Host TCP/mTLS transport (the second
 # A2ATransport impl). Socket + rustls + codec wiring + verifier.
 maos-a2a-tcp = 1500

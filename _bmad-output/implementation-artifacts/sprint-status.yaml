@@ -1,4 +1,4 @@
-last_updated: '2026-06-08T00:00:00Z+story-8-13-review-complete+8-13-1-created'
+last_updated: '2026-06-09T00:00:00Z+story-8-13-1-done'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -103,7 +103,7 @@ development_status:
   # Story 8.13 REVIEW COMPLETE (2026-06-08): 4 parallel layers (Blind Hunter + Edge Case Hunter + Acceptance Auditor + Test Infra Auditor — dev model openai/gpt-5.5). 2 decisions + 3 patches + 2 defers; 9 dismissed. Party-mode consensus (Winston/Amelia/Murat/John ×2 rounds, unanimous): D1+D2→patch, then handling SPLIT. RESOLVED & VERIFIED GREEN: P1 .timeout_connect (blackhole red-test), P2 .redirects(0), P3 IPv6 loopback guard, P4 AC1 anti-tautology (receiver-side wire-content oracle via install_intake_sink — zero a2a/nash/kernel edits). DISCLOSED + CARRIED OUT to 8-13-1: P5 — cross-host consent-denial→ConsentRupture is hand-inserted (self-fulfilling). Spin-out investigation: NO ConsentRupture emission exists anywhere in maos-a2a-core/maos-a2a-tcp — PRE-EXISTING SYSTEMIC gap (8.5 loopback fakes it too), NOT introduced by 8.13. 8.13's new work (live TCP + real HTTP push + AC1 oracle) is genuine and green → done; the systemic rupture gap owned by 8-13-1.
   8-13-cross-host-live-pair-spirit-tcp-binding-and-mobile-push: done
   # Story 8.13.1 (correct-course from 8.13 review P5, 2026-06-08): genuine cross-host consent-denial → ConsentRupture over live TCP. Removes the hand-inserted (self-fulfilling) rupture rows in smoke-mira-nash-tcp-8-13 AND smoke-mira-nash-8-5; the rupture must be EARNED by production code. Carries a DESIGN FORK (A=receiver-side TL journaling in maos-a2a-core / B=sender-side / C=re-ground AC4 to the real -32001 audit signal) because handle_intake_verified today only NACKs (-32001 CODE_INTENT_DENIED) and journals no rupture. Red-first; zero-kernel-KLOC; maos-a2a + maos-a2a-tcp edit-forbidden (maos-a2a-core is the editable seam); workspace 43. Rec dev model claude-opus-4-8.
-  8-13-1-genuine-cross-host-consent-denial-rupture-over-tcp: backlog
+  8-13-1-genuine-cross-host-consent-denial-rupture-over-tcp: done
   # Story 8.14a (Phase 3, SPLIT from 8.14 2026-06-06 to shorten the Butler-experienceable path): J0 evaluator surface + runtime CLI — hello-spirit real impl (0 LOC today) + `maos init` + kernel-rendered shell + `maos audit query` (via Epic 9.1). NEW maos-cli crate. DEPENDS ON 8.11. Provides the `maos spirit add`/`maos run` shell surface BOTH single-Spirit journeys need.
   8-14a-j0-evaluator-surface-and-runtime-cli: backlog
   # Story 8.14b (Phase 3, SPLIT from 8.14): Butler MCP driver set — real Calendar/Slack/Linear/Figma (maos-mcp crate), replacing the fixture-replay provider butler/src/lib.rs:76-77. DEPENDS ON 8.11 + 8.14a. With 8.10·AC1 this is the LAST story on the shortest J-Butler path: 8.10·AC1 → 8.11 → 8.14a → 8.14b.

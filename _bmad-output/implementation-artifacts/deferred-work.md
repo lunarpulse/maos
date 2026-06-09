@@ -290,3 +290,9 @@ dev_model_used: claude-opus-4-7
 
 - **Mock push server single-shot / thread never joined / panic surfaces only as recv_timeout disconnect** [crates/maos-bin/src/main.rs:83 `spawn_push_server`; crates/maos-notify-push/src/lib.rs:134 `spawn_one_shot_server`] — test robustness only. The server accepts exactly one connection (matches the single expected POST) and the spawned thread is never joined; a server-side read error/panic propagates as a generic `recv_timeout` disconnect rather than the underlying cause, making CI flakes harder to diagnose. Not a production defect.
 - **Subprocess smoke has no outer timeout — a hang blocks rather than fails** [crates/maos-bin/tests/smoke_mira_nash_tcp_8_13.rs:15] — `Command::output()` has no wall-clock kill. Internal ops are individually bounded (push 2s, recv_timeout 2s, TLS handshake 30s), so a true infinite hang is unlikely today, but any future unbounded await would block CI indefinitely instead of failing. Consider spawn + kill-on-timeout.
+
+## Deferred from: code review of 8-13-1-genuine-cross-host-consent-denial-rupture-over-tcp (2026-06-09)
+
+- `smoke-mira-nash-8-5` no longer exercises the full `LoopbackA2ARouter::route_outbound` -> deny path [`crates/maos-bin/src/main.rs:smoke_mira_nash_8_5`] — acknowledged trade-off because `maos-a2a` is edit-forbidden and `LoopbackA2ARouter` lacks a rupture hook. Coverage loss is real but bounded by project constraints.
+- `RuptureReason` is hardcoded to `IntentAllowlistMismatch` in `emit_consent_rupture` — extensibility concern for future deny reasons (expired consent, policy violation, etc.), not a current defect for the scoped `-32001` leg.
+- Denied fine-grained intent string is not preserved in the `ConsentRupture` payload — the rupture frame carries only coarse `IntentClass` + `original_frame_id`; audit observability of which specific intent was denied requires correlating to the unadmitted original frame. Schema enhancement, not an explicit AC3 violation.

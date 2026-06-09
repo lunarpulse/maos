@@ -5130,17 +5130,20 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     use mira::{AnomalySignal, Mira, ADVISORY_FINE_GRAINED_INTENT};
     use nash::Nash;
 
-    use maos_a2a::error::A2AError;
     use maos_a2a::{
-        A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile, ConsentAllowlists,
+        A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile, A2ARouterCore, ConsentAllowlists,
         InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
     };
+    // Story 8.13.1 — the receiver intake seam + JSON-RPC types used to drive the
+    // deny directly at production code (LoopbackA2ARouter exposes no rupture hook).
+    use maos_a2a::transport::json_rpc::{A2AJsonRpcRequest, A2AJsonRpcResponse, CODE_INTENT_DENIED};
     use maos_director_surface::halt_ui::{FlowState, HaltFlow, TapEvent};
     use maos_director_surface::notification::{
         NotificationChannel, NotificationDispatcher, NotificationError,
     };
     use maos_domain::frame::{
-        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, RuptureReason,
+        TaskAssignPayload,
     };
     use maos_domain::halt::{HaltId, Resolution};
     use maos_domain::invariants::i1::IntentClass;
@@ -5442,39 +5445,72 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     );
     let advisory_ref = tl.last_frame_id();
 
-    // ── Step 5 — one deliberate EIntentDenied (observable in the TL).
+    // ── Step 5 — one deliberate consent denial that EARNS a real ConsentRupture
+    // from PRODUCTION code (Story 8.13.1 — the hand-insert is deleted). The
+    // advisory intent classifies, but host_a's accept_allowlist is empty, so the
+    // receiver intake denies with -32001 AND its production deny path emits a
+    // typed ConsentRupture frame carrying the policy reason. Driven directly at
+    // the `A2ARouterCore::handle_intake` receiver seam because `LoopbackA2ARouter`
+    // exposes no rupture-sink hook and `maos-a2a` is edit-forbidden — consistent
+    // with the live-TCP smoke, which observes the same emission off `nash.core()`.
     let deny_cfg_a = mk_cfg("host_a", "tls://127.0.0.1:7443", fa.clone(), vec![]);
     let deny_tofu = Arc::new(InMemoryTofuPinStore::new());
     deny_tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;
-    deny_tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1).await?;
-    let deny_router = LoopbackA2ARouter::new(vec![deny_cfg_a, cfg_b], deny_tofu);
-    match LocalRouter::route_outbound(
-        &deny_router,
-        make_frame(IntentClass::Readonly, advisory_json.clone()),
-        &HostId("host_b".into()),
-    )
-    .await
-    {
-        Err(A2AError::IntentDeniedAtPeer { .. }) => {
-            let _rupture_token = tl.insert_frame_event(
-                TlFrameKind::ConsentRupture,
-                MIRA_PID,
-                None,
-                "a2a.consent.denied",
-                b"fine-grained advisory denied at peer (empty accept_allowlist)",
-                FrameOrigin::SpiritAuto,
-            );
-            eprintln!(
-                "smoke-mira-nash-8-5: deliberate consent rejection (IntentDeniedAtPeer/EIntentDenied) — ConsentRupture row written to the TL"
-            );
-        }
-        Ok(()) => {
-            return Err("smoke-mira-nash-8-5: denied advisory was admitted unexpectedly".into())
-        }
-        Err(other) => {
-            return Err(format!("smoke-mira-nash-8-5: unexpected error on denial: {other:?}").into())
+    let deny_core = A2ARouterCore::new(vec![deny_cfg_a], deny_tofu);
+    let (deny_rupture_tx, mut deny_rupture_rx) =
+        tokio::sync::mpsc::channel::<IacFrame>(16);
+    deny_core.install_rupture_sink(deny_rupture_tx).await;
+    let mut denied_frame = make_frame(IntentClass::Readonly, advisory_json.clone());
+    // Story 8.13.1-review / P6 — align with 8.13 smoke: use a distinct fine-grained
+    // intent so the deny is unambiguously the classified-but-policy-denied (-32001)
+    // leg, not an unclassified (-32009) or sender-side deny.
+    denied_frame.consent_envelope = Some(ConsentEnvelope::with_fine_grained_intent(
+        denied_frame.from.clone(),
+        A2AIntent::new("diagnosis-handoff:write-mitigation"),
+    ));
+    let denied_req = A2AJsonRpcRequest::new(
+        "iac.deliver",
+        denied_frame,
+        1,
+    );
+    match deny_core.handle_intake(denied_req).await {
+        A2AJsonRpcResponse::Nack(n) if n.error.code == CODE_INTENT_DENIED => {}
+        other => {
+            return Err(format!(
+                "smoke-mira-nash-8-5: expected -32001 CODE_INTENT_DENIED at intake, got {other:?}"
+            )
+            .into())
         }
     }
+    // OBSERVE the production-emitted rupture (never hand-inserted) and assert it
+    // carries the deny-decision-only signal before journaling it for real.
+    let deny_rupture = deny_rupture_rx.try_recv().map_err(|e| {
+        format!("smoke-mira-nash-8-5: production deny path emitted no ConsentRupture: {e:?}")
+    })?;
+    match &deny_rupture.payload {
+        FramePayload::ConsentRupture(p)
+            if p.rejected.len() == 1
+                && matches!(p.rejected[0].reason, RuptureReason::IntentAllowlistMismatch) => {}
+        other => {
+            return Err(format!(
+                "smoke-mira-nash-8-5: not the production IntentAllowlistMismatch rupture: {other:?}"
+            )
+            .into())
+        }
+    }
+    let deny_rupture_bytes = serde_json::to_vec(&deny_rupture)
+        .map_err(|e| format!("smoke-mira-nash-8-5: serialize rupture: {e}"))?;
+    let _rupture_token = tl.insert_frame_event(
+        TlFrameKind::ConsentRupture,
+        MIRA_PID,
+        None,
+        "a2a.consent.denied",
+        &deny_rupture_bytes,
+        FrameOrigin::SpiritAuto,
+    );
+    eprintln!(
+        "smoke-mira-nash-8-5: deliberate consent rejection (-32001) — PRODUCTION ConsentRupture observed off the deny path + journaled (no hand-insert)"
+    );
 
     // ── Step 6 — director three-tap resolves the halt (KernelHaltResolver + journal).
     let s = HaltFlow::<KernelHaltResolver>::resolve_flow(
@@ -5765,7 +5801,8 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     use maos_director_surface::halt_ui::{FlowState, HaltFlow, TapEvent};
     use maos_director_surface::notification::{NotificationDispatcher, TerminalChannel};
     use maos_domain::frame::{
-        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, RuptureReason,
+        TaskAssignPayload,
     };
     use maos_domain::halt::{HaltId, Resolution};
     use maos_domain::invariants::i1::IntentClass;
@@ -5788,6 +5825,12 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     const MIRA_NONCE: u64 = 8131;
     const NASH_NONCE: u64 = 8132;
     const MIRA_PID: u32 = 813;
+    // Story 8.13.1 / AC3 — a CANONICAL fine-grained intent (sibling of
+    // ADVISORY_FINE_GRAINED_INTENT) that CLASSIFIES (passes the -32009 gate) but
+    // is deliberately absent from Nash's accept_allowlist, so it is policy-denied
+    // with -32001 — the rupture-relevant leg. The consent DECISION is fixtured
+    // (the allowlist); the ConsentRupture RECORD is produced by production code.
+    const DENIED_FINE_GRAINED_INTENT: &str = "diagnosis-handoff:write-mitigation";
 
     fn spawn_push_server() -> Result<(String, mpsc::Receiver<(String, String, Vec<u8>)>), Box<dyn std::error::Error>> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
@@ -6077,6 +6120,12 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     // hook — zero edits to maos-a2a-tcp/kernel.
     let (intake_tx, mut intake_rx) = tokio::sync::mpsc::unbounded_channel::<IacFrame>();
     nash.core().install_intake_sink(intake_tx).await;
+    // Story 8.13.1 / AC3 — drain Nash's production rupture emissions. The deny
+    // path in `A2ARouterCore::handle_intake` pushes a typed ConsentRupture frame
+    // here; the smoke OBSERVES it (never hand-inserts), mirroring the 6.4
+    // sender-receives-the-typed-rupture pattern. Zero edits to maos-a2a-tcp.
+    let (rupture_tx, mut rupture_rx) = tokio::sync::mpsc::channel::<IacFrame>(16);
+    nash.core().install_rupture_sink(rupture_tx).await;
     let mira_tcp = TcpA2AConfig {
         listen_addr: "127.0.0.1:0".parse()?,
         own_cert_chain: mira_cert,
@@ -6090,7 +6139,14 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
         endpoint: format!("tls://{nash_addr}"),
         cert_fingerprint: nash_fp.clone(),
         profile: A2AProfile::CrossHost,
-        allowlists: allow(&[ADVISORY_FINE_GRAINED_INTENT], &[]),
+        // Story 8.13.1 / AC3 — Mira may SEND both the advisory and the
+        // (to-be-denied) write-mitigation intent; Nash accepts only the
+        // advisory, so the second one is policy-denied at the RECEIVER (-32001),
+        // not at Mira's send-allowlist. That is the cross-host rupture leg.
+        allowlists: allow(
+            &[ADVISORY_FINE_GRAINED_INTENT, DENIED_FINE_GRAINED_INTENT],
+            &[],
+        ),
         partition_timeout_secs: 30,
         consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     }];
@@ -6169,12 +6225,85 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
         FrameOrigin::SpiritAuto,
     );
     let advisory_ref = tl.last_frame_id();
+
+    // ── Story 8.13.1 — EARN the cross-host ConsentRupture over the live wire.
+    // Drive a classified-but-policy-denied fine-grained intent Mira→Nash. Mira's
+    // send-allowlist admits it; Nash's accept-allowlist does NOT, so Nash denies
+    // with -32001 (distinct from -32007 peer-binding and -32009 unclassified) AND
+    // its production deny path emits a typed ConsentRupture frame. The matched
+    // (transport-bound) host_a is used, so the -32007 confused-deputy guard above
+    // stays clean and this frame genuinely enters intake.
+    let mut denied = task_assign_frame(0x15, bound_mira_host.clone(), advisory_json.clone());
+    denied.consent_envelope = Some(ConsentEnvelope::with_fine_grained_intent(
+        denied.from.clone(),
+        A2AIntent::new(DENIED_FINE_GRAINED_INTENT),
+    ));
+    let denied_frame_id = denied.frame_id;
+    match A2APeerRouter::route_outbound(&*mira, denied, &HostId("host_b".into())).await {
+        // Sender-side honest observable: the -32001 maps back to IntentDeniedAtPeer.
+        Err(A2AError::IntentDeniedAtPeer { .. }) => {}
+        other => {
+            return Err(format!(
+                "smoke-mira-nash-tcp-8-13: expected IntentDeniedAtPeer on the denied leg, got {other:?}"
+            )
+            .into())
+        }
+    }
+    // Receiver-side authoritative record: OBSERVE the rupture Nash's production
+    // deny path emitted (never hand-inserted). Bound to the TLS-verified peer
+    // (the sender, host_a) + carrying the policy reason only the deny decision
+    // possesses (IntentAllowlistMismatch).
+    let rupture_frame = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        rupture_rx.recv(),
+    )
+    .await
+    .map_err(|_| "smoke-mira-nash-tcp-8-13: timed out waiting for the production ConsentRupture")?
+    .ok_or("smoke-mira-nash-tcp-8-13: rupture sink closed without emitting")?;
+    if rupture_frame.kind != FrameKind::ConsentRupture {
+        return Err(format!(
+            "smoke-mira-nash-tcp-8-13: emitted frame was {:?}, not ConsentRupture",
+            rupture_frame.kind
+        )
+        .into());
+    }
+    // Bound back to the verified sender peer (host_a) — confused-deputy-safe.
+    if rupture_frame.to.first().and_then(|a| a.host_id.as_ref()) != Some(&bound_mira_host) {
+        return Err("smoke-mira-nash-tcp-8-13: rupture not bound to the TLS-verified peer host_a".into());
+    }
+    match &rupture_frame.payload {
+        FramePayload::ConsentRupture(p) => {
+            if p.rejected.len() != 1
+                || !matches!(p.rejected[0].reason, RuptureReason::IntentAllowlistMismatch)
+            {
+                return Err(format!(
+                    "smoke-mira-nash-tcp-8-13: rupture reason was not IntentAllowlistMismatch: {:?}",
+                    p.rejected
+                )
+                .into());
+            }
+            if p.original_frame_id != denied_frame_id {
+                return Err("smoke-mira-nash-tcp-8-13: rupture original_frame_id mismatch".into());
+            }
+            if p.original_kind != FrameKind::TaskAssign {
+                return Err("smoke-mira-nash-tcp-8-13: rupture original_kind mismatch".into());
+            }
+        }
+        other => {
+            return Err(format!("smoke-mira-nash-tcp-8-13: non-ConsentRupture payload {other:?}").into())
+        }
+    }
+    // Journal the GENUINE production rupture frame to the Transparency Log so the
+    // J4 digest can cite it — the row's bytes come from the emitted frame, NOT a
+    // hand-typed string. This is the honest replacement for the deleted fake.
+    let rupture_bytes = serde_json::to_vec(&rupture_frame)
+        .map_err(|e| format!("smoke-mira-nash-tcp-8-13: serialize rupture: {e}"))?;
     let _rupture_token = tl.insert_frame_event(
         TlFrameKind::ConsentRupture,
         MIRA_PID,
         None,
         "a2a.consent.denied",
-        b"fine-grained advisory denied at peer (documented J4 consent rupture)",
+        &rupture_bytes,
         FrameOrigin::SpiritAuto,
     );
     let s = HaltFlow::<KernelHaltResolver>::resolve_flow(FlowState::Tap1Acknowledge, TapEvent::Acknowledge);
