@@ -232,6 +232,11 @@ pub fn ci_default_guard(program: &str, network_requested: bool) -> Result<(), Br
 }
 
 /// Spec for a single subprocess spawn through the bridge (AC1).
+#[maos_attrs::i9_exempt(
+    reason = "live CLI subprocess spawn spec; carries host-injected process \
+              environment (credentials) and argv into the bridge — a transient \
+              value object, not cached kernel domain state"
+)]
 pub struct BridgeSpawnSpec {
     /// Resolved absolute path or PATH-resolvable name of the CLI binary.
     pub program: String,
@@ -283,6 +288,12 @@ enum ReaderMsg {
 /// A live subprocess bridge: owns the child, its stdin (control channel), the
 /// reader threads, and the bounded receiver. RAII — `Drop` kills+reaps the child
 /// and joins the readers so no orphaned process or thread survives.
+#[maos_attrs::i9_exempt(
+    reason = "live subprocess bridge RAII handle; owns OS resources (child \
+              process, stdin control channel, reader thread JoinHandles, \
+              bounded receiver, drop-counter) for one in-flight CLI invocation \
+              — process-bound resource ownership, not cached kernel domain state"
+)]
 pub struct SpawnedBridge {
     child: Option<Child>,
     stdin: Option<ChildStdin>,

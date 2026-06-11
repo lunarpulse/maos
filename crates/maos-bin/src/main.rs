@@ -28,6 +28,9 @@
 //! Story 1b.5a adds the one-shot mode: set `MAOS_ONE_SHOT=hello-spirit`
 //! to run the reference Spirit once and print JSON to stdout.
 
+mod cassette_replay;
+mod env_contract;
+
 use std::sync::Arc;
 use std::thread::available_parallelism;
 use tokio::signal;
@@ -1710,6 +1713,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>,
         > = None;
 
+        // JB-5 — shared output channel for output_shape validation (only
+        // populated for Butler-class Spirits).
+        let butler_output_ch: Arc<std::sync::Mutex<Option<serde_json::Value>>> =
+            Arc::new(std::sync::Mutex::new(None));
         let pid = match kind {
             LoadedSpiritKind::Butler => {
                 // Boot-loud: a halt-posture Spirit MUST have a production
@@ -1766,7 +1773,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     comms: vec![],
                     preference_alignment: None,
                 };
-                let mut butler = butler::Butler::with_scenario(scenario);
+                // JB-5 — output_shape channel already hoisted before match arm.
+                let mut butler = butler::Butler::with_scenario(scenario)
+                    .with_output_channel(Arc::clone(&butler_output_ch));
                 if let Some(port) = scalar_port {
                     butler = butler.with_scalar_port(port);
                 }
@@ -2043,9 +2052,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .with_rate_limiter(Arc::clone(&rate_limiter))
                     .with_iac(Arc::clone(&iac));
                     let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
-                        Arc::new(researcher_inference);
+                        if std::env::var("MAOS_JOURNEY_MODE").as_deref() == Ok("record") {
+                            let cassette_path = std::env::var("MAOS_REPLAY_CASSETTE")
+                                .map_err(|_| "maos run: MAOS_JOURNEY_MODE=record requires MAOS_REPLAY_CASSETTE".to_string())?;
+                            eprintln!("maos run: researcher record-mode → {cassette_path}");
+                            Arc::new(cassette_replay::CassetteRecordPort::new(
+                                Box::new(researcher_inference),
+                                std::path::PathBuf::from(&cassette_path),
+                                spirit_id.to_string(),
+                                "live-record".into(),
+                            ))
+                        } else {
+                            Arc::new(researcher_inference)
+                        };
                     researcher = researcher.with_inference_port(port, token, 0);
                     eprintln!("maos run: researcher live-inference seam wired (--live)");
+                } else if let Ok(cassette_path) = std::env::var("MAOS_REPLAY_CASSETTE") {
+                    let strict = std::env::var("MAOS_REPLAY_STRICT")
+                        .map(|v| v == "1")
+                        .unwrap_or(false);
+                    let replay = cassette_replay::CassetteReplayPort::from_file(
+                        std::path::Path::new(&cassette_path),
+                        strict,
+                    )
+                    .map_err(|e| format!("maos run: cassette replay init failed: {e}"))?;
+                    let token = capability
+                        .issue_with_mediation(
+                            0,
+                            Scope::ProviderInfer {
+                                provider: "replay".into(),
+                            },
+                            60,
+                            [0u8; 32],
+                            IntentClass::Standard,
+                        )
+                        .map_err(|e| format!("maos run: token issue failed: {e}"))?;
+                    let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
+                        Arc::new(replay);
+                    researcher = researcher.with_inference_port(port, token, 0);
+                    eprintln!(
+                        "maos run: researcher cassette-replay inference wired ({})",
+                        cassette_path
+                    );
                 } else {
                     eprintln!(
                         "maos run: researcher deterministic survey (no --live; zero network)"
@@ -2091,6 +2139,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "{}",
                 serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
             );
+            // JB-5 — output_shape enforcement: validate the Spirit's notification
+            // output against the manifest's OutputShapePredicate. The Spirit writes
+            // to the shared output channel during on_idle; the daemon validates here.
+            {
+                let predicate = maos_kernel_core::security::OutputShapePredicate::from(&output_shape);
+                let output_guard = butler_output_ch.lock().unwrap();
+                if let Some(ref output_json) = *output_guard {
+                    if let Err(violation) = predicate.check(output_json) {
+                        eprintln!(
+                            "maos run: output_shape violation: {violation}"
+                        );
+                    }
+                }
+                drop(output_guard);
+            }
             if let Some(handle) = &halt_receipt_handle {
                 if let Some(receipt) = handle.lock().unwrap_or_else(|e| e.into_inner()).clone() {
                     // AC5(f) — render the halt screen-string from the SHARED

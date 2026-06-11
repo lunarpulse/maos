@@ -10,6 +10,8 @@ mod check_bare_review_findings;
 mod check_breaking_md;
 mod check_composition_root_completeness;
 mod check_corpus;
+mod cassette_age_gate;
+mod check_env_contract;
 mod check_deprecations_declared;
 mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
@@ -459,6 +461,23 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 8.15 — cassette age gate: fail if any cassette's recorded_at exceeds 14 days.
+    CassetteAgeGate {
+        #[arg(long, default_value = "crates/maos-journey-test/cassettes")]
+        cassette_dir: String,
+        /// Directory containing the Tier-2 success stamp file (default: same as cassette_dir)
+        #[arg(long)]
+        stamp_dir: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 8.15 — env-contract gate: every MAOS_* env::var read must be registered.
+    CheckEnvContract {
+        #[arg(long, default_value = "crates/maos-bin")]
+        maos_bin_dir: String,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -707,6 +726,12 @@ fn main() {
         Commands::NfrOnb1Gate { check, json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             nfr_onb_1_gate::run(&workspace_root, check, json)
+        }
+        Commands::CassetteAgeGate { cassette_dir, stamp_dir, json } => {
+            cassette_age_gate::run(&cassette_dir, json, stamp_dir.as_deref())
+        }
+        Commands::CheckEnvContract { maos_bin_dir, json } => {
+            check_env_contract::run(&maos_bin_dir, json)
         }
     };
     if let Err(e) = result {

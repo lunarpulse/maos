@@ -516,3 +516,20 @@ nor the maos-iac trait is local to maos-kernel-core without a wrapper struct.
 `#[cfg(test)]`-gated so director-surface tests in other crates can consume it).
 The `Mutex<Vec<(String, LifecycleVerb)>>` captures every `resolve_verb` call for
 test assertions — test-only capture state, never production runtime state, per I9.
+
+### `BridgeSpawnSpec` — `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs`
+
+**Reason:** Story 8.12 live CLI subprocess bridge. A transient value object
+describing one subprocess spawn: program path, argv prefix + hash, host-injected
+process environment (`Vec<(String, String)>` credentials, never journaled), stdio
+shape, and control-channel config. Consumed once at spawn and dropped — it caches
+no cross-invocation kernel domain state per I9.
+
+### `SpawnedBridge` — `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs`
+
+**Reason:** Story 8.12 live CLI subprocess bridge RAII handle. Owns the OS
+resources for one in-flight CLI invocation: the `Child` process, its stdin
+control channel, the reader-thread `Vec<JoinHandle<()>>`, the bounded `Receiver`,
+and an `Arc<AtomicU64>` drop-counter. `Drop` kills+reaps the child and joins the
+readers so no orphaned process or thread survives. This is process-bound resource
+ownership scoped to a single invocation, not cached kernel domain state per I9.

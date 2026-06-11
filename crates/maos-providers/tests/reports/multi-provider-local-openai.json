@@ -3,7 +3,7 @@
     "error": null,
     "fixture_id": "case_empty_prompt",
     "input_tokens": 0,
-    "latency_us": 1,
+    "latency_us": 0,
     "output_tokens": 0,
     "provider": "openai",
     "response_text_len": 0,

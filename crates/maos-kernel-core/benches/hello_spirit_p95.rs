@@ -124,15 +124,21 @@ fn make_test_adapter() -> InferencePortAdapter {
 
     let transparency_log = Arc::new(TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF));
     let telemetry = Arc::new(IacRtMetrics::new());
-    let provider: Arc<dyn Provider> = Arc::new(MockProvider);
 
-    InferencePortAdapter::new(
-        provider,
-        "mock".into(),
-        capabilities,
-        transparency_log,
-        telemetry,
-    )
+    // `InferencePortAdapter::new` now takes a `MultiProviderRouter` rather than a
+    // raw provider + model-id string. Register the mock under "mock" (matching the
+    // `Scope::ProviderInfer { provider: "mock" }` declared in the policy above).
+    let mut providers: std::collections::BTreeMap<String, Arc<dyn Provider>> =
+        std::collections::BTreeMap::new();
+    providers.insert("mock".into(), Arc::new(MockProvider));
+    let router = Arc::new(
+        maos_kernel_core::inference::router::MultiProviderRouter::new(
+            providers,
+            Some("mock".into()),
+        ),
+    );
+
+    InferencePortAdapter::new(router, capabilities, transparency_log, telemetry)
 }
 
 /// Issue a valid capability token for the bench.

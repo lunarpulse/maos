@@ -19,3 +19,13 @@ serde_json = "1.0"
 [features]
 default = []
 fixture_replay = []
+
+# The integration test consumes `maos_mcp::fixture_replay`, which is gated
+# behind `#[cfg(any(test, feature = "fixture_replay"))]`. `cfg(test)` does NOT
+# propagate to integration tests (they link the lib as an external crate), so
+# the module is only visible here when the feature is enabled. `required-features`
+# makes `cargo build --all-targets` skip this target unless the feature is on,
+# instead of failing with an unresolved import.
+[[test]]
+name = "mcp_client_trait_test"
+required-features = ["fixture_replay"]

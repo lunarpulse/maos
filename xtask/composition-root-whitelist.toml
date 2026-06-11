@@ -2,6 +2,14 @@
 # Adapters listed here are EXEMPT from the "exactly one construction"
 # assertion.  Each entry is a simple string (the adapter type name).
 # Justifications are documented in inline comments above each entry.
+#
+# NOTE: the gate is a regex scan over the whole of `crates/maos-bin/src/main.rs`.
+# That file holds the single production composition root (in `fn main`) AND a
+# large set of embedded smoke/journey harnesses (`smoke_orchestrator_fanout_6_2`,
+# `smoke_founder_loop_8_4`, the `dispatch` smoke entrypoints, `test_*` fns) plus
+# per-Spirit live-MCP client setup.  Each harness / per-Spirit path builds its
+# own ISOLATED composition root for test determinism — these are not duplicate
+# shared-state instances, so the regex's duplicate-count heuristic over-reports.
 
 # JournalAdapter — constructed multiple times in one-shot arms because
 # each arm opens its own per-invocation Lifecycle Journal file.
@@ -10,4 +18,38 @@ whitelist = [
     "JournalAdapter",
     "SecurityManagerAdapter",
     "SpiritSchedulerAdapter",
+
+    # --- Story 8.1–8.14 additions (Epic 8 daemon + per-Spirit MCP + smokes) ---
+
+    # TelemetryStreamAdapter — one instance in the production boot path
+    # (`fn main`), plus one per embedded smoke/journey harness and test fn
+    # (smoke-mira-nash, founder-loop, MockMcpClientPort tests). Each harness
+    # needs its own telemetry stream so assertions observe only its own events.
+    "TelemetryStreamAdapter",
+
+    # CapabilityRegistryAdapter — single production instance in `fn main`;
+    # additional instances are per-smoke-harness (each smoke run issues its own
+    # capability tokens against an isolated registry) and in test scaffolding.
+    "CapabilityRegistryAdapter",
+
+    # MemoryManagerAdapter — single production instance in `fn main`; additional
+    # instances back isolated smoke/journey runs that must not share working
+    # memory with the production root or with each other.
+    "MemoryManagerAdapter",
+
+    # IacBusAdapter — single production instance in `fn main`; additional
+    # instances are constructed by the founder-loop / orchestrator-fanout smoke
+    # harnesses (`smoke_founder_loop_8_4`, `smoke_orchestrator_fanout_6_2`),
+    # each wiring its own in-process IAC bus for an isolated Spirit topology.
+    "IacBusAdapter",
+
+    # InferencePortAdapter — production instance in `fn main`; the second site
+    # is the Researcher live-MCP `call` path, a distinct component with its own
+    # provider router, not a clone of the production inference port.
+    "InferencePortAdapter",
+
+    # McpClientAdapter — constructed once PER cognitive Spirit (Butler wraps its
+    # calendar/slack/linear/figma servers; Researcher wraps web/arXiv/github/
+    # citation). These are per-Spirit MCP clients, never a shared instance.
+    "McpClientAdapter",
 ]

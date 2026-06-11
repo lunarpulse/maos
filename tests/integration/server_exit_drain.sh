@@ -26,13 +26,17 @@ MAOS_BIN="${REPO_ROOT}/target/release/maos"
 # ── (A) One-shot drain: generate cap-audit rows, verify persistence ──
 echo "::group::(A) One-shot drain: hello-spirit -> verify cap-audit rows persist"
 
-DB_A="$(mktemp --suffix=.sqlite)"
-rm -f "$DB_A"
-cleanup_a() { rm -f "$DB_A"; }
+# Story 8.14a migrated the binary's audit-DB resolution from the legacy
+# `MAOS_AUDIT_DB` override (dropped from the env-var contract, see
+# crates/maos-bin/src/env_contract.rs) to `${MAOS_HOME}/audit/transparency.sqlite`.
+# Point the smoke at a throwaway MAOS_HOME and read the TL from the resolved path.
+HOME_A="$(mktemp -d)"
+DB_A="${HOME_A}/audit/transparency.sqlite"
+cleanup_a() { rm -rf "$HOME_A"; }
 trap cleanup_a EXIT
 
 set +e
-MAOS_AUDIT_DB="$DB_A" MAOS_ONE_SHOT="hello-spirit" "$MAOS_BIN" >/dev/null 2>/dev/null
+MAOS_HOME="$HOME_A" MAOS_ONE_SHOT="hello-spirit" "$MAOS_BIN" </dev/null >/dev/null 2>/dev/null
 ONE_SHOT_RC=$?
 set -e
 
@@ -65,20 +69,33 @@ else
     echo "one-shot drain: SKIPPED (ANTHROPIC_API_KEY unset; exit code ${ONE_SHOT_RC} consistent with unconfigured provider)"
 fi
 
-rm -f "$DB_A"
+rm -rf "$HOME_A"
 trap - EXIT
 echo "::endgroup::"
 
 # ── (B) Server SIGTERM: inject synthetic row, verify drain + row persistence ──
 echo "::group::(B) Server SIGTERM: verify drain block reachable + synthetic row survives"
 
-DB_B="$(mktemp --suffix=.sqlite)"
+# Story 8.14a repurposed the no-arg / Spirit-less invocation into the
+# kernel-rendered shell — that IS the long-running serving surface now. It opens
+# the Transparency Log and stays alive until SIGTERM, draining on graceful exit.
+# A FIFO fed by a background `sleep` holds the shell's stdin open so it does not
+# EOF and exit before we inject the synthetic row and signal it. Audit DB
+# resolves under MAOS_HOME.
+HOME_B="$(mktemp -d)"
+DB_B="${HOME_B}/audit/transparency.sqlite"
 STDERR_LOG="$(mktemp --suffix=.log)"
-rm -f "$DB_B"
-cleanup_b() { rm -f "$DB_B" "$STDERR_LOG"; }
+STDIN_FIFO="$(mktemp -u)"
+mkfifo "$STDIN_FIFO"
+sleep 120 >"$STDIN_FIFO" &
+STDIN_HOLDER=$!
+cleanup_b() {
+    kill "$STDIN_HOLDER" 2>/dev/null || true
+    rm -rf "$HOME_B" "$STDERR_LOG" "$STDIN_FIFO"
+}
 trap cleanup_b EXIT
 
-NO_COLOR=1 MAOS_AUDIT_DB="$DB_B" "$MAOS_BIN" >/dev/null 2>"$STDERR_LOG" &
+MAOS_HOME="$HOME_B" NO_COLOR=1 "$MAOS_BIN" <"$STDIN_FIFO" >/dev/null 2>"$STDERR_LOG" &
 SERVER_PID=$!
 
 SERVER_READY=0
@@ -111,7 +128,12 @@ sleep 1
 # to SQLite before SIGTERM. The drain block (which awaits the MPSC channel
 # writer) is validated by Part A; Part B additionally verifies that rows
 # already in the DB survive a graceful SIGTERM shutdown.
-sqlite3 "$DB_B" "INSERT INTO transparency_log (timestamp_ns, kind, frame_id, payload) VALUES (strftime('%s','now') * 1000000000, 7, 'synthetic-drain-test', x'00');" \
+# The transparency_log schema gained redaction + IAC-frame columns since this
+# smoke was written (Story 8.2 renamed `payload` → `payload_redacted` and the
+# frame columns spirit_pid/boot_nonce/intent/origin are NOT NULL). Supply every
+# NOT NULL column without a default so the synthetic insert matches the kernel's
+# current on-disk schema.
+sqlite3 "$DB_B" "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin) VALUES ('synthetic-drain-test', strftime('%s','now') * 1000000000, 0, 0, 7, 'synthetic', x'00', 0);" \
     || { echo "FAIL: could not insert synthetic row into audit DB" >&2; kill -9 "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; exit 1; }
 
 PRE_SIGTERM_ROWS="$(sqlite3 "$DB_B" "SELECT COUNT(*) FROM transparency_log WHERE kind = 7;")"

@@ -98,22 +98,28 @@ assert_journal_tail_event() {
     '.lifecycle_event == $ev and .spirit_id == "hello-spirit"' >/dev/null
 }
 
+# NOTE (Story 8.14a): `maosctl run` above is now a kernel-rendered evaluator
+# surface that performs a REAL admission/load, so it journals one `Load` entry
+# (resolved sandbox tier T2) before the start/stop/unload verbs run. Each
+# subsequent verb still writes exactly one entry — the tail-event counts below
+# are therefore offset by +1 from the original v0.1 (pre-`run`-load) sequence:
+#   run → Load(1), start → Start(2), stop → Halt(3), unload → Unload(4).
 echo "::group::start hello-spirit"
 START_ERR="$("${MAOSCTL}" start hello-spirit 2>&1 >/dev/null)"
 echo "$START_ERR" | grep -q "started hello-spirit" || { echo "start: stderr missing 'started hello-spirit' diagnostic — got: $START_ERR" >&2; exit 1; }
-assert_journal_tail_event 1 "Start"
+assert_journal_tail_event 2 "Start"
 echo "::endgroup::"
 
 echo "::group::stop hello-spirit"
 STOP_ERR="$("${MAOSCTL}" stop hello-spirit 2>&1 >/dev/null)"
 echo "$STOP_ERR" | grep -q "stopped hello-spirit" || { echo "stop: stderr missing 'stopped hello-spirit' diagnostic — got: $STOP_ERR" >&2; exit 1; }
-assert_journal_tail_event 2 "Halt"
+assert_journal_tail_event 3 "Halt"
 echo "::endgroup::"
 
 echo "::group::unload hello-spirit"
 UNLOAD_ERR="$("${MAOSCTL}" unload hello-spirit 2>&1 >/dev/null)"
 echo "$UNLOAD_ERR" | grep -q "unloaded hello-spirit" || { echo "unload: stderr missing 'unloaded hello-spirit' diagnostic — got: $UNLOAD_ERR" >&2; exit 1; }
-assert_journal_tail_event 3 "Unload"
+assert_journal_tail_event 4 "Unload"
 echo "::endgroup::"
 
 # ───────────────────────────────────────────────────────────────

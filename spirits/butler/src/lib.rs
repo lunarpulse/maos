@@ -360,6 +360,12 @@ pub struct Butler {
     /// `parking_lot::Mutex` — Butler is `Send + Sync` behind `Arc`; `parking_lot`
     /// preferred over `std::sync::Mutex` for non-poisoning behavior.
     last_notification: Arc<parking_lot::Mutex<Option<NotificationPayload>>>,
+    /// JB-5 — shared output channel for daemon-level output_shape validation.
+    /// The daemon sets this before loading the Spirit; Butler serializes its
+    /// notification to JSON here during `on_idle`. After `fire_on_idle` returns,
+    /// the daemon reads from this channel and validates against the manifest's
+    /// `OutputShapePredicate`.
+    output_channel: Option<Arc<std::sync::Mutex<Option<serde_json::Value>>>>,
 }
 
 impl std::fmt::Debug for Butler {
@@ -442,6 +448,16 @@ impl Butler {
                 *self.last_notification.lock() = Some(notification);
             }
 
+            // JB-5 — serialize the notification to the output channel so the
+            // daemon can validate it against the manifest's OutputShapePredicate.
+            if let Some(ch) = &self.output_channel {
+                let guard = self.last_notification.lock();
+                if let Some(ref notification) = *guard {
+                    let json = serde_json::to_value(notification).unwrap_or_default();
+                    *ch.lock().unwrap() = Some(json);
+                }
+            }
+
             // Story 8.10 AC1 — when the epistemic-scalar port is wired, drive
             // the assessed scalar through the kernel policy path so the
             // `[epistemic_policy]` halt fires.
@@ -479,6 +495,7 @@ impl Default for Butler {
             last_halt_receipt: Arc::new(std::sync::Mutex::new(None)),
             mcp_port: None,
             last_notification: Arc::new(parking_lot::Mutex::new(None)),
+            output_channel: None,
         }
     }
 }
@@ -496,6 +513,7 @@ impl Butler {
             last_halt_receipt: Arc::new(std::sync::Mutex::new(None)),
             mcp_port: None,
             last_notification: Arc::new(parking_lot::Mutex::new(None)),
+            output_channel: None,
         }
     }
 
@@ -504,6 +522,12 @@ impl Butler {
     /// kernel policy path so the `[epistemic_policy]` halt can fire.
     pub fn with_scalar_port(mut self, port: Arc<dyn EpistemicScalarPort>) -> Self {
         self.scalar_port = Some(port);
+        self
+    }
+    /// JB-5 — inject a shared output channel for daemon-level output_shape
+    /// validation. Butler serializes its notification here during `on_idle`.
+    pub fn with_output_channel(mut self, ch: Arc<std::sync::Mutex<Option<serde_json::Value>>>) -> Self {
+        self.output_channel = Some(ch);
         self
     }
 
