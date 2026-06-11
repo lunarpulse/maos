@@ -61,7 +61,13 @@ fn make_response(
 fn run_matrix(provider: &str) -> Vec<serde_json::Value> {
     let cases_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/multi-provider-v0/cases");
-    let reports_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/reports");
+    // Reports go to the REPO-ROOT `tests/reports/` (canonical record dir per
+    // its README, and the exact path the multi-provider.yml upload-artifact /
+    // download-artifact / jq-aggregate / check-multi-provider-drift steps read).
+    // CARGO_MANIFEST_DIR is `crates/maos-providers`, so climb two levels.
+    // Writing crate-local (`CARGO_MANIFEST_DIR/tests/reports`) made the matrix
+    // pass while uploading nothing → report-aggregate's `jq` failed exit 2.
+    let reports_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/reports");
     let mut results = Vec::new();
 
     if !cases_dir.exists() {

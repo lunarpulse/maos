@@ -13,3 +13,11 @@ xtask/tests/fixtures/abi-diff/*/modified-removed/Cargo.lock
 # outcomes, run-ledger). Only schemas + redacted examples under docs/research/
 # are committed; participant data NEVER enters the repo.
 _research/
+
+# Multi-provider matrix report artifacts: multi_provider_matrix writes
+# `tests/reports/multi-provider-<sha>-<provider>.json` and the jq-aggregated
+# `multi-provider-<sha>.json`; CI uploads them as build artifacts — they are
+# not repo records. Prevents the accidental-commit that stranded stale
+# `multi-provider-local-*.json` files in the tree.
+tests/reports/multi-provider-*.json
+crates/maos-providers/tests/reports/

@@ -13,7 +13,24 @@ no-default-features = false
 feature-depth = 1
 
 [advisories]
-ignore = []
+# All entries below are `unmaintained` advisories (NOT `vulnerability` class) for
+# transitive or frozen-ABI dependencies with no safe upgrade. Each is documented;
+# none masks a security vulnerability. FLAG-Winston/John: ratify, and schedule the
+# two migrations called out below.
+ignore = [
+    # serde_cbor 0.11.2 — archived/unmaintained. It is the canonical-CBOR encoder
+    # for the FROZEN ComplianceClaim ABI (maos-compliance/canonical_cbor.rs) and
+    # the CCAC N=600 ship-gate corpus, whose hashes are pinned. Migrating to the
+    # author-recommended `ciborium` (already in-tree) changes canonical byte
+    # ordering → re-pins every ComplianceClaim hash + NFR-Aud-9 corpus. That is a
+    # dedicated story, not a CI-green patch. Tracked as deferred work.
+    "RUSTSEC-2021-0127",
+    # rustls-pemfile 2.2.0 — archived Aug 2025; pulled transitively by the rustls
+    # TLS stack under maos-a2a-tcp. "No safe upgrade is available" (latest is a
+    # thin wrapper over rustls-pki-types' PemObject). Migration = swap to
+    # rustls-pki-types' PemObject API; deferred to an A2A-TLS hardening follow-up.
+    "RUSTSEC-2025-0134",
+]
 
 [licenses]
 allow = [
@@ -42,6 +59,16 @@ skip = [
     # libsqlite3-sys transitive deps. Acceptable for bundled SQLite feature.
     { name = "getrandom" },
     { name = "hashbrown" },
+    # half 1.8.x — pulled ONLY by serde_cbor 0.11.2 (1.8) vs ciborium (2.x).
+    # Disappears the moment the serde_cbor→ciborium migration (RUSTSEC-2021-0127
+    # above) lands. Skip until then.
+    { name = "half" },
+    # thiserror / thiserror-impl 1.x — pulled ONLY by `win32job` (a Windows-only
+    # transitive dep of maos-kernel-core that still uses thiserror 1). Every MAOS
+    # crate is already on thiserror 2.0; this cannot be unified until win32job
+    # upgrades upstream. Not present on the deny graph's linux targets at runtime.
+    { name = "thiserror" },
+    { name = "thiserror-impl" },
 ]
 skip-tree = []
 
