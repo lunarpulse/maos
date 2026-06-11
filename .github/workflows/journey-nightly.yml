@@ -1,0 +1,108 @@
+name: journey-nightly
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NEXTEST_VERSION: "0.9.89"
+
+jobs:
+  tier-2-journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: journey-${{ hashFiles('**/Cargo.lock') }}
+
+      - uses: taiki-e/install-action@nextest
+        with:
+          tool: nextest
+
+      - name: Build workspace
+        run: cargo build --locked --all-targets --workspace
+
+      - name: Tier-1 journey suites (nextest)
+        run: |
+          cargo nextest run \
+            -p maos-journey-test \
+            --test-threads 4 \
+            --no-fail-fast
+
+      - name: Cassette age gate
+        run: cargo run -p xtask -- cassette-age-gate
+
+      - name: Env contract gate
+        run: cargo run -p xtask -- check-env-contract
+
+  # Tier-2: re-record cassettes against live APIs (only when secrets are available).
+  tier-2-rerecord:
+    runs-on: ubuntu-latest
+    needs: tier-2-journey
+    timeout-minutes: 30
+    if: ${{ secrets.MAOS_ANTHROPIC_API_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: journey-rerecord-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
+        with:
+          tool: nextest
+
+      - name: Build workspace
+        run: cargo build --locked --all-targets --workspace
+
+      - name: Re-record journey cassettes (live)
+        env:
+          MAOS_JOURNEY_MODE: record
+          MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
+        run: |
+          cargo nextest run \
+            -p maos-journey-test \
+            --test-threads 1 \
+            --no-fail-fast \
+            --live
+
+      - name: Upload refreshed cassettes
+        uses: actions/upload-artifact@v4
+        with:
+          name: refreshed-cassettes
+          path: crates/maos-journey-test/cassettes/
+          retention-days: 7
+
+      # TODO: Auto-open PR with refreshed cassettes via gh cli / peter-evans/create-pull-request
+      # once bot pipeline permissions are configured.
+      # - name: Open PR with refreshed cassettes
+      #   uses: peter-evans/create-pull-request@v6
+      #   with:
+      #     title: "chore: refresh journey cassettes (${{ github.run_id }})"
+      #     branch: chore/refresh-cassettes
+      #     commit-message: "chore: refresh journey cassettes"
+
+  # J6 real cold-start measurement — migrated from discipline.yml (dead job-level
+  # schedule key). Runs on the workflow-level schedule (0 3 UTC daily).
+  j6-real-measurement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: j6-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run J6 real cold-start measurement (kernel_measurement feature)
+        run: cargo bench -p maos-bench --bench section_13_1 --features kernel_measurement

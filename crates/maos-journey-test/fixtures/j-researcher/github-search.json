@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "results": [
+      {"repo": "org/epistemic-drift-detector", "description": "Reference implementation of drift detection"},
+      {"repo": "org/halt-protocol-lib", "description": "Autonomous halt protocol library"}
+    ]
+  },
+  "id": 1
+}

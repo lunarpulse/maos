@@ -1,0 +1,4 @@
+# CODEOWNERS — review requirements for sensitive paths
+# Changes to journey-test cassettes require review to prevent stale/invalid VCR data
+# from entering the repository.
+crates/maos-journey-test/cassettes/ @*

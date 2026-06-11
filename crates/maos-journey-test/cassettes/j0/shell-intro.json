@@ -1,0 +1,20 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "recorded_at": "2026-06-11T00:00:00Z",
+  "model_id": "hand-authored-seed",
+  "spirit_id": "hello-spirit",
+  "session": "shell-intro",
+  "entries": [
+    {
+      "sequence": 0,
+      "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "prompt_len": 0,
+      "response": {
+        "text": "Hello! I am the MAOS hello-spirit reference implementation. I can help you explore the MAOS kernel and its Spirit ecosystem.",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 50, "output_tokens": 30},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j0/shell-intro", "model_id": "hand-authored-seed"}
+      }
+    }
+  ]
+}

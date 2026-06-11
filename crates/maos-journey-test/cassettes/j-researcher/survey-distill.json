@@ -1,0 +1,20 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "recorded_at": "2026-06-11T00:00:00Z",
+  "model_id": "hand-authored-seed",
+  "spirit_id": "researcher",
+  "session": "survey-distill",
+  "entries": [
+    {
+      "sequence": 0,
+      "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "prompt_len": 120,
+      "response": {
+        "text": "Epistemic drift in LLM agents can be detected via belief-variance scalar tracking with a 0.75 threshold.",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 120, "output_tokens": 30},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-researcher/survey-distill", "model_id": "hand-authored-seed"}
+      }
+    }
+  ]
+}

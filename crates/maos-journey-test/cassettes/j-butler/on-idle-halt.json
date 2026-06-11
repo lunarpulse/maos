@@ -1,0 +1,20 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "recorded_at": "2026-06-11T00:00:00Z",
+  "model_id": "hand-authored-seed",
+  "spirit_id": "butler",
+  "session": "on-idle-halt",
+  "entries": [
+    {
+      "sequence": 0,
+      "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "prompt_len": 0,
+      "response": {
+        "text": "I notice a pattern: you have overlapping calendar events (Team standup and 1:1 with lead) creating a scheduling conflict. Options:\n(a) Create a Linear issue to track the conflict resolution\n(b) Send a Slack reminder to reschedule\n(c) Snooze and revisit later",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    }
+  ]
+}

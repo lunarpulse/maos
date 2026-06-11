@@ -1,0 +1,7 @@
+{
+  "jsonrpc": "2.0",
+  "result": [
+    {"id": "msg-1", "from": "colleague", "urgency": 1, "awaiting_reply": false}
+  ],
+  "id": 1
+}

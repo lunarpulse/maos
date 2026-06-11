@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "content": "Recent research has demonstrated that epistemic drift in LLM-based autonomous agents can be reliably detected using belief-variance scalar tracking. The key finding is that a variance threshold of 0.75 provides optimal sensitivity-specificity tradeoff for triggering autonomous halt protocols.",
+    "url": "https://example.com/paper-a"
+  },
+  "id": 1
+}

@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "result": [
+    {"id": "evt-a", "title": "Team standup", "start_min": 540, "end_min": 600, "status": "confirmed"},
+    {"id": "evt-b", "title": "1:1 with lead", "start_min": 570, "end_min": 630, "status": "confirmed"}
+  ],
+  "id": 1
+}

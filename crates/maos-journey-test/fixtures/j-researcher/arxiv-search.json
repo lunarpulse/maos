@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "papers": [
+      {"arxiv_id": "2501.00001", "title": "Epistemic drift in LLM agents"},
+      {"arxiv_id": "2501.00002", "title": "Autonomous halt protocols for multi-agent systems"}
+    ]
+  },
+  "id": 1
+}

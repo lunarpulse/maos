@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "arxiv_id": "2501.00001",
+    "title": "Epistemic drift in LLM agents",
+    "abstract": "We study the problem of epistemic drift in large language model agents and propose a scalar-tracking based detection mechanism.",
+    "authors": ["A. Researcher", "B. Scientist"],
+    "content": "Epistemic drift occurs when an LLM agent's internal model diverges from grounded observations over successive reasoning cycles."
+  },
+  "id": 1
+}

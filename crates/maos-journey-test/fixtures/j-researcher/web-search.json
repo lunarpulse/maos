@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "results": [
+      {"url": "https://example.com/paper-a", "title": "Paper A: Epistemic drift in LLM agents"},
+      {"url": "https://example.com/paper-b", "title": "Paper B: Autonomous halt protocols"}
+    ]
+  },
+  "id": 1
+}
