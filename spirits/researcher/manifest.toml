@@ -33,7 +33,13 @@ min_substrate_version = "0.1.0-alpha"
 forms = ["rust-inproc"]
 trust_tier = "local"
 description = "MAOS Researcher v0.5 reference Spirit — survey-mode distillation over a participant-scoped log.recall walker (Story 4.4 LogRecallPort) persisted through the kernel-enforced I11 audit chain; the primary reference producer for the five-metric distillation gate (NFR-Aud-7). hypothesize-mode declared (posture-set) but ships at v1.0."
-
+# Parallelism intent — the manifest does NOT parse a `[capabilities.parallelism]`
+# key today (`deny_unknown_fields` rejects it). The bound is realized Spirit-side
+# as `RESEARCHER_PARALLELISM = 8` (see `researcher/src/lib.rs`). This comment
+# documents the intent; the real bound is enforced by the `Semaphore(8)` in
+# `LiveResearcherMcpPort` (maos-bin). When a cross-Spirit scheduler lands
+# (Epic 10 / HSIS), promote this to a parsed field + schema v3 bump.
+# (Winston tech-debt note, 2026-06-10.)
 [capabilities.required]
 # Inference Port — the Spirit-side compressor. App F.4: ≥Sonnet-tier (70B+),
 # temp ≤0.3. At v0.5 the compressor is seeded/mocked in CI (no live LLM); the

@@ -18,6 +18,7 @@ maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_ru
 maos-spirit-abi = { path = "../../crates/maos-spirit-abi" }
 maos-domain = { path = "../../crates/maos-domain" }
 serde = { version = "1", features = ["derive"] }
+thiserror = "2.0"
 serde_json = "1"
 unicode-segmentation = "1"
 

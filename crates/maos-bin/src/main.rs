@@ -615,6 +615,235 @@ impl LiveButlerMcpPort {
             })
     }
 }
+/// Story 8.14c — Live MCP port for Researcher. Wraps the kernel's
+/// `McpClientAdapter` with a two-phase fan-out (search → fetch) bounded by
+/// `RESEARCHER_PARALLELISM` permits.
+///
+/// The async-trait future completes in a single poll because `survey_literature`
+/// internally calls `Handle::current().block_on(...)` — this is the FORK 3
+/// bridge pattern that avoids the 8.14b `Waker::noop()` deadlock on concurrent
+/// `spawn_blocking`.
+struct LiveResearcherMcpPort {
+    spirit_pid: u32,
+    posture_hash: [u8; 32],
+    mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
+    capability: Arc<CapabilityRegistryAdapter>,
+    handle: tokio::runtime::Handle,
+    sem: Arc<tokio::sync::Semaphore>,
+}
+impl LiveResearcherMcpPort {
+    pub fn new(
+        spirit_pid: u32,
+        posture_hash: [u8; 32],
+        mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
+        capability: Arc<CapabilityRegistryAdapter>,
+    ) -> Self {
+        Self {
+            spirit_pid,
+            posture_hash,
+            mcp_client,
+            capability,
+            handle: tokio::runtime::Handle::current(),
+            sem: Arc::new(tokio::sync::Semaphore::new(researcher::RESEARCHER_PARALLELISM)),
+        }
+    }
+}
+impl researcher::ResearcherMcpPort for LiveResearcherMcpPort {
+    fn survey_literature(
+        &self,
+        query: &str,
+    ) -> Result<Vec<researcher::FetchedClaim>, researcher::ResearcherMcpError> {
+        // FORK 3 resolution: block_on from spawn_blocking pool thread.
+        // No noop-waker bridge — Handle::block_on parks the calling thread
+        // until the JoinSet fan-out completes.
+        self.handle.block_on(self.survey_literature_impl(query))
+    }
+}
+impl LiveResearcherMcpPort {
+    async fn survey_literature_impl(
+        &self,
+        query: &str,
+    ) -> Result<Vec<researcher::FetchedClaim>, researcher::ResearcherMcpError> {
+        use maos_domain::ports::mcp::McpError;
+        // Phase 1: search / traverse (NOT citable; produce source keys)
+        let searches: Vec<(&str, &str, serde_json::Value)> = vec![
+            ("web", "search", maos_mcp::drivers::researcher::web_search_args(query)),
+            ("arxiv", "search", maos_mcp::drivers::researcher::arxiv_search_args(query)),
+            ("github", "search_code", maos_mcp::drivers::researcher::github_search_code_args(query)),
+            (
+                "citation-graph",
+                "traverse",
+                maos_mcp::drivers::researcher::citation_graph_traverse_args(query),
+            ),
+        ];
+        let mut set = tokio::task::JoinSet::new();
+        for (server, tool, args) in searches {
+            let sem = Arc::clone(&self.sem);
+            let mcp_client = Arc::clone(&self.mcp_client);
+            let capability = Arc::clone(&self.capability);
+            let spirit_pid = self.spirit_pid;
+            let posture_hash = self.posture_hash;
+            set.spawn(async move {
+                let _permit = sem
+                    .acquire()
+                    .await
+                    .map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                        server: server.into(),
+                        tool: tool.into(),
+                        cause: e.to_string(),
+                    })?;
+                let content = tokio::task::spawn_blocking(move || {
+                    let scope = Scope::McpCall {
+                        server: server.into(),
+                        tool: tool.into(),
+                    };
+                    let token = capability
+                        .issue_with_mediation(spirit_pid, scope, 60, posture_hash, IntentClass::Standard)
+                        .map_err(|e| researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string()))?;
+                    let response = mcp_client
+                        .call(&token, server, tool, args)
+                        .map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                            server: server.into(),
+                            tool: tool.into(),
+                            cause: match e {
+                                McpError::CapabilityDenied { .. } => "unauthorized".into(),
+                                other => other.to_string(),
+                            },
+                        })?;
+                    maos_mcp::drivers::researcher::extract_content(&response).map_err(|e| {
+                        researcher::ResearcherMcpError::CallFailed {
+                            server: server.into(),
+                            tool: tool.into(),
+                            cause: e.to_string(),
+                        }
+                    })
+                })
+                .await
+                .map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                    server: server.into(),
+                    tool: tool.into(),
+                    cause: e.to_string(),
+                })??;
+                let keys =
+                    maos_mcp::drivers::researcher::parse_search_results(&content, server);
+                Ok::<_, researcher::ResearcherMcpError>(
+                    keys.into_iter()
+                        .map(|key| (server.to_string(), key))
+                        .collect::<Vec<_>>(),
+                )
+            });
+        }
+        let mut source_keys: Vec<(String, String)> = Vec::new();
+        while let Some(res) = set.join_next().await {
+            let keys = res.map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                server: "unknown".into(),
+                tool: "unknown".into(),
+                cause: e.to_string(),
+            })??;
+            source_keys.extend(keys);
+        }
+        if source_keys.is_empty() {
+            return Err(researcher::ResearcherMcpError::NoResults);
+        }
+        // Phase 2: fetch (citable; produce ClaimPayload)
+        let mut set = tokio::task::JoinSet::new();
+        for (server, key) in source_keys {
+            let (fetch_server, fetch_tool, args) = match server.as_str() {
+                "web" => ("web", "fetch", maos_mcp::drivers::researcher::web_fetch_args(&key)),
+                "arxiv" => (
+                    "arxiv",
+                    "get_paper",
+                    maos_mcp::drivers::researcher::arxiv_get_paper_args(&key),
+                ),
+                "github" => (
+                    "github",
+                    "get_repo",
+                    maos_mcp::drivers::researcher::github_get_repo_args(&key),
+                ),
+                "citation-graph" => (
+                    "citation-graph",
+                    "get_citations",
+                    maos_mcp::drivers::researcher::citation_graph_get_citations_args(&key),
+                ),
+                _ => continue,
+            };
+            let sem = Arc::clone(&self.sem);
+            let mcp_client = Arc::clone(&self.mcp_client);
+            let capability = Arc::clone(&self.capability);
+            let spirit_pid = self.spirit_pid;
+            let posture_hash = self.posture_hash;
+            set.spawn(async move {
+                let _permit = sem
+                    .acquire()
+                    .await
+                    .map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                        server: fetch_server.into(),
+                        tool: fetch_tool.into(),
+                        cause: e.to_string(),
+                    })?;
+                let claim = tokio::task::spawn_blocking(move || {
+                    let scope = Scope::McpCall {
+                        server: fetch_server.into(),
+                        tool: fetch_tool.into(),
+                    };
+                    let token = capability
+                        .issue_with_mediation(spirit_pid, scope, 60, posture_hash, IntentClass::Standard)
+                        .map_err(|e| researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string()))?;
+                    let response = mcp_client
+                        .call(&token, fetch_server, fetch_tool, args)
+                        .map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                            server: fetch_server.into(),
+                            tool: fetch_tool.into(),
+                            cause: match e {
+                                McpError::CapabilityDenied { .. } => "unauthorized".into(),
+                                other => other.to_string(),
+                            },
+                        })?;
+                    let content = maos_mcp::drivers::researcher::extract_content(&response)
+                        .map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                            server: fetch_server.into(),
+                            tool: fetch_tool.into(),
+                            cause: e.to_string(),
+                        })?;
+                    let claim_json = content.get("claim").ok_or_else(|| {
+                        researcher::ResearcherMcpError::Decode("missing 'claim' field".into())
+                    })?;
+                    let source_key = content
+                        .get("source_key")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            researcher::ResearcherMcpError::Decode("missing 'source_key' field".into())
+                        })?;
+                    let claim: researcher::ClaimPayload =
+                        serde_json::from_value(claim_json.clone()).map_err(|e| {
+                            researcher::ResearcherMcpError::Decode(e.to_string())
+                        })?;
+                    Ok::<_, researcher::ResearcherMcpError>(researcher::FetchedClaim {
+                        claim,
+                        source_key: source_key.to_string(),
+                    })
+                })
+                .await
+                .map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                    server: fetch_server.into(),
+                    tool: fetch_tool.into(),
+                    cause: e.to_string(),
+                })??;
+                Ok::<_, researcher::ResearcherMcpError>(claim)
+            });
+        }
+        let mut claims = Vec::new();
+        while let Some(res) = set.join_next().await {
+            let claim = res.map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                server: "unknown".into(),
+                tool: "unknown".into(),
+                cause: e.to_string(),
+            })??;
+            claims.push(claim);
+        }
+        Ok(claims)
+    }
+}
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1673,9 +1902,126 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 let mut researcher = researcher::Researcher::new();
                 if run.live {
-                    // `--live` → real provider via a dedicated InferencePortAdapter
-                    // (built from the same shared Arcs; the main `inference` adapter
-                    // is left intact for the serving/drain paths).
+                    // Story 8.14c — wire LiveResearcherMcpPort + LogRecallPort when --live.
+                    use maos_domain::ports::mcp::McpTransportId;
+                    use maos_domain::ports::LogRecallPort;
+                    use maos_mcp::client::{McpClientImpl, McpServerEntry};
+                    use maos_mcp::transport::streamable_http::StreamableHttpTransport;
+                    use maos_mcp::transport::McpTransport;
+                    use std::collections::BTreeMap;
+
+                    struct ResearcherLiveMcpClient {
+                        web: Option<McpClientImpl>,
+                        arxiv: Option<McpClientImpl>,
+                        github: Option<McpClientImpl>,
+                        citation_graph: Option<McpClientImpl>,
+                    }
+
+                    impl maos_mcp::McpClient for ResearcherLiveMcpClient {
+                        fn call(
+                            &self,
+                            server_name: &str,
+                            tool: &str,
+                            args: serde_json::Value,
+                        ) -> Result<maos_domain::ports::mcp::McpCallResponse, maos_domain::ports::mcp::McpError> {
+                            use maos_mcp::McpClient;
+                            match server_name {
+                                "web" => self.web.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
+                                "arxiv" => self.arxiv.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
+                                "github" => self.github.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
+                                "citation-graph" => self.citation_graph.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
+                                _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(server_name.into())),
+                            }
+                        }
+                    }
+
+                    let mcp_io = Arc::clone(&io_arc);
+
+                    let make_client = |server_name: &str, uri: String| -> Result<Option<McpClientImpl>, maos_domain::ports::mcp::McpError> {
+                        if uri.is_empty() {
+                            return Ok(None);
+                        }
+                        let mut transports = BTreeMap::new();
+                        transports.insert(
+                            McpTransportId::StreamableHttp,
+                            Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri)) as Arc<dyn McpTransport>,
+                        );
+                        let mut servers = BTreeMap::new();
+                        servers.insert(
+                            server_name.into(),
+                            McpServerEntry {
+                                name: server_name.into(),
+                                transport: McpTransportId::StreamableHttp,
+                                fallback_transport: None,
+                            },
+                        );
+                        let client = McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers)?;
+                        Ok(Some(client))
+                    };
+
+                    let web_uri = std::env::var("MAOS_MCP_WEB_URI").unwrap_or_default();
+                    let arxiv_uri = std::env::var("MAOS_MCP_ARXIV_URI").unwrap_or_default();
+                    let github_uri = std::env::var("MAOS_MCP_GITHUB_URI").unwrap_or_default();
+                    let citation_graph_uri = std::env::var("MAOS_MCP_CITATION_GRAPH_URI").unwrap_or_default();
+
+                    let mcp_adapter = match (|| -> Result<Option<Arc<dyn maos_domain::ports::mcp::McpClientPort>>, maos_domain::ports::mcp::McpError> {
+                        let web = make_client("web", web_uri)?;
+                        let arxiv = make_client("arxiv", arxiv_uri)?;
+                        let github = make_client("github", github_uri)?;
+                        let citation_graph = make_client("citation-graph", citation_graph_uri)?;
+
+                        if web.is_some() || arxiv.is_some() || github.is_some() || citation_graph.is_some() {
+                            let client = Arc::new(ResearcherLiveMcpClient {
+                                web,
+                                arxiv,
+                                github,
+                                citation_graph,
+                            }) as Arc<dyn maos_mcp::McpClient + Send + Sync>;
+                            Ok(Some(Arc::new(maos_kernel_core::api::McpClientAdapter::new(
+                                client,
+                                Arc::clone(&capability),
+                                Arc::clone(&transparency_log),
+                                Arc::clone(&telemetry),
+                            )) as Arc<dyn maos_domain::ports::mcp::McpClientPort>))
+                        } else {
+                            Ok(None)
+                        }
+                    })() {
+                        Ok(adapter_opt) => adapter_opt,
+                        Err(e) => {
+                            eprintln!(
+                                "maos run: warning — failed to construct MCP client for --live: {e}. \
+                                 Researcher will fall back to deterministic survey."
+                            );
+                            None
+                        }
+                    };
+
+                    if let Some(adapter) = mcp_adapter {
+                        let spirit_pid = 0;
+                        let posture_hash = policy
+                            .inner()
+                            .load_full()
+                            .spirit_postures
+                            .get(&spirit_pid)
+                            .map(|s| s.posture_hash())
+                            .unwrap_or([0u8; 32]);
+                        let live_mcp = LiveResearcherMcpPort::new(
+                            spirit_pid,
+                            posture_hash,
+                            adapter,
+                            Arc::clone(&capability),
+                        );
+                        researcher = researcher
+                            .with_mcp_port(Arc::new(live_mcp))
+                            .with_log_recall_port(
+                                Arc::clone(&log_recall_adapter) as Arc<dyn LogRecallPort>,
+                                spirit_pid,
+                            );
+                        eprintln!("maos run: researcher live MCP port wired (--live)");
+                    }
+
+                    // --live also wires the inference seam (pre-existing, unchanged).
                     let provider = router.default_id().ok_or_else(|| {
                         "maos run: --live requested but no inference provider is configured"
                     })?.to_string();

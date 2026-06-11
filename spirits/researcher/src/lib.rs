@@ -45,7 +45,7 @@ use maos_domain::distillation::{
 };
 use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::invariants::i7::ScalarTapEvent;
-use maos_domain::log_recall::{LogRecallEntry, LogRecallError, LogRecallFilter};
+use maos_domain::log_recall::{FrameKindLabel, LogRecallEntry, LogRecallError, LogRecallFilter};
 use maos_domain::ports::inference::{InferenceError, InferenceOptions, InferenceRequest};
 use maos_domain::ports::{DistillationPort, InferencePort, LogRecallPort};
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
@@ -67,6 +67,79 @@ pub enum ResearcherPosture {
     Survey,
     /// Declared per §6.2; the generative ILP+LLM path lands at v1.0 (Decision C).
     Hypothesize,
+}
+/// Story 8.14c — parallelism bound for the MCP fan-out.
+///
+/// FORK 1 RESOLVED (Option A): realized Spirit-side as a const, NOT a manifest
+/// TOML key (`deny_unknown_fields` would reject it). The manifest documents the
+/// intent in a comment under `[capabilities.required]`. The REAL bound is
+/// enforced by `Arc<Semaphore>::new(RESEARCHER_PARALLELISM)` in
+/// `LiveResearcherMcpPort` (maos-bin). When a cross-Spirit scheduler lands
+/// (Epic 10 / HSIS), promote to a parsed `maos-manifest` field + schema v3 bump.
+pub const RESEARCHER_PARALLELISM: usize = 8;
+
+// ───────────────────────────────────────────────────────────────────────────
+// Story 8.14c — MCP domain port (FORK 1 + FORK 2).
+// ───────────────────────────────────────────────────────────────────────────
+
+/// A claim fetched from an MCP tool call, paired with its citable source key.
+///
+/// `source_key` is the join key that correlates this claim to the
+/// `FrameKind::McpInvocation` frame the kernel adapter journaled for the fetch.
+/// It is the exact value stored in the call args (`arxiv_id`, `url`, `repo`,
+/// or `paper_id`) — see `drivers::researcher` arg builders.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FetchedClaim {
+    pub claim: ClaimPayload,
+    pub source_key: String,
+}
+
+/// MCP error variants specific to Researcher's domain port layer.
+#[derive(Debug, thiserror::Error)]
+pub enum ResearcherMcpError {
+    #[error("MCP call failed on {server}/{tool}: {cause}")]
+    CallFailed { server: String, tool: String, cause: String },
+    #[error("capability token issuance failed: {0}")]
+    TokenIssuanceFailed(String),
+    #[error("unauthorized MCP call")]
+    Unauthorized,
+    #[error("no results")]
+    NoResults,
+    #[error("decode error: {0}")]
+    Decode(String),
+}
+
+/// Story 8.14c — the MCP domain port Researcher's `on_idle` calls to fan out
+/// over web/arXiv/GitHub/citation-graph servers.
+///
+/// The trait is **sync** — `LiveResearcherMcpPort` (maos-bin) blocks internally
+/// via `Handle::current().block_on(fanout)` from the `spawn_blocking` pool
+/// (FORK 3 resolution, 2026-06-10). The parallelism-8 `JoinSet`/`Semaphore`
+/// lives entirely inside the impl; no async leaks into the Spirit crate.
+pub trait ResearcherMcpPort: Send + Sync {
+    /// Fan out (≤ [`RESEARCHER_PARALLELISM`] concurrent) over the four declared
+    /// servers for `query`, and return the parsed claims with their source keys.
+    fn survey_literature(
+        &self,
+        query: &str,
+    ) -> Result<Vec<FetchedClaim>, ResearcherMcpError>;
+}
+
+/// Story 8.14c — test double for `ResearcherMcpPort`.
+/// Ships in the SAME commit as the trait (FORK 1 constraint).
+#[cfg(test)]
+pub struct FakeResearcherMcpPort {
+    pub claims: Vec<FetchedClaim>,
+}
+
+#[cfg(test)]
+impl ResearcherMcpPort for FakeResearcherMcpPort {
+    fn survey_literature(
+        &self,
+        _query: &str,
+    ) -> Result<Vec<FetchedClaim>, ResearcherMcpError> {
+        Ok(self.claims.clone())
+    }
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -250,12 +323,13 @@ impl std::fmt::Debug for LiveInference {
 
 /// Researcher reference Spirit. Optionally holds the frames its `on_idle`
 /// survey reasons over (in production the walker seeds these from `log.recall`).
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Researcher {
     /// The cognitive posture-set (§6.2). `Survey` is active at v0.5; `Hypothesize`
     /// is declared but its generative path is not implemented (Decision C).
     posture_set: Vec<ResearcherPosture>,
     /// Frames to survey on the next `on_idle` (seeded by the walker / fixture).
+    /// When `mcp_port` is `Some`, `on_idle` uses the MCP fan-out instead.
     pending: Option<Vec<RecalledFrame>>,
     /// The most recent survey output. `Arc<Mutex<...>>` so Researcher stays
     /// `Sync` as required by the `#[spirit]` macro.
@@ -265,6 +339,31 @@ pub struct Researcher {
     /// the Inference Port. The walker, every cite, and the I11 chain are
     /// unchanged in BOTH modes.
     inference: Option<LiveInference>,
+    /// Story 8.14c — `None` (default) ⇒ byte-identical v0.5 path. `Some` ⇒
+    /// `on_idle` fans out over real MCP servers, walks the participant-scoped
+    /// log for McpInvocation frames, joins by `source_key`, then surveys.
+    mcp_port: Option<Arc<dyn ResearcherMcpPort>>,
+    /// Story 8.14c — the participant-scoped `LogRecallPort` used to recall
+    /// McpInvocation frames after the fan-out. Required when `mcp_port` is `Some`.
+    log_recall_port: Option<Arc<dyn LogRecallPort>>,
+    /// Story 8.14c — the REAL spirit pid (NOT a placeholder). Used for
+    /// participant-scoped `walk()` and token issuance so McpInvocation frames
+    /// journal under the same pid the walker queries.
+    spirit_pid: u32,
+}
+
+impl std::fmt::Debug for Researcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Researcher")
+            .field("posture_set", &self.posture_set)
+            .field("pending", &self.pending)
+            .field("last_output", &self.last_output)
+            .field("inference", &self.inference)
+            .field("mcp_port", &self.mcp_port.is_some())
+            .field("log_recall_port", &self.log_recall_port.is_some())
+            .field("spirit_pid", &self.spirit_pid)
+            .finish()
+    }
 }
 
 #[spirit]
@@ -275,12 +374,50 @@ impl Researcher {
         if ctx.cancellation().is_cancelled() {
             return;
         }
-        if let Some(frames) = &self.pending {
-            // Survey the recalled frames and store the output so the hook has a
-            // production-visible effect. The scalar.tap write / epistemic-policy
-            // halt path is exercised against the real kernel adapters in tests
-            // (the ABI `Ctx` exposes no scalar-write surface yet — Butler 8.1
-            // navigated the same gap).
+        if let Some(mcp_port) = &self.mcp_port {
+            // Story 8.14c — MCP fan-out → scoped walk → join → survey.
+            // ResearcherMcpPort is sync: LiveResearcherMcpPort blocks internally
+            // via Handle::current().block_on (FORK 3 resolution, 2026-06-10).
+            debug_assert!(
+                self.log_recall_port.is_some(),
+                "ResearcherMcpPort wired without LogRecallPort — MCP claims cannot be joined to frames"
+            );
+            // v0.5 fixture placeholder — production derives query from Spirit's
+            // pending research context or operator configuration.
+            let query = "positional-bias";
+            let fetched = match mcp_port.survey_literature(query) {
+                Ok(claims) => claims,
+                Err(e) => {
+                    eprintln!("researcher: MCP survey failed: {e}");
+                    return;
+                }
+            };
+            if let Some(log_port) = &self.log_recall_port {
+                let filter = LogRecallFilter::new(
+                    Some(FrameKindLabel::McpInvocation),
+                    None,
+                    None,
+                    1024,
+                    None,
+                    None,
+                );
+                match self.walk(log_port.as_ref(), self.spirit_pid, filter) {
+                    Ok(frames) => {
+                        let joined = self.join_claims_to_frames(&fetched, &frames);
+                        let output = self.survey(&joined);
+                        let mut guard = self.last_output.lock().unwrap_or_else(|e| e.into_inner());
+                        *guard = Some(output);
+                    }
+                    Err(e) => {
+                        eprintln!("researcher: walk failed: {e}");
+                    }
+                }
+            } else {
+                eprintln!(
+                    "researcher: MCP port wired but no LogRecallPort — cannot join claims"
+                );
+            }
+        } else if let Some(frames) = &self.pending {
             let output = self.survey(frames);
             let mut guard = self.last_output.lock().unwrap_or_else(|e| e.into_inner());
             *guard = Some(output);
@@ -295,9 +432,13 @@ impl Default for Researcher {
             pending: None,
             last_output: Arc::new(Mutex::new(None)),
             inference: None,
+            mcp_port: None,
+            log_recall_port: None,
+            spirit_pid: 0,
         }
     }
 }
+
 
 impl Researcher {
     /// A Researcher with no pending frames (production default).
@@ -330,6 +471,27 @@ impl Researcher {
             token,
             spirit_pid,
         });
+        self
+    }
+
+    /// Story 8.14c — wire the MCP domain port. `maos run` supplies the
+    /// `LiveResearcherMcpPort` (parallelism-8 fan-out over web/arXiv/GitHub/
+    /// citation-graph). When set, `on_idle` fans out instead of surveying
+    /// `self.pending`.
+    pub fn with_mcp_port(mut self, port: Arc<dyn ResearcherMcpPort>) -> Self {
+        self.mcp_port = Some(port);
+        self
+    }
+    /// Story 8.14c — wire the participant-scoped `LogRecallPort` used to recall
+    /// McpInvocation frames after the MCP fan-out. Required when `mcp_port` is
+    /// `Some` so the source-key join can locate the journaled fetch frames.
+    pub fn with_log_recall_port(
+        mut self,
+        port: Arc<dyn LogRecallPort>,
+        spirit_pid: u32,
+    ) -> Self {
+        self.log_recall_port = Some(port);
+        self.spirit_pid = spirit_pid;
         self
     }
 
@@ -371,6 +533,53 @@ impl Researcher {
     ) -> Result<Vec<RecalledFrame>, ResearcherError> {
         let entries = recall_all(port, spirit_pid, base).map_err(ResearcherError::Recall)?;
         fetch_payloads(port, spirit_pid, &entries).map_err(ResearcherError::Recall)
+    }
+
+    // ── Story 8.14c — source-key join (FORK 2) ───────────────────────────────
+
+    /// Join `FetchedClaim`s to McpInvocation `RecalledFrame`s by exact
+    /// `source_key` match. Each joined frame carries the `ClaimPayload` as its
+    /// payload and the McpInvocation frame id as its `frame_id`, so `survey()`
+    /// cites the genuine kernel-journaled fetch frame.
+    ///
+    /// The join filters to Phase-2 intents (`get_paper`/`fetch`/`get_repo`/
+    /// `get_citations`) — Phase-1 search/traverse frames are excluded because
+    /// their args carry a query, not a citable source-key.
+    pub fn join_claims_to_frames(
+        &self,
+        claims: &[FetchedClaim],
+        mcp_frames: &[RecalledFrame],
+    ) -> Vec<RecalledFrame> {
+        let mut result = Vec::new();
+        for claim in claims {
+            for frame in mcp_frames {
+                // Only Phase-2 fetch intents are citable.
+                if !frame.intent.starts_with("mcp:")
+                    || frame.intent.ends_with("/search")
+                    || frame.intent.ends_with("/traverse")
+                    || frame.intent.ends_with("/search_code")
+                {
+                    continue;
+                }
+                if let Ok(args) = serde_json::from_slice::<serde_json::Value>(&frame.payload) {
+                    let frame_key = args
+                        .get("arxiv_id")
+                        .or_else(|| args.get("url"))
+                        .or_else(|| args.get("repo"))
+                        .or_else(|| args.get("paper_id"))
+                        .and_then(|v| v.as_str());
+                    if frame_key == Some(&claim.source_key) {
+                        result.push(RecalledFrame {
+                            frame_id: frame.frame_id,
+                            intent: frame.intent.clone(),
+                            payload: serde_json::to_vec(&claim.claim).unwrap_or_default(),
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+        result
     }
 
     // ── survey cognition (the deterministic seeded compressor) ───────────────
@@ -783,10 +992,11 @@ pub fn decode_frame_id_hex(hex: &str) -> Result<[u8; 16], ResearcherError> {
     }
     Ok(out)
 }
-
 #[cfg(test)]
 mod unit_tests {
     use super::*;
+    use maos_domain::log_recall::{FrameKindLabel, LogFetchResponse, LogRecallPage};
+    use maos_domain::invariants::i3::FrameOrigin;
 
     fn claim_frame(id_byte: u8, claim: &ClaimPayload) -> RecalledFrame {
         RecalledFrame {
@@ -904,5 +1114,215 @@ mod unit_tests {
         let r = Researcher::new();
         assert!(r.posture_set().contains(&ResearcherPosture::Hypothesize));
         assert_eq!(r.active_posture(), ResearcherPosture::Survey);
+    }
+
+    // ── Story 8.14c — MCP fan-out + join + survey (FORK 1 + FORK 2 + FORK 3) ──
+
+    /// A fake `LogRecallPort` that returns pre-baked McpInvocation frames.
+    struct FakeLogRecallPort {
+        frames: Vec<RecalledFrame>,
+    }
+    impl LogRecallPort for FakeLogRecallPort {
+        fn recall(
+            &self,
+            _spirit_pid: u32,
+            _filter: LogRecallFilter,
+        ) -> Result<LogRecallPage, LogRecallError> {
+            Ok(LogRecallPage {
+                entries: self
+                    .frames
+                    .iter()
+                    .map(|f| LogRecallEntry {
+                        frame_id: f.frame_id,
+                        timestamp_ns: 0,
+                        kind: FrameKindLabel::McpInvocation,
+                        intent: f.intent.clone(),
+                        peer_spirit_pid: 0,
+                        payload_available: true,
+                    })
+                    .collect(),
+                next_cursor: None,
+            })
+        }
+        fn fetch(
+            &self,
+            _spirit_pid: u32,
+            frame_id: [u8; 16],
+        ) -> Result<LogFetchResponse, LogRecallError> {
+            self.frames
+                .iter()
+                .find(|f| f.frame_id == frame_id)
+                .map(|f| LogFetchResponse {
+                    frame_id,
+                    timestamp_ns: 0,
+                    kind: FrameKindLabel::McpInvocation,
+                    intent: f.intent.clone(),
+                    payload_redacted: f.payload.clone(),
+                    capability_token: None,
+                    origin: FrameOrigin::SpiritAuto,
+                })
+                .ok_or(LogRecallError::ScopeViolation {
+                    frame_id,
+                    requested_pid: 0,
+                    owner_pid: 0,
+                })
+        }
+    }
+    #[test]
+    fn mcp_fan_out_joins_claims_to_invocation_frames() {
+        let claim = ClaimPayload {
+            claim_id: "arxiv-2501.12345".into(),
+            statement: "LLM-as-judge exhibits positional bias.".into(),
+            topic: "positional-bias".into(),
+            methodology_strength: 0.85,
+            confidence: 0.92,
+            load_bearing: true,
+            polarity: true,
+            hedges: vec!["likely".into()],
+        };
+        let fetched = vec![FetchedClaim {
+            claim: claim.clone(),
+            source_key: "2501.12345".into(),
+        }];
+        let mcp_frames = vec![RecalledFrame {
+            frame_id: [0xAB; 16],
+            intent: "mcp:arxiv/get_paper".into(),
+            payload: serde_json::to_vec(&serde_json::json!({"arxiv_id": "2501.12345"})).unwrap(),
+        }];
+        let joined = Researcher::new().join_claims_to_frames(&fetched, &mcp_frames);
+        assert_eq!(joined.len(), 1);
+        assert_eq!(joined[0].frame_id, [0xAB; 16]);
+        assert_eq!(
+            serde_json::from_slice::<ClaimPayload>(&joined[0].payload).unwrap(),
+            claim
+        );
+    }
+    #[test]
+    fn on_idle_surveys_via_mcp_port_when_wired() {
+        let claim = ClaimPayload {
+            claim_id: "arxiv-2501.12345".into(),
+            statement: "Positional bias exists.".into(),
+            topic: "positional-bias".into(),
+            methodology_strength: 0.9,
+            confidence: 0.95,
+            load_bearing: true,
+            polarity: true,
+            hedges: vec![],
+        };
+        let mcp_port = FakeResearcherMcpPort {
+            claims: vec![FetchedClaim {
+                claim: claim.clone(),
+                source_key: "2501.12345".into(),
+            }],
+        };
+        let log_port = FakeLogRecallPort {
+            frames: vec![RecalledFrame {
+                frame_id: [0xCD; 16],
+                intent: "mcp:arxiv/get_paper".into(),
+                payload: serde_json::to_vec(
+                &serde_json::json!({"arxiv_id": "2501.12345"})).unwrap(),
+            }],
+        };
+        let researcher = Researcher::new()
+            .with_mcp_port(Arc::new(mcp_port))
+            .with_log_recall_port(Arc::new(log_port), 42);
+        let mut ctx = Ctx::mock();
+        researcher.on_idle(&mut ctx);
+        let output = researcher.last_output().unwrap();
+        assert_eq!(output.findings.len(), 1);
+        assert_eq!(output.findings[0].source_log_ref, encode_frame_id_hex(&[0xCD; 16]));
+    }
+
+    #[test]
+    fn on_idle_falls_back_to_pending_when_mcp_port_is_none() {
+        let f = claim_frame(0x11, &claim("c1", "t", 0.9, 0.95, true, false));
+        let researcher = Researcher::with_frames(vec![f.clone()]);
+        let mut ctx = Ctx::mock();
+        researcher.on_idle(&mut ctx);
+        let output = researcher.last_output().unwrap();
+        assert_eq!(output.findings.len(), 1);
+    }
+
+    /// W5 — Negative falsifiability: a fabricated source_key that never appeared
+    /// in any McpInvocation frame joins to nothing → survey produces empty findings.
+    #[test]
+    fn fabricated_cite_replays_empty() {
+        let fabricated = FetchedClaim {
+            claim: ClaimPayload {
+                claim_id: "fake-1".into(),
+                statement: "Never fetched.".into(),
+                topic: "positional-bias".into(),
+                methodology_strength: 0.9,
+                confidence: 0.95,
+                load_bearing: true,
+                polarity: true,
+                hedges: vec![],
+            },
+            source_key: "never-fetched-paper-id".into(),
+        };
+        let mcp_frames = vec![RecalledFrame {
+            frame_id: [0xAB; 16],
+            intent: "mcp:arxiv/get_paper".into(),
+            payload: serde_json::to_vec(
+                &serde_json::json!({"arxiv_id": "real-paper-id"}),
+            )
+            .unwrap(),
+        }];
+        let joined = Researcher::new().join_claims_to_frames(&vec![fabricated], &mcp_frames);
+        assert!(joined.is_empty(), "fabricated key must not match any frame");
+        let output = Researcher::new().survey(&joined);
+        assert!(
+            output.findings.is_empty(),
+            "empty join → empty findings"
+        );
+        assert_eq!(
+            output.scalars.get("methodology_conflict").copied().unwrap_or(0.0),
+            0.0
+        );
+    }
+
+    /// W6 partial — Determinism floor: survey over fixed frames produces the
+    /// same output shape every run (catches Option<McpPort> plumbing perturbing
+    /// ordering or scalar values even when None).
+    #[test]
+    fn survey_over_fixed_frames_is_deterministic() {
+        let f1 = claim_frame(
+            0x11,
+            &ClaimPayload {
+                claim_id: "c1".into(),
+                statement: "s1".into(),
+                topic: "t".into(),
+                methodology_strength: 0.9,
+                confidence: 0.95,
+                load_bearing: true,
+                polarity: true,
+                hedges: vec!["likely".into()],
+            },
+        );
+        let f2 = claim_frame(
+            0x22,
+            &ClaimPayload {
+                claim_id: "c2".into(),
+                statement: "s2".into(),
+                topic: "t".into(),
+                methodology_strength: 0.85,
+                confidence: 0.88,
+                load_bearing: true,
+                polarity: false,
+                hedges: vec!["likely".into()],
+            },
+        );
+        let out1 = Researcher::new().survey(&[f1.clone(), f2.clone()]);
+        let out2 = Researcher::new().survey(&[f1.clone(), f2.clone()]);
+        // Byte-identical serialization is the determinism guard.
+        let bytes1 = serde_json::to_vec(&out1).unwrap();
+        let bytes2 = serde_json::to_vec(&out2).unwrap();
+        assert_eq!(bytes1, bytes2, "survey must be deterministic for fixed input");
+        // The contradictory pair (polarity true vs false, both ms ≥ 0.7) must
+        assert!(
+            out1.scalars.get("methodology_conflict").copied().unwrap_or(0.0) >= 0.7,
+            "Chen-vs-Tanaka shape: opposite polarity + ms≥0.7 → conflict≥0.7, got {}",
+            out1.scalars.get("methodology_conflict").copied().unwrap_or(0.0)
+        );
     }
 }

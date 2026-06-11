@@ -3,3 +3,4 @@
 //! These are PURE functions: no async, no capability tokens. Token issuance
 //! is the caller's responsibility (`LiveButlerMcpPort` in `maos-bin`).
 pub mod butler;
+pub mod researcher;

@@ -303,3 +303,13 @@ dev_model_used: claude-opus-4-7
 - Posture hash all-zeros placeholder — v0.1 scope, no derivation spec; correct for initial release [crates/maos-shell/src/lib.rs:170] — pre-existing design decision
 - `MAOS_REPO_ROOT` env var trusted without validation — dev-only env var for skill staging, not user-facing [crates/maos-shell/src/lib.rs:49] — internal tooling
 - `copy_dir_all` has no symlink or depth guards — dev-only skill staging utility, not user-facing [crates/maos-shell/src/lib.rs:271-283] — internal tooling
+
+## Deferred from: code review of 8-14c-researcher-mcp-driver-set-web-arxiv-github-citation (2026-06-10)
+
+- Missing `researcher_8_14c.rs` subprocess test (AC3 §7) — requires mock MCP server scaffolding in Story 8.15 test harness [crates/maos-bin/tests/]
+- Missing `journey_researcher.rs` journey test (AC3 §8) — depends on Story 8.15 PTY harness [crates/maos-journey-test/tests/]
+- Missing two-sided barrier-gated parallelism test (AC3 §4) — requires `LiveResearcherMcpPort` + async runtime instrumentation [crates/maos-bin/tests/]
+- Missing BudgetWarning@80% observability test (AC3) — kernel mechanism exists; assertion requires subprocess harness
+- ~~Missing citation replay negative falsifiability test (AC3 §6b)~~ — **CLOSED 2026-06-10**: added `fabricated_cite_replays_empty` unit test in `spirits/researcher/src/lib.rs`
+- Missing golden-snapshot determinism floor test (AC3 §3) — **PARTIALLY CLOSED 2026-06-10**: added `survey_over_fixed_frames_is_deterministic` unit test (byte-identical serialization guard); zero-side-effect assertion (zero McpInvocation frames) still needs TL access → deferred to 8.15
+- `spirit_pid = 0` hardcoded in --live arm — pre-existing pattern from 8.14b Butler; all daemon smoke arms use pid 0 [crates/maos-bin/src/main.rs:2001]
