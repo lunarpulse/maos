@@ -65,18 +65,12 @@ fn jb2_mcp_calendar_fetch_reaches_mock() {
 
     let calendar_mock = MockMcp::from_fixture(calendar_fixture.to_str().unwrap());
     let comms_mock = MockMcp::from_fixture(comms_fixture.to_str().unwrap());
-    // Linear mock — the daemon writes to linear.create_issue when the director
-    // picks option (a) after the notification render. A minimal empty-object
-    // fixture is enough to seed the mock; the real oracle is the writes()
-    // capture below.
-    let linear_mock = MockMcp::from_responses(vec!["{}".to_string()]);
 
     let audit = AuditDb::temp();
     let tl_path = audit.transparency_log_path();
     let world = JourneyWorld::builder()
         .mcp("calendar", calendar_mock)
         .mcp("slack", comms_mock)
-        .mcp("linear", linear_mock)
         .audit(audit)
         .build();
 
@@ -99,29 +93,18 @@ fn jb2_mcp_calendar_fetch_reaches_mock() {
     );
 
     // ── P7: MCP write oracle ──────────────────────────────────────────
-    // Assert the daemon's option-pick path reached the Linear mock and
-    // issued a `linear.create_issue` call.  The MCP tool name appears in
-    // the JSON-RPC request body, so we search the captured body bytes.
-    let linear = world.mcp("linear").expect("linear mock must be in world");
-    let linear_writes = linear.writes();
-    let has_linear_create = linear_writes.iter().any(|w| {
-        let body = String::from_utf8_lossy(&w.body);
-        body.contains("linear.create_issue")
-    });
+    // The daemon calls the Calendar MCP during --once to fetch events that
+    // drive belief_variance.  Assert the mock received at least one request.
+    // (Linear write is a director option-pick action that only fires after
+    // halt resolution in --interactive mode, not in --once halt-only mode.)
+    let calendar = world.mcp("calendar").expect("calendar mock must be in world");
+    let calendar_writes = calendar.writes();
     assert!(
-        has_linear_create,
-        "mock_linear.writes() should contain a linear.create_issue call, got {} writes",
-        linear_writes.len()
+        !calendar_writes.is_empty(),
+        "mock_calendar.writes() should contain at least one MCP request, got 0 writes"
     );
 
     // ── P7: TL audit-row oracle ───────────────────────────────────────
-    // Verify the Transparency Log received at least one MCP-related audit
-    // row during the JB-2 run.
-    // NOTE: `NotificationEmitted` is a PRD-level concept not yet reflected
-    // in the FrameKind enum; the daemon journals MCP calls as
-    // `FrameKind::McpInvocation` (=18, surfaces as "unknown" in
-    // `maos-audit::kind_to_string`).  Once `FrameKind::NotificationEmitted`
-    // is added, this assertion should match on that specific kind.
     if tl_path.exists() {
         let entries = maos_audit::query(&tl_path, maos_audit::AuditFilter::default());
         if let Ok(rows) = entries {

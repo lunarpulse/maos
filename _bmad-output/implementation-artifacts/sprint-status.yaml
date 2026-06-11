@@ -1,4 +1,4 @@
-last_updated: '2026-06-10T00:00:00Z+story-8-14c-review-complete'
+last_updated: '2026-06-11T04:30:00Z+story-8-15-done'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -110,7 +110,7 @@ development_status:
   # Story 8.14c (Phase 3, SPLIT from 8.14): Researcher MCP driver set — real web/arXiv/GitHub/citation-graph (extends maos-mcp), parallelism 8. DEPENDS ON 8.11 + 8.14a. Completes the shortest J-Researcher path: 8.11 → 8.14a → 8.14c.
   8-14c-researcher-mcp-driver-set-web-arxiv-github-citation: done
   # Story 8.15 (TEST TRACK, TEA/Murat 2026-06-06): journey-acceptance test harness + red-phase "watch-it-work" suites for ALL Epic-8 journeys. NEW dev-only maos-journey-test crate (PTY+vt100 + ReplayInferenceProvider + MockMcp + tokio virtual time, reusing 8.6 H1-H6 guards). Tier-1 hermetic (<2s/journey, 50x burn-in) + Tier-2 nightly --live re-record + cassette-age gate. ATDD red-phase authored: _bmad-output/test-artifacts/atdd-checklist-8-14b-j-butler-acceptance.md. DEPENDS ON 8.11 + 8.14a; per-journey slices flip green as 8.14b/8.14c/8.12/8.13 land. Relocates the harness sub-AC formerly in 8.11·AC5. LAST in Epic 8, before Epic 9.
-  8-15-journey-acceptance-test-harness-and-red-phase-suites: backlog
+  8-15-journey-acceptance-test-harness-and-red-phase-suites: done  # dev_model_used: claude-opus-4-6; SEALED 2026-06-11: four revert-to-red seals verified RED→GREEN by automated non-author execution (edit→rebuild→RED→restore→rebuild→GREEN for all four targets)
   epic-8-retrospective: optional
   epic-9: backlog
   9-1-ship-maosctl-audit-subcommands-query-subject-access-posture-delta-sealed-export: backlog

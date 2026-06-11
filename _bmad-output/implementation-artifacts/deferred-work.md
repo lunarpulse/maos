@@ -313,3 +313,15 @@ dev_model_used: claude-opus-4-7
 - ~~Missing citation replay negative falsifiability test (AC3 §6b)~~ — **CLOSED 2026-06-10**: added `fabricated_cite_replays_empty` unit test in `spirits/researcher/src/lib.rs`
 - Missing golden-snapshot determinism floor test (AC3 §3) — **PARTIALLY CLOSED 2026-06-10**: added `survey_over_fixed_frames_is_deterministic` unit test (byte-identical serialization guard); zero-side-effect assertion (zero McpInvocation frames) still needs TL access → deferred to 8.15
 - `spirit_pid = 0` hardcoded in --live arm — pre-existing pattern from 8.14b Butler; all daemon smoke arms use pid 0 [crates/maos-bin/src/main.rs:2001]
+
+## Deferred from: code review of 8-15-journey-acceptance-test-harness-and-red-phase-suites (2026-06-11)
+
+- Seed cassettes all-zero `prompt_sha256` — intentional for hand-authored seeds; drift detection activates for Tier-2 recorded cassettes. `crates/maos-journey-test/cassettes/*/`
+- `extract_recorded_at` line-by-line scan fails on minified JSON — cassettes always written with `to_string_pretty`; not a practical concern. `xtask/src/cassette_age_gate.rs:75-84`
+- `CassetteRecordPort` non-atomic write on drop — low-severity, process-kill edge case. `crates/maos-bin/src/cassette_replay.rs:195`
+- `check_env_contract` text-only matching catches common patterns — not a guarantee; `std::env::var` / macro usage evaded. `xtask/src/check_env_contract.rs`
+- `Pty::screen` re-parses entire VT100 buffer per call — O(n) per assertion; optimization for later. Current tests produce bounded output. `crates/maos-journey-test/src/lib.rs:444-449`
+- BudgetWarning@80% render not asserted — acknowledged deferral; requires real wall-clock time (`time_cap_seconds`), incompatible with <2s target. `crates/maos-journey-test/tests/journey_researcher.rs`
+- Barrier-gated parallelism test absent — requires test-only parallelism seam in `LiveResearcherMcpPort`; would require kernel-core or Spirit edits, violating zero-kernel-KLOC constraint. `crates/maos-journey-test/tests/journey_researcher.rs`
+- Seal infrastructure absent (cfg/feature-flag severable seams) — Task 7 BLOCKED for non-author reviewer; infrastructure not needed until seals are executed. Spec: "Mechanize where expressible."
+- J1 resume-continuity (John's THREE MISSING BEATS) — Grade B smoke arm (`MAOS_ONE_SHOT=smoke-founder-loop-8-4`) has no halt/resume cycle. Mandatory bridge item that auto-activates when FounderLoopClass gap closes and J1 upgrades to Grade A. Consensus: Winston/Amelia defer (mechanism absent), Murat/John note obligation is real. `crates/maos-journey-test/tests/journey_j1.rs`

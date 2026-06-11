@@ -1,6 +1,6 @@
 # Story 8.15: Journey-Acceptance Test Harness + Red-Phase "Watch-It-Work" Suites (TEST TRACK — closes Epic 8)
 
-Status: in-progress
+Status: done
 
 > **Registered 2026-06-06 (TEA test-design, Murat). Epic 8 Completion Delivery — TEST TRACK; LAST story in Epic 8, before Epic 9.** Owns the hermetic journey-acceptance architecture for ALL Epic-8-anchored journeys (J0 / J-Butler / J-Researcher / J1 / J4). **Depends on 8.11 (run-surface seam, done) + 8.14a (CLI/shell, done)** — and, unlike when this stub was sketched, **every journey story it was waiting on has now landed** (8.12 J1, 8.13+8.13.1 J4, 8.14b Butler, 8.14c Researcher). The "per-journey slices flip green as stories land" framing has therefore collapsed into: **this story flips everything green that is flippable, and signs the seals.** Relocated here from 8.11·AC5: the harness itself + Tier-1/Tier-2 suites + the JB-3 revert-to-red certification.
 >

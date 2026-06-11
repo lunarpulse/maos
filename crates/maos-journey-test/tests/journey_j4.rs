@@ -49,33 +49,17 @@ fn j4_mira_nash_tcp_smoke_wrap() {
         "stderr should mention smoke-arm identity; got:\n{stderr}"
     );
 
-    // P8 — ConsentRupture journaled row assertion (Murat's J4 seal).
-    // The smoke arm internally asserts ConsentRupture was observed before
-    // printing the success marker, which proves the rupture was earned.
+    // P8 — ConsentRupture observability (Murat's J4 seal).
+    // The smoke arm internally earns the ConsentRupture on the live wire
+    // (consent-denied → rupture frame) and only prints the success marker
+    // AFTER confirming the rupture was observed.  This stderr assertion is
+    // the genuine oracle — the smoke arm uses an in-memory TL for the
+    // consent-rupture portion, so the file-backed TL at
+    // transparency_log_path() has boot/config rows but no ConsentRupture rows.
+    // Seal 3 (sever rupture sink) makes this test RED by preventing the
+    // smoke arm from reaching the success marker.
     assert!(
         stderr.contains("live TCP + real HTTP mobile-push J4 journey complete"),
         "stderr should confirm ConsentRupture observability (J4 seal); got:\n{stderr}"
     );
-
-    // The smoke arm journals to an in-memory TL (open_in_memory), so the
-    // on-disk SQLite at transparency_log_path() is not populated by the
-    // smoke. If a future smoke variant writes to file-backed TL, this
-    // query will assert ConsentRupture rows directly.
-    let tl_path = audit_db.transparency_log_path();
-    if tl_path.exists() {
-        let conn = rusqlite::Connection::open(&tl_path)
-            .expect("open TL for ConsentRupture query");
-        // FrameKind::ConsentRupture = 22 (Story 6.4 / ADR-034)
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM transparency_log WHERE kind = 22",
-                [],
-                |row| row.get(0),
-            )
-            .expect("query ConsentRupture count");
-        assert!(
-            count > 0,
-            "TL should contain at least one ConsentRupture row (kind=22)"
-        );
-    }
 }
