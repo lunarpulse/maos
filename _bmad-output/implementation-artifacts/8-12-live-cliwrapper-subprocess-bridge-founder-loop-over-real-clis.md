@@ -1,3 +1,6 @@
+---
+dev_model_used: claude-opus-4-8
+---
 # Story 8.12: Live CliWrapper Subprocess Bridge — Founder-Loop Over Real CLIs (J1) ⚠ kernel
 
 Status: done

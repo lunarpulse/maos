@@ -662,7 +662,7 @@ impl A2ARouterCore {
                         .data
                         .as_ref()
                         .and_then(|d| d.get("reason"))
-                        .and_then(|v| serde_json::from_value::<UnclassifiedReason>(v.clone()).ok())
+                        .and_then(|v| serde_json::from_value::<UnclassifiedReason>(v.clone()).ok()) // xtask-serde-allow: graceful — .ok() already discards the error; .unwrap_or(Absent) is the deliberate fail-closed fallback
                         .unwrap_or(UnclassifiedReason::Absent);
                     Err(A2AError::ConsentUnclassifiedAtPeer {
                         peer: peer.as_str().to_string(),

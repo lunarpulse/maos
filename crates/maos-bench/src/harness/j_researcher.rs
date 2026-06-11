@@ -54,7 +54,7 @@ fn padded_claim(i: usize, target_kb: usize) -> Vec<u8> {
         polarity: i % 2 == 0,
         hedges: vec!["likely".into(), "uncertain".into()],
     };
-    serde_json::to_vec(&claim).unwrap()
+    serde_json::to_vec(&claim).unwrap() // xtask-serde-allow: bench harness; infallible serialization of a statically-constructed claim
 }
 
 /// Seed a 50-frame burst (16–64 KB payloads) plus one EpistemicHalt frame for

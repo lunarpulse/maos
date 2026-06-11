@@ -1,3 +1,6 @@
+---
+dev_model_used: claude-opus-4-6
+---
 # Story 8.15: Journey-Acceptance Test Harness + Red-Phase "Watch-It-Work" Suites (TEST TRACK — closes Epic 8)
 
 Status: done

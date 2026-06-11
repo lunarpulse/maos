@@ -1,3 +1,6 @@
+---
+dev_model_used: claude-opus-4-8
+---
 Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->

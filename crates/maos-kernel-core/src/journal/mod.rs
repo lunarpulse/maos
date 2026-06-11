@@ -176,7 +176,7 @@ impl JournalAdapter {
 
     pub fn append_transition(&self, entry: JournalEntry) {
         let mut file = self.writer.lock().expect("Journal writer lock poisoned");
-        let line = serde_json::to_string(&entry).expect("JournalEntry serialization is infallible");
+        let line = serde_json::to_string(&entry).expect("JournalEntry serialization is infallible"); // xtask-serde-allow: infallible; fn panics-on-journal-failure by kernel design
         if let Err(e) = write!(file, "{line}\n") {
             panic!(
                 "MAOS kernel panic — Journal append failed: {e}. \

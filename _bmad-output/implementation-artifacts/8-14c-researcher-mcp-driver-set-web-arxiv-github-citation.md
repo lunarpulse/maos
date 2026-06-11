@@ -1,3 +1,6 @@
+---
+dev_model_used: kimi-code/kimi-for-coding
+---
 # Story 8.14c: Researcher MCP Driver Set — web / arXiv / GitHub / citation-graph (completes J-Researcher)
 
 Status: done
@@ -410,7 +413,7 @@ Phase-1 responses are id lists: `arxiv.search` → `{ "papers": [ { "arxiv_id", 
 
 `kimi-code/kimi-for-coding` (2026-06-10)
 
-### Completion Notes
+### Completion Notes List
 
 - **AC0:** Fixture corpus authored at `spirits/researcher/tests/fixtures/researcher-mcp-corpus-v0.5.jsonl` with 8 calls (4 search + 4 fetch). Chen-vs-Tanaka contradictory pair seeds `methodology_conflict ≥ 0.7`.
 - **AC1:** `drivers::researcher` created with pure arg builders + response parsers. `ResearcherMcpPort` trait + `FakeResearcherMcpPort` + `RESEARCHER_PARALLELISM = 8` added to `researcher/src/lib.rs`. `LiveResearcherMcpPort` in `maos-bin` implements two-phase fan-out with `JoinSet` + `Semaphore(8)`. `--live` MCP arm wired in Researcher load block alongside existing inference seam.
@@ -418,17 +421,18 @@ Phase-1 responses are id lists: `arxiv.search` → `{ "papers": [ { "arxiv_id", 
 - **AC3:** Three new unit tests in `researcher`: `mcp_fan_out_joins_claims_to_invocation_frames`, `on_idle_surveys_via_mcp_port_when_wired`, `on_idle_falls_back_to_pending_when_mcp_port_is_none`. Determinism floor verified: `mcp_port=None` falls back to `self.pending`, existing 6 test files unchanged and green. ATDD checklist authored.
 - **AC4:** `check-workspace-count: PASSED (actual=44, declared=44)`. `abi-diff --base abi-baseline/v1-pre-bump.txt`: PASSED (no breaking changes). `cargo test --workspace --lib`: 1206 passed. Zero kernel KLOC confirmed (`maos-kernel-core/src/` untouched). Pre-existing `check-empty-kernel` failures (8.12 `cli_wrapper` I9 violations) are story-neutral.
 - **FORK 3 bridge:** `LiveResearcherMcpPort` captures `Handle` at construction; `survey_literature` internally calls `self.handle.block_on(...)` so the async-trait future completes in a single poll — `on_idle`'s `block_on_sync` (noop waker) is safe.
-- **File List (NEW):**
-  - `crates/maos-mcp/src/drivers/researcher.rs`
-  - `spirits/researcher/tests/fixtures/researcher-mcp-corpus-v0.5.jsonl`
-  - `_bmad-output/test-artifacts/atdd-checklist-8-14c-j-researcher-acceptance.md`
-- **File List (MODIFIED):**
-  - `crates/maos-mcp/src/drivers/mod.rs`
-  - `spirits/researcher/src/lib.rs`
-  - `spirits/researcher/Cargo.toml`
-  - `spirits/researcher/manifest.toml`
-  - `crates/maos-bin/src/main.rs`
-**Remaining dev-time confirmations (cheap, non-blocking):** (a) confirm `on_idle` lands in `spawn_blocking` + a `Handle` is in scope at the bridge; (b) confirm the `search`-tool args vs `get_paper`/`fetch`-tool args split (the citable fetches are the per-id follow-ups whose args carry the source-key, not the query `search` calls); (c) GitHub demo-load-bearing? (corpus author — keep wired regardless).
+- **Remaining dev-time confirmations (cheap, non-blocking):** (a) confirm `on_idle` lands in `spawn_blocking` + a `Handle` is in scope at the bridge; (b) confirm the `search`-tool args vs `get_paper`/`fetch`-tool args split (the citable fetches are the per-id follow-ups whose args carry the source-key, not the query `search` calls); (c) GitHub demo-load-bearing? (corpus author — keep wired regardless).
+
+### File List
+
+- `crates/maos-mcp/src/drivers/researcher.rs` (NEW)
+- `spirits/researcher/tests/fixtures/researcher-mcp-corpus-v0.5.jsonl` (NEW)
+- `_bmad-output/test-artifacts/atdd-checklist-8-14c-j-researcher-acceptance.md` (NEW)
+- `crates/maos-mcp/src/drivers/mod.rs` (MODIFIED)
+- `spirits/researcher/src/lib.rs` (MODIFIED)
+- `spirits/researcher/Cargo.toml` (MODIFIED)
+- `spirits/researcher/manifest.toml` (MODIFIED)
+- `crates/maos-bin/src/main.rs` (MODIFIED)
 
 ## Change Log
 

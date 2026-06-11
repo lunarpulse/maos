@@ -1,3 +1,6 @@
+---
+dev_model_used: claude-opus-4-8
+---
 # Story 8.14b: Butler MCP Driver Set — Calendar / Slack / Linear / Figma (completes J-Butler)
 
 Status: done

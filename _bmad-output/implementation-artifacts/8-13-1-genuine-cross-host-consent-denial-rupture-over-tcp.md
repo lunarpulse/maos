@@ -1,3 +1,6 @@
+---
+dev_model_used: claude-opus-4-8
+---
 # Story 8.13.1: Genuine Cross-Host Consent-Denial → ConsentRupture over Live TCP
 
 Status: done

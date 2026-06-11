@@ -1,3 +1,6 @@
+---
+dev_model_used: claude-opus-4-8
+---
 # Story 8.14a: J0 Evaluator Surface + Runtime CLI — hello-spirit + `maos init` + Kernel-Rendered Shell + Audit Query
 
 Status: ready-for-dev

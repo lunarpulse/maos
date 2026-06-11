@@ -101,8 +101,15 @@ fn find_rs_files(dir: &Path, files: &mut Vec<PathBuf>) {
         let path = entry.path();
         if path.is_dir() {
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            // Skip target, fixtures, and per-crate test directories where mocks are acceptable.
-            if matches!(name, "target" | "fixtures" | "node_modules" | ".git") {
+            // Skip target, fixtures, and per-crate test/bench directories where
+            // `.unwrap()` on serde is idiomatic (a test SHOULD panic on a malformed
+            // fixture). `tests`/`benches` close the gap the original comment claimed
+            // but the match list omitted — this gate polices PRODUCTION error
+            // propagation, not test/bench code.
+            if matches!(
+                name,
+                "target" | "fixtures" | "node_modules" | ".git" | "tests" | "benches"
+            ) {
                 continue;
             }
             find_rs_files(&path, files);
@@ -110,6 +117,47 @@ fn find_rs_files(dir: &Path, files: &mut Vec<PathBuf>) {
             files.push(path);
         }
     }
+}
+
+/// Compute the set of 0-indexed lines that fall inside a `#[cfg(test)]`-guarded
+/// item (module or fn). `.unwrap()` on serde inside test code is idiomatic — a
+/// test SHOULD panic on a malformed fixture — so those lines are not production
+/// error-propagation concerns. Brace-balanced: only the guarded block is skipped,
+/// so production code *after* a `#[cfg(test)]` helper is still scanned.
+fn cfg_test_skip_lines(lines: &[&str]) -> std::collections::HashSet<usize> {
+    let mut skip = std::collections::HashSet::new();
+    let mut i = 0;
+    while i < lines.len() {
+        if lines[i].trim_start().starts_with("#[cfg(test)]") {
+            // Find the first `{` at or after this attribute, then brace-balance.
+            let mut j = i;
+            while j < lines.len() && !lines[j].contains('{') {
+                j += 1;
+            }
+            if j < lines.len() {
+                let mut depth = 0i32;
+                let mut k = j;
+                loop {
+                    for ch in lines[k].chars() {
+                        if ch == '{' {
+                            depth += 1;
+                        } else if ch == '}' {
+                            depth -= 1;
+                        }
+                    }
+                    skip.insert(k);
+                    if depth <= 0 || k + 1 >= lines.len() {
+                        break;
+                    }
+                    k += 1;
+                }
+                i = k + 1;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    skip
 }
 
 /// Scan `path` for serde-call + forbidden-suffix proximity within a 3-line window.
@@ -121,8 +169,13 @@ fn scan_file(path: &Path) -> Vec<Violation> {
     let lines: Vec<&str> = content.lines().collect();
     let serde = serde_call_re();
     let forbidden = forbidden_suffix_re();
+    let test_lines = cfg_test_skip_lines(&lines);
 
     for (i, raw_line) in lines.iter().enumerate() {
+        // Skip serde calls inside `#[cfg(test)]` modules/fns (idiomatic test unwrap).
+        if test_lines.contains(&i) {
+            continue;
+        }
         // Skip explicit-allow lines before any other check.
         if raw_line.contains("// xtask-serde-allow") || raw_line.contains("// allow(serde-unwrap)")
         {

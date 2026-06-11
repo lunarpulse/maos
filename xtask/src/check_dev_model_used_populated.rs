@@ -15,6 +15,7 @@ use std::fs;
 const DEFAULT_STORIES_DIR: &str = "_bmad-output/implementation-artifacts";
 const KNOWN_MODELS: &[&str] = &[
     "claude-opus-4-5",
+    "claude-opus-4-6",
     "claude-opus-4-7",
     // Story 7.5a hygiene — clears the standing WARNING 7.3/7.4 both hit (their
     // dev_model_used was claude-opus-4-8 but the allowlist lagged).
@@ -22,6 +23,10 @@ const KNOWN_MODELS: &[&str] = &[
     "deepseek-v4-pro",
     "k2p6",
     "glm-5.1",
+    // Epic 8 actual dev attributions (per each story's `### Agent Model Used`):
+    // 8.13 shipped on openai/gpt-5.5; 8.14c on kimi-code/kimi-for-coding.
+    "openai/gpt-5.5",
+    "kimi-code/kimi-for-coding",
 ];
 
 #[derive(Debug)]

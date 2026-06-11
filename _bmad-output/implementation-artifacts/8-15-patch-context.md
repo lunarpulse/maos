@@ -1,3 +1,6 @@
+---
+dev_model_used: claude-opus-4-6
+---
 # Patch Context for Story 8-15 Code Review Fixes
 
 ## Constraints

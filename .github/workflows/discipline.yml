@@ -325,7 +325,10 @@ jobs:
             $pr_arg \
             --json
       - name: cassette-age-gate
-        run: cargo run -p xtask -- cassette-age-gate crates/maos-journey-test/cassettes
+        # `cassette_dir` is a `--cassette-dir` flag whose default already points at
+        # crates/maos-journey-test/cassettes; passing the path positionally is a clap
+        # `unexpected argument` error. Rely on the default (or use --cassette-dir).
+        run: cargo run -p xtask -- cassette-age-gate --json
       - name: check-env-contract
         run: cargo run -p xtask -- check-env-contract
 
@@ -1389,8 +1392,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build maos-bin
-        run: cargo build -p maos-bin --release --features fixture_replay
+      - name: Build maos-bin + worker-cli-fixture
+        # The founder-loop demo spawns the real `worker-cli-fixture` subprocess
+        # (resolve_cli_binary checks the daemon-sibling dir / deps/ / $PATH), so the
+        # fixture binary must be built into target/release/ alongside maos.
+        run: cargo build -p maos-bin --release --features fixture_replay && cargo build -p worker --bin worker-cli-fixture --release
       - name: Run smoke-founder-loop-8-4
         # 11pm assign → FR20 buffer drain → FR21 distillate-fed Architect→Reviewer
         # loop → one deliberate EOrchestratorDispatchRawOutput rejection →

@@ -42,12 +42,31 @@ jobs:
       - name: Env contract gate
         run: cargo run -p xtask -- check-env-contract
 
+  # The `secrets` context is NOT available in a job-level `if:` (GitHub rejects
+  # the whole file with "Unrecognized named-value: 'secrets'"). Probe the secret
+  # in a step (where `secrets` IS allowed, via env) and expose a boolean output
+  # that the re-record job gates on through the `needs` context.
+  secret-gate:
+    runs-on: ubuntu-latest
+    outputs:
+      has_anthropic_key: ${{ steps.probe.outputs.present }}
+    steps:
+      - id: probe
+        env:
+          KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # Tier-2: re-record cassettes against live APIs (only when secrets are available).
   tier-2-rerecord:
     runs-on: ubuntu-latest
-    needs: tier-2-journey
+    needs: [tier-2-journey, secret-gate]
     timeout-minutes: 30
-    if: ${{ secrets.MAOS_ANTHROPIC_API_KEY != '' }}
+    if: ${{ needs.secret-gate.outputs.has_anthropic_key == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1

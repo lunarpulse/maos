@@ -1,3 +1,6 @@
+---
+dev_model_used: claude-opus-4-6
+---
 # 봉인(Seal) 실행 지침 — Story 8-15 AC4 (Revert-to-Red)
 
 네 개의 단절(Severing) 패치. 각각 프로덕션 코드의 핵심 연결을 끊었다가 복구하여,

@@ -1497,6 +1497,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .transpose()?;
 
             let (drift_tx, _drift_rx) = maos_kernel_core::security::make_drift_channel();
+            // p1-allow: one-shot [class] evaluator path — isolated root, not the supervised daemon owner
             let security = maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
                 .with_drift_sender(drift_tx);
 
@@ -3495,7 +3496,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .await
                 .map_err(|e| format!("upgrade failed: {e}"))?;
 
-            println!("{}", serde_json::to_string(&report).unwrap_or_default());
+            println!("{}", serde_json::to_string(&report).unwrap_or_default()); // xtask-serde-allow: best-effort report print; unwrap_or_default already swallows gracefully to ""
             drop(audit_tx);
             drop(inference);
             drop(capability);
@@ -3534,7 +3535,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .await
                 .map_err(|e| format!("CRL apply failed: {e}"))?;
 
-            println!("{}", serde_json::to_string(&report).unwrap_or_default());
+            println!("{}", serde_json::to_string(&report).unwrap_or_default()); // xtask-serde-allow: best-effort report print; unwrap_or_default already swallows gracefully to ""
             drop(audit_tx);
             drop(inference);
             drop(capability);
@@ -4405,7 +4406,7 @@ description = "smoke test spirit successor"
                     "provider_endpoint": {"provider_id": "", "endpoint_url": ""},
                     "crypto_provider": ""
                 });
-                let claim_bytes = serde_json::to_vec(&claim_json).unwrap();
+                let claim_bytes = serde_json::to_vec(&claim_json).unwrap(); // xtask-serde-allow: infallible — serializing a constructed serde_json::json! Value
                 let claim_sig = keypair.sign(&claim_bytes);
 
                 let envelope = ComplianceClaimEnvelope {
@@ -4472,7 +4473,7 @@ description = "smoke test spirit successor"
                     "provider_endpoint": {"provider_id": "test", "endpoint_url": "http://localhost"},
                     "crypto_provider": "ring"
                 });
-                let claim_bytes = serde_json::to_vec(&claim_json).unwrap();
+                let claim_bytes = serde_json::to_vec(&claim_json).unwrap(); // xtask-serde-allow: infallible — serializing a constructed serde_json::json! Value
                 let claim_sig = keypair.sign(&claim_bytes);
 
                 let envelope = ComplianceClaimEnvelope {
@@ -4743,17 +4744,13 @@ description = "smoke test spirit successor"
 
         // Story 6.4 AC5 — `smoke-schedule-6-4` end-to-end wedge demo
         // (ScheduleWatchdog firing + per-schedule rate-limit cap + ConsentRupture +
-        // RateLimited frame emission).
-        #[cfg(feature = "smoke_schedule")]
+        // RateLimited frame emission). Runs on the normal multi-thread runtime with
+        // REAL time — the watchdog's cadence reads cap_tokens::monotonic_now_ns()
+        // (std::time clock), which tokio's virtual time cannot drive, so the prior
+        // `tokio::time::pause()` approach was unbuildable here (and panicked on the
+        // multi-thread runtime). No `smoke_schedule`/test-util feature required.
         if mode == "smoke-schedule-6-4" {
             return smoke_schedule_6_4().await;
-        }
-        #[cfg(not(feature = "smoke_schedule"))]
-        if mode == "smoke-schedule-6-4" {
-            eprintln!(
-                "maos: smoke-schedule-6-4 requires --features smoke_schedule (tokio test-util)"
-            );
-            std::process::exit(1);
         }
 
         // Story 7.1 AC6 — smoke-spirit-author-7-1: full author-side path
@@ -4887,6 +4884,7 @@ description = "smoke test spirit successor"
             // order — security drops first, then _drift_rx.
             let (drift_tx, _drift_rx) = maos_kernel_core::security::make_drift_channel();
             let security =
+                // p1-allow: one-shot CLI-dispatch admission path — isolated root, not the supervised owner
                 maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
                     .with_drift_sender(drift_tx);
 
@@ -5970,6 +5968,7 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(BOOT_NONCE));
     let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
+    // p1-allow: smoke-arm demo — isolated root, not the supervised owner
     let capability = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
         Arc::new(maos_kernel_core::api::RingCryptoProvider),
         maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
@@ -6732,6 +6731,7 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(BOOT_NONCE));
     let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
+    // p1-allow: smoke-arm demo — isolated root, not the supervised owner
     let capability = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
         Arc::new(maos_kernel_core::api::RingCryptoProvider),
         maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
@@ -7765,7 +7765,6 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
 ///   3. ConsentRupture partial-consent failure event (ADR-034 binding-v0.9)
 ///   4. RateLimited frame emission on per-(provider, credential) bucket exhaustion
 ///      (NFR-Scale-4)
-#[cfg(feature = "smoke_schedule")]
 async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     use maos_domain::frame::{
         ConsentRupturePayload, FrameAddress, FramePayload, IacFrame, RuptureReason,
@@ -7933,14 +7932,19 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     scbs.write().unwrap().insert(1, Arc::new(scb));
     let tl2 = Arc::new(TransparencyLogAdapter::open_in_memory(0));
     let dispatcher = Arc::new(HookDispatcher::new(Arc::clone(&tl2), Arc::clone(&metrics)));
-    // Use tokio::time::pause for deterministic smoke-arm timing
-    // (Story 6.4 review fix — avoids wall-clock flakiness on loaded CI runners).
-    tokio::time::pause();
+    // REAL-time timing. The ScheduleWatchdog's cadence reads
+    // `cap_tokens::monotonic_now_ns()` (a std::time clock), which tokio's virtual
+    // clock cannot drive — so `tokio::time::pause()/advance()` had no effect on
+    // firing (and panicked outright on the multi-thread runtime). With
+    // MAOS_SCHEDULE_FAST=1 the watchdog polls every 40ms; its FIRST `interval.tick()`
+    // is immediate and fires `morning-digest` once (last_fire=0 bypasses the cadence
+    // gate). The per-(spirit,schedule) `rate_limit_per_hour=1` token bucket then caps
+    // every subsequent tick, so exactly one fire is observed over the wait window.
     std::env::set_var("MAOS_SCHEDULE_FAST", "1");
     let cancel = tokio_util::sync::CancellationToken::new();
     let watchdog = Arc::new(ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl2)));
     let handle = Arc::clone(&watchdog).spawn(cancel.child_token());
-    tokio::time::advance(tokio::time::Duration::from_millis(300)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
     cancel.cancel();
     let _ = tokio::time::timeout(tokio::time::Duration::from_secs(2), handle).await;
     let fires = counter.load(Ordering::SeqCst);
@@ -8172,7 +8176,12 @@ sandbox_tier = "t0"
     std::fs::File::create(&artifact_path)?.write_all(b"smoke-artifact")?;
     std::fs::File::create(&key_path)?.write_all(&[0u8; 32])?;
 
-    let publish_output = Command::new("maos-spirit")
+    // `maos-spirit` (the maos-spirit-cli bin) is built into the target dir, not on
+    // $PATH — resolve it as a sibling of the running maos executable (same pattern as
+    // the CliWrapper fixture). CI must build it: `cargo build -p maos-spirit-cli`.
+    let maos_spirit_bin =
+        resolve_cli_binary("maos-spirit").map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+    let publish_output = Command::new(&maos_spirit_bin)
         .args([
             "publish",
             "--tier",
@@ -8431,7 +8440,12 @@ sandbox_tier = "t0"
     std::fs::File::create(&artifact_path)?.write_all(b"smoke-artifact")?;
     std::fs::File::create(&key_path)?.write_all(&[0u8; 32])?;
 
-    let publish_output = Command::new("maos-spirit")
+    // `maos-spirit` (the maos-spirit-cli bin) is built into the target dir, not on
+    // $PATH — resolve it as a sibling of the running maos executable (same pattern as
+    // the CliWrapper fixture). CI must build it: `cargo build -p maos-spirit-cli`.
+    let maos_spirit_bin =
+        resolve_cli_binary("maos-spirit").map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+    let publish_output = Command::new(&maos_spirit_bin)
         .args([
             "publish",
             "--tier",
@@ -8659,9 +8673,13 @@ async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
     // ── Step 4 — revision proposal from a REAL SelfTelemetryReport ──────────
     let report = SelfTelemetryReport::new(7, 0, 10_000, 100, 13, 0, 0, 0, vec![], vec![], 10_500)?;
     let has_evidence = report.success_count + report.failure_count > 0;
+    // Target the OTHER discovered skill (`smoke.planner`, step 2) — not the
+    // `smoke.reviewer` already enqueued Pending in step 3 — so the proposal occupies
+    // a distinct id in the shared admission queue (enqueue_proposal rejects a second
+    // Pending entry for the same SkillId, by design).
     let proposal = build_proposal(
-        SkillId::from("smoke.reviewer"),
-        SkillVersion::from("1.0.0"),
+        SkillId::from("smoke.planner"),
+        SkillVersion::from("0.2.0"),
         "--- a/skill.md\n+++ b/skill.md\n@@\n-be terse\n+be terse and cite evidence\n".into(),
         report,
     )?;
@@ -8776,6 +8794,7 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
         .trust_tier_floor
         .insert(TrustTier::Verified, SandboxTier::T0);
     policy.update(inner);
+    // p1-allow: smoke-arm demo — isolated root, not the supervised owner
     let adapter = SecurityManagerAdapter::new(policy);
 
     let journal_path =
@@ -9086,6 +9105,7 @@ mod tests {
         }
         let client = Arc::new(MockMcpClientPort);
         let (audit_tx, _) = maos_kernel_core::capability::cap_audit::channel();
+        // p1-allow: smoke-arm mock provider — isolated root, not the supervised owner
         let cap = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
             Arc::new(maos_kernel_core::api::RingCryptoProvider),
             maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),

@@ -171,7 +171,12 @@ fn t12a_kernel_zero_auto_retry_dep_absent() {
 /// extraction added a crate but touched NOTHING in the kernel.
 #[test]
 fn t12b_kernel_core_byte_identical_line_count() {
-    const KERNEL_CORE_SRC_LINES: usize = 19950; // captured at Story 8.6 start
+    // Re-pinned 2026-06-11: 19950 was captured at Story 8.6 start, but Stories
+    // 8.11 (first authorized kernel-byte break since 8.4) and 8.12 (charter
+    // kernel delta, +729 lines) legitimately grew the kernel under explicit
+    // Charter Amendments. This snapshot guards against UNexpected kernel changes
+    // in a2a-tcp work going forward; bump it only alongside an authorized delta.
+    const KERNEL_CORE_SRC_LINES: usize = 21128;
     let kernel_src = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("maos-kernel-core")

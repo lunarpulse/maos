@@ -1,3 +1,6 @@
+---
+dev_model_used: openai/gpt-5.5
+---
 # Story 8.13: Cross-Host Live Pair — Spirit→TCP Binding + Mobile Push (J4 end-to-end)
 
 Status: done
