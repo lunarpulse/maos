@@ -10,7 +10,7 @@
     "test": "vitest run --reporter verbose"
   },
   "dependencies": {
-    "@maos/spirit-ts": "^0.5.0"
+    "@maos/spirit-ts": "file:../../sdks/spirit-ts"
   },
   "devDependencies": {
     "typescript": "^5.4",

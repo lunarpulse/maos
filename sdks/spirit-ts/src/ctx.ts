@@ -1,6 +1,6 @@
 // Ctx mock implementation + deprecation_warnings surface.
 
-import { Ctx, CancellationSignal, DeprecationWarning, NeverCancel } from "../spirit.js";
+import { Ctx, CancellationSignal, DeprecationWarning, NeverCancel } from "./spirit.js";
 
 export class MockCtx implements Ctx {
   private cancel: CancellationSignal;

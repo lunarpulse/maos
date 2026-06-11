@@ -4,6 +4,11 @@ import { Spirit, Ctx } from "../spirit.js";
 import { MockCtx } from "../ctx.js";
 import { HaltResolutionKind, HaltResolutionRecord } from "../halt.js";
 
+// Re-export MockCtx as part of the spirit_test public surface — test authors
+// construct it directly (see tests/sdk.test.ts). It is a runtime class, so a
+// plain `export` (not `export type`).
+export { MockCtx } from "../ctx.js";
+
 export interface MockBusFrame {
   kind: string;
   bytes: Uint8Array;
