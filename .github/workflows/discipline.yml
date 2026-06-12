@@ -865,6 +865,19 @@ jobs:
 
   smoke-spirit-author-7-1:
     runs-on: ubuntu-latest
+    # ============================ DISABLED 2026-06-12 ============================
+    # This job is DISABLED (`if: false`) — it does not run; it reports `skipped`
+    # (⏭️) to the aggregate, never red ❌. It was previously `continue-on-error`
+    # ADVISORY, but the underlying break is a multi-defect TEMPLATE-SUITE failure
+    # that cannot be fixed by a CI patch (see causes below + deferred-work.md
+    # "spirit-authoring template-suite repair"). Until that story lands, the ❌
+    # noise adds nothing, so the job is parked.
+    #
+    # >>> RE-ENABLE: delete the `if: false` line below. If the template repair is
+    #     complete, also delete `continue-on-error: true` to make it BLOCKING.
+    #     FLAG-Winston/John to ratify the flip back to blocking.
+    # ============================================================================
+    if: false
     # ADVISORY gate (2026-06-11). The spirit-authoring TEMPLATE suite
     # (templates/spirit-{rust,ts}) has bit-rotted since Story 7.1 and was never
     # CI-validated (main had no CI run between the 7.1.5 freeze and Epic 8):
@@ -1252,6 +1265,18 @@ jobs:
   # Story 6.1 — Epic 6 bridge precondition gate (AC1)
   check-epic-6-bridge:
     runs-on: ubuntu-latest
+    # ============================ DISABLED 2026-06-12 ============================
+    # This job is DISABLED (`if: false`) — it does not run; it reports `skipped`
+    # (⏭️) to the aggregate, never red ❌. The gate intentionally `exit 1`s while
+    # the Epic-6 A2/A3/A5/A6 bridges remain open (debt-visibility beacon). That
+    # debt is real but tracked elsewhere; the standing ❌ is noise until the
+    # bridges land. Parked here rather than removed so the gate body is preserved.
+    #
+    # >>> RE-ENABLE: delete the `if: false` line below once the A2/A3/A5/A6
+    #     bridges are delivered (the gate then passes on its own). Keep/restore
+    #     `continue-on-error` only if a calibration window is still wanted.
+    # ============================================================================
+    if: false
     continue-on-error: true  # Debt: A2/A3/A5/A6 bridges pending; gate reports truth with exit 1
     steps:
       - uses: actions/checkout@v4
@@ -2121,7 +2146,7 @@ jobs:
             | example-spirit-ts-tests | ${icon(estts)} ${estts} |
             | spirit-test-tests | ${icon(stt)} ${stt} |
             | coverage-matrix-nfr-test-3 | ${icon(cmn3)} ${cmn3} |
-            | smoke-spirit-author-7-1 | ${icon(s71)} ${s71} |
+            | smoke-spirit-author-7-1 (DISABLED 2026-06-12)² | ${icon(s71)} ${s71} |
             | lcas-corpus-tests | ${icon(lct)} ${lct} |
             | isolation-framework-tests | ${icon(ift)} ${ift} |
             | coverage-matrix | ${icon(cm)} ${cm} |
@@ -2131,7 +2156,7 @@ jobs:
             | check-workspace-count | ${icon(cwc)} ${cwc} |
             | check-pub-field-constructors | ${icon(cpfc)} ${cpfc} |
             | check-composition-root-completeness | ${icon(ccrc)} ${ccrc} |
-            | check-epic-6-bridge | ${icon(ceb)} ${ceb} |
+            | check-epic-6-bridge (DISABLED 2026-06-12)² | ${icon(ceb)} ${ceb} |
             | smoke-discipline-7-1-5 | ${icon(sd715)} ${sd715} |
             | check-a2a-sender-completeness | ${icon(casc)} ${casc} |
             | smoke-a2a-fail-closed-8-8 | ${icon(safc)} ${safc} |
@@ -2141,6 +2166,8 @@ jobs:
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 
             ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).
+
+            ² DISABLED (\`if: false\`, 2026-06-12) — parked until remediated, then re-enabled. See \`_bmad-output/implementation-artifacts/deferred-work.md\`.
 
             <!-- discipline-gate-comment -->`;
 

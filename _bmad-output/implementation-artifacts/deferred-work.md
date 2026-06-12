@@ -384,3 +384,28 @@ real measurement paths:
   `--quick` (no-panic-on-breach), exit 0. NOTE: it measures P95≈1.65ms vs the
   1ms v0.5-α soft floor — a real over-budget observation, surfaced not masked
   (the gate stays soft-fail/advisory until the §13.1 calibration window closes).
+
+## Deferred from: CI remediation 2026-06-12 (round 6 — disable two broken advisory gates)
+
+### DISABLED in discipline.yml (`if: false`) — re-enable when remediated
+Two jobs were the only ❌ on green run 27388044071 (both `continue-on-error`, so
+the run already passed). Per direction, they are now fully DISABLED with
+`if: false` rather than left as red-but-advisory noise. Each reports `skipped`
+(⏭️) to the `aggregate` job (never `failure`), so the aggregate stays green and
+every `needs.<job>.result` reference remains valid. The job BODIES are preserved
+in-place (not deleted) so re-enabling is a one-line revert.
+
+1. **`smoke-spirit-author-7-1`** (discipline.yml ~L866) — spirit-authoring
+   TEMPLATE-SUITE bit-rot (cargo-generate ≥0.23 reserves `crate_name`; missing
+   `post-generate.rhai`; `@maos/spirit-ts` unpublished to npm). Not a CI patch —
+   needs the tracked "spirit-authoring template-suite repair" story above.
+   - RE-ENABLE: delete the `if: false` line. If the template repair shipped, also
+     delete `continue-on-error: true` to make it BLOCKING (FLAG-Winston/John).
+
+2. **`check-epic-6-bridge`** (discipline.yml ~L1253) — intentional `exit 1`
+   debt-visibility beacon; fails until the Epic-6 A2/A3/A5/A6 bridges land.
+   - RE-ENABLE: delete the `if: false` line once A2/A3/A5/A6 are delivered (the
+     gate then passes on its own).
+
+Aggregate summary table rows relabeled "(DISABLED 2026-06-12)" with footnote ².
+No code change; workflow-only. YAML re-validated (110 jobs parse).
