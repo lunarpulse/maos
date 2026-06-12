@@ -491,6 +491,26 @@ impl Pty {
         Screen(text)
     }
 
+    /// Poll the rendered screen until it contains ANY of `needles`, or
+    /// `timeout` elapses. Returns `true` if one appeared in time.
+    ///
+    /// The bounded wall-clock poll lives here in the harness (not in test
+    /// bodies) so `tests/journey_*.rs` stay clean under the JB-7 / H4
+    /// no-wallclock guard ([`guards::assert_no_wallclock_or_fixed_sleep`]).
+    pub fn wait_for_screen(&self, needles: &[&str], timeout: Duration) -> bool {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            let screen = self.screen();
+            if needles.iter().any(|n| screen.contains(n)) {
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+
     /// Wait for the child process to exit with a 30 s timeout.
     ///
     /// Returns `Some(status)` if the child exited within the deadline,
