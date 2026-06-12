@@ -64,17 +64,13 @@ fn j0_shell_banner_via_pty() {
     let cmd = format!("{}", maos_bin());
     let pty = Pty::spawn(&cmd, &world);
 
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-    loop {
-        let screen = pty.screen();
-        if screen.contains("maos shell") || screen.contains("hello-spirit") {
-            break;
-        }
-        if std::time::Instant::now() > deadline {
-            panic!("j0: shell banner did not appear within 5s");
-        }
-        std::thread::sleep(std::time::Duration::from_millis(200));
-    }
+    // Bounded poll delegated to the harness (Pty::wait_for_screen) so this
+    // test body stays clean under the JB-7 / H4 no-wallclock guard.
+    let appeared = pty.wait_for_screen(
+        &["maos shell", "hello-spirit"],
+        std::time::Duration::from_secs(5),
+    );
+    assert!(appeared, "j0: shell banner did not appear within 5s");
     let screen = pty.screen();
     assert!(!screen.text().is_empty(), "PTY screen should have content");
 
