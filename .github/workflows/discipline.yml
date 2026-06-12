@@ -1760,6 +1760,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
+      # The PTY journey tests spawn the real `maos` binary, resolved via
+      # `target/debug/maos` (CARGO_BIN_EXE_maos is unset — the binary lives in a
+      # SEPARATE package, maos-bin, so Cargo does not inject it for this crate's
+      # integration tests). `cargo test -p maos-journey-test` does NOT build that
+      # sibling binary, so it MUST be built first — exactly what nightly does
+      # (journey-nightly.yml builds the workspace before the suite). Omitting this
+      # makes maos_bin() panic "maos binary not found" → exit 101.
+      - name: Build the maos binary (debug — journey tests spawn target/debug/maos)
+        run: cargo build --locked -p maos-bin --bin maos
       - name: Hermetic journey suite (replay mode — JB-7 guards + deterministic floors)
         run: cargo test -p maos-journey-test --locked
 
