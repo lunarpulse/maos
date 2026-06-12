@@ -1,0 +1,21 @@
+# maos-kernel-core/src — SINGLE SOURCE OF TRUTH for the pinned line count.
+#
+# Established by Story 8.16 (Epic 8 retro §A4): per-story "byte-identical / +N"
+# claims were locally true but never SUMMED — story records cited 16263 while the
+# only enforced literal (maos-a2a-tcp t11_t12_chaos_absence.rs) and the true HEAD
+# count were 21128. This file is the ONE pinned value; both the
+# `check-kernel-baseline` xtask gate AND the maos-a2a-tcp zero-kernel guard read
+# it, so a multi-story phase can never again drift unsummed.
+#
+# HISTORY (authorized deltas only):
+#   15505  Story 8.4  — last pre-live-runtime pin (founder-loop wedge, zero kernel KLOC)
+#   16263  Story 8.11 — live runtime spine (first authorized byte-break since 8.4; budget seam)
+#   ~16992 Story 8.12 — live CliWrapper subprocess bridge (+729, charter-amended kernel delta)
+#   21128  CI reality at Epic-8 close — reconciled 2026-06-12 (Story 8.16) as the TRUE
+#          `find crates/maos-kernel-core/src -name '*.rs' | xargs wc -l` total at HEAD.
+#          The 15505→21128 growth is the sum of 8.11 + 8.12's charter-amended live-runtime
+#          deltas plus their in-tree tests; it is EXPECTED, not a regression.
+#
+# To change this number you MUST be landing an AUTHORIZED kernel delta (charter
+# amendment + FLAG-Winston), and you update it HERE — nowhere else.
+src_lines = 21128

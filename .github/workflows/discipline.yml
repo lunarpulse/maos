@@ -863,55 +863,13 @@ jobs:
         run: |
           echo "v0.5 soft floor: NFR-Test-3 reported via --dry-run above"
 
-  smoke-spirit-author-7-1:
-    runs-on: ubuntu-latest
-    # ============================ DISABLED 2026-06-12 ============================
-    # This job is DISABLED (`if: false`) — it does not run; it reports `skipped`
-    # (⏭️) to the aggregate, never red ❌. It was previously `continue-on-error`
-    # ADVISORY, but the underlying break is a multi-defect TEMPLATE-SUITE failure
-    # that cannot be fixed by a CI patch (see causes below + deferred-work.md
-    # "spirit-authoring template-suite repair"). Until that story lands, the ❌
-    # noise adds nothing, so the job is parked.
-    #
-    # >>> RE-ENABLE: delete the `if: false` line below. If the template repair is
-    #     complete, also delete `continue-on-error: true` to make it BLOCKING.
-    #     FLAG-Winston/John to ratify the flip back to blocking.
-    # ============================================================================
-    if: false
-    # ADVISORY gate (2026-06-11). The spirit-authoring TEMPLATE suite
-    # (templates/spirit-{rust,ts}) has bit-rotted since Story 7.1 and was never
-    # CI-validated (main had no CI run between the 7.1.5 freeze and Epic 8):
-    #   1. cargo-generate >=0.23 now RESERVES the `crate_name` placeholder the
-    #      templates declare -> generation aborts ("you can't override crate_name").
-    #   2. both cargo-generate.toml reference `[hooks] post=["post-generate.rhai"]`
-    #      but no .rhai file exists in the templates.
-    #   3. the TS template's npm path is blocked on @maos/spirit-ts being
-    #      PUBLISHED to npm (still unpublished at v0.5) — a file: hack would fix
-    #      the smoke but break the real author UX.
-    # Defects 1-2 are cheap; #3 is a genuine pre-publish gap, not a CI patch.
-    # Tracked for a dedicated template-suite repair story (see deferred-work.md).
-    # `continue-on-error` keeps the ❌ VISIBLE without blocking the run/aggregate.
-    # FLAG-Winston/John: ratify advisory posture; revert to blocking when the
-    # template story lands (cargo-generate 0.23 compat + SDK publication/vendoring).
-    continue-on-error: true
-    needs: [reproducible-build, check-workspace-count]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Install cargo-generate
-        run: cargo install cargo-generate --locked || true
-      - name: Build TS SDK
-        run: cd sdks/spirit-ts && npm ci && npm run build
-      - name: Run smoke-spirit-author-7-1
-        run: MAOS_ONE_SHOT=smoke-spirit-author-7-1 cargo run --release -p maos-bin
+  # RETIRED 2026-06-12 by Story 8.16 per ADR-043 — `smoke-spirit-author-7-1` was
+  # an advisory smoke for the v0.5 spirit-authoring template; it broke on Epic-7
+  # template bit-rot (cargo-generate >=0.23 `crate_name` reservation, missing
+  # post-generate.rhai, unpublished @maos/spirit-ts). Spirit-authoring stays
+  # covered by example-spirit-tests / example-spirit-drift / example-spirit-ts-tests
+  # / spirit-test-tests. A future template-repair story may re-introduce a fixed
+  # authoring smoke. Job removed rather than parked `if: false` (no fake-green).
 
   spirit-test-tests:
     runs-on: ubuntu-latest
@@ -1262,52 +1220,15 @@ jobs:
       - name: Run multi-provider drift-check unit + integration tests
         run: cargo test -p xtask check_multi_provider_drift --locked
 
-  # Story 6.1 — Epic 6 bridge precondition gate (AC1)
-  check-epic-6-bridge:
-    runs-on: ubuntu-latest
-    # ============================ DISABLED 2026-06-12 ============================
-    # This job is DISABLED (`if: false`) — it does not run; it reports `skipped`
-    # (⏭️) to the aggregate, never red ❌. The gate intentionally `exit 1`s while
-    # the Epic-6 A2/A3/A5/A6 bridges remain open (debt-visibility beacon). That
-    # debt is real but tracked elsewhere; the standing ❌ is noise until the
-    # bridges land. Parked here rather than removed so the gate body is preserved.
-    #
-    # >>> RE-ENABLE: delete the `if: false` line below once the A2/A3/A5/A6
-    #     bridges are delivered (the gate then passes on its own). Keep/restore
-    #     `continue-on-error` only if a calibration window is still wanted.
-    # ============================================================================
-    if: false
-    continue-on-error: true  # Debt: A2/A3/A5/A6 bridges pending; gate reports truth with exit 1
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-epic-6-bridge (6.1 legacy)
-        run: cargo run -p xtask -- check-epic-6-bridge --json
-      - name: Run check-epic-6-bridge --story 6.2
-        run: cargo run -p xtask -- check-epic-6-bridge --story 6.2 --json
-      - name: Run check-epic-6-bridge --story 6.3
-        run: cargo run -p xtask -- check-epic-6-bridge --story 6.3 --json
-      - name: Run check-epic-6-bridge --story 6.4
-        run: cargo run -p xtask -- check-epic-6-bridge --story 6.4 --json
-      - name: Run check-epic-6-bridge --story 6.5
-        run: cargo run -p xtask -- check-epic-6-bridge --story 6.5 --json
-      - name: Run check-epic-6-bridge --story 7.1
-        run: cargo run -p xtask -- check-epic-6-bridge --story 7.1 --json
-      - name: Run check-epic-6-bridge --story 7.1.5
-        run: cargo run -p xtask -- check-epic-6-bridge --story 7.1.5 --json
-      - name: Run check-epic-6-bridge --story 7.2
-        run: cargo run -p xtask -- check-epic-6-bridge --story 7.2 --json
-      - name: Run check-epic-6-bridge --story 7.3
-        run: cargo run -p xtask -- check-epic-6-bridge --story 7.3 --json
-      - name: Run check-epic-6-bridge --story 7.4
-        run: cargo run -p xtask -- check-epic-6-bridge --story 7.4 --json
-      - name: Run check-epic-6-bridge --story 7.5a
-        run: cargo run -p xtask -- check-epic-6-bridge --story 7.5a --json
+  # RETIRED 2026-06-12 by Story 8.16 per ADR-043 — `check-epic-6-bridge` was a
+  # 4504-line Epic-6 debt-visibility beacon whose §A2/§A3/§A5/§A6 enforcement was
+  # migrated to live hard-fail gates in Story 7.1.5 (check-review-findings-resolved,
+  # check-dev-record-completeness, check-bare-review-findings,
+  # check-dev-model-used-populated, check-serde-error-handling). Its last red
+  # (A4-Debt-1) was a stale entry-counting predicate, not real debt; I9 holder-path
+  # discipline is enforced live by check-empty-kernel + check-service-boundary.
+  # The xtask module stays in tree as archived history. Removed rather than parked
+  # `if: false` (no fake-green). See ADR-043 for the item-by-item successor map.
 
   # Story 6.1 — retract corpus integration tests (AC2)
   retract-corpus-tests:
@@ -1352,7 +1273,7 @@ jobs:
   nfr-perf-1-iac-routing-budget:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true  # soft-fail calibration mode at v0.5-α per Story 6.2 AC3 §13.1 precedent
+    continue-on-error: true  # ADVISORY (Story 8.16 §A5 triage 2026-06-12): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Hard NFR-Perf-1 verification is the maos-bench measurement track, not this CI smoke. Not masking a regression.
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
@@ -1370,7 +1291,7 @@ jobs:
   nfr-perf-8-orchestrator-fanout:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true  # soft-fail calibration mode per Story 6.2 AC3 — flip to hard-fail before Epic 6 closes
+    continue-on-error: true  # ADVISORY (Story 8.16 §A5 triage 2026-06-12; supersedes the stale "flip before Epic 6" note): NFR-Perf-8 fan-out bench is wall-clock-sensitive on shared GH runners — reports, does not gate. Hard verification is the maos-bench track. Not masking a regression.
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
@@ -1791,6 +1712,35 @@ jobs:
       - name: Run check-dev-model-used-populated
         run: cargo run -p xtask -- check-dev-model-used-populated --json
 
+  # Story 8.16 §A4 — kernel-core line-count single source of truth.
+  check-kernel-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-kernel-baseline
+        run: cargo run -p xtask -- check-kernel-baseline --json
+
+  # Story 8.16 §A5 — epic-close green gate: fails on ANY `if: false`-disabled
+  # workflow job (the meta-fix for the four-epic green-at-HEAD decay pattern).
+  check-epic-close-green:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-epic-close-green
+        run: cargo run -p xtask -- check-epic-close-green --json
+
   smoke-discipline-7-1-5:
     runs-on: ubuntu-latest
     needs: [check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated]
@@ -2000,7 +1950,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, mira-tests, nash-tests, orchestrator-tests, worker-tests, architect-tests, reviewer-tests, founder-loop-bench, mira-nash-bench, safety-critical-corpus-8-5, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, check-epic-6-bridge, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-founder-loop-8-4, smoke-mira-nash-8-5, a2a-tcp-tests-8-6, smoke-a2a-tcp-8-6, smoke-a2a-loopback-6-3, smoke-a2a-consent-vocab-8-7, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b, check-a2a-sender-completeness, smoke-a2a-fail-closed-8-8]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, mira-tests, nash-tests, orchestrator-tests, worker-tests, architect-tests, reviewer-tests, founder-loop-bench, mira-nash-bench, safety-critical-corpus-8-5, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-founder-loop-8-4, smoke-mira-nash-8-5, a2a-tcp-tests-8-6, smoke-a2a-tcp-8-6, smoke-a2a-loopback-6-3, smoke-a2a-consent-vocab-8-7, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b, check-a2a-sender-completeness, smoke-a2a-fail-closed-8-8, check-kernel-baseline, check-epic-close-green]
     if: always()
     permissions:
       pull-requests: write
@@ -2036,7 +1986,6 @@ jobs:
           echo "estts=${{ needs.example-spirit-ts-tests.result }}" >> $GITHUB_OUTPUT
           echo "stt=${{ needs.spirit-test-tests.result }}" >> $GITHUB_OUTPUT
           echo "cmn3=${{ needs.coverage-matrix-nfr-test-3.result }}" >> $GITHUB_OUTPUT
-          echo "s71=${{ needs.smoke-spirit-author-7-1.result }}" >> $GITHUB_OUTPUT
           echo "lct=${{ needs.lcas-corpus-tests.result }}" >> $GITHUB_OUTPUT
           echo "ift=${{ needs.isolation-framework-tests.result }}" >> $GITHUB_OUTPUT
           echo "cm=${{ needs.coverage-matrix.result }}" >> $GITHUB_OUTPUT
@@ -2046,13 +1995,14 @@ jobs:
           echo "cwc=${{ needs.check-workspace-count.result }}" >> $GITHUB_OUTPUT
           echo "cpfc=${{ needs.check-pub-field-constructors.result }}" >> $GITHUB_OUTPUT
           echo "ccrc=${{ needs.check-composition-root-completeness.result }}" >> $GITHUB_OUTPUT
-          echo "ceb=${{ needs.check-epic-6-bridge.result }}" >> $GITHUB_OUTPUT
           echo "rct=${{ needs.retract-corpus-tests.result }}" >> $GITHUB_OUTPUT
           echo "cbrf=${{ needs.check-bare-review-findings.result }}" >> $GITHUB_OUTPUT
           echo "cdmu=${{ needs.check-dev-model-used-populated.result }}" >> $GITHUB_OUTPUT
           echo "sd715=${{ needs.smoke-discipline-7-1-5.result }}" >> $GITHUB_OUTPUT
           echo "casc=${{ needs.check-a2a-sender-completeness.result }}" >> $GITHUB_OUTPUT
           echo "safc=${{ needs.smoke-a2a-fail-closed-8-8.result }}" >> $GITHUB_OUTPUT
+          echo "ckb=${{ needs.check-kernel-baseline.result }}" >> $GITHUB_OUTPUT
+          echo "ecg=${{ needs.check-epic-close-green.result }}" >> $GITHUB_OUTPUT
       - name: Check for failures
         id: status
         run: |
@@ -2094,7 +2044,6 @@ jobs:
             const estts = '${{ needs.example-spirit-ts-tests.result }}';
             const stt = '${{ needs.spirit-test-tests.result }}';
             const cmn3 = '${{ needs.coverage-matrix-nfr-test-3.result }}';
-            const s71 = '${{ needs.smoke-spirit-author-7-1.result }}';
             const lct = '${{ needs.lcas-corpus-tests.result }}';
             const ift = '${{ needs.isolation-framework-tests.result }}';
             const cm = '${{ needs.coverage-matrix.result }}';
@@ -2104,13 +2053,14 @@ jobs:
             const cwc = '${{ needs.check-workspace-count.result }}';
             const cpfc = '${{ needs.check-pub-field-constructors.result }}';
             const ccrc = '${{ needs.check-composition-root-completeness.result }}';
-            const ceb = '${{ needs.check-epic-6-bridge.result }}';
             const rct = '${{ needs.retract-corpus-tests.result }}';
             const cbrf = '${{ needs.check-bare-review-findings.result }}';
             const cdmu = '${{ needs.check-dev-model-used-populated.result }}';
             const sd715 = '${{ needs.smoke-discipline-7-1-5.result }}';
             const casc = '${{ needs.check-a2a-sender-completeness.result }}';
             const safc = '${{ needs.smoke-a2a-fail-closed-8-8.result }}';
+            const ckb = '${{ needs.check-kernel-baseline.result }}';
+            const ecg = '${{ needs.check-epic-close-green.result }}';
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
             const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
 
@@ -2146,7 +2096,6 @@ jobs:
             | example-spirit-ts-tests | ${icon(estts)} ${estts} |
             | spirit-test-tests | ${icon(stt)} ${stt} |
             | coverage-matrix-nfr-test-3 | ${icon(cmn3)} ${cmn3} |
-            | smoke-spirit-author-7-1 (DISABLED 2026-06-12)² | ${icon(s71)} ${s71} |
             | lcas-corpus-tests | ${icon(lct)} ${lct} |
             | isolation-framework-tests | ${icon(ift)} ${ift} |
             | coverage-matrix | ${icon(cm)} ${cm} |
@@ -2156,18 +2105,17 @@ jobs:
             | check-workspace-count | ${icon(cwc)} ${cwc} |
             | check-pub-field-constructors | ${icon(cpfc)} ${cpfc} |
             | check-composition-root-completeness | ${icon(ccrc)} ${ccrc} |
-            | check-epic-6-bridge (DISABLED 2026-06-12)² | ${icon(ceb)} ${ceb} |
             | smoke-discipline-7-1-5 | ${icon(sd715)} ${sd715} |
             | check-a2a-sender-completeness | ${icon(casc)} ${casc} |
             | smoke-a2a-fail-closed-8-8 | ${icon(safc)} ${safc} |
             | retract-corpus-tests | ${icon(rct)} ${rct} |
             | check-bare-review-findings | ${icon(cbrf)} ${cbrf} |
             | check-dev-model-used-populated | ${icon(cdmu)} ${cdmu} |
+            | check-kernel-baseline | ${icon(ckb)} ${ckb} |
+            | check-epic-close-green | ${icon(ecg)} ${ecg} |
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 
             ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).
-
-            ² DISABLED (\`if: false\`, 2026-06-12) — parked until remediated, then re-enabled. See \`_bmad-output/implementation-artifacts/deferred-work.md\`.
 
             <!-- discipline-gate-comment -->`;
 

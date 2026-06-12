@@ -171,21 +171,35 @@ fn t12a_kernel_zero_auto_retry_dep_absent() {
 /// extraction added a crate but touched NOTHING in the kernel.
 #[test]
 fn t12b_kernel_core_byte_identical_line_count() {
-    // Re-pinned 2026-06-11: 19950 was captured at Story 8.6 start, but Stories
-    // 8.11 (first authorized kernel-byte break since 8.4) and 8.12 (charter
-    // kernel delta, +729 lines) legitimately grew the kernel under explicit
-    // Charter Amendments. This snapshot guards against UNexpected kernel changes
-    // in a2a-tcp work going forward; bump it only alongside an authorized delta.
-    const KERNEL_CORE_SRC_LINES: usize = 21128;
+    // Story 8.16 §A4: the pinned count is no longer hard-coded here. It is read
+    // from `xtask/kernel-core-baseline.toml` — the SINGLE source of truth shared
+    // with the `check-kernel-baseline` xtask gate — so the kernel line count can
+    // never drift unsummed across a multi-story phase (the 16263-vs-21128 gap).
+    // Bump it ONLY in that toml, alongside an authorized charter delta.
+    let baseline_toml = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("xtask")
+        .join("kernel-core-baseline.toml");
+    let baseline_src =
+        std::fs::read_to_string(&baseline_toml).expect("read xtask/kernel-core-baseline.toml");
+    let kernel_core_src_lines: usize = baseline_src
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.starts_with('#') && l.starts_with("src_lines"))
+        .and_then(|l| l.rsplit('=').next())
+        .map(str::trim)
+        .and_then(|v| v.parse().ok())
+        .expect("parse `src_lines = N` from kernel-core-baseline.toml");
     let kernel_src = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("maos-kernel-core")
         .join("src");
     let total = count_rs_lines(&kernel_src);
     assert_eq!(
-        total, KERNEL_CORE_SRC_LINES,
-        "AC-T12(b): maos-kernel-core/src line count changed ({total} != {KERNEL_CORE_SRC_LINES}) \
-         — the extraction must leave the kernel byte-identical"
+        total, kernel_core_src_lines,
+        "AC-T12(b): maos-kernel-core/src line count changed ({total} != {kernel_core_src_lines}, \
+         pinned in xtask/kernel-core-baseline.toml) — the extraction must leave the kernel byte-identical"
     );
 }
 
