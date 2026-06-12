@@ -35,7 +35,7 @@ fn isolated_data_home(tag: &str) -> IsolatedDataHome {
 }
 
 fn maos_cmd() -> Command {
-    let mut cmd = if let Some(bin) = option_env!("CARGO_BIN_EXE_maos") {
+    let cmd = if let Some(bin) = option_env!("CARGO_BIN_EXE_maos") {
         Command::new(bin)
     } else {
         let debug_bin = std::path::Path::new(workspace_root()).join("target/debug/maos");

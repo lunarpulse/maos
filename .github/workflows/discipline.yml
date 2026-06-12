@@ -1767,8 +1767,15 @@ jobs:
       # sibling binary, so it MUST be built first — exactly what nightly does
       # (journey-nightly.yml builds the workspace before the suite). Omitting this
       # makes maos_bin() panic "maos binary not found" → exit 101.
-      - name: Build the maos binary (debug — journey tests spawn target/debug/maos)
-        run: cargo build --locked -p maos-bin --bin maos
+      # j1_founder_loop_smoke_wrap drives `maos MAOS_ONE_SHOT=smoke-founder-loop-8-4`,
+      # which spawns the real `worker-cli-fixture` subprocess (resolve_cli_binary
+      # checks the daemon-sibling target/debug dir first). That fixture lives in a
+      # SEPARATE package (worker), so building maos-bin alone does not produce it —
+      # nightly only passed because it builds the whole workspace (--all-targets
+      # --workspace). Build the debug fixture sibling here too, else the smoke exits
+      # with "cli_wrapper command 'worker-cli-fixture' not found".
+      - name: Build the maos binary + worker-cli-fixture (debug — journey tests spawn target/debug)
+        run: cargo build --locked -p maos-bin --bin maos && cargo build --locked -p worker --bin worker-cli-fixture
       - name: Hermetic journey suite (replay mode — JB-7 guards + deterministic floors)
         run: cargo test -p maos-journey-test --locked
 
