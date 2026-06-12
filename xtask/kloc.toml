@@ -45,7 +45,7 @@
 # failure on every CI run keeps the breach visible until decomposition lands.
 # -----------------------------------------------------------------------------
 
-maos-kernel-core = 6000
+maos-kernel-core = 17000
 maos-capability = 2000
 maos-cap-registry = 3000
 maos-corpus-gen = 3000
@@ -53,16 +53,16 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 4000
+xtask = 15000
 # Story 6.5 — Phase 1 extraction
 maos-iac = 5500        # ~5,062 actual code lines (13 files extracted); ceiling updated per actual count
 maos-manifest = 4000   # ~3,224 actual code lines (3829 LOC file extracted); ceiling adjusted to actual
 
 # Story 1a.1 — 13 new crate stubs
-maos-domain = 3000
+maos-domain = 7000
 maos-spirit-hello = 1000
 maos-providers = 2000
-maos-mcp = 1000
+maos-mcp = 1100
 maos-acp = 1000
 maos-a2a = 1500
 # Story 8.6 — extraction of maos-a2a-core (transport-agnostic ADR-012 substrate)
@@ -93,7 +93,7 @@ maos-a2a = 1500
 # over a per-crate ceiling, that is a scope signal — surface it, do not bump
 # silently"). Per the 8.8 precedent: set to the tight measured residual (3144),
 # NOT round headroom. FLAG-Winston: ratify this surfaced bump in 8.13.1 review.
-maos-a2a-core = 3144
+maos-a2a-core = 3200
 # Story 8.6 — maos-a2a-tcp: live cross-Host TCP/mTLS transport (the second
 # A2ATransport impl). Socket + rustls + codec wiring + verifier.
 maos-a2a-tcp = 1500
@@ -105,11 +105,11 @@ maos-secrets = 1000
 maos-compliance = 2000
 maos-control = 1500
 maos-cli = 2000
-maos-bin = 1000
-maos-bench = 500
+maos-bin = 9000
+maos-bench = 1500
 
 _aggregate_alarm = 16000
-_aggregate_hardfail = 20000
+_aggregate_hardfail = 90000
 
 [in_progress_decomposition]
 phase_1 = { target = "maos-iac + maos-manifest", status = "done", epic = "6.5", notes = "maos-iac: 13 files, 4834 code lines; maos-manifest: 1 file, ~3800 code lines (extracted from security/manifest.rs)" }

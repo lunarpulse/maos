@@ -350,3 +350,37 @@ now ADVISORY (continue-on-error in discipline.yml) until a dedicated story close
 - Fixed `sdks/spirit-ts` compile errors: `ctx.ts` import `../spirit.js`→`./spirit.js`; type-only
   re-exports → `export type` (index.ts, spirit_test/types.ts); re-export `MockCtx` from spirit_test.
 - `examples/example-spirit-ts` dep `@maos/spirit-ts: "^0.5.0"` → `file:../../sdks/spirit-ts`.
+
+## Deferred from: CI remediation 2026-06-12 (round 5 — nfr-perf compile regression)
+
+### NEW STORY NEEDED — rebuild J4/J6 real `kernel_measurement` harnesses (maos-bench)
+The `kernel_measurement` feature of `maos-bench` failed to COMPILE (17 errors),
+silently masked by the nfr-perf jobs' `continue-on-error`. Root cause: the J4/J6
+real-measurement harnesses authored in Story 8.5 (`201f95b`) drifted against
+current APIs and never recompiled (main had no CI between 7.1.5 and Epic 8). The
+real bodies were temporarily NEUTRALIZED to a smoke fallback + loud "NOT real"
+warning so the lib compiles and the (unrelated) iac_routing_budget /
+orchestrator_fanout perf benches can build and run. A story should REBUILD the
+real measurement paths:
+- `harness/j4.rs::run_j4_kernel` — `CryptoProvider` trait reshaped (now
+  `verify_signature`/`seal_for_export`/`sign_capability_token`; dropped
+  `sign`/`sign_detached`/`generate_keypair`); `CapabilityRegistryAdapter::new`
+  grew 3→8 args; `TransparencyLogAdapter::new`→`open_in_memory`;
+  `Ed25519SigningKey::generate` moved; `Mailbox`/`TelemetryStreamAdapter` ctors.
+- `harness/j6.rs::run_j6_kernel` — references `mira`/`nash` crates that are NOT
+  maos-bench deps (add as dev-deps), and the private `maos_domain::frame::FrameOrigin`
+  (use `maos_domain::invariants::i3::FrameOrigin`); current substrate ctors.
+- Until rebuilt, J4/J6 REAL measurement (section_13_1 / j6-real-measurement
+  nightly) returns smoke samples with a warning — honest but not a real number.
+
+### FIXED in this round (nfr-perf gates now build + RUN)
+- `orchestrator_fanout_nfr_perf_8.rs`: (a) `handle.recv()` now yields
+  `(FrameKind, IacFrame)` — destructure `(_kind, frame)`; (b) removed the
+  criterion `bench_function` wrapper (it sampled a 15s sustained-load op → 1
+  sample → criterion `slice.len() > 1` panic) in favor of a plain `main`
+  (`harness = false` already set) that runs the fan-out once and emits the
+  JourneyResult report. nfr-perf-8 → exit 0, p99≈147µs ≪ 500ms, 0 dropped.
+- nfr-perf-1 (iac_routing_budget) unblocked by the lib compiling; runs in
+  `--quick` (no-panic-on-breach), exit 0. NOTE: it measures P95≈1.65ms vs the
+  1ms v0.5-α soft floor — a real over-budget observation, surfaced not masked
+  (the gate stays soft-fail/advisory until the §13.1 calibration window closes).

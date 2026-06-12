@@ -85,91 +85,22 @@ pub fn run_j4_smoke() -> JourneyResult {
 /// kernel adapters, and exercises the scalar.tap emission path.
 #[cfg(feature = "kernel_measurement")]
 fn run_j4_kernel(config: &J4Config) -> Result<JourneyResult, BenchError> {
-    use crate::harness::monotonic_now_ns;
-    use std::sync::{Arc, mpsc};
-
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_time()
-        .build()
-        .map_err(|e| BenchError::Measurement(format!("Tokio runtime build failed: {e}")))?;
-
-    let (tx, rx) = mpsc::channel();
-    let n = config.invocation_count;
-
-    rt.block_on(async move {
-        use maos_domain::invariants::i1::CapabilityToken;
-        use maos_domain::ports::crypto::CryptoProvider;
-        use maos_kernel_core::capability::cap_policy::PolicyTable;
-        use maos_kernel_core::capability::cap_tokens::Ed25519SigningKey;
-        use maos_kernel_core::capability::CapabilityRegistryAdapter;
-        use maos_kernel_core::iac::mailbox::Mailbox;
-        use maos_kernel_core::iac::TransparencyLogAdapter;
-        use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
-        use maos_kernel_core::telemetry::TelemetryStreamAdapter;
-
-        struct MockCrypto;
-        impl CryptoProvider for MockCrypto {
-            fn verify_signature(&self, _pk: &[u8], _msg: &[u8], _sig: &[u8]) -> bool {
-                true
-            }
-            fn sign(
-                &self,
-                _keypair: &[u8],
-                _msg: &[u8],
-            ) -> Result<Vec<u8>, maos_domain::ports::crypto::CryptoError> {
-                Ok(vec![0u8; 64])
-            }
-            fn generate_keypair(
-                &self,
-            ) -> Result<(Vec<u8>, Vec<u8>), maos_domain::ports::crypto::CryptoError> {
-                Ok((vec![0u8; 32], vec![0u8; 64]))
-            }
-            fn sign_detached(
-                &self,
-                _sk: &[u8],
-                _msg: &[u8],
-            ) -> Result<Vec<u8>, maos_domain::ports::crypto::CryptoError> {
-                Ok(vec![0u8; 64])
-            }
-        }
-
-        let crypto = Arc::new(MockCrypto);
-        let signing_key = Ed25519SigningKey::generate();
-        let policy_table = PolicyTable::new();
-        let iac_metrics = IacRtMetrics::new();
-        let cap_registry = CapabilityRegistryAdapter::new(&signing_key, &policy_table, &iac_metrics)
-            .map_err(|e| BenchError::Measurement(e.to_string()))?;
-
-        let tl = Arc::new(TransparencyLogAdapter::new());
-        let mailbox = Mailbox::new(tl.clone(), &iac_metrics);
-        let _telemetry = TelemetryStreamAdapter::new(mailbox.subscribe_telemetry());
-
-        let mut samples_us = Vec::with_capacity(n as usize);
-
-        for _i in 0..n {
-            let emit_time = monotonic_now_ns();
-            let result = cap_registry.set_scalar("tap", 0);
-            let recv_time = monotonic_now_ns();
-            let latency_ns = recv_time.saturating_sub(emit_time);
-            samples_us.push(latency_ns / 1000);
-            let _ = result;
-        }
-
-        let _ = tx.send(samples_us);
-        Ok::<_, BenchError>(())
-    })
-    .map_err(|e: Box<dyn std::error::Error + Send + Sync>| {
-        BenchError::Measurement(e.to_string())
-    })?
-    .map_err(|e: BenchError| e)?;
-
-    let samples_us = rx
-        .recv()
-        .map_err(|e| BenchError::Measurement(format!("channel receive: {e}")))?;
-
-    let result = build_journey_result("J4", config.invocation_count, &samples_us, J4_P95_BUDGET_US);
-    Ok(result)
+    // DEFERRED (CI remediation 2026-06-12). The real in-kernel scalar.tap wiring
+    // authored in Story 8.5 drifted against the current kernel composition and no
+    // longer compiles: the `CryptoProvider` trait was reshaped (gained
+    // `seal_for_export`/`sign_capability_token`, dropped `sign`/`sign_detached`/
+    // `generate_keypair`, changed `verify_signature`), `CapabilityRegistryAdapter::new`
+    // grew to 8 args, `TransparencyLogAdapter::new` became `open_in_memory`, and
+    // `Ed25519SigningKey::generate` moved. Rebuilding the real path is a tracked
+    // story (see deferred-work.md). Until then the `kernel_measurement` build falls
+    // back to the SMOKE sample with a loud warning — this keeps the maos-bench lib
+    // compiling so the iac_routing_budget / orchestrator_fanout perf benches (which
+    // do NOT use J4) can build and run, WITHOUT presenting smoke numbers as real.
+    eprintln!(
+        "WARNING: J4 real kernel measurement is DEFERRED (harness drift since Story 8.5); \
+         returning a SMOKE sample — these are NOT real measurements."
+    );
+    Ok(run_j4_smoke_with_count(config.invocation_count))
 }
 
 #[cfg(test)]

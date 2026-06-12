@@ -99,58 +99,20 @@ pub fn run_j6_smoke() -> JourneyResult {
 /// full cold-start from empty process to Spirit-ready.
 #[cfg(feature = "kernel_measurement")]
 fn run_j6_kernel(config: &J6Config) -> Result<JourneyResult, J6Error> {
-    use crate::harness::monotonic_now_ns;
-    use maos_domain::frame::FrameOrigin;
-    use maos_kernel_core::iac::transparency_log::FrameKind;
-
-    let n = config.invocation_count;
-    let mut samples_us = Vec::with_capacity(n as usize);
-    for i in 0..n {
-        let boot_nonce = 0xD1_E6_u64.wrapping_add(i);
-        let emit_time = monotonic_now_ns();
-        // Cold-load the kernel substrate a Mira/Nash Spirit needs.
-        let tl = maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(boot_nonce);
-        let _telemetry = maos_kernel_core::telemetry::TelemetryStreamAdapter::default();
-        let _wm = maos_kernel_core::capability::WorkingMemoryStore::new();
-        let _halt = maos_kernel_core::halt::HaltRegistry::new();
-        // Cold-instantiate the actual Spirits (not just substrate).
-        let _mira = mira::Mira::default().with_id("mira-j6");
-        let _nash = nash::Nash::default().with_id("nash-j6");
-        let recv_time = monotonic_now_ns();
-        std::hint::black_box(&tl);
-        std::hint::black_box(&_mira);
-        std::hint::black_box(&_nash);
-        samples_us.push(recv_time.saturating_sub(emit_time) / 1000);
-    }
-    if samples_us.is_empty() {
-        return Err(J6Error::Measurement("no samples collected".into()));
-    }
-    let result = build_journey_result(
-        "J6",
-        config.invocation_count,
-        &samples_us,
-        J6_P95_BUDGET_US,
+    // DEFERRED (CI remediation 2026-06-12). The real cold-load path authored in
+    // Story 8.5 references the `mira` and `nash` Spirit crates, which are NOT
+    // maos-bench dependencies, plus the private `maos_domain::frame::FrameOrigin`
+    // path — it no longer compiles. Rebuilding it (add mira/nash dev-deps, use the
+    // current substrate constructors + `invariants::i3::FrameOrigin`) is a tracked
+    // story (see deferred-work.md). Until then the `kernel_measurement` build falls
+    // back to the SMOKE sample with a loud warning — this keeps the maos-bench lib
+    // compiling so the perf benches (which do NOT use J6) build and run, WITHOUT
+    // presenting smoke numbers as real.
+    eprintln!(
+        "WARNING: J6 real cold-start measurement is DEFERRED (harness drift since Story 8.5); \
+         returning a SMOKE sample — these are NOT real measurements."
     );
-    // NFR-Perf-6 — on overrun, emit a BudgetWarning audit row (not silent pass).
-    if !result.budget_met {
-        let payload = format!(
-            "{{\"journey\":\"j6\",\"p95_us\":{},\"budget_us\":{}}}",
-            result.p95_us, J6_P95_BUDGET_US
-        );
-        // Note: BudgetWarning emission requires a TransparencyLogAdapter. In the
-        // kernel_measurement path we construct one per iteration above; here we
-        // emit against a fresh in-memory log for audit-trail shape verification.
-        let tl = maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(0xD1_E6);
-        let _ = tl.insert_frame_event(
-            FrameKind::BudgetWarning,
-            10,
-            None,
-            "j6.cold_start_p95_overrun",
-            payload.as_bytes(),
-            FrameOrigin::Kernel,
-        );
-    }
-    Ok(result)
+    Ok(run_j6_smoke_with_count(config.invocation_count))
 }
 
 #[cfg(test)]

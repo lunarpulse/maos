@@ -35,7 +35,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use criterion::{criterion_group, criterion_main, Criterion};
 use maos_bench::report::{BenchReport, DecisionRecord, JourneyResult};
 use maos_domain::frame::{
     FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
@@ -123,7 +122,8 @@ fn run_fanout(rt: &Runtime) -> (JourneyResult, u64) {
             let sem = semaphore.clone();
             let join = tokio::spawn(async move {
                 let mut handle = handle;
-                while let Some(frame) = handle.recv().await {
+                // `recv()` yields `(FrameKind, IacFrame)` (the kind tag is unused here).
+                while let Some((_kind, frame)) = handle.recv().await {
                     // dispatch_arrival_ns captured from frame.timestamp_ns
                     let dispatch_start = frame.timestamp_ns;
                     let now = std::time::SystemTime::now()
@@ -211,19 +211,20 @@ fn run_fanout(rt: &Runtime) -> (JourneyResult, u64) {
     (journey, dropped_count)
 }
 
-fn fanout_bench(c: &mut Criterion) {
+// NFR-Perf-8 is a SUSTAINED-LOAD measurement (run the fan-out for a fixed wall
+// window, then report P99 / dropped / budget), not a micro-benchmark. criterion's
+// `bench_function` samples its closure repeatedly to build a statistical
+// distribution — but a single 15s/1h fan-out yields one sample, which panics
+// criterion's univariate stats (`slice.len() > 1`). So this bench is `harness =
+// false` (Cargo.toml) with a plain `main` that runs the fan-out once and emits the
+// JourneyResult report directly. (iac_routing_budget keeps criterion: its 200 µs
+// invocations give criterion plenty of samples.)
+fn main() {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .worker_threads(4)
         .build()
         .expect("tokio runtime");
-
-    c.bench_function("orchestrator_fanout_nfr_perf_8", |b| {
-        b.iter(|| {
-            let result = run_fanout(&rt);
-            criterion::black_box(result)
-        });
-    });
 
     let (journey, dropped) = run_fanout(&rt);
     let report = BenchReport::new(
@@ -245,7 +246,5 @@ fn fanout_bench(c: &mut Criterion) {
     );
     let json = serde_json::to_string_pretty(&report).expect("serialize report");
     eprintln!("{json}");
+    println!("{json}");
 }
-
-criterion_group!(benches, fanout_bench);
-criterion_main!(benches);
