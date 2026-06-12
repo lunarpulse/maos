@@ -88,7 +88,10 @@ fn maos_run_cli_wrapper_worker_spawns_real_subprocess() {
         .find(|e| e.get("event").and_then(|v| v.as_str()) == Some("cli_wrapper_exit"))
         .expect("a cli_wrapper_exit event");
     assert_eq!(exit.get("is_crash").and_then(|v| v.as_bool()), Some(false));
-    let lines = exit.get("stdout_lines").and_then(|v| v.as_u64()).unwrap_or(0);
+    let lines = exit
+        .get("stdout_lines")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
     assert!(
         lines >= 3,
         "the fixture emits 3 canned stdout lines, all journaled as CliSubprocessOutput rows; got {lines}"

@@ -11,8 +11,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use maos_domain::frame::{
-    FrameAddress, FramePayload, IacFrame, PosturePreferences, RetractPayload,
-    TaskAssignPayload, TaskCompletePayload,
+    FrameAddress, FramePayload, IacFrame, PosturePreferences, RetractPayload, TaskAssignPayload,
+    TaskCompletePayload,
 };
 use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i1::IntentClass;
@@ -38,9 +38,7 @@ fn corpus_dir() -> PathBuf {
 
 fn fresh_adapter() -> (Arc<TransparencyLogAdapter>, IacBusAdapter) {
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-    let metrics = Arc::new(
-        maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new(),
-    );
+    let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
     let mailbox = Arc::new(Mailbox::new(metrics));
     let adapter = IacBusAdapter::new(mailbox, tl.clone());
     (tl, adapter)
@@ -170,13 +168,9 @@ async fn run_scenario(s: &IntentLineageScenario) -> Result<(), String> {
         IntentLineageClass::LineageBrokenSpiritAutoStripsField => {
             assert_broken_spirit_auto(s).await
         }
-        IntentLineageClass::LineageContinuityAcrossRetract => {
-            assert_retract_continuity(s).await
-        }
+        IntentLineageClass::LineageContinuityAcrossRetract => assert_retract_continuity(s).await,
         IntentLineageClass::LineageViaGatewayInbound
-        | IntentLineageClass::LineageViaGatewayOutbound => {
-            assert_chain_uninterrupted(s).await
-        }
+        | IntentLineageClass::LineageViaGatewayOutbound => assert_chain_uninterrupted(s).await,
     }
 }
 
@@ -231,12 +225,7 @@ async fn assert_chain_uninterrupted(s: &IntentLineageScenario) -> Result<(), Str
         .map_err(|e| format!("register: {e:?}"))?;
 
     let lineage = IntentLineage::new(vec![A2AIntent::new(&s.originating_intent)]);
-    let mut frame = make_cross_spirit_frame(
-        "spirit-a",
-        "spirit-b",
-        origin_for(&s.origin),
-        lineage,
-    );
+    let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", origin_for(&s.origin), lineage);
     // Walk hops: re-emit the frame as SpiritAuto with the same lineage; each
     // hop's cross-Spirit emission must succeed. Each hop carries a fresh
     // frame_id to avoid TL unique-constraint collisions.

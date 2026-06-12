@@ -50,7 +50,9 @@ pub enum IacBusError {
     },
     /// Story 6.3 — outbound timed out awaiting receiver ACK — partition
     /// behavior per architecture §7.2.
-    #[error("cross-host partition timeout for peer {peer} after {timeout_secs}s (frame {frame_id:?})")]
+    #[error(
+        "cross-host partition timeout for peer {peer} after {timeout_secs}s (frame {frame_id:?})"
+    )]
     CrossHostPartitionTimeout {
         peer: String,
         frame_id: [u8; 16],
@@ -87,7 +89,10 @@ pub enum IacBusError {
     /// Story 6.1 — retract authority violation: only the original sender
     /// can retract their own frame in v0.5-α.
     #[error("retract authority violation: spirit {caller} cannot retract frame from spirit {original_sender}")]
-    RetractAuthorityViolation { caller: String, original_sender: String },
+    RetractAuthorityViolation {
+        caller: String,
+        original_sender: String,
+    },
     /// Story 6.1 — retract payload validation failed.
     #[error("retract payload validation failed: {0}")]
     RetractPayloadInvalid(#[from] RetractPayloadError),

@@ -35,7 +35,11 @@ pub fn run(cassette_dir: &str, json: bool, stamp_dir: Option<&str>) -> Result<()
     }
 
     if json {
-        println!("{{\"cassettes\":{},\"stale\":{}}}", files.len(), stale.len());
+        println!(
+            "{{\"cassettes\":{},\"stale\":{}}}",
+            files.len(),
+            stale.len()
+        );
     }
 
     if stale.is_empty() {
@@ -50,10 +54,7 @@ pub fn run(cassette_dir: &str, json: bool, stamp_dir: Option<&str>) -> Result<()
         for (path, date) in &stale {
             eprintln!("  STALE: {path} (recorded_at: {date})");
         }
-        let stamp_path = Path::new(
-            stamp_dir.unwrap_or(cassette_dir),
-        )
-        .join(TIER2_STAMP_FILE);
+        let stamp_path = Path::new(stamp_dir.unwrap_or(cassette_dir)).join(TIER2_STAMP_FILE);
 
         if stamp_path.exists() {
             Err(format!(
@@ -137,4 +138,3 @@ fn is_stale(date_str: &str, max_age_days: u64) -> bool {
 
     (now - recorded) > max_age_days as i64
 }
-

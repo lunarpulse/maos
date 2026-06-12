@@ -25,7 +25,9 @@ pub fn parse_signed_crl(
 
     // 1b. Structural validation (bypassed by serde deser)
     if crl.entries.is_empty() {
-        return Err(RevocationError::Deserialize("CRL entries must be non-empty".into()));
+        return Err(RevocationError::Deserialize(
+            "CRL entries must be non-empty".into(),
+        ));
     }
 
     // 2. Schema version check (v0.3-β only accepts 1)

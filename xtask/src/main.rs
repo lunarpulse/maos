@@ -4,18 +4,18 @@ use std::process;
 
 mod abi_diff;
 mod calibrate;
+mod cassette_age_gate;
 mod check_a2a_sender_completeness;
 mod check_adr_040_accepted;
 mod check_bare_review_findings;
 mod check_breaking_md;
 mod check_composition_root_completeness;
 mod check_corpus;
-mod cassette_age_gate;
-mod check_env_contract;
 mod check_deprecations_declared;
 mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
 mod check_empty_kernel;
+mod check_env_contract;
 mod check_epic_6_bridge;
 mod check_epic_close_green;
 mod check_fr47;
@@ -747,9 +747,11 @@ fn main() {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             nfr_onb_1_gate::run(&workspace_root, check, json)
         }
-        Commands::CassetteAgeGate { cassette_dir, stamp_dir, json } => {
-            cassette_age_gate::run(&cassette_dir, json, stamp_dir.as_deref())
-        }
+        Commands::CassetteAgeGate {
+            cassette_dir,
+            stamp_dir,
+            json,
+        } => cassette_age_gate::run(&cassette_dir, json, stamp_dir.as_deref()),
         Commands::CheckEnvContract { maos_bin_dir, json } => {
             check_env_contract::run(&maos_bin_dir, json)
         }

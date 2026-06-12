@@ -5,11 +5,9 @@
 
 use std::collections::BTreeSet;
 
-use maos_compliance::builder::{
-    build_signed_envelope, encode_claim_bytes_with_hash,
-};
 #[allow(deprecated)]
 use maos_compliance::builder::seeded_keypair;
+use maos_compliance::builder::{build_signed_envelope, encode_claim_bytes_with_hash};
 use maos_compliance::canonical_cbor::fingerprint_hash;
 use maos_domain::ports::registry::{SignedPackage, SpiritId, TrustTier};
 use maos_registry::admission::{admit_spirit, AdmissionConfig, AdmissionError};

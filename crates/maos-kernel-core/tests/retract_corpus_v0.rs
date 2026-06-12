@@ -11,12 +11,10 @@ use std::sync::Arc;
 use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, RetractPayload};
 use maos_domain::iac_bus_types::RetractOutcome;
 use maos_domain::invariants::i1::IntentClass;
-use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i13::IntentLineage;
+use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::ports::IacBusPort;
-use maos_kernel_core::iac::{
-    IacBusAdapter, Mailbox, TransparencyLogAdapter,
-};
+use maos_kernel_core::iac::{IacBusAdapter, Mailbox, TransparencyLogAdapter};
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 use smallvec::smallvec;
 
@@ -48,29 +46,35 @@ fn make_frame_for_scenario(
     payload_size: usize,
 ) -> IacFrame {
     let payload = match kind {
-        FrameKind::DecisionDispatch => FramePayload::DecisionDispatch(
-            maos_domain::frame::DecisionDispatchPayload {
+        FrameKind::DecisionDispatch => {
+            FramePayload::DecisionDispatch(maos_domain::frame::DecisionDispatchPayload {
                 decision_id: 42,
                 approved: true,
                 working_memory_digest_refs: Default::default(),
-            },
-        ),
-        FrameKind::ConsentRequest => FramePayload::ConsentRequest(
-            maos_domain::frame::ConsentRequestPayload {
+            })
+        }
+        FrameKind::ConsentRequest => {
+            FramePayload::ConsentRequest(maos_domain::frame::ConsentRequestPayload {
                 capability: "test.cap".into(),
-            },
-        ),
+            })
+        }
         FrameKind::EpistemicHalt => FramePayload::EpistemicHalt(
             maos_domain::frame::EpistemicHaltPayload::new(
-                "halt-1".into(), "tag".into(), 0.5, None, "pol".into(), "src".into(),
-            ).unwrap(),
+                "halt-1".into(),
+                "tag".into(),
+                0.5,
+                None,
+                "pol".into(),
+                "src".into(),
+            )
+            .unwrap(),
         ),
-        FrameKind::TelemetryEvent => FramePayload::TelemetryEvent(
-            maos_domain::frame::TelemetryEventPayload {
+        FrameKind::TelemetryEvent => {
+            FramePayload::TelemetryEvent(maos_domain::frame::TelemetryEventPayload {
                 event_type: "test".into(),
                 data: "x".repeat(payload_size.min(4096)),
-            },
-        ),
+            })
+        }
         _ => FramePayload::TaskAssign(maos_domain::frame::TaskAssignPayload {
             goal: "x".repeat(payload_size.min(4096)),
             scope: vec![],
@@ -112,7 +116,11 @@ async fn retract_corpus_fixtures() {
     let corpus = maos_eval::retract_corpus::RetractCorpus::load_from(&corpus_dir)
         .expect("failed to load retract corpus");
 
-    assert!(corpus.len() >= 30, "expected >=30 scenarios, got {}", corpus.len());
+    assert!(
+        corpus.len() >= 30,
+        "expected >=30 scenarios, got {}",
+        corpus.len()
+    );
 
     let mut results = Vec::new();
 
@@ -127,12 +135,22 @@ async fn retract_corpus_fixtures() {
         let to_spirit = &scenario.original_frame.to_spirit;
 
         // Register both spirits
-        let _h_from = adapter.register_spirit_typed(&SpiritId::from(from_spirit.as_str())).ok();
-        let _h_to = adapter.register_spirit_typed(&SpiritId::from(to_spirit.as_str())).ok();
+        let _h_from = adapter
+            .register_spirit_typed(&SpiritId::from(from_spirit.as_str()))
+            .ok();
+        let _h_to = adapter
+            .register_spirit_typed(&SpiritId::from(to_spirit.as_str()))
+            .ok();
 
         let frame_id = hex_to_frame_id(&scenario.original_frame.frame_id_hex);
         let kind = kind_from_str(&scenario.original_frame.kind);
-        let frame = make_frame_for_scenario(frame_id, from_spirit, to_spirit, kind, scenario.original_frame.payload_size_bytes);
+        let frame = make_frame_for_scenario(
+            frame_id,
+            from_spirit,
+            to_spirit,
+            kind,
+            scenario.original_frame.payload_size_bytes,
+        );
 
         let _ = adapter.deliver_typed(frame).await.unwrap();
 

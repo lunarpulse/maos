@@ -14,10 +14,10 @@
 //! the wire-protocol implementation.  No capability tokens are checked here.
 
 pub mod client;
+pub mod drivers;
 #[cfg(any(test, feature = "fixture_replay"))]
 pub mod fixture_replay;
 pub mod transport;
-pub mod drivers;
 
 // Re-export the trait (primary port abstraction) and the concrete impl.
 pub use client::{McpClientImpl, McpServerEntry};

@@ -106,7 +106,9 @@ fn digest_of_digest_flattens_to_original_raw_frames() {
     let researcher = Researcher::new();
 
     // Hop 1: digest over the raws.
-    let frames = researcher.walk(&recall, 10, LogRecallFilter::default()).unwrap();
+    let frames = researcher
+        .walk(&recall, 10, LogRecallFilter::default())
+        .unwrap();
     let survey = researcher.survey(&frames);
     let r1 = researcher.distill_through(&writer, 10, &survey, 1).unwrap();
 

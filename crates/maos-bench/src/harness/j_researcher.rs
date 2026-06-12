@@ -123,7 +123,10 @@ fn run_j_researcher_measurement_with_count(invocation_count: u64) -> JourneyResu
     // halt is proven in the spirit tests, not the bench).
     let halt_survey = researcher.survey(&frames);
     let (halt_tag, _v, _d) = halt_survey.primary_scalar();
-    debug_assert_eq!(halt_tag, "methodology_conflict", "burst triggers a halt scalar");
+    debug_assert_eq!(
+        halt_tag, "methodology_conflict",
+        "burst triggers a halt scalar"
+    );
 
     let result = measure_distillation_step(&researcher, &writer, &frames, invocation_count);
 
@@ -210,7 +213,9 @@ mod tests {
         let recall = LogRecallAdapter::new(Arc::clone(&tl));
         let writer = DistillateWriter::new(Arc::clone(&tl), Arc::new(0u8));
         let researcher = Researcher::new();
-        let frames = researcher.walk(&recall, 10, LogRecallFilter::default()).unwrap();
+        let frames = researcher
+            .walk(&recall, 10, LogRecallFilter::default())
+            .unwrap();
 
         let survey = researcher.survey(&frames);
         let _ = researcher.distill_through(&writer, 10, &survey, 1).unwrap();

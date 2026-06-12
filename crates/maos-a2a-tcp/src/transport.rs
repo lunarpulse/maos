@@ -18,9 +18,7 @@ use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::router::{A2APeerRouter, A2ARouterCore, A2ATransport};
-use maos_a2a_core::transport::json_rpc::{
-    CODE_FRAME_TOO_LARGE, CODE_TIMEOUT,
-};
+use maos_a2a_core::transport::json_rpc::{CODE_FRAME_TOO_LARGE, CODE_TIMEOUT};
 use maos_a2a_core::{
     A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, HandshakeRetryPolicy,
     InMemoryTofuPinStore, TofuPinStore,
@@ -158,13 +156,12 @@ impl TcpA2ATransport {
         // instead of the prior silent "last wins" overwrite; surface it to the
         // operator as a config error.
         for cfg in &peer_configs {
-            cfg.validate().map_err(|e| TcpTransportError::Config(e.to_string()))?;
+            cfg.validate()
+                .map_err(|e| TcpTransportError::Config(e.to_string()))?;
         }
-        let mut core_inner = A2ARouterCore::try_new(
-            peer_configs,
-            pins.clone() as Arc<dyn TofuPinStore>,
-        )
-        .map_err(|e| TcpTransportError::Config(e.to_string()))?;
+        let mut core_inner =
+            A2ARouterCore::try_new(peer_configs, pins.clone() as Arc<dyn TofuPinStore>)
+                .map_err(|e| TcpTransportError::Config(e.to_string()))?;
         // Story 8.8 — the live wire is genuine cross-Host → fail-closed is
         // unconditional in `A2ARouterCore` (Option 2, no toggle). Unclassified
         // frames are denied with CODE_CONSENT_UNCLASSIFIED (-32009).
@@ -277,13 +274,11 @@ impl TcpA2ATransport {
 
     /// Resolve a peer's dial `SocketAddr` from its `tls://host:port` endpoint.
     fn dial_addr(&self, cfg: &A2APeerConfig) -> Result<SocketAddr, TcpTransportError> {
-        let rest = cfg
-            .endpoint
-            .strip_prefix("tls://")
-            .ok_or_else(|| TcpTransportError::Config(format!("endpoint must be tls://: {}", cfg.endpoint)))?;
-        rest.parse::<SocketAddr>().map_err(|e| {
-            TcpTransportError::Config(format!("bad endpoint addr '{rest}': {e}"))
-        })
+        let rest = cfg.endpoint.strip_prefix("tls://").ok_or_else(|| {
+            TcpTransportError::Config(format!("endpoint must be tls://: {}", cfg.endpoint))
+        })?;
+        rest.parse::<SocketAddr>()
+            .map_err(|e| TcpTransportError::Config(format!("bad endpoint addr '{rest}': {e}")))
     }
 
     /// Build a dialing `ClientConfig` whose `ServerCertVerifier` is scoped to the
@@ -318,7 +313,12 @@ impl TcpA2ATransport {
             .map_err(|e| TcpTransportError::Io(format!("connect {addr}: {e}")))?;
         let server_name = ServerName::IpAddress(addr.ip().into());
 
-        let tls = match tokio::time::timeout(self.timeouts.handshake, connector.connect(server_name, tcp)).await {
+        let tls = match tokio::time::timeout(
+            self.timeouts.handshake,
+            connector.connect(server_name, tcp),
+        )
+        .await
+        {
             Err(_) => return Err(TcpTransportError::Timeout("client handshake".into())),
             Ok(Err(e)) => return Err(TcpTransportError::classify_handshake(&e.to_string())),
             Ok(Ok(s)) => s,
@@ -334,7 +334,9 @@ impl TcpA2ATransport {
 
         match tokio::time::timeout(self.timeouts.idle, framed.next()).await {
             Err(_) => Err(TcpTransportError::Timeout("awaiting response".into())),
-            Ok(None) => Err(TcpTransportError::Io("connection closed before response".into())),
+            Ok(None) => Err(TcpTransportError::Io(
+                "connection closed before response".into(),
+            )),
             Ok(Some(Err(e))) => Err(TcpTransportError::Io(format!("recv: {e}"))),
             Ok(Some(Ok(buf))) => serde_json::from_slice::<A2AJsonRpcResponse>(&buf)
                 .map_err(|e| TcpTransportError::Protocol(format!("deserialize response: {e}"))),
@@ -452,8 +454,11 @@ async fn serve_connection(
                 // Codec error: oversized frame is rejected after only the header
                 // (no buffer blow-up) — surface CODE_FRAME_TOO_LARGE best-effort.
                 if is_frame_too_large(&e) {
-                    let nack =
-                        A2AJsonRpcResponse::nack(0, CODE_FRAME_TOO_LARGE, "frame exceeds 1 MiB cap");
+                    let nack = A2AJsonRpcResponse::nack(
+                        0,
+                        CODE_FRAME_TOO_LARGE,
+                        "frame exceeds 1 MiB cap",
+                    );
                     let _ = send_response(&mut framed, &nack).await;
                 }
                 return;
@@ -614,7 +619,8 @@ impl A2APeerRouter for TcpA2ATransport {
         let mut attempt: u8 = 1;
         let mut last_err: TcpTransportError;
         loop {
-            self.last_dial_attempts.store(attempt as usize, Ordering::SeqCst);
+            self.last_dial_attempts
+                .store(attempt as usize, Ordering::SeqCst);
             match self.dial_once(addr, &request, &scoped_cfg).await {
                 Ok(response) => {
                     return self.core.interpret_response(peer, response);
@@ -662,7 +668,10 @@ impl maos_domain::ports::a2a::A2ARouter for TcpA2ATransport {
     ) -> Result<(), maos_domain::iac_bus_types::IacBusError> {
         match <Self as A2APeerRouter>::route_outbound(self, frame, peer).await {
             Ok(()) => Ok(()),
-            Err(e) => Err(maos_a2a_core::router::map_a2a_error_to_iac_bus(e, peer.as_str())),
+            Err(e) => Err(maos_a2a_core::router::map_a2a_error_to_iac_bus(
+                e,
+                peer.as_str(),
+            )),
         }
     }
 }

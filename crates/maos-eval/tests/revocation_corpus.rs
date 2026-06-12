@@ -14,7 +14,11 @@ use maos_eval::RevocationCorpus;
 fn revocation_corpus_loads_all_30_scenarios() {
     let corpus = RevocationCorpus::load_from(Path::new("fixtures/revocation-corpus-v0/"))
         .expect("revocation-corpus-v0 must exist");
-    assert_eq!(corpus.len(), 30, "corpus size lock — 30 scenarios (6 categories × 5 each)");
+    assert_eq!(
+        corpus.len(),
+        30,
+        "corpus size lock — 30 scenarios (6 categories × 5 each)"
+    );
 }
 
 #[test]

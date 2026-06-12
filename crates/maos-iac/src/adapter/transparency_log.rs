@@ -388,7 +388,16 @@ impl TransparencyLogAdapter {
         payload: &[u8],
         origin: FrameOrigin,
     ) -> LogBeforeDeliver<()> {
-        self.insert_frame_event_with_sender(kind, spirit_pid, "", "", capability_token, intent, payload, origin)
+        self.insert_frame_event_with_sender(
+            kind,
+            spirit_pid,
+            "",
+            "",
+            capability_token,
+            intent,
+            payload,
+            origin,
+        )
     }
 
     /// Insert a frame event with sender tracking. Returns `LogBeforeDeliver<()>` per I2 typestate:
@@ -412,7 +421,17 @@ impl TransparencyLogAdapter {
         payload: &[u8],
         origin: FrameOrigin,
     ) -> LogBeforeDeliver<()> {
-        self.insert_frame_event_with_id(None, kind, spirit_pid, from_spirit_id, to_spirit_id, capability_token, intent, payload, origin)
+        self.insert_frame_event_with_id(
+            None,
+            kind,
+            spirit_pid,
+            from_spirit_id,
+            to_spirit_id,
+            capability_token,
+            intent,
+            payload,
+            origin,
+        )
     }
 
     /// Insert a frame event with explicit frame ID and sender tracking.
@@ -669,16 +688,15 @@ impl TransparencyLogAdapter {
                     to_spirit_id: row.get(4)?,
                     boot_nonce: row.get::<_, i64>(5)? as u64,
                     capability_token: cap_token,
-                    kind: FrameKind::from_i64(row.get::<_, i64>(7)?)
-                        .unwrap_or_else(|| {
-                            let disc = row.get::<_, i64>(7).unwrap_or(-1);
-                            eprintln!(
-                                "TL query: unrecognized FrameKind discriminant ({disc}); \
+                    kind: FrameKind::from_i64(row.get::<_, i64>(7)?).unwrap_or_else(|| {
+                        let disc = row.get::<_, i64>(7).unwrap_or(-1);
+                        eprintln!(
+                            "TL query: unrecognized FrameKind discriminant ({disc}); \
                                  mapping to TaskAssign as best-effort fallback \
                                  (schema-migration or cross-version log inspection)"
-                            );
-                            FrameKind::TaskAssign
-                        }),
+                        );
+                        FrameKind::TaskAssign
+                    }),
                     intent: row.get(8)?,
                     payload_redacted: row.get(9)?,
                     origin: match row.get::<_, i64>(10)? {
@@ -744,16 +762,15 @@ impl TransparencyLogAdapter {
                     to_spirit_id: row.get(4)?,
                     boot_nonce: row.get::<_, i64>(5)? as u64,
                     capability_token: cap_token,
-                    kind: FrameKind::from_i64(row.get::<_, i64>(7)?)
-                        .unwrap_or_else(|| {
-                            let disc = row.get::<_, i64>(7).unwrap_or(-1);
-                            eprintln!(
-                                "TL query: unrecognized FrameKind discriminant ({disc}); \
+                    kind: FrameKind::from_i64(row.get::<_, i64>(7)?).unwrap_or_else(|| {
+                        let disc = row.get::<_, i64>(7).unwrap_or(-1);
+                        eprintln!(
+                            "TL query: unrecognized FrameKind discriminant ({disc}); \
                                  mapping to TaskAssign as best-effort fallback \
                                  (schema-migration or cross-version log inspection)"
-                            );
-                            FrameKind::TaskAssign
-                        }),
+                        );
+                        FrameKind::TaskAssign
+                    }),
                     intent: row.get(8)?,
                     payload_redacted: row.get(9)?,
                     origin: match row.get::<_, i64>(10)? {
@@ -834,7 +851,7 @@ impl TransparencyLogAdapter {
             .map_err(AuditError::SqliteWriteFatal)?;
         Ok(rows > 0)
     }
-    
+
     /// Story 6.1 — atomically check-and-mark retraction.
     ///
     /// Holds the inner lock across both operations to prevent TOCTOU races.
@@ -888,7 +905,10 @@ impl TransparencyLogAdapter {
     /// Story 6.1 — check whether a frame has been retracted.
     ///
     /// Returns `Some(retract_frame_id)` if retracted, `None` otherwise.
-    pub fn is_retracted(&self, original_frame_id: [u8; 16]) -> Result<Option<[u8; 16]>, AuditError> {
+    pub fn is_retracted(
+        &self,
+        original_frame_id: [u8; 16],
+    ) -> Result<Option<[u8; 16]>, AuditError> {
         let inner = self
             .inner
             .lock()
@@ -977,10 +997,8 @@ impl IacBusPort for TransparencyLogAdapter {
         _original_frame_id: [u8; 16],
         _reason: String,
         _retracting_spirit: &maos_spirit_abi::identity::SpiritId,
-    ) -> Result<
-        maos_domain::iac_bus_types::RetractOutcome,
-        maos_domain::iac_bus_types::IacBusError,
-    > {
+    ) -> Result<maos_domain::iac_bus_types::RetractOutcome, maos_domain::iac_bus_types::IacBusError>
+    {
         // Stub implementation — the real retract lives in IacBusAdapter.
         // This stub satisfies the trait for TransparencyLogAdapter which
         // is only used in test contexts as a standalone IacBusPort impl.
@@ -1013,7 +1031,9 @@ impl maos_domain::halt::HaltJournal for TransparencyLogAdapter {
                 "halt={}: provided_context: {text}",
                 halt_id.as_str()
             )),
-            maos_domain::halt::Resolution::AcceptedHalt => Some(format!("halt={}: accepted_halt", halt_id.as_str())),
+            maos_domain::halt::Resolution::AcceptedHalt => {
+                Some(format!("halt={}: accepted_halt", halt_id.as_str()))
+            }
             maos_domain::halt::Resolution::AuthorizedOverride {
                 operator_policy_ref,
             } => Some(format!(
@@ -1257,7 +1277,11 @@ mod tests {
             .collect();
         assert_eq!(
             tables,
-            vec!["approval_decision_log", "transparency_log", "transparency_log_retractions"],
+            vec![
+                "approval_decision_log",
+                "transparency_log",
+                "transparency_log_retractions"
+            ],
             "expected exactly three tables"
         );
 

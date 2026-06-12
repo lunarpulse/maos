@@ -14,7 +14,8 @@ maos-spirit-abi = { path = "../maos-spirit-abi" }
 smallvec = { version = "1", features = ["serde"] }
 serde_json = "1.0"
 hex = "0.4"
-# Story 6.3 — A2ARouter port trait (async via tokio::sync — kept minimal).
+ed25519-dalek = { version = "2", features = ["std"] }
+getrandom = "0.3"
 # Per ADR-010, `maos-domain` carries the trait shapes; adapters in
 # `maos-a2a` implement. The `async-trait` macro is already pulled in by
 # `IacBusPort::deliver` (Story 6.1 broke the sync-only constraint).

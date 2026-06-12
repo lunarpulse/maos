@@ -188,14 +188,105 @@ pub enum AuditQuery {
     /// human-readable tabular text. Both formats emit zero ANSI bytes
     /// when `NO_COLOR`, `TERM=dumb`, or `--plain` is set (NFR-Ops-5).
     Query {
-        /// Filter by Spirit name. At v0.1-β only `hello-spirit` is resolvable
-        /// (maps to `spirit_pid = 0` per Story 1b.5a's one-shot path).
-        /// The full Spirit registry / scheduler lookup is Epic 5.
+        /// Filter by Spirit name. Resolved via TL-scan of lifecycle frames
+        /// (Story 9.1, Decision E).
         #[arg(long)]
         spirit: Option<String>,
 
         /// Output format. `ndjson` (default) emits the FR4 schema, one JSON
         /// object per line. `plain` emits a human-readable tabular form.
+        #[arg(long, value_enum, default_value_t = AuditFormat::Ndjson)]
+        format: AuditFormat,
+
+        /// FR41 — time range filter. Supports relative ("30d", "7d", "24h", "1h")
+        /// from now or absolute nanosecond timestamp.
+        #[arg(long)]
+        range: Option<String>,
+
+        /// FR41 — filter by frame kind (e.g. "capability.invocation").
+        #[arg(long)]
+        frame_kind: Option<String>,
+
+        /// FR41 — substring match on intent column (param-bound, SQLi-safe).
+        #[arg(long)]
+        intent_contains: Option<String>,
+
+        /// FR41 — hex-encoded capability token for exact-match filter.
+        #[arg(long)]
+        capability: Option<String>,
+
+        /// FR41 — specific boot_nonce to scope the query.
+        #[arg(long)]
+        boot: Option<u64>,
+
+        /// FR41 — union all boot incarnations for the resolved spirit.
+        #[arg(long)]
+        all_boots: bool,
+
+        /// RESERVED — errors with pointer to --intent-contains.
+        #[arg(long)]
+        tag: Option<String>,
+    },
+    /// FR44 — sealed export bundle.
+    SealedExport {
+        /// Filter by Spirit name.
+        #[arg(long)]
+        spirit: Option<String>,
+        /// Time range filter (e.g. "30d", "7d", "1h").
+        #[arg(long)]
+        range: Option<String>,
+        /// Output file path for the signed bundle JSON.
+        #[arg(long)]
+        output: Option<std::path::PathBuf>,
+        /// Explicit path to audit signing key file.
+        #[arg(long)]
+        audit_key: Option<std::path::PathBuf>,
+    },
+    /// Generate an Ed25519 audit signing key.
+    Keygen {
+        /// Output file path for the signing key.
+        #[arg(long)]
+        output: Option<std::path::PathBuf>,
+    },
+    /// Verify a sealed-export bundle.
+    VerifyBundle {
+        /// Path to bundle JSON file.
+        bundle: std::path::PathBuf,
+        /// Hex-encoded Ed25519 public key, or path to a .hex file.
+        #[arg(long)]
+        pubkey: String,
+    },
+    /// FR42 — subject-access query: retrieve all principal_index rows for a
+    /// given principal, enriched with provenance and spirit-name resolution.
+    SubjectAccess {
+        /// Principal ID to look up (e.g. "user:alice").
+        #[arg(long)]
+        principal: String,
+
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = AuditFormat::Ndjson)]
+        format: AuditFormat,
+    },
+    /// FR43 — posture-delta report: classify composed log entries into
+    /// capability changes, sandbox tier changes, and consent ruptures.
+    ///
+    /// **v0.5 limitation**: the consent dimension surfaces `ConsentRupture`
+    /// events only (FrameKind 22). Allowlist configuration changes to
+    /// `ConsentAllowlists` are not journaled in the Transparency Log at
+    /// v0.5 and are therefore not tracked in this report. This will be
+    /// addressed in a future release when consent-policy mutation events
+    /// are persisted.
+    PostureDelta {
+        /// Time range for the report (required). Supports relative notation
+        /// like "30d", "7d", "24h", "1h".
+        #[arg(long)]
+        range: String,
+
+        /// Filter to a specific Spirit.
+        #[arg(long)]
+        spirit: Option<String>,
+
+        /// Output format.
         #[arg(long, value_enum, default_value_t = AuditFormat::Ndjson)]
         format: AuditFormat,
     },

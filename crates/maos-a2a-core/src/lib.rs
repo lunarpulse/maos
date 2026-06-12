@@ -41,18 +41,14 @@ pub mod transport;
 // `pub use maos_a2a_core::…` re-exports keep every downstream import path
 // (`maos-bin`, `spirits/mira`, `spirits/nash`, tests) compiling unchanged.
 pub use chaos::churn::{ChurnDrillReport, ChurnHarnessConfig};
-pub use chaos::rotation::{
-    compute_t_grace, AgentRotationTimestamps, RotationDrillReport,
-};
+pub use chaos::rotation::{compute_t_grace, AgentRotationTimestamps, RotationDrillReport};
 pub use config::{A2AConfig, A2APeerConfig, A2AProfile};
 // Story 8.7 / AC2b — `A2AConsentEnvelope` was deleted (dead fail-open footgun).
 pub use consent::{ConsentAllowlists, EIntentDenied};
 pub use error::{A2AError, A2AResult};
 pub use identity::{PeerCertFingerprint, PeerId};
 pub use mtls::{HandshakeRetryPolicy, LoopbackTlsConfig};
-pub use router::{
-    map_a2a_error_to_iac_bus, A2APeerRouter, A2ARouterCore, A2ATransport,
-};
+pub use router::{map_a2a_error_to_iac_bus, A2APeerRouter, A2ARouterCore, A2ATransport};
 pub use tofu::{EPinMismatch, InMemoryTofuPinStore, RePinDecision, TofuPin, TofuPinStore};
 pub use transport::json_rpc::{A2AJsonRpcRequest, A2AJsonRpcResponse, AckBody, NackError};
 pub use transport::logical_clock::LamportClock;

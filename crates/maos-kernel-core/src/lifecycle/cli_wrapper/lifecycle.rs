@@ -30,12 +30,14 @@ pub fn handle_subprocess_death(
     exit_code: Option<i32>,
 ) -> RecoveryAction {
     match config.recovery_policy {
-        CliWrapperRecoveryPolicy::RespawnWithContext => {
-            RecoveryAction::Respawn { transfer_context: true, exit_code }
-        }
-        CliWrapperRecoveryPolicy::RespawnFresh => {
-            RecoveryAction::Respawn { transfer_context: false, exit_code }
-        }
+        CliWrapperRecoveryPolicy::RespawnWithContext => RecoveryAction::Respawn {
+            transfer_context: true,
+            exit_code,
+        },
+        CliWrapperRecoveryPolicy::RespawnFresh => RecoveryAction::Respawn {
+            transfer_context: false,
+            exit_code,
+        },
         CliWrapperRecoveryPolicy::Escalate => RecoveryAction::Escalate { exit_code },
         _ => RecoveryAction::Escalate { exit_code },
     }
@@ -50,9 +52,7 @@ pub enum RecoveryAction {
         exit_code: Option<i32>,
     },
     /// Do NOT respawn. Emit `SpiritDied` event and escalate to supervisor.
-    Escalate {
-        exit_code: Option<i32>,
-    },
+    Escalate { exit_code: Option<i32> },
 }
 
 #[cfg(test)]
@@ -107,11 +107,6 @@ mod tests {
     fn escalate_returns_escalate() {
         let c = cfg(CliWrapperRecoveryPolicy::Escalate);
         let action = handle_subprocess_death(&c, Some(1));
-        assert_eq!(
-            action,
-            RecoveryAction::Escalate {
-                exit_code: Some(1),
-            }
-        );
+        assert_eq!(action, RecoveryAction::Escalate { exit_code: Some(1) });
     }
 }

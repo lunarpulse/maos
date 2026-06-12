@@ -59,18 +59,14 @@ fn probe_runtime(bin: &str, kind: ContainerRuntimeKind) -> Result<ContainerRunti
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .and_then(|child| {
-            child.wait_with_output()
-        })
+        .and_then(|child| child.wait_with_output())
         .map_err(|e| T3Error::Io(format!("probe {bin}: {e}")))?;
 
     if !output.status.success() {
         return Err(T3Error::RuntimeUnavailable);
     }
 
-    let version = String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .to_string();
+    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
     Ok(ContainerRuntime {
         kind,

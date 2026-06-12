@@ -12,9 +12,7 @@
 //! must be controlled).
 
 use crate::chaos::metrics::MetricsCollector;
-use crate::chaos::rotation::{
-    compute_t_grace, AgentRotationTimestamps, RotationDrillReport,
-};
+use crate::chaos::rotation::{compute_t_grace, AgentRotationTimestamps, RotationDrillReport};
 
 #[derive(Debug, Clone)]
 pub struct DrillConfig {

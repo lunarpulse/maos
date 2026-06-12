@@ -18,9 +18,9 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time::{interval, Instant};
 
 use maos_domain::frame::IacFrame;
+use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i2::LogBeforeDeliver;
 use maos_domain::invariants::i3::FrameOrigin;
-use maos_domain::iac_bus_types::IacBusError;
 
 use super::transparency_log::{FrameKind, TransparencyLogAdapter};
 
@@ -108,7 +108,7 @@ pub struct BudgetWarningEvent {
     pub backlog_bytes: usize,
 }
 
-    async fn processor_loop(
+async fn processor_loop(
     mut rx: mpsc::UnboundedReceiver<Submission>,
     tl: Arc<TransparencyLogAdapter>,
     budget_warning_tx: mpsc::UnboundedSender<BudgetWarningEvent>,

@@ -72,8 +72,7 @@ fn check() -> Result<Report, String> {
 /// Parse the single `src_lines = N` key from the baseline toml without pulling a
 /// toml dependency (the file is intentionally trivial).
 fn read_pinned(path: &Path) -> Result<usize, String> {
-    let text = fs::read_to_string(path)
-        .map_err(|e| format!("read {}: {e}", path.display()))?;
+    let text = fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
     for line in text.lines() {
         let line = line.trim();
         if line.starts_with('#') {
@@ -86,7 +85,10 @@ fn read_pinned(path: &Path) -> Result<usize, String> {
                 .map_err(|e| format!("parse src_lines `{val}`: {e}"));
         }
     }
-    Err(format!("no `src_lines = N` key found in {}", path.display()))
+    Err(format!(
+        "no `src_lines = N` key found in {}",
+        path.display()
+    ))
 }
 
 fn count_rs_lines(dir: &Path) -> Result<usize, String> {

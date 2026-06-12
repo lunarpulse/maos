@@ -3,8 +3,8 @@
 //! Gateway uninstall integration tests — Story 6.5 / FR65 v0.5.
 
 use maos_kernel_core::orchestrator::{
-    gateway_dispatcher::{GatewayDispatcher, GatewaySubmoduleRegistry},
     echo_gateway::EchoGatewayFactory,
+    gateway_dispatcher::{GatewayDispatcher, GatewaySubmoduleRegistry},
 };
 use maos_manifest::{GatewayEntry, GatewayType, GatewaysSection};
 use std::sync::Arc;
@@ -34,9 +34,14 @@ async fn gateway_uninstall_record_has_spirit_pid() {
     let dispatcher = GatewayDispatcher::new(registry);
 
     dispatcher
-        .admit_spirit_gateways(100, "spirit-100", "principal-100", &GatewaysSection {
-            entries: vec![make_entry("gw-1")],
-        })
+        .admit_spirit_gateways(
+            100,
+            "spirit-100",
+            "principal-100",
+            &GatewaysSection {
+                entries: vec![make_entry("gw-1")],
+            },
+        )
         .await
         .unwrap();
     let record = dispatcher.unload_spirit_gateways(100, "spirit-100").await;
@@ -53,9 +58,14 @@ async fn gateway_uninstall_record_has_gateways() {
     let dispatcher = GatewayDispatcher::new(registry);
 
     dispatcher
-        .admit_spirit_gateways(200, "spirit-200", "principal-200", &GatewaysSection {
-            entries: vec![make_entry("gw-a"), make_entry("gw-b")],
-        })
+        .admit_spirit_gateways(
+            200,
+            "spirit-200",
+            "principal-200",
+            &GatewaysSection {
+                entries: vec![make_entry("gw-a"), make_entry("gw-b")],
+            },
+        )
         .await
         .unwrap();
     let record = dispatcher.unload_spirit_gateways(200, "spirit-200").await;
@@ -70,9 +80,14 @@ async fn gateway_uninstall_record_entry_has_gateway_id() {
     let dispatcher = GatewayDispatcher::new(registry);
 
     dispatcher
-        .admit_spirit_gateways(300, "spirit-300", "principal-300", &GatewaysSection {
-            entries: vec![make_entry("my-gw")],
-        })
+        .admit_spirit_gateways(
+            300,
+            "spirit-300",
+            "principal-300",
+            &GatewaysSection {
+                entries: vec![make_entry("my-gw")],
+            },
+        )
         .await
         .unwrap();
     let record = dispatcher.unload_spirit_gateways(300, "spirit-300").await;
@@ -88,9 +103,14 @@ async fn gateway_uninstall_record_disconnect_outcome_clean() {
     let dispatcher = GatewayDispatcher::new(registry);
 
     dispatcher
-        .admit_spirit_gateways(400, "spirit-400", "principal-400", &GatewaysSection {
-            entries: vec![make_entry("gw-ts")],
-        })
+        .admit_spirit_gateways(
+            400,
+            "spirit-400",
+            "principal-400",
+            &GatewaysSection {
+                entries: vec![make_entry("gw-ts")],
+            },
+        )
         .await
         .unwrap();
     let record = dispatcher.unload_spirit_gateways(400, "spirit-400").await;
@@ -116,9 +136,7 @@ async fn gateway_uninstall_empty_when_no_gateways() {
 
 #[tokio::test]
 async fn gateway_uninstall_serde_round_trip() {
-    use maos_domain::frame::{
-        DisconnectOutcome, GatewayUninstallEntry, GatewayUninstallRecord,
-    };
+    use maos_domain::frame::{DisconnectOutcome, GatewayUninstallEntry, GatewayUninstallRecord};
 
     let record = GatewayUninstallRecord {
         spirit_id: "spirit-42".into(),
@@ -149,7 +167,13 @@ async fn gateway_uninstall_serde_round_trip() {
     assert_eq!(back.spirit_pid, 42);
     assert_eq!(back.gateways.len(), 2);
     assert_eq!(back.gateways[0].gateway_id, "gw-1");
-    assert!(matches!(back.gateways[0].disconnect_outcome, DisconnectOutcome::Clean));
+    assert!(matches!(
+        back.gateways[0].disconnect_outcome,
+        DisconnectOutcome::Clean
+    ));
     assert_eq!(back.gateways[1].gateway_id, "gw-2");
-    assert!(matches!(back.gateways[1].disconnect_outcome, DisconnectOutcome::Timeout));
+    assert!(matches!(
+        back.gateways[1].disconnect_outcome,
+        DisconnectOutcome::Timeout
+    ));
 }

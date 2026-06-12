@@ -50,7 +50,11 @@ fn j1_founder_loop_smoke_wrap() {
 fn j1_founder_class_tripwire() {
     let home = tempfile::TempDir::new().unwrap();
     let output = Command::new(maos_bin())
-        .args(["run", "spirits/founder/orchestrator/manifest.toml", "--once"])
+        .args([
+            "run",
+            "spirits/founder/orchestrator/manifest.toml",
+            "--once",
+        ])
         .env("XDG_DATA_HOME", home.path())
         .env("MAOS_HOME", home.path())
         .current_dir(workspace_root())

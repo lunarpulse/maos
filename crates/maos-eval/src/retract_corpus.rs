@@ -59,7 +59,9 @@ impl RetractCorpus {
             if path.extension().map_or(true, |ext| ext != "json") {
                 continue;
             }
-            if !path.file_stem().map_or(false, |s| s.to_str().map_or(false, |s| s.starts_with("scenario-"))) {
+            if !path.file_stem().map_or(false, |s| {
+                s.to_str().map_or(false, |s| s.starts_with("scenario-"))
+            }) {
                 continue;
             }
             let content = std::fs::read_to_string(path)?;

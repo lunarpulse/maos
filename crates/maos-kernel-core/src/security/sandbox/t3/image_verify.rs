@@ -15,15 +15,15 @@ use maos_domain::sandbox::{T3Error, T3ImageAttestation};
 use super::runtime_detect::ContainerRuntime;
 
 pub fn read_trust_anchor_pub() -> Result<[u8; 32], T3Error> {
-    let hex_str = std::env::var("MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX")
-        .map_err(|_| T3Error::TrustAnchorMissing(
-            "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX env-var not set".into(),
-        ))?;
+    let hex_str = std::env::var("MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX").map_err(|_| {
+        T3Error::TrustAnchorMissing("MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX env-var not set".into())
+    })?;
     let mut key = [0u8; 32];
-    hex::decode_to_slice(hex_str.trim(), &mut key)
-        .map_err(|e| T3Error::TrustAnchorMissing(
-            format!("MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX decode failed: {e}")
-        ))?;
+    hex::decode_to_slice(hex_str.trim(), &mut key).map_err(|e| {
+        T3Error::TrustAnchorMissing(format!(
+            "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX decode failed: {e}"
+        ))
+    })?;
     Ok(key)
 }
 
@@ -58,10 +58,14 @@ pub fn parse_signed_image_attestation(
         return Err(T3Error::TrustAnchorMismatch);
     }
 
-    let entries_bytes = serde_json::to_vec(&attestation.entries)
-        .map_err(|e| T3Error::Io(e.to_string()))?;
+    let entries_bytes =
+        serde_json::to_vec(&attestation.entries).map_err(|e| T3Error::Io(e.to_string()))?;
     crypto
-        .verify_signature(&attestation.signer_pub_key, &entries_bytes, &attestation.signature)
+        .verify_signature(
+            &attestation.signer_pub_key,
+            &entries_bytes,
+            &attestation.signature,
+        )
         .map_err(|_| T3Error::SignatureInvalid)?;
 
     Ok(attestation)
@@ -88,8 +92,8 @@ pub fn verify_image_attestation(
         return Err(T3Error::TrustAnchorMismatch);
     }
 
-    let entries_bytes = serde_json::to_vec(&image.entries)
-        .map_err(|e| T3Error::Io(e.to_string()))?;
+    let entries_bytes =
+        serde_json::to_vec(&image.entries).map_err(|e| T3Error::Io(e.to_string()))?;
     crypto
         .verify_signature(&image.signer_pub_key, &entries_bytes, &image.signature)
         .map_err(|_| T3Error::SignatureInvalid)?;
@@ -99,10 +103,7 @@ pub fn verify_image_attestation(
 
 /// Inspect the local image SHA-256 using the container runtime.
 /// Shells out to `<runtime> image inspect --format '{{.Id}}' <image_uri>`.
-pub fn inspect_image_sha(
-    runtime: &ContainerRuntime,
-    image_uri: &str,
-) -> Result<[u8; 32], T3Error> {
+pub fn inspect_image_sha(runtime: &ContainerRuntime, image_uri: &str) -> Result<[u8; 32], T3Error> {
     let output = std::process::Command::new(&runtime.path)
         .args(["image", "inspect", "--format", "{{.Id}}", image_uri])
         .stdout(std::process::Stdio::piped())

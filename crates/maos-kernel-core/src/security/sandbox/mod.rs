@@ -5,8 +5,8 @@
 //! and FFI. Every `unsafe` block carries a `// SAFETY:` comment.
 #![deny(unsafe_code)]
 
-pub mod unsupported;
 pub mod t3;
+pub mod unsupported;
 
 #[cfg(target_os = "linux")]
 pub mod linux;

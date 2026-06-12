@@ -96,7 +96,9 @@ impl McpAttribution {
 }
 
 /// MCP transport identifier — per-server-URI selectable.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum McpTransportId {
     /// Subprocess MCP server over stdio (stdin/stdout NDJSON).
@@ -176,7 +178,11 @@ mod tests {
     /// Round-trip serde for `McpResponse`.
     #[test]
     fn mcp_response_serde_round_trip() {
-        let attr = McpAttribution::new("test-server".into(), McpTransportId::StreamableHttp, "echo".into());
+        let attr = McpAttribution::new(
+            "test-server".into(),
+            McpTransportId::StreamableHttp,
+            "echo".into(),
+        );
         let resp = McpResponse::new(serde_json::json!({"result": "ok"}), false, attr);
         let encoded = serde_json::to_string(&resp).unwrap();
         let decoded: McpResponse = serde_json::from_str(&encoded).unwrap();

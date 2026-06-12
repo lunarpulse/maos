@@ -33,10 +33,7 @@ pub enum AcpError {
 }
 
 impl AcpServer {
-    pub fn new(
-        lifecycle: Arc<dyn LifecycleResolver>,
-        halts: Arc<dyn HaltResolver>,
-    ) -> Self {
+    pub fn new(lifecycle: Arc<dyn LifecycleResolver>, halts: Arc<dyn HaltResolver>) -> Self {
         Self {
             lifecycle,
             halts,
@@ -71,8 +68,8 @@ impl AcpServer {
                         message: format!("invalid frame: {e}"),
                         decision_id: None,
                     };
-                    let mut json = serde_json::to_vec(&err)
-                        .map_err(|e| AcpError::Parse(e.to_string()))?;
+                    let mut json =
+                        serde_json::to_vec(&err).map_err(|e| AcpError::Parse(e.to_string()))?;
                     json.push(b'\n');
                     writer.write_all(&json)?;
                     writer.flush()?;
@@ -102,8 +99,8 @@ impl AcpServer {
                             "session_end".into(),
                         ],
                     };
-                    let mut json = serde_json::to_vec(&reply)
-                        .map_err(|e| AcpError::Parse(e.to_string()))?;
+                    let mut json =
+                        serde_json::to_vec(&reply).map_err(|e| AcpError::Parse(e.to_string()))?;
                     json.push(b'\n');
                     writer.write_all(&json)?;
                     writer.flush()?;
@@ -118,14 +115,17 @@ impl AcpServer {
                             .map(|h| h.started_at_ns)
                             .unwrap_or(0)
                     };
-                    self.sessions.lock().unwrap().retain(|h| h.session_id != session_id.0);
+                    self.sessions
+                        .lock()
+                        .unwrap()
+                        .retain(|h| h.session_id != session_id.0);
 
                     let reply = AcpFrameOut::SessionTerminated {
                         session_id,
                         duration_ns: now.saturating_sub(started_at_ns),
                     };
-                    let mut json = serde_json::to_vec(&reply)
-                        .map_err(|e| AcpError::Parse(e.to_string()))?;
+                    let mut json =
+                        serde_json::to_vec(&reply).map_err(|e| AcpError::Parse(e.to_string()))?;
                     json.push(b'\n');
                     writer.write_all(&json)?;
                     writer.flush()?;
@@ -208,7 +208,8 @@ impl AcpServer {
                 } => {
                     let resolution_enum = match resolution.as_str() {
                         "approve" => maos_domain::halt::Resolution::AuthorizedOverride {
-                            operator_policy_ref: operator_note.unwrap_or_else(|| "acp-editor".into()),
+                            operator_policy_ref: operator_note
+                                .unwrap_or_else(|| "acp-editor".into()),
                         },
                         "accept" => maos_domain::halt::Resolution::AcceptedHalt,
                         "provide" => maos_domain::halt::Resolution::ProvidedContext {
@@ -309,7 +310,8 @@ mod tests {
             &self,
             spirit_id: &str,
             verb: LifecycleVerb,
-        ) -> Result<maos_domain::lifecycle::LifecycleReceipt, maos_domain::lifecycle::LifecycleError> {
+        ) -> Result<maos_domain::lifecycle::LifecycleReceipt, maos_domain::lifecycle::LifecycleError>
+        {
             if spirit_id == "unknown" {
                 return Err(maos_domain::lifecycle::LifecycleError::NotLoaded {
                     spirit_id: spirit_id.into(),
@@ -340,10 +342,7 @@ mod tests {
 
     #[test]
     fn session_start_replies_session_ready() {
-        let server = AcpServer::new(
-            Arc::new(MockLifecycleResolver),
-            Arc::new(MockHaltResolver),
-        );
+        let server = AcpServer::new(Arc::new(MockLifecycleResolver), Arc::new(MockHaltResolver));
         let sessions = server.session_registry();
 
         // Simulate a session start frame
@@ -364,10 +363,7 @@ mod tests {
 
     #[test]
     fn lifecycle_verb_forwards_to_resolver() {
-        let server = AcpServer::new(
-            Arc::new(MockLifecycleResolver),
-            Arc::new(MockHaltResolver),
-        );
+        let server = AcpServer::new(Arc::new(MockLifecycleResolver), Arc::new(MockHaltResolver));
         let sessions = server.session_registry();
 
         let input = r#"{"kind":"session_start","session_id":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"editor_id":"zed","editor_version":"1.0"}
@@ -389,10 +385,7 @@ mod tests {
 
     #[test]
     fn unknown_frame_kind_replies_error_session_stays_alive() {
-        let server = AcpServer::new(
-            Arc::new(MockLifecycleResolver),
-            Arc::new(MockHaltResolver),
-        );
+        let server = AcpServer::new(Arc::new(MockLifecycleResolver), Arc::new(MockHaltResolver));
         let sessions = server.session_registry();
 
         let input = r#"{"kind":"unknown","data":42}
@@ -413,10 +406,7 @@ mod tests {
 
     #[test]
     fn stdin_eof_implicit_session_end() {
-        let server = AcpServer::new(
-            Arc::new(MockLifecycleResolver),
-            Arc::new(MockHaltResolver),
-        );
+        let server = AcpServer::new(Arc::new(MockLifecycleResolver), Arc::new(MockHaltResolver));
         let sessions = server.session_registry();
 
         let mut output = Vec::new();

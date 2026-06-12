@@ -68,7 +68,9 @@ fn researcher_distillate_is_100pct_traceable() {
     let adapter = LogRecallAdapter::new(Arc::clone(&tl));
     let researcher = Researcher::new();
 
-    let frames = researcher.walk(&adapter, 10, LogRecallFilter::default()).unwrap(); // pid 10 = researcher
+    let frames = researcher
+        .walk(&adapter, 10, LogRecallFilter::default())
+        .unwrap(); // pid 10 = researcher
     let survey = researcher.survey(&frames);
     assert!(!survey.findings.is_empty());
 
@@ -76,8 +78,7 @@ fn researcher_distillate_is_100pct_traceable() {
     // walker (the same scoped fetch the kernel honors).
     let mut resolved = 0usize;
     for finding in &survey.findings {
-        let id = researcher::decode_frame_id_hex(&finding.source_log_ref)
-            .expect("cite decodes");
+        let id = researcher::decode_frame_id_hex(&finding.source_log_ref).expect("cite decodes");
         assert!(
             adapter.fetch(10, id).is_ok(),
             "cited frame {} must resolve",
@@ -110,7 +111,9 @@ fn researcher_digest_payload_has_zero_secret_leakage() {
     );
     let adapter = LogRecallAdapter::new(Arc::clone(&tl));
     let researcher = Researcher::new();
-    let frames = researcher.walk(&adapter, 10, LogRecallFilter::default()).unwrap();
+    let frames = researcher
+        .walk(&adapter, 10, LogRecallFilter::default())
+        .unwrap();
     let survey = researcher.survey(&frames);
 
     // The digest payload Researcher would persist (the I11 request payload).
@@ -136,9 +139,9 @@ fn planted_secret_in_a_digest_fires_redaction() {
     // proving the secret-leakage metric is LIVE, not a no-op. Built directly
     // (not routed through the TL — see the defense-in-depth test below for why a
     // TL-planted secret never even reaches the survey).
-    use std::collections::BTreeMap;
     use maos_domain::distillation::DigestPayload;
     use researcher::{Finding, SurveyOutput};
+    use std::collections::BTreeMap;
 
     let secret = "sk-ant-api03-59c8e3e277515a4ee1fbde7cb68810a4";
     let out = SurveyOutput {
@@ -154,8 +157,7 @@ fn planted_secret_in_a_digest_fires_redaction() {
         bibliography: vec![],
         scalars: BTreeMap::new(),
     };
-    let payload =
-        DigestPayload::Json(serde_json::to_value(&out).expect("survey serializes"));
+    let payload = DigestPayload::Json(serde_json::to_value(&out).expect("survey serializes"));
     let payload_bytes = serde_json::to_vec(&payload).unwrap();
 
     let policy = CorpusBackedRedactionPolicy::new();
@@ -164,7 +166,10 @@ fn planted_secret_in_a_digest_fires_redaction() {
     let fired = matches!(
         &redacted, Cow::Owned(b) if b != &payload_bytes[..]
     );
-    assert!(fired, "a planted sk-ant-api03- secret MUST fire redaction (live control)");
+    assert!(
+        fired,
+        "a planted sk-ant-api03- secret MUST fire redaction (live control)"
+    );
 }
 
 #[test]
@@ -178,7 +183,10 @@ fn tl_write_time_redaction_scrubs_secrets_before_the_survey() {
     seed(
         &tl,
         10,
-        &[("leak", "key sk-ant-api03-59c8e3e277515a4ee1fbde7cb68810a4 leaked")],
+        &[(
+            "leak",
+            "key sk-ant-api03-59c8e3e277515a4ee1fbde7cb68810a4 leaked",
+        )],
     );
     let adapter = LogRecallAdapter::new(Arc::clone(&tl));
     let frames = Researcher::new()

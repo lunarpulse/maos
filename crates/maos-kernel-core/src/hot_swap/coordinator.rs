@@ -257,8 +257,8 @@ impl HotSwapCoordinator {
         // Step 6: Encode + decode CBOR envelope.
         let encoded = state_codec::encode(&state_blob, predecessor_state_schema_version)
             .map_err(|e| HotSwapError::Internal(format!("state codec encode failed: {e}")))?;
-        let envelope = state_codec::decode(&encoded, successor_state_schema_version).map_err(
-            |e| match e {
+        let envelope =
+            state_codec::decode(&encoded, successor_state_schema_version).map_err(|e| match e {
                 // Story 5.2 review backfill: distinguish schema-version mismatch
                 // (legitimate SchemaIncompatible) from decode-level failures
                 // (malformed CBOR, missing fields). The latter is an Internal error,
@@ -270,8 +270,7 @@ impl HotSwapCoordinator {
                     }
                 }
                 other => HotSwapError::Internal(format!("state codec decode failed: {other}")),
-            },
-        )?;
+            })?;
 
         let payload = envelope.payload;
 

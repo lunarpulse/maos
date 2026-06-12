@@ -15,8 +15,8 @@
 //! other kernel services.
 
 // Pure modules — re-exported from maos-capability
-pub use maos_capability::cap_tokens;
 pub use maos_capability::cap_quota;
+pub use maos_capability::cap_tokens;
 
 // Hybrid modules — types from maos-capability, local extensions for
 // cross-cutting orchestration
@@ -223,7 +223,6 @@ impl CapabilityRegistryAdapter {
     pub fn working_memory(&self) -> &WorkingMemoryStore {
         &self.working_memory
     }
-
 
     /// Verify and audit a capability token.
     pub fn verify_and_audit(

@@ -4,13 +4,13 @@
 //!
 //! Validates the Ollama driver against fixture JSON files.
 
+use maos_domain::invariants::i1::{CapabilityToken, TokenId};
 use maos_domain::ports::inference::{
     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
     TokenUsage,
 };
-use maos_domain::invariants::i1::{CapabilityToken, TokenId};
-use maos_providers::Provider;
 use maos_providers::ollama::OllamaProvider;
+use maos_providers::Provider;
 
 struct MockTransport(Vec<u8>);
 
@@ -41,8 +41,7 @@ fn sample_request() -> InferenceRequest {
 
 #[test]
 fn ollama_round_trip_with_fixture_response() {
-    let fixture_bytes =
-        std::fs::read("tests/fixtures/ollama_success_response.json").unwrap();
+    let fixture_bytes = std::fs::read("tests/fixtures/ollama_success_response.json").unwrap();
     let transport = std::sync::Arc::new(MockTransport(fixture_bytes));
     let provider = OllamaProvider::new(
         transport,
@@ -60,8 +59,7 @@ fn ollama_round_trip_with_fixture_response() {
 
 #[test]
 fn ollama_round_trip_with_max_tokens_fixture() {
-    let fixture_bytes =
-        std::fs::read("tests/fixtures/ollama_max_tokens_response.json").unwrap();
+    let fixture_bytes = std::fs::read("tests/fixtures/ollama_max_tokens_response.json").unwrap();
     let transport = std::sync::Arc::new(MockTransport(fixture_bytes));
     let provider = OllamaProvider::new(
         transport,
@@ -77,8 +75,7 @@ fn ollama_round_trip_with_max_tokens_fixture() {
 
 #[test]
 fn ollama_round_trip_with_error_fixture() {
-    let fixture_bytes =
-        std::fs::read("tests/fixtures/ollama_error_response.json").unwrap();
+    let fixture_bytes = std::fs::read("tests/fixtures/ollama_error_response.json").unwrap();
     let transport = std::sync::Arc::new(MockTransport(fixture_bytes));
     let provider = OllamaProvider::new(
         transport,
@@ -90,5 +87,8 @@ fn ollama_round_trip_with_error_fixture() {
     // The Ollama error response fixture has `{"error": "model not found"}`.
     // parse_ollama_response expects `message.content` — the error fixture
     // should fail to parse as a success response, producing a Serde error.
-    assert!(result.is_err(), "error fixture should produce a ProviderError");
+    assert!(
+        result.is_err(),
+        "error fixture should produce a ProviderError"
+    );
 }

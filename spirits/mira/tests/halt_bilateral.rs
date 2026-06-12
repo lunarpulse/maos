@@ -19,11 +19,11 @@
 
 use std::sync::{Arc, Mutex};
 
+use maos_a2a::error::A2AError;
 use maos_a2a::{
     A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile, ConsentAllowlists,
     InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
 };
-use maos_a2a::error::A2AError;
 use maos_director_surface::halt_ui::{FlowState, HaltFlow, TapEvent};
 use maos_director_surface::notification::{
     NotificationChannel, NotificationDispatcher, NotificationError,
@@ -96,22 +96,22 @@ fn build_halt_harness() -> HaltHarness {
     let memory_root = tmp.path().join("memory");
     let journal_path = tmp.path().join("journal");
 
-    let tl = Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(
-        BOOT_NONCE,
-    ));
+    let tl = Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(BOOT_NONCE));
     let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
 
-    let capability = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
-        Arc::new(maos_kernel_core::api::RingCryptoProvider),
-        maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
-        BOOT_NONCE,
-        Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
-        maos_kernel_core::capability::cap_audit::channel().0,
-        maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
-        Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
-        Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
-    ));
+    let capability = Arc::new(
+        maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
+            BOOT_NONCE,
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            maos_kernel_core::capability::cap_audit::channel().0,
+            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
+        ),
+    );
     let orchestrator = Arc::new(
         maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
             Arc::clone(&capability),
@@ -266,10 +266,12 @@ fn advisory_frame(intent: IntentClass) -> IacFrame {
         // Story 8.8 (Option 2) — fail-closed is unconditional; populate the
         // canonical fine-grained intent (granter == from) so the cross-Host frame
         // is classified. (Pre-8.8 this was `None`/band-fallback.)
-        consent_envelope: Some(maos_domain::frame::ConsentEnvelope::with_fine_grained_intent(
-            from,
-            A2AIntent::new(ADVISORY_CONSENT_INTENT),
-        )),
+        consent_envelope: Some(
+            maos_domain::frame::ConsentEnvelope::with_fine_grained_intent(
+                from,
+                A2AIntent::new(ADVISORY_CONSENT_INTENT),
+            ),
+        ),
         intent_lineage: IntentLineage::default(),
     }
 }
@@ -317,16 +319,19 @@ async fn nash_informed_via_consent_and_non_allowlisted_intent_denied() {
     let router = pinned_router(&[ADVISORY_CONSENT_INTENT]).await;
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     router.install_intake_sink(tx).await;
-    LocalRouter::route_outbound(&*router, advisory_frame(IntentClass::Readonly), &HostId("host_b".into()))
-        .await
-        .expect("Nash informed via consent");
+    LocalRouter::route_outbound(
+        &*router,
+        advisory_frame(IntentClass::Readonly),
+        &HostId("host_b".into()),
+    )
+    .await
+    .expect("Nash informed via consent");
     let delivered = rx.recv().await.expect("advisory delivered to Nash");
     let goal = match &delivered.payload {
         FramePayload::TaskAssign(t) => t.goal.clone(),
         other => panic!("unexpected payload {other:?}"),
     };
-    let proposal = Nash::default()
-        .architect(&Nash::from_wire(&goal).expect("advisory off wire"));
+    let proposal = Nash::default().architect(&Nash::from_wire(&goal).expect("advisory off wire"));
     assert_eq!(proposal.subject, "edge-cache");
 
     // Negative — Nash refuses an intent not in its accept_allowlist (EIntentDenied).

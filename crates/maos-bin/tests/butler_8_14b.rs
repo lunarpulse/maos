@@ -126,9 +126,18 @@ fn shell_butler_pick_renders_option_messages() {
     let output = child.wait_with_output().expect("shell output");
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    assert!(stdout.contains("Linear note written"), "pick a renders Linear note: {stdout}");
-    assert!(stdout.contains("Slack message queued"), "pick b renders Slack reminder: {stdout}");
-    assert!(stdout.contains("snoozed"), "pick c renders snooze: {stdout}");
+    assert!(
+        stdout.contains("Linear note written"),
+        "pick a renders Linear note: {stdout}"
+    );
+    assert!(
+        stdout.contains("Slack message queued"),
+        "pick b renders Slack reminder: {stdout}"
+    );
+    assert!(
+        stdout.contains("snoozed"),
+        "pick c renders snooze: {stdout}"
+    );
     assert!(
         stdout.contains("no pending notification"),
         "pick x renders error: {stdout}"
@@ -146,9 +155,7 @@ struct RequestCapture {
     body: Vec<u8>,
 }
 
-fn spawn_mock_mcp_server(
-    responses: Vec<&'static str>,
-) -> (String, mpsc::Receiver<RequestCapture>) {
+fn spawn_mock_mcp_server(responses: Vec<&'static str>) -> (String, mpsc::Receiver<RequestCapture>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let (tx, rx) = mpsc::channel();
@@ -180,7 +187,11 @@ fn spawn_mock_mcp_server(
                     break;
                 }
             }
-            eprintln!("Mock server loop {} - read headers (bytes: {})", i, bytes.len());
+            eprintln!(
+                "Mock server loop {} - read headers (bytes: {})",
+                i,
+                bytes.len()
+            );
             if bytes.is_empty() {
                 break;
             }
@@ -235,7 +246,7 @@ fn butler_8_14b_mcp_drivers() {
         // calendar_events response
         r#"{"jsonrpc":"2.0","result":[{"id":"evt-c","title":"Conflict event 1","start_min":540,"end_min":600,"status":"confirmed"},{"id":"evt-d","title":"Conflict event 2","start_min":570,"end_min":630,"status":"confirmed"}],"id":1}"#,
         // comms_messages response
-        r#"{"jsonrpc":"2.0","result":[],"id":1}"#
+        r#"{"jsonrpc":"2.0","result":[],"id":1}"#,
     ]);
 
     let home = isolated_data_home("mcp_drivers");
@@ -317,7 +328,10 @@ fn butler_undeclared_tool_returns_capability_denied() {
             continue;
         }
         if in_mcp {
-            if line.starts_with("[[") || line.starts_with("[posture") || line.starts_with("[output_shape") {
+            if line.starts_with("[[")
+                || line.starts_with("[posture")
+                || line.starts_with("[output_shape")
+            {
                 in_mcp = false;
             } else {
                 continue;
@@ -332,7 +346,12 @@ fn butler_undeclared_tool_returns_capability_denied() {
     std::fs::write(&temp_manifest_path, new_manifest).unwrap();
 
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
-        .args(["run", temp_manifest_path.to_str().unwrap(), "--live", "--once"])
+        .args([
+            "run",
+            temp_manifest_path.to_str().unwrap(),
+            "--live",
+            "--once",
+        ])
         .env("XDG_DATA_HOME", home.path.clone())
         .env("MAOS_MCP_CALENDAR_URI", url)
         .current_dir(workspace_root())
@@ -346,4 +365,3 @@ fn butler_undeclared_tool_returns_capability_denied() {
         "expected capability scope mismatch or token issuance failure on calendar tool call. stderr was:\n{stderr}"
     );
 }
-

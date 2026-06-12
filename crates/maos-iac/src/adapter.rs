@@ -25,8 +25,6 @@ pub mod payload; // NEW — Story 6.4 typed payloads (ScheduleFireRecord)
 pub mod redaction;
 pub mod transparency_log; // NEW — Story 4.4 DistillateWriter
 
-
-
 pub use maos_domain::ports::IacBusPort;
 
 pub use channels::*;
@@ -67,9 +65,8 @@ pub struct IacBusAdapter {
     /// Populated at deliver_typed for cross-Spirit frames; read by retract() to
     /// carry the original lineage onto the emitted Retract frame.
     /// Bounded by session lifetime; eviction at MAX_LINEAGE_CACHE_ENTRIES.
-    frame_lineage_cache: std::sync::Arc<
-        dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>,
-    >,
+    frame_lineage_cache:
+        std::sync::Arc<dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>>,
     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
     #[cfg(feature = "spirit_test")]
     isolation_hook: Option<
@@ -474,8 +471,7 @@ impl IacBusAdapter {
         // Story 6.1 — use DRR scheduler if present, otherwise synchronous write.
         let to_spirit_id = frame.to.first().map_or("", |a| a.spirit_id.as_str());
         if let Some(ref drr) = self.drr_scheduler {
-            let lineage_bytes =
-                serde_json::to_vec(&frame.intent_lineage).unwrap_or_default();
+            let lineage_bytes = serde_json::to_vec(&frame.intent_lineage).unwrap_or_default();
             drr.submit(
                 frame.clone(),
                 payload_bytes,
@@ -667,18 +663,20 @@ impl IacBusAdapter {
             // But we need a frame_id for the companion table. Use a placeholder
             // that gets overwritten below in the check_and_mark call.
             let placeholder = [0u8; 16];
-            
+
             // Step 3.5: Atomically check-and-mark FIRST to avoid duplicate writes
-            if let Some(existing) = self.transparency_log
+            if let Some(existing) = self
+                .transparency_log
                 .check_and_mark_retracted(original_frame_id, placeholder)
                 .map_err(|e| {
                     maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
-                })? {
+                })?
+            {
                 return Ok(RetractOutcome::Already {
                     existing_retract_frame_id: existing,
                 });
             }
-            
+
             // Step 4: Log the retract frame (I2), routing through DRR if configured
             if let Some(ref drr) = self.drr_scheduler {
                 let payload_bytes = serde_json::to_vec(&retract_frame.payload).map_err(|e| {
@@ -703,7 +701,10 @@ impl IacBusAdapter {
                     transparency_log::FrameKind::Retract,
                     original_entry.spirit_pid,
                     retracting_spirit.as_str(),
-                    retract_frame.to.first().map_or("", |a| a.spirit_id.as_str()),
+                    retract_frame
+                        .to
+                        .first()
+                        .map_or("", |a| a.spirit_id.as_str()),
                     None,
                     "retract",
                     &payload_bytes,
@@ -712,9 +713,10 @@ impl IacBusAdapter {
                 self.transparency_log.last_frame_id()
             }
         };
-        
+
         // Update the companion table entry with the real retract_frame_id
-        let _ = self.transparency_log
+        let _ = self
+            .transparency_log
             .mark_retracted(original_frame_id, retract_frame_id)
             .map_err(|e| {
                 maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
@@ -732,9 +734,7 @@ impl IacBusAdapter {
 impl Default for IacBusAdapter {
     fn default() -> Self {
         Self {
-            mailbox: std::sync::Arc::new(Mailbox::new(std::sync::Arc::new(
-                IacRtMetrics::new(),
-            ))),
+            mailbox: std::sync::Arc::new(Mailbox::new(std::sync::Arc::new(IacRtMetrics::new()))),
             transparency_log: std::sync::Arc::new(TransparencyLogAdapter::open_in_memory(0)),
             drr_scheduler: None,
             digest_provider: std::sync::Arc::new(|_| {
@@ -791,9 +791,7 @@ mod decision_audit_tests {
     #[tokio::test]
     async fn i12_10_decision_frames_100_percent_carry_refs() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-        let mailbox = Arc::new(Mailbox::new(Arc::new(
-            IacRtMetrics::new(),
-        )));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
 
         // Register a target spirit so deliver_typed can route
@@ -842,9 +840,7 @@ mod decision_audit_tests {
     #[tokio::test]
     async fn i12_non_decision_frames_not_decorated() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-        let mailbox = Arc::new(Mailbox::new(Arc::new(
-            IacRtMetrics::new(),
-        )));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
 
         adapter
@@ -934,9 +930,7 @@ mod decision_audit_tests {
     #[tokio::test]
     async fn lineage_human_authored_cross_spirit_auto_populates() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-        let mailbox = Arc::new(Mailbox::new(Arc::new(
-            IacRtMetrics::new(),
-        )));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
         let _target_handle = adapter
             .register_spirit_typed(&SpiritId::from("spirit-b"))
@@ -957,9 +951,7 @@ mod decision_audit_tests {
     #[tokio::test]
     async fn lineage_spirit_auto_cross_spirit_empty_lineage_rejected() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-        let mailbox = Arc::new(Mailbox::new(Arc::new(
-            IacRtMetrics::new(),
-        )));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
         let _target_handle = adapter
             .register_spirit_typed(&SpiritId::from("spirit-b"))
@@ -987,9 +979,7 @@ mod decision_audit_tests {
     #[tokio::test]
     async fn lineage_spirit_auto_cross_spirit_non_empty_lineage_succeeds() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-        let mailbox = Arc::new(Mailbox::new(Arc::new(
-            IacRtMetrics::new(),
-        )));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
         let _target_handle = adapter
             .register_spirit_typed(&SpiritId::from("spirit-b"))
@@ -1010,9 +1000,7 @@ mod decision_audit_tests {
     #[tokio::test]
     async fn lineage_same_spirit_empty_lineage_spirit_auto_succeeds() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-        let mailbox = Arc::new(Mailbox::new(Arc::new(
-            IacRtMetrics::new(),
-        )));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
         let _target_handle = adapter
             .register_spirit_typed(&SpiritId::from("spirit-a"))
@@ -1035,9 +1023,7 @@ mod decision_audit_tests {
     #[tokio::test]
     async fn lineage_broadcast_empty_to_succeeds() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-        let mailbox = Arc::new(Mailbox::new(Arc::new(
-            IacRtMetrics::new(),
-        )));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
 
         let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
@@ -1052,9 +1038,7 @@ mod decision_audit_tests {
     #[tokio::test]
     async fn lineage_human_authored_non_empty_lineage_not_overwritten() {
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-        let mailbox = Arc::new(Mailbox::new(Arc::new(
-            IacRtMetrics::new(),
-        )));
+        let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
         let adapter = IacBusAdapter::new(mailbox, log.clone());
         let _target_handle = adapter
             .register_spirit_typed(&SpiritId::from("spirit-b"))

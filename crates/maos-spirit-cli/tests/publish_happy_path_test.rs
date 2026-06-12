@@ -8,7 +8,9 @@ use std::os::unix::fs::PermissionsExt;
 use maos_domain::ports::registry::SpiritRegistryClient;
 use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
 use maos_spirit_abi::compliance::{ComplianceClaimEnvelope, SigningAlg};
-use maos_spirit_cli::publish::{build_signed_package, run_publish_with_client, PublishArgs, PublishOutcome};
+use maos_spirit_cli::publish::{
+    build_signed_package, run_publish_with_client, PublishArgs, PublishOutcome,
+};
 
 fn write_temp(contents: &[u8], suffix: &str) -> std::path::PathBuf {
     let mut path = std::env::temp_dir();
@@ -111,7 +113,9 @@ fn dry_run_prints_signed_package_without_dispatch() {
 
     let outcome = run_publish_with_client(&args, &client).expect("dry-run failed");
     match outcome {
-        PublishOutcome::DryRun { signed_package_summary } => {
+        PublishOutcome::DryRun {
+            signed_package_summary,
+        } => {
             assert_eq!(signed_package_summary.spirit_id, "test-spirit");
             assert_eq!(signed_package_summary.signature_hex.len(), 128);
             assert_eq!(signed_package_summary.publisher_pubkey_hex.len(), 64);
@@ -192,7 +196,10 @@ fn build_signed_package_produces_valid_signature_envelope() {
     assert_eq!(pkg.spirit_id.as_str(), "test-spirit");
     assert_eq!(pkg.version, "0.1.0");
     // Auto-populated envelope is self-attested: attester_pubkey == publisher_pubkey.
-    assert_eq!(pkg.compliance_envelope.attester_pubkey, pkg.publisher_pubkey);
+    assert_eq!(
+        pkg.compliance_envelope.attester_pubkey,
+        pkg.publisher_pubkey
+    );
     // Envelope signature must be exactly 64 bytes.
     assert_eq!(pkg.compliance_envelope.signature.len(), 64);
 }

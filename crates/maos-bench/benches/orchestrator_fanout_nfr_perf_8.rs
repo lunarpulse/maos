@@ -102,8 +102,7 @@ fn make_task_assign(seq: u64, worker_id: usize) -> IacFrame {
 fn run_fanout(rt: &Runtime) -> (JourneyResult, u64) {
     let dropped = Arc::new(AtomicU64::new(0));
     let semaphore = Arc::new(Semaphore::new(FAN_OUT));
-    let samples: Arc<parking_lot::Mutex<Vec<u64>>> =
-        Arc::new(parking_lot::Mutex::new(Vec::new()));
+    let samples: Arc<parking_lot::Mutex<Vec<u64>>> = Arc::new(parking_lot::Mutex::new(Vec::new()));
     let target = target_duration();
 
     rt.block_on(async {
@@ -233,7 +232,12 @@ fn main() {
         std::env::var("GITHUB_SHA").unwrap_or_else(|_| "untracked".into()),
         vec![journey.clone()],
         DecisionRecord::new(
-            if journey.budget_met { "pass" } else { "soft-fail" }.into(),
+            if journey.budget_met {
+                "pass"
+            } else {
+                "soft-fail"
+            }
+            .into(),
             journey.budget_met,
             dropped == 0,
             true, // j6 not measured here

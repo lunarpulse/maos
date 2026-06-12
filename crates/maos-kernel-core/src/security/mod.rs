@@ -157,29 +157,29 @@ impl SecurityManagerAdapter {
     ///
     /// Story 2.1: added `caps_required` parameter for capability-declaration
     /// → policy-table wiring (replaces hardcoded injection in `maos-bin`).
-     pub fn admit_spirit(
-         &self,
-         spirit_pid: u32,
-         spirit_id: &str,
-         _manifest: &SandboxConfig,
-         caps: &ResourceCaps,
-         caps_required: &CapabilitiesRequired,
-         output_shape: Option<&OutputShape>,
-         journal: &dyn SpiritSchedulerPort,
-         posture_section: &PostureSection,
-         epistemic_policy: Option<&EpistemicPolicySection>,
-         _scheduling: Option<&SchedulingSection>,
-         _lifecycle: Option<&LifecycleSection>,
-         _on_crash: Option<&OnCrashSection>,
-         _supervision: Option<&SupervisionSection>,
-         providers: Option<&ProvidersSection>,
-          // Story 7.5a — the `[class]` section carries the ABI Stability Triple
-          // legs enforced at load: `min_substrate_version` (vs running kernel)
-          // and `manifest_schema_version` (vs the kernel's supported window).
-          // Required at parse time AND admission — None is rejected with
-          // EClassRequired (no silent bypass).
-          class: Option<&ClassSection>,
-     ) -> Result<SandboxSpec, SecurityError> {
+    pub fn admit_spirit(
+        &self,
+        spirit_pid: u32,
+        spirit_id: &str,
+        _manifest: &SandboxConfig,
+        caps: &ResourceCaps,
+        caps_required: &CapabilitiesRequired,
+        output_shape: Option<&OutputShape>,
+        journal: &dyn SpiritSchedulerPort,
+        posture_section: &PostureSection,
+        epistemic_policy: Option<&EpistemicPolicySection>,
+        _scheduling: Option<&SchedulingSection>,
+        _lifecycle: Option<&LifecycleSection>,
+        _on_crash: Option<&OnCrashSection>,
+        _supervision: Option<&SupervisionSection>,
+        providers: Option<&ProvidersSection>,
+        // Story 7.5a — the `[class]` section carries the ABI Stability Triple
+        // legs enforced at load: `min_substrate_version` (vs running kernel)
+        // and `manifest_schema_version` (vs the kernel's supported window).
+        // Required at parse time AND admission — None is rejected with
+        // EClassRequired (no silent bypass).
+        class: Option<&ClassSection>,
+    ) -> Result<SandboxSpec, SecurityError> {
         // ---- Story 7.5a (AC2) — ABI Stability Triple enforcement.
         // Runs at the TOP of admit, BEFORE any policy-table mutation below, so a
         // rejected Spirit leaves NO half-admitted state. Reuses the hand-rolled
@@ -300,10 +300,12 @@ impl SecurityManagerAdapter {
             let lock = crate::security::sandbox::t3::image_lock::T3ImageLock::load_default()
                 .map_err(|e| SecurityError::T3AdmissionFailed(e.to_string()))?;
             if let Some(ref image_pin) = _manifest.image_pin {
-                lock.resolve_pin(image_pin)
-                    .ok_or_else(|| SecurityError::T3AdmissionFailed(
-                        format!("sandbox.image_pin '{}' not present in t3-image.lock", image_pin)
-                    ))?;
+                lock.resolve_pin(image_pin).ok_or_else(|| {
+                    SecurityError::T3AdmissionFailed(format!(
+                        "sandbox.image_pin '{}' not present in t3-image.lock",
+                        image_pin
+                    ))
+                })?;
             } else {
                 lock.default_attestation()
                     .map_err(|e| SecurityError::T3AdmissionFailed(e.to_string()))?;

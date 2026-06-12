@@ -52,16 +52,29 @@ fn init_creates_config_and_dirs() {
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos init");
-    assert!(out.status.success(), "init should succeed: {}", String::from_utf8_lossy(&out.stderr));
-    assert!(home.join("config.toml").exists(), "config.toml should exist");
+    assert!(
+        out.status.success(),
+        "init should succeed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        home.join("config.toml").exists(),
+        "config.toml should exist"
+    );
     assert!(home.join("skills").is_dir(), "skills dir should exist");
     assert!(home.join("audit").is_dir(), "audit dir should exist");
     assert!(home.join("journal").is_dir(), "journal dir should exist");
     assert!(home.join("logs").is_dir(), "logs dir should exist");
     let cfg = std::fs::read_to_string(home.join("config.toml")).unwrap();
     assert!(cfg.contains("[slots]"), "config should declare slots");
-    assert!(cfg.contains("[retention]"), "config should declare retention");
-    assert!(cfg.contains("default = \"persist\""), "retention default should be persist");
+    assert!(
+        cfg.contains("[retention]"),
+        "config should declare retention"
+    );
+    assert!(
+        cfg.contains("default = \"persist\""),
+        "retention default should be persist"
+    );
     let _ = std::fs::remove_dir_all(&home);
 }
 
@@ -76,7 +89,11 @@ fn init_is_idempotent() {
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos init");
-    assert!(out1.status.success(), "first init: {}", String::from_utf8_lossy(&out1.stderr));
+    assert!(
+        out1.status.success(),
+        "first init: {}",
+        String::from_utf8_lossy(&out1.stderr)
+    );
     let before = std::fs::read_to_string(home.join("config.toml")).unwrap();
     // Second init — should say already initialized and NOT clobber.
     let out2 = Command::new(&bin)
@@ -87,7 +104,10 @@ fn init_is_idempotent() {
         .expect("failed to execute maos init again");
     assert!(out2.status.success(), "second init should succeed");
     let stdout = String::from_utf8_lossy(&out2.stdout);
-    assert!(stdout.contains("already initialized"), "second init should say already initialized: {stdout}");
+    assert!(
+        stdout.contains("already initialized"),
+        "second init should say already initialized: {stdout}"
+    );
     let after = std::fs::read_to_string(home.join("config.toml")).unwrap();
     assert_eq!(before, after, "config should not be clobbered");
     let _ = std::fs::remove_dir_all(&home);

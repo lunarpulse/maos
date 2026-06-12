@@ -317,7 +317,7 @@ fn lifecycle_verb(verb: &str, spirit: Option<&str>, color: ColorChoice) -> ExitC
         }
     };
 
-    if let Err(diag) = resolve_spirit_pid(name) {
+    if let Err(diag) = resolve_spirit_pid(name, &default_transparency_log_path(), false) {
         eprintln!("maosctl: {verb} — {diag}");
         return ExitCode::from(2);
     }
@@ -347,7 +347,7 @@ fn lifecycle_verb(verb: &str, spirit: Option<&str>, color: ColorChoice) -> ExitC
 }
 
 fn dispatch_posture(args: &PostureArgs, color: ColorChoice) -> ExitCode {
-    if let Err(diag) = resolve_spirit_pid(&args.spirit) {
+    if let Err(diag) = resolve_spirit_pid(&args.spirit, &default_transparency_log_path(), false) {
         eprintln!("maosctl: posture — {diag}");
         return ExitCode::from(2);
     }
@@ -389,7 +389,7 @@ fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
             cmd.env("MAOS_ONE_SHOT", "halt-list");
             cmd.env("MAOS_HALT_LIMIT", limit.to_string());
             if let Some(s) = spirit {
-                if let Err(diag) = resolve_spirit_pid(s) {
+                if let Err(diag) = resolve_spirit_pid(s, &default_transparency_log_path(), false) {
                     eprintln!("maosctl: halt list — {diag}");
                     return ExitCode::from(2);
                 }
@@ -417,7 +417,7 @@ fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
             text,
             operator_policy,
         } => {
-            if let Err(diag) = resolve_spirit_pid(spirit) {
+            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
                 eprintln!("maosctl: halt resolve — {diag}");
                 return ExitCode::from(2);
             }
@@ -470,7 +470,7 @@ fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
 }
 
 fn dispatch_pause(args: &PauseArgs, color: ColorChoice) -> ExitCode {
-    if let Err(diag) = resolve_spirit_pid(&args.spirit) {
+    if let Err(diag) = resolve_spirit_pid(&args.spirit, &default_transparency_log_path(), false) {
         eprintln!("maosctl: pause — {diag}");
         return ExitCode::from(2);
     }
@@ -498,7 +498,7 @@ fn dispatch_pause(args: &PauseArgs, color: ColorChoice) -> ExitCode {
 }
 
 fn dispatch_resume(args: &ResumeArgs, color: ColorChoice) -> ExitCode {
-    if let Err(diag) = resolve_spirit_pid(&args.spirit) {
+    if let Err(diag) = resolve_spirit_pid(&args.spirit, &default_transparency_log_path(), false) {
         eprintln!("maosctl: resume — {diag}");
         return ExitCode::from(2);
     }
@@ -531,7 +531,7 @@ fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCod
             spirit,
             instruction,
         } => {
-            if let Err(diag) = resolve_spirit_pid(spirit) {
+            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
                 eprintln!("maosctl: orchestrator queue — {diag}");
                 return ExitCode::from(2);
             }
@@ -563,7 +563,7 @@ fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCod
             }
         }
         OrchestratorOp::Status { spirit } => {
-            if let Err(diag) = resolve_spirit_pid(spirit) {
+            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
                 eprintln!("maosctl: orchestrator status — {diag}");
                 return ExitCode::from(2);
             }
@@ -694,7 +694,7 @@ fn dispatch_revocations(args: &RevocationsArgs, color: ColorChoice) -> ExitCode 
 fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
     match &args.op {
         SpiritOp::HotSwapPrecheck { spirit, from, to } => {
-            if let Err(diag) = resolve_spirit_pid(spirit) {
+            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
                 eprintln!("maosctl: spirit hot-swap-precheck — {diag}");
                 return ExitCode::from(1);
             }
@@ -733,7 +733,7 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
             }
         }
         SpiritOp::Upgrade { spirit, to, policy } => {
-            if let Err(diag) = resolve_spirit_pid(spirit) {
+            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
                 eprintln!("maosctl: spirit upgrade — {diag}");
                 return ExitCode::from(1);
             }
@@ -778,7 +778,7 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
                 eprintln!("maos: spirit inspect requires --sandbox at v0.3-β; full inspect surface arrives at Story 9.x");
                 return ExitCode::SUCCESS;
             }
-            if let Err(diag) = resolve_spirit_pid(spirit) {
+            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
                 eprintln!("maos: {diag}");
                 return ExitCode::from(2);
             }
@@ -832,38 +832,211 @@ fn maos_bin_path() -> PathBuf {
 fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCode {
     match query_kind {
         // Bare `maosctl audit` — defaults to ndjson over all entries.
-        None => audit_query(None, AuditFormat::Ndjson, color),
-        Some(AuditQuery::Query { spirit, format }) => {
-            audit_query(spirit.as_deref(), *format, color)
+        None => audit_query(
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            AuditFormat::Ndjson,
+            color,
+        ),
+        Some(AuditQuery::Query {
+            spirit,
+            format,
+            range,
+            frame_kind,
+            intent_contains,
+            capability,
+            boot,
+            all_boots,
+            tag,
+        }) => {
+            if let Some(_tag_val) = tag {
+                eprintln!("maosctl: audit query — --tag is reserved; use --intent-contains for substring matching on the intent column");
+                return ExitCode::from(2);
+            }
+            audit_query(
+                spirit.as_deref(),
+                range.as_deref(),
+                frame_kind.as_deref(),
+                intent_contains.as_deref(),
+                capability.as_deref(),
+                boot.as_ref().copied(),
+                *all_boots,
+                None,
+                *format,
+                color,
+            )
         }
+        Some(AuditQuery::SealedExport {
+            spirit,
+            range,
+            output,
+            audit_key,
+        }) => audit_sealed_export(
+            spirit.as_deref(),
+            range.as_deref(),
+            output,
+            audit_key,
+            color,
+        ),
+        Some(AuditQuery::Keygen { output }) => audit_keygen(output),
+        Some(AuditQuery::VerifyBundle { bundle, pubkey }) => audit_verify_bundle(bundle, pubkey),
+        Some(AuditQuery::SubjectAccess { principal, format }) => {
+            audit_subject_access(principal, *format, color)
+        }
+        Some(AuditQuery::PostureDelta {
+            range,
+            spirit,
+            format,
+        }) => audit_posture_delta(range, spirit.as_deref(), *format, color),
     }
 }
 
-/// Resolve a Spirit name to its `spirit_pid` for filtering. At v0.1-β only
-/// `hello-spirit` is resolvable (maps to `0` per Story 1b.5a's one-shot path).
-/// Other names exit non-zero with a clear diagnostic — full Spirit registry
-/// lookup is Epic 5.
-fn resolve_spirit_pid(name: &str) -> Result<u32, String> {
-    match name {
-        "hello-spirit" => Ok(0),
-        other => Err(format!(
-            "unknown spirit, only 'hello-spirit' is available at v0.1-β (got '{other}')"
-        )),
+/// Resolve a Spirit name to one or more `(boot_nonce, spirit_pid)` pairs.
+///
+/// Delegates to [`maos_audit::resolve_spirit_name`] which scans the TL for
+/// `lifecycle.admit`/`lifecycle.load` intents. Per Decision E: keyed on
+/// `(boot_nonce, spirit_pid)` to discriminate pid reuse across boots.
+/// Default: latest boot (max boot_nonce). `all_boots` unions all incarnations.
+///
+/// Returns a Vec with 1 element normally, or multiple for `--all-boots`.
+/// Unknown names exit non-zero with a clear diagnostic.
+fn resolve_spirit_pid(
+    name: &str,
+    db_path: &std::path::Path,
+    all_boots: bool,
+) -> Result<Vec<(u64, u32)>, String> {
+    maos_audit::resolve_spirit_name(db_path, name, all_boots)
+}
+
+/// Parse a range string into `(since_ns, until_ns)` relative to now.
+///
+/// Supports: "30d", "7d", "24h", "1h" (relative from now) or an absolute
+/// nanosecond timestamp (all-digit string).
+fn parse_range(range: &str) -> Result<(Option<u64>, Option<u64>), String> {
+    let now_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+
+    if range.ends_with('d') {
+        let days: u64 = range[..range.len() - 1]
+            .parse()
+            .map_err(|_| format!("invalid range '{range}': expected number before 'd'"))?;
+        let ns = days
+            .checked_mul(24 * 60 * 60 * 1_000_000_000)
+            .ok_or_else(|| {
+                format!("invalid range '{range}': overflow converting {days} days to nanoseconds")
+            })?;
+        Ok((Some(now_ns.saturating_sub(ns)), None))
+    } else if range.ends_with('h') {
+        let hours: u64 = range[..range.len() - 1]
+            .parse()
+            .map_err(|_| format!("invalid range '{range}': expected number before 'h'"))?;
+        let ns = hours.checked_mul(60 * 60 * 1_000_000_000).ok_or_else(|| {
+            format!("invalid range '{range}': overflow converting {hours} hours to nanoseconds")
+        })?;
+        Ok((Some(now_ns.saturating_sub(ns)), None))
+    } else if range.chars().all(|c| c.is_ascii_digit()) {
+        let abs: u64 = range
+            .parse()
+            .map_err(|_| format!("invalid range '{range}': expected nanosecond timestamp"))?;
+        Ok((Some(abs), None))
+    } else {
+        Err(format!(
+            "invalid range '{range}': use relative (e.g. '30d', '1h') or absolute nanoseconds"
+        ))
     }
 }
 
-fn audit_query(spirit: Option<&str>, format: AuditFormat, _color: ColorChoice) -> ExitCode {
+#[allow(clippy::too_many_arguments)]
+fn audit_query(
+    spirit: Option<&str>,
+    range: Option<&str>,
+    frame_kind: Option<&str>,
+    intent_contains: Option<&str>,
+    capability: Option<&str>,
+    boot: Option<u64>,
+    all_boots: bool,
+    _tag: Option<&str>,
+    format: AuditFormat,
+    _color: ColorChoice,
+) -> ExitCode {
     let db_path = default_transparency_log_path();
 
     let mut filter = maos_audit::AuditFilter::default();
+    // Collect all (boot_nonce, spirit_pid) pairs for client-side filtering
+    // when --all-boots resolves to multiple incarnations.
+    let mut multi_boot_pairs: Option<std::collections::HashSet<(u64, u32)>> = None;
     if let Some(name) = spirit {
-        match resolve_spirit_pid(name) {
-            Ok(pid) => filter.spirit_pid = Some(pid),
+        match resolve_spirit_pid(name, &db_path, all_boots) {
+            Ok(pairs) => {
+                if pairs.len() == 1 {
+                    filter.spirit_pid = Some(pairs[0].1);
+                    filter.boot_nonce = Some(pairs[0].0);
+                } else if !pairs.is_empty() {
+                    // Multiple incarnations: collect all (boot, pid) pairs and
+                    // filter client-side so no incarnation is silently dropped.
+                    multi_boot_pairs = Some(
+                        pairs
+                            .iter()
+                            .copied()
+                            .collect::<std::collections::HashSet<_>>(),
+                    );
+                    // Set spirit_pid only if all pairs share the same pid; otherwise
+                    // query without pid filter and rely on client-side filtering.
+                    let unique_pids: std::collections::HashSet<u32> =
+                        pairs.iter().map(|(_, pid)| *pid).collect();
+                    if unique_pids.len() == 1 {
+                        filter.spirit_pid = Some(pairs[0].1);
+                    }
+                    // Do NOT set boot_nonce — client-side filter handles it.
+                }
+            }
             Err(diag) => {
                 eprintln!("maosctl: audit query — {diag}");
                 return ExitCode::from(2);
             }
         }
+    }
+
+    // Parse range filter
+    if let Some(range_str) = range {
+        match parse_range(range_str) {
+            Ok((since, until)) => {
+                filter.since_ns = since;
+                if let Some(u) = until {
+                    filter.until_ns = Some(u);
+                }
+            }
+            Err(e) => {
+                eprintln!("maosctl: audit query — {e}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    // FR41 new filter fields
+    filter.kind = frame_kind.map(|s| s.to_string());
+    filter.intent_contains = intent_contains.map(|s| s.to_string());
+    filter.capability_token = capability.map(|s| s.to_string());
+    if let Some(b) = boot {
+        if filter.boot_nonce.is_some() && filter.boot_nonce != Some(b) {
+            eprintln!(
+                "maosctl: audit query — --boot {b} conflicts with boot {} resolved from spirit name; \
+                 using explicit --boot value",
+                filter.boot_nonce.unwrap()
+            );
+        }
+        filter.boot_nonce = Some(b);
+        // When --boot is explicit, clear multi-boot client-side filter
+        // since the single boot is now the authoritative scope.
+        multi_boot_pairs = None;
     }
 
     let entries = match maos_audit::query(&db_path, filter) {
@@ -882,19 +1055,18 @@ fn audit_query(spirit: Option<&str>, format: AuditFormat, _color: ColorChoice) -
         }
     };
 
+    // Client-side filtering for multi-boot unions: only keep entries whose
+    // (boot_nonce, spirit_pid) matches one of the resolved incarnations.
+    let entries = match multi_boot_pairs {
+        Some(ref pair_set) => entries
+            .into_iter()
+            .filter(|e| pair_set.contains(&(e.boot_nonce, e.spirit_pid)))
+            .collect(),
+        None => entries,
+    };
+
     let stdout = std::io::stdout();
     let lock = stdout.lock();
-    // FR4 projection engages only when the operator scopes the query to a
-    // Spirit (`--spirit <name>`). Bare `maosctl audit query` keeps the
-    // legacy raw `AuditEntry` NDJSON surface (Story 1b.1 / `to_ndjson`) so
-    // existing tooling (e.g. `tests/integration/audit_spine_smoke.sh`)
-    // observing `frame_id`/`intent` continues to work. AC1 mandates the
-    // FR4 six-key schema for the `--spirit` form specifically; the bare
-    // form remains Story 9.1's territory.
-    //
-    // `_color` is currently advisory — both formats already emit zero ANSI
-    // bytes unconditionally. Wired through for future colored ndjson keys
-    // (Story 9.1) and to document the contract.
     let fr4_mode = spirit.is_some();
     let write_result = match (fr4_mode, format) {
         (true, AuditFormat::Ndjson) => maos_audit::to_fr4_ndjson(entries, lock),
@@ -918,6 +1090,461 @@ fn audit_query(spirit: Option<&str>, format: AuditFormat, _color: ColorChoice) -
             ExitCode::from(2)
         }
     }
+}
+
+// ─── FR44: Sealed Export, Keygen, VerifyBundle ──────────────────────────────
+
+/// FR44 — produce a signed sealed-export bundle.
+fn audit_sealed_export(
+    spirit: Option<&str>,
+    range: Option<&str>,
+    output: &Option<PathBuf>,
+    audit_key: &Option<PathBuf>,
+    _color: ColorChoice,
+) -> ExitCode {
+    // Load audit signing key
+    let seed = match maos_domain::audit_key::load_audit_key_seed(audit_key) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("maosctl: audit sealed-export — {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    // Query audit entries
+    let db_path = default_transparency_log_path();
+    let mut filter = maos_audit::AuditFilter::default();
+    if let Some(name) = spirit {
+        match resolve_spirit_pid(name, &db_path, false) {
+            Ok(pairs) => {
+                if let Some(pair) = pairs.first() {
+                    filter.spirit_pid = Some(pair.1);
+                    filter.boot_nonce = Some(pair.0);
+                }
+            }
+            Err(diag) => {
+                eprintln!("maosctl: audit sealed-export — {diag}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    // Patch 3: honor --range when selecting entries for the bundle
+    if let Some(range_str) = range {
+        match parse_range(range_str) {
+            Ok((since, until)) => {
+                filter.since_ns = since;
+                if let Some(u) = until {
+                    filter.until_ns = Some(u);
+                }
+            }
+            Err(e) => {
+                eprintln!("maosctl: audit sealed-export — {e}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    let entries = match maos_audit::query(&db_path, filter) {
+        Ok(e) => e,
+        Err(maos_audit::AuditError::Open(_)) => {
+            eprintln!(
+                "maosctl: audit sealed-export — no Transparency Log found at {}. \
+                 Run `maosctl run hello-spirit` first to seed the log.",
+                db_path.display()
+            );
+            return ExitCode::from(2);
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit sealed-export — error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    // Build freshness metadata
+    let now_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    let since_ns = entries.iter().map(|e| e.timestamp_ns).min().unwrap_or(0);
+    let until_ns = entries
+        .iter()
+        .map(|e| e.timestamp_ns)
+        .max()
+        .unwrap_or(now_ns);
+
+    let freshness = maos_audit::sealed_export::FreshnessMetadata {
+        export_timestamp_ns: now_ns,
+        covered_window: maos_audit::sealed_export::CoveredWindow { since_ns, until_ns },
+        export_seq: now_ns, // Patch 2: monotonic via nanosecond timestamp
+    };
+
+    // Patch 1: populate I12 digest refs and I11 distilled content from
+    // actual distillate frames in the queried entries, rather than empty vecs.
+    let i12_refs: Vec<String> = entries
+        .iter()
+        .filter(|e| e.kind == "distillate")
+        .map(|e| e.frame_id_hex.clone())
+        .collect();
+
+    let i11_content: Vec<maos_audit::sealed_export::I11Content> = entries
+        .iter()
+        .filter(|e| e.kind == "distillate")
+        .map(|e| maos_audit::sealed_export::I11Content {
+            source_log_ref: vec![e.frame_id_hex.clone()],
+            distillation_depth: 1,
+        })
+        .collect();
+
+    let unsigned =
+        maos_audit::sealed_export::build_bundle(entries, i12_refs, i11_content, freshness);
+
+    let signed = match maos_audit::sealed_export::sign_bundle(unsigned, &seed) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("maosctl: audit sealed-export — signing error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let json_bytes = match serde_json::to_string_pretty(&signed) {
+        Ok(s) => s.into_bytes(),
+        Err(e) => {
+            eprintln!("maosctl: audit sealed-export — serialization error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    match output {
+        Some(path) => {
+            if let Some(parent) = path.parent() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    eprintln!("maosctl: audit sealed-export — cannot create output dir: {e}");
+                    return ExitCode::from(2);
+                }
+            }
+            if let Err(e) = std::fs::write(path, &json_bytes) {
+                eprintln!("maosctl: audit sealed-export — write error: {e}");
+                return ExitCode::from(2);
+            }
+            let pubkey = maos_audit::sealed_export::derive_pubkey(&seed);
+            eprintln!(
+                "maosctl: sealed export written to {} ({} entries, pubkey {})",
+                path.display(),
+                signed.entries.len(),
+                hex::encode(pubkey),
+            );
+        }
+        None => {
+            use std::io::Write;
+            let stdout = std::io::stdout();
+            if let Err(e) = stdout.lock().write_all(&json_bytes) {
+                eprintln!("maosctl: audit sealed-export — write error: {e}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    ExitCode::SUCCESS
+}
+
+/// FR44 — generate an Ed25519 audit signing key.
+fn audit_keygen(output: &Option<PathBuf>) -> ExitCode {
+    match maos_domain::audit_key::generate_audit_key(output) {
+        Ok(fingerprint) => {
+            let path = output
+                .clone()
+                .unwrap_or_else(maos_domain::audit_key::default_audit_key_path);
+            eprintln!(
+                "maosctl: audit keygen — key written to {} (fingerprint: {fingerprint})",
+                path.display(),
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit keygen — {e}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+/// FR44 — verify a sealed-export bundle.
+fn audit_verify_bundle(bundle: &PathBuf, pubkey_arg: &str) -> ExitCode {
+    // Read bundle
+    let bundle_bytes = match std::fs::read_to_string(bundle) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("maosctl: audit verify-bundle — read error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let bundle: maos_audit::sealed_export::AuditBundle = match serde_json::from_str(&bundle_bytes) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("maosctl: audit verify-bundle — invalid bundle JSON: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    // Resolve public key: distinguish file path from hex string.
+    // A hex pubkey is exactly 64 hex chars (32 bytes). A file path typically
+    // has an extension or directory separator — use that as the discriminator.
+    let pubkey_hex = {
+        let path = std::path::Path::new(pubkey_arg);
+        // Treat as file if it has a file extension (.hex, .pub, .txt, etc.)
+        // or contains a directory separator — avoids treating hex strings as
+        // file paths on systems where a 64-char hex string happens to name a
+        // real filesystem entry.
+        let looks_like_file = path.extension().is_some()
+            || pubkey_arg.contains('/')
+            || pubkey_arg.contains(std::path::MAIN_SEPARATOR);
+        if looks_like_file && path.exists() {
+            match std::fs::read_to_string(pubkey_arg) {
+                Ok(s) => s.trim().to_string(),
+                Err(e) => {
+                    eprintln!(
+                        "maosctl: audit verify-bundle — cannot read pubkey file '{}': {e}",
+                        pubkey_arg
+                    );
+                    return ExitCode::from(2);
+                }
+            }
+        } else if looks_like_file {
+            eprintln!(
+                "maosctl: audit verify-bundle — pubkey file '{}' not found",
+                pubkey_arg
+            );
+            return ExitCode::from(2);
+        } else {
+            pubkey_arg.to_string()
+        }
+    };
+
+    let pubkey_bytes: [u8; 32] = match hex::decode(&pubkey_hex)
+        .map_err(|e| format!("invalid pubkey hex: {e}"))
+        .and_then(|bytes| bytes.try_into().map_err(|bytes: Vec<u8>| {
+            format!(
+                "wrong pubkey length: expected 32 bytes (64 hex chars), got {} bytes ({} hex chars)",
+                bytes.len(),
+                pubkey_hex.len()
+            )
+        })) {
+        Ok(arr) => arr,
+        Err(e) => {
+            eprintln!("maosctl: audit verify-bundle — {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    match maos_audit::sealed_export::verify_bundle(&bundle, &pubkey_bytes) {
+        Ok(()) => {
+            eprintln!(
+                "maosctl: audit verify-bundle — OK ({} entries, seq {})",
+                bundle.entries.len(),
+                bundle.freshness.export_seq,
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit verify-bundle — verification failed: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+// ─── FR42: Subject Access ──────────────────────────────────────────────
+
+/// FR42 — subject-access query: retrieve all principal_index rows for a
+/// given principal, enriched with provenance and spirit-name resolution.
+fn audit_subject_access(principal: &str, format: AuditFormat, _color: ColorChoice) -> ExitCode {
+    let db_path = default_transparency_log_path();
+
+    let raw_entries = match maos_audit::subject_access_query(&db_path, principal) {
+        Ok(e) => e,
+        Err(maos_audit::AuditError::Open(_)) => {
+            eprintln!(
+                "maosctl: audit subject-access — no Transparency Log found at {}. \
+                 Run `maosctl run hello-spirit` first to seed the log.",
+                db_path.display()
+            );
+            return ExitCode::from(2);
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit subject-access — error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let enriched = match maos_audit::enrich_subject_access(&db_path, raw_entries) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("maosctl: audit subject-access — enrichment error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let stdout = std::io::stdout();
+    let mut lock = stdout.lock();
+    match format {
+        AuditFormat::Ndjson => {
+            use std::io::Write;
+            for entry in &enriched {
+                let line = match serde_json::to_string(entry) {
+                    Ok(l) => l,
+                    Err(e) => {
+                        eprintln!("maosctl: audit subject-access — encode error: {e}");
+                        return ExitCode::from(2);
+                    }
+                };
+                if let Err(e) = writeln!(lock, "{line}") {
+                    eprintln!("maosctl: audit subject-access — write error: {e}");
+                    return ExitCode::from(2);
+                }
+            }
+        }
+        AuditFormat::Plain => {
+            use std::io::Write;
+            for entry in &enriched {
+                let provenance_str = match &entry.provenance {
+                    maos_audit::Provenance::Direct { frame_ref } => {
+                        format!("direct({frame_ref})")
+                    }
+                    maos_audit::Provenance::Distilled {
+                        effective_source_log_ref,
+                        distillation_depth,
+                    } => {
+                        format!(
+                            "distilled(depth={distillation_depth}, refs={})",
+                            effective_source_log_ref.join(",")
+                        )
+                    }
+                };
+                let name = entry.writer_spirit_name.as_deref().unwrap_or("<unknown>");
+                if let Err(e) = writeln!(
+                    lock,
+                    "{}  {}  pid={}  boot={}  {}:{}  {}",
+                    entry.timestamp_ns,
+                    entry.principal_id,
+                    entry.writer_spirit_pid,
+                    entry.boot_nonce.unwrap_or(0),
+                    entry.schema,
+                    entry.key,
+                    provenance_str,
+                ) {
+                    eprintln!("maosctl: audit subject-access — write error: {e}");
+                    return ExitCode::from(2);
+                }
+                let _ = name; // used in future enriched output
+            }
+        }
+    }
+
+    ExitCode::SUCCESS
+}
+
+// ─── FR43: Posture Delta ───────────────────────────────────────────────
+
+/// FR43 — posture-delta report: classify composed log entries into
+/// capability changes, sandbox tier changes, and consent ruptures.
+fn audit_posture_delta(
+    range_str: &str,
+    spirit: Option<&str>,
+    format: AuditFormat,
+    _color: ColorChoice,
+) -> ExitCode {
+    let db_path = default_transparency_log_path();
+    let journal_path = maos_audit::default_journal_path();
+
+    let (since_ns, until_ns) = match parse_range(range_str) {
+        Ok((s, u)) => (s.unwrap_or(0), u),
+        Err(e) => {
+            eprintln!("maosctl: audit posture-delta — {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let range = maos_audit::log_composition::LogRange {
+        since_ns,
+        until_ns: until_ns.unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos() as u64
+        }),
+    };
+
+    let report =
+        match maos_audit::log_composition::posture_delta(&db_path, &journal_path, range, spirit) {
+            Ok(r) => r,
+            Err(maos_audit::AuditError::Open(_)) => {
+                eprintln!(
+                    "maosctl: audit posture-delta — no Transparency Log found at {}.",
+                    db_path.display()
+                );
+                return ExitCode::from(2);
+            }
+            Err(e) => {
+                eprintln!("maosctl: audit posture-delta — error: {e}");
+                return ExitCode::from(2);
+            }
+        };
+
+    let stdout = std::io::stdout();
+    let mut lock = stdout.lock();
+    match format {
+        AuditFormat::Ndjson => {
+            use std::io::Write;
+            let json = match serde_json::to_string(&report) {
+                Ok(j) => j,
+                Err(e) => {
+                    eprintln!("maosctl: audit posture-delta — encode error: {e}");
+                    return ExitCode::from(2);
+                }
+            };
+            if let Err(e) = writeln!(lock, "{json}") {
+                eprintln!("maosctl: audit posture-delta — write error: {e}");
+                return ExitCode::from(2);
+            }
+        }
+        AuditFormat::Plain => {
+            use std::io::Write;
+            let s = &report.summary;
+            if let Err(e) = writeln!(
+                lock,
+                "Posture Delta Report ({}..{})",
+                s.window_since_ns, s.window_until_ns
+            ) {
+                eprintln!("maosctl: audit posture-delta — write error: {e}");
+                return ExitCode::from(2);
+            }
+            if let Err(e) = writeln!(
+                lock,
+                "  total={}  issued={}  revoked={}  net_delta={}  tier={}  consent_rupture={}",
+                s.total_events,
+                s.capabilities_issued,
+                s.capabilities_revoked,
+                s.net_capability_delta,
+                s.sandbox_tier_changes,
+                s.consent_ruptures,
+            ) {
+                eprintln!("maosctl: audit posture-delta — write error: {e}");
+                return ExitCode::from(2);
+            }
+            if let Err(e) = writeln!(lock, "  NOTE: {}", s.consent_dimension_limitation) {
+                eprintln!("maosctl: audit posture-delta — write error: {e}");
+                return ExitCode::from(2);
+            }
+            for event in &report.events {
+                if let Err(e) = writeln!(lock, "  {}  {:?}", event.timestamp_ns, event.change) {
+                    eprintln!("maosctl: audit posture-delta — write error: {e}");
+                    return ExitCode::from(2);
+                }
+            }
+        }
+    }
+
+    ExitCode::SUCCESS
 }
 
 /// Resolve the default Transparency Log SQLite path.
@@ -998,7 +1625,7 @@ mod tests {
         .expect("audit query --spirit / --format must parse");
         match &cli.command {
             Subcommand::Audit(args) => match &args.query {
-                Some(AuditQuery::Query { spirit, format }) => {
+                Some(AuditQuery::Query { spirit, format, .. }) => {
                     assert_eq!(spirit.as_deref(), Some("hello-spirit"));
                     assert_eq!(*format, AuditFormat::Ndjson);
                 }
@@ -1023,7 +1650,9 @@ mod tests {
         .expect("audit query --format plain must parse");
         match &cli.command {
             Subcommand::Audit(args) => match &args.query {
-                Some(AuditQuery::Query { spirit: _, format }) => {
+                Some(AuditQuery::Query {
+                    spirit: _, format, ..
+                }) => {
                     assert_eq!(*format, AuditFormat::Plain);
                 }
                 _ => panic!("expected AuditQuery::Query struct variant"),
@@ -1039,7 +1668,7 @@ mod tests {
             .expect("audit query with no flags must parse");
         match &cli.command {
             Subcommand::Audit(args) => match &args.query {
-                Some(AuditQuery::Query { spirit, format }) => {
+                Some(AuditQuery::Query { spirit, format, .. }) => {
                     assert!(spirit.is_none(), "no --spirit means None");
                     assert_eq!(*format, AuditFormat::Ndjson, "default format is ndjson");
                 }
@@ -1050,16 +1679,73 @@ mod tests {
     }
 
     #[test]
-    fn resolve_spirit_pid_maps_hello_spirit_to_zero() {
-        assert_eq!(resolve_spirit_pid("hello-spirit").unwrap(), 0);
+    fn resolve_spirit_pid_reads_from_tl() {
+        // Create a test DB with a lifecycle.admit frame for "hello-spirit"
+        let tmpdir = tempfile::TempDir::new().unwrap();
+        let db_path = tmpdir.path().join("test.sqlite");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );",
+        )
+        .unwrap();
+        let payload =
+            serde_json::to_vec(&serde_json::json!({"spirit_id": "hello-spirit"})).unwrap();
+        conn.execute(
+            "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![
+                &[0xAAu8; 16] as &[u8],
+                1000i64,
+                0i64,
+                1i64,
+                rusqlite::types::Null,
+                19i64,  // SpiritAdmitted
+                "hello-spirit",
+                &payload as &[u8],
+                0i64,
+            ],
+        ).unwrap();
+        drop(conn);
+
+        let result = resolve_spirit_pid("hello-spirit", &db_path, false).unwrap();
+        assert_eq!(result, vec![(1, 0)]);
     }
 
     #[test]
-    fn resolve_spirit_pid_rejects_other_names_with_clear_diagnostic() {
-        let err = resolve_spirit_pid("orchestrator").unwrap_err();
+    fn resolve_spirit_pid_rejects_unknown_names_with_clear_diagnostic() {
+        let tmpdir = tempfile::TempDir::new().unwrap();
+        let db_path = tmpdir.path().join("test.sqlite");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );",
+        )
+        .unwrap();
+        drop(conn);
+
+        let err = resolve_spirit_pid("orchestrator", &db_path, false).unwrap_err();
         assert!(
-            err.contains("only 'hello-spirit' is available at v0.1-β"),
-            "diagnostic must name the v0.1-β scope: got {err}"
+            err.contains("unknown spirit 'orchestrator'"),
+            "diagnostic must name the unknown spirit: got {err}"
         );
     }
 
@@ -1109,5 +1795,201 @@ mod tests {
         let color = ColorChoice::Auto;
         let code = lifecycle_verb("stop", None, color);
         assert_ne!(code, ExitCode::SUCCESS);
+    }
+
+    // ── FR41/FR42/FR43 — new audit query flag parsing tests (Story 9.1) ─────
+
+    #[test]
+    fn audit_query_intent_contains_parses() {
+        use crate::cli::AuditQuery;
+        let cli = Cli::try_parse_from(["maosctl", "audit", "query", "--intent-contains", "hello"])
+            .expect("--intent-contains must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::Query {
+                    intent_contains, ..
+                }) => {
+                    assert_eq!(intent_contains.as_deref(), Some("hello"));
+                }
+                _ => panic!("expected AuditQuery::Query"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_query_capability_parses() {
+        use crate::cli::AuditQuery;
+        let cli = Cli::try_parse_from(["maosctl", "audit", "query", "--capability", "abcd1234"])
+            .expect("--capability must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::Query { capability, .. }) => {
+                    assert_eq!(capability.as_deref(), Some("abcd1234"));
+                }
+                _ => panic!("expected AuditQuery::Query"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_query_range_parses() {
+        use crate::cli::AuditQuery;
+        let cli = Cli::try_parse_from(["maosctl", "audit", "query", "--range", "30d"])
+            .expect("--range must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::Query { range, .. }) => {
+                    assert_eq!(range.as_deref(), Some("30d"));
+                }
+                _ => panic!("expected AuditQuery::Query"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_query_tag_parses_but_handler_errors() {
+        use crate::cli::AuditQuery;
+        // The flag parses; the handler rejects at runtime.
+        let cli = Cli::try_parse_from(["maosctl", "audit", "query", "--tag", "foo"])
+            .expect("--tag must parse as a valid flag");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::Query { tag, .. }) => {
+                    assert_eq!(tag.as_deref(), Some("foo"));
+                }
+                _ => panic!("expected AuditQuery::Query"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_query_spirit_all_boots_parses() {
+        use crate::cli::AuditQuery;
+        let cli = Cli::try_parse_from([
+            "maosctl",
+            "audit",
+            "query",
+            "--spirit",
+            "researcher",
+            "--all-boots",
+        ])
+        .expect("--spirit + --all-boots must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::Query {
+                    spirit, all_boots, ..
+                }) => {
+                    assert_eq!(spirit.as_deref(), Some("researcher"));
+                    assert!(*all_boots);
+                }
+                _ => panic!("expected AuditQuery::Query"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_subject_access_parses() {
+        use crate::cli::AuditQuery;
+        let cli = Cli::try_parse_from([
+            "maosctl",
+            "audit",
+            "subject-access",
+            "--principal",
+            "user:alice",
+        ])
+        .expect("audit subject-access must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::SubjectAccess { principal, .. }) => {
+                    assert_eq!(principal, "user:alice");
+                }
+                _ => panic!("expected AuditQuery::SubjectAccess"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_posture_delta_parses() {
+        use crate::cli::AuditQuery;
+        let cli = Cli::try_parse_from(["maosctl", "audit", "posture-delta", "--range", "30d"])
+            .expect("audit posture-delta must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::PostureDelta { range, .. }) => {
+                    assert_eq!(range, "30d");
+                }
+                _ => panic!("expected AuditQuery::PostureDelta"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_sealed_export_parses() {
+        use crate::cli::AuditQuery;
+        let cli = Cli::try_parse_from([
+            "maosctl",
+            "audit",
+            "sealed-export",
+            "--spirit",
+            "test",
+            "--range",
+            "7d",
+        ])
+        .expect("audit sealed-export must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::SealedExport { spirit, range, .. }) => {
+                    assert_eq!(spirit.as_deref(), Some("test"));
+                    assert_eq!(range.as_deref(), Some("7d"));
+                }
+                _ => panic!("expected AuditQuery::SealedExport"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_keygen_parses() {
+        use crate::cli::AuditQuery;
+        let cli =
+            Cli::try_parse_from(["maosctl", "audit", "keygen"]).expect("audit keygen must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::Keygen { .. }) => {}
+                _ => panic!("expected AuditQuery::Keygen"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn audit_verify_bundle_parses() {
+        use crate::cli::AuditQuery;
+        let cli = Cli::try_parse_from([
+            "maosctl",
+            "audit",
+            "verify-bundle",
+            "/tmp/bundle.json",
+            "--pubkey",
+            "abc123",
+        ])
+        .expect("audit verify-bundle must parse");
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::VerifyBundle { bundle, pubkey }) => {
+                    assert_eq!(bundle.to_str(), Some("/tmp/bundle.json"));
+                    assert_eq!(pubkey, "abc123");
+                }
+                _ => panic!("expected AuditQuery::VerifyBundle"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
     }
 }

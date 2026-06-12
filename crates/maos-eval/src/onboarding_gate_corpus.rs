@@ -355,22 +355,25 @@ enum CorpusLine {
 
 impl CorpusLine {
     fn from_str(line: &str, source: &str) -> Result<Self, crate::CorpusError> {
-        let v: serde_json::Value = serde_json::from_str(line).map_err(|e| {
-            crate::CorpusError::Parse {
+        let v: serde_json::Value =
+            serde_json::from_str(line).map_err(|e| crate::CorpusError::Parse {
                 path: source.into(),
                 source: e,
-            }
-        })?;
+            })?;
         if v.get("stand_in_for").is_some() {
-            serde_json::from_value(v).map(Self::Meta).map_err(|e| crate::CorpusError::Parse {
-                path: source.into(),
-                source: e,
-            })
+            serde_json::from_value(v)
+                .map(Self::Meta)
+                .map_err(|e| crate::CorpusError::Parse {
+                    path: source.into(),
+                    source: e,
+                })
         } else {
-            serde_json::from_value(v).map(Self::Scenario).map_err(|e| crate::CorpusError::Parse {
-                path: source.into(),
-                source: e,
-            })
+            serde_json::from_value(v)
+                .map(Self::Scenario)
+                .map_err(|e| crate::CorpusError::Parse {
+                    path: source.into(),
+                    source: e,
+                })
         }
     }
 }
@@ -1226,6 +1229,9 @@ mod tests {
         let fixture = OnboardingCorpus::load_jsonl(&root.join(FIXTURE_CORPUS_REL))
             .expect("load fixture fallback");
         assert_eq!(fixture.scenarios.len(), CORPUS_SCENARIO_COUNT);
-        assert!(fixture.meta.is_some(), "fixture keeps its STAND-IN meta header");
+        assert!(
+            fixture.meta.is_some(),
+            "fixture keeps its STAND-IN meta header"
+        );
     }
 }

@@ -20,9 +20,8 @@ use crate::identity::PeerId;
 use crate::tofu::TofuPinStore;
 use crate::transport::json_rpc::{
     A2AJsonRpcRequest, A2AJsonRpcResponse, AckBody, CODE_CONSENT_EXPIRED,
-    CODE_CONSENT_GRANTER_MISMATCH, CODE_CONSENT_UNCLASSIFIED, CODE_INTENT_DENIED,
-    CODE_INTERNAL, CODE_PEER_IDENTITY_MISMATCH, CODE_PIN_MISMATCH_NOT_PINNED,
-    CODE_SPIRIT_RESTART_DETECTED,
+    CODE_CONSENT_GRANTER_MISMATCH, CODE_CONSENT_UNCLASSIFIED, CODE_INTENT_DENIED, CODE_INTERNAL,
+    CODE_PEER_IDENTITY_MISMATCH, CODE_PIN_MISMATCH_NOT_PINNED, CODE_SPIRIT_RESTART_DETECTED,
 };
 use crate::transport::logical_clock::LamportClock;
 use async_trait::async_trait;
@@ -73,11 +72,7 @@ pub trait A2APeerRouter: Send + Sync {
     ///   1. ADR-012 send_allowlist check (peer.send_allowlist contains frame.intent?)
     ///   2. TOFU pin verify (cross-Host) or mTLS-only (loopback)
     ///   3. JSON-RPC frame serialization + send + await ACK/NACK
-    async fn route_outbound(
-        &self,
-        frame: IacFrame,
-        peer: &HostId,
-    ) -> Result<(), A2AError>;
+    async fn route_outbound(&self, frame: IacFrame, peer: &HostId) -> Result<(), A2AError>;
 
     /// Intake: a peer just sent us a frame.
     ///
@@ -212,10 +207,7 @@ impl A2ARouterCore {
 
     /// Install an intake sink — test-only hook. Accepted frames are forwarded
     /// to the sink AFTER all validation passes.
-    pub async fn install_intake_sink(
-        &self,
-        sink: tokio::sync::mpsc::UnboundedSender<IacFrame>,
-    ) {
+    pub async fn install_intake_sink(&self, sink: tokio::sync::mpsc::UnboundedSender<IacFrame>) {
         let mut guard = self.intake_sink.lock().await;
         *guard = Some(sink);
     }
@@ -226,10 +218,7 @@ impl A2ARouterCore {
     /// NACK. The receiver daemon (or the smoke acting as integration driver)
     /// drains it and journals the genuine, production-produced rupture — the
     /// transparency log never hand-writes the row. Mirrors `install_intake_sink`.
-    pub async fn install_rupture_sink(
-        &self,
-        sink: tokio::sync::mpsc::Sender<IacFrame>,
-    ) {
+    pub async fn install_rupture_sink(&self, sink: tokio::sync::mpsc::Sender<IacFrame>) {
         let mut guard = self.rupture_sink.lock().await;
         *guard = Some(sink);
     }
@@ -424,9 +413,14 @@ impl A2ARouterCore {
     /// [Source: docs/adr/ADR-012-typed-intent-a2a-consent.md] — consent is
     /// `(peer-identity, intent-class)` with an open intent vocabulary.
     fn consent_decision(frame: &IacFrame) -> ConsentDecision {
-        let Some(intent) = frame.consent_envelope.as_ref().and_then(|e| e.intent_class.as_ref())
+        let Some(intent) = frame
+            .consent_envelope
+            .as_ref()
+            .and_then(|e| e.intent_class.as_ref())
         else {
-            return ConsentDecision::Unclassified { reason: UnclassifiedReason::Absent };
+            return ConsentDecision::Unclassified {
+                reason: UnclassifiedReason::Absent,
+            };
         };
         let reason = if intent.as_str().len() > MAX_CANONICAL_INTENT_LEN {
             UnclassifiedReason::Oversized
@@ -496,7 +490,11 @@ impl A2ARouterCore {
             .iter()
             .any(|i| i.as_str().eq_ignore_ascii_case(&s));
         if !admitted {
-            self.warn_unreachable_entries(&allow.accept_allowlist, AllowlistDirection::Accept, peer_id);
+            self.warn_unreachable_entries(
+                &allow.accept_allowlist,
+                AllowlistDirection::Accept,
+                peer_id,
+            );
         }
         admitted
     }
@@ -583,8 +581,7 @@ impl A2ARouterCore {
         // (4) Build JSON-RPC request.
         let id = self.alloc_id();
         let frame_id = frame.frame_id;
-        let request =
-            A2AJsonRpcRequest::new("iac.deliver", frame, id).with_boot_nonce(boot_nonce);
+        let request = A2AJsonRpcRequest::new("iac.deliver", frame, id).with_boot_nonce(boot_nonce);
         Ok((request, peer_cfg, frame_id))
     }
 
@@ -631,8 +628,14 @@ impl A2ARouterCore {
                         .as_ref()
                         .map(|d| {
                             (
-                                d.get("expected").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
-                                d.get("asserted").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+                                d.get("expected")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or_default()
+                                    .to_string(),
+                                d.get("asserted")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or_default()
+                                    .to_string(),
                             )
                         })
                         .unwrap_or_default();
@@ -645,12 +648,21 @@ impl A2ARouterCore {
                         .as_ref()
                         .map(|d| {
                             (
-                                d.get("granter").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
-                                d.get("frame_from").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+                                d.get("granter")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or_default()
+                                    .to_string(),
+                                d.get("frame_from")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or_default()
+                                    .to_string(),
                             )
                         })
                         .unwrap_or_default();
-                    Err(A2AError::ConsentGranterMismatch { granter, frame_from })
+                    Err(A2AError::ConsentGranterMismatch {
+                        granter,
+                        frame_from,
+                    })
                 }
                 // Story 8.8 / AC1 (G7) — the receiver fail-closed-denied an
                 // unclassified frame. Interpret it back into the distinct typed
@@ -784,12 +796,22 @@ impl A2ARouterCore {
                 let granter = format!(
                     "{}@{}",
                     envelope.granter.spirit_id.as_str(),
-                    envelope.granter.host_id.as_ref().map(|h| h.as_str()).unwrap_or("<none>")
+                    envelope
+                        .granter
+                        .host_id
+                        .as_ref()
+                        .map(|h| h.as_str())
+                        .unwrap_or("<none>")
                 );
                 let frame_from = format!(
                     "{}@{}",
                     frame.from.spirit_id.as_str(),
-                    frame.from.host_id.as_ref().map(|h| h.as_str()).unwrap_or("<none>")
+                    frame
+                        .from
+                        .host_id
+                        .as_ref()
+                        .map(|h| h.as_str())
+                        .unwrap_or("<none>")
                 );
                 let data = serde_json::json!({
                     "granter": granter,
@@ -1038,15 +1060,15 @@ mod tests {
     use super::*;
     use crate::config::A2AProfile;
     use crate::identity::PeerCertFingerprint;
+    use crate::identity::PeerId;
     use crate::tofu::InMemoryTofuPinStore;
     use maos_domain::frame::{
         FrameAddress, FramePayload, PosturePreferences, RuptureReason, TaskAssignPayload,
     };
+    use maos_domain::invariants::i1::IntentClass;
     use maos_domain::invariants::i13::IntentLineage;
     use maos_domain::invariants::i3::FrameOrigin;
-    use maos_domain::invariants::i1::IntentClass;
     use maos_domain::invariants::i8::A2AIntent;
-    use crate::identity::PeerId;
     use maos_spirit_abi::identity::{FrameKind, SpiritId};
     use smallvec::smallvec;
 

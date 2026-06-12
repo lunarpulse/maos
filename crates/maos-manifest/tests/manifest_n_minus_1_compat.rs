@@ -45,7 +45,10 @@ fn v1_manifest_loads_on_current_kernel() {
     let c = ClassSection::from_toml_str(&toml).expect(
         "Story 7.5a N-1 supported floor violated — v_MIN manifest rejected by current kernel",
     );
-    assert_eq!(c.manifest_schema_version, MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION);
+    assert_eq!(
+        c.manifest_schema_version,
+        MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION
+    );
 }
 
 #[test]
@@ -94,7 +97,10 @@ fn n_minus_1_load_covers_every_class_field() {
     assert_eq!(c.name, "hello-spirit");
     assert_eq!(c.version, "0.1.0");
     assert_eq!(c.abi, "1.0");
-    assert_eq!(c.manifest_schema_version, MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION);
+    assert_eq!(
+        c.manifest_schema_version,
+        MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION
+    );
     assert_eq!(c.min_substrate_version, "0.1.0-alpha");
     assert_eq!(c.forms, vec!["rust-inproc".to_string()]);
     assert_eq!(c.trust_tier, "local");

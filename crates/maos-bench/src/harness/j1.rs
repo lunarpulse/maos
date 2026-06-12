@@ -66,8 +66,7 @@ fn send_frame(stdin: &mut dyn Write, task_id: u64, content: &str) -> Result<(), 
         "task_id": task_id,
         "content": content
     });
-    let payload = serde_json::to_vec(&frame)
-        .map_err(|e| BenchError::Serialize(e.to_string()))?;
+    let payload = serde_json::to_vec(&frame).map_err(|e| BenchError::Serialize(e.to_string()))?;
     let header = format!("Content-Length: {}\r\n\r\n", payload.len());
     stdin.write_all(header.as_bytes())?;
     stdin.write_all(&payload)?;
@@ -79,13 +78,17 @@ fn read_frame(reader: &mut dyn BufRead) -> Result<String, BenchError> {
     let mut header = String::new();
     reader.read_line(&mut header)?;
     if header.is_empty() {
-        return Err(BenchError::SubprocessCrash("stdin closed (subprocess dead)".into()));
+        return Err(BenchError::SubprocessCrash(
+            "stdin closed (subprocess dead)".into(),
+        ));
     }
     let content_length: usize = header
         .trim()
         .strip_prefix("Content-Length: ")
         .and_then(|s| s.trim().parse().ok())
-        .ok_or_else(|| BenchError::SubprocessCrash(format!("bad Content-Length header: {:?}", header)))?;
+        .ok_or_else(|| {
+            BenchError::SubprocessCrash(format!("bad Content-Length header: {:?}", header))
+        })?;
 
     let mut blank = String::new();
     reader.read_line(&mut blank)?;
@@ -226,8 +229,8 @@ pub fn run_j1_bridge_measurement(config: &J1BridgeConfig) -> Result<JourneyResul
         backpressure: Backpressure::Block,
         env: vec![],
     };
-    let mut bridge =
-        spawn_and_bridge(spec).map_err(|e| BenchError::SubprocessCrash(format!("bridge: {e:?}")))?;
+    let mut bridge = spawn_and_bridge(spec)
+        .map_err(|e| BenchError::SubprocessCrash(format!("bridge: {e:?}")))?;
 
     let total = config.warmup + config.iterations;
     let mut samples_us: Vec<u64> = Vec::with_capacity(config.iterations as usize);

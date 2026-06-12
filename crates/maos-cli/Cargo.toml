@@ -21,6 +21,8 @@ maos-audit = { path = "../maos-audit" }
 maos-registry = { path = "../maos-registry" }
 maos-skill = { path = "../maos-skill" }   # Story 7.4 — `maosctl skills` discovery + admission exit
 serde_json = "1"
+hex = "0.4"       # Story 9.1 FR44 — pubkey hex encoding in verify-bundle
+maos-domain = { path = "../maos-domain" }  # Story 9.1 FR44 — audit key loader
 
 [dev-dependencies]
 # Story 1b.5b — accessibility ANSI test. Both crates are already in the

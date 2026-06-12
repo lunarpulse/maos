@@ -27,7 +27,10 @@ fn discovers_multiple_skills_from_a_temp_root() {
     assert!(discovered
         .iter()
         .all(|d| d.state == SkillAdmissionState::Pending));
-    let ids: Vec<&str> = discovered.iter().map(|d| d.skill.manifest.id.as_str()).collect();
+    let ids: Vec<&str> = discovered
+        .iter()
+        .map(|d| d.skill.manifest.id.as_str())
+        .collect();
     assert!(ids.contains(&"skill.a"));
     assert!(ids.contains(&"skill.b"));
 }

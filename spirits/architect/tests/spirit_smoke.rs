@@ -4,8 +4,8 @@
 //! `maos-manifest` validators. Decision E: NO `[capabilities.required]` (no live
 //! LLM at v0.8).
 
-use architect::Architect;
 use architect::__maos_spirit_vtable_Architect;
+use architect::Architect;
 use maos_spirit_sdk::spirit_test::{assert_no_deprecations, manifest_self_check, SpiritTest};
 
 const MANIFEST: &str = include_str!("../manifest.toml");

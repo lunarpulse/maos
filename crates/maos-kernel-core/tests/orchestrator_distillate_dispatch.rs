@@ -28,9 +28,7 @@ use smallvec::smallvec;
 
 fn fresh_adapter() -> (Arc<TransparencyLogAdapter>, IacBusAdapter) {
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-    let metrics = Arc::new(
-        maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new(),
-    );
+    let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
     let mailbox = Arc::new(Mailbox::new(metrics));
     let adapter = IacBusAdapter::new(mailbox, tl.clone());
     (tl, adapter)
@@ -161,10 +159,7 @@ async fn ac2_scenario_2_2_follow_up_with_distillate_ref_accepted() {
 
     // 2. Worker completes the task.
     let tc = worker_task_complete(2);
-    adapter
-        .deliver_typed(tc)
-        .await
-        .expect("task complete ok");
+    adapter.deliver_typed(tc).await.expect("task complete ok");
 
     // 3. Kernel-side distillate row exists for the prior worker output.
     let distillate_id = write_distillate_row(&tl);
@@ -213,7 +208,10 @@ async fn ac2_scenario_2_3_follow_up_none_after_complete_rejected() {
     let f2 = orchestrator_task_assign(None, 3);
     let err = adapter.deliver_typed(f2).await.expect_err("must reject");
     match err {
-        IacBusError::EOrchestratorDispatchRawOutput { orchestrator, task_id } => {
+        IacBusError::EOrchestratorDispatchRawOutput {
+            orchestrator,
+            task_id,
+        } => {
             assert_eq!(orchestrator, "orchestrator");
             assert_eq!(task_id, "task-3");
         }

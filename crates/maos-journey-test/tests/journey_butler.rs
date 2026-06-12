@@ -10,7 +10,7 @@
 //! JB-6: capability denied on out-of-grant figma:write (RED — driver dependency).
 //! JB-8: posture-shift (RED — Epic 9).
 
-use maos_journey_test::{AuditDb, JourneyWorld, Pty, MockMcp};
+use maos_journey_test::{AuditDb, JourneyWorld, MockMcp, Pty};
 
 fn workspace_root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -32,9 +32,7 @@ fn maos_bin() -> String {
 #[test]
 fn jb1_halt_screen_render_via_pty() {
     let audit = AuditDb::temp();
-    let world = JourneyWorld::builder()
-        .audit(audit)
-        .build();
+    let world = JourneyWorld::builder().audit(audit).build();
 
     let manifest = workspace_root().join("spirits/butler/manifest.toml");
     let cmd = format!("{} run {} --once", maos_bin(), manifest.display());
@@ -58,10 +56,10 @@ fn jb1_halt_screen_render_via_pty() {
 
 #[test]
 fn jb2_mcp_calendar_fetch_reaches_mock() {
-    let calendar_fixture = workspace_root()
-        .join("crates/maos-journey-test/fixtures/j-butler/calendar-events.json");
-    let comms_fixture = workspace_root()
-        .join("crates/maos-journey-test/fixtures/j-butler/comms-messages.json");
+    let calendar_fixture =
+        workspace_root().join("crates/maos-journey-test/fixtures/j-butler/calendar-events.json");
+    let comms_fixture =
+        workspace_root().join("crates/maos-journey-test/fixtures/j-butler/comms-messages.json");
 
     let calendar_mock = MockMcp::from_fixture(calendar_fixture.to_str().unwrap());
     let comms_mock = MockMcp::from_fixture(comms_fixture.to_str().unwrap());
@@ -97,7 +95,9 @@ fn jb2_mcp_calendar_fetch_reaches_mock() {
     // drive belief_variance.  Assert the mock received at least one request.
     // (Linear write is a director option-pick action that only fires after
     // halt resolution in --interactive mode, not in --once halt-only mode.)
-    let calendar = world.mcp("calendar").expect("calendar mock must be in world");
+    let calendar = world
+        .mcp("calendar")
+        .expect("calendar mock must be in world");
     let calendar_writes = calendar.writes();
     assert!(
         !calendar_writes.is_empty(),
@@ -133,7 +133,8 @@ fn jb4_driver_integration_test() {
     let db = tmp.path().join("transparency.sqlite");
     let journal = tmp.path().join("journal.ndjson");
 
-    let tl = maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db, 0x123).unwrap();
+    let tl =
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db, 0x123).unwrap();
     let _ = tl.insert_frame_event(
         maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete,
         1,
@@ -145,7 +146,10 @@ fn jb4_driver_integration_test() {
     let expected_id = tl.last_frame_id();
 
     let butler = butler::Butler::new();
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64;
     let digest = butler.morning_digest(&db, &journal, now, &[], 0.0).unwrap();
 
     assert!(!digest.completed.is_empty());
@@ -167,9 +171,8 @@ fn jb4_driver_integration_test() {
 fn jb5_output_shape_violation() {
     // Create a temp manifest that adds a nonexistent required field,
     // guaranteeing an output_shape violation.
-    let original = std::fs::read_to_string(
-        workspace_root().join("spirits/butler/manifest.toml"),
-    ).expect("butler manifest must be readable");
+    let original = std::fs::read_to_string(workspace_root().join("spirits/butler/manifest.toml"))
+        .expect("butler manifest must be readable");
     let patched = original.replace(
         "required_fields = [\"pattern\", \"confidence\", \"evidence\", \"options\"]",
         "required_fields = [\"pattern\", \"confidence\", \"evidence\", \"options\", \"nonexistent\"]",
@@ -179,11 +182,7 @@ fn jb5_output_shape_violation() {
     std::fs::write(&temp_manifest, patched).expect("write temp manifest");
 
     let world = JourneyWorld::builder().audit(audit).build();
-    let cmd = format!(
-        "{} run {} --once",
-        maos_bin(),
-        temp_manifest.display()
-    );
+    let cmd = format!("{} run {} --once", maos_bin(), temp_manifest.display());
     let pty = Pty::spawn(&cmd, &world);
     let status = pty.wait();
     assert!(
@@ -218,9 +217,8 @@ fn jb5_output_shape_violation() {
 fn jb6_capability_denied() {
     // Read the butler manifest and strip all MCP server entries so no
     // (server, tool) scope is declared, then run with --live.
-    let original = std::fs::read_to_string(
-        workspace_root().join("spirits/butler/manifest.toml"),
-    ).expect("butler manifest must be readable");
+    let original = std::fs::read_to_string(workspace_root().join("spirits/butler/manifest.toml"))
+        .expect("butler manifest must be readable");
 
     // Remove all [[capabilities.required.mcp.servers]] entries.
     let mut in_mcp = false;
@@ -282,7 +280,6 @@ fn jb6_capability_denied() {
         screen.text()
     );
 }
-
 
 #[test]
 #[ignore = "RED: Epic 9 — posture-shift cognition not yet wired"]

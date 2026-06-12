@@ -251,7 +251,12 @@ async fn non_allowlisted_intent_denied_at_accepting_peer() {
     // The source (host_a) config accepts NOTHING → the advisory is refused at
     // intake even though the destination admits the send. Story 8.7 / AC4 — the
     // denial is on the FINE-GRAINED key.
-    let cfg_a = peer("host_a", host_a_fp.clone(), &[ADVISORY_FINE_GRAINED_INTENT], &[]);
+    let cfg_a = peer(
+        "host_a",
+        host_a_fp.clone(),
+        &[ADVISORY_FINE_GRAINED_INTENT],
+        &[],
+    );
     let cfg_b = peer(
         "host_b",
         host_b_fp.clone(),

@@ -45,7 +45,10 @@ impl AcpEditorChannelImpl {
             event: event_json,
         };
 
-        let sessions = self.sessions.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|e| format!("lock poisoned: {e}"))?;
 
         if sessions.is_empty() {
             return Ok(0);
@@ -77,7 +80,9 @@ impl AcpEditorChannelImpl {
 mod tests {
     use super::*;
 
-    fn test_channel(cap: usize) -> (
+    fn test_channel(
+        cap: usize,
+    ) -> (
         AcpEditorChannelImpl,
         crossbeam_channel::Receiver<AcpFrameOut>,
         Arc<Mutex<Vec<AcpOutboundHandle>>>,

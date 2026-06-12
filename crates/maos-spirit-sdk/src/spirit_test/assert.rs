@@ -57,9 +57,12 @@ macro_rules! assert_hook_fired {
             .copied()
             .unwrap_or(0);
         ::core::assert_eq!(
-            actual, $expected_count,
+            actual,
+            $expected_count,
             "assert_hook_fired!: hook '{}' fired {} times, expected {}",
-            $hook_name, actual, $expected_count
+            $hook_name,
+            actual,
+            $expected_count
         );
     }};
 }

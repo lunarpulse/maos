@@ -32,9 +32,5 @@ pub trait A2ARouter: Send + Sync {
     /// on transport / consent / pin / partition failure. The kernel-core code
     /// surfaces the error to the caller; the application layer (Spirit)
     /// decides retry/escalate/halt per architecture §7.2.
-    async fn route_outbound(
-        &self,
-        frame: IacFrame,
-        peer: &HostId,
-    ) -> Result<(), IacBusError>;
+    async fn route_outbound(&self, frame: IacFrame, peer: &HostId) -> Result<(), IacBusError>;
 }

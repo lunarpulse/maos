@@ -65,7 +65,10 @@ fn maos_run_butler_once_fires_epistemic_halt_through_production_wiring() {
         .iter()
         .find(|e| e.get("event").and_then(|v| v.as_str()) == Some("spirit_loaded"))
         .expect("a spirit_loaded event");
-    assert_eq!(loaded.get("spirit_id").and_then(|v| v.as_str()), Some("butler"));
+    assert_eq!(
+        loaded.get("spirit_id").and_then(|v| v.as_str()),
+        Some("butler")
+    );
     assert_eq!(
         loaded.get("boot_loud_port").and_then(|v| v.as_bool()),
         Some(true),

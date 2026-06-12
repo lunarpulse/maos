@@ -15,10 +15,7 @@ pub struct SseTransport {
 }
 
 impl SseTransport {
-    pub fn new(
-        transport_inner: std::sync::Arc<dyn IoSubsystemPort>,
-        endpoint_url: String,
-    ) -> Self {
+    pub fn new(transport_inner: std::sync::Arc<dyn IoSubsystemPort>, endpoint_url: String) -> Self {
         Self {
             transport_inner,
             endpoint_url,
@@ -62,10 +59,7 @@ pub fn build_sse_request_body(request: &McpRequest) -> Result<Vec<u8>, serde_jso
 ///
 /// Per the MCP SSE binding, each `data:` line is a JSON payload.
 /// For v0.5-α single-shot responses, we return the first non-empty data line.
-pub fn parse_sse_response(
-    body: &str,
-    server_name: &str,
-) -> Result<McpResponse, McpTransportError> {
+pub fn parse_sse_response(body: &str, server_name: &str) -> Result<McpResponse, McpTransportError> {
     let mut last_data: Option<String> = None;
 
     for line in body.lines() {

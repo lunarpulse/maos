@@ -1,10 +1,10 @@
 #![cfg(feature = "fixture_replay")]
 
+use maos_domain::invariants::i1::{CapabilityToken, TokenId};
 use maos_domain::ports::inference::{
     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
     TokenUsage,
 };
-use maos_domain::invariants::i1::{CapabilityToken, TokenId};
 use maos_providers::fixture_replay::FixtureReplayProvider;
 use maos_providers::Provider;
 
@@ -93,7 +93,10 @@ fn run_matrix(provider: &str) -> Vec<serde_json::Value> {
 
         let fixture_id = case["fixture_id"].as_str().unwrap_or("unknown");
         let prompt = case["prompt"].as_str().unwrap_or("");
-        let options = case.get("options").cloned().unwrap_or(serde_json::json!({}));
+        let options = case
+            .get("options")
+            .cloned()
+            .unwrap_or(serde_json::json!({}));
 
         let expected = case
             .get("expected_outputs")
@@ -184,64 +187,94 @@ fn run_matrix(provider: &str) -> Vec<serde_json::Value> {
     // then cause the report-aggregate job to fail with no upstream signal.
     let report_json = serde_json::to_string_pretty(&results)
         .unwrap_or_else(|e| panic!("matrix: failed to serialize report: {e}"));
-    std::fs::write(&report_path, report_json)
-        .unwrap_or_else(|e| panic!("matrix: failed to write report at {}: {e}", report_path.display()));
+    std::fs::write(&report_path, report_json).unwrap_or_else(|e| {
+        panic!(
+            "matrix: failed to write report at {}: {e}",
+            report_path.display()
+        )
+    });
 
     results
 }
 
 fn assert_matrix_results(provider: &str) {
     let results = run_matrix(provider);
-    assert!(!results.is_empty(), "matrix_{provider}: should have results");
+    assert!(
+        !results.is_empty(),
+        "matrix_{provider}: should have results"
+    );
 
     let cases_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/multi-provider-v0/cases");
     let case_files: Vec<_> = std::fs::read_dir(&cases_dir)
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+        .filter(|e| {
+            e.path()
+                .extension()
+                .map(|ext| ext == "json")
+                .unwrap_or(false)
+        })
         .collect();
 
     for entry in case_files {
         let content = std::fs::read_to_string(entry.path()).unwrap();
         let case: serde_json::Value = serde_json::from_str(&content).unwrap();
         let fixture_id = case["fixture_id"].as_str().unwrap_or("unknown");
-        let expected = case.get("expected_outputs")
+        let expected = case
+            .get("expected_outputs")
             .and_then(|e| e.get(provider))
             .cloned()
             .unwrap_or(serde_json::json!({}));
 
-        let row = results.iter().find(|r| r["fixture_id"].as_str() == Some(fixture_id));
-        assert!(row.is_some(), "matrix_{provider}: missing fixture {fixture_id}");
+        let row = results
+            .iter()
+            .find(|r| r["fixture_id"].as_str() == Some(fixture_id));
+        assert!(
+            row.is_some(),
+            "matrix_{provider}: missing fixture {fixture_id}"
+        );
 
         let row = row.unwrap();
 
         if expected.get("error").is_some() {
-            assert!(row["error"].as_str().unwrap_or("").len() > 0,
-                "matrix_{provider}/{fixture_id}: expected error result");
+            assert!(
+                row["error"].as_str().unwrap_or("").len() > 0,
+                "matrix_{provider}/{fixture_id}: expected error result"
+            );
         } else {
-            assert!(row["error"].is_null(),
-                "matrix_{provider}/{fixture_id}: unexpected error: {}", row["error"]);
+            assert!(
+                row["error"].is_null(),
+                "matrix_{provider}/{fixture_id}: unexpected error: {}",
+                row["error"]
+            );
             if let (Some(expected_text), Some(actual_text_len)) = (
                 expected.get("text").and_then(|v| v.as_str()),
                 row.get("response_text_len").and_then(|v| v.as_u64()),
             ) {
-                assert_eq!(actual_text_len as usize, expected_text.len(),
-                    "matrix_{provider}/{fixture_id}: text length mismatch");
+                assert_eq!(
+                    actual_text_len as usize,
+                    expected_text.len(),
+                    "matrix_{provider}/{fixture_id}: text length mismatch"
+                );
             }
             if let (Some(expected_in), Some(actual_in)) = (
                 expected.get("input_tokens").and_then(|v| v.as_u64()),
                 row.get("input_tokens").and_then(|v| v.as_u64()),
             ) {
-                assert_eq!(actual_in, expected_in,
-                    "matrix_{provider}/{fixture_id}: input_tokens mismatch");
+                assert_eq!(
+                    actual_in, expected_in,
+                    "matrix_{provider}/{fixture_id}: input_tokens mismatch"
+                );
             }
             if let (Some(expected_out), Some(actual_out)) = (
                 expected.get("output_tokens").and_then(|v| v.as_u64()),
                 row.get("output_tokens").and_then(|v| v.as_u64()),
             ) {
-                assert_eq!(actual_out, expected_out,
-                    "matrix_{provider}/{fixture_id}: output_tokens mismatch");
+                assert_eq!(
+                    actual_out, expected_out,
+                    "matrix_{provider}/{fixture_id}: output_tokens mismatch"
+                );
             }
         }
     }

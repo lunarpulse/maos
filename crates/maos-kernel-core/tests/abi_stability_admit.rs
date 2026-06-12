@@ -254,8 +254,8 @@ fn combined_substrate_too_old_and_schema_n2_checks_substrate_first() {
     let err = admit(&adapter, &journal, 9, &class).unwrap_err();
     match err {
         SecurityError::ESubstrateTooOld { .. } => {}
-        other => panic!(
-            "expected ESubstrateTooOld (substrate check before schema check), got {other:?}"
-        ),
+        other => {
+            panic!("expected ESubstrateTooOld (substrate check before schema check), got {other:?}")
+        }
     }
 }

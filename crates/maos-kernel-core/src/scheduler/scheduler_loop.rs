@@ -180,8 +180,8 @@ impl SpiritSchedulerAdapter {
         // Story 1b.3 — admit the Spirit through the security manager.
         if let Some(ref security) = self.security_manager {
             use crate::security::{
-                CapabilitiesRequired, McpCapabilities, Posture, PostureSection, ProviderCapabilities,
-                ResourceCaps, SandboxConfig,
+                CapabilitiesRequired, McpCapabilities, Posture, PostureSection,
+                ProviderCapabilities, ResourceCaps, SandboxConfig,
             };
             use maos_domain::invariants::i9::SandboxTier;
             let sandbox_cfg = SandboxConfig {

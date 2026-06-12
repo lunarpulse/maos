@@ -11,7 +11,14 @@ fn workspace_root() -> String {
 }
 
 fn isolated_home(label: &str) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!("maos-8-14a-{label}-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+    let path = std::env::temp_dir().join(format!(
+        "maos-8-14a-{label}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
     let _ = std::fs::remove_dir_all(&path);
     std::fs::create_dir_all(&path).unwrap();
     path
@@ -29,7 +36,11 @@ fn init_creates_dot_maos_and_is_idempotent() {
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos init");
-    assert!(out.status.success(), "init exit 0: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "init exit 0: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert!(home.join("config.toml").exists());
 
     // Second init — idempotent.
@@ -41,7 +52,10 @@ fn init_creates_dot_maos_and_is_idempotent() {
         .expect("failed to execute maos init again");
     assert!(out2.status.success());
     let stdout = String::from_utf8_lossy(&out2.stdout);
-    assert!(stdout.contains("already initialized"), "second init should say already initialized: {stdout}");
+    assert!(
+        stdout.contains("already initialized"),
+        "second init should say already initialized: {stdout}"
+    );
 
     let _ = std::fs::remove_dir_all(&home);
 }
@@ -111,7 +125,10 @@ fn audit_query_plain_no_ansi() {
 
     // Empty DB is OK for this smoke; just assert no ANSI escape bytes.
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(!stdout.as_bytes().contains(&0x1b), "--plain must emit zero ANSI bytes");
+    assert!(
+        !stdout.as_bytes().contains(&0x1b),
+        "--plain must emit zero ANSI bytes"
+    );
 
     let _ = std::fs::remove_dir_all(&home);
 }
@@ -147,7 +164,10 @@ fn shell_plain_no_ansi() {
 
     let out = child.wait_with_output().expect("shell failed");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(!stdout.as_bytes().contains(&0x1b), "--plain shell must emit zero ANSI bytes, got: {stdout}");
+    assert!(
+        !stdout.as_bytes().contains(&0x1b),
+        "--plain shell must emit zero ANSI bytes, got: {stdout}"
+    );
 
     let _ = std::fs::remove_dir_all(&home);
 }
@@ -183,7 +203,11 @@ fn audit_query_returns_shell_turn_rows() {
     }
 
     let out = child.wait_with_output().expect("shell failed");
-    assert!(out.status.success(), "shell should succeed: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "shell should succeed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     // Now query the audit log.
     let audit_out = Command::new(bin)
@@ -197,7 +221,10 @@ fn audit_query_returns_shell_turn_rows() {
     // The audit log should contain at least one row from the shell turn.
     // With record_invocation writing CapAuditEvent::Invocation, the plain format
     // should emit at least one line.
-    assert!(!audit_stdout.trim().is_empty(), "audit query should return rows after shell interaction, got: {audit_stdout}");
+    assert!(
+        !audit_stdout.trim().is_empty(),
+        "audit query should return rows after shell interaction, got: {audit_stdout}"
+    );
 
     let _ = std::fs::remove_dir_all(&home);
 }

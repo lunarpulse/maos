@@ -96,10 +96,20 @@ fn seed_transparency_log(db: &Path) {
 
     for k in 0..N_COMPLETIONS {
         let ts = BASE_NS + k * STEP_NS;
-        insert(cid(k), ts, maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete as i64, &format!("task-{k}"));
+        insert(
+            cid(k),
+            ts,
+            maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete as i64,
+            &format!("task-{k}"),
+        );
         if k % 4 == 2 {
             let j = (k - 2) / 4;
-            insert(hid(j), ts, maos_kernel_core::iac::transparency_log::FrameKind::EpistemicHalt as i64, &format!("halt-{j}"));
+            insert(
+                hid(j),
+                ts,
+                maos_kernel_core::iac::transparency_log::FrameKind::EpistemicHalt as i64,
+                &format!("halt-{j}"),
+            );
         }
     }
 }
@@ -138,12 +148,22 @@ fn generate() {
     for d in 0..N_DIGESTS {
         let now = digest_now_ns(d);
         let fire_rate = (d % 10) as f32 / 20.0;
-        let digest = butler.morning_digest(&db, &journal, now, &[], fire_rate).unwrap();
+        let digest = butler
+            .morning_digest(&db, &journal, now, &[], fire_rate)
+            .unwrap();
         let rec = DigestRecord {
             digest_id: format!("d{d:03}"),
             now_ns: now,
-            completed: digest.completed.iter().map(|c| c.source_log_ref.clone()).collect(),
-            open_halts: digest.open_halts.iter().map(|h| h.source_log_ref.clone()).collect(),
+            completed: digest
+                .completed
+                .iter()
+                .map(|c| c.source_log_ref.clone())
+                .collect(),
+            open_halts: digest
+                .open_halts
+                .iter()
+                .map(|h| h.source_log_ref.clone())
+                .collect(),
             trust_bar: digest.trust_bar,
         };
         out.push_str(&serde_json::to_string(&rec).unwrap());
@@ -218,7 +238,10 @@ fn ac6_zero_hallucinations_and_open_halt_inclusion() {
         }
     }
 
-    assert_eq!(hallucinated, 0, "AC6: 0/100 digests may contain a hallucinated task");
+    assert_eq!(
+        hallucinated, 0,
+        "AC6: 0/100 digests may contain a hallucinated task"
+    );
     assert!(
         included_all_open_halts >= 95,
         "AC6: ≥95/100 digests must include all open halts; got {included_all_open_halts}/100"
@@ -258,5 +281,8 @@ fn ac6_checker_detects_a_dropped_open_halt() {
     // the subset check must fail for that digest.
     let truth: BTreeSet<String> = [hex(&hid(0)), hex(&hid(1))].into_iter().collect();
     let reported_missing_one: BTreeSet<String> = [hex(&hid(0))].into_iter().collect();
-    assert!(!truth.is_subset(&reported_missing_one), "dropping an open halt must be detectable");
+    assert!(
+        !truth.is_subset(&reported_missing_one),
+        "dropping an open halt must be detectable"
+    );
 }

@@ -69,10 +69,7 @@ pub struct TcpA2AConfig {
     /// Pre-paired peer leaf-cert fingerprints, loaded into the TOFU pin store.
     pub peer_pins: Vec<PinnedFingerprint>,
     /// Handshake timeout (default 30s; injectable for tests — H5).
-    #[serde(
-        default = "default_handshake_timeout",
-        with = "duration_secs"
-    )]
+    #[serde(default = "default_handshake_timeout", with = "duration_secs")]
     pub handshake_timeout: Duration,
     /// WebPKI trust bundle (LOCKED Option A). `Some` ⇒ CA-chain-to-root THEN pin
     /// (defense-in-depth, the test/prod default); `None` ⇒ pin-only
@@ -123,7 +120,12 @@ impl TcpA2AConfig {
         let store = Arc::new(InMemoryTofuPinStore::new());
         for pin in &self.peer_pins {
             store
-                .pin_first_contact(&pin.peer_id, &pin.fingerprint, &pin.fingerprint, pin.boot_nonce)
+                .pin_first_contact(
+                    &pin.peer_id,
+                    &pin.fingerprint,
+                    &pin.fingerprint,
+                    pin.boot_nonce,
+                )
                 .await
                 .map_err(|e| {
                     TcpTransportError::Config(format!(

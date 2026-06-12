@@ -37,8 +37,14 @@ fn story_6_3_lineage_corpus_loads_70_scenarios_including_20_a2a() {
         .iter()
         .filter(|s| s.scenario_id.contains("lineage_via_a2a_cross_host"))
         .count();
-    assert_eq!(a2a_loopback_count, 10, "expected 10 lineage_via_a2a_loopback scenarios");
-    assert_eq!(a2a_cross_host_count, 10, "expected 10 lineage_via_a2a_cross_host scenarios");
+    assert_eq!(
+        a2a_loopback_count, 10,
+        "expected 10 lineage_via_a2a_loopback scenarios"
+    );
+    assert_eq!(
+        a2a_cross_host_count, 10,
+        "expected 10 lineage_via_a2a_cross_host scenarios"
+    );
 }
 
 #[test]
@@ -47,9 +53,11 @@ fn story_6_3_a2a_scenarios_use_existing_class_for_additive_compat() {
     // `LineageChainUninterrupted` class so the enum doesn't need new variants
     // (additive-only ABI; no `#[non_exhaustive]` required).
     let corpus = IntentLineageCorpus::load_from(&corpus_dir()).expect("load");
-    for s in corpus.scenarios.iter().filter(|s| {
-        s.scenario_id.contains("lineage_via_a2a")
-    }) {
+    for s in corpus
+        .scenarios
+        .iter()
+        .filter(|s| s.scenario_id.contains("lineage_via_a2a"))
+    {
         assert_eq!(
             s.class,
             IntentLineageClass::LineageChainUninterrupted,
@@ -62,10 +70,16 @@ fn story_6_3_a2a_scenarios_use_existing_class_for_additive_compat() {
 #[test]
 fn story_6_3_a2a_scenarios_assert_accept_with_non_empty_lineage() {
     let corpus = IntentLineageCorpus::load_from(&corpus_dir()).expect("load");
-    for s in corpus.scenarios.iter().filter(|s| {
-        s.scenario_id.contains("lineage_via_a2a")
-    }) {
-        assert!(s.expected_outcome.accepted, "{}: must be accept-path", s.scenario_id);
+    for s in corpus
+        .scenarios
+        .iter()
+        .filter(|s| s.scenario_id.contains("lineage_via_a2a"))
+    {
+        assert!(
+            s.expected_outcome.accepted,
+            "{}: must be accept-path",
+            s.scenario_id
+        );
         assert!(
             !s.expected_outcome.expected_lineage_intents.is_empty(),
             "{}: must have non-empty expected lineage",

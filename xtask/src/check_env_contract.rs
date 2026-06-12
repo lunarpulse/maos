@@ -10,8 +10,12 @@ pub fn run(maos_bin_dir: &str, json: bool) -> Result<(), String> {
         ));
     }
 
-    let contract_src = std::fs::read_to_string(&env_contract_path)
-        .map_err(|e| format!("check-env-contract: read {}: {e}", env_contract_path.display()))?;
+    let contract_src = std::fs::read_to_string(&env_contract_path).map_err(|e| {
+        format!(
+            "check-env-contract: read {}: {e}",
+            env_contract_path.display()
+        )
+    })?;
     let registered: Vec<&str> = contract_src
         .lines()
         .filter_map(|line| {
@@ -33,10 +37,7 @@ pub fn run(maos_bin_dir: &str, json: bool) -> Result<(), String> {
     fs_walk::collect_rs_files(&src_dir, &mut rs_files);
 
     for file_path in &rs_files {
-        let file_name = file_path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
+        let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         if file_name == "env_contract.rs" {
             continue;
         }

@@ -67,9 +67,9 @@ impl CapShard {
     /// for the given `spirit_pid`.
     pub fn has_active_tokens_for_spirit(&self, spirit_pid: u32) -> bool {
         let guard = self.inner.read();
-        guard.values().any(|state| {
-            state.spirit_pid == spirit_pid && !state.revoked.load(Ordering::Acquire)
-        })
+        guard
+            .values()
+            .any(|state| state.spirit_pid == spirit_pid && !state.revoked.load(Ordering::Acquire))
     }
 
     /// Evict expired tokens from this shard. Returns the number evicted.

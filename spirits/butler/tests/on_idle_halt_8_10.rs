@@ -28,8 +28,10 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use butler::{Butler, CalendarEvent, EventStatus, ScenarioInput, BUTLER_SPIRIT_ID, BUTLER_SPIRIT_PID};
 use butler::__maos_spirit_vtable_Butler;
+use butler::{
+    Butler, CalendarEvent, EventStatus, ScenarioInput, BUTLER_SPIRIT_ID, BUTLER_SPIRIT_PID,
+};
 
 use maos_domain::halt::HaltReceipt;
 use maos_domain::ports::crypto::CryptoProvider;
@@ -55,7 +57,9 @@ const BOOT_NONCE: u64 = 0x_B17_1E5;
 
 fn butler_policy() -> EpistemicPolicySection {
     let v: toml::Value = toml::from_str(MANIFEST).unwrap();
-    let ep = v.get("epistemic_policy").expect("[epistemic_policy] present");
+    let ep = v
+        .get("epistemic_policy")
+        .expect("[epistemic_policy] present");
     let ep_str = toml::to_string(ep).unwrap();
     EpistemicPolicySection::from_toml_str(&ep_str).expect("Butler [epistemic_policy] must parse")
 }
@@ -85,10 +89,7 @@ impl EpistemicScalarPort for ButlerOrchestratorAdapter {
         value: f64,
         derived_from: &str,
     ) -> Result<Option<HaltReceipt>, ScalarPortError> {
-        self.calls
-            .lock()
-            .unwrap()
-            .push((tag.to_string(), value));
+        self.calls.lock().unwrap().push((tag.to_string(), value));
         self.orchestrator
             .process_scalar_write(
                 &self.tl,
@@ -194,7 +195,10 @@ fn on_idle_fires_the_real_halt_through_the_scalar_port() {
     let assessed = Butler::new().assess(&scenario).primary_scalar();
     let (assessed_tag, assessed_value, _) = assessed;
     assert_eq!(assessed_tag, "belief_variance");
-    assert!(assessed_value >= 0.75, "one conflict crosses the halt floor");
+    assert!(
+        assessed_value >= 0.75,
+        "one conflict crosses the halt floor"
+    );
 
     let world = make_world();
     let calls = Arc::new(Mutex::new(Vec::new()));

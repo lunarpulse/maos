@@ -79,8 +79,14 @@ async fn t1_live_mtls_roundtrip_happy_path() {
     let (decoded_boot, decoded_lamport) = nash
         .last_intake_observed()
         .expect("nash observed an intake");
-    assert_eq!(decoded_boot, MIRA_NONCE, "decoded.boot_nonce == sent.boot_nonce");
-    assert_eq!(decoded_lamport, 1, "decoded.lamport == sent.lamport (params.logical_clock)");
+    assert_eq!(
+        decoded_boot, MIRA_NONCE,
+        "decoded.boot_nonce == sent.boot_nonce"
+    );
+    assert_eq!(
+        decoded_lamport, 1,
+        "decoded.lamport == sent.lamport (params.logical_clock)"
+    );
 
     // Oracle 4: observed_fp == pinned_fp. The handshake only succeeds if the
     // observed mira leaf fingerprint matched nash's active pin; assert nash's

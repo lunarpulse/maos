@@ -13,14 +13,14 @@ pub mod manifest;
 
 // Re-export the most commonly used types at crate root for ergonomic access.
 pub use manifest::{
-    Author, Budget, CapabilitiesRequired, ClassSection, CliWrapperConfig, CliWrapperControlChannel,
+    capabilities_required_to_scopes, resolve_caps, warn_n_minus_1_degradations, Author, Budget,
+    CapabilitiesRequired, ClassSection, CliWrapperConfig, CliWrapperControlChannel,
     CliWrapperPosture, CliWrapperRecoveryPolicy, CliWrapperStdioShape, EpistemicAction,
     EpistemicPolicyRule, EpistemicPolicySection, GatewayEntry, GatewayType, GatewaysSection,
     HaltProtocolCompatibilitySection, HotSwapManifestSection, LifecycleSection, ManifestError,
     McpCapabilities, McpCapabilityServerEntry, McpSection, McpServerEntry, MigratesFromSection,
     OnCrashSection, OnInboundHook, OnRevocationSection, OutputShape, OutputShapePredicate,
-    OutputShapeViolation, Posture, PostureSection, ProviderCapabilities, ProviderConfig, ProvidersSection,
-    ResolvedCaps, ResourceCaps, SandboxConfig, ScalarPredicate, ScheduleEntry, SchedulingSection,
-    SchedulesSection, SupervisionSection, capabilities_required_to_scopes, resolve_caps,
-    warn_n_minus_1_degradations,
+    OutputShapeViolation, Posture, PostureSection, ProviderCapabilities, ProviderConfig,
+    ProvidersSection, ResolvedCaps, ResourceCaps, SandboxConfig, ScalarPredicate, ScheduleEntry,
+    SchedulesSection, SchedulingSection, SupervisionSection,
 };

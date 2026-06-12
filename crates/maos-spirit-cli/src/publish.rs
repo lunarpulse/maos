@@ -154,9 +154,8 @@ pub fn build_signed_package(args: &PublishArgs) -> Result<SignedPackage, CliErro
 
 /// Read a file with a size limit to prevent OOM from malicious inputs.
 fn read_limited_file(path: &PathBuf, max_size: u64, label: &str) -> Result<Vec<u8>, CliError> {
-    let metadata = std::fs::metadata(path).map_err(|e| {
-        CliError::Other(format!("read {label} {:?}: {e}", path))
-    })?;
+    let metadata = std::fs::metadata(path)
+        .map_err(|e| CliError::Other(format!("read {label} {:?}: {e}", path)))?;
     let size = metadata.len();
     if size > max_size {
         return Err(CliError::Other(format!(
@@ -164,9 +163,7 @@ fn read_limited_file(path: &PathBuf, max_size: u64, label: &str) -> Result<Vec<u
             size, max_size
         )));
     }
-    std::fs::read(path).map_err(|e| {
-        CliError::Other(format!("read {label} {:?}: {e}", path))
-    })
+    std::fs::read(path).map_err(|e| CliError::Other(format!("read {label} {:?}: {e}", path)))
 }
 
 /// Convert TrustTier to the CLI string representation.
@@ -250,7 +247,8 @@ pub async fn run_publish(args: PublishArgs) -> anyhow::Result<()> {
             let client = maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient::new(
                 vec![Ok(synthetic_receipt)],
             );
-            let outcome = run_publish_with_client(&args, &client).map_err(|e| anyhow::anyhow!(e))?;
+            let outcome =
+                run_publish_with_client(&args, &client).map_err(|e| anyhow::anyhow!(e))?;
             println!("{}", serde_json::to_string_pretty(&outcome)?);
             return Ok(());
         }
@@ -320,17 +318,26 @@ mod tests {
     fn tier_to_cli_string_round_trips() {
         assert_eq!(tier_to_cli_string(TrustTier::Local), "local");
         assert_eq!(tier_to_cli_string(TrustTier::OrgInternal), "org_internal");
-        assert_eq!(tier_to_cli_string(TrustTier::PublicUntrusted), "public_untrusted");
+        assert_eq!(
+            tier_to_cli_string(TrustTier::PublicUntrusted),
+            "public_untrusted"
+        );
         assert_eq!(tier_to_cli_string(TrustTier::PublicVetted), "public_vetted");
     }
 
     #[test]
     fn resolve_registry_uri_trims_whitespace() {
-        assert_eq!(resolve_registry_uri(Some("  http://example.com  ")), "http://example.com");
+        assert_eq!(
+            resolve_registry_uri(Some("  http://example.com  ")),
+            "http://example.com"
+        );
     }
 
     #[test]
     fn resolve_registry_uri_rejects_whitespace_only() {
-        assert_eq!(resolve_registry_uri(Some("   ")), "http://127.0.0.1:6789/mcp");
+        assert_eq!(
+            resolve_registry_uri(Some("   ")),
+            "http://127.0.0.1:6789/mcp"
+        );
     }
 }

@@ -95,5 +95,12 @@ fn bench_j_researcher(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_j0, bench_j1, bench_j4, bench_j6, bench_j_researcher);
+criterion_group!(
+    benches,
+    bench_j0,
+    bench_j1,
+    bench_j4,
+    bench_j6,
+    bench_j_researcher
+);
 criterion_main!(benches);

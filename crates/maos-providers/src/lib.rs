@@ -6,15 +6,15 @@
 //! multi-provider CI matrix ship in Story 5.5b.
 
 pub mod anthropic;
-pub mod openai;
+pub mod fixture_replay;
 pub mod ollama;
+pub mod openai;
 pub mod provider;
 pub mod rate_limit; // Story 6.4 / NFR-Scale-4
-pub mod fixture_replay;
 
 pub use anthropic::AnthropicProvider;
-pub use openai::OpenAiProvider;
 pub use ollama::OllamaProvider;
+pub use openai::OpenAiProvider;
 pub use provider::{Provider, ProviderError};
 pub use rate_limit::{
     fingerprint_credential, BucketKey, BucketSnapshot, ProviderQuota, ProviderRateLimitConfig,
@@ -30,8 +30,8 @@ pub use provider::Provider as ProviderDriver;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use maos_domain::ports::IoSubsystemPort;
     use maos_domain::ports::io_subsystem::IoError;
+    use maos_domain::ports::IoSubsystemPort;
 
     struct MockTransport;
 

@@ -38,10 +38,13 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
             // Validate existing config is non-trivial.
             let existing = std::fs::read_to_string(&config_path).unwrap_or_default();
             if existing.contains("[slots]") && existing.contains("[retention]") {
-                print_line(color_choice, &format!(
-                    "maos: already initialized — {} exists",
-                    config_path.display()
-                ));
+                print_line(
+                    color_choice,
+                    &format!(
+                        "maos: already initialized — {} exists",
+                        config_path.display()
+                    ),
+                );
                 return Ok(());
             }
             // Truncated/corrupt config — fall through to recreate.
@@ -73,7 +76,10 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
         }
     }
 
-    print_line(color_choice, &format!("maos: initialized {}", home.display()));
+    print_line(
+        color_choice,
+        &format!("maos: initialized {}", home.display()),
+    );
     print_line(
         color_choice,
         &format!(
@@ -145,7 +151,10 @@ pub fn run_shell(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
 
-    print_line(color_choice, "maos shell — type @hello-spirit <msg>  (Ctrl-D to exit)");
+    print_line(
+        color_choice,
+        "maos shell — type @hello-spirit <msg>  (Ctrl-D to exit)",
+    );
 
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
@@ -232,16 +241,26 @@ pub fn run_shell(
                 let payload = serde_json::json!({
                     "user": msg,
                     "response": resp.introduction,
-                }).to_string();
-                let _ = capability.record_invocation(&token_for_audit, "shell.turn".into(), payload.as_bytes());
+                })
+                .to_string();
+                let _ = capability.record_invocation(
+                    &token_for_audit,
+                    "shell.turn".into(),
+                    payload.as_bytes(),
+                );
             }
             Err(maos_spirit_hello::HelloError::Ambiguous { tag, prompt }) => {
                 writeln!(stdout, "[HALT {tag}] {prompt}")?;
                 let payload = serde_json::json!({
                     "user": msg,
                     "halt": tag,
-                }).to_string();
-                let _ = capability.record_invocation(&token_for_audit, "shell.halt".into(), payload.as_bytes());
+                })
+                .to_string();
+                let _ = capability.record_invocation(
+                    &token_for_audit,
+                    "shell.halt".into(),
+                    payload.as_bytes(),
+                );
             }
             Err(e) => {
                 writeln!(stdout, "maos: error: {e}")?;

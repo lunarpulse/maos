@@ -17,8 +17,8 @@
 //! drain-then-terminate with a documented audit marker.
 
 use maos_domain::invariants::i9::SandboxTier;
-use maos_domain::sandbox::T3Error;
 use maos_domain::ports::scheduler::SpiritSchedulerPort;
+use maos_domain::sandbox::T3Error;
 
 use crate::capability::cap_audit::{self, CapAuditEvent};
 

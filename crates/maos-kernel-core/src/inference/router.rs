@@ -22,10 +22,7 @@ pub struct MultiProviderRouter {
 }
 
 impl MultiProviderRouter {
-    pub fn new(
-        providers: BTreeMap<String, Arc<dyn Provider>>,
-        default_id: Option<String>,
-    ) -> Self {
+    pub fn new(providers: BTreeMap<String, Arc<dyn Provider>>, default_id: Option<String>) -> Self {
         Self {
             providers,
             default_id,
@@ -111,11 +108,11 @@ pub enum RouterError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use maos_domain::invariants::i1::{CapabilityToken, TokenId};
     use maos_domain::ports::inference::{
         InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
         TokenUsage,
     };
-    use maos_domain::invariants::i1::{CapabilityToken, TokenId};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct MockProvider {
@@ -259,16 +256,11 @@ mod tests {
         let router = MultiProviderRouter::new(map, Some("primary".into()));
 
         let resp = router
-            .dispatch_with_fallback(
-                "primary",
-                &["secondary".into()],
-                &sample_request(),
-            )
+            .dispatch_with_fallback("primary", &["secondary".into()], &sample_request())
             .unwrap();
         assert_eq!(resp.provider_attribution.provider_id, "openai");
         assert_eq!(
-            primary
-                .call_count(),
+            primary.call_count(),
             1,
             "primary must have been invoked exactly once before fallback"
         );
@@ -292,11 +284,7 @@ mod tests {
         let router = MultiProviderRouter::new(map, Some("primary".into()));
 
         let err = router
-            .dispatch_with_fallback(
-                "primary",
-                &["secondary".into()],
-                &sample_request(),
-            )
+            .dispatch_with_fallback("primary", &["secondary".into()], &sample_request())
             .unwrap_err();
         assert!(matches!(
             err,
@@ -353,11 +341,7 @@ mod tests {
         let router = MultiProviderRouter::new(map, Some("primary".into()));
 
         let resp = router
-            .dispatch_with_fallback(
-                "primary",
-                &["secondary".into()],
-                &sample_request(),
-            )
+            .dispatch_with_fallback("primary", &["secondary".into()], &sample_request())
             .unwrap();
         assert_eq!(resp.provider_attribution.provider_id, "openai");
     }

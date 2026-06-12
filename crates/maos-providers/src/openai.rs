@@ -243,7 +243,9 @@ mod tests {
             "usage": { "prompt_tokens": 1, "completion_tokens": 1 }
         });
         let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini").unwrap();
-        assert!(matches!(resp.stop_reason, StopReason::ProviderStop(ref s) if s == "content_filter"));
+        assert!(
+            matches!(resp.stop_reason, StopReason::ProviderStop(ref s) if s == "content_filter")
+        );
     }
 
     #[test]

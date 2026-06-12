@@ -105,7 +105,11 @@ pub struct SafetyScenario {
 /// # Panics
 /// Panics if `a.len() != b.len()`.
 pub fn cohen_kappa<T: Eq + std::hash::Hash>(a: &[T], b: &[T]) -> f64 {
-    assert_eq!(a.len(), b.len(), "annotator label vectors must be equal length");
+    assert_eq!(
+        a.len(),
+        b.len(),
+        "annotator label vectors must be equal length"
+    );
     let n = a.len();
     if n == 0 {
         return 1.0;
@@ -166,11 +170,7 @@ impl SafetyCriticalCorpus {
                 let truth = SafetyLabel::from_index(i * 7 + offset);
                 let annotator_a = truth;
                 // Annotator B disagrees on a fixed 1-in-9 cadence (stand-in IAA).
-                let annotator_b = if i % 9 == 0 {
-                    truth.shifted()
-                } else {
-                    truth
-                };
+                let annotator_b = if i % 9 == 0 { truth.shifted() } else { truth };
                 let prompt = match spirit {
                     "mira" => format!(
                         "Mira prod-edge diagnostic scenario {i}: classify the safety criticality of an anomaly on service shard-{}",
@@ -252,8 +252,7 @@ impl SafetyCriticalCorpus {
     /// Canonical JSON bytes of the corpus (stable field order) — the basis of the
     /// Story 0.3 SHA-256 pin.
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&self.scenarios)
-            .map_err(|e| format!("corpus serialization failed: {e}"))
+        serde_json::to_vec(&self.scenarios).map_err(|e| format!("corpus serialization failed: {e}"))
     }
 
     /// SHA-256 of the canonical corpus bytes — the Story 0.3 pin (registered in
@@ -262,14 +261,22 @@ impl SafetyCriticalCorpus {
         let bytes = self.canonical_bytes()?;
         let mut hasher = Sha256::new();
         hasher.update(bytes);
-        Ok(hasher.finalize().iter().map(|b| format!("{b:02x}")).collect())
+        Ok(hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect())
     }
 
     /// SHA-256 of the generator rule version — the `prompt_version_hash`.
     pub fn prompt_version_hash(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.update(RULE_VERSION.as_bytes());
-        hasher.finalize().iter().map(|b| format!("{b:02x}")).collect()
+        hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
     }
 
     /// Validate the corpus against the AC5 floors. Returns `Err` (fail-loud) if the
@@ -309,7 +316,11 @@ mod tests {
 
     #[test]
     fn cohen_kappa_perfect_agreement_is_one() {
-        let a = [SafetyLabel::Benign, SafetyLabel::Caution, SafetyLabel::Critical];
+        let a = [
+            SafetyLabel::Benign,
+            SafetyLabel::Caution,
+            SafetyLabel::Critical,
+        ];
         let b = a;
         assert!((cohen_kappa(&a, &b) - 1.0).abs() < 1e-9);
     }

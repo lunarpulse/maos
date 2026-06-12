@@ -26,15 +26,21 @@ fn ctx_mock_returns_empty_deprecation_warnings() {
 
 #[test]
 fn ctx_mock_with_deprecation_warnings_returns_supplied() {
-    let warnings = vec![
-        DeprecationWarning::new("Test::api", "0.5", "1.0", "use Test::new_api"),
-    ];
+    let warnings = vec![DeprecationWarning::new(
+        "Test::api",
+        "0.5",
+        "1.0",
+        "use Test::new_api",
+    )];
     let ctx = Ctx::mock_with_deprecation_warnings(warnings);
     assert_eq!(ctx.deprecation_warnings().len(), 1);
     assert_eq!(ctx.deprecation_warnings()[0].surface, "Test::api");
     assert_eq!(ctx.deprecation_warnings()[0].since_version, "0.5");
     assert_eq!(ctx.deprecation_warnings()[0].planned_removal, "1.0");
-    assert_eq!(ctx.deprecation_warnings()[0].migration_hint, "use Test::new_api");
+    assert_eq!(
+        ctx.deprecation_warnings()[0].migration_hint,
+        "use Test::new_api"
+    );
 }
 
 #[test]
@@ -44,9 +50,12 @@ fn local_runner_populates_deprecation_warnings_surfaced() {
             hooks_fired: Default::default(),
             mock_bus_frames: vec![],
             elapsed_per_hook: Default::default(),
-            deprecation_warnings_surfaced: vec![
-                DeprecationWarning::new("Test::api", "0.5", "1.0", "use Test::new_api"),
-            ],
+            deprecation_warnings_surfaced: vec![DeprecationWarning::new(
+                "Test::api",
+                "0.5",
+                "1.0",
+                "use Test::new_api",
+            )],
         },
         halt_resolutions: vec![],
         captured_frames: vec![],
@@ -57,9 +66,12 @@ fn local_runner_populates_deprecation_warnings_surfaced() {
 #[test]
 fn deprecation_warnings_deduplicated() {
     use maos_spirit_sdk::local_runner::{LocalRunner, LocalRunnerFixture};
-    let warnings = vec![
-        DeprecationWarning::new("Test::api", "0.5", "1.0", "use Test::new_api"),
-    ];
+    let warnings = vec![DeprecationWarning::new(
+        "Test::api",
+        "0.5",
+        "1.0",
+        "use Test::new_api",
+    )];
     let spirit = TestSpirit;
     let vtable = SpiritVtable::<TestSpirit>::from_spirit();
     let fixture = LocalRunnerFixture {
@@ -71,7 +83,11 @@ fn deprecation_warnings_deduplicated() {
     // on_idle fires once; the same warning appears once in the Ctx.
     // Result: exactly 1 unique warning.
     let report = LocalRunner::run(&spirit, &vtable, &fixture);
-    assert_eq!(report.deprecation_warnings_surfaced.len(), 1, "deduplication should reduce to 1 unique warning");
+    assert_eq!(
+        report.deprecation_warnings_surfaced.len(),
+        1,
+        "deduplication should reduce to 1 unique warning"
+    );
     assert_eq!(report.deprecation_warnings_surfaced[0].surface, "Test::api");
 }
 
@@ -83,9 +99,12 @@ fn assert_no_deprecations_panics_when_warnings_present() {
             hooks_fired: Default::default(),
             mock_bus_frames: vec![],
             elapsed_per_hook: Default::default(),
-            deprecation_warnings_surfaced: vec![
-                DeprecationWarning::new("Test::api", "0.5", "1.0", "use Test::new_api"),
-            ],
+            deprecation_warnings_surfaced: vec![DeprecationWarning::new(
+                "Test::api",
+                "0.5",
+                "1.0",
+                "use Test::new_api",
+            )],
         },
         halt_resolutions: vec![],
         captured_frames: vec![],

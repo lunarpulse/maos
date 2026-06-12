@@ -67,7 +67,10 @@ pub async fn run_scaffold(config: ChurnHarnessConfig) -> ChurnDrillReport {
     let recovery_secs = 60;
 
     let mut report = ChurnDrillReport {
-        drill_id: format!("churn-3-host-{}-{}w", config.host_count, config.duration_weeks),
+        drill_id: format!(
+            "churn-3-host-{}-{}w",
+            config.host_count, config.duration_weeks
+        ),
         config: config.clone(),
         detection_latency_median_secs,
         max_blast_radius,

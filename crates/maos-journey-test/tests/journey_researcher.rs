@@ -29,9 +29,7 @@ fn maos_bin() -> String {
 #[test]
 fn jr1_deterministic_survey_via_pty() {
     let audit = AuditDb::temp();
-    let world = JourneyWorld::builder()
-        .audit(audit)
-        .build();
+    let world = JourneyWorld::builder().audit(audit).build();
 
     let manifest = workspace_root().join("spirits/researcher/manifest.toml");
     let cmd = format!("{} run {} --once", maos_bin(), manifest.display());
@@ -53,14 +51,14 @@ fn jr1_deterministic_survey_via_pty() {
 
 #[test]
 fn jr2_live_mcp_fan_out_via_pty() {
-    let web_fixture = workspace_root()
-        .join("crates/maos-journey-test/fixtures/j-researcher/web-search.json");
-    let arxiv_fixture = workspace_root()
-        .join("crates/maos-journey-test/fixtures/j-researcher/arxiv-search.json");
-    let github_fixture = workspace_root()
-        .join("crates/maos-journey-test/fixtures/j-researcher/github-search.json");
-    let citation_fixture = workspace_root()
-        .join("crates/maos-journey-test/fixtures/j-researcher/citation-graph.json");
+    let web_fixture =
+        workspace_root().join("crates/maos-journey-test/fixtures/j-researcher/web-search.json");
+    let arxiv_fixture =
+        workspace_root().join("crates/maos-journey-test/fixtures/j-researcher/arxiv-search.json");
+    let github_fixture =
+        workspace_root().join("crates/maos-journey-test/fixtures/j-researcher/github-search.json");
+    let citation_fixture =
+        workspace_root().join("crates/maos-journey-test/fixtures/j-researcher/citation-graph.json");
 
     let web_mock = MockMcp::from_fixture(web_fixture.to_str().unwrap());
     let arxiv_mock = MockMcp::from_fixture(arxiv_fixture.to_str().unwrap());
@@ -102,7 +100,13 @@ fn jr2_live_mcp_fan_out_via_pty() {
 fn jr_zero_side_effect_deterministic_floor() {
     let audit_db = AuditDb::temp();
     let output = std::process::Command::new(maos_bin())
-        .args(["run", &workspace_root().join("spirits/researcher/manifest.toml").to_string_lossy(), "--once"])
+        .args([
+            "run",
+            &workspace_root()
+                .join("spirits/researcher/manifest.toml")
+                .to_string_lossy(),
+            "--once",
+        ])
         .env("XDG_DATA_HOME", audit_db.path())
         .env("MAOS_HOME", audit_db.path())
         .current_dir(workspace_root())
@@ -127,8 +131,7 @@ fn jr_zero_side_effect_deterministic_floor() {
     // Robust against a daemon that silently journals without printing to stderr.
     let tl_path = audit_db.transparency_log_path();
     if tl_path.exists() {
-        let conn = rusqlite::Connection::open(&tl_path)
-            .expect("open TL for McpInvocation query");
+        let conn = rusqlite::Connection::open(&tl_path).expect("open TL for McpInvocation query");
         // FrameKind::McpInvocation = 18 (Story 5.5c)
         let count: i64 = conn
             .query_row(

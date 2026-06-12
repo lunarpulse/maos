@@ -3,8 +3,8 @@
 //! Gateway Dispatcher integration tests — Story 6.5 / FR54.
 
 use maos_kernel_core::orchestrator::{
-    gateway_dispatcher::{GatewayDispatcher, GatewaySubmoduleRegistry},
     echo_gateway::EchoGatewayFactory,
+    gateway_dispatcher::{GatewayDispatcher, GatewaySubmoduleRegistry},
 };
 use maos_manifest::{GatewayEntry, GatewayType, GatewaysSection};
 use std::sync::Arc;
@@ -63,13 +63,11 @@ async fn gateway_dispatcher_unload_returns_record() {
     let record = dispatcher.unload_spirit_gateways(42, "spirit-42").await;
     assert_eq!(record.spirit_pid, 42);
     assert_eq!(record.gateways.len(), 1);
-    assert!(
-        matches!(
-            record.gateways[0].disconnect_outcome,
-            maos_domain::frame::DisconnectOutcome::Clean
-                | maos_domain::frame::DisconnectOutcome::Timeout
-        )
-    );
+    assert!(matches!(
+        record.gateways[0].disconnect_outcome,
+        maos_domain::frame::DisconnectOutcome::Clean
+            | maos_domain::frame::DisconnectOutcome::Timeout
+    ));
 }
 
 #[tokio::test]

@@ -107,10 +107,7 @@ fn parse_ollama_response(
         .get("prompt_eval_count")
         .and_then(|v| v.as_u64())
         .unwrap_or(0) as u32;
-    let output_tokens = json
-        .get("eval_count")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0) as u32;
+    let output_tokens = json.get("eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
     Ok(InferenceResponse {
         text: content.into(),
@@ -190,8 +187,7 @@ mod tests {
             "prompt_eval_count": 5,
             "eval_count": 10
         });
-        let resp =
-            parse_ollama_response(&json, "http://localhost:11434", "llama3.1:8b").unwrap();
+        let resp = parse_ollama_response(&json, "http://localhost:11434", "llama3.1:8b").unwrap();
         assert_eq!(resp.text, "Greetings from Ollama!");
         assert!(matches!(resp.stop_reason, StopReason::StopSequence));
         assert_eq!(resp.usage.input_tokens, 5);
@@ -207,8 +203,7 @@ mod tests {
             "prompt_eval_count": 1,
             "eval_count": 2
         });
-        let resp =
-            parse_ollama_response(&json, "http://localhost:11434", "llama3.1:8b").unwrap();
+        let resp = parse_ollama_response(&json, "http://localhost:11434", "llama3.1:8b").unwrap();
         assert!(matches!(resp.stop_reason, StopReason::MaxTokens));
     }
 
@@ -220,8 +215,7 @@ mod tests {
             "prompt_eval_count": 1,
             "eval_count": 1
         });
-        let resp =
-            parse_ollama_response(&json, "http://localhost:11434", "llama3.1:8b").unwrap();
+        let resp = parse_ollama_response(&json, "http://localhost:11434", "llama3.1:8b").unwrap();
         assert!(matches!(resp.stop_reason, StopReason::ProviderStop(ref s) if s == "load"));
     }
 
@@ -230,8 +224,7 @@ mod tests {
         let json = serde_json::json!({
             "message": { "content": "text" }
         });
-        let resp =
-            parse_ollama_response(&json, "http://localhost:11434", "llama3.1:8b").unwrap();
+        let resp = parse_ollama_response(&json, "http://localhost:11434", "llama3.1:8b").unwrap();
         assert_eq!(resp.usage.input_tokens, 0);
         assert_eq!(resp.usage.output_tokens, 0);
     }

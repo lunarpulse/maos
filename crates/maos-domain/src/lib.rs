@@ -11,7 +11,8 @@
 //! - No `tokio`, `reqwest`, `sqlx`, `async-std`, `smol`, or `futures`.
 //! - Only `serde` (derive) and `thiserror` are declared as dependencies.
 
-pub mod invariants;
+pub mod audit_key;
+pub mod invariants; // NEW — Story 9.1 FR44 audit signing key loader (Decision B)
 pub use invariants::*;
 
 pub mod cli_wrapper; // NEW — Story 6.2 AC5 CliWrapperSpirit admission errors

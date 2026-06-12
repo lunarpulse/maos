@@ -13,11 +13,11 @@
 
 use std::sync::Arc;
 
+use maos_domain::invariants::i1::{CapabilityToken, TokenId};
 use maos_domain::ports::inference::{
     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
     TokenUsage,
 };
-use maos_domain::invariants::i1::{CapabilityToken, TokenId};
 use maos_kernel_core::inference::router::MultiProviderRouter;
 use maos_kernel_core::io::take_io_journal;
 use maos_providers::fixture_replay::FixtureReplayProvider;
@@ -79,18 +79,23 @@ fn ollama_only_no_cross_provider_leakage() {
     let responses: Vec<_> = (0..5).map(|i| Ok(ollama_response(i))).collect();
     let ollama = Arc::new(FixtureReplayProvider::new(responses));
 
-    let anthropic_responses: Vec<_> = (0..5).map(|i| {
-        Ok(InferenceResponse {
-            text: format!("anthropic-reply-{i}"),
-            stop_reason: StopReason::StopSequence,
-            usage: TokenUsage { input_tokens: 10, output_tokens: 20 },
-            provider_attribution: ProviderAttribution {
-                provider_id: "anthropic".into(),
-                endpoint_url: "https://api.anthropic.com".into(),
-                model_id: None,
-            },
+    let anthropic_responses: Vec<_> = (0..5)
+        .map(|i| {
+            Ok(InferenceResponse {
+                text: format!("anthropic-reply-{i}"),
+                stop_reason: StopReason::StopSequence,
+                usage: TokenUsage {
+                    input_tokens: 10,
+                    output_tokens: 20,
+                },
+                provider_attribution: ProviderAttribution {
+                    provider_id: "anthropic".into(),
+                    endpoint_url: "https://api.anthropic.com".into(),
+                    model_id: None,
+                },
+            })
         })
-    }).collect();
+        .collect();
     let anthropic = Arc::new(FixtureReplayProvider::new(anthropic_responses));
 
     let mut providers = std::collections::BTreeMap::new();

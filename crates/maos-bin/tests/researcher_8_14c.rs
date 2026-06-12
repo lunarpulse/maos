@@ -65,9 +65,7 @@ struct RequestCapture {
 /// in order, one per accepted connection. Returns `(url, Receiver)` where
 /// each received `RequestCapture` records the HTTP method/path/body of one
 /// incoming request.
-fn spawn_mock_mcp_server(
-    responses: Vec<&'static str>,
-) -> (String, mpsc::Receiver<RequestCapture>) {
+fn spawn_mock_mcp_server(responses: Vec<&'static str>) -> (String, mpsc::Receiver<RequestCapture>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let (tx, rx) = mpsc::channel();
@@ -135,11 +133,7 @@ fn spawn_mock_mcp_server(
                 resp
             );
             let _ = stream.write_all(http_response.as_bytes());
-            let _ = tx.send(RequestCapture {
-                method,
-                path,
-                body,
-            });
+            let _ = tx.send(RequestCapture { method, path, body });
         }
     });
     (format!("http://{addr}"), rx)
@@ -213,10 +207,14 @@ fn maos_run_researcher_live_once_wires_mcp_port() {
 
 /// Phase-1 (search/traverse) mock responses — one per MCP endpoint.
 /// Each returns exactly one source key so Phase-2 has one fetch per server.
-const WEB_SEARCH_RESP: &str = r#"{"jsonrpc":"2.0","result":{"results":[{"url":"https://example.com/paper1"}]},"id":1}"#;
-const ARXIV_SEARCH_RESP: &str = r#"{"jsonrpc":"2.0","result":{"papers":[{"arxiv_id":"2401.00001"}]},"id":1}"#;
-const GITHUB_SEARCH_RESP: &str = r#"{"jsonrpc":"2.0","result":{"results":[{"repo":"octocat/hello-world"}]},"id":1}"#;
-const CITATION_SEARCH_RESP: &str = r#"{"jsonrpc":"2.0","result":{"edges":[{"from":"paper-alpha","to":"paper-beta"}]},"id":1}"#;
+const WEB_SEARCH_RESP: &str =
+    r#"{"jsonrpc":"2.0","result":{"results":[{"url":"https://example.com/paper1"}]},"id":1}"#;
+const ARXIV_SEARCH_RESP: &str =
+    r#"{"jsonrpc":"2.0","result":{"papers":[{"arxiv_id":"2401.00001"}]},"id":1}"#;
+const GITHUB_SEARCH_RESP: &str =
+    r#"{"jsonrpc":"2.0","result":{"results":[{"repo":"octocat/hello-world"}]},"id":1}"#;
+const CITATION_SEARCH_RESP: &str =
+    r#"{"jsonrpc":"2.0","result":{"edges":[{"from":"paper-alpha","to":"paper-beta"}]},"id":1}"#;
 
 /// Phase-2 (fetch) mock responses — each carries a `ClaimPayload` + `source_key`.
 const WEB_FETCH_RESP: &str = r#"{"jsonrpc":"2.0","result":{"claim":{"claim_id":"web-1","statement":"Web search found positional bias in LLM agents","topic":"positional-bias","methodology_strength":0.8,"confidence":0.85,"load_bearing":false,"polarity":true,"hedges":["may"]},"source_key":"https://example.com/paper1"},"id":1}"#;
@@ -229,14 +227,11 @@ fn researcher_8_14c_mcp_fanout() {
     // Spawn one mock MCP server per researcher endpoint. Each serves:
     //   request 1 → Phase-1 search/traverse response (returns source keys)
     //   request 2 → Phase-2 fetch response (returns ClaimPayload + source_key)
-    let (web_url, web_rx) =
-        spawn_mock_mcp_server(vec![WEB_SEARCH_RESP, WEB_FETCH_RESP]);
-    let (arxiv_url, arxiv_rx) =
-        spawn_mock_mcp_server(vec![ARXIV_SEARCH_RESP, ARXIV_FETCH_RESP]);
+    let (web_url, web_rx) = spawn_mock_mcp_server(vec![WEB_SEARCH_RESP, WEB_FETCH_RESP]);
+    let (arxiv_url, arxiv_rx) = spawn_mock_mcp_server(vec![ARXIV_SEARCH_RESP, ARXIV_FETCH_RESP]);
     let (github_url, github_rx) =
         spawn_mock_mcp_server(vec![GITHUB_SEARCH_RESP, GITHUB_FETCH_RESP]);
-    let (cit_url, cit_rx) =
-        spawn_mock_mcp_server(vec![CITATION_SEARCH_RESP, CITATION_FETCH_RESP]);
+    let (cit_url, cit_rx) = spawn_mock_mcp_server(vec![CITATION_SEARCH_RESP, CITATION_FETCH_RESP]);
 
     let home = isolated_data_home("fanout");
     let mut child = Command::new(env!("CARGO_BIN_EXE_maos"))
@@ -292,21 +287,25 @@ fn researcher_8_14c_mcp_fanout() {
         "web mock must receive a request body"
     );
 
-    let arxiv_req = arxiv_rx.recv().expect("arxiv Phase-1 search must have fired");
+    let arxiv_req = arxiv_rx
+        .recv()
+        .expect("arxiv Phase-1 search must have fired");
     assert!(
         !arxiv_req.body.is_empty(),
         "arxiv mock must receive a request body"
     );
 
-    let github_req =
-        github_rx.recv().expect("github Phase-1 search_code must have fired");
+    let github_req = github_rx
+        .recv()
+        .expect("github Phase-1 search_code must have fired");
     assert!(
         !github_req.body.is_empty(),
         "github mock must receive a request body"
     );
 
-    let cit_req =
-        cit_rx.recv().expect("citation-graph Phase-1 traverse must have fired");
+    let cit_req = cit_rx
+        .recv()
+        .expect("citation-graph Phase-1 traverse must have fired");
     assert!(
         !cit_req.body.is_empty(),
         "citation-graph mock must receive a request body"
@@ -314,10 +313,15 @@ fn researcher_8_14c_mcp_fanout() {
 
     // Phase-2 fetch calls should also have fired (each server gets a 2nd request).
     let _web_fetch = web_rx.recv().expect("web Phase-2 fetch must have fired");
-    let _arxiv_fetch = arxiv_rx.recv().expect("arxiv Phase-2 get_paper must have fired");
-    let _github_fetch = github_rx.recv().expect("github Phase-2 get_repo must have fired");
-    let _cit_fetch =
-        cit_rx.recv().expect("citation-graph Phase-2 get_citations must have fired");
+    let _arxiv_fetch = arxiv_rx
+        .recv()
+        .expect("arxiv Phase-2 get_paper must have fired");
+    let _github_fetch = github_rx
+        .recv()
+        .expect("github Phase-2 get_repo must have fired");
+    let _cit_fetch = cit_rx
+        .recv()
+        .expect("citation-graph Phase-2 get_citations must have fired");
 
     // ── Assertion 3: no CapabilityDenied ────────────────────────────────
     let combined = format!("{stdout_str}{stderr_str}");

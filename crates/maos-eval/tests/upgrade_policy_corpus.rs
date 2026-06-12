@@ -12,9 +12,8 @@ use maos_eval::UpgradePolicyCorpus;
 
 #[test]
 fn upgrade_policy_corpus_loads_all_20_scenarios() {
-    let corpus =
-        UpgradePolicyCorpus::load_from(Path::new("fixtures/upgrade-policy-corpus-v0/"))
-            .expect("upgrade-policy-corpus-v0 must exist");
+    let corpus = UpgradePolicyCorpus::load_from(Path::new("fixtures/upgrade-policy-corpus-v0/"))
+        .expect("upgrade-policy-corpus-v0 must exist");
     assert_eq!(
         corpus.len(),
         20,
@@ -24,17 +23,21 @@ fn upgrade_policy_corpus_loads_all_20_scenarios() {
 
 #[test]
 fn upgrade_policy_corpus_categories_are_well_formed() {
-    let corpus =
-        UpgradePolicyCorpus::load_from(Path::new("fixtures/upgrade-policy-corpus-v0/"))
-            .expect("upgrade-policy-corpus-v0 must exist");
+    let corpus = UpgradePolicyCorpus::load_from(Path::new("fixtures/upgrade-policy-corpus-v0/"))
+        .expect("upgrade-policy-corpus-v0 must exist");
 
     let valid_policies = ["hot_swap", "cold_swap", "migrator", "migrator"];
     let mut policy_idx = 0usize;
 
     for scenario in &corpus.scenarios {
         assert!(
-            ["hot_swap_success", "cold_swap_success", "migrator_success", "policy_mismatch"]
-                .contains(&scenario.category.as_str()),
+            [
+                "hot_swap_success",
+                "cold_swap_success",
+                "migrator_success",
+                "policy_mismatch"
+            ]
+            .contains(&scenario.category.as_str()),
             "scenario {} has unknown category: {}",
             scenario.scenario_id,
             scenario.category
@@ -67,9 +70,8 @@ fn upgrade_policy_corpus_categories_are_well_formed() {
 
 #[test]
 fn upgrade_policy_corpus_category_distribution_is_uniform() {
-    let corpus =
-        UpgradePolicyCorpus::load_from(Path::new("fixtures/upgrade-policy-corpus-v0/"))
-            .expect("upgrade-policy-corpus-v0 must exist");
+    let corpus = UpgradePolicyCorpus::load_from(Path::new("fixtures/upgrade-policy-corpus-v0/"))
+        .expect("upgrade-policy-corpus-v0 must exist");
 
     use std::collections::HashMap;
     let mut counts: HashMap<&str, usize> = HashMap::new();

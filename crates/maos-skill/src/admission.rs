@@ -102,7 +102,11 @@ impl SkillAdmissionQueue {
     ) -> Result<SkillId, ESkillQueue> {
         let id = skill.manifest.skill_id();
         let version = skill.manifest.skill_version();
-        if self.pending.iter().any(|e| &e.id == &id && e.state == SkillAdmissionState::Pending) {
+        if self
+            .pending
+            .iter()
+            .any(|e| &e.id == &id && e.state == SkillAdmissionState::Pending)
+        {
             return Err(ESkillQueue::DuplicateSkillId(id.to_string()));
         }
         self.audit.push(ApprovalDecision {
@@ -140,7 +144,11 @@ impl SkillAdmissionQueue {
     ) -> Result<SkillId, ESkillQueue> {
         let id = proposal.target_skill_id.clone();
         let version = proposal.target_version.clone();
-        if self.pending.iter().any(|e| &e.id == &id && e.state == SkillAdmissionState::Pending) {
+        if self
+            .pending
+            .iter()
+            .any(|e| &e.id == &id && e.state == SkillAdmissionState::Pending)
+        {
             return Err(ESkillQueue::DuplicateSkillId(id.to_string()));
         }
         let evidence_pid = proposal.telemetry_evidence.spirit_pid;

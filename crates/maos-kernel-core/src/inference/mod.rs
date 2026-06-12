@@ -99,7 +99,9 @@ impl InferencePortAdapter {
             _ => return Err(InferenceError::Unconfigured),
         };
         // Recover the driver to read its credential_fingerprint.
-        let driver = self.router.dispatch(Some(interned))
+        let driver = self
+            .router
+            .dispatch(Some(interned))
             .map_err(|e| InferenceError::ProviderTransport(e.to_string()))?;
         let fp = driver.credential_fingerprint();
         Ok(Some(maos_providers::BucketKey::new(interned, fp)))
@@ -114,9 +116,10 @@ impl InferencePortAdapter {
         provider_id: &str,
     ) -> maos_domain::invariants::i13::IntentLineage {
         use maos_domain::invariants::i8::A2AIntent;
-        maos_domain::invariants::i13::IntentLineage::new(vec![
-            A2AIntent::new(format!("infer:{}", provider_id)),
-        ])
+        maos_domain::invariants::i13::IntentLineage::new(vec![A2AIntent::new(format!(
+            "infer:{}",
+            provider_id
+        ))])
     }
 
     /// Story 6.4 — emit a typed `RateLimited` IAC frame to the invoking
@@ -289,9 +292,10 @@ impl InferencePort for InferencePortAdapter {
 
         let start = std::time::Instant::now();
         let provider_result = if req.fallback_provider_ids.is_empty() {
-            let driver = self.router.dispatch(Some(provider_id)).map_err(|e| {
-                InferenceError::ProviderTransport(e.to_string())
-            })?;
+            let driver = self
+                .router
+                .dispatch(Some(provider_id))
+                .map_err(|e| InferenceError::ProviderTransport(e.to_string()))?;
             driver.complete(&req)
         } else {
             self.router
@@ -302,8 +306,7 @@ impl InferencePort for InferencePortAdapter {
         // + error (does NOT double-decrement the bucket).
         if let Err(ProviderError::ProviderRejected { status, body }) = &provider_result {
             if *status == 429 {
-                let retry_after_ms = Self::parse_retry_after_ms(body)
-                    .unwrap_or(5000);
+                let retry_after_ms = Self::parse_retry_after_ms(body).unwrap_or(5000);
                 let invoking_spirit_id = format!("spirit:{}", req.spirit_pid);
                 let lineage = self.build_rate_limit_lineage(provider_id);
                 self.emit_rate_limited_frame(
@@ -331,7 +334,10 @@ impl InferencePort for InferencePortAdapter {
         });
         let duration_us = start.elapsed().as_micros() as u64;
 
-        let actual_provider = result.as_ref().map(|r| r.provider_attribution.provider_id.as_str()).unwrap_or("unknown");
+        let actual_provider = result
+            .as_ref()
+            .map(|r| r.provider_attribution.provider_id.as_str())
+            .unwrap_or("unknown");
         let intent = format!(
             "infer:{}->{}:{}",
             provider_id,
@@ -442,12 +448,7 @@ mod tests {
         let transparency_log = Arc::new(TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF));
         let telemetry = Arc::new(IacRtMetrics::new());
 
-        InferencePortAdapter::new(
-            test_router(),
-            capabilities,
-            transparency_log,
-            telemetry,
-        )
+        InferencePortAdapter::new(test_router(), capabilities, transparency_log, telemetry)
     }
 
     fn make_token(
@@ -564,17 +565,20 @@ mod tests {
         map.insert("secondary".into(), secondary_ok);
         let router = Arc::new(MultiProviderRouter::new(map, Some("primary".into())));
 
-        let adapter = InferencePortAdapter::new(
-            router,
-            capabilities,
-            transparency_log,
-            telemetry,
-        );
+        let adapter = InferencePortAdapter::new(router, capabilities, transparency_log, telemetry);
 
         crate::capability::cap_tokens::init_monotonic_base();
         let token = adapter
             .capabilities
-            .issue_with_mediation(7, Scope::ProviderInfer { provider: "primary".into() }, 60, [0u8; 32], IntentClass::Standard)
+            .issue_with_mediation(
+                7,
+                Scope::ProviderInfer {
+                    provider: "primary".into(),
+                },
+                60,
+                [0u8; 32],
+                IntentClass::Standard,
+            )
             .unwrap();
 
         let req = InferenceRequest::new(

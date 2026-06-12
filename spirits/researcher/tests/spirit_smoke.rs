@@ -8,9 +8,9 @@
 //! files (`recall_walker`, `distillation_i11`, `scalar_tap`); the SDK
 //! spirit-test harness only exercises the firing-side hook + manifest envelope.
 
-use researcher::{ClaimPayload, RecalledFrame, Researcher};
-use researcher::__maos_spirit_vtable_Researcher;
 use maos_spirit_sdk::spirit_test::{assert_no_deprecations, manifest_self_check, SpiritTest};
+use researcher::__maos_spirit_vtable_Researcher;
+use researcher::{ClaimPayload, RecalledFrame, Researcher};
 
 const MANIFEST: &str = include_str!("../manifest.toml");
 
@@ -56,7 +56,9 @@ fn on_idle_fires_once_and_surveys_within_budget() {
         "on_idle must return before time_cap_seconds=60; took {elapsed:?}"
     );
     // The survey produced a production-visible result.
-    let out = spirit.last_output().expect("on_idle stored a survey output");
+    let out = spirit
+        .last_output()
+        .expect("on_idle stored a survey output");
     assert_eq!(out.findings.len(), 1);
     assert_no_deprecations!(report);
 }
@@ -91,7 +93,12 @@ fn manifest_self_check_is_well_formed() {
     assert!(report.resources_cpu_max_pct.is_some());
     assert!(report.resources_memory_max_mb.is_some());
     // §6.2 output shape.
-    for f in ["findings", "open_questions", "confidence_map", "bibliography"] {
+    for f in [
+        "findings",
+        "open_questions",
+        "confidence_map",
+        "bibliography",
+    ] {
         assert!(
             report.output_shape_required_fields.iter().any(|x| x == f),
             "output_shape must require '{f}'"
@@ -115,10 +122,8 @@ fn manifest_sections_parse_with_authoritative_validators() {
     let _ = class;
 
     // [capabilities.required] — provider.complete + the 4 MCP servers (Decision B).
-    let caps =
-        CapabilitiesRequired::from_toml_str(&capabilities_required_section(MANIFEST)).expect(
-            "[capabilities.required] valid",
-        );
+    let caps = CapabilitiesRequired::from_toml_str(&capabilities_required_section(MANIFEST))
+        .expect("[capabilities.required] valid");
     assert!(!caps.provider.complete.is_empty());
     let servers: Vec<&str> = caps.mcp.servers.iter().map(|s| s.name.as_str()).collect();
     for expected in ["web", "arxiv", "github", "citation-graph"] {

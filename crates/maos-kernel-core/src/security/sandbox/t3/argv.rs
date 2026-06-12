@@ -80,10 +80,7 @@ pub fn build_runtime_argv(
         "--user=65534:65534".to_string(),
         format!("--label=maos.spirit_id={spirit_id}"),
         format!("--label=maos.boot_nonce={boot_nonce}"),
-        format!(
-            "--volume={}:/maos/spirit:ro",
-            spirit_binary_path.display()
-        ),
+        format!("--volume={}:/maos/spirit:ro", spirit_binary_path.display()),
         format!("--cpus={cpu_str}"),
         format!("--memory={mem_str}"),
         format!("--pids-limit={pid_str}"),
@@ -171,7 +168,8 @@ mod tests {
             "argv must include --user"
         );
         assert!(
-            argv.iter().any(|a| a.starts_with("--label=maos.spirit_id=")),
+            argv.iter()
+                .any(|a| a.starts_with("--label=maos.spirit_id=")),
             "argv must include spirit_id label"
         );
         assert!(
@@ -187,16 +185,19 @@ mod tests {
             "argv must include --pids-limit"
         );
         assert!(
-            argv.iter().any(|a| a.starts_with("--name=maos-test-spirit-")),
+            argv.iter()
+                .any(|a| a.starts_with("--name=maos-test-spirit-")),
             "argv must include --name with container name"
         );
         assert!(
-            argv.iter().any(|a| a.starts_with("--volume=") && a.contains(":/maos/spirit:ro")),
+            argv.iter()
+                .any(|a| a.starts_with("--volume=") && a.contains(":/maos/spirit:ro")),
             "argv must include --volume bind mount"
         );
         // Verify image reference includes sha256
         assert!(
-            argv.iter().any(|a| a.starts_with("gcr.io/distroless/cc-debian12@sha256:")),
+            argv.iter()
+                .any(|a| a.starts_with("gcr.io/distroless/cc-debian12@sha256:")),
             "argv must include image URI with sha256 digest"
         );
         // Verify command passthrough after "--"

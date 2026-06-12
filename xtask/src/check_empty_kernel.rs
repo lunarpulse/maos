@@ -282,9 +282,9 @@ impl<'a> Visit<'_> for EmptyKernelVisitor<'a> {
 /// Does NOT match `#[cfg(not(test))]` (production-only code) or
 /// `#[cfg(feature = "test")]` (where `"test"` is a string literal, not an ident).
 fn has_cfg_test(attrs: &[syn::Attribute]) -> bool {
-    attrs.iter().any(|attr| {
-        attr.path().is_ident("cfg") && cfg_meta_has_test_ident(&attr.meta)
-    })
+    attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("cfg") && cfg_meta_has_test_ident(&attr.meta))
 }
 
 /// Walk a `#[cfg(…)]` meta and return true if `test` appears as a positive ident

@@ -46,10 +46,7 @@ impl CassetteReplayPort {
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            let prompt_len = e
-                .get("prompt_len")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0) as usize;
+            let prompt_len = e.get("prompt_len").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
             let resp = e
                 .get("response")
                 .ok_or_else(|| format!("cassette entry {i}: missing 'response'"))?;

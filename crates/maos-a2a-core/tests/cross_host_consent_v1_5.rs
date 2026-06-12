@@ -73,7 +73,6 @@ async fn pinned_core(allowlists: ConsentAllowlists) -> A2ARouterCore {
     A2ARouterCore::new(vec![cfg], tofu)
 }
 
-
 /// `band_intent` is the coarse `IntentClass` (the band-fallback projection);
 /// `fine` is the optional per-frame fine-grained `A2AIntent` that, when present,
 /// supersedes the band at the consent decision point.
@@ -395,7 +394,10 @@ async fn case_insensitive_matching_for_fine_grained_intents() {
     // The allowlist holds mixed-case; the frame carries lowercase.
     // `eq_ignore_ascii_case` must admit the frame (review finding).
     let core = pinned_core(allow(&["Diagnosis-Handoff:Read-Only-Evidence"], &[])).await;
-    let f = frame(IntentClass::Readonly, Some("diagnosis-handoff:read-only-evidence"));
+    let f = frame(
+        IntentClass::Readonly,
+        Some("diagnosis-handoff:read-only-evidence"),
+    );
     core.prepare_outbound(f, &HostId("loopback".into()), 0)
         .await
         .expect("case-insensitive match must admit");
@@ -428,10 +430,19 @@ async fn ac2_granter_mismatch_denied_on_intake() {
     let req = A2AJsonRpcRequest::new(METHOD_IAC_DELIVER, frame_with_foreign_granter(), 1);
     match core.handle_intake(req).await {
         A2AJsonRpcResponse::Nack(n) => {
-            assert_eq!(n.error.code, CODE_CONSENT_GRANTER_MISMATCH, "must NACK -32008");
-            let data = n.error.data.expect("granter-mismatch NACK carries both addresses");
+            assert_eq!(
+                n.error.code, CODE_CONSENT_GRANTER_MISMATCH,
+                "must NACK -32008"
+            );
+            let data = n
+                .error
+                .data
+                .expect("granter-mismatch NACK carries both addresses");
             assert!(data.get("granter").is_some(), "NACK data names the granter");
-            assert!(data.get("frame_from").is_some(), "NACK data names the frame from");
+            assert!(
+                data.get("frame_from").is_some(),
+                "NACK data names the frame from"
+            );
         }
         other => panic!("expected granter-mismatch NACK, got {other:?}"),
     }
@@ -551,7 +562,10 @@ async fn ac2_granter_mismatch_host_id_only() {
     match core.handle_intake(req).await {
         A2AJsonRpcResponse::Nack(n) => {
             assert_eq!(n.error.code, CODE_CONSENT_GRANTER_MISMATCH);
-            let data = n.error.data.expect("granter-mismatch NACK carries addresses");
+            let data = n
+                .error
+                .data
+                .expect("granter-mismatch NACK carries addresses");
             assert!(data.get("granter").is_some());
             assert!(data.get("frame_from").is_some());
         }
@@ -594,7 +608,9 @@ async fn ac5_intent_length_bound_unified_to_canonical_128() {
             0,
         )
         .await
-        .expect_err("128-byte intent_class is the fine-grained key (band allowlist must not match)");
+        .expect_err(
+            "128-byte intent_class is the fine-grained key (band allowlist must not match)",
+        );
     assert!(matches!(
         err,
         A2AError::IntentDenied {

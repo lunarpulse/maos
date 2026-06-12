@@ -85,9 +85,7 @@ mod serde_pubkey32 {
                 let mut arr = [0u8; 32];
                 for (i, slot) in arr.iter_mut().enumerate() {
                     *slot = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(format!(
-                            "expected 32-byte pubkey, got {i} bytes"
-                        ))
+                        serde::de::Error::custom(format!("expected 32-byte pubkey, got {i} bytes"))
                     })?;
                 }
                 Ok(arr)
@@ -373,7 +371,11 @@ impl RegistryClient for LocalFileRegistryClient {
     fn trust_anchor_pub(&self) -> Result<Vec<u8>, RevocationError> {
         let hex_str = std::env::var("MAOS_CRL_TRUST_ANCHOR_PUB_HEX")
             .map_err(|_| RevocationError::TrustAnchorMissing)?;
-        hex::decode(&hex_str).map_err(|e| RevocationError::Io(format!("invalid hex encoding in MAOS_CRL_TRUST_ANCHOR_PUB_HEX: {e}")))
+        hex::decode(&hex_str).map_err(|e| {
+            RevocationError::Io(format!(
+                "invalid hex encoding in MAOS_CRL_TRUST_ANCHOR_PUB_HEX: {e}"
+            ))
+        })
     }
 }
 
@@ -543,12 +545,10 @@ fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
                         (false, false) => continue,
                         (false, true) => return std::cmp::Ordering::Greater,
                         (true, false) => return std::cmp::Ordering::Less,
-                        (true, true) => {
-                            match a_raw.cmp(b_raw) {
-                                std::cmp::Ordering::Equal => continue,
-                                other => return other,
-                            }
-                        }
+                        (true, true) => match a_raw.cmp(b_raw) {
+                            std::cmp::Ordering::Equal => continue,
+                            other => return other,
+                        },
                     }
                 }
                 other => return other,

@@ -83,7 +83,10 @@ impl std::fmt::Debug for TofuPinningVerifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TofuPinningVerifier")
             .field("direction", &(self.direction == VerifyDirection::Server))
-            .field("chain_mode", &matches!(self.posture, TrustPosture::ChainToRoots(_)))
+            .field(
+                "chain_mode",
+                &matches!(self.posture, TrustPosture::ChainToRoots(_)),
+            )
             .finish()
     }
 }
@@ -96,8 +99,7 @@ impl TofuPinningVerifier {
         expected_peer: Option<PeerId>,
         validation_time: Option<UnixTime>,
     ) -> Self {
-        let sig_algs = rustls::crypto::ring::default_provider()
-            .signature_verification_algorithms;
+        let sig_algs = rustls::crypto::ring::default_provider().signature_verification_algorithms;
         Self {
             pins,
             posture,
@@ -123,9 +125,8 @@ impl TofuPinningVerifier {
         usage: KeyUsage,
     ) -> Result<(), RustlsError> {
         // ---- Step 1: WebPKI (validity/structure [+ chain in Some mode]) ----
-        let ee = EndEntityCert::try_from(end_entity).map_err(|e| {
-            reject("BAD_CERTIFICATE", format!("malformed leaf: {e:?}"))
-        })?;
+        let ee = EndEntityCert::try_from(end_entity)
+            .map_err(|e| reject("BAD_CERTIFICATE", format!("malformed leaf: {e:?}")))?;
 
         // Build the trust anchors for this posture. `LeafSelfAnchor` (None mode)
         // anchors the leaf to ITSELF — webpki then checks the self-signature,
@@ -193,7 +194,9 @@ impl TofuPinningVerifier {
 /// regardless of rustls's own wording (AC-A3 shared taxonomy).
 fn reject(tag: &str, detail: String) -> RustlsError {
     RustlsError::InvalidCertificate(rustls::CertificateError::Other(rustls::OtherError(
-        Arc::new(TcpTransportError::classify_handshake(&format!("{tag}: {detail}"))),
+        Arc::new(TcpTransportError::classify_handshake(&format!(
+            "{tag}: {detail}"
+        ))),
     )))
 }
 

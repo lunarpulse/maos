@@ -13,7 +13,10 @@ fn fixture_to_mcp_response(path: &str) -> McpResponse {
     let raw = std::fs::read_to_string(fixture_dir().join(path))
         .unwrap_or_else(|e| panic!("fixture read {path}: {e}"));
     let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
-    let content = value.get("result").cloned().unwrap_or(serde_json::Value::Null);
+    let content = value
+        .get("result")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
     let is_error = content
         .get("isError")
         .and_then(|v| v.as_bool())

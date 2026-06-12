@@ -1480,9 +1480,8 @@ impl RawSchedulesSection {
             // payload_b64 decode (base64 standard). Hand-rolled minimal decoder
             // — workspace has no `base64` dep; FR47 forbids adding one for
             // Story 6.4 (verified via xtask). Empty string → empty bytes.
-            let payload_bytes = decode_b64_strict(&raw.payload_b64).map_err(|e| {
-                ManifestError::Toml(validation_msg("schedule.payload_b64", &e))
-            })?;
+            let payload_bytes = decode_b64_strict(&raw.payload_b64)
+                .map_err(|e| ManifestError::Toml(validation_msg("schedule.payload_b64", &e)))?;
             // compliance_claim_ref_hex — 64 hex chars (= 32 bytes) if present.
             let compliance_claim_ref = match raw.compliance_claim_ref_hex {
                 None => None,
@@ -3411,7 +3410,11 @@ id = "kimi"
 "#;
         let err = ProvidersSection::from_toml_str(toml).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("kimi") && msg.contains("unsupported"), "msg={}", msg);
+        assert!(
+            msg.contains("kimi") && msg.contains("unsupported"),
+            "msg={}",
+            msg
+        );
     }
 
     #[test]
@@ -3439,11 +3442,7 @@ provider_endpoint_pin = "not-hex"
 "#;
         let err = ProvidersSection::from_toml_str(toml).unwrap_err();
         let msg = err.to_string();
-        assert!(
-            msg.contains("64-char hex SHA-256"),
-            "msg={}",
-            msg
-        );
+        assert!(msg.contains("64-char hex SHA-256"), "msg={}", msg);
     }
 
     #[test]
@@ -3457,7 +3456,10 @@ provider_endpoint_pin = "{}"
             "a".repeat(64)
         );
         let section = ProvidersSection::from_toml_str(&toml).unwrap();
-        assert_eq!(section.primary.provider_endpoint_pin.as_deref(), Some("a".repeat(64).as_str()));
+        assert_eq!(
+            section.primary.provider_endpoint_pin.as_deref(),
+            Some("a".repeat(64).as_str())
+        );
     }
 
     #[test]
@@ -3471,7 +3473,11 @@ id = "kimi"
 "#;
         let err = ProvidersSection::from_toml_str(toml).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("fallback[0]") && msg.contains("kimi"), "msg={}", msg);
+        assert!(
+            msg.contains("fallback[0]") && msg.contains("kimi"),
+            "msg={}",
+            msg
+        );
     }
 }
 
@@ -3513,9 +3519,7 @@ pub struct CliWrapperConfig {
     pub posture: CliWrapperPosture,
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 #[non_exhaustive]
 #[serde(rename_all = "snake_case")]
 pub enum CliWrapperRecoveryPolicy {
@@ -3543,9 +3547,7 @@ pub struct CliWrapperPosture {
     pub shutdown_signal: Option<String>,
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(rename_all = "snake_case")]
 pub enum CliWrapperStdioShape {
@@ -3554,9 +3556,7 @@ pub enum CliWrapperStdioShape {
     Raw,
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(rename_all = "snake_case")]
 pub enum CliWrapperControlChannel {
@@ -3614,9 +3614,18 @@ control_channel = "signals"
         assert_eq!(cfg.command, "echo");
         assert_eq!(cfg.output_shape_version, "1.0.0");
         assert!(cfg.argv_prefix.is_empty());
-        assert_eq!(cfg.recovery_policy, CliWrapperRecoveryPolicy::RespawnWithContext);
-        assert_eq!(cfg.posture.stdio_shape, CliWrapperStdioShape::NdjsonOverStdio);
-        assert_eq!(cfg.posture.control_channel, CliWrapperControlChannel::Signals);
+        assert_eq!(
+            cfg.recovery_policy,
+            CliWrapperRecoveryPolicy::RespawnWithContext
+        );
+        assert_eq!(
+            cfg.posture.stdio_shape,
+            CliWrapperStdioShape::NdjsonOverStdio
+        );
+        assert_eq!(
+            cfg.posture.control_channel,
+            CliWrapperControlChannel::Signals
+        );
         assert_eq!(cfg.posture.shutdown_signal, None);
     }
 
@@ -4111,16 +4120,13 @@ impl RawGatewaysSection {
                 let scheme = &rest[..ci];
                 if scheme.is_empty()
                     || !scheme.starts_with(|c: char| c.is_ascii_lowercase())
-                    || !scheme
-                        .chars()
-                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+                    || !scheme.chars().all(|c| {
+                        c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-'
+                    })
                 {
                     return Err(ManifestError::Toml(validation_msg(
                         "gateway.auth_secret_ref",
-                        &format!(
-                            "scheme must be [a-z][a-z0-9_-]+, got '{}'",
-                            scheme
-                        ),
+                        &format!("scheme must be [a-z][a-z0-9_-]+, got '{}'", scheme),
                     )));
                 }
                 let key = &rest[ci + 1..];
@@ -4132,10 +4138,7 @@ impl RawGatewaysSection {
                 {
                     return Err(ManifestError::Toml(validation_msg(
                         "gateway.auth_secret_ref",
-                        &format!(
-                            "key must be [A-Za-z0-9_-]{{1,256}}, got len {}",
-                            key.len()
-                        ),
+                        &format!("key must be [A-Za-z0-9_-]{{1,256}}, got len {}", key.len()),
                     )));
                 }
             }
@@ -4143,20 +4146,14 @@ impl RawGatewaysSection {
             if raw.reconnect_backoff_secs < 1 || raw.reconnect_backoff_secs > 3600 {
                 return Err(ManifestError::Toml(validation_msg(
                     "gateway.reconnect_backoff_secs",
-                    &format!(
-                        "must be in [1, 3600], got {}",
-                        raw.reconnect_backoff_secs
-                    ),
+                    &format!("must be in [1, 3600], got {}", raw.reconnect_backoff_secs),
                 )));
             }
             // max_message_bytes — [256, 1_048_576]
             if raw.max_message_bytes < 256 || raw.max_message_bytes > 1_048_576 {
                 return Err(ManifestError::Toml(validation_msg(
                     "gateway.max_message_bytes",
-                    &format!(
-                        "must be in [256, 1048576], got {}",
-                        raw.max_message_bytes
-                    ),
+                    &format!("must be in [256, 1048576], got {}", raw.max_message_bytes),
                 )));
             }
             entries.push(GatewayEntry {

@@ -11,9 +11,7 @@
 use std::cell::Cell;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use maos_kernel_core::iac::transparency_log::{
-    FrameFilter, FrameKind, TransparencyLogAdapter,
-};
+use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::lifecycle::cli_wrapper::{
     argv_prefix_hash, spawn_and_bridge, Backpressure, BridgeError, BridgeSpawnSpec, ExitCause,
 };
@@ -61,7 +59,13 @@ fn antitheater_real_spawn_nonce_pid_and_reaped() {
     );
     assert_eq!(bridge.from_spirit_id(), "worker");
 
-    let out = bridge.pump_to_journal(&journal, 7, "orchestrator", "worker-cli", &["lineage-x".to_string()]);
+    let out = bridge.pump_to_journal(
+        &journal,
+        7,
+        "orchestrator",
+        "worker-cli",
+        &["lineage-x".to_string()],
+    );
     assert_eq!(out.stdout_lines, 1, "exactly one stdout line echoed");
     assert_eq!(out.dropped, 0);
 
@@ -69,7 +73,11 @@ fn antitheater_real_spawn_nonce_pid_and_reaped() {
     let exit = bridge.wait_and_finalize(&journal, 7, |code| revoked.set(Some(code)));
     assert_eq!(exit.cause, ExitCause::Exited { code: 0 });
     assert!(!exit.cause.is_crash(), "clean exit-0 is NOT a crash");
-    assert_eq!(revoked.get(), Some(Some(0)), "revoke closure fired with exit code");
+    assert_eq!(
+        revoked.get(),
+        Some(Some(0)),
+        "revoke closure fired with exit code"
+    );
 
     // The journaled CliSubprocessOutput row carries the nonce + the real child PID.
     let rows = journal
@@ -80,12 +88,18 @@ fn antitheater_real_spawn_nonce_pid_and_reaped() {
         .unwrap();
     assert_eq!(rows.len(), 1);
     let payload = String::from_utf8_lossy(&rows[0].payload_redacted);
-    assert!(payload.contains(&nonce), "row carries the per-run nonce echoed by the child");
+    assert!(
+        payload.contains(&nonce),
+        "row carries the per-run nonce echoed by the child"
+    );
     assert!(
         payload.contains(&format!("\"child_pid\":{child_pid}")),
         "row carries the child's REAL pid: {payload}"
     );
-    assert_eq!(rows[0].from_spirit_id, "worker", "sender identity captured at spawn");
+    assert_eq!(
+        rows[0].from_spirit_id, "worker",
+        "sender identity captured at spawn"
+    );
 
     // An exit audit row (CapabilityInvocation) was journaled.
     let exits = journal
@@ -130,9 +144,15 @@ fn stdout_drains_before_death_no_truncation() {
     let journal = TransparencyLogAdapter::open_in_memory(0);
     let mut b = spawn_and_bridge(sh_spec("printf 'a\\nb\\nc\\n'; exit 1")).unwrap();
     let out = b.pump_to_journal(&journal, 1, "x", "cli", &[]);
-    assert_eq!(out.stdout_lines, 3, "all 3 pre-death lines captured (no truncation)");
+    assert_eq!(
+        out.stdout_lines, 3,
+        "all 3 pre-death lines captured (no truncation)"
+    );
     let e = b.wait_and_finalize(&journal, 1, |_| {});
-    assert!(e.cause.is_crash(), "non-zero exit after draining is a crash");
+    assert!(
+        e.cause.is_crash(),
+        "non-zero exit after draining is a crash"
+    );
     let rows = journal
         .query_frames(FrameFilter {
             kind: Some(FrameKind::CliSubprocessOutput),
@@ -163,7 +183,10 @@ fn redaction_trap_hex_token_never_lands_in_log() {
         !payload.contains(secret),
         "raw 64-hex secret must NOT appear in the log: {payload}"
     );
-    assert!(payload.contains("REDACTED"), "the secret was scrubbed: {payload}");
+    assert!(
+        payload.contains("REDACTED"),
+        "the secret was scrubbed: {payload}"
+    );
 }
 
 #[test]

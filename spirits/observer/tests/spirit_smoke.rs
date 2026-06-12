@@ -26,13 +26,7 @@ fn on_idle_fires_once_and_surfaces_within_budget() {
     // surface both (production-visible effect), well within time_cap_seconds=10.
     let spirit = Observer::watching(
         PrincipalScope::all(),
-        vec![WatchThreshold::new(
-            "belief_variance",
-            0.7,
-            DriftDirection::Above,
-            0.15,
-        )
-        .unwrap()],
+        vec![WatchThreshold::new("belief_variance", 0.7, DriftDirection::Above, 0.15).unwrap()],
     )
     .with_pending_scalars(vec![ScalarTapEvent {
         spirit_id: "mira".into(),

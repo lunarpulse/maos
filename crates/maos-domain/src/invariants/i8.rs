@@ -217,16 +217,16 @@ mod tests {
     fn is_canonical_rejects_typo_class() {
         // Exactly the "silent never-match" class the warn must catch.
         for s in [
-            "",                              // empty
-            "Diagnosis-Handoff",            // uppercase
-            "diagnosis handoff",            // space
-            "diagnosis-handoff:",           // trailing colon (empty verb)
-            ":read-only",                   // empty namespace
-            "diagnosis--handoff",           // empty segment between dashes
-            "-leading-dash",                // leading dash → empty segment
-            "trailing-dash-",               // trailing dash → empty segment
-            "ns:verb:extra",                // more than one colon
-            "snake_case",                   // underscore not allowed
+            "",                   // empty
+            "Diagnosis-Handoff",  // uppercase
+            "diagnosis handoff",  // space
+            "diagnosis-handoff:", // trailing colon (empty verb)
+            ":read-only",         // empty namespace
+            "diagnosis--handoff", // empty segment between dashes
+            "-leading-dash",      // leading dash → empty segment
+            "trailing-dash-",     // trailing dash → empty segment
+            "ns:verb:extra",      // more than one colon
+            "snake_case",         // underscore not allowed
         ] {
             assert!(
                 !A2AIntent::new(s).is_canonical(),

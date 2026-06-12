@@ -9,13 +9,13 @@
 //!   3.6 Consent envelope expired → ConsentExpired
 //!   3.7 Malformed JSON-RPC → NACK -32700
 
-use maos_a2a::{
-    A2APeerConfig, A2AProfile, A2APeerRouter as LocalRouter, ConsentAllowlists,
-    InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId,
-    A2AJsonRpcRequest, A2AJsonRpcResponse, TofuPinStore,
-};
 use maos_a2a::error::{A2AError, IntentDirection};
 use maos_a2a::transport::json_rpc::{CODE_INTENT_DENIED, METHOD_IAC_DELIVER};
+use maos_a2a::{
+    A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile,
+    ConsentAllowlists, InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId,
+    TofuPinStore,
+};
 use maos_domain::frame::{
     FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
 };
@@ -226,7 +226,6 @@ async fn scenario_3_7_malformed_jsonrpc_returns_parse_error() {
     let err = req.validate().expect_err("must reject");
     assert_eq!(err.code, -32600); // invalid request per JSON-RPC 2.0
 }
-
 
 #[tokio::test]
 async fn scenario_3_6_consent_envelope_expired() {

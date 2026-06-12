@@ -6,9 +6,7 @@
 //! and verifies the ctx handles are callable. Used in integration tests
 //! and the smoke arm.
 
-use maos_spirit_abi::gateway::{
-    GatewayCtx, GatewayError, GatewaySubmodule, InboundMessage,
-};
+use maos_spirit_abi::gateway::{GatewayCtx, GatewayError, GatewaySubmodule, InboundMessage};
 
 /// Echo gateway — accepts all messages, no external I/O.
 pub struct EchoGatewaySubmodule;
@@ -47,9 +45,8 @@ impl GatewaySubmodule for EchoGatewaySubmodule {
         &'a self,
         ctx: &'a GatewayCtx,
         msg: InboundMessage<'a>,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<(), GatewayError>> + Send + 'a>,
-    > {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), GatewayError>> + Send + 'a>>
+    {
         Box::pin(async move {
             ctx.mailbox
                 .deliver_inbound(

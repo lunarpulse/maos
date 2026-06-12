@@ -40,17 +40,18 @@ pub fn load_signing_seed(
         return parse_seed_bytes(&bytes);
     }
     if let Some(var_name) = env_var {
-        let value = std::env::var(var_name).map_err(|e| {
-            CliError::SigningKeyLoad(format!("env var '{var_name}' not set: {e}"))
-        })?;
+        let value = std::env::var(var_name)
+            .map_err(|e| CliError::SigningKeyLoad(format!("env var '{var_name}' not set: {e}")))?;
         return parse_seed_bytes(value.as_bytes());
     }
     // Default fallback
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
-        .map_err(|_| CliError::SigningKeyLoad(
-            "no --signing-key, no --signing-key-env, and $HOME/$USERPROFILE unset".into(),
-        ))?;
+        .map_err(|_| {
+            CliError::SigningKeyLoad(
+                "no --signing-key, no --signing-key-env, and $HOME/$USERPROFILE unset".into(),
+            )
+        })?;
     let default = Path::new(&home).join(".config/maos/spirit-signing.key");
     let bytes = read_key_file(&default)?;
     parse_seed_bytes(&bytes)
@@ -58,17 +59,17 @@ pub fn load_signing_seed(
 
 /// Read a key file with size limits and permission checks.
 fn read_key_file(path: &Path) -> Result<Vec<u8>, CliError> {
-    let metadata = std::fs::metadata(path).map_err(|e| {
-        CliError::SigningKeyLoad(format!("read {:?}: {e}", path))
-    })?;
-    
+    let metadata = std::fs::metadata(path)
+        .map_err(|e| CliError::SigningKeyLoad(format!("read {:?}: {e}", path)))?;
+
     let size = metadata.len();
     if size > MAX_KEY_FILE_SIZE {
         return Err(CliError::SigningKeyLoad(format!(
-            "key file too large: {} bytes (max {})", size, MAX_KEY_FILE_SIZE
+            "key file too large: {} bytes (max {})",
+            size, MAX_KEY_FILE_SIZE
         )));
     }
-    
+
     #[cfg(unix)]
     {
         let mode = metadata.permissions().mode();
@@ -76,14 +77,13 @@ fn read_key_file(path: &Path) -> Result<Vec<u8>, CliError> {
             return Err(CliError::SigningKeyLoad(format!(
                 "key file {:?} has overly permissive permissions ({:04o}); \
                  expected owner-only (0o600 or tighter)",
-                path, mode & 0o777
+                path,
+                mode & 0o777
             )));
         }
     }
-    
-    std::fs::read(path).map_err(|e| {
-        CliError::SigningKeyLoad(format!("read {:?}: {e}", path))
-    })
+
+    std::fs::read(path).map_err(|e| CliError::SigningKeyLoad(format!("read {:?}: {e}", path)))
 }
 
 /// Parse the seed from either raw 32-byte hex or PEM PKCS#8 envelope.
@@ -97,9 +97,8 @@ pub fn parse_seed_bytes(raw: &[u8]) -> Result<Ed25519Seed, CliError> {
     let hex_input = s.strip_prefix("0x").unwrap_or(s);
     let hex_input: String = hex_input.chars().filter(|c| !c.is_whitespace()).collect();
     if hex_input.len() == 64 {
-        let bytes = hex::decode(&hex_input).map_err(|e| {
-            CliError::SigningKeyLoad(format!("hex decode failure: {e}"))
-        })?;
+        let bytes = hex::decode(&hex_input)
+            .map_err(|e| CliError::SigningKeyLoad(format!("hex decode failure: {e}")))?;
         let mut seed = [0u8; 32];
         seed.copy_from_slice(&bytes);
         return Ok(seed);
@@ -128,7 +127,8 @@ fn parse_pem_seed(pem: &str) -> Result<Ed25519Seed, CliError> {
         if line.starts_with("-----BEGIN") {
             if block_count > 0 {
                 return Err(CliError::SigningKeyLoad(
-                    "PEM file contains multiple blocks; expected a single Ed25519 private key".into(),
+                    "PEM file contains multiple blocks; expected a single Ed25519 private key"
+                        .into(),
                 ));
             }
             let label = line
@@ -196,19 +196,22 @@ pub fn derive_keypair(seed: &Ed25519Seed) -> Result<([u8; 32], Ed25519KeyPair), 
 pub fn extract_spirit_id_and_version(manifest_toml: &[u8]) -> Result<(String, String), CliError> {
     let text = std::str::from_utf8(manifest_toml)
         .map_err(|e| CliError::ManifestParse(format!("manifest not UTF-8: {e}")))?;
-    
-    let manifest: toml::Value = text.parse()
+
+    let manifest: toml::Value = text
+        .parse()
         .map_err(|e| CliError::ManifestParse(format!("TOML parse error: {e}")))?;
-    
-    let spirit_id = manifest.get("spirit_id")
+
+    let spirit_id = manifest
+        .get("spirit_id")
         .or_else(|| manifest.get("name"))
         .and_then(|v| v.as_str())
         .ok_or_else(|| CliError::ManifestParse("manifest missing `spirit_id` or `name`".into()))?;
-    
-    let version = manifest.get("version")
+
+    let version = manifest
+        .get("version")
         .and_then(|v| v.as_str())
         .ok_or_else(|| CliError::ManifestParse("manifest missing `version`".into()))?;
-    
+
     Ok((spirit_id.to_string(), version.to_string()))
 }
 
@@ -261,7 +264,9 @@ mod tests {
     fn base64_with_padding_decodes_correctly() {
         // Standard base64 with padding
         let b64 = "SGVsbG8gV29ybGQh";
-        let decoded = base64::engine::general_purpose::STANDARD.decode(b64).unwrap();
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .unwrap();
         assert_eq!(String::from_utf8(decoded).unwrap(), "Hello World!");
     }
 

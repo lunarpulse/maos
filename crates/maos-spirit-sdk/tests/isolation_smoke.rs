@@ -29,10 +29,10 @@ mod spirit_b {
     }
 }
 
-use spirit_a::SpiritA;
 use spirit_a::__maos_spirit_vtable_SpiritA;
-use spirit_b::SpiritB;
+use spirit_a::SpiritA;
 use spirit_b::__maos_spirit_vtable_SpiritB;
+use spirit_b::SpiritB;
 
 #[test]
 fn isolation_framework_fires_4_hook_points_in_order() {

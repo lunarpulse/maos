@@ -27,11 +27,7 @@ struct RejectingGate {
 }
 
 impl ConsentGate for RejectingGate {
-    fn evaluate(
-        &self,
-        _frame: &IacFrame,
-        recipient: &FrameAddress,
-    ) -> Result<(), RuptureReason> {
+    fn evaluate(&self, _frame: &IacFrame, recipient: &FrameAddress) -> Result<(), RuptureReason> {
         if self.rejects.contains(recipient.spirit_id.as_str()) {
             Err(self.reason)
         } else {
@@ -40,7 +36,10 @@ impl ConsentGate for RejectingGate {
     }
 }
 
-fn make_mailbox(reject: Vec<&str>, reason: RuptureReason) -> (Arc<Mailbox>, Arc<TransparencyLogAdapter>) {
+fn make_mailbox(
+    reject: Vec<&str>,
+    reason: RuptureReason,
+) -> (Arc<Mailbox>, Arc<TransparencyLogAdapter>) {
     maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let metrics = Arc::new(IacRtMetrics::new());
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
@@ -102,8 +101,7 @@ fn drain_kind(
 /// AC3.1 — Single-recipient frame, recipient accepts → no rupture.
 #[tokio::test]
 async fn rupture_3_1_single_accept_no_rupture() {
-    let (mailbox, _tl) =
-        make_mailbox(vec![], RuptureReason::IntentAllowlistMismatch); // empty reject set
+    let (mailbox, _tl) = make_mailbox(vec![], RuptureReason::IntentAllowlistMismatch); // empty reject set
     let mut handle_sender = mailbox.register_spirit("sender").unwrap();
     let mut handle_a = mailbox.register_spirit("recipient-a").unwrap();
     let frame = make_frame("sender", vec!["recipient-a"], None);
@@ -129,14 +127,16 @@ async fn rupture_3_2_two_accept_no_rupture() {
 
     assert_eq!(drain_kind(&mut handle_a).len(), 1, "A receives");
     assert_eq!(drain_kind(&mut handle_b).len(), 1, "B receives");
-    assert!(drain_kind(&mut handle_sender).is_empty(), "no rupture frame");
+    assert!(
+        drain_kind(&mut handle_sender).is_empty(),
+        "no rupture frame"
+    );
 }
 
 /// AC3.3 — A accepts + B rejects (intent_allowlist_mismatch) → partial rupture.
 #[tokio::test]
 async fn rupture_3_3_partial_intent_mismatch() {
-    let (mailbox, _tl) =
-        make_mailbox(vec!["b"], RuptureReason::IntentAllowlistMismatch);
+    let (mailbox, _tl) = make_mailbox(vec!["b"], RuptureReason::IntentAllowlistMismatch);
     let mut handle_sender = mailbox.register_spirit("sender").unwrap();
     let mut handle_a = mailbox.register_spirit("a").unwrap();
     let mut handle_b = mailbox.register_spirit("b").unwrap();
@@ -167,8 +167,7 @@ async fn rupture_3_3_partial_intent_mismatch() {
 /// AC3.4 — Both recipients reject → entire frame quarantined.
 #[tokio::test]
 async fn rupture_3_4_full_quarantine() {
-    let (mailbox, _tl) =
-        make_mailbox(vec!["a", "b"], RuptureReason::PrincipalRevoked);
+    let (mailbox, _tl) = make_mailbox(vec!["a", "b"], RuptureReason::PrincipalRevoked);
     let mut handle_sender = mailbox.register_spirit("sender").unwrap();
     let mut handle_a = mailbox.register_spirit("a").unwrap();
     let mut handle_b = mailbox.register_spirit("b").unwrap();
@@ -191,10 +190,7 @@ async fn rupture_3_4_full_quarantine() {
 /// AC3.5 — PostureShiftedDuringTransmission rupture reason variant.
 #[tokio::test]
 async fn rupture_3_5_posture_shift_during_transmission() {
-    let (mailbox, _tl) = make_mailbox(
-        vec!["b"],
-        RuptureReason::PostureShiftedDuringTransmission,
-    );
+    let (mailbox, _tl) = make_mailbox(vec!["b"], RuptureReason::PostureShiftedDuringTransmission);
     let mut handle_sender = mailbox.register_spirit("sender").unwrap();
     let _handle_a = mailbox.register_spirit("a").unwrap();
     let _handle_b = mailbox.register_spirit("b").unwrap();
@@ -233,8 +229,7 @@ async fn rupture_3_6_token_revoked() {
 /// AC3.7 — Recipient unloads mid-frame (RecipientUnloaded reason).
 #[tokio::test]
 async fn rupture_3_7_recipient_unloaded() {
-    let (mailbox, _tl) =
-        make_mailbox(vec!["b"], RuptureReason::RecipientUnloaded);
+    let (mailbox, _tl) = make_mailbox(vec!["b"], RuptureReason::RecipientUnloaded);
     let mut handle_sender = mailbox.register_spirit("sender").unwrap();
     let _handle_a = mailbox.register_spirit("a").unwrap();
     let _handle_b = mailbox.register_spirit("b").unwrap();
@@ -261,8 +256,7 @@ async fn rupture_3_7_recipient_unloaded() {
 /// original), NOT two.
 #[tokio::test]
 async fn rupture_3_8_recursion_bound_at_depth_2() {
-    let (mailbox, _tl) =
-        make_mailbox(vec!["b"], RuptureReason::TokenRevoked);
+    let (mailbox, _tl) = make_mailbox(vec!["b"], RuptureReason::TokenRevoked);
     let mut handle_sender = mailbox.register_spirit("sender").unwrap();
     let _handle_a = mailbox.register_spirit("a").unwrap();
     let _handle_b = mailbox.register_spirit("b").unwrap();
@@ -281,8 +275,7 @@ async fn rupture_3_8_recursion_bound_at_depth_2() {
 #[tokio::test]
 async fn rupture_3_9_lineage_preserved() {
     let lineage = IntentLineage::new(vec![A2AIntent::new("standard")]);
-    let (mailbox, _tl) =
-        make_mailbox(vec!["b"], RuptureReason::IntentAllowlistMismatch);
+    let (mailbox, _tl) = make_mailbox(vec!["b"], RuptureReason::IntentAllowlistMismatch);
     let mut handle_sender = mailbox.register_spirit("sender").unwrap();
     let _handle_a = mailbox.register_spirit("a").unwrap();
     let _handle_b = mailbox.register_spirit("b").unwrap();

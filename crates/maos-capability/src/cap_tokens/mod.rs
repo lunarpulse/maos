@@ -310,7 +310,9 @@ impl CapTokensShardRing {
     /// non-revoked, non-expired token across any shard. Used by the
     /// ScheduleWatchdog principal-revocability gate (Story 6.4).
     pub fn has_active_tokens_for_spirit(&self, spirit_pid: u32) -> bool {
-        self.shards.iter().any(|shard| shard.has_active_tokens_for_spirit(spirit_pid))
+        self.shards
+            .iter()
+            .any(|shard| shard.has_active_tokens_for_spirit(spirit_pid))
     }
 
     /// Debug introspection: list all active (non-revoked) token IDs
@@ -328,7 +330,7 @@ impl CapTokensShardRing {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use maos_domain::ports::crypto::{CryptoProvider, CryptoError};
+    use maos_domain::ports::crypto::{CryptoError, CryptoProvider};
 
     struct MockCryptoProvider;
 

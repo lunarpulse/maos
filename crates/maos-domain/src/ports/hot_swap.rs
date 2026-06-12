@@ -23,8 +23,8 @@
 //! declares the contract that survives the extraction boundary.
 
 use crate::halt::HaltId;
-use crate::invariants::i6::HotSwapState;
 use crate::invariants::i10::JournalEntry;
+use crate::invariants::i6::HotSwapState;
 
 /// Hot-Swap Coordinator — saga orchestrator preserving I6 (token preservation)
 /// and I14 (halt continuity) across Spirit version transitions.

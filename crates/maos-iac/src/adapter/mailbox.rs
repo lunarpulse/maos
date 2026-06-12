@@ -32,8 +32,8 @@ use maos_domain::ports::IacBusPort;
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 
 use super::channels::{channel_class_for, ChannelClass};
-use super::transparency_log::TransparencyLogAdapter;
 use super::metrics::IacRtMetrics;
+use super::transparency_log::TransparencyLogAdapter;
 
 /// Story 6.5 — trait abstraction for updating Spirit activity timestamps
 /// without coupling the mailbox to kernel-core's `SpiritControlBlock`.
@@ -139,10 +139,16 @@ impl std::fmt::Debug for Mailbox {
             .field("mpsc_senders", &self.mpsc_senders)
             .field("broadcast_sender", &self.broadcast_sender)
             .field("metrics", &self.metrics)
-            .field("tracker_present", &self.scbs.lock().map(|g| g.is_some()).unwrap_or(false))
+            .field(
+                "tracker_present",
+                &self.scbs.lock().map(|g| g.is_some()).unwrap_or(false),
+            )
             .field("a2a_router_present", &self.a2a_router.is_some())
             .field("consent_gate_present", &self.consent_gate.get().is_some())
-            .field("transparency_log_present", &self.transparency_log.get().is_some())
+            .field(
+                "transparency_log_present",
+                &self.transparency_log.get().is_some(),
+            )
             .finish()
     }
 }
@@ -267,46 +273,50 @@ impl Mailbox {
         frame: IacFrame,
         rupture_depth: u8,
     ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send + 'a>,
+        Box<
+            dyn std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send + 'a,
+        >,
     > {
         Box::pin(async move {
-        let kind = frame.kind;
+            let kind = frame.kind;
 
-        if kind == FrameKind::TelemetryEvent {
-            // F12: track broadcast telemetry in pending gauge
-            self.metrics.inc_pending("broadcast", kind);
-            // TODO: broadcast receiver drain does not call dec_pending —
-            // pending gauge for "broadcast" is monotonic (append-only) until
-            // a future story wires per-subscriber ACK tracking.
-            let _ = self.broadcast_sender.send(frame);
-            return Ok(LogBeforeDeliver::new(()));
-        }
-
-        // Phase 1: Partition recipients into same-host and cross-host.
-        // Story 6.3 — cross-host frames route via the installed A2ARouter;
-        // when no router is installed, fire `CrossHostNotConfigured`.
-        let mut cross_host_targets: Vec<maos_spirit_abi::identity::HostId> = Vec::new();
-        for addr in &frame.to {
-            let spirit_id = addr.spirit_id.as_str().to_string();
-            if let Some(host_id) = &addr.host_id {
-                cross_host_targets.push(host_id.clone());
-                continue; // same-host validation skipped for cross-host addresses
+            if kind == FrameKind::TelemetryEvent {
+                // F12: track broadcast telemetry in pending gauge
+                self.metrics.inc_pending("broadcast", kind);
+                // TODO: broadcast receiver drain does not call dec_pending —
+                // pending gauge for "broadcast" is monotonic (append-only) until
+                // a future story wires per-subscriber ACK tracking.
+                let _ = self.broadcast_sender.send(frame);
+                return Ok(LogBeforeDeliver::new(()));
             }
-            if !self.mpsc_senders.contains_key(&(spirit_id.clone(), kind)) {
-                return Err(IacBusError::UnknownSpirit(spirit_id));
-            }
-        }
 
-        // Phase 1.5 — Story 6.4 / ADR-034 binding-v0.9: per-recipient consent
-        // gate. The kernel-internal sender (KERNEL_SENDER_SPIRIT_ID) is exempt
-        // so ConsentRupture/RateLimited frames the kernel emits don't enter
-        // the gate (recursion floor). The gate is also bypassed at
-        // `rupture_depth ≥ 1` to prevent rupture-on-rupture cycles per
-        // Story 6.4 AC3 test 3.8.
-        let is_kernel_sender = frame.from.spirit_id.as_str() == KERNEL_SENDER_SPIRIT_ID;
-        let gate_enabled = !is_kernel_sender && rupture_depth < 2;
-        let (accepted_recipients, rejected_recipients): (Vec<FrameAddress>, Vec<RuptureRejection>) =
-            if let (Some(gate), true) = (self.consent_gate.get(), gate_enabled) {
+            // Phase 1: Partition recipients into same-host and cross-host.
+            // Story 6.3 — cross-host frames route via the installed A2ARouter;
+            // when no router is installed, fire `CrossHostNotConfigured`.
+            let mut cross_host_targets: Vec<maos_spirit_abi::identity::HostId> = Vec::new();
+            for addr in &frame.to {
+                let spirit_id = addr.spirit_id.as_str().to_string();
+                if let Some(host_id) = &addr.host_id {
+                    cross_host_targets.push(host_id.clone());
+                    continue; // same-host validation skipped for cross-host addresses
+                }
+                if !self.mpsc_senders.contains_key(&(spirit_id.clone(), kind)) {
+                    return Err(IacBusError::UnknownSpirit(spirit_id));
+                }
+            }
+
+            // Phase 1.5 — Story 6.4 / ADR-034 binding-v0.9: per-recipient consent
+            // gate. The kernel-internal sender (KERNEL_SENDER_SPIRIT_ID) is exempt
+            // so ConsentRupture/RateLimited frames the kernel emits don't enter
+            // the gate (recursion floor). The gate is also bypassed at
+            // `rupture_depth ≥ 1` to prevent rupture-on-rupture cycles per
+            // Story 6.4 AC3 test 3.8.
+            let is_kernel_sender = frame.from.spirit_id.as_str() == KERNEL_SENDER_SPIRIT_ID;
+            let gate_enabled = !is_kernel_sender && rupture_depth < 2;
+            let (accepted_recipients, rejected_recipients): (
+                Vec<FrameAddress>,
+                Vec<RuptureRejection>,
+            ) = if let (Some(gate), true) = (self.consent_gate.get(), gate_enabled) {
                 let mut accept = Vec::new();
                 let mut reject: Vec<RuptureRejection> = Vec::new();
                 for addr in frame.to.iter() {
@@ -323,191 +333,185 @@ impl Mailbox {
                 (frame.to.iter().cloned().collect(), Vec::new())
             };
 
-        if !rejected_recipients.is_empty() {
-            // Quarantine TL row BEFORE rupture emission (I2 log-before-deliver).
-            if let Some(tl) = self.transparency_log.get() {
-                let payload = serde_json::json!({
-                    "original_frame_id": frame.frame_id,
-                    "quarantined_recipients": rejected_recipients
-                        .iter()
-                        .map(|r| r.address.spirit_id.as_str())
-                        .collect::<Vec<_>>(),
-                    "reasons": rejected_recipients
-                        .iter()
-                        .map(|r| serde_json::to_value(&r.reason)
-                            .unwrap_or_else(|_| serde_json::Value::String("serialization_error".into())))
-                        .collect::<Vec<_>>(),
-                    "ruptured_at_ns": maos_capability::cap_tokens::monotonic_now_ns(),
-                });
-                let _ = tl.insert_frame_event_with_sender(
-                    super::transparency_log::FrameKind::ConsentRupture,
-                    0,
-                    frame.from.spirit_id.as_str(),
-                    "",
-                    None,
-                    "consent.rupture.quarantine",
-                    payload.to_string().as_bytes(),
-                    FrameOrigin::Kernel,
-                );
-            }
+            if !rejected_recipients.is_empty() {
+                // Quarantine TL row BEFORE rupture emission (I2 log-before-deliver).
+                if let Some(tl) = self.transparency_log.get() {
+                    let payload = serde_json::json!({
+                        "original_frame_id": frame.frame_id,
+                        "quarantined_recipients": rejected_recipients
+                            .iter()
+                            .map(|r| r.address.spirit_id.as_str())
+                            .collect::<Vec<_>>(),
+                        "reasons": rejected_recipients
+                            .iter()
+                            .map(|r| serde_json::to_value(&r.reason)
+                                .unwrap_or_else(|_| serde_json::Value::String("serialization_error".into())))
+                            .collect::<Vec<_>>(),
+                        "ruptured_at_ns": maos_capability::cap_tokens::monotonic_now_ns(),
+                    });
+                    let _ = tl.insert_frame_event_with_sender(
+                        super::transparency_log::FrameKind::ConsentRupture,
+                        0,
+                        frame.from.spirit_id.as_str(),
+                        "",
+                        None,
+                        "consent.rupture.quarantine",
+                        payload.to_string().as_bytes(),
+                        FrameOrigin::Kernel,
+                    );
+                }
 
-            // Build the ConsentRupture payload and recursively emit to sender.
-            let rupture_payload = ConsentRupturePayload {
-                rupture_id: generate_rupture_id(),
-                original_frame_id: frame.frame_id,
-                original_kind: frame.kind,
-                accepted: accepted_recipients.clone(),
-                rejected: rejected_recipients,
-                ruptured_at_ns: maos_capability::cap_tokens::monotonic_now_ns(),
-            };
-            let rupture_to: Vec<FrameAddress> = vec![frame.from.clone()];
-            let rupture_frame = IacFrame {
-                frame_id: generate_correlation_id(),
-                timestamp_ns: maos_capability::cap_tokens::monotonic_now_ns(),
-                logical_clock: 0,
-                from: FrameAddress {
-                    spirit_id: SpiritId::from(KERNEL_SENDER_SPIRIT_ID),
-                    host_id: None,
-                    role: None,
-                },
-                to: rupture_to.into(),
-                kind: FrameKind::ConsentRupture,
-                intent: frame.intent,
-                payload: FramePayload::ConsentRupture(rupture_payload),
-                auto_marker: FrameOrigin::Kernel,
-                consent_envelope: None,
-                // I13 — rupture inherits original lineage (derived emission).
-                intent_lineage: frame.intent_lineage.clone(),
-            };
+                // Build the ConsentRupture payload and recursively emit to sender.
+                let rupture_payload = ConsentRupturePayload {
+                    rupture_id: generate_rupture_id(),
+                    original_frame_id: frame.frame_id,
+                    original_kind: frame.kind,
+                    accepted: accepted_recipients.clone(),
+                    rejected: rejected_recipients,
+                    ruptured_at_ns: maos_capability::cap_tokens::monotonic_now_ns(),
+                };
+                let rupture_to: Vec<FrameAddress> = vec![frame.from.clone()];
+                let rupture_frame = IacFrame {
+                    frame_id: generate_correlation_id(),
+                    timestamp_ns: maos_capability::cap_tokens::monotonic_now_ns(),
+                    logical_clock: 0,
+                    from: FrameAddress {
+                        spirit_id: SpiritId::from(KERNEL_SENDER_SPIRIT_ID),
+                        host_id: None,
+                        role: None,
+                    },
+                    to: rupture_to.into(),
+                    kind: FrameKind::ConsentRupture,
+                    intent: frame.intent,
+                    payload: FramePayload::ConsentRupture(rupture_payload),
+                    auto_marker: FrameOrigin::Kernel,
+                    consent_envelope: None,
+                    // I13 — rupture inherits original lineage (derived emission).
+                    intent_lineage: frame.intent_lineage.clone(),
+                };
 
-            if rupture_depth >= 2 {
-                // Cycle break — second-level rupture is logged but not emitted.
-                eprintln!(
-                    "maos: WARN consent-rupture recursion depth={} exceeded; cycle broken",
-                    rupture_depth + 1
-                );
-            } else {
-                // Best-effort delivery of the rupture frame. The sender's
-                // mailbox may also have been torn down (depth-2 scenario);
-                // we tolerate that with the depth gate above.
-                if self
-                    .mpsc_senders
-                    .contains_key(&(
+                if rupture_depth >= 2 {
+                    // Cycle break — second-level rupture is logged but not emitted.
+                    eprintln!(
+                        "maos: WARN consent-rupture recursion depth={} exceeded; cycle broken",
+                        rupture_depth + 1
+                    );
+                } else {
+                    // Best-effort delivery of the rupture frame. The sender's
+                    // mailbox may also have been torn down (depth-2 scenario);
+                    // we tolerate that with the depth gate above.
+                    if self.mpsc_senders.contains_key(&(
                         frame.from.spirit_id.as_str().to_string(),
                         FrameKind::ConsentRupture,
-                    ))
-                {
-                    let _ = self.deliver_inner(rupture_frame, rupture_depth + 1).await;
-                }
-            }
-
-            // If NO recipients accepted, the entire frame is quarantined.
-            if accepted_recipients.is_empty() {
-                return Ok(LogBeforeDeliver::new(()));
-            }
-        }
-
-        // Replace the frame's `to` slice with the accepted set so Phase 2/3
-        // delivery only fires for accepted recipients.
-        let mut frame = frame;
-        frame.to = accepted_recipients.into_iter().collect();
-        // Recompute cross_host_targets after consent gate pruning.
-        let cross_host_targets: Vec<maos_spirit_abi::identity::HostId> = frame
-            .to
-            .iter()
-            .filter_map(|a| a.host_id.clone())
-            .collect();
-
-        // Phase 2: Deliver to same-host recipients FIRST (independent from
-        // cross-host). Per D3: cross-host failures MUST NOT block same-host
-        // delivery — these are separate concerns.
-    let now_ns = maos_capability::cap_tokens::monotonic_now_ns();
-
-        // Story 5.3 — update sender's last_progress_iac_ns for spirit-origin frames.
-        if frame.auto_marker.is_spirit_origin() {
-            // Lexical block scopes the std::sync::MutexGuard so the future
-            // remains `Send` (the guard does NOT cross any await point).
-            let scbs_handle = {
-                let guard = self
-                    .scbs
-                    .lock()
-                    .unwrap_or_else(|poison| poison.into_inner());
-                guard.as_ref().map(Arc::clone)
-            };
-            if let Some(tracker) = scbs_handle {
-                let sender_spirit_id = frame.from.spirit_id.as_str();
-                tracker.update_last_progress_iac(sender_spirit_id, now_ns);
-            }
-        }
-
-        for addr in &frame.to {
-            // Story 6.3 — cross-host addresses are routed in Phase 3; skip
-            // the same-host mailbox path for those.
-            if addr.host_id.is_some() {
-                continue;
-            }
-            let spirit_id = addr.spirit_id.as_str().to_string();
-            let sender = self
-                .mpsc_senders
-                .get(&(spirit_id.clone(), kind))
-                .expect("validated in phase 1");
-
-            // Update last_inbound_frame_ns for the recipient via the activity
-            // tracker trait. Mutex guard is scoped to this block so the future
-            // remains `Send`.
-            let tracker_handle = {
-                let guard = self
-                    .scbs
-                    .lock()
-                    .unwrap_or_else(|poison| poison.into_inner());
-                guard.as_ref().map(Arc::clone)
-            };
-            if let Some(tracker) = tracker_handle {
-                tracker.update_last_inbound_frame(&spirit_id, now_ns);
-            }
-
-            match sender.send(frame.clone()).await {
-                Ok(()) => {
-                    self.metrics.inc_pending(&spirit_id, kind);
-                }
-                Err(_) => {
-                    if kind == FrameKind::EpistemicHalt {
-                        return Err(IacBusError::HaltQueueOverflow(spirit_id));
+                    )) {
+                        let _ = self.deliver_inner(rupture_frame, rupture_depth + 1).await;
                     }
-                    return Err(IacBusError::ChannelClosed(spirit_id, kind));
+                }
+
+                // If NO recipients accepted, the entire frame is quarantined.
+                if accepted_recipients.is_empty() {
+                    return Ok(LogBeforeDeliver::new(()));
                 }
             }
-        }
 
-        // Phase 3: Route cross-host frames through the A2A router.
-        // Per-architecture §7.2 + AC2/AC3: cross-host delivery is independent
-        // from same-host; same-host recipients already got their copy above.
-        // Per-target error collection: deliver to all reachable peers, return
-        // the first error (or Ok if all succeed).
-        if !cross_host_targets.is_empty() {
-            let router = self.a2a_router.as_ref().ok_or_else(|| {
-                IacBusError::CrossHostNotConfigured {
-                    host_id: cross_host_targets
-                        .iter()
-                        .map(|h| h.as_str().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", "),
+            // Replace the frame's `to` slice with the accepted set so Phase 2/3
+            // delivery only fires for accepted recipients.
+            let mut frame = frame;
+            frame.to = accepted_recipients.into_iter().collect();
+            // Recompute cross_host_targets after consent gate pruning.
+            let cross_host_targets: Vec<maos_spirit_abi::identity::HostId> =
+                frame.to.iter().filter_map(|a| a.host_id.clone()).collect();
+
+            // Phase 2: Deliver to same-host recipients FIRST (independent from
+            // cross-host). Per D3: cross-host failures MUST NOT block same-host
+            // delivery — these are separate concerns.
+            let now_ns = maos_capability::cap_tokens::monotonic_now_ns();
+
+            // Story 5.3 — update sender's last_progress_iac_ns for spirit-origin frames.
+            if frame.auto_marker.is_spirit_origin() {
+                // Lexical block scopes the std::sync::MutexGuard so the future
+                // remains `Send` (the guard does NOT cross any await point).
+                let scbs_handle = {
+                    let guard = self
+                        .scbs
+                        .lock()
+                        .unwrap_or_else(|poison| poison.into_inner());
+                    guard.as_ref().map(Arc::clone)
+                };
+                if let Some(tracker) = scbs_handle {
+                    let sender_spirit_id = frame.from.spirit_id.as_str();
+                    tracker.update_last_progress_iac(sender_spirit_id, now_ns);
                 }
-            })?;
-            let mut first_err: Option<IacBusError> = None;
-            for host_id in &cross_host_targets {
-                if let Err(e) = router.route_outbound(frame.clone(), host_id).await {
-                    if first_err.is_none() {
-                        first_err = Some(e);
+            }
+
+            for addr in &frame.to {
+                // Story 6.3 — cross-host addresses are routed in Phase 3; skip
+                // the same-host mailbox path for those.
+                if addr.host_id.is_some() {
+                    continue;
+                }
+                let spirit_id = addr.spirit_id.as_str().to_string();
+                let sender = self
+                    .mpsc_senders
+                    .get(&(spirit_id.clone(), kind))
+                    .expect("validated in phase 1");
+
+                // Update last_inbound_frame_ns for the recipient via the activity
+                // tracker trait. Mutex guard is scoped to this block so the future
+                // remains `Send`.
+                let tracker_handle = {
+                    let guard = self
+                        .scbs
+                        .lock()
+                        .unwrap_or_else(|poison| poison.into_inner());
+                    guard.as_ref().map(Arc::clone)
+                };
+                if let Some(tracker) = tracker_handle {
+                    tracker.update_last_inbound_frame(&spirit_id, now_ns);
+                }
+
+                match sender.send(frame.clone()).await {
+                    Ok(()) => {
+                        self.metrics.inc_pending(&spirit_id, kind);
+                    }
+                    Err(_) => {
+                        if kind == FrameKind::EpistemicHalt {
+                            return Err(IacBusError::HaltQueueOverflow(spirit_id));
+                        }
+                        return Err(IacBusError::ChannelClosed(spirit_id, kind));
                     }
                 }
             }
-            if let Some(e) = first_err {
-                return Err(e);
-            }
-        }
 
-        Ok(LogBeforeDeliver::new(()))
+            // Phase 3: Route cross-host frames through the A2A router.
+            // Per-architecture §7.2 + AC2/AC3: cross-host delivery is independent
+            // from same-host; same-host recipients already got their copy above.
+            // Per-target error collection: deliver to all reachable peers, return
+            // the first error (or Ok if all succeed).
+            if !cross_host_targets.is_empty() {
+                let router = self.a2a_router.as_ref().ok_or_else(|| {
+                    IacBusError::CrossHostNotConfigured {
+                        host_id: cross_host_targets
+                            .iter()
+                            .map(|h| h.as_str().to_string())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    }
+                })?;
+                let mut first_err: Option<IacBusError> = None;
+                for host_id in &cross_host_targets {
+                    if let Err(e) = router.route_outbound(frame.clone(), host_id).await {
+                        if first_err.is_none() {
+                            first_err = Some(e);
+                        }
+                    }
+                }
+                if let Some(e) = first_err {
+                    return Err(e);
+                }
+            }
+
+            Ok(LogBeforeDeliver::new(()))
         }) // close Box::pin async move
     }
 
@@ -642,7 +646,8 @@ impl IacBusPort for super::IacBusAdapter {
         reason: String,
         retracting_spirit: &SpiritId,
     ) -> Result<maos_domain::iac_bus_types::RetractOutcome, IacBusError> {
-        self.retract(original_frame_id, reason, retracting_spirit).await
+        self.retract(original_frame_id, reason, retracting_spirit)
+            .await
     }
 }
 

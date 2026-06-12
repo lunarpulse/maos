@@ -116,7 +116,11 @@ impl UpgradeOrchestrator {
             UpgradePolicy::HotSwap => {
                 match self
                     .hot_swap
-                    .initiate_swap(spirit_id, &successor_manifest, Arc::clone(&successor_spirit_obj))
+                    .initiate_swap(
+                        spirit_id,
+                        &successor_manifest,
+                        Arc::clone(&successor_spirit_obj),
+                    )
                     .await
                 {
                     Ok(_result) => {
@@ -156,14 +160,13 @@ impl UpgradeOrchestrator {
                 // protocol.
                 let boot_nonce = 0u64;
                 let new_pid = crate::scheduler::scheduler_loop::allocate_pid();
-                let new_scb =
-                    Arc::new(crate::scheduler::control_block::SpiritControlBlock::new(
-                        new_pid,
-                        spirit_id.into(),
-                        successor_manifest,
-                        Arc::clone(&successor_spirit_obj),
-                        boot_nonce,
-                    ));
+                let new_scb = Arc::new(crate::scheduler::control_block::SpiritControlBlock::new(
+                    new_pid,
+                    spirit_id.into(),
+                    successor_manifest,
+                    Arc::clone(&successor_spirit_obj),
+                    boot_nonce,
+                ));
                 {
                     let scbs = self.scheduler.scbs();
                     let mut map = scbs.write().expect("spirits lock poisoned");
@@ -176,7 +179,11 @@ impl UpgradeOrchestrator {
                 }
                 match self
                     .hot_swap
-                    .initiate_swap(spirit_id, &successor_manifest, Arc::clone(&successor_spirit_obj))
+                    .initiate_swap(
+                        spirit_id,
+                        &successor_manifest,
+                        Arc::clone(&successor_spirit_obj),
+                    )
                     .await
                 {
                     Ok(_result) => {
@@ -232,8 +239,11 @@ impl UpgradeOrchestrator {
             UpgradeOutcome::Reverted => Outcome::Ok, // compensated but not an error
             UpgradeOutcome::Failed => Outcome::Err,
         };
-        self.telemetry
-            .record_iac_rt(Service::UpgradeOrchestrator, telemetry_outcome, latency_ns / 1000);
+        self.telemetry.record_iac_rt(
+            Service::UpgradeOrchestrator,
+            telemetry_outcome,
+            latency_ns / 1000,
+        );
 
         Ok(UpgradeReport {
             spirit_id: spirit_id.into(),
@@ -332,11 +342,7 @@ fn load_bundle_from_file(
 
     let toml_str = std::fs::read_to_string(path).map_err(|e| {
         if e.kind() == io::ErrorKind::NotFound {
-            ManifestError::Toml(format!(
-                "manifest not found at {}: {}",
-                path.display(),
-                e
-            ))
+            ManifestError::Toml(format!("manifest not found at {}: {}", path.display(), e))
         } else {
             ManifestError::Toml(format!("read {}: {}", path.display(), e))
         }

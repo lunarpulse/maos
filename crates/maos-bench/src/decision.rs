@@ -14,7 +14,11 @@ use crate::report::{DecisionRecord, JourneyResult};
 const J1_P95_BUDGET_US: u64 = 25_000;
 const J4_P95_BUDGET_US: u64 = 10_000;
 
-pub fn decide(j1: &JourneyResult, j4: &JourneyResult, j6: Option<&JourneyResult>) -> DecisionRecord {
+pub fn decide(
+    j1: &JourneyResult,
+    j4: &JourneyResult,
+    j6: Option<&JourneyResult>,
+) -> DecisionRecord {
     let j1_met = j1.p95_us <= J1_P95_BUDGET_US;
     let j4_met = j4.p95_us <= J4_P95_BUDGET_US;
     let j6_met = j6.map_or(true, |j| j.budget_met);
@@ -43,11 +47,31 @@ mod tests {
     use super::*;
 
     fn j1_with_p95(p95_us: u64) -> JourneyResult {
-        JourneyResult::new("J1".into(), 1000, p95_us / 2, p95_us, p95_us * 2, p95_us * 3, p95_us, p95_us / 10, p95_us <= J1_P95_BUDGET_US)
+        JourneyResult::new(
+            "J1".into(),
+            1000,
+            p95_us / 2,
+            p95_us,
+            p95_us * 2,
+            p95_us * 3,
+            p95_us,
+            p95_us / 10,
+            p95_us <= J1_P95_BUDGET_US,
+        )
     }
 
     fn j4_with_p95(p95_us: u64) -> JourneyResult {
-        JourneyResult::new("J4".into(), 1000, p95_us / 2, p95_us, p95_us * 2, p95_us * 3, p95_us, p95_us / 10, p95_us <= J4_P95_BUDGET_US)
+        JourneyResult::new(
+            "J4".into(),
+            1000,
+            p95_us / 2,
+            p95_us,
+            p95_us * 2,
+            p95_us * 3,
+            p95_us,
+            p95_us / 10,
+            p95_us <= J4_P95_BUDGET_US,
+        )
     }
 
     #[test]

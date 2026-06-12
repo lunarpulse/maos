@@ -83,9 +83,7 @@ mod serde_pubkey32 {
                 let mut arr = [0u8; 32];
                 for (i, slot) in arr.iter_mut().enumerate() {
                     *slot = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(format!(
-                            "expected 32-byte pubkey, got {i} bytes"
-                        ))
+                        serde::de::Error::custom(format!("expected 32-byte pubkey, got {i} bytes"))
                     })?;
                 }
                 Ok(arr)
@@ -114,9 +112,7 @@ mod serde_sha256 {
                 let mut arr = [0u8; 32];
                 for (i, slot) in arr.iter_mut().enumerate() {
                     *slot = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(format!(
-                            "expected 32-byte SHA-256, got {i} bytes"
-                        ))
+                        serde::de::Error::custom(format!("expected 32-byte SHA-256, got {i} bytes"))
                     })?;
                 }
                 Ok(arr)
@@ -269,10 +265,7 @@ pub enum T3Error {
     )]
     RuntimeUnavailable,
     #[error("image SHA mismatch: expected {expected}, observed {observed}")]
-    ImageMismatch {
-        expected: String,
-        observed: String,
-    },
+    ImageMismatch { expected: String, observed: String },
     #[error("image attestation signature invalid")]
     SignatureInvalid,
     #[error("image attestation trust anchor mismatch")]
@@ -283,9 +276,7 @@ pub enum T3Error {
     ImagePinMissing { name: String },
     #[error("no default T3 image in t3-image.lock")]
     NoDefaultImage,
-    #[error(
-        "image trust anchor not configured (set MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX)"
-    )]
+    #[error("image trust anchor not configured (set MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX)")]
     TrustAnchorMissing(String),
     #[error("container spawn failed: {0}")]
     Spawn(String),
@@ -353,8 +344,8 @@ mod tests {
 
     #[test]
     fn t3_image_attestation_new_rejects_zero_signature() {
-        let entry = T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [1u8; 32], "test", false)
-            .unwrap();
+        let entry =
+            T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [1u8; 32], "test", false).unwrap();
         let err = T3ImageAttestation::new(
             ImageAttestationId([1u8; 32]),
             1,
@@ -369,8 +360,8 @@ mod tests {
 
     #[test]
     fn t3_image_attestation_new_rejects_zero_pubkey() {
-        let entry = T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [1u8; 32], "test", false)
-            .unwrap();
+        let entry =
+            T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [1u8; 32], "test", false).unwrap();
         let err = T3ImageAttestation::new(
             ImageAttestationId([1u8; 32]),
             1,
@@ -385,8 +376,7 @@ mod tests {
 
     #[test]
     fn t3_image_attestation_new_rejects_multiple_defaults() {
-        let e1 =
-            T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [1u8; 32], "one", true).unwrap();
+        let e1 = T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [1u8; 32], "one", true).unwrap();
         let e2 =
             T3ImageEntry::new("ghcr.io/maos/spirit-runtime-2", [2u8; 32], "two", true).unwrap();
         let err = T3ImageAttestation::new(
@@ -403,8 +393,8 @@ mod tests {
 
     #[test]
     fn t3_image_attestation_new_rejects_wrong_schema_version() {
-        let entry = T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [1u8; 32], "test", false)
-            .unwrap();
+        let entry =
+            T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [1u8; 32], "test", false).unwrap();
         let err = T3ImageAttestation::new(
             ImageAttestationId([1u8; 32]),
             2,
@@ -422,13 +412,8 @@ mod tests {
 
     #[test]
     fn t3_image_attestation_new_happy_path() {
-        let entry = T3ImageEntry::new(
-            "ghcr.io/maos/spirit-runtime",
-            [0xAB; 32],
-            "test desc",
-            true,
-        )
-        .unwrap();
+        let entry = T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [0xAB; 32], "test desc", true)
+            .unwrap();
         let attestation = T3ImageAttestation::new(
             ImageAttestationId([0xCD; 32]),
             1,
@@ -454,20 +439,14 @@ mod tests {
     #[test]
     fn t3_image_entry_new_rejects_zero_sha() {
         let err =
-            T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [0u8; 32], "test", false)
-                .unwrap_err();
+            T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [0u8; 32], "test", false).unwrap_err();
         assert!(matches!(err, T3Error::SignatureInvalid));
     }
 
     #[test]
     fn t3_image_entry_new_happy_path() {
-        let e = T3ImageEntry::new(
-            "ghcr.io/maos/spirit-runtime",
-            [1u8; 32],
-            "test desc",
-            true,
-        )
-        .unwrap();
+        let e =
+            T3ImageEntry::new("ghcr.io/maos/spirit-runtime", [1u8; 32], "test desc", true).unwrap();
         assert_eq!(e.image_uri, "ghcr.io/maos/spirit-runtime");
         assert_eq!(e.image_sha256, [1u8; 32]);
         assert_eq!(e.description, "test desc");

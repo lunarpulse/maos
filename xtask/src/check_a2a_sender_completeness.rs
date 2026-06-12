@@ -46,10 +46,7 @@ use std::path::Path;
 const EXEMPT_MARKER: &str = "SENDER-COMPLETENESS-EXEMPT";
 
 /// The forbidden literals for an unclassified cross-Host frame.
-const FORBIDDEN: &[&str] = &[
-    "consent_envelope: None",
-    "intent_class: None",
-];
+const FORBIDDEN: &[&str] = &["consent_envelope: None", "intent_class: None"];
 
 /// The maximum number of honored static-scanner exemptions allowed across the
 /// whole scan. Currently ZERO — no reference sender legitimately needs to emit an
@@ -106,7 +103,13 @@ pub fn run(workspace_root: &str, json: bool) -> Result<(), String> {
             report.violations.len()
         );
         for v in &report.violations {
-            eprintln!("  [{}] {}:{} — {}", v.kind, v.file, v.line, v.context.trim());
+            eprintln!(
+                "  [{}] {}:{} — {}",
+                v.kind,
+                v.file,
+                v.line,
+                v.context.trim()
+            );
         }
     }
 
@@ -123,18 +126,26 @@ fn check(workspace_root: &Path) -> Result<Report, String> {
 
     // (1) spirits/mira + spirits/nash — scan EVERY line; exemptions NOT honored
     // (these are production senders; the escape hatch must never silence them).
-    for spirit in ["spirits/mira/src", "spirits/mira/tests", "spirits/nash/src", "spirits/nash/tests"] {
+    for spirit in [
+        "spirits/mira/src",
+        "spirits/mira/tests",
+        "spirits/nash/src",
+        "spirits/nash/tests",
+    ] {
         let dir = workspace_root.join(spirit);
         if !dir.exists() {
-            return Err(format!("expected cross-Host sender dir missing: {}", dir.display()));
+            return Err(format!(
+                "expected cross-Host sender dir missing: {}",
+                dir.display()
+            ));
         }
         let mut files = Vec::new();
         fs_walk::collect_rs_files(&dir, &mut files);
         files.sort();
         for f in files {
             files_scanned += 1;
-            let src = fs::read_to_string(&f)
-                .map_err(|e| format!("cannot read {}: {e}", f.display()))?;
+            let src =
+                fs::read_to_string(&f).map_err(|e| format!("cannot read {}: {e}", f.display()))?;
             scan_lines_offset(
                 &src,
                 &rel(workspace_root, &f),
@@ -264,7 +275,11 @@ fn scan_lines_offset(
 ) {
     let lines: Vec<&str> = src.lines().collect();
     for (i, line) in lines.iter().enumerate() {
-        let present: Vec<&str> = FORBIDDEN.iter().copied().filter(|f| line.contains(f)).collect();
+        let present: Vec<&str> = FORBIDDEN
+            .iter()
+            .copied()
+            .filter(|f| line.contains(f))
+            .collect();
         if present.is_empty() {
             continue;
         }
@@ -483,7 +498,10 @@ mod tests {
 
     #[test]
     fn exempt_without_justification_is_violation() {
-        let (v, c) = scan("consent_envelope: None, // SENDER-COMPLETENESS-EXEMPT", true);
+        let (v, c) = scan(
+            "consent_envelope: None, // SENDER-COMPLETENESS-EXEMPT",
+            true,
+        );
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].kind, "exempt-missing-justification");
         assert_eq!(c, 0);
@@ -531,11 +549,18 @@ mod tests {
         // A `}` inside a string literal must NOT close the fn early (false GREEN).
         let src = "async fn smoke_a2a_tcp_8_6() {\n    let s = \"a } b { c\";\n    consent_envelope: None,\n}\nfn next(){}\n";
         let (body, base) = extract_fn_body(src, "smoke_a2a_tcp_8_6").expect("found");
-        assert!(body.contains("consent_envelope: None,"), "body must include the post-string line");
+        assert!(
+            body.contains("consent_envelope: None,"),
+            "body must include the post-string line"
+        );
         let mut v = Vec::new();
         let mut c = 0;
         scan_lines_offset(&body, "main.rs", base, false, &mut v, &mut c);
-        assert_eq!(v.len(), 1, "the unclassified literal after a brace-in-string is still caught");
+        assert_eq!(
+            v.len(),
+            1,
+            "the unclassified literal after a brace-in-string is still caught"
+        );
     }
 
     #[test]

@@ -131,13 +131,12 @@ impl RevocationApplier {
                 revoked_count += 1;
 
                 // Revoke capability tokens
-                let tokens_revoked = self
-                    .capability
-                    .revoke_all_for_pid(scb.pid)
-                    .map_err(|_e| RevocationError::Io(format!(
+                let tokens_revoked = self.capability.revoke_all_for_pid(scb.pid).map_err(|_e| {
+                    RevocationError::Io(format!(
                         "capability revocation failed for spirit pid={}",
                         scb.pid
-                    )))?;
+                    ))
+                })?;
                 tokens_revoked_total += tokens_revoked;
 
                 let in_flight_token_count = scb
@@ -231,7 +230,8 @@ impl RevocationApplier {
                             }
                         });
                         {
-                            let mut drains = self.active_drains.lock().expect("active_drains poisoned");
+                            let mut drains =
+                                self.active_drains.lock().expect("active_drains poisoned");
                             drains.insert(scb.pid, handle);
                         }
                         0 // receipts produced asynchronously
@@ -242,16 +242,15 @@ impl RevocationApplier {
                         // container; quarantine_spirit returns
                         // Err(QuarantineRequiresSubprocessForm). Fall back to
                         // drain-then-terminate with the deferred rationale.
-                        let quarantine_result = crate::security::sandbox::t3::quarantine::quarantine_spirit(
-                            self.scheduler.as_ref(),
-                            scb.pid,
-                            maos_domain::invariants::i9::SandboxTier::T3,
-                            None,
-                        );
+                        let quarantine_result =
+                            crate::security::sandbox::t3::quarantine::quarantine_spirit(
+                                self.scheduler.as_ref(),
+                                scb.pid,
+                                maos_domain::invariants::i9::SandboxTier::T3,
+                                None,
+                            );
                         match quarantine_result {
-                            Ok(_report) => {
-                                0
-                            }
+                            Ok(_report) => 0,
                             Err(T3Error::QuarantineRequiresSubprocessForm) => {
                                 eprintln!(
                                     "maos: quarantine deferred for spirit_pid={} (in-process form; T3 re-spawn requires subprocess form at Epic 6)",
@@ -294,7 +293,8 @@ impl RevocationApplier {
                                     }
                                 });
                                 {
-                                    let mut drains = self.active_drains.lock().expect("active_drains poisoned");
+                                    let mut drains =
+                                        self.active_drains.lock().expect("active_drains poisoned");
                                     drains.insert(scb.pid, handle);
                                 }
                                 0
@@ -310,7 +310,7 @@ impl RevocationApplier {
                             scb.on_revocation_action, scb.pid
                         );
                         0
-                    },
+                    }
                 };
 
                 if scb.on_revocation_action == RevocationAction::Quarantine {

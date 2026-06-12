@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://maos.dev/schemas/audit-bundle.v1.json",
+  "title": "maos.audit-bundle.v1",
+  "description": "Sealed export bundle for the MAOS audit trail. Canonical byte serialization for signing uses JSON with sorted keys and no insignificant whitespace (serde_json sorted_keys serializer). The Ed25519 signature covers sha256(canonical_bundle_bytes) where canonical_bundle_bytes is the sorted-key, no-whitespace JSON encoding of all fields except signature_block.",
+  "type": "object",
+  "required": ["schema_version", "entries", "i12_digest_refs", "i11_distilled_content", "freshness", "signature_block"],
+  "properties": {
+    "schema_version": {
+      "const": "maos.audit-bundle.v1"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["frame_id", "timestamp_ns", "spirit_pid", "boot_nonce", "kind", "intent"],
+        "properties": {
+          "frame_id": { "type": "string" },
+          "timestamp_ns": { "type": "integer" },
+          "spirit_pid": { "type": "integer" },
+          "boot_nonce": { "type": "integer" },
+          "capability_token": { "type": ["string", "null"] },
+          "kind": { "type": "string" },
+          "intent": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "i12_digest_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "i11_distilled_content": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_log_ref", "distillation_depth"],
+        "properties": {
+          "source_log_ref": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "distillation_depth": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "freshness": {
+      "type": "object",
+      "required": ["export_timestamp_ns", "covered_window", "export_seq"],
+      "properties": {
+        "export_timestamp_ns": { "type": "integer" },
+        "covered_window": {
+          "type": "object",
+          "required": ["since_ns", "until_ns"],
+          "properties": {
+            "since_ns": { "type": "integer" },
+            "until_ns": { "type": "integer" }
+          },
+          "additionalProperties": false
+        },
+        "export_seq": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "signature_block": {
+      "type": "object",
+      "required": ["algorithm", "attester_pubkey", "signature"],
+      "properties": {
+        "algorithm": {
+          "const": "Ed25519"
+        },
+        "attester_pubkey": {
+          "type": "string",
+          "description": "hex-encoded 32-byte Ed25519 public key"
+        },
+        "signature": {
+          "type": "string",
+          "description": "hex-encoded 64-byte Ed25519 signature over sha256(canonical_bundle_bytes)"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

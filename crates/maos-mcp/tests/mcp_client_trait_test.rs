@@ -12,12 +12,13 @@ use maos_mcp::{McpClient, McpClientImpl, McpServerEntry};
 fn make_replay_transport(
     responses: Vec<Result<McpResponse, maos_mcp::transport::McpTransportError>>,
 ) -> Arc<FixtureReplayMcpServer> {
-    Arc::new(FixtureReplayMcpServer::new(responses, McpTransportId::StreamableHttp))
+    Arc::new(FixtureReplayMcpServer::new(
+        responses,
+        McpTransportId::StreamableHttp,
+    ))
 }
 
-fn make_client_with_transport(
-    transport: Arc<FixtureReplayMcpServer>,
-) -> McpClientImpl {
+fn make_client_with_transport(transport: Arc<FixtureReplayMcpServer>) -> McpClientImpl {
     let mut transports: BTreeMap<McpTransportId, Arc<dyn maos_mcp::transport::McpTransport>> =
         BTreeMap::new();
     transports.insert(McpTransportId::StreamableHttp, transport.clone());

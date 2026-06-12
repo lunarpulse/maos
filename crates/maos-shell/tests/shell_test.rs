@@ -8,8 +8,10 @@ impl maos_domain::ports::inference::InferencePort for MockInference {
     fn complete(
         &self,
         _req: maos_domain::ports::inference::InferenceRequest,
-    ) -> Result<maos_domain::ports::inference::InferenceResponse, maos_domain::ports::inference::InferenceError>
-    {
+    ) -> Result<
+        maos_domain::ports::inference::InferenceResponse,
+        maos_domain::ports::inference::InferenceError,
+    > {
         Ok(maos_domain::ports::inference::InferenceResponse {
             text: "mock response".into(),
             stop_reason: maos_domain::ports::inference::StopReason::StopSequence,
@@ -28,8 +30,14 @@ impl maos_domain::ports::inference::InferencePort for MockInference {
 
 #[test]
 fn shell_parse_at_line_variations() {
-    assert_eq!(parse_at_line("@hello-spirit say hi"), Some(("hello-spirit", "say hi")));
-    assert_eq!(parse_at_line("  @hello-spirit   say hi  "), Some(("hello-spirit", "say hi")));
+    assert_eq!(
+        parse_at_line("@hello-spirit say hi"),
+        Some(("hello-spirit", "say hi"))
+    );
+    assert_eq!(
+        parse_at_line("  @hello-spirit   say hi  "),
+        Some(("hello-spirit", "say hi"))
+    );
     assert_eq!(parse_at_line("hello-spirit say hi"), None);
     assert_eq!(parse_at_line("@spirit"), None);
     assert_eq!(parse_at_line(""), None);
@@ -73,7 +81,10 @@ fn dispatch_directive_well_specified_no_halt() {
         "refactor for better readability and error handling",
     );
     // Should succeed because dimensions (readability, error handling) are specified.
-    assert!(result.is_ok(), "well-specified directive should not halt: {result:?}");
+    assert!(
+        result.is_ok(),
+        "well-specified directive should not halt: {result:?}"
+    );
 }
 
 // Copied from lib.rs for direct testing.
@@ -94,5 +105,8 @@ fn parse_at_line(line: &str) -> Option<(&str, &str)> {
 
 #[test]
 fn parse_at_line_tab_separator() {
-    assert_eq!(parse_at_line("@hello-spirit\tsay hi"), Some(("hello-spirit", "say hi")));
+    assert_eq!(
+        parse_at_line("@hello-spirit\tsay hi"),
+        Some(("hello-spirit", "say hi"))
+    );
 }

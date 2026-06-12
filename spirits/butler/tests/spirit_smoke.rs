@@ -7,8 +7,8 @@
 //! spirit-test harness only SIMULATES halts, so the firing-side assertions
 //! live here and the kernel-side halt assertions live there.
 
-use butler::{Butler, ScenarioInput, CalendarEvent, EventStatus};
 use butler::__maos_spirit_vtable_Butler;
+use butler::{Butler, CalendarEvent, EventStatus, ScenarioInput};
 use maos_spirit_sdk::spirit_test::{assert_no_deprecations, manifest_self_check, SpiritTest};
 
 const MANIFEST: &str = include_str!("../manifest.toml");
@@ -18,8 +18,20 @@ fn on_idle_fires_once_within_budget() {
     // A scenario with a confirmed overlap — on_idle runs the anticipatory pass.
     let scenario = ScenarioInput {
         calendar: vec![
-            CalendarEvent { id: "a".into(), title: "Standup".into(), start_min: 540, end_min: 600, status: EventStatus::Confirmed },
-            CalendarEvent { id: "b".into(), title: "Board call".into(), start_min: 570, end_min: 630, status: EventStatus::Confirmed },
+            CalendarEvent {
+                id: "a".into(),
+                title: "Standup".into(),
+                start_min: 540,
+                end_min: 600,
+                status: EventStatus::Confirmed,
+            },
+            CalendarEvent {
+                id: "b".into(),
+                title: "Board call".into(),
+                start_min: 570,
+                end_min: 630,
+                status: EventStatus::Confirmed,
+            },
         ],
         ..Default::default()
     };
@@ -89,7 +101,11 @@ fn manifest_self_check_is_well_formed() {
             "output_shape must require '{f}'"
         );
     }
-    assert!(report.warnings.is_empty(), "no manifest warnings: {:?}", report.warnings);
+    assert!(
+        report.warnings.is_empty(),
+        "no manifest warnings: {:?}",
+        report.warnings
+    );
 }
 
 #[test]
@@ -106,10 +122,14 @@ fn manifest_sections_parse_with_authoritative_validators() {
     // [capabilities.required] — produces the McpCall scopes (Decision B) +
     // provider.complete.
     let caps_str = capabilities_required_section(MANIFEST);
-    let caps = CapabilitiesRequired::from_toml_str(&caps_str).expect("[capabilities.required] valid");
+    let caps =
+        CapabilitiesRequired::from_toml_str(&caps_str).expect("[capabilities.required] valid");
     assert!(!caps.provider.complete.is_empty());
     let servers: Vec<&str> = caps.mcp.servers.iter().map(|s| s.name.as_str()).collect();
-    assert!(servers.contains(&"calendar") && servers.contains(&"slack"), "MCP scopes declared: {servers:?}");
+    assert!(
+        servers.contains(&"calendar") && servers.contains(&"slack"),
+        "MCP scopes declared: {servers:?}"
+    );
 
     // [posture]
     let _ = PostureSection::from_toml_str(&section(MANIFEST, "posture")).expect("[posture] valid");

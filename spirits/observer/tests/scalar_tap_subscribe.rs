@@ -22,13 +22,7 @@ async fn observer_subscribes_and_receives_peer_scalars() {
 
     let observer = Observer::watching(
         PrincipalScope::from_patterns(["mira"]),
-        vec![WatchThreshold::new(
-            "belief_variance",
-            0.7,
-            DriftDirection::Above,
-            0.15,
-        )
-        .unwrap()],
+        vec![WatchThreshold::new("belief_variance", 0.7, DriftDirection::Above, 0.15).unwrap()],
     );
 
     // Observer establishes its per-Spirit subscription (I7).
@@ -82,13 +76,7 @@ async fn fr31_client_side_filter_drops_out_of_namespace_emitters() {
     // Observer's principal scope admits only `mira`.
     let observer = Observer::watching(
         PrincipalScope::from_patterns(["mira"]),
-        vec![WatchThreshold::new(
-            "belief_variance",
-            0.7,
-            DriftDirection::Above,
-            0.15,
-        )
-        .unwrap()],
+        vec![WatchThreshold::new("belief_variance", 0.7, DriftDirection::Above, 0.15).unwrap()],
     );
     telemetry.subscribe_topic(observer.observer_id(), &topic);
     let mut rx = telemetry.subscribe(&topic).expect("receiver");

@@ -60,9 +60,7 @@ impl ScheduleBucket {
             // tokens-per-second = per-hour / 3600.
             refill_per_sec: cap / 3600.0,
             tokens: parking_lot::Mutex::new(cap),
-            last_refill_ns: AtomicU64::new(
-                crate::capability::cap_tokens::monotonic_now_ns(),
-            ),
+            last_refill_ns: AtomicU64::new(crate::capability::cap_tokens::monotonic_now_ns()),
         }
     }
 
@@ -263,7 +261,8 @@ impl ScheduleWatchdog {
             // Update last-fire timestamp regardless of hook outcome — the
             // dispatch decision (gate passes, rate-limit consumed) is the
             // firing event for cadence purposes.
-            self.last_fire_ns.insert((scb.pid, entry.id.clone()), fired_at_ns);
+            self.last_fire_ns
+                .insert((scb.pid, entry.id.clone()), fired_at_ns);
         }
     }
 
@@ -374,8 +373,8 @@ mod tests {
     fn schedule_bucket_starts_full() {
         crate::capability::cap_tokens::init_monotonic_base();
         let bucket = ScheduleBucket::new(2); // 2/hour
-        // Two consumes succeed; the third fails (refill rate is 2/3600 per sec,
-        // imperceptible at test speed).
+                                             // Two consumes succeed; the third fails (refill rate is 2/3600 per sec,
+                                             // imperceptible at test speed).
         assert!(bucket.try_consume());
         assert!(bucket.try_consume());
         assert!(!bucket.try_consume(), "third consume MUST fail");

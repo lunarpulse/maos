@@ -62,26 +62,30 @@ pub fn spawn_t3(
         return Err(SpawnError::SandboxUnavailable {
             reason: "T3 container isolation not yet implemented on this platform; \
                      pending macOS/Windows CI runners and container-runtime equivalents \
-                     — Linux Podman/Docker is the v0.5 baseline".into(),
+                     — Linux Podman/Docker is the v0.5 baseline"
+                .into(),
         });
     }
 
     #[cfg(target_os = "linux")]
     {
         // 1. Detect runtime (cached after first call via OnceLock).
-        let runtime = runtime_detect::detect_container_runtime()
-            .map_err(|e| SpawnError::T3RuntimeUnavailable {
+        let runtime = runtime_detect::detect_container_runtime().map_err(|e| {
+            SpawnError::T3RuntimeUnavailable {
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         // 2. Verify local image SHA matches the attestation's pin
         //    (v0.5-α: placeholder — see image_verify::inspect_image_sha)
         if let Some(entry) = image.entries.first() {
-            let local_sha = image_verify::inspect_image_sha(&runtime, &entry.image_uri)
-                .map_err(|e| SpawnError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                )))?;
+            let local_sha =
+                image_verify::inspect_image_sha(&runtime, &entry.image_uri).map_err(|e| {
+                    SpawnError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e.to_string(),
+                    ))
+                })?;
             if local_sha != entry.image_sha256 {
                 return Err(SpawnError::SandboxImageMismatch {
                     expected: hex::encode(entry.image_sha256),
@@ -112,11 +116,13 @@ pub fn spawn_t3(
         let child = cmd.spawn().map_err(SpawnError::Io)?;
 
         // 5. Capture host-namespace PID (this is the kernel's ADR-023 identity).
-        let host_pid = inspect_container_host_pid(&runtime, &parent.container_name)
-            .map_err(|e| SpawnError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                e.to_string(),
-            )))?;
+        let host_pid =
+            inspect_container_host_pid(&runtime, &parent.container_name).map_err(|e| {
+                SpawnError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string(),
+                ))
+            })?;
 
         Ok(SandboxedContainerChild {
             child: Some(child),

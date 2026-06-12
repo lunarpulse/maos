@@ -144,8 +144,28 @@ mod tests {
 
     #[test]
     fn bench_report_serde_roundtrip() {
-        let j1 = JourneyResult::new("J1".into(), 1000, 5000, 15000, 30000, 50000, 12000, 5000, true);
-        let j4 = JourneyResult::new("J4".into(), 1000, 2000, 7000, 12000, 20000, 6000, 2000, true);
+        let j1 = JourneyResult::new(
+            "J1".into(),
+            1000,
+            5000,
+            15000,
+            30000,
+            50000,
+            12000,
+            5000,
+            true,
+        );
+        let j4 = JourneyResult::new(
+            "J4".into(),
+            1000,
+            2000,
+            7000,
+            12000,
+            20000,
+            6000,
+            2000,
+            true,
+        );
         let dr = DecisionRecord::new(
             "defer-rust-inproc-to-v2.0+".into(),
             true,

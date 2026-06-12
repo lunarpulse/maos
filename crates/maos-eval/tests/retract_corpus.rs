@@ -65,8 +65,24 @@ fn retract_corpus_category_distribution_is_uniform() {
     }
 
     assert_eq!(counts.len(), 4, "exactly 4 categories");
-    assert_eq!(counts.get("before_delivery").copied().unwrap_or(0), 10, "before_delivery must have 10 scenarios");
-    assert_eq!(counts.get("after_delivery").copied().unwrap_or(0), 10, "after_delivery must have 10 scenarios");
-    assert_eq!(counts.get("authority_violation").copied().unwrap_or(0), 5, "authority_violation must have 5 scenarios");
-    assert_eq!(counts.get("idempotent").copied().unwrap_or(0), 5, "idempotent must have 5 scenarios");
+    assert_eq!(
+        counts.get("before_delivery").copied().unwrap_or(0),
+        10,
+        "before_delivery must have 10 scenarios"
+    );
+    assert_eq!(
+        counts.get("after_delivery").copied().unwrap_or(0),
+        10,
+        "after_delivery must have 10 scenarios"
+    );
+    assert_eq!(
+        counts.get("authority_violation").copied().unwrap_or(0),
+        5,
+        "authority_violation must have 5 scenarios"
+    );
+    assert_eq!(
+        counts.get("idempotent").copied().unwrap_or(0),
+        5,
+        "idempotent must have 5 scenarios"
+    );
 }

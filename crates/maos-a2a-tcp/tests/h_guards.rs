@@ -37,7 +37,11 @@ fn h1_no_committed_cert_material() {
 #[tokio::test]
 async fn h2_pinned_clock_governs_validity() {
     let clock = Clock::capture();
-    assert_eq!(clock.unix(), clock.unix(), "H2: pinned clock readback is stable");
+    assert_eq!(
+        clock.unix(),
+        clock.unix(),
+        "H2: pinned clock readback is stable"
+    );
 
     let ca = mk_ca(&clock, "ca-good");
     let nash_expired = expired_leaf(&ca, &clock);
@@ -48,7 +52,13 @@ async fn h2_pinned_clock_governs_validity() {
         Some(&ca),
         2,
         vec![pin("host_a", &mira_leaf.fingerprint, 1)],
-        vec![peer_cfg("host_a", "tls://127.0.0.1:0", &mira_leaf.fingerprint, &[], &["readonly"])],
+        vec![peer_cfg(
+            "host_a",
+            "tls://127.0.0.1:0",
+            &mira_leaf.fingerprint,
+            &[],
+            &["readonly"],
+        )],
         &clock,
         TcpTimeouts::test_profile(),
         no_retry(),
@@ -61,7 +71,13 @@ async fn h2_pinned_clock_governs_validity() {
         Some(&ca),
         1,
         vec![pin("host_b", &nash_expired.fingerprint, 2)],
-        vec![peer_cfg("host_b", &format!("tls://{nash_addr}"), &nash_expired.fingerprint, &["readonly"], &[])],
+        vec![peer_cfg(
+            "host_b",
+            &format!("tls://{nash_addr}"),
+            &nash_expired.fingerprint,
+            &["readonly"],
+            &[],
+        )],
         &clock,
         TcpTimeouts::test_profile(),
         no_retry(),
@@ -71,7 +87,15 @@ async fn h2_pinned_clock_governs_validity() {
     use maos_a2a_core::router::A2APeerRouter;
     use maos_spirit_abi::identity::HostId;
     let err = mira
-        .route_outbound(make_frame("host_a", "host_b", maos_domain::invariants::i1::IntentClass::Readonly, 1), &HostId("host_b".into()))
+        .route_outbound(
+            make_frame(
+                "host_a",
+                "host_b",
+                maos_domain::invariants::i1::IntentClass::Readonly,
+                1,
+            ),
+            &HostId("host_b".into()),
+        )
         .await
         .expect_err("H2: expired server cert under pinned T0 must be rejected");
     let msg = format!("{err}").to_lowercase();
@@ -79,7 +103,11 @@ async fn h2_pinned_clock_governs_validity() {
         msg.contains("expired") || msg.contains("certificate"),
         "H2: rejection should reference cert validity, got: {err}"
     );
-    assert_eq!(nash.intake_entered(), 0, "H2: rejected handshake never enters intake");
+    assert_eq!(
+        nash.intake_entered(),
+        0,
+        "H2: rejected handshake never enters intake"
+    );
 }
 
 /// H3 — ephemeral port: binding `127.0.0.1:0` yields a concrete non-zero port.
@@ -88,9 +116,22 @@ async fn h3_ephemeral_port_readback() {
     let clock = Clock::capture();
     let ca = mk_ca(&clock, "ca-good");
     let leaf = valid_leaf(&ca, &clock);
-    let ep = bind_endpoint(&leaf, Some(&ca), 1, vec![], vec![], &clock, TcpTimeouts::test_profile(), no_retry()).await;
+    let ep = bind_endpoint(
+        &leaf,
+        Some(&ca),
+        1,
+        vec![],
+        vec![],
+        &clock,
+        TcpTimeouts::test_profile(),
+        no_retry(),
+    )
+    .await;
     let addr = ep.local_addr().expect("H3: local_addr readback");
-    assert!(addr.port() != 0, "H3: bound port must be concrete, got {addr}");
+    assert!(
+        addr.port() != 0,
+        "H3: bound port must be concrete, got {addr}"
+    );
     assert!(addr.ip().is_loopback(), "H3: must bind loopback");
 }
 
@@ -101,8 +142,21 @@ async fn h4_readiness_no_sleep() {
     let clock = Clock::capture();
     let ca = mk_ca(&clock, "ca-good");
     let leaf = valid_leaf(&ca, &clock);
-    let ep = bind_endpoint(&leaf, Some(&ca), 1, vec![], vec![], &clock, TcpTimeouts::test_profile(), no_retry()).await;
-    assert!(ep.local_addr().is_some(), "H4: addr available right after bind, no sleep");
+    let ep = bind_endpoint(
+        &leaf,
+        Some(&ca),
+        1,
+        vec![],
+        vec![],
+        &clock,
+        TcpTimeouts::test_profile(),
+        no_retry(),
+    )
+    .await;
+    assert!(
+        ep.local_addr().is_some(),
+        "H4: addr available right after bind, no sleep"
+    );
 }
 
 /// H5 — injectable timeouts: the test profile is ≤ 250ms on every axis.
@@ -110,7 +164,10 @@ async fn h4_readiness_no_sleep() {
 fn h5_test_profile_timeouts_bounded() {
     let t = TcpTimeouts::test_profile();
     let cap = Duration::from_millis(250);
-    assert!(t.handshake <= cap && t.intake <= cap && t.idle <= cap, "H5: all ≤ 250ms");
+    assert!(
+        t.handshake <= cap && t.intake <= cap && t.idle <= cap,
+        "H5: all ≤ 250ms"
+    );
 }
 
 /// H6 — deterministic teardown: dropping the transport frees the bound port so
@@ -120,7 +177,17 @@ async fn h6_teardown_frees_port() {
     let clock = Clock::capture();
     let ca = mk_ca(&clock, "ca-good");
     let leaf = valid_leaf(&ca, &clock);
-    let ep = bind_endpoint(&leaf, Some(&ca), 1, vec![], vec![], &clock, TcpTimeouts::test_profile(), no_retry()).await;
+    let ep = bind_endpoint(
+        &leaf,
+        Some(&ca),
+        1,
+        vec![],
+        vec![],
+        &clock,
+        TcpTimeouts::test_profile(),
+        no_retry(),
+    )
+    .await;
     let addr: SocketAddr = ep.local_addr().unwrap();
     drop(ep);
 
@@ -135,7 +202,10 @@ async fn h6_teardown_frees_port() {
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    assert!(rebound, "H6: port {addr} must be re-bindable within 250ms after drop");
+    assert!(
+        rebound,
+        "H6: port {addr} must be re-bindable within 250ms after drop"
+    );
 }
 
 /// Sanity: the transport type is constructible and `PeerId` re-exports resolve

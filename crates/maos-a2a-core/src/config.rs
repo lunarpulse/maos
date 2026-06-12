@@ -159,10 +159,7 @@ mod tests {
         assert_eq!(cfg.peer.len(), 1);
         assert_eq!(cfg.peer[0].peer_id.as_str(), "host-b-prod-edge");
         assert!(matches!(cfg.peer[0].profile, A2AProfile::CrossHost));
-        assert_eq!(
-            cfg.peer[0].allowlists.send_allowlist.len(),
-            1
-        );
+        assert_eq!(cfg.peer[0].allowlists.send_allowlist.len(), 1);
     }
 
     #[test]
@@ -260,17 +257,26 @@ mod tests {
             partition_timeout_secs: 30,
             consent_ttl_secs: 0,
         };
-        assert!(base.validate().is_err(), "consent_ttl_secs = 0 must be rejected");
+        assert!(
+            base.validate().is_err(),
+            "consent_ttl_secs = 0 must be rejected"
+        );
         let too_big = A2APeerConfig {
             consent_ttl_secs: 86401,
             ..base.clone()
         };
-        assert!(too_big.validate().is_err(), "consent_ttl_secs = 86401 must be rejected");
+        assert!(
+            too_big.validate().is_err(),
+            "consent_ttl_secs = 86401 must be rejected"
+        );
         let ok = A2APeerConfig {
             consent_ttl_secs: 86400,
             ..base
         };
-        assert!(ok.validate().is_ok(), "consent_ttl_secs = 86400 (boundary) must pass");
+        assert!(
+            ok.validate().is_ok(),
+            "consent_ttl_secs = 86400 (boundary) must pass"
+        );
     }
 
     #[test]

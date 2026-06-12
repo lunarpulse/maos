@@ -15,7 +15,9 @@ use crate::errors::ESkillSchema;
 /// A skill identifier (the `id` of a `maos.skill.v1` document, or an FR57
 /// proposal's `target_skill_id`). Newtype over `String` for type safety at
 /// the queue / proposal boundary.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 #[serde(transparent)]
 pub struct SkillId(pub String);
 
@@ -32,7 +34,9 @@ impl From<&str> for SkillId {
 }
 
 /// A skill version (semver). Newtype over `String`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 #[serde(transparent)]
 pub struct SkillVersion(pub String);
 

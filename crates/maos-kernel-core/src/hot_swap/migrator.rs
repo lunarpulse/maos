@@ -49,16 +49,14 @@ pub async fn run_migrator(
         .unwrap_or_else(|| "unknown".into());
 
     // 1. Verify successor's [migrates_from].versions contains predecessor_version.
-    let migrates_from =
-        successor_manifest
-            .migrates_from
-            .as_ref()
-            .ok_or_else(|| HotSwapError::EMigratorMissing {
-                predecessor_class: predecessor_class.clone(),
-                predecessor_version: predecessor_version.into(),
-                successor_class: successor_class.clone(),
-                successor_version: successor_version.clone(),
-            })?;
+    let migrates_from = successor_manifest.migrates_from.as_ref().ok_or_else(|| {
+        HotSwapError::EMigratorMissing {
+            predecessor_class: predecessor_class.clone(),
+            predecessor_version: predecessor_version.into(),
+            successor_class: successor_class.clone(),
+            successor_version: successor_version.clone(),
+        }
+    })?;
 
     if !migrates_from
         .versions

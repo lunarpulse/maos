@@ -110,8 +110,16 @@ async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
         let payload = serde_json::to_vec(&f.payload).unwrap();
         let drr = adapter.drr_scheduler().unwrap().clone();
         handles.push(tokio::spawn(async move {
-            drr.submit(f, payload, maos_kernel_core::iac::FrameKind::TaskAssign, 0, "standard".into(), FrameOrigin::HumanAuthored, vec![])
-                .await
+            drr.submit(
+                f,
+                payload,
+                maos_kernel_core::iac::FrameKind::TaskAssign,
+                0,
+                "standard".into(),
+                FrameOrigin::HumanAuthored,
+                vec![],
+            )
+            .await
         }));
     }
 
@@ -125,7 +133,10 @@ async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
             found = true;
         }
     }
-    assert!(found, "expected budget warning for spirit a with backlog >= 8 KiB");
+    assert!(
+        found,
+        "expected budget warning for spirit a with backlog >= 8 KiB"
+    );
 
     // Clean up: await all handles so the test completes
     for h in handles {

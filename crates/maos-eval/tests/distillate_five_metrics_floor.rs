@@ -165,9 +165,20 @@ fn test_distillate_corpus_quarterly_audit_shape() {
     );
 
     // The three annotated metric floors hold on the N=500 slice (as on N=100).
-    let recall_mean = mean(&corpus.scenarios.iter().map(|s| s.expected_recall).collect::<Vec<_>>());
-    let faithfulness_mean =
-        mean(&corpus.scenarios.iter().map(|s| s.expected_faithfulness).collect::<Vec<_>>());
+    let recall_mean = mean(
+        &corpus
+            .scenarios
+            .iter()
+            .map(|s| s.expected_recall)
+            .collect::<Vec<_>>(),
+    );
+    let faithfulness_mean = mean(
+        &corpus
+            .scenarios
+            .iter()
+            .map(|s| s.expected_faithfulness)
+            .collect::<Vec<_>>(),
+    );
     let hedge_mean = mean(
         &corpus
             .scenarios
@@ -175,16 +186,25 @@ fn test_distillate_corpus_quarterly_audit_shape() {
             .map(|s| s.expected_hedge_preservation)
             .collect::<Vec<_>>(),
     );
-    assert!(recall_mean >= 0.90, "quarterly digest-recall mean {recall_mean:.3} below 0.90");
+    assert!(
+        recall_mean >= 0.90,
+        "quarterly digest-recall mean {recall_mean:.3} below 0.90"
+    );
     assert!(
         faithfulness_mean >= 0.98,
         "quarterly digest-faithfulness mean {faithfulness_mean:.3} below 0.98"
     );
-    assert!(hedge_mean >= 0.95, "quarterly digest-hedge mean {hedge_mean:.3} below 0.95");
+    assert!(
+        hedge_mean >= 0.95,
+        "quarterly digest-hedge mean {hedge_mean:.3} below 0.95"
+    );
 
     // Traceability — every scenario carries a non-empty source_log_ref.
     assert!(
-        corpus.scenarios.iter().all(|s| !s.source_log_ref.is_empty()),
+        corpus
+            .scenarios
+            .iter()
+            .all(|s| !s.source_log_ref.is_empty()),
         "quarterly traceability: every scenario MUST have a non-empty source_log_ref"
     );
 
@@ -225,11 +245,29 @@ fn test_distillate_corpus_quarterly_audit_shape() {
     //   hedge-focus: faith=0.995, hedge=0.950..0.960
     //   contradiction: faith=0.980..0.985, hedge=0.97
     //   planted-secret: faith=0.995, hedge=0.97
-    let contradiction = corpus.scenarios.iter().filter(|s| s.expected_faithfulness < 0.99).count();
-    let planted = corpus.scenarios.iter().filter(|s| !s.planted_secrets.is_empty()).count();
-    let hedge = corpus.scenarios.iter().filter(|s| s.expected_hedge_preservation < 0.97).count();
-    assert!(contradiction >= 10, "quarterly needs ≥10 contradiction cases, got {contradiction}");
-    assert!(planted >= 10, "quarterly needs ≥10 planted-secret cases, got {planted}");
+    let contradiction = corpus
+        .scenarios
+        .iter()
+        .filter(|s| s.expected_faithfulness < 0.99)
+        .count();
+    let planted = corpus
+        .scenarios
+        .iter()
+        .filter(|s| !s.planted_secrets.is_empty())
+        .count();
+    let hedge = corpus
+        .scenarios
+        .iter()
+        .filter(|s| s.expected_hedge_preservation < 0.97)
+        .count();
+    assert!(
+        contradiction >= 10,
+        "quarterly needs ≥10 contradiction cases, got {contradiction}"
+    );
+    assert!(
+        planted >= 10,
+        "quarterly needs ≥10 planted-secret cases, got {planted}"
+    );
     assert!(hedge >= 10, "quarterly needs ≥10 hedge cases, got {hedge}");
 }
 

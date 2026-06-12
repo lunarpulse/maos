@@ -73,8 +73,7 @@ fn check(dir: &Path) -> Result<Report, String> {
 
     let mut disabled_jobs = Vec::new();
     for file in &files {
-        let text =
-            fs::read_to_string(file).map_err(|e| format!("read {}: {e}", file.display()))?;
+        let text = fs::read_to_string(file).map_err(|e| format!("read {}: {e}", file.display()))?;
         for (i, line) in text.lines().enumerate() {
             // Match a job-level `if: false` directive (ignore comments and the
             // report-aggregate JS strings, which are more-indented or `#`-led).

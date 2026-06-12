@@ -8,8 +8,8 @@
 //! Uses `try_send` + `cap_audit::record_drop()` on saturation per
 //! ADR-030: NEVER block on the audit channel.
 
-use maos_domain::invariants::i9::SandboxTier;
 use crate::capability::cap_audit::{self, CapAuditEvent};
+use maos_domain::invariants::i9::SandboxTier;
 
 pub fn emit_t3_escape_block(
     sender: &cap_audit::Sender,
@@ -27,11 +27,7 @@ pub fn emit_t3_escape_block(
     }
 }
 
-pub fn emit_t3_escape_block_probe(
-    host_pid: u32,
-    category: &str,
-    vector: &str,
-) {
+pub fn emit_t3_escape_block_probe(host_pid: u32, category: &str, vector: &str) {
     eprintln!(
         "maos: T3 escape block probe: host_pid={}, category={}, vector={}",
         host_pid, category, vector

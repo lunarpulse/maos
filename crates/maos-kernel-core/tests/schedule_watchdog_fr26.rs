@@ -16,17 +16,15 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 
+use maos_domain::invariants::i1::Scope;
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::scheduler::{
     control_block::{make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle},
     hook_dispatch::HookDispatcher,
     schedule_watchdog::ScheduleWatchdog,
 };
-use maos_kernel_core::security::manifest::{
-    LifecycleSection, ScheduleEntry, SchedulesSection,
-};
+use maos_kernel_core::security::manifest::{LifecycleSection, ScheduleEntry, SchedulesSection};
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
-use maos_domain::invariants::i1::Scope;
 
 /// Shared counter Spirit — every `on_schedule` call increments the counter
 /// and records the payload bytes for round-trip verification.
@@ -123,11 +121,7 @@ async fn run_watchdog_for(
     let handle = Arc::clone(&watchdog).spawn(cancel.child_token());
     tokio::time::sleep(tokio::time::Duration::from_millis(millis)).await;
     cancel.cancel();
-    let timeout_res = tokio::time::timeout(
-        tokio::time::Duration::from_secs(2),
-        handle,
-    )
-    .await;
+    let timeout_res = tokio::time::timeout(tokio::time::Duration::from_secs(2), handle).await;
     assert!(
         timeout_res.is_ok() && timeout_res.unwrap().is_ok(),
         "watchdog must shut down cleanly within timeout"
@@ -168,10 +162,7 @@ async fn schedule_2_2_two_entries_independent_cadence() {
         2,
         "two-schedules",
         vec!["on_schedule".into()],
-        vec![
-            entry("a", 1, 3600, vec![]),
-            entry("b", 2, 3600, vec![]),
-        ],
+        vec![entry("a", 1, 3600, vec![]), entry("b", 2, 3600, vec![])],
         Arc::clone(&counter),
     );
     let scbs = Arc::new(RwLock::new(BTreeMap::new()));
@@ -212,7 +203,11 @@ async fn schedule_2_3_rate_limit_caps_firing() {
     // Despite cadence ticking many times in 400ms, rate-limit caps firing to
     // bucket-capacity = 1.
     let fires = counter.load(Ordering::SeqCst);
-    assert_eq!(fires, 1, "rate-limit=1/hour caps to single fire (got {})", fires);
+    assert_eq!(
+        fires, 1,
+        "rate-limit=1/hour caps to single fire (got {})",
+        fires
+    );
 }
 
 /// AC2.5 — lifecycle.enabled_hooks excludes `on_schedule` → NO fire.
@@ -301,16 +296,16 @@ async fn schedule_2_8_compliance_claim_stamp_in_tl_row() {
             r.intent.starts_with("schedule.fire:")
         })
         .expect("at least one schedule.fire TL row");
-    let payload: serde_json::Value =
-        serde_json::from_slice(&stamped_row.payload_redacted).unwrap();
+    let payload: serde_json::Value = serde_json::from_slice(&stamped_row.payload_redacted).unwrap();
     let claim_arr = payload["compliance_claim_ref"]
         .as_array()
         .expect("compliance_claim_ref array");
-    let expected: Vec<serde_json::Value> = stamp
-        .iter()
-        .map(|b| serde_json::Value::from(*b))
-        .collect();
-    assert_eq!(claim_arr, &expected, "TL row carries verbatim 32-byte stamp");
+    let expected: Vec<serde_json::Value> =
+        stamp.iter().map(|b| serde_json::Value::from(*b)).collect();
+    assert_eq!(
+        claim_arr, &expected,
+        "TL row carries verbatim 32-byte stamp"
+    );
 }
 
 /// Additional — empty schedules section produces no firings.
@@ -359,7 +354,11 @@ async fn schedule_cadence_respected_between_fires() {
     run_watchdog_for(scbs, dispatcher, tl, 250).await;
 
     let fires = counter.load(Ordering::SeqCst);
-    assert!(fires >= 2, "cadence respected; expected ≥2 fires got {}", fires);
+    assert!(
+        fires >= 2,
+        "cadence respected; expected ≥2 fires got {}",
+        fires
+    );
     // Cadence floor: not 25+ rapid fires (bucket=3600 wouldn't cap;
     // cadence acts as the limit).
     assert!(

@@ -118,11 +118,7 @@ pub fn parse_search_results(content: &serde_json::Value, server: &str) -> Vec<St
             .and_then(|v| v.as_array())
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|item| {
-                        item.get("repo")
-                            .and_then(|v| v.as_str())
-                            .map(String::from)
-                    })
+                    .filter_map(|item| item.get("repo").and_then(|v| v.as_str()).map(String::from))
                     .collect()
             })
             .unwrap_or_default(),

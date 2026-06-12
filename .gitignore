@@ -21,3 +21,10 @@ _research/
 # `multi-provider-local-*.json` files in the tree.
 tests/reports/multi-provider-*.json
 crates/maos-providers/tests/reports/
+
+# Python tooling — added for tools/verify-audit-bundle/ and any future standalone scripts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/

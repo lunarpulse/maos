@@ -54,7 +54,9 @@ impl HandshakeRetryPolicy {
                 .unwrap_or(0)
         });
         // Linear-congruential cheap jitter; deterministic for the same seed
-        let r = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let r = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let off = (r % (2 * jitter_range + 1)) as i64 - jitter_range as i64;
         ((base as i64) + off).max(0) as u64
     }
@@ -92,8 +94,7 @@ pub struct LoopbackTlsConfig {
     pub bind: std::net::SocketAddr,
     pub server_cert: rustls::pki_types::CertificateDer<'static>,
     pub server_key: rustls::pki_types::PrivateKeyDer<'static>,
-    pub client_cert_verifier:
-        Arc<dyn rustls::server::danger::ClientCertVerifier>,
+    pub client_cert_verifier: Arc<dyn rustls::server::danger::ClientCertVerifier>,
 }
 
 /// Build a `rustls::ServerConfig` from a `LoopbackTlsConfig`.
@@ -107,10 +108,16 @@ pub fn build_loopback_server_config(
     let provider = std::sync::Arc::new(rustls::crypto::ring::default_provider());
     let server_config = rustls::ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
-        .map_err(|e| A2AError::HandshakeFailed { class: HandshakeFailureClass::Other, message: format!("protocol_versions: {e}") })?
+        .map_err(|e| A2AError::HandshakeFailed {
+            class: HandshakeFailureClass::Other,
+            message: format!("protocol_versions: {e}"),
+        })?
         .with_client_cert_verifier(cfg.client_cert_verifier.clone())
         .with_single_cert(cert_chain, clone_key(&cfg.server_key))
-        .map_err(|e| A2AError::HandshakeFailed { class: HandshakeFailureClass::Other, message: format!("with_single_cert: {e}") })?;
+        .map_err(|e| A2AError::HandshakeFailed {
+            class: HandshakeFailureClass::Other,
+            message: format!("with_single_cert: {e}"),
+        })?;
     Ok(server_config)
 }
 
@@ -134,9 +141,9 @@ fn clone_key(
             // At v0.5 this arm is unreachable; if a future rustls adds a new
             // variant, this gracefully falls through to a forwarded error
             // rather than crashing in production.
-            rustls::pki_types::PrivateKeyDer::Pkcs8(
-                rustls::pki_types::PrivatePkcs8KeyDer::from(vec![]),
-            )
+            rustls::pki_types::PrivateKeyDer::Pkcs8(rustls::pki_types::PrivatePkcs8KeyDer::from(
+                vec![],
+            ))
         }
     }
 }
@@ -164,11 +171,20 @@ mod tests {
         let p = HandshakeRetryPolicy::default();
         for seed in 0..32 {
             let d2 = p.delay_for_attempt(2, Some(seed));
-            assert!((80..=120).contains(&d2), "attempt 2 delay {d2} out of [80, 120]");
+            assert!(
+                (80..=120).contains(&d2),
+                "attempt 2 delay {d2} out of [80, 120]"
+            );
             let d3 = p.delay_for_attempt(3, Some(seed));
-            assert!((240..=360).contains(&d3), "attempt 3 delay {d3} out of [240, 360]");
+            assert!(
+                (240..=360).contains(&d3),
+                "attempt 3 delay {d3} out of [240, 360]"
+            );
             let d4 = p.delay_for_attempt(4, Some(seed));
-            assert!((800..=1200).contains(&d4), "attempt 4 delay {d4} out of [800, 1200]");
+            assert!(
+                (800..=1200).contains(&d4),
+                "attempt 4 delay {d4} out of [800, 1200]"
+            );
         }
     }
 

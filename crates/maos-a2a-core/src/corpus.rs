@@ -158,7 +158,9 @@ pub fn generate(
         mtls_replay: (0..mtls_n).map(make_mtls_replay).collect(),
         tofu_mismatch: (0..tofu_n).map(make_tofu_mismatch).collect(),
         handshake_fault: (0..fault_n.min(20)).map(make_handshake_fault).collect(),
-        cross_spirit_consent: (0..consent_n.min(30)).map(make_cross_spirit_consent).collect(),
+        cross_spirit_consent: (0..consent_n.min(30))
+            .map(make_cross_spirit_consent)
+            .collect(),
     }
 }
 

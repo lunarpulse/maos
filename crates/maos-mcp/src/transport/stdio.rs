@@ -27,10 +27,7 @@ impl StdioTransport {
         Ok(Self { command, args })
     }
 
-    fn spawn_and_invoke(
-        &self,
-        request: &McpRequest,
-    ) -> Result<McpResponse, McpTransportError> {
+    fn spawn_and_invoke(&self, request: &McpRequest) -> Result<McpResponse, McpTransportError> {
         let mut child = Command::new(&self.command)
             .args(&self.args)
             .stdin(Stdio::piped())
@@ -106,8 +103,8 @@ pub fn parse_stdio_response(
     line: &str,
     server_name: &str,
 ) -> Result<McpResponse, McpTransportError> {
-    let value: serde_json::Value =
-        serde_json::from_str(line).map_err(|e| McpTransportError::Transport(format!("parse: {e}")))?;
+    let value: serde_json::Value = serde_json::from_str(line)
+        .map_err(|e| McpTransportError::Transport(format!("parse: {e}")))?;
 
     let server = server_name.to_string();
     let tool = value
@@ -175,10 +172,7 @@ mod tests {
         let err = parse_stdio_response(resp_line, "test-server").unwrap_err();
         assert!(matches!(
             err,
-            McpTransportError::ServerError {
-                code: -32601,
-                ..
-            }
+            McpTransportError::ServerError { code: -32601, .. }
         ));
     }
 

@@ -182,9 +182,12 @@ mod tests {
 
     #[test]
     fn ctx_mock_with_deprecation_warnings() {
-        let warnings = vec![
-            DeprecationWarning::new("Test::api", "0.5", "1.0", "use Test::new_api"),
-        ];
+        let warnings = vec![DeprecationWarning::new(
+            "Test::api",
+            "0.5",
+            "1.0",
+            "use Test::new_api",
+        )];
         let ctx = Ctx::mock_with_deprecation_warnings(warnings.clone());
         assert_eq!(ctx.deprecation_warnings().len(), 1);
         assert_eq!(ctx.deprecation_warnings()[0].surface, "Test::api");

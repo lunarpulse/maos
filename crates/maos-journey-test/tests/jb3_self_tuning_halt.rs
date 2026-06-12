@@ -54,11 +54,7 @@ fn maos_cmd() -> Command {
 fn jb3_self_tunes_via_belief_variance_halt() {
     let home = isolated_data_home("halt");
     let output = maos_cmd()
-        .args([
-            "run",
-            "spirits/butler/manifest.toml",
-            "--once",
-        ])
+        .args(["run", "spirits/butler/manifest.toml", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
         .current_dir(workspace_root())
         .output()

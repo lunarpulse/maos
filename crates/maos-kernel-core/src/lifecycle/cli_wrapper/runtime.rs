@@ -606,9 +606,7 @@ impl SpawnedBridge {
                     eofs += 1;
                 }
                 Ok(ReaderMsg::FramingError { stream, error }) => {
-                    eprintln!(
-                        "cli_wrapper: framing error on {stream:?}: {error}"
-                    );
+                    eprintln!("cli_wrapper: framing error on {stream:?}: {error}");
                     eofs += 1;
                 }
                 Err(_) => break, // both readers gone
@@ -985,9 +983,18 @@ mod tests {
     fn newline_framing_strips_crlf() {
         let data = b"alpha\r\nbeta\ngamma";
         let mut r = std::io::BufReader::new(&data[..]);
-        assert_eq!(read_newline_delimited(&mut r).unwrap(), Some(b"alpha".to_vec()));
-        assert_eq!(read_newline_delimited(&mut r).unwrap(), Some(b"beta".to_vec()));
-        assert_eq!(read_newline_delimited(&mut r).unwrap(), Some(b"gamma".to_vec()));
+        assert_eq!(
+            read_newline_delimited(&mut r).unwrap(),
+            Some(b"alpha".to_vec())
+        );
+        assert_eq!(
+            read_newline_delimited(&mut r).unwrap(),
+            Some(b"beta".to_vec())
+        );
+        assert_eq!(
+            read_newline_delimited(&mut r).unwrap(),
+            Some(b"gamma".to_vec())
+        );
         assert_eq!(read_newline_delimited(&mut r).unwrap(), None);
     }
 
@@ -1003,7 +1010,13 @@ mod tests {
     #[test]
     fn ci_default_guard_trips_on_real_cli() {
         // The guard must TRIP on a real agent CLI (decoration otherwise).
-        for cli in ["claude", "opencode", "gemini", "kimi", "/usr/local/bin/claude"] {
+        for cli in [
+            "claude",
+            "opencode",
+            "gemini",
+            "kimi",
+            "/usr/local/bin/claude",
+        ] {
             assert!(
                 matches!(
                     ci_default_guard(cli, false),

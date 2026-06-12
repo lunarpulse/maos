@@ -79,9 +79,7 @@ impl TcpTransportError {
                 class: HandshakeFailureClass::Other,
                 message: m.clone(),
             },
-            TcpTransportError::Timeout(m) => {
-                A2AError::TransportFailed(format!("timeout: {m}"))
-            }
+            TcpTransportError::Timeout(m) => A2AError::TransportFailed(format!("timeout: {m}")),
             TcpTransportError::FrameTooLarge(m) => {
                 A2AError::TransportFailed(format!("frame too large: {m}"))
             }

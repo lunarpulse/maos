@@ -337,9 +337,7 @@ impl SpiritControlBlock {
             // freshly-loaded Spirits (the test `idle_watchdog_skips_manifest_
             // disabled_hook` passed for the wrong reason — it relied on this
             // bug). Mailbox::deliver overwrites this on first inbound frame.
-            last_inbound_frame_ns: AtomicU64::new(
-                crate::capability::cap_tokens::monotonic_now_ns(),
-            ),
+            last_inbound_frame_ns: AtomicU64::new(crate::capability::cap_tokens::monotonic_now_ns()),
             last_idle_fire_ns: AtomicU64::new(0),
             last_progress_iac_ns: AtomicU64::new(crate::capability::cap_tokens::monotonic_now_ns()),
             last_heartbeat_ns: AtomicU64::new(crate::capability::cap_tokens::monotonic_now_ns()),

@@ -526,7 +526,10 @@ impl Butler {
     }
     /// JB-5 — inject a shared output channel for daemon-level output_shape
     /// validation. Butler serializes its notification here during `on_idle`.
-    pub fn with_output_channel(mut self, ch: Arc<std::sync::Mutex<Option<serde_json::Value>>>) -> Self {
+    pub fn with_output_channel(
+        mut self,
+        ch: Arc<std::sync::Mutex<Option<serde_json::Value>>>,
+    ) -> Self {
         self.output_channel = Some(ch);
         self
     }
@@ -634,7 +637,13 @@ impl Butler {
         // so they don't silently bypass the epistemic-policy halt rule.
         let user_preference_drift = scenario
             .preference_alignment
-            .and_then(|v| if v.is_nan() { None } else { Some(v.clamp(0.0, 1.0)) })
+            .and_then(|v| {
+                if v.is_nan() {
+                    None
+                } else {
+                    Some(v.clamp(0.0, 1.0))
+                }
+            })
             .unwrap_or(1.0);
 
         let mut triage: Vec<TriagedComms> = scenario
@@ -701,8 +710,7 @@ impl Butler {
             // corruption in the audit trail and must not propagate to the
             // distillation request where it would fail later with a less
             // useful error message.
-            if e.frame_id_hex.len() != 32
-                || !e.frame_id_hex.chars().all(|c| c.is_ascii_hexdigit())
+            if e.frame_id_hex.len() != 32 || !e.frame_id_hex.chars().all(|c| c.is_ascii_hexdigit())
             {
                 return Err(ButlerError::BadFrameIdHex(format!(
                     "audit query returned invalid frame_id_hex: {}",
@@ -876,7 +884,10 @@ fn detect_unresolved_conflicts(events: &[CalendarEvent]) -> Vec<ConflictPair> {
 fn outcome_tag(intent: &str) -> String {
     let lower = intent.to_ascii_lowercase();
     let words: Vec<&str> = lower.split_whitespace().collect();
-    if words.iter().any(|w| matches!(*w, "fail" | "error" | "failed" | "errored")) {
+    if words
+        .iter()
+        .any(|w| matches!(*w, "fail" | "error" | "failed" | "errored"))
+    {
         "failed".to_string()
     } else if words.iter().any(|w| matches!(*w, "cancel" | "cancelled")) {
         "cancelled".to_string()
@@ -893,7 +904,8 @@ fn decode_frame_id_hex(hex: &str) -> Result<[u8; 16], ButlerError> {
     let mut out = [0u8; 16];
     for (i, byte) in out.iter_mut().enumerate() {
         let s = &hex[i * 2..i * 2 + 2];
-        *byte = u8::from_str_radix(s, 16).map_err(|_| ButlerError::BadFrameIdHex(hex.to_string()))?;
+        *byte =
+            u8::from_str_radix(s, 16).map_err(|_| ButlerError::BadFrameIdHex(hex.to_string()))?;
     }
     Ok(out)
 }
@@ -923,7 +935,10 @@ mod unit_tests {
         };
         let a = Butler::new().assess(&s);
         assert_eq!(a.conflicts.len(), 1);
-        assert!(a.belief_variance > 0.7, "one conflict crosses the halt floor");
+        assert!(
+            a.belief_variance > 0.7,
+            "one conflict crosses the halt floor"
+        );
         let (tag, value, _) = a.primary_scalar();
         assert_eq!(tag, "belief_variance");
         assert!(value > 0.7);
@@ -1038,7 +1053,11 @@ pub mod test_support {
         async fn comms_messages(&self) -> Result<Vec<CommsMessage>, ButlerMcpError> {
             Ok(self.comms.clone())
         }
-        async fn write_linear_note(&self, _title: &str, _content: &str) -> Result<(), ButlerMcpError> {
+        async fn write_linear_note(
+            &self,
+            _title: &str,
+            _content: &str,
+        ) -> Result<(), ButlerMcpError> {
             self.write_linear_call_count.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
@@ -1050,8 +1069,8 @@ pub mod test_support {
 
 #[cfg(test)]
 mod mcp_port_tests {
-    use super::*;
     use super::test_support::FakeButlerMcpPort;
+    use super::*;
 
     #[test]
     fn on_idle_fetches_real_calendar_via_mcp_port() {
@@ -1067,9 +1086,14 @@ mod mcp_port_tests {
         );
         butler.on_idle(&mut ctx);
 
-        let assessment = butler.last_assessment().expect("assessment should be stored");
+        let assessment = butler
+            .last_assessment()
+            .expect("assessment should be stored");
         assert_eq!(assessment.conflicts.len(), 1, "one conflict from MCP data");
-        assert!(assessment.belief_variance > 0.7, "conflict crosses halt floor");
+        assert!(
+            assessment.belief_variance > 0.7,
+            "conflict crosses halt floor"
+        );
     }
 
     #[test]
@@ -1087,10 +1111,19 @@ mod mcp_port_tests {
         // A notification should be pending after on_idle detected a conflict.
         assert!(butler.last_notification().is_some(), "notification pending");
 
-        let outcome = butler.handle_option_pick('a', fake.as_ref()).expect("option a should succeed");
+        let outcome = butler
+            .handle_option_pick('a', fake.as_ref())
+            .expect("option a should succeed");
         assert!(outcome.linear_note_written, "linear note written flag set");
-        assert_eq!(fake.linear_writes(), 1, "mcp_port.write_linear_note must be called");
-        assert!(outcome.message.contains("Linear note written"), "message confirms write");
+        assert_eq!(
+            fake.linear_writes(),
+            1,
+            "mcp_port.write_linear_note must be called"
+        );
+        assert!(
+            outcome.message.contains("Linear note written"),
+            "message confirms write"
+        );
     }
 
     #[test]
@@ -1125,7 +1158,9 @@ mod mcp_port_tests {
         );
         butler.on_idle(&mut ctx);
 
-        let assessment = butler.last_assessment().expect("assessment from pending scenario");
+        let assessment = butler
+            .last_assessment()
+            .expect("assessment from pending scenario");
         assert_eq!(assessment.conflicts.len(), 1);
     }
 
@@ -1157,7 +1192,9 @@ mod mcp_port_tests {
         );
         butler.on_idle(&mut ctx);
 
-        let outcome = butler.handle_option_pick('b', fake.as_ref()).expect("option b should succeed");
+        let outcome = butler
+            .handle_option_pick('b', fake.as_ref())
+            .expect("option b should succeed");
         assert!(outcome.reminder_set);
         assert!(outcome.message.contains("Slack message queued"));
     }
@@ -1173,7 +1210,9 @@ mod mcp_port_tests {
         );
         butler.on_idle(&mut ctx);
 
-        let outcome = butler.handle_option_pick('c', fake.as_ref()).expect("option c should succeed");
+        let outcome = butler
+            .handle_option_pick('c', fake.as_ref())
+            .expect("option c should succeed");
         assert!(outcome.snoozed);
         assert!(outcome.message.contains("snoozed"));
     }

@@ -16,10 +16,7 @@ pub struct StreamableHttpTransport {
 }
 
 impl StreamableHttpTransport {
-    pub fn new(
-        transport_inner: std::sync::Arc<dyn IoSubsystemPort>,
-        endpoint_url: String,
-    ) -> Self {
+    pub fn new(transport_inner: std::sync::Arc<dyn IoSubsystemPort>, endpoint_url: String) -> Self {
         Self {
             transport_inner,
             endpoint_url,
@@ -81,7 +78,8 @@ pub fn parse_streamable_http_response(
     server_name: &str,
 ) -> Result<McpResponse, McpTransportError> {
     // Try streamed SSE first
-    if !body.trim_start().starts_with('{') && (body.contains("event:") || body.starts_with("data:")) {
+    if !body.trim_start().starts_with('{') && (body.contains("event:") || body.starts_with("data:"))
+    {
         return crate::transport::sse::parse_sse_response(body, server_name);
     }
 

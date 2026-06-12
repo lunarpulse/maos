@@ -12,11 +12,11 @@
 
 use std::sync::Arc;
 
+use maos_domain::invariants::i1::{CapabilityToken, TokenId};
 use maos_domain::ports::inference::{
     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
     TokenUsage,
 };
-use maos_domain::invariants::i1::{CapabilityToken, TokenId};
 use maos_kernel_core::inference::router::{MultiProviderRouter, RouterError};
 use maos_providers::fixture_replay::FixtureReplayProvider;
 use maos_providers::provider::{Provider, ProviderError};
@@ -25,7 +25,10 @@ fn ok_response(provider: &str, text: &str) -> InferenceResponse {
     InferenceResponse {
         text: text.into(),
         stop_reason: StopReason::StopSequence,
-        usage: TokenUsage { input_tokens: 10, output_tokens: 20 },
+        usage: TokenUsage {
+            input_tokens: 10,
+            output_tokens: 20,
+        },
         provider_attribution: ProviderAttribution {
             provider_id: provider.into(),
             endpoint_url: format!("http://{provider}.test"),
@@ -46,15 +49,18 @@ fn sample_request(pid: u32, provider: Option<&str>) -> InferenceRequest {
 }
 
 fn make_router() -> MultiProviderRouter {
-    let openai = Arc::new(FixtureReplayProvider::new(vec![
-        Ok(ok_response("openai", "openai reply")),
-    ]));
-    let anthropic = Arc::new(FixtureReplayProvider::new(vec![
-        Ok(ok_response("anthropic", "anthropic reply")),
-    ]));
-    let ollama = Arc::new(FixtureReplayProvider::new(vec![
-        Ok(ok_response("ollama", "ollama reply")),
-    ]));
+    let openai = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
+        "openai",
+        "openai reply",
+    ))]));
+    let anthropic = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
+        "anthropic",
+        "anthropic reply",
+    ))]));
+    let ollama = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
+        "ollama",
+        "ollama reply",
+    ))]));
     let mut providers = std::collections::BTreeMap::new();
     providers.insert("openai".into(), openai as Arc<dyn Provider>);
     providers.insert("anthropic".into(), anthropic as Arc<dyn Provider>);
@@ -74,12 +80,16 @@ fn manifest_with_openai_primary_dispatches_to_openai() {
 
 #[test]
 fn manifest_with_anthropic_fallback_walks_on_503() {
-    let primary: Arc<dyn Provider> = Arc::new(FixtureReplayProvider::new(vec![
-        Err(ProviderError::ProviderRejected { status: 503, body: "unavailable".into() }),
-    ]));
-    let secondary: Arc<dyn Provider> = Arc::new(FixtureReplayProvider::new(vec![
-        Ok(ok_response("openai", "fallback reply")),
-    ]));
+    let primary: Arc<dyn Provider> = Arc::new(FixtureReplayProvider::new(vec![Err(
+        ProviderError::ProviderRejected {
+            status: 503,
+            body: "unavailable".into(),
+        },
+    )]));
+    let secondary: Arc<dyn Provider> = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
+        "openai",
+        "fallback reply",
+    ))]));
     let mut providers: std::collections::BTreeMap<String, Arc<dyn Provider>> =
         std::collections::BTreeMap::new();
     providers.insert("primary".into(), primary);

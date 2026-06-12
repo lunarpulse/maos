@@ -18,9 +18,9 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
 #[cfg(test)]
 use std::time::Duration;
+use std::time::Instant;
 
 use dashmap::DashMap;
 use sha2::{Digest, Sha256};
@@ -402,7 +402,7 @@ mod tests {
         let k1 = BucketKey::new("anthropic", 1);
         let k2 = BucketKey::new("anthropic", 2); // different credential
         let k3 = BucketKey::new("openai", 1); // different provider
-        // Exhaust K1's bucket.
+                                              // Exhaust K1's bucket.
         assert!(limiter.try_consume(k1).is_ok());
         assert!(limiter.try_consume(k1).is_ok());
         assert!(limiter.try_consume(k1).is_err());

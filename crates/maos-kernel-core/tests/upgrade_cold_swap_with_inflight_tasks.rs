@@ -40,7 +40,10 @@ fn upgrade_error_lifecycle_variant_carries_message() {
         spirit_id: "test".into(),
     });
     let msg = format!("{err}");
-    assert!(msg.contains("test"), "error message should contain spirit_id: {msg}");
+    assert!(
+        msg.contains("test"),
+        "error message should contain spirit_id: {msg}"
+    );
 }
 
 #[test]

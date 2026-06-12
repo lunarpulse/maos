@@ -87,15 +87,11 @@ pub fn auto_populate(
         let mut pe = std::collections::BTreeMap::new();
         pe.insert(
             serde_cbor::value::Value::Text("provider_id".into()),
-            serde_cbor::value::Value::Text(
-                manifest_fields.provider_endpoint.provider_id.clone(),
-            ),
+            serde_cbor::value::Value::Text(manifest_fields.provider_endpoint.provider_id.clone()),
         );
         pe.insert(
             serde_cbor::value::Value::Text("endpoint_url".into()),
-            serde_cbor::value::Value::Text(
-                manifest_fields.provider_endpoint.endpoint_url.clone(),
-            ),
+            serde_cbor::value::Value::Text(manifest_fields.provider_endpoint.endpoint_url.clone()),
         );
         if let Some(mid) = &manifest_fields.provider_endpoint.model_id {
             pe.insert(

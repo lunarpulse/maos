@@ -7,9 +7,9 @@
 //!
 //! Consumer-facing surface: `AcpServer::new(lifecycle, halts).run(stdin, stdout)`.
 
-pub mod frame;
 #[cfg(any(test, feature = "fixture_replay"))]
 pub mod fixture_replay;
+pub mod frame;
 pub mod notification_channel;
 pub mod server;
 

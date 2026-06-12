@@ -20,10 +20,11 @@ tempfile = "3"
 
 [dev-dependencies]
 maos-spirit-hello = { path = "../maos-spirit-hello" }
+maos-audit = { path = "../maos-audit" }
+rusqlite = { version = "0.31", features = ["bundled"] }
 criterion = "0.5"
 smallvec = { version = "1", features = ["serde"] }
 parking_lot = "0.12"
-
 [features]
 fixture_replay = []
 kernel_measurement = ["tokio"]
@@ -57,3 +58,10 @@ required-features = ["kernel_measurement"]
 name = "orchestrator_fanout_nfr_perf_8"
 harness = false
 required-features = ["kernel_measurement"]
+
+# Story 9.1 — audit query read-path latency bench.
+# Measures `maos_audit::query()` with single-spirit and global filters against
+# a 12k-row temp-file SQLite fixture. No `kernel_measurement` feature needed.
+[[bench]]
+name = "audit_query_latency"
+harness = false

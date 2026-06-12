@@ -14,6 +14,7 @@
 //! sealed-export functions.
 
 pub mod log_composition;
+pub mod sealed_export;
 
 use std::io::Write;
 use std::path::Path;
@@ -38,6 +39,12 @@ pub enum AuditError {
         line: usize,
         missing_field: &'static str,
     },
+    /// A u64 value exceeded i64 range when converting for SQLite binding.
+    #[error("value overflow: {field} ({value}) exceeds i64 range")]
+    ValueOverflow { field: &'static str, value: u64 },
+    /// Empty capability filter string provided.
+    #[error("empty capability filter string")]
+    EmptyCapabilityFilter,
 }
 
 /// FR4-projection error returned by [`project_to_fr4`]. Lifted into
@@ -93,10 +100,15 @@ pub struct AuditEntry {
 #[derive(Debug, Clone, Default)]
 pub struct AuditFilter {
     pub spirit_pid: Option<u32>,
+    pub boot_nonce: Option<u64>,
     pub kind: Option<String>,
     pub since_ns: Option<u64>,
     pub until_ns: Option<u64>,
     pub limit: Option<usize>,
+    /// FR41 — exact-match on capability_token BLOB (hex-encoded input).
+    pub capability_token: Option<String>,
+    /// FR41 — param-bound substring match on intent column.
+    pub intent_contains: Option<String>,
 }
 
 /// Open the per-Host SQLite file read-only and return matching entries.
@@ -119,19 +131,50 @@ pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, Aud
         where_clauses.push("spirit_pid = ?".to_string());
         params.push(Box::new(pid as i64));
     }
+    if let Some(boot) = filter.boot_nonce {
+        where_clauses.push("boot_nonce = ?".to_string());
+        let boot_i64 = i64::try_from(boot).map_err(|_| AuditError::ValueOverflow {
+            field: "boot_nonce",
+            value: boot,
+        })?;
+        params.push(Box::new(boot_i64));
+    }
     if let Some(since) = filter.since_ns {
         where_clauses.push("timestamp_ns >= ?".to_string());
-        params.push(Box::new(since as i64));
+        let since_i64 = i64::try_from(since).map_err(|_| AuditError::ValueOverflow {
+            field: "since_ns",
+            value: since,
+        })?;
+        params.push(Box::new(since_i64));
     }
     if let Some(until) = filter.until_ns {
         where_clauses.push("timestamp_ns <= ?".to_string());
-        params.push(Box::new(until as i64));
+        let until_i64 = i64::try_from(until).map_err(|_| AuditError::ValueOverflow {
+            field: "until_ns",
+            value: until,
+        })?;
+        params.push(Box::new(until_i64));
     }
     if let Some(kind_str) = &filter.kind {
         if let Some(kind_int) = kind_from_string(kind_str) {
             where_clauses.push("kind = ?".to_string());
             params.push(Box::new(kind_int));
         }
+    }
+    // FR41 — capability_token: hex input → blob comparison (param-bound).
+    if let Some(hex_str) = &filter.capability_token {
+        if hex_str.is_empty() {
+            return Err(AuditError::EmptyCapabilityFilter);
+        }
+        let blob = hex::decode(hex_str)
+            .map_err(|e| AuditError::Read(rusqlite::Error::ToSqlConversionFailure(Box::new(e))))?;
+        where_clauses.push("capability_token = ?".to_string());
+        params.push(Box::new(blob));
+    }
+    // FR41 — intent_contains: param-bound LIKE, never string-interpolated (SQLi-safe).
+    if let Some(sub) = &filter.intent_contains {
+        where_clauses.push("intent LIKE '%' || ? || '%'".to_string());
+        params.push(Box::new(sub.clone()));
     }
 
     if !where_clauses.is_empty() {
@@ -276,7 +319,7 @@ fn truncate(s: &str, max_len: usize) -> String {
 
 /// Hex-encode a byte slice.
 fn hex_encode(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    hex::encode(bytes)
 }
 
 /// Convert a kind integer to a human-readable dot-case string.
@@ -295,6 +338,9 @@ fn kind_to_string(kind: i64) -> String {
         9 => "inference.call",
         10 => "decision",
         11 => "distillate",
+        17 => "spirit.revoked",
+        19 => "spirit.admitted",
+        22 => "consent.rupture",
         _ => "unknown",
     }
     .to_string()
@@ -316,6 +362,9 @@ fn kind_from_string(s: &str) -> Option<i64> {
         "inference.call" | "InferenceCall" => Some(9),
         "decision" | "Decision" => Some(10),
         "distillate" | "Distillate" => Some(11),
+        "spirit.revoked" | "SpiritRevoked" => Some(17),
+        "spirit.admitted" | "SpiritAdmitted" => Some(19),
+        "consent.rupture" | "ConsentRupture" => Some(22),
         _ => None,
     }
 }
@@ -462,9 +511,7 @@ pub fn default_journal_path() -> std::path::PathBuf {
     use std::path::PathBuf;
     if let Ok(home) = std::env::var("MAOS_HOME") {
         if !home.is_empty() {
-            return PathBuf::from(home)
-                .join("journal")
-                .join("lifecycle.ndjson");
+            return PathBuf::from(home).join("journal").join("lifecycle.ndjson");
         }
     }
     if let Ok(p) = std::env::var("MAOS_JOURNAL_PATH") {
@@ -619,6 +666,282 @@ pub fn default_archive_dir() -> std::path::PathBuf {
         })
         .unwrap_or_else(|| PathBuf::from("/var/lib"));
     data_home.join("maos").join("spirit-archives")
+}
+
+/// Resolve a Spirit name to one or more `(boot_nonce, spirit_pid)` pairs by
+/// scanning the Transparency Log for SpiritAdmitted (FrameKind 19) frames
+/// whose `payload_redacted` carries `{"spirit_id": "<name>"}`.
+///
+/// Per Decision E: keyed on `(boot_nonce, spirit_pid)` to discriminate pid
+/// reuse across boots. Defaults to the LATEST boot (max `boot_nonce`).
+/// Set `all_boots = true` to union all incarnations.
+///
+/// Returns `Err` if no matching frames exist (unknown spirit name).
+pub fn resolve_spirit_name(
+    db_path: &Path,
+    name: &str,
+    all_boots: bool,
+) -> Result<Vec<(u64, u32)>, String> {
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|e| format!("failed to open TL: {e}"))?;
+
+    // Decision E: scan FrameKind 19 (SpiritAdmitted) TL frames.
+    // The Spirit name is stored in the non-redacted `intent` column.
+    let sql = "SELECT boot_nonce, spirit_pid, intent
+               FROM transparency_log
+               WHERE kind = 19
+               ORDER BY timestamp_ns ASC";
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| format!("prepare failed: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let boot: i64 = row.get(0)?;
+            let pid: i64 = row.get(1)?;
+            let intent: String = row.get(2)?;
+            Ok((boot as u64, pid as u32, intent))
+        })
+        .map_err(|e| format!("query failed: {e}"))?;
+
+    let mut matches: Vec<(u64, u32)> = Vec::new();
+    for row in rows {
+        let (boot, pid, intent) = row.map_err(|e| format!("row error: {e}"))?;
+        if intent == name {
+            matches.push((boot, pid));
+        }
+    }
+
+    if matches.is_empty() {
+        return Err(format!(
+            "unknown spirit '{name}' — no SpiritAdmitted (kind=19) frame found in Transparency Log"
+        ));
+    }
+
+    if all_boots {
+        // Deduplicate by (boot_nonce, spirit_pid)
+        matches.sort();
+        matches.dedup();
+        Ok(matches)
+    } else {
+        // Default: latest boot (max boot_nonce)
+        let max_boot = matches.iter().map(|(b, _)| *b).max().unwrap();
+        let latest: Vec<(u64, u32)> = matches
+            .into_iter()
+            .filter(|(b, _)| *b == max_boot)
+            .collect();
+        Ok(latest)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// FR42 — Subject-access query (principal_index reader)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// One row from the `principal_index` table. Independently defined to keep
+/// the dep direction clean (no maos-kernel-core import).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PrincipalIndexEntry {
+    pub principal_id: String,
+    pub writer_spirit_pid: u32,
+    pub schema: String,
+    pub key: String,
+    pub timestamp_ns: u64,
+}
+
+/// Query the `principal_index` table for all rows matching a given principal.
+/// Opens the same SQLite file as the TL (read-only).
+pub fn subject_access_query(
+    db_path: &Path,
+    principal_id: &str,
+) -> Result<Vec<PrincipalIndexEntry>, AuditError> {
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(AuditError::Open)?;
+
+    let sql = "SELECT principal_id, writer_spirit_pid, schema, key, timestamp_ns
+               FROM principal_index
+               WHERE principal_id = ?
+               ORDER BY timestamp_ns ASC";
+    let mut stmt = conn.prepare(sql).map_err(AuditError::Read)?;
+    let rows = stmt
+        .query_map(rusqlite::params![principal_id], |row| {
+            Ok(PrincipalIndexEntry {
+                principal_id: row.get(0)?,
+                writer_spirit_pid: row.get::<_, i64>(1)? as u32,
+                schema: row.get(2)?,
+                key: row.get(3)?,
+                timestamp_ns: row.get::<_, i64>(4)? as u64,
+            })
+        })
+        .map_err(AuditError::Read)?;
+
+    let mut entries = Vec::new();
+    for row in rows {
+        entries.push(row.map_err(AuditError::Read)?);
+    }
+    Ok(entries)
+}
+
+/// Provenance type for subject-access enrichment (Decision D: Direct/Distilled).
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "provenance_type")]
+pub enum Provenance {
+    Direct {
+        frame_ref: String,
+    },
+    Distilled {
+        effective_source_log_ref: Vec<String>,
+        distillation_depth: u32,
+    },
+}
+
+/// Enriched subject-access entry with provenance and spirit-name resolution.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SubjectAccessEntry {
+    pub principal_id: String,
+    pub writer_spirit_pid: u32,
+    pub writer_spirit_name: Option<String>,
+    pub boot_nonce: Option<u64>,
+    pub schema: String,
+    pub key: String,
+    pub timestamp_ns: u64,
+    pub provenance: Provenance,
+}
+
+/// Enrich a `PrincipalIndexEntry` with provenance by scanning the TL for
+/// Distillate frames whose `spirit_pid` matches the writer. Each Distillate
+/// frame carries `effective_source_log_ref` in `payload_redacted`.
+///
+/// Falls back to `Provenance::Direct` when no Distillate frame is found.
+pub fn enrich_subject_access(
+    db_path: &Path,
+    entries: Vec<PrincipalIndexEntry>,
+) -> Result<Vec<SubjectAccessEntry>, AuditError> {
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(AuditError::Open)?;
+
+    // Build a (spirit_pid, boot_nonce) → (name, admit_timestamp_ns) map from
+    // SpiritAdmitted frames (kind = 19). Keyed by (pid, boot) to handle pid
+    // reuse across boots; admission timestamp lets us pick the correct
+    // incarnation for each principal_index entry.
+    let mut spirit_names: std::collections::HashMap<(u32, u64), (String, u64)> =
+        std::collections::HashMap::new();
+    {
+        let sql = "SELECT spirit_pid, boot_nonce, intent, timestamp_ns
+                   FROM transparency_log
+                   WHERE kind = 19
+                   ORDER BY timestamp_ns ASC";
+        let mut stmt = conn.prepare(sql).map_err(AuditError::Read)?;
+        let rows = stmt
+            .query_map([], |row| {
+                let pid: i64 = row.get(0)?;
+                let boot: i64 = row.get(1)?;
+                let intent: String = row.get(2)?;
+                let admit_ts: i64 = row.get(3)?;
+                Ok((pid as u32, boot as u64, intent, admit_ts as u64))
+            })
+            .map_err(AuditError::Read)?;
+        for row in rows {
+            let (pid, boot, intent, admit_ts) = row.map_err(AuditError::Read)?;
+            spirit_names
+                .entry((pid, boot))
+                .or_insert((intent, admit_ts));
+        }
+    }
+    // Scan for Distillate frames to build provenance.
+    // Latest distillate for a given (pid, boot) wins; ordered by timestamp ASC.
+    let mut distillate_map: std::collections::HashMap<(u32, u64), (Vec<String>, u32)> =
+        std::collections::HashMap::new();
+    {
+        let sql = "SELECT spirit_pid, boot_nonce, frame_id, payload_redacted
+                   FROM transparency_log
+                   WHERE intent LIKE 'distillate%'
+                   ORDER BY timestamp_ns ASC";
+        let mut stmt = conn.prepare(sql).map_err(AuditError::Read)?;
+        let rows = stmt
+            .query_map([], |row| {
+                let pid: i64 = row.get(0)?;
+                let boot: i64 = row.get(1)?;
+                let frame_id: Vec<u8> = row.get(2)?;
+                let payload: Option<Vec<u8>> = row.get(3)?;
+                Ok((pid as u32, boot as u64, frame_id, payload))
+            })
+            .map_err(AuditError::Read)?;
+        for row in rows {
+            let (pid, boot, frame_id, payload) = row.map_err(AuditError::Read)?;
+            if let Some(ref payload_bytes) = payload {
+                if let Ok(val) = serde_json::from_slice::<serde_json::Value>(payload_bytes) {
+                    let refs = val
+                        .get("effective_source_log_ref")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.split(':').map(|r| r.to_string()).collect())
+                        .unwrap_or_else(|| vec![hex_encode(&frame_id)]);
+                    let depth = val
+                        .get("distillation_depth")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(1) as u32;
+                    // Latest distillate for this (pid, boot) wins — ordered by timestamp ASC.
+                    distillate_map.insert((pid, boot), (refs, depth));
+                }
+            }
+        }
+    }
+
+    let mut enriched = Vec::with_capacity(entries.len());
+    for entry in entries {
+        // Per-entry provenance: find the Spirit incarnation that was active
+        // when this entry was written. Admissions are keyed by (pid, boot);
+        // the latest admission whose timestamp is <= entry.timestamp_ns wins.
+        // This correctly attributes entries under pid reuse across boots.
+        let (name, boot_nonce) = {
+            let mut admissions: Vec<(u64, String)> = spirit_names
+                .iter()
+                .filter(|((pid, _), _)| *pid == entry.writer_spirit_pid)
+                .filter(|(_, (_, admit_ts))| *admit_ts <= entry.timestamp_ns)
+                .map(|((_, boot), (name, _))| (*boot, name.clone()))
+                .collect();
+            admissions.sort_by_key(|(boot, _)| *boot);
+            admissions
+                .last()
+                .map(|(boot, name)| (Some(name.clone()), Some(*boot)))
+                .unwrap_or((None, None))
+        };
+
+        let provenance = match boot_nonce {
+            Some(boot) => match distillate_map.get(&(entry.writer_spirit_pid, boot)) {
+                Some((refs, depth)) => Provenance::Distilled {
+                    effective_source_log_ref: refs.clone(),
+                    distillation_depth: *depth,
+                },
+                None => Provenance::Direct {
+                    frame_ref: format!("{}:{}", entry.schema, entry.key),
+                },
+            },
+            None => Provenance::Direct {
+                frame_ref: format!("{}:{}", entry.schema, entry.key),
+            },
+        };
+
+        enriched.push(SubjectAccessEntry {
+            principal_id: entry.principal_id,
+            writer_spirit_pid: entry.writer_spirit_pid,
+            writer_spirit_name: name,
+            boot_nonce,
+            schema: entry.schema,
+            key: entry.key,
+            timestamp_ns: entry.timestamp_ns,
+            provenance,
+        });
+    }
+    Ok(enriched)
 }
 
 /// Pure-function form of the precedence cascade — env values are passed in
@@ -1119,5 +1442,486 @@ mod tests {
             p,
             std::path::PathBuf::from("/var/lib/maos/isolation-corpus")
         );
+    }
+
+    // ── FR41 SQLi-inert test ─────────────────────────────────────────
+
+    /// Helper: create a test DB with one row whose intent is "delegate".
+    fn sqli_test_db() -> (tempfile::TempDir, std::path::PathBuf) {
+        let tmpdir = tempfile::TempDir::new().unwrap();
+        let db_path = tmpdir.path().join("test.sqlite");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![
+                &[0xAAu8; 16] as &[u8],
+                1000i64,
+                7i64,
+                1i64,
+                &[0xBBu8; 32] as &[u8],
+                7i64,
+                "delegate",
+                b"redacted_payload" as &[u8],
+                0i64,
+            ],
+        ).unwrap();
+        drop(conn);
+        (tmpdir, db_path)
+    }
+
+    #[test]
+    fn intent_contains_sqli_is_inert() {
+        let (_tmpdir, db_path) = sqli_test_db();
+        // A SQLi attempt must NOT match anything — it's param-bound.
+        let sqli = "%' OR 1=1 --";
+        let mut filter = AuditFilter::default();
+        filter.intent_contains = Some(sqli.to_string());
+        let entries = query(&db_path, filter).unwrap();
+        // The DB has one row with intent="delegate". The SQLi string is
+        // treated as a literal substring — it does NOT appear in "delegate",
+        // so the result must be empty.
+        assert!(
+            entries.is_empty(),
+            "SQLi attempt must match literally, not inject SQL; got {} results",
+            entries.len()
+        );
+    }
+
+    #[test]
+    fn intent_contains_matches_substring() {
+        let (_tmpdir, db_path) = sqli_test_db();
+        let mut filter = AuditFilter::default();
+        filter.intent_contains = Some("deleg".to_string());
+        let entries = query(&db_path, filter).unwrap();
+        assert_eq!(entries.len(), 1, "substring 'deleg' must match 'delegate'");
+    }
+
+    #[test]
+    fn capability_token_filter_works() {
+        let (_tmpdir, db_path) = sqli_test_db();
+        let mut filter = AuditFilter::default();
+        filter.capability_token = Some("bb".repeat(32));
+        let entries = query(&db_path, filter).unwrap();
+        assert_eq!(
+            entries.len(),
+            1,
+            "matching capability_token must find the row"
+        );
+
+        // Non-matching token
+        let mut filter2 = AuditFilter::default();
+        filter2.capability_token = Some("cc".repeat(32));
+        let entries2 = query(&db_path, filter2).unwrap();
+        assert!(
+            entries2.is_empty(),
+            "non-matching capability_token must return empty"
+        );
+    }
+
+    #[test]
+    fn boot_nonce_filter_works() {
+        let (_tmpdir, db_path) = sqli_test_db();
+        let mut filter = AuditFilter::default();
+        filter.boot_nonce = Some(1);
+        let entries = query(&db_path, filter).unwrap();
+        assert_eq!(entries.len(), 1);
+
+        let mut filter2 = AuditFilter::default();
+        filter2.boot_nonce = Some(999);
+        let entries2 = query(&db_path, filter2).unwrap();
+        assert!(entries2.is_empty());
+    }
+
+    // ── FR42 subject_access_query tests ────────────────────────────────
+
+    #[test]
+    fn subject_access_query_returns_matching_rows() {
+        let tmpdir = tempfile::TempDir::new().unwrap();
+        let db_path = tmpdir.path().join("test.sqlite");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS principal_index (
+                principal_id TEXT NOT NULL,
+                writer_spirit_pid INTEGER NOT NULL,
+                schema TEXT NOT NULL,
+                key TEXT NOT NULL,
+                timestamp_ns INTEGER NOT NULL,
+                PRIMARY KEY (principal_id, writer_spirit_pid, schema, key)
+            );",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO principal_index (principal_id, writer_spirit_pid, schema, key, timestamp_ns)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params!["user:alice", 7i64, "memory", "session-1", 1000i64],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO principal_index (principal_id, writer_spirit_pid, schema, key, timestamp_ns)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params!["user:bob", 8i64, "memory", "session-2", 2000i64],
+        ).unwrap();
+        drop(conn);
+
+        let entries = subject_access_query(&db_path, "user:alice").unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].principal_id, "user:alice");
+        assert_eq!(entries[0].writer_spirit_pid, 7);
+        assert_eq!(entries[0].schema, "memory");
+    }
+
+    #[test]
+    fn resolve_spirit_name_finds_admitted_spirit() {
+        let tmpdir = tempfile::TempDir::new().unwrap();
+        let db_path = tmpdir.path().join("test.sqlite");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );",
+        )
+        .unwrap();
+        let payload = serde_json::to_vec(&serde_json::json!({"spirit_id": "researcher"})).unwrap();
+        conn.execute(
+            "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![
+                &[0x01u8; 16] as &[u8],
+                1000i64,
+                42i64,
+                5i64,
+                rusqlite::types::Null,
+                19i64,  // SpiritAdmitted
+                "researcher",
+                &payload as &[u8],
+                0i64,
+            ],
+        ).unwrap();
+        drop(conn);
+
+        let result = resolve_spirit_name(&db_path, "researcher", false).unwrap();
+        assert_eq!(result, vec![(5, 42)]);
+    }
+
+    #[test]
+    fn resolve_spirit_name_rejects_unknown() {
+        let tmpdir = tempfile::TempDir::new().unwrap();
+        let db_path = tmpdir.path().join("test.sqlite");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );",
+        )
+        .unwrap();
+        drop(conn);
+
+        let err = resolve_spirit_name(&db_path, "nonexistent", false).unwrap_err();
+        assert!(err.contains("unknown spirit 'nonexistent'"));
+    }
+
+    // ── FR42 enrich_subject_access provenance tests ────────────────────
+
+    /// Helper: create a test SQLite file with both `transparency_log` and
+    /// `principal_index` tables. Returns `(tmpdir, db_path)` — the tmpdir
+    /// must stay alive for the file to exist.
+    fn create_test_db_with_principal_index() -> (tempfile::TempDir, std::path::PathBuf) {
+        let tmpdir = tempfile::TempDir::new().unwrap();
+        let db_path = tmpdir.path().join("test.sqlite");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS principal_index (
+                principal_id TEXT NOT NULL,
+                writer_spirit_pid INTEGER NOT NULL,
+                schema TEXT NOT NULL,
+                key TEXT NOT NULL,
+                timestamp_ns INTEGER NOT NULL,
+                PRIMARY KEY (principal_id, writer_spirit_pid, schema, key)
+            );",
+        )
+        .unwrap();
+        drop(conn);
+        (tmpdir, db_path)
+    }
+
+    #[test]
+    fn enrich_subject_access_direct_provenance() {
+        let (_tmpdir, db_path) = create_test_db_with_principal_index();
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        // principal_index row: alice written by spirit pid=42
+        conn.execute(
+            "INSERT INTO principal_index (principal_id, writer_spirit_pid, schema, key, timestamp_ns)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params!["alice@example.org", 42i64, "memory", "session-1", 1000i64],
+        ).unwrap();
+
+        // TL: lifecycle.admit for spirit pid=42 so enrich can resolve the name
+        let admit_payload = serde_json::to_vec(&serde_json::json!({
+            "spirit_id": "researcher"
+        }))
+        .unwrap();
+        conn.execute(
+            "INSERT INTO transparency_log
+             (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![
+                &[0x01u8; 16] as &[u8],
+                500i64,  // before the principal entry
+                42i64,
+                10i64,
+                rusqlite::types::Null,
+                19i64,  // SpiritAdmitted
+                "researcher",
+                &admit_payload as &[u8],
+                0i64,
+            ],
+        ).unwrap();
+
+        // NO Distillate frames for pid 42 — provenance must be Direct
+        drop(conn);
+
+        let entries = subject_access_query(&db_path, "alice@example.org").unwrap();
+        assert_eq!(entries.len(), 1);
+        let enriched = enrich_subject_access(&db_path, entries).unwrap();
+        assert_eq!(enriched.len(), 1);
+
+        // Must be Direct provenance since no Distillate frame exists
+        assert!(
+            matches!(&enriched[0].provenance, Provenance::Direct { frame_ref } if frame_ref == "memory:session-1"),
+            "expected Direct provenance with frame_ref 'memory:session-1', got {:?}",
+            enriched[0].provenance,
+        );
+        assert_eq!(
+            enriched[0].writer_spirit_name.as_deref(),
+            Some("researcher")
+        );
+        assert_eq!(enriched[0].boot_nonce, Some(10));
+    }
+
+    #[test]
+    fn enrich_subject_access_distilled_provenance() {
+        let (_tmpdir, db_path) = create_test_db_with_principal_index();
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        // principal_index row: bob written by spirit pid=99
+        conn.execute(
+            "INSERT INTO principal_index (principal_id, writer_spirit_pid, schema, key, timestamp_ns)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params!["bob@example.org", 99i64, "preference", "theme", 2000i64],
+        ).unwrap();
+
+        // TL: lifecycle.admit for spirit pid=99
+        let admit_payload = serde_json::to_vec(&serde_json::json!({
+            "spirit_id": "butler"
+        }))
+        .unwrap();
+        conn.execute(
+            "INSERT INTO transparency_log
+             (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![
+                &[0x01u8; 16] as &[u8],
+                500i64,
+                99i64,
+                20i64,  // boot_nonce
+                rusqlite::types::Null,
+                19i64,  // SpiritAdmitted
+                "butler",
+                &admit_payload as &[u8],
+                0i64,
+            ],
+        ).unwrap();
+
+        // TL: Distillate frame for pid=99, boot_nonce=20
+        let distillate_payload = serde_json::to_vec(&serde_json::json!({
+            "kind": "distillate",
+            "effective_source_log_ref": "ab:cd:ef:12:34",
+            "distillation_depth": 2
+        }))
+        .unwrap();
+        conn.execute(
+            "INSERT INTO transparency_log
+             (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![
+                &[0x02u8; 16] as &[u8],
+                1000i64,
+                99i64,
+                20i64,  // same boot_nonce as lifecycle.admit
+                rusqlite::types::Null,
+                11i64,  // Distillate
+                "distillate.commit",
+                &distillate_payload as &[u8],
+                0i64,
+            ],
+        ).unwrap();
+
+        drop(conn);
+
+        let entries = subject_access_query(&db_path, "bob@example.org").unwrap();
+        assert_eq!(entries.len(), 1);
+        let enriched = enrich_subject_access(&db_path, entries).unwrap();
+        assert_eq!(enriched.len(), 1);
+
+        // Must be Distilled provenance with correct depth and refs
+        match &enriched[0].provenance {
+            Provenance::Distilled {
+                effective_source_log_ref,
+                distillation_depth,
+            } => {
+                assert_eq!(*distillation_depth, 2);
+                assert_eq!(
+                    effective_source_log_ref,
+                    &vec![
+                        "ab".to_string(),
+                        "cd".to_string(),
+                        "ef".to_string(),
+                        "12".to_string(),
+                        "34".to_string(),
+                    ]
+                );
+            }
+            other => panic!("expected Distilled provenance, got {:?}", other),
+        }
+        assert_eq!(enriched[0].writer_spirit_name.as_deref(), Some("butler"));
+        assert_eq!(enriched[0].boot_nonce, Some(20));
+    }
+
+    #[test]
+    fn pid_reuse_misattribution_test() {
+        let (_tmpdir, db_path) = create_test_db_with_principal_index();
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        // Spirit "researcher" admitted at pid=100, boot_nonce=1000
+        let researcher_payload = serde_json::to_vec(&serde_json::json!({
+            "spirit_id": "researcher"
+        }))
+        .unwrap();
+        conn.execute(
+            "INSERT INTO transparency_log
+             (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![
+                &[0x01u8; 16] as &[u8],
+                1000i64,
+                100i64,
+                1000i64,  // boot_nonce for researcher
+                rusqlite::types::Null,
+                19i64,  // SpiritAdmitted
+                "researcher",
+                &researcher_payload as &[u8],
+                0i64,
+            ],
+        ).unwrap();
+
+        // Spirit "butler" reused pid=100, boot_nonce=2000
+        let butler_payload = serde_json::to_vec(&serde_json::json!({
+            "spirit_id": "butler"
+        }))
+        .unwrap();
+        conn.execute(
+            "INSERT INTO transparency_log
+             (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![
+                &[0x02u8; 16] as &[u8],
+                2000i64,
+                100i64,  // SAME PID
+                2000i64,  // different boot_nonce
+                rusqlite::types::Null,
+                19i64,
+                "butler",
+                &butler_payload as &[u8],
+                0i64,
+            ],
+        ).unwrap();
+
+        // principal_index: alice's entries written by researcher (pid=100)
+        conn.execute(
+            "INSERT INTO principal_index (principal_id, writer_spirit_pid, schema, key, timestamp_ns)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params!["alice@example.org", 100i64, "memory", "research-note-1", 1200i64],
+        ).unwrap();
+
+        // principal_index: bob's entries written by butler (pid=100, same pid)
+        conn.execute(
+            "INSERT INTO principal_index (principal_id, writer_spirit_pid, schema, key, timestamp_ns)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params!["bob@example.org", 100i64, "preference", "theme", 2200i64],
+        ).unwrap();
+
+        drop(conn);
+
+        // Query alice's data — should get ONLY researcher's entry
+        let entries = subject_access_query(&db_path, "alice@example.org").unwrap();
+        assert_eq!(entries.len(), 1, "alice should have exactly one entry");
+        assert_eq!(entries[0].key, "research-note-1");
+
+        // Enrich: each entry is attributed to the incarnation active at its
+        // write timestamp. Alice wrote at ts=1200, between researcher (ts=1000)
+        // and butler (ts=2000), so she is attributed to researcher boot=1000.
+        let enriched = enrich_subject_access(&db_path, entries).unwrap();
+        assert_eq!(enriched.len(), 1);
+        assert_eq!(
+            enriched[0].writer_spirit_name.as_deref(),
+            Some("researcher")
+        );
+        assert_eq!(enriched[0].boot_nonce, Some(1000));
+
+        // Bob wrote at ts=2200, after butler's admission, so he is attributed
+        // to butler boot=2000 — the previous pid-only logic would have wrongly
+        // attributed him to researcher.
+        let bob_entries = subject_access_query(&db_path, "bob@example.org").unwrap();
+        assert_eq!(bob_entries.len(), 1);
+        assert_eq!(bob_entries[0].key, "theme");
+        let bob_enriched = enrich_subject_access(&db_path, bob_entries).unwrap();
+        assert_eq!(bob_enriched.len(), 1);
+        assert_eq!(
+            bob_enriched[0].writer_spirit_name.as_deref(),
+            Some("butler")
+        );
+        assert_eq!(bob_enriched[0].boot_nonce, Some(2000));
     }
 }

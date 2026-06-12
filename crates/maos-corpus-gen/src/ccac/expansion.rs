@@ -5,12 +5,12 @@
 //! `maos_compliance::canonical_cbor`. Re-running `expand` on any host yields
 //! byte-identical output.
 
+#[allow(deprecated)]
+use maos_compliance::builder::seeded_keypair;
 use maos_compliance::builder::{
     build_self_attested_envelope, build_signed_envelope, encode_claim_bytes,
     encode_claim_bytes_with_hash,
 };
-#[allow(deprecated)]
-use maos_compliance::builder::seeded_keypair;
 use maos_compliance::canonical_cbor::fingerprint_hash;
 use maos_spirit_abi::compliance::{
     CapabilityId, ComplianceClaimEnvelope, CryptoProviderId, ExecutionContextFingerprint,
@@ -45,7 +45,8 @@ fn build_item(
     global_idx: usize,
     reference: &str,
 ) -> CcacItem {
-    let (manifest, ctx) = reference_context(reference).expect("CCAC expansion uses only valid references");
+    let (manifest, ctx) =
+        reference_context(reference).expect("CCAC expansion uses only valid references");
     let ref_fp = ctx.to_fingerprint();
     let (kp, pk) = seeded_keypair(0xCCAC_0000u32.wrapping_add(global_idx as u32));
 
@@ -217,7 +218,10 @@ fn sign_json(
 /// Mutate exactly one structural field of `ref_fp` to a value that differs from
 /// the reference (so the evaluator names that field as the drift).
 /// Returns `None` for unknown field names.
-fn mutate_field(ref_fp: &ExecutionContextFingerprint, field: &str) -> Option<ExecutionContextFingerprint> {
+fn mutate_field(
+    ref_fp: &ExecutionContextFingerprint,
+    field: &str,
+) -> Option<ExecutionContextFingerprint> {
     let mut fp = ref_fp.clone();
     match field {
         "TrustTier" => fp.trust_tier = other_tier(ref_fp.trust_tier),

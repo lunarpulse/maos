@@ -23,7 +23,9 @@ pub mod registry;
 
 pub use buffer::{OrchestratorBuffer, OrchestratorBufferError};
 pub use echo_gateway::{EchoGatewayFactory, EchoGatewaySubmodule};
-pub use gateway_dispatcher::{GatewayDispatcher, GatewayInstance, GatewaySubmoduleFactory, GatewaySubmoduleRegistry};
+pub use gateway_dispatcher::{
+    GatewayDispatcher, GatewayInstance, GatewaySubmoduleFactory, GatewaySubmoduleRegistry,
+};
 pub use registry::OrchestratorBufferRegistry;
 
 use crate::iac::transparency_log::TransparencyLogAdapter;

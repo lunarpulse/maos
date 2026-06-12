@@ -30,8 +30,8 @@ pub struct T3ImageLock {
 impl T3ImageLock {
     /// Load the pin file from `path`.
     pub fn load(path: &Path) -> Result<Self, T3Error> {
-        let bytes = std::fs::read(path)
-            .map_err(|e| T3Error::Io(format!("read t3-image.lock: {e}")))?;
+        let bytes =
+            std::fs::read(path).map_err(|e| T3Error::Io(format!("read t3-image.lock: {e}")))?;
         let attestations: Vec<T3ImageAttestation> =
             serde_json::from_slice(&bytes).map_err(|e| T3Error::Io(e.to_string()))?;
         Ok(Self { attestations })
@@ -70,11 +70,8 @@ impl T3ImageLock {
 
     /// Get the first entry from the default attestation.
     pub fn default_entry(&self) -> Result<&T3ImageEntry, T3Error> {
-        self.default_attestation().and_then(|a| {
-            a.entries
-                .first()
-                .ok_or(T3Error::NoDefaultImage)
-        })
+        self.default_attestation()
+            .and_then(|a| a.entries.first().ok_or(T3Error::NoDefaultImage))
     }
 }
 

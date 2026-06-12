@@ -16,9 +16,9 @@ pub use maos_iac::*;
 // a local wrapper struct so the Mailbox (now in maos-iac) can update timestamps
 // without coupling to kernel-core types. The wrapper struct is local to
 // maos-kernel-core, satisfying the orphan rule.
+use maos_iac::mailbox::SpiritActivityTracker;
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
-use maos_iac::mailbox::SpiritActivityTracker;
 
 /// Local wrapper around the SCB map to implement SpiritActivityTracker.
 /// This wrapper is needed because `RwLock<BTreeMap<...>>` is from std
@@ -40,31 +40,25 @@ impl ScbTracker {
 }
 
 impl SpiritActivityTracker for ScbTracker {
-    fn update_last_inbound_frame(
-        &self,
-        spirit_id: &str,
-        timestamp_ns: u64,
-    ) {
+    fn update_last_inbound_frame(&self, spirit_id: &str, timestamp_ns: u64) {
         use std::sync::atomic::Ordering;
         if let Ok(scbs) = self.inner.read() {
             for (_, scb) in scbs.iter() {
                 if scb.spirit_id == spirit_id {
-                    scb.last_inbound_frame_ns.store(timestamp_ns, Ordering::Relaxed);
+                    scb.last_inbound_frame_ns
+                        .store(timestamp_ns, Ordering::Relaxed);
                 }
             }
         }
     }
 
-    fn update_last_progress_iac(
-        &self,
-        spirit_id: &str,
-        timestamp_ns: u64,
-    ) {
+    fn update_last_progress_iac(&self, spirit_id: &str, timestamp_ns: u64) {
         use std::sync::atomic::Ordering;
         if let Ok(scbs) = self.inner.read() {
             for (_, scb) in scbs.iter() {
                 if scb.spirit_id == spirit_id {
-                    scb.last_progress_iac_ns.store(timestamp_ns, Ordering::Relaxed);
+                    scb.last_progress_iac_ns
+                        .store(timestamp_ns, Ordering::Relaxed);
                 }
             }
         }

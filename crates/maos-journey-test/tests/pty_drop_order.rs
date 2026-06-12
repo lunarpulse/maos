@@ -7,9 +7,7 @@ use maos_journey_test::{AuditDb, JourneyWorld, Pty};
 
 #[test]
 fn drop_while_child_streaming() {
-    let world = JourneyWorld::builder()
-        .audit(AuditDb::temp())
-        .build();
+    let world = JourneyWorld::builder().audit(AuditDb::temp()).build();
     let pty = Pty::spawn("echo hello world", &world);
     std::thread::sleep(std::time::Duration::from_millis(500));
     let screen = pty.screen();
@@ -22,9 +20,7 @@ fn drop_while_child_streaming() {
 
 #[test]
 fn pty_screen_captures_output() {
-    let world = JourneyWorld::builder()
-        .audit(AuditDb::temp())
-        .build();
+    let world = JourneyWorld::builder().audit(AuditDb::temp()).build();
     let pty = Pty::spawn("echo MAOS_JOURNEY_TEST_MARKER", &world);
     std::thread::sleep(std::time::Duration::from_millis(500));
     let screen = pty.screen();

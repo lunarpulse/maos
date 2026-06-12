@@ -246,10 +246,10 @@ impl A2AJsonRpcResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use maos_domain::frame::{FrameAddress, FramePayload, TaskAssignPayload, PosturePreferences};
+    use maos_domain::frame::{FrameAddress, FramePayload, PosturePreferences, TaskAssignPayload};
     use maos_domain::invariants::i1::IntentClass;
-    use maos_domain::invariants::i3::FrameOrigin;
     use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
     use maos_spirit_abi::identity::{FrameKind, SpiritId};
     use smallvec::smallvec;
 

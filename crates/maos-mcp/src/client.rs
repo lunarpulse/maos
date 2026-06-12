@@ -105,9 +105,9 @@ impl McpClientImpl {
                 // Walk fallback if present
                 if let Some(fb_id) = &entry.fallback_transport {
                     if let Some(fb_transport) = self.transports.get(fb_id) {
-                        fb_transport.invoke(request).map_err(|fb_err| {
-                            McpError::Transport(fb_err.to_string())
-                        })
+                        fb_transport
+                            .invoke(request)
+                            .map_err(|fb_err| McpError::Transport(fb_err.to_string()))
                     } else {
                         Err(McpError::Transport(format!(
                             "primary transport error: {te}"
@@ -156,7 +156,11 @@ mod tests {
     #[test]
     fn call_routes_to_per_server_transport() {
         let t1 = Arc::new(FixtureReplayMcpServer::new(
-            vec![Ok(fake_response("server-a", "echo", McpTransportId::StreamableHttp))],
+            vec![Ok(fake_response(
+                "server-a",
+                "echo",
+                McpTransportId::StreamableHttp,
+            ))],
             McpTransportId::StreamableHttp,
         ));
         let t2 = Arc::new(FixtureReplayMcpServer::new(
@@ -219,7 +223,10 @@ mod tests {
         ));
 
         let mut transports = BTreeMap::new();
-        transports.insert(McpTransportId::StreamableHttp, primary as Arc<dyn McpTransport>);
+        transports.insert(
+            McpTransportId::StreamableHttp,
+            primary as Arc<dyn McpTransport>,
+        );
         transports.insert(McpTransportId::Stdio, fallback as Arc<dyn McpTransport>);
 
         let mut servers = BTreeMap::new();
@@ -252,7 +259,10 @@ mod tests {
         ));
 
         let mut transports = BTreeMap::new();
-        transports.insert(McpTransportId::StreamableHttp, primary as Arc<dyn McpTransport>);
+        transports.insert(
+            McpTransportId::StreamableHttp,
+            primary as Arc<dyn McpTransport>,
+        );
         transports.insert(McpTransportId::Stdio, fallback as Arc<dyn McpTransport>);
 
         let mut servers = BTreeMap::new();
@@ -287,7 +297,10 @@ mod tests {
         ));
 
         let mut transports = BTreeMap::new();
-        transports.insert(McpTransportId::StreamableHttp, primary as Arc<dyn McpTransport>);
+        transports.insert(
+            McpTransportId::StreamableHttp,
+            primary as Arc<dyn McpTransport>,
+        );
         transports.insert(McpTransportId::Stdio, fallback as Arc<dyn McpTransport>);
 
         let mut servers = BTreeMap::new();
@@ -317,11 +330,15 @@ mod tests {
             },
         );
         // No stdio transport registered
-        let t = Arc::new(FixtureReplayMcpServer::new(vec![], McpTransportId::StreamableHttp));
+        let t = Arc::new(FixtureReplayMcpServer::new(
+            vec![],
+            McpTransportId::StreamableHttp,
+        ));
         let mut transports = BTreeMap::new();
         transports.insert(McpTransportId::StreamableHttp, t as Arc<dyn McpTransport>);
 
-        let client = McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers).unwrap();
+        let client =
+            McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers).unwrap();
         let err = client.call("svc", "echo", json!({})).unwrap_err();
         assert!(matches!(err, McpError::Transport(_)));
         assert!(err.to_string().contains("not registered"));

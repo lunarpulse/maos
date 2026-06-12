@@ -1,11 +1,11 @@
-use maos_kernel_core::security::manifest::{
-    CapabilitiesRequired, ClassSection, OnCrashSection, OnRevocationSection, OutputShape,
-    PostureSection, ProviderCapabilities, ProvidersSection, ResourceCaps, SandboxConfig,
-    SchedulingSection, SupervisionSection, LifecycleSection,
-};
-use maos_kernel_core::security::SecurityManagerAdapter;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
 use maos_domain::ports::scheduler::SpiritSchedulerPort;
+use maos_kernel_core::security::manifest::{
+    CapabilitiesRequired, ClassSection, LifecycleSection, OnCrashSection, OnRevocationSection,
+    OutputShape, PostureSection, ProviderCapabilities, ProvidersSection, ResourceCaps,
+    SandboxConfig, SchedulingSection, SupervisionSection,
+};
+use maos_kernel_core::security::SecurityManagerAdapter;
 
 mod common;
 
@@ -47,8 +47,11 @@ fn default_resources() -> ResourceCaps {
 }
 
 fn default_posture() -> PostureSection {
-    PostureSection::from_toml_str(r#"default = "cautious"
-allowed_max = "cautious""#).unwrap()
+    PostureSection::from_toml_str(
+        r#"default = "cautious"
+allowed_max = "cautious""#,
+    )
+    .unwrap()
 }
 
 fn admit_with_provider(
@@ -115,7 +118,10 @@ id = "anthropic"
             matches!(e, JournalEntry::Lifecycle(le) if le.lifecycle_event == LifecycleEvent::ProviderSwitched)
         })
         .collect();
-    assert!(switch_events.is_empty(), "first admit should not emit ProviderSwitched");
+    assert!(
+        switch_events.is_empty(),
+        "first admit should not emit ProviderSwitched"
+    );
 }
 
 #[test]
@@ -141,7 +147,10 @@ id = "anthropic"
             matches!(e, JournalEntry::Lifecycle(le) if le.lifecycle_event == LifecycleEvent::ProviderSwitched)
         })
         .collect();
-    assert!(switch_events.is_empty(), "same provider should not emit ProviderSwitched");
+    assert!(
+        switch_events.is_empty(),
+        "same provider should not emit ProviderSwitched"
+    );
 }
 
 #[test]
@@ -171,15 +180,24 @@ id = "openai"
     let switch_events: Vec<_> = entries
         .iter()
         .filter_map(|e| match e {
-            JournalEntry::Lifecycle(le) if le.lifecycle_event == LifecycleEvent::ProviderSwitched => {
+            JournalEntry::Lifecycle(le)
+                if le.lifecycle_event == LifecycleEvent::ProviderSwitched =>
+            {
                 Some(le.clone())
             }
             _ => None,
         })
         .collect();
-    assert_eq!(switch_events.len(), 1, "should emit exactly one ProviderSwitched");
+    assert_eq!(
+        switch_events.len(),
+        1,
+        "should emit exactly one ProviderSwitched"
+    );
     assert_eq!(switch_events[0].spirit_id, "spirit-a");
-    assert!(switch_events[0].timestamp >= 1, "applied_at_ns should be >= 1 (monotonic_now_ns)");
+    assert!(
+        switch_events[0].timestamp >= 1,
+        "applied_at_ns should be >= 1 (monotonic_now_ns)"
+    );
 }
 
 #[test]
@@ -217,11 +235,17 @@ id = "ollama"
     let switch_events: Vec<_> = entries
         .iter()
         .filter_map(|e| match e {
-            JournalEntry::Lifecycle(le) if le.lifecycle_event == LifecycleEvent::ProviderSwitched => {
+            JournalEntry::Lifecycle(le)
+                if le.lifecycle_event == LifecycleEvent::ProviderSwitched =>
+            {
                 Some(le.clone())
             }
             _ => None,
         })
         .collect();
-    assert_eq!(switch_events.len(), 2, "should emit two ProviderSwitched events");
+    assert_eq!(
+        switch_events.len(),
+        2,
+        "should emit two ProviderSwitched events"
+    );
 }

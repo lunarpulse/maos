@@ -153,6 +153,7 @@ body
 
 #[test]
 fn leading_blank_lines_before_fence_are_tolerated() {
-    let src = "\n\n---\nid = \"x\"\nversion = \"1.0.0\"\nname = \"X\"\ndescription = \"d\"\n---\nbody\n";
+    let src =
+        "\n\n---\nid = \"x\"\nversion = \"1.0.0\"\nname = \"X\"\ndescription = \"d\"\n---\nbody\n";
     assert!(parse_skill(src).is_ok());
 }

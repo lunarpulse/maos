@@ -89,7 +89,10 @@ impl SearchQuery {
     /// Construct a `SearchQuery`, applying `limit` clamping.
     /// Enforces non-empty text per doc contract.
     pub fn new(text: String, include_yanked: bool, limit: u32) -> Self {
-        assert!(!text.trim().is_empty(), "SearchQuery::new: text must be non-empty");
+        assert!(
+            !text.trim().is_empty(),
+            "SearchQuery::new: text must be non-empty"
+        );
         Self {
             text,
             include_yanked,
@@ -337,12 +340,7 @@ pub struct YankEntry {
 }
 
 impl YankEntry {
-    pub fn new(
-        spirit_id: SpiritId,
-        version: String,
-        yanked_at_ns: u64,
-        reason: String,
-    ) -> Self {
+    pub fn new(spirit_id: SpiritId, version: String, yanked_at_ns: u64, reason: String) -> Self {
         Self {
             spirit_id,
             version,
@@ -409,9 +407,7 @@ pub enum RegistryError {
     #[error("registry transport error: {0}")]
     Transport(String),
 
-    #[error(
-        "registry not configured (set MAOS_REGISTRY_URI or [registry].uri in operator.toml)"
-    )]
+    #[error("registry not configured (set MAOS_REGISTRY_URI or [registry].uri in operator.toml)")]
     Unconfigured,
 
     #[error("org signature does not match operator-configured org key")]
@@ -431,9 +427,7 @@ pub enum RegistryError {
     #[error(
         "consumer-side trust-tier server-side signature missing or invalid: {reason} (operator requires `[registry].require_server_tier_signature=true`)"
     )]
-    ServerTierSignatureRequired {
-        reason: String,
-    },
+    ServerTierSignatureRequired { reason: String },
 
     #[error(
         "server-reported tier '{server_reported:?}' exceeds operator floor '{operator_floor:?}'"
@@ -500,10 +494,7 @@ impl<'de> serde::Deserialize<'de> for SignedManifest {
             .map_err(|e| serde::de::Error::custom(format!("pubkey hex decode: {e}")))?
             .try_into()
             .map_err(|v: Vec<u8>| {
-                serde::de::Error::custom(format!(
-                    "expected 32-byte pubkey, got {} bytes",
-                    v.len()
-                ))
+                serde::de::Error::custom(format!("expected 32-byte pubkey, got {} bytes", v.len()))
             })?;
         // Enforce invariant: both server_reported_tier and server_signature_on_tier
         // must be present together, or both absent.
@@ -581,10 +572,7 @@ impl<'de> serde::Deserialize<'de> for SignedArtifact {
             .map_err(|e| serde::de::Error::custom(format!("pubkey hex decode: {e}")))?
             .try_into()
             .map_err(|v: Vec<u8>| {
-                serde::de::Error::custom(format!(
-                    "expected 32-byte pubkey, got {} bytes",
-                    v.len()
-                ))
+                serde::de::Error::custom(format!("expected 32-byte pubkey, got {} bytes", v.len()))
             })?;
         Ok(SignedArtifact {
             spirit_id: h.spirit_id,
@@ -637,10 +625,7 @@ impl<'de> serde::Deserialize<'de> for SignedPackage {
             .map_err(|e| serde::de::Error::custom(format!("pubkey hex decode: {e}")))?
             .try_into()
             .map_err(|v: Vec<u8>| {
-                serde::de::Error::custom(format!(
-                    "expected 32-byte pubkey, got {} bytes",
-                    v.len()
-                ))
+                serde::de::Error::custom(format!("expected 32-byte pubkey, got {} bytes", v.len()))
             })?;
         Ok(SignedPackage {
             spirit_id: h.spirit_id,
@@ -785,9 +770,12 @@ mod tests {
 
     #[test]
     fn yank_list_serde_roundtrip() {
-        let list = YankList::new(vec![
-            YankEntry::new(SpiritId::from("s1"), "1.0.0".into(), 10, "reason".into()),
-        ]);
+        let list = YankList::new(vec![YankEntry::new(
+            SpiritId::from("s1"),
+            "1.0.0".into(),
+            10,
+            "reason".into(),
+        )]);
         let json = serde_json::to_string(&list).unwrap();
         let list2: YankList = serde_json::from_str(&json).unwrap();
         assert_eq!(list.entries.len(), list2.entries.len());

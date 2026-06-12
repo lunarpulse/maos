@@ -11,11 +11,7 @@ fn stdio_transport_spawn_and_exchange() {
     )
     .unwrap();
 
-    let req = McpRequest::new(
-        "test-server".into(),
-        "echo".into(),
-        serde_json::json!({}),
-    );
+    let req = McpRequest::new("test-server".into(), "echo".into(), serde_json::json!({}));
     let resp = transport.invoke(req).unwrap();
 
     assert!(!resp.is_error);
@@ -26,17 +22,10 @@ fn stdio_transport_spawn_and_exchange() {
 
 #[test]
 fn stdio_transport_nonexistent_binary_returns_transport_error() {
-    let transport = StdioTransport::new(
-        "/nonexistent/binary/that/does/not/exist".into(),
-        vec![],
-    )
-    .unwrap();
+    let transport =
+        StdioTransport::new("/nonexistent/binary/that/does/not/exist".into(), vec![]).unwrap();
 
-    let req = McpRequest::new(
-        "test-server".into(),
-        "echo".into(),
-        serde_json::json!({}),
-    );
+    let req = McpRequest::new("test-server".into(), "echo".into(), serde_json::json!({}));
     let err = transport.invoke(req).unwrap_err();
 
     assert!(format!("{err}").contains("spawn failed"));
@@ -50,11 +39,7 @@ fn stdio_transport_malformed_output_returns_transport_error() {
     )
     .unwrap();
 
-    let req = McpRequest::new(
-        "test-server".into(),
-        "echo".into(),
-        serde_json::json!({}),
-    );
+    let req = McpRequest::new("test-server".into(), "echo".into(), serde_json::json!({}));
     let err = transport.invoke(req).unwrap_err();
 
     assert!(format!("{err}").contains("parse"));

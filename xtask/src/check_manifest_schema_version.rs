@@ -115,11 +115,9 @@ fn scan_hardcoded_comparisons(path: &Path) -> Vec<(usize, String)> {
 /// Parse the `POST_V1_SCHEMA_SECTIONS: &[&str] = &["a", "b", ...];` constant
 /// from manifest.rs, returning the list of section name strings.
 fn parse_post_v1_sections(source: &str) -> Option<Vec<String>> {
-    let line = source.lines().find(|l| {
-        l.contains("POST_V1_SCHEMA_SECTIONS")
-            && l.contains("&[")
-            && l.contains("]")
-    })?;
+    let line = source
+        .lines()
+        .find(|l| l.contains("POST_V1_SCHEMA_SECTIONS") && l.contains("&[") && l.contains("]"))?;
     let eq_idx = line.find("= &[")? + 4;
     let end = line.rfind("]")?;
     let inner = &line[eq_idx..end];
@@ -127,7 +125,8 @@ fn parse_post_v1_sections(source: &str) -> Option<Vec<String>> {
         .split(',')
         .filter_map(|s| {
             let s = s.trim();
-            s.strip_prefix('"').and_then(|s| s.strip_suffix('"'))
+            s.strip_prefix('"')
+                .and_then(|s| s.strip_suffix('"'))
                 .map(String::from)
         })
         .collect::<Vec<_>>();
@@ -332,7 +331,8 @@ fn validate(v: u32) {
 
     #[test]
     fn parse_post_v1_sections_extracts_entries() {
-        let src = r#"const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway"];"#;
+        let src =
+            r#"const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway"];"#;
         let entries = parse_post_v1_sections(src).unwrap();
         assert_eq!(entries, vec!["cli_wrapper", "schedule", "gateway"]);
     }

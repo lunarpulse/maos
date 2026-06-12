@@ -60,8 +60,10 @@ async fn bind_node(
 async fn build_mesh(clock: &Clock, ca: &Ca, leaves: &[Leaf; 3]) -> Vec<TcpA2ATransport> {
     let mut nodes = Vec::new();
     for i in 0..3 {
-        let peers: Vec<(usize, &Leaf)> =
-            (0..3).filter(|j| *j != i).map(|j| (j, &leaves[j])).collect();
+        let peers: Vec<(usize, &Leaf)> = (0..3)
+            .filter(|j| *j != i)
+            .map(|j| (j, &leaves[j]))
+            .collect();
         nodes.push(bind_node(clock, ca, i, &leaves[i], &peers).await);
     }
     // Wire real readback addresses (H3/H4) now that all listeners are bound.
@@ -83,13 +85,21 @@ async fn assert_nxn_reachable(nodes: &[TcpA2ATransport]) {
             if i == j {
                 continue;
             }
-            let frame = make_frame(HOSTS[i], HOSTS[j], IntentClass::Readonly, (i * 3 + j) as u64 + 1);
+            let frame = make_frame(
+                HOSTS[i],
+                HOSTS[j],
+                IntentClass::Readonly,
+                (i * 3 + j) as u64 + 1,
+            );
             nodes[i]
                 .route_outbound(frame, &HostId(HOSTS[j].into()))
                 .await
-                .unwrap_or_else(|e| panic!("AC-T11: {} → {} must ACK, got {e}", HOSTS[i], HOSTS[j]));
+                .unwrap_or_else(|e| {
+                    panic!("AC-T11: {} → {} must ACK, got {e}", HOSTS[i], HOSTS[j])
+                });
             assert!(
-                nodes[i].last_dial_attempts() <= HandshakeRetryPolicy::default().max_attempts as usize,
+                nodes[i].last_dial_attempts()
+                    <= HandshakeRetryPolicy::default().max_attempts as usize,
                 "AC-T11: retry counters bounded by max_attempts"
             );
         }

@@ -23,10 +23,10 @@ use maos_a2a_core::{
 use maos_domain::frame::{
     ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
 };
+use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
-use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId};
 use smallvec::smallvec;
@@ -56,9 +56,14 @@ fn peer_cfg(allowlists: ConsentAllowlists) -> A2APeerConfig {
 async fn fail_closed_core(allowlists: ConsentAllowlists) -> A2ARouterCore {
     let cfg = peer_cfg(allowlists);
     let tofu = Arc::new(InMemoryTofuPinStore::new());
-    tofu.pin_first_contact(&PeerId::new("loopback"), &cfg.cert_fingerprint, &cfg.cert_fingerprint, 1)
-        .await
-        .expect("pin");
+    tofu.pin_first_contact(
+        &PeerId::new("loopback"),
+        &cfg.cert_fingerprint,
+        &cfg.cert_fingerprint,
+        1,
+    )
+    .await
+    .expect("pin");
     // Fail-closed is unconditional (Option 2, team consensus 2026-06-07).
     A2ARouterCore::new(vec![cfg], tofu)
 }
@@ -134,8 +139,14 @@ async fn assert_accept_unclassified(core: &A2ARouterCore, f: IacFrame, expect: U
 }
 
 async fn assert_send_unclassified(core: &A2ARouterCore, f: IacFrame, expect: UnclassifiedReason) {
-    match core.prepare_outbound(f, &HostId("loopback".into()), 0).await {
-        Err(A2AError::ConsentUnclassified { direction: IntentDirection::Send, reason }) => {
+    match core
+        .prepare_outbound(f, &HostId("loopback".into()), 0)
+        .await
+    {
+        Err(A2AError::ConsentUnclassified {
+            direction: IntentDirection::Send,
+            reason,
+        }) => {
             assert_eq!(reason, expect, "send-side deny reason must be legible");
         }
         other => panic!("expected send-side ConsentUnclassified, got {other:?}"),
@@ -156,8 +167,18 @@ async fn absent_envelope_denied_both_directions() {
 #[tokio::test]
 async fn envelope_without_intent_class_denied() {
     let core = fail_closed_core(allow(&[FINE], &[FINE])).await;
-    assert_accept_unclassified(&core, frame_envelope_no_intent(), UnclassifiedReason::Absent).await;
-    assert_send_unclassified(&core, frame_envelope_no_intent(), UnclassifiedReason::Absent).await;
+    assert_accept_unclassified(
+        &core,
+        frame_envelope_no_intent(),
+        UnclassifiedReason::Absent,
+    )
+    .await;
+    assert_send_unclassified(
+        &core,
+        frame_envelope_no_intent(),
+        UnclassifiedReason::Absent,
+    )
+    .await;
 }
 
 // ── (c) non-canonical intent_class → NonCanonical ─────────────────────────────
@@ -165,8 +186,18 @@ async fn envelope_without_intent_class_denied() {
 #[tokio::test]
 async fn non_canonical_intent_denied_both_directions() {
     let core = fail_closed_core(allow(&[FINE], &[FINE])).await;
-    assert_accept_unclassified(&core, frame(Some("Diagnosis Handoff")), UnclassifiedReason::NonCanonical).await;
-    assert_send_unclassified(&core, frame(Some("Diagnosis Handoff")), UnclassifiedReason::NonCanonical).await;
+    assert_accept_unclassified(
+        &core,
+        frame(Some("Diagnosis Handoff")),
+        UnclassifiedReason::NonCanonical,
+    )
+    .await;
+    assert_send_unclassified(
+        &core,
+        frame(Some("Diagnosis Handoff")),
+        UnclassifiedReason::NonCanonical,
+    )
+    .await;
 }
 
 // ── (d) oversized (129 bytes) intent_class → Oversized ────────────────────────
@@ -196,8 +227,14 @@ async fn classified_not_allowlisted_is_minus_32001_not_minus_32009() {
     }
     // Send side: classified intent not in send_allowlist → IntentDenied (not Unclassified).
     let core2 = fail_closed_core(allow(&[], &[FINE])).await;
-    match core2.prepare_outbound(frame(Some(FINE)), &HostId("loopback".into()), 0).await {
-        Err(A2AError::IntentDenied { direction: IntentDirection::Send, .. }) => {}
+    match core2
+        .prepare_outbound(frame(Some(FINE)), &HostId("loopback".into()), 0)
+        .await
+    {
+        Err(A2AError::IntentDenied {
+            direction: IntentDirection::Send,
+            ..
+        }) => {}
         other => panic!("expected send-side IntentDenied, got {other:?}"),
     }
 }
@@ -216,10 +253,16 @@ async fn classified_allowlisted_admitted() {
         .await
         .expect("classified send admitted");
     // Accept admits.
-    assert!(matches!(core.handle_intake(req).await, A2AJsonRpcResponse::Ack(_)));
+    assert!(matches!(
+        core.handle_intake(req).await,
+        A2AJsonRpcResponse::Ack(_)
+    ));
     let delivered = rx.recv().await.expect("delivered");
     assert_eq!(
-        delivered.consent_envelope.and_then(|e| e.intent_class).map(|i| i.as_str().to_string()),
+        delivered
+            .consent_envelope
+            .and_then(|e| e.intent_class)
+            .map(|i| i.as_str().to_string()),
         Some(FINE.to_string())
     );
 }
@@ -269,8 +312,14 @@ fn map_a2a_error_to_iac_bus_consent_unclassified() {
     let bus = map_a2a_error_to_iac_bus(err, "peer-a");
     match bus {
         IacBusError::CrossHostRouteFailure(msg) => {
-            assert!(msg.contains("absent"), "message must carry the reason: {msg}");
-            assert!(msg.contains("Send"), "message must carry the direction: {msg}");
+            assert!(
+                msg.contains("absent"),
+                "message must carry the reason: {msg}"
+            );
+            assert!(
+                msg.contains("Send"),
+                "message must carry the direction: {msg}"
+            );
             assert!(msg.contains("peer-a"), "message must carry the peer: {msg}");
         }
         other => panic!("expected CrossHostRouteFailure, got {other:?}"),
@@ -284,8 +333,14 @@ fn map_a2a_error_to_iac_bus_consent_unclassified() {
     let bus = map_a2a_error_to_iac_bus(err, "caller");
     match bus {
         IacBusError::CrossHostRouteFailure(msg) => {
-            assert!(msg.contains("non_canonical"), "message must carry the reason: {msg}");
-            assert!(msg.contains("test"), "message must carry the denied peer: {msg}");
+            assert!(
+                msg.contains("non_canonical"),
+                "message must carry the reason: {msg}"
+            );
+            assert!(
+                msg.contains("test"),
+                "message must carry the denied peer: {msg}"
+            );
         }
         other => panic!("expected CrossHostRouteFailure, got {other:?}"),
     }
@@ -345,12 +400,18 @@ async fn exactly_128_bytes_is_classified() {
     // 128 bytes of all lowercase-alphanumeric passes is_canonical.
     let intent_128 = A2AIntent::new("a".repeat(128));
     assert_eq!(intent_128.as_str().len(), MAX_CANONICAL_INTENT_LEN);
-    assert!(intent_128.is_canonical(), "128-byte all-lowercase intent must be canonical");
+    assert!(
+        intent_128.is_canonical(),
+        "128-byte all-lowercase intent must be canonical"
+    );
 
     // 129 bytes is Oversized (fails is_canonical due to length guard).
     let intent_129 = A2AIntent::new("a".repeat(129));
     assert_eq!(intent_129.as_str().len(), MAX_CANONICAL_INTENT_LEN + 1);
-    assert!(!intent_129.is_canonical(), "129-byte intent must fail is_canonical");
+    assert!(
+        !intent_129.is_canonical(),
+        "129-byte intent must fail is_canonical"
+    );
 
     // End-to-end: 128-byte intent passes the fail-closed classification gate
     // (is classified, not unclassified), even though it may not be allowlisted.
@@ -358,7 +419,10 @@ async fn exactly_128_bytes_is_classified() {
 
     let f_128 = frame(Some(intent_128.as_str()));
     // Send side: should NOT produce ConsentUnclassified — it is classified.
-    match core.prepare_outbound(f_128, &HostId("loopback".into()), 0).await {
+    match core
+        .prepare_outbound(f_128, &HostId("loopback".into()), 0)
+        .await
+    {
         Err(A2AError::ConsentUnclassified { .. }) => {
             panic!("128-byte canonical intent must be classified, not unclassified")
         }
@@ -388,7 +452,10 @@ fn deserializer_missing_vs_empty_vs_null() {
     // Missing field → None
     let json_missing = r#"{"consent_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"granter":{"host_id":null,"spirit_id":"s"},"timestamp_ns":0}"#;
     let env: ConsentEnvelope = serde_json::from_str(json_missing).expect("missing field parses");
-    assert!(env.intent_class.is_none(), "missing intent_class must be None, not Some(\"\")");
+    assert!(
+        env.intent_class.is_none(),
+        "missing intent_class must be None, not Some(\"\")"
+    );
     // Explicit null → None
     let json_null = r#"{"consent_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"granter":{"host_id":null,"spirit_id":"s"},"timestamp_ns":0,"intent_class":null}"#;
     let env: ConsentEnvelope = serde_json::from_str(json_null).expect("null parses");
@@ -404,5 +471,8 @@ fn deserializer_missing_vs_empty_vs_null() {
     // Valid string → Some("valid")
     let json_valid = r#"{"consent_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"granter":{"host_id":null,"spirit_id":"s"},"timestamp_ns":0,"intent_class":"rca-summary"}"#;
     let env: ConsentEnvelope = serde_json::from_str(json_valid).expect("valid parses");
-    assert_eq!(env.intent_class.as_ref().map(|i| i.as_str()), Some("rca-summary"));
+    assert_eq!(
+        env.intent_class.as_ref().map(|i| i.as_str()),
+        Some("rca-summary")
+    );
 }

@@ -100,7 +100,10 @@ impl Nash {
                 proposals.push(self.architect(adv));
             }
         }
-        let mut guard = self.last_proposals.lock().unwrap_or_else(|e| e.into_inner());
+        let mut guard = self
+            .last_proposals
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         *guard = proposals;
     }
 }
@@ -253,7 +256,10 @@ mod unit_tests {
         let n = Nash::default();
         let low = n.architect(&advisory(0.1)).confidence;
         let high = n.architect(&advisory(0.9)).confidence;
-        assert!(high < low, "a harder (more severe) anomaly is less confident");
+        assert!(
+            high < low,
+            "a harder (more severe) anomaly is less confident"
+        );
     }
 
     #[test]
@@ -270,7 +276,10 @@ mod unit_tests {
         let p = n.architect(&advisory(0.5));
         let v = serde_json::to_value(&p).unwrap();
         for field in ["subject", "proposed_fix", "components", "confidence"] {
-            assert!(v.get(field).is_some(), "missing required output field {field}");
+            assert!(
+                v.get(field).is_some(),
+                "missing required output field {field}"
+            );
         }
     }
 

@@ -8,9 +8,9 @@
 use std::collections::VecDeque;
 
 #[cfg(any(test, feature = "fixture_replay"))]
-use maos_domain::ports::inference::{InferenceRequest, InferenceResponse};
-#[cfg(any(test, feature = "fixture_replay"))]
 use crate::provider::{Provider, ProviderError};
+#[cfg(any(test, feature = "fixture_replay"))]
+use maos_domain::ports::inference::{InferenceRequest, InferenceResponse};
 
 /// A `Provider` that replays canned responses from a ring buffer.
 ///
@@ -43,9 +43,9 @@ impl Provider for FixtureReplayProvider {
     fn complete(&self, req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
         self.calls.lock().unwrap().push(req.clone());
         let mut responses = self.responses.lock().unwrap();
-        responses
-            .pop_front()
-            .unwrap_or_else(|| panic!("FixtureReplayProvider: response ring empty — all canned responses consumed"))
+        responses.pop_front().unwrap_or_else(|| {
+            panic!("FixtureReplayProvider: response ring empty — all canned responses consumed")
+        })
     }
 }
 
@@ -109,10 +109,8 @@ mod tests {
 
     #[test]
     fn ring_replays_in_order() {
-        let provider = FixtureReplayProvider::new(vec![
-            Ok(ok_response("first")),
-            Ok(ok_response("second")),
-        ]);
+        let provider =
+            FixtureReplayProvider::new(vec![Ok(ok_response("first")), Ok(ok_response("second"))]);
         let req = sample_request();
         let r1 = provider.complete(&req).unwrap();
         let r2 = provider.complete(&req).unwrap();

@@ -22,10 +22,8 @@ fn skip_if_no_container_runtime() -> bool {
 
 #[test]
 fn t3_escape_corpus_loads_all_25_scenarios() {
-    let corpus = T3EscapeCorpus::load_from(Path::new(
-        "fixtures/t3-escape-corpus-v0/",
-    ))
-    .expect("t3-escape-corpus-v0 must exist");
+    let corpus = T3EscapeCorpus::load_from(Path::new("fixtures/t3-escape-corpus-v0/"))
+        .expect("t3-escape-corpus-v0 must exist");
     assert_eq!(
         corpus.scenarios.len(),
         25,
@@ -35,10 +33,8 @@ fn t3_escape_corpus_loads_all_25_scenarios() {
 
 #[test]
 fn t3_escape_corpus_categories_are_well_formed() {
-    let corpus = T3EscapeCorpus::load_from(Path::new(
-        "fixtures/t3-escape-corpus-v0/",
-    ))
-    .expect("t3-escape-corpus-v0 must exist");
+    let corpus = T3EscapeCorpus::load_from(Path::new("fixtures/t3-escape-corpus-v0/"))
+        .expect("t3-escape-corpus-v0 must exist");
 
     let valid_categories = [
         "filesystem_escape",
@@ -80,10 +76,8 @@ fn t3_escape_corpus_categories_are_well_formed() {
 
 #[test]
 fn t3_escape_corpus_each_category_has_five_scenarios() {
-    let corpus = T3EscapeCorpus::load_from(Path::new(
-        "fixtures/t3-escape-corpus-v0/",
-    ))
-    .expect("t3-escape-corpus-v0 must exist");
+    let corpus = T3EscapeCorpus::load_from(Path::new("fixtures/t3-escape-corpus-v0/"))
+        .expect("t3-escape-corpus-v0 must exist");
 
     let categories = [
         "filesystem_escape",
@@ -108,12 +102,14 @@ fn t3_escape_corpus_each_category_has_five_scenarios() {
 
 #[test]
 fn t3_escape_corpus_all_scenarios_unique_ids() {
-    let corpus = T3EscapeCorpus::load_from(Path::new(
-        "fixtures/t3-escape-corpus-v0/",
-    ))
-    .expect("t3-escape-corpus-v0 must exist");
+    let corpus = T3EscapeCorpus::load_from(Path::new("fixtures/t3-escape-corpus-v0/"))
+        .expect("t3-escape-corpus-v0 must exist");
 
-    let mut ids: Vec<&str> = corpus.scenarios.iter().map(|s| s.scenario_id.as_str()).collect();
+    let mut ids: Vec<&str> = corpus
+        .scenarios
+        .iter()
+        .map(|s| s.scenario_id.as_str())
+        .collect();
     ids.sort();
     ids.dedup();
     assert_eq!(

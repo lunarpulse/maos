@@ -17,17 +17,16 @@
 //!   * P7 — `A2AJsonRpcRequest::try_from_bytes` on malformed JSON emits a
 //!          `CODE_PARSE_ERROR (-32700)` NACK (not a raw serde error)
 
+use maos_a2a::transport::json_rpc::{
+    A2AJsonRpcRequest, A2AJsonRpcResponse, CODE_CONSENT_EXPIRED, CODE_INTERNAL, CODE_PARSE_ERROR,
+    CODE_PIN_MISMATCH_NOT_PINNED, CODE_SPIRIT_RESTART_DETECTED,
+};
 use maos_a2a::{
     A2APeerConfig, A2APeerRouter, A2AProfile, ConsentAllowlists, InMemoryTofuPinStore,
     LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
 };
-use maos_a2a::transport::json_rpc::{
-    A2AJsonRpcRequest, A2AJsonRpcResponse, CODE_CONSENT_EXPIRED, CODE_INTERNAL,
-    CODE_PARSE_ERROR, CODE_PIN_MISMATCH_NOT_PINNED, CODE_SPIRIT_RESTART_DETECTED,
-};
 use maos_domain::frame::{
-    ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences,
-    TaskAssignPayload,
+    ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
 };
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i13::IntentLineage;

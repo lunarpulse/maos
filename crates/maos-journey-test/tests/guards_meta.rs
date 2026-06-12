@@ -22,21 +22,15 @@ fn jb7_journey_researcher_no_wallclock() {
 
 #[test]
 fn jb7_journey_j1_no_wallclock() {
-    guards::assert_no_wallclock_or_fixed_sleep(
-        test_root().join("journey_j1.rs").to_str().unwrap(),
-    );
+    guards::assert_no_wallclock_or_fixed_sleep(test_root().join("journey_j1.rs").to_str().unwrap());
 }
 
 #[test]
 fn jb7_journey_j4_no_wallclock() {
-    guards::assert_no_wallclock_or_fixed_sleep(
-        test_root().join("journey_j4.rs").to_str().unwrap(),
-    );
+    guards::assert_no_wallclock_or_fixed_sleep(test_root().join("journey_j4.rs").to_str().unwrap());
 }
 
 #[test]
 fn jb7_journey_j0_no_wallclock() {
-    guards::assert_no_wallclock_or_fixed_sleep(
-        test_root().join("journey_j0.rs").to_str().unwrap(),
-    );
+    guards::assert_no_wallclock_or_fixed_sleep(test_root().join("journey_j0.rs").to_str().unwrap());
 }

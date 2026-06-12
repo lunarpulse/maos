@@ -141,9 +141,7 @@ pub fn resolve_tier_grant(
                 if requested <= grant.permitted_tier {
                     TierGrantDecision::Granted {
                         tier: requested,
-                        permitted_egress_destinations: grant
-                            .permitted_egress_destinations
-                            .clone(),
+                        permitted_egress_destinations: grant.permitted_egress_destinations.clone(),
                     }
                 } else {
                     TierGrantDecision::Denied {
@@ -222,7 +220,12 @@ mod tests {
     #[test]
     fn non_linux_fails_closed() {
         let al = allowlist_t3();
-        let d = resolve_tier_grant(SandboxTier::T3, "ghcr.io/maos/worker@sha256:abc", "maos-publisher-1", &al);
+        let d = resolve_tier_grant(
+            SandboxTier::T3,
+            "ghcr.io/maos/worker@sha256:abc",
+            "maos-publisher-1",
+            &al,
+        );
         assert!(matches!(
             d,
             TierGrantDecision::Denied {

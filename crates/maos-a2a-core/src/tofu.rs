@@ -49,10 +49,7 @@ pub enum EPinMismatch {
     #[error("no TOFU pin recorded for peer {0} — first-contact not yet attempted")]
     NotPinned(String),
     #[error("TOFU pin invalidated for peer {peer}: {reason}")]
-    Invalidated {
-        peer: String,
-        reason: String,
-    },
+    Invalidated { peer: String, reason: String },
 }
 
 /// Operator decision on a re-pin request.
@@ -177,10 +174,7 @@ impl InMemoryTofuPinStore {
     /// Returns the [`PeerId`] whose **active** pin equals `observed`, or `None`
     /// (unpinned / invalidated). This is the TOFU trust oracle the
     /// `TofuPinningVerifier` consults after WebPKI succeeds.
-    pub fn find_active_pin_by_fingerprint(
-        &self,
-        observed: &PeerCertFingerprint,
-    ) -> Option<PeerId> {
+    pub fn find_active_pin_by_fingerprint(&self, observed: &PeerCertFingerprint) -> Option<PeerId> {
         self.pins.iter().find_map(|entry| {
             let pin = entry.value();
             if pin.invalidated.is_none() && &pin.fingerprint == observed {
@@ -311,13 +305,13 @@ impl TofuPinStore for InMemoryTofuPinStore {
         peer: &PeerId,
         prior_boot_nonce: u64,
     ) -> Result<(), A2AError> {
-        let mut entry = self
-            .pins
-            .get_mut(peer.as_str())
-            .ok_or_else(|| A2AError::PinInvalidated {
-                peer: peer.as_str().to_string(),
-                awaiting_repin: false,
-            })?;
+        let mut entry =
+            self.pins
+                .get_mut(peer.as_str())
+                .ok_or_else(|| A2AError::PinInvalidated {
+                    peer: peer.as_str().to_string(),
+                    awaiting_repin: false,
+                })?;
         entry.invalidated = Some(Invalidated::SpiritRestarted { prior_boot_nonce });
         Ok(())
     }
@@ -488,16 +482,12 @@ mod tests {
     async fn await_repin_consent_accept_path() {
         let approval_id = [42u8; 16];
         let new_boot = 5u64;
-        let store = InMemoryTofuPinStore::new().with_repin_hook(
-            move |_, _, _| RePinDecision::AcceptedByOperator { approval_id },
-        );
+        let store = InMemoryTofuPinStore::new()
+            .with_repin_hook(move |_, _, _| RePinDecision::AcceptedByOperator { approval_id });
         let peer = PeerId::new("p");
         let new_fp = fp("cert-B");
         let decision = store.await_repin_consent(&peer, &new_fp, new_boot).await;
-        assert!(matches!(
-            decision,
-            RePinDecision::AcceptedByOperator { .. }
-        ));
+        assert!(matches!(decision, RePinDecision::AcceptedByOperator { .. }));
         // Re-pin materialized — verify_pinned should now pass against new_fp.
         let pin = store.get_pin(&peer).await.expect("pin exists");
         assert_eq!(pin.boot_nonce, new_boot);

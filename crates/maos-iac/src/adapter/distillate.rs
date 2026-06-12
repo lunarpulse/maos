@@ -729,7 +729,10 @@ mod tests {
                 ..Default::default()
             })
             .unwrap();
-        assert!(distillates.is_empty(), "no Distillate row on a rejected forgery");
+        assert!(
+            distillates.is_empty(),
+            "no Distillate row on a rejected forgery"
+        );
     }
 
     #[test]

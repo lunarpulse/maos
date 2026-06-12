@@ -11,8 +11,8 @@
 //! hook + the manifest envelope.
 
 use maos_spirit_sdk::spirit_test::{assert_no_deprecations, manifest_self_check, SpiritTest};
-use orchestrator::Orchestrator;
 use orchestrator::__maos_spirit_vtable_Orchestrator;
+use orchestrator::Orchestrator;
 
 const MANIFEST: &str = include_str!("../manifest.toml");
 

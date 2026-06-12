@@ -72,18 +72,18 @@ impl IntentLineageCorpus {
         for entry in walkdir::WalkDir::new(dir).sort_by_file_name().into_iter() {
             let entry = entry.map_err(|e| {
                 let msg = e.to_string();
-                crate::CorpusError::Io(e.into_io_error().unwrap_or_else(|| {
-                    std::io::Error::new(std::io::ErrorKind::Other, msg)
-                }))
+                crate::CorpusError::Io(
+                    e.into_io_error()
+                        .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+                )
             })?;
             let path = entry.path();
             if path.extension().map_or(true, |ext| ext != "json") {
                 continue;
             }
-            if !path
-                .file_stem()
-                .map_or(false, |s| s.to_str().map_or(false, |s| s.starts_with("scenario-")))
-            {
+            if !path.file_stem().map_or(false, |s| {
+                s.to_str().map_or(false, |s| s.starts_with("scenario-"))
+            }) {
                 continue;
             }
             let content = std::fs::read_to_string(path)?;

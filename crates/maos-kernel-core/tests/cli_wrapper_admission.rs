@@ -72,7 +72,11 @@ fn sh_probe_cfg(observed: &str, declared: &str) -> CliWrapperConfig {
 fn ac5_scenario_5_1_declared_matches_observed_admission_succeeds() {
     let c = sh_probe_cfg("1.0.0", "1.0.0");
     let result = probe_and_verify_shape(&c, SandboxTier::T3);
-    assert!(result.is_ok(), "expected admission ok, got {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "expected admission ok, got {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -81,9 +85,7 @@ fn ac5_scenario_5_2_minor_bump_mismatch_fires_eoutput_shape_adapter_mismatch() {
     let err = probe_and_verify_shape(&c, SandboxTier::T3).unwrap_err();
     match err {
         CliWrapperAdmissionError::EOutputShapeAdapterMismatch {
-            declared,
-            observed,
-            ..
+            declared, observed, ..
         } => {
             assert_eq!(declared, "1.0.0");
             assert_eq!(observed, "1.1.0");

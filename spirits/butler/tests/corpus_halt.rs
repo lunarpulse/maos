@@ -54,7 +54,9 @@ fn corpus_path() -> PathBuf {
 
 fn butler_policy() -> EpistemicPolicySection {
     let v: toml::Value = toml::from_str(MANIFEST).unwrap();
-    let ep = v.get("epistemic_policy").expect("[epistemic_policy] present");
+    let ep = v
+        .get("epistemic_policy")
+        .expect("[epistemic_policy] present");
     let ep_str = toml::to_string(ep).unwrap();
     EpistemicPolicySection::from_toml_str(&ep_str).expect("Butler [epistemic_policy] must parse")
 }
@@ -143,9 +145,8 @@ fn load_rows() -> Vec<CorpusRow> {
         .enumerate()
         .filter(|(_, l)| !l.trim().is_empty())
         .map(|(i, l)| {
-            serde_json::from_str::<CorpusRow>(l).unwrap_or_else(|e| {
-                panic!("corpus row {} (1-based) parses: {e}", i + 1)
-            })
+            serde_json::from_str::<CorpusRow>(l)
+                .unwrap_or_else(|e| panic!("corpus row {} (1-based) parses: {e}", i + 1))
         })
         .collect()
 }
@@ -236,7 +237,10 @@ fn preference_drift_fires_the_second_rule() {
     let butler = Butler::new();
     let (tag, _v, _d) = butler.assess(&df.input).primary_scalar();
     assert_eq!(tag, "user_preference_drift");
-    assert!(kernel_observed_halt(&df.input, &policy), "df01 must halt via drift rule");
+    assert!(
+        kernel_observed_halt(&df.input, &policy),
+        "df01 must halt via drift rule"
+    );
 }
 
 #[test]
@@ -244,7 +248,10 @@ fn decision_d_corpus_loads_via_onboarding_loader() {
     // AC3 final bullet / Decision D: OnboardingCorpus::load_jsonl tolerates the
     // extra `input` field, has NO meta line, and is exactly 30 scenarios.
     let corpus = OnboardingCorpus::load_jsonl(&corpus_path()).expect("corpus loads");
-    assert!(corpus.meta.is_none(), "real corpus has NO stand_in_for meta line");
+    assert!(
+        corpus.meta.is_none(),
+        "real corpus has NO stand_in_for meta line"
+    );
     assert_eq!(corpus.scenarios.len(), 30);
     validate_corpus_size(&corpus).expect("exactly 30 scenarios");
 }
@@ -257,12 +264,19 @@ fn ac3_ac4_corpus_scores_above_floors_and_closes_the_seam() {
     // Bus-observed halts (Story 8.1 real path): the seam's `Some(map)` branch.
     let mut observations: BTreeMap<String, bool> = BTreeMap::new();
     for row in &rows {
-        observations.insert(row.scenario_id.clone(), kernel_observed_halt(&row.input, &policy));
+        observations.insert(
+            row.scenario_id.clone(),
+            kernel_observed_halt(&row.input, &policy),
+        );
     }
 
     // AC4: the resolver now prefers the Butler corpus (file exists) → not provisional.
     let resolved = resolve_corpus(&workspace_root()).expect("resolve");
-    assert_eq!(resolved.source, CorpusSource::Butler, "seam flipped Fixture → Butler");
+    assert_eq!(
+        resolved.source,
+        CorpusSource::Butler,
+        "seam flipped Fixture → Butler"
+    );
     assert!(!resolved.source.is_provisional());
 
     let corpus = OnboardingCorpus::load_jsonl(&resolved.path).expect("load resolved");
@@ -275,7 +289,10 @@ fn ac3_ac4_corpus_scores_above_floors_and_closes_the_seam() {
     let outcome = score_candidate(&corpus, &resolved, &input, Some(&observations));
 
     assert_eq!(outcome.corpus_source, "butler");
-    assert!(!outcome.provisional, "Butler-sourced ⇒ provisional:false (seam closed)");
+    assert!(
+        !outcome.provisional,
+        "Butler-sourced ⇒ provisional:false (seam closed)"
+    );
     assert!(outcome.corpus_pass, "a decision for all 30 scenarios");
     assert!(
         outcome.halt_recall_calendar_conflict >= 0.90,

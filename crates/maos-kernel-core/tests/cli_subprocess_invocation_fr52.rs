@@ -83,7 +83,10 @@ fn ac6_scenario_6_2_cap_token_expired_propagation() {
         exit_code: Some(127),
     };
     match reason {
-        RevokeReason::CliSubprocessExit { spirit_pid, exit_code } => {
+        RevokeReason::CliSubprocessExit {
+            spirit_pid,
+            exit_code,
+        } => {
             assert_eq!(spirit_pid, 42);
             assert_eq!(exit_code, Some(127));
         }

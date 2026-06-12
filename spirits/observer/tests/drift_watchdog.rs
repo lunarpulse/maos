@@ -94,13 +94,10 @@ async fn drift_scenarios_warn_before_halt_via_the_real_dispatcher() {
 
         let observer = Observer::watching(
             PrincipalScope::from_patterns(sc.namespace.clone()),
-            vec![WatchThreshold::new(
-                sc.tag.clone(),
-                sc.threshold,
-                sc.direction,
-                sc.warn_margin,
-            )
-            .unwrap()],
+            vec![
+                WatchThreshold::new(sc.tag.clone(), sc.threshold, sc.direction, sc.warn_margin)
+                    .unwrap(),
+            ],
         );
         telemetry.subscribe_topic(observer.observer_id(), &topic);
         let mut rx = telemetry.subscribe(&topic).expect("receiver");

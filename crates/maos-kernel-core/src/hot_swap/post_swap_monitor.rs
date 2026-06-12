@@ -153,7 +153,6 @@ impl PostSwapMonitor {
 
         None
     }
-
 }
 
 #[cfg(test)]

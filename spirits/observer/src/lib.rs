@@ -174,7 +174,9 @@ impl std::fmt::Display for WatchThresholdError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NonFiniteThreshold => write!(f, "watch threshold must be finite (got NaN/Inf)"),
-            Self::NonFiniteWarnMargin => write!(f, "watch warn_margin must be finite (got NaN/Inf)"),
+            Self::NonFiniteWarnMargin => {
+                write!(f, "watch warn_margin must be finite (got NaN/Inf)")
+            }
         }
     }
 }
@@ -315,7 +317,10 @@ impl std::fmt::Display for StructuralSignalError {
         match self {
             Self::EmptySubject => write!(f, "structural signal subject must be non-empty"),
             Self::NonFiniteMagnitude => {
-                write!(f, "structural signal magnitude must be finite (got NaN/Inf)")
+                write!(
+                    f,
+                    "structural signal magnitude must be finite (got NaN/Inf)"
+                )
             }
             Self::MagnitudeOutOfRange => {
                 write!(f, "structural signal magnitude must be in [0.0, 1.0]")
@@ -748,13 +753,10 @@ mod unit_tests {
         // Halt when value < 0.6 (peer on_value_below); band = (0.6, 0.75].
         let o = Observer::watching(
             PrincipalScope::all(),
-            vec![WatchThreshold::new(
-                "user_preference_drift",
-                0.6,
-                DriftDirection::Below,
-                0.15,
-            )
-            .unwrap()],
+            vec![
+                WatchThreshold::new("user_preference_drift", 0.6, DriftDirection::Below, 0.15)
+                    .unwrap(),
+            ],
         );
         // Above band → no warning.
         assert!(o
@@ -944,7 +946,12 @@ mod unit_tests {
             Err(WatchThresholdError::NonFiniteThreshold)
         ));
         assert!(matches!(
-            WatchThreshold::new("belief_variance", f64::INFINITY, DriftDirection::Above, 0.15),
+            WatchThreshold::new(
+                "belief_variance",
+                f64::INFINITY,
+                DriftDirection::Above,
+                0.15
+            ),
             Err(WatchThresholdError::NonFiniteThreshold)
         ));
         assert!(matches!(
@@ -961,15 +968,33 @@ mod unit_tests {
     fn structural_signal_new_validates() {
         // Story 8.10 AC5 — the validating constructor for StructuralSignal.
         assert!(matches!(
-            StructuralSignal::new(SANDBOX_BLOCK_FRAME_KIND, "", DivergenceKind::FdTableGrowth, 0.5, ""),
+            StructuralSignal::new(
+                SANDBOX_BLOCK_FRAME_KIND,
+                "",
+                DivergenceKind::FdTableGrowth,
+                0.5,
+                ""
+            ),
             Err(StructuralSignalError::EmptySubject)
         ));
         assert!(matches!(
-            StructuralSignal::new(SANDBOX_BLOCK_FRAME_KIND, "mira", DivergenceKind::FdTableGrowth, f64::NAN, ""),
+            StructuralSignal::new(
+                SANDBOX_BLOCK_FRAME_KIND,
+                "mira",
+                DivergenceKind::FdTableGrowth,
+                f64::NAN,
+                ""
+            ),
             Err(StructuralSignalError::NonFiniteMagnitude)
         ));
         assert!(matches!(
-            StructuralSignal::new(SANDBOX_BLOCK_FRAME_KIND, "mira", DivergenceKind::FdTableGrowth, 1.5, ""),
+            StructuralSignal::new(
+                SANDBOX_BLOCK_FRAME_KIND,
+                "mira",
+                DivergenceKind::FdTableGrowth,
+                1.5,
+                ""
+            ),
             Err(StructuralSignalError::MagnitudeOutOfRange)
         ));
         let sig = StructuralSignal::new(
@@ -988,8 +1013,14 @@ mod unit_tests {
     fn principal_scope_prefix_wildcard_matches() {
         let scope = PrincipalScope::from_patterns(["worker-*"]);
         assert!(scope.admits("worker-7"), "prefix wildcard matches");
-        assert!(scope.admits("worker-"), "prefix wildcard matches empty suffix");
-        assert!(!scope.admits("mira"), "prefix wildcard does not match unrelated");
+        assert!(
+            scope.admits("worker-"),
+            "prefix wildcard matches empty suffix"
+        );
+        assert!(
+            !scope.admits("mira"),
+            "prefix wildcard does not match unrelated"
+        );
     }
 
     #[test]
@@ -1017,23 +1048,19 @@ mod unit_tests {
     fn drift_below_direction_reset_allows_rewarning() {
         let o = Observer::watching(
             PrincipalScope::all(),
-            vec![WatchThreshold::new(
-                "user_preference_drift",
-                0.6,
-                DriftDirection::Below,
-                0.15,
-            )
-            .unwrap()],
+            vec![
+                WatchThreshold::new("user_preference_drift", 0.6, DriftDirection::Below, 0.15)
+                    .unwrap(),
+            ],
         );
         // Safe (above band).
         assert!(o
             .observe_scalar(&scalar("mira", "user_preference_drift", 0.90))
             .is_none());
         // In band → warn.
-        assert!(
-            o.observe_scalar(&scalar("mira", "user_preference_drift", 0.66))
-                .is_some()
-        );
+        assert!(o
+            .observe_scalar(&scalar("mira", "user_preference_drift", 0.66))
+            .is_some());
         // Still in band → dedup.
         assert!(o
             .observe_scalar(&scalar("mira", "user_preference_drift", 0.65))
@@ -1053,13 +1080,10 @@ mod unit_tests {
     fn drift_below_direction_confidence_value() {
         let o = Observer::watching(
             PrincipalScope::all(),
-            vec![WatchThreshold::new(
-                "user_preference_drift",
-                0.6,
-                DriftDirection::Below,
-                0.15,
-            )
-            .unwrap()],
+            vec![
+                WatchThreshold::new("user_preference_drift", 0.6, DriftDirection::Below, 0.15)
+                    .unwrap(),
+            ],
         );
         let s = o
             .observe_scalar(&scalar("mira", "user_preference_drift", 0.66))

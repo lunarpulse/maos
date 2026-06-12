@@ -32,10 +32,7 @@ pub enum HelloError {
     /// The Inference Port returned an error (not Unconfigured).
     Inference(InferenceError),
     /// Deterministic ambiguity halt (FORK 6).
-    Ambiguous {
-        tag: String,
-        prompt: String,
-    },
+    Ambiguous { tag: String, prompt: String },
 }
 
 impl fmt::Display for HelloError {
@@ -133,12 +130,25 @@ fn is_ambiguous(directive: &str) -> Option<(&'static str, String)> {
     for token in &vague_tokens {
         if lower.contains(token) {
             // Anti-over-fire guard: if dimensions are specified, do NOT halt.
-            let dimension_words = ["performance", "memory", "safety", "readability", "maintainability", "testability", "api", "error handling", "async", "concurrency"];
+            let dimension_words = [
+                "performance",
+                "memory",
+                "safety",
+                "readability",
+                "maintainability",
+                "testability",
+                "api",
+                "error handling",
+                "async",
+                "concurrency",
+            ];
             let has_dimension = dimension_words.iter().any(|dw| lower.contains(dw));
             if !has_dimension {
                 return Some((
                     "task.acceptance_criterion.ambiguous",
-                    format!("'{token}' is undefined; please specify the dimensions you care about."),
+                    format!(
+                        "'{token}' is undefined; please specify the dimensions you care about."
+                    ),
                 ));
             }
         }

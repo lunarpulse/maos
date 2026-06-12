@@ -175,7 +175,10 @@ impl Mira {
                 diagnoses.push(self.diagnose(sig));
             }
         }
-        let mut guard = self.last_diagnoses.lock().unwrap_or_else(|e| e.into_inner());
+        let mut guard = self
+            .last_diagnoses
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         *guard = diagnoses;
     }
 }
@@ -289,7 +292,10 @@ impl Mira {
         match self.try_halt_payload(diagnosis) {
             Ok(payload) => Some(payload),
             Err(e) => {
-                eprintln!("mira: halt_payload construction failed for subject={}: {:?}", diagnosis.subject, e);
+                eprintln!(
+                    "mira: halt_payload construction failed for subject={}: {:?}",
+                    diagnosis.subject, e
+                );
                 None
             }
         }
@@ -316,12 +322,13 @@ impl Mira {
         // TECH-DEBT(8.5): EpistemicHaltPayload uses f32 for value/threshold.
         // Guard against f64→f32 truncation flipping the halt decision at the boundary.
         let epsilon: f64 = 1e-6;
-        let confidence_f32 = if (diagnosis.confidence - DIAGNOSTIC_CONFIDENCE_HALT_THRESHOLD).abs() < epsilon {
-            // At the boundary: bias toward the halt (cast the threshold, which is the comparison floor)
-            DIAGNOSTIC_CONFIDENCE_HALT_THRESHOLD as f32
-        } else {
-            diagnosis.confidence as f32
-        };
+        let confidence_f32 =
+            if (diagnosis.confidence - DIAGNOSTIC_CONFIDENCE_HALT_THRESHOLD).abs() < epsilon {
+                // At the boundary: bias toward the halt (cast the threshold, which is the comparison floor)
+                DIAGNOSTIC_CONFIDENCE_HALT_THRESHOLD as f32
+            } else {
+                diagnosis.confidence as f32
+            };
         EpistemicHaltPayload::new(
             halt_id,
             DIAGNOSTIC_CONFIDENCE_TAG.to_string(),
@@ -417,10 +424,15 @@ mod unit_tests {
             d.confidence
         );
         assert!(d.requires_halt);
-        let payload = m.halt_payload(&d).expect("halt payload produced at boundary");
+        let payload = m
+            .halt_payload(&d)
+            .expect("halt payload produced at boundary");
         assert_eq!(payload.tag, DIAGNOSTIC_CONFIDENCE_TAG);
         assert!((payload.value - d.confidence as f32).abs() < 1e-6);
-        assert_eq!(payload.threshold, Some(DIAGNOSTIC_CONFIDENCE_HALT_THRESHOLD as f32));
+        assert_eq!(
+            payload.threshold,
+            Some(DIAGNOSTIC_CONFIDENCE_HALT_THRESHOLD as f32)
+        );
     }
 
     #[test]
@@ -451,7 +463,10 @@ mod unit_tests {
         let d = m.diagnose(&known_severe());
         let v = serde_json::to_value(&d).unwrap();
         for field in ["subject", "finding", "severity", "confidence"] {
-            assert!(v.get(field).is_some(), "missing required output field {field}");
+            assert!(
+                v.get(field).is_some(),
+                "missing required output field {field}"
+            );
         }
     }
 
@@ -498,7 +513,10 @@ mod unit_tests {
             source_log_ref: String::new(),
         });
         // NaN baseline should not silently bypass halt; severity should be finite.
-        assert!(!d.severity.is_nan(), "NaN baseline must not propagate NaN severity");
+        assert!(
+            !d.severity.is_nan(),
+            "NaN baseline must not propagate NaN severity"
+        );
         assert!(d.severity >= 0.0 && d.severity <= 1.0);
     }
 
@@ -514,7 +532,10 @@ mod unit_tests {
             source_log_ref: String::new(),
         });
         // Negative baseline should not produce unexpected severity > 1.0.
-        assert!(d.severity >= 0.0 && d.severity <= 1.0, "negative baseline must clamp severity");
+        assert!(
+            d.severity >= 0.0 && d.severity <= 1.0,
+            "negative baseline must clamp severity"
+        );
     }
 
     #[test]
@@ -529,8 +550,14 @@ mod unit_tests {
             source_log_ref: String::new(),
         });
         let payload = m.try_halt_payload(&d).expect("halt payload");
-        assert!(payload.halt_id.contains("mira-test"), "halt_id must include spirit_id to prevent collision");
-        assert!(payload.halt_id.contains("svc"), "halt_id must include subject");
+        assert!(
+            payload.halt_id.contains("mira-test"),
+            "halt_id must include spirit_id to prevent collision"
+        );
+        assert!(
+            payload.halt_id.contains("svc"),
+            "halt_id must include subject"
+        );
     }
 
     #[test]

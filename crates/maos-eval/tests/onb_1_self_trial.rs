@@ -114,7 +114,10 @@ fn smoke_onb_1_self_trial_seam_closed_butler_nonprovisional() {
 
     // The self-trial candidate succeeds against the Butler corpus (recall 1.0,
     // precision 1.0) and — because the source is now Butler — is NON-provisional.
-    assert!(outcome.succeed, "butler self-trial candidate should succeed");
+    assert!(
+        outcome.succeed,
+        "butler self-trial candidate should succeed"
+    );
     assert!(
         !outcome.provisional,
         "Butler-sourced outcome must NOT be provisional (seam closed)"
@@ -129,7 +132,10 @@ fn smoke_onb_1_self_trial_seam_closed_butler_nonprovisional() {
     let verdict = evaluate_cohort(&outcomes);
 
     assert_eq!(outcomes.len(), 1, "self-trial is N=1, NOT the N=12 gate");
-    assert!(!verdict.provisional, "Butler-sourced verdict is non-provisional");
+    assert!(
+        !verdict.provisional,
+        "Butler-sourced verdict is non-provisional"
+    );
     assert!(
         !verdict.passed,
         "an N=1 sample can never pass the ≥10/12 cohort floor — guards against \

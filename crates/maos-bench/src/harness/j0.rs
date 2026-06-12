@@ -19,7 +19,9 @@ const INPROC_P95_BUDGET_US: u64 = 60_000; // 60ms
 const INVOCATION_COUNT: u64 = 1000;
 
 /// Build a file-backed Transparency Log with a realistic ~24h workload.
-fn seed_butler_tl(db: &Path) -> Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter> {
+fn seed_butler_tl(
+    db: &Path,
+) -> Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter> {
     use maos_domain::invariants::i3::FrameOrigin;
     use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 

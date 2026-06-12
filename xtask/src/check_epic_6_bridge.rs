@@ -233,13 +233,13 @@ pub fn run_with_story(json: bool, story_arg: Option<&str>) -> Result<(), String>
         results.push(check_7_4_a2_a5_hard_fail());
         results.push(check_7_4_7_3_rf_inventory().map_err(|e| format!("7.4-7.3-RF error: {}", e))?);
         results.push(check_7_4_maos_skill_baseline());
-        results.push(check_7_4_skill_scope_baseline().map_err(|e| format!("7.4-SCOPE error: {}", e))?);
+        results
+            .push(check_7_4_skill_scope_baseline().map_err(|e| format!("7.4-SCOPE error: {}", e))?);
         results.push(
             check_7_4_cli_wrapper_baseline().map_err(|e| format!("7.4-CLIWRAPPER error: {}", e))?,
         );
         results.push(
-            check_7_4_self_telemetry_baseline()
-                .map_err(|e| format!("7.4-SELFTEL error: {}", e))?,
+            check_7_4_self_telemetry_baseline().map_err(|e| format!("7.4-SELFTEL error: {}", e))?,
         );
         results.push(check_7_4_lcas_baseline().map_err(|e| format!("7.4-LCAS error: {}", e))?);
         results.push(check_7_4_abi_frozen().map_err(|e| format!("7.4-ABI-FROZEN error: {}", e))?);
@@ -3790,7 +3790,9 @@ fn discipline_job_count() -> usize {
                     .next()
                     .map(|c| c.is_ascii_lowercase())
                     .unwrap_or(false)
-                && key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                && key
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
         })
         .count()
 }
@@ -3972,9 +3974,10 @@ fn check_7_4_skill_scope_baseline() -> Result<CheckResult, std::io::Error> {
     let src = fs::read_to_string(path)?;
     let scope_variant_present = src.contains("SkillAuthorSelf");
     // Policy wiring must move together with the scope variant.
-    let policy_wired = fs::read_to_string("crates/maos-kernel-core/src/capability/cap_policy/mod.rs")
-        .map(|c| c.contains("SkillAuthorSelf"))
-        .unwrap_or(false);
+    let policy_wired =
+        fs::read_to_string("crates/maos-kernel-core/src/capability/cap_policy/mod.rs")
+            .map(|c| c.contains("SkillAuthorSelf"))
+            .unwrap_or(false);
     let all_absent = !scope_variant_present && !policy_wired;
     let all_present = scope_variant_present && policy_wired;
     let consistent = all_absent || all_present;
@@ -4214,7 +4217,11 @@ fn check_7_5a_7_4_done() -> CheckResult {
         passed: found_done,
         message: format!(
             "blocking_7_5a: Story 7.4 status=done → {}",
-            if found_done { "PASS" } else { "FAIL — 7.4 not done" }
+            if found_done {
+                "PASS"
+            } else {
+                "FAIL — 7.4 not done"
+            }
         ),
     }
 }

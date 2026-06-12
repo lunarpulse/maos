@@ -137,9 +137,7 @@ struct RunArgs {
 /// Parse `run <manifest-path> [--live] [--once]` from the process args (the args
 /// AFTER the binary name). Manual parsing — the binary has no clap dependency.
 /// Returns `None` when the first arg is not `run` (the env-gated paths win).
-fn parse_run_args<I: IntoIterator<Item = String>>(
-    args: I,
-) -> Result<Option<RunArgs>, String> {
+fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<RunArgs>, String> {
     let mut it = args.into_iter();
     if it.next().as_deref() != Some("run") {
         return Ok(None);
@@ -172,7 +170,10 @@ fn parse_run_args<I: IntoIterator<Item = String>>(
             live,
             once,
         })),
-        None => Err("maos run: missing manifest path — expected: maos run <manifest> [--live] [--once]".into()),
+        None => Err(
+            "maos run: missing manifest path — expected: maos run <manifest> [--live] [--once]"
+                .into(),
+        ),
     }
 }
 
@@ -214,7 +215,9 @@ fn classify_spirit(class_name: &str) -> Option<LoadedSpiritKind> {
 /// boot. Keyed on `manifest.posture`, never on the Spirit id — a name-keyed
 /// check would decapitate Researcher (assistive, async scalar-emitter, no port)
 /// and re-ship the 8.1 footgun for the next halt-Spirit.
-fn requires_epistemic_halt_port(posture: &maos_kernel_core::security::manifest::PostureSection) -> bool {
+fn requires_epistemic_halt_port(
+    posture: &maos_kernel_core::security::manifest::PostureSection,
+) -> bool {
     use maos_kernel_core::security::manifest::Posture;
     matches!(
         posture.allowed_max,
@@ -245,7 +248,9 @@ fn resolve_cli_binary(command: &str) -> Result<String, String> {
         return if p.exists() {
             Ok(command.to_string())
         } else {
-            Err(format!("maos run: cli_wrapper command not found at absolute path '{command}'"))
+            Err(format!(
+                "maos run: cli_wrapper command not found at absolute path '{command}'"
+            ))
         };
     }
     if let Ok(exe) = std::env::current_exe() {
@@ -542,37 +547,56 @@ impl LiveButlerMcpPort {
 #[async_trait::async_trait]
 impl butler::ButlerMcpPort for LiveButlerMcpPort {
     async fn calendar_events(&self) -> Result<Vec<butler::CalendarEvent>, butler::ButlerMcpError> {
-        self.call_mcp("calendar", "list_events", maos_mcp::drivers::butler::calendar_list_events_args()).await
-            .and_then(|content| {
-                serde_json::from_value(content)
-                    .map_err(|e| butler::ButlerMcpError::CallFailed {
-                        server: "calendar".into(),
-                        tool: "list_events".into(),
-                        cause: maos_domain::ports::mcp::McpError::Decode(e.to_string()),
-                    })
+        self.call_mcp(
+            "calendar",
+            "list_events",
+            maos_mcp::drivers::butler::calendar_list_events_args(),
+        )
+        .await
+        .and_then(|content| {
+            serde_json::from_value(content).map_err(|e| butler::ButlerMcpError::CallFailed {
+                server: "calendar".into(),
+                tool: "list_events".into(),
+                cause: maos_domain::ports::mcp::McpError::Decode(e.to_string()),
             })
+        })
     }
     async fn comms_messages(&self) -> Result<Vec<butler::CommsMessage>, butler::ButlerMcpError> {
-        self.call_mcp("slack", "list_messages", maos_mcp::drivers::butler::slack_list_messages_args()).await
-            .and_then(|content| {
-                serde_json::from_value(content)
-                    .map_err(|e| butler::ButlerMcpError::CallFailed {
-                        server: "slack".into(),
-                        tool: "list_messages".into(),
-                        cause: maos_domain::ports::mcp::McpError::Decode(e.to_string()),
-                    })
+        self.call_mcp(
+            "slack",
+            "list_messages",
+            maos_mcp::drivers::butler::slack_list_messages_args(),
+        )
+        .await
+        .and_then(|content| {
+            serde_json::from_value(content).map_err(|e| butler::ButlerMcpError::CallFailed {
+                server: "slack".into(),
+                tool: "list_messages".into(),
+                cause: maos_domain::ports::mcp::McpError::Decode(e.to_string()),
             })
+        })
     }
-    async fn write_linear_note(&self, title: &str, content: &str) -> Result<(), butler::ButlerMcpError> {
-        let _ = self.call_mcp(
-            "linear",
-            "create_issue",
-            maos_mcp::drivers::butler::linear_create_issue_args(title, content),
-        ).await?;
+    async fn write_linear_note(
+        &self,
+        title: &str,
+        content: &str,
+    ) -> Result<(), butler::ButlerMcpError> {
+        let _ = self
+            .call_mcp(
+                "linear",
+                "create_issue",
+                maos_mcp::drivers::butler::linear_create_issue_args(title, content),
+            )
+            .await?;
         Ok(())
     }
     async fn fetch_figma_summary(&self) -> Result<serde_json::Value, butler::ButlerMcpError> {
-        self.call_mcp("figma", "get_file", maos_mcp::drivers::butler::figma_get_file_args()).await
+        self.call_mcp(
+            "figma",
+            "get_file",
+            maos_mcp::drivers::butler::figma_get_file_args(),
+        )
+        .await
     }
 }
 impl LiveButlerMcpPort {
@@ -610,12 +634,13 @@ impl LiveButlerMcpPort {
                     cause: other,
                 },
             })?;
-        maos_mcp::drivers::butler::extract_content(&response)
-            .map_err(|e| butler::ButlerMcpError::CallFailed {
+        maos_mcp::drivers::butler::extract_content(&response).map_err(|e| {
+            butler::ButlerMcpError::CallFailed {
                 server: server.into(),
                 tool: tool.into(),
                 cause: e,
-            })
+            }
+        })
     }
 }
 /// Story 8.14c — Live MCP port for Researcher. Wraps the kernel's
@@ -647,7 +672,9 @@ impl LiveResearcherMcpPort {
             mcp_client,
             capability,
             handle: tokio::runtime::Handle::current(),
-            sem: Arc::new(tokio::sync::Semaphore::new(researcher::RESEARCHER_PARALLELISM)),
+            sem: Arc::new(tokio::sync::Semaphore::new(
+                researcher::RESEARCHER_PARALLELISM,
+            )),
         }
     }
 }
@@ -670,9 +697,21 @@ impl LiveResearcherMcpPort {
         use maos_domain::ports::mcp::McpError;
         // Phase 1: search / traverse (NOT citable; produce source keys)
         let searches: Vec<(&str, &str, serde_json::Value)> = vec![
-            ("web", "search", maos_mcp::drivers::researcher::web_search_args(query)),
-            ("arxiv", "search", maos_mcp::drivers::researcher::arxiv_search_args(query)),
-            ("github", "search_code", maos_mcp::drivers::researcher::github_search_code_args(query)),
+            (
+                "web",
+                "search",
+                maos_mcp::drivers::researcher::web_search_args(query),
+            ),
+            (
+                "arxiv",
+                "search",
+                maos_mcp::drivers::researcher::arxiv_search_args(query),
+            ),
+            (
+                "github",
+                "search_code",
+                maos_mcp::drivers::researcher::github_search_code_args(query),
+            ),
             (
                 "citation-graph",
                 "traverse",
@@ -687,32 +726,39 @@ impl LiveResearcherMcpPort {
             let spirit_pid = self.spirit_pid;
             let posture_hash = self.posture_hash;
             set.spawn(async move {
-                let _permit = sem
-                    .acquire()
-                    .await
-                    .map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                let _permit = sem.acquire().await.map_err(|e| {
+                    researcher::ResearcherMcpError::CallFailed {
                         server: server.into(),
                         tool: tool.into(),
                         cause: e.to_string(),
-                    })?;
+                    }
+                })?;
                 let content = tokio::task::spawn_blocking(move || {
                     let scope = Scope::McpCall {
                         server: server.into(),
                         tool: tool.into(),
                     };
                     let token = capability
-                        .issue_with_mediation(spirit_pid, scope, 60, posture_hash, IntentClass::Standard)
-                        .map_err(|e| researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string()))?;
-                    let response = mcp_client
-                        .call(&token, server, tool, args)
-                        .map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                        .issue_with_mediation(
+                            spirit_pid,
+                            scope,
+                            60,
+                            posture_hash,
+                            IntentClass::Standard,
+                        )
+                        .map_err(|e| {
+                            researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
+                        })?;
+                    let response = mcp_client.call(&token, server, tool, args).map_err(|e| {
+                        researcher::ResearcherMcpError::CallFailed {
                             server: server.into(),
                             tool: tool.into(),
                             cause: match e {
                                 McpError::CapabilityDenied { .. } => "unauthorized".into(),
                                 other => other.to_string(),
                             },
-                        })?;
+                        }
+                    })?;
                     maos_mcp::drivers::researcher::extract_content(&response).map_err(|e| {
                         researcher::ResearcherMcpError::CallFailed {
                             server: server.into(),
@@ -727,8 +773,7 @@ impl LiveResearcherMcpPort {
                     tool: tool.into(),
                     cause: e.to_string(),
                 })??;
-                let keys =
-                    maos_mcp::drivers::researcher::parse_search_results(&content, server);
+                let keys = maos_mcp::drivers::researcher::parse_search_results(&content, server);
                 Ok::<_, researcher::ResearcherMcpError>(
                     keys.into_iter()
                         .map(|key| (server.to_string(), key))
@@ -752,7 +797,11 @@ impl LiveResearcherMcpPort {
         let mut set = tokio::task::JoinSet::new();
         for (server, key) in source_keys {
             let (fetch_server, fetch_tool, args) = match server.as_str() {
-                "web" => ("web", "fetch", maos_mcp::drivers::researcher::web_fetch_args(&key)),
+                "web" => (
+                    "web",
+                    "fetch",
+                    maos_mcp::drivers::researcher::web_fetch_args(&key),
+                ),
                 "arxiv" => (
                     "arxiv",
                     "get_paper",
@@ -776,22 +825,29 @@ impl LiveResearcherMcpPort {
             let spirit_pid = self.spirit_pid;
             let posture_hash = self.posture_hash;
             set.spawn(async move {
-                let _permit = sem
-                    .acquire()
-                    .await
-                    .map_err(|e| researcher::ResearcherMcpError::CallFailed {
+                let _permit = sem.acquire().await.map_err(|e| {
+                    researcher::ResearcherMcpError::CallFailed {
                         server: fetch_server.into(),
                         tool: fetch_tool.into(),
                         cause: e.to_string(),
-                    })?;
+                    }
+                })?;
                 let claim = tokio::task::spawn_blocking(move || {
                     let scope = Scope::McpCall {
                         server: fetch_server.into(),
                         tool: fetch_tool.into(),
                     };
                     let token = capability
-                        .issue_with_mediation(spirit_pid, scope, 60, posture_hash, IntentClass::Standard)
-                        .map_err(|e| researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string()))?;
+                        .issue_with_mediation(
+                            spirit_pid,
+                            scope,
+                            60,
+                            posture_hash,
+                            IntentClass::Standard,
+                        )
+                        .map_err(|e| {
+                            researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
+                        })?;
                     let response = mcp_client
                         .call(&token, fetch_server, fetch_tool, args)
                         .map_err(|e| researcher::ResearcherMcpError::CallFailed {
@@ -815,12 +871,13 @@ impl LiveResearcherMcpPort {
                         .get("source_key")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| {
-                            researcher::ResearcherMcpError::Decode("missing 'source_key' field".into())
+                            researcher::ResearcherMcpError::Decode(
+                                "missing 'source_key' field".into(),
+                            )
                         })?;
                     let claim: researcher::ClaimPayload =
-                        serde_json::from_value(claim_json.clone()).map_err(|e| {
-                            researcher::ResearcherMcpError::Decode(e.to_string())
-                        })?;
+                        serde_json::from_value(claim_json.clone())
+                            .map_err(|e| researcher::ResearcherMcpError::Decode(e.to_string()))?;
                     Ok::<_, researcher::ResearcherMcpError>(researcher::FetchedClaim {
                         claim,
                         source_key: source_key.to_string(),
@@ -878,7 +935,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match args.next().as_deref() {
             Some("init") => {
                 for a in args {
-                    if a == "--plain" { plain_flag = true; }
+                    if a == "--plain" {
+                        plain_flag = true;
+                    }
                 }
                 let color = maos_cli::accessibility::ColorChoice::resolve(
                     plain_flag,
@@ -891,9 +950,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if args.next().as_deref() == Some("query") {
                     while let Some(a) = args.next() {
                         match a.as_str() {
-                            "--spirit" => { audit_spirit = args.next(); if audit_spirit.is_none() { return Err("--spirit requires a value".into()); } }
-                            "--format" => { if let Some(f) = args.next() { audit_format = f; } else { return Err("--format requires a value (ndjson|plain)".into()); } }
-                            "--plain" => { plain_flag = true; }
+                            "--spirit" => {
+                                audit_spirit = args.next();
+                                if audit_spirit.is_none() {
+                                    return Err("--spirit requires a value".into());
+                                }
+                            }
+                            "--format" => {
+                                if let Some(f) = args.next() {
+                                    audit_format = f;
+                                } else {
+                                    return Err("--format requires a value (ndjson|plain)".into());
+                                }
+                            }
+                            "--plain" => {
+                                plain_flag = true;
+                            }
                             _ => {}
                         }
                     }
@@ -913,7 +985,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Some("shell") => {
                 for a in args {
-                    if a == "--plain" { plain_flag = true; }
+                    if a == "--plain" {
+                        plain_flag = true;
+                    }
                 }
                 shell_mode = true;
             }
@@ -1093,12 +1167,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let digest_memory: Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync> =
         Arc::clone(&memory) as Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync>;
     let iac = Arc::new(
-        IacBusAdapter::new(Arc::clone(&mailbox), Arc::clone(&transparency_log)).with_digest_provider(
-            maos_kernel_core::iac::decision_logger::memory_backed_digest_provider(
-                digest_memory,
-                |_sid| Some(0),
+        IacBusAdapter::new(Arc::clone(&mailbox), Arc::clone(&transparency_log))
+            .with_digest_provider(
+                maos_kernel_core::iac::decision_logger::memory_backed_digest_provider(
+                    digest_memory,
+                    |_sid| Some(0),
+                ),
             ),
-        ),
     );
     eprintln!("maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)");
 
@@ -1466,7 +1541,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let manifest_path = std::path::PathBuf::from("spirits/hello-spirit/manifest.toml");
             let manifest_toml = std::fs::read_to_string(&manifest_path)
                 .map_err(|e| format!("shell: cannot read hello-spirit manifest: {e}"))?;
-            let manifest_root: toml::Value = manifest_toml.parse()
+            let manifest_root: toml::Value = manifest_toml
+                .parse()
                 .map_err(|e| format!("shell: cannot parse hello-spirit manifest: {e}"))?;
 
             let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
@@ -1476,7 +1552,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &toml::to_string(&manifest_root["resources"]).unwrap_or_default(),
             )?;
             let caps_required = maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
-                &toml::to_string(manifest_root.get("capabilities").and_then(|c| c.get("required")).ok_or("missing [capabilities.required]")?).map_err(|e| format!("caps: {e}"))?,
+                &toml::to_string(
+                    manifest_root
+                        .get("capabilities")
+                        .and_then(|c| c.get("required"))
+                        .ok_or("missing [capabilities.required]")?,
+                )
+                .map_err(|e| format!("caps: {e}"))?,
             )?;
             let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
                 &toml::to_string(&manifest_root["output_shape"]).unwrap_or_default(),
@@ -1484,10 +1566,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
                 &toml::to_string(&manifest_root["class"]).unwrap_or_default(),
             )?;
-            let posture_section = maos_kernel_core::security::manifest::PostureSection::from_toml_str(
-                &toml::to_string(&manifest_root["posture"]).unwrap_or_default(),
-            )?;
-            let epistemic_policy = manifest_root.get("epistemic_policy")
+            let posture_section =
+                maos_kernel_core::security::manifest::PostureSection::from_toml_str(
+                    &toml::to_string(&manifest_root["posture"]).unwrap_or_default(),
+                )?;
+            let epistemic_policy = manifest_root
+                .get("epistemic_policy")
                 .map(|v| {
                     let s = toml::to_string(v)
                         .map_err(|e| format!("epistemic_policy serialize: {e}"))?;
@@ -1498,8 +1582,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let (drift_tx, _drift_rx) = maos_kernel_core::security::make_drift_channel();
             // p1-allow: one-shot [class] evaluator path — isolated root, not the supervised daemon owner
-            let security = maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
-                .with_drift_sender(drift_tx);
+            let security =
+                maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
+                    .with_drift_sender(drift_tx);
 
             let journal_path = maos_audit::default_journal_path();
             if let Some(parent) = journal_path.parent() {
@@ -1508,14 +1593,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
                 .map_err(|e| format!("shell: cannot open journal: {e}"))?;
 
-            security.admit_spirit(
-                0, "hello-spirit",
-                &sandbox_cfg, &resource_caps, &caps_required,
-                Some(&output_shape), &journal, &posture_section,
-                epistemic_policy.as_ref(),
-                None, None, None, None, None,
-                Some(&class_section),
-            ).map_err(|e| format!("shell: hello-spirit admission failed: {e}"))?;
+            security
+                .admit_spirit(
+                    0,
+                    "hello-spirit",
+                    &sandbox_cfg,
+                    &resource_caps,
+                    &caps_required,
+                    Some(&output_shape),
+                    &journal,
+                    &posture_section,
+                    epistemic_policy.as_ref(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(&class_section),
+                )
+                .map_err(|e| format!("shell: hello-spirit admission failed: {e}"))?;
             drop(journal);
             eprintln!("maos: hello-spirit admitted via canonical path (shell mode)");
         }
@@ -1541,10 +1637,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // it, then either drive a single `on_idle` pass (`--once`) or fall through to
     // the existing serving loop so `on_idle` fires against real time.
     if let Some(run) = run_args.clone() {
+        use maos_kernel_core::scheduler::control_block::SpiritManifestBundle;
         use maos_kernel_core::security::manifest::{
             LifecycleSection, PostureSection, SchedulingSection,
         };
-        use maos_kernel_core::scheduler::control_block::SpiritManifestBundle;
 
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
 
@@ -1578,9 +1674,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // [cli_wrapper] and [class] are mutually exclusive (architecture §6.7).
         if manifest_root.get("cli_wrapper").is_some() {
             if manifest_root.get("class").is_some() {
-                return Err("maos run: manifest declares both [cli_wrapper] and [class] — \
+                return Err(
+                    "maos run: manifest declares both [cli_wrapper] and [class] — \
                             mutually exclusive (architecture §6.7, EManifestSchemaConflict)"
-                    .into());
+                        .into(),
+                );
             }
             run_cli_wrapper_manifest(
                 &manifest_root,
@@ -1615,9 +1713,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .into());
         }
-        let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(&extract(
-            "sandbox",
-        )?)?;
+        let sandbox_cfg =
+            maos_kernel_core::security::SandboxConfig::from_toml_str(&extract("sandbox")?)?;
         let resource_caps =
             maos_kernel_core::security::ResourceCaps::from_toml_str(&extract("resources")?)?;
         let caps_required = {
@@ -1626,12 +1723,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .and_then(|c| c.get("required"))
                 .ok_or("maos run: missing [capabilities.required]")?;
             maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
-                &toml::to_string(v).map_err(|e| format!("serialize [capabilities.required]: {e}"))?,
+                &toml::to_string(v)
+                    .map_err(|e| format!("serialize [capabilities.required]: {e}"))?,
             )?
         };
-        let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(&extract(
-            "output_shape",
-        )?)?;
+        let output_shape =
+            maos_kernel_core::security::OutputShape::from_toml_str(&extract("output_shape")?)?;
         let posture_section = PostureSection::from_toml_str(&extract("posture")?)
             .map_err(|e| format!("posture parse: {e}"))?;
         let epistemic_policy = opt_section("epistemic_policy")
@@ -1666,9 +1763,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let journal = Arc::clone(&shared_journal);
         let (drift_tx, drift_rx) = maos_kernel_core::security::make_drift_channel();
         let _drift_guard = drift_rx; // hold the receiver for the daemon's lifetime
-        let security =
-            maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
-                .with_drift_sender(drift_tx);
+        let security = maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
+            .with_drift_sender(drift_tx);
         let spirit_id = class_section.name.clone();
         security
             .admit_spirit(
@@ -1801,28 +1897,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             server_name: &str,
                             tool: &str,
                             args: serde_json::Value,
-                        ) -> Result<maos_domain::ports::mcp::McpCallResponse, maos_domain::ports::mcp::McpError> {
+                        ) -> Result<
+                            maos_domain::ports::mcp::McpCallResponse,
+                            maos_domain::ports::mcp::McpError,
+                        > {
                             use maos_mcp::McpClient;
                             match server_name {
-                                "calendar" => self.calendar.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
-                                "slack" => self.slack.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
-                                "linear" => self.linear.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
-                                "figma" => self.figma.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
-                                _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(server_name.into())),
+                                "calendar" => self
+                                    .calendar
+                                    .as_ref()
+                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                    .call(server_name, tool, args),
+                                "slack" => self
+                                    .slack
+                                    .as_ref()
+                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                    .call(server_name, tool, args),
+                                "linear" => self
+                                    .linear
+                                    .as_ref()
+                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                    .call(server_name, tool, args),
+                                "figma" => self
+                                    .figma
+                                    .as_ref()
+                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                    .call(server_name, tool, args),
+                                _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(
+                                    server_name.into(),
+                                )),
                             }
                         }
                     }
 
                     let mcp_io = Arc::clone(&io_arc);
 
-                    let make_client = |server_name: &str, uri: String| -> Result<Option<McpClientImpl>, maos_domain::ports::mcp::McpError> {
+                    let make_client = |server_name: &str,
+                                       uri: String|
+                     -> Result<
+                        Option<McpClientImpl>,
+                        maos_domain::ports::mcp::McpError,
+                    > {
                         if uri.is_empty() {
                             return Ok(None);
                         }
                         let mut transports = BTreeMap::new();
                         transports.insert(
                             McpTransportId::StreamableHttp,
-                            Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri)) as Arc<dyn McpTransport>,
+                            Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri))
+                                as Arc<dyn McpTransport>,
                         );
                         let mut servers = BTreeMap::new();
                         servers.insert(
@@ -1833,7 +1956,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 fallback_transport: None,
                             },
                         );
-                        let client = McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers)?;
+                        let client = McpClientImpl::new(
+                            transports,
+                            McpTransportId::StreamableHttp,
+                            servers,
+                        )?;
                         Ok(Some(client))
                     };
 
@@ -1933,28 +2060,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             server_name: &str,
                             tool: &str,
                             args: serde_json::Value,
-                        ) -> Result<maos_domain::ports::mcp::McpCallResponse, maos_domain::ports::mcp::McpError> {
+                        ) -> Result<
+                            maos_domain::ports::mcp::McpCallResponse,
+                            maos_domain::ports::mcp::McpError,
+                        > {
                             use maos_mcp::McpClient;
                             match server_name {
-                                "web" => self.web.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
-                                "arxiv" => self.arxiv.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
-                                "github" => self.github.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
-                                "citation-graph" => self.citation_graph.as_ref().ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?.call(server_name, tool, args),
-                                _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(server_name.into())),
+                                "web" => self
+                                    .web
+                                    .as_ref()
+                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                    .call(server_name, tool, args),
+                                "arxiv" => self
+                                    .arxiv
+                                    .as_ref()
+                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                    .call(server_name, tool, args),
+                                "github" => self
+                                    .github
+                                    .as_ref()
+                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                    .call(server_name, tool, args),
+                                "citation-graph" => self
+                                    .citation_graph
+                                    .as_ref()
+                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                    .call(server_name, tool, args),
+                                _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(
+                                    server_name.into(),
+                                )),
                             }
                         }
                     }
 
                     let mcp_io = Arc::clone(&io_arc);
 
-                    let make_client = |server_name: &str, uri: String| -> Result<Option<McpClientImpl>, maos_domain::ports::mcp::McpError> {
+                    let make_client = |server_name: &str,
+                                       uri: String|
+                     -> Result<
+                        Option<McpClientImpl>,
+                        maos_domain::ports::mcp::McpError,
+                    > {
                         if uri.is_empty() {
                             return Ok(None);
                         }
                         let mut transports = BTreeMap::new();
                         transports.insert(
                             McpTransportId::StreamableHttp,
-                            Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri)) as Arc<dyn McpTransport>,
+                            Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri))
+                                as Arc<dyn McpTransport>,
                         );
                         let mut servers = BTreeMap::new();
                         servers.insert(
@@ -1965,14 +2119,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 fallback_transport: None,
                             },
                         );
-                        let client = McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers)?;
+                        let client = McpClientImpl::new(
+                            transports,
+                            McpTransportId::StreamableHttp,
+                            servers,
+                        )?;
                         Ok(Some(client))
                     };
 
                     let web_uri = std::env::var("MAOS_MCP_WEB_URI").unwrap_or_default();
                     let arxiv_uri = std::env::var("MAOS_MCP_ARXIV_URI").unwrap_or_default();
                     let github_uri = std::env::var("MAOS_MCP_GITHUB_URI").unwrap_or_default();
-                    let citation_graph_uri = std::env::var("MAOS_MCP_CITATION_GRAPH_URI").unwrap_or_default();
+                    let citation_graph_uri =
+                        std::env::var("MAOS_MCP_CITATION_GRAPH_URI").unwrap_or_default();
 
                     let mcp_adapter = match (|| -> Result<Option<Arc<dyn maos_domain::ports::mcp::McpClientPort>>, maos_domain::ports::mcp::McpError> {
                         let web = make_client("web", web_uri)?;
@@ -2032,9 +2191,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     // --live also wires the inference seam (pre-existing, unchanged).
-                    let provider = router.default_id().ok_or_else(|| {
-                        "maos run: --live requested but no inference provider is configured"
-                    })?.to_string();
+                    let provider = router
+                        .default_id()
+                        .ok_or_else(|| {
+                            "maos run: --live requested but no inference provider is configured"
+                        })?
+                        .to_string();
                     let token = capability
                         .issue_with_mediation(
                             0,
@@ -2144,13 +2306,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // output against the manifest's OutputShapePredicate. The Spirit writes
             // to the shared output channel during on_idle; the daemon validates here.
             {
-                let predicate = maos_kernel_core::security::OutputShapePredicate::from(&output_shape);
+                let predicate =
+                    maos_kernel_core::security::OutputShapePredicate::from(&output_shape);
                 let output_guard = butler_output_ch.lock().unwrap();
                 if let Some(ref output_json) = *output_guard {
                     if let Err(violation) = predicate.check(output_json) {
-                        eprintln!(
-                            "maos run: output_shape violation: {violation}"
-                        );
+                        eprintln!("maos run: output_shape violation: {violation}");
                     }
                 }
                 drop(output_guard);
@@ -5592,7 +5753,10 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
     let first = orch
         .drain_next(|| buffer.dequeue_at_safe_point())
         .ok_or("safe point must drain the first instruction")?;
-    eprintln!("smoke-founder-loop-8-4: orchestrator drained '{}'", first.goal);
+    eprintln!(
+        "smoke-founder-loop-8-4: orchestrator drained '{}'",
+        first.goal
+    );
     orch.begin_delegation();
     // FR20: while a delegation is in flight, the next instruction is NOT preempted.
     if orch.drain_next(|| buffer.dequeue_at_safe_point()).is_some() {
@@ -5624,8 +5788,13 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
         ))
         .await?;
     orch.complete_delegation();
-    let design_ref =
-        founder_loop_producer_distill(&tl, &memory, 30, "design-proposal", &proposal.digest_text())?;
+    let design_ref = founder_loop_producer_distill(
+        &tl,
+        &memory,
+        30,
+        "design-proposal",
+        &proposal.digest_text(),
+    )?;
     eprintln!(
         "smoke-founder-loop-8-4: architect proposed {} components; distilled → distillate {:02x?}…",
         proposal.components.len(),
@@ -5682,7 +5851,13 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── 4. A deliberate raw dispatch (None after a completion) is REJECTED.
     let raw_payload = orch.build_task_assign("sneak raw output past the gate", "x", None);
-    let raw_frame = orch.assign_frame(14, "architect", SpiritRole::Worker, raw_payload, lineage.clone());
+    let raw_frame = orch.assign_frame(
+        14,
+        "architect",
+        SpiritRole::Worker,
+        raw_payload,
+        lineage.clone(),
+    );
     match adapter.deliver_typed(raw_frame).await {
         Err(IacBusError::EOrchestratorDispatchRawOutput { .. }) => eprintln!(
             "smoke-founder-loop-8-4: deliberate raw dispatch REJECTED (EOrchestratorDispatchRawOutput) — FR21, observable in TL"
@@ -5734,9 +5909,11 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|e| format!("smoke-founder-loop-8-4: worker bridge spawn failed: {e}"))?;
         let worker_child_pid = bridge.child_pid();
         if worker_child_pid == std::process::id() {
-            return Err("smoke-founder-loop-8-4: worker did not spawn a real subprocess \
+            return Err(
+                "smoke-founder-loop-8-4: worker did not spawn a real subprocess \
                         (child_pid == parent_pid — anti-theater FAIL)"
-                .into());
+                    .into(),
+            );
         }
         let pump = bridge.pump_to_journal(
             &tl,
@@ -5745,7 +5922,11 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
             "worker-cli-fixture",
             &["founder-loop-wedge".to_string()],
         );
-        let exit = bridge.wait_and_finalize(&tl, 0, |_code| { /* no cap-token issued in the in-proc journey */ });
+        let exit = bridge.wait_and_finalize(
+            &tl,
+            0,
+            |_code| { /* no cap-token issued in the in-proc journey */ },
+        );
         if exit.cause.is_crash() {
             return Err(format!(
                 "smoke-founder-loop-8-4: worker fixture crashed unexpectedly: {:?}",
@@ -5799,7 +5980,9 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
             .query_frame_by_id(r.digest_frame_id)?
             .ok_or("a cited distillate must resolve against the real Transparency Log")?;
         if !matches!(row.kind, TlFrameKind::Distillate) {
-            return Err("a citation must resolve to a real Distillate row, not a synthetic one".into());
+            return Err(
+                "a citation must resolve to a real Distillate row, not a synthetic one".into(),
+            );
         }
         citations.push(r.digest_frame_id);
     }
@@ -5850,14 +6033,18 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
     for row in &cli_rows {
         let payload = String::from_utf8_lossy(&row.payload_redacted);
         if !payload.contains("\"child_pid\":") {
-            return Err("smoke-founder-loop-8-4: a CliSubprocessOutput row lacks the spawned \
+            return Err(
+                "smoke-founder-loop-8-4: a CliSubprocessOutput row lacks the spawned \
                         child PID (anti-theater FAIL — not provably a real subprocess)"
-                .into());
+                    .into(),
+            );
         }
         if payload.contains(&parent_pid_marker) {
-            return Err("smoke-founder-loop-8-4: a CliSubprocessOutput row carries the PARENT pid \
+            return Err(
+                "smoke-founder-loop-8-4: a CliSubprocessOutput row carries the PARENT pid \
                         (anti-theater FAIL — in-process computation masquerading as a subprocess)"
-                .into());
+                    .into(),
+            );
         }
     }
     eprintln!(
@@ -5898,7 +6085,9 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     };
     // Story 8.13.1 — the receiver intake seam + JSON-RPC types used to drive the
     // deny directly at production code (LoopbackA2ARouter exposes no rupture hook).
-    use maos_a2a::transport::json_rpc::{A2AJsonRpcRequest, A2AJsonRpcResponse, CODE_INTENT_DENIED};
+    use maos_a2a::transport::json_rpc::{
+        A2AJsonRpcRequest, A2AJsonRpcResponse, CODE_INTENT_DENIED,
+    };
     use maos_director_surface::halt_ui::{FlowState, HaltFlow, TapEvent};
     use maos_director_surface::notification::{
         NotificationChannel, NotificationDispatcher, NotificationError,
@@ -5969,16 +6158,18 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
     // p1-allow: smoke-arm demo — isolated root, not the supervised owner
-    let capability = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
-        Arc::new(maos_kernel_core::api::RingCryptoProvider),
-        maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
-        BOOT_NONCE,
-        Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
-        maos_kernel_core::capability::cap_audit::channel().0,
-        maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
-        Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
-        Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
-    ));
+    let capability = Arc::new(
+        maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
+            BOOT_NONCE,
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            maos_kernel_core::capability::cap_audit::channel().0,
+            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
+        ),
+    );
     let orchestrator = Arc::new(
         maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
             Arc::clone(&capability),
@@ -5991,7 +6182,9 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
             memory_root,
             4,
         )),
-        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db_path)?),
+        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(
+            &db_path,
+        )?),
         Arc::new(maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path)?),
         Arc::clone(&tl),
     ));
@@ -6077,18 +6270,19 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     let fb = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
     // Story 8.7 / AC2+AC6 — the reference pair consents on the FINE-GRAINED
     // intent, not the coarse `readonly` band.
-    let mk_cfg = |id: &str, ep: &str, fp: PeerCertFingerprint, accept: Vec<A2AIntent>| A2APeerConfig {
-        peer_id: PeerId::new(id),
-        endpoint: ep.into(),
-        cert_fingerprint: fp,
-        profile: A2AProfile::Loopback,
-        allowlists: ConsentAllowlists {
-            send_allowlist: vec![A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT)],
-            accept_allowlist: accept,
-        },
-        partition_timeout_secs: 30,
-        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
-    };
+    let mk_cfg =
+        |id: &str, ep: &str, fp: PeerCertFingerprint, accept: Vec<A2AIntent>| A2APeerConfig {
+            peer_id: PeerId::new(id),
+            endpoint: ep.into(),
+            cert_fingerprint: fp,
+            profile: A2AProfile::Loopback,
+            allowlists: ConsentAllowlists {
+                send_allowlist: vec![A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT)],
+                accept_allowlist: accept,
+            },
+            partition_timeout_secs: 30,
+            consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
+        };
     let cfg_a = mk_cfg(
         "host_a",
         "tls://127.0.0.1:7443",
@@ -6102,8 +6296,10 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
         vec![A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT)],
     );
     let tofu = Arc::new(InMemoryTofuPinStore::new());
-    tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;
-    tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1).await?;
+    tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1)
+        .await?;
+    tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1)
+        .await?;
     let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b.clone()], tofu);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     router.install_intake_sink(tx).await;
@@ -6218,10 +6414,11 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     // with the live-TCP smoke, which observes the same emission off `nash.core()`.
     let deny_cfg_a = mk_cfg("host_a", "tls://127.0.0.1:7443", fa.clone(), vec![]);
     let deny_tofu = Arc::new(InMemoryTofuPinStore::new());
-    deny_tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;
+    deny_tofu
+        .pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1)
+        .await?;
     let deny_core = A2ARouterCore::new(vec![deny_cfg_a], deny_tofu);
-    let (deny_rupture_tx, mut deny_rupture_rx) =
-        tokio::sync::mpsc::channel::<IacFrame>(16);
+    let (deny_rupture_tx, mut deny_rupture_rx) = tokio::sync::mpsc::channel::<IacFrame>(16);
     deny_core.install_rupture_sink(deny_rupture_tx).await;
     let mut denied_frame = make_frame(IntentClass::Readonly, advisory_json.clone());
     // Story 8.13.1-review / P6 — align with 8.13 smoke: use a distinct fine-grained
@@ -6231,11 +6428,7 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
         denied_frame.from.clone(),
         A2AIntent::new("diagnosis-handoff:write-mitigation"),
     ));
-    let denied_req = A2AJsonRpcRequest::new(
-        "iac.deliver",
-        denied_frame,
-        1,
-    );
+    let denied_req = A2AJsonRpcRequest::new("iac.deliver", denied_frame, 1);
     match deny_core.handle_intake(denied_req).await {
         A2AJsonRpcResponse::Nack(n) if n.error.code == CODE_INTENT_DENIED => {}
         other => {
@@ -6379,7 +6572,9 @@ async fn build_a2a_tcp_daemon_router(
 /// loopback shortcut of `smoke-a2a-loopback-6-3`.
 async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a_core::router::A2ATransport;
-    use maos_a2a_core::{A2APeerConfig, A2AProfile, ConsentAllowlists, PeerCertFingerprint, PeerId};
+    use maos_a2a_core::{
+        A2APeerConfig, A2AProfile, ConsentAllowlists, PeerCertFingerprint, PeerId,
+    };
     use maos_a2a_tcp::{PinnedFingerprint, TcpA2AConfig};
     use maos_domain::frame::{
         FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
@@ -6404,26 +6599,28 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
     let ca_cert = ca_params.self_signed(&ca_key)?;
     let ca_pem = ca_cert.pem();
 
-    let mk_leaf = |ca_cert: &rcgen::Certificate,
-                   ca_key: &rcgen::KeyPair|
-     -> Result<(String, String, PeerCertFingerprint), Box<dyn std::error::Error>> {
-        let key = rcgen::KeyPair::generate()?;
-        let params = rcgen::CertificateParams::new(vec!["127.0.0.1".to_string()])?;
-        let cert = params.signed_by(&key, ca_cert, ca_key)?;
-        let fp = PeerCertFingerprint::from_cert_der(cert.der().as_ref());
-        Ok((cert.pem(), key.serialize_pem(), fp))
-    };
+    let mk_leaf =
+        |ca_cert: &rcgen::Certificate,
+         ca_key: &rcgen::KeyPair|
+         -> Result<(String, String, PeerCertFingerprint), Box<dyn std::error::Error>> {
+            let key = rcgen::KeyPair::generate()?;
+            let params = rcgen::CertificateParams::new(vec!["127.0.0.1".to_string()])?;
+            let cert = params.signed_by(&key, ca_cert, ca_key)?;
+            let fp = PeerCertFingerprint::from_cert_der(cert.der().as_ref());
+            Ok((cert.pem(), key.serialize_pem(), fp))
+        };
     let (mira_cert_pem, mira_key_pem, mira_fp) = mk_leaf(&ca_cert, &ca_key)?;
     let (nash_cert_pem, nash_key_pem, nash_fp) = mk_leaf(&ca_cert, &ca_key)?;
 
     // ── Write PEM material to a temp dir.
     let dir = std::env::temp_dir().join(format!("maos-smoke-a2a-tcp-8-6-{}", std::process::id()));
     std::fs::create_dir_all(&dir)?;
-    let write = |name: &str, body: &str| -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-        let p = dir.join(name);
-        std::fs::write(&p, body)?;
-        Ok(p)
-    };
+    let write =
+        |name: &str, body: &str| -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+            let p = dir.join(name);
+            std::fs::write(&p, body)?;
+            Ok(p)
+        };
     let ca_path = write("ca.pem", &ca_pem)?;
     let mira_cert = write("mira.cert.pem", &mira_cert_pem)?;
     let mira_key = write("mira.key.pem", &mira_key_pem)?;
@@ -6518,10 +6715,12 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
             prior_distillate_ref: None,
         }),
         auto_marker: FrameOrigin::SpiritAuto,
-        consent_envelope: Some(maos_domain::frame::ConsentEnvelope::with_fine_grained_intent(
-            advisory_from,
-            A2AIntent::new("diagnosis-handoff:read-only-evidence"),
-        )),
+        consent_envelope: Some(
+            maos_domain::frame::ConsentEnvelope::with_fine_grained_intent(
+                advisory_from,
+                A2AIntent::new("diagnosis-handoff:read-only-evidence"),
+            ),
+        ),
         intent_lineage: IntentLineage::default(),
     };
 
@@ -6535,7 +6734,10 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
         .last_intake_observed()
         .ok_or("smoke-a2a-tcp-8-6: Nash did not observe the advisory")?;
     if boot != MIRA_NONCE {
-        return Err(format!("smoke-a2a-tcp-8-6: boot_nonce mismatch on wire: {boot} != {MIRA_NONCE}").into());
+        return Err(format!(
+            "smoke-a2a-tcp-8-6: boot_nonce mismatch on wire: {boot} != {MIRA_NONCE}"
+        )
+        .into());
     }
     eprintln!(
         "smoke-a2a-tcp-8-6: Nash(host_b) ACKed the advisory over live mTLS \
@@ -6559,7 +6761,9 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
 
     use maos_a2a_core::error::A2AError;
     use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
-    use maos_a2a_core::{A2APeerConfig, A2AProfile, ConsentAllowlists, PeerCertFingerprint, PeerId};
+    use maos_a2a_core::{
+        A2APeerConfig, A2AProfile, ConsentAllowlists, PeerCertFingerprint, PeerId,
+    };
     use maos_a2a_tcp::{PinnedFingerprint, TcpA2AConfig};
     use maos_director_surface::halt_ui::{FlowState, HaltFlow, TapEvent};
     use maos_director_surface::notification::{NotificationDispatcher, TerminalChannel};
@@ -6595,24 +6799,36 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     // (the allowlist); the ConsentRupture RECORD is produced by production code.
     const DENIED_FINE_GRAINED_INTENT: &str = "diagnosis-handoff:write-mitigation";
 
-    fn spawn_push_server() -> Result<(String, mpsc::Receiver<(String, String, Vec<u8>)>), Box<dyn std::error::Error>> {
+    fn spawn_push_server(
+    ) -> Result<(String, mpsc::Receiver<(String, String, Vec<u8>)>), Box<dyn std::error::Error>>
+    {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let addr = listener.local_addr()?;
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
-            let Ok((mut stream, _)) = listener.accept() else { return; };
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
+            };
             let mut bytes = Vec::new();
             let mut buf = [0u8; 1024];
             let header_end = loop {
-                let Ok(n) = stream.read(&mut buf) else { return; };
-                if n == 0 { return; }
+                let Ok(n) = stream.read(&mut buf) else {
+                    return;
+                };
+                if n == 0 {
+                    return;
+                }
                 bytes.extend_from_slice(&buf[..n]);
                 if let Some(pos) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
                     break pos + 4;
                 }
             };
             let headers = String::from_utf8_lossy(&bytes[..header_end]);
-            let mut first = headers.lines().next().unwrap_or_default().split_whitespace();
+            let mut first = headers
+                .lines()
+                .next()
+                .unwrap_or_default()
+                .split_whitespace();
             let method = first.next().unwrap_or_default().to_string();
             let path = first.next().unwrap_or_default().to_string();
             let len = headers
@@ -6625,8 +6841,12 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .unwrap_or(0);
             while bytes.len().saturating_sub(header_end) < len {
-                let Ok(n) = stream.read(&mut buf) else { return; };
-                if n == 0 { return; }
+                let Ok(n) = stream.read(&mut buf) else {
+                    return;
+                };
+                if n == 0 {
+                    return;
+                }
                 bytes.extend_from_slice(&buf[..n]);
             }
             let body = bytes[header_end..header_end + len].to_vec();
@@ -6662,11 +6882,7 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    fn task_assign_frame(
-        id_byte: u8,
-        from_host: HostId,
-        body: String,
-    ) -> IacFrame {
+    fn task_assign_frame(id_byte: u8, from_host: HostId, body: String) -> IacFrame {
         let from = FrameAddress {
             spirit_id: SpiritId::from("mira"),
             host_id: Some(from_host.clone()),
@@ -6732,16 +6948,18 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
     // p1-allow: smoke-arm demo — isolated root, not the supervised owner
-    let capability = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
-        Arc::new(maos_kernel_core::api::RingCryptoProvider),
-        maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
-        BOOT_NONCE,
-        Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
-        maos_kernel_core::capability::cap_audit::channel().0,
-        maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
-        Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
-        Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
-    ));
+    let capability = Arc::new(
+        maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
+            BOOT_NONCE,
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            maos_kernel_core::capability::cap_audit::channel().0,
+            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
+        ),
+    );
     let orchestrator = Arc::new(
         maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
             Arc::clone(&capability),
@@ -6750,9 +6968,18 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     );
     let mailbox = Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::clone(&metrics)));
     let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
-        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(root.join("memory"), 4)),
-        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&root.join("audit.db"))?),
-        Arc::new(maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&root.join("audit.db"))?),
+        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
+            root.join("memory"),
+            4,
+        )),
+        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(
+            &root.join("audit.db"),
+        )?),
+        Arc::new(
+            maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(
+                &root.join("audit.db"),
+            )?,
+        ),
         Arc::clone(&tl),
     ));
     let resolver = Arc::new(KernelHaltResolver::new(
@@ -6804,7 +7031,11 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let report = flow.dispatch_halt(halt_id.clone(), payload.clone())?;
     if report.delivered != 1 || report.errors != 0 {
-        return Err(format!("smoke-mira-nash-tcp-8-13: push report was delivered={} errors={}", report.delivered, report.errors).into());
+        return Err(format!(
+            "smoke-mira-nash-tcp-8-13: push report was delivered={} errors={}",
+            report.delivered, report.errors
+        )
+        .into());
     }
     let (method, path, body) = push_rx.recv_timeout(std::time::Duration::from_secs(2))?;
     if method != "POST" || path != "/j4-halt" {
@@ -6823,9 +7054,13 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
         PushConfig::new(format!("http://{dead_addr}/closed"), None)
             .with_timeout(std::time::Duration::from_millis(100)),
     )));
-    isolation_dispatcher.register(Box::new(TerminalChannel::new(Arc::new(Mutex::new(Vec::<u8>::new()))).with_color(false)));
+    isolation_dispatcher.register(Box::new(
+        TerminalChannel::new(Arc::new(Mutex::new(Vec::<u8>::new()))).with_color(false),
+    ));
     let isolation = isolation_dispatcher.dispatch(
-        NotificationEvent::Halt { payload: payload.clone() },
+        NotificationEvent::Halt {
+            payload: payload.clone(),
+        },
         NotificationLevel::Immediate,
     )?;
     if isolation.delivered != 1 || isolation.errors != 1 {
@@ -6838,7 +7073,10 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     let ca_cert = ca_params.self_signed(&ca_key)?;
     let ca_path = root.join("ca.pem");
     std::fs::write(&ca_path, ca_cert.pem())?;
-    let mk_leaf = |name: &str| -> Result<(std::path::PathBuf, std::path::PathBuf, PeerCertFingerprint), Box<dyn std::error::Error>> {
+    let mk_leaf = |name: &str| -> Result<
+        (std::path::PathBuf, std::path::PathBuf, PeerCertFingerprint),
+        Box<dyn std::error::Error>,
+    > {
         let key = rcgen::KeyPair::generate()?;
         let params = rcgen::CertificateParams::new(vec!["127.0.0.1".to_string()])?;
         let cert = params.signed_by(&key, &ca_cert, &ca_key)?;
@@ -6862,7 +7100,11 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
         listen_addr: "127.0.0.1:0".parse()?,
         own_cert_chain: nash_cert,
         own_private_key: nash_key,
-        peer_pins: vec![PinnedFingerprint { peer_id: PeerId::new("host_a"), fingerprint: mira_fp.clone(), boot_nonce: MIRA_NONCE }],
+        peer_pins: vec![PinnedFingerprint {
+            peer_id: PeerId::new("host_a"),
+            fingerprint: mira_fp.clone(),
+            boot_nonce: MIRA_NONCE,
+        }],
         handshake_timeout: std::time::Duration::from_secs(30),
         ca_roots: Some(ca_path.clone()),
     };
@@ -6894,7 +7136,11 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
         listen_addr: "127.0.0.1:0".parse()?,
         own_cert_chain: mira_cert,
         own_private_key: mira_key,
-        peer_pins: vec![PinnedFingerprint { peer_id: PeerId::new("host_b"), fingerprint: nash_fp.clone(), boot_nonce: NASH_NONCE }],
+        peer_pins: vec![PinnedFingerprint {
+            peer_id: PeerId::new("host_b"),
+            fingerprint: nash_fp.clone(),
+            boot_nonce: NASH_NONCE,
+        }],
         handshake_timeout: std::time::Duration::from_secs(30),
         ca_roots: Some(ca_path),
     };
@@ -6923,7 +7169,9 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     let bound_mira_host = HostId("host_a".into());
     let frame = task_assign_frame(0x13, bound_mira_host.clone(), advisory_json.clone());
     if frame.from.host_id.as_ref() != Some(&bound_mira_host) {
-        return Err("smoke-mira-nash-tcp-8-13: frame host_id was not transport-bound host_a".into());
+        return Err(
+            "smoke-mira-nash-tcp-8-13: frame host_id was not transport-bound host_a".into(),
+        );
     }
     let router: Arc<dyn A2ARouter> = mira.clone();
     router
@@ -6934,16 +7182,19 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
         .last_intake_observed()
         .ok_or("smoke-mira-nash-tcp-8-13: Nash did not observe the advisory")?;
     if boot != MIRA_NONCE || lamport == 0 {
-        return Err(format!("smoke-mira-nash-tcp-8-13: bad wire observation boot={boot} lamport={lamport}").into());
+        return Err(format!(
+            "smoke-mira-nash-tcp-8-13: bad wire observation boot={boot} lamport={lamport}"
+        )
+        .into());
     }
     // D1 — receiver-side wire-content oracle. Pull the advisory Nash actually
     // RECEIVED off the wire (captured at intake by the sink above) and feed its
     // RAW goal bytes through Nash's own deserializer. This closes the AC1
     // anti-tautology gap: the prior assertions deserialized the test-local
     // `advisory_json`, so a corrupted on-wire payload still passed.
-    let received_frame = intake_rx
-        .try_recv()
-        .map_err(|e| format!("smoke-mira-nash-tcp-8-13: intake captured no received frame: {e:?}"))?;
+    let received_frame = intake_rx.try_recv().map_err(|e| {
+        format!("smoke-mira-nash-tcp-8-13: intake captured no received frame: {e:?}")
+    })?;
     let received_goal = match &received_frame.payload {
         FramePayload::TaskAssign(p) => p.goal.clone(),
         other => {
@@ -6958,7 +7209,9 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     // it is handed to `Nash::from_wire` (deserialize) exactly as Nash would on
     // the live path. A wire mutation of the goal now fails here.
     let received_advisory = Nash::from_wire(&received_goal).map_err(|e| {
-        format!("smoke-mira-nash-tcp-8-13: received advisory failed to rehydrate off the wire: {e:?}")
+        format!(
+            "smoke-mira-nash-tcp-8-13: received advisory failed to rehydrate off the wire: {e:?}"
+        )
     })?;
     if received_advisory.severity < 0.66 {
         return Err(
@@ -6966,7 +7219,9 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
                 .into(),
         );
     }
-    let proposal = Nash::default().with_id("nash").architect(&received_advisory);
+    let proposal = Nash::default()
+        .with_id("nash")
+        .architect(&received_advisory);
     if !proposal.proposed_fix.contains("circuit-breaker") || proposal.confidence >= 0.95 {
         return Err(
             "smoke-mira-nash-tcp-8-13: Nash proposal not derived from the RECEIVED Mira severity"
@@ -6977,7 +7232,12 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     match A2APeerRouter::route_outbound(&*mira, forged, &HostId("host_b".into())).await {
         Err(A2AError::PeerIdentityMismatch { expected, asserted })
             if expected == "host_a" && asserted == "host_x" => {}
-        other => return Err(format!("smoke-mira-nash-tcp-8-13: confused-deputy guard failed: {other:?}").into()),
+        other => {
+            return Err(format!(
+                "smoke-mira-nash-tcp-8-13: confused-deputy guard failed: {other:?}"
+            )
+            .into())
+        }
     }
 
     let _advisory_token = tl.insert_frame_event(
@@ -7017,13 +7277,12 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     // deny path emitted (never hand-inserted). Bound to the TLS-verified peer
     // (the sender, host_a) + carrying the policy reason only the deny decision
     // possesses (IntentAllowlistMismatch).
-    let rupture_frame = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        rupture_rx.recv(),
-    )
-    .await
-    .map_err(|_| "smoke-mira-nash-tcp-8-13: timed out waiting for the production ConsentRupture")?
-    .ok_or("smoke-mira-nash-tcp-8-13: rupture sink closed without emitting")?;
+    let rupture_frame = tokio::time::timeout(std::time::Duration::from_secs(2), rupture_rx.recv())
+        .await
+        .map_err(|_| {
+            "smoke-mira-nash-tcp-8-13: timed out waiting for the production ConsentRupture"
+        })?
+        .ok_or("smoke-mira-nash-tcp-8-13: rupture sink closed without emitting")?;
     if rupture_frame.kind != FrameKind::ConsentRupture {
         return Err(format!(
             "smoke-mira-nash-tcp-8-13: emitted frame was {:?}, not ConsentRupture",
@@ -7033,7 +7292,9 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     }
     // Bound back to the verified sender peer (host_a) — confused-deputy-safe.
     if rupture_frame.to.first().and_then(|a| a.host_id.as_ref()) != Some(&bound_mira_host) {
-        return Err("smoke-mira-nash-tcp-8-13: rupture not bound to the TLS-verified peer host_a".into());
+        return Err(
+            "smoke-mira-nash-tcp-8-13: rupture not bound to the TLS-verified peer host_a".into(),
+        );
     }
     match &rupture_frame.payload {
         FramePayload::ConsentRupture(p) => {
@@ -7054,7 +7315,9 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         other => {
-            return Err(format!("smoke-mira-nash-tcp-8-13: non-ConsentRupture payload {other:?}").into())
+            return Err(
+                format!("smoke-mira-nash-tcp-8-13: non-ConsentRupture payload {other:?}").into(),
+            )
         }
     }
     // Journal the GENUINE production rupture frame to the Transparency Log so the
@@ -7070,7 +7333,10 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
         &rupture_bytes,
         FrameOrigin::SpiritAuto,
     );
-    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(FlowState::Tap1Acknowledge, TapEvent::Acknowledge);
+    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(
+        FlowState::Tap1Acknowledge,
+        TapEvent::Acknowledge,
+    );
     let s = HaltFlow::<KernelHaltResolver>::resolve_flow(s, TapEvent::SelectKind);
     let s = HaltFlow::<KernelHaltResolver>::resolve_flow(s, TapEvent::Submit);
     if s != FlowState::Done {
@@ -7083,10 +7349,18 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     if !matches!(cited.kind, TlFrameKind::ConsentRequest) {
         return Err("smoke-mira-nash-tcp-8-13: digest citation did not resolve to advisory".into());
     }
-    let halts = tl.query_frames(FrameFilter { kind: Some(TlFrameKind::EpistemicHalt), ..Default::default() })?;
-    let ruptures = tl.query_frames(FrameFilter { kind: Some(TlFrameKind::ConsentRupture), ..Default::default() })?;
+    let halts = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::EpistemicHalt),
+        ..Default::default()
+    })?;
+    let ruptures = tl.query_frames(FrameFilter {
+        kind: Some(TlFrameKind::ConsentRupture),
+        ..Default::default()
+    })?;
     if halts.is_empty() || ruptures.is_empty() {
-        return Err("smoke-mira-nash-tcp-8-13: expected EpistemicHalt + ConsentRupture rows".into());
+        return Err(
+            "smoke-mira-nash-tcp-8-13: expected EpistemicHalt + ConsentRupture rows".into(),
+        );
     }
 
     drop(mira);
@@ -7101,7 +7375,8 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
         InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
     };
     use maos_domain::frame::{
-        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences,
+        TaskAssignPayload,
     };
     use maos_domain::invariants::i1::IntentClass;
     use maos_domain::invariants::i13::IntentLineage;
@@ -7368,7 +7643,8 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
         InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
     };
     use maos_domain::frame::{
-        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences,
+        TaskAssignPayload,
     };
     use maos_domain::invariants::i1::IntentClass;
     use maos_domain::invariants::i13::IntentLineage;
@@ -7419,8 +7695,10 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
         consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     };
     let tofu = Arc::new(InMemoryTofuPinStore::new());
-    tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;
-    tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1).await?;
+    tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1)
+        .await?;
+    tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1)
+        .await?;
     let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b], tofu);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     router.install_intake_sink(tx).await;
@@ -7465,9 +7743,13 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
     };
 
     // ── (1) fine-grained ADMITTED frame ──────────────────────────────────────
-    LocalRouter::route_outbound(&router, make_frame(1, ADMIT_INTENT), &HostId("host_b".into()))
-        .await
-        .map_err(|e| format!("smoke-a2a-consent-vocab-8-7: admitted frame REJECTED: {e}"))?;
+    LocalRouter::route_outbound(
+        &router,
+        make_frame(1, ADMIT_INTENT),
+        &HostId("host_b".into()),
+    )
+    .await
+    .map_err(|e| format!("smoke-a2a-consent-vocab-8-7: admitted frame REJECTED: {e}"))?;
     let delivered = rx
         .recv()
         .await
@@ -7490,8 +7772,12 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
     }
 
     // ── (2) fine-grained DENIED frame (confused-deputy directive) ────────────
-    match LocalRouter::route_outbound(&router, make_frame(2, DENY_INTENT), &HostId("host_b".into()))
-        .await
+    match LocalRouter::route_outbound(
+        &router,
+        make_frame(2, DENY_INTENT),
+        &HostId("host_b".into()),
+    )
+    .await
     {
         Err(A2AError::IntentDeniedAtPeer { message, .. }) => {
             // The NACK message format is: "intent {intent} not in accept_allowlist for peer {peer}"
@@ -7513,14 +7799,22 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
             );
         }
         Ok(()) => {
-            return Err("smoke-a2a-consent-vocab-8-7: directive admitted unexpectedly (band collapse?)".into())
+            return Err(
+                "smoke-a2a-consent-vocab-8-7: directive admitted unexpectedly (band collapse?)"
+                    .into(),
+            )
         }
         Err(other) => {
-            return Err(format!("smoke-a2a-consent-vocab-8-7: unexpected error on denial: {other:?}").into())
+            return Err(format!(
+                "smoke-a2a-consent-vocab-8-7: unexpected error on denial: {other:?}"
+            )
+            .into())
         }
     }
 
-    eprintln!("smoke-a2a-consent-vocab-8-7: ✅ fine-grained consent vocabulary verified end-to-end");
+    eprintln!(
+        "smoke-a2a-consent-vocab-8-7: ✅ fine-grained consent vocabulary verified end-to-end"
+    );
     Ok(())
 }
 
@@ -7543,7 +7837,8 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
         InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
     };
     use maos_domain::frame::{
-        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences,
+        TaskAssignPayload,
     };
     use maos_domain::invariants::i1::IntentClass;
     use maos_domain::invariants::i13::IntentLineage;
@@ -7585,8 +7880,10 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
         consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
     };
     let tofu = Arc::new(InMemoryTofuPinStore::new());
-    tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1).await?;
-    tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1).await?;
+    tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1)
+        .await?;
+    tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1)
+        .await?;
     // Fail-closed unconditionally (Option 2 — A2ARouterCore has no band-fallback toggle).
     let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b], tofu);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -7629,7 +7926,10 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
     // ── (1) classified frame DELIVERED ───────────────────────────────────────
     let classified = base_frame(
         1,
-        Some(ConsentEnvelope::with_fine_grained_intent(from(), A2AIntent::new(FINE_INTENT))),
+        Some(ConsentEnvelope::with_fine_grained_intent(
+            from(),
+            A2AIntent::new(FINE_INTENT),
+        )),
     );
     LocalRouter::route_outbound(&router, classified, &HostId("host_b".into()))
         .await
@@ -7638,10 +7938,15 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
         .recv()
         .await
         .ok_or("smoke-a2a-fail-closed-8-8: classified frame not delivered")?;
-    if delivered.consent_envelope.and_then(|e| e.intent_class).map(|i| i.as_str().to_string())
+    if delivered
+        .consent_envelope
+        .and_then(|e| e.intent_class)
+        .map(|i| i.as_str().to_string())
         != Some(FINE_INTENT.to_string())
     {
-        return Err("smoke-a2a-fail-closed-8-8: delivered frame missing fine-grained intent_class".into());
+        return Err(
+            "smoke-a2a-fail-closed-8-8: delivered frame missing fine-grained intent_class".into(),
+        );
     }
     eprintln!("smoke-a2a-fail-closed-8-8: ✓ classified '{FINE_INTENT}' DELIVERED");
 
@@ -7681,12 +7986,19 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── (2) ABSENT intent_class DENIED -32009 (accept) + refused at sender ────
     assert_accept_denied(&router, base_frame(2, None), "absent-intent frame").await?;
-    match LocalRouter::route_outbound(&router, base_frame(3, None), &HostId("host_b".into())).await {
-        Err(A2AError::ConsentUnclassified { direction: maos_a2a::error::IntentDirection::Send, .. }) => {
+    match LocalRouter::route_outbound(&router, base_frame(3, None), &HostId("host_b".into())).await
+    {
+        Err(A2AError::ConsentUnclassified {
+            direction: maos_a2a::error::IntentDirection::Send,
+            ..
+        }) => {
             eprintln!("smoke-a2a-fail-closed-8-8: ✓ absent-intent frame REFUSED at sender (ConsentUnclassified{{Send}}) — never leaves the Host");
         }
         other => {
-            return Err(format!("smoke-a2a-fail-closed-8-8: sender backstop failed for absent intent: {other:?}").into());
+            return Err(format!(
+                "smoke-a2a-fail-closed-8-8: sender backstop failed for absent intent: {other:?}"
+            )
+            .into());
         }
     }
 
@@ -7698,7 +8010,12 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
         intent_class: Some(A2AIntent::new("Diagnosis Handoff")), // spaces + caps
         valid_until_ns: None,
     };
-    assert_accept_denied(&router, base_frame(4, Some(non_canonical_env)), "non-canonical-intent frame").await?;
+    assert_accept_denied(
+        &router,
+        base_frame(4, Some(non_canonical_env)),
+        "non-canonical-intent frame",
+    )
+    .await?;
 
     // ── (4) SENDER-SIDE non-canonical deny ────────────────────────────────────
     let non_canonical_send_env = ConsentEnvelope {
@@ -7722,7 +8039,10 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("smoke-a2a-fail-closed-8-8: ✓ non-canonical-intent '!invalid' REFUSED at sender (ConsentUnclassified{{Send}})");
         }
         other => {
-            return Err(format!("smoke-a2a-fail-closed-8-8: sender non-canonical deny failed: {other:?}").into());
+            return Err(format!(
+                "smoke-a2a-fail-closed-8-8: sender non-canonical deny failed: {other:?}"
+            )
+            .into());
         }
     }
 
@@ -7749,7 +8069,10 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("smoke-a2a-fail-closed-8-8: ✓ oversized intent (129 bytes) REFUSED at sender (ConsentUnclassified{{Send, Oversized}})");
         }
         other => {
-            return Err(format!("smoke-a2a-fail-closed-8-8: sender oversized deny failed: {other:?}").into());
+            return Err(format!(
+                "smoke-a2a-fail-closed-8-8: sender oversized deny failed: {other:?}"
+            )
+            .into());
         }
     }
 
@@ -8179,8 +8502,8 @@ sandbox_tier = "t0"
     // `maos-spirit` (the maos-spirit-cli bin) is built into the target dir, not on
     // $PATH — resolve it as a sibling of the running maos executable (same pattern as
     // the CliWrapper fixture). CI must build it: `cargo build -p maos-spirit-cli`.
-    let maos_spirit_bin =
-        resolve_cli_binary("maos-spirit").map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+    let maos_spirit_bin = resolve_cli_binary("maos-spirit")
+        .map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
     let publish_output = Command::new(&maos_spirit_bin)
         .args([
             "publish",
@@ -8449,8 +8772,8 @@ sandbox_tier = "t0"
     // `maos-spirit` (the maos-spirit-cli bin) is built into the target dir, not on
     // $PATH — resolve it as a sibling of the running maos executable (same pattern as
     // the CliWrapper fixture). CI must build it: `cargo build -p maos-spirit-cli`.
-    let maos_spirit_bin =
-        resolve_cli_binary("maos-spirit").map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+    let maos_spirit_bin = resolve_cli_binary("maos-spirit")
+        .map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
     let publish_output = Command::new(&maos_spirit_bin)
         .args([
             "publish",
@@ -8670,10 +8993,14 @@ async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── Step 3 — dynamic-write via skill.author.self → Pending (NOT admitted) ─
     let mut queue = maos_skill::SkillAdmissionQueue::new();
-    let id = queue.enqueue_skill(skill.clone(), SkillEntryPath::AuthorSelf, "spirit:1").map_err(|e| format!("step3: {e}"))?;
+    let id = queue
+        .enqueue_skill(skill.clone(), SkillEntryPath::AuthorSelf, "spirit:1")
+        .map_err(|e| format!("step3: {e}"))?;
     let state = queue.state_of(&id);
     if state != Some(SkillAdmissionState::Pending) {
-        return Err(format!("step3: skill.author.self skill must land Pending, got {state:?}").into());
+        return Err(
+            format!("step3: skill.author.self skill must land Pending, got {state:?}").into(),
+        );
     }
     emit(serde_json::json!({
         "step": 3, "surface": "author_self", "state": "pending"
@@ -8692,7 +9019,9 @@ async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
         "--- a/skill.md\n+++ b/skill.md\n@@\n-be terse\n+be terse and cite evidence\n".into(),
         report,
     )?;
-    let pid = queue.enqueue_proposal(proposal, "spirit:7").map_err(|e| format!("step4: {e}"))?;
+    let pid = queue
+        .enqueue_proposal(proposal, "spirit:7")
+        .map_err(|e| format!("step4: {e}"))?;
     if queue.state_of(&pid) != Some(SkillAdmissionState::Pending) {
         return Err("step4: revision proposal must land Pending".into());
     }
@@ -8817,7 +9146,9 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
             let _ = std::fs::remove_file(&self.path);
         }
     }
-    let _guard = JournalGuard { path: journal_path.clone() };
+    let _guard = JournalGuard {
+        path: journal_path.clone(),
+    };
     let journal = JournalAdapter::open(&journal_path)?;
 
     let kernel_version = env!("CARGO_PKG_VERSION");
@@ -8941,7 +9272,10 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
         .lines()
         .any(|l| l.trim_start().starts_with("**Migration:**"));
     if entries == 0 || !has_migration {
-        return Err("step 5: BREAKING.md gate would fail (need ≥1 dated entry with a **Migration:** line)".into());
+        return Err(
+            "step 5: BREAKING.md gate would fail (need ≥1 dated entry with a **Migration:** line)"
+                .into(),
+        );
     }
     emit(serde_json::json!({
         "step": 5, "surface": "breaking_md", "outcome": "pass", "entries": entries
@@ -9108,23 +9442,26 @@ mod tests {
                 _server: &str,
                 _tool: &str,
                 _args: serde_json::Value,
-            ) -> Result<maos_domain::ports::mcp::McpResponse, maos_domain::ports::mcp::McpError> {
+            ) -> Result<maos_domain::ports::mcp::McpResponse, maos_domain::ports::mcp::McpError>
+            {
                 Err(maos_domain::ports::mcp::McpError::Unconfigured)
             }
         }
         let client = Arc::new(MockMcpClientPort);
         let (audit_tx, _) = maos_kernel_core::capability::cap_audit::channel();
         // p1-allow: smoke-arm mock provider — isolated root, not the supervised owner
-        let cap = Arc::new(maos_kernel_core::capability::CapabilityRegistryAdapter::new(
-            Arc::new(maos_kernel_core::api::RingCryptoProvider),
-            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
-            1, // BOOT_NONCE
-            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
-            audit_tx,
-            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
-            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
-            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::new(10)),
-        ));
+        let cap = Arc::new(
+            maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+                Arc::new(maos_kernel_core::api::RingCryptoProvider),
+                maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
+                1, // BOOT_NONCE
+                Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+                audit_tx,
+                maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+                Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+                Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::new(10)),
+            ),
+        );
         let port = LiveButlerMcpPort::new(0, [0u8; 32], client, cap);
         assert_eq!(port.spirit_pid, 0);
         assert_eq!(port.posture_hash, [0u8; 32]);

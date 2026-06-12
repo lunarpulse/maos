@@ -97,7 +97,10 @@ async fn researcher_subscribes_receives_and_incorporates_a_scalar() {
         "the observed scalar is incorporated into the confidence map"
     );
     assert_eq!(
-        survey.scalars.get("observed::observer::confidence").copied(),
+        survey
+            .scalars
+            .get("observed::observer::confidence")
+            .copied(),
         Some(0.62)
     );
     assert!(survey
@@ -136,7 +139,9 @@ async fn researcher_distillate_is_consumable_in_the_fr17_digest_pattern() {
     let writer = DistillateWriter::new(Arc::clone(&tl), Arc::new(0u8));
     let researcher = Researcher::new();
 
-    let frames = researcher.walk(&recall, 10, LogRecallFilter::default()).unwrap();
+    let frames = researcher
+        .walk(&recall, 10, LogRecallFilter::default())
+        .unwrap();
     let mut survey = researcher.survey(&frames);
     researcher.incorporate_scalar(
         &mut survey,

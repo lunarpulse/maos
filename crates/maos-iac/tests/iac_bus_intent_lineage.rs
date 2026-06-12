@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 
+use maos_capability::cap_tokens::init_monotonic_base;
 use maos_domain::frame::{
     FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
 };
@@ -16,9 +17,8 @@ use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::ports::IacBusPort;
-use maos_capability::cap_tokens::init_monotonic_base;
-use maos_iac::adapter::{IacBusAdapter, Mailbox, TransparencyLogAdapter};
 use maos_iac::adapter::IacRtMetrics;
+use maos_iac::adapter::{IacBusAdapter, Mailbox, TransparencyLogAdapter};
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 
 fn make_frame(from: &str, to: &[&str], origin: FrameOrigin) -> IacFrame {

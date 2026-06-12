@@ -24,16 +24,16 @@ use maos_a2a_tcp::{
 use maos_domain::invariants::i8::A2AIntent;
 use rcgen::{BasicConstraints, CertificateParams, IsCa, KeyPair};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName, UnixTime};
+use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tempfile::TempDir;
+use time::OffsetDateTime;
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;
 use tokio_rustls::TlsConnector;
 use tokio_util::codec::Framed;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tempfile::TempDir;
-use time::OffsetDateTime;
 
 /// H2 — a single pinned clock captured once per test.
 #[derive(Clone, Copy)]
@@ -43,7 +43,9 @@ pub struct Clock {
 
 impl Clock {
     pub fn capture() -> Self {
-        Self { t0: SystemTime::now() }
+        Self {
+            t0: SystemTime::now(),
+        }
     }
 
     /// The rustls validation time (T0) fed to the verifier (H2).
@@ -405,7 +407,10 @@ pub fn make_frame(
             prior_distillate_ref: None,
         }),
         auto_marker: FrameOrigin::SpiritAuto,
-        consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(from, canonical_intent)),
+        consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(
+            from,
+            canonical_intent,
+        )),
         intent_lineage: IntentLineage::default(),
     }
 }

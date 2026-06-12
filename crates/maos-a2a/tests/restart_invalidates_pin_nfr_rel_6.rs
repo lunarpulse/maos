@@ -57,10 +57,8 @@ async fn scenario_4_2_spirit_restart_invalidates_pin() {
 #[tokio::test]
 async fn scenario_4_3_operator_accept_repin() {
     let approval_id = [0xAB; 16];
-    let store =
-        InMemoryTofuPinStore::new().with_repin_hook(move |_, _, _| RePinDecision::AcceptedByOperator {
-            approval_id,
-        });
+    let store = InMemoryTofuPinStore::new()
+        .with_repin_hook(move |_, _, _| RePinDecision::AcceptedByOperator { approval_id });
     let peer = PeerId::new("host-b");
     let cert_v1 = fp("cert-v1");
     let cert_v2 = fp("cert-v2");
@@ -83,7 +81,10 @@ async fn scenario_4_3_operator_accept_repin() {
     }
 
     // Subsequent verify against v2 succeeds; v1 fails.
-    store.verify_pinned(&peer, &cert_v2).await.expect("verify v2");
+    store
+        .verify_pinned(&peer, &cert_v2)
+        .await
+        .expect("verify v2");
     let err = store
         .verify_pinned(&peer, &cert_v1)
         .await
@@ -97,11 +98,10 @@ async fn scenario_4_3_operator_accept_repin() {
 
 #[tokio::test]
 async fn scenario_4_4_operator_reject_repin_closes_stream() {
-    let store = InMemoryTofuPinStore::new().with_repin_hook(|_, _, _| {
-        RePinDecision::RejectedByOperator {
+    let store =
+        InMemoryTofuPinStore::new().with_repin_hook(|_, _, _| RePinDecision::RejectedByOperator {
             reason: "not approved".into(),
-        }
-    });
+        });
     let peer = PeerId::new("host-b");
     let cert_v1 = fp("cert-v1");
     let cert_v2 = fp("cert-v2");

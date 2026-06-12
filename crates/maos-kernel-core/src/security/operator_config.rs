@@ -63,26 +63,43 @@ impl RegistrySection {
                             if let Some(uri) = registry_table.get("uri").and_then(|v| v.as_str()) {
                                 section.uri = uri.to_string();
                             }
-                            if let Some(tf) = registry_table.get("tier_floor").and_then(|v| v.as_str()) {
+                            if let Some(tf) =
+                                registry_table.get("tier_floor").and_then(|v| v.as_str())
+                            {
                                 section.tier_floor = parse_tier(tf);
                             }
-                            if let Some(b) = registry_table.get("t3_for_public_untrusted").and_then(|v| v.as_bool()) {
+                            if let Some(b) = registry_table
+                                .get("t3_for_public_untrusted")
+                                .and_then(|v| v.as_bool())
+                            {
                                 section.t3_for_public_untrusted = b;
                             }
-                            if let Some(b) = registry_table.get("allow_unsigned_local").and_then(|v| v.as_bool()) {
+                            if let Some(b) = registry_table
+                                .get("allow_unsigned_local")
+                                .and_then(|v| v.as_bool())
+                            {
                                 section.allow_unsigned_local = b;
                             }
-                            if let Some(hex_key) = registry_table.get("org_signing_pubkey").and_then(|v| v.as_str()) {
+                            if let Some(hex_key) = registry_table
+                                .get("org_signing_pubkey")
+                                .and_then(|v| v.as_str())
+                            {
                                 if let Ok(bytes) = hex::decode(hex_key) {
                                     if let Ok(arr) = bytes.try_into() {
                                         section.org_signing_pubkey = Some(arr);
                                     }
                                 }
                             }
-                            if let Some(b) = registry_table.get("require_server_tier_signature").and_then(|v| v.as_bool()) {
+                            if let Some(b) = registry_table
+                                .get("require_server_tier_signature")
+                                .and_then(|v| v.as_bool())
+                            {
                                 section.require_server_tier_signature = b;
                             }
-                            if let Some(b) = registry_table.get("allow_force_tier_at_import").and_then(|v| v.as_bool()) {
+                            if let Some(b) = registry_table
+                                .get("allow_force_tier_at_import")
+                                .and_then(|v| v.as_bool())
+                            {
                                 section.allow_force_tier_at_import = b;
                             }
                         }
@@ -142,7 +159,10 @@ fn parse_tier(s: &str) -> TrustTier {
         "public_vetted" => TrustTier::PublicVetted,
         "public_untrusted" => TrustTier::PublicUntrusted,
         _ => {
-            eprintln!("maos: warning: unrecognized trust tier '{}', defaulting to 'local'", s);
+            eprintln!(
+                "maos: warning: unrecognized trust tier '{}', defaulting to 'local'",
+                s
+            );
             TrustTier::Local
         }
     }

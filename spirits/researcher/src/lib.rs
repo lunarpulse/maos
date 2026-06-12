@@ -98,7 +98,11 @@ pub struct FetchedClaim {
 #[derive(Debug, thiserror::Error)]
 pub enum ResearcherMcpError {
     #[error("MCP call failed on {server}/{tool}: {cause}")]
-    CallFailed { server: String, tool: String, cause: String },
+    CallFailed {
+        server: String,
+        tool: String,
+        cause: String,
+    },
     #[error("capability token issuance failed: {0}")]
     TokenIssuanceFailed(String),
     #[error("unauthorized MCP call")]
@@ -119,10 +123,7 @@ pub enum ResearcherMcpError {
 pub trait ResearcherMcpPort: Send + Sync {
     /// Fan out (≤ [`RESEARCHER_PARALLELISM`] concurrent) over the four declared
     /// servers for `query`, and return the parsed claims with their source keys.
-    fn survey_literature(
-        &self,
-        query: &str,
-    ) -> Result<Vec<FetchedClaim>, ResearcherMcpError>;
+    fn survey_literature(&self, query: &str) -> Result<Vec<FetchedClaim>, ResearcherMcpError>;
 }
 
 /// Story 8.14c — test double for `ResearcherMcpPort`.
@@ -134,10 +135,7 @@ pub struct FakeResearcherMcpPort {
 
 #[cfg(test)]
 impl ResearcherMcpPort for FakeResearcherMcpPort {
-    fn survey_literature(
-        &self,
-        _query: &str,
-    ) -> Result<Vec<FetchedClaim>, ResearcherMcpError> {
+    fn survey_literature(&self, _query: &str) -> Result<Vec<FetchedClaim>, ResearcherMcpError> {
         Ok(self.claims.clone())
     }
 }
@@ -231,7 +229,11 @@ impl SurveyOutput {
     /// A methodology-strength conflict dominates; otherwise the weakest
     /// load-bearing confidence is reported.
     pub fn primary_scalar(&self) -> (&'static str, f64, String) {
-        let conflict = self.scalars.get("methodology_conflict").copied().unwrap_or(0.0);
+        let conflict = self
+            .scalars
+            .get("methodology_conflict")
+            .copied()
+            .unwrap_or(0.0);
         if conflict > 0.0 {
             return (
                 "methodology_conflict",
@@ -413,9 +415,7 @@ impl Researcher {
                     }
                 }
             } else {
-                eprintln!(
-                    "researcher: MCP port wired but no LogRecallPort — cannot join claims"
-                );
+                eprintln!("researcher: MCP port wired but no LogRecallPort — cannot join claims");
             }
         } else if let Some(frames) = &self.pending {
             let output = self.survey(frames);
@@ -438,7 +438,6 @@ impl Default for Researcher {
         }
     }
 }
-
 
 impl Researcher {
     /// A Researcher with no pending frames (production default).
@@ -485,11 +484,7 @@ impl Researcher {
     /// Story 8.14c — wire the participant-scoped `LogRecallPort` used to recall
     /// McpInvocation frames after the MCP fan-out. Required when `mcp_port` is
     /// `Some` so the source-key join can locate the journaled fetch frames.
-    pub fn with_log_recall_port(
-        mut self,
-        port: Arc<dyn LogRecallPort>,
-        spirit_pid: u32,
-    ) -> Self {
+    pub fn with_log_recall_port(mut self, port: Arc<dyn LogRecallPort>, spirit_pid: u32) -> Self {
         self.log_recall_port = Some(port);
         self.spirit_pid = spirit_pid;
         self
@@ -619,7 +614,10 @@ impl Researcher {
             match serde_json::from_slice::<ClaimPayload>(&frame.payload) {
                 Ok(claim) => {
                     let confidence = sanitize_unit(claim.confidence);
-                    if confidence_map.insert(claim.claim_id.clone(), confidence).is_some() {
+                    if confidence_map
+                        .insert(claim.claim_id.clone(), confidence)
+                        .is_some()
+                    {
                         open_questions.push(format!(
                             "duplicate claim_id '{}' — later frame overwrites earlier",
                             claim.claim_id
@@ -712,7 +710,9 @@ impl Researcher {
         // the below-0.7 rule on an unrelated low-confidence exploratory claim).
         let load_bearing_confidence = load_bearing_confidences
             .into_iter()
-            .fold(None, |acc: Option<f32>, c| Some(acc.map_or(c, |a| a.min(c))))
+            .fold(None, |acc: Option<f32>, c| {
+                Some(acc.map_or(c, |a| a.min(c)))
+            })
             .unwrap_or(1.0);
 
         let mut scalars: BTreeMap<String, f64> = BTreeMap::new();
@@ -942,7 +942,10 @@ fn summarize(statement: &str) -> String {
     if graphemes.len() <= MAX_FINDING_SUMMARY_CHARS {
         return statement.to_string();
     }
-    let head: String = graphemes.into_iter().take(MAX_FINDING_SUMMARY_CHARS).collect();
+    let head: String = graphemes
+        .into_iter()
+        .take(MAX_FINDING_SUMMARY_CHARS)
+        .collect();
     format!("{head}…")
 }
 
@@ -987,16 +990,16 @@ pub fn decode_frame_id_hex(hex: &str) -> Result<[u8; 16], ResearcherError> {
     let mut out = [0u8; 16];
     for (i, byte) in out.iter_mut().enumerate() {
         let s = &clean[i * 2..i * 2 + 2];
-        *byte =
-            u8::from_str_radix(s, 16).map_err(|_| ResearcherError::BadFrameIdHex(hex.to_string()))?;
+        *byte = u8::from_str_radix(s, 16)
+            .map_err(|_| ResearcherError::BadFrameIdHex(hex.to_string()))?;
     }
     Ok(out)
 }
 #[cfg(test)]
 mod unit_tests {
     use super::*;
-    use maos_domain::log_recall::{FrameKindLabel, LogFetchResponse, LogRecallPage};
     use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::log_recall::{FrameKindLabel, LogFetchResponse, LogRecallPage};
 
     fn claim_frame(id_byte: u8, claim: &ClaimPayload) -> RecalledFrame {
         RecalledFrame {
@@ -1024,7 +1027,10 @@ mod unit_tests {
         let f = claim_frame(0x11, &claim("c1", "t", 0.9, 0.95, true, false));
         let out = Researcher::new().survey(&[f]);
         assert_eq!(out.findings.len(), 1);
-        assert_eq!(out.findings[0].source_log_ref, encode_frame_id_hex(&[0x11; 16]));
+        assert_eq!(
+            out.findings[0].source_log_ref,
+            encode_frame_id_hex(&[0x11; 16])
+        );
         assert!(out.findings[0].hedges.contains(&"likely".to_string()));
         assert_eq!(out.bibliography.len(), 1);
         assert!(out.confidence_map.contains_key("c1"));
@@ -1037,7 +1043,10 @@ mod unit_tests {
         let out = Researcher::new().survey(&[a, b]);
         let (tag, value, _) = out.primary_scalar();
         assert_eq!(tag, "methodology_conflict");
-        assert!(value >= 0.7, "conflict {value} must cross the 0.7 halt floor");
+        assert!(
+            value >= 0.7,
+            "conflict {value} must cross the 0.7 halt floor"
+        );
     }
 
     #[test]
@@ -1046,8 +1055,14 @@ mod unit_tests {
         let out = Researcher::new().survey(&[a]);
         let (tag, value, _) = out.primary_scalar();
         assert_eq!(tag, "load_bearing_confidence");
-        assert!(value < 0.7, "weak load-bearing confidence crosses the below-0.7 floor");
-        assert!(out.open_questions.iter().any(|q| q.contains("confidence floor")));
+        assert!(
+            value < 0.7,
+            "weak load-bearing confidence crosses the below-0.7 floor"
+        );
+        assert!(out
+            .open_questions
+            .iter()
+            .any(|q| q.contains("confidence floor")));
     }
 
     #[test]
@@ -1055,8 +1070,16 @@ mod unit_tests {
         let f = claim_frame(0x21, &claim("c", "t", 0.9, 0.9, true, false));
         let out = Researcher::new().survey(&[f]);
         let v = serde_json::to_value(&out).unwrap();
-        for field in ["findings", "open_questions", "confidence_map", "bibliography"] {
-            assert!(v.get(field).is_some(), "missing required output field {field}");
+        for field in [
+            "findings",
+            "open_questions",
+            "confidence_map",
+            "bibliography",
+        ] {
+            assert!(
+                v.get(field).is_some(),
+                "missing required output field {field}"
+            );
         }
     }
 
@@ -1077,7 +1100,9 @@ mod unit_tests {
             bibliography: vec![],
             scalars: BTreeMap::new(),
         };
-        let err = Researcher::new().to_distillation_request(&empty, 1).unwrap_err();
+        let err = Researcher::new()
+            .to_distillation_request(&empty, 1)
+            .unwrap_err();
         assert!(matches!(
             err,
             ResearcherError::Distillation(DistillationError::AuditChainMissing { .. })
@@ -1099,7 +1124,10 @@ mod unit_tests {
             },
         );
         assert_eq!(out.open_questions.len(), before + 1);
-        assert!(out.confidence_map.keys().any(|k| k.starts_with("observed::")));
+        assert!(out
+            .confidence_map
+            .keys()
+            .any(|k| k.starts_with("observed::")));
     }
 
     #[test]
@@ -1219,8 +1247,8 @@ mod unit_tests {
             frames: vec![RecalledFrame {
                 frame_id: [0xCD; 16],
                 intent: "mcp:arxiv/get_paper".into(),
-                payload: serde_json::to_vec(
-                &serde_json::json!({"arxiv_id": "2501.12345"})).unwrap(),
+                payload: serde_json::to_vec(&serde_json::json!({"arxiv_id": "2501.12345"}))
+                    .unwrap(),
             }],
         };
         let researcher = Researcher::new()
@@ -1230,7 +1258,10 @@ mod unit_tests {
         researcher.on_idle(&mut ctx);
         let output = researcher.last_output().unwrap();
         assert_eq!(output.findings.len(), 1);
-        assert_eq!(output.findings[0].source_log_ref, encode_frame_id_hex(&[0xCD; 16]));
+        assert_eq!(
+            output.findings[0].source_log_ref,
+            encode_frame_id_hex(&[0xCD; 16])
+        );
     }
 
     #[test]
@@ -1263,20 +1294,18 @@ mod unit_tests {
         let mcp_frames = vec![RecalledFrame {
             frame_id: [0xAB; 16],
             intent: "mcp:arxiv/get_paper".into(),
-            payload: serde_json::to_vec(
-                &serde_json::json!({"arxiv_id": "real-paper-id"}),
-            )
-            .unwrap(),
+            payload: serde_json::to_vec(&serde_json::json!({"arxiv_id": "real-paper-id"})).unwrap(),
         }];
         let joined = Researcher::new().join_claims_to_frames(&vec![fabricated], &mcp_frames);
         assert!(joined.is_empty(), "fabricated key must not match any frame");
         let output = Researcher::new().survey(&joined);
-        assert!(
-            output.findings.is_empty(),
-            "empty join → empty findings"
-        );
+        assert!(output.findings.is_empty(), "empty join → empty findings");
         assert_eq!(
-            output.scalars.get("methodology_conflict").copied().unwrap_or(0.0),
+            output
+                .scalars
+                .get("methodology_conflict")
+                .copied()
+                .unwrap_or(0.0),
             0.0
         );
     }
@@ -1317,12 +1346,22 @@ mod unit_tests {
         // Byte-identical serialization is the determinism guard.
         let bytes1 = serde_json::to_vec(&out1).unwrap();
         let bytes2 = serde_json::to_vec(&out2).unwrap();
-        assert_eq!(bytes1, bytes2, "survey must be deterministic for fixed input");
+        assert_eq!(
+            bytes1, bytes2,
+            "survey must be deterministic for fixed input"
+        );
         // The contradictory pair (polarity true vs false, both ms ≥ 0.7) must
         assert!(
-            out1.scalars.get("methodology_conflict").copied().unwrap_or(0.0) >= 0.7,
+            out1.scalars
+                .get("methodology_conflict")
+                .copied()
+                .unwrap_or(0.0)
+                >= 0.7,
             "Chen-vs-Tanaka shape: opposite polarity + ms≥0.7 → conflict≥0.7, got {}",
-            out1.scalars.get("methodology_conflict").copied().unwrap_or(0.0)
+            out1.scalars
+                .get("methodology_conflict")
+                .copied()
+                .unwrap_or(0.0)
         );
     }
 }

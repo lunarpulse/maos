@@ -16,7 +16,9 @@
 pub enum CliWrapperAdmissionError {
     /// ADR-021: observed CLI output shape != declared `output_shape_version`.
     /// The kernel REFUSES TO START the wrapper. NO fallback parsing.
-    #[error("output shape adapter mismatch: declared {declared}, observed {observed} for CLI {cli}")]
+    #[error(
+        "output shape adapter mismatch: declared {declared}, observed {observed} for CLI {cli}"
+    )]
     EOutputShapeAdapterMismatch {
         cli: String,
         declared: String,
@@ -37,10 +39,7 @@ pub enum CliWrapperAdmissionError {
     /// Output-shape adapter not registered in the Spirit registry.
     /// Adapter id format: `cli-wrapper-template:<cli-name>:<shape-version>`.
     #[error("output shape adapter not registered: cli-wrapper-template:{cli}:{shape_version}")]
-    EOutputShapeAdapterNotRegistered {
-        cli: String,
-        shape_version: String,
-    },
+    EOutputShapeAdapterNotRegistered { cli: String, shape_version: String },
 
     /// Story 6.2 AC6 — CliWrapperSpirit MUST declare `[sandbox] tier = "t3"`.
     /// Lower tiers cannot contain a subprocess CLI invocation; the FR52 surface

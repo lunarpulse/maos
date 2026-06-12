@@ -64,14 +64,25 @@ fn walker_is_participant_scoped_and_paginates() {
     // Walk pid 10 with a small page size so recall_all must follow next_cursor
     // across multiple pages — all 5 of pid 10's frames, NONE of pid 20's.
     let frames = researcher
-        .walk(&adapter, 10, LogRecallFilter::new(None, None, None, 2, None, None))
+        .walk(
+            &adapter,
+            10,
+            LogRecallFilter::new(None, None, None, 2, None, None),
+        )
         .expect("walk succeeds");
-    assert_eq!(frames.len(), 5, "exactly the 5 emitter-scoped frames of pid 10");
+    assert_eq!(
+        frames.len(),
+        5,
+        "exactly the 5 emitter-scoped frames of pid 10"
+    );
     // Every payload is a real claim the survey can parse (walker fetched it).
     for f in &frames {
         let claim: ClaimPayload =
             serde_json::from_slice(&f.payload).expect("each recalled frame carries a claim");
-        assert!(claim.claim_id.starts_with("claim-10-"), "only pid-10 claims");
+        assert!(
+            claim.claim_id.starts_with("claim-10-"),
+            "only pid-10 claims"
+        );
     }
 
     // Walk pid 20 — sees ONLY its own 4 frames (scope isolation, both directions).
@@ -109,7 +120,10 @@ fn cross_spirit_fetch_is_a_scope_violation() {
     }
 
     // The emitter itself fetches fine.
-    assert!(adapter.fetch(10, frame_id).is_ok(), "emitter may fetch its own frame");
+    assert!(
+        adapter.fetch(10, frame_id).is_ok(),
+        "emitter may fetch its own frame"
+    );
 }
 
 #[test]

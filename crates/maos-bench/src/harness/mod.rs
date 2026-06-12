@@ -134,7 +134,17 @@ pub fn build_journey_result(
     sorted.sort_unstable();
     let (p50, p95, p99, max, mean, std_dev) = compute_quantiles(&sorted);
     let budget_met = p95 <= budget_us;
-    JourneyResult::new(name.into(), invocation_count, p50, p95, p99, max, mean, std_dev, budget_met)
+    JourneyResult::new(
+        name.into(),
+        invocation_count,
+        p50,
+        p95,
+        p99,
+        max,
+        mean,
+        std_dev,
+        budget_met,
+    )
 }
 
 #[cfg(test)]

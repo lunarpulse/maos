@@ -22,8 +22,8 @@ pub mod intent_lineage_corpus; // NEW — Story 6.2 AC4 NFR-Aud-14 100% intent_l
 pub mod isolation_corpus; // NEW — Story 4.5 cross-Spirit isolation 200-corpus
 pub mod onboarding_gate_corpus; // NEW — Story 7.5b NFR-Onb-1 30-min first-Spirit gate infra
 pub mod retract_corpus; // NEW — Story 6.1 retract corpus (AC2)
-pub mod safety_critical_corpus; // NEW — Story 8.5 safety-critical corpus + Cohen's κ (AC5)
 pub mod revocation_corpus; // NEW — Story 5.4 revocation corpus (AC5)
+pub mod safety_critical_corpus; // NEW — Story 8.5 safety-critical corpus + Cohen's κ (AC5)
 pub mod t3_escape_corpus; // NEW — Story 5.5a T3 escape corpus (AC4)
 pub mod termination_corpus; // NEW — Story 5.2 HSIS 300-corpus (AC5)
 pub mod upgrade_policy_corpus; // NEW — Story 5.4 upgrade-policy corpus (AC1)
@@ -35,10 +35,10 @@ pub use isolation_corpus::{
     MethodologyAttestation,
 };
 pub use retract_corpus::{RetractCorpus, RetractExpectedOutcome, RetractScenario};
+pub use revocation_corpus::{RevocationCorpus, RevocationExpectedOutcome, RevocationScenario};
 pub use safety_critical_corpus::{
     cohen_kappa, SafetyCriticalCorpus, SafetyLabel, SafetyScenario, SAFETY_CRITICAL_KAPPA_FLOOR,
 };
-pub use revocation_corpus::{RevocationCorpus, RevocationExpectedOutcome, RevocationScenario};
 pub use t3_escape_corpus::{
     T3AttackPayload, T3EscapeCorpus, T3EscapeScenario, T3ExpectedOutcome, T3Preconditions,
 };

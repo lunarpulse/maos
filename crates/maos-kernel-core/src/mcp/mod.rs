@@ -55,7 +55,11 @@ impl McpClientAdapter {
         // Real posture-hash and tier will be wired when the kernel tracks per-call posture state.
         let posture_hash = [0u8; 32];
         self.capability
-            .verify_and_audit(token, posture_hash, maos_domain::invariants::i9::SandboxTier(0))
+            .verify_and_audit(
+                token,
+                posture_hash,
+                maos_domain::invariants::i9::SandboxTier(0),
+            )
             .map_err(|_e| McpError::CapabilityDenied {
                 server: server.into(),
                 tool: tool.into(),
@@ -136,7 +140,11 @@ mod tests {
     use maos_domain::ports::mcp::{McpAttribution, McpRequest, McpResponse};
     use maos_mcp::fixture_replay::FixtureReplayMcpServer;
 
-    fn test_adapter() -> (McpClientAdapter, Arc<CapabilityRegistryAdapter>, Arc<TransparencyLogAdapter>) {
+    fn test_adapter() -> (
+        McpClientAdapter,
+        Arc<CapabilityRegistryAdapter>,
+        Arc<TransparencyLogAdapter>,
+    ) {
         let crypto: Arc<dyn maos_domain::ports::crypto::CryptoProvider> =
             Arc::new(MockCryptoProvider);
         let signing_key = Ed25519SigningKey::new([0u8; 32]);
@@ -189,8 +197,14 @@ mod tests {
         )) as Arc<dyn maos_mcp::McpTransport>;
 
         use std::collections::BTreeMap;
-        let mut transports: BTreeMap<maos_domain::ports::mcp::McpTransportId, Arc<dyn maos_mcp::McpTransport>> = BTreeMap::new();
-        transports.insert(maos_domain::ports::mcp::McpTransportId::Stdio, mcp_transport);
+        let mut transports: BTreeMap<
+            maos_domain::ports::mcp::McpTransportId,
+            Arc<dyn maos_mcp::McpTransport>,
+        > = BTreeMap::new();
+        transports.insert(
+            maos_domain::ports::mcp::McpTransportId::Stdio,
+            mcp_transport,
+        );
 
         let mut servers: BTreeMap<String, maos_mcp::McpServerEntry> = BTreeMap::new();
         servers.insert(
@@ -264,7 +278,12 @@ mod tests {
             },
         );
         let resp = adapter
-            .call(&token, "test-server", "echo", serde_json::json!({"msg": "hi"}))
+            .call(
+                &token,
+                "test-server",
+                "echo",
+                serde_json::json!({"msg": "hi"}),
+            )
             .unwrap();
         assert!(!resp.is_error);
 
@@ -335,8 +354,14 @@ mod tests {
         )) as Arc<dyn maos_mcp::McpTransport>;
 
         use std::collections::BTreeMap;
-        let mut transports: BTreeMap<maos_domain::ports::mcp::McpTransportId, Arc<dyn maos_mcp::McpTransport>> = BTreeMap::new();
-        transports.insert(maos_domain::ports::mcp::McpTransportId::Stdio, mcp_transport);
+        let mut transports: BTreeMap<
+            maos_domain::ports::mcp::McpTransportId,
+            Arc<dyn maos_mcp::McpTransport>,
+        > = BTreeMap::new();
+        transports.insert(
+            maos_domain::ports::mcp::McpTransportId::Stdio,
+            mcp_transport,
+        );
         let mut servers: BTreeMap<String, maos_mcp::McpServerEntry> = BTreeMap::new();
         servers.insert(
             "err-srv".into(),
@@ -351,7 +376,8 @@ mod tests {
                 transports,
                 maos_domain::ports::mcp::McpTransportId::StreamableHttp,
                 servers,
-            ).unwrap(),
+            )
+            .unwrap(),
         );
         let adapter = McpClientAdapter::new(client, capabilities.clone(), tl.clone(), telemetry);
 
@@ -388,24 +414,34 @@ mod tests {
     #[test]
     fn monotonic_now_ns_used_for_timestamp() {
         let (adapter, capabilities, tl) = test_adapter();
-        let token = make_token(&capabilities, 7, Scope::McpCall {
-            server: "test-server".into(),
-            tool: "echo".into(),
-        });
+        let token = make_token(
+            &capabilities,
+            7,
+            Scope::McpCall {
+                server: "test-server".into(),
+                tool: "echo".into(),
+            },
+        );
         let _resp = adapter
             .call(&token, "test-server", "echo", serde_json::json!({}))
             .unwrap();
-        let entries = tl.query_frames(crate::iac::FrameFilter {
-            kind: Some(FrameKind::McpInvocation),
-            ..Default::default()
-        }).unwrap();
+        let entries = tl
+            .query_frames(crate::iac::FrameFilter {
+                kind: Some(FrameKind::McpInvocation),
+                ..Default::default()
+            })
+            .unwrap();
         assert_eq!(entries.len(), 1);
-        assert!(entries[0].timestamp_ns > 0, "TL timestamp should be non-zero");
+        assert!(
+            entries[0].timestamp_ns > 0,
+            "TL timestamp should be non-zero"
+        );
     }
 
     #[test]
     fn encode_error_variant_is_constructable() {
-        let err = McpError::Encode(serde_json::from_str::<serde_json::Value>("not json").unwrap_err());
+        let err =
+            McpError::Encode(serde_json::from_str::<serde_json::Value>("not json").unwrap_err());
         assert!(err.to_string().to_lowercase().contains("encode"));
     }
 }

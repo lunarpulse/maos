@@ -31,7 +31,7 @@ pub use regression::{RegressionCase, RegressionCorpus, SpiritClass};
 
 // Story 7.1 v0.5 binding — convenience aliases so authors can write
 // `spirit_test::assert!`, `spirit_test::expect_frame!`, `spirit_test::expect_halt!`.
+pub use crate::assert_no_deprecations;
 pub use crate::spirit_test_assert as assert;
 pub use crate::spirit_test_expect_frame as expect_frame;
 pub use crate::spirit_test_expect_halt as expect_halt;
-pub use crate::assert_no_deprecations;

@@ -107,13 +107,19 @@ impl JourneyWorldBuilder {
         let mcp = self.mcp;
 
         let mut env = BTreeMap::new();
-        env.insert("MAOS_HOME".into(), audit.path().to_string_lossy().into_owned());
+        env.insert(
+            "MAOS_HOME".into(),
+            audit.path().to_string_lossy().into_owned(),
+        );
         env.insert(
             "XDG_DATA_HOME".into(),
             audit.path().join("xdg").to_string_lossy().into_owned(),
         );
         if let Some(cassette_path) = llm.cassette_path() {
-            env.insert("MAOS_REPLAY_CASSETTE".into(), cassette_path.to_string_lossy().into_owned());
+            env.insert(
+                "MAOS_REPLAY_CASSETTE".into(),
+                cassette_path.to_string_lossy().into_owned(),
+            );
         }
         for (server_name, mock) in &mcp {
             let env_key = match server_name.as_str() {

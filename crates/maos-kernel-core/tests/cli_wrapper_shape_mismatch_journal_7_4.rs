@@ -42,7 +42,9 @@ fn sh_probe_cfg(observed: &str, declared: &str) -> CliWrapperConfig {
     }
 }
 
-fn mismatch_frames(log: &TransparencyLogAdapter) -> Vec<maos_kernel_core::iac::transparency_log::TransparencyLogEntry> {
+fn mismatch_frames(
+    log: &TransparencyLogAdapter,
+) -> Vec<maos_kernel_core::iac::transparency_log::TransparencyLogEntry> {
     log.query_frames(FrameFilter {
         kind: Some(FrameKind::CliWrapperShapeMismatch),
         ..Default::default()

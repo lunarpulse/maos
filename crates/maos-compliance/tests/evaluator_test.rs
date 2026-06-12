@@ -5,12 +5,12 @@
 
 use std::collections::BTreeSet;
 
+#[allow(deprecated)]
+use maos_compliance::builder::seeded_keypair;
 use maos_compliance::builder::{
     build_self_attested_envelope, build_signed_envelope, encode_claim_bytes,
     encode_claim_bytes_with_hash,
 };
-#[allow(deprecated)]
-use maos_compliance::builder::seeded_keypair;
 use maos_compliance::canonical_cbor::fingerprint_hash;
 use maos_compliance::evaluator::{evaluate_envelope_at, DriftField, EComplianceRejection};
 use maos_compliance::{ComplianceVerdict, RuntimeExecutionContext};
@@ -347,7 +347,11 @@ fn multi_field_drift_names_first_divergent_field() {
 
     match evaluate_envelope_at(&env, &ctx_from(&ref_fp), NOW_MS) {
         ComplianceVerdict::Reject(EComplianceRejection::ContextDrift { field, .. }) => {
-            assert_eq!(field, DriftField::TrustTier, "first divergent field must be TrustTier, not the also-drifted CryptoProvider");
+            assert_eq!(
+                field,
+                DriftField::TrustTier,
+                "first divergent field must be TrustTier, not the also-drifted CryptoProvider"
+            );
         }
         other => panic!("expected ContextDrift, got {other:?}"),
     }

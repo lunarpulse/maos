@@ -72,7 +72,10 @@ pub struct GatewayDispatcher {
 impl std::fmt::Debug for GatewayDispatcher {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GatewayDispatcher")
-            .field("gateways", &format!("DashMap<{} entries>", self.gateways.len()))
+            .field(
+                "gateways",
+                &format!("DashMap<{} entries>", self.gateways.len()),
+            )
             .field("factories", &"...")
             .finish()
     }
@@ -117,8 +120,9 @@ impl GatewayDispatcher {
             };
 
             let cancel_flag = Arc::new(AtomicBool::new(false));
-            let cancel_handle: Box<dyn CancellationSignal> =
-                Box::new(GatewayCancelHandle { flag: cancel_flag.clone() });
+            let cancel_handle: Box<dyn CancellationSignal> = Box::new(GatewayCancelHandle {
+                flag: cancel_flag.clone(),
+            });
             let mailbox: Box<dyn GatewayMailboxHandle> = Box::new(StubMailbox);
             let capability: Box<dyn GatewayCapabilityHandle> = Box::new(StubCapability);
             let secrets: Box<dyn GatewaySecretsHandle> = Box::new(StubSecrets);
@@ -156,9 +160,14 @@ impl GatewayDispatcher {
                         Ok(bytes) => bytes,
                         Err(e) => {
                             tl.write_lifecycle(
-                                &spirit_id, &gateway_id, &gateway_type_str,
-                                "auth_resolve_failed", 0,
-                            ).await.ok();
+                                &spirit_id,
+                                &gateway_id,
+                                &gateway_type_str,
+                                "auth_resolve_failed",
+                                0,
+                            )
+                            .await
+                            .ok();
                             return;
                         }
                     };
@@ -167,9 +176,14 @@ impl GatewayDispatcher {
                     loop {
                         if cancel.is_cancelled().await {
                             tl.write_lifecycle(
-                                &spirit_id, &gateway_id, &gateway_type_str,
-                                "cancelled_before_connect", 0,
-                            ).await.ok();
+                                &spirit_id,
+                                &gateway_id,
+                                &gateway_type_str,
+                                "cancelled_before_connect",
+                                0,
+                            )
+                            .await
+                            .ok();
                             return;
                         }
 
@@ -188,25 +202,40 @@ impl GatewayDispatcher {
                         match result {
                             Ok(()) => {
                                 tl.write_lifecycle(
-                                    &spirit_id, &gateway_id, &gateway_type_str,
-                                    "connect", 0,
-                                ).await.ok();
+                                    &spirit_id,
+                                    &gateway_id,
+                                    &gateway_type_str,
+                                    "connect",
+                                    0,
+                                )
+                                .await
+                                .ok();
                                 return;
                             }
                             Err(GatewayError::Backoff { retry_after }) => {
                                 attempt += 1;
                                 if attempt > max_retries {
                                     tl.write_lifecycle(
-                                        &spirit_id, &gateway_id, &gateway_type_str,
-                                        "backoff_exhausted", 0,
-                                    ).await.ok();
+                                        &spirit_id,
+                                        &gateway_id,
+                                        &gateway_type_str,
+                                        "backoff_exhausted",
+                                        0,
+                                    )
+                                    .await
+                                    .ok();
                                     return;
                                 }
                                 let delay = retry_after.min(max_backoff);
                                 tl.write_lifecycle(
-                                    &spirit_id, &gateway_id, &gateway_type_str,
-                                    "backoff_retry", 0,
-                                ).await.ok();
+                                    &spirit_id,
+                                    &gateway_id,
+                                    &gateway_type_str,
+                                    "backoff_retry",
+                                    0,
+                                )
+                                .await
+                                .ok();
                                 tokio::time::sleep(delay).await;
                             }
                             Err(
@@ -217,9 +246,14 @@ impl GatewayDispatcher {
                                 | _,
                             ) => {
                                 tl.write_lifecycle(
-                                    &spirit_id, &gateway_id, &gateway_type_str,
-                                    "connect_failed", 0,
-                                ).await.ok();
+                                    &spirit_id,
+                                    &gateway_id,
+                                    &gateway_type_str,
+                                    "connect_failed",
+                                    0,
+                                )
+                                .await
+                                .ok();
                                 return;
                             }
                         }
@@ -338,7 +372,10 @@ pub struct GatewaySubmoduleRegistry {
 impl std::fmt::Debug for GatewaySubmoduleRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GatewaySubmoduleRegistry")
-            .field("factories", &format!("DashMap<{} entries>", self.factories.len()))
+            .field(
+                "factories",
+                &format!("DashMap<{} entries>", self.factories.len()),
+            )
             .finish()
     }
 }
@@ -356,18 +393,11 @@ impl GatewaySubmoduleRegistry {
         Self::default()
     }
 
-    pub fn register(
-        &self,
-        gateway_type: GatewayType,
-        factory: Arc<dyn GatewaySubmoduleFactory>,
-    ) {
+    pub fn register(&self, gateway_type: GatewayType, factory: Arc<dyn GatewaySubmoduleFactory>) {
         self.factories.insert(gateway_type, factory);
     }
 
-    pub fn get(
-        &self,
-        gateway_type: &GatewayType,
-    ) -> Option<Arc<dyn GatewaySubmoduleFactory>> {
+    pub fn get(&self, gateway_type: &GatewayType) -> Option<Arc<dyn GatewaySubmoduleFactory>> {
         self.factories.get(gateway_type).map(|e| e.clone())
     }
 }
@@ -375,10 +405,7 @@ impl GatewaySubmoduleRegistry {
 /// Factory trait for creating gateway submodule instances.
 /// Receives the manifest entry for per-instance configuration.
 pub trait GatewaySubmoduleFactory: Send + Sync {
-    fn create(
-        &self,
-        entry: &GatewayEntry,
-    ) -> Result<Box<dyn GatewaySubmodule>, GatewayError>;
+    fn create(&self, entry: &GatewayEntry) -> Result<Box<dyn GatewaySubmodule>, GatewayError>;
 }
 
 // ------------------------------------------------------------------
@@ -393,9 +420,7 @@ struct GatewayCancelHandle {
 }
 
 impl CancellationSignal for GatewayCancelHandle {
-    fn is_cancelled(
-        &self,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>> {
+    fn is_cancelled(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>> {
         let flag = self.flag.clone();
         Box::pin(async move { flag.load(Ordering::Acquire) })
     }

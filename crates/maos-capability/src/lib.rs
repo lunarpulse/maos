@@ -15,7 +15,7 @@
 //! ## Classification
 //! universal-arithmetic (§4.0.7)
 
-pub mod cap_tokens;
-pub mod cap_quota;
 pub mod cap_audit;
+pub mod cap_quota;
+pub mod cap_tokens;
 pub mod working_memory;

@@ -54,8 +54,7 @@ fn j0_init_creates_config() {
 #[test]
 fn j0_shell_banner_via_pty() {
     let audit = AuditDb::temp();
-    let cassette = workspace_root()
-        .join("crates/maos-journey-test/cassettes/j0/shell-intro.json");
+    let cassette = workspace_root().join("crates/maos-journey-test/cassettes/j0/shell-intro.json");
     let world = JourneyWorld::builder()
         .audit(audit)
         .cassette(cassette.to_str().unwrap())

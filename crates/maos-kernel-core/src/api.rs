@@ -13,8 +13,8 @@
 pub use crate::capability::CapabilityRegistryAdapter;
 pub use crate::iac::IacBusAdapter;
 pub use crate::iac::TransparencyLogAdapter; // NEW — Story 1b.1 Transparency Log audit-spine
-pub use crate::io::IoSubsystemAdapter;
 pub use crate::io::take_io_journal;
+pub use crate::io::IoSubsystemAdapter;
 pub use crate::journal::JournalAdapter; // NEW — Story 1b.1 Lifecycle Journal per I10
 pub use crate::memory::MemoryManagerAdapter;
 pub use crate::scheduler::SpiritSchedulerAdapter;

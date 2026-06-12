@@ -49,7 +49,10 @@ fn halt_posture_spirit_without_port_fatally_fails_boot() {
         .args(["run", "spirits/butler/manifest.toml", "--once"])
         // The test seam that simulates "forgot to wire the port" — the 8.1 footgun.
         .env("MAOS_TEST_ONLY_STRIP_SCALAR_PORT", "1")
-        .env("XDG_DATA_HOME", isolated_data_home("bootloud-a").path.clone())
+        .env(
+            "XDG_DATA_HOME",
+            isolated_data_home("bootloud-a").path.clone(),
+        )
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos-bin");
@@ -77,7 +80,10 @@ fn halt_posture_spirit_without_port_fatally_fails_boot() {
 fn deterministic_posture_spirit_without_port_boots_clean() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/researcher/manifest.toml", "--once"])
-        .env("XDG_DATA_HOME", isolated_data_home("bootloud-b").path.clone())
+        .env(
+            "XDG_DATA_HOME",
+            isolated_data_home("bootloud-b").path.clone(),
+        )
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos-bin");

@@ -25,7 +25,10 @@ pub fn run(json: bool) -> Result<(), String> {
     match parse_skill(VALID) {
         Ok(skill) => {
             if skill.manifest.id != "check.valid" {
-                failures.push(format!("valid skill parsed but id wrong: {}", skill.manifest.id));
+                failures.push(format!(
+                    "valid skill parsed but id wrong: {}",
+                    skill.manifest.id
+                ));
             }
         }
         Err(e) => failures.push(format!("valid skill failed to parse: {e}")),
@@ -62,7 +65,9 @@ pub fn run(json: bool) -> Result<(), String> {
         });
         println!("{payload}");
     } else if passed {
-        eprintln!("check-skill-schema: PASS (maos.skill.v1 round-trip + deny_unknown_fields + semver)");
+        eprintln!(
+            "check-skill-schema: PASS (maos.skill.v1 round-trip + deny_unknown_fields + semver)"
+        );
     } else {
         for f in &failures {
             eprintln!("  [FAIL] {f}");

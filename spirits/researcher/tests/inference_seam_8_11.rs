@@ -82,8 +82,14 @@ fn token(pid: u32) -> CapabilityToken {
 #[test]
 fn live_path_uses_inference_port_text_with_token_and_pid() {
     const PID: u32 = 42;
-    let frames = vec![claim_frame([1u8; 16], "c1", "the original source statement")];
-    let port = Arc::new(StubInferencePort::new("LIVE digest sentence from the model."));
+    let frames = vec![claim_frame(
+        [1u8; 16],
+        "c1",
+        "the original source statement",
+    )];
+    let port = Arc::new(StubInferencePort::new(
+        "LIVE digest sentence from the model.",
+    ));
 
     let researcher = Researcher::with_frames(frames.clone()).with_inference_port(
         Arc::clone(&port) as Arc<dyn InferencePort + Send + Sync>,
@@ -117,7 +123,11 @@ fn live_path_uses_inference_port_text_with_token_and_pid() {
 /// DETERMINISTIC path (no seam): byte-identical to v0.5 — the regression guard.
 #[test]
 fn deterministic_path_is_byte_identical_to_v05_survey() {
-    let frames = vec![claim_frame([2u8; 16], "c1", "the original source statement")];
+    let frames = vec![claim_frame(
+        [2u8; 16],
+        "c1",
+        "the original source statement",
+    )];
 
     let det = Researcher::with_frames(frames.clone());
     assert!(!det.is_live());
@@ -125,11 +135,15 @@ fn deterministic_path_is_byte_identical_to_v05_survey() {
 
     // The deterministic statement is the bounded summary of the SOURCE, never a
     // model's text. A live run with a different model text must differ here.
-    assert_eq!(det_out.findings[0].statement, "the original source statement");
+    assert_eq!(
+        det_out.findings[0].statement,
+        "the original source statement"
+    );
 
     let live = Researcher::with_frames(frames.clone()).with_inference_port(
-        Arc::new(StubInferencePort::new("a completely different model sentence"))
-            as Arc<dyn InferencePort + Send + Sync>,
+        Arc::new(StubInferencePort::new(
+            "a completely different model sentence",
+        )) as Arc<dyn InferencePort + Send + Sync>,
         token(7),
         7,
     );
@@ -159,7 +173,11 @@ fn live_error_falls_back_to_deterministic_summary() {
             Err(InferenceError::Timeout)
         }
     }
-    let frames = vec![claim_frame([3u8; 16], "c1", "the original source statement")];
+    let frames = vec![claim_frame(
+        [3u8; 16],
+        "c1",
+        "the original source statement",
+    )];
     let researcher = Researcher::with_frames(frames.clone()).with_inference_port(
         Arc::new(FailingPort) as Arc<dyn InferencePort + Send + Sync>,
         token(9),

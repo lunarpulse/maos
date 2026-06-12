@@ -5,9 +5,7 @@
 //! skill (Pending, distinguishable in audit), and `approve` activates it. NO
 //! new telemetry counters are added — the report shape is consumed verbatim.
 
-use maos_domain::self_telemetry::{
-    HaltTelemetryEntry, ResolutionKindLabel, SelfTelemetryReport,
-};
+use maos_domain::self_telemetry::{HaltTelemetryEntry, ResolutionKindLabel, SelfTelemetryReport};
 use maos_skill::{
     build_proposal, ESkillProposal, SkillAdmissionQueue, SkillAdmissionState, SkillEntryPath,
     SkillId, SkillVersion,
@@ -66,11 +64,21 @@ fn proposal_enters_queue_pending_and_approve_activates() {
     assert_eq!(q.state_of(&id), Some(SkillAdmissionState::Pending));
     // Distinguishable in audit as a revision (not a new skill).
     let entry = &q.entries()[0];
-    assert!(matches!(entry.entry_path, SkillEntryPath::RevisionProposal(_)));
-    assert!(entry.skill.is_none(), "a revision targets an existing skill");
+    assert!(matches!(
+        entry.entry_path,
+        SkillEntryPath::RevisionProposal(_)
+    ));
+    assert!(
+        entry.skill.is_none(),
+        "a revision targets an existing skill"
+    );
     let enqueue_row = &q.audit_trail()[0];
     assert_eq!(enqueue_row.intent, "revision_proposal");
-    assert!(enqueue_row.reasoning.as_ref().unwrap().contains("spirit_pid=7"));
+    assert!(enqueue_row
+        .reasoning
+        .as_ref()
+        .unwrap()
+        .contains("spirit_pid=7"));
 
     // Operator admission activates it.
     assert!(q.approve(&id));

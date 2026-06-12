@@ -8,9 +8,7 @@
 
 use std::sync::Arc;
 
-use maos_domain::frame::{
-    DecisionDispatchPayload, FrameAddress, FramePayload, IacFrame,
-};
+use maos_domain::frame::{DecisionDispatchPayload, FrameAddress, FramePayload, IacFrame};
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i12::WorkingMemoryDigestRefs;
 use maos_domain::invariants::i3::FrameOrigin;

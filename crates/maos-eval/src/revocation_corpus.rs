@@ -44,7 +44,10 @@ impl RevocationCorpus {
             if path.extension().map_or(true, |ext| ext != "json") {
                 continue;
             }
-            if path.file_name().map_or(false, |n| n == "methodology-attestation.json") {
+            if path
+                .file_name()
+                .map_or(false, |n| n == "methodology-attestation.json")
+            {
                 continue;
             }
             let content = std::fs::read_to_string(path)?;

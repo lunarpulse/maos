@@ -9,7 +9,8 @@ use std::fmt;
 use std::time::Duration;
 
 use maos_director_surface::notification::{
-    NotificationChannel, NotificationError, NotificationEvent, NotificationLevel, NotificationSurface,
+    NotificationChannel, NotificationError, NotificationEvent, NotificationLevel,
+    NotificationSurface,
 };
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -48,7 +49,10 @@ impl fmt::Debug for PushConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PushConfig")
             .field("endpoint_url", &self.endpoint_url)
-            .field("auth_token", &self.auth_token.as_ref().map(|_| "<redacted>"))
+            .field(
+                "auth_token",
+                &self.auth_token.as_ref().map(|_| "<redacted>"),
+            )
             .field("timeout", &self.timeout)
             .finish()
     }
@@ -242,7 +246,10 @@ mod tests {
         let result = channel.dispatch(&halt_event(), NotificationLevel::Immediate);
         let elapsed = start.elapsed();
 
-        assert!(result.is_err(), "blackhole dispatch must surface a typed error");
+        assert!(
+            result.is_err(),
+            "blackhole dispatch must surface a typed error"
+        );
         assert!(
             elapsed < Duration::from_secs(5),
             "connect phase was not bounded by config.timeout: took {elapsed:?} (default would be ~30s)"
@@ -277,7 +284,9 @@ mod tests {
         let front = TcpListener::bind("127.0.0.1:0").unwrap();
         let front_addr = front.local_addr().unwrap();
         thread::spawn(move || {
-            let Ok((mut stream, _)) = front.accept() else { return };
+            let Ok((mut stream, _)) = front.accept() else {
+                return;
+            };
             let mut buf = [0u8; 1024];
             let _ = stream.read(&mut buf);
             let resp = format!(

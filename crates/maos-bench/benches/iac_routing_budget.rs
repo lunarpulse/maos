@@ -154,7 +154,12 @@ fn iac_routing_bench(c: &mut Criterion) {
         std::env::var("GITHUB_SHA").unwrap_or_else(|_| "untracked".into()),
         vec![journey.clone()],
         DecisionRecord::new(
-            if journey.budget_met { "pass" } else { "soft-fail" }.into(),
+            if journey.budget_met {
+                "pass"
+            } else {
+                "soft-fail"
+            }
+            .into(),
             journey.budget_met,
             true, // j4 not measured here
             true, // j6 not measured here

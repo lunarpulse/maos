@@ -18,9 +18,7 @@ pub fn report_to_markdown(report: &RotationDrillReport) -> Result<String, serde_
 
 /// Calibration-mode breach reporter — logs but does NOT panic.
 pub fn report_breach(metric: &str, observed: u64, floor: u64) -> String {
-    format!(
-        "[v0.5 calibration] {metric} = {observed}ms breached floor {floor}ms (NOT enforced)"
-    )
+    format!("[v0.5 calibration] {metric} = {observed}ms breached floor {floor}ms (NOT enforced)")
 }
 
 #[cfg(test)]

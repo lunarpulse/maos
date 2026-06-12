@@ -36,12 +36,10 @@ impl LamportClock {
         let mut prev = self.counter.load(Ordering::SeqCst);
         loop {
             let new = std::cmp::max(prev, observed) + 1;
-            match self.counter.compare_exchange(
-                prev,
-                new,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            match self
+                .counter
+                .compare_exchange(prev, new, Ordering::SeqCst, Ordering::SeqCst)
+            {
                 Ok(_) => return new,
                 Err(curr) => prev = curr,
             }
@@ -94,7 +92,11 @@ mod tests {
         let mut values: Vec<u64> = handles.into_iter().map(|h| h.join().unwrap()).collect();
         values.sort_unstable();
         for (i, v) in values.iter().enumerate() {
-            assert_eq!(*v, (i + 1) as u64, "values must be 1..=16 with no duplicates");
+            assert_eq!(
+                *v,
+                (i + 1) as u64,
+                "values must be 1..=16 with no duplicates"
+            );
         }
     }
 

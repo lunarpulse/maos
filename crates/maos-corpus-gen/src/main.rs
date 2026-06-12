@@ -259,8 +259,7 @@ fn run_lcas_extend(existing_path: &str, out_path: &str) -> Result<(), String> {
     }
 
     for item in maos_corpus_gen::lcas::generate_extension() {
-        let line = serde_json::to_string(&item)
-            .map_err(|e| format!("serialization error: {e}"))?;
+        let line = serde_json::to_string(&item).map_err(|e| format!("serialization error: {e}"))?;
         rows.push((item.id.clone(), line));
     }
 

@@ -22,7 +22,9 @@ pub enum CliError {
     #[error("manifest parse failure: {0}")]
     ManifestParse(String),
 
-    #[error("tier mismatch: --tier='{cli_tier}' but manifest declares trust_tier='{manifest_tier}'")]
+    #[error(
+        "tier mismatch: --tier='{cli_tier}' but manifest declares trust_tier='{manifest_tier}'"
+    )]
     TierMismatch {
         cli_tier: String,
         manifest_tier: String,

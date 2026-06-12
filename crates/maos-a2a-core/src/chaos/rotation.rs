@@ -8,10 +8,7 @@ use serde::{Deserialize, Serialize};
 /// `p99_handshake_rtt_ms` is the trailing 30-day p99 of `iac_handshake_duration_us`
 /// (TLS 1.3 handshake duration). If `days_of_history < 30` (cold deployment),
 /// use the max observed handshake duration floored at 500 ms.
-pub fn compute_t_grace(
-    p99_handshake_rtt_ms: u64,
-    days_of_history: u32,
-) -> std::time::Duration {
+pub fn compute_t_grace(p99_handshake_rtt_ms: u64, days_of_history: u32) -> std::time::Duration {
     let baseline_ms = if days_of_history < 30 {
         std::cmp::max(p99_handshake_rtt_ms, 500)
     } else {
@@ -40,7 +37,8 @@ pub struct AgentRotationTimestamps {
 impl AgentRotationTimestamps {
     /// `t_1 − t_0` in milliseconds; `None` if `t_1` is `None`.
     pub fn revocation_propagation_ms(&self) -> Option<u64> {
-        self.t_1_ns.map(|t1| (t1.saturating_sub(self.t_0_ns)) / 1_000_000)
+        self.t_1_ns
+            .map(|t1| (t1.saturating_sub(self.t_0_ns)) / 1_000_000)
     }
 
     /// `t_2 − t_1` in milliseconds; `None` if either is `None`.
@@ -101,8 +99,7 @@ impl RotationDrillReport {
             .iter()
             .filter_map(|a| a.re_handshake_ms())
             .collect();
-        let e2e_samples: Vec<u64> =
-            per_agent.iter().filter_map(|a| a.end_to_end_ms()).collect();
+        let e2e_samples: Vec<u64> = per_agent.iter().filter_map(|a| a.end_to_end_ms()).collect();
 
         let (prop_p50, prop_p99) = percentiles(&prop_samples);
         let (rh_p50, rh_p99) = percentiles(&rh_samples);
@@ -117,10 +114,8 @@ impl RotationDrillReport {
         // §7.2.1.b floors:
         // v0.7: revocation propagation p50 ≤ 30s, p99 ≤ 90s; re-handshake p50 ≤ 30s, p99 ≤ 60s.
         // v1.0: + end-to-end p50 ≤ 60s, p99 ≤ 150s; cert_post_grace_reject ≤ 0.1%.
-        let passes_v07_floors = prop_p50 <= 30_000
-            && prop_p99 <= 90_000
-            && rh_p50 <= 30_000
-            && rh_p99 <= 60_000;
+        let passes_v07_floors =
+            prop_p50 <= 30_000 && prop_p99 <= 90_000 && rh_p50 <= 30_000 && rh_p99 <= 60_000;
 
         let passes_v10_floors = passes_v07_floors
             && e2e_p50 <= 60_000
@@ -209,9 +204,7 @@ mod tests {
             t_1_ns: Some(10_000_000_000), // 10s
             t_2_ns: Some(20_000_000_000), // 20s
         }];
-        let r = RotationDrillReport::from_per_agent(
-            "test", 1, 500, 5_000, agents, 0, 100,
-        );
+        let r = RotationDrillReport::from_per_agent("test", 1, 500, 5_000, agents, 0, 100);
         assert!(r.passes_v07_floors);
         assert!(r.passes_v10_floors); // 10/10/20 all under
     }
@@ -239,9 +232,7 @@ mod tests {
                 t_2_ns: Some(140_000_000_000),
             },
         ];
-        let r = RotationDrillReport::from_per_agent(
-            "test", 3, 500, 5_000, agents, 0, 100,
-        );
+        let r = RotationDrillReport::from_per_agent("test", 3, 500, 5_000, agents, 0, 100);
         assert!(!r.passes_v07_floors);
     }
 
@@ -254,13 +245,7 @@ mod tests {
             t_2_ns: Some(20_000_000_000),
         }];
         let r = RotationDrillReport::from_per_agent(
-            "test",
-            1,
-            500,
-            5_000,
-            agents,
-            10,
-            1_000, // 1% — above v1.0 floor
+            "test", 1, 500, 5_000, agents, 10, 1_000, // 1% — above v1.0 floor
         );
         assert!(r.passes_v07_floors);
         assert!(!r.passes_v10_floors);

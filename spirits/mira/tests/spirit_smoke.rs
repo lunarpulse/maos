@@ -48,7 +48,10 @@ fn on_idle_fires_once_and_diagnoses_within_budget() {
     assert_eq!(diagnoses.len(), 2, "both scenarios diagnosed");
     // The known scenario is confidently diagnosed; the unknown-severe one reaches
     // Mira's halt boundary.
-    assert!(diagnoses.iter().any(|d| !d.requires_halt), "known → no halt");
+    assert!(
+        diagnoses.iter().any(|d| !d.requires_halt),
+        "known → no halt"
+    );
     assert!(
         diagnoses.iter().any(|d| d.requires_halt),
         "unknown-severe → halt boundary"

@@ -36,7 +36,13 @@ async fn mira_dials_nash(
         nash_ca,
         NASH_NONCE,
         vec![pin("host_a", nash_pins_mira, MIRA_NONCE)],
-        vec![peer_cfg("host_a", "tls://127.0.0.1:0", nash_pins_mira, &[], &["readonly"])],
+        vec![peer_cfg(
+            "host_a",
+            "tls://127.0.0.1:0",
+            nash_pins_mira,
+            &[],
+            &["readonly"],
+        )],
         clock,
         TcpTimeouts::test_profile(),
         retry.clone(),
@@ -85,8 +91,8 @@ async fn t3_tofu_pin_mismatch_rejected() {
         Some(&ca),
         Some(&ca),
         &mira_leaf,
-        &nash_b,                  // Nash serves fp_B
-        &nash_a.fingerprint,      // Mira pins fp_A ≠ fp_B
+        &nash_b,             // Nash serves fp_B
+        &nash_a.fingerprint, // Mira pins fp_A ≠ fp_B
         &mira_leaf.fingerprint,
         no_retry(),
     )
@@ -98,7 +104,11 @@ async fn t3_tofu_pin_mismatch_rejected() {
         msg.contains("pin_mismatch") || msg.contains("pin mismatch"),
         "AC-T3: must classify as TOFU pin mismatch (not generic IO), got: {err}"
     );
-    assert_eq!(nash.intake_entered(), 0, "AC-T3: rejection at TLS → intake never entered");
+    assert_eq!(
+        nash.intake_entered(),
+        0,
+        "AC-T3: rejection at TLS → intake never entered"
+    );
 }
 
 /// AC-T4 — wrong CA (valid-but-untrusted root) → REJECTED at the chain layer,
@@ -118,8 +128,8 @@ async fn t4_wrong_ca_rejected_at_chain_layer_even_if_pinned() {
         Some(&ca_good),
         Some(&ca_good),
         &mira_leaf,
-        &nash_evil,                  // Nash serves a ca_evil leaf
-        &nash_evil.fingerprint,      // ...whose fp IS pinned (coincidence)
+        &nash_evil,             // Nash serves a ca_evil leaf
+        &nash_evil.fingerprint, // ...whose fp IS pinned (coincidence)
         &mira_leaf.fingerprint,
         no_retry(),
     )
@@ -135,7 +145,11 @@ async fn t4_wrong_ca_rejected_at_chain_layer_even_if_pinned() {
         msg.contains("bad_certificate") || msg.contains("untrusted") || msg.contains("certificate"),
         "AC-T4: must classify as bad-cert / untrusted-issuer, got: {err}"
     );
-    assert_eq!(nash.intake_entered(), 0, "AC-T4: chain rejection → intake never entered");
+    assert_eq!(
+        nash.intake_entered(),
+        0,
+        "AC-T4: chain rejection → intake never entered"
+    );
 }
 
 /// AC-T4b (1) — pin-only posture: unpinned leaf → REJECTED at the pin step.
@@ -243,7 +257,10 @@ async fn t5_expired_cert_retries_then_fails() {
 
     let err = res.expect_err("AC-T5: expired server cert must terminally fail");
     let msg = format!("{err}").to_lowercase();
-    assert!(msg.contains("expired") || msg.contains("certificate"), "AC-T5: terminal cert-class err, got: {err}");
+    assert!(
+        msg.contains("expired") || msg.contains("certificate"),
+        "AC-T5: terminal cert-class err, got: {err}"
+    );
     assert_eq!(
         mira.last_dial_attempts(),
         retry.max_attempts as usize,
@@ -291,8 +308,8 @@ async fn t6_mitm_cert_swap_after_pin_rejected() {
         Some(&ca),
         Some(&ca),
         &mira_leaf,
-        &nash_c,                 // Nash now serves fp_C
-        &nash_a.fingerprint,     // Mira holds the prior pin fp_A
+        &nash_c,             // Nash now serves fp_C
+        &nash_a.fingerprint, // Mira holds the prior pin fp_A
         &mira_leaf.fingerprint,
         no_retry(),
     )

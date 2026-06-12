@@ -112,7 +112,10 @@ pub enum A2AError {
     /// with `CODE_CONSENT_UNCLASSIFIED` (-32009); the sender reconstructs this
     /// typed mirror from the NACK (NOT conflated with `IntentDeniedAtPeer`).
     #[error("cross-Host consent unclassified ({reason}) at peer {peer} — fail-closed deny")]
-    ConsentUnclassifiedAtPeer { peer: String, reason: UnclassifiedReason },
+    ConsentUnclassifiedAtPeer {
+        peer: String,
+        reason: UnclassifiedReason,
+    },
 
     /// Outbound `route_outbound` timed out awaiting receiver ACK — partition
     /// behavior per architecture §7.2 "A2A in-flight frames during partition

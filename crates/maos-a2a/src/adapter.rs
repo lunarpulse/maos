@@ -16,7 +16,9 @@ use maos_a2a_core::router::{map_a2a_error_to_iac_bus, A2ARouterCore};
 // trait moved to `maos-a2a-core` but the historical sub-module path is
 // retained). The import also brings the traits into scope for the impls below.
 pub use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
-use maos_a2a_core::{A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, LamportClock, TofuPinStore};
+use maos_a2a_core::{
+    A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, LamportClock, TofuPinStore,
+};
 use maos_domain::frame::IacFrame;
 use maos_domain::iac_bus_types::IacBusError;
 use maos_spirit_abi::identity::HostId;
@@ -49,10 +51,7 @@ impl LoopbackA2ARouter {
 
     /// Install an intake sink — test-only hook. Accepted frames are forwarded
     /// to the sink AFTER all validation passes.
-    pub async fn install_intake_sink(
-        &self,
-        sink: tokio::sync::mpsc::UnboundedSender<IacFrame>,
-    ) {
+    pub async fn install_intake_sink(&self, sink: tokio::sync::mpsc::UnboundedSender<IacFrame>) {
         self.core.install_intake_sink(sink).await;
     }
 
@@ -63,16 +62,11 @@ impl LoopbackA2ARouter {
 
 #[async_trait]
 impl A2APeerRouter for LoopbackA2ARouter {
-    async fn route_outbound(
-        &self,
-        frame: IacFrame,
-        peer: &HostId,
-    ) -> Result<(), A2AError> {
+    async fn route_outbound(&self, frame: IacFrame, peer: &HostId) -> Result<(), A2AError> {
         // Shared steps (1)–(4): allowlist + TOFU verify + clock tick + build.
         // Loopback uses the v0.5-α `boot_nonce = 0` sentinel (the in-process
         // shortcut never crosses a restart boundary).
-        let (request, peer_cfg, frame_id) =
-            self.core.prepare_outbound(frame, peer, 0).await?;
+        let (request, peer_cfg, frame_id) = self.core.prepare_outbound(frame, peer, 0).await?;
 
         // Loopback "wire": hand the request straight to intake, bounded by the
         // peer's partition timeout per architecture §7.2.
@@ -105,11 +99,7 @@ impl A2ATransport for LoopbackA2ARouter {}
 /// `maos_a2a_core::router::map_a2a_error_to_iac_bus`.
 #[async_trait]
 impl maos_domain::ports::a2a::A2ARouter for LoopbackA2ARouter {
-    async fn route_outbound(
-        &self,
-        frame: IacFrame,
-        peer: &HostId,
-    ) -> Result<(), IacBusError> {
+    async fn route_outbound(&self, frame: IacFrame, peer: &HostId) -> Result<(), IacBusError> {
         match <Self as A2APeerRouter>::route_outbound(self, frame, peer).await {
             Ok(()) => Ok(()),
             Err(e) => Err(map_a2a_error_to_iac_bus(e, peer.as_str())),
@@ -125,9 +115,7 @@ mod tests {
     use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
     use maos_a2a_core::tofu::InMemoryTofuPinStore;
     use maos_a2a_core::ConsentAllowlists;
-    use maos_domain::frame::{
-        FrameAddress, FramePayload, PosturePreferences, TaskAssignPayload,
-    };
+    use maos_domain::frame::{FrameAddress, FramePayload, PosturePreferences, TaskAssignPayload};
     use maos_domain::invariants::i1::IntentClass;
     use maos_domain::invariants::i13::IntentLineage;
     use maos_domain::invariants::i3::FrameOrigin;
@@ -143,7 +131,7 @@ mod tests {
             profile: A2AProfile::Loopback,
             allowlists,
             partition_timeout_secs: 30,
-        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
+            consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
         }
     }
 

@@ -167,12 +167,7 @@ fn rate_4_8_provider_credential_fingerprint_distinct() {
         fn http_get(&self, _: &str) -> Result<Vec<u8>, IoError> {
             unimplemented!()
         }
-        fn http_post(
-            &self,
-            _: &str,
-            _: &[u8],
-            _: &[(&str, &str)],
-        ) -> Result<Vec<u8>, IoError> {
+        fn http_post(&self, _: &str, _: &[u8], _: &[(&str, &str)]) -> Result<Vec<u8>, IoError> {
             Ok(vec![])
         }
     }
@@ -202,7 +197,10 @@ fn rate_4_8_provider_credential_fingerprint_distinct() {
     )
     .unwrap();
     assert_ne!(anth_a.credential_fingerprint(), 0);
-    assert_ne!(anth_a.credential_fingerprint(), anth_b.credential_fingerprint());
+    assert_ne!(
+        anth_a.credential_fingerprint(),
+        anth_b.credential_fingerprint()
+    );
     // Same key string across providers — fingerprints match (sha256 is
     // deterministic over bytes; cross-provider isolation comes from the
     // BucketKey carrying provider_id).
@@ -212,7 +210,10 @@ fn rate_4_8_provider_credential_fingerprint_distinct() {
         "same key bytes → same fingerprint; isolation comes from provider_id"
     );
     // Ollama uses base_url; distinct from anth_a's key.
-    assert_ne!(anth_a.credential_fingerprint(), ollama.credential_fingerprint());
+    assert_ne!(
+        anth_a.credential_fingerprint(),
+        ollama.credential_fingerprint()
+    );
 
     // The bucket keying confirms isolation: same fingerprint but different
     // provider_ids → different bucket keys.
@@ -221,5 +222,8 @@ fn rate_4_8_provider_credential_fingerprint_distinct() {
     assert_ne!(k_anth_a, k_oai_a);
 
     // `fingerprint_credential` standalone produces the same value.
-    assert_eq!(fingerprint_credential("key-A"), anth_a.credential_fingerprint());
+    assert_eq!(
+        fingerprint_credential("key-A"),
+        anth_a.credential_fingerprint()
+    );
 }

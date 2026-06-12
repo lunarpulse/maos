@@ -220,7 +220,11 @@ mod tests {
     fn registry_names_are_unique() {
         let mut seen = std::collections::HashSet::new();
         for e in MAOS_ENV_REGISTRY {
-            assert!(seen.insert(e.name), "duplicate env-contract entry: {}", e.name);
+            assert!(
+                seen.insert(e.name),
+                "duplicate env-contract entry: {}",
+                e.name
+            );
         }
     }
 

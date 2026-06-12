@@ -372,7 +372,11 @@ mod tests {
     fn expected_signals_invariant_matches_gold_label() {
         for item in generate_extension() {
             if item.gold_label == "continue" {
-                assert!(item.expected_signals.is_empty(), "continue → empty: {}", item.id);
+                assert!(
+                    item.expected_signals.is_empty(),
+                    "continue → empty: {}",
+                    item.id
+                );
             } else {
                 assert!(
                     !item.expected_signals.is_empty(),

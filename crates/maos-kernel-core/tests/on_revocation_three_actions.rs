@@ -8,7 +8,10 @@
 #[test]
 fn revocation_action_default_is_terminate_immediately() {
     use maos_domain::revocation::RevocationAction;
-    assert_eq!(RevocationAction::default(), RevocationAction::TerminateImmediately);
+    assert_eq!(
+        RevocationAction::default(),
+        RevocationAction::TerminateImmediately
+    );
 }
 
 #[test]
@@ -48,7 +51,10 @@ fn on_revocation_section_parses_terminate_immediately() {
         "action = \"terminate-immediately\"",
     )
     .unwrap();
-    assert_eq!(section.action, maos_domain::revocation::RevocationAction::TerminateImmediately);
+    assert_eq!(
+        section.action,
+        maos_domain::revocation::RevocationAction::TerminateImmediately
+    );
 }
 
 #[test]
@@ -57,7 +63,10 @@ fn on_revocation_section_parses_drain_then_terminate() {
         "action = \"drain-then-terminate\"",
     )
     .unwrap();
-    assert_eq!(section.action, maos_domain::revocation::RevocationAction::DrainThenTerminate);
+    assert_eq!(
+        section.action,
+        maos_domain::revocation::RevocationAction::DrainThenTerminate
+    );
 }
 
 #[test]
@@ -66,14 +75,20 @@ fn on_revocation_section_parses_quarantine() {
         "action = \"quarantine\"",
     )
     .unwrap();
-    assert_eq!(section.action, maos_domain::revocation::RevocationAction::Quarantine);
+    assert_eq!(
+        section.action,
+        maos_domain::revocation::RevocationAction::Quarantine
+    );
 }
 
 #[test]
 fn on_revocation_section_default_empty_string() {
     let section =
         maos_kernel_core::security::manifest::OnRevocationSection::from_toml_str("").unwrap();
-    assert_eq!(section.action, maos_domain::revocation::RevocationAction::TerminateImmediately);
+    assert_eq!(
+        section.action,
+        maos_domain::revocation::RevocationAction::TerminateImmediately
+    );
 }
 
 #[test]

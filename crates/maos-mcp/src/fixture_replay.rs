@@ -42,11 +42,9 @@ impl FixtureReplayMcpServer {
 impl McpTransport for FixtureReplayMcpServer {
     fn invoke(&self, request: McpRequest) -> Result<McpResponse, McpTransportError> {
         self.calls.lock().unwrap().push(request.clone());
-        self.responses
-            .lock()
-            .unwrap()
-            .pop_front()
-            .ok_or_else(|| McpTransportError::Transport("fixture replay: response ring empty".into()))?
+        self.responses.lock().unwrap().pop_front().ok_or_else(|| {
+            McpTransportError::Transport("fixture replay: response ring empty".into())
+        })?
     }
 
     fn id(&self) -> McpTransportId {
