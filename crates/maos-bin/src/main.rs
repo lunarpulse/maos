@@ -8357,7 +8357,13 @@ sandbox_tier = "t0"
         std::fs::File::create(&import_tar_path)?.write_all(&buf)?;
     }
 
-    let import_output = Command::new("maosctl")
+    // Resolve the freshly-built `maosctl` (maos-cli) as a daemon-sibling, not via
+    // bare PATH lookup: a stale `~/.cargo/bin/maosctl` would shadow it locally, and
+    // in CI maosctl is not on PATH at all — `Command::new("maosctl")` then aborts
+    // the smoke before step 8 can run. resolve_cli_binary checks the sibling first.
+    let maosctl_bin =
+        resolve_cli_binary("maosctl").map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+    let import_output = Command::new(&maosctl_bin)
         .args(["import", "--offline", import_tar_path.to_str().unwrap()])
         .env("MAOS_REGISTRY_ALLOW_FORCE_TIER_AT_IMPORT", "true")
         .output()?;
@@ -8575,7 +8581,10 @@ sandbox_tier = "t0"
         std::fs::File::create(&import_tar_path)?.write_all(&buf)?;
     }
 
-    let import_output = Command::new("maosctl")
+    // See smoke_registry_7_2_fast: resolve the sibling maosctl, not a stale PATH one.
+    let maosctl_bin =
+        resolve_cli_binary("maosctl").map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+    let import_output = Command::new(&maosctl_bin)
         .args([
             "import",
             "--offline",

@@ -214,6 +214,10 @@ fn render_template(
             substituted = rewrite_git_deps_to_path(&substituted);
         }
 
+        if rel_path == "package.json" && language == Language::TypeScript {
+            substituted = rewrite_npm_sdk_dep_to_path(&substituted);
+        }
+
         rendered.insert(rel_path.clone(), substituted);
     }
 
@@ -243,6 +247,18 @@ fn rewrite_git_deps_to_path(cargo_toml: &str) -> String {
         out.push('\n');
     }
     out
+}
+
+/// The baked in-repo `examples/example-spirit-ts` references the LOCAL,
+/// unpublished `@maos/spirit-ts` SDK by a `file:` path — mirroring how the Rust
+/// example rewrites git deps to path deps. The template keeps the registry spec
+/// (`^0.5.0`) for real authors, who get the published package once it ships.
+/// Without this, `npm ci` in the example cannot resolve `@maos/spirit-ts`.
+fn rewrite_npm_sdk_dep_to_path(package_json: &str) -> String {
+    package_json.replace(
+        "\"@maos/spirit-ts\": \"^0.5.0\"",
+        "\"@maos/spirit-ts\": \"file:../../sdks/spirit-ts\"",
+    )
 }
 
 fn extract_features(line: &str) -> String {

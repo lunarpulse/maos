@@ -1791,7 +1791,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo build -p maos-bin -p maos-spirit-cli
+      # maos-cli produces the `maosctl` binary the smoke's step-8 air-gap import
+      # invokes (resolved as a daemon-sibling). Without it, maosctl is absent in CI
+      # and the smoke aborts at `maosctl import`.
+      - run: cargo build -p maos-bin -p maos-spirit-cli -p maos-cli
       - run: MAOS_ONE_SHOT=smoke-registry-7-2 cargo run -p maos-bin
 
   # Story 7.2 AC4 — FR59 ≤5min yank-propagation latency gate.
