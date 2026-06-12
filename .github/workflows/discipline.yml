@@ -2061,6 +2061,11 @@ jobs:
             const safc = '${{ needs.smoke-a2a-fail-closed-8-8.result }}';
             const ckb = '${{ needs.check-kernel-baseline.result }}';
             const ecg = '${{ needs.check-epic-close-green.result }}';
+            // Pre-existing latent bug fixed by Story 8.16 (surfaced on the FIRST PR, run 27397275823):
+            // `dt` is used in the advisory determinism-tests table row but was never declared, so the
+            // github-script threw ReferenceError on every `pull_request` event (this step is PR-only,
+            // and all prior CI ran on `push`, where it is skipped).
+            const dt = '${{ needs.determinism-tests.result }}';
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
             const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
 
