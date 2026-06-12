@@ -1,4 +1,4 @@
-last_updated: '2026-06-11T04:30:00Z+story-8-15-done'
+last_updated: '2026-06-12T00:00:00Z+epic-8-retrospective-done'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -111,13 +111,17 @@ development_status:
   8-14c-researcher-mcp-driver-set-web-arxiv-github-citation: done
   # Story 8.15 (TEST TRACK, TEA/Murat 2026-06-06): journey-acceptance test harness + red-phase "watch-it-work" suites for ALL Epic-8 journeys. NEW dev-only maos-journey-test crate (PTY+vt100 + ReplayInferenceProvider + MockMcp + tokio virtual time, reusing 8.6 H1-H6 guards). Tier-1 hermetic (<2s/journey, 50x burn-in) + Tier-2 nightly --live re-record + cassette-age gate. ATDD red-phase authored: _bmad-output/test-artifacts/atdd-checklist-8-14b-j-butler-acceptance.md. DEPENDS ON 8.11 + 8.14a; per-journey slices flip green as 8.14b/8.14c/8.12/8.13 land. Relocates the harness sub-AC formerly in 8.11·AC5. LAST in Epic 8, before Epic 9.
   8-15-journey-acceptance-test-harness-and-red-phase-suites: done  # dev_model_used: claude-opus-4-6; SEALED 2026-06-11: four revert-to-red seals verified RED→GREEN by automated non-author execution (edit→rebuild→RED→restore→rebuild→GREEN for all four targets)
-  epic-8-retrospective: optional
+  epic-8-retrospective: done  # retro 2026-06-12 (epic-8-retro-2026-06-12.md); §A1 pre-Epic-9 re-green+reconcile bridge + §A2 NEW Story 9.6 (multi-Spirit scheduler/founder-class standalone) required before Story 9.1; epic_update_required: true
+  # Story 8.16 (Epic 8→9 discipline bridge, spec 2026-06-12: 8-16-epic-9-readiness-bridge-re-green-reconcile-verify-and-close-gate.md): folds retro §A1+§A3+§A4+§A5+§A6 into one green-at-HEAD receipt + stages §A2 (Story 9.6). Resolves the 2 if:false-disabled gates (smoke-spirit-author-7-1 + check-epic-6-bridge: repair-or-retire-with-ADR), single-sources the kernel-core count (records 16263 vs CI-pinned 21128), triages residual continue-on-error, verifies 7.4 skill-queue closure, wires the epic-close-green gate (§A5), records the §A6 non-Opus safety-net, and authors+sequences Story 9.6. BLOCKS Epic 9 Story 9.1. ready-for-dev; rec claude-opus-4-8.
+  8-16-epic-9-readiness-bridge-re-green-reconcile-verify-and-close-gate: in-review  # executed 2026-06-12 claude-opus-4-8: retired 2 if:false gates (ADR-043), kernel single-source 21128 (§A4 check-kernel-baseline), epic-close-green gate (§A5), §A3 verified 2/4-open→Epic9, Story 9.6 staged; green-at-HEAD zero if:false. REVIEW: §A5 non-author seal PASS + Winston ratified ADR-043 (accepted-w/-conditions, applied). REMAINING: integrated GHA run-id on push (Lunarpulse pushes) → then flip to done
   epic-9: backlog
   9-1-ship-maosctl-audit-subcommands-query-subject-access-posture-delta-sealed-export: backlog
   9-2-execute-gdpr-article-17-cascade-with-deterministic-replay-and-proof-of-erasure: backlog
   9-3-publish-the-typed-error-catalog-governance-audit-artifacts-and-wire-cost-attribution: backlog
   9-4-productionize-the-operator-surface-distribution-backup-dr-air-gap-region-pinning: backlog
   9-5-publish-five-canonical-docs-with-wcag-aa-korean-i18n-and-onboarding-artifacts: backlog
+  # Story 9.6 (added 2026-06-12 by Epic 8 retro §A2, ratified Lunarpulse; spec stub by Story 8.16 AC8): multi-Spirit scheduler + founder-class standalone load — closes 8.12 FORK B classify_spirit short-circuit, upgrades J1/J4 to Grade-A, auto-activates 8.15 J1 resume-continuity beat, folds Epic-7 §A3 open items (skill-queue persistence + functional approve/reject). Sequence before/around 9.4. Rec claude-opus-4-8.
+  9-6-multi-spirit-scheduler-founder-class-standalone-load: backlog
   epic-9-retrospective: optional
   epic-10: backlog
   10-1-execute-the-v1-0-release-gate-pen-test-ccac-cross-validation-hsis-verification: backlog

@@ -265,4 +265,16 @@ So that the documentation surface is real, accessible, localized, and the compet
 **Then** structured trace IDs and span linkage are exported per IAC frame, capability invocation, halt event
 **And** SIEM export lands at v2.0 (NFR-Aud-11 second phase)
 
+## Story 9.6: Multi-Spirit Scheduler + Founder-Class Standalone Load
+
+> **Added 2026-06-12 by the Epic 8 retrospective (action §A2; `epic-8-retro-2026-06-12.md`), ratified by Lunarpulse.** The multi-Spirit scheduler / founder-class-standalone-load gap (8.12 FORK B; recurred in 8.14c and 8.15's Grade-B J1 stub) was the biggest unresolved Epic-8 item but homeless — Epic 9's original scope is audit/compliance/operator only. It gates J1/J4 Grade-A and the multi-tool orchestration that Story 9.4 implicitly assumes. Story spec stub authored by Story 8.16 AC8: `_bmad-output/implementation-artifacts/9-6-multi-spirit-scheduler-founder-class-standalone-load.md`. Full AC set to be written at sprint planning.
+
+As an operator running MAOS in production,
+I want `maos run` to load and schedule more than one Spirit — including founder-class `[class]` Spirits that today short-circuit at admission (`classify_spirit` → `FounderLoopClass` directional error, not standalone-loadable),
+So that the founder-loop topology and the Mira↔Nash pair run as first-class `maos run` daemons, J1/J4 upgrade from Grade-B smoke wraps to Grade-A end-to-end journeys, and the J1 resume-continuity beat (8.15 D4, authored RED) auto-activates.
+
+**Scope sketch:** close the `classify_spirit` founder-class short-circuit (caps section + scalar port — FLAG Winston/John); multi-Spirit scheduling in the daemon composition root (per-Spirit pid, retiring the hardcoded `spirit_pid = 0`); upgrade J1/J4 to Grade-A; fold in the Epic-7 §A3 open items (durable skill-queue persistence + functional `maosctl skills approve/reject`, verified still-open by Story 8.16 AC6) OR split them to a dedicated skill-queue story. **Sequence before/around Story 9.4.** Likely a charter kernel delta — re-pin `xtask/kernel-core-baseline.toml` (Story 8.16 §A4 single source of truth) alongside the authorized delta. Rec dev model `claude-opus-4-8`.
+
+**Acceptance Criteria:** _TBD at Epic-9 sprint planning._
+
 ---

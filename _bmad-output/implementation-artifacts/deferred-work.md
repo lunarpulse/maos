@@ -1,3 +1,14 @@
+## Epic-7 §A3 skill-queue closure — VERIFIED by Story 8.16 (2026-06-12, "verify don't assume"); 2 of 4 items still OPEN → Epic 9
+
+Epic 7 retro §A3 required four skill-queue items closed "before Story 8.4 (founder-loop)". Story 8.16 AC6 verified them mechanically at HEAD (`crates/maos-skill/`, `crates/maos-cli/`):
+
+- ✅ **SkillId charset enforced** — validated in `maos-skill/src/schema.rs:178` + `proposal.rs:52` (`a-z 0-9 - .`), typed errors `errors.rs:33,60`.
+- ✅ **Duplicate-skill-ID enqueue rejected** — `ESkillQueue::DuplicateSkillId` typed error, returned in `admission.rs:106` (`enqueue_skill`) + `:144` (`enqueue_proposal`).
+- ❌ **Skill-queue restart persistence — STILL OPEN.** `SkillAdmissionQueue` holds `pending: Vec<PendingEntry>` + `audit: Vec<ApprovalDecision>` in memory only (`admission.rs:38-40`); no durable store. (Epic-7 §A3 "in-process-only skill queue" was NOT closed; 8.4 founder-loop shipped without depending on it.)
+- ❌ **`maosctl skills approve/reject` functional — STILL OPEN.** `maos-cli/src/subcommands.rs:73-82` are acknowledgement-only stubs (`println!` "acknowledged", line 3: "All others remain stubs"; lines 44-45: "the durable queue store is future work").
+
+**FILED to Epic 9** (explicit, NOT silently inherited): the durable skill-queue store + functional `approve/reject` (operator-admission exit that actually mutates state and survives restart). Natural home = Story 9.6 (scheduler/runtime) or a named skill-queue story at Epic-9 sprint planning. Tracked here so the gap is owned, not assumed-closed.
+
 ## Deferred from: code review of 8-12-live-cliwrapper-subprocess-bridge-founder-loop-over-real-clis (2026-06-08)
 
 - No sandbox enforcement on hermetic path — Command spawn by design; live container = Tier-2. `runtime.rs:spawn_and_bridge`
@@ -385,27 +396,27 @@ real measurement paths:
   1ms v0.5-α soft floor — a real over-budget observation, surfaced not masked
   (the gate stays soft-fail/advisory until the §13.1 calibration window closes).
 
-## Deferred from: CI remediation 2026-06-12 (round 6 — disable two broken advisory gates)
+## ~~Deferred from: CI remediation 2026-06-12 (round 6 — disable two broken advisory gates)~~ — CLOSED by Story 8.16 (2026-06-12)
 
-### DISABLED in discipline.yml (`if: false`) — re-enable when remediated
-Two jobs were the only ❌ on green run 27388044071 (both `continue-on-error`, so
-the run already passed). Per direction, they are now fully DISABLED with
-`if: false` rather than left as red-but-advisory noise. Each reports `skipped`
-(⏭️) to the `aggregate` job (never `failure`), so the aggregate stays green and
-every `needs.<job>.result` reference remains valid. The job BODIES are preserved
-in-place (not deleted) so re-enabling is a one-line revert.
+### ✅ RESOLVED — both `if: false` gates RETIRED per ADR-043 (no longer parked)
+Story 8.16 (Epic 8→9 readiness bridge, retro §A1) closed this entry. Per the
+retro ruling, `if: false` is not an acceptable terminal state — each gate was
+RETIRED with a ratified ADR (ADR-043), not re-parked. The new `check-epic-close-green`
+gate now hard-fails on ANY `if: false` workflow job, so this failure mode cannot recur.
 
-1. **`smoke-spirit-author-7-1`** (discipline.yml ~L866) — spirit-authoring
-   TEMPLATE-SUITE bit-rot (cargo-generate ≥0.23 reserves `crate_name`; missing
-   `post-generate.rhai`; `@maos/spirit-ts` unpublished to npm). Not a CI patch —
-   needs the tracked "spirit-authoring template-suite repair" story above.
-   - RE-ENABLE: delete the `if: false` line. If the template repair shipped, also
-     delete `continue-on-error: true` to make it BLOCKING (FLAG-Winston/John).
+1. **`smoke-spirit-author-7-1`** — **RETIRED** (ADR-043 Decision 2). Advisory
+   spirit-authoring smoke broken by Epic-7 template bit-rot. Spirit-authoring stays
+   covered by `example-spirit-tests` / `example-spirit-drift` / `example-spirit-ts-tests`
+   / `spirit-test-tests` (all live). A future template-repair story may re-introduce
+   a fixed authoring smoke. Job removed from discipline.yml; `if: false` deleted.
 
-2. **`check-epic-6-bridge`** (discipline.yml ~L1253) — intentional `exit 1`
-   debt-visibility beacon; fails until the Epic-6 A2/A3/A5/A6 bridges land.
-   - RE-ENABLE: delete the `if: false` line once A2/A3/A5/A6 are delivered (the
-     gate then passes on its own).
+2. **`check-epic-6-bridge`** — **RETIRED** (ADR-043 Decision 1). Legacy Epic-6
+   debt beacon whose §A2/§A3/§A5/§A6 enforcement migrated to live hard-fail gates
+   in Story 7.1.5; its last red (`A4-Debt-1`) was a stale entry-counting predicate
+   (i9-whitelist.toml + i9-exemptions.md both exist; I9 enforced live by
+   check-empty-kernel + check-service-boundary). Job removed from discipline.yml;
+   `if: false` deleted; xtask module kept in tree as archived history.
 
-Aggregate summary table rows relabeled "(DISABLED 2026-06-12)" with footnote ².
-No code change; workflow-only. YAML re-validated (110 jobs parse).
+Aggregate `needs:`/`report-aggregate` updated to drop both retired jobs (no dangling
+`needs.<job>.result`); the `²` DISABLED footnote removed. `check-kernel-baseline` (§A4)
+and `check-epic-close-green` (§A5) added. YAML re-validated.

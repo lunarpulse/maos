@@ -17,8 +17,10 @@ mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
 mod check_empty_kernel;
 mod check_epic_6_bridge;
+mod check_epic_close_green;
 mod check_fr47;
 mod check_judge_config;
+mod check_kernel_baseline;
 mod check_loom;
 mod check_manifest_schema_version;
 pub mod check_mock_not_in_release;
@@ -287,6 +289,22 @@ enum Commands {
             default_value = "_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md"
         )]
         kernel_design: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 8.16 §A4 — kernel-core line-count single source of truth. Counts
+    /// `crates/maos-kernel-core/src` and compares to `xtask/kernel-core-baseline.toml`;
+    /// hard-fails on drift (so a multi-story phase cannot drift the kernel unsummed).
+    #[command(name = "check-kernel-baseline")]
+    CheckKernelBaseline {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 8.16 §A5 — epic-close green gate. Fails if ANY workflow job is
+    /// disabled with a job-level `if: false` (the Epic-8 fake-green mode). Makes
+    /// "mark an epic retrospective done while gates are parked red" impossible.
+    #[command(name = "check-epic-close-green")]
+    CheckEpicCloseGreen {
         #[arg(long)]
         json: bool,
     },
@@ -718,6 +736,8 @@ fn main() {
         Commands::CheckBareReviewFindings { json } => check_bare_review_findings::run(json),
         Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
+        Commands::CheckKernelBaseline { json } => check_kernel_baseline::run(json),
+        Commands::CheckEpicCloseGreen { json } => check_epic_close_green::run(json),
         Commands::StabilityMatrix { check, json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             stability_matrix::run(&workspace_root, check, json)
