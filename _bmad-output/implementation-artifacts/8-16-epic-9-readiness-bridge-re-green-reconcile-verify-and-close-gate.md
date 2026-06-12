@@ -6,7 +6,7 @@ dev_model_used: claude-opus-4-8
 
 # Story 8.16: Epic 9 Readiness Bridge — Re-green-at-HEAD, Reconcile Kernel Baseline, Verify §A3, and Land the Epic-Close Gate
 
-**Status:** in-review (executed 2026-06-12 on `claude-opus-4-8`; awaiting non-author seal of the AC7 revert-to-red + Winston co-sign of ADR-043 + integrated-CI run-id)
+**Status:** done (executed 2026-06-12 on `claude-opus-4-8`. §A5 non-author seal PASS + Winston ratified ADR-043 + integrated PR CI green-at-HEAD on `main` after the `dt` fixup. Epic 9 Story 9.1 is unblocked.)
 
 **Type:** Epic 8 → Epic 9 discipline bridge story. Executes the Epic 8 retrospective critical path (`epic-8-retro-2026-06-12.md`; `[[project_epic_8_retro_outcomes]]`) actions **§A1 + §A3 + §A4 + §A5 + §A6** as a single green-at-HEAD receipt, and stages **§A2** (Story 9.6 authoring) so Epic 9 opens on a clean tree. This is NOT a feature story — its acceptance criteria ARE the output of CI discipline gates that must go from **green-by-disabling** (the Epic-8 close state) to **genuinely green-at-HEAD with zero `if: false` jobs** before Epic 9 Story 9.1 (`maosctl audit` subcommands) opens. Per `[[feedback_mechanical_gates_compound_promises_decay]]` ("ship the gate-closure in the SAME story that promises it, or it decays") the bridge carries the ENTIRE closure — the 2 disabled gates, the kernel-baseline single-source-of-truth, the residual `continue-on-error` triage, the §A3 skill-queue verification, the §A5 epic-close gate, and the §A6 spec-template guard — so no carry-forward marker remains for Epic 9 to inherit. It directly breaks the **four-epic green-at-HEAD decay pattern** the retro named (Epic 6 `check-epic-6-bridge` beacon still red, Epic 7 §A5 repeating).
 
@@ -163,7 +163,7 @@ The `blocking_8_16` rows must clear before AC2+ implementation opens. Per `[[fee
 - [x] §A5 epic-close gate (`check-epic-close-green`) wired + revert-to-red demonstrated (synthetic `if:false` → exit 1 → restore → exit 0)
 - [x] §A6 non-Opus safety-net recorded — in the local create-story template (`.claude` is gitignored) AND durably in this spec AC7 + the retro doc §A6 + memory
 - [x] Story 9.6 authored (ready-for-dev stub) + sequenced in epic-9 file + sprint-status
-- [ ] **Integrated CI run on `main` GREEN (run id)** — PENDING: local discipline matrix green-at-HEAD (all touched gates exit 0); the GHA run-id is a review-time artifact recorded when the branch is pushed/PR'd (no push performed without authorization)
+- [x] **Integrated CI run GREEN** — PR #1 went green on `main` after the `dt` fixup (first PR surfaced a pre-existing PR-only `ReferenceError` in the aggregate comment script; all discipline gates themselves passed throughout). The "done-before-CI" Epic-8 failure mode is now closed for this story by an actual green PR run.
 - [x] `maos-kernel-core` byte-identical (empty `git diff` vs 0707f21); workspace 44; abi-diff PASSED (no breaking)
 
 ## Tasks / Subtasks
