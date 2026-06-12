@@ -1741,6 +1741,28 @@ jobs:
       - name: Run check-epic-close-green
         run: cargo run -p xtask -- check-epic-close-green --json
 
+  # Pre-merge coverage for the HERMETIC journey suite. The full
+  # `maos-journey-test` crate runs only in journey-nightly.yml (scheduled),
+  # never here — so push/PR CI was green while a Story-8.15 self-contradiction
+  # (j0 polled the PTY with raw Instant::now(), violating its own JB-7/H4
+  # no-wallclock guard) sat latent until the first nightly fired. This job runs
+  # the suite in REPLAY mode (no secrets, no network — cassette/MockMcp only),
+  # so the JB-7 guards + j0/j1/j4/researcher/butler deterministic floors gate
+  # every PR. The secret-gated live re-record stays nightly-only.
+  journey-hermetic-tier-1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Hermetic journey suite (replay mode — JB-7 guards + deterministic floors)
+        run: cargo test -p maos-journey-test --locked
+
   smoke-discipline-7-1-5:
     runs-on: ubuntu-latest
     needs: [check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated]
@@ -1950,7 +1972,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, mira-tests, nash-tests, orchestrator-tests, worker-tests, architect-tests, reviewer-tests, founder-loop-bench, mira-nash-bench, safety-critical-corpus-8-5, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-founder-loop-8-4, smoke-mira-nash-8-5, a2a-tcp-tests-8-6, smoke-a2a-tcp-8-6, smoke-a2a-loopback-6-3, smoke-a2a-consent-vocab-8-7, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b, check-a2a-sender-completeness, smoke-a2a-fail-closed-8-8, check-kernel-baseline, check-epic-close-green]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, mira-tests, nash-tests, orchestrator-tests, worker-tests, architect-tests, reviewer-tests, founder-loop-bench, mira-nash-bench, safety-critical-corpus-8-5, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-founder-loop-8-4, smoke-mira-nash-8-5, a2a-tcp-tests-8-6, smoke-a2a-tcp-8-6, smoke-a2a-loopback-6-3, smoke-a2a-consent-vocab-8-7, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b, check-a2a-sender-completeness, smoke-a2a-fail-closed-8-8, check-kernel-baseline, check-epic-close-green, journey-hermetic-tier-1]
     if: always()
     permissions:
       pull-requests: write
@@ -2003,6 +2025,7 @@ jobs:
           echo "safc=${{ needs.smoke-a2a-fail-closed-8-8.result }}" >> $GITHUB_OUTPUT
           echo "ckb=${{ needs.check-kernel-baseline.result }}" >> $GITHUB_OUTPUT
           echo "ecg=${{ needs.check-epic-close-green.result }}" >> $GITHUB_OUTPUT
+          echo "jht1=${{ needs.journey-hermetic-tier-1.result }}" >> $GITHUB_OUTPUT
       - name: Check for failures
         id: status
         run: |
@@ -2061,6 +2084,7 @@ jobs:
             const safc = '${{ needs.smoke-a2a-fail-closed-8-8.result }}';
             const ckb = '${{ needs.check-kernel-baseline.result }}';
             const ecg = '${{ needs.check-epic-close-green.result }}';
+            const jht1 = '${{ needs.journey-hermetic-tier-1.result }}';
             // Pre-existing latent bug fixed by Story 8.16 (surfaced on the FIRST PR, run 27397275823):
             // `dt` is used in the advisory determinism-tests table row but was never declared, so the
             // github-script threw ReferenceError on every `pull_request` event (this step is PR-only,
@@ -2118,6 +2142,7 @@ jobs:
             | check-dev-model-used-populated | ${icon(cdmu)} ${cdmu} |
             | check-kernel-baseline | ${icon(ckb)} ${ckb} |
             | check-epic-close-green | ${icon(ecg)} ${ecg} |
+            | journey-hermetic-tier-1 | ${icon(jht1)} ${jht1} |
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 
             ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).
