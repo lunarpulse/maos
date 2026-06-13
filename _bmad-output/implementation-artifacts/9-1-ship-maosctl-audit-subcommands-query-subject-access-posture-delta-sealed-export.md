@@ -3,9 +3,18 @@ dev_model_used: claude-opus-4-6
 ---
 
 # Story 9.1: Ship `maosctl audit` Subcommands — Query, Subject-Access, Posture-Delta, Sealed-Export
-Status: done
+Status: blocked
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
+## Blockers (discovered during CI workflow simulation)
+
+Story 9.1 cannot be marked `done` until these CI gates are green. All were run locally against the committed tree (`77a34d0`) and compared against the parent (`9f0979d`).
+
+1. **`check-kernel-baseline` regression** — `crates/maos-kernel-core/src` is **21197 lines**; `xtask/kernel-core-baseline.toml` pins **21128**. Parent commit was green at 21128. The Story 9.1 commit added **+69 lines** inside `maos-kernel-core/src`, which violates the single-source baseline charter (requires authorized delta + `FLAG-Winston`).
+2. **`check-service-boundary` regression** — Parent had **0 violations**. Story 9.1 commit introduces **29 violations**, including removed public kernel symbols, new unclassified public symbols, and P1 violations (`SecurityManagerAdapter` and `CapabilityRegistryAdapter` constructed twice in `maos-bin/src/main.rs`).
+3. **`audit-query-fr4-smoke` regression** — `maosctl audit query --spirit hello-spirit` fails because the new resolver requires `FrameKind 19` (`SpiritAdmitted`) frames and the `MAOS_ONE_SHOT=hello-spirit` path does not emit them. A backward-compat fallback for `hello-spirit` → `spirit_pid 0` exists as an unstaged local fix in `crates/maos-audit/src/lib.rs` but has not been committed.
+4. **`reproducible-build` pre-existing failure** — Two consecutive `cargo build --locked --all-targets --workspace` runs produce different debug `rlib` artifact hashes. This fails on both parent and Story 9.1 commits; it is **not** caused by Story 9.1 but blocks a fully green CI run.
+
 <!-- Party-mode preflight 2026-06-12 (Winston/Amelia/Murat/John): all 5 forks RESOLVED with reachability facts grepped. See "Resolved Design Decisions (preflight)" below — it SUPERSEDES the original recommended defaults. -->
 
 > **⚑ PREFLIGHT-RESOLVED.** A party-mode design review (Winston, Amelia, Murat, John) ran before dev and **resolved all five open forks against grepped reachability facts.** The decisions are in **"Resolved Design Decisions (preflight)"** below and are binding — they override the per-fork "recommended defaults" that appear inline in the ACs. Three of the original defaults were overridden (A renamed, B re-architected to compile, D upgraded to full-transitive). Read that section before coding.

@@ -667,10 +667,9 @@ pub fn default_archive_dir() -> std::path::PathBuf {
         .unwrap_or_else(|| PathBuf::from("/var/lib"));
     data_home.join("maos").join("spirit-archives")
 }
-
 /// Resolve a Spirit name to one or more `(boot_nonce, spirit_pid)` pairs by
 /// scanning the Transparency Log for SpiritAdmitted (FrameKind 19) frames
-/// whose `payload_redacted` carries `{"spirit_id": "<name>"}`.
+/// whose non-redacted `intent` column carries the Spirit name.
 ///
 /// Per Decision E: keyed on `(boot_nonce, spirit_pid)` to discriminate pid
 /// reuse across boots. Defaults to the LATEST boot (max `boot_nonce`).
@@ -715,9 +714,39 @@ pub fn resolve_spirit_name(
     }
 
     if matches.is_empty() {
-        return Err(format!(
-            "unknown spirit '{name}' — no SpiritAdmitted (kind=19) frame found in Transparency Log"
-        ));
+        // Backward-compat fallback for the v0.1-β evaluator path:
+        // `MAOS_ONE_SHOT=hello-spirit` predates kernel-side FrameKind 19
+        // emission, so if no admission frames exist but the TL contains
+        // rows for the legacy hardcoded hello-spirit PID, resolve from
+        // those rows rather than failing. This keeps Story 1b.5b's FR4
+        // smoke path working while still preferring Decision E authoritative
+        // admissions when present.
+        if name == "hello-spirit" {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT DISTINCT boot_nonce, spirit_pid
+                     FROM transparency_log
+                     WHERE spirit_pid = 0
+                     ORDER BY boot_nonce ASC",
+                )
+                .map_err(|e| format!("prepare fallback failed: {e}"))?;
+            let rows = stmt
+                .query_map([], |row| {
+                    let boot: i64 = row.get(0)?;
+                    let pid: i64 = row.get(1)?;
+                    Ok((boot as u64, pid as u32))
+                })
+                .map_err(|e| format!("fallback query failed: {e}"))?;
+            for row in rows {
+                matches.push(row.map_err(|e| format!("fallback row error: {e}"))?);
+            }
+        }
+
+        if matches.is_empty() {
+            return Err(format!(
+                "unknown spirit '{name}' — no SpiritAdmitted (kind=19) frame found in Transparency Log"
+            ));
+        }
     }
 
     if all_boots {
