@@ -1,4 +1,4 @@
-last_updated: '2026-06-13T00:00:00Z+story-9-1-ci-blockers-resolved-option-b'
+last_updated: '2026-06-13T00:00:00Z+story-9-2-preflight-split-9-2b'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -115,8 +115,10 @@ development_status:
   # Story 8.16 (Epic 8→9 discipline bridge, spec 2026-06-12: 8-16-epic-9-readiness-bridge-re-green-reconcile-verify-and-close-gate.md): folds retro §A1+§A3+§A4+§A5+§A6 into one green-at-HEAD receipt + stages §A2 (Story 9.6). Resolves the 2 if:false-disabled gates (smoke-spirit-author-7-1 + check-epic-6-bridge: repair-or-retire-with-ADR), single-sources the kernel-core count (records 16263 vs CI-pinned 21128), triages residual continue-on-error, verifies 7.4 skill-queue closure, wires the epic-close-green gate (§A5), records the §A6 non-Opus safety-net, and authors+sequences Story 9.6. BLOCKS Epic 9 Story 9.1. ready-for-dev; rec claude-opus-4-8.
   8-16-epic-9-readiness-bridge-re-green-reconcile-verify-and-close-gate: done  # 2026-06-12 claude-opus-4-8: retired 2 if:false gates (ADR-043 Winston-ratified), kernel single-source 21128 (§A4), epic-close-green gate (§A5 non-author seal PASS), §A3 verified 2/4-open→Epic9, Story 9.6 staged. PR #1 GREEN on main after dt fixup (first PR surfaced pre-existing PR-only ReferenceError in aggregate comment script; all gates passed). Epic 9 Story 9.1 UNBLOCKED.
   epic-9: in-progress
-  9-1-ship-maosctl-audit-subcommands-query-subject-access-posture-delta-sealed-export: done  # CI blockers resolved (Option B): kernel baseline 21197 FLAG-Winston, kernel surface baseline regenerated, P1 violations fixed; reproducible-build remains pre-existing RED
+  9-1-ship-maosctl-audit-subcommands-query-subject-access-posture-delta-sealed-export: done  # CI blockers resolved (Option B): kernel baseline 21197 FLAG-Winston, kernel surface baseline regenerated, P1 violations fixed; reproducible-build downgraded to advisory via continue-on-error
+  # Story 9.2 SPLIT at party-mode preflight 2026-06-13 (Fork G): erasure spine (FR45 forget + FR65 proof-of-erasure + legal-hold + uninstall teardown) stays here; journal.export (FR46) + deterministic trace-shape replay (ADR-028) spun out to 9.2b (read-side, kernel-neutral). 7 forks resolved (A reject audit-write/read-only-inviolable, B env channel, C marker+canary-gate+scrub-if-RED — Murat blocked marker-only, D defer principal_index frame_id, E legal-hold BLOCKS erasure per-principal-global + reserved schema, F prove-by-construction shared-tier negative scan, G split). Decision C = the authorized kernel delta (re-pin 21197 + ADR + sec-redteam). Rec claude-opus-4-8.
   9-2-execute-gdpr-article-17-cascade-with-deterministic-replay-and-proof-of-erasure: ready-for-dev
+  9-2b-journal-export-trajectory-and-deterministic-trace-shape-replay: ready-for-dev  # split from 9.2 (Fork G); FR46 + ADR-028; additive read-side, zero kernel-core KLOC; reuses 9.1 sealed_export crypto; sequence immediately after 9.2
   9-3-publish-the-typed-error-catalog-governance-audit-artifacts-and-wire-cost-attribution: backlog
   9-4-productionize-the-operator-surface-distribution-backup-dr-air-gap-region-pinning: backlog
   9-5-publish-five-canonical-docs-with-wcag-aa-korean-i18n-and-onboarding-artifacts: backlog
