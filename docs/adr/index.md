@@ -15,6 +15,7 @@ Committed ADRs for the MAOS project.
 | [ADR-022](ADR-022-tagged-scalar-working-memory-slot.md) | Tagged-scalar working-memory slot | binding-v0.1 | [epistemic_policy] rules trigger halts via four universal-arithmetic predicates (at v0.3) |
 | [ADR-023](ADR-023-capability-token-ttl-bind-to-pid.md) | Capability-token TTL + bind-to-PID | binding-v0.1 | TTL ≤60s; tokens bound to (Spirit-PID + boot-nonce + expiry) |
 | [ADR-026](ADR-026-principal-memory-namespace.md) | Principal Memory Namespace | binding-v0.1 | subject-access query / right-to-be-forgotten (at v0.5) |
+| [ADR-028](ADR-028-replay-determinism-trace-shape.md) | Replay determinism over trace-shape | binding-v1.0 | `replay_byte_identical_two_process` + `redaction_k_anonymity` CI gate |
 | [ADR-030](ADR-030-capability-registry-decomposition.md) | Capability Registry decomposition | binding-v0.1 | hot-path token verify <5µs P99 benchmark |
 | [ADR-032](ADR-032-spirit-wire-protocol-bytes-on-wire.md) | Spirit Wire Protocol bytes-on-wire | binding-v0.1 | byte-equal golden corpus per frame variant per SDK |
 | [ADR-037](ADR-037-constitutional-amendment-process.md) | Constitutional amendment process | binding-v0.1 | invariant-lock CI gate |
@@ -22,7 +23,6 @@ Committed ADRs for the MAOS project.
 | [ADR-039](ADR-039-per-module-unsafe-code-policy.md) | Per-module `#![forbid(unsafe_code)]` policy | binding-v0.1 | `xtask check-unsafe` + `xtask/unsafe-allowlist.toml` |
 | [ADR-040](ADR-040-rust-inproc-measurement-gate-v05-decision.md) | §13.1 rust-inproc measurement gate — v0.5 decision | binding-v0.5 | `xtask check-adr-040-accepted` + `crates/maos-bench/` |
 | [ADR-041](ADR-041-phase-3-4-kernel-core-extraction-via-port-traits.md) | Phase 3/4 `maos-kernel-core` extraction via port traits | binding-v0.7 | `xtask/kloc.toml [in_progress_decomposition]` + `xtask check-service-boundary` P1 per extracted crate |
-| [ADR-044](ADR-044-gdpr-article-17-distillate-redaction.md) | GDPR Article 17 distillate redaction — marker + body-scrub-on-embed | binding-v1.0 | `xtask check-kernel-baseline` + `maos-audit` read-only CI guard |
 
 > 16 `binding-v0.1` ADRs as of Story 1a.1; **15 as of Story 1b.6** (ADR-039 — per-module unsafe policy, accepts the 1b.3 relaxation).
 > **17 as of Story 5.5e** (ADR-040 — §13.1 rust-inproc measurement gate, binding-v0.5).

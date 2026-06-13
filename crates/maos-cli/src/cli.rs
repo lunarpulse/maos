@@ -303,6 +303,40 @@ pub enum AuditQuery {
         #[arg(long, value_enum, default_value_t = AuditFormat::Ndjson)]
         format: AuditFormat,
     },
+    /// FR46 — trajectory export: signed trajectory bundle with redaction.
+    ///
+    /// v1.0 HARD byte-identity over the signed/shape surface.
+    /// v1.5 extends to cross-platform/cross-toolchain/cross-schema-revision envelope.
+    Export {
+        /// Filter by Spirit name.
+        #[arg(long)]
+        spirit: Option<String>,
+        /// Time range filter (e.g. "30d", "7d", "1h").
+        #[arg(long)]
+        range: Option<String>,
+        /// Output file path for the signed trajectory JSON.
+        #[arg(long)]
+        output: Option<std::path::PathBuf>,
+        /// Explicit path to audit signing key file.
+        #[arg(long)]
+        audit_key: Option<std::path::PathBuf>,
+        /// Redaction policy name. Default: "none" (no redaction).
+        #[arg(long, default_value = "none")]
+        redaction_policy: String,
+    },
+    /// ADR-028 — replay a sealed-export or trajectory bundle as a
+    /// deterministic trace-shape document.
+    ///
+    /// v1.0 HARD byte-identity: two replays of the same bundle produce
+    /// byte-identical output.  v1.5 extends to cross-platform /
+    /// cross-toolchain-version / cross-schema-revision envelope.
+    Replay {
+        /// Path to the bundle JSON file (audit-bundle.v1 or trajectory.v1).
+        bundle: std::path::PathBuf,
+        /// Output file path for the trace-shape JSON.
+        #[arg(long)]
+        output: Option<std::path::PathBuf>,
+    },
 }
 
 /// Output format for `maosctl audit query`.

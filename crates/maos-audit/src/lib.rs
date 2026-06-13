@@ -15,6 +15,8 @@
 
 pub mod erasure;
 pub mod log_composition;
+pub mod replay;
+
 pub mod sealed_export;
 
 use std::io::Write;
@@ -46,6 +48,9 @@ pub enum AuditError {
     /// Empty capability filter string provided.
     #[error("empty capability filter string")]
     EmptyCapabilityFilter,
+    /// A `kind` filter string does not map to a known frame kind.
+    #[error("unknown frame kind filter '{0}'")]
+    UnknownKind(String),
 }
 
 /// FR4-projection error returned by [`project_to_fr4`]. Lifted into
@@ -94,6 +99,23 @@ pub struct AuditEntry {
     pub kind: String,
     /// Intent string from the frame.
     pub intent: String,
+    /// Per-frame redaction metadata. Populated ONLY by `query_with_redaction()`.
+    /// Mirrors the `capability_token_hex` serde-skip pattern (F1 A-prime).
+    #[serde(rename = "redaction", skip_serializing_if = "Option::is_none", default)]
+    pub redaction: Option<RedactionMeta>,
+}
+
+/// Redaction metadata for a single frame (Story 9.2b, F1 A-prime).
+///
+/// Carries the redaction class + **bucketed** original payload byte length
+/// (power-of-two bucket, NOT exact byte count).  No content hash — see
+/// ADR-028 D3 (F5: confirmation-oracle risk on low-entropy fields).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct RedactionMeta {
+    /// Redaction class derived from frame metadata (e.g. "payload", "intent").
+    pub class: String,
+    /// Bucketed original payload byte length (power-of-two bucket).
+    pub original_len_bucket: u64,
 }
 
 /// Filter for the read-side query — same shape as the kernel-side
@@ -130,7 +152,11 @@ pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, Aud
 
     if let Some(pid) = filter.spirit_pid {
         where_clauses.push("spirit_pid = ?".to_string());
-        params.push(Box::new(pid as i64));
+        let pid_i64 = i64::try_from(pid).map_err(|_| AuditError::ValueOverflow {
+            field: "spirit_pid",
+            value: pid.into(),
+        })?;
+        params.push(Box::new(pid_i64));
     }
     if let Some(boot) = filter.boot_nonce {
         where_clauses.push("boot_nonce = ?".to_string());
@@ -157,9 +183,12 @@ pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, Aud
         params.push(Box::new(until_i64));
     }
     if let Some(kind_str) = &filter.kind {
-        if let Some(kind_int) = kind_from_string(kind_str) {
-            where_clauses.push("kind = ?".to_string());
-            params.push(Box::new(kind_int));
+        match kind_from_string(kind_str) {
+            Some(kind_int) => {
+                where_clauses.push("kind = ?".to_string());
+                params.push(Box::new(kind_int));
+            }
+            None => return Err(AuditError::UnknownKind(kind_str.clone())),
         }
     }
     // FR41 — capability_token: hex input → blob comparison (param-bound).
@@ -184,7 +213,11 @@ pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, Aud
     }
     sql.push_str(" ORDER BY timestamp_ns ASC, frame_id ASC");
     if let Some(limit) = filter.limit {
-        params.push(Box::new(limit as i64));
+        let limit_i64 = i64::try_from(limit).map_err(|_| AuditError::ValueOverflow {
+            field: "limit",
+            value: limit as u64,
+        })?;
+        params.push(Box::new(limit_i64));
         sql.push_str(" LIMIT ?");
     }
 
@@ -202,6 +235,173 @@ pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, Aud
                 capability_token_hex: cap_blob.as_ref().map(|b| hex_encode(b)),
                 kind: kind_to_string(row.get::<_, i64>(5)?),
                 intent: row.get(6)?,
+                redaction: None,
+            })
+        })
+        .map_err(AuditError::Read)?;
+
+    let mut entries = Vec::new();
+    for row in rows {
+        entries.push(row.map_err(AuditError::Read)?);
+    }
+    Ok(entries)
+}
+
+/// Bucket a byte length to a privacy-safe size bucket.
+///
+/// Used by `query_with_redaction()` to produce length buckets for redacted
+/// payloads (ADR-028 D3 — no exact byte length, no content hash).
+///
+/// To avoid a confirmation oracle on low-entropy fields (e.g. a boolean),
+/// values below 8 bytes are rounded up to the 8-byte bucket so that many
+/// distinct small lengths collide. Zero-length payloads bucket to 0.
+pub fn bucket_len(len: usize) -> u64 {
+    if len == 0 {
+        return 0;
+    }
+    std::cmp::max((len as u64).next_power_of_two(), 8)
+}
+
+/// Query the Transparency Log with redaction metadata populated.
+///
+/// Same as [`query`] but additionally reads `payload_redacted`. For rows where
+/// the column is non-empty, it derives a privacy-safe `RedactionMeta`; rows
+/// with an empty `payload_redacted` keep `AuditEntry::redaction = None`. This
+/// is the **ONLY** sanctioned populator of `AuditEntry::redaction` — see
+/// ADR-028 D4 and the call-path oracle test
+/// `redaction_field_is_none_for_all_non_replay_callers`.
+///
+/// Requires the same read-only SQLite connection as `query()`.
+pub fn query_with_redaction(
+    db_path: &Path,
+    filter: AuditFilter,
+) -> Result<Vec<AuditEntry>, AuditError> {
+    // ADR-028 D6: replay determinism requires a quiesced / WAL-checkpointed DB.
+    // If a SQLite WAL file is present, the DB may still have uncheckpointed
+    // writes from an open writer, making replay non-deterministic.
+    let wal_path = db_path.with_extension("sqlite-wal");
+    if wal_path.exists() {
+        return Err(AuditError::Open(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error {
+                code: rusqlite::ffi::ErrorCode::DatabaseBusy,
+                extended_code: 0,
+            },
+            Some(format!(
+                "Transparency Log has an active WAL ({}). \
+                 Quiesce/checkpoint the kernel before deterministic replay/export.",
+                wal_path.display()
+            )),
+        )));
+    }
+
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(AuditError::Open)?;
+    let mut sql = String::from(
+        "SELECT frame_id, timestamp_ns, spirit_pid, boot_nonce,
+                capability_token, kind, intent, payload_redacted
+         FROM transparency_log",
+    );
+    let mut where_clauses: Vec<String> = Vec::new();
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
+    if let Some(pid) = filter.spirit_pid {
+        where_clauses.push("spirit_pid = ?".to_string());
+        let pid_i64 = i64::try_from(pid).map_err(|_| AuditError::ValueOverflow {
+            field: "spirit_pid",
+            value: pid.into(),
+        })?;
+        params.push(Box::new(pid_i64));
+    }
+    if let Some(boot) = filter.boot_nonce {
+        where_clauses.push("boot_nonce = ?".to_string());
+        let boot_i64 = i64::try_from(boot).map_err(|_| AuditError::ValueOverflow {
+            field: "boot_nonce",
+            value: boot,
+        })?;
+        params.push(Box::new(boot_i64));
+    }
+    if let Some(since) = filter.since_ns {
+        where_clauses.push("timestamp_ns >= ?".to_string());
+        let since_i64 = i64::try_from(since).map_err(|_| AuditError::ValueOverflow {
+            field: "since_ns",
+            value: since,
+        })?;
+        params.push(Box::new(since_i64));
+    }
+    if let Some(until) = filter.until_ns {
+        where_clauses.push("timestamp_ns <= ?".to_string());
+        let until_i64 = i64::try_from(until).map_err(|_| AuditError::ValueOverflow {
+            field: "until_ns",
+            value: until,
+        })?;
+        params.push(Box::new(until_i64));
+    }
+    if let Some(kind_str) = &filter.kind {
+        match kind_from_string(kind_str) {
+            Some(kind_int) => {
+                where_clauses.push("kind = ?".to_string());
+                params.push(Box::new(kind_int));
+            }
+            None => return Err(AuditError::UnknownKind(kind_str.clone())),
+        }
+    }
+    if let Some(hex_str) = &filter.capability_token {
+        if hex_str.is_empty() {
+            return Err(AuditError::EmptyCapabilityFilter);
+        }
+        let blob = hex::decode(hex_str)
+            .map_err(|e| AuditError::Read(rusqlite::Error::ToSqlConversionFailure(Box::new(e))))?;
+        where_clauses.push("capability_token = ?".to_string());
+        params.push(Box::new(blob));
+    }
+    if let Some(limit) = filter.limit {
+        let limit_i64 = i64::try_from(limit).map_err(|_| AuditError::ValueOverflow {
+            field: "limit",
+            value: limit as u64,
+        })?;
+        params.push(Box::new(limit_i64));
+        sql.push_str(" LIMIT ?");
+    }
+    if let Some(sub) = &filter.intent_contains {
+        where_clauses.push("intent LIKE '%' || ? || '%'".to_string());
+        params.push(Box::new(sub.clone()));
+    }
+
+    if !where_clauses.is_empty() {
+        sql.push_str(" WHERE ");
+        sql.push_str(&where_clauses.join(" AND "));
+    }
+    sql.push_str(" ORDER BY timestamp_ns ASC, frame_id ASC");
+    let mut stmt = conn.prepare(&sql).map_err(AuditError::Read)?;
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+    let rows = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            let frame_id_blob: Vec<u8> = row.get(0)?;
+            let cap_blob: Option<Vec<u8>> = row.get(4)?;
+            let payload_blob: Vec<u8> = row.get(7)?;
+            let kind_int: i64 = row.get(5)?;
+            let kind_str = kind_to_string(kind_int);
+
+            let redaction = if payload_blob.is_empty() {
+                None
+            } else {
+                Some(RedactionMeta {
+                    class: kind_str.clone(),
+                    original_len_bucket: bucket_len(payload_blob.len()),
+                })
+            };
+            Ok(AuditEntry {
+                frame_id_hex: hex_encode(&frame_id_blob),
+                timestamp_ns: row.get::<_, i64>(1)? as u64,
+                spirit_pid: row.get::<_, i64>(2)? as u32,
+                boot_nonce: row.get::<_, i64>(3)? as u64,
+                capability_token_hex: cap_blob.as_ref().map(|b| hex_encode(b)),
+                kind: kind_str,
+                intent: row.get(6)?,
+                redaction,
             })
         })
         .map_err(AuditError::Read)?;
@@ -1197,6 +1397,7 @@ mod tests {
             capability_token_hex: Some("bb".repeat(32)),
             kind: "capability.invocation".into(),
             intent: "delegate".into(),
+            redaction: None,
         }];
         let mut buf = Vec::new();
         to_ndjson(entries, &mut buf).unwrap();
@@ -1217,6 +1418,7 @@ mod tests {
             capability_token_hex: Some("bb".repeat(32)),
             kind: "inference.call".into(),
             intent: "claude-3-haiku".into(),
+            redaction: None,
         }
     }
 

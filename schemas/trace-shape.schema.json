@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://maos.dev/schemas/trace-shape.v1.json",
+  "$comment": "v1.0 HARD byte-identity: two replays of the same bundle produce byte-identical output. v1.5 extends to cross-platform/cross-toolchain/cross-schema-revision envelope.",
+  "title": "MAOS Trace Shape",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source_bundle_hash",
+    "frame_count",
+    "frames",
+    "determinism_scope"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "maos.trace-shape.v1"
+    },
+    "source_bundle_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Hex-encoded SHA-256 of the source trajectory/audit bundle canonical bytes."
+    },
+    "frame_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of frames in the trace."
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/frame"
+      }
+    },
+    "determinism_scope": {
+      "const": "v1.0-single-platform"
+    }
+  },
+  "$defs": {
+    "frame": {
+      "type": "object",
+      "required": [
+        "frame_id",
+        "timestamp_ns",
+        "kind",
+        "intent",
+        "shape_class",
+        "placeholder"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "frame_id": {
+          "type": "string"
+        },
+        "timestamp_ns": {
+          "type": "integer"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "intent": {
+          "type": "string"
+        },
+        "shape_class": {
+          "type": "string",
+          "enum": [
+            "structural",
+            "capability",
+            "halt",
+            "decision",
+            "telemetry",
+            "other"
+          ]
+        },
+        "placeholder": {
+          "type": ["string", "null"],
+          "description": "Redaction placeholder string when the frame was redacted; null otherwise."
+        }
+      }
+    }
+  }
+}

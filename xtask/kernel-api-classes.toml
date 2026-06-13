@@ -538,3 +538,6 @@
 "maos_registry::client::McpSpiritRegistryClient"                       = "data-movement"
 "maos_registry::admission::admit_spirit"                                = "data-movement"
 "maos_domain::ports::registry::SpiritRegistryClient"                    = "data-movement"
+
+# Story 9.2 — registered erasure backend names (data-movement: erasure is a payload-transform/registry lookup)
+"maos_kernel_core::memory::REGISTERED_ERASURE_BACKENDS" = "data-movement"

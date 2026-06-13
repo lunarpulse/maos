@@ -929,6 +929,23 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
             spirit,
             format,
         }) => audit_posture_delta(range, spirit.as_deref(), *format, color),
+        Some(AuditQuery::Export {
+            spirit,
+            range,
+            output,
+            audit_key,
+            redaction_policy,
+        }) => audit_trajectory_export(
+            spirit.as_deref(),
+            range.as_deref(),
+            output,
+            audit_key,
+            redaction_policy,
+            color,
+        ),
+        Some(AuditQuery::Replay { bundle, output }) => {
+            audit_replay(bundle, output)
+        }
     }
 }
 
@@ -1151,12 +1168,19 @@ fn audit_sealed_export(
     let mut filter = maos_audit::AuditFilter::default();
     if let Some(name) = spirit {
         match resolve_spirit_pid(name, &db_path, false) {
-            Ok(pairs) => {
-                if let Some(pair) = pairs.first() {
+            Ok(pairs) => match pairs.as_slice() {
+                [] => {}
+                [pair] => {
                     filter.spirit_pid = Some(pair.1);
                     filter.boot_nonce = Some(pair.0);
                 }
-            }
+                _ => {
+                    eprintln!(
+                        "maosctl: audit sealed-export — spirit '{name}' resolves to multiple (boot_nonce, pid) pairs; use --all-boots or disambiguate"
+                    );
+                    return ExitCode::from(2);
+                }
+            },
             Err(diag) => {
                 eprintln!("maosctl: audit sealed-export — {diag}");
                 return ExitCode::from(2);
@@ -1580,6 +1604,392 @@ fn audit_posture_delta(
     }
 
     ExitCode::SUCCESS
+}
+
+// ─── FR46: Trajectory Export ────────────────────────────────────────────
+
+/// FR46 — produce a signed trajectory export bundle.
+fn audit_trajectory_export(
+    spirit: Option<&str>,
+    range: Option<&str>,
+    output: &Option<PathBuf>,
+    audit_key: &Option<PathBuf>,
+    redaction_policy: &str,
+    _color: ColorChoice,
+) -> ExitCode {
+    const VALID_REDUCTION_POLICIES: &[&str] = &["none", "all"];
+    if !VALID_REDUCTION_POLICIES.contains(&redaction_policy) {
+        eprintln!(
+            "maosctl: audit export — unknown redaction policy '{}'. valid: {}",
+            redaction_policy,
+            VALID_REDUCTION_POLICIES.join(", ")
+        );
+        return ExitCode::from(2);
+    }
+
+    // Load audit signing key
+    let seed = match maos_domain::audit_key::load_audit_key_seed(audit_key) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("maosctl: audit export — {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let db_path = default_transparency_log_path();
+    let mut filter = maos_audit::AuditFilter::default();
+    if let Some(name) = spirit {
+        match resolve_spirit_pid(name, &db_path, false) {
+            Ok(pairs) => match pairs.as_slice() {
+                [] => {}
+                [pair] => {
+                    filter.spirit_pid = Some(pair.1);
+                    filter.boot_nonce = Some(pair.0);
+                }
+                _ => {
+                    eprintln!(
+                        "maosctl: audit export — spirit '{name}' resolves to multiple (boot_nonce, pid) pairs; use --all-boots or disambiguate"
+                    );
+                    return ExitCode::from(2);
+                }
+            },
+            Err(diag) => {
+                eprintln!("maosctl: audit export — {diag}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    if let Some(range_str) = range {
+        match parse_range(range_str) {
+            Ok((since, until)) => {
+                filter.since_ns = since;
+                if let Some(u) = until {
+                    filter.until_ns = Some(u);
+                }
+            }
+            Err(e) => {
+                eprintln!("maosctl: audit export — {e}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    // Use query_with_redaction to get redaction metadata
+    let mut entries = match maos_audit::query_with_redaction(&db_path, filter) {
+        Ok(e) => e,
+        Err(maos_audit::AuditError::Open(_)) => {
+            eprintln!(
+                "maosctl: audit export — no Transparency Log found at {}. \
+                 Run `maosctl run hello-spirit` first to seed the log.",
+                db_path.display()
+            );
+            return ExitCode::from(2);
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit export — error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    // Apply redaction policy — fail-closed / default-deny
+    let apply_redaction = redaction_policy != "none";
+    let mut applied_redaction = false;
+    if apply_redaction {
+        for entry in &mut entries {
+            if let Some(meta) = entry.redaction.as_ref() {
+                // Redact: scrub intent to placeholder
+                entry.intent = maos_audit::replay::render_placeholder(meta);
+                applied_redaction = true;
+            }
+        }
+    }
+
+    // Build freshness
+    let now_ns = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) => d.as_nanos() as u64,
+        Err(e) => {
+            eprintln!("maosctl: audit export — system clock before Unix epoch: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let since_ns = entries.iter().map(|e| e.timestamp_ns).min().unwrap_or(0);
+    let until_ns = entries.iter().map(|e| e.timestamp_ns).max().unwrap_or(now_ns);
+
+    let export_seq = match next_export_seq() {
+        Ok(seq) => seq,
+        Err(e) => {
+            eprintln!("maosctl: audit export — {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let freshness = maos_audit::sealed_export::FreshnessMetadata {
+        export_timestamp_ns: now_ns,
+        covered_window: maos_audit::sealed_export::CoveredWindow { since_ns, until_ns },
+        export_seq,
+    };
+
+    let i12_refs: Vec<String> = entries
+        .iter()
+        .filter(|e| e.kind == "distillate")
+        .map(|e| e.frame_id_hex.clone())
+        .collect();
+    let i11_content: Vec<maos_audit::sealed_export::I11Content> = entries
+        .iter()
+        .filter(|e| e.kind == "distillate")
+        .map(|e| maos_audit::sealed_export::I11Content {
+            source_log_ref: vec![e.frame_id_hex.clone()],
+            distillation_depth: 1,
+        })
+        .collect();
+
+    // Build with trajectory schema version; redaction fields are part of the
+    // signed payload so third-party verification covers them.
+    let unsigned = maos_audit::sealed_export::build_trajectory_bundle(
+        entries,
+        i12_refs,
+        i11_content,
+        freshness,
+        applied_redaction,
+        redaction_policy.to_string(),
+    );
+
+    let signed = match maos_audit::sealed_export::sign_bundle(unsigned, &seed) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("maosctl: audit export — signing error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let json_bytes = match serde_json::to_string_pretty(&signed) {
+        Ok(s) => s.into_bytes(),
+        Err(e) => {
+            eprintln!("maosctl: audit export — serialization error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    match output {
+        Some(path) => {
+            if let Some(parent) = path.parent() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    eprintln!("maosctl: audit export — cannot create output dir: {e}");
+                    return ExitCode::from(2);
+                }
+            }
+            if let Err(e) = std::fs::write(path, &json_bytes) {
+                eprintln!("maosctl: audit export — write error: {e}");
+                return ExitCode::from(2);
+            }
+            let pubkey = maos_audit::sealed_export::derive_pubkey(&seed);
+            eprintln!(
+                "maosctl: trajectory export written to {} ({} entries, applied_redaction={}, pubkey {})",
+                path.display(),
+                signed.entries.len(),
+                signed.applied_redaction,
+                hex::encode(pubkey),
+            );
+        }
+        None => {
+            use std::io::Write;
+            let stdout = std::io::stdout();
+            if let Err(e) = stdout.lock().write_all(&json_bytes) {
+                eprintln!("maosctl: audit export — write error: {e}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    ExitCode::SUCCESS
+}
+
+/// Return the next monotonic export sequence number.
+///
+/// Persists the last used value in a small JSON file next to the Transparency
+/// Log so that repeated exports never reuse or regress the sequence, even if
+/// the system clock jumps backwards.
+fn next_export_seq() -> Result<u64, String> {
+    let tl_path = default_transparency_log_path();
+    let audit_dir = tl_path
+        .parent()
+        .ok_or("Transparency Log path has no parent directory")?;
+    let state_path = audit_dir.join("export-seq.json");
+    let last = std::fs::read_to_string(&state_path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| v.get("last_export_seq").and_then(|v| v.as_u64()))
+        .unwrap_or(0);
+
+    let now_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| format!("system clock before Unix epoch: {e}"))?
+        .as_nanos() as u64;
+
+    let seq = std::cmp::max(now_ns, last.saturating_add(1));
+
+    let state = serde_json::json!({ "last_export_seq": seq });
+    std::fs::create_dir_all(audit_dir)
+        .map_err(|e| format!("cannot create audit state dir: {e}"))?;
+    std::fs::write(&state_path, serde_json::to_string(&state).unwrap())
+        .map_err(|e| format!("cannot write export-seq state: {e}"))?;
+
+    Ok(seq)
+}
+
+// ─── ADR-028: Replay ───────────────────────────────────────────────────
+
+/// Maximum recursion depth when canonicalizing an untrusted bundle.
+const REPLAY_SORT_VALUE_MAX_DEPTH: usize = 128;
+
+/// ADR-028 — replay a sealed-export or trajectory bundle as a trace-shape doc.
+fn audit_replay(bundle_path: &PathBuf, output: &Option<PathBuf>) -> ExitCode {
+    // Read bundle file
+    let bundle_bytes = match std::fs::read(bundle_path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("maosctl: audit replay — cannot read bundle: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let bundle_val: serde_json::Value = match serde_json::from_slice(&bundle_bytes) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("maosctl: audit replay — invalid JSON: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    // Extract entries from the bundle
+    let entries_val = match bundle_val.get("entries") {
+        Some(v) => v,
+        None => {
+            eprintln!("maosctl: audit replay — bundle has no 'entries' field");
+            return ExitCode::from(1);
+        }
+    };
+
+    let entries: Vec<maos_audit::AuditEntry> = match serde_json::from_value(entries_val.clone()) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("maosctl: audit replay — cannot parse entries: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    // Compute canonical bytes of the bundle (minus signature_block)
+    // for the source_bundle_hash. Reuse the shared sealed_export canonicalizer
+    // with a depth limit to avoid stack overflow on adversarial input.
+    let mut bundle_for_hash = bundle_val.clone();
+    if let Some(obj) = bundle_for_hash.as_object_mut() {
+        obj.remove("signature_block");
+    }
+    let canonical_bytes = match sort_value_with_depth_limit(
+        bundle_for_hash,
+        REPLAY_SORT_VALUE_MAX_DEPTH,
+    ) {
+        Ok(sorted) => serde_json::to_string(&sorted)
+            .expect("sorted Value is serializable")
+            .into_bytes(),
+        Err(e) => {
+            eprintln!("maosctl: audit replay — {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    // Run replay
+    let trace_shape = match maos_audit::replay::replay(&entries, &canonical_bytes) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("maosctl: audit replay — {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    let shape_bytes = match maos_audit::replay::runner::replay_to_canonical_bytes(&trace_shape) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("maosctl: audit replay — {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    // Output pretty-printed for human readability
+    let pretty = match serde_json::to_string_pretty(&trace_shape) {
+        Ok(s) => s.into_bytes(),
+        Err(e) => {
+            eprintln!("maosctl: audit replay — serialization error: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    match output {
+        Some(path) => {
+            if let Some(parent) = path.parent() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    eprintln!("maosctl: audit replay — cannot create output dir: {e}");
+                    return ExitCode::from(2);
+                }
+            }
+            if let Err(e) = std::fs::write(path, &pretty) {
+                eprintln!("maosctl: audit replay — write error: {e}");
+                return ExitCode::from(2);
+            }
+            eprintln!(
+                "maosctl: trace-shape written to {} ({} frames, {} canonical bytes)",
+                path.display(),
+                trace_shape.frame_count,
+                shape_bytes.len(),
+            );
+        }
+        None => {
+            use std::io::Write;
+            let stdout = std::io::stdout();
+            if let Err(e) = stdout.lock().write_all(&pretty) {
+                eprintln!("maosctl: audit replay — write error: {e}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    ExitCode::SUCCESS
+}
+
+/// Recursively sort JSON object keys with a depth limit.
+///
+/// Delegates to `maos_audit::sealed_export::sort_value` but guards against
+/// adversarial deeply-nested input that could otherwise stack-overflow the CLI.
+fn sort_value_with_depth_limit(
+    value: serde_json::Value,
+    max_depth: usize,
+) -> Result<serde_json::Value, String> {
+    fn recurse(v: serde_json::Value, depth: usize, max: usize) -> Result<serde_json::Value, String> {
+        if depth > max {
+            return Err("bundle nesting exceeds safe depth limit".to_string());
+        }
+        match v {
+            serde_json::Value::Object(map) => {
+                let mut sorted = serde_json::Map::new();
+                for (k, v) in map.into_iter() {
+                    sorted.insert(k, recurse(v, depth + 1, max)?);
+                }
+                Ok(serde_json::Value::Object(sorted))
+            }
+            serde_json::Value::Array(arr) => Ok(serde_json::Value::Array(
+                arr.into_iter()
+                    .map(|v| recurse(v, depth + 1, max))
+                    .collect::<Result<_, _>>()?,
+            )),
+            other => Ok(other),
+        }
+    }
+    Ok(maos_audit::sealed_export::sort_value(recurse(
+        value,
+        0,
+        max_depth,
+    )?))
 }
 
 /// Resolve the default Transparency Log SQLite path.

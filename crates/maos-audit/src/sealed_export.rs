@@ -15,6 +15,10 @@ pub struct AuditBundle {
     pub i12_digest_refs: Vec<String>,
     pub i11_distilled_content: Vec<I11Content>,
     pub freshness: FreshnessMetadata,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub applied_redaction: bool,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub redaction_policy: String,
     pub signature_block: SignatureBlock,
 }
 
@@ -53,6 +57,14 @@ pub struct BundleForSigning {
     pub i12_digest_refs: Vec<String>,
     pub i11_distilled_content: Vec<I11Content>,
     pub freshness: FreshnessMetadata,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub applied_redaction: bool,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub redaction_policy: String,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -74,6 +86,10 @@ pub enum SealedExportError {
 // ─── Core functions ────────────────────────────────────────────────────────
 
 /// Build a `BundleForSigning` from the raw components.
+///
+/// Used for the 9.1 `maos.audit-bundle.v1` surface. Redaction fields are left
+/// at their default values so they are omitted from the canonical bytes,
+/// preserving the 9.1 byte-identity contract.
 pub fn build_bundle(
     entries: Vec<crate::AuditEntry>,
     i12_refs: Vec<String>,
@@ -86,17 +102,34 @@ pub fn build_bundle(
         i12_digest_refs: i12_refs,
         i11_distilled_content: i11_content,
         freshness,
+        applied_redaction: false,
+        redaction_policy: String::new(),
     }
 }
 
-/// Deterministic canonical serialization: sorted keys, no insignificant whitespace.
+/// Build a `BundleForSigning` for a `maos.trajectory.v1` export.
 ///
-/// Serializes to `serde_json::Value`, recursively sorts all object keys via
-/// `BTreeMap` ordering, then outputs compact JSON. Ensures byte-identical
-/// output regardless of struct field declaration order.
-pub fn canonicalize(bundle: &BundleForSigning) -> Vec<u8> {
-    _canonicalize_to_bytes(bundle)
+/// Unlike [`build_bundle`], this populates `applied_redaction` and
+/// `redaction_policy` so they are covered by the Ed25519 signature.
+pub fn build_trajectory_bundle(
+    entries: Vec<crate::AuditEntry>,
+    i12_refs: Vec<String>,
+    i11_content: Vec<I11Content>,
+    freshness: FreshnessMetadata,
+    applied_redaction: bool,
+    redaction_policy: String,
+) -> BundleForSigning {
+    BundleForSigning {
+        schema_version: "maos.trajectory.v1".to_string(),
+        entries,
+        i12_digest_refs: i12_refs,
+        i11_distilled_content: i11_content,
+        freshness,
+        applied_redaction,
+        redaction_policy,
+    }
 }
+
 
 /// Sign the canonical bundle bytes with Ed25519.
 ///
@@ -119,6 +152,8 @@ pub fn sign_bundle(
         i12_digest_refs: bundle_for_signing.i12_digest_refs,
         i11_distilled_content: bundle_for_signing.i11_distilled_content,
         freshness: bundle_for_signing.freshness,
+        applied_redaction: bundle_for_signing.applied_redaction,
+        redaction_policy: bundle_for_signing.redaction_policy,
         signature_block: SignatureBlock {
             algorithm: "Ed25519".to_string(),
             attester_pubkey: hex::encode(pubkey_bytes),
@@ -127,10 +162,6 @@ pub fn sign_bundle(
     })
 }
 
-/// In-tree convenience verifier.
-///
-/// Rebuilds the canonical bytes (all fields except `signature_block`),
-/// hashes with sha256, and verifies the Ed25519 signature.
 pub fn verify_bundle(
     bundle: &AuditBundle,
     pubkey_bytes: &[u8; 32],
@@ -144,6 +175,8 @@ pub fn verify_bundle(
         i12_digest_refs: bundle.i12_digest_refs.clone(),
         i11_distilled_content: bundle.i11_distilled_content.clone(),
         freshness: bundle.freshness.clone(),
+        applied_redaction: bundle.applied_redaction,
+        redaction_policy: bundle.redaction_policy.clone(),
     };
 
     let canonical = canonicalize(&unsigned);
@@ -165,26 +198,33 @@ pub fn verify_bundle(
         .map_err(|_| SealedExportError::VerificationFailed)
 }
 
-/// Serialize a `BundleForSigning` to canonical bytes (sorted keys, no whitespace).
+/// Serialize any serializable value to canonical bytes (sorted keys, no whitespace).
 ///
-/// The approach: serialize to `serde_json::Value`, which preserves struct field
-/// order, then re-serialize using `serde_json::to_string` which outputs compact
-/// JSON. Since we control the struct definition order and use Vec (not HashMap),
-/// field order is deterministic.
-///
-/// For true sorted-key guarantee (independent of struct definition order),
-/// we serialize to a `BTreeMap<String, serde_json::Value>` first.
-fn _canonicalize_to_bytes(bundle: &BundleForSigning) -> Vec<u8> {
-    // Serialize to serde_json::Value, then convert to sorted representation
-    let value = serde_json::to_value(bundle).expect("BundleForSigning is always serializable");
+/// Public so that `replay::runner` and `maosctl audit replay` can reuse the same
+/// canonicalizer — ADR-028 D5b (one canonicalizer, not three).
+pub fn canonicalize_value<T: serde::Serialize>(value: &T) -> Vec<u8> {
+    let value = serde_json::to_value(value).expect("value is serializable");
     let sorted = sort_value(value);
     serde_json::to_string(&sorted)
         .expect("sorted Value is always serializable")
         .into_bytes()
 }
 
+/// Deterministic canonical serialization: sorted keys, no insignificant whitespace.
+///
+/// Serializes to `serde_json::Value`, recursively sorts all object keys via
+/// `BTreeMap` ordering, then outputs compact JSON. Ensures byte-identical
+/// output regardless of struct field declaration order.
+pub fn canonicalize(bundle: &BundleForSigning) -> Vec<u8> {
+    canonicalize_value(bundle)
+}
+
 /// Recursively sort all JSON object keys using BTreeMap for deterministic order.
-fn sort_value(value: serde_json::Value) -> serde_json::Value {
+///
+/// Public so that callers can canonicalize arbitrary `serde_json::Value` shapes
+/// with the same ordering rules (e.g., `maosctl audit replay` over an untrusted
+/// bundle read from disk).
+pub fn sort_value(value: serde_json::Value) -> serde_json::Value {
     match value {
         serde_json::Value::Object(map) => {
             let sorted: serde_json::Map<String, serde_json::Value> = {
@@ -225,6 +265,7 @@ mod tests {
             capability_token_hex: None,
             kind: "test.kind".to_string(),
             intent: "test.intent".to_string(),
+            redaction: None,
         }]
     }
 

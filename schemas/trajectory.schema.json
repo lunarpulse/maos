@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://maos.dev/schemas/trajectory.v1.json",
+  "$comment": "v1.0 HARD byte-identity over the signed/shape surface. v1.5 extends to cross-platform/cross-toolchain/cross-schema-revision envelope.",
+  "title": "maos.trajectory.v1",
+  "description": "Trajectory bundle for the MAOS audit trail. Canonical byte serialization for signing uses JSON with sorted keys and no insignificant whitespace (serde_json sorted_keys serializer). The Ed25519 signature covers sha256(canonical_bundle_bytes) where canonical_bundle_bytes is the sorted-key, no-whitespace JSON encoding of all fields except signature_block.",
+  "type": "object",
+  "required": ["schema_version", "entries", "applied_redaction", "redaction_policy", "freshness", "signature_block"],
+  "properties": {
+    "schema_version": {
+      "const": "maos.trajectory.v1"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["frame_id", "timestamp_ns", "spirit_pid", "boot_nonce", "kind", "intent"],
+        "properties": {
+          "frame_id": { "type": "string" },
+          "timestamp_ns": { "type": "integer" },
+          "spirit_pid": { "type": "integer" },
+          "boot_nonce": { "type": "integer" },
+          "capability_token": { "type": ["string", "null"] },
+          "kind": { "type": "string" },
+          "intent": { "type": "string" },
+          "redaction": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["class", "original_len_bucket"],
+                "properties": {
+                  "class": { "type": "string" },
+                  "original_len_bucket": { "type": "integer" }
+                },
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "applied_redaction": {
+      "type": "boolean",
+      "description": "True iff any entry in the bundle was redacted"
+    },
+    "redaction_policy": {
+      "type": "string",
+      "description": "Name of the redaction policy applied during export"
+    },
+    "freshness": {
+      "type": "object",
+      "required": ["export_timestamp_ns", "covered_window", "export_seq"],
+      "properties": {
+        "export_timestamp_ns": { "type": "integer" },
+        "covered_window": {
+          "type": "object",
+          "required": ["since_ns", "until_ns"],
+          "properties": {
+            "since_ns": { "type": "integer" },
+            "until_ns": { "type": "integer" }
+          },
+          "additionalProperties": false
+        },
+        "export_seq": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "signature_block": {
+      "type": "object",
+      "required": ["algorithm", "attester_pubkey", "signature"],
+      "properties": {
+        "algorithm": {
+          "const": "Ed25519"
+        },
+        "attester_pubkey": {
+          "type": "string",
+          "description": "hex-encoded 32-byte Ed25519 public key"
+        },
+        "signature": {
+          "type": "string",
+          "description": "hex-encoded 64-byte Ed25519 signature over sha256(canonical_bundle_bytes)"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
