@@ -15,6 +15,15 @@
 #          FLAG-Winston: authorized 2026-06-12 to support audit-read-side composition
 #          wiring (shared SecurityManagerAdapter/CapabilityRegistryAdapter owner and
 #          transparency-log query paths). The delta is additive; no public symbols removed.
+#   21276  Story 9.2  — GDPR Article 17 erasure spine (+79, charter-amended kernel delta).
+#          FLAG-Winston: authorized Decision C — distillate redaction-marker frame +
+#          conditional body-scrub on forget; additive only; no public symbols removed.
+#   21336  Story 9.2 review (2026-06-13) — GDPR erasure review patches (+60,
+#          charter-amended kernel delta). P29 durable legal-hold store wiring
+#          (place/release/consult in forget_with_reason), P3 content-filtered
+#          distillate scrub, P7 atomic frame-id capture, P2 case-insensitive
+#          hold, REGISTERED_ERASURE_BACKENDS const + release_legal_hold. All
+#          additive; no public symbols removed.
 # To change this number you MUST be landing an AUTHORIZED kernel delta (charter
 # amendment + FLAG-Winston), and you update it HERE — nowhere else.
-src_lines = 21197
+src_lines = 21336

@@ -251,6 +251,18 @@ CREATE TABLE IF NOT EXISTS approval_decision_log (
     reasoning           TEXT
 );
 
+-- Story 9.2 (P29) — durable per-principal-global legal holds.  Consulted by
+-- every forget/uninstall so a held principal cannot be erased by a later
+-- command until explicitly released (Decision E: release re-queues, never
+-- auto-fires).  Lives in the I9-sanctioned Transparency Log holder (same
+-- Connection) — no new state-bearing struct.
+CREATE TABLE IF NOT EXISTS legal_holds (
+    principal_id        TEXT    NOT NULL PRIMARY KEY,
+    reason              TEXT    NOT NULL,
+    case_ref            TEXT,
+    requested_at_ns     INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_approval_actor
     ON approval_decision_log(actor, timestamp_ns);
 ";
@@ -563,6 +575,286 @@ impl TransparencyLogAdapter {
                     "MAOS kernel panic — Transparency Log write failed: {e}. \
                      Architecture §7.3 I2: log-before-deliver guarantee broken; \
                      kernel halts. Audit the SQLite file for corruption."
+                );
+            }
+        }
+    }
+    /// Story 9.2 — overwrite a Distillate frame's payload with a redaction
+    /// tombstone.  This is the body-scrub half of Decision C; the marker
+    /// frame is appended separately so the audit chain remains append-only.
+    pub fn scrub_distillate_body(
+        &self,
+        frame_id: [u8; 16],
+        reason: &str,
+    ) -> Result<(), AuditError> {
+        let tombstone = serde_json::json!({
+            "redacted": true,
+            "reason": reason,
+            "original_kind": "Distillate",
+        });
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let changed = inner
+            .conn
+            .execute(
+                "UPDATE transparency_log SET payload_redacted = ?1 WHERE frame_id = ?2",
+                rusqlite::params![tombstone.to_string().as_bytes(), &frame_id[..]],
+            )
+            .map_err(AuditError::SqliteWriteFatal)?;
+        if changed == 0 {
+            // P25: a scrub that matched no row is indistinguishable from
+            // success unless we surface it — the distillate frame may not exist.
+            return Err(AuditError::SqliteRead(rusqlite::Error::QueryReturnedNoRows));
+        }
+        Ok(())
+    }
+
+    /// Story 9.2 — append a redaction-marker frame referencing a Distillate
+    /// frame.  Uses an intent string (`distillate.redacted`) rather than a new
+    /// `FrameKind` to keep the ABI frozen.
+    pub fn insert_distillate_redaction_marker(
+        &self,
+        principal_id: &str,
+        distillate_frame_id: [u8; 16],
+    ) -> LogBeforeDeliver<()> {
+        let payload = serde_json::json!({
+            "principal_id": principal_id,
+            "redacted_distillate_frame_id": format_frame_id_hex(&distillate_frame_id),
+        });
+        self.insert_frame_event(
+            FrameKind::TaskComplete,
+            0,
+            None,
+            "distillate.redacted",
+            payload.to_string().as_bytes(),
+            FrameOrigin::Kernel,
+        )
+    }
+
+    /// Story 9.2 — return every frame_id in the Transparency Log, sorted.
+    pub fn all_frame_ids(&self) -> Result<Vec<[u8; 16]>, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let mut stmt = inner
+            .conn
+            .prepare("SELECT frame_id FROM transparency_log ORDER BY timestamp_ns ASC, frame_id ASC")
+            .map_err(AuditError::SqliteRead)?;
+        let rows = stmt
+            .query_map([], |row| {
+                let bytes: Vec<u8> = row.get(0)?;
+                // P8: a corrupt/non-16-byte row must not panic the cascade.
+                if bytes.len() != 16 {
+                    return Err(rusqlite::Error::FromSqlConversionFailure(
+                        16,
+                        rusqlite::types::Type::Blob,
+                        format!(
+                            "transparency_log frame_id is {} bytes, expected 16",
+                            bytes.len()
+                        )
+                        .into(),
+                    ));
+                }
+                let mut arr = [0u8; 16];
+                arr.copy_from_slice(&bytes);
+                Ok(arr)
+            })
+            .map_err(AuditError::SqliteRead)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(AuditError::SqliteRead)?);
+        }
+        Ok(out)
+    }
+
+    /// Story 9.2 — list distinct principal_ids written by a given spirit pid.
+    pub fn principal_ids_for_spirit_pid(
+        &self,
+        spirit_pid: u32,
+    ) -> Result<Vec<String>, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let mut stmt = inner
+            .conn
+            .prepare("SELECT DISTINCT principal_id FROM principal_index WHERE writer_spirit_pid = ?1")
+            .map_err(AuditError::SqliteRead)?;
+        let rows = stmt
+            .query_map(rusqlite::params![spirit_pid as i64], |row| {
+                let pid: String = row.get(0)?;
+                Ok(pid)
+            })
+            .map_err(AuditError::SqliteRead)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(AuditError::SqliteRead)?);
+        }
+        Ok(out)
+    }
+
+    /// Story 9.2 — return every Distillate frame authored by a Spirit in
+    /// `writer_spirit_pids`, with its `payload_redacted` body.  Used by the
+    /// forget cascade to find candidate distillates for body-scrub (P3).
+    /// The cascade then applies a content-based filter so only distillates
+    /// that actually reference the forgotten principal are scrubbed.
+    pub fn distillate_frames_for_pids(
+        &self,
+        writer_spirit_pids: &std::collections::HashSet<u32>,
+    ) -> Result<Vec<([u8; 16], Vec<u8>)>, AuditError> {
+        if writer_spirit_pids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let placeholders = (0..writer_spirit_pids.len())
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "SELECT frame_id, payload_redacted FROM transparency_log \
+             WHERE kind = ?1 AND spirit_pid IN ({placeholders}) \
+             ORDER BY timestamp_ns ASC",
+        );
+        let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
+        let pid_params: Vec<Box<dyn rusqlite::types::ToSql>> = std::iter::once(Box::new(
+            FrameKind::Distillate as i64,
+        ) as Box<dyn rusqlite::types::ToSql>)
+            .chain(writer_spirit_pids.iter().map(|p| Box::new(*p as i64) as Box<dyn rusqlite::types::ToSql>))
+            .collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            pid_params.iter().map(|p| p.as_ref()).collect();
+        let rows = stmt
+            .query_map(param_refs.as_slice(), |row| {
+                let fid_bytes: Vec<u8> = row.get(0)?;
+                let payload: Vec<u8> = row.get(1)?;
+                let mut arr = [0u8; 16];
+                if fid_bytes.len() == 16 {
+                    arr.copy_from_slice(&fid_bytes);
+                }
+                Ok((arr, payload))
+            })
+            .map_err(AuditError::SqliteRead)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(AuditError::SqliteRead)?);
+        }
+        Ok(out)
+    }
+
+    /// Story 9.2 (P29) — place a durable per-principal-global legal hold.
+    /// Idempotent: re-placing replaces the reason/case_ref/timestamp.
+    pub fn place_legal_hold(
+        &self,
+        principal_id: &str,
+        reason: &str,
+        case_ref: Option<&str>,
+        requested_at_ns: u64,
+    ) -> Result<(), AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        inner
+            .conn
+            .execute(
+                "INSERT OR REPLACE INTO legal_holds \
+                 (principal_id, reason, case_ref, requested_at_ns) \
+                 VALUES (?1, ?2, ?3, ?4)",
+                rusqlite::params![
+                    principal_id,
+                    reason,
+                    case_ref,
+                    requested_at_ns as i64,
+                ],
+            )
+            .map_err(AuditError::SqliteWriteFatal)?;
+        Ok(())
+    }
+
+    /// Story 9.2 (P29) — is this principal under a durable legal hold?
+    pub fn is_under_legal_hold(&self, principal_id: &str) -> Result<bool, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let exists: i64 = inner
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM legal_holds WHERE principal_id = ?1",
+                rusqlite::params![principal_id],
+                |row| row.get(0),
+            )
+            .map_err(AuditError::SqliteRead)?;
+        Ok(exists > 0)
+    }
+
+    /// Story 9.2 (P29) — release a legal hold so the principal may be erased
+    /// again. Returns whether a hold was actually removed.
+    pub fn release_legal_hold(&self, principal_id: &str) -> Result<bool, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let removed = inner
+            .conn
+            .execute(
+                "DELETE FROM legal_holds WHERE principal_id = ?1",
+                rusqlite::params![principal_id],
+            )
+            .map_err(AuditError::SqliteWriteFatal)?;
+        Ok(removed > 0)
+    }
+
+    /// Story 9.2 (P7) — journal a kernel `TaskComplete` frame and return its
+    /// frame_id, both under one lock acquisition so a concurrent insert cannot
+    /// steal `last_frame_id`.  Panics on write failure per the I2 binding,
+    /// exactly like `insert_frame_event`.  Used by the forget cascade where the
+    /// receipt must name the frame that was just written.
+    pub fn insert_kernel_event_returning_id(
+        &self,
+        spirit_pid: u32,
+        intent: &str,
+        payload: &[u8],
+    ) -> [u8; 16] {
+        let redacted = self.redaction.redact(payload);
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let frame_id = Self::next_frame_id(&mut inner);
+        let timestamp_ns = wall_clock_now_ns();
+        inner.last_frame_id = frame_id;
+        let result = inner.conn.execute(
+            "INSERT INTO transparency_log
+                (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce, capability_token,
+                 kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            rusqlite::params![
+                &frame_id[..],
+                timestamp_ns as i64,
+                spirit_pid as i64,
+                "",
+                "",
+                inner.boot_nonce as i64,
+                None::<&[u8]>,
+                FrameKind::TaskComplete as i64,
+                intent,
+                &redacted[..],
+                FrameOrigin::Kernel as i64,
+            ],
+        );
+        match result {
+            Ok(_) => frame_id,
+            Err(e) => {
+                panic!(
+                    "MAOS I2 binding (Story 9.2 P7): transparency-log write failed for \
+                     '{intent}': {e}"
                 );
             }
         }
@@ -938,6 +1230,15 @@ impl TransparencyLogAdapter {
     }
 }
 
+/// Format a frame_id as colon-separated hex pairs.
+fn format_frame_id_hex(frame_id: &[u8; 16]) -> String {
+    frame_id
+        .chunks(2)
+        .map(|chunk| format!("{:02x}{:02x}", chunk[0], chunk[1]))
+        .collect::<Vec<_>>()
+        .join(":")
+}
+
 /// Adapter-side IacBusPort impl. v0.1-β routes log-before-deliver to the
 /// `MailboxStub`; Story 6.1 replaces the stub with the real DRR fairness
 /// scheduler + mailbox semantics.
@@ -1279,10 +1580,11 @@ mod tests {
             tables,
             vec![
                 "approval_decision_log",
+                "legal_holds",
                 "transparency_log",
                 "transparency_log_retractions"
             ],
-            "expected exactly three tables"
+            "expected exactly four tables"
         );
 
         // 2. No foreign keys on transparency_log

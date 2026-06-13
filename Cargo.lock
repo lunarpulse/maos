@@ -1194,6 +1194,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "maos-domain",
+ "maos-kernel-core",
  "rusqlite",
  "serde",
  "serde_json",

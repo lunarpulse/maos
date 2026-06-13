@@ -107,6 +107,19 @@ pub enum Subcommand {
     /// shows their admission state; `approve`/`reject` give the pending
     /// operator-admission queue its exit (no skill activates without `approve`).
     Skills(SkillsArgs),
+    /// GDPR Article 17 — forget a principal and emit a receipt.
+    Forget(ForgetArgs),
+}
+
+/// Story 9.2 — `maosctl forget --principal <id> [--reason <legal-hold>]`.
+#[derive(clap::Args, Debug)]
+pub struct ForgetArgs {
+    /// Principal identifier to erase (e.g. `alice@example.org`).
+    #[arg(long, value_name = "PRINCIPAL")]
+    pub principal: String,
+    /// Optional legal-hold reason, e.g. `legal-hold` or `legal-hold:<case-ref>`.
+    #[arg(long, value_name = "REASON")]
+    pub reason: Option<String>,
 }
 
 /// Story 7.4 — `maosctl skills <list|approve|reject>`.

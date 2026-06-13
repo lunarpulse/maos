@@ -20,7 +20,7 @@ hex = "0.4"
 
 [dev-dependencies]
 tempfile = "3"
-
+maos-kernel-core = { path = "../maos-kernel-core" }
 # Story 1b.5b — fixture generator binary. Synthetic FR4 NDJSON producer that
 # never touches `maos-kernel-core`; uses only existing deps (`serde_json`)
 # plus a hand-rolled LCG for determinism. Lives under `src/bin/` so it does
@@ -29,3 +29,7 @@ tempfile = "3"
 [[bin]]
 name = "gen_fixture"
 path = "src/bin/gen_fixture.rs"
+[[bin]]
+name = "gen_gdpr_cascade"
+path = "src/bin/gen_gdpr_cascade.rs"
+

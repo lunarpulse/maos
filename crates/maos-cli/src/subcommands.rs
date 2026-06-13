@@ -7,10 +7,10 @@ use std::process::ExitCode;
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
-    AuditFormat, AuditQuery, HaltArgs, HaltOp, ImportArgs, InstallArgs, OrchestratorArgs,
-    OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs,
-    RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs,
-    SpiritOp, Subcommand, UpgradePolicyArg,
+    AuditFormat, AuditQuery, ForgetArgs, HaltArgs, HaltOp, ImportArgs, InstallArgs,
+    OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice,
+    ResolutionKindChoice, ResumeArgs, RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs,
+    SkillsArgs, SkillsOp, SpiritArgs, SpiritOp, Subcommand, UpgradePolicyArg,
 };
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
@@ -20,6 +20,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Stop(args) => lifecycle_verb("stop", args.spirit.as_deref(), color),
         Subcommand::Unload(args) => lifecycle_verb("unload", args.spirit.as_deref(), color),
         Subcommand::Uninstall(args) => lifecycle_verb("uninstall", args.spirit.as_deref(), color),
+        Subcommand::Forget(args) => dispatch_forget(args, color),
         Subcommand::Run(args) => run(args, color),
         Subcommand::Audit(args) => audit_dispatch(&args.query, color),
         Subcommand::Posture(args) => dispatch_posture(args, color),
@@ -346,6 +347,40 @@ fn lifecycle_verb(verb: &str, spirit: Option<&str>, color: ColorChoice) -> ExitC
     }
 }
 
+/// Story 9.2 (FR45) — `maosctl forget` shells to `maos-bin` via the
+/// existing `MAOS_ONE_SHOT` env channel.  Principal and optional reason
+/// are forwarded through `MAOS_FORGET_PRINCIPAL` / `MAOS_FORGET_REASON`.
+fn dispatch_forget(args: &ForgetArgs, color: ColorChoice) -> ExitCode {
+    let principal = args.principal.trim();
+    if principal.is_empty() {
+        eprintln!("maosctl: forget requires a non-empty --principal");
+        return ExitCode::from(2);
+    }
+
+    let bin = maos_bin_path();
+    let mut cmd = std::process::Command::new(&bin);
+    cmd.env("MAOS_ONE_SHOT", "forget");
+    cmd.env("MAOS_FORGET_PRINCIPAL", principal);
+    if let Some(reason) = &args.reason {
+        cmd.env("MAOS_FORGET_REASON", reason);
+    }
+
+    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+        cmd.env("NO_COLOR", "1");
+    }
+
+    match cmd.status() {
+        Ok(s) if s.success() => ExitCode::SUCCESS,
+        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
+        Err(e) => {
+            eprintln!(
+                "maosctl: failed to execute maos-bin at '{}': {e}",
+                bin.display()
+            );
+            ExitCode::from(2)
+        }
+    }
+}
 fn dispatch_posture(args: &PostureArgs, color: ColorChoice) -> ExitCode {
     if let Err(diag) = resolve_spirit_pid(&args.spirit, &default_transparency_log_path(), false) {
         eprintln!("maosctl: posture — {diag}");
@@ -1560,7 +1595,7 @@ fn default_transparency_log_path() -> PathBuf {
 mod tests {
     use super::*;
     use crate::accessibility::ColorChoice;
-    use crate::cli::{Cli, InstallArgs, RunArgs, Subcommand};
+    use crate::cli::{Cli, ForgetArgs, InstallArgs, RunArgs, Subcommand};
     use clap::Parser;
 
     #[test]
@@ -1991,5 +2026,49 @@ mod tests {
             },
             _ => panic!("expected Audit subcommand"),
         }
+    }
+    // ── FR45 forget dispatch parsing tests (Story 9.2) ───────────────
+
+    #[test]
+    fn forget_parses_principal_and_reason() {
+        let cli = Cli::try_parse_from([
+            "maosctl",
+            "forget",
+            "--principal",
+            "urn:maos:principal:test",
+            "--reason",
+            "gdpr-art17",
+        ])
+        .expect("forget --principal --reason must parse");
+        match &cli.command {
+            Subcommand::Forget(args) => {
+                assert_eq!(args.principal, "urn:maos:principal:test");
+                assert_eq!(args.reason.as_deref(), Some("gdpr-art17"));
+            }
+            _ => panic!("expected Forget subcommand"),
+        }
+    }
+
+    #[test]
+    fn forget_reason_is_optional() {
+        let cli = Cli::try_parse_from(["maosctl", "forget", "--principal", "p1"])
+            .expect("forget with only --principal must parse");
+        match &cli.command {
+            Subcommand::Forget(args) => {
+                assert_eq!(args.principal, "p1");
+                assert!(args.reason.is_none());
+            }
+            _ => panic!("expected Forget subcommand"),
+        }
+    }
+
+    #[test]
+    fn dispatch_forget_rejects_empty_principal() {
+        let args = ForgetArgs {
+            principal: "".into(),
+            reason: None,
+        };
+        let code = dispatch_forget(&args, ColorChoice::Auto);
+        assert_ne!(code, ExitCode::SUCCESS);
     }
 }

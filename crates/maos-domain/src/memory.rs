@@ -360,6 +360,36 @@ impl ForgetReceipt {
         })
     }
 }
+// ---------------------------------------------------------------------------
+// Story 9.2 — GDPR Art.17 forget outcome with legal-hold suspension.
+// ---------------------------------------------------------------------------
+
+/// Record of a lawful legal-hold that blocked a forget cascade.
+/// Per Decision E: scope is per-principal-global in v1.0; the schema
+/// reserves `scope` so per-Spirit holds can be added later.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LegalHoldRecord {
+    pub principal_id: String,
+    pub scope: String,
+    pub reason: String,
+    pub case_ref: Option<String>,
+    pub requested_at_ns: u64,
+    pub status: String,
+}
+
+/// Result of `MemoryManagerAdapter::forget_with_reason`.
+/// Either the cascade erased the principal, or a legal hold suspended it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "outcome")]
+pub enum ForgetOutcome {
+    Erased {
+        receipt: ForgetReceipt,
+        redacted_distillate_frame_ids: Vec<String>,
+    },
+    Suspended {
+        hold: LegalHoldRecord,
+    },
+}
 
 // ---------------------------------------------------------------------------
 // ExportEntry / ExportPayload

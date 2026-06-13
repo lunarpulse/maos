@@ -25,6 +25,14 @@ pub use private::PrivateMemoryStore;
 pub use self_telemetry::SelfTelemetryAggregator;
 pub use shared::SharedMemoryStore;
 
+/// Decision F — the registered set of storage backends the GDPR forget cascade
+/// must account for.  This is the single source of truth shared with the
+/// multi-backend erasure test: adding a backend here WITHOUT partitioning it
+/// (proved-erased / proved-principal-empty) in that test FAILS the test, so a
+/// new backend can never slip through unaudited.
+pub const REGISTERED_ERASURE_BACKENDS: &[&str] = &["private", "principal_index", "shared"];
+
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -33,11 +41,10 @@ use maos_spirit_sdk::spirit_test::{AttemptResult, IsolationHookPoint, Observatio
 #[cfg(feature = "spirit_test")]
 use parking_lot::Mutex;
 
-use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
-use maos_domain::invariants::i3::FrameOrigin;
+use crate::iac::transparency_log::TransparencyLogAdapter;
 use maos_domain::memory::{
-    ExportEntry, ExportPayload, ForgetReceipt, MemoryEntry, MemoryError, MemoryNamespace,
-    MemoryTier, MemoryValue, PrincipalIndexRow,
+    ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord, MemoryEntry,
+    MemoryError, MemoryNamespace, MemoryTier, MemoryValue, PrincipalIndexRow,
 };
 
 // Re-exports above make PrivateMemoryStore, SharedMemoryStore,
@@ -94,6 +101,170 @@ impl MemoryManagerAdapter {
     pub fn with_isolation_hook(mut self, hook: Arc<Mutex<dyn IsolationHookPoint + Send>>) -> Self {
         self.isolation_hook = Some(hook);
         self
+    }
+    /// Story 9.2 — GDPR Art.17 forget cascade with optional legal-hold.
+    ///
+    /// * `reason` starting with `legal-hold` (case-insensitive) places a
+    ///   **durable** per-principal-global hold (P29) and suspends erasure.
+    /// * A principal already under a durable hold is suspended even without an
+    ///   explicit reason — a second command cannot bypass a hold.
+    /// * Otherwise the cascade runs and distillate bodies that reference the
+    ///   principal are scrubbed + redaction-marker frames appended.
+    pub fn forget_with_reason(
+        &self,
+        principal_id: &str,
+        reason: Option<&str>,
+    ) -> Result<ForgetOutcome, MemoryError> {
+        // P2: case-insensitive legal-hold detection.  Both the bare form and
+        // the `legal-hold:<ref>` form must match regardless of capitalization.
+        let is_legal_hold = reason
+            .map(|r| {
+                let lower = r.trim().to_ascii_lowercase();
+                lower == "legal-hold" || lower.starts_with("legal-hold:")
+            })
+            .unwrap_or(false);
+
+        if is_legal_hold {
+            // P29: place a DURABLE hold consulted by every later forget/uninstall.
+            let requested_at_ns = Self::now_ns();
+            let reason_str = reason.unwrap_or("legal-hold").to_string();
+            let lower = reason_str.trim().to_ascii_lowercase();
+            let case_ref = lower
+                .strip_prefix("legal-hold:")
+                .map(|s| s.trim().to_string());
+            self.transparency_log
+                .place_legal_hold(
+                    principal_id,
+                    &reason_str,
+                    case_ref.as_deref(),
+                    requested_at_ns,
+                )
+                .map_err(|e| MemoryError::Storage(e.to_string()))?;
+            let payload = serde_json::json!({
+                "principal_id": principal_id,
+                "scope": "principal",
+                "reason": reason_str,
+                "case_ref": case_ref,
+                "status": "suspended",
+            });
+            // P7: journal + capture frame_id atomically.
+            self.transparency_log.insert_kernel_event_returning_id(
+                0,
+                "principal.forget.held",
+                payload.to_string().as_bytes(),
+            );
+            let hold = LegalHoldRecord {
+                principal_id: principal_id.to_string(),
+                scope: "principal".to_string(),
+                reason: reason_str,
+                case_ref,
+                requested_at_ns,
+                status: "NOT ERASED — SUSPENDED UNDER LEGAL HOLD".to_string(),
+            };
+            return Ok(ForgetOutcome::Suspended { hold });
+        }
+
+        // P29: a prior durable hold blocks erasure even without an explicit
+        // reason on THIS invocation.  This is the cross-command protection the
+        // uninstall path relies on (run_uninstall_cascade calls with reason=None).
+        if self
+            .transparency_log
+            .is_under_legal_hold(principal_id)
+            .map_err(|e| MemoryError::Storage(e.to_string()))?
+        {
+            let requested_at_ns = Self::now_ns();
+            let payload = serde_json::json!({
+                "principal_id": principal_id,
+                "scope": "principal",
+                "status": "suspended-by-prior-hold",
+            });
+            self.transparency_log.insert_kernel_event_returning_id(
+                0,
+                "principal.forget.held",
+                payload.to_string().as_bytes(),
+            );
+            let hold = LegalHoldRecord {
+                principal_id: principal_id.to_string(),
+                scope: "principal".to_string(),
+                reason: "blocked by prior durable legal hold".to_string(),
+                case_ref: None,
+                requested_at_ns,
+                status: "NOT ERASED — SUSPENDED UNDER PRIOR LEGAL HOLD".to_string(),
+            };
+            return Ok(ForgetOutcome::Suspended { hold });
+        }
+
+        // 1. Snapshot index rows (needed to identify affected Spirits/distillates).
+        let rows = self.principal_index.lookup(principal_id)?;
+        let writer_pids: HashSet<u32> = rows.iter().map(|r| r.writer_spirit_pid).collect();
+
+        // 2. Body-scrub for distillates that REFERENCE the forgotten principal.
+        //    P3: only distillates whose body embeds the principal_id are
+        //    scrubbed — not every distillate by any writer Spirit (which would
+        //    destroy unrelated principals' data).
+        //    P5: a query error is propagated, not silently dropped.
+        //    P4: a scrub/marker failure is propagated and the frame is NOT
+        //    attested as redacted.
+        let mut redacted_distillate_frame_ids: Vec<String> = Vec::new();
+        if !writer_pids.is_empty() {
+            let distillates = self
+                .transparency_log
+                .distillate_frames_for_pids(&writer_pids)
+                .map_err(|e| MemoryError::Storage(e.to_string()))?;
+            let needle = principal_id.as_bytes();
+            for (frame_id, body) in distillates {
+                if !body.windows(needle.len()).any(|w| w == needle) {
+                    continue;
+                }
+                self.transparency_log
+                    .scrub_distillate_body(frame_id, "gdpr-forget")
+                    .map_err(|e| MemoryError::Storage(e.to_string()))?;
+                let _ = self
+                    .transparency_log
+                    .insert_distillate_redaction_marker(principal_id, frame_id);
+                redacted_distillate_frame_ids.push(hex::encode(frame_id));
+            }
+        }
+
+        // 3. Delete private-tier entries + principal_index rows (existing cascade).
+        let deleted_entries = self.private.forget_principal(principal_id)?;
+        let deleted_index_rows = self.principal_index.forget(principal_id)?;
+
+        // 4. Journal the cascade with the redaction set and reason.  P7: the
+        //    frame_id is captured atomically with the insert.
+        let payload = serde_json::json!({
+            "principal_id": principal_id,
+            "deleted_entries": deleted_entries,
+            "deleted_index_rows": deleted_index_rows,
+            "redacted_distillate_frame_ids": redacted_distillate_frame_ids,
+            "reason": reason,
+        });
+        let frame_id = self.transparency_log.insert_kernel_event_returning_id(
+            0,
+            "principal.forget",
+            payload.to_string().as_bytes(),
+        );
+        let timestamp_ns = Self::now_ns();
+        let receipt = ForgetReceipt::new(
+            principal_id,
+            deleted_entries,
+            deleted_index_rows,
+            timestamp_ns,
+            frame_id,
+        )
+        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        Ok(ForgetOutcome::Erased {
+            receipt,
+            redacted_distillate_frame_ids,
+        })
+    }
+
+    /// Story 9.2 (P29) — release a durable legal hold so the principal may be
+    /// erased again.  Returns whether a hold was actually removed.
+    pub fn release_legal_hold(&self, principal_id: &str) -> Result<bool, MemoryError> {
+        self.transparency_log
+            .release_legal_hold(principal_id)
+            .map_err(|e| MemoryError::Storage(e.to_string()))
     }
 
     #[cfg(feature = "spirit_test")]
@@ -254,48 +425,16 @@ impl MemoryManagerPort for MemoryManagerAdapter {
     }
 
     fn forget(&self, principal_id: &str) -> Result<ForgetReceipt, MemoryError> {
-        // 1. Collect index rows (pre-delete snapshot).
-        let rows = self.principal_index.lookup(principal_id)?;
-        let index_count = rows.len() as u64;
-
-        // 2. Delete from PrivateMemoryStore for each index row.
-        let mut deleted_entries: u64 = 0;
-        for row in &rows {
-            let ns = MemoryNamespace::principal(&row.principal_id, &row.schema)
-                .map_err(|e| MemoryError::Storage(e.to_string()))?;
-            // We track the count from forget_principal which does a batch delete.
+        match self.forget_with_reason(principal_id, None)? {
+            ForgetOutcome::Erased { receipt, .. } => Ok(receipt),
+            ForgetOutcome::Suspended { .. } => {
+                // The trait-level `forget` is the legacy no-reason path;
+                // a legal-hold is impossible without an explicit reason.
+                Err(MemoryError::Storage(
+                    "forget unexpectedly returned legal-hold without reason".to_string(),
+                ))
+            }
         }
-        // Use the principal-level forget on the private store.
-        deleted_entries = self.private.forget_principal(principal_id)?;
-
-        // 3. Delete from PrincipalNamespaceIndex.
-        let deleted_index_rows = self.principal_index.forget(principal_id)?;
-
-        // 4. Mint frame_id and timestamp.
-        let frame_id = self.mint_frame_id();
-        let timestamp_ns = Self::now_ns();
-
-        // 5. Write Transparency Log frame.
-        let payload = format!(
-            "principal_forget: id={} entries={} index_rows={}",
-            principal_id, deleted_entries, deleted_index_rows
-        );
-        self.transparency_log.insert_frame_event(
-            FrameKind::TaskComplete,
-            0, // kernel-side cascade — affects multiple Spirits
-            None,
-            "principal.forget",
-            payload.as_bytes(),
-            FrameOrigin::Kernel,
-        );
-
-        Ok(ForgetReceipt {
-            principal_id: principal_id.to_string(),
-            deleted_entries,
-            deleted_index_rows,
-            timestamp_ns,
-            frame_id,
-        })
     }
 
     fn export_redactable(

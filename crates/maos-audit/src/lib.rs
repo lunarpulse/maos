@@ -13,6 +13,7 @@
 //! Story 9.1 extends this crate with subject-access, posture-delta, and
 //! sealed-export functions.
 
+pub mod erasure;
 pub mod log_composition;
 pub mod sealed_export;
 
@@ -666,6 +667,36 @@ pub fn default_archive_dir() -> std::path::PathBuf {
         })
         .unwrap_or_else(|| PathBuf::from("/var/lib"));
     data_home.join("maos").join("spirit-archives")
+}
+/// Resolve the default erasure-proof retention directory (Story 9.2).
+///
+/// Precedence (highest → lowest):
+///   1. `MAOS_ERASURE_PROOFS_DIR` env var
+///   2. `$XDG_DATA_HOME/maos/erasure-proofs`
+///   3. `$HOME/.local/share/maos/erasure-proofs`
+///   4. `/var/lib/maos/erasure-proofs`
+pub fn default_erasure_proofs_dir() -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Ok(p) = std::env::var("MAOS_ERASURE_PROOFS_DIR") {
+        if !p.is_empty() {
+            return PathBuf::from(p);
+        }
+        // P19: an empty MAOS_ERASURE_PROOFS_DIR silently falls through to the
+        // default path — a read-only library path-resolver must not perform
+        // side-effecting I/O on a recoverable misconfiguration.
+    }
+    let data_home = std::env::var("XDG_DATA_HOME")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .filter(|h| !h.is_empty())
+                .map(|h| PathBuf::from(h).join(".local").join("share"))
+        })
+        .unwrap_or_else(|| PathBuf::from("/var/lib"));
+    data_home.join("maos").join("erasure-proofs")
 }
 /// Resolve a Spirit name to one or more `(boot_nonce, spirit_pid)` pairs by
 /// scanning the Transparency Log for SpiritAdmitted (FrameKind 19) frames

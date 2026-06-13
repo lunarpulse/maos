@@ -357,6 +357,23 @@ jobs:
       - name: Run check-corpus
         run: cargo run -p xtask -- check-corpus --json
 
+  maos-audit-read-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Grep for write-open patterns in maos-audit
+        run: |
+          set +e
+          violations=0
+          if grep -R -E 'OPEN_READ_WRITE|SQLITE_OPEN_CREATE|SQLITE_OPEN_READ_WRITE' crates/maos-audit/ --include='*.rs'; then
+            echo "Story 9.2 / Decision A.2 violation: maos-audit contains a write-open pattern"
+            violations=1
+          fi
+          if [ "$violations" -ne 0 ]; then
+            exit 1
+          fi
+          echo "maos-audit read-only guard passed."
+
   check-judge-config:
     runs-on: ubuntu-latest
     steps:
@@ -2000,7 +2017,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
-    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, mira-tests, nash-tests, orchestrator-tests, worker-tests, architect-tests, reviewer-tests, founder-loop-bench, mira-nash-bench, safety-critical-corpus-8-5, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-founder-loop-8-4, smoke-mira-nash-8-5, a2a-tcp-tests-8-6, smoke-a2a-tcp-8-6, smoke-a2a-loopback-6-3, smoke-a2a-consent-vocab-8-7, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b, check-a2a-sender-completeness, smoke-a2a-fail-closed-8-8, check-kernel-baseline, check-epic-close-green, journey-hermetic-tier-1]
+    needs: [reproducible-build, check-unsafe, check-empty-kernel, check-loom, check-service-boundary, kloc-check, abi-diff, invariant-lock, check-corpus, maos-audit-read-only, check-judge-config, check-security-md, server-exit-drain, audit-spine-smoke, cap-token-verify-bench, cap-registry-smoke, fr4-1000-call-fixture, audit-query-fr4-smoke, maosctl-smoke, manifest-field-coverage, v01-evaluator-path, hello-spirit-tests, hello-spirit-bench, onb-nfr2-timing, coverage-matrix, corpus-staleness, calibrate-per-commit, determinism-tests, check-fr47, check-workspace-count, example-spirit-tests, butler-tests, researcher-tests, researcher-bench, observer-tests, mira-tests, nash-tests, orchestrator-tests, worker-tests, architect-tests, reviewer-tests, founder-loop-bench, mira-nash-bench, safety-critical-corpus-8-5, example-spirit-drift, example-spirit-ts-tests, spirit-test-tests, lcas-corpus-tests, isolation-framework-tests, check-pub-field-constructors, check-composition-root-completeness, nfr-rel-1-crash-detection-2s, nfr-rel-2-hang-detection-60s, nfr-rel-4-silent-failure-detection, nfr-rel-10-cold-restart, nfr-rel-11-halt-receipt-999pct, nfr-rel-9-revocation-5s-p99, upgrade-policy-corpus, revocation-corpus, t3-escape-corpus, nfr-sec-1-t3-image-signature, t3-smoke-busybox, multi-provider-drift-tests, retract-corpus-tests, check-serde-error-handling, nfr-perf-1-iac-routing-budget, nfr-perf-8-orchestrator-fanout, nfr-aud-14-intent-lineage-corpus, smoke-orchestrator-fanout-6-2, smoke-founder-loop-8-4, smoke-mira-nash-8-5, a2a-tcp-tests-8-6, smoke-a2a-tcp-8-6, smoke-a2a-loopback-6-3, smoke-a2a-consent-vocab-8-7, a2a-loopback-corpus-v0, intent-lineage-a2a-extension-6-3, smoke-schedule-6-4, fr26-schedule-firing-corpus, adr-034-consent-rupture-corpus, nfr-scale-4-rate-limit-isolation, intent-lineage-6-4-extension, check-manifest-schema-version, manifest-n-minus-1-test, check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated, coverage-matrix-nfr-test-3, smoke-discipline-7-1-5, smoke-registry-7-2, fr59-yank-propagation-5min, air-gap-import-corpus, ccac-n600-ship-gate, smoke-compliance-7-3, smoke-skill-7-4, check-skill-schema, smoke-abi-7-5a, check-stability-matrix, check-breaking-md, nfr-onb-1-gate, smoke-onb-1-7-5b, check-a2a-sender-completeness, smoke-a2a-fail-closed-8-8, check-kernel-baseline, check-epic-close-green, journey-hermetic-tier-1]
     if: always()
     permissions:
       pull-requests: write
@@ -2017,6 +2034,7 @@ jobs:
           echo "ad=${{ needs.abi-diff.result }}" >> $GITHUB_OUTPUT
           echo "il=${{ needs.invariant-lock.result }}" >> $GITHUB_OUTPUT
           echo "cc=${{ needs.check-corpus.result }}" >> $GITHUB_OUTPUT
+          echo "mar=${{ needs.maos-audit-read-only.result }}" >> $GITHUB_OUTPUT
           echo "cjc=${{ needs.check-judge-config.result }}" >> $GITHUB_OUTPUT
           echo "csm=${{ needs.check-security-md.result }}" >> $GITHUB_OUTPUT
           echo "sed=${{ needs.server-exit-drain.result }}" >> $GITHUB_OUTPUT
@@ -2076,6 +2094,7 @@ jobs:
             const ad = '${{ needs.abi-diff.result }}';
             const il = '${{ needs.invariant-lock.result }}';
             const cc = '${{ needs.check-corpus.result }}';
+            const mar = '${{ needs.maos-audit-read-only.result }}';
             const cjc = '${{ needs.check-judge-config.result }}';
             const csm = '${{ needs.check-security-md.result }}';
             const sed = '${{ needs.server-exit-drain.result }}';
@@ -2134,6 +2153,7 @@ jobs:
             | abi-diff | ${icon(ad)} ${ad} |
             | invariant-lock | ${icon(il)} ${il} |
             | check-corpus | ${icon(cc)} ${cc} |
+            | maos-audit-read-only | ${icon(mar)} ${mar} |
             | check-judge-config | ${icon(cjc)} ${cjc} |
             | check-security-md | ${icon(csm)} ${csm} |
             | server-exit-drain | ${icon(sed)} ${sed} |

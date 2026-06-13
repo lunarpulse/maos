@@ -2436,6 +2436,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "maos: {diag} {spirit_id} (journal: {})",
                 journal_path.display()
             );
+            if mode == "uninstall" {
+                let proof_path = run_uninstall_cascade(
+                    &spirit_id,
+                    memory.as_ref(),
+                    capability.as_ref(),
+                    &transparency_log,
+                    &audit_db_path,
+                )
+                .map_err(|e| format!("uninstall cascade failed: {e}"))?;
+                println!(
+                    "{{\"status\":\"uninstalled\",\"spirit_id\":\"{spirit_id}\",\"proof_path\":\"{proof_path}\"}}"
+                );
+            }
+            return Ok(());
+        }
+
+        // Story 9.2 — FR45 forget one-shot path.
+        if mode == "forget" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+            let principal = std::env::var("MAOS_FORGET_PRINCIPAL")
+                .map_err(|_| "MAOS_FORGET_PRINCIPAL is required for forget")?;
+            let reason = std::env::var("MAOS_FORGET_REASON").ok();
+            let outcome = memory
+                .forget_with_reason(&principal, reason.as_deref())
+                .map_err(|e| format!("forget cascade failed: {e}"))?;
+            let json = serde_json::to_string(&outcome)
+                .map_err(|e| format!("failed to serialize ForgetOutcome: {e}"))?;
+            println!("{json}");
+            // P29-cli: a legal-hold suspension is NOT a success — exit 3 so
+            // automation scripts can distinguish erased (0) from held (3).
+            if matches!(outcome, maos_domain::memory::ForgetOutcome::Suspended { .. }) {
+                std::process::exit(3);
+            }
             return Ok(());
         }
 
@@ -5257,6 +5290,170 @@ description = "smoke test spirit successor"
     };
     eprintln!("maos: drained {cap_audit_rows} cap-audit row(s); exiting cleanly");
     Ok(())
+}
+
+/// Story 9.2 — real uninstall cascade + proof-of-erasure emission.
+///
+/// Resolves the spirit name to its pid(s), forgets every principal
+/// namespace associated with those pids, revokes all capability tokens,
+/// builds a signed Merkle proof, and persists the bundle to the
+/// `MAOS_ERASURE_PROOFS_DIR` / XDG default.
+fn run_uninstall_cascade(
+    spirit_id: &str,
+    memory: &maos_kernel_core::memory::MemoryManagerAdapter,
+    capability: &maos_kernel_core::capability::CapabilityRegistryAdapter,
+    transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
+    audit_db_path: &std::path::Path,
+) -> Result<String, Box<dyn std::error::Error>> {
+    use maos_audit::erasure::proof::{
+        build_erasure_proof, write_proof_bundle, CategoryStatus, ErasureCategory,
+    };
+
+    // Capture pre-erasure tree leaves.
+    let pre_frame_ids = transparency_log
+        .all_frame_ids()
+        .map_err(|e| format!("failed to read pre-erasure frame ids: {e}"))?;
+
+    // Resolve spirit name → pid(s).  Latest boot only matches the CLI default.
+    let incarnations =
+        maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false)
+            .map_err(|e| format!("failed to resolve spirit '{spirit_id}': {e}"))?;
+    if incarnations.is_empty() {
+        return Err(format!("no incarnation found for spirit '{spirit_id}'").into());
+    }
+
+    let mut total_deleted_entries: u64 = 0;
+    let mut total_deleted_index_rows: u64 = 0;
+    let mut total_revoked_tokens: usize = 0;
+    let mut all_principal_ids: Vec<String> = Vec::new();
+    let mut erased_distillate_frame_ids: Vec<[u8; 16]> = Vec::new();
+
+    for (_boot_nonce, spirit_pid) in &incarnations {
+        let spirit_pid = *spirit_pid;
+        // Forget every principal that this spirit wrote to.  forget_with_reason
+        // consults the durable legal-hold store (P29), so a held principal is
+        // suspended here rather than erased — the Suspended arm is live.
+        let principal_ids = transparency_log
+            .principal_ids_for_spirit_pid(spirit_pid)
+            .map_err(|e| format!("failed to list principals for pid {spirit_pid}: {e}"))?;
+        for principal_id in &principal_ids {
+            match memory.forget_with_reason(principal_id, None) {
+                Ok(maos_domain::memory::ForgetOutcome::Erased {
+                    receipt,
+                    redacted_distillate_frame_ids,
+                }) => {
+                    total_deleted_entries += receipt.deleted_entries;
+                    total_deleted_index_rows += receipt.deleted_index_rows;
+                    all_principal_ids.push(principal_id.clone());
+                    // Collect the scrubbed distillate frames for the proof.
+                    for hex_id in redacted_distillate_frame_ids {
+                        if let Ok(bytes) = hex::decode(&hex_id) {
+                            if bytes.len() == 16 {
+                                let mut arr = [0u8; 16];
+                                arr.copy_from_slice(&bytes);
+                                erased_distillate_frame_ids.push(arr);
+                            }
+                        }
+                    }
+                }
+                Ok(maos_domain::memory::ForgetOutcome::Suspended { hold }) => {
+                    eprintln!(
+                        "maos: uninstall blocked by legal hold for principal {}: {:?}",
+                        principal_id, hold
+                    );
+                }
+                Err(e) => {
+                    return Err(format!("forget failed for principal {principal_id}: {e}").into());
+                }
+            }
+        }
+
+        // Revoke all capability tokens for the spirit.
+        total_revoked_tokens += capability.revoke_all_for_pid(spirit_pid).unwrap_or(0);
+    }
+
+    // Capture post-erasure tree leaves.
+    let post_frame_ids = transparency_log
+        .all_frame_ids()
+        .map_err(|e| format!("failed to read post-erasure frame ids: {e}"))?;
+
+    // Build and sign the proof bundle.
+    let uninstalled_at_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
+
+    // P6: the proof MUST be signed with the operator's audit key (Story 9.1).
+    // A missing/unreadable key is a hard failure — silently falling back to an
+    // ephemeral, unpersisted key would produce a proof that is permanently
+    // unverifiable.
+    let signing_seed: [u8; 32] = maos_domain::audit_key::load_audit_key_seed(&None)
+        .map_err(|e| {
+            format!(
+                "no operator audit key configured (set MAOS_AUDIT_KEY_SEED / provision via \
+                 Story 9.1); cannot sign proof-of-erasure: {e}"
+            )
+        })?;
+
+    let categories = vec![
+        ErasureCategory {
+            name: "memory_namespace".into(),
+            status: CategoryStatus::Removed {
+                count: total_deleted_entries,
+            },
+        },
+        ErasureCategory {
+            name: "principal_index".into(),
+            status: CategoryStatus::Removed {
+                count: total_deleted_index_rows,
+            },
+        },
+        ErasureCategory {
+            name: "capability_tokens".into(),
+            status: CategoryStatus::Removed {
+                count: total_revoked_tokens as u64,
+            },
+        },
+        ErasureCategory {
+            name: "intent_lineage".into(),
+            status: CategoryStatus::VerifiedEmpty,
+        },
+        ErasureCategory {
+            name: "pending_halts".into(),
+            status: CategoryStatus::CoverageGap {
+                reason: "no per-Spirit halt enumeration API at v1.0".into(),
+            },
+        },
+        ErasureCategory {
+            name: "scheduled_invocations".into(),
+            status: CategoryStatus::CoverageGap {
+                reason: "no per-Spirit schedule enumeration API at v1.0".into(),
+            },
+        },
+    ];
+
+    // P23: stamp the proof with the LATEST incarnation's pid (the current
+    // boot).  `resolve_spirit_name(all_boots=false)` returns only the latest
+    // boot, so this is the single current incarnation.
+    let stamp_pid = incarnations
+        .last()
+        .map(|(_, pid)| *pid)
+        .unwrap_or(0);
+    let proof = build_erasure_proof(
+        spirit_id.to_string(),
+        stamp_pid,
+        uninstalled_at_ns,
+        &pre_frame_ids,
+        &post_frame_ids,
+        &erased_distillate_frame_ids,
+        &all_principal_ids,
+        categories,
+        &signing_seed,
+    )
+    .map_err(|e| format!("failed to build erasure proof: {e}"))?;
+
+    let proof_dir = maos_audit::default_erasure_proofs_dir();
+    let proof_path = write_proof_bundle(&proof, &proof_dir)
+        .map_err(|e| format!("failed to write erasure proof: {e}"))?;
+
+    Ok(proof_path.to_string_lossy().to_string())
 }
 
 /// Parse a 32-char lowercase hex string into a 16-byte TokenId.

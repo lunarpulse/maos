@@ -22,6 +22,7 @@ Committed ADRs for the MAOS project.
 | [ADR-039](ADR-039-per-module-unsafe-code-policy.md) | Per-module `#![forbid(unsafe_code)]` policy | binding-v0.1 | `xtask check-unsafe` + `xtask/unsafe-allowlist.toml` |
 | [ADR-040](ADR-040-rust-inproc-measurement-gate-v05-decision.md) | §13.1 rust-inproc measurement gate — v0.5 decision | binding-v0.5 | `xtask check-adr-040-accepted` + `crates/maos-bench/` |
 | [ADR-041](ADR-041-phase-3-4-kernel-core-extraction-via-port-traits.md) | Phase 3/4 `maos-kernel-core` extraction via port traits | binding-v0.7 | `xtask/kloc.toml [in_progress_decomposition]` + `xtask check-service-boundary` P1 per extracted crate |
+| [ADR-044](ADR-044-gdpr-article-17-distillate-redaction.md) | GDPR Article 17 distillate redaction — marker + body-scrub-on-embed | binding-v1.0 | `xtask check-kernel-baseline` + `maos-audit` read-only CI guard |
 
 > 16 `binding-v0.1` ADRs as of Story 1a.1; **15 as of Story 1b.6** (ADR-039 — per-module unsafe policy, accepts the 1b.3 relaxation).
 > **17 as of Story 5.5e** (ADR-040 — §13.1 rust-inproc measurement gate, binding-v0.5).

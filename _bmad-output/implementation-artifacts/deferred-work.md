@@ -420,3 +420,7 @@ gate now hard-fails on ANY `if: false` workflow job, so this failure mode cannot
 Aggregate `needs:`/`report-aggregate` updated to drop both retired jobs (no dangling
 `needs.<job>.result`); the `²` DISABLED footnote removed. `check-kernel-baseline` (§A4)
 and `check-epic-close-green` (§A5) added. YAML re-validated.
+
+## Deferred from: code review of story-9-2-execute-gdpr-article-17-cascade-with-deterministic-replay-and-proof-of-erasure (2026-06-13)
+
+- **No cross-store transaction in the forget cascade (W1, HIGH).** private-delete + index-delete + distillate-scrub + journal run sequentially in `forget_with_reason` with no transaction/compensation; a failure after the private delete leaves dangling index rows and no rollback. Largely pre-existing (the original `MemoryManagerPort::forget` has the same non-atomic pattern); this change widens the non-atomic window by adding the distillate scrub step. ADR-044 covers only the distillate mark+scrub atomicity, not cross-store atomicity. True cross-store transactionality (private FS + sqlite index + TL sqlite) is an architectural lift. `crates/maos-kernel-core/src/memory/mod.rs:155-205`
