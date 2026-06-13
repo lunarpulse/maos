@@ -1096,6 +1096,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     eprintln!("maos: capability registry initialized (Story 1b.2)");
 
+    // Story 9.1 — single supervised SecurityManagerAdapter owner shared across the
+    // daemon, shell, `maos run`, and one-shot admission paths. Constructing it
+    // once satisfies check-service-boundary P1 (single owner per §4.0.8).
+    let (security_drift_tx, security_drift_rx) =
+        maos_kernel_core::security::make_drift_channel();
+    let _security_drift_rx = security_drift_rx; // hold receiver for adapter lifetime
+    let security = Arc::new(
+        maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
+            .with_drift_sender(security_drift_tx),
+    );
+
     // Story 4.2 — HaltRegistry + WorkingMemoryOrchestrator for scalar-write pipeline.
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
     let orchestrator = Arc::new(
@@ -1580,11 +1591,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .transpose()?;
 
-            let (drift_tx, _drift_rx) = maos_kernel_core::security::make_drift_channel();
-            // p1-allow: one-shot [class] evaluator path — isolated root, not the supervised daemon owner
-            let security =
-                maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
-                    .with_drift_sender(drift_tx);
 
             let journal_path = maos_audit::default_journal_path();
             if let Some(parent) = journal_path.parent() {
@@ -1761,10 +1767,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // opening a second JournalAdapter at the same SQLite path risks
         // concurrent-write corruption).
         let journal = Arc::clone(&shared_journal);
-        let (drift_tx, drift_rx) = maos_kernel_core::security::make_drift_channel();
-        let _drift_guard = drift_rx; // hold the receiver for the daemon's lifetime
-        let security = maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
-            .with_drift_sender(drift_tx);
         let spirit_id = class_section.name.clone();
         security
             .admit_spirit(
@@ -2536,10 +2538,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &extract_section(&manifest_root, "class")?,
             )?;
 
-            // One-shot manifest-admission probe (validate path), not the supervised
-            // SecurityManagerAdapter singleton — see check-service-boundary P1 (Story 7.1.7).
-            let security =
-                maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy)); // p1-allow: transient admission probe
+            // Reuse the single composition-root SecurityManagerAdapter (line ~1102).
             let _spec = security.admit_spirit(
                 0,
                 &spirit_id,
@@ -5039,15 +5038,7 @@ description = "smoke test spirit successor"
             let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
                 .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
 
-            // Construct SecurityManagerAdapter with drift channel (Story 2.1 AC4).
-            // Drift channel: receiver declared first so it outlives the
-            // sender (held by security). Rust drops in reverse declaration
-            // order — security drops first, then _drift_rx.
-            let (drift_tx, _drift_rx) = maos_kernel_core::security::make_drift_channel();
-            let security =
-                // p1-allow: one-shot CLI-dispatch admission path — isolated root, not the supervised owner
-                maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
-                    .with_drift_sender(drift_tx);
+            // Reuse the single composition-root SecurityManagerAdapter (line ~1102).
 
             // Admit hello-spirit through the canonical admission path.
             let posture_section =
@@ -9450,7 +9441,7 @@ mod tests {
         let client = Arc::new(MockMcpClientPort);
         let (audit_tx, _) = maos_kernel_core::capability::cap_audit::channel();
         // p1-allow: smoke-arm mock provider — isolated root, not the supervised owner
-        let cap = Arc::new(
+        let cap = Arc::new( // p1-allow: unit-test mock root — isolated from the supervised composition owner
             maos_kernel_core::capability::CapabilityRegistryAdapter::new(
                 Arc::new(maos_kernel_core::api::RingCryptoProvider),
                 maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
