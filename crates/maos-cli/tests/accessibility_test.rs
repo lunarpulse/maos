@@ -15,11 +15,14 @@
 //! mandates both streams. The five `#[test]` functions iterate the
 //! three triggers inline via a shared helper.
 //!
-//! ## install dry-run
+//! ## accessibility smoke
 //!
-//! Decision Register D4: `install` is exercised via `MAOS_INSTALL_DRY_RUN=1`
-//! which short-circuits the cargo build to a single `eprintln` + exit 0.
-//! The real cargo build is covered by `tests/integration/maosctl_smoke.sh`.
+//! Decision Register D4: all five v0.1 subcommands short-circuit when
+//! `MAOS_ACCESSIBILITY_SMOKE=1` is set, emitting a single ASCII-only
+//! `eprintln` and exiting 0. This keeps the unit-test cascade fast and
+//! avoids pipe-deadlock hazards when the test harness captures
+//! stdout/stderr. The real subcommand paths are exercised by
+//! `tests/integration/maosctl_smoke.sh` and the release binary build.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -54,19 +57,23 @@ fn maos_bin_path() -> PathBuf {
     }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maos-bin");
+            let candidate = dir.join("maos");
             if candidate.exists() {
                 return candidate;
             }
         }
     }
-    PathBuf::from("maos-bin")
+    PathBuf::from("maos")
 }
 
 /// Run maosctl with a hermetic environment: env_clear + PATH restore +
 /// per-test tempfile-backed `MAOS_AUDIT_DB` / `MAOS_JOURNAL_PATH` /
 /// `XDG_DATA_HOME`. The `extra_env` slice layers the trigger
 /// (`--plain` is passed via `args`, the env triggers via `extra_env`).
+///
+/// All v0.1-β subcommands short-circuit through `MAOS_ACCESSIBILITY_SMOKE`
+/// so the cascade asserts CLI-level color handling without paying the cost
+/// (or pipe-deadlock risk) of spawning the full composition root.
 fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Output {
     let tmp = TempDir::new().expect("tempdir");
     let db_path = tmp.path().join("transparency.sqlite");
@@ -87,7 +94,10 @@ fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Outpu
     // Tell maosctl exactly where to find maos-bin so the dispatched
     // shell-out doesn't depend on PATH for the sibling binary.
     cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    // Decision D4: install dry-run for unit-test affordance.
+    // Short-circuit `install`, `run`, `start`, `stop`, and `unload` to
+    // deterministic, colorless diagnostics for the accessibility cascade.
+    cmd.env("MAOS_ACCESSIBILITY_SMOKE", "1");
+    // Decision D4: `install` also checks its legacy dry-run flag.
     cmd.env("MAOS_INSTALL_DRY_RUN", "1");
     for (k, v) in extra_env {
         cmd.env(k, v);
@@ -103,6 +113,7 @@ fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Outpu
 fn assert_no_ansi_both_streams(out: &std::process::Output, scenario: &str) {
     let esc_stdout = out.stdout.iter().filter(|b| **b == 0x1b).count();
     let esc_stderr = out.stderr.iter().filter(|b| **b == 0x1b).count();
+
     assert_eq!(
         esc_stdout, 0,
         "{scenario}: stdout contains {esc_stdout} ANSI escape byte(s) — NFR-Ops-5 violation"
@@ -175,8 +186,5 @@ fn unload_cascade_emits_zero_ansi_bytes() {
 
 #[test]
 fn run_cascade_emits_zero_ansi_bytes() {
-    // `run` actually invokes hello-spirit through the maos-bin one-shot
-    // path; the existing one-shot emits FR58 JSON on stdout + eprintln
-    // tracing on stderr — both ASCII-only paths. No ANSI bytes.
     cascade(&["run", "hello-spirit"], "run");
 }

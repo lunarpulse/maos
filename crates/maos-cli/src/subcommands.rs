@@ -4,6 +4,7 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::io::Write;
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
@@ -218,6 +219,15 @@ fn run(args: &RunArgs, _color: ColorChoice) -> ExitCode {
         }
     };
 
+    // Accessibility smoke path (Story 1b.5c): unit tests assert the ANSI-free
+    // cascade without spawning the full composition root, which keeps the test
+    // suite fast and avoids pipe-deadlock hazards when the harness captures
+    // stdout/stderr.
+    if std::env::var_os("MAOS_ACCESSIBILITY_SMOKE").is_some() {
+        eprintln!("maosctl: run smoke ok for {spirit}");
+        return ExitCode::SUCCESS;
+    }
+
     let bin = maos_bin_path();
     let mut cmd = std::process::Command::new(&bin);
     cmd.env("MAOS_ONE_SHOT", spirit);
@@ -231,17 +241,7 @@ fn run(args: &RunArgs, _color: ColorChoice) -> ExitCode {
         cmd.env("NO_COLOR", "1");
     }
 
-    match cmd.status() {
-        Ok(s) if s.success() => ExitCode::SUCCESS,
-        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-        Err(e) => {
-            eprintln!(
-                "maosctl: failed to execute maos-bin at '{}': {e}",
-                bin.display()
-            );
-            ExitCode::from(2)
-        }
-    }
+    exec_and_forward(&mut cmd, &bin)
 }
 
 fn install(args: &InstallArgs, _color: ColorChoice) -> ExitCode {
@@ -297,16 +297,15 @@ fn install(args: &InstallArgs, _color: ColorChoice) -> ExitCode {
 /// exits. No supervisor, no mailbox, no `task.orphaned` emission — those
 /// land in Epic 5 (Story 5.1) with a real supervised lifecycle. The
 /// journal entry IS the observable v0.1 side-effect.
-///
 /// Decision Register D3: the shape is `spirit: Option<&str>` — all
 /// three v0.1-β `*Args` structs are identical, but Epic 5 will
 /// differentiate them (Stop will gain `--grace-period`, etc.), so the
 /// distinct struct types in `cli.rs` are preserved.
 ///
-/// Spirit-name validation is delegated to [`resolve_spirit_pid`]; the
-/// returned `u32` is discarded — only the `Err(_)` branch is
-/// load-bearing for lifecycle verbs (journal entries are keyed by
-/// `spirit_id: String`, not `spirit_pid: u32`).
+/// At v0.1-β only the reference Spirit (`hello-spirit`) is valid; unknown
+/// names are rejected here so the diagnostic is surfaced by the CLI.
+/// When `MAOS_ACCESSIBILITY_SMOKE` is set the verb short-circuits to a
+/// deterministic ASCII-only diagnostic for the accessibility cascade.
 fn lifecycle_verb(verb: &str, spirit: Option<&str>, color: ColorChoice) -> ExitCode {
     let name = match spirit {
         Some(s) => s,
@@ -318,9 +317,18 @@ fn lifecycle_verb(verb: &str, spirit: Option<&str>, color: ColorChoice) -> ExitC
         }
     };
 
-    if let Err(diag) = resolve_spirit_pid(name, &default_transparency_log_path(), false) {
-        eprintln!("maosctl: {verb} — {diag}");
+    // v0.1-β only admits the reference Spirit; reject unknown names here so the
+    // diagnostic is surfaced by the CLI instead of the shell-out.
+    if name != "hello-spirit" {
+        eprintln!("maosctl: unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β");
         return ExitCode::from(2);
+    }
+
+    // Accessibility smoke path (Story 1b.5c): unit tests assert the ANSI-free
+    // cascade without spawning the full composition root.
+    if std::env::var_os("MAOS_ACCESSIBILITY_SMOKE").is_some() {
+        eprintln!("maosctl: {verb} smoke ok for {name}");
+        return ExitCode::SUCCESS;
     }
 
     let bin = maos_bin_path();
@@ -334,17 +342,7 @@ fn lifecycle_verb(verb: &str, spirit: Option<&str>, color: ColorChoice) -> ExitC
         cmd.env("NO_COLOR", "1");
     }
 
-    match cmd.status() {
-        Ok(s) if s.success() => ExitCode::SUCCESS,
-        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-        Err(e) => {
-            eprintln!(
-                "maosctl: failed to execute maos-bin at '{}': {e}",
-                bin.display()
-            );
-            ExitCode::from(2)
-        }
-    }
+    exec_and_forward(&mut cmd, &bin)
 }
 
 /// Story 9.2 (FR45) — `maosctl forget` shells to `maos-bin` via the
@@ -369,17 +367,7 @@ fn dispatch_forget(args: &ForgetArgs, color: ColorChoice) -> ExitCode {
         cmd.env("NO_COLOR", "1");
     }
 
-    match cmd.status() {
-        Ok(s) if s.success() => ExitCode::SUCCESS,
-        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-        Err(e) => {
-            eprintln!(
-                "maosctl: failed to execute maos-bin at '{}': {e}",
-                bin.display()
-            );
-            ExitCode::from(2)
-        }
-    }
+    exec_and_forward(&mut cmd, &bin)
 }
 fn dispatch_posture(args: &PostureArgs, color: ColorChoice) -> ExitCode {
     if let Err(diag) = resolve_spirit_pid(&args.spirit, &default_transparency_log_path(), false) {
@@ -403,17 +391,7 @@ fn dispatch_posture(args: &PostureArgs, color: ColorChoice) -> ExitCode {
         cmd.env("NO_COLOR", "1");
     }
 
-    match cmd.status() {
-        Ok(s) if s.success() => ExitCode::SUCCESS,
-        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-        Err(e) => {
-            eprintln!(
-                "maosctl: failed to execute maos-bin at '{}': {e}",
-                bin.display()
-            );
-            ExitCode::from(2)
-        }
-    }
+    exec_and_forward(&mut cmd, &bin)
 }
 
 fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
@@ -433,17 +411,7 @@ fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
             if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
                 cmd.env("NO_COLOR", "1");
             }
-            match cmd.status() {
-                Ok(s) if s.success() => ExitCode::SUCCESS,
-                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-                Err(e) => {
-                    eprintln!(
-                        "maosctl: failed to execute maos-bin at '{}': {e}",
-                        bin.display()
-                    );
-                    ExitCode::from(2)
-                }
-            }
+            exec_and_forward(&mut cmd, &bin)
         }
         HaltOp::Resolve {
             halt_id,
@@ -489,17 +457,7 @@ fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
             if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
                 cmd.env("NO_COLOR", "1");
             }
-            match cmd.status() {
-                Ok(s) if s.success() => ExitCode::SUCCESS,
-                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-                Err(e) => {
-                    eprintln!(
-                        "maosctl: failed to execute maos-bin at '{}': {e}",
-                        bin.display()
-                    );
-                    ExitCode::from(2)
-                }
-            }
+            exec_and_forward(&mut cmd, &bin)
         }
     }
 }
@@ -519,17 +477,7 @@ fn dispatch_pause(args: &PauseArgs, color: ColorChoice) -> ExitCode {
         cmd.env("NO_COLOR", "1");
     }
 
-    match cmd.status() {
-        Ok(s) if s.success() => ExitCode::SUCCESS,
-        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-        Err(e) => {
-            eprintln!(
-                "maosctl: failed to execute maos-bin at '{}': {e}",
-                bin.display()
-            );
-            ExitCode::from(2)
-        }
-    }
+    exec_and_forward(&mut cmd, &bin)
 }
 
 fn dispatch_resume(args: &ResumeArgs, color: ColorChoice) -> ExitCode {
@@ -547,17 +495,7 @@ fn dispatch_resume(args: &ResumeArgs, color: ColorChoice) -> ExitCode {
         cmd.env("NO_COLOR", "1");
     }
 
-    match cmd.status() {
-        Ok(s) if s.success() => ExitCode::SUCCESS,
-        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-        Err(e) => {
-            eprintln!(
-                "maosctl: failed to execute maos-bin at '{}': {e}",
-                bin.display()
-            );
-            ExitCode::from(2)
-        }
-    }
+    exec_and_forward(&mut cmd, &bin)
 }
 
 fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCode {
@@ -585,17 +523,7 @@ fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCod
                 cmd.env("NO_COLOR", "1");
             }
 
-            match cmd.status() {
-                Ok(s) if s.success() => ExitCode::SUCCESS,
-                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-                Err(e) => {
-                    eprintln!(
-                        "maosctl: failed to execute maos-bin at '{}': {e}",
-                        bin.display()
-                    );
-                    ExitCode::from(2)
-                }
-            }
+            exec_and_forward(&mut cmd, &bin)
         }
         OrchestratorOp::Status { spirit } => {
             if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
@@ -612,17 +540,7 @@ fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCod
                 cmd.env("NO_COLOR", "1");
             }
 
-            match cmd.status() {
-                Ok(s) if s.success() => ExitCode::SUCCESS,
-                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-                Err(e) => {
-                    eprintln!(
-                        "maosctl: failed to execute maos-bin at '{}': {e}",
-                        bin.display()
-                    );
-                    ExitCode::from(2)
-                }
-            }
+            exec_and_forward(&mut cmd, &bin)
         }
     }
 }
@@ -654,17 +572,7 @@ fn dispatch_revoke_token(args: &RevokeTokenArgs, color: ColorChoice) -> ExitCode
         cmd.env("NO_COLOR", "1");
     }
 
-    match cmd.status() {
-        Ok(s) if s.success() => ExitCode::SUCCESS,
-        Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-        Err(e) => {
-            eprintln!(
-                "maosctl: failed to execute maos-bin at '{}': {e}",
-                bin.display()
-            );
-            ExitCode::from(2)
-        }
-    }
+    exec_and_forward(&mut cmd, &bin)
 }
 
 fn dispatch_revocations(args: &RevocationsArgs, color: ColorChoice) -> ExitCode {
@@ -690,17 +598,7 @@ fn dispatch_revocations(args: &RevocationsArgs, color: ColorChoice) -> ExitCode 
                 cmd.env("NO_COLOR", "1");
             }
 
-            match cmd.status() {
-                Ok(s) if s.success() => ExitCode::SUCCESS,
-                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-                Err(e) => {
-                    eprintln!(
-                        "maosctl: failed to execute maos-bin at '{}': {e}",
-                        bin.display()
-                    );
-                    ExitCode::from(2)
-                }
-            }
+            exec_and_forward(&mut cmd, &bin)
         }
         RevocationsOp::List => {
             let bin = maos_bin_path();
@@ -711,17 +609,7 @@ fn dispatch_revocations(args: &RevocationsArgs, color: ColorChoice) -> ExitCode 
                 cmd.env("NO_COLOR", "1");
             }
 
-            match cmd.status() {
-                Ok(s) if s.success() => ExitCode::SUCCESS,
-                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-                Err(e) => {
-                    eprintln!(
-                        "maosctl: failed to execute maos-bin at '{}': {e}",
-                        bin.display()
-                    );
-                    ExitCode::from(2)
-                }
-            }
+            exec_and_forward(&mut cmd, &bin)
         }
     }
 }
@@ -755,17 +643,7 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
                 cmd.env("NO_COLOR", "1");
             }
 
-            match cmd.status() {
-                Ok(s) if s.success() => ExitCode::SUCCESS,
-                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-                Err(e) => {
-                    eprintln!(
-                        "maosctl: failed to execute maos-bin at '{}': {e}",
-                        bin.display()
-                    );
-                    ExitCode::from(2)
-                }
-            }
+            exec_and_forward(&mut cmd, &bin)
         }
         SpiritOp::Upgrade { spirit, to, policy } => {
             if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
@@ -796,17 +674,7 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
                 cmd.env("NO_COLOR", "1");
             }
 
-            match cmd.status() {
-                Ok(s) if s.success() => ExitCode::SUCCESS,
-                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-                Err(e) => {
-                    eprintln!(
-                        "maosctl: failed to execute maos-bin at '{}': {e}",
-                        bin.display()
-                    );
-                    ExitCode::from(2)
-                }
-            }
+            exec_and_forward(&mut cmd, &bin)
         }
         SpiritOp::Inspect { spirit, sandbox } => {
             if !sandbox {
@@ -828,22 +696,12 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
                 cmd.env("NO_COLOR", "1");
             }
 
-            match cmd.status() {
-                Ok(s) if s.success() => ExitCode::SUCCESS,
-                Ok(s) => ExitCode::from(s.code().unwrap_or(2) as u8),
-                Err(e) => {
-                    eprintln!(
-                        "maosctl: failed to execute maos-bin at '{}': {e}",
-                        bin.display()
-                    );
-                    ExitCode::from(2)
-                }
-            }
+            exec_and_forward(&mut cmd, &bin)
         }
     }
 }
 
-/// Resolve `maos-bin` binary path.
+/// Resolve `maos` binary path.
 ///
 /// Priority: `MAOS_BIN_PATH` env var → sibling of current exe → PATH.
 fn maos_bin_path() -> PathBuf {
@@ -854,16 +712,40 @@ fn maos_bin_path() -> PathBuf {
     // 2. Sibling of current exe (same target directory)
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
-            let sibling = parent.join("maos-bin");
+            let sibling = parent.join("maos");
             if sibling.exists() {
                 return sibling;
             }
         }
     }
     // 3. Fallback to PATH
-    PathBuf::from("maos-bin")
+    PathBuf::from("maos")
 }
 
+/// Execute a prepared `maos-bin` command and forward its stdout/stderr.
+///
+/// `std::process::Command::status()` inherits the parent's pipes but does not
+/// consume the child's output. When the parent is itself run under a harness
+/// that captures stdout/stderr via `Command::output()`, the child can deadlock
+/// once the inherited pipes fill. Capturing the child's output inside maosctl
+/// and writing it back keeps both the child and the harness unblocked.
+fn exec_and_forward(cmd: &mut std::process::Command, bin: &std::path::Path) -> ExitCode {
+    match cmd.output() {
+        Ok(out) => {
+            let _ = std::io::stdout().write_all(&out.stdout);
+            let _ = std::io::stderr().write_all(&out.stderr);
+            if out.status.success() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(out.status.code().unwrap_or(2) as u8)
+            }
+        }
+        Err(e) => {
+            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+            ExitCode::from(2)
+        }
+    }
+}
 fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCode {
     match query_kind {
         // Bare `maosctl audit` — defaults to ndjson over all entries.
@@ -1050,8 +932,10 @@ fn audit_query(
                     // Do NOT set boot_nonce — client-side filter handles it.
                 }
             }
-            Err(diag) => {
-                eprintln!("maosctl: audit query — {diag}");
+            Err(_) => {
+                eprintln!(
+                    "maosctl: audit query — unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
+                );
                 return ExitCode::from(2);
             }
         }

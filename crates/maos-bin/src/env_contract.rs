@@ -87,6 +87,16 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_FORGET_PRINCIPAL",
+        purpose: "Principal identifier for forget verb",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_FORGET_REASON",
+        purpose: "Optional human-readable reason for forget verb",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_HALT_LIMIT",
         purpose: "Max number of halt events to display",
         stability: EnvStability::UserFacing,

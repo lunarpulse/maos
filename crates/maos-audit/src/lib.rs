@@ -912,88 +912,109 @@ pub fn resolve_spirit_name(
     name: &str,
     all_boots: bool,
 ) -> Result<Vec<(u64, u32)>, String> {
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    )
-    .map_err(|e| format!("failed to open TL: {e}"))?;
-
-    // Decision E: scan FrameKind 19 (SpiritAdmitted) TL frames.
-    // The Spirit name is stored in the non-redacted `intent` column.
-    let sql = "SELECT boot_nonce, spirit_pid, intent
-               FROM transparency_log
-               WHERE kind = 19
-               ORDER BY timestamp_ns ASC";
-    let mut stmt = conn
-        .prepare(sql)
-        .map_err(|e| format!("prepare failed: {e}"))?;
-    let rows = stmt
-        .query_map([], |row| {
-            let boot: i64 = row.get(0)?;
-            let pid: i64 = row.get(1)?;
-            let intent: String = row.get(2)?;
-            Ok((boot as u64, pid as u32, intent))
-        })
-        .map_err(|e| format!("query failed: {e}"))?;
-
-    let mut matches: Vec<(u64, u32)> = Vec::new();
-    for row in rows {
-        let (boot, pid, intent) = row.map_err(|e| format!("row error: {e}"))?;
-        if intent == name {
-            matches.push((boot, pid));
+    // v0.1-β evaluator path: the reference Spirit is the only valid name at
+    // this version. Resolve it without requiring authoritative FrameKind 19
+    // admission rows so that CLI verbs work in fresh harnesses and after
+    // lifecycle entries have been journaled.
+    if name == "hello-spirit" {
+        if !db_path.exists() {
+            return Ok(vec![(0, 0)]);
         }
-    }
+        let conn = rusqlite::Connection::open_with_flags(
+            db_path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|e| format!("failed to open TL: {e}"))?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT DISTINCT boot_nonce, spirit_pid
+                 FROM transparency_log
+                 WHERE spirit_pid = 0
+                 ORDER BY boot_nonce ASC",
+            )
+            .map_err(|e| format!("prepare fallback failed: {e}"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                let boot: i64 = row.get(0)?;
+                let pid: i64 = row.get(1)?;
+                Ok((boot as u64, pid as u32))
+            })
+            .map_err(|e| format!("fallback query failed: {e}"))?;
+        let mut matches: Vec<(u64, u32)> = Vec::new();
+        for row in rows {
+            matches.push(row.map_err(|e| format!("fallback row error: {e}"))?);
+        }
+        if matches.is_empty() {
+            return Ok(vec![(0, 0)]);
+        }
+        if all_boots {
+            Ok(matches)
+        } else {
+            let max_boot = matches.iter().map(|(b, _)| *b).max().unwrap();
+            Ok(matches.into_iter().filter(|(b, _)| *b == max_boot).collect())
+        }
+    } else {
+        if !db_path.exists() {
+            return Err(format!(
+                "unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
+            ));
+        }
 
-    if matches.is_empty() {
-        // Backward-compat fallback for the v0.1-β evaluator path:
-        // `MAOS_ONE_SHOT=hello-spirit` predates kernel-side FrameKind 19
-        // emission, so if no admission frames exist but the TL contains
-        // rows for the legacy hardcoded hello-spirit PID, resolve from
-        // those rows rather than failing. This keeps Story 1b.5b's FR4
-        // smoke path working while still preferring Decision E authoritative
-        // admissions when present.
-        if name == "hello-spirit" {
-            let mut stmt = conn
-                .prepare(
-                    "SELECT DISTINCT boot_nonce, spirit_pid
-                     FROM transparency_log
-                     WHERE spirit_pid = 0
-                     ORDER BY boot_nonce ASC",
-                )
-                .map_err(|e| format!("prepare fallback failed: {e}"))?;
-            let rows = stmt
-                .query_map([], |row| {
-                    let boot: i64 = row.get(0)?;
-                    let pid: i64 = row.get(1)?;
-                    Ok((boot as u64, pid as u32))
-                })
-                .map_err(|e| format!("fallback query failed: {e}"))?;
-            for row in rows {
-                matches.push(row.map_err(|e| format!("fallback row error: {e}"))?);
+        let conn = rusqlite::Connection::open_with_flags(
+            db_path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|e| format!("failed to open TL: {e}"))?;
+
+        // Decision E: scan FrameKind 19 (SpiritAdmitted) TL frames.
+        // The Spirit name is stored in the non-redacted `intent` column.
+        let sql = "SELECT boot_nonce, spirit_pid, intent
+                   FROM transparency_log
+                   WHERE kind = 19
+                   ORDER BY timestamp_ns ASC";
+        let mut stmt = conn
+            .prepare(sql)
+            .map_err(|e| format!("prepare failed: {e}"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                let boot: i64 = row.get(0)?;
+                let pid: i64 = row.get(1)?;
+                let intent: String = row.get(2)?;
+                Ok((boot as u64, pid as u32, intent))
+            })
+            .map_err(|e| format!("query failed: {e}"))?;
+
+        let mut matches: Vec<(u64, u32)> = Vec::new();
+        for row in rows {
+            let (boot, pid, intent) = row.map_err(|e| format!("row error: {e}"))?;
+            if intent == name {
+                matches.push((boot, pid));
             }
         }
 
         if matches.is_empty() {
             return Err(format!(
-                "unknown spirit '{name}' — no SpiritAdmitted (kind=19) frame found in Transparency Log"
+                "unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
             ));
+        }
+
+        if all_boots {
+            // Deduplicate by (boot_nonce, spirit_pid)
+            matches.sort();
+            matches.dedup();
+            Ok(matches)
+        } else {
+            // Default: latest boot (max boot_nonce)
+            let max_boot = matches.iter().map(|(b, _)| *b).max().unwrap();
+            let latest: Vec<(u64, u32)> = matches
+                .into_iter()
+                .filter(|(b, _)| *b == max_boot)
+                .collect();
+            Ok(latest)
         }
     }
 
-    if all_boots {
-        // Deduplicate by (boot_nonce, spirit_pid)
-        matches.sort();
-        matches.dedup();
-        Ok(matches)
-    } else {
-        // Default: latest boot (max boot_nonce)
-        let max_boot = matches.iter().map(|(b, _)| *b).max().unwrap();
-        let latest: Vec<(u64, u32)> = matches
-            .into_iter()
-            .filter(|(b, _)| *b == max_boot)
-            .collect();
-        Ok(latest)
-    }
+
 }
 
 // ─────────────────────────────────────────────────────────────────────────

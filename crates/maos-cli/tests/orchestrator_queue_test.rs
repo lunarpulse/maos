@@ -32,13 +32,13 @@ fn maos_bin_path() -> PathBuf {
     }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maos-bin");
+            let candidate = dir.join("maos");
             if candidate.exists() {
                 return candidate;
             }
         }
     }
-    PathBuf::from("maos-bin")
+    PathBuf::from("maos")
 }
 
 fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Output {
