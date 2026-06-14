@@ -265,6 +265,7 @@ mod tests {
             capability_token_hex: None,
             kind: "test.kind".to_string(),
             intent: "test.intent".to_string(),
+            payload: String::new(),
             redaction: None,
         }]
     }

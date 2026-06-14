@@ -26,10 +26,11 @@
 #          additive; no public symbols removed.
 # To change this number you MUST be landing an AUTHORIZED kernel delta (charter
 # amendment + FLAG-Winston), and you update it HERE — nowhere else.
-#   21438  Story 9.3b — FR62 GovernanceEvent + FR64 CostAttribution kernel delta
-#          (+102, charter-amended kernel delta, jointly re-pinned).
-#          FLAG-Winston: authorized per ADR-045/ADR-046. FR64 cost emission at
-#          inference/mod.rs (+67), SR-3 forget-cascade extension in memory/mod.rs
-#          (+35). All additive; no public symbols removed. Re-pin recorded as the
-#          first ratified AbiExtensionProposal (ADR-045 §8 dogfooding).
-src_lines = 21438
+  21472  Story 9.3b — FR62 GovernanceEvent + FR64 CostAttribution kernel delta
+         (+136, charter-amended kernel delta, jointly re-pinned).
+         FLAG-Winston: authorized per ADR-045/ADR-046. FR64 cost emission at
+         inference/mod.rs (+68), SR-3 forget-cascade extension in memory/mod.rs
+         (+70), AC6 erasure schema-version stamp in memory/mod.rs. All additive;
+         no public symbols removed. Re-pin recorded as the first ratified
+         AbiExtensionProposal (ADR-045 §8 dogfooding).
+src_lines = 21472

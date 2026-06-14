@@ -2009,7 +2009,7 @@ fn build_cost_report(
     let mut warnings: Vec<String> = Vec::new();
 
     for entry in entries {
-        let payload: CostAttributionPayload = match serde_json::from_str(&entry.intent) {
+        let payload: CostAttributionPayload = match serde_json::from_str(&entry.payload) {
             Ok(p) => p,
             Err(e) => {
                 warnings.push(format!(
@@ -2019,6 +2019,7 @@ fn build_cost_report(
                 continue;
             }
         };
+
 
         let principal_display = match &payload.principal {
             PrincipalRef::Resolved { principal_id } => principal_id.clone(),
@@ -2735,5 +2736,60 @@ mod tests {
         };
         let code = dispatch_forget(&args, ColorChoice::Auto);
         assert_ne!(code, ExitCode::SUCCESS);
+    }
+    #[test]
+    fn cost_report_reads_payload_not_intent() {
+        // Regression: build_cost_report must parse the JSON payload, not the
+        // intent string. Real TL rows store "cost:inference-attribution" in
+        // intent and the CostAttributionPayload JSON in payload_redacted.
+        use maos_domain::cost::{
+            AttributionConfidence, AttributionSource, CostAttributionPayload, CostDimension,
+            PrincipalRef,
+        };
+        use std::collections::BTreeMap;
+
+        let mut dims = BTreeMap::new();
+        dims.insert(CostDimension::TokensIn, 1000);
+        dims.insert(CostDimension::TokensOut, 500);
+        let payload = CostAttributionPayload {
+            schema_version: 1,
+            timestamp_ns: 1_000_000,
+            spirit_pid: 7,
+            provider: "anthropic".into(),
+            model: "claude-3".into(),
+            principal: PrincipalRef::Resolved {
+                principal_id: "user:alice".into(),
+            },
+            attribution_source: AttributionSource::WriteTargetProxy,
+            attribution_confidence: AttributionConfidence::Exact,
+            dimensions: dims,
+        };
+        let entry = maos_audit::AuditEntry {
+            frame_id_hex: "aa".repeat(16),
+            timestamp_ns: 1_000_000,
+            spirit_pid: 7,
+            boot_nonce: 1,
+            capability_token_hex: None,
+            kind: "cost.attribution".into(),
+            intent: "cost:inference-attribution".into(),
+            payload: serde_json::to_string(&payload).unwrap(),
+            redaction: None,
+        };
+        let pricing = maos_domain::cost::ProviderPricingConfig::new(vec![
+            maos_domain::cost::ProviderPricingEntry {
+                provider: "anthropic".into(),
+                model: "claude-3".into(),
+                input_price_micro_per_1k: 3000,
+                output_price_micro_per_1k: 15000,
+            },
+        ]);
+        let report = build_cost_report("2026-06", &[entry], &pricing);
+        assert_eq!(report.warnings.len(), 0, "must not warn on valid payload");
+        assert_eq!(report.rows.len(), 1);
+        assert_eq!(report.rows[0].principal, "user:alice");
+        assert_eq!(report.rows[0].tokens_in, 1000);
+        assert_eq!(report.rows[0].tokens_out, 500);
+        // (1000*3000 + 500*15000) / 1000 = 10_500 µ$
+        assert_eq!(report.total_cost_micro, 10_500);
     }
 }

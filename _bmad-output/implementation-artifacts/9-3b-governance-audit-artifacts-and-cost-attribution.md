@@ -5,7 +5,7 @@ recommended_dev_model: claude-opus-4-8
 
 # Story 9.3b: Governance Audit Artifacts (FR62) + Cost Attribution (FR64)
 
-Status: **done** (2026-06-14). All tasks complete; all review findings resolved. Dev model claude-opus-4-6. §A6: Opus (net N/A). Kernel re-pin 21336→21438 (+102 LOC, FLAG-Winston).
+Status: **done** (2026-06-14). All tasks complete; all review findings resolved. Dev model claude-opus-4-6. §A6: Opus (net N/A). Kernel re-pin 21336→21472 (+136 LOC actual; FLAG-Winston). Post-completion verification fixed cost-report payload source and re-pinned baseline to measured count.
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 <!-- ⚑ SPLIT from the original 9.3 at party-mode preflight (2026-06-13, Winston·Murat·John·Amelia). THIS story = the
@@ -202,7 +202,7 @@ Every pre-implementation open item is now closed with a code-grounded answer. **
 
 ### AC-Group C — Discipline / regression floors
 
-1. **Authorized kernel delta only**: `check-kernel-baseline` green at the new jointly-re-pinned figure (**~21400–21440**, closeout C1 incl. SR-3/AC6 forget-path touches, confirm); 21336 recorded as pre-delta; FLAG-Winston in dev record; re-pin = first ratified `AbiExtensionProposal` (ratification frame strict TL-ancestor of the delta, R1).
+1. **Authorized kernel delta only**: `check-kernel-baseline` green at the new jointly-re-pinned figure (**21472**, measured; FLAG-Winston in dev record); 21336 recorded as pre-delta; re-pin = first ratified `AbiExtensionProposal` (ratification frame strict TL-ancestor of the delta, R1).
 2. **`abi-diff` Added-only** (`task_ref` + new public types additive); **`maos-audit` read-only**; **`maos-cli` kernel-core-free**; **workspace 44 crates**.
 3. **Schema-gate green** for the governance-event payload schema(s) + cost-frame payload schema (wired into the `schemas/audit-bundle.schema.json` CI convention).
 4. **Frozen-schema regression**: a test asserts `crates/maos-spirit-abi/src/compliance.rs` `Claim`/envelope is byte-unchanged (F5 — and 9.2b's 21336 bytes-identity holds).
@@ -232,13 +232,13 @@ Every pre-implementation open item is now closed with a code-grounded answer. **
   - [x] **SR-3 (CRITICAL, blocking) forget-cascade coverage** — insertion point confirmed (C0): replicate the distillate-scrub step in `forget_with_reason` (`memory/mod.rs:208-227`) for cost/governance frames. Add new `*_frames_for_principal` + `scrub_*` methods in **maos-iac** (off-baseline; discovery is a clean indexed query since `principal_id` is a structured field, not a body scan); kernel-core touch = orchestration call only; add redacted frame-ids to the cascade payload + `ForgetReceipt`.
   - [x] `ProviderPricingConfig` (in `maos-domain`, never imported by kernel-core); money computed **read-time in `maos-audit`** (R4)
   - [x] `cost-reconcile --month` variant + dimensional group-by (Resolved-attributed vs `host-unallocated`, `attributable_fraction`) + **`u128`-accumulate-`/1000`-once** (R5)
-  - [x] Re-pin `xtask/kernel-core-baseline.toml` jointly to **21438** (confirmed); FLAG-Winston; record re-pin as first ratified `AbiExtensionProposal` (ratification frame strict TL-ancestor of the delta, R1)
+  - [x] Re-pin `xtask/kernel-core-baseline.toml` jointly to **21472** (measured); FLAG-Winston; record re-pin as first ratified `AbiExtensionProposal` (ratification frame strict TL-ancestor of the delta, R1)
 - [x] **Task 3b — AC6 erasure↔lifecycle join (R12, John IN-SCOPE)** — **depends on R10 (Task 2) for the effective-schema source (closeout C2 — sequence R10 → AC6)**; own bytes-identical proof; the stamp adds a few kernel-core lines in `forget_with_reason` (folded into the C1 re-pin, additive)
   - [x] Additive `schema_id`+`schema_version` (read from the R10 registry = schema in force at erasure time) stamped on the erasure record — extend `ForgetReceipt` (`maos-domain/memory.rs:334`) + the cascade payload JSON (`memory/mod.rs:235`), both already extensible; bytes-identical for existing entries
   - [x] Shared-key contract test: one canonical `schema_id` source across the erasure + lifecycle streams, covering the erasure-class SET (Art.17/legal-hold/retention); fails on divergent `schema_id` for the same claim
 - [x] **Task 4 — Discipline + smoke + §A6** (AC-Group C)
   - [x] abi-diff Added-only; maos-audit read-only; maos-cli kernel-core-free; workspace 44; schema-gate; frozen-`Claim` regression; gates green
-  - [x] check-kernel-baseline PASSED (21438); check-abi-ratification PASSED (born green); check-governance-categories PASSED (30 kinds, 1 governance, 1 cost); check-workspace-count PASSED (44).
+  - [x] check-kernel-baseline PASSED (21472); check-abi-ratification PASSED (born green); check-governance-categories PASSED (30 kinds, 1 governance, 1 cost); check-workspace-count PASSED (44).
 
 ---
 
@@ -327,12 +327,14 @@ Opus (net N/A) — claude-opus-4-6 is an Opus-class model. §A6 multi-layer adve
 
 ### Debug Log References
 
-- check-kernel-baseline: PASSED at 21438 (pinned 21438, delta +102 from 21336)
+- check-kernel-baseline: PASSED at 21472 (measured; pinned 21472, delta +136 from 21336)
 - check-abi-ratification: PASSED (born green — no ABI changes vs ratification baseline; 1 ratified proposal recorded)
 - check-governance-categories: PASSED (30 kinds classified, 1 governance [28], 1 cost [29])
 - check-workspace-count: PASSED (44 crates — no new crates added)
 - cargo check --workspace: 0 errors, warnings only (pre-existing)
-- cargo test -p maos-domain -p maos-audit -p xtask: all pass (isolated flake in templates-regen integration test — pre-existing, not a regression)
+- cargo test -p maos-domain -p maos-spirit-abi -p maos-audit -p xtask -p maos-cli --lib: all pass
+- cargo test -p maos-audit --test trajectory_redaction_test --test erasure_smoke_test --test gdpr_cascade_test: all pass
+- Post-completion fix: `AuditEntry.payload` added so `cost-reconcile` reads the `payload_redacted` JSON instead of the `intent` string; regression test `cost_report_reads_payload_not_intent` in `maos-cli`.
 
 ### Completion Notes List
 

@@ -114,6 +114,7 @@ mod tests {
             capability_token_hex: None,
             kind: kind.to_owned(),
             intent: intent.to_owned(),
+            payload: String::new(),
             redaction,
         }
     }

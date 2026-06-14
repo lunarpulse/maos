@@ -172,6 +172,7 @@ fn serde_no_key_when_redaction_none() {
         capability_token_hex: None,
         kind: "task.assign".into(),
         intent: "test".into(),
+        payload: String::new(),
         redaction: None,
     };
 
@@ -184,7 +185,6 @@ fn serde_no_key_when_redaction_none() {
 
 #[test]
 fn serde_key_present_when_redaction_some() {
-    // Positive test: when redaction is Some, the JSON must contain it.
     let entry = maos_audit::AuditEntry {
         frame_id_hex: "aa".repeat(16),
         timestamp_ns: 1000,
@@ -193,6 +193,7 @@ fn serde_key_present_when_redaction_some() {
         capability_token_hex: None,
         kind: "task.assign".into(),
         intent: "test".into(),
+        payload: String::new(),
         redaction: Some(maos_audit::RedactionMeta {
             class: "task.assign".into(),
             original_len_bucket: 64,
@@ -221,6 +222,7 @@ fn serde_bytes_differ_with_redaction_some_vs_none() {
         capability_token_hex: None,
         kind: "task.assign".into(),
         intent: "test".into(),
+        payload: String::new(),
         redaction: None,
     };
 
@@ -245,8 +247,6 @@ fn sealed_export_bytes_unchanged_with_redaction_field_none() {
     // F1 A-prime golden-bytes regression test:
     // A sealed bundle built from entries with redaction=None MUST produce
     // identical canonical bytes as the same entries without redaction field.
-    //
-    // This proves the additive field does not change the 9.1 signed surface.
     let entry = maos_audit::AuditEntry {
         frame_id_hex: "deadbeef".to_string(),
         timestamp_ns: 1000,
@@ -255,6 +255,7 @@ fn sealed_export_bytes_unchanged_with_redaction_field_none() {
         capability_token_hex: None,
         kind: "test.kind".to_string(),
         intent: "test.intent".to_string(),
+        payload: String::new(),
         redaction: None,
     };
 
