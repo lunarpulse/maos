@@ -1,0 +1,491 @@
+# FR63 Typed Error Catalog — kernel-emitted E* invariant error set
+#
+# Source-of-truth for the E*-prefixed error taxonomy (preflight F1).
+# CI gate: `cargo xtask error-catalog-check`
+#
+# Every E*-prefixed enum variant and E*-prefixed error enum in the scan
+# directories MUST have a corresponding [[error]] entry with all 6 metadata
+# fields.  The check asserts the bijection:
+#   - un-catalogued E* variant in source  → FAIL
+#   - stale registry entry (source gone)  → FAIL
+#   - missing metadata field              → FAIL
+#
+# Field reference (NFR-Doc-2):
+#   code            — stable user-facing E-prefixed identifier
+#   severity        — user | policy | security | infra | internal
+#   recovery_class  — retry | retry_with_correction | reject | fix_config | escalate
+#   owner           — crate that defines the variant
+#   kernel_or_spirit — kernel | spirit | both
+#   since_version   — semver when the variant was introduced
+
+[meta]
+catalog_version = "1.0.0"
+since_story = "9-3"
+fr_reference = "FR63"
+# Directories scanned by the AST inventory (relative to workspace root).
+scan_dirs = [
+    "crates/maos-domain/src",
+    "crates/maos-kernel-core/src",
+    "crates/maos-compliance/src",
+    "crates/maos-a2a-core/src",
+    "crates/maos-skill/src",
+]
+# Lower-bound regression guard (F2): the catalog MUST contain at least this
+# many entries.  The actual count is an output, not a target.
+min_entry_count = 35
+
+# ---------------------------------------------------------------------------
+# IacBusError — crates/maos-domain/src/iac_bus_types.rs
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EIntentLineageBroken"
+rust_path = "IacBusError::EIntentLineageBroken"
+source_file = "crates/maos-domain/src/iac_bus_types.rs"
+description = "Cross-Spirit frame has empty intent_lineage on non-human origin (I14 consent-laundering guard)"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EOrchestratorDispatchRawOutput"
+rust_path = "IacBusError::EOrchestratorDispatchRawOutput"
+source_file = "crates/maos-domain/src/iac_bus_types.rs"
+description = "Orchestrator dispatch references raw worker output instead of a distillate (FR21)"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+# ---------------------------------------------------------------------------
+# HaltContinuityError — crates/maos-domain/src/halt.rs
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EHaltContinuityViolation"
+rust_path = "HaltContinuityError::EHaltContinuityViolation"
+source_file = "crates/maos-domain/src/halt.rs"
+description = "Hot-swap halt-protocol schema mismatch — successor does not support predecessor halt version (I14)"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+# ---------------------------------------------------------------------------
+# HotSwapError — crates/maos-domain/src/hot_swap.rs
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EMigratorMissing"
+rust_path = "HotSwapError::EMigratorMissing"
+source_file = "crates/maos-domain/src/hot_swap.rs"
+description = "No state-transfer migrator registered for predecessor→successor class+version pair"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+# ---------------------------------------------------------------------------
+# PrecheckOutcome — crates/maos-domain/src/hot_swap.rs (verdict, not error)
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EMigratorMissing_PrecheckOutcome"
+rust_path = "PrecheckOutcome::EMigratorMissing"
+source_file = "crates/maos-domain/src/hot_swap.rs"
+description = "Precheck verdict: migrator missing for the hot-swap candidate"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+# ---------------------------------------------------------------------------
+# CliWrapperAdmissionError — crates/maos-domain/src/cli_wrapper.rs
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EOutputShapeAdapterMismatch"
+rust_path = "CliWrapperAdmissionError::EOutputShapeAdapterMismatch"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "ADR-021: observed CLI output shape does not match declared output_shape_version — admission refused"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EManifestSchemaConflict"
+rust_path = "CliWrapperAdmissionError::EManifestSchemaConflict"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "Manifest declares both [class] and [cli_wrapper] — mutually exclusive per architecture §6.7"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ECliBinaryNotFound"
+rust_path = "CliWrapperAdmissionError::ECliBinaryNotFound"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "CLI binary not found on PATH or at the declared path"
+severity = "infra"
+recovery_class = "fix_config"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EOutputShapeAdapterNotRegistered"
+rust_path = "CliWrapperAdmissionError::EOutputShapeAdapterNotRegistered"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "Output-shape adapter not registered in the Spirit registry"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ECliWrapperRequiresT3"
+rust_path = "CliWrapperAdmissionError::ECliWrapperRequiresT3"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "CliWrapperSpirit MUST declare sandbox tier = t3; lower tiers cannot contain subprocess CLI invocation"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ECliProbeFailed"
+rust_path = "CliWrapperAdmissionError::ECliProbeFailed"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "CLI probe subprocess exited non-zero, stdio I/O failure, or adapter-declared probe protocol violated"
+severity = "infra"
+recovery_class = "retry"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ECliWrapperTierNotGranted"
+rust_path = "CliWrapperAdmissionError::ECliWrapperTierNotGranted"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "Manifest requested sandbox tier not granted by host-side grant allowlist — fail-closed, no silent downgrade"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.9.0"
+
+[[error]]
+code = "ERespawnWithContextUnsupported"
+rust_path = "CliWrapperAdmissionError::ERespawnWithContextUnsupported"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "recovery_policy=respawn_with_context deferred to Epic 10 / NFR-Rel-3 HSIS — admission fails closed"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.9.0"
+
+# ---------------------------------------------------------------------------
+# SecurityError — crates/maos-kernel-core/src/security/mod.rs
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "ESubstrateTooOld"
+rust_path = "SecurityError::ESubstrateTooOld"
+source_file = "crates/maos-kernel-core/src/security/mod.rs"
+description = "FR8: running kernel older than Spirit's declared min_substrate_version"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-kernel-core"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EAbiTooOld"
+rust_path = "SecurityError::EAbiTooOld"
+source_file = "crates/maos-kernel-core/src/security/mod.rs"
+description = "Manifest schema version below N-2 minimum supported — hard refusal"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-kernel-core"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EAbiTooNew"
+rust_path = "SecurityError::EAbiTooNew"
+source_file = "crates/maos-kernel-core/src/security/mod.rs"
+description = "Manifest schema version above maximum supported — kernel upgrade required"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-kernel-core"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EClassRequired"
+rust_path = "SecurityError::EClassRequired"
+source_file = "crates/maos-kernel-core/src/security/mod.rs"
+description = "Spirit admitted without required [class] section — manifest malformed or parser bypassed"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-kernel-core"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+# ---------------------------------------------------------------------------
+# EComplianceRejection — crates/maos-compliance/src/evaluator.rs
+# (E*-prefixed enum; all variants are part of the E* set)
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EComplianceRejection::SignatureInvalid"
+rust_path = "EComplianceRejection::SignatureInvalid"
+source_file = "crates/maos-compliance/src/evaluator.rs"
+description = "ComplianceClaim Ed25519 signature verification failed (or signing_alg unsupported)"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-compliance"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EComplianceRejection::MalformedClaim"
+rust_path = "EComplianceRejection::MalformedClaim"
+source_file = "crates/maos-compliance/src/evaluator.rs"
+description = "ComplianceClaim could not be decoded, was missing a required field, or carried an unknown enum value"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-compliance"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EComplianceRejection::ContextDrift"
+rust_path = "EComplianceRejection::ContextDrift"
+source_file = "crates/maos-compliance/src/evaluator.rs"
+description = "Runtime execution-context drifted from the attested ComplianceClaim fingerprint"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-compliance"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EComplianceRejection::ExpiredClaim"
+rust_path = "EComplianceRejection::ExpiredClaim"
+source_file = "crates/maos-compliance/src/evaluator.rs"
+description = "ComplianceClaim carried an expires_at_unix_ms in the past"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-compliance"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+# ---------------------------------------------------------------------------
+# EPinMismatch — crates/maos-a2a-core/src/tofu.rs
+# (E*-prefixed enum; all variants are part of the E* set)
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EPinMismatch::Mismatch"
+rust_path = "EPinMismatch::Mismatch"
+source_file = "crates/maos-a2a-core/src/tofu.rs"
+description = "TOFU pin mismatch for peer — pinned fingerprint does not match observed"
+severity = "security"
+recovery_class = "escalate"
+owner = "maos-a2a-core"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EPinMismatch::NotPinned"
+rust_path = "EPinMismatch::NotPinned"
+source_file = "crates/maos-a2a-core/src/tofu.rs"
+description = "No TOFU pin recorded for peer — first-contact not yet attempted"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-a2a-core"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "EPinMismatch::Invalidated"
+rust_path = "EPinMismatch::Invalidated"
+source_file = "crates/maos-a2a-core/src/tofu.rs"
+description = "TOFU pin invalidated for peer (Spirit restart, manual invalidation)"
+severity = "user"
+recovery_class = "escalate"
+owner = "maos-a2a-core"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+# ---------------------------------------------------------------------------
+# ESkillSchema — crates/maos-skill/src/errors.rs
+# (E*-prefixed enum; all variants are part of the E* set)
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "ESkillSchema::MissingFence"
+rust_path = "ESkillSchema::MissingFence"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "maos.skill.v1 document missing the --- TOML frontmatter fence"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ESkillSchema::UnknownField"
+rust_path = "ESkillSchema::UnknownField"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Unknown field in TOML frontmatter — deny_unknown_fields rejects it"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ESkillSchema::TomlParse"
+rust_path = "ESkillSchema::TomlParse"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "TOML frontmatter failed to parse (malformed syntax, missing required field, wrong value type)"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ESkillSchema::EmptyId"
+rust_path = "ESkillSchema::EmptyId"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Skill id must be non-empty"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ESkillSchema::InvalidIdCharset"
+rust_path = "ESkillSchema::InvalidIdCharset"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Skill id contains invalid characters (allowed: a-z, 0-9, '-', '.')"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ESkillSchema::EmptyName"
+rust_path = "ESkillSchema::EmptyName"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Skill name must be non-empty"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ESkillSchema::InvalidSemver"
+rust_path = "ESkillSchema::InvalidSemver"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Skill version is not a valid semver string"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ESkillSchema::EmptyBody"
+rust_path = "ESkillSchema::EmptyBody"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Skill body must be present (non-empty markdown after frontmatter fence)"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+# ---------------------------------------------------------------------------
+# ESkillProposal — crates/maos-skill/src/errors.rs
+# (E*-prefixed enum; all variants are part of the E* set)
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "ESkillProposal::EmptyTargetId"
+rust_path = "ESkillProposal::EmptyTargetId"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Revision proposal target_skill_id must be non-empty"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ESkillProposal::InvalidTargetIdCharset"
+rust_path = "ESkillProposal::InvalidTargetIdCharset"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Revision proposal target_skill_id contains invalid characters"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ESkillProposal::InvalidTargetVersion"
+rust_path = "ESkillProposal::InvalidTargetVersion"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Revision proposal target_version is not valid semver"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
+code = "ESkillProposal::EmptyDiff"
+rust_path = "ESkillProposal::EmptyDiff"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Revision proposal proposed_diff must be non-empty (FR57)"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+# ---------------------------------------------------------------------------
+# ESkillQueue — crates/maos-skill/src/errors.rs
+# (E*-prefixed enum; all variants are part of the E* set)
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "ESkillQueue::DuplicateSkillId"
+rust_path = "ESkillQueue::DuplicateSkillId"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "A Pending entry with this SkillId already exists in the admission queue"
+severity = "user"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"

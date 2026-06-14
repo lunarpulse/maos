@@ -132,14 +132,16 @@ As an enterprise operator,
 I want the typed error catalog at `https://docs.maos.dev/errors/<ERR_NAME>` with CI-enforced metadata for every error variant (FR63), governance audit-queryable artifacts surfacing vetter-key admission / ABI-extension proposals / ComplianceClaim schema versions (FR62), AND cost attribution per Spirit per task per principal with ≥98% reconciliation against provider billing (FR64 + NFR-Cost-1),
 So that v1.0 is production-grade for enterprise: errors are diagnosable, governance is auditable, costs are attributable.
 
+> **⚑ SPLIT at preflight (party-mode 2026-06-13, ratified Winston·Murat·John·Amelia).** Split on the kernel-impact seam (mirrors 9.2→9.2b): **Story 9.3** ships **FR63** (typed error catalog — kernel-neutral, lands first, feeds Story 9.5's troubleshooting-guide 100%-coverage gate); **Story 9.3b** ships **FR62 + FR64** (governance audit artifacts + cost attribution — the kernel-touching half, behind ONE authorized re-pin, with FR62's ABI-extension-proposal model sequenced *before* FR64's re-pin, which lands as the first ratified `AbiExtensionProposal`). Both blockers (frozen-ComplianceClaim, cost-reconciliation oracle) are quarantined in 9.3b. Full preflight consensus lives in the two story files. Requirement errata applied to `requirements-inventory.md` (FR62/FR63/FR64/NFR-Doc-2/NFR-Cost-1).
+
 **Acceptance Criteria:**
 
 **Given** the typed error catalog (FR63)
 **When** any kernel-emitted error is raised
 **Then** the error carries a stable typed code from the published catalog
-**And** the catalog covers all 14+ named typed errors documented in architecture-maos-minimal-opus.md
+**And** the catalog covers the **complete kernel-emitted `E*` error set** (the "14+ named errors" — locked as a registry, count is an output not a target; preflight F2)
 **And** each variant has 6 CI-enforced metadata fields: code / severity / recovery-class / owner / kernel-or-spirit / since-version (NFR-Doc-2)
-**And** `cargo run --bin error-metadata-check` exits non-zero if any variant is missing any field
+**And** `cargo xtask error-catalog-check` exits non-zero if any variant is missing any field **and** if any kernel-emitted error is absent from the registry **and** if a registry entry is stale (bidirectional bijection; preflight F1/F3)
 
 **Given** the documentation site at `docs.maos.dev/errors/<ERR_NAME>`
 **When** any error code is documented

@@ -23,6 +23,8 @@ Committed ADRs for the MAOS project.
 | [ADR-039](ADR-039-per-module-unsafe-code-policy.md) | Per-module `#![forbid(unsafe_code)]` policy | binding-v0.1 | `xtask check-unsafe` + `xtask/unsafe-allowlist.toml` |
 | [ADR-040](ADR-040-rust-inproc-measurement-gate-v05-decision.md) | §13.1 rust-inproc measurement gate — v0.5 decision | binding-v0.5 | `xtask check-adr-040-accepted` + `crates/maos-bench/` |
 | [ADR-041](ADR-041-phase-3-4-kernel-core-extraction-via-port-traits.md) | Phase 3/4 `maos-kernel-core` extraction via port traits | binding-v0.7 | `xtask/kloc.toml [in_progress_decomposition]` + `xtask check-service-boundary` P1 per extracted crate |
+| [ADR-045](ADR-045-governance-audit-artifacts.md) | Governance audit artifacts (FR62) | proposed (Story 9.3b) | abi-diff↔ratified-proposal reconciliation + `--kind governance` completeness; frozen-`Claim` regression |
+| [ADR-046](ADR-046-cost-attribution-and-reconciliation.md) | Cost attribution + reconciliation (FR64) | proposed (Story 9.3b) | CI cost-reconcile golden-vector oracle (no `f64`, no import of pricing fn); kernel-baseline re-pin |
 
 > 16 `binding-v0.1` ADRs as of Story 1a.1; **15 as of Story 1b.6** (ADR-039 — per-module unsafe policy, accepts the 1b.3 relaxation).
 > **17 as of Story 5.5e** (ADR-040 — §13.1 rust-inproc measurement gate, binding-v0.5).

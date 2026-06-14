@@ -16,6 +16,7 @@ mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
 mod check_empty_kernel;
 mod check_env_contract;
+mod check_error_catalog;
 mod check_epic_6_bridge;
 mod check_epic_close_green;
 mod check_fr47;
@@ -496,6 +497,24 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 9.3 FR63 — typed error catalog CI gate: bijection check between
+    /// `xtask/error-catalog.toml` and AST-discovered E*-prefixed error variants.
+    #[command(name = "error-catalog-check")]
+    ErrorCatalogCheck {
+        #[arg(long, default_value = "xtask/error-catalog.toml")]
+        catalog: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 9.3 FR63 — generate deterministic machine-readable error catalog
+    /// artifact (per-error retryability + cause-chain + version-stability).
+    #[command(name = "error-catalog-generate")]
+    ErrorCatalogGenerate {
+        #[arg(long, default_value = "xtask/error-catalog.toml")]
+        catalog: String,
+        #[arg(long, default_value = "docs/errors/error-catalog.json")]
+        output: String,
+    },
 }
 
 fn main() {
@@ -754,6 +773,12 @@ fn main() {
         } => cassette_age_gate::run(&cassette_dir, json, stamp_dir.as_deref()),
         Commands::CheckEnvContract { maos_bin_dir, json } => {
             check_env_contract::run(&maos_bin_dir, json)
+        }
+        Commands::ErrorCatalogCheck { catalog, json } => {
+            check_error_catalog::run(&catalog, json)
+        }
+        Commands::ErrorCatalogGenerate { catalog, output } => {
+            check_error_catalog::run_generate(&catalog, &output)
         }
     };
     if let Err(e) = result {
