@@ -374,4 +374,39 @@ mod tests {
         let uuid = Uuid::from_bytes(bytes);
         assert_eq!(uuid.as_bytes(), &bytes);
     }
+    /// Story 9.3b AC-Group C #4 — frozen `Claim` byte-unchanged regression.
+    ///
+    /// A pinned JSON snapshot of a representative `Claim`.  Any change to
+    /// field names, field order, or serialization shape breaks this test and
+    /// therefore requires an `ABI_VERSION` bump per §8.5.
+    #[test]
+    fn claim_json_snapshot_is_unchanged() {
+        let claim = Claim {
+            claim_id: Uuid::from_bytes([
+                0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+                0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+            ]),
+            issued_at_unix_ms: 1_717_000_000_000,
+            expires_at_unix_ms: Some(1_717_086_400_000),
+            principle_refs: vec![PrincipleRef::EuAiActArt14],
+            evidence: vec![
+                EvidenceKind::CorpusReplay {
+                    corpus_sha256: [0xAB; 32],
+                },
+            ],
+            verdict: Verdict::Admit,
+        };
+
+        let json = serde_json::to_string(&claim).expect("Claim serialization must not fail");
+
+        // Golden snapshot — update ONLY alongside an ABI_VERSION bump.
+        // The exact shape is derived from the field declaration order and
+        // the serde attributes on `Claim`.
+        let expected = r#"{"claim_id":[1,35,69,103,137,171,205,239,1,35,69,103,137,171,205,239],"issued_at_unix_ms":1717000000000,"expires_at_unix_ms":1717086400000,"principle_refs":["eu_ai_act_art14"],"evidence":[{"kind":"corpus_replay","corpus_sha256":[171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171,171]}],"verdict":"admit"}"#;
+
+        assert_eq!(
+            json, expected,
+            "Claim JSON snapshot changed; if intentional, bump ABI_VERSION and update this golden value"
+        );
+    }
 }

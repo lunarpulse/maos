@@ -9,6 +9,8 @@ description = "MAOS Spirit ABI — stable public surface for cross-version compa
 
 [dependencies]
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+[dev-dependencies]
+serde_json = "1.0"
 
 [features]
 mock = []

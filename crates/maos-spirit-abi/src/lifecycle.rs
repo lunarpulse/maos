@@ -485,7 +485,7 @@ mod tests {
         s.on_unload(&mut ctx);
         // Story 5.2: three new hooks with default bodies.
         s.on_swap_out(&mut ctx);
-        assert_eq!(s.snapshot(&mut ctx), Vec::new());
+        assert_eq!(s.snapshot(&mut ctx), Vec::<u8>::new());
         assert!(matches!(
             s.migrate(&mut ctx, b"test"),
             Err(MigratorError::NotImplemented)

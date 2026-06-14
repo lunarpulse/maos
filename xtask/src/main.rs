@@ -3,6 +3,8 @@ use std::path::Path;
 use std::process;
 
 mod abi_diff;
+mod check_abi_ratification;
+mod check_governance_categories;
 mod calibrate;
 mod cassette_age_gate;
 mod check_a2a_sender_completeness;
@@ -515,6 +517,31 @@ enum Commands {
         #[arg(long, default_value = "docs/errors/error-catalog.json")]
         output: String,
     },
+    /// Story 9.3b FR62 — abi-diff ⊆ ratified reconciliation gate (ADR-045 §4 / R1).
+    /// Asserts every abi-diff-detected ABI change is covered by a ratified
+    /// AbiExtensionProposal in the manifest and backed by a TL-ancestor frame.
+    #[command(name = "check-abi-ratification")]
+    CheckAbiRatification {
+        #[arg(long, default_value = "xtask/abi-ratifications.toml")]
+        manifest: String,
+        /// ABI baseline to diff against. If the file does not exist,
+        /// the base case (no changes) is assumed — born green.
+        #[arg(long, default_value = "xtask/abi-baseline/ratification-baseline.txt")]
+        baseline: String,
+        /// Transparency Log SQLite path. Required when ABI changes are
+        /// detected, so the gate can verify each ratification frame is a
+        /// strict TL-ancestor of the delta.
+        #[arg(long, default_value = "/var/lib/maos/audit/transparency.sqlite")]
+        transparency_log: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 9.3b FR62 — governance category completeness cross-check (R9).
+    #[command(name = "check-governance-categories")]
+    CheckGovernanceCategories {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -779,6 +806,20 @@ fn main() {
         }
         Commands::ErrorCatalogGenerate { catalog, output } => {
             check_error_catalog::run_generate(&catalog, &output)
+        }
+        Commands::CheckAbiRatification {
+            manifest,
+            baseline,
+            transparency_log,
+            json,
+        } => check_abi_ratification::run(
+            &manifest,
+            &baseline,
+            &transparency_log,
+            json,
+        ),
+        Commands::CheckGovernanceCategories { json } => {
+            check_governance_categories::run(json)
         }
     };
     if let Err(e) = result {

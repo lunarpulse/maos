@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://maos.dev/schemas/governance-event-payload.v1.json",
+  "title": "maos.governance-event-payload.v1",
+  "description": "Payload shape for FrameKind::GovernanceEvent (28) rows in the Transparency Log. Per ADR-045: three governance streams share this kind, discriminated by governance_type.",
+  "type": "object",
+  "required": ["recorded_at_ns", "effective_at_ns", "event"],
+  "properties": {
+    "recorded_at_ns": {
+      "type": "integer",
+      "description": "Monotonic journal position (nanosecond wall-clock of TL insertion)."
+    },
+    "effective_at_ns": {
+      "type": "integer",
+      "description": "When the governance decision takes effect. May differ from recorded_at_ns (R12)."
+    },
+    "event": {
+      "type": "object",
+      "required": ["governance_type"],
+      "description": "Discriminated governance event (tagged by governance_type).",
+      "oneOf": [
+        {
+          "properties": {
+            "governance_type": { "const": "AbiExtension" },
+            "proposal_id": { "type": "string" },
+            "summary": { "type": "string" },
+            "adr_ref": { "type": "string" },
+            "status": { "enum": ["proposed", "ratified", "rejected"] },
+            "covered_changes": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "required": ["governance_type", "proposal_id", "summary", "adr_ref", "status", "covered_changes"]
+        },
+        {
+          "properties": {
+            "governance_type": { "const": "VetterKey" },
+            "spirit_id": { "type": "string" },
+            "version": { "type": "string" },
+            "admitted": { "type": "boolean" },
+            "effective_tier": { "type": "string" },
+            "journal_note": { "type": "string" }
+          },
+          "required": ["governance_type", "spirit_id", "version", "admitted", "effective_tier", "journal_note"]
+        },
+        {
+          "properties": {
+            "governance_type": { "const": "SchemaLifecycle" },
+            "schema_id": { "type": "string" },
+            "schema_content_hash": { "type": "string" },
+            "supersedes": { "type": ["string", "null"] },
+            "version": { "type": "integer" },
+            "ratified_by": { "type": "string" }
+          },
+          "required": ["governance_type", "schema_id", "schema_content_hash", "version", "ratified_by"]
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

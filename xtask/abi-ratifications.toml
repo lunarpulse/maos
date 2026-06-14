@@ -1,0 +1,32 @@
+# ABI-extension proposal ratification manifest (ADR-045 §4 / F6).
+#
+# Every abi-diff-detected ABI change must be covered by a ratified entry
+# here, or the `xtask check-abi-ratification` gate fails.
+# Base case: no ABI changes + no entries = PASS (∅ ⊆ anything).
+
+# Story 9.3b — FR62/FR64 kernel re-pin, the FIRST ratified AbiExtensionProposal.
+# Dogfoods ADR-045 §8: the re-pin is recorded through the governance model it introduces.
+[[ratification]]
+proposal_id = "9.3b-FR62-FR64-kernel-repin"
+summary = "FR62 GovernanceEvent (28) + FR64 CostAttribution (29) FrameKind discriminants + cost emission at inference/mod.rs + SR-3 forget-cascade extension"
+adr_ref = "ADR-045,ADR-046"
+status = "ratified"
+covered_changes = [
+  "GovernanceEvent",
+  "CostAttribution",
+  "CostAttributionPayload",
+  "PrincipalRef",
+  "AttributionSource",
+  "AttributionConfidence",
+  "CostDimension",
+  "ProviderPricingConfig",
+  "ProviderPricingEntry",
+  "SchemaRegistryEntry",
+  "GovernanceEventPayload",
+  "GovernanceEventKind",
+  "VetterKeyPayload",
+  "SchemaLifecyclePayload",
+  "RatificationStatus",
+  "AbiExtensionProposal",
+]
+ratified_at = "2026-06-14"

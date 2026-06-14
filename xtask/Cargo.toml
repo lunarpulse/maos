@@ -38,3 +38,6 @@ regex = "1.10"
 # chrono: date math for corpus-staleness. default-features=false avoids oldtime
 # and serde integrations not needed at v0.1-alpha.
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+maos-iac = { path = "../crates/maos-iac" }
+maos-audit = { path = "../crates/maos-audit" }

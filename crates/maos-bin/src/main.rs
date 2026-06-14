@@ -905,6 +905,56 @@ impl LiveResearcherMcpPort {
     }
 }
 
+/// Emit a `FrameKind::GovernanceEvent` with a `VetterKeyPayload` to the
+/// Transparency Log. Consolidates the formerly copy-pasted emission blocks
+/// (Story 9.3b review — VetterKey emission coverage).
+///
+/// Called on every admission, rejection, and rotation decision point so the
+/// audit trail records the full trust-tier decision history.
+fn emit_vetter_key_event(
+    tl: &maos_kernel_core::iac::TransparencyLogAdapter,
+    spirit_id: &str,
+    version: &str,
+    admitted: bool,
+    effective_tier: &str,
+    journal_note: &str,
+) {
+    // Fallback to epoch-zero when the system clock is before UNIX_EPOCH
+    // (e.g. pre-epoch embedded / VM clocks). A zero timestamp is
+    // preferable to a panic in a production governance-emission path
+    // (Story 9.3b patch 2).
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or(std::time::Duration::ZERO)
+        .as_nanos() as u64;
+    let gov_payload = maos_domain::governance::GovernanceEventPayload {
+        recorded_at_ns: now,
+        effective_at_ns: now,
+        event: maos_domain::governance::GovernanceEventKind::VetterKey(
+            maos_domain::governance::VetterKeyPayload {
+                spirit_id: spirit_id.to_owned(),
+                version: version.to_owned(),
+                admitted,
+                effective_tier: effective_tier.to_owned(),
+                journal_note: journal_note.to_owned(),
+            },
+        ),
+    };
+    let gov_bytes = serde_json::to_vec(&gov_payload).unwrap();
+    let _token = tl.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::GovernanceEvent,
+        0,
+        None,
+        if admitted {
+            "governance:vetter-key-admission"
+        } else {
+            "governance:vetter-key-rejection"
+        },
+        &gov_bytes,
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
+}
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cpus = worker_thread_count();
@@ -1599,7 +1649,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
                 .map_err(|e| format!("shell: cannot open journal: {e}"))?;
 
-            security
+            let _shell_spec = security
                 .admit_spirit(
                     0,
                     "hello-spirit",
@@ -1617,7 +1667,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     None,
                     Some(&class_section),
                 )
-                .map_err(|e| format!("shell: hello-spirit admission failed: {e}"))?;
+                .map_err(|e| {
+                    emit_vetter_key_event(
+                        &transparency_log,
+                        "hello-spirit",
+                        &class_section.version,
+                        false,
+                        "N/A",
+                        &format!("shell: hello-spirit admission rejected: {e}"),
+                    );
+                    format!("shell: hello-spirit admission failed: {e}")
+                })?;
+            emit_vetter_key_event(
+                &transparency_log,
+                "hello-spirit",
+                &class_section.version,
+                true,
+                &format!("{:?}", _shell_spec.tier),
+                "shell: hello-spirit admitted via canonical path",
+            );
             drop(journal);
             eprintln!("maos: hello-spirit admitted via canonical path (shell mode)");
         }
@@ -1768,7 +1836,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // concurrent-write corruption).
         let journal = Arc::clone(&shared_journal);
         let spirit_id = class_section.name.clone();
-        security
+        let _run_spec = security
             .admit_spirit(
                 0,
                 &spirit_id,
@@ -1786,7 +1854,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 None,
                 Some(&class_section),
             )
-            .map_err(|e| format!("maos run: admission failed: {e}"))?;
+            .map_err(|e| {
+                emit_vetter_key_event(
+                    &transparency_log,
+                    &spirit_id,
+                    &class_section.version,
+                    false,
+                    "N/A",
+                    &format!("maos run: admission rejected: {e}"),
+                );
+                format!("maos run: admission failed: {e}")
+            })?;
+        emit_vetter_key_event(
+            &transparency_log,
+            &spirit_id,
+            &class_section.version,
+            true,
+            &format!("{:?}", _run_spec.tier),
+            "maos run: admission granted",
+        );
 
         let bundle = SpiritManifestBundle {
             scheduling,
@@ -2472,6 +2558,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
 
+        // Story 9.3b — `maosctl governance admit` one-shot path.
+        if mode == "governance-admit" {
+            let schema_id = std::env::var("MAOS_GOVERNANCE_SCHEMA_ID")
+                .map_err(|_| "MAOS_GOVERNANCE_SCHEMA_ID is required for governance-admit")?;
+            let version: u32 = std::env::var("MAOS_GOVERNANCE_VERSION")
+                .map_err(|_| "MAOS_GOVERNANCE_VERSION is required for governance-admit")?
+                .parse()
+                .map_err(|_| "MAOS_GOVERNANCE_VERSION must be a u32")?;
+            let schema_content_hash = std::env::var("MAOS_GOVERNANCE_CONTENT_HASH")
+                .map_err(|_| "MAOS_GOVERNANCE_CONTENT_HASH is required for governance-admit")?;
+            let ratified_by = std::env::var("MAOS_GOVERNANCE_RATIFIED_BY")
+                .map_err(|_| "MAOS_GOVERNANCE_RATIFIED_BY is required for governance-admit")?;
+            let effective_at_ns: u64 = std::env::var("MAOS_GOVERNANCE_EFFECTIVE_AT_NS")
+                .map_err(|_| "MAOS_GOVERNANCE_EFFECTIVE_AT_NS is required for governance-admit")?
+                .parse()
+                .map_err(|_| "MAOS_GOVERNANCE_EFFECTIVE_AT_NS must be a u64")?;
+            let supersedes_hash = std::env::var("MAOS_GOVERNANCE_SUPERSEDES").ok();
+
+            let recorded_at_ns = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos() as u64;
+
+            let entry = maos_domain::governance::SchemaRegistryEntry {
+                schema_id: schema_id.clone(),
+                version,
+                effective_at_ns,
+                supersedes_hash,
+                ratified_by: ratified_by.clone(),
+                recorded_at_ns,
+                schema_content_hash: schema_content_hash.clone(),
+            };
+
+            let _token = transparency_log
+                .register_schema_lifecycle(&entry)
+                .map_err(|e| format!("governance admit failed: {e}"))?;
+
+            eprintln!(
+                "maos: admitted schema {schema_id} v{version} (ratified by {ratified_by})"
+            );
+            return Ok(());
+        }
         if mode == "posture-shift" {
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
 
@@ -2588,7 +2716,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 None,
                 None,
                 Some(&class_section),
-            )?;
+            ).map_err(|e| {
+                emit_vetter_key_event(
+                    &transparency_log,
+                    &spirit_id,
+                    &class_section.version,
+                    false,
+                    "N/A",
+                    &format!("posture-shift: re-admission rejected: {e}"),
+                );
+                e
+            })?;
+            emit_vetter_key_event(
+                &transparency_log,
+                &spirit_id,
+                &class_section.version,
+                true,
+                &format!("{:?}", _spec.tier),
+                "posture-shift: re-admission granted",
+            );
 
             // Perform the posture shift
             let new_hash = policy
@@ -5327,6 +5473,7 @@ fn run_uninstall_cascade(
     let mut total_revoked_tokens: usize = 0;
     let mut all_principal_ids: Vec<String> = Vec::new();
     let mut erased_distillate_frame_ids: Vec<[u8; 16]> = Vec::new();
+    let mut erased_principal_frame_ids: Vec<[u8; 16]> = Vec::new();
 
     for (_boot_nonce, spirit_pid) in &incarnations {
         let spirit_pid = *spirit_pid;
@@ -5341,6 +5488,7 @@ fn run_uninstall_cascade(
                 Ok(maos_domain::memory::ForgetOutcome::Erased {
                     receipt,
                     redacted_distillate_frame_ids,
+                    redacted_principal_frame_ids,
                 }) => {
                     total_deleted_entries += receipt.deleted_entries;
                     total_deleted_index_rows += receipt.deleted_index_rows;
@@ -5352,6 +5500,17 @@ fn run_uninstall_cascade(
                                 let mut arr = [0u8; 16];
                                 arr.copy_from_slice(&bytes);
                                 erased_distillate_frame_ids.push(arr);
+                            }
+                        }
+                    }
+                    // Collect the scrubbed principal frames for audit
+                    // (Story 9.3b patch 3 — do not discard with `..`).
+                    for hex_id in redacted_principal_frame_ids {
+                        if let Ok(bytes) = hex::decode(&hex_id) {
+                            if bytes.len() == 16 {
+                                let mut arr = [0u8; 16];
+                                arr.copy_from_slice(&bytes);
+                                erased_principal_frame_ids.push(arr);
                             }
                         }
                     }
@@ -5412,6 +5571,12 @@ fn run_uninstall_cascade(
             },
         },
         ErasureCategory {
+            name: "principal_frames".into(),
+            status: CategoryStatus::Removed {
+                count: erased_principal_frame_ids.len() as u64,
+            },
+        },
+        ErasureCategory {
             name: "intent_lineage".into(),
             status: CategoryStatus::VerifiedEmpty,
         },
@@ -5444,6 +5609,7 @@ fn run_uninstall_cascade(
         &post_frame_ids,
         &erased_distillate_frame_ids,
         &all_principal_ids,
+        &erased_principal_frame_ids,
         categories,
         &signing_seed,
     )

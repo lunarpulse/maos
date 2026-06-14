@@ -75,6 +75,10 @@ pub struct ErasureProof {
     pub pre_leaves: Vec<String>,
     pub post_leaves: Vec<String>,
     pub erased_frame_proofs: Vec<ErasedFrameProof>,
+    /// Inclusion proofs for principal-bearing frames whose payloads were
+    /// redacted during the forget cascade.  They prove the frames existed in
+    /// the pre-erasure tree (SR-3).
+    pub redacted_principal_frame_proofs: Vec<ErasedFrameProof>,
     pub subject_exclusion_proofs: Vec<MerkleProof>,
     pub categories: Vec<ErasureCategory>,
     pub signature_block: SignatureBlock,
@@ -92,6 +96,7 @@ struct ErasureProofForSigning {
     pub pre_leaves: Vec<String>,
     pub post_leaves: Vec<String>,
     pub erased_frame_proofs: Vec<ErasedFrameProof>,
+    pub redacted_principal_frame_proofs: Vec<ErasedFrameProof>,
     pub subject_exclusion_proofs: Vec<MerkleProof>,
     pub categories: Vec<ErasureCategory>,
 }
@@ -151,15 +156,11 @@ fn sort_value(value: serde_json::Value) -> serde_json::Value {
     }
 }
 
-/// Build a signed proof-of-erasure bundle.
-///
-/// * `pre_frame_ids` — all TL frame_ids present before the uninstall cascade.
-/// * `post_frame_ids` — all TL frame_ids present after the cascade.
-/// * `erased_frame_ids` — the distillate frames whose bodies were scrubbed;
-///   each is proven present in the pre-tree (AC3 inclusion).  May be empty if
-///   no distillates were touched.
 /// * `erased_principal_ids` — the principals erased; each yields a canonical
 ///   subject-leaf exclusion proof against the post-tree (AC3 exclusion).
+/// * `redacted_principal_frame_ids` — principal-bearing frames whose payloads
+///   were redacted (not deleted).  Each is proven present in the pre-tree
+///   (SR-3 inclusion) so a verifier can bind the redaction to real TL frames.
 pub fn build_erasure_proof(
     spirit_id: String,
     spirit_pid: u32,
@@ -168,6 +169,7 @@ pub fn build_erasure_proof(
     post_frame_ids: &[[u8; 16]],
     erased_frame_ids: &[[u8; 16]],
     erased_principal_ids: &[String],
+    redacted_principal_frame_ids: &[[u8; 16]],
     categories: Vec<ErasureCategory>,
     signing_seed: &[u8; 32],
 ) -> Result<ErasureProof, ErasureProofError> {
@@ -184,6 +186,25 @@ pub fn build_erasure_proof(
             )
         })?;
         erased_frame_proofs.push(ErasedFrameProof {
+            frame_id: format_frame_id(fid),
+            pre_inclusion: proof,
+        });
+    }
+
+
+    // Inclusion (SR-3): each principal-bearing frame that was redacted must
+    // have existed in the pre-erasure tree so the redaction is bound to real
+    // TL frames.
+    let mut redacted_principal_frame_proofs = Vec::with_capacity(redacted_principal_frame_ids.len());
+    for fid in redacted_principal_frame_ids {
+        let leaf = hash_leaf(fid);
+        let proof = prove_inclusion(&pre_tree, leaf).ok_or_else(|| {
+            ErasureProofError::VerificationFailed(
+                "redacted principal frame is absent from the pre-tree; cannot prove inclusion"
+                    .to_string(),
+            )
+        })?;
+        redacted_principal_frame_proofs.push(ErasedFrameProof {
             frame_id: format_frame_id(fid),
             pre_inclusion: proof,
         });
@@ -218,6 +239,7 @@ pub fn build_erasure_proof(
         pre_leaves,
         post_leaves,
         erased_frame_proofs,
+        redacted_principal_frame_proofs,
         subject_exclusion_proofs,
         categories,
     };
@@ -238,6 +260,7 @@ pub fn build_erasure_proof(
         pre_leaves: unsigned.pre_leaves,
         post_leaves: unsigned.post_leaves,
         erased_frame_proofs: unsigned.erased_frame_proofs,
+        redacted_principal_frame_proofs: unsigned.redacted_principal_frame_proofs,
         subject_exclusion_proofs: unsigned.subject_exclusion_proofs,
         categories: unsigned.categories,
         signature_block: SignatureBlock {
@@ -269,6 +292,7 @@ pub fn verify_erasure_proof(
         pre_leaves: proof.pre_leaves.clone(),
         post_leaves: proof.post_leaves.clone(),
         erased_frame_proofs: proof.erased_frame_proofs.clone(),
+        redacted_principal_frame_proofs: proof.redacted_principal_frame_proofs.clone(),
         subject_exclusion_proofs: proof.subject_exclusion_proofs.clone(),
         categories: proof.categories.clone(),
     };
@@ -325,6 +349,21 @@ pub fn verify_erasure_proof(
         }
     }
 
+    // Inclusion (SR-3): each redacted principal-bearing frame was in the pre-tree.
+    for efp in &proof.redacted_principal_frame_proofs {
+        let fid = parse_frame_id_hex(&efp.frame_id).ok_or_else(|| {
+            ErasureProofError::VerificationFailed(
+                "malformed redacted principal frame_id".to_string(),
+            )
+        })?;
+        let leaf = hash_leaf(&fid);
+        if !super::merkle::verify_proof(proof.pre_root, leaf, &efp.pre_inclusion) {
+            return Err(ErasureProofError::VerificationFailed(
+                "redacted-principal-frame pre-inclusion proof invalid".to_string(),
+            ));
+        }
+    }
+
     // Exclusion: each canonical subject leaf is absent from the post-tree.
     for sp in &proof.subject_exclusion_proofs {
         if !super::merkle::verify_proof(proof.post_root, sp.leaf, sp) {
@@ -346,6 +385,7 @@ pub fn verify_erasure_proof(
         .any(|c| matches!(c.status, CategoryStatus::Removed { count } if count > 0));
     if claims_removal
         && proof.erased_frame_proofs.is_empty()
+        && proof.redacted_principal_frame_proofs.is_empty()
         && proof.subject_exclusion_proofs.is_empty()
     {
         return Err(ErasureProofError::VerificationFailed(
@@ -460,6 +500,7 @@ mod tests {
             &post,
             &erased,
             &principals,
+            &[],
             vec![
                 ErasureCategory {
                     name: "memory_namespace".into(),
@@ -499,6 +540,7 @@ mod tests {
             &post,
             &[never_existed],
             &[],
+            &[],
             vec![],
             &seed,
         );
@@ -518,6 +560,7 @@ mod tests {
             &post,
             &[pre[0]],
             &["bob@example.org".to_string()],
+            &[],
             vec![ErasureCategory {
                 name: "memory_namespace".into(),
                 status: CategoryStatus::Removed { count: 1 },
@@ -549,6 +592,7 @@ mod tests {
             &post,
             &[pre[0]],
             &["carol@example.org".to_string()],
+            &[],
             vec![ErasureCategory {
                 name: "memory_namespace".into(),
                 status: CategoryStatus::Removed { count: 1 },

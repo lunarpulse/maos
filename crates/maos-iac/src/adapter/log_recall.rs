@@ -127,6 +127,8 @@ impl LogRecallAdapter {
             FrameKind::GatewayOutbound => DomainFrameKindLabel::GatewayOutbound,
             FrameKind::SpiritImported => DomainFrameKindLabel::SpiritImported,
             FrameKind::CliWrapperShapeMismatch => DomainFrameKindLabel::CliWrapperShapeMismatch,
+            FrameKind::GovernanceEvent => DomainFrameKindLabel::GovernanceEvent,
+            FrameKind::CostAttribution => DomainFrameKindLabel::CostAttribution,
         }
     }
 
@@ -169,6 +171,8 @@ impl LogRecallAdapter {
             DomainFrameKindLabel::CliWrapperShapeMismatch => {
                 Some(FrameKind::CliWrapperShapeMismatch)
             }
+            DomainFrameKindLabel::GovernanceEvent => Some(FrameKind::GovernanceEvent),
+            DomainFrameKindLabel::CostAttribution => Some(FrameKind::CostAttribution),
             other => {
                 eprintln!(
                     "maos: warning: unmapped FrameKindLabel {:?} in to_kernel_kind \

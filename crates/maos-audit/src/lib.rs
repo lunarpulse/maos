@@ -31,6 +31,10 @@ pub enum AuditError {
     Open(rusqlite::Error),
     #[error("sqlite read failed: {0}")]
     Read(rusqlite::Error),
+    #[error("sqlite query failed: {0}")]
+    Query(rusqlite::Error),
+    #[error("sqlite row decode failed: {0}")]
+    Row(String),
     #[error("ndjson encode failed: {0}")]
     Encode(#[from] serde_json::Error),
     #[error("io error: {0}")]
@@ -134,7 +138,41 @@ pub struct AuditFilter {
     pub intent_contains: Option<String>,
 }
 
+/// Resolve the `kind` filter string to a concrete list of `i64` discriminators.
+///
+/// Supports:
+/// - single category names (`"governance"`, `"cost"`) via `kind_category_to_kinds`
+/// - comma-separated categories/kinds (`"governance,cost"`)
+/// - single kind names (`"TaskAssign"`, `"task.assign"`) via `kind_from_string`
+///
+/// Returns `None` only when none of the comma-separated tokens resolve
+/// (callers should surface `AuditError::UnknownKind`).
+fn resolve_kind_filter(kind_str: &str) -> Option<Vec<i64>> {
+    let mut result = Vec::new();
+    let mut any_recognized = false;
+    for token in kind_str.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+        if let Some(kinds) = kind_category_to_kinds(token) {
+            result.extend(kinds);
+            any_recognized = true;
+        } else if let Some(kind) = kind_from_string(token) {
+            result.push(kind);
+            any_recognized = true;
+        }
+    }
+    if any_recognized {
+        // Preserve stable order and remove duplicates without changing the
+        // SQL `kind IN (...)` semantics.
+        let mut deduped = result;
+        deduped.sort_unstable();
+        deduped.dedup();
+        Some(deduped)
+    } else {
+        None
+    }
+}
+
 /// Open the per-Host SQLite file read-only and return matching entries.
+
 pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, AuditError> {
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
@@ -183,10 +221,20 @@ pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, Aud
         params.push(Box::new(until_i64));
     }
     if let Some(kind_str) = &filter.kind {
-        match kind_from_string(kind_str) {
-            Some(kind_int) => {
-                where_clauses.push("kind = ?".to_string());
-                params.push(Box::new(kind_int));
+        match resolve_kind_filter(kind_str) {
+            Some(kinds) => {
+                if kinds.len() == 1 {
+                    where_clauses.push("kind = ?".to_string());
+                    params.push(Box::new(kinds[0]));
+                } else {
+                    let placeholders: Vec<String> = kinds.iter().enumerate()
+                        .map(|(i, _)| format!("?{}", params.len() + i + 1))
+                        .collect();
+                    where_clauses.push(format!("kind IN ({})", placeholders.join(",")));
+                    for k in &kinds {
+                        params.push(Box::new(*k));
+                    }
+                }
             }
             None => return Err(AuditError::UnknownKind(kind_str.clone())),
         }
@@ -340,10 +388,20 @@ pub fn query_with_redaction(
         params.push(Box::new(until_i64));
     }
     if let Some(kind_str) = &filter.kind {
-        match kind_from_string(kind_str) {
-            Some(kind_int) => {
-                where_clauses.push("kind = ?".to_string());
-                params.push(Box::new(kind_int));
+        match resolve_kind_filter(kind_str) {
+            Some(kinds) => {
+                if kinds.len() == 1 {
+                    where_clauses.push("kind = ?".to_string());
+                    params.push(Box::new(kinds[0]));
+                } else {
+                    let placeholders: Vec<String> = kinds.iter().enumerate()
+                        .map(|(i, _)| format!("?{}", params.len() + i + 1))
+                        .collect();
+                    where_clauses.push(format!("kind IN ({})", placeholders.join(",")));
+                    for k in &kinds {
+                        params.push(Box::new(*k));
+                    }
+                }
             }
             None => return Err(AuditError::UnknownKind(kind_str.clone())),
         }
@@ -427,6 +485,63 @@ pub fn to_ndjson<W: Write>(
         writeln!(out, "{line}")?;
     }
     Ok(())
+}
+/// One ratification frame read from the Transparency Log.
+///
+/// Used by the `xtask check-abi-ratification` gate to verify that
+/// ratified ABI-extension proposals exist as journaled governance events
+/// and strictly precede the ABI delta they cover (ADR-045 §4 / R1).
+#[derive(Debug, Clone)]
+pub struct RatificationFrame {
+    pub proposal_id: String,
+    pub seq: i64,
+}
+
+/// Load ratification frames from the Transparency Log.
+///
+/// Searches for `FrameKind::GovernanceEvent` frames whose payload is an
+/// `AbiExtensionProposal` with `status == Ratified`.
+/// Returns them sorted by ascending `seq`.
+pub fn load_ratification_frames(db_path: &Path) -> Result<Vec<RatificationFrame>, AuditError> {
+    use maos_domain::governance::{GovernanceEventKind, GovernanceEventPayload, RatificationStatus};
+
+    // FrameKind::GovernanceEvent discriminator is pinned at 28 (wire-stable
+    // since Story 1b.1; see maos-iac::adapter::transparency_log::FrameKind).
+    const GOVERNANCE_EVENT_KIND: i64 = 28;
+
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(AuditError::Open)?;
+
+    let mut stmt = conn
+        .prepare("SELECT seq, payload FROM transparency_log WHERE kind = ? ORDER BY seq ASC")
+        .map_err(AuditError::Query)?;
+
+    let rows = stmt
+        .query_map([GOVERNANCE_EVENT_KIND], |row| {
+            let seq: i64 = row.get(0)?;
+            let payload: Vec<u8> = row.get(1)?;
+            Ok((seq, payload))
+        })
+        .map_err(AuditError::Query)?;
+
+    let mut frames = Vec::new();
+    for row in rows {
+        let (seq, payload) = row.map_err(AuditError::Query)?;
+        let payload: GovernanceEventPayload = serde_json::from_slice(&payload)
+            .map_err(|e| AuditError::Row(format!("frame seq {seq}: {e}")))?;
+        if let GovernanceEventKind::AbiExtension(proposal) = payload.event {
+            if proposal.status == RatificationStatus::Ratified {
+                frames.push(RatificationFrame {
+                    proposal_id: proposal.proposal_id,
+                    seq,
+                });
+            }
+        }
+    }
+    Ok(frames)
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -542,6 +657,8 @@ fn kind_to_string(kind: i64) -> String {
         17 => "spirit.revoked",
         19 => "spirit.admitted",
         22 => "consent.rupture",
+        28 => "governance.event",
+        29 => "cost.attribution",
         _ => "unknown",
     }
     .to_string()
@@ -566,6 +683,60 @@ fn kind_from_string(s: &str) -> Option<i64> {
         "spirit.revoked" | "SpiritRevoked" => Some(17),
         "spirit.admitted" | "SpiritAdmitted" => Some(19),
         "consent.rupture" | "ConsentRupture" => Some(22),
+        "governance.event" | "GovernanceEvent" => Some(28),
+        "cost.attribution" | "CostAttribution" => Some(29),
+        _ => None,
+    }
+}
+
+/// Story 9.3b (F7) — resolve a category name to the set of FrameKind
+/// discriminators it covers.  Used by `maosctl audit query --kind governance`.
+///
+/// Categories: `"governance"` → FrameKind::GovernanceEvent (28);
+/// `"cost"` → FrameKind::CostAttribution (29, added in Task 3).
+/// Returns None for unrecognized categories.
+pub fn kind_category_to_kinds(category: &str) -> Option<Vec<i64>> {
+    let kinds = match category {
+        "governance" => vec![28],
+        "cost" => vec![29],
+        _ => return None,
+    };
+    if kinds.is_empty() {
+        None
+    } else {
+        Some(kinds)
+    }
+}
+
+/// Audit-category classification for a FrameKind discriminator.
+///
+/// This is the INVERSE of `kind_category_to_kinds` — maps a single kind
+/// i64 to its category.  The R9 completeness check in xtask asserts
+/// these two round-trip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuditCategory {
+    Governance,
+    Cost,
+    /// Operational kinds (0–27 except governance/cost) — NOT a catch-all
+    /// `Other` (no `_ => Other` arm per AC3).
+    Operational,
+}
+
+/// Classify a single FrameKind i64 into its audit category.
+///
+/// Per R9: uses explicit arms, NOT a catch-all `_ => Other`.
+/// The EXCLUDED set documents pre-existing kinds that are not
+/// governance or cost.  A new kind FORCES a classification decision.
+pub fn kind_to_category(kind: i64) -> Option<AuditCategory> {
+    match kind {
+        // Governance
+        28 => Some(AuditCategory::Governance),
+        29 => Some(AuditCategory::Cost),
+        // Operational (pre-existing kinds 0–27)
+        0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+        12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 |
+        24 | 25 | 26 | 27 => Some(AuditCategory::Operational),
+        // Unknown kind — forces a classification decision on introduction
         _ => None,
     }
 }

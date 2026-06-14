@@ -8,10 +8,11 @@ use std::io::Write;
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
-    AuditFormat, AuditQuery, ForgetArgs, HaltArgs, HaltOp, ImportArgs, InstallArgs,
-    OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice,
-    ResolutionKindChoice, ResumeArgs, RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs,
-    SkillsArgs, SkillsOp, SpiritArgs, SpiritOp, Subcommand, UpgradePolicyArg,
+    AuditFormat, AuditQuery, ForgetArgs, GovernanceArgs, GovernanceOp, HaltArgs, HaltOp,
+    ImportArgs, InstallArgs, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs,
+    PostureChoice, ResolutionKindChoice, ResumeArgs, RevocationsArgs, RevocationsOp,
+    RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs, SpiritOp, Subcommand,
+    UpgradePolicyArg,
 };
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
@@ -34,6 +35,39 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Revocations(args) => dispatch_revocations(args, color),
         Subcommand::Import(args) => dispatch_import(args, color),
         Subcommand::Skills(args) => dispatch_skills(args, color),
+        Subcommand::Governance(args) => dispatch_governance(args, color),
+    }
+}
+
+/// Story 9.3b — `maosctl governance admit` shells to `maos-bin` via the
+/// `MAOS_ONE_SHOT=governance-admit` env channel.  The kernel-side handler
+/// writes the schema-lifecycle registry row + governance event frame.
+fn dispatch_governance(args: &GovernanceArgs, color: ColorChoice) -> ExitCode {
+    match &args.op {
+        GovernanceOp::Admit {
+            schema_id,
+            version,
+            content_hash,
+            supersedes,
+            ratified_by,
+            effective_at_ns,
+        } => {
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "governance-admit");
+            cmd.env("MAOS_GOVERNANCE_SCHEMA_ID", schema_id);
+            cmd.env("MAOS_GOVERNANCE_VERSION", version.to_string());
+            cmd.env("MAOS_GOVERNANCE_CONTENT_HASH", content_hash);
+            cmd.env("MAOS_GOVERNANCE_RATIFIED_BY", ratified_by);
+            cmd.env("MAOS_GOVERNANCE_EFFECTIVE_AT_NS", effective_at_ns.to_string());
+            if let Some(s) = supersedes {
+                cmd.env("MAOS_GOVERNANCE_SUPERSEDES", s);
+            }
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+            exec_and_forward(&mut cmd, &bin)
+        }
     }
 }
 
@@ -827,6 +861,9 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
         ),
         Some(AuditQuery::Replay { bundle, output }) => {
             audit_replay(bundle, output)
+        }
+        Some(AuditQuery::CostReconcile { month, format, pricing }) => {
+            audit_cost_reconcile(month, pricing, *format)
         }
     }
 }
@@ -1883,6 +1920,340 @@ fn sort_value_with_depth_limit(
 /// side) to prevent path-drift data loss.
 fn default_transparency_log_path() -> PathBuf {
     maos_audit::default_transparency_log_path()
+}
+
+// ─── FR64: Cost Reconcile ──────────────────────────────────────────────
+
+/// FR64 cost-reconcile report row.
+#[derive(Debug, serde::Serialize)]
+struct CostReportRow {
+    principal: String,
+    spirit_pid: u32,
+    provider: String,
+    model: String,
+    tokens_in: i64,
+    tokens_out: i64,
+    cost_micro: u64,
+}
+/// FR64 cost-reconcile report.
+#[derive(Debug, serde::Serialize)]
+struct CostReport {
+    month: String,
+    rows: Vec<CostReportRow>,
+    total_cost_micro: u64,
+    attributed_cost_micro: u64,
+    attributable_fraction: f64,
+    /// Per-Spirit attributable fraction (SR-2).  Unlike the host-wide
+    /// `attributable_fraction`, each entry only counts costs emitted by that
+    /// spirit_pid.
+    per_spirit_attributable_fraction: std::collections::BTreeMap<u32, f64>,
+    warnings: Vec<String>,
+}
+
+/// Parse "YYYY-MM" into `(since_ns, until_ns)` nanosecond bounds.
+///
+/// Uses `chrono` for calendar math so negative/pre-epoch years and leap
+/// months are handled consistently. Rejects months outside 1-12 and years
+/// before 1970 to prevent silent wrap-around of the Unix-epoch offset.
+fn parse_month_range(month: &str) -> Result<(u64, u64), String> {
+    let parts: Vec<&str> = month.split('-').collect();
+    if parts.len() != 2 {
+        return Err("month must be YYYY-MM".into());
+    }
+    let year: i32 = parts[0]
+        .parse()
+        .map_err(|_| "invalid year in YYYY-MM".to_string())?;
+    let mon: u32 = parts[1]
+        .parse()
+        .map_err(|_| "invalid month in YYYY-MM".to_string())?;
+    if !(1..=12).contains(&mon) {
+        return Err("month must be 1-12".into());
+    }
+    if year < 1970 {
+        return Err("year must be >= 1970".into());
+    }
+    let since = chrono::NaiveDate::from_ymd_opt(year, mon, 1)
+        .ok_or_else(|| "invalid YYYY-MM date".to_string())?
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    let since_ns = since.and_utc().timestamp().max(0) as u64 * 1_000_000_000;
+
+    let (next_year, next_mon) = if mon == 12 {
+        (year + 1, 1)
+    } else {
+        (year, mon + 1)
+    };
+    let until = chrono::NaiveDate::from_ymd_opt(next_year, next_mon, 1)
+        .ok_or_else(|| "invalid YYYY-MM date".to_string())?
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    let until_ns = until.and_utc().timestamp().max(0) as u64 * 1_000_000_000;
+
+    Ok((since_ns, until_ns))
+}
+///
+/// R5: accumulates token counts per group, then multiplies by price once
+/// using `u128` to avoid overflow, dividing by 1000 at the end.
+fn build_cost_report(
+    month: &str,
+    entries: &[maos_audit::AuditEntry],
+    pricing: &maos_domain::cost::ProviderPricingConfig,
+) -> CostReport {
+    use maos_domain::cost::{CostAttributionPayload, CostDimension, PrincipalRef};
+    use std::collections::BTreeMap;
+
+    // Group key: (principal_display, spirit_pid, provider, model)
+    type Key = (String, u32, String, String);
+    // Accumulator: (tokens_in, tokens_out)
+    let mut groups: BTreeMap<Key, (i64, i64)> = BTreeMap::new();
+    let mut warnings: Vec<String> = Vec::new();
+
+    for entry in entries {
+        let payload: CostAttributionPayload = match serde_json::from_str(&entry.intent) {
+            Ok(p) => p,
+            Err(e) => {
+                warnings.push(format!(
+                    "skipping malformed cost payload for frame {}: {e}",
+                    entry.frame_id_hex
+                ));
+                continue;
+            }
+        };
+
+        let principal_display = match &payload.principal {
+            PrincipalRef::Resolved { principal_id } => principal_id.clone(),
+            PrincipalRef::Ambiguous { .. } | PrincipalRef::Unattributed => {
+                "host-unallocated".to_string()
+            }
+        };
+
+        let tokens_in = payload
+            .dimensions
+            .get(&CostDimension::TokensIn)
+            .copied()
+            .unwrap_or(0)
+            .max(0);
+        let tokens_out = payload
+            .dimensions
+            .get(&CostDimension::TokensOut)
+            .copied()
+            .unwrap_or(0)
+            .max(0);
+
+        let key = (
+            principal_display,
+            payload.spirit_pid,
+            payload.provider.clone(),
+            payload.model.clone(),
+        );
+        let acc = groups.entry(key).or_insert((0, 0));
+        acc.0 = acc.0.saturating_add(tokens_in);
+        acc.1 = acc.1.saturating_add(tokens_out);
+    }
+
+    // First pass: compute full-precision cost per group and the authoritative
+    // total.  R5 requires exactly one division by 1000 at the window boundary.
+    let mut row_precisions: Vec<(Key, (i64, i64), u128)> = Vec::with_capacity(groups.len());
+    let mut total_cost_u128: u128 = 0;
+    let mut attributed_cost_u128: u128 = 0;
+    let mut per_spirit_cost: BTreeMap<u32, (u128, u128)> = BTreeMap::new();
+
+    for (key, (tokens_in, tokens_out)) in &groups {
+        let (input_price, output_price) = pricing
+            .lookup(&key.2, &key.3)
+            .map(|e| (e.input_price_micro_per_1k, e.output_price_micro_per_1k))
+            .unwrap_or((0, 0));
+
+        let cost_u128 = (*tokens_in as u128) * (input_price as u128)
+            + (*tokens_out as u128) * (output_price as u128);
+
+        total_cost_u128 += cost_u128;
+        if key.0 != "host-unallocated" {
+            attributed_cost_u128 += cost_u128;
+        }
+        let spirit_entry = per_spirit_cost.entry(key.1).or_insert((0, 0));
+        spirit_entry.0 += cost_u128;
+        if key.0 != "host-unallocated" {
+            spirit_entry.1 += cost_u128;
+        }
+        row_precisions.push((key.clone(), (*tokens_in, *tokens_out), cost_u128));
+    }
+
+    let total_cost_micro = (total_cost_u128 / 1000) as u64;
+    let attributed_cost_micro = (attributed_cost_u128 / 1000) as u64;
+
+    let per_spirit_attributable_fraction: BTreeMap<u32, f64> = per_spirit_cost
+        .iter()
+        .map(|(pid, (total, attributed))| {
+            let fraction = if *total == 0 {
+                0.0
+            } else {
+                *attributed as f64 / *total as f64
+            };
+            (*pid, fraction)
+        })
+        .collect();
+
+    // Second pass: assign each row a cost_micro that sums exactly to
+    // total_cost_micro.  This preserves the single-division authority and
+    // eliminates per-row rounding drift.
+    let mut rows = Vec::with_capacity(row_precisions.len());
+    let mut assigned_total: u64 = 0;
+    for (i, (key, (tokens_in, tokens_out), cost_u128)) in row_precisions.iter().enumerate() {
+        let cost_micro = if total_cost_u128 == 0 {
+            0
+        } else if i == row_precisions.len() - 1 {
+            // Last row absorbs the residual so the column foots exactly.
+            total_cost_micro - assigned_total
+        } else {
+            ((*cost_u128 * total_cost_micro as u128) / total_cost_u128) as u64
+        };
+        assigned_total += cost_micro;
+        rows.push(CostReportRow {
+            principal: key.0.clone(),
+            spirit_pid: key.1,
+            provider: key.2.clone(),
+            model: key.3.clone(),
+            tokens_in: *tokens_in,
+            tokens_out: *tokens_out,
+            cost_micro,
+        });
+    }
+
+    let attributable_fraction = if total_cost_u128 == 0 {
+        0.0
+    } else {
+        attributed_cost_u128 as f64 / total_cost_u128 as f64
+    };
+
+    CostReport {
+        month: month.to_string(),
+        rows,
+        total_cost_micro,
+        attributed_cost_micro,
+        attributable_fraction,
+        per_spirit_attributable_fraction,
+        warnings,
+    }
+}
+
+/// Format a cost report as human-readable plain text.
+fn format_cost_report_plain(report: &CostReport) -> String {
+    let mut out = String::new();
+    use std::fmt::Write;
+    let _ = writeln!(out, "Cost Reconcile Report — {}", report.month);
+    let _ = writeln!(
+        out,
+        "  total={} µ$  attributed={} µ$  fraction={:.4}",
+        report.total_cost_micro, report.attributed_cost_micro, report.attributable_fraction,
+    );
+    for row in &report.rows {
+        let _ = writeln!(
+            out,
+            "  {:30} pid={:<5} {:12}/{:24} in={:<10} out={:<10} cost={} µ$",
+            row.principal,
+            row.spirit_pid,
+            row.provider,
+            row.model,
+            row.tokens_in,
+            row.tokens_out,
+            row.cost_micro,
+        );
+    }
+    if !report.per_spirit_attributable_fraction.is_empty() {
+        let _ = writeln!(out, "\nPer-Spirit attributable fraction:");
+        for (pid, frac) in &report.per_spirit_attributable_fraction {
+            let _ = writeln!(out, "  pid={pid}: {frac:.4}");
+        }
+    }
+    if !report.warnings.is_empty() {
+        let _ = writeln!(out, "\nWarnings:");
+        for w in &report.warnings {
+            let _ = writeln!(out, "  ⚠ {w}");
+        }
+    }
+    out
+}
+/// FR64 — cost-reconcile CLI entry point.
+fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) -> ExitCode {
+    let db_path = default_transparency_log_path();
+
+    // Parse month → time range.
+    let (since_ns, until_ns) = match parse_month_range(month) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("maosctl: audit cost-reconcile — {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    // Load pricing config.
+    let pricing_content = match std::fs::read_to_string(pricing_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("maosctl: audit cost-reconcile — cannot read pricing: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let pricing: maos_domain::cost::ProviderPricingConfig = match toml::from_str(&pricing_content)
+    {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("maosctl: audit cost-reconcile — invalid pricing config: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    // Query cost-attribution frames for the month.
+    let filter = maos_audit::AuditFilter {
+        kind: Some("cost".to_string()),
+        since_ns: Some(since_ns),
+        until_ns: Some(until_ns),
+        ..Default::default()
+    };
+    let entries = match maos_audit::query(&db_path, filter) {
+        Ok(e) => e,
+        Err(maos_audit::AuditError::Open(_)) => {
+            eprintln!(
+                "maosctl: audit cost-reconcile — no Transparency Log found at {}.",
+                db_path.display()
+            );
+            return ExitCode::from(2);
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit cost-reconcile — error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let report = build_cost_report(month, &entries, &pricing);
+
+    let stdout = std::io::stdout();
+    let mut lock = stdout.lock();
+    match format {
+        AuditFormat::Ndjson => {
+            let json = match serde_json::to_string(&report) {
+                Ok(j) => j,
+                Err(e) => {
+                    eprintln!("maosctl: audit cost-reconcile — encode error: {e}");
+                    return ExitCode::from(2);
+                }
+            };
+            if let Err(e) = writeln!(lock, "{json}") {
+                eprintln!("maosctl: audit cost-reconcile — write error: {e}");
+                return ExitCode::from(2);
+            }
+        }
+        AuditFormat::Plain => {
+            let text = format_cost_report_plain(&report);
+            if let Err(e) = write!(lock, "{text}") {
+                eprintln!("maosctl: audit cost-reconcile — write error: {e}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    ExitCode::SUCCESS
 }
 
 #[cfg(test)]

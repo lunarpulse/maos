@@ -101,6 +101,15 @@ pub enum FrameKind {
     /// Log before the kernel returns, per ADR-021's "audit drift is the failure
     /// mode the substrate cannot tolerate".
     CliWrapperShapeMismatch = 27,
+    /// Story 9.3b — FR62 (ADR-045): governance audit artifact.  Payload is
+    /// `GovernanceEventPayload` (discriminated by `GovernanceEventKind`):
+    /// ABI-extension proposals/ratification, vetter-key admission/rotation,
+    /// ComplianceClaim schema-lifecycle events.
+    GovernanceEvent = 28,
+    /// Story 9.3b — FR64 (ADR-046): cost-attribution fact.  Payload is
+    /// `CostAttributionPayload` (RAW dimensional facts — no money field;
+    /// money computed read-time in `maos-audit` via `ProviderPricingConfig`).
+    CostAttribution = 29,
 }
 
 impl FrameKind {
@@ -135,6 +144,8 @@ impl FrameKind {
             25 => Some(Self::GatewayOutbound),
             26 => Some(Self::SpiritImported),
             27 => Some(Self::CliWrapperShapeMismatch),
+            28 => Some(Self::GovernanceEvent),
+            29 => Some(Self::CostAttribution),
             _ => None,
         }
     }
@@ -207,7 +218,11 @@ pub enum AuditError {
     SqliteRead(rusqlite::Error),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("malformed frame_id blob: expected 16 bytes, got {0}")]
+    MalformedFrameId(usize),
 }
+
+
 
 /// SQL schema for both tables.
 const SCHEMA_SQL: &str = "\
@@ -265,8 +280,26 @@ CREATE TABLE IF NOT EXISTS legal_holds (
 
 CREATE INDEX IF NOT EXISTS idx_approval_actor
     ON approval_decision_log(actor, timestamp_ns);
-";
 
+-- Story 9.3b (R10) — schema-lifecycle registry for governance audit.
+CREATE TABLE IF NOT EXISTS schema_lifecycle_registry (
+    schema_id           TEXT    NOT NULL,
+    version             INTEGER NOT NULL,
+    effective_at_ns     INTEGER NOT NULL,
+    supersedes_hash     TEXT,
+    ratified_by         TEXT    NOT NULL,
+    recorded_at_ns      INTEGER NOT NULL,
+    schema_content_hash TEXT    NOT NULL,
+    PRIMARY KEY (schema_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_slr_schema_id
+    ON schema_lifecycle_registry(schema_id);
+CREATE INDEX IF NOT EXISTS idx_slr_version
+    ON schema_lifecycle_registry(version);
+CREATE INDEX IF NOT EXISTS idx_slr_recorded_at
+    ON schema_lifecycle_registry(recorded_at_ns);
+";
 /// The Transparency Log + Approval Decision Log adapter.
 ///
 /// One per Host; constructed in the composition root (`maos-bin/main.rs`)
@@ -745,6 +778,115 @@ impl TransparencyLogAdapter {
             out.push(row.map_err(AuditError::SqliteRead)?);
         }
         Ok(out)
+    }
+
+    /// Story 9.3b (SR-3) — return every cost-attribution or governance frame
+    /// authored by a Spirit in `writer_spirit_pids` that embeds a principal_id.
+    /// Used by the forget cascade to find candidates for body-scrub.
+    ///
+    /// Unlike distillate frames (which require a content-based body scan),
+    /// cost/governance frames carry principal_id as a STRUCTURED field,
+    /// so discovery is a clean indexed query.
+    pub fn principal_bearing_frames_for_pids(
+        &self,
+        writer_spirit_pids: &std::collections::HashSet<u32>,
+    ) -> Result<Vec<([u8; 16], Vec<u8>)>, AuditError> {
+        if writer_spirit_pids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let placeholders = (0..writer_spirit_pids.len())
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        // FrameKind 28 = GovernanceEvent, 29 = CostAttribution
+        let sql = format!(
+            "SELECT frame_id, payload_redacted FROM transparency_log \
+             WHERE kind IN (28, 29) AND spirit_pid IN ({placeholders}) \
+             ORDER BY timestamp_ns ASC",
+        );
+        let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
+        let pids: Vec<i64> = writer_spirit_pids.iter().map(|&p| p as i64).collect();
+        let params_ref: Vec<&dyn rusqlite::types::ToSql> =
+            pids.iter().map(|p| p as &dyn rusqlite::types::ToSql).collect();
+        let rows = stmt
+            .query_map(rusqlite::params_from_iter(params_ref), |row| {
+                let fid: Vec<u8> = row.get(0)?;
+                let body: Vec<u8> = row.get(1)?;
+                Ok((fid, body))
+            })
+            .map_err(AuditError::SqliteRead)?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (fid_vec, body) = row.map_err(AuditError::SqliteRead)?;
+            if fid_vec.len() != 16 {
+                return Err(AuditError::MalformedFrameId(fid_vec.len()));
+            }
+            let mut fid = [0u8; 16];
+            fid.copy_from_slice(&fid_vec);
+            out.push((fid, body));
+
+        }
+        Ok(out)
+    }
+
+    /// Story 9.3b (SR-3) — scrub a principal-bearing cost/governance frame's
+    /// payload by replacing the principal_id with a redaction tombstone.
+    /// This mirrors `scrub_distillate_body` but for structured payloads.
+    pub fn scrub_principal_bearing_frame(
+        &self,
+        frame_id: [u8; 16],
+        reason: &str,
+    ) -> Result<(), AuditError> {
+        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        // Try to parse the existing payload and redact only the principal_id field.
+        let existing: Vec<u8> = inner
+            .conn
+            .query_row(
+                "SELECT payload_redacted FROM transparency_log WHERE frame_id = ?1",
+                rusqlite::params![&frame_id[..]],
+                |row| row.get(0),
+            )
+            .map_err(AuditError::SqliteRead)?;
+        let redacted_bytes = match serde_json::from_slice::<serde_json::Value>(&existing) {
+            Ok(mut val) => {
+                if let Some(obj) = val.as_object_mut() {
+                    if obj.contains_key("principal_id") {
+                        obj.insert(
+                            "principal_id".to_string(),
+                            serde_json::Value::String("[REDACTED]".to_string()),
+                        );
+                    }
+                    // Also record redaction metadata
+                    obj.insert(
+                        "redacted".to_string(),
+                        serde_json::Value::Bool(true),
+                    );
+                    obj.insert(
+                        "redaction_reason".to_string(),
+                        serde_json::Value::String(reason.to_string()),
+                    );
+                }
+                serde_json::to_vec(&val).expect("re-serialization of redacted payload")
+            }
+            Err(_) => {
+                // Cannot parse payload — fall back to full replacement tombstone
+                let tombstone = serde_json::json!({
+                    "redacted": true,
+                    "reason": reason,
+                    "original_frame_id": format_frame_id_hex(&frame_id),
+                });
+                tombstone.to_string().into_bytes()
+            }
+        };
+        inner.conn.execute(
+            "UPDATE transparency_log SET payload_redacted = ?1 WHERE frame_id = ?2",
+            rusqlite::params![&redacted_bytes[..], &frame_id[..]],
+        ).map_err(|e| {
+            panic!("MAOS kernel panic — principal-bearing frame scrub failed: {e}. I2.");
+        }).unwrap();
+
+        Ok(())
     }
 
     /// Story 9.2 (P29) — place a durable per-principal-global legal hold.
@@ -1227,6 +1369,164 @@ impl TransparencyLogAdapter {
     /// Get a reference to the mailbox stub (for testing).
     pub fn mailbox(&self) -> &MailboxStub {
         &self.mailbox
+    }
+
+    /// Story 9.3b (R10) — append a schema-lifecycle registry entry AND emit
+    /// the corresponding governance frame atomically.
+    ///
+    /// HARD-REJECTS any entry lacking a `ratified_by` ADR reference.
+    pub fn register_schema_lifecycle(
+        &self,
+        entry: &maos_domain::governance::SchemaRegistryEntry,
+    ) -> Result<LogBeforeDeliver<()>, AuditError> {
+        if entry.ratified_by.is_empty() {
+            return Err(AuditError::SqliteWriteFatal(
+                rusqlite::Error::InvalidParameterName("ratified_by must not be empty".into()),
+            ));
+        }
+        let mut inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        // Atomic: registry append + frame emission in one SQLite transaction.
+        // Manual BEGIN/COMMIT to avoid borrow conflicts with Transaction<'_>.
+        inner.conn.execute_batch("BEGIN;").map_err(AuditError::SqliteWriteFatal)?;
+        let commit_or_rollback = |conn: &Connection, result: Result<(), AuditError>| -> Result<(), AuditError> {
+            match result {
+                Ok(()) => conn.execute_batch("COMMIT;").map_err(AuditError::SqliteWriteFatal),
+                Err(e) => {
+                    let _ = conn.execute_batch("ROLLBACK;");
+                    Err(e)
+                }
+            }
+        };
+        let result = (|| -> Result<(), AuditError> {
+            inner.conn.execute(
+                "INSERT INTO schema_lifecycle_registry
+                    (schema_id, version, effective_at_ns, supersedes_hash, ratified_by, recorded_at_ns, schema_content_hash)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    entry.schema_id,
+                    entry.version as i64,
+                    entry.effective_at_ns as i64,
+                    entry.supersedes_hash.as_deref(),
+                    entry.ratified_by,
+                    entry.recorded_at_ns as i64,
+                    entry.schema_content_hash,
+                ],
+            ).map_err(|e| {
+                panic!("MAOS kernel panic — schema_lifecycle_registry write failed: {e}. I2.");
+            }).unwrap();
+            // Build governance frame payload
+            let payload = maos_domain::governance::GovernanceEventPayload {
+                recorded_at_ns: entry.recorded_at_ns,
+                effective_at_ns: entry.effective_at_ns,
+                event: maos_domain::governance::GovernanceEventKind::SchemaLifecycle(
+                    maos_domain::governance::SchemaLifecyclePayload {
+                        schema_id: entry.schema_id.clone(),
+                        schema_content_hash: entry.schema_content_hash.clone(),
+                        supersedes: entry.supersedes_hash.clone(),
+                        version: entry.version,
+                        ratified_by: entry.ratified_by.clone(),
+                    },
+                ),
+            };
+            let payload_bytes =
+                serde_json::to_vec(&payload).expect("governance payload serialization");
+            let redacted = self.redaction.redact(&payload_bytes);
+            let frame_id_val = Self::next_frame_id(&mut inner);
+            let timestamp_ns = wall_clock_now_ns();
+            inner.last_frame_id = frame_id_val;
+            inner.conn.execute(
+                "INSERT INTO transparency_log
+                    (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce, capability_token,
+                     kind, intent, payload_redacted, origin)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                rusqlite::params![
+                    &frame_id_val[..],
+                    timestamp_ns as i64,
+                    0i64,
+                    "",
+                    "",
+                    inner.boot_nonce as i64,
+                    Option::<&[u8]>::None,
+                    FrameKind::GovernanceEvent as i64,
+                    "governance:schema-lifecycle",
+                    &redacted[..],
+                    FrameOrigin::Kernel as i64,
+                ],
+            ).map_err(|e| {
+                panic!("MAOS kernel panic — Transparency Log write failed: {e}. I2.");
+            }).unwrap();
+            Ok(())
+        })();
+        commit_or_rollback(&inner.conn, result)?;
+        Ok(LogBeforeDeliver::new(()))
+    }
+
+    /// Story 9.3b (R10) — query the schema-lifecycle registry for a specific
+    /// schema_id. Returns entries ordered by version ascending.
+    pub fn query_schema_registry(
+        &self,
+        schema_id: &str,
+    ) -> Result<Vec<maos_domain::governance::SchemaRegistryEntry>, AuditError> {
+        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let mut stmt = inner
+            .conn
+            .prepare(
+                "SELECT schema_id, version, effective_at_ns, supersedes_hash, ratified_by, recorded_at_ns, schema_content_hash
+             FROM schema_lifecycle_registry WHERE schema_id = ?1 ORDER BY version ASC",
+            )
+            .map_err(AuditError::SqliteRead)?;
+        let rows = stmt
+            .query_map(rusqlite::params![schema_id], |row| {
+                Ok(maos_domain::governance::SchemaRegistryEntry {
+                    schema_id: row.get(0)?,
+                    version: row.get::<_, i64>(1)? as u32,
+                    effective_at_ns: row.get::<_, i64>(2)? as u64,
+                    supersedes_hash: row.get(3)?,
+                    ratified_by: row.get(4)?,
+                    recorded_at_ns: row.get::<_, i64>(5)? as u64,
+                    schema_content_hash: row.get(6)?,
+                })
+            })
+            .map_err(AuditError::SqliteRead)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(AuditError::SqliteRead)?);
+        }
+        Ok(out)
+    }
+
+    /// Story 9.3b — query the schema version currently in force for a
+    /// given schema_id (the latest by version number).
+    pub fn current_schema_version(
+        &self,
+        schema_id: &str,
+    ) -> Result<Option<maos_domain::governance::SchemaRegistryEntry>, AuditError> {
+        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let mut stmt = inner
+            .conn
+            .prepare(
+                "SELECT schema_id, version, effective_at_ns, supersedes_hash, ratified_by, recorded_at_ns, schema_content_hash
+             FROM schema_lifecycle_registry WHERE schema_id = ?1 ORDER BY version DESC LIMIT 1",
+            )
+            .map_err(AuditError::SqliteRead)?;
+        let mut rows = stmt
+            .query_map(rusqlite::params![schema_id], |row| {
+                Ok(maos_domain::governance::SchemaRegistryEntry {
+                    schema_id: row.get(0)?,
+                    version: row.get::<_, i64>(1)? as u32,
+                    effective_at_ns: row.get::<_, i64>(2)? as u64,
+                    supersedes_hash: row.get(3)?,
+                    ratified_by: row.get(4)?,
+                    recorded_at_ns: row.get::<_, i64>(5)? as u64,
+                    schema_content_hash: row.get(6)?,
+                })
+            })
+            .map_err(AuditError::SqliteRead)?;
+        match rows.next() {
+            Some(Ok(entry)) => Ok(Some(entry)),
+            Some(Err(e)) => Err(AuditError::SqliteRead(e)),
+            None => Ok(None),
+        }
     }
 }
 

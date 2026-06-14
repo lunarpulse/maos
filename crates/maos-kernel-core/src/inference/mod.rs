@@ -360,6 +360,74 @@ impl InferencePort for InferencePortAdapter {
             Ok(ref resp) => {
                 self.telemetry
                     .record_iac_rt(Service::Capability, Outcome::Ok, duration_us);
+
+                // Story 9.3b — FR64 cost-attribution emission (ADR-046).
+                // Capture TokenUsage + ProviderAttribution as RAW dimensional
+                // facts — no money field (R4).
+                let now_ns = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos() as u64;
+
+                // F8 — principal attribution at emission (R2 / SR-4).
+                let principal_ids = self
+                    .transparency_log
+                    .principal_ids_for_spirit_pid(req.spirit_pid)
+                    .unwrap_or_default();
+                let (principal, confidence) = match principal_ids.as_slice() {
+                    [] => (
+                        maos_domain::cost::PrincipalRef::Unattributed,
+                        maos_domain::cost::AttributionConfidence::Unknown,
+                    ),
+                    [one] => (
+                        maos_domain::cost::PrincipalRef::Resolved {
+                            principal_id: one.clone(),
+                        },
+                        maos_domain::cost::AttributionConfidence::Exact,
+                    ),
+                    many => (
+                        maos_domain::cost::PrincipalRef::Ambiguous {
+                            count: many.len() as u32,
+                        },
+                        maos_domain::cost::AttributionConfidence::Ambiguous,
+                    ),
+                };
+
+                let mut dimensions = std::collections::BTreeMap::new();
+                dimensions.insert(
+                    maos_domain::cost::CostDimension::TokensIn,
+                    resp.usage.input_tokens as i64,
+                );
+                dimensions.insert(
+                    maos_domain::cost::CostDimension::TokensOut,
+                    resp.usage.output_tokens as i64,
+                );
+
+                let cost_payload = maos_domain::cost::CostAttributionPayload {
+                    schema_version: 1,
+                    timestamp_ns: now_ns,
+                    spirit_pid: req.spirit_pid,
+                    provider: resp.provider_attribution.provider_id.clone(),
+                    model: resp
+                        .provider_attribution
+                        .model_id
+                        .clone()
+                        .unwrap_or_default(),
+                    principal,
+                    attribution_source: maos_domain::cost::AttributionSource::WriteTargetProxy,
+                    attribution_confidence: confidence,
+                    dimensions,
+                };
+                let cost_bytes =
+                    serde_json::to_vec(&cost_payload).expect("cost payload serialization");
+                let _cost_token = self.transparency_log.insert_frame_event(
+                    FrameKind::CostAttribution,
+                    req.spirit_pid,
+                    None,
+                    "cost:inference-attribution",
+                    &cost_bytes,
+                    FrameOrigin::Kernel,
+                );
             }
             Err(_) => {
                 self.telemetry

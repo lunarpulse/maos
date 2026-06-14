@@ -86,6 +86,33 @@ fn headline_erasure_demo_produces_verifiable_proof() {
         );
         tl.last_frame_id()
     };
+    // Story 9.3b SR-3 setup: also emit a principal-bearing cost-attribution
+    // frame so the forget cascade has a structured frame to redact.
+    let cost_payload = maos_domain::cost::CostAttributionPayload {
+        schema_version: 1,
+        timestamp_ns: 1,
+        spirit_pid: 7,
+        provider: "anthropic".into(),
+        model: "claude-3".into(),
+        principal: maos_domain::cost::PrincipalRef::Resolved {
+            principal_id: PRINCIPAL.into(),
+        },
+        attribution_source: maos_domain::cost::AttributionSource::WriteTargetProxy,
+        attribution_confidence: maos_domain::cost::AttributionConfidence::Exact,
+        dimensions: {
+            let mut d = std::collections::BTreeMap::new();
+            d.insert(maos_domain::cost::CostDimension::TokensIn, 100);
+            d
+        },
+    };
+    tl.insert_frame_event(
+        FrameKind::CostAttribution,
+        7,
+        None,
+        "cost.attribution",
+        &serde_json::to_vec(&cost_payload).unwrap(),
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
     let writer = DistillateWriter::new(Arc::clone(&tl), Arc::new(()) as Arc<dyn std::any::Any + Send + Sync>);
     let distillate_body = format!("{CANARY} principal={PRINCIPAL}");
     let receipt = writer
@@ -105,11 +132,12 @@ fn headline_erasure_demo_produces_verifiable_proof() {
 
     // 2. Forget the principal.
     let outcome = memory.forget_with_reason(PRINCIPAL, None).unwrap();
-    let redacted = match outcome {
+    let (erased_distillate_frame_ids, erased_principal_frame_ids) = match outcome {
         maos_domain::memory::ForgetOutcome::Erased {
             redacted_distillate_frame_ids,
+            redacted_principal_frame_ids,
             ..
-        } => redacted_distillate_frame_ids,
+        } => (redacted_distillate_frame_ids, redacted_principal_frame_ids),
         other => panic!("expected Erased, got {other:?}"),
     };
 
@@ -127,7 +155,7 @@ fn headline_erasure_demo_produces_verifiable_proof() {
 
     // 4. Build + sign the proof-of-erasure.
     let post_frame_ids = tl.all_frame_ids().unwrap();
-    let erased_frame_ids: Vec<[u8; 16]> = redacted
+    let erased_frame_ids: Vec<[u8; 16]> = erased_distillate_frame_ids
         .iter()
         .filter_map(|h| hex::decode(h).ok())
         .filter(|b| b.len() == 16)
@@ -141,6 +169,16 @@ fn headline_erasure_demo_produces_verifiable_proof() {
         erased_frame_ids.contains(&distillate_frame_id),
         "the scrubbed distillate must be among the erased frames"
     );
+    let erased_principal_frame_ids: Vec<[u8; 16]> = erased_principal_frame_ids
+        .iter()
+        .filter_map(|h| hex::decode(h).ok())
+        .filter(|b| b.len() == 16)
+        .map(|b| {
+            let mut a = [0u8; 16];
+            a.copy_from_slice(&b);
+            a
+        })
+        .collect();
     let seed = [0x9_2u8; 32];
     let proof = build_erasure_proof(
         "smoke-spirit".into(),
@@ -150,10 +188,19 @@ fn headline_erasure_demo_produces_verifiable_proof() {
         &post_frame_ids,
         &erased_frame_ids,
         &[PRINCIPAL.to_string()],
-        vec![ErasureCategory {
-            name: "memory_namespace".into(),
-            status: CategoryStatus::Removed { count: 1 },
-        }],
+        &erased_principal_frame_ids,
+        vec![
+            ErasureCategory {
+                name: "memory_namespace".into(),
+                status: CategoryStatus::Removed { count: 1 },
+            },
+            ErasureCategory {
+                name: "principal_frames".into(),
+                status: CategoryStatus::Removed {
+                    count: erased_principal_frame_ids.len() as u64,
+                },
+            },
+        ],
         &seed,
     )
     .unwrap();
@@ -163,6 +210,13 @@ fn headline_erasure_demo_produces_verifiable_proof() {
         .verifying_key()
         .to_bytes();
     assert!(verify_erasure_proof(&proof, &pubkey).is_ok());
+    // SR-3: the proof must include inclusion proofs for any redacted
+    // principal-bearing frames (e.g., cost/governance frames whose payloads
+    // were scrubbed but which remain in the append-only TL).
+    assert!(
+        !proof.redacted_principal_frame_proofs.is_empty(),
+        "SR-3: redacted principal-bearing frames must be wired into the proof"
+    );
     assert!(
         verify_erasure_proof_against_log(&proof, &pubkey, &pre_frame_ids, &post_frame_ids).is_ok(),
         "against-log verification must pass with the real frame sets"

@@ -32,6 +32,15 @@ pub use shared::SharedMemoryStore;
 /// new backend can never slip through unaudited.
 pub const REGISTERED_ERASURE_BACKENDS: &[&str] = &["private", "principal_index", "shared"];
 
+/// AC6 / R12 — the full set of erasure-class lineage ids the forget cascade
+/// must stamp in the `ForgetReceipt`.  Mirrors the governance test
+/// `erasure_class_lineage_ids` in `maos_domain::governance`.
+pub const ERASURE_CLASS_LINEAGE_IDS: &[&str] = &[
+    "compliance.claim.gdpr-erasure",
+    "compliance.claim.legal-hold",
+    "compliance.claim.retention-expiry",
+];
+
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -46,6 +55,8 @@ use maos_domain::memory::{
     ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord, MemoryEntry,
     MemoryError, MemoryNamespace, MemoryTier, MemoryValue, PrincipalIndexRow,
 };
+use maos_domain::cost::{CostAttributionPayload, PrincipalRef};
+use maos_domain::governance::GovernanceEventPayload;
 
 // Re-exports above make PrivateMemoryStore, SharedMemoryStore,
 // PrincipalNamespaceIndex available in this module scope.
@@ -226,6 +237,47 @@ impl MemoryManagerAdapter {
             }
         }
 
+        // SR-3 (Story 9.3b) — scrub cost/governance frames that embed the
+        // forgotten principal. Unlike distillates (content-based body scan),
+        // these frames carry principal_id as a structured JSON field.
+        let mut redacted_principal_frame_ids: Vec<String> = Vec::new();
+        if !writer_pids.is_empty() && !principal_id.is_empty() {
+            let principal_frames = self
+                .transparency_log
+                .principal_bearing_frames_for_pids(&writer_pids)
+                .map_err(|e| MemoryError::Storage(e.to_string()))?;
+            for (frame_id, body) in principal_frames {
+                // Structured match: parse as typed cost/governance payloads
+                // instead of fragile byte-substring scan (SR-3 review fix).
+                let frame_matches = if let Ok(cost) =
+                    serde_json::from_slice::<CostAttributionPayload>(&body)
+                {
+                    match &cost.principal {
+                        PrincipalRef::Resolved { principal_id: pid } => pid == principal_id,
+                        _ => false,
+                    }
+                } else if let Ok(_gov) =
+                    serde_json::from_slice::<GovernanceEventPayload>(&body)
+                {
+                    // Governance frames do not carry a principal_id field;
+                    // they are never principal-bearing for forget purposes.
+                    false
+                } else {
+                    // Unknown frame schema — fall back to byte scan so
+                    // future frame kinds are not silently skipped.
+                    body.windows(principal_id.len())
+                        .any(|w| w == principal_id.as_bytes())
+                };
+                if !frame_matches {
+                    continue;
+                }
+                self.transparency_log
+                    .scrub_principal_bearing_frame(frame_id, "gdpr-forget")
+                    .map_err(|e| MemoryError::Storage(e.to_string()))?;
+                redacted_principal_frame_ids.push(hex::encode(frame_id));
+            }
+        }
+
         // 3. Delete private-tier entries + principal_index rows (existing cascade).
         let deleted_entries = self.private.forget_principal(principal_id)?;
         let deleted_index_rows = self.principal_index.forget(principal_id)?;
@@ -237,6 +289,7 @@ impl MemoryManagerAdapter {
             "deleted_entries": deleted_entries,
             "deleted_index_rows": deleted_index_rows,
             "redacted_distillate_frame_ids": redacted_distillate_frame_ids,
+            "redacted_principal_frame_ids": redacted_principal_frame_ids,
             "reason": reason,
         });
         let frame_id = self.transparency_log.insert_kernel_event_returning_id(
@@ -245,7 +298,7 @@ impl MemoryManagerAdapter {
             payload.to_string().as_bytes(),
         );
         let timestamp_ns = Self::now_ns();
-        let receipt = ForgetReceipt::new(
+        let mut receipt = ForgetReceipt::new(
             principal_id,
             deleted_entries,
             deleted_index_rows,
@@ -253,9 +306,24 @@ impl MemoryManagerAdapter {
             frame_id,
         )
         .map_err(|e| MemoryError::Storage(e.to_string()))?;
+
+        // Story 9.3b (AC6 / R12) — stamp the schema version in force at
+        // erasure-execution time, read from the R10 schema-lifecycle registry.
+        // Look up the full erasure-class set (R12), not just gdpr-erasure.
+        for lineage_id in ERASURE_CLASS_LINEAGE_IDS {
+            if let Ok(Some(entry)) = self
+                .transparency_log
+                .current_schema_version(lineage_id)
+            {
+                receipt.schema_id = Some(entry.schema_id);
+                receipt.schema_version = Some(entry.version);
+                break;
+            }
+        }
         Ok(ForgetOutcome::Erased {
             receipt,
             redacted_distillate_frame_ids,
+            redacted_principal_frame_ids,
         })
     }
 

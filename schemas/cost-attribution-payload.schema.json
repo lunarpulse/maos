@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://maos.dev/schemas/cost-attribution-payload.v1.json",
+  "title": "maos.cost-attribution-payload.v1",
+  "description": "Payload shape for FrameKind::CostAttribution (29) rows in the Transparency Log. Per ADR-046: carries raw dimensional facts (quantities + identity only); money is computed read-time in maos-audit via ProviderPricingConfig.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "timestamp_ns",
+    "spirit_pid",
+    "provider",
+    "model",
+    "principal",
+    "attribution_source",
+    "attribution_confidence",
+    "dimensions"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Schema version for forward-read-tolerance (R6)."
+    },
+    "timestamp_ns": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Nanosecond wall-clock timestamp of the inference call."
+    },
+    "spirit_pid": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Spirit process ID that made the inference call."
+    },
+    "provider": {
+      "type": "string",
+      "description": "Provider that served the request."
+    },
+    "model": {
+      "type": "string",
+      "description": "Model ID used."
+    },
+    "principal": {
+      "type": "object",
+      "description": "Principal attribution at cost-emission time (SR-4).",
+      "oneOf": [
+        {
+          "properties": {
+            "kind": { "const": "Unattributed" }
+          },
+          "required": ["kind"]
+        },
+        {
+          "properties": {
+            "kind": { "const": "Resolved" },
+            "principal_id": { "type": "string" }
+          },
+          "required": ["kind", "principal_id"]
+        },
+        {
+          "properties": {
+            "kind": { "const": "Ambiguous" },
+            "count": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["kind", "count"]
+        }
+      ]
+    },
+    "attribution_source": {
+      "type": "string",
+      "enum": ["write_target_proxy", "session_principal"],
+      "description": "How the principal was attributed."
+    },
+    "attribution_confidence": {
+      "type": "string",
+      "enum": ["exact", "ambiguous", "unknown"],
+      "description": "Confidence level of the attribution."
+    },
+    "dimensions": {
+      "type": "object",
+      "description": "Cost-dimension quantities. v1.0: tokens_in, tokens_out. No usd_micros or cost_micro field (R4).",
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "propertyNames": {
+        "enum": ["tokens_in", "tokens_out"]
+      }
+    }
+  },
+  "additionalProperties": false
+}

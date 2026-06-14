@@ -337,6 +337,13 @@ pub struct ForgetReceipt {
     pub deleted_index_rows: u64,
     pub timestamp_ns: u64,
     pub frame_id: [u8; 16],
+    /// Story 9.3b (AC6 / R12) — schema in force at erasure-execution time.
+    /// Additive; bytes-identical for pre-9.3b entries via `skip_serializing_if`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema_id: Option<String>,
+    /// Story 9.3b (AC6 / R12) — schema version in force at erasure-execution time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema_version: Option<u32>,
 }
 
 impl ForgetReceipt {
@@ -357,6 +364,8 @@ impl ForgetReceipt {
             deleted_index_rows,
             timestamp_ns,
             frame_id,
+            schema_id: None,
+            schema_version: None,
         })
     }
 }
@@ -385,6 +394,7 @@ pub enum ForgetOutcome {
     Erased {
         receipt: ForgetReceipt,
         redacted_distillate_frame_ids: Vec<String>,
+        redacted_principal_frame_ids: Vec<String>,
     },
     Suspended {
         hold: LegalHoldRecord,

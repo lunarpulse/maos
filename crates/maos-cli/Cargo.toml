@@ -16,13 +16,16 @@ name = "maos_cli"
 path = "src/lib.rs"
 
 [dependencies]
+chrono = "0.4"    # Story 9.3b — calendar-safe month-range parsing
 clap = { version = "4.5", features = ["derive"] }
 maos-audit = { path = "../maos-audit" }
+maos-domain = { path = "../maos-domain" }  # Story 9.1 FR44 — audit key loader
 maos-registry = { path = "../maos-registry" }
 maos-skill = { path = "../maos-skill" }   # Story 7.4 — `maosctl skills` discovery + admission exit
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+toml = "0.8"
 hex = "0.4"       # Story 9.1 FR44 — pubkey hex encoding in verify-bundle
-maos-domain = { path = "../maos-domain" }  # Story 9.1 FR44 — audit key loader
 
 [dev-dependencies]
 # Story 1b.5b — accessibility ANSI test. Both crates are already in the

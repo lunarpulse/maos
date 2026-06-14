@@ -83,6 +83,10 @@ pub enum FrameKindLabel {
     /// output-shape mismatch (ADR-021), journaled with the `{cli, declared,
     /// observed}` version diff.
     CliWrapperShapeMismatch,
+    /// Story 9.3b — FR62 (ADR-045): governance audit artifact.
+    GovernanceEvent,
+    /// Story 9.3b — FR64 (ADR-046): cost-attribution fact.
+    CostAttribution,
 }
 
 impl LogRecallFilter {

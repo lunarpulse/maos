@@ -109,6 +109,41 @@ pub enum Subcommand {
     Skills(SkillsArgs),
     /// GDPR Article 17 — forget a principal and emit a receipt.
     Forget(ForgetArgs),
+    /// Story 9.3b — governance operations on the schema-lifecycle registry.
+    Governance(GovernanceArgs),
+}
+#[derive(clap::Args, Debug)]
+pub struct GovernanceArgs {
+    #[command(subcommand)]
+    pub op: GovernanceOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum GovernanceOp {
+    /// Admit a schema version into the lifecycle registry.
+    ///
+    /// Emits a `FrameKind::GovernanceEvent` frame with a `SchemaLifecyclePayload`
+    /// and appends the ratified entry to the `schema_lifecycle_registry` table.
+    Admit {
+        /// Stable schema lineage id, e.g. `compliance.claim.gdpr-erasure`.
+        #[arg(long)]
+        schema_id: String,
+        /// Schema version number.
+        #[arg(long)]
+        version: u32,
+        /// SHA-256 hex of the canonical schema bytes.
+        #[arg(long)]
+        content_hash: String,
+        /// Optional prior version content hash for the chain.
+        #[arg(long)]
+        supersedes: Option<String>,
+        /// ADR reference that ratified this schema version.
+        #[arg(long)]
+        ratified_by: String,
+        /// When the schema takes effect (nanoseconds since Unix epoch).
+        #[arg(long)]
+        effective_at_ns: u64,
+    },
 }
 
 /// Story 9.2 — `maosctl forget --principal <id> [--reason <legal-hold>]`.
@@ -336,6 +371,24 @@ pub enum AuditQuery {
         /// Output file path for the trace-shape JSON.
         #[arg(long)]
         output: Option<std::path::PathBuf>,
+    },
+    /// FR64 — cost-reconcile observability report.
+    ///
+    /// Groups cost-attribution frames by (month × principal × spirit × provider × model)
+    /// and computes cost read-time in integer micro-USD. Only `Resolved(single)`
+    /// rows are attributed to a principal; `Ambiguous` + `Unattributed` → `host-unallocated`.
+    CostReconcile {
+        /// Month to reconcile (YYYY-MM format).
+        #[arg(long)]
+        month: String,
+
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = AuditFormat::Ndjson)]
+        format: AuditFormat,
+
+        /// Path to the pricing config TOML file.
+        #[arg(long, default_value = "xtask/provider-pricing.toml")]
+        pricing: String,
     },
 }
 

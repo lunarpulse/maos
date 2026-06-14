@@ -1,0 +1,20 @@
+# Synthetic price-book fixture for CI cost-reconcile oracle (ADR-046 §7).
+# Prices in micro-USD per 1k tokens.
+
+[[entries]]
+provider = "anthropic"
+model = "claude-3"
+input_price_micro_per_1k = 3000
+output_price_micro_per_1k = 15000
+
+[[entries]]
+provider = "openai"
+model = "gpt-4"
+input_price_micro_per_1k = 30000
+output_price_micro_per_1k = 60000
+
+[[entries]]
+provider = "anthropic"
+model = "claude-3-5-sonnet"
+input_price_micro_per_1k = 3000
+output_price_micro_per_1k = 15000
