@@ -123,6 +123,8 @@ development_status:
   9-3b-governance-audit-artifacts-and-cost-attribution: done
   9-4-productionize-the-operator-surface-distribution-backup-dr-air-gap-region-pinning: done  # REVIEW COMPLETE 2026-06-14: 5 decision-needed findings resolved by team consensus (Winston·Murat·Amelia·John), 21 patches applied, 0 defer, 4 dismissed. All findings resolved; tests pass. Zero kernel-core delta.
   9-4b-region-pinning-model-provenance-and-tenancy-reservation: done  # COMMITTED 2026-06-15 as a125737: 9 code review patches applied + 2 deferred; R-SCH1 v2 corpus prior-commit requirement waived, retroactive corpus tracked as follow-up.
+  9-5-publish-five-canonical-docs-with-wcag-aa-korean-i18n-and-onboarding-artifacts: backlog
+  # Story 9.6 (added 2026-06-12 by Epic 8 retro §A2, ratified Lunarpulse; spec stub by Story 8.16 AC8): multi-Spirit scheduler + founder-class standalone load — closes 8.12 FORK B classify_spirit short-circuit, upgrades J1/J4 to Grade-A, auto-activates 8.15 J1 resume-continuity beat, folds Epic-7 §A3 open items (skill-queue persistence + functional approve/reject). Sequence before/around 9.4. Rec claude-opus-4-8.
   9-6-multi-spirit-scheduler-founder-class-standalone-load: backlog
   epic-9-retrospective: optional
   epic-10: backlog
