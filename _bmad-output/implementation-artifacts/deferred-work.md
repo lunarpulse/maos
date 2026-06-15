@@ -435,3 +435,7 @@ and `check-epic-close-green` (§A5) added. YAML re-validated.
 
 - **Ed25519 double-hash composition** — `regional_teardown.rs` and `sealed_export.rs` sign a SHA-256 digest with Ed25519 (which itself hashes with SHA-512), creating a non-standard `Ed25519(SHA-256(msg))` composition. Internally consistent but differs from pure Ed25519. Deferred: consider signing canonical bytes directly in a future hardening pass.
 - **Home signing seed reused as region-key derivation base** — `run_uninstall_cascade` uses the same `signing_seed` as both the HKDF base for region keys and the raw home signing key. HKDF differentiates outputs, but ideal key separation would use distinct seeds. Deferred to a future crypto-hardening story.
+
+## Deferred from: code review of 9-5a-trust-anchor-framing-adr-and-stability-compliance-scope (2026-06-15)
+
+- STABILITY.md relative ADR link will need doc-site rewriting — `[ADR-047](docs/adr/ADR-047-trust-anchor-framing-carry-forward.md)` is correct for GitHub root rendering today, but Docusaurus (Story 9.5) serves STABILITY.md at a different path so the relative link will break. Story 9.5 owns the frozen-URL-contract link handling (AC-1 spine + manifest-seeded link check); re-evaluate the link format when 9.5 wires the doc site. Emitted by the generator at `xtask/src/stability_matrix.rs:218`; rendered at `STABILITY.md:57`.

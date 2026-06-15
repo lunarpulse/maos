@@ -197,14 +197,29 @@ can cash," not an over-promised window.
 
 ## Substrate-Self Compliance Scope
 
-<!-- full content: Story 9.5 (NFR-Comp-3) — this is the structural-presence STUB. -->
+<!-- NFR-Comp-3 — full scope language (Story 9.5a). -->
 
-The MAOS substrate itself is assessed against, and its boundary scoped relative
-to, the following regimes: **SOC 2**, **ISO 27001**, **FedRAMP**, and the
-**kernel-as-service trust boundary**. The substrate provides the mechanisms
-(transparency log, capability mediation, sandbox tiers, ComplianceClaim
-envelopes); **mapping a concrete deployment to any specific control framework is
-the OPERATOR's responsibility.** Full scope language lands in Story 9.5.
+The MAOS substrate draws a **kernel-as-service trust boundary**: the kernel
+provides mechanisms (Transparency Log, capability mediation, sandbox tiers
+T0–T3, ComplianceClaim envelopes, GDPR Art. 17 erasure cascade); it does
+**not** assert compliance of any deployment, operator, or Spirit running on it.
+
+**Compliance-framework scope is the OPERATOR's responsibility.**
+
+| Framework | Substrate provides | Operator owns |
+|---|---|---|
+| **SOC 2** | Append-only audit trail (TL); capability-token TTL + PID binding; sandbox-tier enforcement; sealed-export for external audit | Control mapping; access reviews; monitoring; incident response |
+| **ISO 27001** | Asset inventory via Spirit manifest + TL; cryptographic key derivation (HKDF-SHA256, operator-local seed); region-pinning (NFR-Comp-4) | ISMS scope; risk assessment; Statement of Applicability; corrective actions |
+| **FedRAMP** | Pluggable crypto-provider seam (FR48) — FIPS-validated module is operator/distributor choice; boundary definition via sandbox tiers; continuous-monitoring data (TL + posture-delta) | System Security Plan (SSP); POA&M; 3PAO engagement; ATO package |
+
+The trust root is **operator-local** and **air-gap compatible**: the
+Transparency Log signing key is derived from the operator's seed via
+HKDF-SHA256 with no online CA, OCSP, or key-server dependency
+([ADR-047](docs/adr/ADR-047-trust-anchor-framing-carry-forward.md),
+NFR-Ops-12). The substrate's competitive framing is
+**substrate-as-substrate** — infrastructure in the Linux/Postgres/Kubernetes
+reference class — not a certifying authority (ADR-047 §2, considered and
+rejected).
 
 ## Export
 
@@ -376,5 +391,100 @@ mod tests {
         // No 1.0.0 tag exists pre-Epic-10 → deterministic placeholder.
         let clock = lts_clock_start(&root);
         assert!(clock.contains("Epic 10") || clock.contains("tag `"));
+    }
+
+    /// Proven-red negative test for `--check` (Story 9.5a, AC-2, D8/Epic-8
+    /// disabled-gate lesson): mutate the committed output → assert the check
+    /// comparison detects drift. Proves the `--check` path can actually fail,
+    /// not just vacuously pass.
+    #[test]
+    fn check_detects_drift_proven_red() {
+        let root = std::env::current_dir()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        // Isolate the mutation: render from the TEMPDIR, not the real workspace,
+        // so the only delta in the check is the mutation itself. Rendering from
+        // `&root` diverges from `render(&tmp)` once a `1.0.0` git tag exists —
+        // lts_clock_start resolves a SHA in the real repo but the placeholder in
+        // a git-less tempdir — which would let the test pass without the mutation.
+        let tmp_dir = tempfile::TempDir::new().expect("tempdir");
+        let tmp = tmp_dir.path();
+
+        // Copy the real workspace files the renderer reads.
+        let copy = |rel: &str| {
+            let src = root.join(rel);
+            let dst = tmp.join(rel);
+            std::fs::create_dir_all(dst.parent().unwrap()).unwrap();
+            std::fs::copy(&src, &dst).unwrap();
+        };
+        copy(SPIRIT_ABI_LIB);
+        copy(CARGO_TOML);
+        copy(BREAKING_MD);
+        // The deprecation cross-check walks crates/**/*.rs — create an empty
+        // crates dir so it doesn't error out (vacuously passes at zero files).
+        std::fs::create_dir_all(tmp.join("crates")).unwrap();
+
+        // Render from the tempdir so the check comparison is self-consistent
+        // (the mutation is the ONLY difference between rendered and on-disk).
+        let rendered = render(&tmp).expect("render succeeds");
+
+        // Mutate the compliance-scope section — the exact text this story added.
+        let mutated = rendered.replace(
+            "OPERATOR's responsibility",
+            "SUBSTRATE's responsibility",
+        );
+        assert_ne!(
+            rendered, mutated,
+            "mutation must produce different output (pre-condition)"
+        );
+
+        // Write the MUTATED STABILITY.md (not the correct one).
+        let stability_path = tmp.join(STABILITY_MD);
+        std::fs::write(&stability_path, &mutated).unwrap();
+
+        // Run the check: it must FAIL (Err) because the mutated file ≠ rendered.
+        let result = run(&tmp, true, false);
+        assert!(
+            result.is_err(),
+            "stability-matrix --check must FAIL on a mutated STABILITY.md (proven-red)"
+        );
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("drift"),
+            "error message must mention drift, got: {err}"
+        );
+
+        // tmp_dir cleans itself up on Drop.
+    }
+
+    /// Verify the NFR-Comp-3 scope text is present in the rendered output
+    /// (not the stub).
+    #[test]
+    fn render_contains_full_nfr_comp_3_scope() {
+        let root = std::env::current_dir()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let rendered = render(&root).expect("render");
+        // Full scope language must be present (not the stub).
+        assert!(
+            rendered.contains("kernel-as-service trust boundary"),
+            "NFR-Comp-3: must contain kernel-as-service trust boundary"
+        );
+        assert!(
+            rendered.contains("OPERATOR's responsibility"),
+            "NFR-Comp-3: must state operator responsibility"
+        );
+        assert!(
+            rendered.contains("ADR-047"),
+            "NFR-Comp-3: must reference ADR-047"
+        );
+        assert!(
+            !rendered.contains("Full scope language lands in Story 9.5"),
+            "NFR-Comp-3: stub text must be gone"
+        );
     }
 }

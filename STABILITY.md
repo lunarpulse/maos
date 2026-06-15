@@ -22,16 +22,16 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 |---|---|
 | `kernel_version` | `0.1.0-alpha` |
 | `abi_version` | `1` |
-| `manifest_schema_version` (current) | `2` |
-| supported schema window | `1..=2` |
+| `manifest_schema_version` (current) | `3` |
+| supported schema window | `1..=3` |
 | workspace crates | `44` |
 
 | Manifest schema | Kernel behavior |
 |---|---|
-| `manifest_schema_version = 2` (current) | ✅ strict load (`deny_unknown_fields`) |
-| `manifest_schema_version = 1` (N-1) | ✅ supported (loads with WARN-level degradation notes) |
+| `manifest_schema_version = 3` (current) | ✅ strict load (`deny_unknown_fields`) |
+| `manifest_schema_version = 2` (N-1) | ✅ supported (loads with WARN-level degradation notes) |
 | `manifest_schema_version < 1` (N-2) | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |
-| `manifest_schema_version > 2` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
+| `manifest_schema_version > 3` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
 | `min_substrate_version` > running `kernel_version` | ⛔ hard refusal — typed `SecurityError::ESubstrateTooOld` (FR8) |
 
 The version gate is **fail-closed in both directions**: an out-of-window
@@ -62,14 +62,29 @@ can cash," not an over-promised window.
 
 ## Substrate-Self Compliance Scope
 
-<!-- full content: Story 9.5 (NFR-Comp-3) — this is the structural-presence STUB. -->
+<!-- NFR-Comp-3 — full scope language (Story 9.5a). -->
 
-The MAOS substrate itself is assessed against, and its boundary scoped relative
-to, the following regimes: **SOC 2**, **ISO 27001**, **FedRAMP**, and the
-**kernel-as-service trust boundary**. The substrate provides the mechanisms
-(transparency log, capability mediation, sandbox tiers, ComplianceClaim
-envelopes); **mapping a concrete deployment to any specific control framework is
-the OPERATOR's responsibility.** Full scope language lands in Story 9.5.
+The MAOS substrate draws a **kernel-as-service trust boundary**: the kernel
+provides mechanisms (Transparency Log, capability mediation, sandbox tiers
+T0–T3, ComplianceClaim envelopes, GDPR Art. 17 erasure cascade); it does
+**not** assert compliance of any deployment, operator, or Spirit running on it.
+
+**Compliance-framework scope is the OPERATOR's responsibility.**
+
+| Framework | Substrate provides | Operator owns |
+|---|---|---|
+| **SOC 2** | Append-only audit trail (TL); capability-token TTL + PID binding; sandbox-tier enforcement; sealed-export for external audit | Control mapping; access reviews; monitoring; incident response |
+| **ISO 27001** | Asset inventory via Spirit manifest + TL; cryptographic key derivation (HKDF-SHA256, operator-local seed); region-pinning (NFR-Comp-4) | ISMS scope; risk assessment; Statement of Applicability; corrective actions |
+| **FedRAMP** | Pluggable crypto-provider seam (FR48) — FIPS-validated module is operator/distributor choice; boundary definition via sandbox tiers; continuous-monitoring data (TL + posture-delta) | System Security Plan (SSP); POA&M; 3PAO engagement; ATO package |
+
+The trust root is **operator-local** and **air-gap compatible**: the
+Transparency Log signing key is derived from the operator's seed via
+HKDF-SHA256 with no online CA, OCSP, or key-server dependency
+([ADR-047](docs/adr/ADR-047-trust-anchor-framing-carry-forward.md),
+NFR-Ops-12). The substrate's competitive framing is
+**substrate-as-substrate** — infrastructure in the Linux/Postgres/Kubernetes
+reference class — not a certifying authority (ADR-047 §2, considered and
+rejected).
 
 ## Export
 
