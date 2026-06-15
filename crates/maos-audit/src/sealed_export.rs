@@ -130,7 +130,6 @@ pub fn build_trajectory_bundle(
     }
 }
 
-
 /// Sign the canonical bundle bytes with Ed25519.
 ///
 /// Computes sha256(canonical_bytes), signs with the given seed,

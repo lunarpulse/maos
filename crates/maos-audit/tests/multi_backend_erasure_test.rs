@@ -19,17 +19,14 @@ fn open_isolated_adapter(dir: &TempDir) -> Arc<maos_kernel_core::memory::MemoryM
     let db_path = dir.path().join("audit.sqlite");
 
     let private = Arc::new(maos_kernel_core::memory::PrivateMemoryStore::new(
-        fs_root, 4 * 1024,
+        fs_root,
+        4 * 1024,
     ));
-    let shared = Arc::new(
-        maos_kernel_core::memory::SharedMemoryStore::open(&db_path).unwrap(),
-    );
-    let principal_index = Arc::new(
-        maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap(),
-    );
+    let shared = Arc::new(maos_kernel_core::memory::SharedMemoryStore::open(&db_path).unwrap());
+    let principal_index =
+        Arc::new(maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
     let tl = Arc::new(
-        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1)
-            .unwrap(),
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1).unwrap(),
     );
     Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
         private,
@@ -41,7 +38,9 @@ fn open_isolated_adapter(dir: &TempDir) -> Arc<maos_kernel_core::memory::MemoryM
 
 fn private_store_contains(fs_root: &Path, needle: &str) -> bool {
     fn scan_dir(dir: &Path, needle: &str) -> bool {
-        let Ok(entries) = std::fs::read_dir(dir) else { return false };
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return false;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
@@ -65,9 +64,7 @@ fn shared_store_contains(db_path: &Path, needle: &str) -> bool {
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .unwrap();
-    let mut stmt = conn
-        .prepare("SELECT value FROM shared_memory")
-        .unwrap();
+    let mut stmt = conn.prepare("SELECT value FROM shared_memory").unwrap();
     let rows: Vec<Vec<u8>> = stmt
         .query_map([], |row| {
             let bytes: Vec<u8> = row.get(0)?;
@@ -132,7 +129,10 @@ fn multi_backend_erasure_partition_invariant() {
 
     // Principal index: address-only rows must be gone.
     let rows = maos_audit::subject_access_query(&db_path, principal).unwrap();
-    assert!(rows.is_empty(), "principal_index still contains rows after forget");
+    assert!(
+        rows.is_empty(),
+        "principal_index still contains rows after forget"
+    );
     proved_erased.push("principal_index");
 
     // Shared tier: empirical canary scan returns the legitimate shared canary,
@@ -146,14 +146,23 @@ fn multi_backend_erasure_partition_invariant() {
     // Partition invariant: every registered backend is in exactly one bucket,
     // buckets are disjoint, and together they cover the registered set.
     let registered: std::collections::HashSet<&str> =
-        maos_kernel_core::memory::REGISTERED_ERASURE_BACKENDS.iter().copied().collect();
+        maos_kernel_core::memory::REGISTERED_ERASURE_BACKENDS
+            .iter()
+            .copied()
+            .collect();
     let covered: std::collections::HashSet<&str> = proved_erased.iter().copied().collect();
     let retained: std::collections::HashSet<&str> =
         proved_principal_empty.iter().copied().collect();
 
-    assert!(covered.is_disjoint(&retained), "erased and principal-empty sets must be disjoint");
+    assert!(
+        covered.is_disjoint(&retained),
+        "erased and principal-empty sets must be disjoint"
+    );
     assert_eq!(
-        covered.union(&retained).copied().collect::<std::collections::HashSet<_>>(),
+        covered
+            .union(&retained)
+            .copied()
+            .collect::<std::collections::HashSet<_>>(),
         registered,
         "all registered backends must be accounted for"
     );

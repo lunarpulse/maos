@@ -3,12 +3,12 @@ use std::path::Path;
 use std::process;
 
 mod abi_diff;
-mod check_abi_ratification;
-mod check_governance_categories;
 mod calibrate;
 mod cassette_age_gate;
 mod check_a2a_sender_completeness;
+mod check_abi_ratification;
 mod check_adr_040_accepted;
+mod check_air_gap;
 mod check_bare_review_findings;
 mod check_breaking_md;
 mod check_composition_root_completeness;
@@ -18,10 +18,11 @@ mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
 mod check_empty_kernel;
 mod check_env_contract;
-mod check_error_catalog;
 mod check_epic_6_bridge;
 mod check_epic_close_green;
+mod check_error_catalog;
 mod check_fr47;
+mod check_governance_categories;
 mod check_judge_config;
 mod check_kernel_baseline;
 mod check_loom;
@@ -48,6 +49,7 @@ mod invariant_lock;
 mod kloc_check;
 mod nfr_onb_1_gate;
 mod rebaseline_check;
+mod release_verify;
 mod stability_matrix;
 mod templates_regen;
 
@@ -542,6 +544,51 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 9.4 AC-1 — release artifact signing and verification gate.
+    #[command(name = "release-verify")]
+    ReleaseVerify {
+        /// Sign mode: generate .sig from SHA256SUMS
+        #[arg(long)]
+        sign: bool,
+        /// Verify mode: check .sig + SHA256 integrity
+        #[arg(long)]
+        verify: bool,
+        /// SHA256SUMS file path
+        #[arg(long)]
+        sha256sums: Option<String>,
+        /// Signature file path (for verify)
+        #[arg(long)]
+        sig: Option<String>,
+        /// Output path for generated signature (sign mode)
+        #[arg(long)]
+        output: Option<String>,
+        /// Env var name containing hex-encoded signing key (sign mode)
+        #[arg(long)]
+        key_env: Option<String>,
+        /// File containing signing key (sign mode, alternative to --key-env)
+        #[arg(long)]
+        key_file: Option<String>,
+        /// Directory containing release artifacts (verify mode)
+        #[arg(long)]
+        artifacts_dir: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 9.4 R-AG1 — air-gap no-network-symbols CI gate + dirty-fixture bite.
+    #[command(name = "check-air-gap")]
+    CheckAirGap {
+        /// Path to the air-gap binary to scan.
+        #[arg(long, default_value = "target/debug/maos")]
+        binary: String,
+        /// Path to the dirty-fixture binary (must be rejected by the gate).
+        #[arg(long)]
+        dirty_fixture: Option<String>,
+        /// Build the air-gap binary first (cargo build --no-default-features --features air-gap).
+        #[arg(long)]
+        build_first: bool,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -801,9 +848,7 @@ fn main() {
         Commands::CheckEnvContract { maos_bin_dir, json } => {
             check_env_contract::run(&maos_bin_dir, json)
         }
-        Commands::ErrorCatalogCheck { catalog, json } => {
-            check_error_catalog::run(&catalog, json)
-        }
+        Commands::ErrorCatalogCheck { catalog, json } => check_error_catalog::run(&catalog, json),
         Commands::ErrorCatalogGenerate { catalog, output } => {
             check_error_catalog::run_generate(&catalog, &output)
         }
@@ -812,15 +857,35 @@ fn main() {
             baseline,
             transparency_log,
             json,
-        } => check_abi_ratification::run(
-            &manifest,
-            &baseline,
-            &transparency_log,
+        } => check_abi_ratification::run(&manifest, &baseline, &transparency_log, json),
+        Commands::CheckGovernanceCategories { json } => check_governance_categories::run(json),
+        Commands::ReleaseVerify {
+            sign,
+            verify,
+            sha256sums,
+            sig,
+            output,
+            key_env,
+            key_file,
+            artifacts_dir,
+            json,
+        } => release_verify::run(
+            sign,
+            verify,
+            sha256sums.as_deref(),
+            sig.as_deref(),
+            output.as_deref(),
+            key_env.as_deref(),
+            key_file.as_deref(),
+            artifacts_dir.as_deref(),
             json,
         ),
-        Commands::CheckGovernanceCategories { json } => {
-            check_governance_categories::run(json)
-        }
+        Commands::CheckAirGap {
+            binary,
+            build_first,
+            dirty_fixture,
+            json,
+        } => check_air_gap::run(&binary, build_first, dirty_fixture.as_deref(), json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

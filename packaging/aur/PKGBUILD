@@ -1,0 +1,64 @@
+# Story 9.4 AC-2 — AUR PKGBUILD for MAOS.
+#
+# Install: makepkg -si
+# Verifies SHA256 + Ed25519 signature (fail-closed) via the bundled release public key.
+#
+# NOTE: At v0.5 this is a SCAFFOLD. The AUR package must be submitted
+# separately after the first tagged release. The embedded RELEASE_PUBKEY
+# must be replaced with the production key before the first tagged release.
+
+# Maintainer: Lunarpulse <lunarpulse@users.noreply.github.com>
+pkgname=maos
+pkgver=0.5.0
+pkgrel=1
+pkgdesc="Minimal Agentic Operating System — multi-Spirit runtime"
+arch=('x86_64' 'aarch64')
+url="https://github.com/lunarpulse/maos"
+license=('Apache-2.0 OR MIT')
+depends=()
+makedepends=('cargo' 'rust' 'python-cryptography')
+
+source_x86_64=("https://github.com/lunarpulse/maos/releases/download/v${pkgver}/maos-linux-amd64"
+               "https://github.com/lunarpulse/maos/releases/download/v${pkgver}/SHA256SUMS"
+               "https://github.com/lunarpulse/maos/releases/download/v${pkgver}/SHA256SUMS.sig")
+source_aarch64=("https://github.com/lunarpulse/maos/releases/download/v${pkgver}/maos-linux-arm64"
+                "https://github.com/lunarpulse/maos/releases/download/v${pkgver}/SHA256SUMS"
+                "https://github.com/lunarpulse/maos/releases/download/v${pkgver}/SHA256SUMS.sig")
+sha256sums_x86_64=('PLACEHOLDER_SHA256_LINUX_AMD64'
+                   'PLACEHOLDER_SHA256_SUMS'
+                   'PLACEHOLDER_SHA256_SIG')
+sha256sums_aarch64=('PLACEHOLDER_SHA256_LINUX_ARM64'
+                    'PLACEHOLDER_SHA256_SUMS'
+                    'PLACEHOLDER_SHA256_SIG')
+
+# Placeholder: replace with the production Ed25519 release public key
+# (64 lowercase hex chars) before the first tagged release.
+RELEASE_PUBKEY='bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7'
+
+prepare() {
+    # Verify the Ed25519 signature over SHA256SUMS using the bundled pubkey.
+    # The signature convention is Ed25519(SHA256(SHA256SUMS)) as implemented in
+    # `crates/maos-audit/src/release_verify.rs`.
+    python3 - <<PY
+import hashlib, sys
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+pubkey = Ed25519PublicKey.from_public_bytes(bytes.fromhex('${RELEASE_PUBKEY}'))
+with open('SHA256SUMS', 'rb') as f:
+    message = hashlib.sha256(f.read()).digest()
+with open('SHA256SUMS.sig', 'rb') as f:
+    signature = f.read()
+try:
+    pubkey.verify(signature, message)
+except Exception as e:
+    print(f'Ed25519 signature verification failed: {e}', file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+package() {
+    if [[ "$CARCH" == "x86_64" ]]; then
+        install -Dm755 "${srcdir}/maos-linux-amd64" "${pkgdir}/usr/bin/maos"
+    elif [[ "$CARCH" == "aarch64" ]]; then
+        install -Dm755 "${srcdir}/maos-linux-arm64" "${pkgdir}/usr/bin/maos"
+    fi
+}

@@ -41,3 +41,4 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 
 maos-iac = { path = "../crates/maos-iac" }
 maos-audit = { path = "../crates/maos-audit" }
+maos-domain = { path = "../crates/maos-domain" }

@@ -22,11 +22,12 @@ maos-audit = { path = "../maos-audit" }
 maos-domain = { path = "../maos-domain" }  # Story 9.1 FR44 — audit key loader
 maos-registry = { path = "../maos-registry" }
 maos-skill = { path = "../maos-skill" }   # Story 7.4 — `maosctl skills` discovery + admission exit
+rusqlite = { version = "0.31", features = ["bundled", "backup"] }  # Story 9.4 AC-3 — TL backup/restore
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+thiserror = "2"  # Story 9.4 AC-3 — typed backup/DR errors
 toml = "0.8"
 hex = "0.4"       # Story 9.1 FR44 — pubkey hex encoding in verify-bundle
-
 [dev-dependencies]
 # Story 1b.5b — accessibility ANSI test. Both crates are already in the
 # workspace via `maos-audit`, so `Cargo.lock` does NOT grow.

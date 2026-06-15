@@ -16,9 +16,7 @@ use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::{DistillationPort, MemoryManagerPort};
 use maos_kernel_core::iac::distillate::DistillateWriter;
-use maos_kernel_core::iac::transparency_log::{
-    FrameFilter, FrameKind, TransparencyLogAdapter,
-};
+use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::memory::MemoryManagerAdapter;
 use tempfile::TempDir;
 
@@ -35,11 +33,13 @@ fn fresh_adapter(
     let fs_root = dir.path().join("memory");
     std::fs::create_dir_all(&fs_root).unwrap();
     let db_path = dir.path().join("audit.sqlite");
-    let private = Arc::new(maos_kernel_core::memory::PrivateMemoryStore::new(fs_root, 4 * 1024));
+    let private = Arc::new(maos_kernel_core::memory::PrivateMemoryStore::new(
+        fs_root,
+        4 * 1024,
+    ));
     let shared = Arc::new(maos_kernel_core::memory::SharedMemoryStore::open(&db_path).unwrap());
-    let principal_index = Arc::new(
-        maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap(),
-    );
+    let principal_index =
+        Arc::new(maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
     let tl = Arc::new(TransparencyLogAdapter::open(&db_path, 1).unwrap());
     let memory = Arc::new(MemoryManagerAdapter::new(
         private,
@@ -73,7 +73,13 @@ fn headline_erasure_demo_produces_verifiable_proof() {
         schema: "chat".into(),
     };
     memory
-        .write(7, MemoryTier::Private, &ns, "msg1", MemoryValue::Text("hi".into()))
+        .write(
+            7,
+            MemoryTier::Private,
+            &ns,
+            "msg1",
+            MemoryValue::Text("hi".into()),
+        )
         .unwrap();
     let source = {
         tl.insert_frame_event(
@@ -113,7 +119,10 @@ fn headline_erasure_demo_produces_verifiable_proof() {
         &serde_json::to_vec(&cost_payload).unwrap(),
         maos_domain::invariants::i3::FrameOrigin::Kernel,
     );
-    let writer = DistillateWriter::new(Arc::clone(&tl), Arc::new(()) as Arc<dyn std::any::Any + Send + Sync>);
+    let writer = DistillateWriter::new(
+        Arc::clone(&tl),
+        Arc::new(()) as Arc<dyn std::any::Any + Send + Sync>,
+    );
     let distillate_body = format!("{CANARY} principal={PRINCIPAL}");
     let receipt = writer
         .write_distillate(
@@ -125,7 +134,9 @@ fn headline_erasure_demo_produces_verifiable_proof() {
     let distillate_frame_id = receipt.digest_frame_id;
 
     // Pre-forget: subject access finds the row; canary present.
-    assert!(!maos_audit::subject_access_query(&db_path, PRINCIPAL).unwrap().is_empty());
+    assert!(!maos_audit::subject_access_query(&db_path, PRINCIPAL)
+        .unwrap()
+        .is_empty());
     assert!(canary_in_distillates(&tl, CANARY));
 
     let pre_frame_ids = tl.all_frame_ids().unwrap();
@@ -233,9 +244,17 @@ fn legal_hold_arm_suspends_and_blocks_second_forget() {
         schema: "chat".into(),
     };
     memory
-        .write(7, MemoryTier::Private, &ns, "msg1", MemoryValue::Text("hi".into()))
+        .write(
+            7,
+            MemoryTier::Private,
+            &ns,
+            "msg1",
+            MemoryValue::Text("hi".into()),
+        )
         .unwrap();
-    assert!(!maos_audit::subject_access_query(&db_path, PRINCIPAL).unwrap().is_empty());
+    assert!(!maos_audit::subject_access_query(&db_path, PRINCIPAL)
+        .unwrap()
+        .is_empty());
 
     // P29: a legal-hold suspends and persists.
     let held = memory
@@ -246,7 +265,9 @@ fn legal_hold_arm_suspends_and_blocks_second_forget() {
         maos_domain::memory::ForgetOutcome::Suspended { .. }
     ));
     // The principal is retained.
-    assert!(!maos_audit::subject_access_query(&db_path, PRINCIPAL).unwrap().is_empty());
+    assert!(!maos_audit::subject_access_query(&db_path, PRINCIPAL)
+        .unwrap()
+        .is_empty());
 
     // A second forget WITHOUT a reason is blocked by the durable hold.
     let second = memory.forget_with_reason(PRINCIPAL, None).unwrap();
@@ -254,7 +275,9 @@ fn legal_hold_arm_suspends_and_blocks_second_forget() {
         matches!(second, maos_domain::memory::ForgetOutcome::Suspended { .. }),
         "a prior durable hold must block a later reasonless forget"
     );
-    assert!(!maos_audit::subject_access_query(&db_path, PRINCIPAL).unwrap().is_empty());
+    assert!(!maos_audit::subject_access_query(&db_path, PRINCIPAL)
+        .unwrap()
+        .is_empty());
 
     // Release the hold → a subsequent forget erases.
     assert!(memory.release_legal_hold(PRINCIPAL).unwrap());
@@ -263,7 +286,9 @@ fn legal_hold_arm_suspends_and_blocks_second_forget() {
         third,
         maos_domain::memory::ForgetOutcome::Erased { .. }
     ));
-    assert!(maos_audit::subject_access_query(&db_path, PRINCIPAL).unwrap().is_empty());
+    assert!(maos_audit::subject_access_query(&db_path, PRINCIPAL)
+        .unwrap()
+        .is_empty());
 }
 
 #[test]

@@ -1,0 +1,56 @@
+#!/usr/bin/make -f
+
+# Story 9.4 AC-2 — Debian rules for MAOS.
+# Verifies SHA256 + Ed25519 signature before installing the release binary.
+# The embedded RELEASE_PUBKEY must be replaced with the production key
+# before the first tagged release.
+
+export DH_VERBOSE = 1
+
+RELEASE_PUBKEY := bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7
+
+# Map Debian build architecture to the published MAOS binary name.
+ifeq ($(DEB_HOST_ARCH),amd64)
+  MAOS_BINARY := maos-linux-amd64
+else ifeq ($(DEB_HOST_ARCH),arm64)
+  MAOS_BINARY := maos-linux-arm64
+else
+  $(error Unsupported Debian architecture: $(DEB_HOST_ARCH); expected amd64 or arm64)
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	# Verify the Ed25519 signature over SHA256SUMS using the bundled pubkey.
+	# The signature convention is Ed25519(SHA256(SHA256SUMS)) as implemented in
+	# `crates/maos-audit/src/release_verify.rs`.
+	python3 - <<'PY'
+import hashlib, sys
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+pubkey = Ed25519PublicKey.from_public_bytes(bytes.fromhex('$(RELEASE_PUBKEY)'))
+with open('SHA256SUMS', 'rb') as f:
+    message = hashlib.sha256(f.read()).digest()
+with open('SHA256SUMS.sig', 'rb') as f:
+    signature = f.read()
+try:
+    pubkey.verify(signature, message)
+except Exception as e:
+    print(f'Ed25519 signature verification failed: {e}', file=sys.stderr)
+    sys.exit(1)
+PY
+
+override_dh_auto_install:
+	install -D -m 0755 $(MAOS_BINARY) debian/maos/usr/bin/maos
+
+override_dh_auto_build:
+	# Nothing to build; binary is pre-built.
+
+override_dh_auto_test:
+	# Verify that the downloaded binary matches the signed manifest.
+	expected_hash=$$(awk -v fname="$(MAOS_BINARY)" '$$0 ~ "  " fname {print $$1}' SHA256SUMS); \
+	actual_hash=$$(sha256sum $(MAOS_BINARY) | awk '{print $$1}'); \
+	if [ "$$expected_hash" != "$$actual_hash" ]; then \
+		echo "SHA256 mismatch for $(MAOS_BINARY)" >&2; \
+		exit 1; \
+	fi

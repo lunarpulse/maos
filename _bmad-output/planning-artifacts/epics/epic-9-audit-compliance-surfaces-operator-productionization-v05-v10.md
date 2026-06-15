@@ -171,6 +171,8 @@ As an enterprise operator deploying MAOS to production,
 I want pre-built binaries (Linux amd64/arm64, macOS arm64) via signed GitHub Releases (v0.5) progressing to Homebrew/AUR/deb/rpm/container images (v1.0), Transparency Log backup/DR with RPO ≤1h / RTO ≤4h, air-gapped deployment validation in CI, region-pinning primitive (PIPL §40), Spirit model-provenance manifest field (SB-1047), AND multi-operator tenancy primitive-reservation (v1.0 reserved, v1.5+ implemented),
 So that v1.0 ships to production-tenant operators without ad-hoc deployment glue.
 
+> **⚑ SPLIT at preflight (party-mode 2026-06-14, ratified 5/5 Winston·Murat·Amelia·John·Mary).** Split on the kernel-core baseline seam (mirrors 9.2→9.2b, 9.3→9.3b): **Story 9.4** ships the **pure-ops half** (AC-1 signed binaries · AC-2 packaging/containers · AC-3 region-scoped backup/DR · AC-4 air-gap CI — zero kernel-core delta, lands first); **Story 9.4b** ships the **kernel-touching compliance primitives** behind ONE authorized re-pin (AC-5 region-pinning only) + ONE ratified `AbiExtensionProposal` (AC-6 model-provenance surface): AC-5 (HKDF+AEAD enforce-at-use, `ERegionViolation`) · AC-6 (manifest schema 2→3 + FR62 governance journaling) · AC-7 (tenancy reservation, narrowed to a `deployment_operator_id` stamp) · AC-8 (`provider_history` bound). Region enforcement is **enforce-at-use** (foreign-region data fails to verify/decrypt), not at-copy; the `validate_namespace_write` stub is untouched; Mary ruled ZERO new principal-bearing frames (conditional on schema constraints). Full preflight consensus lives in the two story files.
+
 **Acceptance Criteria:**
 
 **Given** pre-built binaries at v0.5

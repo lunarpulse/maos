@@ -1,0 +1,15 @@
+[package]
+name = "dirty-network-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Dirty fixture that links tokio::net — proves the air-gap gate catches violations"
+
+[[bin]]
+name = "dirty-network-fixture"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["net", "macros", "rt"] }
+
+[workspace]

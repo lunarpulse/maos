@@ -383,17 +383,15 @@ mod tests {
     fn claim_json_snapshot_is_unchanged() {
         let claim = Claim {
             claim_id: Uuid::from_bytes([
-                0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
-                0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+                0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB,
+                0xCD, 0xEF,
             ]),
             issued_at_unix_ms: 1_717_000_000_000,
             expires_at_unix_ms: Some(1_717_086_400_000),
             principle_refs: vec![PrincipleRef::EuAiActArt14],
-            evidence: vec![
-                EvidenceKind::CorpusReplay {
-                    corpus_sha256: [0xAB; 32],
-                },
-            ],
+            evidence: vec![EvidenceKind::CorpusReplay {
+                corpus_sha256: [0xAB; 32],
+            }],
             verdict: Verdict::Admit,
         };
 

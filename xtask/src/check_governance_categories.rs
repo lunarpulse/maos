@@ -100,5 +100,9 @@ pub fn run(json: bool) -> Result<(), String> {
         }
     }
 
-    if passed { Ok(()) } else { Err("governance category completeness check failed".into()) }
+    if passed {
+        Ok(())
+    } else {
+        Err("governance category completeness check failed".into())
+    }
 }

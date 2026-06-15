@@ -26,7 +26,10 @@ impl Lcg {
     }
 
     fn next_u64(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(Self::MULTIPLIER).wrapping_add(Self::INCREMENT);
+        self.0 = self
+            .0
+            .wrapping_mul(Self::MULTIPLIER)
+            .wrapping_add(Self::INCREMENT);
         self.0
     }
 
@@ -94,7 +97,11 @@ fn generate_cascade(out_path: &str) -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 None
             };
-            let boot_nonce = if stratum == "pid_reuse" { 1 } else { idx as u64 };
+            let boot_nonce = if stratum == "pid_reuse" {
+                1
+            } else {
+                idx as u64
+            };
             let schema = schemas[lcg.next_usize(schemas.len())].to_string();
             let key = format!("key-{}", hex(&lcg.next_u64().to_le_bytes()[..4]));
             let value = format!("value-{}", hex(&lcg.next_u64().to_le_bytes()));

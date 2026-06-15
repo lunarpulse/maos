@@ -61,7 +61,9 @@ struct GdprLeakageProbe {
     canary: Option<String>,
 }
 
-fn open_isolated_stores(dir: &TempDir) -> (
+fn open_isolated_stores(
+    dir: &TempDir,
+) -> (
     Arc<maos_kernel_core::memory::PrivateMemoryStore>,
     Arc<maos_kernel_core::memory::SharedMemoryStore>,
     Arc<maos_kernel_core::memory::PrincipalNamespaceIndex>,
@@ -73,19 +75,14 @@ fn open_isolated_stores(dir: &TempDir) -> (
     let db_path = dir.path().join("audit.sqlite");
 
     let private = Arc::new(maos_kernel_core::memory::PrivateMemoryStore::new(
-        fs_root, 4 * 1024,
+        fs_root,
+        4 * 1024,
     ));
-    let shared = Arc::new(
-        maos_kernel_core::memory::SharedMemoryStore::open(&db_path).unwrap(),
-    );
-    let principal_index = Arc::new(
-        maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap(),
-    );
+    let shared = Arc::new(maos_kernel_core::memory::SharedMemoryStore::open(&db_path).unwrap());
+    let principal_index =
+        Arc::new(maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
     let tl = Arc::new(
-        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(
-            &db_path, 1,
-        )
-        .unwrap(),
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1).unwrap(),
     );
     (private, shared, principal_index, tl, db_path)
 }
@@ -158,13 +155,9 @@ fn write_distillate_with_canary(
     // content-based filter (P3) can link this distillate to its subject and
     // scrub it.  A real distillate references its subject principal.
     let body = format!("{canary} principal={principal}");
-    let request = DistillationRequest::new(
-        vec![source_frame_id],
-        1,
-        DigestPayload::Text(body),
-        None,
-    )
-    .unwrap();
+    let request =
+        DistillationRequest::new(vec![source_frame_id], 1, DigestPayload::Text(body), None)
+            .unwrap();
     let receipt = writer.write_distillate(spirit_pid, request).unwrap();
     receipt.digest_frame_id
 }
@@ -175,9 +168,7 @@ fn count_redaction_markers(
 ) -> usize {
     let entries = tl
         .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
-            kind: Some(
-                maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete,
-            ),
+            kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete),
             ..Default::default()
         })
         .unwrap();
@@ -203,9 +194,7 @@ fn canary_survives_in_distillate_bodies(
     // the cascade's reach.
     let entries = tl
         .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
-            kind: Some(
-                maos_kernel_core::iac::transparency_log::FrameKind::Distillate,
-            ),
+            kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::Distillate),
             ..Default::default()
         })
         .unwrap();
@@ -271,7 +260,11 @@ fn gdpr_cascade_v0_corpus_replay() {
             "erased" => match outcome {
                 ForgetOutcome::Erased { receipt, .. } => {
                     if scenario.reused_pid {
-                        assert_eq!(receipt.deleted_entries, 1, "{}: pid-reuse erase should delete exactly the original row", scenario.scenario_id);
+                        assert_eq!(
+                            receipt.deleted_entries, 1,
+                            "{}: pid-reuse erase should delete exactly the original row",
+                            scenario.scenario_id
+                        );
                     }
                 }
                 _ => panic!(
@@ -281,15 +274,26 @@ fn gdpr_cascade_v0_corpus_replay() {
             },
             "suspended" => match outcome {
                 ForgetOutcome::Suspended { hold } => {
-                    assert!(hold.reason.starts_with("legal-hold"), "{}: hold reason must start with legal-hold", scenario.scenario_id);
-                    assert!(hold.status.contains("SUSPENDED"), "{}: hold status must contain SUSPENDED", scenario.scenario_id);
+                    assert!(
+                        hold.reason.starts_with("legal-hold"),
+                        "{}: hold reason must start with legal-hold",
+                        scenario.scenario_id
+                    );
+                    assert!(
+                        hold.status.contains("SUSPENDED"),
+                        "{}: hold status must contain SUSPENDED",
+                        scenario.scenario_id
+                    );
                 }
                 _ => panic!(
                     "{}: expected Suspended, got {:?}",
                     scenario.scenario_id, outcome
                 ),
             },
-            other => panic!("{}: unknown expected_outcome {}", scenario.scenario_id, other),
+            other => panic!(
+                "{}: unknown expected_outcome {}",
+                scenario.scenario_id, other
+            ),
         }
 
         if scenario.expected_outcome == "erased" {
@@ -333,8 +337,7 @@ fn gdpr_cascade_v0_corpus_replay() {
                 &scenario.key,
                 &scenario.value,
             );
-            let reused_rows =
-                maos_audit::subject_access_query(&db_path, reused_principal).unwrap();
+            let reused_rows = maos_audit::subject_access_query(&db_path, reused_principal).unwrap();
             assert_eq!(
                 reused_rows.len(),
                 1,
@@ -394,9 +397,7 @@ fn gdpr_cascade_probe_v0_leakage_check() {
                 probe.principal
             );
             // Drive the cascade the original test skipped.
-            let outcome = memory
-                .forget_with_reason(&probe.principal, None)
-                .unwrap();
+            let outcome = memory.forget_with_reason(&probe.principal, None).unwrap();
             assert!(
                 matches!(outcome, ForgetOutcome::Erased { .. }),
                 "{}: control principal must erase",
@@ -443,9 +444,7 @@ fn gdpr_cascade_probe_v0_leakage_check() {
                     &probe.principal,
                     canary,
                 );
-                memory
-                    .forget_with_reason(&probe.principal, None)
-                    .unwrap();
+                memory.forget_with_reason(&probe.principal, None).unwrap();
                 assert!(
                     !canary_survives_in_distillate_bodies(&tl, canary),
                     "{}: probe canary leaked into distillate body after forget",

@@ -17,8 +17,7 @@ fn setup_test_db() -> (TempDir, std::path::PathBuf) {
     let db_path = dir.path().join("audit.sqlite");
 
     let tl = Arc::new(
-        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1)
-            .unwrap(),
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1).unwrap(),
     );
 
     // Insert a few frames with varying kinds
@@ -27,7 +26,7 @@ fn setup_test_db() -> (TempDir, std::path::PathBuf) {
 
     tl.insert_frame_event(
         FrameKind::CapabilityInvocation,
-        1,     // spirit_pid
+        1, // spirit_pid
         Some(&cap_token),
         "test.capability.invoke",
         b"capability payload data that is somewhat long",
@@ -133,7 +132,10 @@ fn redaction_field_is_none_for_all_non_replay_callers() {
     // 1. query() path
     let entries = maos_audit::query(&db_path, maos_audit::AuditFilter::default()).unwrap();
     for e in &entries {
-        assert!(e.redaction.is_none(), "query() caller: redaction must be None");
+        assert!(
+            e.redaction.is_none(),
+            "query() caller: redaction must be None"
+        );
     }
 
     // 2. sealed-export path: build a bundle from query() entries and verify
@@ -146,12 +148,8 @@ fn redaction_field_is_none_for_all_non_replay_callers() {
         },
         export_seq: 1,
     };
-    let unsigned = maos_audit::sealed_export::build_bundle(
-        entries.clone(),
-        vec![],
-        vec![],
-        freshness,
-    );
+    let unsigned =
+        maos_audit::sealed_export::build_bundle(entries.clone(), vec![], vec![], freshness);
     for e in &unsigned.entries {
         assert!(
             e.redaction.is_none(),

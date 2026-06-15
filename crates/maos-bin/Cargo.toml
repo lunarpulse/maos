@@ -12,8 +12,19 @@ name = "maos"
 path = "src/main.rs"
 
 [features]
-spirit_test = ["maos-kernel-core/spirit_test", "maos-spirit-sdk/spirit_test"]
-fixture_replay = ["maos-mcp/fixture_replay", "maos-acp/fixture_replay", "maos-providers/fixture_replay", "maos-registry/fixture_replay", "maos-bench/fixture_replay"]
+default = ["network"]
+network = [
+    "dep:maos-registry",
+    "dep:maos-providers",
+    "dep:maos-mcp",
+    "dep:maos-a2a-tcp",
+    "dep:maos-notify-push",
+    "dep:rcgen",
+    "dep:maos-a2a",
+]
+air-gap = []  # Compile-out all networking: reqwest, hyper client, tokio::net, DNS resolvers
+spirit_test = ["network", "maos-kernel-core/spirit_test", "maos-spirit-sdk/spirit_test"]
+fixture_replay = ["network", "maos-mcp/fixture_replay", "maos-acp/fixture_replay", "maos-providers/fixture_replay", "maos-registry/fixture_replay", "maos-bench/fixture_replay"]
 smoke_schedule = ["tokio/test-util"]
 
 [dependencies]
@@ -23,19 +34,19 @@ maos-audit = { path = "../maos-audit" }
 maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
 maos-kernel-core = { path = "../maos-kernel-core" }
-maos-mcp = { path = "../maos-mcp" }
-maos-notify-push = { path = "../maos-notify-push" }
-maos-registry = { path = "../maos-registry" }
+maos-mcp = { path = "../maos-mcp", optional = true }
+maos-notify-push = { path = "../maos-notify-push", optional = true }
+maos-registry = { path = "../maos-registry", optional = true }
 maos-acp = { path = "../maos-acp" }
-maos-providers = { path = "../maos-providers" }
+maos-providers = { path = "../maos-providers", optional = true }
 maos-bench = { path = "../maos-bench" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 maos-spirit-sdk = { path = "../maos-spirit-sdk" }
-maos-a2a = { path = "../maos-a2a" }  # Story 6.3 — composition-root A2A router wiring + smoke arm
+maos-a2a = { path = "../maos-a2a", optional = true }  # Story 6.3 — composition-root A2A router wiring + smoke arm
 maos-a2a-core = { path = "../maos-a2a-core" }  # Story 8.6 — protocol substrate (config/pin types for the daemon binding)
-maos-a2a-tcp = { path = "../maos-a2a-tcp" }    # Story 8.6 — live cross-Host TCP/mTLS transport + smoke-a2a-tcp-8-6
-rcgen = "0.13"  # Story 8.6 — runtime self-signed cert gen for the smoke-a2a-tcp-8-6 demo
+maos-a2a-tcp = { path = "../maos-a2a-tcp", optional = true }    # Story 8.6 — live cross-Host TCP/mTLS transport + smoke-a2a-tcp-8-6
+rcgen = { version = "0.13", optional = true }  # Story 8.6 — runtime self-signed cert gen for the smoke-a2a-tcp-8-6 demo
 maos-compliance = { path = "../maos-compliance" }   # Story 7.3 — v0.9-binding evaluator (smoke-compliance-7-3)
 maos-spirit-cli = { path = "../maos-spirit-cli" }   # Story 7.3 — REAL producer round-trip in the smoke arm
 maos-corpus-gen = { path = "../maos-corpus-gen" }   # Story 7.3 — CCAC slice replay + reference contexts

@@ -88,7 +88,11 @@ pub fn build_tree(leaves: &[NodeHash]) -> MerkleTree {
     }
 
     let root = layers.last().unwrap()[0];
-    MerkleTree { leaves, layers, root }
+    MerkleTree {
+        leaves,
+        layers,
+        root,
+    }
 }
 
 /// Build a tree directly from raw frame_ids.
@@ -256,12 +260,18 @@ mod tests {
             for id in &ids {
                 let leaf = hash_leaf(id);
                 let proof = prove_inclusion(&tree, leaf).unwrap();
-                assert!(verify_proof(tree.root, leaf, &proof), "{n}-leaf inclusion {id:?}");
+                assert!(
+                    verify_proof(tree.root, leaf, &proof),
+                    "{n}-leaf inclusion {id:?}"
+                );
             }
             // Exclusion of a non-member.
             let absent = hash_leaf(&[200u8; 16]);
             let excl = prove_exclusion(&tree, absent).unwrap();
-            assert!(verify_proof(tree.root, excl.leaf, &excl), "{n}-leaf exclusion");
+            assert!(
+                verify_proof(tree.root, excl.leaf, &excl),
+                "{n}-leaf exclusion"
+            );
         }
     }
 
@@ -287,7 +297,10 @@ mod tests {
         // Flip a sibling byte → the recomputed root must not match.
         if let Some(sib) = proof.siblings.first_mut() {
             sib[0] ^= 0xff;
-            assert!(!verify_proof(tree.root, leaf, &proof), "tampered proof must fail");
+            assert!(
+                !verify_proof(tree.root, leaf, &proof),
+                "tampered proof must fail"
+            );
         }
         // Tamper the leaf claim against a valid proof for a different leaf.
         let good = prove_inclusion(&tree, hash_leaf(&ids[3])).unwrap();

@@ -13,7 +13,9 @@ use maos_domain::memory::{ForgetOutcome, MemoryNamespace, MemoryTier, MemoryValu
 use maos_domain::ports::{DistillationPort, MemoryManagerPort};
 use tempfile::TempDir;
 
-fn open_isolated_stores(dir: &TempDir) -> (
+fn open_isolated_stores(
+    dir: &TempDir,
+) -> (
     Arc<maos_kernel_core::memory::PrivateMemoryStore>,
     Arc<maos_kernel_core::memory::SharedMemoryStore>,
     Arc<maos_kernel_core::memory::PrincipalNamespaceIndex>,
@@ -25,19 +27,14 @@ fn open_isolated_stores(dir: &TempDir) -> (
     let db_path = dir.path().join("audit.sqlite");
 
     let private = Arc::new(maos_kernel_core::memory::PrivateMemoryStore::new(
-        fs_root, 4 * 1024,
+        fs_root,
+        4 * 1024,
     ));
-    let shared = Arc::new(
-        maos_kernel_core::memory::SharedMemoryStore::open(&db_path).unwrap(),
-    );
-    let principal_index = Arc::new(
-        maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap(),
-    );
+    let shared = Arc::new(maos_kernel_core::memory::SharedMemoryStore::open(&db_path).unwrap());
+    let principal_index =
+        Arc::new(maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
     let tl = Arc::new(
-        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(
-            &db_path, 1,
-        )
-        .unwrap(),
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1).unwrap(),
     );
     (private, shared, principal_index, tl, db_path)
 }
@@ -110,16 +107,10 @@ fn write_distillate_with_canary(
     // Embed the principal_id in the distillate body so the forget cascade's
     // content-based filter (P3) links this distillate to its subject.
     let body = format!("{canary} principal={principal}");
-    let request = DistillationRequest::new(
-        vec![source_frame_id],
-        1,
-        DigestPayload::Text(body),
-        None,
-    )
-    .unwrap();
-    let receipt = writer
-        .write_distillate(spirit_pid, request)
-        .unwrap();
+    let request =
+        DistillationRequest::new(vec![source_frame_id], 1, DigestPayload::Text(body), None)
+            .unwrap();
+    let receipt = writer.write_distillate(spirit_pid, request).unwrap();
     receipt.digest_frame_id
 }
 
@@ -129,9 +120,7 @@ fn count_redaction_markers(
 ) -> usize {
     let entries = tl
         .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
-            kind: Some(
-                maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete,
-            ),
+            kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete),
             ..Default::default()
         })
         .unwrap();
@@ -151,9 +140,7 @@ fn canary_survives_in_distillate_bodies(
 ) -> bool {
     let entries = tl
         .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
-            kind: Some(
-                maos_kernel_core::iac::transparency_log::FrameKind::Distillate,
-            ),
+            kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::Distillate),
             ..Default::default()
         })
         .unwrap();
@@ -239,9 +226,7 @@ fn legal_hold_blocks_erasure_and_journals_request() {
     // Request journaled.
     let entries = tl
         .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
-            kind: Some(
-                maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete,
-            ),
+            kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete),
             ..Default::default()
         })
         .unwrap();
@@ -254,10 +239,10 @@ fn forget_receipt_matches_transparency_log_frame_id() {
     let (private, shared, principal_index, tl, _db_path) = open_isolated_stores(&dir);
     let memory = make_memory_adapter(private, shared, principal_index, tl.clone());
 
-    write_principal_data(
-        &memory, 3, "carol@example.org", "chat", "msg1", "hi",
-    );
-    let outcome = memory.forget_with_reason("carol@example.org", None).unwrap();
+    write_principal_data(&memory, 3, "carol@example.org", "chat", "msg1", "hi");
+    let outcome = memory
+        .forget_with_reason("carol@example.org", None)
+        .unwrap();
 
     let receipt = match outcome {
         ForgetOutcome::Erased { receipt, .. } => receipt,

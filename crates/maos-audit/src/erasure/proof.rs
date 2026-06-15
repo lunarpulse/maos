@@ -13,7 +13,9 @@ use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use super::merkle::{hash_leaf, build_tree_from_frame_ids, prove_exclusion, prove_inclusion, MerkleProof, NodeHash};
+use super::merkle::{
+    build_tree_from_frame_ids, hash_leaf, prove_exclusion, prove_inclusion, MerkleProof, NodeHash,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "status")]
@@ -137,7 +139,8 @@ fn parse_frame_id_hex(s: &str) -> Option<[u8; 16]> {
 
 /// Canonicalize the unsigned proof for signing: sorted JSON keys, compact.
 fn canonicalize(unsigned: &ErasureProofForSigning) -> Result<Vec<u8>, ErasureProofError> {
-    let value = serde_json::to_value(unsigned).map_err(|e| ErasureProofError::Serialization(e.to_string()))?;
+    let value = serde_json::to_value(unsigned)
+        .map_err(|e| ErasureProofError::Serialization(e.to_string()))?;
     let sorted = sort_value(value);
     serde_json::to_vec(&sorted).map_err(|e| ErasureProofError::Serialization(e.to_string()))
 }
@@ -145,13 +148,13 @@ fn canonicalize(unsigned: &ErasureProofForSigning) -> Result<Vec<u8>, ErasurePro
 fn sort_value(value: serde_json::Value) -> serde_json::Value {
     match value {
         serde_json::Value::Object(map) => {
-            let sorted: BTreeMap<String, serde_json::Value> = map
-                .into_iter()
-                .map(|(k, v)| (k, sort_value(v)))
-                .collect();
+            let sorted: BTreeMap<String, serde_json::Value> =
+                map.into_iter().map(|(k, v)| (k, sort_value(v))).collect();
             serde_json::Value::Object(sorted.into_iter().collect())
         }
-        serde_json::Value::Array(arr) => serde_json::Value::Array(arr.into_iter().map(sort_value).collect()),
+        serde_json::Value::Array(arr) => {
+            serde_json::Value::Array(arr.into_iter().map(sort_value).collect())
+        }
         other => other,
     }
 }
@@ -191,11 +194,11 @@ pub fn build_erasure_proof(
         });
     }
 
-
     // Inclusion (SR-3): each principal-bearing frame that was redacted must
     // have existed in the pre-erasure tree so the redaction is bound to real
     // TL frames.
-    let mut redacted_principal_frame_proofs = Vec::with_capacity(redacted_principal_frame_ids.len());
+    let mut redacted_principal_frame_proofs =
+        Vec::with_capacity(redacted_principal_frame_ids.len());
     for fid in redacted_principal_frame_ids {
         let leaf = hash_leaf(fid);
         let proof = prove_inclusion(&pre_tree, leaf).ok_or_else(|| {
@@ -299,9 +302,8 @@ pub fn verify_erasure_proof(
 
     let canonical = canonicalize(&unsigned)?;
     let digest = Sha256::digest(&canonical);
-    let pubkey = VerifyingKey::from_bytes(pubkey_bytes).map_err(|e| {
-        ErasureProofError::VerificationFailed(format!("invalid pubkey: {e}"))
-    })?;
+    let pubkey = VerifyingKey::from_bytes(pubkey_bytes)
+        .map_err(|e| ErasureProofError::VerificationFailed(format!("invalid pubkey: {e}")))?;
     let signature_bytes = hex::decode(&proof.signature_block.signature)
         .map_err(|e| ErasureProofError::VerificationFailed(format!("bad signature hex: {e}")))?;
     let signature = ed25519_dalek::Signature::from_slice(&signature_bytes)
@@ -449,10 +451,19 @@ pub fn write_proof_bundle(
     let safe_spirit: String = proof
         .spirit_id
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let root_suffix = hex::encode(&proof.post_root[0..8]);
-    let filename = format!("{}-{}-{}.bundle", safe_spirit, proof.uninstalled_at_ns, root_suffix);
+    let filename = format!(
+        "{}-{}-{}.bundle",
+        safe_spirit, proof.uninstalled_at_ns, root_suffix
+    );
     let path = dir.join(&filename);
     let bytes = serde_json::to_vec_pretty(proof)
         .map_err(|e| ErasureProofError::Serialization(e.to_string()))?;
@@ -544,7 +555,10 @@ mod tests {
             vec![],
             &seed,
         );
-        assert!(result.is_err(), "cannot prove inclusion of a frame absent from pre-tree");
+        assert!(
+            result.is_err(),
+            "cannot prove inclusion of a frame absent from pre-tree"
+        );
     }
 
     #[test]

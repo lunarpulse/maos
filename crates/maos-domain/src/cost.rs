@@ -132,7 +132,10 @@ pub struct ProviderPricingEntry {
 /// Serializes as `{ "entries": [...] }` — the index is rebuilt on
 /// deserialization via `#[serde(from)]`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(from = "ProviderPricingConfigSerde", into = "ProviderPricingConfigSerde")]
+#[serde(
+    from = "ProviderPricingConfigSerde",
+    into = "ProviderPricingConfigSerde"
+)]
 pub struct ProviderPricingConfig {
     entries: Vec<ProviderPricingEntry>,
     index: HashMap<(String, String), usize>,
@@ -301,7 +304,10 @@ mod tests {
         assert_eq!(payload.dimensions.len(), 2);
         assert_eq!(payload.dimensions[&CostDimension::TokensIn], 100);
         assert_eq!(payload.dimensions[&CostDimension::TokensOut], 50);
-        assert_eq!(payload.schema_version, 2, "R6: higher schema_version preserved");
+        assert_eq!(
+            payload.schema_version, 2,
+            "R6: higher schema_version preserved"
+        );
     }
 
     #[test]
@@ -336,7 +342,7 @@ mod tests {
             ProviderPricingEntry {
                 provider: "anthropic".into(),
                 model: "claude-3".into(),
-                input_price_micro_per_1k: 3000,  // $0.003 / 1k input tokens
+                input_price_micro_per_1k: 3000, // $0.003 / 1k input tokens
                 output_price_micro_per_1k: 15000, // $0.015 / 1k output tokens
             },
             ProviderPricingEntry {
@@ -375,14 +381,12 @@ mod tests {
     /// final divide-by-1000.  This guards against row-level rounding drift.
     #[test]
     fn cost_accumulation_is_linear_before_division() {
-        let config = ProviderPricingConfig::new(vec![
-            ProviderPricingEntry {
-                provider: "anthropic".into(),
-                model: "claude-3".into(),
-                input_price_micro_per_1k: 3000,
-                output_price_micro_per_1k: 15000,
-            },
-        ]);
+        let config = ProviderPricingConfig::new(vec![ProviderPricingEntry {
+            provider: "anthropic".into(),
+            model: "claude-3".into(),
+            input_price_micro_per_1k: 3000,
+            output_price_micro_per_1k: 15000,
+        }]);
         let e = config.lookup("anthropic", "claude-3").unwrap();
 
         let total_tokens: u128 = 1234;

@@ -16,8 +16,7 @@ fn setup_test_db() -> (TempDir, std::path::PathBuf) {
     let db_path = dir.path().join("audit.sqlite");
 
     let tl = Arc::new(
-        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1)
-            .unwrap(),
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1).unwrap(),
     );
 
     use maos_kernel_core::iac::transparency_log::FrameKind;
@@ -25,30 +24,49 @@ fn setup_test_db() -> (TempDir, std::path::PathBuf) {
 
     // Insert diverse frame kinds for shape-class coverage
     tl.insert_frame_event(
-        FrameKind::TaskAssign, 1, Some(&cap),
-        "assign.work", b"task payload", FrameOrigin::Kernel,
+        FrameKind::TaskAssign,
+        1,
+        Some(&cap),
+        "assign.work",
+        b"task payload",
+        FrameOrigin::Kernel,
     );
     tl.insert_frame_event(
-        FrameKind::CapabilityInvocation, 1, Some(&cap),
-        "file.read", b"cap payload data", FrameOrigin::Kernel,
+        FrameKind::CapabilityInvocation,
+        1,
+        Some(&cap),
+        "file.read",
+        b"cap payload data",
+        FrameOrigin::Kernel,
     );
     tl.insert_frame_event(
-        FrameKind::EpistemicHalt, 1, None,
-        "halt.confidence", b"halt", FrameOrigin::Kernel,
+        FrameKind::EpistemicHalt,
+        1,
+        None,
+        "halt.confidence",
+        b"halt",
+        FrameOrigin::Kernel,
     );
     tl.insert_frame_event(
-        FrameKind::Decision, 1, Some(&cap),
-        "decide.route", b"decision data", FrameOrigin::Kernel,
+        FrameKind::Decision,
+        1,
+        Some(&cap),
+        "decide.route",
+        b"decision data",
+        FrameOrigin::Kernel,
     );
     tl.insert_frame_event(
-        FrameKind::TelemetryEvent, 1, None,
-        "telemetry.ping", b"", FrameOrigin::Kernel,
+        FrameKind::TelemetryEvent,
+        1,
+        None,
+        "telemetry.ping",
+        b"",
+        FrameOrigin::Kernel,
     );
 
     drop(tl);
     (dir, db_path)
 }
-
 
 /// Read the committed trace-shape schema from the workspace `schemas/` dir.
 fn trace_shape_schema_path() -> std::path::PathBuf {
@@ -73,7 +91,9 @@ fn validate_trace_shape(value: &serde_json::Value) -> Result<(), String> {
         .map_err(|e| format!("cannot parse trace-shape.schema.json: {e}"))?;
 
     let obj = value.as_object().ok_or("trace-shape must be an object")?;
-    let required = schema["required"].as_array().ok_or("schema missing required")?;
+    let required = schema["required"]
+        .as_array()
+        .ok_or("schema missing required")?;
     for key in required {
         let key = key.as_str().ok_or("schema required key not string")?;
         if !obj.contains_key(key) {
@@ -88,19 +108,25 @@ fn validate_trace_shape(value: &serde_json::Value) -> Result<(), String> {
         return Err("determinism_scope mismatch".to_string());
     }
 
-    let hash = value["source_bundle_hash"].as_str().ok_or("source_bundle_hash must be string")?;
+    let hash = value["source_bundle_hash"]
+        .as_str()
+        .ok_or("source_bundle_hash must be string")?;
     if hash.len() != 64 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err("source_bundle_hash must be 64 hex chars".to_string());
     }
 
-    let frame_count = value["frame_count"].as_u64().ok_or("frame_count must be integer")?;
+    let frame_count = value["frame_count"]
+        .as_u64()
+        .ok_or("frame_count must be integer")?;
     let frames = value["frames"].as_array().ok_or("frames must be array")?;
     if frames.len() as u64 != frame_count {
         return Err("frame_count does not match frames.len()".to_string());
     }
 
     let defs = schema["$defs"].as_object().ok_or("schema missing $defs")?;
-    let frame_schema = defs["frame"].as_object().ok_or("schema missing frame def")?;
+    let frame_schema = defs["frame"]
+        .as_object()
+        .ok_or("schema missing frame def")?;
     let frame_required: HashSet<&str> = frame_schema["required"]
         .as_array()
         .ok_or("frame schema missing required")?
@@ -115,7 +141,9 @@ fn validate_trace_shape(value: &serde_json::Value) -> Result<(), String> {
         .collect();
 
     for (i, frame) in frames.iter().enumerate() {
-        let f = frame.as_object().ok_or_else(|| format!("frame {i} not object"))?;
+        let f = frame
+            .as_object()
+            .ok_or_else(|| format!("frame {i} not object"))?;
         for key in &frame_required {
             if !f.contains_key(*key) {
                 return Err(format!("frame {i} missing required field {key}"));
@@ -124,7 +152,9 @@ fn validate_trace_shape(value: &serde_json::Value) -> Result<(), String> {
         if f.len() != frame_required.len() {
             return Err(format!("frame {i} has extra fields"));
         }
-        let class = f["shape_class"].as_str().ok_or_else(|| format!("frame {i} shape_class not string"))?;
+        let class = f["shape_class"]
+            .as_str()
+            .ok_or_else(|| format!("frame {i} shape_class not string"))?;
         if !valid_classes.contains(class) {
             return Err(format!("frame {i} invalid shape_class: {class}"));
         }
@@ -141,10 +171,8 @@ fn validate_trace_shape(value: &serde_json::Value) -> Result<(), String> {
 fn replay_trace_shape_validates_against_schema() {
     let (_dir, db_path) = setup_test_db();
 
-    let entries = maos_audit::query_with_redaction(
-        &db_path,
-        maos_audit::AuditFilter::default(),
-    ).unwrap();
+    let entries =
+        maos_audit::query_with_redaction(&db_path, maos_audit::AuditFilter::default()).unwrap();
 
     assert!(!entries.is_empty());
 
@@ -184,16 +212,10 @@ fn replay_determinism_two_process_byte_identical() {
     let out2 = child2.wait_with_output().expect("worker 2 output");
 
     if !out1.status.success() {
-        panic!(
-            "worker 1 failed: {}",
-            String::from_utf8_lossy(&out1.stderr)
-        );
+        panic!("worker 1 failed: {}", String::from_utf8_lossy(&out1.stderr));
     }
     if !out2.status.success() {
-        panic!(
-            "worker 2 failed: {}",
-            String::from_utf8_lossy(&out2.stderr)
-        );
+        panic!("worker 2 failed: {}", String::from_utf8_lossy(&out2.stderr));
     }
 
     assert_eq!(
@@ -216,7 +238,8 @@ fn replay_worker() {
     let entries = maos_audit::query_with_redaction(
         std::path::Path::new(&db_path),
         maos_audit::AuditFilter::default(),
-    ).unwrap();
+    )
+    .unwrap();
     let shape = maos_audit::replay::replay(&entries, input.as_bytes()).unwrap();
     let bytes = maos_audit::replay::runner::replay_to_canonical_bytes(&shape).unwrap();
     std::io::Write::write_all(&mut std::io::stdout(), &bytes).unwrap();
@@ -227,10 +250,8 @@ fn replay_one_byte_tamper_diverges() {
     // Anti-tautology: tampering with bundle bytes must produce different hash
     let (_dir, db_path) = setup_test_db();
 
-    let entries = maos_audit::query_with_redaction(
-        &db_path,
-        maos_audit::AuditFilter::default(),
-    ).unwrap();
+    let entries =
+        maos_audit::query_with_redaction(&db_path, maos_audit::AuditFilter::default()).unwrap();
 
     let shape_original = maos_audit::replay::replay(&entries, b"original-bundle").unwrap();
     let bytes_original =
@@ -248,8 +269,7 @@ fn replay_one_byte_tamper_diverges() {
 
     // Specifically: source_bundle_hash should differ
     assert_ne!(
-        shape_original.source_bundle_hash,
-        shape_tampered.source_bundle_hash,
+        shape_original.source_bundle_hash, shape_tampered.source_bundle_hash,
         "source_bundle_hash must differ after tamper"
     );
 }
@@ -258,27 +278,35 @@ fn replay_one_byte_tamper_diverges() {
 fn replay_shape_classes_correct() {
     let (_dir, db_path) = setup_test_db();
 
-    let entries = maos_audit::query_with_redaction(
-        &db_path,
-        maos_audit::AuditFilter::default(),
-    ).unwrap();
+    let entries =
+        maos_audit::query_with_redaction(&db_path, maos_audit::AuditFilter::default()).unwrap();
 
     let shape = maos_audit::replay::replay(&entries, b"test").unwrap();
 
     // Check specific shape class assignments
-    let structural: Vec<_> = shape.frames.iter()
+    let structural: Vec<_> = shape
+        .frames
+        .iter()
         .filter(|f| f.shape_class == "structural")
         .collect();
-    let capability: Vec<_> = shape.frames.iter()
+    let capability: Vec<_> = shape
+        .frames
+        .iter()
         .filter(|f| f.shape_class == "capability")
         .collect();
-    let halt: Vec<_> = shape.frames.iter()
+    let halt: Vec<_> = shape
+        .frames
+        .iter()
         .filter(|f| f.shape_class == "halt")
         .collect();
-    let decision: Vec<_> = shape.frames.iter()
+    let decision: Vec<_> = shape
+        .frames
+        .iter()
         .filter(|f| f.shape_class == "decision")
         .collect();
-    let telemetry: Vec<_> = shape.frames.iter()
+    let telemetry: Vec<_> = shape
+        .frames
+        .iter()
         .filter(|f| f.shape_class == "telemetry")
         .collect();
 
@@ -293,10 +321,8 @@ fn replay_shape_classes_correct() {
 fn replay_with_redaction_produces_placeholders() {
     let (_dir, db_path) = setup_test_db();
 
-    let entries = maos_audit::query_with_redaction(
-        &db_path,
-        maos_audit::AuditFilter::default(),
-    ).unwrap();
+    let entries =
+        maos_audit::query_with_redaction(&db_path, maos_audit::AuditFilter::default()).unwrap();
 
     let shape = maos_audit::replay::replay(&entries, b"test").unwrap();
 
@@ -308,10 +334,16 @@ fn replay_with_redaction_produces_placeholders() {
             saw_placeholder = true;
             assert!(ph.starts_with("<REDACTED:"), "placeholder format: {ph}");
             assert!(ph.ends_with('>'), "placeholder format: {ph}");
-            assert!(!ph.contains("hash"), "placeholder must not contain hash: {ph}");
+            assert!(
+                !ph.contains("hash"),
+                "placeholder must not contain hash: {ph}"
+            );
         }
     }
-    assert!(saw_placeholder, "at least one frame must have a placeholder");
+    assert!(
+        saw_placeholder,
+        "at least one frame must have a placeholder"
+    );
 }
 
 #[test]
@@ -323,15 +355,11 @@ fn verify_trajectory_rejects_open_writer() {
     let db_path = dir.path().join("audit.sqlite");
 
     let _tl = Arc::new(
-        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1,
-        ).unwrap(),
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1).unwrap(),
     );
 
-    let err = maos_audit::query_with_redaction(
-        &db_path,
-        maos_audit::AuditFilter::default(),
-    )
-    .expect_err("query_with_redaction must reject an open writer");
+    let err = maos_audit::query_with_redaction(&db_path, maos_audit::AuditFilter::default())
+        .expect_err("query_with_redaction must reject an open writer");
 
     let msg = format!("{err}");
     assert!(

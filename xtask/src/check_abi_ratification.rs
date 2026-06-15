@@ -89,8 +89,8 @@ pub fn reconcile(abi_changes: &[String], ratifications: &[RatificationEntry]) ->
 
 /// Load ratification entries from the manifest TOML.
 pub fn load_manifest(path: &Path) -> Result<Vec<RatificationEntry>, String> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let content =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     let manifest: Manifest = toml::from_str(&content)
         .map_err(|e| format!("invalid manifest {}: {e}", path.display()))?;
     Ok(manifest.ratification)
@@ -109,10 +109,8 @@ pub fn compute_abi_changes(baseline_path: &Path) -> Result<Vec<String>, String> 
     let baseline = fs::read_to_string(baseline_path)
         .map_err(|e| format!("cannot read baseline {}: {e}", baseline_path.display()))?;
     let current = capture_public_api()?;
-    let baseline_lines: std::collections::HashSet<&str> = baseline
-        .lines()
-        .filter(|l| !l.is_empty())
-        .collect();
+    let baseline_lines: std::collections::HashSet<&str> =
+        baseline.lines().filter(|l| !l.is_empty()).collect();
     let added: Vec<String> = current
         .lines()
         .filter(|l| !l.is_empty() && !baseline_lines.contains(l))
@@ -137,7 +135,6 @@ fn capture_public_api() -> Result<String, String> {
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
-
 
 /// Verify that every ratified proposal covering an ABI change has a
 /// ratification frame in the Transparency Log that strictly precedes
@@ -186,8 +183,12 @@ pub fn run(
     if result.passed && !abi_changes.is_empty() {
         let tl_path = Path::new(transparency_log_path);
         if tl_path.exists() {
-            let tl_frames = maos_audit::load_ratification_frames(tl_path)
-                .map_err(|e| format!("cannot load ratification frames from {}: {e}", tl_path.display()))?;
+            let tl_frames = maos_audit::load_ratification_frames(tl_path).map_err(|e| {
+                format!(
+                    "cannot load ratification frames from {}: {e}",
+                    tl_path.display()
+                )
+            })?;
             let abi_change_seq = tl_frames.iter().map(|f| f.seq).max().unwrap_or(0);
             let mut covering_ids = Vec::new();
             for change in &abi_changes {
@@ -290,9 +291,15 @@ mod tests {
             "pub enum FrameKind::GovernanceEvent".to_string(),
             "pub struct GovernanceEventPayload".to_string(),
         ];
-        let ratifications = vec![ratified_entry(vec!["GovernanceEvent", "GovernanceEventPayload"])];
+        let ratifications = vec![ratified_entry(vec![
+            "GovernanceEvent",
+            "GovernanceEventPayload",
+        ])];
         let result = reconcile(&changes, &ratifications);
-        assert!(result.passed, "R7(a) should PASS with matching ratification");
+        assert!(
+            result.passed,
+            "R7(a) should PASS with matching ratification"
+        );
         assert!(result.uncovered.is_empty());
     }
 
@@ -361,10 +368,7 @@ mod tests {
         let ratifications = vec![ratified_entry(vec!["GovernanceEvent"])];
         let result = reconcile(&changes, &ratifications);
         assert!(!result.passed, "partial coverage should FAIL");
-        assert_eq!(
-            result.uncovered,
-            vec!["pub struct CostAttributionPayload"]
-        );
+        assert_eq!(result.uncovered, vec!["pub struct CostAttributionPayload"]);
     }
 
     // ── Manifest round-trip ──

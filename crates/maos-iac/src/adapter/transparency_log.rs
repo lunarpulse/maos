@@ -222,8 +222,6 @@ pub enum AuditError {
     MalformedFrameId(usize),
 }
 
-
-
 /// SQL schema for both tables.
 const SCHEMA_SQL: &str = "\
 CREATE TABLE IF NOT EXISTS transparency_log (
@@ -674,7 +672,9 @@ impl TransparencyLogAdapter {
             .expect("TransparencyLogAdapter inner poisoned");
         let mut stmt = inner
             .conn
-            .prepare("SELECT frame_id FROM transparency_log ORDER BY timestamp_ns ASC, frame_id ASC")
+            .prepare(
+                "SELECT frame_id FROM transparency_log ORDER BY timestamp_ns ASC, frame_id ASC",
+            )
             .map_err(AuditError::SqliteRead)?;
         let rows = stmt
             .query_map([], |row| {
@@ -704,17 +704,16 @@ impl TransparencyLogAdapter {
     }
 
     /// Story 9.2 — list distinct principal_ids written by a given spirit pid.
-    pub fn principal_ids_for_spirit_pid(
-        &self,
-        spirit_pid: u32,
-    ) -> Result<Vec<String>, AuditError> {
+    pub fn principal_ids_for_spirit_pid(&self, spirit_pid: u32) -> Result<Vec<String>, AuditError> {
         let inner = self
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
         let mut stmt = inner
             .conn
-            .prepare("SELECT DISTINCT principal_id FROM principal_index WHERE writer_spirit_pid = ?1")
+            .prepare(
+                "SELECT DISTINCT principal_id FROM principal_index WHERE writer_spirit_pid = ?1",
+            )
             .map_err(AuditError::SqliteRead)?;
         let rows = stmt
             .query_map(rusqlite::params![spirit_pid as i64], |row| {
@@ -757,9 +756,14 @@ impl TransparencyLogAdapter {
         let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
         let pid_params: Vec<Box<dyn rusqlite::types::ToSql>> = std::iter::once(Box::new(
             FrameKind::Distillate as i64,
-        ) as Box<dyn rusqlite::types::ToSql>)
-            .chain(writer_spirit_pids.iter().map(|p| Box::new(*p as i64) as Box<dyn rusqlite::types::ToSql>))
-            .collect();
+        )
+            as Box<dyn rusqlite::types::ToSql>)
+        .chain(
+            writer_spirit_pids
+                .iter()
+                .map(|p| Box::new(*p as i64) as Box<dyn rusqlite::types::ToSql>),
+        )
+        .collect();
         let param_refs: Vec<&dyn rusqlite::types::ToSql> =
             pid_params.iter().map(|p| p.as_ref()).collect();
         let rows = stmt
@@ -794,7 +798,10 @@ impl TransparencyLogAdapter {
         if writer_spirit_pids.is_empty() {
             return Ok(Vec::new());
         }
-        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
         let placeholders = (0..writer_spirit_pids.len())
             .map(|_| "?")
             .collect::<Vec<_>>()
@@ -807,8 +814,10 @@ impl TransparencyLogAdapter {
         );
         let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
         let pids: Vec<i64> = writer_spirit_pids.iter().map(|&p| p as i64).collect();
-        let params_ref: Vec<&dyn rusqlite::types::ToSql> =
-            pids.iter().map(|p| p as &dyn rusqlite::types::ToSql).collect();
+        let params_ref: Vec<&dyn rusqlite::types::ToSql> = pids
+            .iter()
+            .map(|p| p as &dyn rusqlite::types::ToSql)
+            .collect();
         let rows = stmt
             .query_map(rusqlite::params_from_iter(params_ref), |row| {
                 let fid: Vec<u8> = row.get(0)?;
@@ -825,7 +834,6 @@ impl TransparencyLogAdapter {
             let mut fid = [0u8; 16];
             fid.copy_from_slice(&fid_vec);
             out.push((fid, body));
-
         }
         Ok(out)
     }
@@ -838,7 +846,10 @@ impl TransparencyLogAdapter {
         frame_id: [u8; 16],
         reason: &str,
     ) -> Result<(), AuditError> {
-        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
         // Try to parse the existing payload and redact only the principal_id field.
         let existing: Vec<u8> = inner
             .conn
@@ -858,10 +869,7 @@ impl TransparencyLogAdapter {
                         );
                     }
                     // Also record redaction metadata
-                    obj.insert(
-                        "redacted".to_string(),
-                        serde_json::Value::Bool(true),
-                    );
+                    obj.insert("redacted".to_string(), serde_json::Value::Bool(true));
                     obj.insert(
                         "redaction_reason".to_string(),
                         serde_json::Value::String(reason.to_string()),
@@ -879,12 +887,16 @@ impl TransparencyLogAdapter {
                 tombstone.to_string().into_bytes()
             }
         };
-        inner.conn.execute(
-            "UPDATE transparency_log SET payload_redacted = ?1 WHERE frame_id = ?2",
-            rusqlite::params![&redacted_bytes[..], &frame_id[..]],
-        ).map_err(|e| {
-            panic!("MAOS kernel panic — principal-bearing frame scrub failed: {e}. I2.");
-        }).unwrap();
+        inner
+            .conn
+            .execute(
+                "UPDATE transparency_log SET payload_redacted = ?1 WHERE frame_id = ?2",
+                rusqlite::params![&redacted_bytes[..], &frame_id[..]],
+            )
+            .map_err(|e| {
+                panic!("MAOS kernel panic — principal-bearing frame scrub failed: {e}. I2.");
+            })
+            .unwrap();
 
         Ok(())
     }
@@ -908,12 +920,7 @@ impl TransparencyLogAdapter {
                 "INSERT OR REPLACE INTO legal_holds \
                  (principal_id, reason, case_ref, requested_at_ns) \
                  VALUES (?1, ?2, ?3, ?4)",
-                rusqlite::params![
-                    principal_id,
-                    reason,
-                    case_ref,
-                    requested_at_ns as i64,
-                ],
+                rusqlite::params![principal_id, reason, case_ref, requested_at_ns as i64,],
             )
             .map_err(AuditError::SqliteWriteFatal)?;
         Ok(())
@@ -1384,19 +1391,28 @@ impl TransparencyLogAdapter {
                 rusqlite::Error::InvalidParameterName("ratified_by must not be empty".into()),
             ));
         }
-        let mut inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
         // Atomic: registry append + frame emission in one SQLite transaction.
         // Manual BEGIN/COMMIT to avoid borrow conflicts with Transaction<'_>.
-        inner.conn.execute_batch("BEGIN;").map_err(AuditError::SqliteWriteFatal)?;
-        let commit_or_rollback = |conn: &Connection, result: Result<(), AuditError>| -> Result<(), AuditError> {
-            match result {
-                Ok(()) => conn.execute_batch("COMMIT;").map_err(AuditError::SqliteWriteFatal),
-                Err(e) => {
-                    let _ = conn.execute_batch("ROLLBACK;");
-                    Err(e)
+        inner
+            .conn
+            .execute_batch("BEGIN;")
+            .map_err(AuditError::SqliteWriteFatal)?;
+        let commit_or_rollback =
+            |conn: &Connection, result: Result<(), AuditError>| -> Result<(), AuditError> {
+                match result {
+                    Ok(()) => conn
+                        .execute_batch("COMMIT;")
+                        .map_err(AuditError::SqliteWriteFatal),
+                    Err(e) => {
+                        let _ = conn.execute_batch("ROLLBACK;");
+                        Err(e)
+                    }
                 }
-            }
-        };
+            };
         let result = (|| -> Result<(), AuditError> {
             inner.conn.execute(
                 "INSERT INTO schema_lifecycle_registry
@@ -1467,7 +1483,10 @@ impl TransparencyLogAdapter {
         &self,
         schema_id: &str,
     ) -> Result<Vec<maos_domain::governance::SchemaRegistryEntry>, AuditError> {
-        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
         let mut stmt = inner
             .conn
             .prepare(
@@ -1501,7 +1520,10 @@ impl TransparencyLogAdapter {
         &self,
         schema_id: &str,
     ) -> Result<Option<maos_domain::governance::SchemaRegistryEntry>, AuditError> {
-        let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
         let mut stmt = inner
             .conn
             .prepare(

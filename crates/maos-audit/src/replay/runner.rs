@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::AuditEntry;
 use super::redaction_placeholder::render_placeholder;
+use crate::AuditEntry;
 #[derive(Debug, thiserror::Error)]
 pub enum ReplayError {
     #[error("serialization error: {0}")]
@@ -33,7 +33,10 @@ pub struct TraceShape {
 /// Classify a kind string into a trace-shape class.
 fn classify_kind(kind: &str) -> &'static str {
     match kind {
-        "task.assign" | "task.complete" | "retract" | "cli.subprocess.output"
+        "task.assign"
+        | "task.complete"
+        | "retract"
+        | "cli.subprocess.output"
         | "cli.wrapper.shape.mismatch" => "structural",
 
         "capability.invocation" | "spirit.revoked" | "mcp.invocation" => "capability",
@@ -42,7 +45,10 @@ fn classify_kind(kind: &str) -> &'static str {
 
         "decision" | "decision.dispatch" | "distillate" => "decision",
 
-        "telemetry.event" | "budget.warning" | "budget.exceeded" | "task.stalled"
+        "telemetry.event"
+        | "budget.warning"
+        | "budget.exceeded"
+        | "task.stalled"
         | "silent.failure.suspect" => "telemetry",
 
         _ => "other",

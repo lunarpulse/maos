@@ -17,6 +17,8 @@ pub mod erasure;
 pub mod log_composition;
 pub mod replay;
 
+pub mod backup;
+pub mod release_verify;
 pub mod sealed_export;
 
 use std::io::Write;
@@ -233,7 +235,9 @@ pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, Aud
                     where_clauses.push("kind = ?".to_string());
                     params.push(Box::new(kinds[0]));
                 } else {
-                    let placeholders: Vec<String> = kinds.iter().enumerate()
+                    let placeholders: Vec<String> = kinds
+                        .iter()
+                        .enumerate()
                         .map(|(i, _)| format!("?{}", params.len() + i + 1))
                         .collect();
                     where_clauses.push(format!("kind IN ({})", placeholders.join(",")));
@@ -402,7 +406,9 @@ pub fn query_with_redaction(
                     where_clauses.push("kind = ?".to_string());
                     params.push(Box::new(kinds[0]));
                 } else {
-                    let placeholders: Vec<String> = kinds.iter().enumerate()
+                    let placeholders: Vec<String> = kinds
+                        .iter()
+                        .enumerate()
                         .map(|(i, _)| format!("?{}", params.len() + i + 1))
                         .collect();
                     where_clauses.push(format!("kind IN ({})", placeholders.join(",")));
@@ -512,7 +518,9 @@ pub struct RatificationFrame {
 /// `AbiExtensionProposal` with `status == Ratified`.
 /// Returns them sorted by ascending `seq`.
 pub fn load_ratification_frames(db_path: &Path) -> Result<Vec<RatificationFrame>, AuditError> {
-    use maos_domain::governance::{GovernanceEventKind, GovernanceEventPayload, RatificationStatus};
+    use maos_domain::governance::{
+        GovernanceEventKind, GovernanceEventPayload, RatificationStatus,
+    };
 
     // FrameKind::GovernanceEvent discriminator is pinned at 28 (wire-stable
     // since Story 1b.1; see maos-iac::adapter::transparency_log::FrameKind).
@@ -742,9 +750,8 @@ pub fn kind_to_category(kind: i64) -> Option<AuditCategory> {
         28 => Some(AuditCategory::Governance),
         29 => Some(AuditCategory::Cost),
         // Operational (pre-existing kinds 0–27)
-        0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
-        12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 |
-        24 | 25 | 26 | 27 => Some(AuditCategory::Operational),
+        0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19
+        | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 => Some(AuditCategory::Operational),
         // Unknown kind — forces a classification decision on introduction
         _ => None,
     }
@@ -1131,7 +1138,10 @@ pub fn resolve_spirit_name(
             Ok(matches)
         } else {
             let max_boot = matches.iter().map(|(b, _)| *b).max().unwrap();
-            Ok(matches.into_iter().filter(|(b, _)| *b == max_boot).collect())
+            Ok(matches
+                .into_iter()
+                .filter(|(b, _)| *b == max_boot)
+                .collect())
         }
     } else {
         if !db_path.exists() {
@@ -1193,8 +1203,6 @@ pub fn resolve_spirit_name(
             Ok(latest)
         }
     }
-
-
 }
 
 // ─────────────────────────────────────────────────────────────────────────

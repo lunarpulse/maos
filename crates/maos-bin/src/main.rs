@@ -33,44 +33,64 @@ mod env_contract;
 
 use std::sync::Arc;
 use std::thread::available_parallelism;
+#[cfg(feature = "network")]
 use tokio::signal;
+#[cfg(feature = "network")]
 use tokio_util::sync::CancellationToken;
 
+#[cfg(feature = "network")]
 use maos_director_surface::notification::{NotificationDispatcher, TerminalChannel};
+#[cfg(feature = "network")]
 use maos_domain::invariants::i1::IntentClass;
+#[cfg(feature = "network")]
 use maos_domain::invariants::i1::Scope;
+#[cfg(feature = "network")]
 use maos_domain::orchestrator::OrchestratorInstruction;
+#[cfg(feature = "network")]
 use maos_domain::orchestrator::OrchestratorInstructionId;
+#[cfg(feature = "network")]
 use maos_domain::ports::crypto::CryptoProvider;
+#[cfg(feature = "network")]
 use maos_domain::ports::CapabilityRegistryPort;
+#[cfg(feature = "network")]
 use maos_kernel_core::api::{
     CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter, RingCryptoProvider,
     TelemetryStreamAdapter,
 };
+#[cfg(feature = "network")]
 use maos_kernel_core::hot_swap::HotSwapCoordinator;
+#[cfg(feature = "network")]
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
+#[cfg(feature = "network")]
 use maos_kernel_core::iac::Mailbox;
+#[cfg(feature = "network")]
 use maos_kernel_core::inference::InferencePortAdapter;
+#[cfg(feature = "network")]
 use maos_kernel_core::security::approval::ApprovalManager;
+#[cfg(feature = "network")]
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
+#[cfg(feature = "network")]
 use maos_providers::AnthropicProvider;
 
 fn worker_thread_count() -> usize {
     available_parallelism().map(usize::from).unwrap_or(1)
 }
 
+#[cfg(feature = "network")]
 /// YankObserver that writes `FrameKind::SpiritRevoked` rows to the
 /// Transparency Log so every propagated yank is auditable (Story 7.2).
 struct TlYankObserver {
     tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
 }
 
+#[cfg(feature = "network")]
 impl TlYankObserver {
     fn new(tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>) -> Self {
         Self { tl }
     }
 }
 
+#[cfg(feature = "network")]
 impl maos_registry::yank::YankObserver for TlYankObserver {
     fn on_yank(&self, entry: &maos_domain::ports::registry::YankEntry) {
         let payload = serde_json::json!({
@@ -94,20 +114,24 @@ impl maos_registry::yank::YankObserver for TlYankObserver {
     }
 }
 
+#[cfg(feature = "network")]
 /// RAII guard that removes a temp directory on scope exit (including early
 /// returns). Story 7.3: hoisted to module scope — it was defined locally in one
 /// smoke fn but referenced by another, which left maos-bin uncompilable at the
 /// Story 7.2 HEAD (see Story 7.3 Review Findings).
 struct TempDirGuard(std::path::PathBuf);
+#[cfg(feature = "network")]
 impl Drop for TempDirGuard {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 
+#[cfg(feature = "network")]
 /// Fallback provider when Anthropic is unconfigured (no API key).
 struct UnconfiguredProvider;
 
+#[cfg(feature = "network")]
 impl maos_providers::Provider for UnconfiguredProvider {
     fn complete(
         &self,
@@ -122,9 +146,11 @@ impl maos_providers::Provider for UnconfiguredProvider {
 // Story 8.11 — `maos run <manifest> [--live] [--once]` production run surface.
 // ─────────────────────────────────────────────────────────────────────────────
 
+#[cfg(feature = "network")]
 /// Parsed `maos run` invocation. `None` (from [`parse_run_args`]) means no `run`
 /// subcommand was given → preserve the existing `MAOS_ONE_SHOT` / Spirit-less
 /// serving behavior.
+#[cfg(feature = "network")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RunArgs {
     manifest_path: String,
@@ -134,6 +160,7 @@ struct RunArgs {
     once: bool,
 }
 
+#[cfg(feature = "network")]
 /// Parse `run <manifest-path> [--live] [--once]` from the process args (the args
 /// AFTER the binary name). Manual parsing — the binary has no clap dependency.
 /// Returns `None` when the first arg is not `run` (the env-gated paths win).
@@ -182,6 +209,7 @@ fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<RunA
 /// **port-requirement** decision is NOT keyed here (it is posture-derived — see
 /// [`requires_epistemic_halt_port`]) so adding a future halt-Spirit cannot
 /// re-ship the 8.1 bug by forgetting a name (FORK D guardrail).
+#[cfg(feature = "network")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LoadedSpiritKind {
     Butler,
@@ -198,6 +226,7 @@ enum LoadedSpiritKind {
     FounderLoopClass,
 }
 
+#[cfg(feature = "network")]
 fn classify_spirit(class_name: &str) -> Option<LoadedSpiritKind> {
     match class_name {
         "butler" => Some(LoadedSpiritKind::Butler),
@@ -215,6 +244,7 @@ fn classify_spirit(class_name: &str) -> Option<LoadedSpiritKind> {
 /// boot. Keyed on `manifest.posture`, never on the Spirit id — a name-keyed
 /// check would decapitate Researcher (assistive, async scalar-emitter, no port)
 /// and re-ship the 8.1 footgun for the next halt-Spirit.
+#[cfg(feature = "network")]
 fn requires_epistemic_halt_port(
     posture: &maos_kernel_core::security::manifest::PostureSection,
 ) -> bool {
@@ -226,6 +256,7 @@ fn requires_epistemic_halt_port(
 }
 
 /// Story 8.12 — map a `[sandbox] tier = "T3"` string to the operational tier.
+#[cfg(feature = "network")]
 fn parse_sandbox_tier(s: &str) -> Result<maos_domain::invariants::i9::SandboxTier, String> {
     use maos_domain::invariants::i9::SandboxTier;
     match s.trim().to_ascii_uppercase().as_str() {
@@ -242,6 +273,7 @@ fn parse_sandbox_tier(s: &str) -> Result<maos_domain::invariants::i9::SandboxTie
 /// deterministic fixture-CLI (`worker-cli-fixture`) is built as a sibling of the
 /// daemon binary in the cargo target dir; tests run the daemon from
 /// `target/debug/deps/`, so the parent dir is also checked, then `$PATH`.
+#[cfg(feature = "network")]
 fn resolve_cli_binary(command: &str) -> Result<String, String> {
     let p = std::path::Path::new(command);
     if p.is_absolute() {
@@ -291,6 +323,7 @@ fn resolve_cli_binary(command: &str) -> Result<String, String> {
 /// `FrameKind::CliSubprocessOutput=21` row, and on exit revokes the cap-token
 /// with `RevokeReason::CliSubprocessExit`. Composition-root only — the kernel
 /// receives a constructed handle and decides no topology.
+#[cfg(feature = "network")]
 fn run_cli_wrapper_manifest(
     manifest_root: &toml::Value,
     run: &RunArgs,
@@ -471,6 +504,7 @@ fn run_cli_wrapper_manifest(
 /// the adapter only forwards Butler's assessed scalar and records the receipt so
 /// the daemon can render the halt screen-string. `process_scalar_write` is
 /// `&self` (no `Mutex` around the orchestrator).
+#[cfg(feature = "network")]
 struct ButlerOrchestratorAdapter {
     orchestrator:
         Arc<maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator>,
@@ -483,6 +517,7 @@ struct ButlerOrchestratorAdapter {
     last_receipt: Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>,
 }
 
+#[cfg(feature = "network")]
 impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
     fn write_scalar(
         &self,
@@ -518,15 +553,18 @@ impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
     }
 }
 
+#[cfg(feature = "network")]
 /// Story 8.14b — Live MCP port for Butler. Wraps the kernel's
 /// `McpClientAdapter` (capability mediation + audit) with per-tool-type
 /// token issuance.
+#[cfg(feature = "network")]
 struct LiveButlerMcpPort {
     spirit_pid: u32,
     posture_hash: [u8; 32],
     mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
     capability: Arc<CapabilityRegistryAdapter>,
 }
+#[cfg(feature = "network")]
 impl LiveButlerMcpPort {
     pub fn new(
         spirit_pid: u32,
@@ -544,6 +582,7 @@ impl LiveButlerMcpPort {
     // Comment budget on Winston's request
     // spawn_blocking budget comment: MCP calls are low-frequency (once per on_idle cycle), not inner loops.
 }
+#[cfg(feature = "network")]
 #[async_trait::async_trait]
 impl butler::ButlerMcpPort for LiveButlerMcpPort {
     async fn calendar_events(&self) -> Result<Vec<butler::CalendarEvent>, butler::ButlerMcpError> {
@@ -599,6 +638,7 @@ impl butler::ButlerMcpPort for LiveButlerMcpPort {
         .await
     }
 }
+#[cfg(feature = "network")]
 impl LiveButlerMcpPort {
     async fn call_mcp(
         &self,
@@ -643,6 +683,7 @@ impl LiveButlerMcpPort {
         })
     }
 }
+#[cfg(feature = "network")]
 /// Story 8.14c — Live MCP port for Researcher. Wraps the kernel's
 /// `McpClientAdapter` with a two-phase fan-out (search → fetch) bounded by
 /// `RESEARCHER_PARALLELISM` permits.
@@ -651,6 +692,7 @@ impl LiveButlerMcpPort {
 /// internally calls `Handle::current().block_on(...)` — this is the FORK 3
 /// bridge pattern that avoids the 8.14b `Waker::noop()` deadlock on concurrent
 /// `spawn_blocking`.
+#[cfg(feature = "network")]
 struct LiveResearcherMcpPort {
     spirit_pid: u32,
     posture_hash: [u8; 32],
@@ -659,6 +701,7 @@ struct LiveResearcherMcpPort {
     handle: tokio::runtime::Handle,
     sem: Arc<tokio::sync::Semaphore>,
 }
+#[cfg(feature = "network")]
 impl LiveResearcherMcpPort {
     pub fn new(
         spirit_pid: u32,
@@ -678,6 +721,7 @@ impl LiveResearcherMcpPort {
         }
     }
 }
+#[cfg(feature = "network")]
 impl researcher::ResearcherMcpPort for LiveResearcherMcpPort {
     fn survey_literature(
         &self,
@@ -689,6 +733,7 @@ impl researcher::ResearcherMcpPort for LiveResearcherMcpPort {
         self.handle.block_on(self.survey_literature_impl(query))
     }
 }
+#[cfg(feature = "network")]
 impl LiveResearcherMcpPort {
     async fn survey_literature_impl(
         &self,
@@ -911,6 +956,7 @@ impl LiveResearcherMcpPort {
 ///
 /// Called on every admission, rejection, and rotation decision point so the
 /// audit trail records the full trust-tier decision history.
+#[cfg(feature = "network")]
 fn emit_vetter_key_event(
     tl: &maos_kernel_core::iac::TransparencyLogAdapter,
     spirit_id: &str,
@@ -955,6 +1001,311 @@ fn emit_vetter_key_event(
     );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Air-gap build: minimal main with no network surface (R-AG2).
+// ─────────────────────────────────────────────────────────────────────────────
+#[cfg(not(feature = "network"))]
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.is_empty() {
+        print_air_gap_usage();
+        std::process::exit(1);
+    }
+
+    match args[0].as_str() {
+        "init" => air_gap_init(),
+        "run" => air_gap_run(&args[1..]),
+        "backup" => air_gap_backup(&args[1..]),
+        "audit" => air_gap_audit(&args[1..]),
+        "install" => air_gap_install(&args[1..]),
+        "--version" | "-V" => {
+            println!("maos {}", env!("CARGO_PKG_VERSION"));
+            std::process::exit(0);
+        }
+        _ => {
+            eprintln!("maos: unknown command '{}' in air-gap mode", args[0]);
+            print_air_gap_usage();
+            std::process::exit(1);
+        }
+    }
+}
+
+#[cfg(not(feature = "network"))]
+fn print_air_gap_usage() {
+    eprintln!(
+        "maos {} (air-gap build — network surface compiled out)\n\n\
+         Usage: maos <COMMAND>\n\n\
+         Commands:\n\
+           init                    Initialize MAOS home directory\n\
+           run <manifest>         Run a Spirit manifest offline (stub inference)\n\
+           backup create <dest>   Create a TL backup\n\
+           backup verify <backup> Verify a TL backup via cold restore\n\
+           backup restore <backup> <target>  Restore a TL backup\n\
+           audit query             Offline audit query stub\n\
+           install --from-local <dir>  Install a verified release artifact\n\
+           --version               Print version",
+        env!("CARGO_PKG_VERSION")
+    );
+}
+
+#[cfg(not(feature = "network"))]
+fn air_gap_init() {
+    let color =
+        maos_cli::accessibility::ColorChoice::resolve(false, &maos_cli::accessibility::RealEnv);
+    if let Err(e) = maos_shell::run_init(color) {
+        eprintln!("init failed: {e}");
+        std::process::exit(1);
+    }
+}
+
+#[cfg(not(feature = "network"))]
+fn air_gap_run(_args: &[String]) {
+    // AC-4: the substrate boots, runs, and produces a Transparency Log entry
+    // even with networking compiled out. Real offline inference is a v1.0/9.4b
+    // follow-up; at v0.5 we write a no-op TL entry and emit a clear diagnostic.
+    let tl_path = maos_audit::default_transparency_log_path();
+    if let Some(parent) = tl_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    // Best-effort offline entry: append a sentinel line to a plain-text stub file
+    // next to the TL so the operator can observe that the substrate attempted to
+    // boot. The real TL is SQLite and may not exist yet in an air-gap install.
+    let stub = tl_path.with_extension("airgap-stub.log");
+    let entry = format!(
+        "{} air-gap boot stub\n",
+        std::time::SystemTime::UNIX_EPOCH
+            .elapsed()
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    );
+    if let Err(e) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&stub)
+        .and_then(|mut f| std::io::Write::write_all(&mut f, entry.as_bytes()))
+    {
+        eprintln!("air-gap run: failed to write TL stub: {e}");
+        std::process::exit(1);
+    }
+    eprintln!(
+        "air-gap run: offline inference is stubbed; TL stub written to {}",
+        stub.display()
+    );
+}
+
+#[cfg(not(feature = "network"))]
+fn air_gap_backup(args: &[String]) {
+    if args.len() < 2 {
+        eprintln!("usage: maos backup <create|verify|restore> ...");
+        std::process::exit(1);
+    }
+    match args[0].as_str() {
+        "create" => {
+            let dest = std::path::Path::new(&args[1]);
+            let source = maos_audit::default_transparency_log_path();
+            match maos_cli::backup::backup_transparency_log(&source, dest) {
+                Ok(()) => {
+                    eprintln!("backup created: {}", dest.display());
+                }
+                Err(e) => {
+                    eprintln!("backup failed: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        "verify" => {
+            let source = maos_audit::default_transparency_log_path();
+            let backup_path = std::path::Path::new(&args[1]);
+            match air_gap_verify_backup(&source, backup_path) {
+                Ok(()) => eprintln!("backup verified: cold-restore Merkle roots match"),
+                Err(e) => {
+                    eprintln!("backup verification failed: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        "restore" => {
+            if args.len() < 3 {
+                eprintln!("usage: maos backup restore <backup> <target>");
+                std::process::exit(1);
+            }
+            let backup_path = std::path::Path::new(&args[1]);
+            let target_path = std::path::Path::new(&args[2]);
+            match maos_cli::backup::backup_transparency_log(backup_path, target_path) {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!("restore failed: {e}");
+                    std::process::exit(1);
+                }
+            }
+            match air_gap_verify_backup(backup_path, target_path) {
+                Ok(()) => eprintln!("restore complete: {}", target_path.display()),
+                Err(e) => {
+                    eprintln!("restored copy verification failed: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {
+            eprintln!("usage: maos backup <create|verify|restore> ...");
+            std::process::exit(1);
+        }
+    }
+}
+
+#[cfg(not(feature = "network"))]
+fn air_gap_verify_backup(
+    source_path: &std::path::Path,
+    backup_path: &std::path::Path,
+) -> Result<(), String> {
+    let restored = maos_cli::backup::cold_restore_to_temp(backup_path)
+        .map_err(|e| format!("cold restore failed: {e}"))?;
+    let source_root = maos_audit::backup::compute_merkle_root(source_path)
+        .map_err(|e| format!("source Merkle root failed: {e}"))?;
+    let restored_root = maos_audit::backup::compute_merkle_root(&restored)
+        .map_err(|e| format!("restored Merkle root failed: {e}"))?;
+    if source_root != restored_root {
+        return Err(format!(
+            "Merkle root mismatch: source={}, restored={}",
+            hex::encode(source_root),
+            hex::encode(restored_root)
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "network"))]
+fn air_gap_audit(args: &[String]) {
+    if args.len() < 2 || args[0] != "query" {
+        eprintln!("usage: maos audit query");
+        std::process::exit(1);
+    }
+    let tl_path = maos_audit::default_transparency_log_path();
+    match maos_audit::backup::compute_merkle_root(&tl_path) {
+        Ok(root) => {
+            eprintln!("air-gap audit query: TL path = {}", tl_path.display());
+            eprintln!("Merkle root = {}", hex::encode(root));
+        }
+        Err(e) => {
+            eprintln!("air-gap audit query failed: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
+#[cfg(not(feature = "network"))]
+fn air_gap_install(args: &[String]) {
+    if args.len() < 2 || args[0] != "--from-local" {
+        eprintln!("usage: maos install --from-local <dir>");
+        eprintln!("note: remote fetch is unavailable in air-gap mode");
+        std::process::exit(1);
+    }
+    let dir = &args[1];
+    let dir_path = std::path::Path::new(dir);
+    let sums_path = dir_path.join("SHA256SUMS");
+    let sig_path = dir_path.join("SHA256SUMS.sig");
+    let binary_name = match air_gap_platform_binary_name() {
+        Ok(n) => n,
+        Err(e) => {
+            eprintln!("install: {e}");
+            std::process::exit(2);
+        }
+    };
+    let bin_path = dir_path.join(binary_name);
+
+    let sums_content = std::fs::read(&sums_path)
+        .map_err(|e| format!("cannot read {}: {e}", sums_path.display()))
+        .unwrap_or_else(|e| {
+            eprintln!("install: {e}");
+            std::process::exit(2);
+        });
+    let sig_bytes_vec = std::fs::read(&sig_path)
+        .map_err(|e| format!("cannot read {}: {e}", sig_path.display()))
+        .unwrap_or_else(|e| {
+            eprintln!("install: {e}");
+            std::process::exit(2);
+        });
+    let sig_array: [u8; 64] = match sig_bytes_vec.as_slice().try_into() {
+        Ok(a) => a,
+        Err(_) => {
+            eprintln!(
+                "install: {} must be 64 bytes, got {}",
+                sig_path.display(),
+                sig_bytes_vec.len()
+            );
+            std::process::exit(2);
+        }
+    };
+    let bin_content = std::fs::read(&bin_path)
+        .map_err(|e| format!("cannot read {}: {e}", bin_path.display()))
+        .unwrap_or_else(|e| {
+            eprintln!("install: {e}");
+            std::process::exit(2);
+        });
+
+    let files: Vec<(&str, &[u8])> = vec![(binary_name, bin_content.as_slice())];
+    match maos_audit::release_verify::verify_release(
+        &sums_content,
+        &sig_array,
+        &maos_audit::release_verify::RELEASE_PUBKEY,
+        &files,
+        true,
+    ) {
+        Ok(_) => eprintln!("install: verification passed"),
+        Err(e) => {
+            eprintln!("install: verification FAILED: {e}");
+            std::process::exit(1);
+        }
+    }
+
+    let install_target = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|p| p.join("maos")))
+        .unwrap_or_else(|| std::path::PathBuf::from("/usr/local/bin/maos"));
+    if let Some(parent) = install_target.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match std::fs::copy(&bin_path, &install_target) {
+        Ok(_) => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut perms = std::fs::metadata(&install_target)
+                    .map(|m| m.permissions())
+                    .unwrap_or_else(|_| std::fs::Permissions::from_mode(0o755));
+                perms.set_mode(perms.mode() | 0o111);
+                let _ = std::fs::set_permissions(&install_target, perms);
+            }
+            eprintln!(
+                "install: installed verified binary to {}",
+                install_target.display()
+            );
+        }
+        Err(e) => {
+            eprintln!("install: failed to install binary: {e}");
+            std::process::exit(2);
+        }
+    }
+}
+
+#[cfg(not(feature = "network"))]
+fn air_gap_platform_binary_name() -> Result<&'static str, String> {
+    if cfg!(target_arch = "x86_64") && cfg!(target_os = "linux") {
+        Ok("maos-linux-amd64")
+    } else if cfg!(target_arch = "aarch64") && cfg!(target_os = "linux") {
+        Ok("maos-linux-arm64")
+    } else if cfg!(target_arch = "aarch64") && cfg!(target_os = "macos") {
+        Ok("maos-darwin-arm64")
+    } else {
+        Err(format!(
+            "unsupported platform: {}-{}",
+            std::env::consts::ARCH,
+            std::env::consts::OS
+        ))
+    }
+}
+
+#[cfg(feature = "network")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cpus = worker_thread_count();
@@ -1149,8 +1500,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Story 9.1 — single supervised SecurityManagerAdapter owner shared across the
     // daemon, shell, `maos run`, and one-shot admission paths. Constructing it
     // once satisfies check-service-boundary P1 (single owner per §4.0.8).
-    let (security_drift_tx, security_drift_rx) =
-        maos_kernel_core::security::make_drift_channel();
+    let (security_drift_tx, security_drift_rx) = maos_kernel_core::security::make_drift_channel();
     let _security_drift_rx = security_drift_rx; // hold receiver for adapter lifetime
     let security = Arc::new(
         maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
@@ -1640,7 +1990,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map_err(|e| format!("epistemic_policy parse: {e}"))
                 })
                 .transpose()?;
-
 
             let journal_path = maos_audit::default_journal_path();
             if let Some(parent) = journal_path.parent() {
@@ -2552,7 +2901,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{json}");
             // P29-cli: a legal-hold suspension is NOT a success — exit 3 so
             // automation scripts can distinguish erased (0) from held (3).
-            if matches!(outcome, maos_domain::memory::ForgetOutcome::Suspended { .. }) {
+            if matches!(
+                outcome,
+                maos_domain::memory::ForgetOutcome::Suspended { .. }
+            ) {
                 std::process::exit(3);
             }
             return Ok(());
@@ -2595,9 +2947,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .register_schema_lifecycle(&entry)
                 .map_err(|e| format!("governance admit failed: {e}"))?;
 
-            eprintln!(
-                "maos: admitted schema {schema_id} v{version} (ratified by {ratified_by})"
-            );
+            eprintln!("maos: admitted schema {schema_id} v{version} (ratified by {ratified_by})");
             return Ok(());
         }
         if mode == "posture-shift" {
@@ -2700,33 +3050,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
 
             // Reuse the single composition-root SecurityManagerAdapter (line ~1102).
-            let _spec = security.admit_spirit(
-                0,
-                &spirit_id,
-                &sandbox_cfg,
-                &resource_caps,
-                &caps_required,
-                Some(&output_shape),
-                &journal,
-                &posture_section,
-                epistemic_policy.as_ref(),
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(&class_section),
-            ).map_err(|e| {
-                emit_vetter_key_event(
-                    &transparency_log,
+            let _spec = security
+                .admit_spirit(
+                    0,
                     &spirit_id,
-                    &class_section.version,
-                    false,
-                    "N/A",
-                    &format!("posture-shift: re-admission rejected: {e}"),
-                );
-                e
-            })?;
+                    &sandbox_cfg,
+                    &resource_caps,
+                    &caps_required,
+                    Some(&output_shape),
+                    &journal,
+                    &posture_section,
+                    epistemic_policy.as_ref(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(&class_section),
+                )
+                .map_err(|e| {
+                    emit_vetter_key_event(
+                        &transparency_log,
+                        &spirit_id,
+                        &class_section.version,
+                        false,
+                        "N/A",
+                        &format!("posture-shift: re-admission rejected: {e}"),
+                    );
+                    e
+                })?;
             emit_vetter_key_event(
                 &transparency_log,
                 &spirit_id,
@@ -5438,6 +5790,7 @@ description = "smoke test spirit successor"
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 9.2 — real uninstall cascade + proof-of-erasure emission.
 ///
 /// Resolves the spirit name to its pid(s), forgets every principal
@@ -5461,9 +5814,8 @@ fn run_uninstall_cascade(
         .map_err(|e| format!("failed to read pre-erasure frame ids: {e}"))?;
 
     // Resolve spirit name → pid(s).  Latest boot only matches the CLI default.
-    let incarnations =
-        maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false)
-            .map_err(|e| format!("failed to resolve spirit '{spirit_id}': {e}"))?;
+    let incarnations = maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false)
+        .map_err(|e| format!("failed to resolve spirit '{spirit_id}': {e}"))?;
     if incarnations.is_empty() {
         return Err(format!("no incarnation found for spirit '{spirit_id}'").into());
     }
@@ -5543,8 +5895,8 @@ fn run_uninstall_cascade(
     // A missing/unreadable key is a hard failure — silently falling back to an
     // ephemeral, unpersisted key would produce a proof that is permanently
     // unverifiable.
-    let signing_seed: [u8; 32] = maos_domain::audit_key::load_audit_key_seed(&None)
-        .map_err(|e| {
+    let signing_seed: [u8; 32] =
+        maos_domain::audit_key::load_audit_key_seed(&None).map_err(|e| {
             format!(
                 "no operator audit key configured (set MAOS_AUDIT_KEY_SEED / provision via \
                  Story 9.1); cannot sign proof-of-erasure: {e}"
@@ -5597,10 +5949,7 @@ fn run_uninstall_cascade(
     // P23: stamp the proof with the LATEST incarnation's pid (the current
     // boot).  `resolve_spirit_name(all_boots=false)` returns only the latest
     // boot, so this is the single current incarnation.
-    let stamp_pid = incarnations
-        .last()
-        .map(|(_, pid)| *pid)
-        .unwrap_or(0);
+    let stamp_pid = incarnations.last().map(|(_, pid)| *pid).unwrap_or(0);
     let proof = build_erasure_proof(
         spirit_id.to_string(),
         stamp_pid,
@@ -5622,6 +5971,7 @@ fn run_uninstall_cascade(
     Ok(proof_path.to_string_lossy().to_string())
 }
 
+#[cfg(feature = "network")]
 /// Parse a 32-char lowercase hex string into a 16-byte TokenId.
 /// Rejects invalid lengths and non-hex characters.
 fn parse_token_id_hex(s: &str) -> Result<[u8; 16], String> {
@@ -5643,6 +5993,7 @@ fn parse_token_id_hex(s: &str) -> Result<[u8; 16], String> {
     Ok(bytes)
 }
 
+#[cfg(feature = "network")]
 #[cfg(unix)]
 async fn shutdown_unix_term() {
     use tokio::signal::unix::{signal, SignalKind};
@@ -5650,11 +6001,13 @@ async fn shutdown_unix_term() {
     term.recv().await;
 }
 
+#[cfg(feature = "network")]
 #[cfg(not(unix))]
 async fn shutdown_unix_term() {
     std::future::pending::<()>().await;
 }
 
+#[cfg(feature = "network")]
 /// Story 6.2 AC7 — `smoke-orchestrator-fanout-6-2` end-to-end wedge demo.
 ///
 /// Demonstrates the founder-loop wedge at compressed timeline (10 dispatches
@@ -5937,6 +6290,7 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 8.4 — a `SpiritRole::Worker` `task.complete` frame (Architect/Reviewer
 /// are specialized Workers — Decision C). Used by `smoke_founder_loop_8_4`.
 fn founder_loop_task_complete(
@@ -5979,6 +6333,7 @@ fn founder_loop_task_complete(
     }
 }
 
+#[cfg(feature = "network")]
 /// Story 8.4 — producer-side distillation (Decision K): the producing Spirit
 /// seeds its OWN output frame and distills it via the real `DistillateWriter`.
 /// Returns the `PriorDistillateRef` the Orchestrator references.
@@ -6014,6 +6369,7 @@ fn founder_loop_producer_distill(
     })
 }
 
+#[cfg(feature = "network")]
 /// Story 8.4 AC6 — `smoke-founder-loop-8-4` end-to-end founder-loop wedge demo.
 ///
 /// The runnable headline artifact (Decision G; mirrors
@@ -6427,6 +6783,7 @@ async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
 /// All adapters are REAL (the resolved 8.1–8.4 dev-dep bridge pattern); only the
 /// terminal mobile-push transport is fixture-replaced (Decision D — the real
 /// `MobilePushChannel` is the §6.5 `unimplemented!` stub).
+#[cfg(feature = "network")]
 async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     use std::sync::{Arc, Mutex};
 
@@ -6877,6 +7234,7 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 6.3 AC7 — `smoke-a2a-loopback-6-3` end-to-end A2A wedge demo.
 ///
 /// Demonstrates the A2A loopback v0.8 surface:
@@ -6899,6 +7257,7 @@ async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
 /// `maos-kernel-core` receives NO new public fn (this lives entirely in the
 /// composition root). Returns the concrete `Arc<TcpA2ATransport>` (which impls
 /// both `A2ARouter` and `A2ATransport`) so the caller can also read `local_addr`.
+#[cfg(feature = "network")]
 async fn build_a2a_tcp_daemon_router(
     tcp_config: maos_a2a_tcp::TcpA2AConfig,
     peer_configs: Vec<maos_a2a_core::A2APeerConfig>,
@@ -6918,6 +7277,7 @@ async fn build_a2a_tcp_daemon_router(
     Ok(std::sync::Arc::new(transport))
 }
 
+#[cfg(feature = "network")]
 /// Story 8.6 AC-T13/AC-A7 — `smoke-a2a-tcp-8-6`: a live cross-Host advisory from
 /// Mira(host_a) to Nash(host_b) over a REAL TCP/mTLS socket. Two independent
 /// `TcpA2ATransport` endpoints (each via [`build_a2a_tcp_daemon_router`], the
@@ -7106,6 +7466,7 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 8.13 — the J4 Mira/Nash journey with the 8.5 cognition/halt path
 /// composed onto the 8.6 live TCP/mTLS wire and the real HTTP mobile-push adapter.
 async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
@@ -7723,6 +8084,7 @@ async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a::{
         A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile, ConsentAllowlists, EPinMismatch,
@@ -7979,6 +8341,7 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 8.7 AC6 — `smoke-a2a-consent-vocab-8-7` runnable headline.
 ///
 /// Demonstrates ADR-012 fine-grained typed-intent consent end-to-end over the
@@ -8172,6 +8535,7 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 8.8 AC4 — `smoke-a2a-fail-closed-8-8` runnable headline.
 ///
 /// Demonstrates the fail-closed cross-Host consent policy (closes audit G7) over
@@ -8434,6 +8798,7 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 6.4 AC5 — `smoke-schedule-6-4` end-to-end wedge demo.
 ///
 /// Demonstrates four surfaces in sequence:
@@ -8656,6 +9021,7 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 7.1 AC6 — `smoke-spirit-author-7-1` end-to-end author path demo.
 async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
     use std::process::Command;
@@ -8759,6 +9125,7 @@ async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 7.1.5 AC5 — `smoke-discipline-7-1-5` runs all four §A2-family gates.
 async fn smoke_discipline_7_1_5() -> Result<(), Box<dyn std::error::Error>> {
     use std::process::Command;
@@ -8799,6 +9166,7 @@ async fn smoke_discipline_7_1_5() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 7.2 AC6 — end-to-end registry round-trip smoke arm.
 ///
 /// Walks the v1.0 binding surface (publish → search → install → yank →
@@ -9076,6 +9444,7 @@ sandbox_tier = "t0"
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// D4 remediation — SLOW path: exercises live `maos-spirit` and `maosctl`
 /// binaries via `std::process::Command`. Gated behind `MAOS_SMOKE_SLOW=1`.
 async fn smoke_registry_7_2_slow() -> Result<(), Box<dyn std::error::Error>> {
@@ -9291,6 +9660,7 @@ sandbox_tier = "t0"
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 7.2 AC3 + AC6 — focused air-gap-only smoke arm.
 async fn smoke_import_7_2() -> Result<(), Box<dyn std::error::Error>> {
     println!(
@@ -9299,6 +9669,7 @@ async fn smoke_import_7_2() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 7.4 AC6 — `MAOS_ONE_SHOT=smoke-skill-7-4`: the v0.5 skill-ecosystem
 /// observability demo. Six deterministic JSON lines, no network, <30s:
 ///   1. parse + validate a `maos.skill.v1` document;
@@ -9451,6 +9822,7 @@ async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 7.5a AC6 — `MAOS_ONE_SHOT=smoke-abi-7-5a`: the ABI Stability Triple
 /// observability demo (the Layer-1.5 bridge per `feedback_lunarpulse_observability_preference`).
 /// Five deterministic JSON lines, no network, <30s:
@@ -9638,6 +10010,7 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "network")]
 /// Story 7.3 AC6 — `MAOS_ONE_SHOT=smoke-compliance-7-3`: the v1.0
 /// admission-verification observability demo. Six deterministic JSON lines,
 /// no network, <30s:
@@ -9782,7 +10155,7 @@ async fn smoke_compliance_7_3() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "network"))]
 mod tests {
     use super::*;
 
@@ -9804,7 +10177,8 @@ mod tests {
         let client = Arc::new(MockMcpClientPort);
         let (audit_tx, _) = maos_kernel_core::capability::cap_audit::channel();
         // p1-allow: smoke-arm mock provider — isolated root, not the supervised owner
-        let cap = Arc::new( // p1-allow: unit-test mock root — isolated from the supervised composition owner
+        let cap = Arc::new(
+            // p1-allow: unit-test mock root — isolated from the supervised composition owner
             maos_kernel_core::capability::CapabilityRegistryAdapter::new(
                 Arc::new(maos_kernel_core::api::RingCryptoProvider),
                 maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),

@@ -1,0 +1,80 @@
+# Story 9.4 AC-2 — Container image build and push.
+#
+# Builds the MAOS container image and pushes to Docker Hub + GHCR
+# with cosign signing for verification parity with AC-1 binary signing.
+#
+# NOTE: At v0.5 this workflow is a SCAFFOLD. Container registry
+# credentials and cosign signing must be configured before enabling.
+
+name: container
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY_GHCR: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write  # cosign keyless signing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/maos
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Cosign signing for OCI signature verification parity with AC-1.
+      # Sign both GHCR and Docker Hub digests; metadata-action does not emit
+      # `digest`, so we use the build-push-action output instead.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign GHCR container image
+        run: |
+          cosign sign --yes ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+
+      - name: Sign Docker Hub container image
+        run: |
+          cosign sign --yes ${{ secrets.DOCKERHUB_USERNAME }}/maos@${{ steps.build.outputs.digest }}

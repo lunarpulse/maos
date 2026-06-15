@@ -51,12 +51,12 @@ use maos_spirit_sdk::spirit_test::{AttemptResult, IsolationHookPoint, Observatio
 use parking_lot::Mutex;
 
 use crate::iac::transparency_log::TransparencyLogAdapter;
+use maos_domain::cost::{CostAttributionPayload, PrincipalRef};
+use maos_domain::governance::GovernanceEventPayload;
 use maos_domain::memory::{
     ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord, MemoryEntry,
     MemoryError, MemoryNamespace, MemoryTier, MemoryValue, PrincipalIndexRow,
 };
-use maos_domain::cost::{CostAttributionPayload, PrincipalRef};
-use maos_domain::governance::GovernanceEventPayload;
 
 // Re-exports above make PrivateMemoryStore, SharedMemoryStore,
 // PrincipalNamespaceIndex available in this module scope.
@@ -256,9 +256,7 @@ impl MemoryManagerAdapter {
                         PrincipalRef::Resolved { principal_id: pid } => pid == principal_id,
                         _ => false,
                     }
-                } else if let Ok(_gov) =
-                    serde_json::from_slice::<GovernanceEventPayload>(&body)
-                {
+                } else if let Ok(_gov) = serde_json::from_slice::<GovernanceEventPayload>(&body) {
                     // Governance frames do not carry a principal_id field;
                     // they are never principal-bearing for forget purposes.
                     false
@@ -311,10 +309,7 @@ impl MemoryManagerAdapter {
         // erasure-execution time, read from the R10 schema-lifecycle registry.
         // Look up the full erasure-class set (R12), not just gdpr-erasure.
         for lineage_id in ERASURE_CLASS_LINEAGE_IDS {
-            if let Ok(Some(entry)) = self
-                .transparency_log
-                .current_schema_version(lineage_id)
-            {
+            if let Ok(Some(entry)) = self.transparency_log.current_schema_version(lineage_id) {
                 receipt.schema_id = Some(entry.schema_id);
                 receipt.schema_version = Some(entry.version);
                 break;

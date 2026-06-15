@@ -2,15 +2,15 @@
 //! with a real body (Story 1b.1). `run` and `install` land at 1b.5a.
 //! All others remain stubs.
 
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::io::Write;
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
-    AuditFormat, AuditQuery, ForgetArgs, GovernanceArgs, GovernanceOp, HaltArgs, HaltOp,
-    ImportArgs, InstallArgs, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs,
-    PostureChoice, ResolutionKindChoice, ResumeArgs, RevocationsArgs, RevocationsOp,
+    AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs, GovernanceArgs, GovernanceOp,
+    HaltArgs, HaltOp, ImportArgs, InstallArgs, OrchestratorArgs, OrchestratorOp, PauseArgs,
+    PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs, RevocationsArgs, RevocationsOp,
     RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs, SpiritOp, Subcommand,
     UpgradePolicyArg,
 };
@@ -36,7 +36,95 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Import(args) => dispatch_import(args, color),
         Subcommand::Skills(args) => dispatch_skills(args, color),
         Subcommand::Governance(args) => dispatch_governance(args, color),
+        Subcommand::Backup(args) => dispatch_backup(args, color),
     }
+}
+
+/// Story 9.4 AC-3 — `maosctl backup <create|verify|restore>`.
+fn dispatch_backup(args: &BackupArgs, _color: ColorChoice) -> ExitCode {
+    match &args.op {
+        BackupOp::Create { dest } => {
+            let source = default_transparency_log_path();
+            let dest_path = std::path::Path::new(dest);
+            match crate::backup::backup_transparency_log(&source, dest_path) {
+                Ok(()) => {
+                    eprintln!("backup created: {dest}");
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("error: backup failed: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        BackupOp::Verify { backup } => {
+            let source = default_transparency_log_path();
+            let backup_path = std::path::Path::new(backup);
+            match verify_backup_via_cold_restore(&source, backup_path) {
+                Ok(()) => {
+                    eprintln!("backup integrity verified: cold-restore Merkle roots match");
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("error: backup verification failed: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        BackupOp::Restore { backup, target } => {
+            let start = std::time::Instant::now();
+            let backup_path = std::path::Path::new(backup);
+            let target_path = std::path::Path::new(target);
+            // Restore = copy backup to target via the same backup API.
+            match crate::backup::backup_transparency_log(backup_path, target_path) {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!("error: restore failed: {e}");
+                    return ExitCode::FAILURE;
+                }
+            }
+            // Verify the restored copy against the backup via cold restore.
+            match verify_backup_via_cold_restore(backup_path, target_path) {
+                Ok(()) => {
+                    let elapsed = start.elapsed();
+                    eprintln!(
+                        "restore complete: {target} (Merkle verified, RTO={:.3}s)",
+                        elapsed.as_secs_f64()
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("error: restored copy verification failed: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+    }
+}
+
+/// R-DR1 — verify backup integrity by performing an independent cold restore.
+///
+/// Restores `backup_path` to a temporary file, then compares the Merkle root of
+/// that restored copy against the live source TL. This proves the backup is not
+/// only readable but restorable to a new database.
+fn verify_backup_via_cold_restore(
+    source_path: &std::path::Path,
+    backup_path: &std::path::Path,
+) -> Result<(), String> {
+    let restored = crate::backup::cold_restore_to_temp(backup_path)
+        .map_err(|e| format!("cold restore failed: {e}"))?;
+    let source_root = maos_audit::backup::compute_merkle_root(source_path)
+        .map_err(|e| format!("source Merkle root failed: {e}"))?;
+    let restored_root = maos_audit::backup::compute_merkle_root(&restored)
+        .map_err(|e| format!("restored Merkle root failed: {e}"))?;
+    if source_root != restored_root {
+        return Err(format!(
+            "Merkle root mismatch: source={}, restored={}",
+            hex::encode(source_root),
+            hex::encode(restored_root)
+        ));
+    }
+    Ok(())
 }
 
 /// Story 9.3b — `maosctl governance admit` shells to `maos-bin` via the
@@ -59,7 +147,10 @@ fn dispatch_governance(args: &GovernanceArgs, color: ColorChoice) -> ExitCode {
             cmd.env("MAOS_GOVERNANCE_VERSION", version.to_string());
             cmd.env("MAOS_GOVERNANCE_CONTENT_HASH", content_hash);
             cmd.env("MAOS_GOVERNANCE_RATIFIED_BY", ratified_by);
-            cmd.env("MAOS_GOVERNANCE_EFFECTIVE_AT_NS", effective_at_ns.to_string());
+            cmd.env(
+                "MAOS_GOVERNANCE_EFFECTIVE_AT_NS",
+                effective_at_ns.to_string(),
+            );
             if let Some(s) = supersedes {
                 cmd.env("MAOS_GOVERNANCE_SUPERSEDES", s);
             }
@@ -279,7 +370,201 @@ fn run(args: &RunArgs, _color: ColorChoice) -> ExitCode {
 }
 
 fn install(args: &InstallArgs, _color: ColorChoice) -> ExitCode {
-    // At v0.1-α, install is a compilation check: build the hello-Spirit crate.
+    // Resolve pubkey: --release-pubkey override or bundled default.
+    let pubkey: [u8; 32] = if let Some(hex_str) = &args.release_pubkey {
+        let bytes = match hex::decode(hex_str) {
+            Ok(b) if b.len() == 32 => {
+                let mut arr = [0u8; 32];
+                arr.copy_from_slice(&b);
+                arr
+            }
+            Ok(b) => {
+                eprintln!(
+                    "maosctl: --release-pubkey must be 32 bytes (64 hex chars), got {} bytes",
+                    b.len()
+                );
+                return ExitCode::from(2);
+            }
+            Err(e) => {
+                eprintln!("maosctl: --release-pubkey invalid hex: {e}");
+                return ExitCode::from(2);
+            }
+        };
+        bytes
+    } else {
+        maos_audit::release_verify::RELEASE_PUBKEY
+    };
+
+    // Path B: local release artifact verification/install.
+    if let Some(dir) = &args.from_local {
+        return install_from_local(dir, &pubkey, args.verify_only, args.prefix.as_deref());
+    }
+
+    // Path A: legacy spirit install. The remote-fetch path is intentionally
+    // removed at v0.5 (AC-1 scoped to --from-local); a 'v...' source string
+    // no longer misroutes here.
+    install_spirit(args)
+}
+
+/// Detect the release binary name for the current platform.
+fn platform_binary_name() -> Result<&'static str, String> {
+    if cfg!(target_arch = "x86_64") && cfg!(target_os = "linux") {
+        Ok("maos-linux-amd64")
+    } else if cfg!(target_arch = "aarch64") && cfg!(target_os = "linux") {
+        Ok("maos-linux-arm64")
+    } else if cfg!(target_arch = "aarch64") && cfg!(target_os = "macos") {
+        Ok("maos-darwin-arm64")
+    } else {
+        Err(format!(
+            "unsupported platform for release install: {}-{}",
+            std::env::consts::ARCH,
+            std::env::consts::OS
+        ))
+    }
+}
+
+/// Path B: verify (and optionally install) a locally-staged release artifact.
+fn install_from_local(
+    dir: &str,
+    pubkey: &[u8; 32],
+    verify_only: bool,
+    prefix: Option<&std::path::Path>,
+) -> ExitCode {
+    let dir_path = std::path::Path::new(dir);
+    let sums_path = dir_path.join("SHA256SUMS");
+    let sig_path = dir_path.join("SHA256SUMS.sig");
+    let binary_name = match platform_binary_name() {
+        Ok(name) => name,
+        Err(e) => {
+            eprintln!("maosctl: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let bin_path = dir_path.join(binary_name);
+
+    // Read SHA256SUMS
+    let sums_content = match std::fs::read(&sums_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("maosctl: cannot read {}: {e}", sums_path.display());
+            return ExitCode::from(2);
+        }
+    };
+
+    // Read SHA256SUMS.sig (raw 64-byte Ed25519 signature)
+    let sig_bytes: [u8; 64] = match std::fs::read(&sig_path) {
+        Ok(b) if b.len() == 64 => {
+            let mut arr = [0u8; 64];
+            arr.copy_from_slice(&b);
+            arr
+        }
+        Ok(b) => {
+            eprintln!(
+                "maosctl: {} must be 64 bytes (raw Ed25519 signature), got {} bytes",
+                sig_path.display(),
+                b.len()
+            );
+            return ExitCode::from(2);
+        }
+        Err(e) => {
+            eprintln!("maosctl: cannot read {}: {e}", sig_path.display());
+            return ExitCode::from(2);
+        }
+    };
+
+    // Read the binary
+    let bin_content = match std::fs::read(&bin_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("maosctl: cannot read {}: {e}", bin_path.display());
+            return ExitCode::from(2);
+        }
+    };
+
+    // Full verification pipeline: signature → SHA256. Single-platform subset
+    // verification is allowed because the operator staged only this artifact.
+    let files: Vec<(&str, &[u8])> = vec![(binary_name, bin_content.as_slice())];
+    match maos_audit::release_verify::verify_release(
+        &sums_content,
+        &sig_bytes,
+        pubkey,
+        &files,
+        true,
+    ) {
+        Ok(entries) => {
+            eprintln!("maosctl: verification passed for {} file(s)", entries.len());
+            for entry in &entries {
+                eprintln!("  ✓ {} ({})", entry.filename, &entry.hash[..16]);
+            }
+        }
+        Err(e) => {
+            eprintln!("maosctl: release verification FAILED: {e}");
+            return ExitCode::from(1);
+        }
+    }
+
+    if verify_only {
+        return ExitCode::SUCCESS;
+    }
+
+    // Install: copy verified binary to the requested or default location.
+    let install_target = if let Some(p) = prefix {
+        p.join("maos")
+    } else {
+        match std::env::current_exe() {
+            Ok(exe) => exe
+                .parent()
+                .unwrap_or(std::path::Path::new("."))
+                .join("maos"),
+            Err(_) => std::path::PathBuf::from("/usr/local/bin/maos"),
+        }
+    };
+
+    if let Some(parent) = install_target.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            eprintln!(
+                "maosctl: failed to create install directory {}: {e}",
+                parent.display()
+            );
+            return ExitCode::from(2);
+        }
+    }
+
+    match std::fs::copy(&bin_path, &install_target) {
+        Ok(_) => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut perms = std::fs::metadata(&install_target)
+                    .map(|m| m.permissions())
+                    .unwrap_or_else(|_| std::fs::Permissions::from_mode(0o755));
+                perms.set_mode(perms.mode() | 0o111); // ensure owner executable bit
+                if let Err(e) = std::fs::set_permissions(&install_target, perms) {
+                    eprintln!(
+                        "maosctl: installed binary but failed to set executable permissions on {}: {e}",
+                        install_target.display()
+                    );
+                    return ExitCode::from(2);
+                }
+            }
+            eprintln!(
+                "maosctl: installed verified binary to {}",
+                install_target.display()
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!(
+                "maosctl: failed to install binary to {}: {e}",
+                install_target.display()
+            );
+            ExitCode::from(2)
+        }
+    }
+}
+
+/// Path A: legacy spirit install (v0.1-α cargo build).
+fn install_spirit(args: &InstallArgs) -> ExitCode {
     let spirit_crate = match &args.source {
         Some(s) if s == "hello-spirit" => "maos-spirit-hello",
         Some(s) => {
@@ -297,9 +582,7 @@ fn install(args: &InstallArgs, _color: ColorChoice) -> ExitCode {
     // so the accessibility cascade test in `tests/accessibility_test.rs`
     // can assert zero ANSI bytes without paying the ~30s build cost, and
     // the integration smokes (`maosctl_smoke.sh`, `v01_evaluator_path.sh`)
-    // keep under 60s. The real cargo build path is exercised by the
-    // release binary build step at the top of each integration script
-    // (which compiles `maos-spirit-hello` transitively).
+    // keep under 60s.
     if std::env::var_os("MAOS_INSTALL_DRY_RUN").is_some() {
         eprintln!("maosctl: {spirit_crate} compiled successfully");
         return ExitCode::SUCCESS;
@@ -775,7 +1058,10 @@ fn exec_and_forward(cmd: &mut std::process::Command, bin: &std::path::Path) -> E
             }
         }
         Err(e) => {
-            eprintln!("maosctl: failed to execute maos-bin at '{}': {e}", bin.display());
+            eprintln!(
+                "maosctl: failed to execute maos-bin at '{}': {e}",
+                bin.display()
+            );
             ExitCode::from(2)
         }
     }
@@ -859,12 +1145,12 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
             redaction_policy,
             color,
         ),
-        Some(AuditQuery::Replay { bundle, output }) => {
-            audit_replay(bundle, output)
-        }
-        Some(AuditQuery::CostReconcile { month, format, pricing }) => {
-            audit_cost_reconcile(month, pricing, *format)
-        }
+        Some(AuditQuery::Replay { bundle, output }) => audit_replay(bundle, output),
+        Some(AuditQuery::CostReconcile {
+            month,
+            format,
+            pricing,
+        }) => audit_cost_reconcile(month, pricing, *format),
     }
 }
 
@@ -1635,7 +1921,11 @@ fn audit_trajectory_export(
         }
     };
     let since_ns = entries.iter().map(|e| e.timestamp_ns).min().unwrap_or(0);
-    let until_ns = entries.iter().map(|e| e.timestamp_ns).max().unwrap_or(now_ns);
+    let until_ns = entries
+        .iter()
+        .map(|e| e.timestamp_ns)
+        .max()
+        .unwrap_or(now_ns);
 
     let export_seq = match next_export_seq() {
         Ok(seq) => seq,
@@ -1807,18 +2097,16 @@ fn audit_replay(bundle_path: &PathBuf, output: &Option<PathBuf>) -> ExitCode {
     if let Some(obj) = bundle_for_hash.as_object_mut() {
         obj.remove("signature_block");
     }
-    let canonical_bytes = match sort_value_with_depth_limit(
-        bundle_for_hash,
-        REPLAY_SORT_VALUE_MAX_DEPTH,
-    ) {
-        Ok(sorted) => serde_json::to_string(&sorted)
-            .expect("sorted Value is serializable")
-            .into_bytes(),
-        Err(e) => {
-            eprintln!("maosctl: audit replay — {e}");
-            return ExitCode::from(2);
-        }
-    };
+    let canonical_bytes =
+        match sort_value_with_depth_limit(bundle_for_hash, REPLAY_SORT_VALUE_MAX_DEPTH) {
+            Ok(sorted) => serde_json::to_string(&sorted)
+                .expect("sorted Value is serializable")
+                .into_bytes(),
+            Err(e) => {
+                eprintln!("maosctl: audit replay — {e}");
+                return ExitCode::from(2);
+            }
+        };
 
     // Run replay
     let trace_shape = match maos_audit::replay::replay(&entries, &canonical_bytes) {
@@ -1886,7 +2174,11 @@ fn sort_value_with_depth_limit(
     value: serde_json::Value,
     max_depth: usize,
 ) -> Result<serde_json::Value, String> {
-    fn recurse(v: serde_json::Value, depth: usize, max: usize) -> Result<serde_json::Value, String> {
+    fn recurse(
+        v: serde_json::Value,
+        depth: usize,
+        max: usize,
+    ) -> Result<serde_json::Value, String> {
         if depth > max {
             return Err("bundle nesting exceeds safe depth limit".to_string());
         }
@@ -1907,9 +2199,7 @@ fn sort_value_with_depth_limit(
         }
     }
     Ok(maos_audit::sealed_export::sort_value(recurse(
-        value,
-        0,
-        max_depth,
+        value, 0, max_depth,
     )?))
 }
 
@@ -2019,7 +2309,6 @@ fn build_cost_report(
                 continue;
             }
         };
-
 
         let principal_display = match &payload.principal {
             PrincipalRef::Resolved { principal_id } => principal_id.clone(),
@@ -2196,8 +2485,7 @@ fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) ->
             return ExitCode::from(2);
         }
     };
-    let pricing: maos_domain::cost::ProviderPricingConfig = match toml::from_str(&pricing_content)
-    {
+    let pricing: maos_domain::cost::ProviderPricingConfig = match toml::from_str(&pricing_content) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("maosctl: audit cost-reconcile — invalid pricing config: {e}");
@@ -2303,6 +2591,11 @@ mod tests {
         let color = ColorChoice::Auto;
         let args = InstallArgs {
             source: Some("nonexistent-spirit".into()),
+            release_url: None,
+            release_pubkey: None,
+            verify_only: false,
+            from_local: None,
+            prefix: None,
         };
         let result = install(&args, color);
         // Non-zero exit code expected
@@ -2791,5 +3084,95 @@ mod tests {
         assert_eq!(report.rows[0].tokens_out, 500);
         // (1000*3000 + 500*15000) / 1000 = 10_500 µ$
         assert_eq!(report.total_cost_micro, 10_500);
+    }
+
+    // ── Story 9.4: install --from-local verification tests ──────────
+
+    /// Dev seed matching `RELEASE_PUBKEY` (same as maos-audit tests).
+    fn dev_seed() -> [u8; 32] {
+        let hex_str = "794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d";
+        let bytes: Vec<u8> = (0..hex_str.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex_str[i..i + 2], 16).unwrap())
+            .collect();
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&bytes);
+        seed
+    }
+
+    /// Create a staged release directory with SHA256SUMS, SHA256SUMS.sig, and a binary.
+    fn staged_release_dir(
+        binary_name: &str,
+        binary_content: &[u8],
+        seed: &[u8; 32],
+    ) -> tempfile::TempDir {
+        use maos_audit::release_verify::{generate_sha256sums, sha256_hex, sign_sha256sums};
+
+        let dir = tempfile::tempdir().unwrap();
+        let hash = sha256_hex(binary_content);
+        let sums = generate_sha256sums(&[(binary_name.to_string(), hash)]);
+        let sig = sign_sha256sums(sums.as_bytes(), seed);
+
+        std::fs::write(dir.path().join(binary_name), binary_content).unwrap();
+        std::fs::write(dir.path().join("SHA256SUMS"), sums.as_bytes()).unwrap();
+        std::fs::write(dir.path().join("SHA256SUMS.sig"), &sig).unwrap();
+        dir
+    }
+    #[test]
+    fn install_verify_local_release_artifact() {
+        let seed = dev_seed();
+        let binary = b"maos v0.5.0 release binary stub";
+        let binary_name = platform_binary_name().unwrap();
+        let dir = staged_release_dir(binary_name, binary, &seed);
+
+        let exit = install_from_local(
+            dir.path().to_str().unwrap(),
+            &maos_audit::release_verify::RELEASE_PUBKEY,
+            true, // verify_only
+            None,
+        );
+        assert_eq!(exit, ExitCode::SUCCESS);
+    }
+
+    #[test]
+    fn install_verify_tampered_artifact_rejected() {
+        let seed = dev_seed();
+        let binary = b"maos v0.5.0 release binary stub";
+        let binary_name = platform_binary_name().unwrap();
+        let dir = staged_release_dir(binary_name, binary, &seed);
+
+        // Tamper the binary after staging
+        let bin_path = dir.path().join(binary_name);
+        std::fs::write(&bin_path, b"tampered content").unwrap();
+
+        let exit = install_from_local(
+            dir.path().to_str().unwrap(),
+            &maos_audit::release_verify::RELEASE_PUBKEY,
+            true,
+            None,
+        );
+        assert_eq!(exit, ExitCode::from(1));
+    }
+
+    #[test]
+    fn install_verify_missing_sig_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let binary_name = platform_binary_name().unwrap();
+        let binary = b"some binary";
+        let hash = maos_audit::release_verify::sha256_hex(binary);
+        let sums =
+            maos_audit::release_verify::generate_sha256sums(&[(binary_name.to_string(), hash)]);
+
+        std::fs::write(dir.path().join(binary_name), binary).unwrap();
+        std::fs::write(dir.path().join("SHA256SUMS"), sums.as_bytes()).unwrap();
+        // No SHA256SUMS.sig → fail-closed
+
+        let exit = install_from_local(
+            dir.path().to_str().unwrap(),
+            &maos_audit::release_verify::RELEASE_PUBKEY,
+            true,
+            None,
+        );
+        assert_eq!(exit, ExitCode::from(2));
     }
 }

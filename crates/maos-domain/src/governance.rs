@@ -214,7 +214,10 @@ mod tests {
 
         // Positive: both keyed off the same canonical source.
         assert_eq!(lifecycle.schema_id, registry_entry.schema_id);
-        assert_eq!(lifecycle.schema_content_hash, registry_entry.schema_content_hash);
+        assert_eq!(
+            lifecycle.schema_content_hash,
+            registry_entry.schema_content_hash
+        );
         assert_eq!(lifecycle.version, registry_entry.version);
 
         // Negative: a divergent schema_id MUST NOT match (fake-join guard).
@@ -257,7 +260,10 @@ mod tests {
         ];
         // Each must be a valid reverse-DNS lineage name (R11)
         for id in &erasure_class_ids {
-            assert!(id.starts_with("compliance.claim."), "R11: reverse-DNS lineage name");
+            assert!(
+                id.starts_with("compliance.claim."),
+                "R11: reverse-DNS lineage name"
+            );
             assert!(!id.is_empty());
         }
     }

@@ -1,0 +1,94 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: maos-linux-amd64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: maos-linux-arm64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact_name: maos-darwin-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+      # For arm64 Linux cross-compile
+      - name: Install cross-compile deps (aarch64-linux)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Build release binary
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+        run: cargo build --release -p maos-bin --locked --target ${{ matrix.target }}
+      - name: Check mock-not-in-release
+        run: cargo run -p xtask -- check-mock-not-in-release --binary target/${{ matrix.target }}/release/maos --json
+      - name: Package artifact
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/maos dist/${{ matrix.artifact_name }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/${{ matrix.artifact_name }}
+
+  sign-and-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Generate SHA256SUMS and sign
+        run: |
+          cd dist
+          sha256sum maos-* > SHA256SUMS
+          cargo run -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums SHA256SUMS --output SHA256SUMS.sig
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+          MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+      - name: Guardrail: production pubkey must differ from dev seed
+        run: |
+          cargo test -p maos-audit production_pubkey_must_differ_from_dev_seed
+        env:
+          MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+      - name: Verify artifacts (self-test)
+        run: |
+          cd dist
+          cargo run -p xtask -- release-verify --verify --sha256sums SHA256SUMS --sig SHA256SUMS.sig --artifacts-dir .
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/maos-*
+            dist/SHA256SUMS
+            dist/SHA256SUMS.sig
+          generate_release_notes: true

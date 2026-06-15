@@ -15,11 +15,11 @@ pub mod audit_key;
 pub mod invariants; // NEW — Story 9.1 FR44 audit signing key loader (Decision B)
 pub use invariants::*;
 
-pub mod cost; // NEW — Story 9.3b FR64 cost attribution (ADR-046)
 pub mod cli_wrapper; // NEW — Story 6.2 AC5 CliWrapperSpirit admission errors
+pub mod cost; // NEW — Story 9.3b FR64 cost attribution (ADR-046)
 pub mod distillation; // NEW — Story 4.4 distillation domain types
-pub mod governance; // NEW — Story 9.3b FR62 governance audit artifacts (ADR-045)
 pub mod frame;
+pub mod governance; // NEW — Story 9.3b FR62 governance audit artifacts (ADR-045)
 pub mod halt;
 pub mod host_grant; // NEW — Story 8.12 AC5 host-side capability/tier grant allowlist (FORK A)
 pub mod hot_swap;

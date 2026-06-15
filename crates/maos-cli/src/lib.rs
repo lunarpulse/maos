@@ -11,9 +11,9 @@ use std::ffi::OsString;
 use std::process::ExitCode;
 
 pub mod accessibility;
+pub mod backup;
 pub mod cli;
 pub mod subcommands;
-
 use clap::Parser;
 
 /// Library-level entry point. Returns a `std::process::ExitCode`

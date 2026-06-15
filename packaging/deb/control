@@ -1,0 +1,18 @@
+Source: maos
+Section: devel
+Priority: optional
+Maintainer: Lunarpulse <lunarpulse@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13), cargo, rustc (>= 1.88), python3-cryptography
+Standards-Version: 4.6.0
+Homepage: https://github.com/lunarpulse/maos
+Vcs-Git: https://github.com/lunarpulse/maos.git
+Rules-Requires-Root: no
+
+Package: maos
+Architecture: amd64 arm64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Minimal Agentic Operating System — multi-Spirit runtime
+ MAOS provides a minimal, verifiable substrate for running autonomous AI
+ agents (Spirits) with append-only audit logging, capability-token
+ authorization, and configurable sandbox tiers. Pre-built release binaries
+ are Ed25519-signed with SHA256 integrity verification.

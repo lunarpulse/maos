@@ -38,7 +38,9 @@ pub enum TelemetryMode {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum Subcommand {
-    /// Install a Spirit (Story 1b.5b lands the real body).
+    /// Install a Spirit or verify a release artifact (Story 1b.5b, Story 9.4).
+    /// Supports legacy spirit install, local release verification (`--from-local`),
+    /// and remote fetch stub (source = release tag like "v0.5.0").
     Install(InstallArgs),
     /// Start a Spirit — writes one `LifecycleEvent::Start` Lifecycle Journal
     /// entry and exits (v0.1-β, Story 1b.5c). Supervised lifecycle with
@@ -111,6 +113,40 @@ pub enum Subcommand {
     Forget(ForgetArgs),
     /// Story 9.3b — governance operations on the schema-lifecycle registry.
     Governance(GovernanceArgs),
+    /// Story 9.4 AC-3 — Transparency Log backup/DR (region-scoped).
+    Backup(BackupArgs),
+}
+
+/// Story 9.4 — `maosctl backup <create|verify|restore>`.
+#[derive(clap::Args, Debug)]
+pub struct BackupArgs {
+    #[command(subcommand)]
+    pub op: BackupOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum BackupOp {
+    /// Create a WAL-checkpoint-consistent backup of the Transparency Log.
+    Create {
+        /// Destination path for the backup file.
+        #[arg(long)]
+        dest: String,
+    },
+    /// Verify backup integrity via Merkle root cross-check.
+    Verify {
+        /// Path to the backup file.
+        #[arg(long)]
+        backup: String,
+    },
+    /// Restore from backup to a target path.
+    Restore {
+        /// Path to the backup file.
+        #[arg(long)]
+        backup: String,
+        /// Target path for the restored TL.
+        #[arg(long)]
+        target: String,
+    },
 }
 #[derive(clap::Args, Debug)]
 pub struct GovernanceArgs {
@@ -190,8 +226,32 @@ pub enum SkillsOp {
 
 #[derive(clap::Args, Debug)]
 pub struct InstallArgs {
-    /// Spirit registry URI or local path (placeholder at v0.1-α).
+    /// Spirit registry URI, local path, or release tag (e.g., "v0.5.0").
+    /// At v0.5 only the legacy spirit install path uses this argument.
     pub source: Option<String>,
+
+    /// GitHub Releases URL override (default: repo from Cargo.toml metadata).
+    /// Remote fetch is deferred to a v1.0/AC-2 follow-up.
+    #[arg(long)]
+    pub release_url: Option<String>,
+
+    /// Hex-encoded Ed25519 public key for signature verification.
+    /// Default: bundled release public key.
+    #[arg(long)]
+    pub release_pubkey: Option<String>,
+
+    /// Verify an already-downloaded artifact without installing.
+    #[arg(long)]
+    pub verify_only: bool,
+
+    /// Path to a locally-staged release artifact directory.
+    /// Must contain SHA256SUMS, SHA256SUMS.sig, and the binary.
+    #[arg(long)]
+    pub from_local: Option<String>,
+
+    /// Installation prefix directory. Default: parent of the current executable.
+    #[arg(long)]
+    pub prefix: Option<std::path::PathBuf>,
 }
 
 #[derive(clap::Args, Debug)]
