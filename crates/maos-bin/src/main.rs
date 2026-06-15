@@ -1001,6 +1001,81 @@ fn emit_vetter_key_event(
     );
 }
 
+/// Story 9.4b AC-6/D7 — the deploy-time accountable operator identity stamped on
+/// every model-provenance governance event. Resolved from
+/// `MAOS_DEPLOYMENT_OPERATOR_ID`, defaulting to a stable single-operator
+/// sentinel for v1.0 deployments (the ONLY persisted-record tenancy reservation).
+#[cfg(feature = "network")]
+fn deployment_operator_id() -> String {
+    std::env::var("MAOS_DEPLOYMENT_OPERATOR_ID")
+        .unwrap_or_else(|_| "maos.deployment.operator.default".to_string())
+}
+
+/// Story 9.4b AC-6 — resolve the model-provenance admission policy from the
+/// operator environment. Defaults are AC-11 safe (provenance optional, no
+/// staleness window) so pre-v3 / non-covered manifests stay admissible.
+#[cfg(feature = "network")]
+fn resolve_model_provenance_policy() -> maos_registry::admission::ModelProvenancePolicy {
+    let require = std::env::var("MAOS_REQUIRE_MODEL_PROVENANCE")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    let max_age_secs = std::env::var("MAOS_MODEL_PROVENANCE_MAX_AGE_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok());
+    let now_unix_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    maos_registry::admission::ModelProvenancePolicy {
+        require,
+        max_age_secs,
+        now_unix_secs,
+    }
+}
+
+/// Story 9.4b AC-6 (D6/D7) — emit a `FrameKind::GovernanceEvent` carrying a
+/// `ModelProvenancePayload` to the Transparency Log. Records the provenance
+/// triple bound to schema-identity + content-hash with the constant
+/// `deployment_operator_id` — SCHEMA identity only, zero claim-instance ids, so
+/// it stays out of the GDPR forget cascade (D5). Queryable via
+/// `maosctl audit query --kind governance`.
+#[cfg(feature = "network")]
+fn emit_model_provenance_event(
+    tl: &maos_kernel_core::iac::TransparencyLogAdapter,
+    rec: &maos_registry::admission::ModelProvenanceRecord,
+) -> Result<(), String> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or(std::time::Duration::ZERO)
+        .as_nanos() as u64;
+    let gov_payload = maos_domain::governance::GovernanceEventPayload {
+        recorded_at_ns: now,
+        effective_at_ns: now,
+        event: maos_domain::governance::GovernanceEventKind::ModelProvenance(
+            maos_domain::governance::ModelProvenancePayload {
+                schema_id: maos_domain::governance::MODEL_PROVENANCE_SCHEMA_ID.to_string(),
+                schema_content_hash: rec.content_hash.clone(),
+                deployment_operator_id: deployment_operator_id(),
+                covered_model_id: rec.covered_model_id.clone(),
+                training_data_lineage: rec.training_data_lineage.clone(),
+                last_eval_timestamp: rec.last_eval_timestamp.clone(),
+                version: 1,
+            },
+        ),
+    };
+    let gov_bytes = serde_json::to_vec(&gov_payload)
+        .map_err(|e| format!("model-provenance governance serialization failed (fail-closed): {e}"))?;
+    let _token = tl.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::GovernanceEvent,
+        0,
+        None,
+        "governance:model-provenance-admission",
+        &gov_bytes,
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
+    Ok(())
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Air-gap build: minimal main with no network surface (R-AG2).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1540,12 +1615,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Story 4.3 — assemble the full MemoryManagerAdapter.
-    let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
-        private_store,
-        shared_store,
-        principal_index,
-        Arc::clone(&transparency_log),
-    ));
+    let memory = Arc::new(
+        maos_kernel_core::memory::MemoryManagerAdapter::new(
+            private_store,
+            shared_store,
+            principal_index,
+            Arc::clone(&transparency_log),
+        )
+        // Story 9.4b AC-5 — pin the memory manager to the operator's home region
+        // (None = pinning disabled). Routes every store write through the
+        // WriteEntryPoint region chokepoint.
+        .with_home_region(
+            maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
+                .home_region,
+        ),
+    );
 
     // Story 4.3 — SelfTelemetryAggregator (FR56).
     let self_telemetry = Arc::new(
@@ -2222,6 +2306,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &format!("{:?}", _run_spec.tier),
             "maos run: admission granted",
         );
+
+        // Story 9.4b AC-6 (D6/D7) — model-provenance admission gate + FR62
+        // journaling. Fail-closed: a required/stale/malformed [model_provenance]
+        // section blocks the run BEFORE the Spirit is constructed below. A
+        // permissive default policy (require=false) leaves pre-v3 manifests
+        // untouched (AC-11). When present-and-valid, emit the governance event.
+        if let Some(rec) = maos_registry::admission::validate_model_provenance(
+            manifest_toml.as_bytes(),
+            &resolve_model_provenance_policy(),
+        )
+        .map_err(|e| format!("maos run: model-provenance admission failed: {e}"))?
+        {
+            emit_model_provenance_event(&transparency_log, &rec)
+                .map_err(|e| format!("maos run: {e}"))?;
+        }
 
         let bundle = SpiritManifestBundle {
             scheduling,
@@ -3087,6 +3186,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &format!("{:?}", _spec.tier),
                 "posture-shift: re-admission granted",
             );
+
+            // Story 9.4b AC-6 — re-journal the model-provenance governance event
+            // on posture-shift re-admission so the append-only trail stays
+            // complete. The fail-closed gate runs at first load (`maos run`);
+            // here a present-and-valid section re-emits fail-closed.
+            if let Ok(Some(rec)) = maos_registry::admission::validate_model_provenance(
+                manifest_toml.as_bytes(),
+                &resolve_model_provenance_policy(),
+            ) {
+                emit_model_provenance_event(&transparency_log, &rec)
+                    .map_err(|e| format!("posture-shift: {e}"))?;
+            }
 
             // Perform the posture shift
             let new_hash = policy
@@ -5967,6 +6078,47 @@ fn run_uninstall_cascade(
     let proof_dir = maos_audit::default_erasure_proofs_dir();
     let proof_path = write_proof_bundle(&proof, &proof_dir)
         .map_err(|e| format!("failed to write erasure proof: {e}"))?;
+
+    // Story 9.4b AC-13/AC-14/AC-15 — when the deployment is region-pinned, emit
+    // the two-phase regional teardown receipt alongside the proof:
+    //   (a) the forget cascade just completed IS the real erasure over the
+    //       region-scoped plaintext rows (under Option A + AC-13 the node is
+    //       provably single-jurisdiction, so the spirit's rows on this node ARE
+    //       the home-region set — no separate jurisdiction filter needed);
+    //   (b) decommission the region's signing key (Option A — signed, not
+    //       encrypted; see `regional_teardown` for the honest framing).
+    // Fail-closed: a teardown that cannot attest BOTH phases is an error, never
+    // a silent success (AC-14). The receipt is HOME-key-signed, hence
+    // region-NEUTRAL — it survives the region decommission (AC-10/AC-15).
+    if let Some(region) = maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk().home_region {
+        use maos_audit::erasure::regional_teardown::{
+            build_regional_teardown_receipt, decommission_region_key, ForgetCascadeAttestation,
+            REQUIRED_STORES,
+        };
+        let forget = ForgetCascadeAttestation::from_outcome(
+            REQUIRED_STORES.iter().map(|s| s.to_string()).collect(),
+            all_principal_ids.len() as u64,
+        )
+        .map_err(|e| format!("regional teardown failed (fail-closed): {e}"))?;
+        let key = decommission_region_key(&signing_seed, &region);
+        let receipt = build_regional_teardown_receipt(
+            &signing_seed, // HOME / control-plane key — region-NEUTRAL receipt
+            &region,
+            uninstalled_at_ns,
+            forget,
+            key,
+        )
+        .map_err(|e| format!("regional teardown failed (fail-closed): {e}"))?;
+        let receipt_json = serde_json::to_string_pretty(&receipt)
+            .map_err(|e| format!("failed to serialize teardown receipt: {e}"))?;
+        let receipt_path = proof_dir.join(format!(
+            "regional-teardown-{}-{}.json",
+            region.as_str(),
+            uninstalled_at_ns
+        ));
+        std::fs::write(&receipt_path, receipt_json)
+            .map_err(|e| format!("failed to write teardown receipt: {e}"))?;
+    }
 
     Ok(proof_path.to_string_lossy().to_string())
 }

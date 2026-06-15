@@ -9,6 +9,7 @@ description = "MAOS Spirit Registry — MCP-Streamable-HTTP server + kernel-side
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
+maos-manifest = { path = "../maos-manifest" } # Story 9.4b AC-6 — [model_provenance] admission validation
 maos-mcp = { path = "../maos-mcp" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-compliance = { path = "../maos-compliance" }

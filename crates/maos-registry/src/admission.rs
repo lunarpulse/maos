@@ -53,6 +53,18 @@ pub enum AdmissionError {
 
     #[error("operator-policy unsigned_local rejected — operator must set allow_unsigned_local=true to admit unsigned local Spirits")]
     UnsignedLocalRejected,
+
+    /// Story 9.4b AC-6 — typed, **catalogued** model-provenance rejection
+    /// (presence / staleness). The wrapped variants are defined in
+    /// `maos-domain` (the FR63-scanned home), so the error is catalogued there.
+    #[error(transparent)]
+    ModelProvenance(#[from] maos_domain::provenance::ProvenanceError),
+
+    /// Story 9.4b AC-6 — a present `[model_provenance]` section failed to parse
+    /// (malformed shape / free-text lineage). Distinct from `ModelProvenance`
+    /// (a policy reject) so the operator sees a config-fix signal.
+    #[error("model-provenance section malformed: {0}")]
+    ModelProvenanceMalformed(String),
 }
 
 /// Configuration for the admission path.
@@ -247,6 +259,100 @@ pub fn admit_spirit(
                     pkg.version
                 ),
             })
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Story 9.4b AC-6 — model-provenance admission gate (NFR-Comp-5 / SB-1047)
+//
+// Model-provenance is a SEPARATE admission axis from `admit_spirit`'s tier /
+// signature / ComplianceClaim checks (mirrors the sandbox-tier boundary note
+// inside `admit_spirit`). It lives in this module and is invoked on the same
+// composition-root admission path; keeping it off `AdmissionConfig` preserves
+// the frozen `admit_spirit` signature (AC-11: pre-v3 admissions byte-stable).
+// The returned record is what the caller journals as the FR62 governance event.
+// ---------------------------------------------------------------------------
+
+/// Operator policy for the model-provenance admission gate (D5/D6).
+#[derive(Debug, Clone)]
+pub struct ModelProvenancePolicy {
+    /// When `true`, a Spirit admitted without a `[model_provenance]` section is
+    /// rejected with `EModelProvenanceMissing` (covered classes — SB-1047).
+    /// Defaults to `false` so pre-v3 / non-covered manifests stay admissible.
+    pub require: bool,
+    /// Maximum allowed age of `last_eval_timestamp` in seconds. `None` disables
+    /// the staleness check.
+    pub max_age_secs: Option<u64>,
+    /// Admission wall-clock as Unix seconds (injected for determinism/testing).
+    pub now_unix_secs: i64,
+}
+
+impl Default for ModelProvenancePolicy {
+    fn default() -> Self {
+        // AC-11 safe default: provenance optional, no staleness window.
+        Self {
+            require: false,
+            max_age_secs: None,
+            now_unix_secs: 0,
+        }
+    }
+}
+
+/// The provenance facts captured at admission, bound for the FR62 governance
+/// event (D6 — schema-identity + content-hash; D7 — `deployment_operator_id`).
+/// Carries SCHEMA/class-metadata only — **zero claim-instance ids**.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelProvenanceRecord {
+    pub covered_model_id: String,
+    pub training_data_lineage: Vec<String>,
+    pub last_eval_timestamp: String,
+    /// SHA-256 hex over the canonical provenance-triple bytes.
+    pub content_hash: String,
+}
+
+/// AC-6 — validate the OPTIONAL `[model_provenance]` section on the admission
+/// path. Returns:
+/// - `Ok(None)` when absent and not required (AC-11 — pre-v3 manifests admit);
+/// - `Ok(Some(record))` when present-and-valid (caller emits the FR62 event);
+/// - `Err(AdmissionError::ModelProvenance(_))` on missing-but-required or stale
+///   (typed, **catalogued** in `maos-domain`);
+/// - `Err(AdmissionError::ModelProvenanceMalformed(_))` on a present-but-broken
+///   section (e.g. free-text lineage).
+pub fn validate_model_provenance(
+    manifest_toml: &[u8],
+    policy: &ModelProvenancePolicy,
+) -> Result<Option<ModelProvenanceRecord>, AdmissionError> {
+    use maos_domain::provenance::ProvenanceError;
+    use maos_manifest::ModelProvenanceSection;
+
+    let text = String::from_utf8_lossy(manifest_toml);
+    let section = ModelProvenanceSection::from_manifest_toml(&text)
+        .map_err(|e| AdmissionError::ModelProvenanceMalformed(e.to_string()))?;
+
+    match section {
+        None => {
+            if policy.require {
+                return Err(ProvenanceError::EModelProvenanceMissing.into());
+            }
+            Ok(None)
+        }
+        Some(sec) => {
+            if let Some(max_age) = policy.max_age_secs {
+                sec.validate_staleness(policy.now_unix_secs, max_age)?;
+            }
+            let content_hash = {
+                use sha2::Digest;
+                let mut h = sha2::Sha256::new();
+                h.update(sec.canonical_content_bytes());
+                hex::encode(h.finalize())
+            };
+            Ok(Some(ModelProvenanceRecord {
+                covered_model_id: sec.covered_model_id,
+                training_data_lineage: sec.training_data_lineage,
+                last_eval_timestamp: sec.last_eval_timestamp,
+                content_hash,
+            }))
         }
     }
 }
@@ -755,6 +861,94 @@ mod tests {
             matches!(err, AdmissionError::PublisherSignatureInvalid),
             "expected PublisherSignatureInvalid, got {err:?}"
         );
+    }
+
+    // ----------------------------------------------------------------
+    // Story 9.4b AC-6 — model-provenance admission gate
+    // ----------------------------------------------------------------
+
+    fn manifest_with_provenance(lineage: &str, ts: &str) -> Vec<u8> {
+        format!(
+            "[class]\nname = \"x\"\nversion = \"0.1.0\"\ntrust_tier = \"local\"\n\
+             [model_provenance]\ncovered_model_id = \"anthropic.claude-opus-4-8\"\n\
+             training_data_lineage = [\"{lineage}\"]\nlast_eval_timestamp = \"{ts}\"\n"
+        )
+        .into_bytes()
+    }
+
+    #[test]
+    fn provenance_absent_admits_when_not_required_ac11() {
+        let manifest = b"[class]\nname = \"x\"\nversion = \"0.1.0\"\n".to_vec();
+        let got =
+            validate_model_provenance(&manifest, &ModelProvenancePolicy::default()).unwrap();
+        assert!(got.is_none(), "pre-v3 manifest must stay admissible");
+    }
+
+    #[test]
+    fn provenance_absent_but_required_rejects_catalogued() {
+        use maos_domain::provenance::ProvenanceError;
+        let manifest = b"[class]\nname = \"x\"\nversion = \"0.1.0\"\n".to_vec();
+        let policy = ModelProvenancePolicy {
+            require: true,
+            ..Default::default()
+        };
+        let err = validate_model_provenance(&manifest, &policy).unwrap_err();
+        assert!(matches!(
+            err,
+            AdmissionError::ModelProvenance(ProvenanceError::EModelProvenanceMissing)
+        ));
+    }
+
+    #[test]
+    fn provenance_present_valid_returns_record_with_content_hash() {
+        let manifest =
+            manifest_with_provenance("lineage.public-web.cc-2024", "2026-06-01T00:00:00Z");
+        let rec = validate_model_provenance(&manifest, &ModelProvenancePolicy::default())
+            .unwrap()
+            .expect("present");
+        assert_eq!(rec.covered_model_id, "anthropic.claude-opus-4-8");
+        assert_eq!(rec.content_hash.len(), 64); // sha256 hex
+        assert!(rec.content_hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn provenance_stale_rejects() {
+        use maos_domain::provenance::ProvenanceError;
+        let manifest =
+            manifest_with_provenance("lineage.public-web.cc-2024", "2026-06-01T00:00:00Z");
+        // last_eval = 1_780_272_000; now = +100 days; window = 30 days.
+        let policy = ModelProvenancePolicy {
+            require: true,
+            max_age_secs: Some(30 * 86_400),
+            now_unix_secs: 1_780_272_000 + 100 * 86_400,
+        };
+        let err = validate_model_provenance(&manifest, &policy).unwrap_err();
+        assert!(matches!(
+            err,
+            AdmissionError::ModelProvenance(ProvenanceError::EModelProvenanceStale { .. })
+        ));
+    }
+
+    #[test]
+    fn provenance_free_text_lineage_rejects_malformed() {
+        let manifest =
+            manifest_with_provenance("trained on private emails", "2026-06-01T00:00:00Z");
+        let err = validate_model_provenance(&manifest, &ModelProvenancePolicy::default())
+            .unwrap_err();
+        assert!(matches!(err, AdmissionError::ModelProvenanceMalformed(_)));
+    }
+
+    #[test]
+    fn provenance_content_hash_is_deterministic() {
+        let m1 = manifest_with_provenance("lineage.a.b", "2026-06-01T00:00:00Z");
+        let m2 = manifest_with_provenance("lineage.a.b", "2026-06-01T00:00:00Z");
+        let r1 = validate_model_provenance(&m1, &ModelProvenancePolicy::default())
+            .unwrap()
+            .unwrap();
+        let r2 = validate_model_provenance(&m2, &ModelProvenancePolicy::default())
+            .unwrap()
+            .unwrap();
+        assert_eq!(r1.content_hash, r2.content_hash);
     }
 
     #[test]

@@ -126,8 +126,65 @@ pub struct SecurityManagerAdapter {
     /// Drift-event channel sender (Story 2.1 AC4).
     /// The runtime detector that emits events ships in Story 9.x.
     drift_sender: Option<mpsc::Sender<DriftEvent>>,
-    /// Story 5.5b — tracks last provider per spirit_id for ProviderSwitched emission.
-    provider_history: Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>,
+    /// Story 5.5b — tracks last provider per spirit_id for ProviderSwitched
+    /// emission.  Story 9.4b AC-8 — now **bounded** (see [`ProviderHistory`]).
+    provider_history: Arc<std::sync::Mutex<ProviderHistory>>,
+}
+
+/// Story 9.4b AC-8 — bounded last-provider tracker for ProviderSwitched
+/// emission.
+///
+/// Previously an unbounded `HashMap<String, String>` (`deferred-work.md:193`):
+/// under high Spirit churn it grew without limit because nothing evicted
+/// terminated Spirits.  Bounded at [`ProviderHistory::CAP`] entries with an
+/// **evict-oldest-by-first-insertion** overflow policy — the latest provider is
+/// always tracked (never *reject-new*).  Evicting a stale Spirit's entry only
+/// means a later re-admission is treated as first-seen (no false
+/// ProviderSwitched), which is benign: this is ephemeral switch-detection state
+/// that is never serialized into a replayed artifact.
+#[derive(Debug, Default)]
+struct ProviderHistory {
+    map: std::collections::HashMap<String, String>,
+    order: std::collections::VecDeque<String>,
+}
+
+impl ProviderHistory {
+    /// Soft cap on tracked Spirits — far above any realistic concurrent count.
+    const CAP: usize = 4096;
+
+    /// Insert/update the last provider for `spirit_id`, returning the previous
+    /// value (so the caller can detect a switch).  Enforces the cap with
+    /// evict-oldest on overflow.
+    ///
+    /// **Invariant**: `order` and `map` stay synchronised — every key in `map`
+    /// appears exactly once in `order`, and vice-versa.  On an *update* (key
+    /// already tracked) the old position is removed and the key is pushed to the
+    /// back so it becomes the newest entry for eviction purposes.
+    fn insert(&mut self, spirit_id: String, provider: String) -> Option<String> {
+        let prev = self.map.insert(spirit_id.clone(), provider);
+        if prev.is_some() {
+            // Update case: remove the stale position so the key appears only
+            // once in the deque (at the back after the push below).
+            if let Some(pos) = self.order.iter().position(|k| k == &spirit_id) {
+                self.order.remove(pos);
+            }
+        }
+        self.order.push_back(spirit_id);
+        while self.map.len() > Self::CAP {
+            match self.order.pop_front() {
+                Some(oldest) => {
+                    self.map.remove(&oldest);
+                }
+                None => break,
+            }
+        }
+        prev
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.map.len()
+    }
 }
 
 impl SecurityManagerAdapter {
@@ -135,7 +192,7 @@ impl SecurityManagerAdapter {
         Self {
             policy,
             drift_sender: None,
-            provider_history: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            provider_history: Arc::new(std::sync::Mutex::new(ProviderHistory::default())),
         }
     }
 
@@ -431,7 +488,7 @@ impl Default for SecurityManagerAdapter {
         Self {
             policy: Arc::new(PolicyTable::new()),
             drift_sender: None,
-            provider_history: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            provider_history: Arc::new(std::sync::Mutex::new(ProviderHistory::default())),
         }
     }
 }
@@ -466,5 +523,107 @@ impl SecurityManagerPort for SecurityManagerAdapter {
             decision: true,
             reasoning: Some("v0.1-β placeholder approval".into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod provider_history_tests {
+    use super::ProviderHistory;
+
+    /// AC-8 — the tracker is bounded: it never exceeds CAP regardless of churn,
+    /// and `insert` still returns the previous value so switch-detection works.
+    #[test]
+    fn provider_history_is_bounded_under_churn() {
+        let mut h = ProviderHistory::default();
+        // Insert far more distinct spirits than the cap.
+        for i in 0..(ProviderHistory::CAP + 5_000) {
+            let prev = h.insert(format!("spirit-{i}"), "anthropic".to_string());
+            assert!(prev.is_none(), "distinct keys have no prior value");
+        }
+        assert!(
+            h.len() <= ProviderHistory::CAP,
+            "provider_history must stay bounded (was {}, cap {})",
+            h.len(),
+            ProviderHistory::CAP
+        );
+    }
+
+    /// AC-8 — overflow policy is evict-oldest, NOT reject-new: re-inserting an
+    /// existing key returns the previous provider (switch is detectable) and
+    /// the newest entry always survives.
+    #[test]
+    fn provider_history_tracks_switch_and_keeps_newest() {
+        let mut h = ProviderHistory::default();
+        assert_eq!(h.insert("s1".into(), "anthropic".into()), None);
+        // Same key, new provider → returns prior (a detectable switch).
+        assert_eq!(
+            h.insert("s1".into(), "openai".into()),
+            Some("anthropic".to_string())
+        );
+        // Fill past the cap; the most-recently-inserted key must remain.
+        for i in 0..(ProviderHistory::CAP + 10) {
+            h.insert(format!("bulk-{i}"), "ollama".into());
+        }
+        let last = format!("bulk-{}", ProviderHistory::CAP + 10 - 1);
+        // Re-inserting the newest returns its tracked value (not evicted).
+        assert_eq!(h.insert(last, "ollama".into()), Some("ollama".to_string()));
+    }
+
+    /// Regression: re-inserting an already-tracked spirit must move it to the
+    /// back of the eviction order, not leave a ghost entry at the old position.
+    /// Without the fix, `order` would accumulate duplicates and desynchronise
+    /// from `map`, causing either unbounded growth or premature eviction of
+    /// live entries.
+    #[test]
+    fn provider_history_reinsertion_keeps_order_synced() {
+        let mut h = ProviderHistory::default();
+
+        // Seed three entries: A (oldest), B, C (newest).
+        h.insert("A".into(), "p1".into());
+        h.insert("B".into(), "p1".into());
+        h.insert("C".into(), "p1".into());
+
+        // Re-insert A — it should move to the back of the eviction order.
+        h.insert("A".into(), "p2".into());
+
+        // order must still have exactly 3 entries (no duplicates).
+        assert_eq!(h.order.len(), h.map.len(), "order and map must stay in sync");
+        assert_eq!(h.order.len(), 3);
+
+        // Eviction order is now B, C, A (B is oldest).
+        assert_eq!(h.order[0], "B");
+        assert_eq!(h.order[2], "A");
+    }
+
+    /// Regression: after eviction-then-reinsertion of the same spirit_id,
+    /// order must contain exactly one entry for that id and the map must
+    /// track it.
+    #[test]
+    fn provider_history_evict_then_reinsert_no_ghost() {
+        let mut h = ProviderHistory::default();
+
+        // Fill to exactly CAP entries.
+        for i in 0..ProviderHistory::CAP {
+            h.insert(format!("s-{i}"), "p".into());
+        }
+        assert_eq!(h.len(), ProviderHistory::CAP);
+
+        // One more insert evicts s-0.
+        h.insert("overflow".into(), "p".into());
+        assert_eq!(h.len(), ProviderHistory::CAP);
+        assert!(!h.map.contains_key("s-0"), "s-0 should have been evicted");
+
+        // Re-insert s-0 (genuinely new again after eviction).
+        let prev = h.insert("s-0".into(), "p".into());
+        assert!(prev.is_none(), "evicted key re-insertion should be None");
+
+        // order and map must stay perfectly in sync.
+        assert_eq!(
+            h.order.len(),
+            h.map.len(),
+            "order ({}) != map ({}) after evict-reinsert cycle",
+            h.order.len(),
+            h.map.len(),
+        );
     }
 }

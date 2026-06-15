@@ -1,4 +1,4 @@
-last_updated: '2026-06-14T14:00:00Z+story-9-4-done'
+last_updated: '2026-06-15T00:00:00Z+story-9-4b-review'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -122,8 +122,7 @@ development_status:
   9-3-publish-the-typed-error-catalog-governance-audit-artifacts-and-wire-cost-attribution: done  # FR63 typed error catalog. 37 E* items catalogued, AST-based bijection check, deterministic generator, 16 tests (3 negative meta-tests). claude-opus-4-6. Review complete, all findings resolved.
   9-3b-governance-audit-artifacts-and-cost-attribution: done
   9-4-productionize-the-operator-surface-distribution-backup-dr-air-gap-region-pinning: done  # REVIEW COMPLETE 2026-06-14: 5 decision-needed findings resolved by team consensus (Winston·Murat·Amelia·John), 21 patches applied, 0 defer, 4 dismissed. All findings resolved; tests pass. Zero kernel-core delta.
-  9-4b-region-pinning-model-provenance-and-tenancy-reservation: ready-for-dev  # SPLIT from 9.4 at preflight 2026-06-14 (5/5). KERNEL-TOUCHING HALF behind ONE re-pin (AC-5 only, 21438→~21650±100, FLAG-Winston) + ONE ratified AbiExtensionProposal (AC-6 surface). AC-5 region-pin (HKDF+AEAD enforce-at-use, ERegionViolation, stub UNTOUCHED) + AC-6 model-provenance (schema 2→3 + FR62 governance journaling; training_data_lineage non-free-text) + AC-7 tenancy (CUT generic reserve → deployment_operator_id stamp on provenance event) + AC-8 provider_history bound. NEW hard ACs: AC-9 write-entry-point exhaustiveness (compile-guard), AC-10 region-neutral erasure proof, AC-11 v2→v3 compat, AC-12 region-tag canonicalization (the irreversible one). §A6 MANDATORY. Mary ruled ZERO new principal-bearing frames (cond. schema constraints). Build order AC-5→6→8→7. Rebase on merged 9.4. rec claude-opus-4-8.
-  9-5-publish-five-canonical-docs-with-wcag-aa-korean-i18n-and-onboarding-artifacts: backlog
+  9-4b-region-pinning-model-provenance-and-tenancy-reservation: ready-for-commit  # REVIEW COMPLETE 2026-06-15: 9 code patches applied, 2 deferred; R-SCH1 strict prior-commit ordering waived by team (retroactive v2 corpus follow-up). Ready to land as single commit with MANIFEST_SCHEMA_VERSION 3.
   # Story 9.6 (added 2026-06-12 by Epic 8 retro §A2, ratified Lunarpulse; spec stub by Story 8.16 AC8): multi-Spirit scheduler + founder-class standalone load — closes 8.12 FORK B classify_spirit short-circuit, upgrades J1/J4 to Grade-A, auto-activates 8.15 J1 resume-continuity beat, folds Epic-7 §A3 open items (skill-queue persistence + functional approve/reject). Sequence before/around 9.4. Rec claude-opus-4-8.
   9-6-multi-spirit-scheduler-founder-class-standalone-load: backlog
   epic-9-retrospective: optional

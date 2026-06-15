@@ -57,6 +57,21 @@ tier = "T2"
 name = "MAOS Project"
 homepage = "https://github.com/lunarpulse/maos"
 
+# Story 9.4b AC-6 (NFR-Comp-5 / SB-1047) — model provenance. Reference example of
+# the schema-v3 [model_provenance] section. `training_data_lineage` is
+# schema-constrained to reverse-DNS lineage references (NOT free-text — D5), so
+# "zero principal nexus" is structural. Validated at admission and journaled as
+# an FR62 governance event (queryable via `maosctl audit query --kind governance`).
+# Mira is deterministic (no live LLM at v1.5); its provenance describes the
+# deterministic diagnostic model lineage.
+[model_provenance]
+covered_model_id = "maos.mira.deterministic-diagnostic-v1"
+training_data_lineage = [
+    "lineage.maos.prod-edge-anomaly-corpus-2026",
+    "lineage.maos.diagnostic-rule-set-v1",
+]
+last_eval_timestamp = "2026-06-01T00:00:00Z"
+
 # Mira's diagnostic-confidence epistemic policy (architecture §4.6 / §6.4). Mira
 # computes its own `diagnostic_confidence` scalar; the kernel performs the
 # universal-arithmetic comparison and fires the halt when confidence on an

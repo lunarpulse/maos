@@ -17,6 +17,11 @@ maos-domain = { path = "../maos-domain" }
 ed25519-dalek = { version = "2", features = ["std"] }
 sha2 = "0.10"
 hex = "0.4"
+# Story 9.4b AC-5 (re-ratification R3) — region-bound TL signing-key derivation.
+# RustCrypto `hkdf` (HKDF-SHA256 over the existing `sha2`, pulls `hmac`) —
+# consistent with Decision B (NOT ring) and the audited RustCrypto stack;
+# no hand-rolled KDF (Winston ruling).
+hkdf = "0.12"
 
 [dev-dependencies]
 tempfile = "3"

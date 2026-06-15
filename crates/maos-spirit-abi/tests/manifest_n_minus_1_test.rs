@@ -64,17 +64,22 @@ fn n_minus_1_supported_floor_in_effect() {
 
 #[test]
 fn n_minus_2_hard_refusal_posture() {
-    // For any kernel at version N ≥ 3, the kernel MUST refuse manifests
-    // written for N-2 (the hard-refusal floor). At v0.5-α (current = 2) this
-    // assertion is vacuously true; encoding it now pins the contract shape
-    // Story 7.5a will publish in STABILITY.md.
+    // Story 7.5a's intended posture is: at kernel version N ≥ 3, refuse
+    // manifests written for N-2 (lift MIN_SUPPORTED to N-1). Story 9.4b AC-6
+    // bumped MANIFEST_SCHEMA_VERSION 2→3 but **deliberately keeps MIN_SUPPORTED
+    // at 1** (re-ratification: "Epic 1b baseline manifests load unchanged") —
+    // so the N-2 hard-refusal floor-lift is DEFERRED to Story 7.5a and is NOT
+    // yet in effect. This test pins that deferral consciously: when 7.5a lifts
+    // MIN, flip this back to the strict `MIN > N-2` assertion in the same PR as
+    // the STABILITY.md entry.
     if MANIFEST_SCHEMA_VERSION >= 3 {
         let n_minus_2 = MANIFEST_SCHEMA_VERSION - 2;
         assert!(
-            MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION > n_minus_2,
-            "MIN_SUPPORTED ({}) ≤ N-2 ({}) — Story 7.5a N-2 hard-refusal floor violated; v_{} manifests would be silently admitted",
+            MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION <= n_minus_2,
+            "Story 9.4b AC-6 deferred the N-2 floor-lift: MIN_SUPPORTED ({}) is expected to \
+             still admit N-2 ({}) at v1.0. If 7.5a has lifted the floor, restore the strict \
+             `MIN > N-2` assertion here.",
             MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION,
-            n_minus_2,
             n_minus_2,
         );
     }
@@ -82,17 +87,21 @@ fn n_minus_2_hard_refusal_posture() {
 
 #[test]
 fn manifest_schema_version_pinned_at_epic_6_addition_count() {
-    // Epic 6 added exactly four manifest sections: [[cli_wrapper]] (6.2),
-    // [[schedules]] (6.4), [gateways] / [[gateway]] (6.5), and the
-    // ConsentEnvelope.intent_class + valid_until_ns additive fields (6.4).
-    // The version bump from 1 → 2 corresponds to that single Epic 6 boundary.
+    // Schema-bump ledger (this guard fires on every bump to force a conscious
+    // update alongside the governing record):
+    //   1 → 2  Epic 6 §A4: [[cli_wrapper]] (6.2), [[schedules]] (6.4),
+    //          [gateways]/[[gateway]] (6.5), ConsentEnvelope.intent_class +
+    //          valid_until_ns (6.4).
+    //   2 → 3  Story 9.4b AC-6: additive [model_provenance] section
+    //          (covered_model_id, training_data_lineage [reverse-DNS, not
+    //          free-text], last_eval_timestamp). Recorded as a ratified
+    //          [[ratification]] in xtask/abi-ratifications.toml (ADR-045 §8).
     //
-    // This test guards against a silent re-bump without an accompanying retro
-    // entry — when the next bump lands, this assertion must be updated in
-    // the same PR as the new STABILITY.md entry.
+    // When the next bump lands, update this assertion in the same PR as the new
+    // STABILITY.md / ratification entry.
     assert_eq!(
-        MANIFEST_SCHEMA_VERSION, 2,
+        MANIFEST_SCHEMA_VERSION, 3,
         "MANIFEST_SCHEMA_VERSION was changed without updating this guard — \
-         confirm Epic 6 §A4 retro is amended OR new retro entry exists",
+         add the bump to the ledger above + the governing ratification/retro entry",
     );
 }

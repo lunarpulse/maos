@@ -30,6 +30,9 @@ pub mod memory; // NEW — Story 4.3 memory tier types
 pub mod notification;
 pub mod orchestrator;
 pub mod ports;
+pub mod provenance; // NEW — Story 9.4b AC-6 model-provenance admission error taxonomy (D5/D6)
+pub mod region; // NEW — Story 9.4b AC-5/AC-12 region-pinning jurisdiction label
+pub mod reserved_namespaces; // NEW — Story 9.4b AC-7 multi-operator tenancy reservation (D8)
 pub mod revocation; // NEW — Story 5.4 CRL types + RegistryClient trait
 pub mod sandbox; // NEW — Story 5.5a T3 container isolation domain types
 pub mod self_telemetry; // NEW — Story 4.3 self-telemetry types

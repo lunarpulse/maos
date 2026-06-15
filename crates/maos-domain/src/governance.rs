@@ -104,6 +104,47 @@ pub struct SchemaRegistryEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Model-provenance admission event (Story 9.4b AC-6, ADR-045 §1 stream 4)
+// ---------------------------------------------------------------------------
+
+/// Stable version-independent reverse-DNS schema identity for the
+/// model-provenance governance stream (R11 lineage-name form).
+pub const MODEL_PROVENANCE_SCHEMA_ID: &str = "spirit.model-provenance";
+
+/// AC-6 (Story 9.4b, D6/D7) — model-provenance governance event payload.
+///
+/// Emitted at admission whenever a Spirit declares a `[model_provenance]`
+/// section. Per **D6**, admission presence-check alone is necessary-but-not-
+/// sufficient for SB-1047, so this records the provenance triple bound to a
+/// stable `schema_id` + a `schema_content_hash`, making the append-only TL the
+/// immutable provenance trail. Per the 9.3b discipline (R11) it carries SCHEMA
+/// identity only and **zero claim-instance ids**, so per **D5** (class metadata,
+/// zero principal nexus) it stays OUT of the GDPR forget cascade.
+///
+/// Per **D7** the only persisted-record tenancy reservation made at v1.0 is the
+/// `deployment_operator_id` constant field — no generic per-record tenant field.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelProvenancePayload {
+    /// Stable reverse-DNS schema identity — `MODEL_PROVENANCE_SCHEMA_ID` (R11).
+    pub schema_id: String,
+    /// SHA-256 hex over the canonical provenance-triple bytes. Proves WHAT
+    /// provenance was admitted, not merely that a field existed (D6).
+    pub schema_content_hash: String,
+    /// D7 — the single deploy-time-known accountable identity (SB-1047 deployer).
+    /// The ONLY persisted-record tenancy reservation made at v1.0.
+    pub deployment_operator_id: String,
+    /// Covered model identifier (class metadata; deploy-time fixed — D5).
+    pub covered_model_id: String,
+    /// Structured training-data lineage references (reverse-DNS lineage names,
+    /// NOT free-text — D5 makes "zero principal nexus" structural).
+    pub training_data_lineage: Vec<String>,
+    /// Last evaluation timestamp declared in the manifest (RFC3339 string).
+    pub last_eval_timestamp: String,
+    /// Schema version of this provenance-event payload.
+    pub version: u32,
+}
+
+// ---------------------------------------------------------------------------
 // Governance event envelope (shared across all three streams)
 // ---------------------------------------------------------------------------
 
@@ -122,6 +163,8 @@ pub enum GovernanceEventKind {
     VetterKey(VetterKeyPayload),
     /// ComplianceClaim schema-lifecycle event (ADR-045 §2, stream 2).
     SchemaLifecycle(SchemaLifecyclePayload),
+    /// Model-provenance admission event (Story 9.4b AC-6, D6/D7).
+    ModelProvenance(ModelProvenancePayload),
 }
 
 /// Payload for governance TL frames (`FrameKind::GovernanceEvent` = 28).
@@ -248,6 +291,72 @@ mod tests {
             Some(lifecycle.schema_content_hash.as_str()),
             "AC6: v2 must chain back to v1's content hash"
         );
+    }
+
+    /// AC-6 — model-provenance governance payload round-trips and is tagged
+    /// under the shared `governance_type` discriminator.
+    #[test]
+    fn model_provenance_event_round_trip_and_tagged() {
+        let payload = GovernanceEventPayload {
+            recorded_at_ns: 7_000_000,
+            effective_at_ns: 7_000_000,
+            event: GovernanceEventKind::ModelProvenance(ModelProvenancePayload {
+                schema_id: MODEL_PROVENANCE_SCHEMA_ID.into(),
+                schema_content_hash: "abc123".into(),
+                deployment_operator_id: "maos.deployment.operator.default".into(),
+                covered_model_id: "anthropic.claude-opus-4-8".into(),
+                training_data_lineage: vec!["lineage.public-web.cc-2024".into()],
+                last_eval_timestamp: "2026-06-01T00:00:00Z".into(),
+                version: 1,
+            }),
+        };
+        let json = serde_json::to_string(&payload).unwrap();
+        assert!(json.contains(r#""governance_type":"ModelProvenance""#));
+        let back: GovernanceEventPayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(payload, back);
+    }
+
+    /// AC-6 / D5 / R11 — the provenance payload carries SCHEMA identity only,
+    /// with ZERO claim-instance id fields. Structural guard: the serialized
+    /// keys are exactly the known schema/class-metadata set — a future field
+    /// named like a principal/claim-instance id would red this.
+    #[test]
+    fn model_provenance_payload_has_zero_claim_instance_ids() {
+        let payload = ModelProvenancePayload {
+            schema_id: MODEL_PROVENANCE_SCHEMA_ID.into(),
+            schema_content_hash: "deadbeef".into(),
+            deployment_operator_id: "op".into(),
+            covered_model_id: "m".into(),
+            training_data_lineage: vec![],
+            last_eval_timestamp: "2026-06-01T00:00:00Z".into(),
+            version: 1,
+        };
+        let v: serde_json::Value = serde_json::to_value(&payload).unwrap();
+        let keys: std::collections::BTreeSet<&str> =
+            v.as_object().unwrap().keys().map(|s| s.as_str()).collect();
+        let allowed: std::collections::BTreeSet<&str> = [
+            "schema_id",
+            "schema_content_hash",
+            "deployment_operator_id",
+            "covered_model_id",
+            "training_data_lineage",
+            "last_eval_timestamp",
+            "version",
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            keys, allowed,
+            "AC-6/R11: provenance payload must carry ONLY schema/class-metadata \
+             fields — zero claim-instance ids"
+        );
+        // Defensive: no field name hints at a per-principal / per-claim id.
+        for k in &keys {
+            assert!(
+                !k.contains("principal") && !k.contains("subject") && !k.contains("claim_id"),
+                "AC-6: forbidden claim-instance id field {k:?}"
+            );
+        }
     }
 
     /// Erasure-class lineage ids cover the full set (Art.17 / legal-hold / retention).

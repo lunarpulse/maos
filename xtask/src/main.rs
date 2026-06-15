@@ -3,6 +3,7 @@ use std::path::Path;
 use std::process;
 
 mod abi_diff;
+mod bypass_scan;
 mod calibrate;
 mod cassette_age_gate;
 mod check_a2a_sender_completeness;
@@ -544,6 +545,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 9.4b AC-9 — region write/read bypass scanner (R-RG3 runtime companion).
+    #[command(name = "bypass-scan")]
+    BypassScan {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 9.4 AC-1 — release artifact signing and verification gate.
     #[command(name = "release-verify")]
     ReleaseVerify {
@@ -859,6 +866,7 @@ fn main() {
             json,
         } => check_abi_ratification::run(&manifest, &baseline, &transparency_log, json),
         Commands::CheckGovernanceCategories { json } => check_governance_categories::run(json),
+        Commands::BypassScan { json } => bypass_scan::run(json),
         Commands::ReleaseVerify {
             sign,
             verify,

@@ -8,4 +8,5 @@
 
 pub mod merkle;
 pub mod proof;
+pub mod regional_teardown; // Story 9.4b AC-13/14/15 — two-phase regional teardown + region-neutral receipt
 pub mod sla;

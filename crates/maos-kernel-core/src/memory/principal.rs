@@ -62,7 +62,7 @@ impl PrincipalNamespaceIndex {
 
     /// Record a principal-namespace write — called by `MemoryManagerAdapter::write`
     /// whenever `namespace == MemoryNamespace::Principal { .. }`.
-    pub fn record_write(
+    pub(in crate::memory) fn record_write(
         &self,
         principal_id: &str,
         writer_spirit_pid: u32,
@@ -93,7 +93,7 @@ impl PrincipalNamespaceIndex {
     /// Subject-access query — returns every `(writer_spirit_pid, schema,
     /// key, timestamp_ns)` indexed for the given `principal_id` across
     /// ALL Spirits on this Host.  Sorted by `(writer_spirit_pid, schema, key)`.
-    pub fn lookup(&self, principal_id: &str) -> Result<Vec<PrincipalIndexRow>, MemoryError> {
+    pub(in crate::memory) fn lookup(&self, principal_id: &str) -> Result<Vec<PrincipalIndexRow>, MemoryError> {
         let conn = self
             .conn
             .lock()

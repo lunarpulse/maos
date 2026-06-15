@@ -30,3 +30,28 @@ covered_changes = [
   "AbiExtensionProposal",
 ]
 ratified_at = "2026-06-14"
+
+# Story 9.4b AC-6 — model-provenance manifest field + FR62 governance journaling.
+# Purely-additive ABI surface (D2: ratification-only, zero kernel-core re-pin).
+# Records the schema 2→3 bump and the new model-provenance governance stream.
+[[ratification]]
+proposal_id = "9.4b-AC6-model-provenance"
+summary = "MANIFEST_SCHEMA_VERSION 2→3 + [model_provenance] section (ModelProvenanceSection) + FR62 ModelProvenance governance stream (ModelProvenancePayload) + catalogued ProvenanceError; admission gate validate_model_provenance (D6/D7)"
+adr_ref = "ADR-045"
+status = "ratified"
+covered_changes = [
+  "MANIFEST_SCHEMA_VERSION",
+  "ModelProvenanceSection",
+  "ModelProvenancePayload",
+  "ModelProvenance",
+  "MODEL_PROVENANCE_SCHEMA_ID",
+  "ProvenanceError",
+  "EModelProvenanceMissing",
+  "EModelProvenanceStale",
+  "ModelProvenancePolicy",
+  "ModelProvenanceRecord",
+  "validate_model_provenance",
+  "GovernanceEventKind",
+  "GovernanceEventPayload",
+]
+ratified_at = "2026-06-15"

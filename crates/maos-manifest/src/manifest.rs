@@ -198,9 +198,11 @@ impl ClassSection {
 }
 
 /// Schema sections added AFTER `manifest_schema_version = 1` (Epic 6 §A4 bump,
-/// retro 2026-05-28): `[[cli_wrapper]]`, `[[schedule]]`, `[gateway]`. A manifest
-/// authored at the N-1 floor omits these; they default via `#[serde(default)]`.
-const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway"];
+/// retro 2026-05-28): `[[cli_wrapper]]`, `[[schedule]]`, `[gateway]`; and the
+/// schema-v3 bump (Story 9.4b AC-6): `[model_provenance]`. A manifest authored
+/// at the N-1 floor omits these; they default via `#[serde(default)]` /
+/// optional-on-read.
+const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance"];
 
 /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
 /// newer-than-declared schema section that an N-1 manifest omits (and thus
@@ -1716,6 +1718,243 @@ impl RawAuthor {
 }
 
 // ------------------------------------------------------------------
+// [model_provenance] section (Story 9.4b AC-6, NFR-Comp-5 / SB-1047)
+// ------------------------------------------------------------------
+
+/// The `[model_provenance]` manifest section — SB-1047 model provenance
+/// (D5/D6). **Optional on read** (AC-11): pre-v3 manifests omit it and stay
+/// admissible. `training_data_lineage` is **schema-constrained to reverse-DNS
+/// lineage references — NOT free-text** (D5), which makes "zero principal
+/// nexus" structural rather than promised (pasted prose / PII cannot satisfy
+/// the grammar).
+#[maos_attrs::i9_exempt(
+    reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
+)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelProvenanceSection {
+    pub covered_model_id: String,
+    pub training_data_lineage: Vec<String>,
+    pub last_eval_timestamp: String,
+    /// `last_eval_timestamp` parsed to Unix seconds (UTC) at validation time;
+    /// the admission staleness check (D6) compares against this.
+    pub last_eval_unix_secs: i64,
+}
+
+impl ModelProvenanceSection {
+    /// Parse a standalone `[model_provenance]` section body.
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawModelProvenanceSection =
+            toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        raw.validate()
+    }
+
+    /// Extract the OPTIONAL `[model_provenance]` table from a full manifest TOML
+    /// document. Returns `Ok(None)` when absent (AC-11 — pre-v3 manifests stay
+    /// admissible), `Ok(Some(_))` when present-and-valid, `Err` when present but
+    /// malformed.
+    pub fn from_manifest_toml(full_toml: &str) -> Result<Option<Self>, ManifestError> {
+        let root: toml::Value =
+            toml::from_str(full_toml).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        match root.get("model_provenance") {
+            None => Ok(None),
+            Some(v) => {
+                let section_toml =
+                    toml::to_string(v).map_err(|e| ManifestError::Toml(e.to_string()))?;
+                Self::from_toml_str(&section_toml).map(Some)
+            }
+        }
+    }
+
+    /// AC-6 / D6 — admission staleness policy. Returns `EModelProvenanceStale`
+    /// when the declared evaluation is older than `max_age_secs` relative to
+    /// `now_unix_secs`.
+    pub fn validate_staleness(
+        &self,
+        now_unix_secs: i64,
+        max_age_secs: u64,
+    ) -> Result<(), maos_domain::provenance::ProvenanceError> {
+        let age = now_unix_secs.saturating_sub(self.last_eval_unix_secs);
+        if age < 0 {
+            // Clock skew or future eval timestamp — not stale.
+            return Ok(());
+        }
+        if (age as u64) > max_age_secs {
+            return Err(
+                maos_domain::provenance::ProvenanceError::EModelProvenanceStale {
+                    last_eval_unix_secs: self.last_eval_unix_secs,
+                    now_unix_secs,
+                    max_age_secs,
+                },
+            );
+        }
+        Ok(())
+    }
+
+    /// Canonical content bytes for the FR62 governance content-hash (D6). A
+    /// stable, field-ordered, length-prefixed serialization of the provenance
+    /// triple — NOT the raw TOML (which varies with formatting/whitespace), so
+    /// the content hash is reproducible across re-admissions.
+    pub fn canonical_content_bytes(&self) -> Vec<u8> {
+        fn push_lp(out: &mut Vec<u8>, s: &str) {
+            out.extend_from_slice(&(s.len() as u64).to_le_bytes());
+            out.extend_from_slice(s.as_bytes());
+        }
+        let mut out = Vec::new();
+        push_lp(&mut out, &self.covered_model_id);
+        push_lp(&mut out, &self.last_eval_timestamp);
+        out.extend_from_slice(&(self.training_data_lineage.len() as u64).to_le_bytes());
+        for l in &self.training_data_lineage {
+            push_lp(&mut out, l);
+        }
+        out
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawModelProvenanceSection {
+    covered_model_id: String,
+    training_data_lineage: Vec<String>,
+    last_eval_timestamp: String,
+}
+
+impl RawModelProvenanceSection {
+    fn validate(self) -> Result<ModelProvenanceSection, ManifestError> {
+        if self.covered_model_id.trim().is_empty() {
+            return Err(ManifestError::Toml(validation_msg(
+                "model_provenance.covered_model_id",
+                "empty",
+            )));
+        }
+        if self.training_data_lineage.is_empty() {
+            return Err(ManifestError::Toml(validation_msg(
+                "model_provenance.training_data_lineage",
+                "must list at least one reverse-DNS lineage reference (free-text is rejected — D5)",
+            )));
+        }
+        for (i, l) in self.training_data_lineage.iter().enumerate() {
+            if !is_reverse_dns_lineage(l) {
+                return Err(ManifestError::Toml(validation_msg(
+                    &format!("model_provenance.training_data_lineage[{i}]"),
+                    &format!(
+                        "'{l}' is not a structured reverse-DNS lineage reference \
+                         (NOT free-text) — D5"
+                    ),
+                )));
+            }
+        }
+        let last_eval_unix_secs = parse_rfc3339_utc_secs(&self.last_eval_timestamp).map_err(|e| {
+            ManifestError::Toml(validation_msg("model_provenance.last_eval_timestamp", &e))
+        })?;
+        Ok(ModelProvenanceSection {
+            covered_model_id: self.covered_model_id,
+            training_data_lineage: self.training_data_lineage,
+            last_eval_timestamp: self.last_eval_timestamp,
+            last_eval_unix_secs,
+        })
+    }
+}
+
+/// A structured reverse-DNS lineage reference (D5): two or more dot-separated
+/// labels, each non-empty `[a-z0-9-]` (lowercase), no leading/trailing/double
+/// dots. This grammar is what makes `training_data_lineage` NON-free-text —
+/// pasted prose or PII cannot satisfy it, so "zero principal nexus" is
+/// structural.
+fn is_reverse_dns_lineage(s: &str) -> bool {
+    if s.is_empty() || s.len() > 253 {
+        return false;
+    }
+    let labels: Vec<&str> = s.split('.').collect();
+    if labels.len() < 2 {
+        return false;
+    }
+    labels.iter().all(|label| {
+        !label.is_empty()
+            && label.len() <= 63
+            && label
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+    })
+}
+
+fn is_leap_year(y: i64) -> bool {
+    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+}
+
+/// Minimal strict RFC3339 (UTC `Z`) → Unix seconds. Accepts exactly
+/// `YYYY-MM-DDTHH:MM:SSZ` (no offsets, no fractional seconds) so that v1.0
+/// model-provenance timestamps stay unambiguous and dependency-free. Returns a
+/// human-readable reason on malformed input.
+fn parse_rfc3339_utc_secs(s: &str) -> Result<i64, String> {
+    let b = s.as_bytes();
+    if b.len() != 20
+        || b[4] != b'-'
+        || b[7] != b'-'
+        || b[10] != b'T'
+        || b[13] != b':'
+        || b[16] != b':'
+        || b[19] != b'Z'
+    {
+        return Err(format!(
+            "expected strict UTC RFC3339 'YYYY-MM-DDTHH:MM:SSZ', got '{s}'"
+        ));
+    }
+    let num = |a: usize, z: usize| -> Result<i64, String> {
+        std::str::from_utf8(&b[a..z])
+            .ok()
+            .filter(|x| x.chars().all(|c| c.is_ascii_digit()))
+            .and_then(|x| x.parse::<i64>().ok())
+            .ok_or_else(|| format!("non-numeric field in timestamp '{s}'"))
+    };
+    let year = num(0, 4)?;
+    let month = num(5, 7)?;
+    let day = num(8, 10)?;
+    let hour = num(11, 13)?;
+    let min = num(14, 16)?;
+    let sec = num(17, 19)?;
+    if !(1..=12).contains(&month) {
+        return Err(format!("month out of range in '{s}'"));
+    }
+    if hour > 23 || min > 59 || sec > 60 {
+        return Err(format!("time field out of range in '{s}'"));
+    }
+    let mdays = [
+        31,
+        if is_leap_year(year) { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+    if day < 1 || day > mdays[(month - 1) as usize] {
+        return Err(format!("day out of range in '{s}'"));
+    }
+    let mut days: i64 = 0;
+    if year >= 1970 {
+        for y in 1970..year {
+            days += if is_leap_year(y) { 366 } else { 365 };
+        }
+    } else {
+        for y in year..1970 {
+            days -= if is_leap_year(y) { 366 } else { 365 };
+        }
+    }
+    for m in 1..month {
+        days += mdays[(m - 1) as usize];
+    }
+    days += day - 1;
+    Ok(days * 86_400 + hour * 3_600 + min * 60 + sec)
+}
+
+// ------------------------------------------------------------------
 // [providers] section (Story 5.5b, AC2)
 // ------------------------------------------------------------------
 
@@ -2217,8 +2456,9 @@ description = "MAOS reference Spirit"
     fn class_section_rejects_above_max_schema_version() {
         // Anything beyond MAX_SUPPORTED is hard-rejected — the kernel does not
         // gamble on future schemas it has not been compiled against.
+        // (Story 9.4b bumped MAX_SUPPORTED 2→3, so the above-max probe is now 4.)
         let s =
-            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 3");
+            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 4");
         let err = ClassSection::from_toml_str(&s).unwrap_err();
         assert!(
             matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.manifest_schema_version"))
@@ -4430,5 +4670,134 @@ auth_secret_ref = "secret:echo:token"
         assert_eq!(e.max_message_bytes, 4096);
         assert!(e.inbound_allowlist.is_empty());
         assert!(e.outbound_allowlist.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod model_provenance_tests {
+    use super::*;
+
+    const VALID: &str = r#"
+covered_model_id = "anthropic.claude-opus-4-8"
+training_data_lineage = ["lineage.public-web.cc-2024", "lineage.licensed.books-corpus"]
+last_eval_timestamp = "2026-06-01T00:00:00Z"
+"#;
+
+    #[test]
+    fn valid_section_parses_and_derives_unix_secs() {
+        let s = ModelProvenanceSection::from_toml_str(VALID).expect("valid");
+        assert_eq!(s.covered_model_id, "anthropic.claude-opus-4-8");
+        assert_eq!(s.training_data_lineage.len(), 2);
+        // 2026-06-01T00:00:00Z = 1_780_272_000 unix secs (verified below by inverse).
+        assert_eq!(s.last_eval_unix_secs, 1_780_272_000);
+    }
+
+    #[test]
+    fn free_text_lineage_is_rejected_not_admitted() {
+        // D5: pasted prose / PII cannot satisfy the reverse-DNS grammar.
+        let toml = r#"
+covered_model_id = "m"
+training_data_lineage = ["Trained on John Doe's emails, SSN 123-45-6789"]
+last_eval_timestamp = "2026-06-01T00:00:00Z"
+"#;
+        let err = ModelProvenanceSection::from_toml_str(toml).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("training_data_lineage") && msg.contains("NOT free-text"),
+            "expected free-text rejection, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn empty_lineage_rejected() {
+        let toml = r#"
+covered_model_id = "m"
+training_data_lineage = []
+last_eval_timestamp = "2026-06-01T00:00:00Z"
+"#;
+        assert!(ModelProvenanceSection::from_toml_str(toml).is_err());
+    }
+
+    #[test]
+    fn unknown_field_rejected_deny_unknown_fields() {
+        let toml = r#"
+covered_model_id = "m"
+training_data_lineage = ["lineage.a.b"]
+last_eval_timestamp = "2026-06-01T00:00:00Z"
+extra_field = "nope"
+"#;
+        assert!(ModelProvenanceSection::from_toml_str(toml).is_err());
+    }
+
+    #[test]
+    fn malformed_timestamp_rejected() {
+        for bad in [
+            "2026-06-01",                 // date only
+            "2026-06-01T00:00:00+02:00",  // offset not allowed
+            "2026-13-01T00:00:00Z",       // month OOR
+            "2026-02-30T00:00:00Z",       // day OOR (Feb)
+            "2026-06-01T24:00:00Z",       // hour OOR
+            "not-a-date",
+        ] {
+            let toml = format!(
+                "covered_model_id = \"m\"\ntraining_data_lineage = [\"lineage.a.b\"]\nlast_eval_timestamp = \"{bad}\"\n"
+            );
+            assert!(
+                ModelProvenanceSection::from_toml_str(&toml).is_err(),
+                "expected reject for bad timestamp {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn leap_year_feb_29_accepted() {
+        // 2028 is a leap year; Feb 29 must parse.
+        let toml = "covered_model_id = \"m\"\ntraining_data_lineage = [\"lineage.a.b\"]\nlast_eval_timestamp = \"2028-02-29T12:00:00Z\"\n";
+        let s = ModelProvenanceSection::from_toml_str(toml).expect("leap day valid");
+        // sanity: 2028-02-29T12:00:00Z is after 2026-06-01.
+        assert!(s.last_eval_unix_secs > 1_780_272_000);
+    }
+
+    #[test]
+    fn absent_section_is_none_optional_on_read_ac11() {
+        // AC-11: a v2 manifest with no [model_provenance] stays admissible.
+        let manifest = "[class]\nname = \"x\"\nversion = \"0.1.0\"\n[author]\nname = \"a\"\n";
+        let got = ModelProvenanceSection::from_manifest_toml(manifest).expect("ok");
+        assert!(got.is_none());
+    }
+
+    #[test]
+    fn present_section_extracted_from_full_manifest() {
+        let manifest = format!(
+            "[class]\nname = \"x\"\nversion = \"0.1.0\"\n[model_provenance]\n{VALID}"
+        );
+        let got = ModelProvenanceSection::from_manifest_toml(&manifest)
+            .expect("ok")
+            .expect("present");
+        assert_eq!(got.covered_model_id, "anthropic.claude-opus-4-8");
+    }
+
+    #[test]
+    fn staleness_rejects_old_eval() {
+        use maos_domain::provenance::ProvenanceError;
+        let s = ModelProvenanceSection::from_toml_str(VALID).unwrap();
+        // now = last_eval + 100 days; window = 30 days → stale.
+        let now = s.last_eval_unix_secs + 100 * 86_400;
+        let err = s.validate_staleness(now, 30 * 86_400).unwrap_err();
+        assert!(matches!(err, ProvenanceError::EModelProvenanceStale { .. }));
+        // fresh within window → ok.
+        assert!(s.validate_staleness(s.last_eval_unix_secs + 10 * 86_400, 30 * 86_400).is_ok());
+    }
+
+    #[test]
+    fn canonical_content_bytes_are_deterministic_and_field_sensitive() {
+        let a = ModelProvenanceSection::from_toml_str(VALID).unwrap();
+        let b = ModelProvenanceSection::from_toml_str(VALID).unwrap();
+        assert_eq!(a.canonical_content_bytes(), b.canonical_content_bytes());
+        let other = ModelProvenanceSection::from_toml_str(
+            "covered_model_id = \"different.model\"\ntraining_data_lineage = [\"lineage.a.b\"]\nlast_eval_timestamp = \"2026-06-01T00:00:00Z\"\n",
+        )
+        .unwrap();
+        assert_ne!(a.canonical_content_bytes(), other.canonical_content_bytes());
     }
 }

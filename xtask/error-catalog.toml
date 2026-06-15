@@ -489,3 +489,57 @@ recovery_class = "retry_with_correction"
 owner = "maos-skill"
 kernel_or_spirit = "kernel"
 since_version = "0.5.0"
+
+# ---------------------------------------------------------------------------
+# RegionError — crates/maos-domain/src/region.rs
+# Story 9.4b AC-5 region-pinning (NFR-Comp-4 / PIPL §40)
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "ERegionViolation"
+rust_path = "RegionError::ERegionViolation"
+source_file = "crates/maos-domain/src/region.rs"
+description = "Foreign-region data detected on a read/verify/enforcement path — region pinning fail-closed (NFR-Comp-4 / PIPL §40)"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "1.0.0"
+
+[[error]]
+code = "ERegionTagInvalid"
+rust_path = "RegionError::ERegionTagInvalid"
+source_file = "crates/maos-domain/src/region.rs"
+description = "Operator-supplied region tag failed the frozen ascii-v1 grammar (AC-12), rejected before any key derivation"
+severity = "policy"
+recovery_class = "fix_config"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "1.0.0"
+
+# ---------------------------------------------------------------------------
+# ProvenanceError — crates/maos-domain/src/provenance.rs
+# Story 9.4b AC-6 model-provenance admission (NFR-Comp-5 / SB-1047)
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "EModelProvenanceMissing"
+rust_path = "ProvenanceError::EModelProvenanceMissing"
+source_file = "crates/maos-domain/src/provenance.rs"
+description = "Spirit class requires model-provenance but the [model_provenance] manifest section is absent at admission (NFR-Comp-5 / SB-1047)"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "1.0.0"
+
+[[error]]
+code = "EModelProvenanceStale"
+rust_path = "ProvenanceError::EModelProvenanceStale"
+source_file = "crates/maos-domain/src/provenance.rs"
+description = "Declared model-provenance last_eval_timestamp is older than the operator-configured staleness window (D6 — presence necessary but not sufficient)"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "1.0.0"

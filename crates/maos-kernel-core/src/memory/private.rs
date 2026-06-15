@@ -165,7 +165,7 @@ impl PrivateMemoryStore {
     // public API
     // ------------------------------------------------------------------
 
-    pub fn write(
+    pub(in crate::memory) fn write(
         &self,
         spirit_pid: u32,
         namespace: &MemoryNamespace,
@@ -197,7 +197,7 @@ impl PrivateMemoryStore {
         Ok(())
     }
 
-    pub fn read(
+    pub(in crate::memory) fn read(
         &self,
         spirit_pid: u32,
         namespace: &MemoryNamespace,
@@ -247,7 +247,7 @@ impl PrivateMemoryStore {
     /// Scan entries matching a key prefix within the given namespace,
     /// up to `limit` entries.  Order is NOT deterministic (HashMap
     /// iteration).  Merges in-memory and filesystem entries.
-    pub fn scan(
+    pub(in crate::memory) fn scan(
         &self,
         spirit_pid: u32,
         namespace: &MemoryNamespace,

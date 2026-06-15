@@ -1464,6 +1464,16 @@ fn audit_sealed_export(
 
     let unsigned =
         maos_audit::sealed_export::build_bundle(entries, i12_refs, i11_content, freshness);
+    // Story 9.4b AC-5 — region-pin the export when MAOS_REGION_HOME is set so a
+    // foreign-region verifier cannot validate it (None ⇒ byte-identical to pre-9.4b).
+    let unsigned = match resolve_region_home() {
+        Ok(Some(r)) => unsigned.with_region(&r),
+        Ok(None) => unsigned,
+        Err(e) => {
+            eprintln!("maosctl: audit sealed-export — invalid region config: {e}");
+            return ExitCode::from(2);
+        }
+    };
 
     let signed = match maos_audit::sealed_export::sign_bundle(unsigned, &seed) {
         Ok(b) => b,
@@ -1965,6 +1975,15 @@ fn audit_trajectory_export(
         applied_redaction,
         redaction_policy.to_string(),
     );
+    // Story 9.4b AC-5 — region-pin the trajectory export when MAOS_REGION_HOME is set.
+    let unsigned = match resolve_region_home() {
+        Ok(Some(r)) => unsigned.with_region(&r),
+        Ok(None) => unsigned,
+        Err(e) => {
+            eprintln!("maosctl: audit export — invalid region config: {e}");
+            return ExitCode::from(2);
+        }
+    };
 
     let signed = match maos_audit::sealed_export::sign_bundle(unsigned, &seed) {
         Ok(b) => b,
@@ -2543,6 +2562,28 @@ fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) ->
     }
 
     ExitCode::SUCCESS
+}
+
+/// Resolve the operator home region respecting `operator.toml` + `MAOS_REGION_HOME`
+/// precedence.  Matches `RegionSection::resolve_from_env_and_disk()` semantics so
+/// CLI sealed-exports region-pin identically to the in-process memory manager
+/// (Story 9.4b split-brain fix).
+fn resolve_region_home() -> Result<Option<maos_domain::region::Region>, maos_domain::region::RegionError> {
+    let disk_tag = read_operator_toml_region_tag();
+    maos_domain::region::Region::resolve_home(disk_tag.as_deref())
+}
+
+/// Read the `[region].home_region` value from `~/.config/maos/operator.toml`,
+/// returning `None` when the file is absent, unparseable, or lacks the key.
+fn read_operator_toml_region_tag() -> Option<String> {
+    let home = std::env::var("HOME").ok()?;
+    let path = std::path::PathBuf::from(home)
+        .join(".config")
+        .join("maos")
+        .join("operator.toml");
+    let contents = std::fs::read_to_string(path).ok()?;
+    let val: toml::Value = contents.parse().ok()?;
+    val.get("region")?.get("home_region")?.as_str().map(String::from)
 }
 
 #[cfg(test)]

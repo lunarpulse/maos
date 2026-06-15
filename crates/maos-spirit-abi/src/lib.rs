@@ -57,12 +57,21 @@ pub const ABI_VERSION: u32 = 1;
 /// `MANIFEST_SCHEMA_VERSION = 2` accept manifests authored against `= 1`
 /// (the N-1 supported floor enforced by `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION`).
 ///
+/// Bumped to `3` in Story 9.4b AC-6 (2026-06-15) to track the additive
+/// `[model_provenance]` section (`covered_model_id`, `training_data_lineage`
+/// — reverse-DNS-constrained, NOT free-text — `last_eval_timestamp`). The
+/// section is wire-compatible at the TOML/serde layer: it is OPTIONAL on read
+/// (`from_manifest_toml` returns `None` when absent), so kernels at
+/// `MANIFEST_SCHEMA_VERSION = 3` still admit manifests authored at `= 2`
+/// (the N-1 supported floor) — AC-11 append-only compat. Recorded as one
+/// ratified `[[ratification]]` entry in `xtask/abi-ratifications.toml`.
+///
 /// This constant is the single authoritative source consumed by
 /// `maos-manifest::ClassSection` validation and by the `xtask
 /// check-manifest-schema-version` gate. Story 7.5a's ABI Stability Triple
 /// `(kernel_version, abi_version, manifest_schema_version)` consumes this
 /// constant directly.
-pub const MANIFEST_SCHEMA_VERSION: u32 = 2;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 3;
 
 /// Lowest manifest schema version this kernel accepts at admission.
 ///

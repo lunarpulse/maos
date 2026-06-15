@@ -190,7 +190,7 @@ dev_model_used: claude-opus-4-7
 ## Deferred from: code review of 5-5b-run-the-multi-provider-ci-matrix-across-anthropic-openai-and-ollama (2026-05-23)
 
 - Ollama driver lacks `with_api_key` test helper — intentional, no API key needed. `OllamaProvider::new` returns `Ok` unconditionally.
-- `provider_history` HashMap in `admit_spirit` grows unbounded under high spirit churn — no cleanup path for terminated spirits. Forward-shaped to Story 9.4.
+- ~~`provider_history` HashMap in `admit_spirit` grows unbounded under high spirit churn — no cleanup path for terminated spirits. Forward-shaped to Story 9.4.~~ **CLOSED (Story 9.4b AC-8, 2026-06-15):** replaced the unbounded `HashMap` with the bounded `ProviderHistory` (`crates/maos-kernel-core/src/security/mod.rs`) — cap 4096, **overflow policy = evict-oldest-by-first-insertion** (never reject-new, so the latest provider is always tracked). Eviction of a stale Spirit only makes a later re-admission first-seen (no false ProviderSwitched); state is ephemeral and never serialized into replayed artifacts. Tests: `provider_history_is_bounded_under_churn`, `provider_history_tracks_switch_and_keeps_newest`.
 - `io_call_journal` non-feature stub returns empty `Vec` — currently `#[cfg]`-protected on tests. Acceptable for v0.5-α; structural improvement at v0.5+.
 - `UnconfiguredProvider` inserted under `"anthropic"` key in composition root — semantically misleading (enumerating `registered_ids()` shows Anthropic when it's not configured). Pre-existing Story 1b.4 pattern.
 
@@ -430,3 +430,8 @@ and `check-epic-close-green` (§A5) added. YAML re-validated.
 - ~~**resolve_spirit_pid may return multiple matches; export silently uses the first** [crates/maos-cli/src/subcommands.rs:1625-1630]~~ — **FIXED 2026-06-13**: `audit_trajectory_export` and `audit_sealed_export` now fail with exit code 2 and a clear disambiguation message when `resolve_spirit_pid` returns more than one `(boot_nonce, spirit_pid)` pair.
 - ~~**Unmapped kind string in filter.kind is silently dropped** [crates/maos-audit/src/lib.rs:302-307]~~ — **FIXED 2026-06-13**: both `query()` and `query_with_redaction()` now return `AuditError::UnknownKind` for unmapped `filter.kind` strings instead of silently omitting the filter.
 - ~~**SQLite numeric casts can silently wrap/truncate** [crates/maos-audit/src/lib.rs:349-352]~~ — **PARTIALLY FIXED 2026-06-13**: binding casts for `spirit_pid` and `limit` now use `i64::try_from` with `AuditError::ValueOverflow`. Row-extraction `as` casts left unchanged because the kernel stores u64 values (including values > `i64::MAX`) via bit-cast in SQLite's signed INTEGER column; changing them to `try_from` would break round-trip of legitimate TL rows.
+
+## Deferred from: code review of 9-4b-region-pinning-model-provenance-and-tenancy-reservation (2026-06-15)
+
+- **Ed25519 double-hash composition** — `regional_teardown.rs` and `sealed_export.rs` sign a SHA-256 digest with Ed25519 (which itself hashes with SHA-512), creating a non-standard `Ed25519(SHA-256(msg))` composition. Internally consistent but differs from pure Ed25519. Deferred: consider signing canonical bytes directly in a future hardening pass.
+- **Home signing seed reused as region-key derivation base** — `run_uninstall_cascade` uses the same `signing_seed` as both the HKDF base for region keys and the raw home signing key. HKDF differentiates outputs, but ideal key separation would use distinct seeds. Deferred to a future crypto-hardening story.

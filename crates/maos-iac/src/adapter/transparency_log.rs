@@ -1903,10 +1903,14 @@ mod tests {
             vec![
                 "approval_decision_log",
                 "legal_holds",
+                // Story 9.3b (commit 3041fec) added the schema-lifecycle registry
+                // table at open; this exhaustive list was left stale until the
+                // Story 9.4b AC-6 regression caught it.
+                "schema_lifecycle_registry",
                 "transparency_log",
                 "transparency_log_retractions"
             ],
-            "expected exactly four tables"
+            "expected exactly five tables"
         );
 
         // 2. No foreign keys on transparency_log

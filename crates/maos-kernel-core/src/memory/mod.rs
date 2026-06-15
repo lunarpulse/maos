@@ -17,6 +17,8 @@ pub mod principal;
 pub mod private;
 pub mod self_telemetry;
 pub mod shared;
+pub mod write_entry_point; // Story 9.4b AC-5/AC-9 — region-enforcement chokepoint
+pub mod read_entry_point; // Story 9.4b R1-COND / AC-9 — region-enforcement chokepoint (read side)
 
 pub use maos_domain::ports::MemoryManagerPort;
 
@@ -75,6 +77,10 @@ pub struct MemoryManagerAdapter {
     principal_index: Arc<PrincipalNamespaceIndex>,
     transparency_log: Arc<TransparencyLogAdapter>,
     next_frame_counter: AtomicU64,
+    /// Story 9.4b AC-5 — configured home jurisdiction; `None` disables region
+    /// pinning (legacy / default-region semantics).  Every store write routes
+    /// through `write_entry_point::enforce_region` against this value.
+    home_region: Option<maos_domain::region::Region>,
     /// Story 4.3 — cross-Spirit isolation hook (Story 4.5 corpus).
     /// Feature-gated so production builds carry zero runtime cost.
     #[cfg(feature = "spirit_test")]
@@ -94,9 +100,18 @@ impl MemoryManagerAdapter {
             principal_index,
             transparency_log,
             next_frame_counter: AtomicU64::new(0),
+            home_region: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
+    }
+
+    /// Story 9.4b AC-5 — pin this memory manager to a home jurisdiction.  Set at
+    /// the composition root from `RegionSection::resolve_from_env_and_disk`.
+    /// When unset (default), region pinning is disabled.
+    pub fn with_home_region(mut self, home_region: Option<maos_domain::region::Region>) -> Self {
+        self.home_region = home_region;
+        self
     }
 
     /// Create a pid-fused memory view for a Spirit.  This is the I5
@@ -408,6 +423,17 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         #[cfg(feature = "spirit_test")]
         self.fire_isolation_hooks(&case_id, true);
 
+        // AC-5/AC-9: every store write routes through the single region
+        // chokepoint.  DirectWrite is home-by-construction (passes when pinning
+        // matches or is disabled); future replay/restore paths MUST construct a
+        // `WriteEntryPoint` carrying source-region provenance and will fail
+        // closed here on a cross-region write.
+        write_entry_point::enforce_region(
+            &write_entry_point::WriteEntryPoint::DirectWrite,
+            self.home_region.as_ref(),
+        )
+        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+
         match tier {
             MemoryTier::Private => {
                 self.private
@@ -447,6 +473,14 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         #[cfg(feature = "spirit_test")]
         self.fire_isolation_hooks(&case_id, true);
 
+        // R1-COND / AC-9: every store read routes through the single region
+        // chokepoint.  DirectRead is home-by-construction.
+        read_entry_point::enforce_region(
+            &read_entry_point::ReadEntryPoint::DirectRead,
+            self.home_region.as_ref(),
+        )
+        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+
         match tier {
             MemoryTier::Private => self.private.read(spirit_pid, namespace, key),
             MemoryTier::Shared => self.shared.read(spirit_pid, namespace, key),
@@ -473,6 +507,14 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         #[cfg(feature = "spirit_test")]
         self.fire_isolation_hooks(&case_id, true);
 
+        // R1-COND / AC-9: every store scan routes through the single region
+        // chokepoint.  DirectRead is home-by-construction.
+        read_entry_point::enforce_region(
+            &read_entry_point::ReadEntryPoint::DirectRead,
+            self.home_region.as_ref(),
+        )
+        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+
         match tier {
             MemoryTier::Private => self.private.scan(spirit_pid, namespace, prefix, limit),
             MemoryTier::Shared => self.shared.scan(spirit_pid, namespace, prefix, limit),
@@ -484,6 +526,13 @@ impl MemoryManagerPort for MemoryManagerAdapter {
     }
 
     fn subject_access(&self, principal_id: &str) -> Result<Vec<PrincipalIndexRow>, MemoryError> {
+        // R1-COND / AC-9: subject-access lookup routes through the read
+        // chokepoint.  DirectRead is home-by-construction.
+        read_entry_point::enforce_region(
+            &read_entry_point::ReadEntryPoint::DirectRead,
+            self.home_region.as_ref(),
+        )
+        .map_err(|e| MemoryError::Storage(e.to_string()))?;
         self.principal_index.lookup(principal_id)
     }
 

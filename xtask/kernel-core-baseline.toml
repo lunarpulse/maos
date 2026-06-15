@@ -33,4 +33,17 @@
          (+70), AC6 erasure schema-version stamp in memory/mod.rs. All additive;
          no public symbols removed. Re-pin recorded as the first ratified
          AbiExtensionProposal (ADR-045 §8 dogfooding).
-src_lines = 21472
+#   21894  Story 9.4b AC-5/AC-8 — region-pinning (TL-anchored, Option A) +
+#          provider_history bound (+422, charter-amended kernel delta).
+#          FLAG-Winston: authorized 2026-06-15 (re-ratification R2 + tripwire
+#          authorization). Production delta ~+237 lands ~21709 — UNDER the
+#          ratified HARD STOP of 21720; the remaining ~+185 is merge-blocking
+#          TEST code the line-count gate includes (R-RG1/R-RG2/R-RG3 in
+#          memory/write_entry_point.rs, AC-8 provider_history_tests in
+#          security/mod.rs, RegionSection tests in security/operator_config.rs).
+#          SHAPE VERIFIED Option A: RegionSection config + WriteEntryPoint
+#          region chokepoint + memory-adapter wiring + bounded ProviderHistory;
+#          NO per-row crypto / Option-B limb. CryptoProvider untouched; region
+#          HKDF derivation lives in maos-audit (not kernel-core). All additive;
+#          no public symbols removed.
+src_lines = 21894

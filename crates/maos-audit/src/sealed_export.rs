@@ -4,7 +4,42 @@
 //! Uses `ed25519-dalek` + `sha2` — NOT `ring` and NOT `maos-kernel-core`.
 
 use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
+use hkdf::Hkdf;
+use maos_domain::region::Region;
 use sha2::{Digest, Sha256};
+
+// ─── Story 9.4b AC-5 — region-bound TL signing-key derivation ────────────────
+
+/// HKDF-SHA256 salt domain-separator for region-bound TL signing-key derivation.
+const REGION_TL_SIGNING_SALT: &[u8] = b"maos.region.tl-signing.v1";
+/// HKDF `info` prefix binding the frozen region encoding id (AC-12 `ascii-v1`)
+/// into the derivation context.  Two spellings of one region canonicalize to the
+/// same bytes (see [`Region`]) and therefore derive the same key — by design.
+const REGION_INFO_PREFIX: &[u8] = b"maos.region.ascii-v1:";
+
+/// Derive a region-bound Ed25519 signing seed from a base seed (AC-5 / AC-12).
+///
+/// `region` is already-canonical (`ascii-v1`) by virtue of the [`Region`] type,
+/// so this derivation is stable and unambiguous.  A bundle signed under one
+/// region cannot be verified under another region's derived key (R-RG1), which
+/// is the cryptographic root of region pinning at the export/TL layer.
+pub fn derive_region_signing_seed(base_seed: &[u8; 32], region: &Region) -> [u8; 32] {
+    let hk = Hkdf::<Sha256>::new(Some(REGION_TL_SIGNING_SALT), base_seed);
+    let mut info = Vec::with_capacity(REGION_INFO_PREFIX.len() + region.as_bytes().len());
+    info.extend_from_slice(REGION_INFO_PREFIX);
+    info.extend_from_slice(region.as_bytes());
+    let mut okm = [0u8; 32];
+    hk.expand(&info, &mut okm)
+        .expect("32 bytes is a valid HKDF-SHA256 output length");
+    okm
+}
+
+/// Derive the region-bound Ed25519 *public* key — the expected attester key for
+/// verifying a bundle pinned to `region` (the verify-side companion of
+/// [`derive_region_signing_seed`]).
+pub fn derive_region_pubkey(base_seed: &[u8; 32], region: &Region) -> [u8; 32] {
+    derive_pubkey(&derive_region_signing_seed(base_seed, region))
+}
 
 // ─── Bundle types ──────────────────────────────────────────────────────────
 
@@ -19,6 +54,13 @@ pub struct AuditBundle {
     pub applied_redaction: bool,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub redaction_policy: String,
+    /// Story 9.4b AC-5 — canonical (`ascii-v1`) jurisdiction tag this bundle is
+    /// region-pinned to.  `None` for pre-region (v2) bundles — omitted from the
+    /// canonical bytes so region-less exports stay byte-identical (AC-11 /
+    /// R-SCH compat).  When `Some`, the signing key is HKDF-derived from this
+    /// tag, so tampering it breaks verification (R-RG4′).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
     pub signature_block: SignatureBlock,
 }
 
@@ -61,10 +103,25 @@ pub struct BundleForSigning {
     pub applied_redaction: bool,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub redaction_policy: String,
+    /// Story 9.4b AC-5 — region tag covered by the signature.  `None` is omitted
+    /// from canonical bytes (byte-identity preserved); `Some` is signed, so a
+    /// post-sign tamper of the region field fails verification (R-RG4′).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
 }
 
 fn is_false(b: &bool) -> bool {
     !*b
+}
+
+impl BundleForSigning {
+    /// Region-pin this bundle to `region` (Story 9.4b AC-5).  The region is
+    /// covered by the canonical bytes AND drives HKDF derivation of the signing
+    /// key in [`sign_bundle`].
+    pub fn with_region(mut self, region: &Region) -> Self {
+        self.region = Some(region.as_str().to_string());
+        self
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -104,6 +161,7 @@ pub fn build_bundle(
         freshness,
         applied_redaction: false,
         redaction_policy: String::new(),
+        region: None,
     }
 }
 
@@ -127,6 +185,7 @@ pub fn build_trajectory_bundle(
         freshness,
         applied_redaction,
         redaction_policy,
+        region: None,
     }
 }
 
@@ -141,7 +200,18 @@ pub fn sign_bundle(
     let canonical = canonicalize(&bundle_for_signing);
     let digest = Sha256::digest(&canonical);
 
-    let signing_key = SigningKey::from_bytes(seed);
+    // AC-5: when region-pinned, sign with the HKDF-derived region key so the
+    // bundle only verifies under that region's derived attester key (R-RG1).
+    let effective_seed = match &bundle_for_signing.region {
+        Some(tag) => {
+            let region = Region::canonicalize(tag).map_err(|e| {
+                SealedExportError::Serialization(format!("invalid region tag: {e}"))
+            })?;
+            derive_region_signing_seed(seed, &region)
+        }
+        None => *seed,
+    };
+    let signing_key = SigningKey::from_bytes(&effective_seed);
     let signature = signing_key.sign(&digest);
     let pubkey_bytes = signing_key.verifying_key().to_bytes();
 
@@ -153,6 +223,7 @@ pub fn sign_bundle(
         freshness: bundle_for_signing.freshness,
         applied_redaction: bundle_for_signing.applied_redaction,
         redaction_policy: bundle_for_signing.redaction_policy,
+        region: bundle_for_signing.region,
         signature_block: SignatureBlock {
             algorithm: "Ed25519".to_string(),
             attester_pubkey: hex::encode(pubkey_bytes),
@@ -176,6 +247,9 @@ pub fn verify_bundle(
         freshness: bundle.freshness.clone(),
         applied_redaction: bundle.applied_redaction,
         redaction_policy: bundle.redaction_policy.clone(),
+        // AC-5/R-RG4′: region is covered by the signature — a post-sign tamper
+        // changes the recomputed digest and verification fails.
+        region: bundle.region.clone(),
     };
 
     let canonical = canonicalize(&unsigned);
@@ -278,6 +352,117 @@ mod tests {
             },
             export_seq: 1,
         }
+    }
+
+    // ─── Story 9.4b AC-5 region-binding gates ──────────────────────────────
+
+    fn region(tag: &str) -> Region {
+        Region::canonicalize(tag).unwrap()
+    }
+
+    /// R-RG1 (MERGE-BLOCKING) — same-input-opposite-verdict: a bundle pinned to
+    /// the home region verifies under the home-derived attester key; the SAME
+    /// bundle is rejected under a foreign region's derived key.
+    #[test]
+    fn r_rg1_home_allow_foreign_region_violation() {
+        let seed = [7u8; 32];
+        let unsigned = build_bundle(make_test_entries(), vec![], vec![], make_freshness())
+            .with_region(&region("eu"));
+        let signed = sign_bundle(unsigned, &seed).unwrap();
+
+        // home (eu) attester key -> ALLOW
+        let eu_pub = derive_region_pubkey(&seed, &region("eu"));
+        assert!(verify_bundle(&signed, &eu_pub).is_ok(), "home region must verify");
+
+        // foreign (us) attester key -> region violation (verification fails)
+        let us_pub = derive_region_pubkey(&seed, &region("us"));
+        assert!(
+            matches!(verify_bundle(&signed, &us_pub), Err(SealedExportError::VerificationFailed)),
+            "foreign-region key must fail verification (R-RG1)"
+        );
+    }
+
+    /// R-RG4′ (MERGE-BLOCKING) — cryptographic-binding bite: tampering the
+    /// region tag in a signed bundle breaks verification (the region is covered
+    /// by the signed digest), NOT merely a region-field string check.
+    #[test]
+    fn r_rg4_prime_region_tamper_breaks_verification() {
+        let seed = [7u8; 32];
+        let unsigned = build_bundle(make_test_entries(), vec![], vec![], make_freshness())
+            .with_region(&region("eu"));
+        let mut signed = sign_bundle(unsigned, &seed).unwrap();
+        let eu_pub = derive_region_pubkey(&seed, &region("eu"));
+        assert!(verify_bundle(&signed, &eu_pub).is_ok());
+
+        // Attacker rewrites the region field post-seal.
+        signed.region = Some("us".to_string());
+        assert!(
+            verify_bundle(&signed, &eu_pub).is_err(),
+            "region tamper must fail verification (R-RG4′)"
+        );
+        // ...and it does not verify under the tampered region's key either.
+        let us_pub = derive_region_pubkey(&seed, &region("us"));
+        assert!(verify_bundle(&signed, &us_pub).is_err());
+    }
+
+    /// AC-11 / R-SCH — byte-identity preserved: a region-less (`None`) bundle
+    /// serializes WITHOUT a `region` key, so pre-region exports stay byte-for-
+    /// byte identical (9.2b HARD byte-identity replay not disturbed).
+    #[test]
+    fn r_sch_region_none_omitted_from_canonical_bytes() {
+        let unsigned = build_bundle(make_test_entries(), vec![], vec![], make_freshness());
+        assert!(unsigned.region.is_none());
+        let canonical = String::from_utf8(canonicalize(&unsigned)).unwrap();
+        assert!(
+            !canonical.contains("region"),
+            "region-less bundle must not emit a region key: {canonical}"
+        );
+    }
+
+    /// AC-11 / R-SCH3 — backward compat: a v2 bundle JSON with NO region field
+    /// deserializes (region = None) and verifies under the raw (non-derived)
+    /// seed, exactly as before this story.
+    #[test]
+    fn r_sch3_v2_no_region_field_verifies_with_raw_seed() {
+        let seed = [3u8; 32];
+        // Sign with NO region -> raw seed path (the pre-9.4b behavior).
+        let unsigned = build_bundle(make_test_entries(), vec![], vec![], make_freshness());
+        let signed = sign_bundle(unsigned, &seed).unwrap();
+        // Round-trip through JSON (a "v2 on disk" bundle has no region key).
+        let json = serde_json::to_string(&signed).unwrap();
+        assert!(!json.contains("\"region\""), "v2 bundle must omit region");
+        let reparsed: AuditBundle = serde_json::from_str(&json).unwrap();
+        assert!(reparsed.region.is_none());
+        let raw_pub = derive_pubkey(&seed);
+        assert!(verify_bundle(&reparsed, &raw_pub).is_ok());
+    }
+
+    /// AC-12 — two spellings of one region derive the IDENTICAL signing key
+    /// (the irreversible failure class this story guards against).
+    #[test]
+    fn ac12_two_spellings_derive_identical_key() {
+        let seed = [9u8; 32];
+        let a = derive_region_signing_seed(&seed, &region("US-EAST-1"));
+        let b = derive_region_signing_seed(&seed, &region("us-east-1"));
+        assert_eq!(a, b);
+        // Different regions derive different keys.
+        let c = derive_region_signing_seed(&seed, &region("eu-west-1"));
+        assert_ne!(a, c);
+    }
+
+    /// R-SCH2 — round-trip: a region-pinned bundle survives serialize/
+    /// deserialize WITHOUT dropping the region tag, and still verifies.
+    #[test]
+    fn r_sch2_region_bundle_roundtrip_no_field_drop() {
+        let seed = [5u8; 32];
+        let unsigned = build_bundle(make_test_entries(), vec![], vec![], make_freshness())
+            .with_region(&region("ap-northeast-1"));
+        let signed = sign_bundle(unsigned, &seed).unwrap();
+        let json = serde_json::to_string(&signed).unwrap();
+        let reparsed: AuditBundle = serde_json::from_str(&json).unwrap();
+        assert_eq!(reparsed.region.as_deref(), Some("ap-northeast-1"));
+        let pubkey = derive_region_pubkey(&seed, &region("ap-northeast-1"));
+        assert!(verify_bundle(&reparsed, &pubkey).is_ok());
     }
 
     #[test]

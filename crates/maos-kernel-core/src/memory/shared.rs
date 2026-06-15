@@ -120,7 +120,7 @@ impl SharedMemoryStore {
 
     /// Write a value for the given writer spirit.  The `writer_spirit_pid`
     /// is kernel-set from the calling context.
-    pub fn write(
+    pub(in crate::memory) fn write(
         &self,
         writer_spirit_pid: u32,
         namespace: &MemoryNamespace,
@@ -150,7 +150,7 @@ impl SharedMemoryStore {
 
     /// Read a value from the shared store.  Queries by `(namespace, key)`
     /// regardless of writer_pid — shared-tier semantics.
-    pub fn read(
+    pub(in crate::memory) fn read(
         &self,
         _reader_spirit_pid: u32,
         namespace: &MemoryNamespace,
@@ -188,7 +188,7 @@ impl SharedMemoryStore {
     }
 
     /// Scan shared entries matching a key prefix within a namespace.
-    pub fn scan(
+    pub(in crate::memory) fn scan(
         &self,
         _reader_spirit_pid: u32,
         namespace: &MemoryNamespace,
