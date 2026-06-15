@@ -122,8 +122,7 @@ development_status:
   9-3-publish-the-typed-error-catalog-governance-audit-artifacts-and-wire-cost-attribution: done  # FR63 typed error catalog. 37 E* items catalogued, AST-based bijection check, deterministic generator, 16 tests (3 negative meta-tests). claude-opus-4-6. Review complete, all findings resolved.
   9-3b-governance-audit-artifacts-and-cost-attribution: done
   9-4-productionize-the-operator-surface-distribution-backup-dr-air-gap-region-pinning: done  # REVIEW COMPLETE 2026-06-14: 5 decision-needed findings resolved by team consensus (Winston·Murat·Amelia·John), 21 patches applied, 0 defer, 4 dismissed. All findings resolved; tests pass. Zero kernel-core delta.
-  9-4b-region-pinning-model-provenance-and-tenancy-reservation: ready-for-commit  # REVIEW COMPLETE 2026-06-15: 9 code patches applied, 2 deferred; R-SCH1 strict prior-commit ordering waived by team (retroactive v2 corpus follow-up). Ready to land as single commit with MANIFEST_SCHEMA_VERSION 3.
-  # Story 9.6 (added 2026-06-12 by Epic 8 retro §A2, ratified Lunarpulse; spec stub by Story 8.16 AC8): multi-Spirit scheduler + founder-class standalone load — closes 8.12 FORK B classify_spirit short-circuit, upgrades J1/J4 to Grade-A, auto-activates 8.15 J1 resume-continuity beat, folds Epic-7 §A3 open items (skill-queue persistence + functional approve/reject). Sequence before/around 9.4. Rec claude-opus-4-8.
+  9-4b-region-pinning-model-provenance-and-tenancy-reservation: done  # COMMITTED 2026-06-15 as a125737: 9 code review patches applied + 2 deferred; R-SCH1 v2 corpus prior-commit requirement waived, retroactive corpus tracked as follow-up.
   9-6-multi-spirit-scheduler-founder-class-standalone-load: backlog
   epic-9-retrospective: optional
   epic-10: backlog

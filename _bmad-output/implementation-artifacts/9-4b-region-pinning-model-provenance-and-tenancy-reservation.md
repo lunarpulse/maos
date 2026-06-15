@@ -3,7 +3,7 @@ recommended_dev_model: claude-opus-4-8
 ---
 
 # Story 9.4b: Region-Pinning + Model-Provenance + Multi-Operator Tenancy Reservation (KERNEL-TOUCHING HALF)
-Status: ready-for-commit
+Status: done
 
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
