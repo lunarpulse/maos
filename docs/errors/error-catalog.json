@@ -11,7 +11,9 @@
     "rust_path": "SecurityError::EAbiTooNew",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The spirit manifest declares a schema_version higher than the kernel's maximum supported ABI version. This happens when a spirit built for a newer kernel release is deployed onto an older kernel that has not been upgraded.",
+    "remediation": "Upgrade the MAOS kernel to a version that supports the manifest's declared schema_version. Run `maos version` to check the current kernel ABI ceiling, then consult the release notes for the minimum kernel version that covers the spirit's declared version."
   },
   "EAbiTooOld": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -25,7 +27,9 @@
     "rust_path": "SecurityError::EAbiTooOld",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The spirit manifest declares a schema_version that falls below the kernel's N-2 minimum support window. The kernel enforces a hard floor to prevent running dangerously outdated manifests that may lack required security fields.",
+    "remediation": "Re-author the spirit manifest to target a schema_version within the kernel's supported range. Check `maos manifest validate <manifest>` for the current minimum, then bump the manifest's `schema_version` field and verify all required fields for that version are present."
   },
   "EClassRequired": {
     "cause_chain_semantics": "security policy enforcement",
@@ -39,7 +43,9 @@
     "rust_path": "SecurityError::EClassRequired",
     "severity": "security",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The spirit manifest is missing the mandatory `[class]` section. Every spirit must declare its class for the kernel to apply the correct sandbox policy and lifecycle rules. This can also occur if a manifest parser bypass allowed a classless manifest to reach admission.",
+    "remediation": "Add a valid `[class]` section to the spirit manifest TOML. Example: `[class]\nkind = \"worker\"`. Then re-submit the manifest through the standard admission path — never bypass the manifest parser."
   },
   "ECliBinaryNotFound": {
     "cause_chain_semantics": "infrastructure or environment",
@@ -53,7 +59,9 @@
     "rust_path": "CliWrapperAdmissionError::ECliBinaryNotFound",
     "severity": "infra",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The CLI wrapper spirit references an external binary (via the manifest's `binary` or `path` field) that does not exist at the declared filesystem path and is not discoverable on the system PATH.",
+    "remediation": "Install the required CLI binary and ensure it is either on PATH or referenced by absolute path in the manifest. Verify with `which <binary>` or `ls <declared_path>`. If running in a container, ensure the binary is included in the image."
   },
   "ECliProbeFailed": {
     "cause_chain_semantics": "infrastructure or environment",
@@ -67,7 +75,9 @@
     "rust_path": "CliWrapperAdmissionError::ECliProbeFailed",
     "severity": "infra",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The CLI wrapper ran its probe subprocess (typically `<binary> --version` or a custom probe command) and the subprocess exited with a non-zero code, produced unreadable output, or violated the adapter's declared probe protocol.",
+    "remediation": "Run the probe command manually outside MAOS to diagnose the failure: e.g. `<binary> --version`. Check that the binary starts correctly, has the right permissions, and that its output matches the adapter's expected probe format. This error is retryable — transient failures (e.g. a locked resource) may resolve on retry."
   },
   "ECliWrapperRequiresT3": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -81,7 +91,9 @@
     "rust_path": "CliWrapperAdmissionError::ECliWrapperRequiresT3",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The CLI wrapper spirit manifest declares a sandbox tier lower than t3. Because CLI wrappers spawn external subprocesses, they require t3 (the highest sandbox tier) to contain the subprocess securely.",
+    "remediation": "Set `sandbox_tier = \"t3\"` in the spirit manifest's `[cli_wrapper]` section. Lower tiers (t1, t2) do not permit subprocess invocation by design."
   },
   "ECliWrapperTierNotGranted": {
     "cause_chain_semantics": "security policy enforcement",
@@ -95,7 +107,9 @@
     "rust_path": "CliWrapperAdmissionError::ECliWrapperTierNotGranted",
     "severity": "security",
     "since_version": "0.9.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The spirit manifest requests a sandbox tier (e.g. t3) that the host-side grant allowlist does not include. The kernel enforces fail-closed behavior — it will not silently downgrade to a lower tier.",
+    "remediation": "Add the requested sandbox tier to the host's grant allowlist configuration. Locate the grant allowlist (typically in the MAOS host config or deployment policy) and add the spirit's identity or class to the t3 grant list. Re-deploy after updating the allowlist."
   },
   "EComplianceRejection::ContextDrift": {
     "cause_chain_semantics": "security policy enforcement",
@@ -109,7 +123,9 @@
     "rust_path": "EComplianceRejection::ContextDrift",
     "severity": "security",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "During runtime, the execution context (environment fingerprint, resource bindings, or host state) changed in a way that no longer matches the fingerprint attested in the ComplianceClaim. This indicates the compliance invariant was violated after initial admission.",
+    "remediation": "Investigate what changed in the execution environment since the ComplianceClaim was issued. Common triggers include host reconfiguration, resource re-binding, or container migration. Re-attest the ComplianceClaim against the current context fingerprint and re-submit the spirit."
   },
   "EComplianceRejection::ExpiredClaim": {
     "cause_chain_semantics": "security policy enforcement",
@@ -123,7 +139,9 @@
     "rust_path": "EComplianceRejection::ExpiredClaim",
     "severity": "security",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The ComplianceClaim's `expires_at_unix_ms` timestamp is in the past relative to the kernel's clock. Claims are time-bounded to prevent stale attestations from being replayed.",
+    "remediation": "Re-issue the ComplianceClaim with a fresh `expires_at_unix_ms` value. Ensure the claim-issuing service and the MAOS kernel have synchronized clocks (NTP). If clock skew is suspected, check `timedatectl` or equivalent on both the issuer and the kernel host."
   },
   "EComplianceRejection::MalformedClaim": {
     "cause_chain_semantics": "security policy enforcement",
@@ -137,7 +155,9 @@
     "rust_path": "EComplianceRejection::MalformedClaim",
     "severity": "security",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The ComplianceClaim payload could not be decoded (invalid encoding), was missing a required field (e.g. `issuer`, `subject`, `expires_at_unix_ms`), or contained an unrecognized enum variant that the kernel cannot interpret.",
+    "remediation": "Validate the ComplianceClaim against the expected schema before submission. Ensure all required fields are present and that enum values match the kernel's known set. Use a JSON/CBOR validator to check encoding integrity."
   },
   "EComplianceRejection::SignatureInvalid": {
     "cause_chain_semantics": "security policy enforcement",
@@ -151,7 +171,9 @@
     "rust_path": "EComplianceRejection::SignatureInvalid",
     "severity": "security",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The Ed25519 signature on the ComplianceClaim failed cryptographic verification. This can occur if the claim was tampered with in transit, signed with a wrong or rotated key, or uses an unsupported signing algorithm.",
+    "remediation": "Verify that the signing key used to produce the ComplianceClaim matches the public key the kernel trusts. Check the key fingerprint with the compliance authority. If keys were rotated, update the kernel's trusted-key store and re-sign the claim."
   },
   "EHaltContinuityViolation": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -165,7 +187,9 @@
     "rust_path": "HaltContinuityError::EHaltContinuityViolation",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "During a hot-swap, the successor spirit does not support the halt-protocol schema version that the predecessor used to serialize its halt state. This violates invariant I14 which requires halt-protocol continuity across swaps.",
+    "remediation": "Ensure the successor spirit's manifest declares support for the predecessor's halt-protocol version in its `halt_versions_supported` list. If the predecessor used halt protocol v2, the successor must list v2 (or a superset). Update the successor manifest and re-attempt the hot-swap."
   },
   "EIntentLineageBroken": {
     "cause_chain_semantics": "security policy enforcement",
@@ -179,7 +203,9 @@
     "rust_path": "IacBusError::EIntentLineageBroken",
     "severity": "security",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "A cross-spirit IAC (inter-agent communication) frame arrived with an empty `intent_lineage` field, but its origin is non-human. Invariant I14 requires that all machine-originated frames carry a non-empty intent lineage to prevent consent-laundering — one spirit impersonating a human origin to bypass approval gates.",
+    "remediation": "Ensure the sending spirit populates the `intent_lineage` field on every outbound IAC frame. The lineage must trace back to the original human-approved intent. Review the sending spirit's IAC dispatch logic to confirm it propagates lineage from its own inbound frames."
   },
   "EManifestSchemaConflict": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -193,7 +219,9 @@
     "rust_path": "CliWrapperAdmissionError::EManifestSchemaConflict",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The spirit manifest contains both a `[class]` section and a `[cli_wrapper]` section. Per architecture §6.7 these are mutually exclusive — a spirit is either a native class-based spirit or a CLI wrapper, never both.",
+    "remediation": "Remove one of the conflicting sections from the manifest. If the spirit wraps an external CLI binary, keep `[cli_wrapper]` and remove `[class]`. If it is a native spirit, keep `[class]` and remove `[cli_wrapper]`."
   },
   "EMigratorMissing": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -207,7 +235,9 @@
     "rust_path": "HotSwapError::EMigratorMissing",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "A hot-swap was attempted between a predecessor and successor spirit, but no state-transfer migrator is registered for that specific class+version pair. The kernel cannot transfer runtime state without a matching migrator.",
+    "remediation": "Register a migrator for the predecessor→successor class+version pair in the spirit registry. Implement the `StateMigrator` trait for the transition and register it before attempting the hot-swap. Check `maos registry list-migrators` to see what is currently registered."
   },
   "EMigratorMissing_PrecheckOutcome": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -221,7 +251,9 @@
     "rust_path": "PrecheckOutcome::EMigratorMissing",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The hot-swap precheck phase detected that no migrator is registered for the candidate swap. This is the precheck-phase equivalent of EMigratorMissing — it fires before the actual swap is attempted to provide an early failure signal.",
+    "remediation": "Register the missing migrator for the predecessor→successor transition before re-running the precheck. This is identical to the EMigratorMissing remediation — implement and register a `StateMigrator` for the specific class+version pair."
   },
   "EOrchestratorDispatchRawOutput": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -235,7 +267,9 @@
     "rust_path": "IacBusError::EOrchestratorDispatchRawOutput",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "An orchestrator spirit's dispatch references raw worker output directly instead of referencing a distillate (per FR21). Raw output must be distilled before it can be dispatched to downstream consumers, to ensure safety and compliance review.",
+    "remediation": "Update the orchestrator's dispatch logic to reference a distillate ID rather than a raw output ID. Ensure the worker's output has been processed through the distillation pipeline before the orchestrator dispatches it. Check the orchestrator's IAC frame construction code."
   },
   "EOutputShapeAdapterMismatch": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -249,7 +283,9 @@
     "rust_path": "CliWrapperAdmissionError::EOutputShapeAdapterMismatch",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The CLI wrapper's actual output (observed during the probe or first invocation) does not match the `output_shape_version` declared in the manifest. Per ADR-021 the kernel enforces shape consistency at admission time to prevent downstream parsing failures.",
+    "remediation": "Update the manifest's `output_shape_version` to match the CLI binary's actual output format, or update the CLI binary to produce output matching the declared shape. Run the CLI manually and compare its output structure against the declared shape adapter."
   },
   "EOutputShapeAdapterNotRegistered": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -263,7 +299,9 @@
     "rust_path": "CliWrapperAdmissionError::EOutputShapeAdapterNotRegistered",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The spirit manifest references an `output_shape_version` whose adapter is not registered in the Spirit registry. The kernel cannot parse the CLI output without a matching adapter.",
+    "remediation": "Register the output-shape adapter in the Spirit registry before submitting the manifest. Implement the adapter for the declared `output_shape_version` and register it. Alternatively, change the manifest to reference an already-registered shape version."
   },
   "EPinMismatch::Invalidated": {
     "cause_chain_semantics": "invalid user input or request",
@@ -277,7 +315,9 @@
     "rust_path": "EPinMismatch::Invalidated",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The TOFU (Trust On First Use) pin for a peer spirit was explicitly invalidated — either because the peer restarted and generated a new identity, or because an operator manually revoked the pin.",
+    "remediation": "Re-establish trust with the peer by initiating a new first-contact handshake. If the peer restarted legitimately, accept the new pin. If the invalidation was unexpected, investigate whether the peer's identity was compromised before re-pinning."
   },
   "EPinMismatch::Mismatch": {
     "cause_chain_semantics": "security policy enforcement",
@@ -291,7 +331,9 @@
     "rust_path": "EPinMismatch::Mismatch",
     "severity": "security",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The observed cryptographic fingerprint of a peer spirit does not match the previously pinned fingerprint (TOFU). This is a potential man-in-the-middle indicator — something is presenting a different identity than what was trusted on first contact.",
+    "remediation": "Do NOT blindly accept the new fingerprint. Investigate why the peer's fingerprint changed. If the peer was legitimately re-keyed, verify through an out-of-band channel and update the pin. If the change is unexplained, treat it as a potential security incident and escalate to the security team."
   },
   "EPinMismatch::NotPinned": {
     "cause_chain_semantics": "invalid user input or request",
@@ -305,7 +347,9 @@
     "rust_path": "EPinMismatch::NotPinned",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "No TOFU pin exists for the target peer because first-contact has never been completed. The spirit attempted to communicate with a peer it has never established trust with.",
+    "remediation": "Initiate a first-contact handshake with the peer to establish and record the TOFU pin. Use `maos a2a trust <peer_id>` or the equivalent API call to perform initial trust establishment before attempting communication."
   },
   "ERespawnWithContextUnsupported": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -319,7 +363,9 @@
     "rust_path": "CliWrapperAdmissionError::ERespawnWithContextUnsupported",
     "severity": "policy",
     "since_version": "0.9.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The spirit manifest sets `recovery_policy = \"respawn_with_context\"`, but this recovery mode is not yet implemented — it is deferred to Epic 10 / NFR-Rel-3 (HSIS). The kernel fails closed rather than silently ignoring the unsupported policy.",
+    "remediation": "Change the manifest's `recovery_policy` to a supported value (e.g. `\"respawn\"` or `\"halt\"`). The `respawn_with_context` mode will be available in a future release. Monitor the MAOS roadmap for Epic 10 delivery."
   },
   "ESkillProposal::EmptyDiff": {
     "cause_chain_semantics": "invalid user input or request",
@@ -333,7 +379,9 @@
     "rust_path": "ESkillProposal::EmptyDiff",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "A skill revision proposal was submitted with an empty `proposed_diff` field. Per FR57, every revision proposal must contain a non-empty diff describing what changed.",
+    "remediation": "Populate the `proposed_diff` field with the actual changes before submitting the revision proposal. The diff should describe the content modifications between the current skill version and the proposed revision."
   },
   "ESkillProposal::EmptyTargetId": {
     "cause_chain_semantics": "invalid user input or request",
@@ -347,7 +395,9 @@
     "rust_path": "ESkillProposal::EmptyTargetId",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "A skill revision proposal was submitted with an empty `target_skill_id` field. The proposal must identify which skill it targets.",
+    "remediation": "Set the `target_skill_id` field to the non-empty identifier of the skill being revised. Use `maos skill list` to find valid skill IDs in the registry."
   },
   "ESkillProposal::InvalidTargetIdCharset": {
     "cause_chain_semantics": "invalid user input or request",
@@ -361,7 +411,9 @@
     "rust_path": "ESkillProposal::InvalidTargetIdCharset",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The `target_skill_id` in the revision proposal contains characters outside the allowed set. Skill IDs must conform to the charset rules (typically lowercase alphanumeric, hyphens, and dots).",
+    "remediation": "Correct the `target_skill_id` to use only allowed characters: lowercase letters (a-z), digits (0-9), hyphens (-), and dots (.). Remove or replace any uppercase letters, spaces, underscores, or special characters."
   },
   "ESkillProposal::InvalidTargetVersion": {
     "cause_chain_semantics": "invalid user input or request",
@@ -375,7 +427,9 @@
     "rust_path": "ESkillProposal::InvalidTargetVersion",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The `target_version` field in the revision proposal is not a valid semver string (e.g. `1.2.3`). The kernel requires strict semver for all version references.",
+    "remediation": "Fix the `target_version` to be a valid semver string (MAJOR.MINOR.PATCH, e.g. `1.0.0`). Pre-release and build metadata are allowed per semver spec (e.g. `1.0.0-beta.1`). Do not use partial versions like `1.0` or non-numeric segments."
   },
   "ESkillQueue::DuplicateSkillId": {
     "cause_chain_semantics": "invalid user input or request",
@@ -389,7 +443,9 @@
     "rust_path": "ESkillQueue::DuplicateSkillId",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "A skill with the same `SkillId` already exists in the Pending state within the admission queue. The queue enforces uniqueness to prevent duplicate processing.",
+    "remediation": "Wait for the existing pending entry to be processed (admitted or rejected) before re-submitting. If the pending entry is stale, cancel it first with `maos skill cancel <skill_id>`, then re-submit."
   },
   "ESkillSchema::EmptyBody": {
     "cause_chain_semantics": "invalid user input or request",
@@ -403,7 +459,9 @@
     "rust_path": "ESkillSchema::EmptyBody",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The skill document has no content after the TOML frontmatter fence. A skill must contain non-empty markdown body text that describes its behavior.",
+    "remediation": "Add markdown content after the closing `---` fence of the TOML frontmatter. The body should describe the skill's purpose, triggers, and behavior. Even a minimal description is required."
   },
   "ESkillSchema::EmptyId": {
     "cause_chain_semantics": "invalid user input or request",
@@ -417,7 +475,9 @@
     "rust_path": "ESkillSchema::EmptyId",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The skill's TOML frontmatter has an `id` field that is empty or contains only whitespace. Every skill must have a non-empty identifier.",
+    "remediation": "Set the `id` field in the TOML frontmatter to a non-empty value. Example: `id = \"my-skill-name\"`. The ID must also conform to charset rules (lowercase alphanumeric, hyphens, dots)."
   },
   "ESkillSchema::EmptyName": {
     "cause_chain_semantics": "invalid user input or request",
@@ -431,7 +491,9 @@
     "rust_path": "ESkillSchema::EmptyName",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The skill's TOML frontmatter has a `name` field that is empty or contains only whitespace. Every skill must have a human-readable display name.",
+    "remediation": "Set the `name` field in the TOML frontmatter to a non-empty human-readable string. Example: `name = \"My Skill Name\"`. The name is used for display purposes in the skill registry."
   },
   "ESkillSchema::InvalidIdCharset": {
     "cause_chain_semantics": "invalid user input or request",
@@ -445,7 +507,9 @@
     "rust_path": "ESkillSchema::InvalidIdCharset",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The skill's `id` field contains characters outside the allowed set. Only lowercase letters (a-z), digits (0-9), hyphens (-), and dots (.) are permitted.",
+    "remediation": "Rename the skill ID to use only allowed characters. Replace uppercase letters with lowercase, spaces/underscores with hyphens. Example: `My_Skill` → `my-skill`."
   },
   "ESkillSchema::InvalidSemver": {
     "cause_chain_semantics": "invalid user input or request",
@@ -459,7 +523,9 @@
     "rust_path": "ESkillSchema::InvalidSemver",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The skill's `version` field in the TOML frontmatter is not a valid semver string. The kernel strictly validates version strings at parse time.",
+    "remediation": "Set the `version` field to a valid semver string: `MAJOR.MINOR.PATCH` (e.g. `version = \"1.0.0\"`). Partial versions like `1.0` or non-numeric versions like `v1` are not accepted."
   },
   "ESkillSchema::MissingFence": {
     "cause_chain_semantics": "invalid user input or request",
@@ -473,7 +539,9 @@
     "rust_path": "ESkillSchema::MissingFence",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The skill document is missing the `---` TOML frontmatter fence. The `maos.skill.v1` format requires a fenced TOML block at the top of the document.",
+    "remediation": "Add the TOML frontmatter fence at the top of the skill document. The document must start with `---` followed by TOML key-value pairs and end with `---` before the markdown body. Example:\n```\n---\nid = \"my-skill\"\nname = \"My Skill\"\nversion = \"1.0.0\"\n---\nSkill body here.\n```"
   },
   "ESkillSchema::TomlParse": {
     "cause_chain_semantics": "invalid user input or request",
@@ -487,7 +555,9 @@
     "rust_path": "ESkillSchema::TomlParse",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The TOML content within the frontmatter fences failed to parse. This is caused by malformed TOML syntax (unclosed quotes, invalid escapes), a missing required field, or a field with the wrong value type (e.g. string where integer expected).",
+    "remediation": "Validate the TOML frontmatter with a TOML linter (e.g. `taplo check`). Fix any syntax errors, add missing required fields, and ensure value types match the schema. Common issues: unquoted strings, missing commas in arrays, bare keys with special characters."
   },
   "ESkillSchema::UnknownField": {
     "cause_chain_semantics": "invalid user input or request",
@@ -501,7 +571,9 @@
     "rust_path": "ESkillSchema::UnknownField",
     "severity": "user",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The TOML frontmatter contains a field name that is not recognized by the skill schema. The schema uses `deny_unknown_fields` to reject any extraneous keys, preventing silent misconfiguration.",
+    "remediation": "Remove the unrecognized field from the TOML frontmatter. Check the skill schema documentation for the list of valid fields. Common mistakes: typos in field names (e.g. `verson` instead of `version`), or fields from a newer schema version not yet supported."
   },
   "ESubstrateTooOld": {
     "cause_chain_semantics": "admission or runtime policy",
@@ -515,6 +587,8 @@
     "rust_path": "SecurityError::ESubstrateTooOld",
     "severity": "policy",
     "since_version": "0.5.0",
-    "version_stability": "stable within LTS cycle — no breaking error-code changes"
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The spirit manifest declares a `min_substrate_version` (per FR8) that is higher than the running kernel's version. The spirit requires a newer kernel than what is currently deployed.",
+    "remediation": "Upgrade the MAOS kernel to at least the version specified in the spirit's `min_substrate_version` field. Run `maos version` to check the current kernel version. Alternatively, if the spirit's requirement is overly strict, lower the `min_substrate_version` in the manifest."
   }
 }

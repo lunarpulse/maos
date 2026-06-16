@@ -111,6 +111,15 @@ maos-bench = 1500
 _aggregate_alarm = 16000
 _aggregate_hardfail = 90000
 
+# --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
+# docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a
+# workspace member and must contribute ZERO Rust source. This is ENFORCED — not
+# relied on by incidence — by `assert_docs_site_zero_rust()` in xtask's kloc gate
+# (xtask/src/kloc_check.rs), which walks docs-site/ and hard-fails on any `.rs`
+# file. tokei's `--types Rust` flag provides the structural exclusion; the xtask
+# assertion is the explicit gate the spec mandates.
+_docs_site_isolation = "ENFORCED by xtask kloc assert_docs_site_zero_rust() — docs-site must contribute 0 Rust LOC"
+
 [in_progress_decomposition]
 phase_1 = { target = "maos-iac + maos-manifest", status = "done", epic = "6.5", notes = "maos-iac: 13 files, 4834 code lines; maos-manifest: 1 file, ~3800 code lines (extracted from security/manifest.rs)" }
 phase_2 = { target = "maos-capability", status = "done", epic = "6.1", notes = "CORRECTED 2026-05-25: extracted ~1,271 LOC of pure surface; cross-cutting orchestration remains in kernel-core" }

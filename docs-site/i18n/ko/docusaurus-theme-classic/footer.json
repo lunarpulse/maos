@@ -1,0 +1,58 @@
+{
+  "link.title.Docs": {
+    "message": "문서",
+    "description": "Footer docs section"
+  },
+  "link.title.Reference": {
+    "message": "참조",
+    "description": "Footer reference section"
+  },
+  "link.title.Community": {
+    "message": "커뮤니티",
+    "description": "Footer community section"
+  },
+  "link.item.label.Write a Spirit": {
+    "message": "Spirit 작성하기",
+    "description": "Footer link"
+  },
+  "link.item.label.Run MAOS": {
+    "message": "MAOS 실행",
+    "description": "Footer link"
+  },
+  "link.item.label.Understand MAOS": {
+    "message": "MAOS 이해",
+    "description": "Footer link"
+  },
+  "link.item.label.Manifest Schema": {
+    "message": "Manifest Schema",
+    "description": "Footer link"
+  },
+  "link.item.label.ABI Reference": {
+    "message": "ABI Reference",
+    "description": "Footer link"
+  },
+  "link.item.label.Error Catalog": {
+    "message": "에러 카탈로그",
+    "description": "Footer link"
+  },
+  "link.item.label.Governance": {
+    "message": "거버넌스",
+    "description": "Footer link"
+  },
+  "link.item.label.Code of Conduct": {
+    "message": "행동 규범",
+    "description": "Footer link"
+  },
+  "link.item.label.RFC Template": {
+    "message": "RFC 템플릿",
+    "description": "Footer link"
+  },
+  "link.item.label.GitHub": {
+    "message": "GitHub",
+    "description": "Footer link"
+  },
+  "copyright": {
+    "message": "Copyright © 2026 MAOS Contributors. Apache-2.0 OR MIT.",
+    "description": "Footer copyright"
+  }
+}

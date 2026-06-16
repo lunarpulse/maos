@@ -1,0 +1,74 @@
+name: docs-site
+
+# Isolated CI job for the documentation site (D2 isolation contract).
+# Does NOT touch the Rust workspace, air-gap test, or any kernel gate.
+
+on:
+  push:
+    paths:
+      - 'docs-site/**'
+      - 'docs/errors/error-catalog.json'
+      - 'LOCALES.md'
+      - 'BREAKING.md'
+      - 'GOVERNANCE.md'
+      - 'CODE_OF_CONDUCT.md'
+      - 'RFC_TEMPLATE.md'
+      - 'TRADEMARK.md'
+      - '.github/workflows/docs-site.yml'
+  pull_request:
+    paths:
+      - 'docs-site/**'
+      - 'docs/errors/error-catalog.json'
+      - 'LOCALES.md'
+      - 'BREAKING.md'
+      - 'GOVERNANCE.md'
+      - 'CODE_OF_CONDUCT.md'
+      - 'RFC_TEMPLATE.md'
+      - 'TRADEMARK.md'
+      - '.github/workflows/docs-site.yml'
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: docs-site/package-lock.json
+
+      - name: Install dependencies
+        working-directory: docs-site
+        run: npm ci
+
+      # gate:build — per-locale builds exit 0; onBrokenLinks/Anchors: throw
+      - name: "gate:build — Build all locales"
+        working-directory: docs-site
+        run: npx docusaurus build
+
+      # gate:routes — all manifest routes resolve with content floor
+      - name: "gate:routes + gate:cookbook-count"
+        working-directory: docs-site
+        run: node scripts/gate-routes.js
+
+      # gate:troubleshoot-bidi + gate:troubleshoot-teach
+      - name: "gate:troubleshoot-bidi + gate:troubleshoot-teach"
+        working-directory: docs-site
+        run: node scripts/gate-troubleshoot-bidi.js
+
+      # gate:glossary-lock — per-unit positional + denylist
+      - name: "gate:glossary-lock"
+        working-directory: docs-site
+        run: node scripts/gate-glossary-lock.js
+
+      # gate:a11y + gate:a11y-ko-lang
+      - name: "gate:a11y + gate:a11y-ko-lang"
+        working-directory: docs-site
+        run: node scripts/gate-a11y.js
+
+      # Proven-red companion tests (D8)
+      - name: "proven-red — verify gates reject mutated input"
+        working-directory: docs-site
+        run: node scripts/proven-red.js

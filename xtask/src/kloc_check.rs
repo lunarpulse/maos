@@ -38,6 +38,11 @@ pub struct Report {
 }
 
 pub fn run(config: &str, json: bool) -> Result<(), String> {
+    // Hard Guardrail #2 (Story 9.5 D2): docs-site is a non-Cargo Docusaurus
+    // project and must contribute ZERO Rust source. The spec mandates an
+    // explicit, *enforced* assertion — not reliance on incidence. Fail fast.
+    assert_docs_site_zero_rust()?;
+
     let report = kloc_check(config)?;
 
     if json {
@@ -67,6 +72,49 @@ pub fn run(config: &str, json: bool) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Hard Guardrail #2 (Story 9.5 D2): docs-site is a non-Cargo Docusaurus project
+/// and must contribute ZERO Rust source. tokei's `--types Rust` excludes it
+/// structurally, but the spec mandates an *explicit, enforced* path-exclusion
+/// ("don't rely on incidence"). This walks docs-site/ and fails if any `.rs`
+/// file is present (skipping vendored/generated trees).
+fn assert_docs_site_zero_rust() -> Result<(), String> {
+    let docs_site = Path::new("docs-site");
+    if !docs_site.is_dir() {
+        return Ok(()); // docs-site absent — nothing to assert
+    }
+    let mut offenders = Vec::new();
+    walk_rust_files(docs_site, &mut offenders);
+    if offenders.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "docs-site isolation violation (Story 9.5 Hard Guardrail #2): found {} Rust file(s) \
+             under docs-site/ (must be 0): {}",
+            offenders.len(),
+            offenders.join(", ")
+        ))
+    }
+}
+
+fn walk_rust_files(dir: &Path, out: &mut Vec<String>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let p = entry.path();
+        if p.is_dir() {
+            // Skip vendored / generated trees.
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if matches!(name, "node_modules" | "build" | ".docusaurus" | ".git" | "target") {
+                continue;
+            }
+            walk_rust_files(&p, out);
+        } else if p.extension().and_then(|e| e.to_str()) == Some("rs") {
+            out.push(p.display().to_string());
+        }
+    }
 }
 
 fn kloc_check(config_path: &str) -> Result<Report, String> {
