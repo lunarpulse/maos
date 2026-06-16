@@ -15,6 +15,15 @@ use alloc::vec::Vec;
 ///
 /// The Spirit sees only this integer handle; the kernel resolves it
 /// to the actual `CapabilityToken` at mediation time.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::ctx::CapabilityHandle;
+///
+/// let handle = CapabilityHandle(42);
+/// assert_eq!(handle, CapabilityHandle(42));
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CapabilityHandle(pub u64);
 
@@ -22,6 +31,15 @@ pub struct CapabilityHandle(pub u64);
 ///
 /// The Spirit sees only this integer handle; the kernel resolves it
 /// to the actual mailbox queue at dispatch time.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::ctx::MailboxHandle;
+///
+/// let handle = MailboxHandle(7);
+/// assert_eq!(handle, MailboxHandle(7));
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MailboxHandle(pub u64);
 
@@ -46,16 +64,52 @@ pub struct Ctx {
 
 impl Ctx {
     /// Borrow the cancellation signal.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
+    ///
+    /// let mut ctx = Ctx::for_rust_inproc_hook(
+    ///     CapabilityHandle(100),
+    ///     MailboxHandle(200),
+    /// );
+    /// assert!(!ctx.cancellation().is_cancelled());
+    /// ```
     pub fn cancellation(&self) -> &dyn CancellationSignal {
         self.cancellation
     }
 
     /// Opaque capability handle — the kernel resolves this at mediation time.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
+    ///
+    /// let ctx = Ctx::for_rust_inproc_hook(
+    ///     CapabilityHandle(100),
+    ///     MailboxHandle(200),
+    /// );
+    /// assert_eq!(ctx.capability(), CapabilityHandle(100));
+    /// ```
     pub fn capability(&self) -> CapabilityHandle {
         self.capability_handle
     }
 
     /// Opaque mailbox handle — the kernel resolves this at IAC dispatch time.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
+    ///
+    /// let ctx = Ctx::for_rust_inproc_hook(
+    ///     CapabilityHandle(100),
+    ///     MailboxHandle(200),
+    /// );
+    /// assert_eq!(ctx.mailbox(), MailboxHandle(200));
+    /// ```
     pub fn mailbox(&self) -> MailboxHandle {
         self.mailbox_handle
     }
@@ -63,6 +117,18 @@ impl Ctx {
     /// Story 7.1 v0.5 binding — observe any deprecated ABI surfaces the
     /// Spirit code has used during the current hook fire. Returns an empty
     /// slice at v0.5 because the v0.5 ABI has no deprecations.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
+    ///
+    /// let ctx = Ctx::for_rust_inproc_hook(
+    ///     CapabilityHandle(100),
+    ///     MailboxHandle(200),
+    /// );
+    /// assert!(ctx.deprecation_warnings().is_empty());
+    /// ```
     pub fn deprecation_warnings(&self) -> &[DeprecationWarning] {
         &self.deprecation_warnings
     }
@@ -117,6 +183,19 @@ impl Ctx {
     /// (no Spirit author can call this; the Spirit receives a fully-
     /// constructed `Ctx` from the kernel and never constructs one
     /// itself).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
+    ///
+    /// let ctx = Ctx::for_rust_inproc_hook(
+    ///     CapabilityHandle(100),
+    ///     MailboxHandle(200),
+    /// );
+    /// assert_eq!(ctx.capability(), CapabilityHandle(100));
+    /// assert_eq!(ctx.mailbox(), MailboxHandle(200));
+    /// ```
     pub fn for_rust_inproc_hook(
         capability_handle: CapabilityHandle,
         mailbox_handle: MailboxHandle,

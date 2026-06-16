@@ -19,6 +19,29 @@
 //! - `pub mod ctx` — `Ctx` Spirit-author-facing context type
 //!
 //! All additions are ABI-additive per §8.5 rows 7+8. `ABI_VERSION` remains `1`.
+//!
+//! # Version history
+//!
+//! | Module / constant | Introduced | Notes |
+//! |---|---|---|
+//! | `ABI_VERSION` | Story 1b.4 | Frozen at `1` at ComplianceClaim envelope freeze |
+//! | `cancellation`, `lifecycle`, `ctx` | Story 2.1 | Additive ABI surface, no version bump |
+//! | `identity` | Story 1b.1 | Wire-stable since v0.1-β |
+//! | `compliance` | Story 1b.4 | Frozen schema, ABI_VERSION bump trigger |
+//! | `gateway` | Story 6.5 | ADR-029 binding-v1.0 |
+//! | `deprecation` | Story 7.1 | Empty-present deprecation channel |
+//! | `MANIFEST_SCHEMA_VERSION = 3` | Story 9.4b | `[model_provenance]` section |
+//!
+//! ## Modules
+//! | Module | Description | Introduced |
+//! |---|---|---|
+//! | [`cancellation`] | `CancellationSignal` trait + `NeverCancel` — runtime-agnostic cancellation | Story 2.1 |
+//! | [`compliance`] | `ComplianceClaim` envelope — Ed25519-signed attestation schema | Story 1b.4 (frozen) |
+//! | [`ctx`] | `Ctx` type — Spirit-author-facing context for hook invocations | Story 2.1 |
+//! | [`deprecation`] | `DeprecationWarning` — deprecation channel for ABI surface evolution | Story 7.1 |
+//! | [`gateway`] | `GatewaySubmodule` trait + `GatewayCtx` — external messaging gateway contract | Story 6.5 (ADR-029) |
+//! | [`identity`] | `SpiritId`, `HostId`, `FrameKind` — wire-stable identity and frame discrimination | Story 1b.1 |
+//! | [`lifecycle`] | `Spirit` trait + `SpiritVtable` + payload types | Story 2.1 |
 
 extern crate alloc;
 
@@ -33,9 +56,18 @@ pub mod lifecycle;
 pub use deprecation::DeprecationWarning;
 
 /// ABI version constant for the MAOS Spirit ABI.
+///
 /// Bumped according to the ABI Stability Triple rules (§8.5).
 ///
 /// **Story 1b.4 froze this at `1`** at the ComplianceClaim envelope freeze.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::ABI_VERSION;
+///
+/// assert_eq!(ABI_VERSION, 1);
+/// ```
 pub const ABI_VERSION: u32 = 1;
 
 /// Manifest schema version currently emitted by the kernel.
@@ -71,6 +103,14 @@ pub const ABI_VERSION: u32 = 1;
 /// check-manifest-schema-version` gate. Story 7.5a's ABI Stability Triple
 /// `(kernel_version, abi_version, manifest_schema_version)` consumes this
 /// constant directly.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
+///
+/// assert_eq!(MANIFEST_SCHEMA_VERSION, 3);
+/// ```
 pub const MANIFEST_SCHEMA_VERSION: u32 = 3;
 
 /// Lowest manifest schema version this kernel accepts at admission.
@@ -78,6 +118,20 @@ pub const MANIFEST_SCHEMA_VERSION: u32 = 3;
 /// Story 7.5a will lift this floor on each ABI bump per the N-1 supported /
 /// N-2 hard-refusal policy. At v0.5-α the floor remains at `1` — Epic 1b
 /// baseline manifests load unchanged.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+///
+/// fn check_manifest_version(declared: u32) -> bool {
+///     declared >= MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION
+/// }
+///
+/// assert!(check_manifest_version(1));
+/// assert!(check_manifest_version(3));
+/// assert!(!check_manifest_version(0));
+/// ```
 pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1;
 
 /// Highest manifest schema version this kernel emits or accepts.
@@ -85,4 +139,24 @@ pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1;
 /// Currently equal to `MANIFEST_SCHEMA_VERSION`. The two constants stay
 /// synonymous until Story 7.5a introduces an explicit N+1 acceptance window
 /// for forward-compatibility experiments.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::{
+///     MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION,
+///     MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION,
+/// };
+///
+/// fn is_version_supported(v: u32) -> bool {
+///     v >= MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION
+///         && v <= MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION
+/// }
+///
+/// assert!(is_version_supported(1));  // N-1 — supported
+/// assert!(is_version_supported(2));  // N-1 — supported
+/// assert!(is_version_supported(3));  // Current — supported
+/// assert!(!is_version_supported(4)); // Future — EAbiTooNew
+/// assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
+/// ```
 pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;

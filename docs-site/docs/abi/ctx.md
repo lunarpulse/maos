@@ -1,150 +1,147 @@
----
-title: ctx
-sidebar_position: 3
-description: "Ctx type — Spirit-author-facing context carrying cancellation, capability, and mailbox handles."
----
+<!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->
 
 # `ctx` Module
 
-The `ctx` module provides the `Ctx` type — the Spirit-author-facing context passed to every lifecycle hook. It is the **only** surface through which a hook can interact with the kernel (per invariant I1: Spirits cannot bypass the Capability Registry).
+## Related
 
-Introduced in Story 2.1.
+- [lifecycle Module](./lifecycle) — hooks that receive `Ctx`
+- [cancellation Module](./cancellation) — `CancellationSignal` returned by `Ctx::cancellation()`
+- [deprecation Module](./deprecation) — `DeprecationWarning` returned by `Ctx::deprecation_warnings()`
 
-## Ctx
+
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+
+Spirit-author-facing context type.
+
+`Ctx` carries the cancellation signal, capability handle, and
+mailbox handle a Spirit hook receives at invocation time. It is the
+ONLY surface through which a hook can interact with the kernel —
+per I1, Spirits cannot bypass the Capability Registry.
+
+## Structs
+
+Spirit-author-facing context passed to every hook.
+
+Carries a cancellation signal (so long-running hooks can bail early),
+an opaque capability handle (so hooks can use capability APIs
+via the SDK), and an opaque mailbox handle (for IAC frame send/receive
+via the SDK).
+
+The cancellation signal is stored with a `'static` bound because
+the kernel owns the underlying signal (e.g., an `Arc<AtomicBool>`)
+and ensures it outlives all Spirit hook invocations. This avoids
+lifetime parameters on the vtable dispatch functions.
 
 ```rust
-pub struct Ctx {
-    // Internal fields — not directly accessible
-    cancellation: &'static dyn CancellationSignal,
-    capability_handle: CapabilityHandle,
-    mailbox_handle: MailboxHandle,
-    deprecation_warnings: Vec<DeprecationWarning>,
-}
+pub struct Ctx { /* private fields */ }
 ```
 
-### Methods
+### Inherent Items
 
-| Method | Returns | Description |
-|---|---|---|
-| `cancellation()` | `&dyn CancellationSignal` | Borrow the cancellation signal for checking/awaiting cancellation |
-| `capability()` | `CapabilityHandle` | Opaque handle resolved by the kernel at capability mediation time |
-| `mailbox()` | `MailboxHandle` | Opaque handle resolved by the kernel at IAC dispatch time |
-| `deprecation_warnings()` | `&[DeprecationWarning]` | Observe deprecated ABI surfaces used during the current hook fire (Story 7.1) |
+Borrow the cancellation signal.
 
-### Example: Using Ctx in a Hook
+# Example
 
 ```rust
-use maos_spirit_abi::lifecycle::Spirit;
-use maos_spirit_abi::ctx::Ctx;
+use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
 
-struct MySpirit;
-
-impl Spirit for MySpirit {
-    fn on_start(&self, ctx: &mut Ctx) {
-        // Check for cancellation
-        if ctx.cancellation().is_cancelled() {
-            return;
-        }
-
-        // Read the capability handle for SDK calls
-        let cap = ctx.capability();
-
-        // Read the mailbox handle for IAC frame operations
-        let mbox = ctx.mailbox();
-
-        // Check for deprecation warnings (empty at v0.5)
-        for warning in ctx.deprecation_warnings() {
-            // Log deprecated surface usage
-        }
-    }
-}
+let mut ctx = Ctx::for_rust_inproc_hook(
+    CapabilityHandle(100),
+    MailboxHandle(200),
+);
+assert!(!ctx.cancellation().is_cancelled());
 ```
 
-## CapabilityHandle
-
-Opaque handle to a capability token held kernel-side. The Spirit sees only this integer handle; the kernel resolves it to the actual `CapabilityToken` at mediation time.
-
 ```rust
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CapabilityHandle(pub u64);
+pub fn cancellation(&self) -> &dyn CancellationSignal
 ```
 
-### Example
+Opaque capability handle — the kernel resolves this at mediation time.
+
+# Example
 
 ```rust
-use maos_spirit_abi::ctx::CapabilityHandle;
+use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
 
-let handle = CapabilityHandle(42);
-assert_eq!(handle, CapabilityHandle(42));
-```
-
-## MailboxHandle
-
-Opaque handle to the Spirit's mailbox. The Spirit sees only this integer handle; the kernel resolves it to the actual mailbox queue at dispatch time.
-
-```rust
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MailboxHandle(pub u64);
-```
-
-### Example
-
-```rust
-use maos_spirit_abi::ctx::MailboxHandle;
-
-let handle = MailboxHandle(7);
-assert_eq!(handle, MailboxHandle(7));
-```
-
-## Mock Constructors (Test Only)
-
-Available under `#[cfg(any(test, feature = "mock"))]`:
-
-### `Ctx::mock()`
-
-Constructs a `Ctx` with `NeverCancel`, zero handles, and no deprecation warnings. For SDK-side unit tests.
-
-```rust
-#[cfg(test)]
-fn test_my_spirit() {
-    use maos_spirit_abi::ctx::Ctx;
-    use maos_spirit_abi::lifecycle::Spirit;
-
-    let mut ctx = Ctx::mock();
-    let spirit = MySpirit;
-    spirit.on_load(&mut ctx);
-}
-```
-
-### `Ctx::mock_with_deprecation_warnings()`
-
-Constructs a mock `Ctx` with pre-populated deprecation warnings. Used by `spirit-test` to verify the deprecation channel (Story 7.1).
-
-```rust
-#[cfg(test)]
-fn test_deprecation_surface() {
-    use maos_spirit_abi::ctx::Ctx;
-    use maos_spirit_abi::DeprecationWarning;
-
-    let warning = DeprecationWarning::new(
-        "Ctx::old_method",
-        "0.5",
-        "1.0",
-        "use Ctx::new_method instead",
-    );
-    let ctx = Ctx::mock_with_deprecation_warnings(vec![warning]);
-    assert_eq!(ctx.deprecation_warnings().len(), 1);
-}
-```
-
-### `Ctx::for_rust_inproc_hook()`
-
-Kernel-internal constructor for rust-inproc dispatch (NOT gated behind `mock`). Spirit authors never call this directly.
-
-```rust
-// Kernel-side only — not for Spirit authors
 let ctx = Ctx::for_rust_inproc_hook(
     CapabilityHandle(100),
     MailboxHandle(200),
 );
+assert_eq!(ctx.capability(), CapabilityHandle(100));
+```
+
+```rust
+pub fn capability(&self) -> CapabilityHandle
+```
+
+Opaque mailbox handle — the kernel resolves this at IAC dispatch time.
+
+# Example
+
+```rust
+use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
+
+let ctx = Ctx::for_rust_inproc_hook(
+    CapabilityHandle(100),
+    MailboxHandle(200),
+);
+assert_eq!(ctx.mailbox(), MailboxHandle(200));
+```
+
+```rust
+pub fn mailbox(&self) -> MailboxHandle
+```
+
+Story 7.1 v0.5 binding — observe any deprecated ABI surfaces the
+Spirit code has used during the current hook fire. Returns an empty
+slice at v0.5 because the v0.5 ABI has no deprecations.
+
+# Example
+
+```rust
+use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
+
+let ctx = Ctx::for_rust_inproc_hook(
+    CapabilityHandle(100),
+    MailboxHandle(200),
+);
+assert!(ctx.deprecation_warnings().is_empty());
+```
+
+```rust
+pub fn deprecation_warnings(&self) -> &[DeprecationWarning]
+```
+
+Construct a kernel-internal `Ctx` for rust-inproc hook dispatch.
+
+Story 5.1 closure: the kernel-side `HookDispatcher` requires a
+`Ctx` to pass to each hook fire. At v0.3-β the rust-inproc form
+uses a `&'static NeverCancel` because the kernel mediates
+cancellation through `KernelCtx`'s SCB state, not through `Ctx`.
+Real handles are zero-valued (rust-inproc form does not use them;
+Story 5.5x's subprocess form will populate them from the wire
+decode handshake).
+
+This constructor is NOT gated behind the `mock` feature — it is
+the production-supported kernel-side surface for rust-inproc
+dispatch, and is callable only from within `maos-kernel-core`
+(no Spirit author can call this; the Spirit receives a fully-
+constructed `Ctx` from the kernel and never constructs one
+itself).
+
+# Example
+
+```rust
+use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
+
+let ctx = Ctx::for_rust_inproc_hook(
+    CapabilityHandle(100),
+    MailboxHandle(200),
+);
+assert_eq!(ctx.capability(), CapabilityHandle(100));
+assert_eq!(ctx.mailbox(), MailboxHandle(200));
+```
+
+```rust
+pub fn for_rust_inproc_hook(capability_handle: CapabilityHandle, mailbox_handle: MailboxHandle) -> Self
 ```

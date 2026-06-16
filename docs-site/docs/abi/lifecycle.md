@@ -1,207 +1,84 @@
----
-title: lifecycle
-sidebar_position: 2
-description: Spirit trait with 14 lifecycle hooks, SpiritVtable dispatch table, and payload types.
----
+<!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->
 
 # `lifecycle` Module
 
-The lifecycle module defines the **Spirit trait** — the in-process Rust trait contract between the kernel and a Spirit. It provides 14 lifecycle hooks (per FR55), a dispatch vtable, and typed payloads.
+## Related
 
-Introduced in Story 2.1 (11 hooks), extended in Story 5.2 (+3 hot-swap hooks: `on_swap_out`, `snapshot`, `migrate`).
+- [ABI Stability Policy](/migrate/abi-stability) — when `ABI_VERSION` bumps
+- [ctx Module](./ctx) — `Ctx` passed to every hook
+- [cancellation Module](./cancellation) — `CancellationSignal` used in hooks
 
-## Spirit Trait
 
-The core trait every Spirit implements. All hooks have default no-op bodies — a Spirit author writes only the hooks they need.
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
 
-```rust
-pub trait Spirit {
-    fn on_load(&self, ctx: &mut Ctx) {}
-    fn on_start(&self, ctx: &mut Ctx) {}
-    fn on_frame<'a>(&self, ctx: &mut Ctx, payload: &FramePayload<'a>) {}
-    fn on_idle(&self, ctx: &mut Ctx) {}
-    fn on_telemetry_event<'a>(&self, ctx: &mut Ctx, payload: &TelemetryEventPayload<'a>) {}
-    fn on_schedule<'a>(&self, ctx: &mut Ctx, payload: &SchedulePayload<'a>) {}
-    fn on_swap_in<'a>(&self, ctx: &mut Ctx, payload: &SwapInPayload<'a>) {}
-    fn on_pause(&self, ctx: &mut Ctx) {}
-    fn on_resume(&self, ctx: &mut Ctx) {}
-    fn on_unload(&self, ctx: &mut Ctx) {}
-    fn on_consolidate<'a>(&self, ctx: &mut Ctx, payload: &ConsolidatePayload<'a>) {}
-    fn on_swap_out(&self, ctx: &mut Ctx) {}                                          // Story 5.2
-    fn snapshot(&self, ctx: &mut Ctx) -> Vec<u8> { Vec::new() }                      // Story 5.2
-    fn migrate(&self, ctx: &mut Ctx, predecessor_state: &[u8])
-        -> Result<Vec<u8>, MigratorError> { Err(MigratorError::NotImplemented) }     // Story 5.2
-}
-```
+Lifecycle hooks trait — the in-process Rust trait contract between
+the kernel and a Spirit.
 
-### Hook Reference
+Per architecture §5.3: "The Spirit ABI is the contract between the
+kernel and a Spirit. Every Spirit conforms to it."
 
-| Hook | Fires When | Payload | §5.3 Ref |
-|---|---|---|---|
-| `on_load` | Spirit admitted and loaded | — | §5.3.1 |
-| `on_start` | First `Start` verb received | — | §5.3.2 |
-| `on_frame` | IAC frame arrives at mailbox | `FramePayload` | §5.3.3 |
-| `on_idle` | No frames for ≥ `idle_timeout_ms` | — | §5.3.4 |
-| `on_telemetry_event` | Scalar-tap event fires | `TelemetryEventPayload` | §5.3.5 |
-| `on_schedule` | Scheduled invocation fires | `SchedulePayload` | §5.3.6 |
-| `on_swap_in` | Predecessor state arrives (hot-swap) | `SwapInPayload` | §5.3.7 |
-| `on_pause` | Kernel pauses the Spirit | — | §5.3.8 |
-| `on_resume` | Kernel resumes a paused Spirit | — | §5.3.9 |
-| `on_unload` | `Unload` verb received | — | §5.3.10 |
-| `on_consolidate` | Batch window closes | `ConsolidatePayload` | §5.3.11 |
-| `on_swap_out` | About to be swapped out | — | §5.3.12 |
-| `snapshot` | Produce state snapshot for hot-swap | — (returns `Vec<u8>`) | §5.3.13 |
-| `migrate` | Cross-major migration entry | predecessor `&[u8]` (returns `Result<Vec<u8>, MigratorError>`) | §5.3.14 |
+This module ships the **14-hook signature set** per FR55 (Story 5.2
+extended from the original 11). The 1 deferred hook from the
+architecture §5.3 14-hook list is:
 
-### Example: Implementing a Spirit
+| Hook | Deferred to | Reason |
+|---|---|---|
+| `epistemic_resolve` | Story 4.1 | Halt-protocol resolution |
 
-```rust
-use maos_spirit_abi::lifecycle::{Spirit, FramePayload};
-use maos_spirit_abi::ctx::Ctx;
+Story 5.1 shipped the runtime firing for 11 hooks. Story 5.2 adds
+the hot-swap hooks (`on_swap_out`, `snapshot`, `migrate`) with full
+dispatcher integration, bringing the total to 14.
 
-struct MySpirit {
-    frame_count: std::sync::atomic::AtomicU64,
-}
+ADR-002 (Spirit form at v0.1): The trait signature serves both
+`rust-inproc` and `subprocess` forms. The `CancellationSignal`
+abstraction is the bridge that makes this possible — in-process
+Spirits receive a `&dyn CancellationSignal` backed by the kernel's
+Tokio runtime; subprocess Spirits receive a signal the wire protocol
+carries as a message.
 
-impl Spirit for MySpirit {
-    fn on_load(&self, ctx: &mut Ctx) {
-        // Initialize resources when admitted by the kernel
-    }
+## Enums
 
-    fn on_frame<'a>(&self, ctx: &mut Ctx, payload: &FramePayload<'a>) {
-        // Check for cancellation before processing
-        if ctx.cancellation().is_cancelled() {
-            return;
-        }
-        self.frame_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        // Process payload.frame_data[..payload.frame_len]
-    }
+Resource budget envelope key — the `#[hook(budget = "…")]`
+attribute parses to one of these variants at compile time.
 
-    fn on_unload(&self, ctx: &mut Ctx) {
-        // Clean up resources before removal
-    }
-}
-```
-
-## Payload Types
-
-All payloads are `#[derive(Debug, Clone, Copy)]` and carry raw byte slices. Full typed frames (IAC Bus dispatch) land in Epic 6.
-
-### FramePayload
-
-```rust
-pub struct FramePayload<'a> {
-    pub frame_data: &'a [u8],
-    pub frame_len: usize,
-}
-```
-
-### TelemetryEventPayload
-
-```rust
-pub struct TelemetryEventPayload<'a> {
-    pub event_data: &'a [u8],
-    pub event_len: usize,
-}
-```
-
-### SchedulePayload
-
-```rust
-pub struct SchedulePayload<'a> {
-    pub schedule_data: &'a [u8],
-    pub schedule_len: usize,
-}
-```
-
-### SwapInPayload
-
-```rust
-pub struct SwapInPayload<'a> {
-    pub predecessor_state: &'a [u8],
-    pub state_len: usize,
-}
-```
-
-### ConsolidatePayload
-
-```rust
-pub struct ConsolidatePayload<'a> {
-    pub batch_data: &'a [u8],
-    pub batch_len: usize,
-}
-```
-
-## HookBudgetKey
-
-Maps `#[hook(budget = "...")]` attributes to resource budget envelopes at compile time. The kernel consults the manifest's `[budget]` section against this key at firing time.
+The kernel consults the manifest's `[budget]` section against this
+key at firing time. Actual enforcement ships in Story 5.1.
 
 ```rust
 pub enum HookBudgetKey {
-    ContextWindow,   // Token or byte-equivalent context window size
-    TimeCapSeconds,  // Per-invocation time cap
-    CpuMaxPct,       // CPU usage percentage cap
-    MemoryMaxMb,     // Memory ceiling in MB
-    FdMax,           // File descriptor cap
+    ContextWindow,
+    TimeCapSeconds,
+    CpuMaxPct,
+    MemoryMaxMb,
+    FdMax,
 }
 ```
 
-## MigratorError
+Cross-major migration error — returned by `Spirit::migrate`.
 
-Returned by `Spirit::migrate` when cross-major migration fails.
+`#[non_exhaustive]` lets future stories add variants without an ABI bump.
+Hand-rolled Display impl because `maos-spirit-abi` is `#![no_std]`
+with minimal dependencies (only `serde`).
 
 ```rust
-#[non_exhaustive]
 pub enum MigratorError {
     NotImplemented,
-    Malformed(String),
-    Internal(String),
+    Malformed,
+    Internal,
 }
 ```
 
-Use the constructor methods to enforce non-empty messages:
 
-```rust
-// Preferred — enforces non-empty message
-let err = MigratorError::new_malformed("missing header field");
-let err = MigratorError::new_internal("state checksum mismatch");
-```
+## Functions
 
-## SpiritVtable
+Returns `true` if the kernel should invoke the given hook for a
+Spirit whose manifest declares the `enabled_hooks` subset.
 
-Per-hook function-pointer dispatch table used by the kernel at runtime (Story 5.1). The vtable is `#[repr(C)]` for subprocess-form FFI dispatch (Epic 5, Story 5.5x).
+The invocation gate is signature-level: the kernel consults this
+predicate at dispatch time. The runtime hook caller ships in
+Story 5.1.
 
-```rust
-#[repr(C)]
-pub struct SpiritVtable<T: Spirit + 'static> {
-    // One function pointer per hook — constructed by the #[spirit] proc-macro
-}
-```
-
-### Example: Constructing a vtable
-
-```rust
-use maos_spirit_abi::lifecycle::{Spirit, SpiritVtable};
-
-struct EchoSpirit;
-
-impl Spirit for EchoSpirit {
-    // Use default no-op implementations
-}
-
-// The #[spirit] proc-macro generates this; manual construction for illustration:
-let vtable = SpiritVtable::<EchoSpirit>::new();
-```
-
-## `kernel_invocation_allowed`
-
-Predicate function the kernel calls at dispatch time to check if a hook is in the Spirit's `enabled_hooks` subset.
-
-```rust
-pub fn kernel_invocation_allowed(enabled_hooks: &[&str], hook_name: &str) -> bool;
-```
-
-### Example
+# Example
 
 ```rust
 use maos_spirit_abi::lifecycle::kernel_invocation_allowed;
@@ -209,4 +86,84 @@ use maos_spirit_abi::lifecycle::kernel_invocation_allowed;
 let enabled = &["on_load", "on_frame", "on_unload"];
 assert!(kernel_invocation_allowed(enabled, "on_frame"));
 assert!(!kernel_invocation_allowed(enabled, "on_idle"));
+```
+
+```rust
+pub fn kernel_invocation_allowed(enabled_hooks: &[&str], hook_name: &str) -> bool
+```
+
+
+## Traits
+
+The Spirit lifecycle trait.
+
+A Spirit implements this trait to receive lifecycle events from the
+kernel. Every method has a default no-op body, so a Spirit author
+writes only the hooks they care about.
+
+# Example
+
+```rust
+use maos_spirit_abi::lifecycle::{Spirit, FramePayload};
+use maos_spirit_abi::ctx::Ctx;
+
+struct MySpirit;
+
+impl Spirit for MySpirit {
+    fn on_load(&self, _ctx: &mut Ctx) {
+        // Initialize resources when admitted by the kernel.
+    }
+
+    fn on_frame<'a>(&self, ctx: &mut Ctx, payload: &FramePayload<'a>) {
+        if ctx.cancellation().is_cancelled() {
+            return;
+        }
+        let _data = &payload.frame_data[..payload.frame_len];
+    }
+
+    fn on_unload(&self, _ctx: &mut Ctx) {
+        // Clean up resources before removal.
+    }
+}
+```
+
+# Firing semantics (architecture §5.3 references)
+
+| Hook | Fires when… | Payload | Implemented at |
+|---|---|---|---|
+| `on_load` | Spirit is admitted and loaded (§5.3.1) | — | Story 2.1 |
+| `on_start` | Spirit receives first `Start` verb (§5.3.2) | — | Story 2.1 |
+| `on_frame` | IAC frame arrives (§5.3.3) | `FramePayload` | Story 2.1 |
+| `on_idle` | No frames for ≥ idle_timeout_ms (§5.3.4) | — | Story 2.1 |
+| `on_telemetry_event` | Scalar-tap event fires (§5.3.5) | `TelemetryEventPayload` | Story 2.1 |
+| `on_schedule` | Scheduled invocation fires (§5.3.6) | `SchedulePayload` | Story 2.1 |
+| `on_swap_in` | Predecessor state arrives (§5.3.7) | `SwapInPayload` | Story 2.1 |
+| `on_pause` | Kernel pauses Spirit (§5.3.8) | — | Story 2.1 |
+| `on_resume` | Kernel resumes Spirit (§5.3.9) | — | Story 2.1 |
+| `on_unload` | Spirit receives `Unload` verb (§5.3.10) | — | Story 2.1 |
+| `on_consolidate` | Batch window closes (§5.3.11) | `ConsolidatePayload` | Story 2.1 |
+| `on_swap_out` | Spirit is about to be swapped out (§5.3.12) | — | Story 5.2 ✅ |
+| `snapshot` | Produce state snapshot for hot-swap (§5.3.13) | — (returns `Vec<u8>`) | Story 5.2 ✅ |
+| `migrate` | Cross-major migration entry (§5.3.14) | predecessor_state `&[u8]` (returns `Result<Vec<u8>, MigratorError>`) | Story 5.2 ✅ |
+
+All hooks receive a `&mut Ctx` carrying the cancellation signal,
+capability handle, and mailbox handle.
+
+```rust
+pub trait Spirit {
+    fn on_load(&self, ctx: &mut Ctx);
+    fn on_start(&self, ctx: &mut Ctx);
+    fn on_frame<'a>(&self, ctx: &mut Ctx, payload: &FramePayload<'a>);
+    fn on_idle(&self, ctx: &mut Ctx);
+    fn on_telemetry_event<'a>(&self, ctx: &mut Ctx, payload: &TelemetryEventPayload<'a>);
+    fn on_schedule<'a>(&self, ctx: &mut Ctx, payload: &SchedulePayload<'a>);
+    fn on_swap_in<'a>(&self, ctx: &mut Ctx, payload: &SwapInPayload<'a>);
+    fn on_pause(&self, ctx: &mut Ctx);
+    fn on_resume(&self, ctx: &mut Ctx);
+    fn on_unload(&self, ctx: &mut Ctx);
+    fn on_consolidate<'a>(&self, ctx: &mut Ctx, payload: &ConsolidatePayload<'a>);
+    fn on_swap_out(&self, ctx: &mut Ctx);
+    fn snapshot(&self, ctx: &mut Ctx) -> alloc::vec::Vec<u8>;
+    fn migrate(&self, ctx: &mut Ctx, predecessor_state: &[u8]) -> Result<alloc::vec::Vec<u8>, MigratorError>;
+}
 ```

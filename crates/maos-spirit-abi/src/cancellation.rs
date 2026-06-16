@@ -34,6 +34,15 @@ use core::task::{Context, Poll};
 /// ```
 pub trait CancellationSignal {
     /// Synchronous poll: returns `true` if cancellation has been requested.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use maos_spirit_abi::cancellation::{CancellationSignal, NeverCancel};
+    ///
+    /// let signal = NeverCancel;
+    /// assert!(!signal.is_cancelled());
+    /// ```
     fn is_cancelled(&self) -> bool;
 
     /// Async await: returns a future that resolves when cancellation is
@@ -80,6 +89,17 @@ impl<'a> Future for CancellationFuture<'a> {
 ///
 /// Useful for trait-object dispatch smoke tests and SDK-side unit tests
 /// that do not require an async runtime.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::cancellation::{CancellationSignal, NeverCancel};
+///
+/// let signal = NeverCancel;
+/// assert!(!signal.is_cancelled());
+///
+/// // NeverCancel is the default signal used by Ctx::mock().
+/// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NeverCancel;
 

@@ -17,6 +17,22 @@
 ///
 /// Populated by the kernel at hook-fire time from any ABI surface annotated
 /// `#[maos_attrs::deprecated_since(version = "0.5", remove_at = "1.0", migration = "...")]`.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::DeprecationWarning;
+///
+/// const OLD_SEND_WARNING: DeprecationWarning = DeprecationWarning::new(
+///     "Ctx::old_send_method",
+///     "0.5",
+///     "1.0",
+///     "use Ctx::new_send_method instead",
+/// );
+///
+/// assert_eq!(OLD_SEND_WARNING.surface, "Ctx::old_send_method");
+/// assert_eq!(OLD_SEND_WARNING.since_version, "0.5");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DeprecationWarning {
     /// The deprecated surface identifier — e.g., `"Ctx::old_send_method"`.

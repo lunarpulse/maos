@@ -41,6 +41,19 @@ use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
 /// payload INDIRECTLY via its SHA-256 hash, keeping the envelope
 /// fixed-size and the signature verifiable without CBOR-parsing the
 /// claim at the verify step.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::{ComplianceClaimEnvelope, SigningAlg};
+///
+/// let envelope = ComplianceClaimEnvelope {
+///     signature: [0u8; 64],       // Replace with real Ed25519 signature
+///     attester_pubkey: [0u8; 32], // Replace with real public key
+///     claim_bytes: vec![],        // CBOR-encoded Claim
+///     signing_alg: SigningAlg::Ed25519,
+/// };
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComplianceClaimEnvelope {
     /// Ed25519 signature over `sha256(claim_bytes)`. 64 bytes.
@@ -95,6 +108,14 @@ impl<'de> serde::Deserialize<'de> for ComplianceClaimEnvelope {
 /// Additive enum: adding a variant at the end with explicit `#[repr(u8)]`
 /// discriminant is NOT an ABI break. Removing or reordering variants IS
 /// an ABI break per §8.5.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::SigningAlg;
+///
+/// let alg = SigningAlg::Ed25519;
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 #[serde(rename_all = "snake_case")]
@@ -108,6 +129,35 @@ pub enum SigningAlg {
 /// The canonical encoding for hash purposes is:
 /// `fingerprint_hash = sha256(cbor_canonical(ser(&self)))`
 /// using RFC 8949 canonical CBOR.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::{
+///     ExecutionContextFingerprint, TrustTier, SandboxTier,
+///     CapabilityId, ProviderEndpointPin, CryptoProviderId,
+/// };
+/// use std::collections::BTreeSet;
+///
+///
+/// let fingerprint = ExecutionContextFingerprint {
+///     manifest_hash: [0u8; 32],
+///     spirit_version: "1.0.0".into(),
+///     trust_tier: TrustTier::PublicVetted,
+///     sandbox_tier: SandboxTier::T2,
+///     capability_scope: {
+///         let mut set = BTreeSet::new();
+///         set.insert(CapabilityId("model.invoke".into()));
+///         set
+///     },
+///     provider_endpoint: ProviderEndpointPin {
+///         provider_id: "anthropic".into(),
+///         endpoint_url: "https://api.anthropic.com".into(),
+///         model_id: None,
+///     },
+///     crypto_provider: CryptoProviderId("ring".into()),
+/// };
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ExecutionContextFingerprint {
     /// SHA-256 of the Spirit's manifest.toml after canonicalization.
@@ -128,6 +178,14 @@ pub struct ExecutionContextFingerprint {
 }
 
 /// Trust tier — operator-visible metadata classification.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::TrustTier;
+///
+/// let tier = TrustTier::PublicVetted;
+/// ```
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
@@ -145,6 +203,14 @@ pub enum TrustTier {
 }
 
 /// Sandbox tier — OS-native sandbox primitive classification.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::SandboxTier;
+///
+/// let tier = SandboxTier::T2;
+/// ```
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
@@ -164,10 +230,30 @@ pub enum SandboxTier {
 }
 
 /// Capability identifier — sorted, canonical, hash-stable.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::CapabilityId;
+///
+/// let id = CapabilityId("model.invoke".into());
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub struct CapabilityId(pub String);
 
 /// Provider endpoint pin per ADR-005 pluggable provider drivers.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::ProviderEndpointPin;
+///
+/// let pin = ProviderEndpointPin {
+///     provider_id: "anthropic".into(),
+///     endpoint_url: "https://api.anthropic.com".into(),
+///     model_id: Some("claude-3-7-sonnet".into()),
+/// };
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ProviderEndpointPin {
     /// Provider identifier (e.g., "anthropic", "openai", "ollama").
@@ -180,10 +266,37 @@ pub struct ProviderEndpointPin {
 }
 
 /// Crypto provider identifier per §8.6 pluggable crypto trait.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::CryptoProviderId;
+///
+/// let id = CryptoProviderId("ring".into());
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub struct CryptoProviderId(pub String);
 
 /// The inner claim payload — what `claim_bytes` CBOR-encodes.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::{
+///     Claim, Uuid, PrincipleRef, EvidenceKind, Verdict,
+/// };
+///
+/// let claim = Claim {
+///     claim_id: Uuid::from_bytes([1u8; 16]),
+///     issued_at_unix_ms: 1717200000000,
+///     expires_at_unix_ms: Some(1717300000000),
+///     principle_refs: vec![PrincipleRef::Soc2TypeIi],
+///     evidence: vec![EvidenceKind::ManualReview {
+///         reviewer_id: "reviewer-42".into(),
+///     }],
+///     verdict: Verdict::Admit,
+/// };
+/// ```
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Claim {
     /// UUID v4 unique claim identifier.
@@ -208,6 +321,15 @@ pub struct Claim {
 /// shape, less abi-diff churn. The `uuid` crate's serde impl emits a *string*
 /// in human-readable formats and *bytes* in binary formats — using the newtype
 /// guarantees `[u8;16]` in all codecs without qualification.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::Uuid;
+///
+/// let id = Uuid::from_bytes([0xAB; 16]);
+/// assert_eq!(id.as_bytes(), &[0xAB; 16]);
+/// ```
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
@@ -230,6 +352,15 @@ impl Uuid {
 /// Additive enum with explicit discriminants. Adding a variant at the
 /// end with `#[serde(other)]` fallback is NOT an ABI break; removing or
 /// reordering IS.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::PrincipleRef;
+///
+/// let principle = PrincipleRef::Soc2TypeIi;
+/// assert_eq!(principle as u8, 1);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 #[serde(rename_all = "snake_case")]
@@ -248,6 +379,23 @@ pub enum PrincipleRef {
 }
 
 /// Evidence supporting a compliance claim.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::EvidenceKind;
+///
+/// let corpus = EvidenceKind::CorpusReplay {
+///     corpus_sha256: [0xAA; 32],
+/// };
+///
+/// let review = EvidenceKind::ManualReview {
+///     reviewer_id: "eng-lead-01".into(),
+/// };
+///
+/// assert!(matches!(corpus, EvidenceKind::CorpusReplay { .. }));
+/// assert!(matches!(review, EvidenceKind::ManualReview { .. }));
+/// ```
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EvidenceKind {
@@ -279,6 +427,24 @@ pub enum EvidenceKind {
 ///
 /// Explicit discriminants on every variant — reordering without updating
 /// discriminants is an ABI break per §8.5 self-test row #5.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::compliance::Verdict;
+///
+/// let verdict = Verdict::AdmitWithCaveats {
+///     caveats: vec!["Model version not pinned".into()],
+/// };
+///
+/// match verdict {
+///     Verdict::Admit => { /* admitted */ }
+///     Verdict::AdmitWithCaveats { caveats } => {
+///         assert_eq!(caveats.len(), 1);
+///     }
+///     _ => { /* other verdict */ }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 #[serde(rename_all = "snake_case")]

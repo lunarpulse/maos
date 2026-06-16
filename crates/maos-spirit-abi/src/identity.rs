@@ -13,19 +13,43 @@ use alloc::string::String;
 /// architecture §7.1. Variants 0..=6 are IAC bus frame kinds; variants
 /// 7/8/9 are kernel-internal audit kinds that do NOT flow through the
 /// IAC router.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::identity::FrameKind;
+///
+/// let kind = FrameKind::from_u8(0);
+/// assert_eq!(kind, Some(FrameKind::TaskAssign));
+///
+/// let unknown = FrameKind::from_u8(99);
+/// assert_eq!(unknown, None);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum FrameKind {
+    /// IAC bus frame kind: task assignment.
     TaskAssign = 0,
+    /// IAC bus frame kind: task completion.
     TaskComplete = 1,
+    /// IAC bus frame kind: decision dispatch.
     DecisionDispatch = 2,
+    /// IAC bus frame kind: epistemic halt.
     EpistemicHalt = 3,
+    /// IAC bus frame kind: telemetry event.
     TelemetryEvent = 4,
+    /// IAC bus frame kind: consent request.
     ConsentRequest = 5,
+    /// IAC bus frame kind: retract.
     Retract = 6,
+
+    /// Kernel-internal audit kind: capability invocation.
     CapabilityInvocation = 7,
+    /// Kernel-internal audit kind: sandbox block.
     SandboxBlock = 8,
+    /// Kernel-internal audit kind: inference call.
     InferenceCall = 9,
+
     /// Story 6.2 AC6 — FR52: a line of stdout/stderr captured from a
     /// CliWrapperSpirit's invoked CLI subprocess. Payload shape:
     /// `{ cli_binary_path, invoking_spirit_id, output_stream: "stdout"|"stderr",
@@ -55,6 +79,17 @@ pub enum FrameKind {
 }
 
 impl FrameKind {
+    /// Parse a `u8` discriminant into a `FrameKind`, returning `None` for unknown values.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use maos_spirit_abi::identity::FrameKind;
+    ///
+    /// assert_eq!(FrameKind::from_u8(0), Some(FrameKind::TaskAssign));
+    /// assert_eq!(FrameKind::from_u8(25), Some(FrameKind::GatewayOutbound));
+    /// assert_eq!(FrameKind::from_u8(99), None);
+    /// ```
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
             0 => Some(Self::TaskAssign),
@@ -83,10 +118,31 @@ impl FrameKind {
 /// per-Spirit routing." The newtype exists so that a bare `String` cannot
 /// be accidentally used where a `SpiritId` is required (address typing
 /// per ADR-010).
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::identity::SpiritId;
+///
+/// let id = SpiritId::from("my-spirit");
+/// let id2 = SpiritId::from(String::from("my-spirit"));
+/// assert_eq!(id, id2);
+/// assert_eq!(id.as_str(), "my-spirit");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct SpiritId(pub String);
 
 impl SpiritId {
+    /// Borrow as string slice.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use maos_spirit_abi::identity::SpiritId;
+    ///
+    /// let id = SpiritId::from("my-spirit");
+    /// assert_eq!(id.as_str(), "my-spirit");
+    /// ```
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -108,10 +164,20 @@ impl From<&str> for SpiritId {
 ///
 /// Same-Host routing at v0.3-β uses `None` for `FrameAddress.host_id`;
 /// cross-Host A2A (Story 6.3) fills `Some(host_id)`.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::identity::HostId;
+///
+/// let host = HostId("node-east-1".into());
+/// assert_eq!(host.as_str(), "node-east-1");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct HostId(pub String);
 
 impl HostId {
+    /// Borrow as string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -123,10 +189,29 @@ impl HostId {
 /// Spirit identity from a `SpiritRole` when the sender targets a role rather
 /// than a specific Spirit. v0.3-β supports the four Director-surface roles
 /// enumerated here; the full role ontology ships in Story 6.1.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::identity::SpiritRole;
+///
+/// let role = SpiritRole::Worker;
+///
+/// match role {
+///     SpiritRole::Director => { /* orchestration logic */ }
+///     SpiritRole::Observer => { /* monitoring logic */ }
+///     SpiritRole::Worker => { /* task execution logic */ }
+///     SpiritRole::Orchestrator => { /* multi-Spirit coordination */ }
+/// }
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum SpiritRole {
+    /// Director role: orchestration and decision authority.
     Director,
+    /// Observer role: monitoring and telemetry.
     Observer,
+    /// Worker role: task execution.
     Worker,
+    /// Orchestrator role: multi-Spirit coordination.
     Orchestrator,
 }

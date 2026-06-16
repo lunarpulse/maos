@@ -1,94 +1,50 @@
----
-title: cancellation
-sidebar_position: 6
-description: "CancellationSignal trait and NeverCancel — runtime-agnostic cancellation for Spirit hooks."
----
+<!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->
 
 # `cancellation` Module
 
-The cancellation module provides a `#![no_std]` abstraction for Spirit hook cancellation. It bridges the gap between in-process Spirits (backed by Tokio) and subprocess Spirits (backed by wire protocol signals) per ADR-002.
+## Related
 
-Introduced in Story 2.1.
+- [ADR-002](/adr/ADR-002-spirit-form-at-v01) — why cancellation is runtime-agnostic
+- [lifecycle Module](./lifecycle) — hooks that poll `CancellationSignal`
+- [ctx Module](./ctx) — `Ctx::cancellation()`
 
-## CancellationSignal Trait
 
-The kernel-side bridge that lets hook implementations check or await cancellation without coupling to a specific runtime.
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
 
-```rust
-pub trait CancellationSignal {
-    /// Synchronous poll: returns true if cancellation has been requested.
-    fn is_cancelled(&self) -> bool;
+Cancellation signal trait — no_std abstraction for Spirit hook cancellation.
 
-    /// Async await: returns a future that resolves when cancellation is requested.
-    /// Not object-safe — use is_cancelled() on &dyn CancellationSignal.
-    fn cancelled(&self) -> CancellationFuture<'_>
-    where
-        Self: Sized;
-}
-```
+ADR-002 commits to subprocess-form Spirits as the v0.1 default with
+rust-inproc gated on measurement. Subprocess Spirits live in a different
+process from the kernel's Tokio runtime; they cannot directly reference a
+`tokio_util::sync::CancellationToken` instance. This trait provides an
+abstraction the wire protocol can carry as a signal.
 
-### Methods
+The SDK side (std-aware, tokio-aware) provides `TokioCancellationSignal`
+as the production impl; tests use `NeverCancel`.
 
-| Method | Returns | Object-safe? | Description |
-|---|---|---|---|
-| `is_cancelled()` | `bool` | ✅ Yes | Synchronous poll — use in hook implementations |
-| `cancelled()` | `CancellationFuture` | ❌ No (`Self: Sized`) | Async wait — override in production adapters |
+## Structs
 
-### Example: Checking Cancellation in a Hook
+Future returned by [`CancellationSignal::cancelled`].
 
-```rust
-use maos_spirit_abi::lifecycle::{Spirit, FramePayload};
-use maos_spirit_abi::ctx::Ctx;
-
-struct BatchProcessor;
-
-impl Spirit for BatchProcessor {
-    fn on_frame<'a>(&self, ctx: &mut Ctx, payload: &FramePayload<'a>) {
-        // Check cancellation before expensive work
-        if ctx.cancellation().is_cancelled() {
-            return;
-        }
-
-        // Process the frame
-        let data = &payload.frame_data[..payload.frame_len];
-        // ... batch processing logic ...
-    }
-}
-```
-
-## CancellationFuture
-
-Future returned by `CancellationSignal::cancelled()`. Polls `is_cancelled()` without registering a waker.
+**Limitation:** The default implementation polls `is_cancelled()` without
+registering a waker. Executors that rely solely on waker notifications
+(including Tokio) will never re-poll after the first `Pending` result,
+causing this future to hang indefinitely if the signal is not already
+cancelled. Use `is_cancelled()` for synchronous polling in hook
+implementations; the async `cancelled()` method is a placeholder for
+production adapters (`TokioCancellationSignal`) that override it with
+an efficient runtime-aware wait.
 
 ```rust
-pub struct CancellationFuture<'a> {
-    signal: &'a dyn CancellationSignal,
-}
-
-impl<'a> Future for CancellationFuture<'a> {
-    type Output = ();
-    // Returns Poll::Ready(()) when is_cancelled() is true
-}
+pub struct CancellationFuture<'a> { /* private fields */ }
 ```
 
-**Important limitation:** The default `cancelled()` implementation does not register a waker. Executors relying solely on waker notifications (including Tokio) will never re-poll after the first `Pending`. Use `is_cancelled()` for synchronous polling in hooks. Production adapters like `TokioCancellationSignal` override `cancelled()` with an efficient runtime-aware implementation.
+Reference implementation: a cancellation signal that never fires.
 
-## NeverCancel
+Useful for trait-object dispatch smoke tests and SDK-side unit tests
+that do not require an async runtime.
 
-Reference implementation that never fires. Useful for tests and SDK-side unit tests that do not require an async runtime.
-
-```rust
-#[derive(Debug, Clone, Copy, Default)]
-pub struct NeverCancel;
-
-impl CancellationSignal for NeverCancel {
-    fn is_cancelled(&self) -> bool {
-        false
-    }
-}
-```
-
-### Example: Using NeverCancel in Tests
+# Example
 
 ```rust
 use maos_spirit_abi::cancellation::{CancellationSignal, NeverCancel};
@@ -96,25 +52,36 @@ use maos_spirit_abi::cancellation::{CancellationSignal, NeverCancel};
 let signal = NeverCancel;
 assert!(!signal.is_cancelled());
 
-// NeverCancel is the default signal used by Ctx::mock()
+// NeverCancel is the default signal used by Ctx::mock().
 ```
 
-## Implementation Guide
+```rust
+pub struct NeverCancel;
+```
 
-To implement a production cancellation signal (e.g., backed by Tokio), implement the trait and override `cancelled()`:
+
+## Traits
+
+Trait for cancellation signals — the kernel-side bridge that lets
+hook implementations check or await cancellation without coupling
+to a specific runtime.
+
+Structurally parallel to the D9 pattern from Story 1b.6:
+one no_std wire-format abstraction, one std operational adapter.
+
+# Example
+
+```ignore
+fn on_frame(&self, ctx: &mut Ctx) {
+    if ctx.cancellation().is_cancelled() {
+        return; // bail early
+    }
+    // … do work …
+}
+```
 
 ```rust
-use maos_spirit_abi::cancellation::CancellationSignal;
-
-struct TokioCancellationSignal {
-    // Backed by tokio_util::sync::CancellationToken
-    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
-}
-
-impl CancellationSignal for TokioCancellationSignal {
-    fn is_cancelled(&self) -> bool {
-        self.cancelled.load(std::sync::atomic::Ordering::Acquire)
-    }
-    // Override cancelled() with a Tokio-aware async wait in production
+pub trait CancellationSignal {
+    fn is_cancelled(&self) -> bool;
 }
 ```

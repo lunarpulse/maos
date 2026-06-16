@@ -36,6 +36,19 @@ use core::marker::PhantomData;
 ///
 /// v0.1-β carries raw byte slices. Full typed frames (IAC Bus dispatch)
 /// land in Epic 6.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::lifecycle::FramePayload;
+///
+/// let data: &[u8] = b"hello";
+/// let payload = FramePayload {
+///     frame_data: data,
+///     frame_len: data.len(),
+/// };
+/// assert_eq!(payload.frame_len, 5);
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct FramePayload<'a> {
     pub frame_data: &'a [u8],
@@ -43,6 +56,19 @@ pub struct FramePayload<'a> {
 }
 
 /// Payload delivered to `on_telemetry_event`.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::lifecycle::TelemetryEventPayload;
+///
+/// let data: &[u8] = b"event";
+/// let payload = TelemetryEventPayload {
+///     event_data: data,
+///     event_len: data.len(),
+/// };
+/// assert_eq!(payload.event_len, 5);
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct TelemetryEventPayload<'a> {
     pub event_data: &'a [u8],
@@ -50,6 +76,19 @@ pub struct TelemetryEventPayload<'a> {
 }
 
 /// Payload delivered to `on_schedule`.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::lifecycle::SchedulePayload;
+///
+/// let data: &[u8] = b"schedule";
+/// let payload = SchedulePayload {
+///     schedule_data: data,
+///     schedule_len: data.len(),
+/// };
+/// assert_eq!(payload.schedule_len, 8);
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct SchedulePayload<'a> {
     pub schedule_data: &'a [u8],
@@ -57,6 +96,19 @@ pub struct SchedulePayload<'a> {
 }
 
 /// Payload delivered to `on_swap_in` (hot-swap predecessor state reference).
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::lifecycle::SwapInPayload;
+///
+/// let state: &[u8] = b"predecessor-state";
+/// let payload = SwapInPayload {
+///     predecessor_state: state,
+///     state_len: state.len(),
+/// };
+/// assert_eq!(payload.state_len, 17);
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct SwapInPayload<'a> {
     pub predecessor_state: &'a [u8],
@@ -64,6 +116,19 @@ pub struct SwapInPayload<'a> {
 }
 
 /// Payload delivered to `on_consolidate` (batch summary).
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::lifecycle::ConsolidatePayload;
+///
+/// let data: &[u8] = b"batch-summary";
+/// let payload = ConsolidatePayload {
+///     batch_data: data,
+///     batch_len: data.len(),
+/// };
+/// assert_eq!(payload.batch_len, 13);
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct ConsolidatePayload<'a> {
     pub batch_data: &'a [u8],
@@ -116,6 +181,32 @@ macro_rules! count_hooks {
 /// A Spirit implements this trait to receive lifecycle events from the
 /// kernel. Every method has a default no-op body, so a Spirit author
 /// writes only the hooks they care about.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::lifecycle::{Spirit, FramePayload};
+/// use maos_spirit_abi::ctx::Ctx;
+///
+/// struct MySpirit;
+///
+/// impl Spirit for MySpirit {
+///     fn on_load(&self, _ctx: &mut Ctx) {
+///         // Initialize resources when admitted by the kernel.
+///     }
+///
+///     fn on_frame<'a>(&self, ctx: &mut Ctx, payload: &FramePayload<'a>) {
+///         if ctx.cancellation().is_cancelled() {
+///             return;
+///         }
+///         let _data = &payload.frame_data[..payload.frame_len];
+///     }
+///
+///     fn on_unload(&self, _ctx: &mut Ctx) {
+///         // Clean up resources before removal.
+///     }
+/// }
+/// ```
 ///
 /// # Firing semantics (architecture §5.3 references)
 ///
@@ -232,6 +323,16 @@ pub enum MigratorError {
 }
 
 impl MigratorError {
+    /// Construct a `MigratorError::Malformed` variant, enforcing a non-empty message.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use maos_spirit_abi::lifecycle::MigratorError;
+    ///
+    /// let err = MigratorError::new_malformed("missing header field");
+    /// assert!(matches!(err, MigratorError::Malformed(_)));
+    /// ```
     pub fn new_malformed(msg: impl Into<alloc::string::String>) -> Self {
         let msg = msg.into();
         if msg.is_empty() {
@@ -240,6 +341,16 @@ impl MigratorError {
         Self::Malformed(msg)
     }
 
+    /// Construct a `MigratorError::Internal` variant, enforcing a non-empty message.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use maos_spirit_abi::lifecycle::MigratorError;
+    ///
+    /// let err = MigratorError::new_internal("state checksum mismatch");
+    /// assert!(matches!(err, MigratorError::Internal(_)));
+    /// ```
     pub fn new_internal(msg: impl Into<alloc::string::String>) -> Self {
         let msg = msg.into();
         if msg.is_empty() {
@@ -386,6 +497,16 @@ impl<T: Spirit + 'static> SpiritVtable<T> {
 /// The invocation gate is signature-level: the kernel consults this
 /// predicate at dispatch time. The runtime hook caller ships in
 /// Story 5.1.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::lifecycle::kernel_invocation_allowed;
+///
+/// let enabled = &["on_load", "on_frame", "on_unload"];
+/// assert!(kernel_invocation_allowed(enabled, "on_frame"));
+/// assert!(!kernel_invocation_allowed(enabled, "on_idle"));
+/// ```
 pub fn kernel_invocation_allowed(enabled_hooks: &[&str], hook_name: &str) -> bool {
     if enabled_hooks.is_empty() {
         return true;

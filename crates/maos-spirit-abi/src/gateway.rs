@@ -21,6 +21,25 @@ use core::pin::Pin;
 use core::time::Duration;
 
 /// Error type returned by gateway submodule operations.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::gateway::GatewayError;
+/// use core::time::Duration;
+///
+/// let err = GatewayError::Backoff {
+///     retry_after: Duration::from_secs(5),
+/// };
+///
+/// match err {
+///     GatewayError::Fatal(_) => { /* terminate */ }
+///     GatewayError::Backoff { retry_after } => {
+///         assert_eq!(retry_after, Duration::from_secs(5));
+///     }
+///     _ => { /* other error */ }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum GatewayError {
@@ -39,6 +58,20 @@ pub enum GatewayError {
 }
 
 /// Inbound message from an external gateway.
+///
+/// # Example
+///
+/// ```rust
+/// use maos_spirit_abi::gateway::InboundMessage;
+///
+/// let msg = InboundMessage {
+///     external_recipient_id: "chat_id:123456789",
+///     sender_id: "user-42",
+///     payload: b"hello",
+///     timestamp_ns: 1_717_000_000_000_000_000,
+/// };
+/// assert_eq!(msg.payload, b"hello");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InboundMessage<'a> {
     /// External recipient identifier (e.g., "chat_id:123456789").
@@ -58,6 +91,16 @@ pub struct InboundMessage<'a> {
 /// All boxed handles are cloneable (cheap Arc reference semantics) so the
 /// dispatcher can construct a fresh `GatewayCtx` for `on_disconnect` without
 /// requiring the spawned task to release its copy.
+///
+/// # Example
+///
+/// ```ignore
+/// use maos_spirit_abi::gateway::GatewayCtx;
+///
+/// fn connect(ctx: GatewayCtx) {
+///     println!("connecting gateway {} for spirit {}", ctx.gateway_id, ctx.spirit_id);
+/// }
+/// ```
 pub struct GatewayCtx {
     /// Gateway entry id from the manifest.
     pub gateway_id: String,
@@ -87,6 +130,43 @@ pub struct GatewayCtx {
 ///
 /// All methods are async. The trait uses `Pin<Box<dyn Future>>` return types
 /// for dyn compatibility in `#![no_std]` environments.
+///
+/// # Example
+///
+/// ```ignore
+/// use maos_spirit_abi::gateway::{
+///     GatewaySubmodule, GatewayCtx, GatewayError, InboundMessage,
+/// };
+/// use core::future::Future;
+/// use core::pin::Pin;
+/// use alloc::boxed::Box;
+///
+/// struct TelegramGateway;
+///
+/// impl GatewaySubmodule for TelegramGateway {
+///     fn on_connect(
+///         &self, ctx: GatewayCtx,
+///     ) -> Pin<Box<dyn Future<Output = Result<(), GatewayError>> + Send>> {
+///         Box::pin(async move { Ok(()) })
+///     }
+///
+///     fn on_disconnect(
+///         &self, ctx: GatewayCtx,
+///     ) -> Pin<Box<dyn Future<Output = Result<(), GatewayError>> + Send>> {
+///         Box::pin(async move { Ok(()) })
+///     }
+///
+///     fn on_inbound_message<'a>(
+///         &'a self, ctx: &'a GatewayCtx, msg: InboundMessage<'a>,
+///     ) -> Pin<Box<dyn Future<Output = Result<(), GatewayError>> + Send + 'a>> {
+///         Box::pin(async move { Ok(()) })
+///     }
+///
+///     fn auth_secret_ref(&self) -> &str {
+///         "telegram-bot-token"
+///     }
+/// }
+/// ```
 #[allow(async_fn_in_trait)]
 pub trait GatewaySubmodule: Send + Sync {
     /// Establish the long-lived connection. Fires at Spirit-admission

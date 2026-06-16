@@ -1,70 +1,90 @@
----
-title: constants
-sidebar_position: 9
-description: "ABI_VERSION, MANIFEST_SCHEMA_VERSION, and supported window constants."
----
+<!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->
 
-# Constants
+# `constants` Module
 
-The `maos-spirit-abi` crate root exports four constants that form the mechanical core of the [ABI Stability Triple](/migrate/abi-stability). These are the single source of truth consumed by admission checks, CI gates, and the stability matrix.
+## Related
 
-## ABI_VERSION
+- [ABI Stability Policy](/migrate/abi-stability) — full compatibility window documentation
+- [v1 → v2 Migration](/migrate/v1-to-v2) — what changed at manifest schema version 2
+- [v2 → v3 Migration](/migrate/v2-to-v3) — what changed at manifest schema version 3
 
-```rust
-pub const ABI_VERSION: u32 = 1;
-```
 
-Wire-format version of the Spirit ABI. Bumped according to the §8.5 ABI-break rules. Frozen at `1` by Story 1b.4 at the ComplianceClaim envelope freeze.
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
 
-This constant changes only when a **breaking** wire-format change occurs (field removal, field rename, type change, enum variant removal). Additive changes (optional fields, new enum variants with `#[serde(other)]`) do NOT bump this.
 
-### Example
+## Constants
+
+ABI version constant for the MAOS Spirit ABI.
+
+Bumped according to the ABI Stability Triple rules (§8.5).
+
+**Story 1b.4 froze this at `1`** at the ComplianceClaim envelope freeze.
+
+# Example
 
 ```rust
 use maos_spirit_abi::ABI_VERSION;
 
 assert_eq!(ABI_VERSION, 1);
-// Use in version negotiation or logging
-println!("Spirit ABI version: {ABI_VERSION}");
 ```
-
-## MANIFEST_SCHEMA_VERSION
 
 ```rust
-pub const MANIFEST_SCHEMA_VERSION: u32 = 3;
+pub const ABI_VERSION: u32 = 1u32;
 ```
 
-Schema version currently emitted by the kernel for Spirit manifest TOML files. This is the version a newly-authored manifest should declare in its `[class]` section.
+Manifest schema version currently emitted by the kernel.
 
-### Version History
+Bumped to `2` in Epic 6 §A4 (retro 2026-05-28) to track the four additive
+sections landed across Epic 6 stories 6.2 / 6.4 / 6.5:
 
-| Version | Introduced | Changes |
-|---|---|---|
-| `1` | Epic 1b | Baseline manifest schema |
-| `2` | Epic 6 (2026-05-28) | `[[cli_wrapper]]`, `[[schedules]]`, `[gateways]`/`[[gateway]]`, consent envelope extensions |
-| `3` | Story 9.4b (2026-06-15) | `[model_provenance]` section |
+- `[[cli_wrapper]]` (Story 6.2 — `command`, `output_shape_version`,
+  `recovery_policy`, `posture`, `shutdown_signal`).
+- `[[schedules]]` (Story 6.4 — `id`, `cadence`, `rate_limit_per_hour`,
+  `compliance_claim_ref_hex`, `side_effect_scopes`, `payload_b64`).
+- `[gateways]` / `[[gateway]]` (Story 6.5 — `id`, `type`, `auth_secret_ref`,
+  `inbound_routing`, gateway-specific config blocks).
+- `ConsentEnvelope.intent_class` + `ConsentEnvelope.valid_until_ns`
+  (Story 6.4 — additive on the consent envelope shape).
 
-### Example
+All four additions are wire-compatible at the TOML/serde layer
+(`#[serde(default)]` + `#[serde(deny_unknown_fields)]`), so kernels at
+`MANIFEST_SCHEMA_VERSION = 2` accept manifests authored against `= 1`
+(the N-1 supported floor enforced by `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION`).
+
+Bumped to `3` in Story 9.4b AC-6 (2026-06-15) to track the additive
+`[model_provenance]` section (`covered_model_id`, `training_data_lineage`
+— reverse-DNS-constrained, NOT free-text — `last_eval_timestamp`). The
+section is wire-compatible at the TOML/serde layer: it is OPTIONAL on read
+(`from_manifest_toml` returns `None` when absent), so kernels at
+`MANIFEST_SCHEMA_VERSION = 3` still admit manifests authored at `= 2`
+(the N-1 supported floor) — AC-11 append-only compat. Recorded as one
+ratified `[[ratification]]` entry in `xtask/abi-ratifications.toml`.
+
+This constant is the single authoritative source consumed by
+`maos-manifest::ClassSection` validation and by the `xtask
+check-manifest-schema-version` gate. Story 7.5a's ABI Stability Triple
+`(kernel_version, abi_version, manifest_schema_version)` consumes this
+constant directly.
+
+# Example
 
 ```rust
 use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 
 assert_eq!(MANIFEST_SCHEMA_VERSION, 3);
-// Reference in manifest generation
-println!("manifest_schema_version = {MANIFEST_SCHEMA_VERSION}");
 ```
-
-## MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION
 
 ```rust
-pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 3u32;
 ```
 
-Lowest manifest schema version the kernel accepts at admission. Manifests below this floor are refused with `SecurityError::EAbiTooOld` (N-2 hard refusal).
+Lowest manifest schema version this kernel accepts at admission.
 
-The floor is lifted on each ABI bump per the N-1 supported / N-2 hard-refusal policy.
+Story 7.5a will lift this floor on each ABI bump per the N-1 supported /
+N-2 hard-refusal policy. At v0.5-α the floor remains at `1` — Epic 1b
+baseline manifests load unchanged.
 
-### Example
+# Example
 
 ```rust
 use maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
@@ -78,17 +98,17 @@ assert!(check_manifest_version(3));
 assert!(!check_manifest_version(0));
 ```
 
-## MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION
-
 ```rust
-pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION; // 3
+pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1u32;
 ```
 
-Highest manifest schema version the kernel accepts. Manifests above this ceiling are refused with `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required).
+Highest manifest schema version this kernel emits or accepts.
 
-Currently equal to `MANIFEST_SCHEMA_VERSION`. The two constants stay synonymous until an explicit N+1 acceptance window is introduced for forward-compatibility experiments.
+Currently equal to `MANIFEST_SCHEMA_VERSION`. The two constants stay
+synonymous until Story 7.5a introduces an explicit N+1 acceptance window
+for forward-compatibility experiments.
 
-### Example
+# Example
 
 ```rust
 use maos_spirit_abi::{
@@ -108,25 +128,6 @@ assert!(!is_version_supported(4)); // Future — EAbiTooNew
 assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 ```
 
-## Relationship to the ABI Stability Triple
-
-These constants compose the [ABI Stability Triple](/migrate/abi-stability):
-
+```rust
+pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 3u32;
 ```
-(kernel_version, ABI_VERSION, MANIFEST_SCHEMA_VERSION)
-= ("0.1.0-alpha", 1, 3)
-```
-
-The `kernel_version` comes from the workspace `Cargo.toml`, not from this crate. Together, the triple is the load-time compatibility contract enforced at Spirit admission.
-
-## CI Gates
-
-- **`stability-matrix --check`** verifies that `STABILITY.md` matches these constants.
-- **`abi-diff --deny removed --deny changed`** guards `ABI_VERSION` against unintended breaks.
-- **`check-manifest-schema-version`** validates that manifest `[class]` sections declare a version within the supported window.
-
-## Reference
-
-- [ABI Stability Policy](/migrate/abi-stability) — full compatibility window documentation
-- [v1 → v2 Migration](/migrate/v1-to-v2) — what changed at version 2
-- [v2 → v3 Migration](/migrate/v2-to-v3) — what changed at version 3

@@ -44,6 +44,7 @@ mod coverage_matrix;
 mod coverage_matrix_nfr_test_3;
 mod example_spirit_regen;
 mod fs_walk;
+mod gen_abi_docs;
 mod gen_isolation_corpus;
 mod gen_termination_corpus;
 mod invariant_lock;
@@ -596,6 +597,16 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 9.5c — generate ABI reference `.md` from maos-spirit-abi rustdoc JSON.
+    #[command(name = "gen-abi-docs")]
+    GenAbiDocs {
+        /// Output directory for generated `.md` files.
+        #[arg(long, default_value = "docs-site/docs/abi")]
+        out_dir: String,
+        /// Check mode: fail if committed docs differ from generated output.
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 fn main() {
@@ -894,6 +905,7 @@ fn main() {
             dirty_fixture,
             json,
         } => check_air_gap::run(&binary, build_first, dirty_fixture.as_deref(), json),
+        Commands::GenAbiDocs { out_dir, check } => gen_abi_docs::run(Some(&out_dir), check),
     };
     if let Err(e) = result {
         eprintln!("{e}");

@@ -2,3 +2,6 @@
 # Changes to journey-test cassettes require review to prevent stale/invalid VCR data
 # from entering the repository.
 crates/maos-journey-test/cassettes/ @*
+# docs-site/docs/abi/*.md are auto-generated from maos-spirit-abi rustdoc JSON.
+# Do not hand-edit; regenerate with `cargo run -p xtask -- gen-abi-docs`.
+docs-site/docs/abi/*.md @*
