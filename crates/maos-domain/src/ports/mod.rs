@@ -46,6 +46,7 @@ pub mod security;
 pub mod self_telemetry; // NEW — Story 4.3 SelfTelemetryPort per FR56
 pub mod task;
 pub mod telemetry; // NEW — Story 5.3 in-flight task assignment record
+pub mod trace_sink; // NEW — Story 9.5b TraceSink port per NFR-Obs-2 / R2-2
 
 pub mod crypto; // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 / §8.6
 
@@ -70,3 +71,6 @@ pub use scheduler::SpiritSchedulerPort;
 pub use security::SecurityManagerPort;
 pub use self_telemetry::SelfTelemetryPort; // NEW — Story 4.3
 pub use telemetry::TelemetryStreamPort; // NEW
+pub use trace_sink::{
+    CapabilitySpanAttrs, HaltSpanAttrs, IacFrameSpanAttrs, SpanContext, SpanGuard, TraceSink,
+}; // NEW — Story 9.5b

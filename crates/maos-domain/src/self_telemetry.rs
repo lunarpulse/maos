@@ -99,6 +99,29 @@ impl HaltTelemetryEntry {
     }
 }
 
+impl HaltTelemetryEntry {
+    /// Story 9.5b — convert to [`HaltSpanAttrs`] for OTel emission.
+    ///
+    /// The raw `value` is bucketed to `value_band` (R2-5: principal-correlatable
+    /// scalar → coarse band). `frame_id` is the halt→frame correlation key (R2-4).
+    pub fn to_span_attrs(
+        &self,
+        frame_id: [u8; 16],
+    ) -> crate::ports::trace_sink::HaltSpanAttrs {
+        crate::ports::trace_sink::HaltSpanAttrs {
+            halt_id: self.halt_id.clone(),
+            tag: self.tag.clone(),
+            predicate_kind: self.predicate_kind.clone(),
+            value_band: crate::ports::trace_sink::HaltSpanAttrs::bucket_value(
+                self.value,
+                self.threshold,
+            ),
+            threshold: self.threshold,
+            frame_id,
+        }
+    }
+}
+
 /// One distillation-outcome entry (v0.3-β proxy from Decision frames).
 /// Story 4.4 lands the explicit `FrameKind::Distillate` variant.
 #[doc = "Construct via [`DistillationOutcomeEntry::new`] to enforce validation; struct literals bypass non-empty checks."]

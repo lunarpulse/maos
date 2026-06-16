@@ -45,6 +45,7 @@ members = [
     "spirits/mira",
     "spirits/nash",
     "crates/maos-shell",
+    "crates/maos-telemetry",
 ]
 default-members = []
 exclude = ["templates", "templates/spirit-ts"]

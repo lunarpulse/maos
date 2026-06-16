@@ -1,3 +1,10 @@
+## Deferred from: Story 9.5b preflight party-mode Round 2 (2026-06-16) — OTel spans are a new telemetry data-sink the GDPR erasure scope must acknowledge
+
+> Surfaced by Murat in the 9.5b OpenTelemetry-adapter preflight (Winston·Amelia·Murat·John, ratified Lunarpulse). Cross-story finding — out of 9.5b's own ACs by design, filed here so the gap is owned, not assumed-closed.
+
+- **OTel span attributes are a 4th telemetry surface the forget cascade cannot reach.** The GDPR Art.17 forget cascade reaches exactly `REGISTERED_ERASURE_BACKENDS = ["private","principal_index","shared"]` (`crates/maos-kernel-core/src/memory/mod.rs:35`). Span attributes emitted by the new `maos-telemetry` adapter are a NEW data sink outside that set. Story 9.5b mitigates this **by construction** via `gate:otel-attr-contract` (AC-5): spans carry **zero principal/subject nexus** → erasure-exempt by construction, mirroring `governance.rs:122` ("zero principal nexus → stays OUT of the forget cascade"). So spans are NOT wired into the cascade, and the attr-contract gate prevents a future contributor from silently adding a PII key.
+- **What's deferred / owned elsewhere:** the *existence* of this telemetry surface should be acknowledged in the **GDPR erasure scope documentation / data-sink inventory** owned by Stories 9.2 / 9.2b (forget cascade) — not just constrained inside 9.5b's test gate. Action: when the 9.5b adapter lands, add "OTel span attributes (erasure-exempt by zero-principal-nexus construction; enforced by `gate:otel-attr-contract`)" to the erasure-scope/data-sink inventory so the exemption is a documented invariant, not an implicit one. Flag to the 9.2 erasure owner (John/Winston). E1b ComplianceClaim schema is unchanged (no new claim field) — this is scope-documentation, not a claim amendment.
+
 ## Epic-7 §A3 skill-queue closure — VERIFIED by Story 8.16 (2026-06-12, "verify don't assume"); 2 of 4 items still OPEN → Epic 9
 
 Epic 7 retro §A3 required four skill-queue items closed "before Story 8.4 (founder-loop)". Story 8.16 AC6 verified them mechanically at HEAD (`crates/maos-skill/`, `crates/maos-cli/`):

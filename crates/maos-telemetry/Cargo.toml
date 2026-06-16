@@ -1,0 +1,33 @@
+[package]
+name = "maos-telemetry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS OpenTelemetry SLO-class adapter — TraceSink impl (Story 9.5b / NFR-Obs-2)"
+
+[features]
+default = []
+# OTLP/gRPC exporter (tonic transport). NOT default — the default kernel
+# build must NOT link opentelemetry or tonic (AC-2 / AC-4).
+otlp = ["dep:opentelemetry-otlp", "dep:tonic"]
+
+[dependencies]
+maos-domain = { path = "../maos-domain" }
+
+# OTel SDK — always needed for the TraceSink implementation (in-memory
+# exporter for tests, pluggable exporter for production).
+opentelemetry = "0.32"
+opentelemetry_sdk = { version = "0.32", features = ["trace", "rt-tokio", "testing"] }
+
+# OTLP exporter — gated behind the `otlp` feature (W1 / M3).
+opentelemetry-otlp = { version = "0.32", features = ["grpc-tonic"], optional = true }
+tonic = { version = "0.13", optional = true }
+
+tokio = { version = "1", features = ["sync", "rt"] }
+
+[dev-dependencies]
+maos-iac = { path = "../maos-iac" }
+tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "test-util"] }
+futures = "0.3"

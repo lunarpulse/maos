@@ -67,6 +67,10 @@ pub struct IacBusAdapter {
     /// Bounded by session lifetime; eviction at MAX_LINEAGE_CACHE_ENTRIES.
     frame_lineage_cache:
         std::sync::Arc<dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>>,
+    /// Story 9.5b — optional OTel trace sink for IAC-frame span emission.
+    /// `None` = off (no-op branch; zero allocation). Wired from
+    /// composition root via [`IacBusAdapter::with_trace_sink`].
+    trace_sink: Option<std::sync::Arc<dyn maos_domain::ports::TraceSink>>,
     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
     #[cfg(feature = "spirit_test")]
     isolation_hook: Option<
@@ -96,6 +100,7 @@ impl IacBusAdapter {
                 maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
+            trace_sink: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
@@ -105,6 +110,24 @@ impl IacBusAdapter {
     pub fn with_drr_scheduler(mut self, drr: drr_scheduler::DrrScheduler) -> Self {
         self.drr_scheduler = Some(drr);
         self
+    }
+
+    /// Story 9.5b — attach the optional OTel trace sink. When `Some`,
+    /// `deliver_typed` wraps each IAC frame in a trace span. When `None`
+    /// (default), the branch is not taken and nothing allocates.
+    pub fn with_trace_sink(
+        mut self,
+        sink: std::sync::Arc<dyn maos_domain::ports::TraceSink>,
+    ) -> Self {
+        self.trace_sink = Some(sink);
+        self
+    }
+
+    /// Story 9.5b — accessor for the trace sink. Callers outside
+    /// kernel-core (composition root, tests) use this to create
+    /// capability spans as children of the IAC-frame span.
+    pub fn trace_sink(&self) -> Option<&std::sync::Arc<dyn maos_domain::ports::TraceSink>> {
+        self.trace_sink.as_ref()
     }
 
     /// Story 4.5 — attach an isolation hook for cross-Spirit corpus observation.
@@ -289,6 +312,46 @@ impl IacBusAdapter {
         // digest_provider is injected from the composition root.
         let mut frame =
             decision_logger::decorate_decision_frame(frame, |sid| (self.digest_provider)(sid));
+
+        // Story 9.5b — IAC-frame span. Attrs built INSIDE the branch;
+        // nothing allocates when the sink is `None` (AC-2).
+        // Named `_frame_span_guard` — bare `let _ =` drops at semicolon
+        // → zero-duration span (grep gate).
+        let _frame_span_guard = if let Some(sink) = &self.trace_sink {
+            let kind_label: &'static str = match frame.kind {
+                maos_spirit_abi::identity::FrameKind::TaskAssign => "task_assign",
+                maos_spirit_abi::identity::FrameKind::TaskComplete => "task_complete",
+                maos_spirit_abi::identity::FrameKind::DecisionDispatch => "decision_dispatch",
+                maos_spirit_abi::identity::FrameKind::EpistemicHalt => "epistemic_halt",
+                maos_spirit_abi::identity::FrameKind::TelemetryEvent => "telemetry_event",
+                maos_spirit_abi::identity::FrameKind::ConsentRequest => "consent_request",
+                maos_spirit_abi::identity::FrameKind::Retract => "retract",
+                maos_spirit_abi::identity::FrameKind::CapabilityInvocation => {
+                    "capability_invocation"
+                }
+                maos_spirit_abi::identity::FrameKind::SandboxBlock => "sandbox_block",
+                maos_spirit_abi::identity::FrameKind::InferenceCall => "inference_call",
+                maos_spirit_abi::identity::FrameKind::CliSubprocessOutput => {
+                    "cli_subprocess_output"
+                }
+                maos_spirit_abi::identity::FrameKind::ConsentRupture => "consent_rupture",
+                maos_spirit_abi::identity::FrameKind::RateLimited => "rate_limited",
+                maos_spirit_abi::identity::FrameKind::GatewayInbound => "gateway_inbound",
+                maos_spirit_abi::identity::FrameKind::GatewayOutbound => "gateway_outbound",
+            };
+            let intent_label: &'static str = match frame.intent {
+                maos_domain::invariants::i1::IntentClass::HighPrivilege => "high",
+                maos_domain::invariants::i1::IntentClass::Standard => "standard",
+                maos_domain::invariants::i1::IntentClass::Readonly => "readonly",
+            };
+            sink.iac_frame_span(maos_domain::ports::IacFrameSpanAttrs {
+                frame_id: frame.frame_id,
+                kind: kind_label,
+                intent: intent_label,
+            })
+        } else {
+            maos_domain::ports::SpanGuard::noop()
+        };
 
         // Story 4.5 — AC5: fire isolation hooks BEFORE lineage check
         // so corpus harness observes the attempt before the kernel rejects it.
@@ -741,6 +804,7 @@ impl Default for IacBusAdapter {
                 maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
+            trace_sink: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
