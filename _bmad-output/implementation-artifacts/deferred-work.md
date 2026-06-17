@@ -16,6 +16,15 @@ Epic 7 retro §A3 required four skill-queue items closed "before Story 8.4 (foun
 
 **FILED to Epic 9** (explicit, NOT silently inherited): the durable skill-queue store + functional `approve/reject` (operator-admission exit that actually mutates state and survives restart). Natural home = Story 9.6 (scheduler/runtime) or a named skill-queue story at Epic-9 sprint planning. Tracked here so the gap is owned, not assumed-closed.
 
+**RESOLVED 2026-06-17 → Story 9.7** (split from 9.6 AC-5 at party-mode preflight, ratified Lunarpulse). Both OPEN items are 9.7's AC-1 (durable store, own atomic write, `maos.skill-queue.v1` schema) + AC-2 (functional `approve/reject`). Slotted as the Epic-9 CLOSER with a hard gate: `epic-9-retrospective` cannot open until `9-7` is `done` — the compounding gate that ends the 3-epic decay.
+
+## Daemon-side skill-admission ENFORCEMENT — filed to Epic 10 (Story 9.7 preflight 2026-06-17, John's F6b finding)
+
+> Surfaced in the 9.7 preflight (Winston·John·Murat·Amelia). Story 9.7 makes `maosctl skills approve/reject` durable + auditable, but the `maos run` DAEMON does NOT consult persisted admission state at spirit-load time (admission is CLI-only today). So 9.7 ships audit/forensics value + a documented limitation; the ENFORCEMENT half is a separate body of work that touches the daemon — filed here, NOT a decaying promise.
+
+- **Gap:** an operator who `maosctl skills reject <id>` expects that skill blocked from loading. Today the daemon never reads the queue → a rejected skill can still load. 9.7's documented limitation names this explicitly.
+- **Follow-up story (Epic 10):** the `maos run` daemon honors persisted admitted/rejected skill state at spirit-load (consume the 9.7 `SkillQueueStore` + the `reconcile-pending-from-TL` view; reject load of a non-admitted/rejected skill with a typed error). Touches the daemon composition root (out of 9.7's charter). Flag Winston (kernel/daemon surface) + John (operator-enforcement UX).
+
 ## Deferred from: code review of 8-12-live-cliwrapper-subprocess-bridge-founder-loop-over-real-clis (2026-06-08)
 
 - No sandbox enforcement on hermetic path — Command spawn by design; live container = Tier-2. `runtime.rs:spawn_and_bridge`

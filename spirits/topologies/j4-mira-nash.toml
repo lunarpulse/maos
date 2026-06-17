@@ -1,0 +1,10 @@
+[topology]
+name = "j4-mira-nash"
+
+[[topology.spirits]]
+manifest = "../mira/manifest.toml"
+priority_weight = 2
+
+[[topology.spirits]]
+manifest = "../nash/manifest.toml"
+priority_weight = 1

@@ -1,0 +1,14 @@
+[topology]
+name = "j1-founder-loop"
+
+[[topology.spirits]]
+manifest = "../orchestrator/manifest.toml"
+priority_weight = 3
+
+[[topology.spirits]]
+manifest = "../architect/manifest.toml"
+priority_weight = 2
+
+[[topology.spirits]]
+manifest = "../reviewer/manifest.toml"
+priority_weight = 1

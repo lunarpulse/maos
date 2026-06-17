@@ -1205,8 +1205,7 @@ fn is_file_exempt(file: &str, exemptions: &[String]) -> bool {
 /// configured so future hook additions (Story 5.2's hot-swap trio, future
 /// `epistemic_resolve`) don't require gate code changes.
 fn load_expected_hook_count(workspace_root: &Path, config_path: Option<&Path>) -> usize {
-    let default_path = workspace_root.join("xtask/spirit-abi-hook-count.toml");
-    let path = config_path
+    let resolved = config_path
         .map(|p| {
             if p.is_absolute() {
                 p.to_path_buf()
@@ -1214,20 +1213,50 @@ fn load_expected_hook_count(workspace_root: &Path, config_path: Option<&Path>) -
                 workspace_root.join(p)
             }
         })
-        .unwrap_or(default_path);
-    if !path.exists() {
-        return 11; // back-compat fallback to the FR55 Epic 2 baseline.
+        .unwrap_or_else(|| workspace_root.join("xtask/spirit-abi-hook-count.toml"));
+
+    if resolved.exists() {
+        return load_hook_count_from_file(&resolved);
     }
-    let Ok(content) = fs::read_to_string(&path) else {
-        return 11;
-    };
-    let Ok(toml) = content.parse::<toml::Value>() else {
-        return 11;
-    };
+
+    // The workspace-root-relative path did not resolve (e.g. --path points at
+    // a fixture directory). Try the process cwd as a second explicit attempt,
+    // but warn loudly so this never passes silently.
+    let cwd_path = std::env::current_dir()
+        .unwrap_or_default()
+        .join("xtask/spirit-abi-hook-count.toml");
+    if cwd_path.exists() {
+        eprintln!(
+            "WARNING: load_expected_hook_count: {} not found; falling back to cwd-relative {}. \
+             Pass an explicit config path or run from the workspace root to silence this.",
+            resolved.display(),
+            cwd_path.display(),
+        );
+        return load_hook_count_from_file(&cwd_path);
+    }
+
+    panic!(
+        "load_expected_hook_count: cannot find spirit-abi-hook-count.toml \
+         (tried {} and {}). Provide an explicit --spirit-abi-hook-count path \
+         or run from the workspace root.",
+        resolved.display(),
+        cwd_path.display(),
+    );
+}
+
+fn load_hook_count_from_file(path: &Path) -> usize {
+    let content = fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("load_expected_hook_count: cannot read {}: {e}", path.display()));
+    let toml: toml::Value = content
+        .parse()
+        .unwrap_or_else(|e| panic!("load_expected_hook_count: invalid TOML in {}: {e}", path.display()));
     toml.get("expected_count")
         .and_then(|v| v.as_integer())
         .map(|n| n as usize)
-        .unwrap_or(11)
+        .unwrap_or_else(|| panic!(
+            "load_expected_hook_count: missing `expected_count` key in {}",
+            path.display(),
+        ))
 }
 
 /// AST-walk `maos-spirit-abi/src/lifecycle.rs` + `maos-spirit-derive/src/lib.rs`

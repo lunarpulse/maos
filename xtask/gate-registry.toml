@@ -49,4 +49,6 @@ gates = [
     # Story 7.5b AC9 — NFR-Onb-1 30-min first-Spirit gate: stratification + cohort
     # evaluator + Butler-corpus seam over committed example artifacts (provisional).
     "nfr-onb-1-gate",
+    # Story 9.6 AC-5 — retired founder/J4 smoke-arm literal reappearance guard.
+    "check-literal-reappearance",
 ]

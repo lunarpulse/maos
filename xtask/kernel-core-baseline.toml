@@ -46,4 +46,16 @@
 #          NO per-row crypto / Option-B limb. CryptoProvider untouched; region
 #          HKDF derivation lives in maos-audit (not kernel-core). All additive;
 #          no public symbols removed.
-src_lines = 21894
+#   22226  Story 9.6 — baseline reconciliation at multi-Spirit scheduler cutover
+#          (+332 observed at HEAD before this story's maos-bin-only driver loop;
+#          no maos-kernel-core files changed by Story 9.6). FLAG-Winston carry-forward:
+#          visibility blocker resolved by using public scheduler.load()/returned pid
+#          and existing public pick_next_spirit_from_slice/HookDispatcher surfaces;
+#          allocate_pid remains pub(crate), so no new kernel ABI was exposed.
+#   22227  Story 9.6 review closure — added `#[i9_exempt]` to `ProviderHistory`
+#          (`crates/maos-kernel-core/src/security/mod.rs`) to resolve a pre-existing
+#          I9 / P3 violation inherited from Story 9.4b AC-8. The bounded
+#          last-provider tracker is ephemeral switch-detection state, not learned
+#          state; +1 line. FLAG-Winston: this is an invariant-lock exemption, not a
+#          functional kernel delta.
+src_lines = 22227

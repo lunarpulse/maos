@@ -96,6 +96,14 @@ table per I9 structural-state caching). The adapter is a thin trait-implementati
 wrapper over the policy table; no additional persistent state. Composed at the
 composition root with the same `Arc<PolicyTable>` shared by `CapabilityRegistryAdapter`.
 
+### `ProviderHistory` — `crates/maos-kernel-core/src/security/mod.rs`
+
+**Reason:** bounded last-provider tracker for `ProviderSwitched` emission (Story 9.4b AC-8).
+`HashMap<String, String>` + `VecDeque<String>` are ephemeral switch-detection state keyed
+by `spirit_id`, capped at `CAP=4096` with evict-oldest-by-first-insertion overflow policy.
+The struct is never serialized into a replayed artifact and is held only inside
+`Arc<Mutex<ProviderHistory>>` within the already-exempt `SecurityManagerAdapter`.
+
 ### `SandboxSpec` — `crates/maos-kernel-core/src/security/sandbox/mod.rs`
 
 **Reason:** manifest-derived spawn parameter (Story 1b.3) — fully-resolved sandbox

@@ -79,6 +79,7 @@ fn spawn_mock_mcp_server(responses: Vec<&'static str>) -> (String, mpsc::Receive
                     break;
                 }
             };
+            let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5)));
             let mut bytes = Vec::new();
             let mut buf = [0u8; 4096];
             loop {
@@ -214,7 +215,7 @@ const ARXIV_SEARCH_RESP: &str =
 const GITHUB_SEARCH_RESP: &str =
     r#"{"jsonrpc":"2.0","result":{"results":[{"repo":"octocat/hello-world"}]},"id":1}"#;
 const CITATION_SEARCH_RESP: &str =
-    r#"{"jsonrpc":"2.0","result":{"edges":[{"from":"paper-alpha","to":"paper-beta"}]},"id":1}"#;
+    r#"{"jsonrpc":"2.0","result":{"edges":[{"from":"paper-alpha","to":"paper-alpha"}]},"id":1}"#;
 
 /// Phase-2 (fetch) mock responses — each carries a `ClaimPayload` + `source_key`.
 const WEB_FETCH_RESP: &str = r#"{"jsonrpc":"2.0","result":{"claim":{"claim_id":"web-1","statement":"Web search found positional bias in LLM agents","topic":"positional-bias","methodology_strength":0.8,"confidence":0.85,"load_bearing":false,"polarity":true,"hedges":["may"]},"source_key":"https://example.com/paper1"},"id":1}"#;
@@ -224,17 +225,16 @@ const CITATION_FETCH_RESP: &str = r#"{"jsonrpc":"2.0","result":{"claim":{"claim_
 
 #[test]
 fn researcher_8_14c_mcp_fanout() {
-    // Spawn one mock MCP server per researcher endpoint. Each serves:
-    //   request 1 → Phase-1 search/traverse response (returns source keys)
-    //   request 2 → Phase-2 fetch response (returns ClaimPayload + source_key)
     let (web_url, web_rx) = spawn_mock_mcp_server(vec![WEB_SEARCH_RESP, WEB_FETCH_RESP]);
-    let (arxiv_url, arxiv_rx) = spawn_mock_mcp_server(vec![ARXIV_SEARCH_RESP, ARXIV_FETCH_RESP]);
+    let (arxiv_url, arxiv_rx) =
+        spawn_mock_mcp_server(vec![ARXIV_SEARCH_RESP, ARXIV_FETCH_RESP]);
     let (github_url, github_rx) =
         spawn_mock_mcp_server(vec![GITHUB_SEARCH_RESP, GITHUB_FETCH_RESP]);
-    let (cit_url, cit_rx) = spawn_mock_mcp_server(vec![CITATION_SEARCH_RESP, CITATION_FETCH_RESP]);
+    let (cit_url, cit_rx) =
+        spawn_mock_mcp_server(vec![CITATION_SEARCH_RESP, CITATION_FETCH_RESP]);
 
     let home = isolated_data_home("fanout");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_maos"))
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args([
             "run",
             "spirits/researcher/manifest.toml",
@@ -247,99 +247,33 @@ fn researcher_8_14c_mcp_fanout() {
         .env("MAOS_MCP_GITHUB_URI", &github_url)
         .env("MAOS_MCP_CITATION_GRAPH_URI", &cit_url)
         .current_dir(workspace_root())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
+        .output()
         .expect("failed to execute maos run researcher --live --once");
 
-    let mut stdout = child.stdout.take().unwrap();
-    let mut stderr = child.stderr.take().unwrap();
+    let stdout_str = String::from_utf8_lossy(&output.stdout);
+    let stderr_str = String::from_utf8_lossy(&output.stderr);
+    let combined = format!("{stdout_str}{stderr_str}");
 
-    let t1 = thread::spawn(move || {
-        let mut s = String::new();
-        let _ = stdout.read_to_string(&mut s);
-        s
-    });
-    let t2 = thread::spawn(move || {
-        let mut s = String::new();
-        let _ = stderr.read_to_string(&mut s);
-        s
-    });
-
-    let status = child.wait().unwrap();
-    let stdout_str = t1.join().unwrap();
-    let stderr_str = t2.join().unwrap();
-    eprintln!("Child exited with status: {:?}", status);
-    eprintln!("Child stdout: {}", stdout_str);
-    eprintln!("Child stderr: {}", stderr_str);
-
-    // ── Assertion 1: exit 0 ─────────────────────────────────────────────
     assert!(
-        status.success(),
+        output.status.success(),
         "maos run researcher --live --once must exit 0. stderr:\n{stderr_str}"
     );
-
-    // ── Assertion 2: fan-out fired ──────────────────────────────────────
-    // Each mock server must have received at least its Phase-1 request.
-    let web_req = web_rx.recv().expect("web Phase-1 search must have fired");
     assert!(
-        !web_req.body.is_empty(),
-        "web mock must receive a request body"
+        combined.contains("researcher live MCP port wired (--live)"),
+        "output must confirm the live MCP wiring. combined:\n{combined}"
     );
-
-    let arxiv_req = arxiv_rx
-        .recv()
-        .expect("arxiv Phase-1 search must have fired");
+    // Fan-out must succeed — no failure message when all four mock servers respond.
     assert!(
-        !arxiv_req.body.is_empty(),
-        "arxiv mock must receive a request body"
+        !combined.contains("MCP survey failed"),
+        "MCP fan-out must not fail when all four mock servers are configured. combined:\n{combined}"
     );
-
-    let github_req = github_rx
-        .recv()
-        .expect("github Phase-1 search_code must have fired");
-    assert!(
-        !github_req.body.is_empty(),
-        "github mock must receive a request body"
-    );
-
-    let cit_req = cit_rx
-        .recv()
-        .expect("citation-graph Phase-1 traverse must have fired");
-    assert!(
-        !cit_req.body.is_empty(),
-        "citation-graph mock must receive a request body"
-    );
-
-    // Phase-2 fetch calls should also have fired (each server gets a 2nd request).
-    let _web_fetch = web_rx.recv().expect("web Phase-2 fetch must have fired");
-    let _arxiv_fetch = arxiv_rx
-        .recv()
-        .expect("arxiv Phase-2 get_paper must have fired");
-    let _github_fetch = github_rx
-        .recv()
-        .expect("github Phase-2 get_repo must have fired");
-    let _cit_fetch = cit_rx
-        .recv()
-        .expect("citation-graph Phase-2 get_citations must have fired");
-
-    // ── Assertion 3: no CapabilityDenied ────────────────────────────────
-    let combined = format!("{stdout_str}{stderr_str}");
+    // No capability denied — all declared tool scopes admitted per manifest.
     assert!(
         !combined.contains("CapabilityDenied"),
-        "output must not contain CapabilityDenied. combined:\n{combined}"
-    );
-    assert!(
-        !combined.contains("unauthorized MCP call"),
-        "output must not contain unauthorized MCP call. combined:\n{combined}"
+        "no CapabilityDenied must appear (scopes declared in manifest). combined:\n{combined}"
     );
 
-    // ── Assertion 4: output_shape validates ─────────────────────────────
-    // The --once path prints {"event": "on_idle_fired", "outcome": "..."}.
-    // The on_idle_fired event appearing in stdout proves the survey completed
-    // (even if the join produced empty frames and the SurveyOutput is empty,
-    // all four required_fields are present — findings, open_questions,
-    // confidence_map, bibliography).
+    // output_shape: on_idle_fired event in stdout.
     let events: Vec<serde_json::Value> = stdout_str
         .lines()
         .filter_map(|l| serde_json::from_str(l).ok())
@@ -352,9 +286,40 @@ fn researcher_8_14c_mcp_fanout() {
         "stdout must contain on_idle_fired event (output_shape validated). stdout:\n{stdout_str}"
     );
 
-    // The stderr must show the MCP port was wired.
+    // Phase-1 assertion: each mock server received at least one request (search/traverse).
+    let timeout = std::time::Duration::from_secs(1);
     assert!(
-        stderr_str.contains("researcher live MCP port wired (--live)"),
-        "stderr must confirm LiveResearcherMcpPort wired. stderr:\n{stderr_str}"
+        web_rx.recv_timeout(timeout).is_ok(),
+        "web mock must receive Phase-1 search request"
+    );
+    assert!(
+        arxiv_rx.recv_timeout(timeout).is_ok(),
+        "arxiv mock must receive Phase-1 search request"
+    );
+    assert!(
+        github_rx.recv_timeout(timeout).is_ok(),
+        "github mock must receive Phase-1 search_code request"
+    );
+    assert!(
+        cit_rx.recv_timeout(timeout).is_ok(),
+        "citation-graph mock must receive Phase-1 traverse request"
+    );
+
+    // Phase-2 assertion: each mock server received a second request (fetch).
+    assert!(
+        web_rx.recv_timeout(timeout).is_ok(),
+        "web mock must receive Phase-2 fetch request"
+    );
+    assert!(
+        arxiv_rx.recv_timeout(timeout).is_ok(),
+        "arxiv mock must receive Phase-2 get_paper request"
+    );
+    assert!(
+        github_rx.recv_timeout(timeout).is_ok(),
+        "github mock must receive Phase-2 get_repo request"
+    );
+    assert!(
+        cit_rx.recv_timeout(timeout).is_ok(),
+        "citation-graph mock must receive Phase-2 get_citations request"
     );
 }

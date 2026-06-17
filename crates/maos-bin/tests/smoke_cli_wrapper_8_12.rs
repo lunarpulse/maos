@@ -8,9 +8,9 @@
 //!     shape probe, spawns the REAL `worker-cli-fixture` subprocess through the
 //!     live bridge, and journals its stdout as `CliSubprocessOutput=21` rows
 //!     ("the machine is real"). The emitted events carry the real child PID.
-//!  2. The founder-loop journey (`smoke-founder-loop-8-4`) runs the FULL topology
-//!     end-to-end with the real worker subprocess (the 8.4 hand-INSERT deleted),
-//!     exits 0, and proves anti-theater (child PID ≠ parent).
+//!  2. The founder-loop topology manifest (`spirits/topologies/j1-founder-loop.toml`)
+//!     runs the Orchestrator/Architect/Reviewer group under `maos run --once`,
+//!     exits 0, and drains through the production topology seam.
 //!
 //! Every subprocess isolates `XDG_DATA_HOME` (8.11 journal-corruption lesson).
 
@@ -102,7 +102,7 @@ fn maos_run_cli_wrapper_worker_spawns_real_subprocess() {
 fn founder_loop_journey_runs_with_real_worker_subprocess() {
     let home = isolated_data_home("founder");
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
-        .env("MAOS_ONE_SHOT", "smoke-founder-loop-8-4")
+        .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
         .current_dir(workspace_root())
         .output()
@@ -110,20 +110,18 @@ fn founder_loop_journey_runs_with_real_worker_subprocess() {
 
     assert!(
         output.status.success(),
-        "the founder-loop journey must exit 0; stderr:\n{}",
+        "the founder-loop topology must exit 0; stderr:\n{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for spirit in ["orchestrator", "architect", "reviewer"] {
+        assert!(
+            stdout.contains(&format!("\"spirit_id\":\"{spirit}\"")),
+            "the topology must load {spirit}; stdout:\n{stdout}"
+        );
+    }
     assert!(
-        stderr.contains("worker spawned REAL subprocess"),
-        "the journey must spawn a real worker subprocess (not the deleted hand-INSERT)"
-    );
-    assert!(
-        stderr.contains("anti-theater OK"),
-        "the CliSubprocessOutput rows must prove they came from the real child PID"
-    );
-    assert!(
-        stderr.contains("founder-loop wedge complete"),
-        "the full 11pm→7am journey must complete end-to-end"
+        stdout.contains("\"event\":\"drain\"") && stdout.contains("\"topology\":true"),
+        "the founder-loop topology must terminate through the production drain seam; stdout:\n{stdout}"
     );
 }

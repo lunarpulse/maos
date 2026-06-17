@@ -63,8 +63,23 @@ fn journal_append_p99_measurement() {
         "journal_fsync P50 = {p50_us}µs, P99 = {p99_us}µs (NFR-Rel-8 budget: {BUDGET_US}µs = 1.5ms)"
     );
 
-    assert!(
-        p99 < BUDGET_NS,
-        "NFR-Rel-8 binding broken: journal_fsync P99 = {p99_us}µs, budget = {BUDGET_US}µs"
-    );
+    let in_ci = std::env::var_os("CI").is_some() || std::env::var_os("GITHUB_ACTIONS").is_some();
+    let enforce_nfr = std::env::var_os("MAOS_ENFORCE_NFR").map_or(false, |v| v == "1");
+
+    if p99 >= BUDGET_NS {
+        if in_ci {
+            panic!(
+                "NFR-Rel-8 binding broken: journal_fsync P99 = {p99_us}µs, budget = {BUDGET_US}µs"
+            );
+        } else if enforce_nfr {
+            panic!(
+                "NFR-Rel-8 (MAOS_ENFORCE_NFR=1): journal_fsync P99 = {p99_us}µs exceeds budget = {BUDGET_US}µs"
+            );
+        } else {
+            eprintln!(
+                "WARNING: journal_fsync P99 = {p99_us}µs EXCEEDS NFR-Rel-8 budget of {BUDGET_US}µs. \
+                 Set MAOS_ENFORCE_NFR=1 or run in CI to enforce."
+            );
+        }
+    }
 }

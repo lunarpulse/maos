@@ -541,3 +541,20 @@
 
 # Story 9.2 — registered erasure backend names (data-movement: erasure is a payload-transform/registry lookup)
 "maos_kernel_core::memory::REGISTERED_ERASURE_BACKENDS" = "data-movement"
+
+# Story 9.4b — region-pinning + erasure-class lineage identifiers (kernel-core surface)
+# RegionSection: operator policy config parsed at admission (supervision, parallel to OperatorPolicyConfig)
+"maos_kernel_core::security::operator_config::RegionSection"             = "supervision"
+"maos_kernel_core::security::operator_config::RegionSection::home_region" = "supervision"
+"maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk" = "supervision"
+# Memory region-enforcement entry points: data-movement (memory tier I/O chokepoints)
+"maos_kernel_core::memory::write_entry_point::WriteEntryPoint"           = "data-movement"
+"maos_kernel_core::memory::write_entry_point::WriteEntryPoint::new"      = "data-movement"
+"maos_kernel_core::memory::write_entry_point::WriteEntryPoint::write"    = "data-movement"
+"maos_kernel_core::memory::write_entry_point::enforce_region"            = "data-movement"
+"maos_kernel_core::memory::read_entry_point::ReadEntryPoint"             = "data-movement"
+"maos_kernel_core::memory::read_entry_point::ReadEntryPoint::new"        = "data-movement"
+"maos_kernel_core::memory::read_entry_point::ReadEntryPoint::read"       = "data-movement"
+"maos_kernel_core::memory::read_entry_point::enforce_region"             = "data-movement"
+# Erasure-class lineage id set: data-movement (governance payload/registry lookup)
+"maos_kernel_core::memory::ERASURE_CLASS_LINEAGE_IDS"                    = "data-movement"

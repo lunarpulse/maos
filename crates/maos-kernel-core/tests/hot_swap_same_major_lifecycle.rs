@@ -116,5 +116,5 @@ async fn same_major_swap_happy_path() {
     // TODO: construct HotSwapCoordinator, run initiate_swap with successor,
     // assert swap succeeds, journal contains HotSwap, pid unchanged.
     // Full test requires composition-root wiring (Task 3.3).
-    assert!(pid > 0, "pid must be non-zero");
+    assert_eq!(scheduler.resolve_pid("test-spirit"), Some(pid));
 }

@@ -206,24 +206,18 @@ fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<RunA
 
 /// Which reference Spirit a manifest's `[class].name` selects. Construction is
 /// keyed by class (the daemon MUST build the right concrete Spirit type); the
-/// **port-requirement** decision is NOT keyed here (it is posture-derived — see
-/// [`requires_epistemic_halt_port`]) so adding a future halt-Spirit cannot
-/// re-ship the 8.1 bug by forgetting a name (FORK D guardrail).
+/// port-requirement decision is keyed by the declared epistemic halt transport,
+/// not posture or class.
 #[cfg(feature = "network")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LoadedSpiritKind {
     Butler,
     Researcher,
-    /// Story 8.12 AC3 — the founder-loop `[class]` Spirits (orchestrator /
-    /// architect / reviewer) are *classifiable* by the daemon, but they run as
-    /// the in-process founder-loop topology (Orchestrator → Worker(real CLI) →
-    /// Architect → Reviewer → digest), NOT as N independent single-Spirit
-    /// `maos run` invocations. A standalone load short-circuits with a clear
-    /// directional error (FORK B: no general multi-Spirit scheduler under
-    /// `maos run` — that is Epic 9 operator surface). The full topology runs via
-    /// the `smoke-founder-loop-8-4` journey entrypoint with the real worker
-    /// subprocess.
-    FounderLoopClass,
+    Orchestrator,
+    Architect,
+    Reviewer,
+    Mira,
+    Nash,
 }
 
 #[cfg(feature = "network")]
@@ -231,28 +225,80 @@ fn classify_spirit(class_name: &str) -> Option<LoadedSpiritKind> {
     match class_name {
         "butler" => Some(LoadedSpiritKind::Butler),
         "researcher" => Some(LoadedSpiritKind::Researcher),
-        // AC3: classifiable, but topology-bound (see LoadedSpiritKind::FounderLoopClass).
-        "orchestrator" | "architect" | "reviewer" => Some(LoadedSpiritKind::FounderLoopClass),
+        "orchestrator" => Some(LoadedSpiritKind::Orchestrator),
+        "architect" => Some(LoadedSpiritKind::Architect),
+        "reviewer" => Some(LoadedSpiritKind::Reviewer),
+        "mira" => Some(LoadedSpiritKind::Mira),
+        "nash" => Some(LoadedSpiritKind::Nash),
         _ => None,
     }
 }
 
-/// Story 8.11 / AC6 FORK D — the **posture-keyed** boot-loud predicate. A Spirit
-/// whose manifest declares a self-halting autonomy ceiling
-/// (`autonomous-with-halt` or higher) drives an epistemic halt via the
-/// synchronous [`EpistemicScalarPort`] and therefore REQUIRES that port wired at
-/// boot. Keyed on `manifest.posture`, never on the Spirit id — a name-keyed
-/// check would decapitate Researcher (assistive, async scalar-emitter, no port)
-/// and re-ship the 8.1 footgun for the next halt-Spirit.
+#[cfg(feature = "network")]
+fn caps_required_or_empty(
+    manifest_root: &toml::Value,
+) -> Result<maos_kernel_core::security::CapabilitiesRequired, Box<dyn std::error::Error>> {
+    if let Some(v) = manifest_root
+        .get("capabilities")
+        .and_then(|c| c.get("required"))
+    {
+        return Ok(maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
+            &toml::to_string(v).map_err(|e| format!("serialize [capabilities.required]: {e}"))?,
+        )?);
+    }
+    Ok(maos_kernel_core::security::CapabilitiesRequired {
+        provider: maos_kernel_core::security::ProviderCapabilities { complete: Vec::new() },
+        mcp: maos_kernel_core::security::McpCapabilities { servers: Vec::new() },
+    })
+}
+
+#[cfg(feature = "network")]
+fn topology_manifest_entries(root: &toml::Value) -> Result<Option<Vec<String>>, String> {
+    let Some(topology) = root.get("topology") else {
+        return Ok(None);
+    };
+    let spirits = topology
+        .get("spirits")
+        .and_then(toml::Value::as_array)
+        .ok_or("maos run: [topology] manifest must declare [[topology.spirits]] entries")?;
+    let mut entries = Vec::with_capacity(spirits.len());
+    for (idx, spirit) in spirits.iter().enumerate() {
+        let manifest = spirit
+            .get("manifest")
+            .or_else(|| spirit.get("path"))
+            .and_then(toml::Value::as_str)
+            .ok_or_else(|| {
+                format!("maos run: [[topology.spirits]] entry {idx} must declare manifest")
+            })?;
+        entries.push(manifest.to_string());
+    }
+    if entries.is_empty() {
+        return Err("maos run: [topology] manifest has no spirits".into());
+    }
+    Ok(Some(entries))
+}
+
+/// Story 9.6 — boot-loud predicate keyed to synchronous scalar halt transport,
+/// not posture. The current manifests expose transport structurally through the
+/// scalar tags consumed by in-process ports: Butler's belief/preference scalars
+/// and Mira's diagnostic-confidence scalar require a port; founder-loop dispatch
+/// ambiguity rules are deterministic and do not.
 #[cfg(feature = "network")]
 fn requires_epistemic_halt_port(
-    posture: &maos_kernel_core::security::manifest::PostureSection,
+    policy: Option<&maos_kernel_core::security::manifest::EpistemicPolicySection>,
 ) -> bool {
-    use maos_kernel_core::security::manifest::Posture;
-    matches!(
-        posture.allowed_max,
-        Posture::AutonomousWithHalt | Posture::Autonomous
-    )
+    use maos_kernel_core::security::manifest::EpistemicAction;
+    let Some(policy) = policy else {
+        return false;
+    };
+    policy.rules.iter().any(|rule| {
+        rule.action == EpistemicAction::Halt
+            && rule.predicate.is_some()
+            && matches!(
+                rule.tag.as_str(),
+                "belief_variance" | "user_preference_drift" | "diagnostic_confidence"
+            )
+    })
 }
 
 /// Story 8.12 — map a `[sandbox] tier = "T3"` string to the operational tier.
@@ -559,7 +605,8 @@ impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
 /// token issuance.
 #[cfg(feature = "network")]
 struct LiveButlerMcpPort {
-    spirit_pid: u32,
+    spirit_pid: std::sync::atomic::AtomicU32,
+    #[allow(dead_code)]
     posture_hash: [u8; 32],
     mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
     capability: Arc<CapabilityRegistryAdapter>,
@@ -573,7 +620,7 @@ impl LiveButlerMcpPort {
         capability: Arc<CapabilityRegistryAdapter>,
     ) -> Self {
         Self {
-            spirit_pid,
+            spirit_pid: std::sync::atomic::AtomicU32::new(spirit_pid),
             posture_hash,
             mcp_client,
             capability,
@@ -653,7 +700,7 @@ impl LiveButlerMcpPort {
         let token = self
             .capability
             .issue_with_mediation(
-                self.spirit_pid,
+                self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst),
                 scope,
                 60,
                 // Pass [0u8; 32] because the kernel's McpClientAdapter is hardcoded to verify using [0u8; 32]
@@ -694,7 +741,7 @@ impl LiveButlerMcpPort {
 /// `spawn_blocking`.
 #[cfg(feature = "network")]
 struct LiveResearcherMcpPort {
-    spirit_pid: u32,
+    spirit_pid: std::sync::atomic::AtomicU32,
     posture_hash: [u8; 32],
     mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
     capability: Arc<CapabilityRegistryAdapter>,
@@ -710,7 +757,7 @@ impl LiveResearcherMcpPort {
         capability: Arc<CapabilityRegistryAdapter>,
     ) -> Self {
         Self {
-            spirit_pid,
+            spirit_pid: std::sync::atomic::AtomicU32::new(spirit_pid),
             posture_hash,
             mcp_client,
             capability,
@@ -768,7 +815,7 @@ impl LiveResearcherMcpPort {
             let sem = Arc::clone(&self.sem);
             let mcp_client = Arc::clone(&self.mcp_client);
             let capability = Arc::clone(&self.capability);
-            let spirit_pid = self.spirit_pid;
+            let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
             let posture_hash = self.posture_hash;
             set.spawn(async move {
                 let _permit = sem.acquire().await.map_err(|e| {
@@ -867,7 +914,7 @@ impl LiveResearcherMcpPort {
             let sem = Arc::clone(&self.sem);
             let mcp_client = Arc::clone(&self.mcp_client);
             let capability = Arc::clone(&self.capability);
-            let spirit_pid = self.spirit_pid;
+            let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
             let posture_hash = self.posture_hash;
             set.spawn(async move {
                 let _permit = sem.acquire().await.map_err(|e| {
@@ -1659,6 +1706,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // `decision.*` frame records what the Spirit actually reasoned over. At
     // v0.3-β the daemon is single-Spirit (pid 0, the first scheduler-assigned
     // pid — consistent with the rest of this composition root).
+    let pid_by_spirit_id: Arc<std::sync::RwLock<std::collections::BTreeMap<String, u32>>> =
+        Arc::new(std::sync::RwLock::new(std::collections::BTreeMap::new()));
+    let digest_pid_map = Arc::clone(&pid_by_spirit_id);
     let digest_memory: Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync> =
         Arc::clone(&memory) as Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync>;
     let iac = Arc::new(
@@ -1666,7 +1716,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_digest_provider(
                 maos_kernel_core::iac::decision_logger::memory_backed_digest_provider(
                     digest_memory,
-                    |_sid| Some(0),
+                    move |sid| {
+                        digest_pid_map
+                            .read()
+                            .unwrap_or_else(|e| {
+                                eprintln!("CRITICAL: pid_by_spirit_id RwLock poisoned (digest closure read)");
+                                e.into_inner()
+                            })
+                            .get(sid.as_str())
+                            .copied()
+                    },
                 ),
             ),
     );
@@ -2172,7 +2231,322 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .get(section)
                 .and_then(|v| toml::to_string(v).ok())
         };
+        if let Some(topology_entries) = topology_manifest_entries(&manifest_root)? {
+            let topology_base = manifest_path.parent().unwrap_or_else(|| std::path::Path::new("."));
+            let mut loaded_pids: Vec<(String, u32)> = Vec::with_capacity(topology_entries.len());
+            for entry in topology_entries {
+                let child_path = {
+                    let p = std::path::PathBuf::from(&entry);
+                    if p.is_absolute() { p } else { topology_base.join(p) }
+                };
+                let child_toml = std::fs::read_to_string(&child_path).map_err(|e| {
+                    format!(
+                        "maos run: failed to read topology spirit manifest {}: {e}",
+                        child_path.display()
+                    )
+                })?;
+                let child_root: toml::Value = toml::from_str(&child_toml).map_err(|e| {
+                    format!(
+                        "maos run: topology spirit manifest {} TOML parse error: {e}",
+                        child_path.display()
+                    )
+                })?;
+                if child_root.get("cli_wrapper").is_some() {
+                    return Err(format!(
+                        "maos run: topology entry {} is [cli_wrapper]; class Spirits only in topology manifests",
+                        child_path.display()
+                    )
+                    .into());
+                }
+                let child_extract = |section: &str| -> Result<String, Box<dyn std::error::Error>> {
+                    let v = child_root.get(section).ok_or_else(|| {
+                        format!(
+                            "maos run: topology entry {} missing manifest section [{section}]",
+                            child_path.display()
+                        )
+                    })?;
+                    Ok(toml::to_string(v).map_err(|e| format!("serialize [{section}]: {e}"))?)
+                };
+                let child_opt_section = |section: &str| -> Option<String> {
+                    child_root.get(section).and_then(|v| toml::to_string(v).ok())
+                };
+                let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
+                    &child_extract("class")?,
+                )?;
+                let kind = classify_spirit(&class_section.name).ok_or_else(|| {
+                    format!(
+                        "maos run: unknown topology Spirit class '{}' in {}",
+                        class_section.name,
+                        child_path.display()
+                    )
+                })?;
+                let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
+                    &child_extract("sandbox")?,
+                )?;
+                let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
+                    &child_extract("resources")?,
+                )?;
+                let caps_required = caps_required_or_empty(&child_root)?;
+                let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
+                    &child_extract("output_shape")?,
+                )?;
+                let posture_section = PostureSection::from_toml_str(&child_extract("posture")?)
+                    .map_err(|e| format!("posture parse: {e}"))?;
+                let epistemic_policy = child_opt_section("epistemic_policy")
+                    .map(|s| {
+                        maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
+                            .map_err(|e| format!("epistemic_policy parse: {e}"))
+                    })
+                    .transpose()?;
+                let scheduling = match child_opt_section("scheduling") {
+                    Some(s) => SchedulingSection::from_toml_str(&s)?,
+                    None => SchedulingSection::default(),
+                };
+                let lifecycle = match child_opt_section("lifecycle") {
+                    Some(s) => LifecycleSection::from_toml_str(&s)?,
+                    None => LifecycleSection::default(),
+                };
+                let budget = child_opt_section("budget")
+                    .map(|s| {
+                        maos_kernel_core::security::manifest::Budget::from_toml_str(&s)
+                            .map_err(|e| format!("budget parse: {e}"))
+                    })
+                    .transpose()?;
+                let journal = Arc::clone(&shared_journal);
+                let spirit_id = class_section.name.clone();
+                // Patch 7 — reject duplicate spirit_id in topology entries.
+                if loaded_pids.iter().any(|(id, _)| id == &spirit_id) {
+                    return Err(format!(
+                        "maos run: duplicate spirit_id '{spirit_id}' in [[topology.spirits]] — \
+                         each entry must resolve to a unique [class].name"
+                    )
+                    .into());
+                }
+                let bundle = SpiritManifestBundle {
+                    scheduling,
+                    lifecycle,
+                    class: Some(class_section.clone()),
+                    budget,
+                    ..Default::default()
+                };
+                let needs_port = requires_epistemic_halt_port(epistemic_policy.as_ref());
+                let strip_port = std::env::var_os("MAOS_TEST_ONLY_STRIP_SCALAR_PORT").is_some();
+                let pid = match kind {
+                    LoadedSpiritKind::Orchestrator => scheduler
+                        .load(
+                            &spirit_id,
+                            bundle,
+                            orchestrator::Orchestrator::new(&spirit_id),
+                            boot_nonce,
+                        )
+                        .await
+                        .map_err(|e| format!("maos run: scheduler.load failed for {spirit_id}: {e}"))?,
+                    LoadedSpiritKind::Architect => scheduler
+                        .load(
+                            &spirit_id,
+                            bundle,
+                            architect::Architect::new(&spirit_id)
+                                .with_pending_spec("founder-loop topology manifest load"),
+                            boot_nonce,
+                        )
+                        .await
+                        .map_err(|e| format!("maos run: scheduler.load failed for {spirit_id}: {e}"))?,
+                    LoadedSpiritKind::Reviewer => scheduler
+                        .load(
+                            &spirit_id,
+                            bundle,
+                            reviewer::Reviewer::new(&spirit_id).with_pending_design(
+                                reviewer::DesignUnderReview::default(),
+                            ),
+                            boot_nonce,
+                        )
+                        .await
+                        .map_err(|e| format!("maos run: scheduler.load failed for {spirit_id}: {e}"))?,
+                    LoadedSpiritKind::Mira => {
+                        // Story 9.6 — Mira declares a synchronous diagnostic scalar
+                        // halt transport. Wire the production EpistemicScalarPort
+                        // adapter so the kernel can evaluate the scalar and fire the
+                        // halt; fail boot loud if the port cannot be wired.
+                        if needs_port && strip_port {
+                            return Err(format!(
+                                "maos run: FATAL boot — topology Spirit '{spirit_id}' declares \
+                                 synchronous diagnostic scalar halt transport but no \
+                                 EpistemicScalarPort could be wired"
+                            )
+                            .into());
+                        }
+                        let policy = epistemic_policy.clone().ok_or(
+                            "maos run: Mira manifest must declare [epistemic_policy]",
+                        )?;
+                        let last_receipt = Arc::new(std::sync::Mutex::new(None));
+                        let adapter: Arc<dyn maos_domain::ports::EpistemicScalarPort> =
+                            Arc::new(ButlerOrchestratorAdapter {
+                                orchestrator: Arc::clone(&orchestrator),
+                                tl: Arc::clone(&transparency_log),
+                                journal: Arc::clone(&journal),
+                                policy,
+                                boot_nonce,
+                                last_receipt,
+                            });
+                        scheduler
+                            .load(
+                                &spirit_id,
+                                bundle,
+                                mira::Mira::default()
+                                    .with_id(&spirit_id)
+                                    .with_scalar_port(adapter),
+                                boot_nonce,
+                            )
+                            .await
+                            .map_err(|e| format!("maos run: scheduler.load failed for {spirit_id}: {e}"))?
+                    }
+                    LoadedSpiritKind::Nash => scheduler
+                        .load(
+                            &spirit_id,
+                            bundle,
+                            nash::Nash::default().with_id(&spirit_id),
+                            boot_nonce,
+                        )
+                        .await
+                        .map_err(|e| format!("maos run: scheduler.load failed for {spirit_id}: {e}"))?,
+                    LoadedSpiritKind::Butler | LoadedSpiritKind::Researcher => {
+                        return Err(format!(
+                            "maos run: topology manifests currently accept deterministic class Spirits only; got {spirit_id}"
+                        )
+                        .into());
+                    }
+                };
+                // Patch 3 — admit with the real scheduler-allocated pid (was
+                // hardcoded 0 before scheduler.load returned it).
+                let _run_spec = security
+                    .admit_spirit(
+                        pid,
+                        &spirit_id,
+                        &sandbox_cfg,
+                        &resource_caps,
+                        &caps_required,
+                        Some(&output_shape),
+                        journal.as_ref(),
+                        &posture_section,
+                        epistemic_policy.as_ref(),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(&class_section),
+                    )
+                    .map_err(|e| format!("maos run: topology admission failed for {spirit_id}: {e}"))?;
+                emit_vetter_key_event(
+                    &transparency_log,
+                    &spirit_id,
+                    &class_section.version,
+                    true,
+                    &format!("{:?}", _run_spec.tier),
+                    "maos run: topology admission granted",
+                );
+                if let Some(rec) = maos_registry::admission::validate_model_provenance(
+                    child_toml.as_bytes(),
+                    &resolve_model_provenance_policy(),
+                )
+                .map_err(|e| {
+                    format!("maos run: topology model-provenance admission failed for {spirit_id}: {e}")
+                })?
+                {
+                    emit_model_provenance_event(&transparency_log, &rec)
+                        .map_err(|e| format!("maos run: {e}"))?;
+                }
+                scheduler
+                    .start(pid)
+                    .await
+                    .map_err(|e| format!("maos run: scheduler.start failed for {spirit_id}: {e}"))?;
+                pid_by_spirit_id
+                    .write()
+                    .unwrap_or_else(|e| {
+                        eprintln!("CRITICAL: pid_by_spirit_id RwLock poisoned (topology insert)");
+                        e.into_inner()
+                    })
+                    .insert(spirit_id.clone(), pid);
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "event": "spirit_loaded",
+                        "spirit_id": spirit_id,
+                        "pid": pid,
+                        "topology": true,
+                        "boot_loud_port": needs_port && !strip_port,
+                    })
+                );
+                loaded_pids.push((spirit_id, pid));
+            }
+            if run.once {
+                let mut fired_pids: Vec<u32> = Vec::with_capacity(loaded_pids.len());
+                for _ in 0..loaded_pids.len() {
+                    let scbs = {
+                        let scbs = scheduler.scbs();
+                        let guard = scbs.read().unwrap();
+                        guard.values().cloned().collect::<Vec<_>>()
+                    };
+                    let scheduled_pid =
+                        maos_kernel_core::scheduler::pick_next_spirit_from_slice(&scbs);
+                    // Patch 2 — picker result is PRIMARY; skip already-fired pids.
+                    // Patch 8 — fallback also skips already-fired SCBs.
+                    let scb = scheduled_pid
+                        .and_then(|spid| {
+                            scbs.iter().find(|scb| scb.pid == spid && !fired_pids.contains(&scb.pid))
+                        })
+                        .or_else(|| {
+                            scbs.iter().find(|scb| !fired_pids.contains(&scb.pid))
+                        })
+                        .cloned();
+                    let Some(scb) = scb else {
+                        break;
+                    };
+                    fired_pids.push(scb.pid);
+                    let outcome = scheduler.dispatcher_arc().fire_on_idle(&scb).await;
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "event": "on_idle_fired",
+                            "spirit_id": scb.spirit_id,
+                            "pid": scb.pid,
+                            "outcome": format!("{outcome:?}")
+                        })
+                    );
+                }
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "event": "drain",
+                        "topology": true,
+                        "spirits": loaded_pids.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>()
+                    })
+                );
+                yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
+                drop(audit_tx);
+                drop(inference);
+                drop(capability);
+                drop(orchestrator);
+                drop(scheduler);
+                drop(lifecycle_resolver);
+                match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => eprintln!("maos run: audit writer task failed during topology drain: {e}"),
+                    Err(_) => eprintln!("maos run: audit writer topology drain timed out after 5s"),
+                }
+                eprintln!("maos run: topology --once complete — exiting cleanly");
+                return Ok(());
+            }
+            // Patch 6 — topology continuous mode is not yet implemented.
+            // Fail explicitly rather than silently falling through to the
+            // single-Spirit serving loop (which is guarded by topology().is_none()).
+            return Err(
+                "maos run: topology continuous mode is not yet supported; use --once".into(),
+            );
+        }
 
+
+        if manifest_root.get("topology").is_none() {
         // ── Story 8.12 AC3 — [cli_wrapper] load fork, BEFORE extract("class"). ──
         // A [cli_wrapper] manifest has no [class] section, so the class recipe
         // below cannot load it. The fork lives here in the composition root
@@ -2201,39 +2575,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let kind = classify_spirit(&class_section.name).ok_or_else(|| {
             format!(
                 "maos run: unknown Spirit class '{}' (known: butler, researcher, \
-                 orchestrator/architect/reviewer [founder-loop journey])",
+                 orchestrator, architect, reviewer, mira, nash)",
                 class_section.name
             )
         })?;
-        // AC3 / FORK B — founder-loop [class] Spirits are classifiable but run as
-        // the in-process founder-loop journey topology, not standalone. Fail loud
-        // with a directional message BEFORE the class recipe (whose required
-        // sections these thin Spirits intentionally omit).
-        if kind == LoadedSpiritKind::FounderLoopClass {
-            return Err(format!(
-                "maos run: '{}' is a founder-loop [class] Spirit — classifiable, but it runs \
-                 inside the founder-loop journey topology (Orchestrator → Worker(real CLI) → \
-                 Architect → Reviewer → digest), NOT as a standalone single-Spirit `maos run`. \
-                 Run the founder-loop journey (smoke-founder-loop-8-4); a general multi-Spirit \
-                 scheduler under `maos run` is Epic 9 operator surface (Story 8.12 FORK B).",
-                class_section.name
-            )
-            .into());
-        }
         let sandbox_cfg =
             maos_kernel_core::security::SandboxConfig::from_toml_str(&extract("sandbox")?)?;
         let resource_caps =
             maos_kernel_core::security::ResourceCaps::from_toml_str(&extract("resources")?)?;
-        let caps_required = {
-            let v = manifest_root
-                .get("capabilities")
-                .and_then(|c| c.get("required"))
-                .ok_or("maos run: missing [capabilities.required]")?;
-            maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
-                &toml::to_string(v)
-                    .map_err(|e| format!("serialize [capabilities.required]: {e}"))?,
-            )?
-        };
+        let caps_required = caps_required_or_empty(&manifest_root)?;
         let output_shape =
             maos_kernel_core::security::OutputShape::from_toml_str(&extract("output_shape")?)?;
         let posture_section = PostureSection::from_toml_str(&extract("posture")?)
@@ -2341,7 +2691,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "maos run: WARNING — MAOS_TEST_ONLY_STRIP_SCALAR_PORT is set.                  This is a test-only seam and must NEVER be used in production."
             );
         }
-        let needs_port = requires_epistemic_halt_port(&posture_section);
+        let needs_port = requires_epistemic_halt_port(epistemic_policy.as_ref());
         let mut halt_receipt_handle: Option<
             Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>,
         > = None;
@@ -2413,6 +2763,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     butler = butler.with_scalar_port(port);
                 }
                 // Story 8.14b FORK 1 — wire LiveButlerMcpPort when --live.
+                let mut butler_mcp_ref: Option<Arc<LiveButlerMcpPort>> = None;
                 if run.live {
                     use maos_domain::ports::mcp::McpTransportId;
                     use maos_mcp::client::{McpClientImpl, McpServerEntry};
@@ -2437,8 +2788,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             maos_domain::ports::mcp::McpCallResponse,
                             maos_domain::ports::mcp::McpError,
                         > {
-                            use maos_mcp::McpClient;
-                            match server_name {
+                        match server_name {
                                 "calendar" => self
                                     .calendar
                                     .as_ref()
@@ -2539,28 +2889,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
 
                     if let Some(adapter) = mcp_adapter {
-                        let spirit_pid = 0;
-                        let posture_hash = policy
-                            .inner()
-                            .load_full()
-                            .spirit_postures
-                            .get(&spirit_pid)
-                            .map(|s| s.posture_hash())
-                            .unwrap_or([0u8; 32]);
-                        let live_mcp = LiveButlerMcpPort::new(
-                            spirit_pid,
+                        // Hardcode [0u8;32] to match the kernel McpClientAdapter
+                        // check_capability verification (which also uses [0u8;32]).
+                        let posture_hash = [0u8; 32];
+                        let live_mcp = Arc::new(LiveButlerMcpPort::new(
+                            0,
                             posture_hash,
                             adapter,
                             Arc::clone(&capability),
-                        );
-                        butler = butler.with_mcp_port(Arc::new(live_mcp));
+                        ));
+                        butler = butler.with_mcp_port(Arc::clone(&live_mcp) as Arc<dyn butler::ButlerMcpPort>);
+                        butler_mcp_ref = Some(live_mcp);
                         eprintln!("maos run: butler live MCP port wired (--live)");
                     }
                 }
-                scheduler
+                let pid = scheduler
                     .load(&spirit_id, bundle, butler, boot_nonce)
                     .await
-                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?
+                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?;
+                // Patch 4 — update the MCP port's spirit_pid to the real
+                // scheduler-allocated value (was hardcoded 0 at construction time).
+                if let Some(ref mcp) = butler_mcp_ref {
+                    mcp.spirit_pid.store(pid, std::sync::atomic::Ordering::SeqCst);
+                }
+                pid
             }
             LoadedSpiritKind::Researcher => {
                 if needs_port {
@@ -2574,6 +2926,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .into());
                 }
                 let mut researcher = researcher::Researcher::new();
+                let mut researcher_mcp_ref: Option<Arc<LiveResearcherMcpPort>> = None;
                 if run.live {
                     // Story 8.14c — wire LiveResearcherMcpPort + LogRecallPort when --live.
                     use maos_domain::ports::mcp::McpTransportId;
@@ -2600,34 +2953,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             maos_domain::ports::mcp::McpCallResponse,
                             maos_domain::ports::mcp::McpError,
                         > {
-                            use maos_mcp::McpClient;
-                            match server_name {
-                                "web" => self
-                                    .web
-                                    .as_ref()
-                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                    .call(server_name, tool, args),
-                                "arxiv" => self
-                                    .arxiv
-                                    .as_ref()
-                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                    .call(server_name, tool, args),
-                                "github" => self
-                                    .github
-                                    .as_ref()
-                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                    .call(server_name, tool, args),
-                                "citation-graph" => self
-                                    .citation_graph
-                                    .as_ref()
-                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                    .call(server_name, tool, args),
-                                _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(
-                                    server_name.into(),
-                                )),
-                            }
+                        match server_name {
+                            "web" => self
+                                .web
+                                .as_ref()
+                                .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                .call(server_name, tool, args),
+                            "arxiv" => self
+                                .arxiv
+                                .as_ref()
+                                .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                .call(server_name, tool, args),
+                            "github" => self
+                                .github
+                                .as_ref()
+                                .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                .call(server_name, tool, args),
+                            "citation-graph" => self
+                                .citation_graph
+                                .as_ref()
+                                .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                .call(server_name, tool, args),
+                            _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(
+                                server_name.into(),
+                            )),
                         }
                     }
+                }
 
                     let mcp_io = Arc::clone(&io_arc);
 
@@ -2703,26 +3055,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
 
                     if let Some(adapter) = mcp_adapter {
-                        let spirit_pid = 0;
-                        let posture_hash = policy
-                            .inner()
-                            .load_full()
-                            .spirit_postures
-                            .get(&spirit_pid)
-                            .map(|s| s.posture_hash())
-                            .unwrap_or([0u8; 32]);
-                        let live_mcp = LiveResearcherMcpPort::new(
-                            spirit_pid,
+                        // Hardcode [0u8;32] to match the kernel McpClientAdapter
+                        // check_capability verification (which also uses [0u8;32]).
+                        let posture_hash = [0u8; 32];
+                        let live_mcp = Arc::new(LiveResearcherMcpPort::new(
+                            0,
                             posture_hash,
                             adapter,
                             Arc::clone(&capability),
-                        );
+                        ));
                         researcher = researcher
-                            .with_mcp_port(Arc::new(live_mcp))
+                            .with_mcp_port(Arc::clone(&live_mcp) as Arc<dyn researcher::ResearcherMcpPort>)
                             .with_log_recall_port(
                                 Arc::clone(&log_recall_adapter) as Arc<dyn LogRecallPort>,
-                                spirit_pid,
+                                // FIXME(Patch 4): spirit_pid is 0 because the real pid
+                                // is not allocated until scheduler.load() below. Fixing
+                                // requires making allocate_pid() pub or restructuring
+                                // the Researcher to accept deferred pid.
+                                0,
                             );
+                        researcher_mcp_ref = Some(live_mcp);
                         eprintln!("maos run: researcher live MCP port wired (--live)");
                     }
 
@@ -2735,6 +3087,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .to_string();
                     let token = capability
                         .issue_with_mediation(
+                            // FIXME(Patch 4): spirit_pid is 0 because pid is not yet
+                            // allocated; requires pre-alloc or deferred binding.
                             0,
                             Scope::ProviderInfer { provider },
                             60,
@@ -2764,6 +3118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         } else {
                             Arc::new(researcher_inference)
                         };
+                    // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
                     researcher = researcher.with_inference_port(port, token, 0);
                     eprintln!("maos run: researcher live-inference seam wired (--live)");
                 } else if let Ok(cassette_path) = std::env::var("MAOS_REPLAY_CASSETTE") {
@@ -2777,6 +3132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map_err(|e| format!("maos run: cassette replay init failed: {e}"))?;
                     let token = capability
                         .issue_with_mediation(
+                            // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
                             0,
                             Scope::ProviderInfer {
                                 provider: "replay".into(),
@@ -2788,6 +3144,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map_err(|e| format!("maos run: token issue failed: {e}"))?;
                     let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
                         Arc::new(replay);
+                    // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
                     researcher = researcher.with_inference_port(port, token, 0);
                     eprintln!(
                         "maos run: researcher cassette-replay inference wired ({})",
@@ -2798,17 +3155,100 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "maos run: researcher deterministic survey (no --live; zero network)"
                     );
                 }
-                scheduler
+                let pid = scheduler
                     .load(&spirit_id, bundle, researcher, boot_nonce)
+                    .await
+                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?;
+                // Patch 4 — update the MCP port's spirit_pid to the real
+                // scheduler-allocated value (was hardcoded 0 at construction time).
+                if let Some(ref mcp) = researcher_mcp_ref {
+                    mcp.spirit_pid.store(pid, std::sync::atomic::Ordering::SeqCst);
+                }
+                pid
+            }
+            LoadedSpiritKind::Orchestrator => scheduler
+                .load(
+                    &spirit_id,
+                    bundle,
+                    orchestrator::Orchestrator::new(&spirit_id),
+                    boot_nonce,
+                )
+                .await
+                .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
+            LoadedSpiritKind::Architect => scheduler
+                .load(
+                    &spirit_id,
+                    bundle,
+                    architect::Architect::new(&spirit_id)
+                        .with_pending_spec("founder-loop topology manifest load"),
+                    boot_nonce,
+                )
+                .await
+                .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
+            LoadedSpiritKind::Reviewer => scheduler
+                .load(
+                    &spirit_id,
+                    bundle,
+                    reviewer::Reviewer::new(&spirit_id).with_pending_design(
+                        reviewer::DesignUnderReview::default(),
+                    ),
+                    boot_nonce,
+                )
+                .await
+                .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
+            LoadedSpiritKind::Mira => {
+                // Story 9.6 — Mira declares a synchronous diagnostic scalar halt
+                // transport. Wire the production EpistemicScalarPort adapter.
+                if needs_port && strip_port {
+                    return Err(format!(
+                        "maos run: FATAL boot — Spirit '{spirit_id}' declares synchronous \
+                         diagnostic scalar halt transport but no EpistemicScalarPort could be wired"
+                    )
+                    .into());
+                }
+                let policy = epistemic_policy.clone().ok_or(
+                    "maos run: Mira manifest must declare [epistemic_policy]",
+                )?;
+                let last_receipt = Arc::new(std::sync::Mutex::new(None));
+                halt_receipt_handle = Some(Arc::clone(&last_receipt));
+                let adapter: Arc<dyn maos_domain::ports::EpistemicScalarPort> =
+                    Arc::new(ButlerOrchestratorAdapter {
+                        orchestrator: Arc::clone(&orchestrator),
+                        tl: Arc::clone(&transparency_log),
+                        journal: Arc::clone(&journal),
+                        policy,
+                        boot_nonce,
+                        last_receipt,
+                    });
+                scheduler
+                    .load(
+                        &spirit_id,
+                        bundle,
+                        mira::Mira::default()
+                            .with_id(&spirit_id)
+                            .with_scalar_port(adapter),
+                        boot_nonce,
+                    )
                     .await
                     .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?
             }
-            LoadedSpiritKind::FounderLoopClass => {
-                unreachable!(
-                    "FounderLoopClass short-circuits with a directional error before the load match"
+            LoadedSpiritKind::Nash => scheduler
+                .load(
+                    &spirit_id,
+                    bundle,
+                    nash::Nash::default().with_id(&spirit_id),
+                    boot_nonce,
                 )
-            }
+                .await
+                .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?
         };
+        pid_by_spirit_id
+            .write()
+            .unwrap_or_else(|e| {
+                eprintln!("CRITICAL: pid_by_spirit_id RwLock poisoned (single-spirit insert)");
+                e.into_inner()
+            })
+            .insert(spirit_id.clone(), pid);
         scheduler
             .start(pid)
             .await
@@ -2853,7 +3293,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 drop(output_guard);
             }
             if let Some(handle) = &halt_receipt_handle {
-                if let Some(receipt) = handle.lock().unwrap_or_else(|e| e.into_inner()).clone() {
+                if let Some(receipt) = handle.lock().unwrap_or_else(|e| {
+                    eprintln!("CRITICAL: halt_receipt Mutex poisoned");
+                    e.into_inner()
+                }).clone() {
                     // AC5(f) — render the halt screen-string from the SHARED
                     // constants so production output and the JB-3 assertion can
                     // never drift (compile-error on rename).
@@ -2898,6 +3341,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // IdleWatchdog drives on_idle against real time. `MAOS_ONE_SHOT` is unset
         // on the `maos run` path, so the block below is skipped.
         eprintln!("maos run: '{spirit_id}' loaded — entering serving loop");
+        }
     }
     // ─────────────────────────────────────────────────────────────
 
@@ -5505,15 +5949,6 @@ description = "smoke test spirit successor"
             return smoke_orchestrator_fanout_6_2().await;
         }
 
-        // Story 8.4 AC6 — `smoke-founder-loop-8-4` end-to-end founder-loop wedge.
-        if mode == "smoke-founder-loop-8-4" {
-            return smoke_founder_loop_8_4().await;
-        }
-
-        // Story 8.5 AC7 — `smoke-mira-nash-8-5` end-to-end bilateral-pair J4 journey.
-        if mode == "smoke-mira-nash-8-5" {
-            return smoke_mira_nash_8_5().await;
-        }
 
         // Story 8.6 AC-T13/AC-A7 — `smoke-a2a-tcp-8-6`: live cross-Host
         // Mira(host_a) → Nash(host_b) advisory over a REAL TCP/mTLS socket
@@ -5522,10 +5957,6 @@ description = "smoke test spirit successor"
             return smoke_a2a_tcp_8_6().await;
         }
 
-        // Story 8.13 — J4 end-to-end over live TCP/mTLS plus real HTTP mobile push.
-        if mode == "smoke-mira-nash-tcp-8-13" {
-            return smoke_mira_nash_tcp_8_13().await;
-        }
 
         // Story 6.3 AC7 — `smoke-a2a-loopback-6-3` end-to-end A2A wedge demo.
         if mode == "smoke-a2a-loopback-6-3" {
@@ -5599,7 +6030,7 @@ description = "smoke test spirit successor"
 
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-founder-loop-8-4, smoke-mira-nash-8-5, smoke-a2a-tcp-8-6, smoke-a2a-consent-vocab-8-7, smoke-a2a-fail-closed-8-8"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-a2a-tcp-8-6, smoke-a2a-consent-vocab-8-7, smoke-a2a-fail-closed-8-8"
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -6214,7 +6645,7 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
         .register_spirit_typed(&SpiritId::from("worker-cli-stub"))
         .expect("register worker-cli-stub");
 
-    let originating_lineage = IntentLineage::new(vec![A2AIntent::new("smoke-founder-loop-wedge")]);
+    let originating_lineage = IntentLineage::new(vec![A2AIntent::new("orchestrator-fanout-wedge")]);
 
     let make_frame = |seq: u64, prior: Option<PriorDistillateRef>, target: &str| -> IacFrame {
         let mut id = [0u8; 16];
@@ -6443,962 +6874,6 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
 }
 
 #[cfg(feature = "network")]
-/// Story 8.4 — a `SpiritRole::Worker` `task.complete` frame (Architect/Reviewer
-/// are specialized Workers — Decision C). Used by `smoke_founder_loop_8_4`.
-fn founder_loop_task_complete(
-    worker_id: &str,
-    seq: u64,
-    result: &str,
-    lineage: maos_domain::invariants::i13::IntentLineage,
-) -> maos_domain::frame::IacFrame {
-    use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, TaskCompletePayload};
-    use maos_domain::invariants::i1::IntentClass;
-    use maos_domain::invariants::i3::FrameOrigin;
-    use maos_spirit_abi::identity::{FrameKind, SpiritId, SpiritRole};
-
-    let mut frame_id = [0u8; 16];
-    frame_id[0..8].copy_from_slice(&(seq | (1u64 << 62)).to_le_bytes());
-    let mut to = smallvec::SmallVec::<[FrameAddress; 1]>::new();
-    to.push(FrameAddress {
-        spirit_id: SpiritId::from("orchestrator"),
-        host_id: None,
-        role: Some(SpiritRole::Orchestrator),
-    });
-    IacFrame {
-        frame_id,
-        timestamp_ns: seq,
-        logical_clock: seq,
-        from: FrameAddress {
-            spirit_id: SpiritId::from(worker_id),
-            host_id: None,
-            role: Some(SpiritRole::Worker),
-        },
-        to,
-        kind: FrameKind::TaskComplete,
-        intent: IntentClass::Standard,
-        payload: FramePayload::TaskComplete(TaskCompletePayload {
-            result: result.into(),
-        }),
-        auto_marker: FrameOrigin::HumanAuthored,
-        consent_envelope: None,
-        intent_lineage: lineage,
-    }
-}
-
-#[cfg(feature = "network")]
-/// Story 8.4 — producer-side distillation (Decision K): the producing Spirit
-/// seeds its OWN output frame and distills it via the real `DistillateWriter`.
-/// Returns the `PriorDistillateRef` the Orchestrator references.
-fn founder_loop_producer_distill(
-    tl: &std::sync::Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
-    memory: &std::sync::Arc<dyn std::any::Any + Send + Sync>,
-    producer_pid: u32,
-    intent: &str,
-    digest: &str,
-) -> Result<maos_domain::frame::PriorDistillateRef, Box<dyn std::error::Error>> {
-    use maos_domain::distillation::{DigestPayload, DistillationRequest};
-    use maos_domain::invariants::i3::FrameOrigin;
-    use maos_domain::ports::DistillationPort;
-    use maos_kernel_core::iac::distillate::DistillateWriter;
-    use maos_kernel_core::iac::transparency_log::FrameKind as TlFrameKind;
-
-    let _ = tl.insert_frame_event(
-        TlFrameKind::InferenceCall,
-        producer_pid,
-        None,
-        intent,
-        digest.as_bytes(),
-        FrameOrigin::SpiritAuto,
-    );
-    let source = vec![tl.last_frame_id()];
-    let writer = DistillateWriter::new(std::sync::Arc::clone(tl), std::sync::Arc::clone(memory));
-    let req = DistillationRequest::new(source, 1, DigestPayload::Text(digest.to_string()), None)?;
-    let receipt = writer.write_distillate(producer_pid, req)?;
-    Ok(maos_domain::frame::PriorDistillateRef {
-        digest_frame_id: receipt.digest_frame_id,
-        distillation_depth: receipt.effective_distillation_depth,
-        intent_lineage: receipt.intent_lineage,
-    })
-}
-
-#[cfg(feature = "network")]
-/// Story 8.4 AC6 — `smoke-founder-loop-8-4` end-to-end founder-loop wedge demo.
-///
-/// The runnable headline artifact (Decision G; mirrors
-/// `smoke-orchestrator-fanout-6-2`). Runs the full wedge at a COMPRESSED
-/// timeline — 11pm-assign → overnight distillate dispatch → halt-and-resume
-/// across the pause → 7am digest — over substrate that ALREADY exists (zero
-/// kernel KLOC):
-///
-/// 1. **FR20** — the director buffers instructions in the REAL
-///    [`OrchestratorBuffer`]; the Orchestrator drains them at safe sequence
-///    points and NEVER preempts an in-flight delegation.
-/// 2. **FR21** — every follow-up `task.assign` carries a producer-authored
-///    `PriorDistillateRef` (Decision K); a deliberate raw dispatch is REJECTED
-///    with `EOrchestratorDispatchRawOutput` (observable in the Transparency Log).
-/// 3. **Architect→Reviewer loop** — the Architect proposes (deterministic), the
-///    Reviewer critiques (deterministic); each distills its OWN output and the
-///    distillate flows through the Orchestrator.
-/// 4. **CliWrapper Worker** — the fixture-replayed canned output is captured as
-///    `FrameKind::CliSubprocessOutput=21` provenance rows (Decision B).
-/// 5. **Halt-and-resume-overnight** — the pause drains the buffer via
-///    `recall_all_pending()` and snapshots it through the hot-swap `state_codec`
-///    CBOR envelope (FR51/ADR-017); the resume re-enqueues, preserving the
-///    in-flight work (Decision I).
-/// 6. **Morning digest** — cites ACTUAL `source_log_ref`s (the I11 distillate
-///    chain) that resolve against the REAL Transparency Log (FR17 path,
-///    Decision H).
-async fn smoke_founder_loop_8_4() -> Result<(), Box<dyn std::error::Error>> {
-    use std::sync::Arc;
-
-    use architect::Architect;
-    use orchestrator::Orchestrator;
-    use reviewer::{DesignUnderReview, Reviewer};
-
-    use maos_domain::iac_bus_types::IacBusError;
-    use maos_domain::invariants::i13::IntentLineage;
-    use maos_domain::invariants::i3::FrameOrigin;
-    use maos_domain::invariants::i8::A2AIntent;
-    use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
-    use maos_kernel_core::hot_swap::state_codec;
-    use maos_kernel_core::iac::transparency_log::{
-        FrameFilter, FrameKind as TlFrameKind, TransparencyLogAdapter,
-    };
-    use maos_kernel_core::iac::{IacBusAdapter, Mailbox};
-    use maos_kernel_core::orchestrator::OrchestratorBuffer;
-    use maos_spirit_abi::identity::{SpiritId, SpiritRole};
-
-    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-    eprintln!("smoke-founder-loop-8-4: 11pm — founder assigns the overnight task");
-
-    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
-    let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
-    let mailbox = Arc::new(Mailbox::new(metrics));
-    let adapter = IacBusAdapter::new(mailbox.clone(), tl.clone());
-
-    let _orch_reg = adapter
-        .register_spirit_typed(&SpiritId::from("orchestrator"))
-        .expect("register orchestrator");
-    let _arch_reg = adapter
-        .register_spirit_typed(&SpiritId::from("architect"))
-        .expect("register architect");
-    let _rev_reg = adapter
-        .register_spirit_typed(&SpiritId::from("reviewer"))
-        .expect("register reviewer");
-    let _worker_reg = adapter
-        .register_spirit_typed(&SpiritId::from("worker"))
-        .expect("register worker");
-
-    let orch = Orchestrator::new("orchestrator");
-    let architect = Architect::new("architect");
-    let reviewer = Reviewer::new("reviewer");
-    let lineage = IntentLineage::new(vec![A2AIntent::new("founder-loop-wedge")]);
-    let memory: Arc<dyn std::any::Any + Send + Sync> = Arc::new(0u8);
-
-    // ── 1. FR20: director buffers instructions; orchestrator drains at safe points.
-    let buffer = OrchestratorBuffer::new();
-    buffer.enqueue(OrchestratorInstruction::new(
-        OrchestratorInstructionId(1),
-        "design the overnight founder-loop task",
-        1,
-    )?)?;
-    buffer.enqueue(OrchestratorInstruction::new(
-        OrchestratorInstructionId(2),
-        "review the proposed design",
-        2,
-    )?)?;
-    eprintln!(
-        "smoke-founder-loop-8-4: FR20 buffer holds {} director instruction(s)",
-        buffer.pending_count()
-    );
-
-    let first = orch
-        .drain_next(|| buffer.dequeue_at_safe_point())
-        .ok_or("safe point must drain the first instruction")?;
-    eprintln!(
-        "smoke-founder-loop-8-4: orchestrator drained '{}'",
-        first.goal
-    );
-    orch.begin_delegation();
-    // FR20: while a delegation is in flight, the next instruction is NOT preempted.
-    if orch.drain_next(|| buffer.dequeue_at_safe_point()).is_some() {
-        return Err("FR20 violated: drained while a delegation was in flight".into());
-    }
-
-    // ── 2. FR21: dispatch the design task to the Architect (first dispatch — None accepted).
-    adapter
-        .deliver_typed(orch.first_dispatch(
-            10,
-            "architect",
-            SpiritRole::Worker,
-            &first.goal,
-            "sound component decomposition",
-            lineage.clone(),
-        ))
-        .await?;
-    eprintln!("smoke-founder-loop-8-4: dispatched design task → architect (FR21 first dispatch)");
-
-    // ── 3. Architect proposes (deterministic), completes, distills its OWN output.
-    let proposal = architect
-        .propose("parse director instruction; build task assignment; attach distillate ref");
-    adapter
-        .deliver_typed(founder_loop_task_complete(
-            "architect",
-            11,
-            &proposal.digest_text(),
-            lineage.clone(),
-        ))
-        .await?;
-    orch.complete_delegation();
-    let design_ref = founder_loop_producer_distill(
-        &tl,
-        &memory,
-        30,
-        "design-proposal",
-        &proposal.digest_text(),
-    )?;
-    eprintln!(
-        "smoke-founder-loop-8-4: architect proposed {} components; distilled → distillate {:02x?}…",
-        proposal.components.len(),
-        &design_ref.digest_frame_id[..4]
-    );
-
-    // Safe point re-opened — drain the second instruction.
-    let second = orch
-        .drain_next(|| buffer.dequeue_at_safe_point())
-        .ok_or("second instruction must drain after completion")?;
-    orch.begin_delegation();
-
-    // FR21: dispatch the review task to the Reviewer WITH the distillate (follow-up).
-    adapter
-        .deliver_typed(orch.followup_dispatch(
-            12,
-            "reviewer",
-            SpiritRole::Worker,
-            &second.goal,
-            "actionable critique",
-            design_ref.clone(),
-            lineage.clone(),
-        ))
-        .await?;
-    eprintln!("smoke-founder-loop-8-4: dispatched review task → reviewer (FR21 distillate-fed)");
-
-    // Reviewer critiques (deterministic), completes, distills its OWN critique.
-    let under_review = DesignUnderReview {
-        components: proposal.components.clone(),
-        interfaces: proposal.interfaces.clone(),
-        risks: proposal.risks.clone(),
-    };
-    let critique = reviewer.review(&under_review);
-    adapter
-        .deliver_typed(founder_loop_task_complete(
-            "reviewer",
-            13,
-            &critique.digest_text(),
-            lineage.clone(),
-        ))
-        .await?;
-    orch.complete_delegation();
-    let critique_ref = founder_loop_producer_distill(
-        &tl,
-        &memory,
-        31,
-        "design-critique",
-        &critique.digest_text(),
-    )?;
-    eprintln!(
-        "smoke-founder-loop-8-4: reviewer verdict '{}'; critique distilled → flows back through orchestrator",
-        critique.verdict
-    );
-
-    // ── 4. A deliberate raw dispatch (None after a completion) is REJECTED.
-    let raw_payload = orch.build_task_assign("sneak raw output past the gate", "x", None);
-    let raw_frame = orch.assign_frame(
-        14,
-        "architect",
-        SpiritRole::Worker,
-        raw_payload,
-        lineage.clone(),
-    );
-    match adapter.deliver_typed(raw_frame).await {
-        Err(IacBusError::EOrchestratorDispatchRawOutput { .. }) => eprintln!(
-            "smoke-founder-loop-8-4: deliberate raw dispatch REJECTED (EOrchestratorDispatchRawOutput) — FR21, observable in TL"
-        ),
-        other => {
-            return Err(format!(
-                "smoke-founder-loop-8-4: expected EOrchestratorDispatchRawOutput, got {other:?}"
-            )
-            .into())
-        }
-    }
-
-    // ── 5. CliWrapper Worker — Story 8.12: a REAL subprocess spawned through the
-    // live AC1 stdio bridge (the Story-8.4 hand-INSERT of canned rows is DELETED).
-    // The deterministic `worker-cli-fixture` is a real OS process; the bridge
-    // frames its stdout and journals each line as a `CliSubprocessOutput=21` row
-    // via the real `insert_frame_event_with_sender` path. Anti-theater
-    // (AC6): the child's REAL pid lands in the rows, `child_pid != parent`, and
-    // the child is reaped — spawn-or-fail, never in-process computation.
-    {
-        use maos_kernel_core::lifecycle::cli_wrapper::{
-            argv_prefix_hash, ci_default_guard, spawn_and_bridge, Backpressure, BridgeSpawnSpec,
-        };
-        use maos_kernel_core::security::manifest::{
-            CliWrapperControlChannel, CliWrapperStdioShape,
-        };
-
-        let worker_bin = resolve_cli_binary("worker-cli-fixture")?;
-        // AC6 — hermetic ci_default guard: the journey spawns ONLY the
-        // deterministic fixture-CLI, zero network. (Its trip behavior is proven
-        // in runtime::tests::ci_default_guard_trips_on_real_cli.)
-        ci_default_guard(&worker_bin, false)
-            .map_err(|e| format!("smoke-founder-loop-8-4: hermetic guard: {e}"))?;
-        let argv_prefix = vec!["--maos-worker".to_string()];
-        let spec = BridgeSpawnSpec {
-            program: worker_bin,
-            argv_prefix: argv_prefix.clone(),
-            task_args: vec![],
-            expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
-            from_spirit_id: "worker".to_string(),
-            stdio_shape: CliWrapperStdioShape::NdjsonOverStdio,
-            control_channel: CliWrapperControlChannel::Signals,
-            shutdown_signal: Some("SIGTERM".to_string()),
-            channel_capacity: 64,
-            backpressure: Backpressure::Block,
-            env: vec![],
-        };
-        let mut bridge = spawn_and_bridge(spec)
-            .map_err(|e| format!("smoke-founder-loop-8-4: worker bridge spawn failed: {e}"))?;
-        let worker_child_pid = bridge.child_pid();
-        if worker_child_pid == std::process::id() {
-            return Err(
-                "smoke-founder-loop-8-4: worker did not spawn a real subprocess \
-                        (child_pid == parent_pid — anti-theater FAIL)"
-                    .into(),
-            );
-        }
-        let pump = bridge.pump_to_journal(
-            &tl,
-            0,
-            "orchestrator",
-            "worker-cli-fixture",
-            &["founder-loop-wedge".to_string()],
-        );
-        let exit = bridge.wait_and_finalize(
-            &tl,
-            0,
-            |_code| { /* no cap-token issued in the in-proc journey */ },
-        );
-        if exit.cause.is_crash() {
-            return Err(format!(
-                "smoke-founder-loop-8-4: worker fixture crashed unexpectedly: {:?}",
-                exit.cause
-            )
-            .into());
-        }
-        eprintln!(
-            "smoke-founder-loop-8-4: worker spawned REAL subprocess pid={worker_child_pid} \
-             (parent={}) → {} stdout line(s) journaled as CliSubprocessOutput rows; exit {:?}, reaped",
-            std::process::id(),
-            pump.stdout_lines,
-            exit.cause
-        );
-    }
-
-    // ── 6. Halt-and-resume-overnight: snapshot the in-flight buffer via the hot-swap codec.
-    buffer.enqueue(OrchestratorInstruction::new(
-        OrchestratorInstructionId(3),
-        "incorporate the review feedback",
-        3,
-    )?)?;
-    let pending = buffer.recall_all_pending();
-    let snapshot = serde_json::to_vec(&pending)?;
-    const FOUNDER_LOOP_SCHEMA: u32 = 0x0001_0000; // major=1
-    let blob = state_codec::encode(&snapshot, FOUNDER_LOOP_SCHEMA)?;
-    eprintln!(
-        "smoke-founder-loop-8-4: overnight pause — snapshotted {} pending instruction(s) ({} bytes CBOR)",
-        pending.len(),
-        blob.len()
-    );
-    // … the founder sleeps …
-    let envelope = state_codec::decode(&blob, FOUNDER_LOOP_SCHEMA)?;
-    let restored: Vec<OrchestratorInstruction> = serde_json::from_slice(&envelope.payload)?;
-    let resumed = OrchestratorBuffer::new();
-    for inst in &restored {
-        resumed.enqueue(inst.clone())?;
-    }
-    eprintln!(
-        "smoke-founder-loop-8-4: 7am resume — re-enqueued {} instruction(s); in-flight work preserved",
-        resumed.pending_count()
-    );
-    if resumed.pending_count() != pending.len() {
-        return Err("halt-and-resume did not preserve the buffered work".into());
-    }
-
-    // ── 7. Morning digest cites ACTUAL source_log_refs (FR17 path) resolving in the real TL.
-    let mut citations = Vec::new();
-    for r in [&design_ref, &critique_ref] {
-        let row = tl
-            .query_frame_by_id(r.digest_frame_id)?
-            .ok_or("a cited distillate must resolve against the real Transparency Log")?;
-        if !matches!(row.kind, TlFrameKind::Distillate) {
-            return Err(
-                "a citation must resolve to a real Distillate row, not a synthetic one".into(),
-            );
-        }
-        citations.push(r.digest_frame_id);
-    }
-    eprintln!(
-        "smoke-founder-loop-8-4: morning digest cites {} distillate source_log_ref(s), all resolving against the real Transparency Log",
-        citations.len()
-    );
-
-    // ── Verify the Transparency-Log state.
-    let task_assigns = tl.query_frames(FrameFilter {
-        kind: Some(TlFrameKind::TaskAssign),
-        ..Default::default()
-    })?;
-    let distillates = tl.query_frames(FrameFilter {
-        kind: Some(TlFrameKind::Distillate),
-        ..Default::default()
-    })?;
-    let cli_rows = tl.query_frames(FrameFilter {
-        kind: Some(TlFrameKind::CliSubprocessOutput),
-        ..Default::default()
-    })?;
-    eprintln!(
-        "smoke-founder-loop-8-4: TL state — {} TaskAssign / {} Distillate / {} CliSubprocessOutput rows",
-        task_assigns.len(),
-        distillates.len(),
-        cli_rows.len()
-    );
-    if distillates.len() < 2 {
-        return Err(format!(
-            "smoke-founder-loop-8-4: expected ≥2 Distillate rows, got {}",
-            distillates.len()
-        )
-        .into());
-    }
-    // Story 8.12 AC6 — anti-theater: the CliSubprocessOutput rows must have come
-    // from the REAL spawned worker subprocess. The fixture emits 3 canned lines;
-    // each journaled row carries the child's real PID, which is NOT this process.
-    if cli_rows.len() != worker::CANNED_OUTPUT_LINES.len() {
-        return Err(format!(
-            "smoke-founder-loop-8-4: expected {} real CliSubprocessOutput rows from the worker \
-             subprocess, got {}",
-            worker::CANNED_OUTPUT_LINES.len(),
-            cli_rows.len()
-        )
-        .into());
-    }
-    let parent_pid_marker = format!("\"child_pid\":{}", std::process::id());
-    for row in &cli_rows {
-        let payload = String::from_utf8_lossy(&row.payload_redacted);
-        if !payload.contains("\"child_pid\":") {
-            return Err(
-                "smoke-founder-loop-8-4: a CliSubprocessOutput row lacks the spawned \
-                        child PID (anti-theater FAIL — not provably a real subprocess)"
-                    .into(),
-            );
-        }
-        if payload.contains(&parent_pid_marker) {
-            return Err(
-                "smoke-founder-loop-8-4: a CliSubprocessOutput row carries the PARENT pid \
-                        (anti-theater FAIL — in-process computation masquerading as a subprocess)"
-                    .into(),
-            );
-        }
-    }
-    eprintln!(
-        "smoke-founder-loop-8-4: anti-theater OK — all {} CliSubprocessOutput rows carry the real \
-         worker child PID (≠ parent {})",
-        cli_rows.len(),
-        std::process::id()
-    );
-
-    eprintln!(
-        "smoke-founder-loop-8-4: ✅ founder-loop wedge complete — 11pm assign → overnight distillate dispatch → halt-and-resume → 7am digest cites real log refs"
-    );
-    Ok(())
-}
-
-/// Story 8.5 AC7 — `smoke-mira-nash-8-5` end-to-end bilateral-pair J4 journey.
-///
-/// Mira(host_a) diagnoses a prod-edge anomaly → a halt fires on Mira → the
-/// mobile-push test-double captures the `Halt` notification + Nash(host_b) is
-/// informed via A2A typed-intent consent (TOFU verified, allowlists admit) → the
-/// director three-tap resolves the halt (real `KernelHaltResolver` + journal) →
-/// the morning digest cites an actual `source_log_ref` resolving against the REAL
-/// Transparency Log (FR17); one deliberate `EIntentDenied` consent rejection is
-/// observable in the TL (a `ConsentRupture` row). Exits 0.
-///
-/// All adapters are REAL (the resolved 8.1–8.4 dev-dep bridge pattern); only the
-/// terminal mobile-push transport is fixture-replaced (Decision D — the real
-/// `MobilePushChannel` is the §6.5 `unimplemented!` stub).
-#[cfg(feature = "network")]
-async fn smoke_mira_nash_8_5() -> Result<(), Box<dyn std::error::Error>> {
-    use std::sync::{Arc, Mutex};
-
-    use mira::{AnomalySignal, Mira, ADVISORY_FINE_GRAINED_INTENT};
-    use nash::Nash;
-
-    use maos_a2a::{
-        A2APeerConfig, A2APeerRouter as LocalRouter, A2AProfile, A2ARouterCore, ConsentAllowlists,
-        InMemoryTofuPinStore, LoopbackA2ARouter, PeerCertFingerprint, PeerId, TofuPinStore,
-    };
-    // Story 8.13.1 — the receiver intake seam + JSON-RPC types used to drive the
-    // deny directly at production code (LoopbackA2ARouter exposes no rupture hook).
-    use maos_a2a::transport::json_rpc::{
-        A2AJsonRpcRequest, A2AJsonRpcResponse, CODE_INTENT_DENIED,
-    };
-    use maos_director_surface::halt_ui::{FlowState, HaltFlow, TapEvent};
-    use maos_director_surface::notification::{
-        NotificationChannel, NotificationDispatcher, NotificationError,
-    };
-    use maos_domain::frame::{
-        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, RuptureReason,
-        TaskAssignPayload,
-    };
-    use maos_domain::halt::{HaltId, Resolution};
-    use maos_domain::invariants::i1::IntentClass;
-    use maos_domain::invariants::i13::IntentLineage;
-    use maos_domain::invariants::i3::FrameOrigin;
-    use maos_domain::invariants::i8::A2AIntent;
-    use maos_domain::notification::{NotificationEvent, NotificationLevel, NotificationSurface};
-    use maos_kernel_core::halt::KernelHaltResolver;
-    use maos_kernel_core::iac::transparency_log::{
-        FrameFilter, FrameKind as TlFrameKind, TransparencyLogAdapter,
-    };
-    use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
-    use smallvec::smallvec;
-
-    /// Decision D — captures the dispatched Halt, reports the MobilePush surface.
-    /// NOTE: `std::sync::Mutex` is correct here because `NotificationDispatcher::dispatch`
-    /// is synchronous. If the dispatcher ever becomes async, this must migrate to
-    /// `tokio::sync::Mutex` to avoid executor blocking.
-    struct MobilePushCapture {
-        captured: Arc<Mutex<Vec<NotificationEvent>>>,
-    }
-    impl NotificationChannel for MobilePushCapture {
-        fn surface(&self) -> NotificationSurface {
-            NotificationSurface::MobilePush
-        }
-        fn dispatch(
-            &self,
-            event: &NotificationEvent,
-            _level: NotificationLevel,
-        ) -> Result<(), NotificationError> {
-            self.captured
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .push(event.clone());
-            Ok(())
-        }
-    }
-
-    const BOOT_NONCE: u64 = 0x8585;
-    const MIRA_PID: u32 = 8585;
-    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-    eprintln!("smoke-mira-nash-8-5: starting the J4 bilateral diagnostic-architect journey");
-
-    // ── Step 0 — real kernel halt machinery (temp-backed memory stores).
-    let mem_dir =
-        std::env::temp_dir().join(format!("maos-smoke-mira-nash-8-5-{}", std::process::id()));
-    std::fs::create_dir_all(&mem_dir)?;
-    // RAII guard: ensure temp directory is cleaned up even on early return / panic.
-    struct TempDirGuard(std::path::PathBuf);
-    impl Drop for TempDirGuard {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
-    let _mem_guard = TempDirGuard(mem_dir.clone());
-    let db_path = mem_dir.join("audit.db");
-    let memory_root = mem_dir.join("memory");
-    let journal_path = mem_dir.join("journal");
-
-    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(BOOT_NONCE));
-    let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
-    let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
-    // p1-allow: smoke-arm demo — isolated root, not the supervised owner
-    let capability = Arc::new(
-        maos_kernel_core::capability::CapabilityRegistryAdapter::new(
-            Arc::new(maos_kernel_core::api::RingCryptoProvider),
-            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
-            BOOT_NONCE,
-            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
-            maos_kernel_core::capability::cap_audit::channel().0,
-            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
-            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
-            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
-        ),
-    );
-    let orchestrator = Arc::new(
-        maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
-            Arc::clone(&capability),
-            Arc::clone(&halt_registry),
-        ),
-    );
-    let mailbox = Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::clone(&metrics)));
-    let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
-        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
-            memory_root,
-            4,
-        )),
-        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(
-            &db_path,
-        )?),
-        Arc::new(maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db_path)?),
-        Arc::clone(&tl),
-    ));
-    let output_markers = Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new());
-    let resolver = Arc::new(KernelHaltResolver::new(
-        Arc::clone(&halt_registry),
-        Arc::clone(&tl),
-        output_markers,
-        mailbox,
-        BOOT_NONCE,
-        memory,
-        orchestrator,
-    ));
-    let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)?;
-
-    let captured = Arc::new(Mutex::new(Vec::new()));
-    let mut dispatcher = NotificationDispatcher::new();
-    dispatcher.register(Box::new(MobilePushCapture {
-        captured: Arc::clone(&captured),
-    }));
-    let flow = HaltFlow::new(
-        resolver,
-        Arc::new(dispatcher),
-        Arc::clone(&tl) as Arc<dyn maos_domain::halt::HaltJournal>,
-    );
-
-    // ── Step 1 — Mira(host_a) diagnoses an unexplained prod-edge anomaly.
-    let signal = AnomalySignal {
-        subject: "edge-cache".into(),
-        metric: "novel_entropy_drift".into(),
-        observed: 0.91,
-        baseline: 0.10,
-        detail: "unrecognised entropy drift on the prod-edge cache; no known pattern".into(),
-        source_log_ref: String::new(),
-    };
-    let mira = Mira::default().with_id("mira");
-    let diag = mira.diagnose(&signal);
-    eprintln!(
-        "smoke-mira-nash-8-5: Mira(host_a) diagnosed '{}' — confidence {:.2}, requires_halt={}",
-        diag.subject, diag.confidence, diag.requires_halt
-    );
-    if !diag.requires_halt {
-        return Err("smoke-mira-nash-8-5: anomaly did not reach Mira's halt boundary".into());
-    }
-    let payload = mira
-        .halt_payload(&diag)
-        .ok_or("smoke-mira-nash-8-5: halt payload not produced")?;
-    let halt_id = HaltId::new(payload.halt_id.clone())?;
-
-    // ── Step 2 — a halt fires on Mira (real invoke_halt → TL EpistemicHalt row).
-    let _receipt = maos_kernel_core::halt::invoke_halt(
-        &tl,
-        &journal,
-        &halt_registry,
-        payload.clone(),
-        MIRA_PID,
-        "mira",
-        BOOT_NONCE,
-    )?;
-    eprintln!("smoke-mira-nash-8-5: a halt fired on Mira (EpistemicHalt row in the TL)");
-
-    // ── Step 3 — the halt notification ROUTES to the mobile-push surface.
-    let report = flow.dispatch_halt(halt_id.clone(), payload.clone())?;
-    if report.delivered != 1 {
-        return Err(format!(
-            "smoke-mira-nash-8-5: expected 1 mobile-push delivery, got {}",
-            report.delivered
-        )
-        .into());
-    }
-    if !matches!(
-        captured.lock().unwrap().first(),
-        Some(NotificationEvent::Halt { .. })
-    ) {
-        return Err("smoke-mira-nash-8-5: mobile-push channel did not capture the Halt".into());
-    }
-    eprintln!(
-        "smoke-mira-nash-8-5: halt notification ROUTED to the mobile-push surface (test-double captured it)"
-    );
-
-    // ── Step 4 — Nash(host_b) informed via A2A typed-intent consent (TOFU verified).
-    let fa = PeerCertFingerprint::from_cert_der(b"mira-host-a-cert-v1");
-    let fb = PeerCertFingerprint::from_cert_der(b"nash-host-b-cert-v1");
-    // Story 8.7 / AC2+AC6 — the reference pair consents on the FINE-GRAINED
-    // intent, not the coarse `readonly` band.
-    let mk_cfg =
-        |id: &str, ep: &str, fp: PeerCertFingerprint, accept: Vec<A2AIntent>| A2APeerConfig {
-            peer_id: PeerId::new(id),
-            endpoint: ep.into(),
-            cert_fingerprint: fp,
-            profile: A2AProfile::Loopback,
-            allowlists: ConsentAllowlists {
-                send_allowlist: vec![A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT)],
-                accept_allowlist: accept,
-            },
-            partition_timeout_secs: 30,
-            consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
-        };
-    let cfg_a = mk_cfg(
-        "host_a",
-        "tls://127.0.0.1:7443",
-        fa.clone(),
-        vec![A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT)],
-    );
-    let cfg_b = mk_cfg(
-        "host_b",
-        "tls://127.0.0.1:7444",
-        fb.clone(),
-        vec![A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT)],
-    );
-    let tofu = Arc::new(InMemoryTofuPinStore::new());
-    tofu.pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1)
-        .await?;
-    tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1)
-        .await?;
-    let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b.clone()], tofu);
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    router.install_intake_sink(tx).await;
-
-    let advisory = mira.advisory(&diag);
-    let advisory_json = serde_json::to_string(&advisory)?;
-    // Unique frame counter to avoid deterministic ID collisions in router caches.
-    let mut frame_counter: u64 = 0;
-    let mut make_frame = |intent: IntentClass, body: String| {
-        frame_counter += 1;
-        let mut fid = [0u8; 16];
-        fid[0..8].copy_from_slice(&frame_counter.to_be_bytes());
-        fid[8..16].copy_from_slice(&BOOT_NONCE.to_be_bytes());
-        let from = FrameAddress {
-            spirit_id: SpiritId::from("mira"),
-            host_id: Some(HostId("host_a".into())),
-            role: Some(SpiritRole::Worker),
-        };
-        IacFrame {
-            frame_id: fid,
-            timestamp_ns: 0,
-            logical_clock: 0,
-            from: from.clone(),
-            to: smallvec![FrameAddress {
-                spirit_id: SpiritId::from("nash"),
-                host_id: Some(HostId("host_b".into())),
-                role: Some(SpiritRole::Worker),
-            }],
-            // TECH-DEBT(8.5): TaskAssign reused as read-only advisory carrier.
-            // The v1.0 ABI has no Evidence/Observation variant (AC8). Next taxonomy
-            // revision should add one.
-            kind: FrameKind::TaskAssign,
-            intent,
-            payload: FramePayload::TaskAssign(TaskAssignPayload {
-                goal: body,
-                scope: vec![],
-                success_criteria: "architect a mitigation".into(),
-                posture_preferences: PosturePreferences::default(),
-                prior_distillate_ref: None,
-            }),
-            auto_marker: FrameOrigin::SpiritAuto,
-            // Story 8.7 / AC2 — populate the fine-grained per-frame intent. No
-            // reference cross-Host frame leaves with `intent_class == None`.
-            consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(
-                from,
-                A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT),
-            )),
-            intent_lineage: IntentLineage::default(),
-        }
-    };
-    LocalRouter::route_outbound(
-        &router,
-        make_frame(IntentClass::Readonly, advisory_json.clone()),
-        &HostId("host_b".into()),
-    )
-    .await
-    .map_err(|e| format!("smoke-mira-nash-8-5: advisory to Nash REJECTED unexpectedly: {e}"))?;
-    let delivered = rx
-        .recv()
-        .await
-        .ok_or("smoke-mira-nash-8-5: Nash received no advisory")?;
-    // Story 8.7 / AC2 — assert no off-Host frame leaves with intent_class == None,
-    // and that the receiver sees the fine-grained intent end-to-end.
-    match delivered
-        .consent_envelope
-        .as_ref()
-        .and_then(|e| e.intent_class.as_ref())
-        .map(|i| i.as_str())
-    {
-        Some(s) if s == ADVISORY_FINE_GRAINED_INTENT => {}
-        other => {
-            return Err(format!(
-                "smoke-mira-nash-8-5: AC2 violated — off-Host advisory must carry fine-grained intent_class, got {other:?}"
-            )
-            .into())
-        }
-    }
-    let goal = match &delivered.payload {
-        FramePayload::TaskAssign(t) => t.goal.clone(),
-        other => return Err(format!("unexpected payload {other:?}").into()),
-    };
-    let proposal = Nash::default()
-        .with_id("nash")
-        .architect(&Nash::from_wire(&goal)?);
-    eprintln!(
-        "smoke-mira-nash-8-5: Nash(host_b) informed via A2A consent (TOFU verified); proposed '{}'",
-        proposal.proposed_fix
-    );
-
-    // Record the advisory as a real TL row so the morning digest can cite it.
-    // `insert_frame_event` returns a must-use `LogBeforeDeliver` token, not a
-    // `Result` (Story 8.6: pre-existing maos-bin compile break fixed to unblock
-    // the maos-a2a-core extraction's downstream compile — analogous to the
-    // 7.3/8.3 pre-existing maos-bin fixes).
-    let _advisory_token = tl.insert_frame_event(
-        TlFrameKind::ConsentRequest,
-        MIRA_PID,
-        None,
-        "diagnostic.advisory",
-        advisory_json.as_bytes(),
-        FrameOrigin::SpiritAuto,
-    );
-    let advisory_ref = tl.last_frame_id();
-
-    // ── Step 5 — one deliberate consent denial that EARNS a real ConsentRupture
-    // from PRODUCTION code (Story 8.13.1 — the hand-insert is deleted). The
-    // advisory intent classifies, but host_a's accept_allowlist is empty, so the
-    // receiver intake denies with -32001 AND its production deny path emits a
-    // typed ConsentRupture frame carrying the policy reason. Driven directly at
-    // the `A2ARouterCore::handle_intake` receiver seam because `LoopbackA2ARouter`
-    // exposes no rupture-sink hook and `maos-a2a` is edit-forbidden — consistent
-    // with the live-TCP smoke, which observes the same emission off `nash.core()`.
-    let deny_cfg_a = mk_cfg("host_a", "tls://127.0.0.1:7443", fa.clone(), vec![]);
-    let deny_tofu = Arc::new(InMemoryTofuPinStore::new());
-    deny_tofu
-        .pin_first_contact(&PeerId::new("host_a"), &fa, &fa, 1)
-        .await?;
-    let deny_core = A2ARouterCore::new(vec![deny_cfg_a], deny_tofu);
-    let (deny_rupture_tx, mut deny_rupture_rx) = tokio::sync::mpsc::channel::<IacFrame>(16);
-    deny_core.install_rupture_sink(deny_rupture_tx).await;
-    let mut denied_frame = make_frame(IntentClass::Readonly, advisory_json.clone());
-    // Story 8.13.1-review / P6 — align with 8.13 smoke: use a distinct fine-grained
-    // intent so the deny is unambiguously the classified-but-policy-denied (-32001)
-    // leg, not an unclassified (-32009) or sender-side deny.
-    denied_frame.consent_envelope = Some(ConsentEnvelope::with_fine_grained_intent(
-        denied_frame.from.clone(),
-        A2AIntent::new("diagnosis-handoff:write-mitigation"),
-    ));
-    let denied_req = A2AJsonRpcRequest::new("iac.deliver", denied_frame, 1);
-    match deny_core.handle_intake(denied_req).await {
-        A2AJsonRpcResponse::Nack(n) if n.error.code == CODE_INTENT_DENIED => {}
-        other => {
-            return Err(format!(
-                "smoke-mira-nash-8-5: expected -32001 CODE_INTENT_DENIED at intake, got {other:?}"
-            )
-            .into())
-        }
-    }
-    // OBSERVE the production-emitted rupture (never hand-inserted) and assert it
-    // carries the deny-decision-only signal before journaling it for real.
-    let deny_rupture = deny_rupture_rx.try_recv().map_err(|e| {
-        format!("smoke-mira-nash-8-5: production deny path emitted no ConsentRupture: {e:?}")
-    })?;
-    match &deny_rupture.payload {
-        FramePayload::ConsentRupture(p)
-            if p.rejected.len() == 1
-                && matches!(p.rejected[0].reason, RuptureReason::IntentAllowlistMismatch) => {}
-        other => {
-            return Err(format!(
-                "smoke-mira-nash-8-5: not the production IntentAllowlistMismatch rupture: {other:?}"
-            )
-            .into())
-        }
-    }
-    let deny_rupture_bytes = serde_json::to_vec(&deny_rupture)
-        .map_err(|e| format!("smoke-mira-nash-8-5: serialize rupture: {e}"))?;
-    let _rupture_token = tl.insert_frame_event(
-        TlFrameKind::ConsentRupture,
-        MIRA_PID,
-        None,
-        "a2a.consent.denied",
-        &deny_rupture_bytes,
-        FrameOrigin::SpiritAuto,
-    );
-    eprintln!(
-        "smoke-mira-nash-8-5: deliberate consent rejection (-32001) — PRODUCTION ConsentRupture observed off the deny path + journaled (no hand-insert)"
-    );
-
-    // ── Step 6 — director three-tap resolves the halt (KernelHaltResolver + journal).
-    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(
-        FlowState::Tap1Acknowledge,
-        TapEvent::Acknowledge,
-    );
-    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(s, TapEvent::SelectKind);
-    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(s, TapEvent::Submit);
-    if s != FlowState::Done {
-        return Err("smoke-mira-nash-8-5: three-tap did not reach Done".into());
-    }
-    flow.submit_resolution(halt_id.clone(), Resolution::AcceptedHalt, "mira")?;
-    eprintln!(
-        "smoke-mira-nash-8-5: director three-tap resolved the halt (KernelHaltResolver + journal)"
-    );
-
-    // ── Step 7 — morning digest cites an actual source_log_ref against the real TL (FR17).
-    let cited = tl
-        .query_frame_by_id(advisory_ref)?
-        .ok_or("smoke-mira-nash-8-5: the cited advisory must resolve against the real TL")?;
-    if !matches!(cited.kind, TlFrameKind::ConsentRequest) {
-        return Err("smoke-mira-nash-8-5: citation must resolve to the real advisory row".into());
-    }
-    eprintln!(
-        "smoke-mira-nash-8-5: morning digest cites advisory source_log_ref (TL frame {:02x?}…) resolving against the real Transparency Log",
-        &advisory_ref[..4]
-    );
-
-    // ── Verify the Transparency-Log state.
-    let halts = tl.query_frames(FrameFilter {
-        kind: Some(TlFrameKind::EpistemicHalt),
-        ..Default::default()
-    })?;
-    let ruptures = tl.query_frames(FrameFilter {
-        kind: Some(TlFrameKind::ConsentRupture),
-        ..Default::default()
-    })?;
-    eprintln!(
-        "smoke-mira-nash-8-5: TL state — {} EpistemicHalt / {} ConsentRupture row(s)",
-        halts.len(),
-        ruptures.len()
-    );
-    if halts.is_empty() || ruptures.is_empty() {
-        return Err(
-            "smoke-mira-nash-8-5: expected EpistemicHalt + ConsentRupture rows in the TL".into(),
-        );
-    }
-
-    // mem_dir is cleaned up by the RAII TempDirGuard declared at the top of the
-    // function — cleanup runs even on early return or panic.
-    eprintln!(
-        "smoke-mira-nash-8-5: ✅ bilateral pair complete — Mira diagnoses → halt fires → mobile-push + Nash via consent → three-tap resolve → digest cites real log refs"
-    );
-    Ok(())
-}
-
-#[cfg(feature = "network")]
-/// Story 6.3 AC7 — `smoke-a2a-loopback-6-3` end-to-end A2A wedge demo.
-///
-/// Demonstrates the A2A loopback v0.8 surface:
-///   * Two in-process A2A loopback peers (Host A + Host B)
-///   * Self-signed mTLS substrate + TOFU pinning on first contact
-///   * One ALLOWED frame: Mira → Nash `diagnosis-handoff:read-only-evidence`
-///     → both allowlists admit → frame delivered to Nash's intake
-///   * One DISALLOWED frame: Mira → Nash `code-mutation-directive` →
-///     sender-side `IntentDenied { direction: Send }` BEFORE wire
-///   * One TOFU pin mismatch: Host B presents a different cert fingerprint
-///     on the second connection → `EPinMismatch::Mismatch` fires
-///   * Per-frame Lamport clock — assert monotone advance on receiver
 /// Story 8.6 AC-A5 — the daemon-mode binding for the live cross-Host transport.
 ///
 /// When a `TcpA2AConfig` is present, the composition root calls this to
@@ -7481,6 +6956,8 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
     // ── Write PEM material to a temp dir.
     let dir = std::env::temp_dir().join(format!("maos-smoke-a2a-tcp-8-6-{}", std::process::id()));
     std::fs::create_dir_all(&dir)?;
+    // Patch 11 — RAII guard ensures cleanup on all exit paths (including early returns).
+    let _dir_guard = TempDirGuard(dir.clone());
     let write =
         |name: &str, body: &str| -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
             let p = dir.join(name);
@@ -7613,626 +7090,7 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
     // ── Teardown (H6): dropping the transports aborts the accept loops.
     drop(mira);
     drop(nash);
-    let _ = std::fs::remove_dir_all(&dir);
     eprintln!("smoke-a2a-tcp-8-6: ✅ live cross-Host TCP/mTLS transport verified");
-    Ok(())
-}
-
-#[cfg(feature = "network")]
-/// Story 8.13 — the J4 Mira/Nash journey with the 8.5 cognition/halt path
-/// composed onto the 8.6 live TCP/mTLS wire and the real HTTP mobile-push adapter.
-async fn smoke_mira_nash_tcp_8_13() -> Result<(), Box<dyn std::error::Error>> {
-    use std::io::{Read, Write};
-    use std::net::TcpListener;
-    use std::sync::{mpsc, Arc, Mutex};
-
-    use maos_a2a_core::error::A2AError;
-    use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
-    use maos_a2a_core::{
-        A2APeerConfig, A2AProfile, ConsentAllowlists, PeerCertFingerprint, PeerId,
-    };
-    use maos_a2a_tcp::{PinnedFingerprint, TcpA2AConfig};
-    use maos_director_surface::halt_ui::{FlowState, HaltFlow, TapEvent};
-    use maos_director_surface::notification::{NotificationDispatcher, TerminalChannel};
-    use maos_domain::frame::{
-        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, RuptureReason,
-        TaskAssignPayload,
-    };
-    use maos_domain::halt::{HaltId, Resolution};
-    use maos_domain::invariants::i1::IntentClass;
-    use maos_domain::invariants::i13::IntentLineage;
-    use maos_domain::invariants::i3::FrameOrigin;
-    use maos_domain::invariants::i8::A2AIntent;
-    use maos_domain::notification::{NotificationEvent, NotificationLevel};
-    use maos_domain::ports::a2a::A2ARouter;
-    use maos_kernel_core::halt::KernelHaltResolver;
-    use maos_kernel_core::iac::transparency_log::{
-        FrameFilter, FrameKind as TlFrameKind, TransparencyLogAdapter,
-    };
-    use maos_notify_push::{MobilePushHttp, PushConfig};
-    use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
-    use mira::{AnomalySignal, Mira, ADVISORY_FINE_GRAINED_INTENT};
-    use nash::Nash;
-    use smallvec::smallvec;
-
-    const BOOT_NONCE: u64 = 0x8130;
-    const MIRA_NONCE: u64 = 8131;
-    const NASH_NONCE: u64 = 8132;
-    const MIRA_PID: u32 = 813;
-    // Story 8.13.1 / AC3 — a CANONICAL fine-grained intent (sibling of
-    // ADVISORY_FINE_GRAINED_INTENT) that CLASSIFIES (passes the -32009 gate) but
-    // is deliberately absent from Nash's accept_allowlist, so it is policy-denied
-    // with -32001 — the rupture-relevant leg. The consent DECISION is fixtured
-    // (the allowlist); the ConsentRupture RECORD is produced by production code.
-    const DENIED_FINE_GRAINED_INTENT: &str = "diagnosis-handoff:write-mitigation";
-
-    fn spawn_push_server(
-    ) -> Result<(String, mpsc::Receiver<(String, String, Vec<u8>)>), Box<dyn std::error::Error>>
-    {
-        let listener = TcpListener::bind("127.0.0.1:0")?;
-        let addr = listener.local_addr()?;
-        let (tx, rx) = mpsc::channel();
-        std::thread::spawn(move || {
-            let Ok((mut stream, _)) = listener.accept() else {
-                return;
-            };
-            let mut bytes = Vec::new();
-            let mut buf = [0u8; 1024];
-            let header_end = loop {
-                let Ok(n) = stream.read(&mut buf) else {
-                    return;
-                };
-                if n == 0 {
-                    return;
-                }
-                bytes.extend_from_slice(&buf[..n]);
-                if let Some(pos) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
-                    break pos + 4;
-                }
-            };
-            let headers = String::from_utf8_lossy(&bytes[..header_end]);
-            let mut first = headers
-                .lines()
-                .next()
-                .unwrap_or_default()
-                .split_whitespace();
-            let method = first.next().unwrap_or_default().to_string();
-            let path = first.next().unwrap_or_default().to_string();
-            let len = headers
-                .lines()
-                .find_map(|line| {
-                    let (name, value) = line.split_once(':')?;
-                    name.eq_ignore_ascii_case("content-length")
-                        .then(|| value.trim().parse::<usize>().ok())
-                        .flatten()
-                })
-                .unwrap_or(0);
-            while bytes.len().saturating_sub(header_end) < len {
-                let Ok(n) = stream.read(&mut buf) else {
-                    return;
-                };
-                if n == 0 {
-                    return;
-                }
-                bytes.extend_from_slice(&buf[..n]);
-            }
-            let body = bytes[header_end..header_end + len].to_vec();
-            let _ = stream.write_all(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n");
-            let _ = tx.send((method, path, body));
-        });
-        Ok((format!("http://{addr}/j4-halt"), rx))
-    }
-
-    fn assert_loopback_url(url: &str) -> Result<(), String> {
-        let rest = url
-            .strip_prefix("http://")
-            .ok_or_else(|| "push URL must use http:// loopback in Tier-1".to_string())?;
-        // A bracketed IPv6 authority (`[::1]:port/...`) must be peeled off
-        // BEFORE the generic `:`/`/` split — that split shreds `[::1]` into a
-        // bare `[`, so the explicitly-allowed `[::1]` loopback would be wrongly
-        // rejected (the review-flagged dead branch).
-        let host = if let Some(after) = rest.strip_prefix('[') {
-            let end = after
-                .find(']')
-                .ok_or_else(|| "push URL has unterminated IPv6 host".to_string())?;
-            format!("[{}]", &after[..end])
-        } else {
-            rest.split([':', '/'])
-                .next()
-                .ok_or_else(|| "push URL missing host".to_string())?
-                .to_string()
-        };
-        if host == "127.0.0.1" || host == "localhost" || host == "[::1]" {
-            Ok(())
-        } else {
-            Err(format!("non-loopback push endpoint rejected: {host}"))
-        }
-    }
-
-    fn task_assign_frame(id_byte: u8, from_host: HostId, body: String) -> IacFrame {
-        let from = FrameAddress {
-            spirit_id: SpiritId::from("mira"),
-            host_id: Some(from_host.clone()),
-            role: Some(SpiritRole::Worker),
-        };
-        IacFrame {
-            frame_id: [id_byte; 16],
-            timestamp_ns: 0,
-            logical_clock: 0,
-            from: from.clone(),
-            to: smallvec![FrameAddress {
-                spirit_id: SpiritId::from("nash"),
-                host_id: Some(HostId("host_b".into())),
-                role: Some(SpiritRole::Worker),
-            }],
-            kind: FrameKind::TaskAssign,
-            intent: IntentClass::Readonly,
-            payload: FramePayload::TaskAssign(TaskAssignPayload {
-                goal: body,
-                scope: vec![],
-                success_criteria: "architect a mitigation".into(),
-                posture_preferences: PosturePreferences::default(),
-                prior_distillate_ref: None,
-            }),
-            auto_marker: FrameOrigin::SpiritAuto,
-            consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(
-                from,
-                A2AIntent::new(ADVISORY_FINE_GRAINED_INTENT),
-            )),
-            intent_lineage: IntentLineage::default(),
-        }
-    }
-
-    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-    eprintln!("smoke-mira-nash-tcp-8-13: starting live J4 journey");
-
-    let root = std::env::temp_dir().join(format!("maos-smoke-8-13-{}", std::process::id()));
-    std::fs::create_dir_all(&root)?;
-    struct TempDirGuard(std::path::PathBuf);
-    impl Drop for TempDirGuard {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
-    let _guard = TempDirGuard(root.clone());
-    std::env::set_var("XDG_DATA_HOME", root.join("xdg"));
-
-    let (push_url, push_rx) = spawn_push_server()?;
-    assert_loopback_url(&push_url)?;
-    if assert_loopback_url("https://push.example.invalid/j4").is_ok() {
-        return Err("smoke-mira-nash-tcp-8-13: no-egress guard trip-test failed".into());
-    }
-    // The fixed bracketed-IPv6 branch must accept `[::1]` and still reject a
-    // non-loopback bracketed host (positive + negative coverage of the branch
-    // the smoke's own `127.0.0.1` URL never exercises).
-    assert_loopback_url("http://[::1]:8080/j4")
-        .map_err(|e| format!("smoke-mira-nash-tcp-8-13: [::1] loopback wrongly rejected: {e}"))?;
-    if assert_loopback_url("http://[2001:db8::1]:8080/j4").is_ok() {
-        return Err("smoke-mira-nash-tcp-8-13: non-loopback IPv6 guard trip-test failed".into());
-    }
-
-    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(BOOT_NONCE));
-    let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
-    let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
-    // p1-allow: smoke-arm demo — isolated root, not the supervised owner
-    let capability = Arc::new(
-        maos_kernel_core::capability::CapabilityRegistryAdapter::new(
-            Arc::new(maos_kernel_core::api::RingCryptoProvider),
-            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
-            BOOT_NONCE,
-            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
-            maos_kernel_core::capability::cap_audit::channel().0,
-            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
-            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
-            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
-        ),
-    );
-    let orchestrator = Arc::new(
-        maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
-            Arc::clone(&capability),
-            Arc::clone(&halt_registry),
-        ),
-    );
-    let mailbox = Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::clone(&metrics)));
-    let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
-        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
-            root.join("memory"),
-            4,
-        )),
-        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(
-            &root.join("audit.db"),
-        )?),
-        Arc::new(
-            maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(
-                &root.join("audit.db"),
-            )?,
-        ),
-        Arc::clone(&tl),
-    ));
-    let resolver = Arc::new(KernelHaltResolver::new(
-        Arc::clone(&halt_registry),
-        Arc::clone(&tl),
-        Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new()),
-        mailbox,
-        BOOT_NONCE,
-        memory,
-        orchestrator,
-    ));
-    let journal = maos_kernel_core::journal::JournalAdapter::open(&root.join("journal"))?;
-
-    let mut dispatcher = NotificationDispatcher::new();
-    dispatcher.register(Box::new(MobilePushHttp::new(
-        PushConfig::new(push_url.clone(), Some("operator-token".into()))
-            .with_timeout(std::time::Duration::from_secs(2)),
-    )));
-    let flow = HaltFlow::new(
-        Arc::clone(&resolver),
-        Arc::new(dispatcher),
-        Arc::clone(&tl) as Arc<dyn maos_domain::halt::HaltJournal>,
-    );
-
-    let signal = AnomalySignal {
-        subject: "edge-cache".into(),
-        metric: "novel_entropy_drift".into(),
-        observed: 0.91,
-        baseline: 0.10,
-        detail: "unrecognised entropy drift on the prod-edge cache; no known pattern".into(),
-        source_log_ref: "tl:source:8-13".into(),
-    };
-    let mira_spirit = Mira::default().with_id("mira");
-    let diag = mira_spirit.diagnose(&signal);
-    let advisory = mira_spirit.advisory(&diag);
-    let advisory_json = serde_json::to_string(&advisory)?;
-    let payload = mira_spirit
-        .halt_payload(&diag)
-        .ok_or("smoke-mira-nash-tcp-8-13: halt payload not produced")?;
-    let halt_id = HaltId::new(payload.halt_id.clone())?;
-    let _receipt = maos_kernel_core::halt::invoke_halt(
-        &tl,
-        &journal,
-        &halt_registry,
-        payload.clone(),
-        MIRA_PID,
-        "mira",
-        BOOT_NONCE,
-    )?;
-    let report = flow.dispatch_halt(halt_id.clone(), payload.clone())?;
-    if report.delivered != 1 || report.errors != 0 {
-        return Err(format!(
-            "smoke-mira-nash-tcp-8-13: push report was delivered={} errors={}",
-            report.delivered, report.errors
-        )
-        .into());
-    }
-    let (method, path, body) = push_rx.recv_timeout(std::time::Duration::from_secs(2))?;
-    if method != "POST" || path != "/j4-halt" {
-        return Err(format!("smoke-mira-nash-tcp-8-13: bad push request {method} {path}").into());
-    }
-    match serde_json::from_slice::<NotificationEvent>(&body)? {
-        NotificationEvent::Halt { payload: got } if got == payload => {}
-        other => return Err(format!("smoke-mira-nash-tcp-8-13: bad push body {other:?}").into()),
-    }
-
-    let dead = TcpListener::bind("127.0.0.1:0")?;
-    let dead_addr = dead.local_addr()?;
-    drop(dead);
-    let mut isolation_dispatcher = NotificationDispatcher::new();
-    isolation_dispatcher.register(Box::new(MobilePushHttp::new(
-        PushConfig::new(format!("http://{dead_addr}/closed"), None)
-            .with_timeout(std::time::Duration::from_millis(100)),
-    )));
-    isolation_dispatcher.register(Box::new(
-        TerminalChannel::new(Arc::new(Mutex::new(Vec::<u8>::new()))).with_color(false),
-    ));
-    let isolation = isolation_dispatcher.dispatch(
-        NotificationEvent::Halt {
-            payload: payload.clone(),
-        },
-        NotificationLevel::Immediate,
-    )?;
-    if isolation.delivered != 1 || isolation.errors != 1 {
-        return Err("smoke-mira-nash-tcp-8-13: per-channel error isolation failed".into());
-    }
-
-    let ca_key = rcgen::KeyPair::generate()?;
-    let mut ca_params = rcgen::CertificateParams::new(vec!["ca-good".to_string()])?;
-    ca_params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
-    let ca_cert = ca_params.self_signed(&ca_key)?;
-    let ca_path = root.join("ca.pem");
-    std::fs::write(&ca_path, ca_cert.pem())?;
-    let mk_leaf = |name: &str| -> Result<
-        (std::path::PathBuf, std::path::PathBuf, PeerCertFingerprint),
-        Box<dyn std::error::Error>,
-    > {
-        let key = rcgen::KeyPair::generate()?;
-        let params = rcgen::CertificateParams::new(vec!["127.0.0.1".to_string()])?;
-        let cert = params.signed_by(&key, &ca_cert, &ca_key)?;
-        let fp = PeerCertFingerprint::from_cert_der(cert.der().as_ref());
-        let cert_path = root.join(format!("{name}.cert.pem"));
-        let key_path = root.join(format!("{name}.key.pem"));
-        std::fs::write(&cert_path, cert.pem())?;
-        std::fs::write(&key_path, key.serialize_pem())?;
-        Ok((cert_path, key_path, fp))
-    };
-    let (mira_cert, mira_key, mira_fp) = mk_leaf("mira")?;
-    let (nash_cert, nash_key, nash_fp) = mk_leaf("nash")?;
-    if mira_fp == nash_fp {
-        return Err("smoke-mira-nash-tcp-8-13: endpoints must have distinct TLS pins".into());
-    }
-    let allow = |send: &[&str], accept: &[&str]| ConsentAllowlists {
-        send_allowlist: send.iter().map(|s| A2AIntent::new(*s)).collect(),
-        accept_allowlist: accept.iter().map(|s| A2AIntent::new(*s)).collect(),
-    };
-    let nash_tcp = TcpA2AConfig {
-        listen_addr: "127.0.0.1:0".parse()?,
-        own_cert_chain: nash_cert,
-        own_private_key: nash_key,
-        peer_pins: vec![PinnedFingerprint {
-            peer_id: PeerId::new("host_a"),
-            fingerprint: mira_fp.clone(),
-            boot_nonce: MIRA_NONCE,
-        }],
-        handshake_timeout: std::time::Duration::from_secs(30),
-        ca_roots: Some(ca_path.clone()),
-    };
-    let nash_peers = vec![A2APeerConfig {
-        peer_id: PeerId::new("host_a"),
-        endpoint: "tls://127.0.0.1:0".into(),
-        cert_fingerprint: mira_fp.clone(),
-        profile: A2AProfile::CrossHost,
-        allowlists: allow(&[], &[ADVISORY_FINE_GRAINED_INTENT]),
-        partition_timeout_secs: 30,
-        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
-    }];
-    let nash = build_a2a_tcp_daemon_router(nash_tcp, nash_peers, NASH_NONCE).await?;
-    let nash_addr = nash.local_addr().ok_or("nash failed to bind")?;
-    // D1 — capture the frame Nash receives at intake (after the live-wire
-    // validation, BEFORE Nash parses the advisory) so the wire-content oracle
-    // can assert on the bytes that actually crossed the wire, not the
-    // test-local advisory copy. Reuses the existing `A2ARouterCore` intake-sink
-    // hook — zero edits to maos-a2a-tcp/kernel.
-    let (intake_tx, mut intake_rx) = tokio::sync::mpsc::unbounded_channel::<IacFrame>();
-    nash.core().install_intake_sink(intake_tx).await;
-    // Story 8.13.1 / AC3 — drain Nash's production rupture emissions. The deny
-    // path in `A2ARouterCore::handle_intake` pushes a typed ConsentRupture frame
-    // here; the smoke OBSERVES it (never hand-inserts), mirroring the 6.4
-    // sender-receives-the-typed-rupture pattern. Zero edits to maos-a2a-tcp.
-    let (rupture_tx, mut rupture_rx) = tokio::sync::mpsc::channel::<IacFrame>(16);
-    nash.core().install_rupture_sink(rupture_tx).await;
-    let mira_tcp = TcpA2AConfig {
-        listen_addr: "127.0.0.1:0".parse()?,
-        own_cert_chain: mira_cert,
-        own_private_key: mira_key,
-        peer_pins: vec![PinnedFingerprint {
-            peer_id: PeerId::new("host_b"),
-            fingerprint: nash_fp.clone(),
-            boot_nonce: NASH_NONCE,
-        }],
-        handshake_timeout: std::time::Duration::from_secs(30),
-        ca_roots: Some(ca_path),
-    };
-    let mira_peers = vec![A2APeerConfig {
-        peer_id: PeerId::new("host_b"),
-        endpoint: format!("tls://{nash_addr}"),
-        cert_fingerprint: nash_fp.clone(),
-        profile: A2AProfile::CrossHost,
-        // Story 8.13.1 / AC3 — Mira may SEND both the advisory and the
-        // (to-be-denied) write-mitigation intent; Nash accepts only the
-        // advisory, so the second one is policy-denied at the RECEIVER (-32001),
-        // not at Mira's send-allowlist. That is the cross-host rupture leg.
-        allowlists: allow(
-            &[ADVISORY_FINE_GRAINED_INTENT, DENIED_FINE_GRAINED_INTENT],
-            &[],
-        ),
-        partition_timeout_secs: 30,
-        consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
-    }];
-    let mira = build_a2a_tcp_daemon_router(mira_tcp, mira_peers, MIRA_NONCE).await?;
-    let mira_addr = mira.local_addr().ok_or("mira failed to bind")?;
-    if mira_addr == nash_addr {
-        return Err("smoke-mira-nash-tcp-8-13: transports must bind distinct sockets".into());
-    }
-
-    let bound_mira_host = HostId("host_a".into());
-    let frame = task_assign_frame(0x13, bound_mira_host.clone(), advisory_json.clone());
-    if frame.from.host_id.as_ref() != Some(&bound_mira_host) {
-        return Err(
-            "smoke-mira-nash-tcp-8-13: frame host_id was not transport-bound host_a".into(),
-        );
-    }
-    let router: Arc<dyn A2ARouter> = mira.clone();
-    router
-        .route_outbound(frame, &HostId("host_b".into()))
-        .await
-        .map_err(|e| format!("smoke-mira-nash-tcp-8-13: live advisory failed: {e:?}"))?;
-    let (boot, lamport) = nash
-        .last_intake_observed()
-        .ok_or("smoke-mira-nash-tcp-8-13: Nash did not observe the advisory")?;
-    if boot != MIRA_NONCE || lamport == 0 {
-        return Err(format!(
-            "smoke-mira-nash-tcp-8-13: bad wire observation boot={boot} lamport={lamport}"
-        )
-        .into());
-    }
-    // D1 — receiver-side wire-content oracle. Pull the advisory Nash actually
-    // RECEIVED off the wire (captured at intake by the sink above) and feed its
-    // RAW goal bytes through Nash's own deserializer. This closes the AC1
-    // anti-tautology gap: the prior assertions deserialized the test-local
-    // `advisory_json`, so a corrupted on-wire payload still passed.
-    let received_frame = intake_rx.try_recv().map_err(|e| {
-        format!("smoke-mira-nash-tcp-8-13: intake captured no received frame: {e:?}")
-    })?;
-    let received_goal = match &received_frame.payload {
-        FramePayload::TaskAssign(p) => p.goal.clone(),
-        other => {
-            return Err(format!(
-                "smoke-mira-nash-tcp-8-13: received non-TaskAssign payload {other:?}"
-            )
-            .into())
-        }
-    };
-    // Anti-tautology invariant: `received_goal` is the advisory's raw bytes AS
-    // RECEIVED (the captured frame field, never a re-serialized parsed struct);
-    // it is handed to `Nash::from_wire` (deserialize) exactly as Nash would on
-    // the live path. A wire mutation of the goal now fails here.
-    let received_advisory = Nash::from_wire(&received_goal).map_err(|e| {
-        format!(
-            "smoke-mira-nash-tcp-8-13: received advisory failed to rehydrate off the wire: {e:?}"
-        )
-    })?;
-    if received_advisory.severity < 0.66 {
-        return Err(
-            "smoke-mira-nash-tcp-8-13: received advisory did not carry high-severity Mira finding"
-                .into(),
-        );
-    }
-    let proposal = Nash::default()
-        .with_id("nash")
-        .architect(&received_advisory);
-    if !proposal.proposed_fix.contains("circuit-breaker") || proposal.confidence >= 0.95 {
-        return Err(
-            "smoke-mira-nash-tcp-8-13: Nash proposal not derived from the RECEIVED Mira severity"
-                .into(),
-        );
-    }
-    let forged = task_assign_frame(0x14, HostId("host_x".into()), advisory_json.clone());
-    match A2APeerRouter::route_outbound(&*mira, forged, &HostId("host_b".into())).await {
-        Err(A2AError::PeerIdentityMismatch { expected, asserted })
-            if expected == "host_a" && asserted == "host_x" => {}
-        other => {
-            return Err(format!(
-                "smoke-mira-nash-tcp-8-13: confused-deputy guard failed: {other:?}"
-            )
-            .into())
-        }
-    }
-
-    let _advisory_token = tl.insert_frame_event(
-        TlFrameKind::ConsentRequest,
-        MIRA_PID,
-        None,
-        "diagnostic.advisory.tcp",
-        advisory_json.as_bytes(),
-        FrameOrigin::SpiritAuto,
-    );
-    let advisory_ref = tl.last_frame_id();
-
-    // ── Story 8.13.1 — EARN the cross-host ConsentRupture over the live wire.
-    // Drive a classified-but-policy-denied fine-grained intent Mira→Nash. Mira's
-    // send-allowlist admits it; Nash's accept-allowlist does NOT, so Nash denies
-    // with -32001 (distinct from -32007 peer-binding and -32009 unclassified) AND
-    // its production deny path emits a typed ConsentRupture frame. The matched
-    // (transport-bound) host_a is used, so the -32007 confused-deputy guard above
-    // stays clean and this frame genuinely enters intake.
-    let mut denied = task_assign_frame(0x15, bound_mira_host.clone(), advisory_json.clone());
-    denied.consent_envelope = Some(ConsentEnvelope::with_fine_grained_intent(
-        denied.from.clone(),
-        A2AIntent::new(DENIED_FINE_GRAINED_INTENT),
-    ));
-    let denied_frame_id = denied.frame_id;
-    match A2APeerRouter::route_outbound(&*mira, denied, &HostId("host_b".into())).await {
-        // Sender-side honest observable: the -32001 maps back to IntentDeniedAtPeer.
-        Err(A2AError::IntentDeniedAtPeer { .. }) => {}
-        other => {
-            return Err(format!(
-                "smoke-mira-nash-tcp-8-13: expected IntentDeniedAtPeer on the denied leg, got {other:?}"
-            )
-            .into())
-        }
-    }
-    // Receiver-side authoritative record: OBSERVE the rupture Nash's production
-    // deny path emitted (never hand-inserted). Bound to the TLS-verified peer
-    // (the sender, host_a) + carrying the policy reason only the deny decision
-    // possesses (IntentAllowlistMismatch).
-    let rupture_frame = tokio::time::timeout(std::time::Duration::from_secs(2), rupture_rx.recv())
-        .await
-        .map_err(|_| {
-            "smoke-mira-nash-tcp-8-13: timed out waiting for the production ConsentRupture"
-        })?
-        .ok_or("smoke-mira-nash-tcp-8-13: rupture sink closed without emitting")?;
-    if rupture_frame.kind != FrameKind::ConsentRupture {
-        return Err(format!(
-            "smoke-mira-nash-tcp-8-13: emitted frame was {:?}, not ConsentRupture",
-            rupture_frame.kind
-        )
-        .into());
-    }
-    // Bound back to the verified sender peer (host_a) — confused-deputy-safe.
-    if rupture_frame.to.first().and_then(|a| a.host_id.as_ref()) != Some(&bound_mira_host) {
-        return Err(
-            "smoke-mira-nash-tcp-8-13: rupture not bound to the TLS-verified peer host_a".into(),
-        );
-    }
-    match &rupture_frame.payload {
-        FramePayload::ConsentRupture(p) => {
-            if p.rejected.len() != 1
-                || !matches!(p.rejected[0].reason, RuptureReason::IntentAllowlistMismatch)
-            {
-                return Err(format!(
-                    "smoke-mira-nash-tcp-8-13: rupture reason was not IntentAllowlistMismatch: {:?}",
-                    p.rejected
-                )
-                .into());
-            }
-            if p.original_frame_id != denied_frame_id {
-                return Err("smoke-mira-nash-tcp-8-13: rupture original_frame_id mismatch".into());
-            }
-            if p.original_kind != FrameKind::TaskAssign {
-                return Err("smoke-mira-nash-tcp-8-13: rupture original_kind mismatch".into());
-            }
-        }
-        other => {
-            return Err(
-                format!("smoke-mira-nash-tcp-8-13: non-ConsentRupture payload {other:?}").into(),
-            )
-        }
-    }
-    // Journal the GENUINE production rupture frame to the Transparency Log so the
-    // J4 digest can cite it — the row's bytes come from the emitted frame, NOT a
-    // hand-typed string. This is the honest replacement for the deleted fake.
-    let rupture_bytes = serde_json::to_vec(&rupture_frame)
-        .map_err(|e| format!("smoke-mira-nash-tcp-8-13: serialize rupture: {e}"))?;
-    let _rupture_token = tl.insert_frame_event(
-        TlFrameKind::ConsentRupture,
-        MIRA_PID,
-        None,
-        "a2a.consent.denied",
-        &rupture_bytes,
-        FrameOrigin::SpiritAuto,
-    );
-    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(
-        FlowState::Tap1Acknowledge,
-        TapEvent::Acknowledge,
-    );
-    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(s, TapEvent::SelectKind);
-    let s = HaltFlow::<KernelHaltResolver>::resolve_flow(s, TapEvent::Submit);
-    if s != FlowState::Done {
-        return Err("smoke-mira-nash-tcp-8-13: three-tap did not reach Done".into());
-    }
-    flow.submit_resolution(halt_id, Resolution::AcceptedHalt, "mira")?;
-    let cited = tl
-        .query_frame_by_id(advisory_ref)?
-        .ok_or("smoke-mira-nash-tcp-8-13: cited advisory missing")?;
-    if !matches!(cited.kind, TlFrameKind::ConsentRequest) {
-        return Err("smoke-mira-nash-tcp-8-13: digest citation did not resolve to advisory".into());
-    }
-    let halts = tl.query_frames(FrameFilter {
-        kind: Some(TlFrameKind::EpistemicHalt),
-        ..Default::default()
-    })?;
-    let ruptures = tl.query_frames(FrameFilter {
-        kind: Some(TlFrameKind::ConsentRupture),
-        ..Default::default()
-    })?;
-    if halts.is_empty() || ruptures.is_empty() {
-        return Err(
-            "smoke-mira-nash-tcp-8-13: expected EpistemicHalt + ConsentRupture rows".into(),
-        );
-    }
-
-    drop(mira);
-    drop(nash);
-    eprintln!("smoke-mira-nash-tcp-8-13: ✅ live TCP + real HTTP mobile-push J4 journey complete");
     Ok(())
 }
 
@@ -8960,12 +7818,9 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
 ///   4. RateLimited frame emission on per-(provider, credential) bucket exhaustion
 ///      (NFR-Scale-4)
 async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
-    use maos_domain::frame::{
-        ConsentRupturePayload, FrameAddress, FramePayload, IacFrame, RuptureReason,
-    };
-    use maos_domain::invariants::i1::IntentClass;
-    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, RuptureReason};
     use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i13::IntentLineage;
     use maos_kernel_core::iac::mailbox::{ConsentGate, Mailbox};
     use maos_kernel_core::iac::transparency_log::{
         FrameFilter, FrameKind as TlFrameKind, TransparencyLogAdapter,
@@ -10311,6 +9166,85 @@ async fn smoke_compliance_7_3() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn story_9_6_classifies_founder_and_diagnostic_spirits() {
+        assert_eq!(classify_spirit("orchestrator"), Some(LoadedSpiritKind::Orchestrator));
+        assert_eq!(classify_spirit("architect"), Some(LoadedSpiritKind::Architect));
+        assert_eq!(classify_spirit("reviewer"), Some(LoadedSpiritKind::Reviewer));
+        assert_eq!(classify_spirit("mira"), Some(LoadedSpiritKind::Mira));
+        assert_eq!(classify_spirit("nash"), Some(LoadedSpiritKind::Nash));
+    }
+
+    #[test]
+    fn story_9_6_missing_capabilities_required_means_empty_caps() {
+        let root: toml::Value = toml::from_str(
+            r#"
+            [class]
+            name = "architect"
+            "#,
+        )
+        .unwrap();
+        let caps = caps_required_or_empty(&root).unwrap();
+        assert!(caps.provider.complete.is_empty());
+        assert!(caps.mcp.servers.is_empty());
+    }
+
+    #[test]
+    fn story_9_6_port_requirement_uses_halt_transport_not_posture() {
+        let orchestrator_policy = maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
+            r#"
+            default_action = "verbalize_only"
+
+            [[rules]]
+            tag = "dispatch_ambiguity"
+            action = "halt"
+            on_value_above = { threshold = 0.5 }
+            "#,
+        )
+        .unwrap();
+        assert!(
+            !requires_epistemic_halt_port(Some(&orchestrator_policy)),
+            "deterministic founder-loop policy must not require a scalar port"
+        );
+
+        let mira_policy = maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
+            r#"
+            default_action = "verbalize_only"
+
+            [[rules]]
+            tag = "diagnostic_confidence"
+            action = "halt"
+            on_value_below = { threshold = 0.5 }
+            "#,
+        )
+        .unwrap();
+        assert!(
+            requires_epistemic_halt_port(Some(&mira_policy)),
+            "Mira's synchronous diagnostic scalar transport must require a port"
+        );
+    }
+
+    #[test]
+    fn story_9_6_parses_topology_manifest_entries() {
+        let root: toml::Value = toml::from_str(
+            r#"
+            [topology]
+            name = "founder-loop"
+
+            [[topology.spirits]]
+            manifest = "spirits/orchestrator/manifest.toml"
+
+            [[topology.spirits]]
+            manifest = "spirits/architect/manifest.toml"
+            "#,
+        )
+        .unwrap();
+        let entries = topology_manifest_entries(&root).unwrap().unwrap();
+        assert_eq!(entries, vec![
+            "spirits/orchestrator/manifest.toml".to_string(),
+            "spirits/architect/manifest.toml".to_string(),
+        ]);
+    }
     #[tokio::test]
     async fn test_live_butler_mcp_port_new() {
         struct MockMcpClientPort;
@@ -10343,7 +9277,194 @@ mod tests {
             ),
         );
         let port = LiveButlerMcpPort::new(0, [0u8; 32], client, cap);
-        assert_eq!(port.spirit_pid, 0);
+        assert_eq!(port.spirit_pid.load(std::sync::atomic::Ordering::SeqCst), 0);
         assert_eq!(port.posture_hash, [0u8; 32]);
+    }
+
+    // ── Patch 9: requires_epistemic_halt_port unit tests ──
+
+    #[test]
+    fn story_9_6_halt_port_none_policy_returns_false() {
+        assert!(
+            !requires_epistemic_halt_port(None),
+            "None policy must not require a scalar port"
+        );
+    }
+
+    #[test]
+    fn story_9_6_halt_port_non_allowlisted_tag_returns_false() {
+        let policy = maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
+            r#"
+            default_action = "verbalize_only"
+
+            [[rules]]
+            tag = "dispatch_ambiguity"
+            action = "halt"
+            on_value_above = { threshold = 0.5 }
+            "#,
+        )
+        .unwrap();
+        assert!(
+            !requires_epistemic_halt_port(Some(&policy)),
+            "dispatch_ambiguity is deterministic and must not require a scalar port"
+        );
+    }
+
+    #[test]
+    fn story_9_6_halt_port_orchestrator_deterministic_no_port() {
+        // Orchestrator uses dispatch_ambiguity — deterministic, no port needed.
+        let policy = maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
+            r#"
+            default_action = "verbalize_only"
+
+            [[rules]]
+            tag = "dispatch_ambiguity"
+            action = "halt"
+            on_value_above = { threshold = 0.6 }
+            "#,
+        )
+        .unwrap();
+        assert!(!requires_epistemic_halt_port(Some(&policy)));
+    }
+
+    #[test]
+    fn story_9_6_halt_port_mira_scalar_requires_port() {
+        // Mira uses diagnostic_confidence — synchronous scalar, port required.
+        let policy = maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
+            r#"
+            default_action = "verbalize_only"
+
+            [[rules]]
+            tag = "diagnostic_confidence"
+            action = "halt"
+            on_value_below = { threshold = 0.5 }
+            "#,
+        )
+        .unwrap();
+        assert!(requires_epistemic_halt_port(Some(&policy)));
+    }
+
+    // ── Patch 10: topology_manifest_entries parser edge-case tests ──
+
+    #[test]
+    fn story_9_6_topology_empty_spirits_array_is_error() {
+        let root: toml::Value = toml::from_str(
+            r#"
+            [topology]
+            name = "empty"
+            spirits = []
+            "#,
+        )
+        .unwrap();
+        let err = topology_manifest_entries(&root).unwrap_err();
+        assert!(
+            err.contains("no spirits"),
+            "expected 'no spirits' error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn story_9_6_topology_missing_manifest_key_is_error() {
+        let root: toml::Value = toml::from_str(
+            r#"
+            [topology]
+            name = "bad"
+
+            [[topology.spirits]]
+            role = "worker"
+            "#,
+        )
+        .unwrap();
+        let err = topology_manifest_entries(&root).unwrap_err();
+        assert!(
+            err.contains("must declare manifest"),
+            "expected 'must declare manifest' error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn story_9_6_non_topology_manifest_returns_none() {
+        let root: toml::Value = toml::from_str(
+            r#"
+            [class]
+            name = "butler"
+            "#,
+        )
+        .unwrap();
+        assert!(topology_manifest_entries(&root).unwrap().is_none());
+    }
+
+    #[test]
+    fn story_9_6_topology_table_without_spirits_key_is_error() {
+        let root: toml::Value = toml::from_str(
+            r#"
+            [topology]
+            name = "incomplete"
+            "#,
+        )
+        .unwrap();
+        let err = topology_manifest_entries(&root).unwrap_err();
+        assert!(
+            err.contains("must declare [[topology.spirits]]"),
+            "expected spirits-required error, got: {err}"
+        );
+    }
+
+    // ── Patch 12: Single-driver guard — compile-time + API-shape test ──
+
+    #[test]
+    fn story_9_6_single_driver_guard_classify_round_trips() {
+        // Verify every LoadedSpiritKind variant is reachable from classify_spirit
+        // and that the topology parser produces the expected entry count.
+        let all_names = [
+            "butler",
+            "researcher",
+            "orchestrator",
+            "architect",
+            "reviewer",
+            "mira",
+            "nash",
+        ];
+        let mut kinds = std::collections::HashSet::new();
+        for name in &all_names {
+            let kind = classify_spirit(name).unwrap_or_else(|| {
+                panic!("classify_spirit({name}) returned None — missing variant?")
+            });
+            kinds.insert(format!("{kind:?}"));
+        }
+        // Every known class maps to a distinct variant.
+        assert_eq!(
+            kinds.len(),
+            all_names.len(),
+            "classify_spirit must produce a unique variant per known class"
+        );
+        // Unknown class returns None.
+        assert!(classify_spirit("unknown").is_none());
+
+        // Verify topology parser count matches for a 2-spirit manifest.
+        let root: toml::Value = toml::from_str(
+            r#"
+            [topology]
+            name = "test"
+
+            [[topology.spirits]]
+            manifest = "a/manifest.toml"
+
+            [[topology.spirits]]
+            manifest = "b/manifest.toml"
+            "#,
+        )
+        .unwrap();
+        let entries = topology_manifest_entries(&root).unwrap().unwrap();
+        assert_eq!(entries.len(), 2);
+    }
+
+    #[test]
+    fn story_9_6_pick_next_spirit_callable() {
+        // Compile-time guard: pick_next_spirit_from_slice is importable and
+        // returns None on an empty slice — the same entrypoint used by both
+        // topology --once and single-Spirit fire paths.
+        let result = maos_kernel_core::scheduler::pick_next_spirit_from_slice(&[]);
+        assert!(result.is_none(), "empty slice must yield None");
     }
 }

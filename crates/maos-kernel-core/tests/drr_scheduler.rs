@@ -122,10 +122,14 @@ async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
             .await
         }));
     }
+    // Wait for all submit tasks to finish sending so every frame is in the
+    // (unbounded) channel before we inspect budget warnings.
+    for h in &mut handles {
+        let _ = h.await;
+    }
 
     // Give the DRR processor a moment to enqueue all frames
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
     // At least one budget warning should have been emitted for spirit "a"
     let mut found = false;
     while let Ok(evt) = bw_rx.try_recv() {
@@ -138,10 +142,6 @@ async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
         "expected budget warning for spirit a with backlog >= 8 KiB"
     );
 
-    // Clean up: await all handles so the test completes
-    for h in handles {
-        let _ = h.await;
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]

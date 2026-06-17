@@ -1,4 +1,5 @@
 use std::process::Command;
+static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn xtask() -> Command {
     let mut cmd = Command::new("cargo");
@@ -12,6 +13,7 @@ fn workspace_root() -> std::path::PathBuf {
 
 #[test]
 fn check_mode_passes_on_committed_example() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let output = xtask()
         .args(["example-spirit-regen", "--check", "--json"])
         .current_dir(workspace_root())
@@ -31,6 +33,7 @@ fn check_mode_passes_on_committed_example() {
 
 #[test]
 fn check_mode_fails_on_drift() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let root = workspace_root();
     let lib_path = root.join("examples/example-spirit/src/lib.rs");
     let original = std::fs::read_to_string(&lib_path).unwrap();
@@ -59,6 +62,7 @@ fn check_mode_fails_on_drift() {
 
 #[test]
 fn regen_mode_overwrites_files() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let root = workspace_root();
     let tmpdir = tempfile::tempdir().unwrap();
     let template_dir = tmpdir.path().join("templates/spirit-rust/src");
@@ -79,6 +83,7 @@ fn regen_mode_overwrites_files() {
 
 #[test]
 fn regen_mode_preserves_readme() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let root = workspace_root();
     let readme_path = root.join("examples/example-spirit/README.md");
     assert!(readme_path.exists(), "README.md should exist before test");

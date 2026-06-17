@@ -122,13 +122,12 @@ pub fn run_audit_query(
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
 
-    match format {
-        "ndjson" => {
-            maos_audit::to_fr4_ndjson(entries, &mut lock)?;
-        }
-        "plain" | _ => {
-            maos_audit::to_fr4_plain(entries, &mut lock)?;
-        }
+    let fr4_mode = spirit.is_some();
+    match (fr4_mode, format) {
+        (true, "ndjson") => maos_audit::to_fr4_ndjson(entries, &mut lock)?,
+        (true, _) => maos_audit::to_fr4_plain(entries, &mut lock)?,
+        (false, "ndjson") => maos_audit::to_ndjson(entries, &mut lock)?,
+        (false, _) => maos_audit::to_plain(entries, &mut lock)?,
     }
 
     // Ensure trailing newline (plain table already adds one; NDJSON may not).

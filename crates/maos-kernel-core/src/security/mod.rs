@@ -142,6 +142,7 @@ pub struct SecurityManagerAdapter {
 /// means a later re-admission is treated as first-seen (no false
 /// ProviderSwitched), which is benign: this is ephemeral switch-detection state
 /// that is never serialized into a replayed artifact.
+#[maos_attrs::i9_exempt(reason = "bounded last-provider tracker for ProviderSwitched emission (Story 9.4b AC-8); ephemeral switch-detection state keyed by spirit_id, capped at CAP=4096 with evict-oldest-by-first-insertion, never serialized into a replayed artifact; held inside Arc<Mutex<ProviderHistory>> in SecurityManagerAdapter")]
 #[derive(Debug, Default)]
 struct ProviderHistory {
     map: std::collections::HashMap<String, String>,

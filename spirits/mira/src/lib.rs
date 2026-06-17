@@ -37,6 +37,7 @@
 use std::sync::{Arc, Mutex};
 
 use maos_domain::frame::{EpistemicHaltPayload, HaltPayloadError};
+use maos_domain::ports::EpistemicScalarPort;
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
 
@@ -148,7 +149,7 @@ pub struct DiagnosticAdvisory {
 /// optional seeded batch of pending signals an `on_idle` pass diagnoses.
 /// `Arc<Mutex<...>>` interior state keeps Mira `Sync` as the `#[spirit]` macro
 /// requires (poison-safe `unwrap_or_else(|e| e.into_inner())` — the 8.2/8.3 fix).
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Mira {
     /// This Mira's own Spirit id.
     spirit_id: String,
@@ -156,6 +157,20 @@ pub struct Mira {
     pending_signals: Option<Vec<AnomalySignal>>,
     /// Diagnoses produced by the most recent `on_idle` pass.
     last_diagnoses: Arc<Mutex<Vec<Diagnosis>>>,
+    /// Optional EpistemicScalarPort for wiring the diagnostic-confidence scalar
+    /// through the kernel's synchronous scalar halt transport (Story 9.6).
+    scalar_port: Option<Arc<dyn EpistemicScalarPort>>,
+}
+
+impl std::fmt::Debug for Mira {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Mira")
+            .field("spirit_id", &self.spirit_id)
+            .field("pending_signals", &self.pending_signals)
+            .field("last_diagnoses", &self.last_diagnoses)
+            .field("scalar_port", &self.scalar_port.as_ref().map(|_| ".."))
+            .finish()
+    }
 }
 
 #[spirit]
@@ -175,6 +190,27 @@ impl Mira {
                 diagnoses.push(self.diagnose(sig));
             }
         }
+        // Story 9.6 — when an EpistemicScalarPort is wired, forward halt-boundary
+        // diagnostic-confidence scalars through the kernel's synchronous scalar
+        // transport so the declared `[epistemic_policy]` rule can fire.
+        if let Some(port) = &self.scalar_port {
+            for diagnosis in &diagnoses {
+                if diagnosis.requires_halt {
+                    let derived_from = if diagnosis.source_log_ref.is_empty() {
+                        format!("mira:diagnose:{}", diagnosis.subject)
+                    } else {
+                        diagnosis.source_log_ref.clone()
+                    };
+                    let _ = port.write_scalar(
+                        0, // TODO: thread real per-Spirit pid (Story 8.11 follow-up)
+                        &self.spirit_id,
+                        DIAGNOSTIC_CONFIDENCE_TAG,
+                        diagnosis.confidence,
+                        &derived_from,
+                    );
+                }
+            }
+        }
         let mut guard = self
             .last_diagnoses
             .lock()
@@ -189,6 +225,7 @@ impl Default for Mira {
             spirit_id: "mira".to_string(),
             pending_signals: None,
             last_diagnoses: Arc::new(Mutex::new(Vec::new())),
+            scalar_port: None,
         }
     }
 }
@@ -203,6 +240,13 @@ impl Mira {
     /// Seed signals an `on_idle` pass will diagnose (fixture / harness).
     pub fn with_pending_signals(mut self, signals: Vec<AnomalySignal>) -> Self {
         self.pending_signals = Some(signals);
+        self
+    }
+
+    /// Wire the EpistemicScalarPort used to forward diagnostic-confidence scalars
+    /// to the kernel's synchronous scalar halt transport (Story 9.6).
+    pub fn with_scalar_port(mut self, port: Arc<dyn EpistemicScalarPort>) -> Self {
+        self.scalar_port = Some(port);
         self
     }
 

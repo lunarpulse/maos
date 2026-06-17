@@ -132,7 +132,7 @@ async fn five_verb_lifecycle_routes_through_scheduler() {
         .load("test-spirit", manifest, spirit, 0xBEEF)
         .await
         .expect("load");
-    assert!(pid > 0, "pid must be non-zero");
+    assert_eq!(scheduler.resolve_pid("test-spirit"), Some(pid), "pid must resolve to the loaded spirit");
 
     // 2. Start
     scheduler.start(pid).await.expect("start");

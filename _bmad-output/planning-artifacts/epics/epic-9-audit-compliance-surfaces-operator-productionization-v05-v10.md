@@ -279,6 +279,16 @@ So that the founder-loop topology and the Mira↔Nash pair run as first-class `m
 
 **Scope sketch:** close the `classify_spirit` founder-class short-circuit (caps section + scalar port — FLAG Winston/John); multi-Spirit scheduling in the daemon composition root (per-Spirit pid, retiring the hardcoded `spirit_pid = 0`); upgrade J1/J4 to Grade-A; fold in the Epic-7 §A3 open items (durable skill-queue persistence + functional `maosctl skills approve/reject`, verified still-open by Story 8.16 AC6) OR split them to a dedicated skill-queue story. **Sequence before/around Story 9.4.** Likely a charter kernel delta — re-pin `xtask/kernel-core-baseline.toml` (Story 8.16 §A4 single source of truth) alongside the authorized delta. Rec dev model `claude-opus-4-8`.
 
-**Acceptance Criteria:** _TBD at Epic-9 sprint planning._
+**Acceptance Criteria** (set at sprint planning 2026-06-17 + party-mode preflight): AC-1 deterministic `[class]` spirits standalone-loadable (close 8.12 FORK B; add mira/nash to `classify_spirit`; re-key `requires_epistemic_halt_port` off posture onto epistemic halt-transport — Mira's `cautious`+scalar case proved posture-keying re-opens the 8.1 fail-open); AC-2 multi-Spirit scheduling via a declarative `[topology]` manifest (`maos run <path>`), reusing the existing kernel-core DRR primitives (per-Spirit pid retires the 3× hardcoded `spirit_pid=0`); AC-3 J1 Grade-A + author the 8.15 D4 resume-continuity beat (referential-identity oracle + cold-start negative control); AC-4 J4 Grade-A (earned-ConsentRupture oracle); AC-5 retire the `MAOS_ONE_SHOT` smoke arms (literal-reappearance lint + drain-complete terminal seam); AC-6 green-at-HEAD + kernel baseline (delta likely zero — primitives pre-exist in kernel-core). Skill-queue persistence split to Story 9.7. Full spec + Task-0 consensus in the story file.
+
+## Story 9.7: Durable Skill-Queue Persistence + Functional `maosctl skills approve/reject`
+
+> **Split from Story 9.6 AC-5 at party-mode preflight 2026-06-17 (Winston·John·Murat·Amelia, ratified Lunarpulse).** The Epic-7 §A3 carry-forward (durable skill-queue + functional approve/reject) has been homeless since Epic 7 — a different Job-to-be-Done in different crates (`maos-skill`/`maos-cli`), orthogonal to the scheduler. Slotted as the **Epic-9 closer** with a hard gate: the `epic-9-retrospective` cannot open until 9.7 is `done` (the compounding gate that stops a 4th disappearance). Reuses the existing `SkillAdmissionQueue` mechanics + the `maos-registry` `LocalFsRegistryStorage` idiom + the `TransparencyLogAdapter::insert_approval_decision` journal shape; zero kernel-core delta expected.
+
+As an operator vetting the skill ecosystem,
+I want `maosctl skills approve <id>` / `reject <id>` to mutate durable admission state that survives a process restart, with the decision journaled to the audit log,
+So that skill operator-admission is a real, persistent, auditable exit — not an in-memory queue lost on exit and a CLI that only prints "acknowledged".
+
+**Acceptance Criteria:** AC-1 durable `SkillQueueStore`/`LocalFsSkillQueueStore` (restart round-trip; 7 in-memory tests still pass); AC-2 functional `approve/reject` (load→mutate→persist→report, preserve unknown/already-resolved no-op semantics); AC-3 audit-journal drain (approve + reject rows); AC-4 green-at-HEAD + Epic-close gate. Full spec in the story file.
 
 ---

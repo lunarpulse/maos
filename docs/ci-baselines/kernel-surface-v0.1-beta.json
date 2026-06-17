@@ -4,6 +4,16 @@
   "items": [
     {
       "kind": "const",
+      "path": "maos_kernel_core::memory::ERASURE_CLASS_LINEAGE_IDS",
+      "signature_hash": "835752794a0aefdee88329aab83962e97c01c07c5308a57134d7cebfe9e27b5e"
+    },
+    {
+      "kind": "const",
+      "path": "maos_kernel_core::memory::REGISTERED_ERASURE_BACKENDS",
+      "signature_hash": "76aa1e5be231eaec462c2fabc6aa8ff83eec406f03fe270758f3e4e3ced780b9"
+    },
+    {
+      "kind": "const",
       "path": "maos_kernel_core::scheduler::scheduler_loop::SCHEDULER_QUANTUM",
       "signature_hash": "36cd0a0ce8204756ff6a7c8326539fce44416b2d42c0c7b69c3fdf88b2052783"
     },
@@ -131,6 +141,16 @@
       "kind": "enum",
       "path": "maos_kernel_core::lifecycle::upgrade::UpgradePolicy",
       "signature_hash": "1ee6a8c9ad65235ee5c5dc6202d9375f2355610100f7660c9aaaa130b9e3e014"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::memory::read_entry_point::ReadEntryPoint",
+      "signature_hash": "2dfdaabd258b1acf1bbaf59e1688d6c1b75626f56870d7bc2203c068115cd281"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::memory::write_entry_point::WriteEntryPoint",
+      "signature_hash": "45d7dc52d0b3a10f8879f21b8f6fa572eea5410489a06f8ab25bb41626c78942"
     },
     {
       "kind": "enum",
@@ -301,6 +321,16 @@
       "kind": "fn",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::spawn_and_bridge",
       "signature_hash": "81177b751108bdd02c3d073c6a177f65eba976f8df0f4c0105acc0fd7d232de3"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::memory::read_entry_point::enforce_region",
+      "signature_hash": "b479d88b680f50747492911f51db7b4d494cb4cb13793a12c8f9bbe9aa0c45ec"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::memory::write_entry_point::enforce_region",
+      "signature_hash": "1f0433569b9d5b0c15ffb35bc3e7b261fafb1d7aedbb004e8459f9830a5635ff"
     },
     {
       "kind": "fn",
@@ -655,7 +685,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::memory::MemoryManagerAdapter",
-      "signature_hash": "92e71542bcaf9624b00b5e342721eb665546d0411e678b1db88713d33d725012"
+      "signature_hash": "153e47731f1be482df588956c1747e779f02549ba4e8c6f9d3c3086a78c689ab"
     },
     {
       "kind": "struct",
@@ -780,7 +810,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::security::SecurityManagerAdapter",
-      "signature_hash": "0bb714f5c17b24130ee64ec757c865435b9f2b86b7a5de0d0ac8eea9a676d477"
+      "signature_hash": "729414a501ef35c96b8f80a095ac2bd25686e9d0ba96b2d83db16f86246cd51a"
     },
     {
       "kind": "struct",
@@ -796,6 +826,11 @@
       "kind": "struct",
       "path": "maos_kernel_core::security::crypto::tests::MockCryptoProvider",
       "signature_hash": "7fa59eb6f9eb229312cbd24b88b9010073903537fff9eaa39018cb2489aaf460"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::operator_config::RegionSection",
+      "signature_hash": "360a4985ffe0585b073cf986b0d3fa03631eb66f2390de9b191d04186d22bfed"
     },
     {
       "kind": "struct",
