@@ -1,8 +1,8 @@
 <!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->
 
-# `ctx` Module
+# `ctx` Module {#abi-ctx-module}
 
-## Related
+## Related {#abi-ctx-related}
 
 - [lifecycle Module](./lifecycle) — hooks that receive `Ctx`
 - [cancellation Module](./cancellation) — `CancellationSignal` returned by `Ctx::cancellation()`
@@ -18,7 +18,10 @@ mailbox handle a Spirit hook receives at invocation time. It is the
 ONLY surface through which a hook can interact with the kernel —
 per I1, Spirits cannot bypass the Capability Registry.
 
-## Structs
+
+## Structs {#ctx-structs}
+
+### `Ctx` {#maos-spirit-abi-ctx-ctx}
 
 Spirit-author-facing context passed to every hook.
 
@@ -32,15 +35,20 @@ the kernel owns the underlying signal (e.g., an `Arc<AtomicBool>`)
 and ensures it outlives all Spirit hook invocations. This avoids
 lifetime parameters on the vtable dispatch functions.
 
+
 ```rust
 pub struct Ctx { /* private fields */ }
 ```
 
-### Inherent Items
+### Inherent Items {#maos-spirit-abi-ctx-ctx-inherent-items}
+
+Methods and associated functions implemented directly on this type.
+
+### `cancellation` {#cancellation}
 
 Borrow the cancellation signal.
 
-# Example
+# Example {#cancellation-example}
 
 ```rust
 use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
@@ -52,13 +60,16 @@ let mut ctx = Ctx::for_rust_inproc_hook(
 assert!(!ctx.cancellation().is_cancelled());
 ```
 
+
 ```rust
 pub fn cancellation(&self) -> &dyn CancellationSignal
 ```
 
+### `capability` {#capability}
+
 Opaque capability handle — the kernel resolves this at mediation time.
 
-# Example
+# Example {#capability-example}
 
 ```rust
 use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
@@ -70,13 +81,16 @@ let ctx = Ctx::for_rust_inproc_hook(
 assert_eq!(ctx.capability(), CapabilityHandle(100));
 ```
 
+
 ```rust
 pub fn capability(&self) -> CapabilityHandle
 ```
 
+### `mailbox` {#mailbox}
+
 Opaque mailbox handle — the kernel resolves this at IAC dispatch time.
 
-# Example
+# Example {#mailbox-example}
 
 ```rust
 use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
@@ -88,15 +102,18 @@ let ctx = Ctx::for_rust_inproc_hook(
 assert_eq!(ctx.mailbox(), MailboxHandle(200));
 ```
 
+
 ```rust
 pub fn mailbox(&self) -> MailboxHandle
 ```
+
+### `deprecation_warnings` {#deprecation-warnings}
 
 Story 7.1 v0.5 binding — observe any deprecated ABI surfaces the
 Spirit code has used during the current hook fire. Returns an empty
 slice at v0.5 because the v0.5 ABI has no deprecations.
 
-# Example
+# Example {#deprecation-warnings-example}
 
 ```rust
 use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
@@ -108,9 +125,12 @@ let ctx = Ctx::for_rust_inproc_hook(
 assert!(ctx.deprecation_warnings().is_empty());
 ```
 
+
 ```rust
 pub fn deprecation_warnings(&self) -> &[DeprecationWarning]
 ```
+
+### `for_rust_inproc_hook` {#for-rust-inproc-hook}
 
 Construct a kernel-internal `Ctx` for rust-inproc hook dispatch.
 
@@ -129,7 +149,7 @@ dispatch, and is callable only from within `maos-kernel-core`
 constructed `Ctx` from the kernel and never constructs one
 itself).
 
-# Example
+# Example {#for-rust-inproc-hook-example}
 
 ```rust
 use maos_spirit_abi::ctx::{Ctx, CapabilityHandle, MailboxHandle};
@@ -141,6 +161,7 @@ let ctx = Ctx::for_rust_inproc_hook(
 assert_eq!(ctx.capability(), CapabilityHandle(100));
 assert_eq!(ctx.mailbox(), MailboxHandle(200));
 ```
+
 
 ```rust
 pub fn for_rust_inproc_hook(capability_handle: CapabilityHandle, mailbox_handle: MailboxHandle) -> Self

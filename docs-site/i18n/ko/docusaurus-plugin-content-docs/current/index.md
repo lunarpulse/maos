@@ -23,7 +23,7 @@ sidebar_position: 0
 | [Migration Runbooks](/migrate/) | 브레이킹 체인지 마이그레이션 가이드 |
 | [Troubleshooting](/troubleshoot/) | 모든 에러 코드와 원인 및 해결 방법 |
 | [Deployment](/deploy/) | 토폴로지 가이드, 에어갭, 백업/복원 |
-| [ABI Reference](/abi/latest) | `maos-spirit-abi` 생성된 API 문서 |
+| [ABI Reference](/abi/v1/) | `maos-spirit-abi` 생성된 API 문서 |
 
 ## 커뮤니티
 

@@ -42,4 +42,4 @@ See [`SECURITY.md`](https://github.com/lunarpulse/maos/blob/main/SECURITY.md) fo
 
 - [Manifest Schema](/manifest/latest) — every field your Spirit can declare
 - [Migration Guides](/migrate/) — breaking-change migration paths
-- [ABI Reference](/abi/latest) — generated API docs for `maos-spirit-abi`
+- [ABI Reference](/abi/v1/) — generated API docs for `maos-spirit-abi`

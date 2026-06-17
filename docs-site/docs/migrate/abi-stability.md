@@ -118,6 +118,6 @@ Deprecation warnings are observable at runtime via `Ctx::deprecation_warnings()`
 
 ## Reference
 
-- [ABI Constants](/abi/constants) — live values in code
+- [ABI Constants](/abi/v1/constants) — live values in code
 - [v1 → v2 Migration](./v1-to-v2)
 - [v2 → v3 Migration](./v2-to-v3)

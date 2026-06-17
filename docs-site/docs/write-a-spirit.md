@@ -21,7 +21,7 @@ This pulls the Spirit template — the same one [`examples/example-spirit`](http
 
 Open `src/lib.rs` and edit `on_idle` (or another lifecycle hook). The `#[spirit]` proc-macro wires your `impl` block into the `SpiritVtable` the kernel calls.
 
-See the [Manifest Schema](/manifest/latest) for every field your `spirit.toml` can declare, and the [ABI Reference](/abi/latest) for the full hook surface.
+See the [Manifest Schema](/manifest/latest) for every field your `spirit.toml` can declare, and the [ABI Reference](/abi/v1/) for the full hook surface.
 
 ## 3. Run it locally — no kernel required
 

@@ -6,6 +6,7 @@
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
     "build": "docusaurus build",
+    "postbuild": "node scripts/postbuild-fallback-lang.js",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
@@ -16,9 +17,19 @@
     "gate:routes": "node scripts/gate-routes.js",
     "gate:glossary-lock": "node scripts/gate-glossary-lock.js",
     "gate:troubleshoot": "node scripts/gate-troubleshoot-bidi.js",
+    "gate:anchor-ids": "node scripts/gate-anchor-ids.js",
+    "gate:ko-coverage": "node scripts/gate-ko-coverage.js",
+    "gate:links": "playwright test tests/playwright/links.spec.ts --project=behavioral",
+    "gate:fallback": "playwright test tests/playwright/fallback.spec.ts --project=behavioral",
+    "gate:switcher": "playwright test tests/playwright/switcher.spec.ts --project=behavioral",
+    "gate:version-dropdown": "playwright test tests/playwright/version-dropdown.spec.ts --project=behavioral",
+    "gate:deep-link-preserve": "playwright test tests/playwright/deep-link-preserve.spec.ts --project=behavioral",
+    "gate:theme": "playwright test tests/playwright/theme.spec.ts --project=behavioral",
     "gate:a11y": "node scripts/gate-a11y.js",
-    "gate:proven-red": "node scripts/proven-red.js",
-    "gate:all": "npm run build && npm run gate:routes && npm run gate:troubleshoot && npm run gate:glossary-lock && npm run gate:a11y && npm run gate:proven-red"
+    "gate:behavioral": "playwright test --project=behavioral --project=a11y",
+    "gate:static": "npm run gate:routes && npm run gate:troubleshoot && npm run gate:glossary-lock && npm run gate:anchor-ids",
+    "gate:proven-red": "node scripts/proven-red.js && playwright test --project=proven-red",
+    "gate:all": "npm run build && npm run gate:static && npm run gate:behavioral && npm run gate:proven-red"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.1",
@@ -32,10 +43,11 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@axe-core/cli": "^4.11.3",
+    "@axe-core/playwright": "^4.11.0",
     "@docusaurus/module-type-aliases": "3.10.1",
     "@docusaurus/tsconfig": "3.10.1",
     "@docusaurus/types": "3.10.1",
+    "@playwright/test": "^1.54.2",
     "@types/react": "^19.0.0",
     "serve": "^14.2.6",
     "typescript": "~6.0.2"

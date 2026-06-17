@@ -33,6 +33,10 @@
   --ifm-color-primary-lightest: #4a80c7;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+
+  /* Axe-backed WCAG AA scan: inline links need non-color affordance. */
+  --ifm-link-color: #1d3c66;
+  --ifm-link-hover-color: #162f52;
 }
 
 [data-theme="dark"] {
@@ -44,7 +48,45 @@
   --ifm-color-primary-light: #89b6ec;
   --ifm-color-primary-lighter: #97bfef;
   --ifm-color-primary-lightest: #bdd7f5;
+  --ifm-link-color: #9dccff;
+  --ifm-link-hover-color: #bdd7f5;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+.theme-doc-markdown a:not(.hash-link) {
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+/* Light-mode token override for WCAG AA contrast; dark mode keeps the Prism theme. */
+html:not([data-theme="dark"]) .token.function,
+html:not([data-theme="dark"]) .token.parameter,
+html:not([data-theme="dark"]) .token.variable,
+html:not([data-theme="dark"]) .token.property,
+html:not([data-theme="dark"]) .token.operator,
+html:not([data-theme="dark"]) .token.punctuation,
+html:not([data-theme="dark"]) .token.comment,
+html:not([data-theme="dark"]) .token.string,
+html:not([data-theme="dark"]) .token.number,
+html:not([data-theme="dark"]) .token.keyword,
+html:not([data-theme="dark"]) .token.boolean {
+  color: #1d3c66 !important;
+}
+
+
+/* Namespace tokens from the Prism theme use opacity:0.7 and fail WCAG AA contrast. */
+html:not([data-theme="dark"]) .token.namespace {
+  color: #595959 !important;
+  opacity: 1 !important;
+}
+
+/* Fallback: any Prism token type not explicitly styled above must still meet WCAG AA contrast. */
+html:not([data-theme="dark"]) .token {
+  color: #1d3c66 !important;
+  opacity: 1 !important;
+}
+.theme-doc-markdown table {
+  overflow: visible !important;
 }
 
 /* --- Focus indicators (WCAG 2.4.7 — visible focus) ----------------------- */

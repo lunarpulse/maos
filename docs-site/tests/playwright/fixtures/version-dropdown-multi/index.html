@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ABI Reference</title>
+  <style>
+    .navbar { display: flex; gap: 1rem; padding: 0.5rem; border-bottom: 1px solid #ccc; }
+    .dropdown { position: relative; }
+    .dropdown__menu { display: none; position: absolute; background: white; border: 1px solid #ccc; }
+    .dropdown--open .dropdown__menu { display: block; }
+    .dropdown__menu a { display: block; padding: 0.5rem 1rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar" aria-label="Main">
+    <div class="dropdown docsVersionDropdown">
+      <button aria-label="Select version" aria-haspopup="true" aria-expanded="false">Version</button>
+      <div class="dropdown__menu" role="menu">
+        <a href="/v1/" role="menuitem">v1</a>
+        <a href="/v2/" role="menuitem">v2</a>
+      </div>
+    </div>
+  </nav>
+  <main id="main-content">
+    <h1>ABI Reference</h1>
+    <p>Select a version from the dropdown.</p>
+  </main>
+  <script>
+    document.querySelector('.dropdown button').addEventListener('click', function () {
+      this.closest('.dropdown').classList.toggle('dropdown--open');
+    });
+    document.querySelectorAll('.dropdown__menu a').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        const version = a.textContent.trim();
+        document.querySelector('main').innerHTML = '<h1>ABI ' + version + ' placeholder</h1><p>Content for ' + version + '.</p>';
+        document.querySelector('.dropdown').classList.remove('dropdown--open');
+      });
+    });
+  </script>
+</body>
+</html>

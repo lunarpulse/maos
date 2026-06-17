@@ -100,14 +100,6 @@ function main() {
     gate("gate-troubleshoot-bidi.js")
   );
 
-  const koBuildIndex = path.join(SITE_DIR, "build", "ko", "index.html");
-  // gate:a11y-ko-lang — flip lang="ko" to lang="en"
-  provenRed(
-    "gate:a11y-ko-lang",
-    koBuildIndex,
-    (orig) => orig.replace(/lang="ko"/, 'lang="en"'),
-    gate("gate-a11y.js")
-  );
 
   // gate:troubleshoot-teach — blank a page's Resolution so the teaching
   // contract (Resolution non-empty + distinct from Summary) fails.

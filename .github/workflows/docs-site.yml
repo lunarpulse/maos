@@ -38,37 +38,37 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: docs-site/package-lock.json
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('docs-site/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Install dependencies
         working-directory: docs-site
         run: npm ci
 
-      # gate:build — per-locale builds exit 0; onBrokenLinks/Anchors: throw
-      - name: "gate:build — Build all locales"
+      - name: Install Chromium for behavioral gates
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         working-directory: docs-site
-        run: npx docusaurus build
+        run: npx playwright install --with-deps chromium
 
-      # gate:routes — all manifest routes resolve with content floor
-      - name: "gate:routes + gate:cookbook-count"
+      - name: gate:build
         working-directory: docs-site
-        run: node scripts/gate-routes.js
+        run: npm run build
 
-      # gate:troubleshoot-bidi + gate:troubleshoot-teach
-      - name: "gate:troubleshoot-bidi + gate:troubleshoot-teach"
+      - name: gate:static
         working-directory: docs-site
-        run: node scripts/gate-troubleshoot-bidi.js
+        run: npm run gate:static
 
-      # gate:glossary-lock — per-unit positional + denylist
-      - name: "gate:glossary-lock"
+      - name: gate:behavioral
+        timeout-minutes: 10
         working-directory: docs-site
-        run: node scripts/gate-glossary-lock.js
+        run: npm run gate:behavioral
 
-      # gate:a11y + gate:a11y-ko-lang
-      - name: "gate:a11y + gate:a11y-ko-lang"
+      - name: gate:proven-red
         working-directory: docs-site
-        run: node scripts/gate-a11y.js
-
-      # Proven-red companion tests (D8)
-      - name: "proven-red — verify gates reject mutated input"
-        working-directory: docs-site
-        run: node scripts/proven-red.js
+        run: npm run gate:proven-red

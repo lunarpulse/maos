@@ -6,7 +6,8 @@ import type * as Preset from "@docusaurus/preset-classic";
 //   /manifest/   /cookbook/   /migrate/   /troubleshoot/
 //   /deploy/     /errors/<ERR_NAME>      /abi/<version>/
 //   /community/governance   /community/rfc-template
-// Redirects configured below; reorg degrades to 301, not 404.
+// Redirects configured below; static `serve` emits client-side redirects.
+// Production hosting/CDN must bind these redirects as HTTP 301s for non-JS tools.
 
 const config: Config = {
   title: "MAOS",
@@ -60,16 +61,36 @@ const config: Config = {
 
   plugins: [
     [
+      "@docusaurus/plugin-content-docs",
+      {
+        id: "abi",
+        path: "abi/v1",
+        routeBasePath: "abi/v1",
+        sidebarPath: "./sidebars-abi.ts",
+      },
+    ],
+    [
       "@docusaurus/plugin-client-redirects",
       {
         redirects: [
-          // D6 frozen URL contract — day-one redirects so reorg → 301, not 404
+          // D6 frozen URL contract — static `serve` proves client-side redirect target resolution.
           { from: "/schema", to: "/manifest/latest" },
           { from: "/errors", to: "/troubleshoot/" },
-          { from: "/reference", to: "/abi/latest" },
+          { from: "/reference", to: "/abi/v1/" },
           { from: "/runbooks", to: "/deploy/" },
           { from: "/patterns", to: "/cookbook/" },
           { from: "/breaking", to: "/migrate/" },
+          { from: "/abi", to: "/abi/v1/" },
+          { from: "/abi/latest", to: "/abi/v1/" },
+          { from: "/abi/cancellation", to: "/abi/v1/cancellation" },
+          { from: "/abi/compliance", to: "/abi/v1/compliance" },
+          { from: "/abi/constants", to: "/abi/v1/constants" },
+          { from: "/abi/ctx", to: "/abi/v1/ctx" },
+          { from: "/abi/deprecation", to: "/abi/v1/deprecation" },
+          { from: "/abi/gateway", to: "/abi/v1/gateway" },
+          { from: "/abi/identity", to: "/abi/v1/identity" },
+          { from: "/abi/index", to: "/abi/v1/" },
+          { from: "/abi/lifecycle", to: "/abi/v1/lifecycle" },
         ],
       },
     ],
@@ -84,15 +105,11 @@ const config: Config = {
         { to: "/migrate/", label: "Migrate", position: "left" },
         { to: "/troubleshoot/", label: "Troubleshoot", position: "left" },
         { to: "/deploy/", label: "Deploy", position: "left" },
-        { to: "/abi/latest", label: "ABI Reference", position: "left" },
+        { to: "/abi/v1/", label: "ABI Reference", position: "left" },
         {
           to: "/community/governance",
           label: "Community",
           position: "left",
-        },
-        {
-          type: "docsVersionDropdown",
-          position: "right",
         },
         {
           type: "localeDropdown",
@@ -120,7 +137,7 @@ const config: Config = {
           title: "Reference",
           items: [
             { label: "Manifest Schema", to: "/manifest/latest" },
-            { label: "ABI Reference", to: "/abi/latest" },
+            { label: "ABI Reference", to: "/abi/v1/" },
             { label: "Error Catalog", to: "/troubleshoot/" },
           ],
         },
@@ -141,11 +158,14 @@ const config: Config = {
       darkTheme: prismThemes.dracula,
       additionalLanguages: ["toml", "bash", "rust"],
     },
-    // WCAG AA: high contrast color mode available
+    // WCAG AA: high contrast color mode available.
+    // respectPrefersColorScheme is OFF so the toggle is a deterministic 2-state
+    // light<->dark switch. With it ON, Docusaurus cycles system->light->dark and the
+    // first click from "system" on a light OS is a visual no-op (reads as broken).
     colorMode: {
       defaultMode: "light",
       disableSwitch: false,
-      respectPrefersColorScheme: true,
+      respectPrefersColorScheme: false,
     },
   } satisfies Preset.ThemeConfig,
 };

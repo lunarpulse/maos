@@ -1,6 +1,6 @@
 # Story 9.5: Publish Five Canonical Docs with WCAG AA, Korean i18n, and Onboarding Artifacts (DOCS HALF)
 
-Status: in-progress
+Status: done — all 5 ACs met; deferred AC-1 `/abi/` generation + AC-2 axe + AC-4 behavioral gates closed by siblings 9.5c + 9.5d (both `done`); `gate:static` + `gate:behavioral` (114) + `gate:proven-red` all green at HEAD 2026-06-17.
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -244,6 +244,7 @@ Opus (§A6 N/A — docs/i18n/tooling story, zero kernel surface)
 
 - 2026-06-15: Story 9.5 implementation complete. Docusaurus doc-site with 5 canonical docs, Korean i18n with glossary lock, WCAG AA a11y, 5 onboarding artifacts, isolated CI with proven-red gates. Zero kernel-core delta.
 - 2026-06-15: Code review complete (Blind+Edge+Acceptance; Test Infra skipped, dev model Claude). 5 decisions resolved, 14 patches APPLIED+VERIFIED (gate:all EXIT 0), 6 deferred, 1 dismissed. Status → in-progress (AC-1/AC-2/AC-3/AC-4 core portions deferred, not delivered). **Follow-ups spawned to close the gaps: `9-5c` (rustdoc /abi/ generation + archives — D3) and `9-5d` (Playwright behavioral gates + axe-core WCAG scan — D1+D2). 9.5 → done once BOTH land (parallel-safe).** See Review Findings below + `deferred-work.md`.
+- 2026-06-17: **Story 9.5 → done.** Closure condition satisfied — siblings landed and verified `done`: 9.5a (trust-anchor ADR), 9.5b (OTel adapter), 9.5c (rustdoc-generated `/abi/`, closing review-D3), 9.5d (real `@axe-core/playwright` WCAG AA scan closing D1 + the 5 Playwright behavioral gates closing D2 + versioned `/abi/v1/` AC-0 + locale-invariant anchor IDs AC-5/D-gen7). Re-verified at HEAD (not trusted from records): `npm run gate:static` PASS (routes 83/83, cookbook 12, troubleshoot-bidi 37/37, troubleshoot-teach, glossary-lock 42 terms, anchor-ids 9 pages); `npm run gate:behavioral` **114 passed** (links/fallback/switcher/version-dropdown/deep-link-preserve + axe-core a11y over distinct rendered pages × {en,ko}); `npm run gate:proven-red` 5 static + 1 Playwright runtime-mutation companions all observed red. All 5 ACs met across 9.5 + 9.5c + 9.5d.
 
 ### Review Findings
 

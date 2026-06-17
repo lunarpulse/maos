@@ -601,7 +601,7 @@ enum Commands {
     #[command(name = "gen-abi-docs")]
     GenAbiDocs {
         /// Output directory for generated `.md` files.
-        #[arg(long, default_value = "docs-site/docs/abi")]
+        #[arg(long, default_value = "docs-site/abi/v1")]
         out_dir: String,
         /// Check mode: fail if committed docs differ from generated output.
         #[arg(long)]

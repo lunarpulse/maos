@@ -42,4 +42,4 @@ MAOS는 OS가 프로세스를 호스팅하는 방식으로 **LLM 기반 Spirit�
 
 - [Manifest Schema](/manifest/latest) — Spirit이 선언할 수 있는 모든 필드
 - [Migration Guides](/migrate/) — 브레이킹 체인지 마이그레이션 경로
-- [ABI Reference](/abi/latest) — `maos-spirit-abi` 생성된 API 문서
+- [ABI Reference](/abi/v1/) — `maos-spirit-abi` 생성된 API 문서

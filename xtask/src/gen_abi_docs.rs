@@ -1,4 +1,4 @@
-//! Generate `docs-site/docs/abi/*.md` from `maos-spirit-abi` rustdoc JSON.
+//! Generate `docs-site/abi/v1/*.md` from `maos-spirit-abi` rustdoc JSON.
 //!
 //! Story 9.5c — anti-rot: the committed `.md` files are build artifacts;
 //! regenerate via `cargo run -p xtask -- gen-abi-docs`.
@@ -24,7 +24,7 @@ pub const NIGHTLY: &str = "nightly-2026-05-01";
 pub const EXPECTED_FORMAT_VERSION: u32 = 57;
 
 const MANIFEST_PATH: &str = "crates/maos-spirit-abi/Cargo.toml";
-const ABI_OUT_DIR: &str = "docs-site/docs/abi";
+const ABI_OUT_DIR: &str = "docs-site/abi/v1";
 
 // ------------------------------------------------------------------
 // rustdoc JSON serde structs (hand-rolled, minimal surface)
@@ -494,11 +494,16 @@ fn render_where_clauses(generics: &Generics) -> String {
 struct RenderContext<'a> {
     index: &'a HashMap<String, Item>,
     id_to_key: &'a HashMap<String, String>,
+    paths: &'a HashMap<String, PathItem>,
 }
 
 impl<'a> RenderContext<'a> {
     fn item_by_id(&self, id: u32) -> Option<&Item> {
         self.id_to_key.get(&id.to_string()).and_then(|k| self.index.get(k))
+    }
+
+    fn item_path(&self, item: &Item) -> Option<&[String]> {
+        self.paths.get(&item.id.to_string()).map(|path| path.path.as_slice())
     }
 }
 
@@ -515,28 +520,180 @@ fn write_page(path: &Path, title: &str, body: &str, related_partial: Option<&Pat
     fs::write(path, out).map_err(|e| format!("write {}: {e}", path.display()))?;
     Ok(())
 }
+
+fn anchor_id_from_text(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut previous_dash = false;
+    for ch in text.chars() {
+        let mapped = match ch {
+            'a'..='z' | '0'..='9' => Some(ch),
+            'A'..='Z' => Some(ch.to_ascii_lowercase()),
+            _ if ch.is_ascii_punctuation() => Some('-'),
+            _ => None,
+        };
+        if let Some(mapped) = mapped {
+            if mapped == '-' {
+                if !previous_dash && !out.is_empty() {
+                    out.push('-');
+                    previous_dash = true;
+                }
+            } else {
+                out.push(mapped);
+                previous_dash = false;
+            }
+        }
+    }
+    while out.ends_with('-') {
+        out.pop();
+    }
+    if out.is_empty() {
+        "section".to_string()
+    } else {
+        out
+    }
+}
+
+/// Tracks whether the parser is inside a Markdown fenced code block.
+///
+/// Supports both triple-backtick and triple-tilde fences, matching fence
+/// length so nested fences (e.g. ` ``` ` inside `~~~~`) do not desync.
+#[derive(Debug, Default)]
+struct FenceTracker {
+    open: Option<(char, usize)>,
+}
+
+impl FenceTracker {
+    fn toggle(&mut self, line: &str) {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() {
+            return;
+        }
+        let first = match trimmed.chars().next() {
+            Some('`') | Some('~') => trimmed.chars().next().unwrap(),
+            _ => return,
+        };
+        let len = trimmed.chars().take_while(|&c| c == first).count();
+        if len < 3 {
+            return;
+        }
+        match self.open {
+            Some((c, l)) if c == first && l == len => self.open = None,
+            None => self.open = Some((first, len)),
+            _ => {}
+        }
+    }
+
+    fn is_open(&self) -> bool {
+        self.open.is_some()
+    }
+}
+
+fn deduplicate_anchor_ids(text: &str) -> String {
+    let re = regex::Regex::new(r"\{#([A-Za-z0-9_-]+)\}").expect("valid anchor regex");
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    for cap in re.captures_iter(text) {
+        let whole = cap.get(0).expect("whole match");
+        out.push_str(&text[last..whole.start()]);
+        let id = cap[1].to_string();
+        let count = seen.entry(id.clone()).or_insert(0);
+        *count += 1;
+        if *count > 1 {
+            out.push_str(&format!("{{#{}-{}}}", id, *count - 1));
+        } else {
+            out.push_str(whole.as_str());
+        }
+        last = whole.end();
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
+fn anchor_id_from_parts(parts: &[String]) -> String {
+    anchor_id_from_text(&parts.join("-"))
+}
+
+fn item_anchor_id(item: &Item, ctx: &RenderContext) -> String {
+    ctx.item_path(item)
+        .map(anchor_id_from_parts)
+        .unwrap_or_else(|| anchor_id_from_text(item.name.as_deref().unwrap_or("item")))
+}
+
+fn module_anchor_id(module_item: &Item, suffix: &str) -> String {
+    let base = module_item
+        .name
+        .as_deref()
+        .map(anchor_id_from_text)
+        .unwrap_or_else(|| "maos-spirit-abi".to_string());
+    format!("{}-{}", base, anchor_id_from_text(suffix))
+}
+
+fn add_explicit_ids_to_markdown_headings(markdown: &str, prefix: &str) -> String {
+    let mut out = String::with_capacity(markdown.len());
+    let mut tracker = FenceTracker::default();
+    for line in markdown.lines() {
+        tracker.toggle(line);
+        if tracker.is_open() {
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('#') && !trimmed.contains("{#") {
+            let level = trimmed.chars().take_while(|c| *c == '#').count();
+            if (1..=6).contains(&level) && trimmed.chars().nth(level) == Some(' ') {
+                let heading = trimmed[level + 1..].trim();
+                out.push_str(line);
+                out.push_str(" {#");
+                out.push_str(prefix);
+                out.push('-');
+                out.push_str(&anchor_id_from_text(heading));
+                out.push_str("}\n");
+                continue;
+            }
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
 /// Assemble the canonical text of a generated page (used by `--check` and for writing).
 fn assemble_page_text(title: &str, body: &str, related_partial: Option<&Path>) -> Result<String, String> {
     let mut out = header();
     out.push('\n');
-    out.push_str(&format!("# `{}` Module\n\n", title));
+    out.push_str(&format!(
+        "# `{}` Module {{#abi-{}-module}}\n\n",
+        title,
+        anchor_id_from_text(title)
+    ));
     if let Some(partial) = related_partial {
         if let Ok(content) = fs::read_to_string(partial) {
-            out.push_str(&content);
+            // Prefix is just abi-{module} so the "Related" heading gets the stable
+            // ID abi-{module}-related, not the stuttered abi-{module}-related-related.
+            out.push_str(&add_explicit_ids_to_markdown_headings(
+                &content,
+                &format!("abi-{}", anchor_id_from_text(title)),
+            ));
             out.push('\n');
         }
     }
     out.push_str(body);
-    Ok(out)
+    Ok(deduplicate_anchor_ids(&out))
 }
+
 
 fn render_item(item: &Item, ctx: &RenderContext) -> Option<String> {
     let name = item.name.as_deref()?;
     let docs = item.docs.as_deref().unwrap_or("");
+    let anchor = item_anchor_id(item, ctx);
     let mut out = String::new();
 
+    out.push_str(&format!("### `{}` {{#{}}}\n\n", name, anchor));
+
     if !docs.is_empty() {
-        out.push_str(docs.trim());
+        out.push_str(&add_explicit_ids_to_markdown_headings(docs.trim(), &anchor));
         out.push('\n');
     }
 
@@ -545,13 +702,13 @@ fn render_item(item: &Item, ctx: &RenderContext) -> Option<String> {
             out.push_str("\n```rust\n");
             out.push_str(&render_struct(name, s));
             out.push_str("\n```\n");
-            render_inherent_impl_items(&mut out, &s.impls, ctx);
+            render_inherent_impl_items(&mut out, &s.impls, ctx, &anchor);
         }
         ItemInner::Enum(e) => {
             out.push_str("\n```rust\n");
             out.push_str(&render_enum(name, e, ctx));
             out.push_str("\n```\n");
-            render_inherent_impl_items(&mut out, &e.impls, ctx);
+            render_inherent_impl_items(&mut out, &e.impls, ctx, &anchor);
         }
         ItemInner::Trait(t) => {
             out.push_str("\n```rust\n");
@@ -735,7 +892,7 @@ fn render_constant(name: &str, c: &ConstantInner) -> String {
     format!("pub const {}: {} = {};", name, render_type(&c.ty), value)
 }
 
-fn render_inherent_impl_items(out: &mut String, impl_ids: &[u32], ctx: &RenderContext) {
+fn render_inherent_impl_items(out: &mut String, impl_ids: &[u32], ctx: &RenderContext, parent_anchor: &str) {
     let mut sections: Vec<String> = Vec::new();
     for impl_id in impl_ids {
         let Some(item) = ctx.item_by_id(*impl_id) else {
@@ -757,9 +914,11 @@ fn render_inherent_impl_items(out: &mut String, impl_ids: &[u32], ctx: &RenderCo
             sections.push(rendered);
         }
     }
-
     if !sections.is_empty() {
-        out.push_str("\n### Inherent Items\n");
+        out.push_str(&format!(
+            "\n### Inherent Items {{#{}-inherent-items}}\n\nMethods and associated functions implemented directly on this type.\n",
+            parent_anchor
+        ));
         for section in sections {
             out.push('\n');
             out.push_str(&section);
@@ -772,9 +931,17 @@ fn render_inherent_impl_items(out: &mut String, impl_ids: &[u32], ctx: &RenderCo
 
 fn render_module_page(module_item: &Item, ctx: &RenderContext, skip_constants: bool) -> String {
     let mut sections: Vec<String> = Vec::new();
+    let module_prefix = module_item
+        .name
+        .as_deref()
+        .map(anchor_id_from_text)
+        .unwrap_or_else(|| "maos-spirit-abi".to_string());
     if let Some(docs) = &module_item.docs {
         if !docs.trim().is_empty() {
-            sections.push(docs.trim().to_string());
+            sections.push(add_explicit_ids_to_markdown_headings(
+                docs.trim(),
+                &module_prefix,
+            ));
         }
     }
     if let ItemInner::Module(ModuleInner { items, .. }) = &module_item.inner {
@@ -800,7 +967,11 @@ fn render_module_page(module_item: &Item, ctx: &RenderContext, skip_constants: b
         }
 
         for (kind, ids) in by_kind {
-            sections.push(format!("\n## {}\n", kind));
+            sections.push(format!(
+                "\n## {} {{#{}}}\n",
+                kind,
+                module_anchor_id(module_item, &kind)
+            ));
             for iid in ids {
                 if let Some(item) = ctx.item_by_id(iid) {
                     if let Some(rendered) = render_item(item, ctx) {
@@ -814,7 +985,7 @@ fn render_module_page(module_item: &Item, ctx: &RenderContext, skip_constants: b
 }
 
 fn render_constants_page(crate_root: &Item, ctx: &RenderContext) -> String {
-    let mut sections = vec!["\n## Constants\n".to_string()];
+    let mut sections = vec!["\n## Constants {#maos-spirit-abi-constants}\n".to_string()];
     if let ItemInner::Module(ModuleInner { items, .. }) = &crate_root.inner {
         for iid in items {
             if let Some(item) = ctx.item_by_id(*iid) {
@@ -870,6 +1041,7 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
     let ctx = RenderContext {
         index: &krate.index,
         id_to_key: &id_to_key,
+        paths: &krate.paths,
     };
 
     // 4. Collect modules.
@@ -1090,9 +1262,9 @@ fn generate_rustdoc_json() -> Result<PathBuf, String> {
 
 #[cfg(test)]
 mod tests {
+    use super::FenceTracker;
     use std::fs;
     use std::path::Path;
-
     fn workspace_root() -> &'static Path {
         Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
     }
@@ -1124,7 +1296,7 @@ mod tests {
 
         let live_value = live_value.expect("MANIFEST_SCHEMA_VERSION constant not found");
 
-        let constants_md = workspace_root().join("docs-site/docs/abi/constants.md");
+        let constants_md = workspace_root().join("docs-site/abi/v1/constants.md");
         let constants_md = fs::read_to_string(constants_md).expect("read constants.md");
         let expected = regex::Regex::new(&format!(
             r"pub const MANIFEST_SCHEMA_VERSION: u32 = {}(?:u32)?;",
@@ -1144,7 +1316,7 @@ mod tests {
     fn anti_rot_gate_catches_semantic_drift() {
         let temp = tempfile::tempdir().expect("tempdir");
         let temp_path = temp.path().to_path_buf();
-        let abi_dir = workspace_root().join("docs-site/docs/abi");
+        let abi_dir = workspace_root().join("docs-site/abi/v1");
 
         // Seed the temp output tree with the committed generated pages and hand-curated partials.
         for entry in fs::read_dir(abi_dir).expect("read abi dir") {
@@ -1174,7 +1346,7 @@ mod tests {
     fn anti_rot_gate_catches_orphan_generated_page() {
         let temp = tempfile::tempdir().expect("tempdir");
         let temp_path = temp.path().to_path_buf();
-        let abi_dir = workspace_root().join("docs-site/docs/abi");
+        let abi_dir = workspace_root().join("docs-site/abi/v1");
 
         for entry in fs::read_dir(abi_dir).expect("read abi dir") {
             let entry = entry.expect("dir entry");
@@ -1201,7 +1373,7 @@ mod tests {
     /// AC-3 empty-diff floor: the generator must emit at least 8 pages.
     #[test]
     fn empty_diff_floor() {
-        let abi_dir = workspace_root().join("docs-site/docs/abi");
+        let abi_dir = workspace_root().join("docs-site/abi/v1");
         let pages: Vec<_> = fs::read_dir(abi_dir)
             .expect("read abi dir")
             .filter_map(|e| e.ok())
@@ -1216,6 +1388,63 @@ mod tests {
             "expected at least 8 generated abi pages, got {}",
             pages.len()
         );
+    }
+
+    /// D-cons4: generated ABI docs must carry locale-invariant explicit heading IDs.
+    #[test]
+    fn generated_abi_pages_have_explicit_heading_ids() {
+        let abi_dir = workspace_root().join("docs-site/abi/v1");
+        for entry in fs::read_dir(abi_dir).expect("read abi dir") {
+            let entry = entry.expect("dir entry");
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !name.ends_with(".md") || name.starts_with("_related_") {
+                continue;
+            }
+            let content = fs::read_to_string(entry.path()).expect("read generated page");
+            let mut tracker = FenceTracker::default();
+            for (idx, line) in content.lines().enumerate() {
+                tracker.toggle(line);
+                if tracker.is_open() {
+                    continue;
+                }
+                let trimmed = line.trim_start();
+                if trimmed.starts_with('#') && trimmed.contains(' ') {
+                    assert!(
+                        trimmed.contains("{#"),
+                        "{}:{} generated heading lacks explicit ID: {}",
+                        name,
+                        idx + 1,
+                        line
+                    );
+                }
+            }
+        }
+    }
+
+    /// D-cons4: generated ABI docs must not contain duplicate explicit heading IDs
+    /// within a single page (otherwise deep-link preservation is ambiguous).
+    #[test]
+    fn generated_abi_pages_have_unique_heading_ids() {
+        let abi_dir = workspace_root().join("docs-site/abi/v1");
+        let id_re = regex::Regex::new(r"\{#([A-Za-z0-9_-]+)\}").expect("valid anchor regex");
+        for entry in fs::read_dir(abi_dir).expect("read abi dir") {
+            let entry = entry.expect("dir entry");
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !name.ends_with(".md") || name.starts_with("_related_") {
+                continue;
+            }
+            let content = fs::read_to_string(entry.path()).expect("read generated page");
+            let mut seen = std::collections::HashSet::new();
+            for cap in id_re.captures_iter(&content) {
+                let id = cap[1].to_string();
+                assert!(
+                    seen.insert(id.clone()),
+                    "{}: duplicate explicit heading ID: {}",
+                    name,
+                    id
+                );
+            }
+        }
     }
 
     /// AC-3 cross-gate-contract (simplified): every module recorded in the v1
@@ -1236,7 +1465,7 @@ mod tests {
             }
         }
 
-        let abi_dir = workspace_root().join("docs-site/docs/abi");
+        let abi_dir = workspace_root().join("docs-site/abi/v1");
         let mut generated_modules: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
         for entry in fs::read_dir(abi_dir).expect("read abi dir") {
             let entry = entry.expect("dir entry");

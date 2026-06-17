@@ -10,7 +10,7 @@ FROM this file (D5, Story 9.5).
 | Locale | Status | Notes |
 |--------|--------|-------|
 | `en` (English) | **Default** — source locale | All content authored in English |
-| `ko` (Korean) | **v1.0** — active | Machine-translated with locked-term enforcement |
+| `ko` (Korean) | **active — partial coverage** | Machine-translated with locked-term enforcement. Story 9.5 shipped a representative sample (journey-layer pages) + English fallback; **full canonical coverage is owned by Story 10.3** (see Page Coverage below) |
 | `ja` (Japanese) | **Deferred to v1.5** | Not stubbed; explicit deferral |
 | `zh-CN` (Chinese Simplified) | **Deferred to v1.5** | Not stubbed; explicit deferral |
 | RTL locales (ar, he, etc.) | **Deferred to v2.5** | Requires layout and component changes |
@@ -95,9 +95,27 @@ break the domain model.
 > requires a native/fluent Korean reviewer to evaluate translation quality
 > per-release. CI is a floor, not a ceiling.
 
+## Page Coverage (per-locale completeness)
+
+Adding a locale (above) is distinct from *fully translating* it. Korean is **active
+but partial**: Story 9.5 deliberately shipped the toolchain, the glossary lock, and a
+representative sample (the journey-layer pages), with **English fallback** for the rest
+(`gate:fallback`, AC-4). The glossary-lock gate enforces locked terms only on pages that
+*are* translated — it does **not** require full coverage — so coverage is a permitted
+floor today, not the target.
+
+- **Visibility now:** `npm run gate:ko-coverage` (in `docs-site/`) reports
+  translated/total per canonical doc deliverable. Report-only by default.
+- **Teeth at v1.0:** **Story 10.3** (Epic 10 v1.0 ship gate, NFR-Doc-6) requires Korean
+  present for **all 5 canonical doc deliverables**. That story wires
+  `KO_COVERAGE_MIN=100` into the `docs-site` CI to turn the promise into a mechanical
+  gate (a promise without a gate decays — Epic 8 lesson). Open scoping question for 10.3:
+  whether the 37 generated `/errors/` pages count toward the troubleshoot deliverable.
+
 ## Deferral Policy
 
-- **v1.0:** English (source) + Korean (locked-term-enforced, CI-gated)
+- **v1.0:** English (source) + Korean (locked-term-enforced, CI-gated; **full canonical
+  page coverage at Story 10.3** — see Page Coverage above)
 - **v1.5:** Japanese + Chinese Simplified (same locked-term model)
 - **v2.5:** RTL locale support (requires Docusaurus RTL theme + layout audit)
 - New locales follow the same pattern: add to `docs-site/docusaurus.config.ts`

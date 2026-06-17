@@ -1,12 +1,12 @@
 <!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->
 
-# `compliance` Module
+# `compliance` Module {#abi-compliance-module}
 
-## Related
+## Related {#abi-compliance-related}
 
 - [ABI Stability Policy](/migrate/abi-stability) — `ABI_VERSION=1` freeze context
-- [ADR-009](/adr/ADR-009-trust-tier-taxonomy) — `TrustTier` rationale
-- [ADR-004](/adr/ADR-004-sandbox-tier-taxonomy) — `SandboxTier` rationale
+- [ADR-009](https://github.com/lunarpulse/maos/blob/main/docs/adr/ADR-009-trust-tier-taxonomy.md) — `TrustTier` rationale
+- [ADR-004](https://github.com/lunarpulse/maos/blob/main/docs/adr/ADR-004-sandbox-tier-taxonomy.md) — `SandboxTier` rationale
 
 
 *ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
@@ -19,7 +19,7 @@ Story 1b.4 froze the schema, added serde derives, resolved the `Uuid`
 newtype decision, and bumped `ABI_VERSION` to `1`. This freeze is the
 **one sanctioned ABI break** in Epic 1b.
 
-# §8.5 ABI-break rule (review report §5 self-test)
+# §8.5 ABI-break rule (review report §5 self-test) {#compliance-8-5abi-breakrule-reviewreport5self-test}
 
 The following changes **DO** bump `ABI_VERSION` (mechanical enforcement
 via the `abi-diff` gate, now baselined at `v1-pre-bump.txt`):
@@ -44,7 +44,10 @@ The abi-diff gate (`--deny removed --deny changed`, baselined at
 `v1-pre-bump.txt`) is the mechanical half of this rule; this doc-block
 is the canonical human-readable reference.
 
-## Enums
+
+## Enums {#compliance-enums}
+
+### `SigningAlg` {#maos-spirit-abi-compliance-signingalg}
 
 Signing algorithm identifier.
 
@@ -52,7 +55,7 @@ Additive enum: adding a variant at the end with explicit `#[repr(u8)]`
 discriminant is NOT an ABI break. Removing or reordering variants IS
 an ABI break per §8.5.
 
-# Example
+# Example {#maos-spirit-abi-compliance-signingalg-example}
 
 ```rust
 use maos_spirit_abi::compliance::SigningAlg;
@@ -60,21 +63,25 @@ use maos_spirit_abi::compliance::SigningAlg;
 let alg = SigningAlg::Ed25519;
 ```
 
+
 ```rust
 pub enum SigningAlg {
     Ed25519,
 }
 ```
 
+### `TrustTier` {#maos-spirit-abi-compliance-trusttier}
+
 Trust tier — operator-visible metadata classification.
 
-# Example
+# Example {#maos-spirit-abi-compliance-trusttier-example}
 
 ```rust
 use maos_spirit_abi::compliance::TrustTier;
 
 let tier = TrustTier::PublicVetted;
 ```
+
 
 ```rust
 pub enum TrustTier {
@@ -85,15 +92,18 @@ pub enum TrustTier {
 }
 ```
 
+### `SandboxTier` {#maos-spirit-abi-compliance-sandboxtier}
+
 Sandbox tier — OS-native sandbox primitive classification.
 
-# Example
+# Example {#maos-spirit-abi-compliance-sandboxtier-example}
 
 ```rust
 use maos_spirit_abi::compliance::SandboxTier;
 
 let tier = SandboxTier::T2;
 ```
+
 
 ```rust
 pub enum SandboxTier {
@@ -105,13 +115,15 @@ pub enum SandboxTier {
 }
 ```
 
+### `PrincipleRef` {#maos-spirit-abi-compliance-principleref}
+
 Principles the claim attests compliance with.
 
 Additive enum with explicit discriminants. Adding a variant at the
 end with `#[serde(other)]` fallback is NOT an ABI break; removing or
 reordering IS.
 
-# Example
+# Example {#maos-spirit-abi-compliance-principleref-example}
 
 ```rust
 use maos_spirit_abi::compliance::PrincipleRef;
@@ -119,6 +131,7 @@ use maos_spirit_abi::compliance::PrincipleRef;
 let principle = PrincipleRef::Soc2TypeIi;
 assert_eq!(principle as u8, 1);
 ```
+
 
 ```rust
 pub enum PrincipleRef {
@@ -130,9 +143,11 @@ pub enum PrincipleRef {
 }
 ```
 
+### `EvidenceKind` {#maos-spirit-abi-compliance-evidencekind}
+
 Evidence supporting a compliance claim.
 
-# Example
+# Example {#maos-spirit-abi-compliance-evidencekind-example}
 
 ```rust
 use maos_spirit_abi::compliance::EvidenceKind;
@@ -149,6 +164,7 @@ assert!(matches!(corpus, EvidenceKind::CorpusReplay { .. }));
 assert!(matches!(review, EvidenceKind::ManualReview { .. }));
 ```
 
+
 ```rust
 pub enum EvidenceKind {
     CorpusReplay,
@@ -158,12 +174,14 @@ pub enum EvidenceKind {
 }
 ```
 
+### `Verdict` {#maos-spirit-abi-compliance-verdict}
+
 Verdict rendered by the attesting party.
 
 Explicit discriminants on every variant — reordering without updating
 discriminants is an ABI break per §8.5 self-test row #5.
 
-# Example
+# Example {#maos-spirit-abi-compliance-verdict-example}
 
 ```rust
 use maos_spirit_abi::compliance::Verdict;
@@ -180,6 +198,7 @@ match verdict {
     _ => { /* other verdict */ }
 }
 ```
+
 
 ```rust
 pub enum Verdict {

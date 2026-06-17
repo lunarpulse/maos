@@ -1,80 +1,348 @@
 {
   "$schema": "./route-manifest.schema.json",
-  "_comment": "Shared route manifest — single source of truth for gate:routes, gate:links, gate:a11y (D7). Every canonical route must be listed; scanned==expected is a gate assertion.",
+  "_comment": "Shared route manifest \u2014 single source of truth for gate:routes, gate:links, gate:a11y (D7). Every canonical route and redirect target must be listed; axe coverage gates distinct rendered pages.",
   "version": "1.0.0",
   "routes": [
-    { "path": "/", "label": "Landing", "content_floor": "three-door table" },
-    { "path": "/write-a-spirit", "label": "Write a Spirit", "content_floor": "code fence" },
-    { "path": "/run-maos", "label": "Run MAOS", "content_floor": "code fence" },
-    { "path": "/understand-maos", "label": "Understand MAOS", "content_floor": "concepts table" },
-
-    { "path": "/manifest/latest", "label": "Manifest Schema (index)", "content_floor": "link list" },
-    { "path": "/manifest/v3", "label": "Manifest v3 Reference", "content_floor": "code fence" },
-    { "path": "/manifest/v2", "label": "Manifest v2 Reference", "content_floor": "prose" },
-    { "path": "/manifest/v1", "label": "Manifest v1 Reference", "content_floor": "prose" },
-
-    { "path": "/cookbook/", "label": "Cookbook (index)", "content_floor": "pattern list" },
-    { "path": "/cookbook/hello-world-spirit", "label": "Hello World Spirit", "content_floor": "code fence" },
-    { "path": "/cookbook/manifest-fields", "label": "Manifest Fields", "content_floor": "code fence" },
-    { "path": "/cookbook/lifecycle-hooks", "label": "Lifecycle Hooks", "content_floor": "code fence" },
-    { "path": "/cookbook/cancellation-handling", "label": "Cancellation Handling", "content_floor": "code fence" },
-    { "path": "/cookbook/capability-scoping", "label": "Capability Scoping", "content_floor": "code fence" },
-    { "path": "/cookbook/hot-swap-migration", "label": "Hot-Swap Migration", "content_floor": "code fence" },
-    { "path": "/cookbook/scheduled-invocations", "label": "Scheduled Invocations", "content_floor": "code fence" },
-    { "path": "/cookbook/gateway-integration", "label": "Gateway Integration", "content_floor": "code fence" },
-    { "path": "/cookbook/compliance-claim", "label": "Compliance Claim", "content_floor": "code fence" },
-    { "path": "/cookbook/testing-with-spirit-sdk", "label": "Testing with Spirit SDK", "content_floor": "code fence" },
-    { "path": "/cookbook/cli-wrapper-spirit", "label": "CLI Wrapper Spirit", "content_floor": "code fence" },
-    { "path": "/cookbook/error-handling", "label": "Error Handling", "content_floor": "code fence" },
-
-    { "path": "/migrate/", "label": "Migration (index)", "content_floor": "link list" },
-    { "path": "/migrate/v2-to-v3", "label": "v2 to v3 Migration", "content_floor": "code fence" },
-    { "path": "/migrate/v1-to-v2", "label": "v1 to v2 Migration", "content_floor": "code fence" },
-    { "path": "/migrate/abi-stability", "label": "ABI Stability", "content_floor": "prose" },
-
-    { "path": "/troubleshoot/", "label": "Troubleshoot (index)", "content_floor": "error table" },
-
-    { "path": "/deploy/", "label": "Deploy (index)", "content_floor": "link list" },
-    { "path": "/deploy/topology", "label": "Deployment Topology", "content_floor": "prose" },
-    { "path": "/deploy/air-gap-deployment", "label": "Air-Gap Deployment", "content_floor": "code fence" },
-    { "path": "/deploy/restore-drill", "label": "Restore Drill", "content_floor": "code fence" },
-    { "path": "/deploy/release-signing", "label": "Release Signing", "content_floor": "code fence" },
-
-    { "path": "/abi/latest", "label": "ABI Reference (index)", "content_floor": "module list" },
-    { "path": "/abi/lifecycle", "label": "ABI: Lifecycle", "content_floor": "code fence" },
-    { "path": "/abi/ctx", "label": "ABI: Ctx", "content_floor": "code fence" },
-    { "path": "/abi/compliance", "label": "ABI: Compliance", "content_floor": "code fence" },
-    { "path": "/abi/identity", "label": "ABI: Identity", "content_floor": "code fence" },
-    { "path": "/abi/cancellation", "label": "ABI: Cancellation", "content_floor": "code fence" },
-    { "path": "/abi/gateway", "label": "ABI: Gateway", "content_floor": "code fence" },
-    { "path": "/abi/deprecation", "label": "ABI: Deprecation", "content_floor": "prose" },
-    { "path": "/abi/constants", "label": "ABI: Constants", "content_floor": "prose" },
-
-    { "path": "/community/governance", "label": "Governance", "content_floor": "prose" },
-    { "path": "/community/code-of-conduct", "label": "Code of Conduct", "content_floor": "prose" },
-    { "path": "/community/rfc-template", "label": "RFC Template", "content_floor": "prose" },
-    { "path": "/community/locales", "label": "Locales & i18n", "content_floor": "prose" },
-    { "path": "/community/trademark", "label": "Trademark", "content_floor": "prose" },
-    { "path": "/community/breaking-changes", "label": "Breaking Changes", "content_floor": "prose" }
+    {
+      "path": "/",
+      "label": "Landing",
+      "content_floor": "three-door table"
+    },
+    {
+      "path": "/write-a-spirit",
+      "label": "Write a Spirit",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/run-maos",
+      "label": "Run MAOS",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/understand-maos",
+      "label": "Understand MAOS",
+      "content_floor": "concepts table"
+    },
+    {
+      "path": "/manifest/latest",
+      "label": "Manifest Schema (index)",
+      "content_floor": "link list"
+    },
+    {
+      "path": "/manifest/v3",
+      "label": "Manifest v3 Reference",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/manifest/v2",
+      "label": "Manifest v2 Reference",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/manifest/v1",
+      "label": "Manifest v1 Reference",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/cookbook/",
+      "label": "Cookbook (index)",
+      "content_floor": "pattern list"
+    },
+    {
+      "path": "/cookbook/hello-world-spirit",
+      "label": "Hello World Spirit",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/manifest-fields",
+      "label": "Manifest Fields",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/lifecycle-hooks",
+      "label": "Lifecycle Hooks",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/cancellation-handling",
+      "label": "Cancellation Handling",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/capability-scoping",
+      "label": "Capability Scoping",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/hot-swap-migration",
+      "label": "Hot-Swap Migration",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/scheduled-invocations",
+      "label": "Scheduled Invocations",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/gateway-integration",
+      "label": "Gateway Integration",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/compliance-claim",
+      "label": "Compliance Claim",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/testing-with-spirit-sdk",
+      "label": "Testing with Spirit SDK",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/cli-wrapper-spirit",
+      "label": "CLI Wrapper Spirit",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/cookbook/error-handling",
+      "label": "Error Handling",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/migrate/",
+      "label": "Migration (index)",
+      "content_floor": "link list"
+    },
+    {
+      "path": "/migrate/v2-to-v3",
+      "label": "v2 to v3 Migration",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/migrate/v1-to-v2",
+      "label": "v1 to v2 Migration",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/migrate/abi-stability",
+      "label": "ABI Stability",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/troubleshoot/",
+      "label": "Troubleshoot (index)",
+      "content_floor": "error table"
+    },
+    {
+      "path": "/deploy/",
+      "label": "Deploy (index)",
+      "content_floor": "link list"
+    },
+    {
+      "path": "/deploy/topology",
+      "label": "Deployment Topology",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/deploy/air-gap-deployment",
+      "label": "Air-Gap Deployment",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/deploy/restore-drill",
+      "label": "Restore Drill",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/deploy/release-signing",
+      "label": "Release Signing",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/abi/v1/",
+      "label": "ABI Reference v1 (index)",
+      "content_floor": "module list"
+    },
+    {
+      "path": "/abi/v1/lifecycle",
+      "label": "ABI v1: Lifecycle",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/abi/v1/ctx",
+      "label": "ABI v1: Ctx",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/abi/v1/compliance",
+      "label": "ABI v1: Compliance",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/abi/v1/identity",
+      "label": "ABI v1: Identity",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/abi/v1/cancellation",
+      "label": "ABI v1: Cancellation",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/abi/v1/gateway",
+      "label": "ABI v1: Gateway",
+      "content_floor": "code fence"
+    },
+    {
+      "path": "/abi/v1/deprecation",
+      "label": "ABI v1: Deprecation",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/abi/v1/constants",
+      "label": "ABI v1: Constants",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/community/governance",
+      "label": "Governance",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/community/code-of-conduct",
+      "label": "Code of Conduct",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/community/rfc-template",
+      "label": "RFC Template",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/community/locales",
+      "label": "Locales & i18n",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/community/trademark",
+      "label": "Trademark",
+      "content_floor": "prose"
+    },
+    {
+      "path": "/community/breaking-changes",
+      "label": "Breaking Changes",
+      "content_floor": "prose"
+    }
   ],
   "error_routes_pattern": "/errors/{ERR_NAME}",
+  "expected_distinct_pages": 113,
   "error_codes": [
-    "EAbiTooNew", "EAbiTooOld", "EClassRequired", "ECliBinaryNotFound",
-    "ECliProbeFailed", "ECliWrapperRequiresT3", "ECliWrapperTierNotGranted",
-    "EComplianceRejection::ContextDrift", "EComplianceRejection::ExpiredClaim",
-    "EComplianceRejection::MalformedClaim", "EComplianceRejection::SignatureInvalid",
-    "EHaltContinuityViolation", "EIntentLineageBroken", "EManifestSchemaConflict",
-    "EMigratorMissing", "EMigratorMissing_PrecheckOutcome",
-    "EOrchestratorDispatchRawOutput", "EOutputShapeAdapterMismatch",
+    "EAbiTooNew",
+    "EAbiTooOld",
+    "EClassRequired",
+    "ECliBinaryNotFound",
+    "ECliProbeFailed",
+    "ECliWrapperRequiresT3",
+    "ECliWrapperTierNotGranted",
+    "EComplianceRejection::ContextDrift",
+    "EComplianceRejection::ExpiredClaim",
+    "EComplianceRejection::MalformedClaim",
+    "EComplianceRejection::SignatureInvalid",
+    "EHaltContinuityViolation",
+    "EIntentLineageBroken",
+    "EManifestSchemaConflict",
+    "EMigratorMissing",
+    "EMigratorMissing_PrecheckOutcome",
+    "EOrchestratorDispatchRawOutput",
+    "EOutputShapeAdapterMismatch",
     "EOutputShapeAdapterNotRegistered",
-    "EPinMismatch::Invalidated", "EPinMismatch::Mismatch", "EPinMismatch::NotPinned",
+    "EPinMismatch::Invalidated",
+    "EPinMismatch::Mismatch",
+    "EPinMismatch::NotPinned",
     "ERespawnWithContextUnsupported",
-    "ESkillProposal::EmptyDiff", "ESkillProposal::EmptyTargetId",
-    "ESkillProposal::InvalidTargetIdCharset", "ESkillProposal::InvalidTargetVersion",
+    "ESkillProposal::EmptyDiff",
+    "ESkillProposal::EmptyTargetId",
+    "ESkillProposal::InvalidTargetIdCharset",
+    "ESkillProposal::InvalidTargetVersion",
     "ESkillQueue::DuplicateSkillId",
-    "ESkillSchema::EmptyBody", "ESkillSchema::EmptyId", "ESkillSchema::EmptyName",
-    "ESkillSchema::InvalidIdCharset", "ESkillSchema::InvalidSemver",
-    "ESkillSchema::MissingFence", "ESkillSchema::TomlParse",
-    "ESkillSchema::UnknownField", "ESubstrateTooOld"
+    "ESkillSchema::EmptyBody",
+    "ESkillSchema::EmptyId",
+    "ESkillSchema::EmptyName",
+    "ESkillSchema::InvalidIdCharset",
+    "ESkillSchema::InvalidSemver",
+    "ESkillSchema::MissingFence",
+    "ESkillSchema::TomlParse",
+    "ESkillSchema::UnknownField",
+    "ESubstrateTooOld"
+  ],
+  "redirects": [
+    {
+      "from": "/schema",
+      "to": "/manifest/latest"
+    },
+    {
+      "from": "/errors",
+      "to": "/troubleshoot/"
+    },
+    {
+      "from": "/reference",
+      "to": "/abi/v1/"
+    },
+    {
+      "from": "/runbooks",
+      "to": "/deploy/"
+    },
+    {
+      "from": "/patterns",
+      "to": "/cookbook/"
+    },
+    {
+      "from": "/breaking",
+      "to": "/migrate/"
+    },
+    {
+      "from": "/abi",
+      "to": "/abi/v1/"
+    },
+    {
+      "from": "/abi/latest",
+      "to": "/abi/v1/"
+    },
+    {
+      "from": "/abi/index",
+      "to": "/abi/v1/"
+    },
+    {
+      "from": "/abi/cancellation",
+      "to": "/abi/v1/cancellation"
+    },
+    {
+      "from": "/abi/compliance",
+      "to": "/abi/v1/compliance"
+    },
+    {
+      "from": "/abi/constants",
+      "to": "/abi/v1/constants"
+    },
+    {
+      "from": "/abi/ctx",
+      "to": "/abi/v1/ctx"
+    },
+    {
+      "from": "/abi/deprecation",
+      "to": "/abi/v1/deprecation"
+    },
+    {
+      "from": "/abi/gateway",
+      "to": "/abi/v1/gateway"
+    },
+    {
+      "from": "/abi/identity",
+      "to": "/abi/v1/identity"
+    },
+    {
+      "from": "/abi/lifecycle",
+      "to": "/abi/v1/lifecycle"
+    }
   ]
 }

@@ -74,5 +74,5 @@ The version 3 bump is recorded as a ratified entry in `xtask/abi-ratifications.t
 ## Reference
 
 - [ABI Stability Policy](./abi-stability) — N-1/N-2 rules and the ABI Stability Triple
-- [ABI Constants](/abi/constants) — live values for `MANIFEST_SCHEMA_VERSION` and supported window
+- [ABI Constants](/abi/v1/constants) — live values for `MANIFEST_SCHEMA_VERSION` and supported window
 - [`BREAKING.md`](https://github.com/maos/maos/blob/main/BREAKING.md) — CI-enforced change ledger

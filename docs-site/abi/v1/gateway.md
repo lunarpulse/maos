@@ -1,10 +1,10 @@
 <!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->
 
-# `gateway` Module
+# `gateway` Module {#abi-gateway-module}
 
-## Related
+## Related {#abi-gateway-related}
 
-- [ADR-029](/adr/ADR-029-gateway-submodules) — gateway submodule contract
+- [ADR-029](https://github.com/lunarpulse/maos/blob/main/docs/adr/ADR-029-gateway-submodules.md) — gateway submodule contract
 - [lifecycle Module](./lifecycle) — distinct from the 14-hook `Spirit` trait
 
 
@@ -23,11 +23,14 @@ time. The ctx provides handles to kernel services (mailbox, capability
 verification, secrets, transparency log). The implementor runs in a
 `tokio::spawn`ed task owned by the `GatewayDispatcher`.
 
-## Enums
+
+## Enums {#gateway-enums}
+
+### `GatewayError` {#maos-spirit-abi-gateway-gatewayerror}
 
 Error type returned by gateway submodule operations.
 
-# Example
+# Example {#maos-spirit-abi-gateway-gatewayerror-example}
 
 ```rust
 use maos_spirit_abi::gateway::GatewayError;
@@ -46,6 +49,7 @@ match err {
 }
 ```
 
+
 ```rust
 pub enum GatewayError {
     Fatal,
@@ -57,7 +61,9 @@ pub enum GatewayError {
 ```
 
 
-## Traits
+## Traits {#gateway-traits}
+
+### `GatewaySubmodule` {#maos-spirit-abi-gateway-gatewaysubmodule}
 
 Trait for gateway submodule implementations.
 
@@ -65,12 +71,12 @@ Implementors are registered with the `GatewayDispatcher` via a
 `GatewaySubmoduleFactory`. The dispatcher calls `on_connect` when the
 Spirit is admitted and `on_disconnect` when the Spirit is unloaded.
 
-# Async
+# Async {#maos-spirit-abi-gateway-gatewaysubmodule-async}
 
 All methods are async. The trait uses `Pin<Box<dyn Future>>` return types
 for dyn compatibility in `#![no_std]` environments.
 
-# Example
+# Example {#maos-spirit-abi-gateway-gatewaysubmodule-example}
 
 ```ignore
 use maos_spirit_abi::gateway::{
@@ -107,6 +113,7 @@ impl GatewaySubmodule for TelegramGateway {
 }
 ```
 
+
 ```rust
 pub trait GatewaySubmodule {
     fn on_connect(&self, ctx: GatewayCtx) -> Pin<Box<dyn Future + Send>>;
@@ -116,7 +123,10 @@ pub trait GatewaySubmodule {
 }
 ```
 
+### `CancellationSignal` {#maos-spirit-abi-gateway-cancellationsignal}
+
 Cancellation signal — polled by gateway implementors to detect unload.
+
 
 ```rust
 pub trait CancellationSignal {
@@ -125,7 +135,10 @@ pub trait CancellationSignal {
 }
 ```
 
+### `GatewayMailboxHandle` {#maos-spirit-abi-gateway-gatewaymailboxhandle}
+
 Mailbox handle for gateway submodules to deliver inbound IAC frames.
+
 
 ```rust
 pub trait GatewayMailboxHandle {
@@ -134,7 +147,10 @@ pub trait GatewayMailboxHandle {
 }
 ```
 
+### `GatewayCapabilityHandle` {#maos-spirit-abi-gateway-gatewaycapabilityhandle}
+
 Capability handle for verifying outbound gateway sends.
+
 
 ```rust
 pub trait GatewayCapabilityHandle {
@@ -143,7 +159,10 @@ pub trait GatewayCapabilityHandle {
 }
 ```
 
+### `GatewaySecretsHandle` {#maos-spirit-abi-gateway-gatewaysecretshandle}
+
 Secrets handle for resolving `auth_secret_ref`.
+
 
 ```rust
 pub trait GatewaySecretsHandle {
@@ -152,7 +171,10 @@ pub trait GatewaySecretsHandle {
 }
 ```
 
+### `GatewayTransparencyLogHandle` {#maos-spirit-abi-gateway-gatewaytransparencyloghandle}
+
 Transparency log handle for writing gateway lifecycle records.
+
 
 ```rust
 pub trait GatewayTransparencyLogHandle {

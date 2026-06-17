@@ -23,7 +23,7 @@ sidebar_position: 0
 | [Migration Runbooks](/migrate/) | Breaking-change migration guides (v2→v3, etc.) |
 | [Troubleshooting](/troubleshoot/) | Every error code explained with causes and remediation |
 | [Deployment](/deploy/) | Topology guides, air-gap, backup/restore, release signing |
-| [ABI Reference](/abi/latest) | Generated API documentation for `maos-spirit-abi` |
+| [ABI Reference](/abi/v1/) | Generated API documentation for `maos-spirit-abi` |
 
 ## Community
 

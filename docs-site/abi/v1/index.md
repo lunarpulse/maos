@@ -1,8 +1,8 @@
 <!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->
 
-# `index` Module
+# `index` Module {#abi-index-module}
 
-## Related
+## Related {#abi-index-related}
 
 - [ABI Stability Policy](/migrate/abi-stability) — compatibility window and bump rules
 - [Constants](./constants) — `ABI_VERSION` and `MANIFEST_SCHEMA_VERSION` reference
@@ -20,7 +20,7 @@ Bumping `ABI_VERSION` here is the **ABI-bump trigger** per §8.5.
 The abi-diff gate (`--deny removed --deny changed`) is baselined at
 `abi-baseline/v1-pre-bump.txt` after the 1b.4 freeze.
 
-## Story 2.1 additive surface (does NOT bump `ABI_VERSION`)
+## Story 2.1 additive surface (does NOT bump `ABI_VERSION`) {#maos-spirit-abi-story2-1additivesurface-doesnotbump-abi-version}
 
 Story 2.1 adds:
 - `pub mod cancellation` — `CancellationSignal` trait + `NeverCancel`
@@ -29,7 +29,7 @@ Story 2.1 adds:
 
 All additions are ABI-additive per §8.5 rows 7+8. `ABI_VERSION` remains `1`.
 
-# Version history
+# Version history {#maos-spirit-abi-versionhistory}
 
 | Module / constant | Introduced | Notes |
 |---|---|---|
@@ -41,7 +41,7 @@ All additions are ABI-additive per §8.5 rows 7+8. `ABI_VERSION` remains `1`.
 | `deprecation` | Story 7.1 | Empty-present deprecation channel |
 | `MANIFEST_SCHEMA_VERSION = 3` | Story 9.4b | `[model_provenance]` section |
 
-## Modules
+## Modules {#maos-spirit-abi-modules}
 | Module | Description | Introduced |
 |---|---|---|
 | [`cancellation`] | `CancellationSignal` trait + `NeverCancel` — runtime-agnostic cancellation | Story 2.1 |

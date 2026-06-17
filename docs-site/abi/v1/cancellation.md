@@ -1,10 +1,10 @@
 <!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->
 
-# `cancellation` Module
+# `cancellation` Module {#abi-cancellation-module}
 
-## Related
+## Related {#abi-cancellation-related}
 
-- [ADR-002](/adr/ADR-002-spirit-form-at-v01) — why cancellation is runtime-agnostic
+- [ADR-002](https://github.com/lunarpulse/maos/blob/main/docs/adr/ADR-002-spirit-form-at-v01-subprocess-only-inproc-gated-on-measurement.md) — why cancellation is runtime-agnostic
 - [lifecycle Module](./lifecycle) — hooks that poll `CancellationSignal`
 - [ctx Module](./ctx) — `Ctx::cancellation()`
 
@@ -22,7 +22,10 @@ abstraction the wire protocol can carry as a signal.
 The SDK side (std-aware, tokio-aware) provides `TokioCancellationSignal`
 as the production impl; tests use `NeverCancel`.
 
-## Structs
+
+## Structs {#cancellation-structs}
+
+### `CancellationFuture` {#maos-spirit-abi-cancellation-cancellationfuture}
 
 Future returned by [`CancellationSignal::cancelled`].
 
@@ -35,16 +38,19 @@ implementations; the async `cancelled()` method is a placeholder for
 production adapters (`TokioCancellationSignal`) that override it with
 an efficient runtime-aware wait.
 
+
 ```rust
 pub struct CancellationFuture<'a> { /* private fields */ }
 ```
+
+### `NeverCancel` {#maos-spirit-abi-cancellation-nevercancel}
 
 Reference implementation: a cancellation signal that never fires.
 
 Useful for trait-object dispatch smoke tests and SDK-side unit tests
 that do not require an async runtime.
 
-# Example
+# Example {#maos-spirit-abi-cancellation-nevercancel-example}
 
 ```rust
 use maos_spirit_abi::cancellation::{CancellationSignal, NeverCancel};
@@ -55,12 +61,15 @@ assert!(!signal.is_cancelled());
 // NeverCancel is the default signal used by Ctx::mock().
 ```
 
+
 ```rust
 pub struct NeverCancel;
 ```
 
 
-## Traits
+## Traits {#cancellation-traits}
+
+### `CancellationSignal` {#maos-spirit-abi-cancellation-cancellationsignal}
 
 Trait for cancellation signals — the kernel-side bridge that lets
 hook implementations check or await cancellation without coupling
@@ -69,7 +78,7 @@ to a specific runtime.
 Structurally parallel to the D9 pattern from Story 1b.6:
 one no_std wire-format abstraction, one std operational adapter.
 
-# Example
+# Example {#maos-spirit-abi-cancellation-cancellationsignal-example}
 
 ```ignore
 fn on_frame(&self, ctx: &mut Ctx) {
@@ -79,6 +88,7 @@ fn on_frame(&self, ctx: &mut Ctx) {
     // … do work …
 }
 ```
+
 
 ```rust
 pub trait CancellationSignal {

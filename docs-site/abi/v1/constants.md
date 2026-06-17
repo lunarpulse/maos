@@ -1,8 +1,8 @@
 <!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->
 
-# `constants` Module
+# `constants` Module {#abi-constants-module}
 
-## Related
+## Related {#abi-constants-related}
 
 - [ABI Stability Policy](/migrate/abi-stability) — full compatibility window documentation
 - [v1 → v2 Migration](/migrate/v1-to-v2) — what changed at manifest schema version 2
@@ -12,7 +12,9 @@
 *ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
 
 
-## Constants
+## Constants {#maos-spirit-abi-constants}
+
+### `ABI_VERSION` {#maos-spirit-abi-abi-version}
 
 ABI version constant for the MAOS Spirit ABI.
 
@@ -20,7 +22,7 @@ Bumped according to the ABI Stability Triple rules (§8.5).
 
 **Story 1b.4 froze this at `1`** at the ComplianceClaim envelope freeze.
 
-# Example
+# Example {#maos-spirit-abi-abi-version-example}
 
 ```rust
 use maos_spirit_abi::ABI_VERSION;
@@ -28,9 +30,12 @@ use maos_spirit_abi::ABI_VERSION;
 assert_eq!(ABI_VERSION, 1);
 ```
 
+
 ```rust
 pub const ABI_VERSION: u32 = 1u32;
 ```
+
+### `MANIFEST_SCHEMA_VERSION` {#maos-spirit-abi-manifest-schema-version}
 
 Manifest schema version currently emitted by the kernel.
 
@@ -66,7 +71,7 @@ check-manifest-schema-version` gate. Story 7.5a's ABI Stability Triple
 `(kernel_version, abi_version, manifest_schema_version)` consumes this
 constant directly.
 
-# Example
+# Example {#maos-spirit-abi-manifest-schema-version-example}
 
 ```rust
 use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
@@ -74,9 +79,12 @@ use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 assert_eq!(MANIFEST_SCHEMA_VERSION, 3);
 ```
 
+
 ```rust
 pub const MANIFEST_SCHEMA_VERSION: u32 = 3u32;
 ```
+
+### `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` {#maos-spirit-abi-min-supported-manifest-schema-version}
 
 Lowest manifest schema version this kernel accepts at admission.
 
@@ -84,7 +92,7 @@ Story 7.5a will lift this floor on each ABI bump per the N-1 supported /
 N-2 hard-refusal policy. At v0.5-α the floor remains at `1` — Epic 1b
 baseline manifests load unchanged.
 
-# Example
+# Example {#maos-spirit-abi-min-supported-manifest-schema-version-example}
 
 ```rust
 use maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
@@ -98,9 +106,12 @@ assert!(check_manifest_version(3));
 assert!(!check_manifest_version(0));
 ```
 
+
 ```rust
 pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1u32;
 ```
+
+### `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` {#maos-spirit-abi-max-supported-manifest-schema-version}
 
 Highest manifest schema version this kernel emits or accepts.
 
@@ -108,7 +119,7 @@ Currently equal to `MANIFEST_SCHEMA_VERSION`. The two constants stay
 synonymous until Story 7.5a introduces an explicit N+1 acceptance window
 for forward-compatibility experiments.
 
-# Example
+# Example {#maos-spirit-abi-max-supported-manifest-schema-version-example}
 
 ```rust
 use maos_spirit_abi::{
@@ -127,6 +138,7 @@ assert!(is_version_supported(3));  // Current — supported
 assert!(!is_version_supported(4)); // Future — EAbiTooNew
 assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 ```
+
 
 ```rust
 pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 3u32;

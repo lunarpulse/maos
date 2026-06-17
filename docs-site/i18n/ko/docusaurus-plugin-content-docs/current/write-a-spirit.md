@@ -21,7 +21,7 @@ Spirit 템플릿을 가져옵니다 — [`examples/example-spirit`](https://gith
 
 `src/lib.rs`를 열고 `on_idle` (또는 다른 라이프사이클 훅)을 편집하세요. `#[spirit]` proc-macro가 구현 블록을 kernel이 호출하는 SpiritVtable로 연결합니다.
 
-[Manifest Schema](/manifest/latest)에서 `spirit.toml`이 선언할 수 있는 모든 필드를 확인하고, [ABI Reference](/abi/latest)에서 전체 훅 서피스를 확인하세요.
+[Manifest Schema](/manifest/latest)에서 `spirit.toml`이 선언할 수 있는 모든 필드를 확인하고, [ABI Reference](/abi/v1/)에서 전체 훅 서피스를 확인하세요.
 
 ## 3. 로컬에서 실행 — kernel 필요 없음
 
