@@ -6,6 +6,13 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+// Story 9.7 — trait must be in scope for `load()`/`save()` on the store.
+use maos_skill::SkillQueueStore;
+use std::collections::{HashMap, HashSet};
+use maos_domain::invariants::i4::ApprovalDecision;
+use maos_iac::adapter::transparency_log::TransparencyLogAdapter;
+use maos_skill::{DiscoveredSkill, SkillAdmissionState, SkillId};
+
 use crate::accessibility::ColorChoice;
 use crate::cli::{
     AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs, GovernanceArgs, GovernanceOp,
@@ -162,54 +169,370 @@ fn dispatch_governance(args: &GovernanceArgs, color: ColorChoice) -> ExitCode {
     }
 }
 
-/// Story 7.4 (FR39) — `maosctl skills <list|approve|reject>`.
+/// Story 9.7 (FR39) — `maosctl skills <list|approve|reject>`.
 ///
 /// `list` runs filesystem discovery over the conventional `[skills.search_path]`
-/// roots and renders each `maos.skill.v1` skill with its admission state (always
-/// `Pending` at discovery — nothing auto-admits). `approve`/`reject` give the
-/// pending operator-admission queue its exit. At v0.5 the admission queue has no
-/// cross-invocation persistent store, so `approve`/`reject` record the operator
-/// decision and acknowledge it; the durable queue store is future work (the
-/// queue mechanics + audit rows live in `maos-skill::admission`).
+/// roots, then derives each skill's admission state from the Transparency Log
+/// decided-set (AC-4: pending = discovered MINUS decided). `approve`/`reject`
+/// journal the operator decision to the TL FIRST (the commit point), then
+/// update the `queue.json` cache. `queue.json` is a rebuildable cache over the
+/// append-only TL — not the source of truth.
 fn dispatch_skills(args: &SkillsArgs, _color: ColorChoice) -> ExitCode {
     match &args.op {
-        SkillsOp::List { root } => {
-            let roots: Vec<PathBuf> = if root.is_empty() {
-                maos_skill::default_search_path()
-            } else {
-                root.iter().map(PathBuf::from).collect()
-            };
-            let outcome = maos_skill::discover_skills_detailed(&roots);
-            if outcome.discovered.is_empty() && outcome.skipped.is_empty() {
-                println!("maosctl skills: no skills discovered on the search path");
-            }
-            for d in &outcome.discovered {
-                println!(
-                    "{:<24} {:<10} {:?}  ({})",
-                    d.skill.manifest.id,
-                    d.skill.manifest.version,
-                    d.state,
-                    d.source_path.display()
-                );
-            }
-            for (path, reason) in &outcome.skipped {
-                eprintln!("maosctl skills: skipped {} — {}", path.display(), reason);
-            }
-            ExitCode::SUCCESS
+        SkillsOp::List { root } => dispatch_skills_list(root),
+        SkillsOp::Approve { skill_id, actor } => {
+            dispatch_skills_decide(skill_id, true, actor.as_deref())
         }
-        SkillsOp::Approve { skill_id } => {
-            // FR39 admission exit. The durable queue store is future work; at
-            // v0.5 we acknowledge the operator decision (the queue + audit-row
-            // mechanics are exercised by `maos-skill::admission` tests + the
-            // `smoke-skill-7-4` arm).
-            println!("maosctl skills: operator-admit acknowledged for skill `{skill_id}` (FR39)");
-            ExitCode::SUCCESS
-        }
-        SkillsOp::Reject { skill_id } => {
-            println!("maosctl skills: operator-reject acknowledged for skill `{skill_id}` (FR39)");
-            ExitCode::SUCCESS
+        SkillsOp::Reject { skill_id, actor } => {
+            dispatch_skills_decide(skill_id, false, actor.as_deref())
         }
     }
+}
+
+/// Resolve the operator identity for an approve/reject (AC-3 `actor`).
+/// Precedence: explicit `--actor` flag → `$USER` → `"operator"` fallback.
+fn resolve_actor(actor: Option<&str>) -> String {
+    actor
+        .map(str::to_string)
+        .or_else(|| std::env::var("USER").ok().filter(|u| !u.is_empty()))
+        .unwrap_or_else(|| "operator".to_string())
+}
+
+/// Load the skill-queue cache, warning appropriately when it is absent,
+/// future-schema, or corrupt. The cache is a rebuildable projection over the
+/// Transparency Log (F3/AC-4); a bad cache must never brick the CLI surface.
+fn load_cache_warn(store: &maos_skill::LocalFsSkillQueueStore) -> Vec<maos_skill::QueueEntry> {
+    use maos_skill::ESkillStore;
+    match store.load() {
+        Ok(s) => s,
+        Err(ESkillStore::UnknownSchemaVersion(v)) => {
+            eprintln!(
+                "maosctl skills: warning: queue cache schema `{v}` is newer/unknown — rebuilding from discovery + TL"
+            );
+            Vec::new()
+        }
+        Err(ESkillStore::Io(e)) => {
+            eprintln!(
+                "maosctl skills: warning: queue cache I/O error ({e}) — proceeding from discovery + TL"
+            );
+            Vec::new()
+        }
+        Err(ESkillStore::Json(e)) => {
+            eprintln!(
+                "maosctl skills: warning: queue cache JSON error ({e}) — proceeding from discovery + TL"
+            );
+            Vec::new()
+        }
+        Err(_) => {
+            eprintln!(
+                "maosctl skills: warning: queue cache unreadable — proceeding from discovery + TL"
+            );
+            Vec::new()
+        }
+    }
+}
+
+/// `maosctl skills list` — discover + derive admission state from the TL.
+fn dispatch_skills_list(root: &[String]) -> ExitCode {
+    let roots: Vec<PathBuf> = if root.is_empty() {
+        maos_skill::default_search_path()
+    } else {
+        root.iter().map(PathBuf::from).collect()
+    };
+    let outcome = maos_skill::discover_skills_detailed(&roots);
+    let store = maos_skill::LocalFsSkillQueueStore::new();
+    let stored = load_cache_warn(&store);
+    let tl_path = default_transparency_log_path();
+    let view = admission_view(&outcome.discovered, stored, &tl_path);
+    if !view.tl_readable {
+        eprintln!(
+            "maosctl skills: warning: Transparency Log unreadable at {} — showing cache/discovery state (TL reconcile skipped)",
+            tl_path.display()
+        );
+    }
+    let state_by_id: HashMap<SkillId, SkillAdmissionState> = view
+        .entries
+        .iter()
+        .map(|e| (e.id.clone(), e.state))
+        .collect();
+    if outcome.discovered.is_empty() && outcome.skipped.is_empty() && view.entries.is_empty() {
+        println!("maosctl skills: no skills discovered on the search path");
+    }
+    for d in &outcome.discovered {
+        let state = state_by_id
+            .get(&d.skill.manifest.skill_id())
+            .copied()
+            .unwrap_or(d.state);
+        println!(
+            "{:<24} {:<10} {:?}  ({})",
+            d.skill.manifest.id,
+            d.skill.manifest.version,
+            state,
+            d.source_path.display()
+        );
+    }
+    // Cache-only entries (previously discovered, now off the search path).
+    let on_path: HashSet<SkillId> = outcome
+        .discovered
+        .iter()
+        .map(|d| d.skill.manifest.skill_id())
+        .collect();
+    for e in &view.entries {
+        if !on_path.contains(&e.id) {
+            println!(
+                "{:<24} {:<10} {:?}  (queued, not on search path)",
+                e.id, e.version, e.state
+            );
+        }
+    }
+    for (path, reason) in &outcome.skipped {
+        eprintln!("maosctl skills: skipped {} — {}", path.display(), reason);
+    }
+    ExitCode::SUCCESS
+}
+
+/// `maosctl skills approve/reject` — journal-FIRST to the TL, then update cache.
+///
+/// Story 9.7 AC-3 (R2 journal-first ordering): the TL write is the COMMIT
+/// POINT. Only on a committed journal row is the `queue.json` cache rewritten.
+/// If the TL write fails the command aborts, mutates NOTHING, and reports
+/// failure with a non-zero exit — never silent-success-without-journal.
+fn dispatch_skills_decide(skill_id: &str, approve: bool, actor: Option<&str>) -> ExitCode {
+    let store = maos_skill::LocalFsSkillQueueStore::new();
+    let roots = maos_skill::default_search_path();
+    let tl_path = default_transparency_log_path();
+    let actor = resolve_actor(actor);
+    let verb = if approve { "approve" } else { "reject" };
+
+    let outcome = maos_skill::discover_skills_detailed(&roots);
+    let stored = load_cache_warn(&store);
+    match decide_skill(
+        &outcome.discovered,
+        stored,
+        &store,
+        &tl_path,
+        skill_id,
+        approve,
+        &actor,
+    ) {
+        DecideOutcome::Applied { new_state } => {
+            println!(
+                "maosctl skills: skill `{skill_id}` {verb}d by `{actor}` — now {new_state:?}"
+            );
+            ExitCode::SUCCESS
+        }
+        DecideOutcome::AlreadyResolved { state } => {
+            eprintln!(
+                "maosctl skills: skill `{skill_id}` is already {state:?} — no action taken"
+            );
+            ExitCode::SUCCESS
+        }
+        DecideOutcome::NotFound => {
+            eprintln!(
+                "maosctl skills: skill `{skill_id}` not found on the search path — use `maosctl skills list` to see available skills"
+            );
+            ExitCode::FAILURE
+        }
+        DecideOutcome::JournalFailed(e) => {
+            eprintln!(
+                "maosctl skills: FAILED to journal {verb} decision to Transparency Log: {e}\n\
+                 Decision NOT applied — no silent loss. Retry when the TL is accessible."
+            );
+            ExitCode::FAILURE
+        }
+    }
+}
+
+// ─── Story 9.7 AC-4: admission view + reconcile (pub for tests) ────────
+
+/// The TL decided-set: `target -> is_approve`. Built from `query_approvals`
+/// (ordered `decision_id ASC` = monotonic insertion order); the LAST row per
+/// target wins (LWW by `decision_id`, NOT the non-monotonic `timestamp_ns` —
+/// Review #5). Only targets whose latest row is approve/reject are kept;
+/// enqueue rows + unrelated capabilities are filtered out (R5).
+pub fn decided_set(approvals: &[ApprovalDecision]) -> HashMap<String, bool> {
+    let mut latest_per_target: HashMap<&str, &ApprovalDecision> = HashMap::new();
+    for d in approvals {
+        latest_per_target.insert(d.target.as_str(), d);
+    }
+    latest_per_target
+        .into_iter()
+        .filter_map(|(target, d)| match d.capability.as_str() {
+            "skill.admission.approve" => Some((target.to_string(), true)),
+            "skill.admission.reject" => Some((target.to_string(), false)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Derive an entry's admission state from the decided-set (AC-4). A target not
+/// in the decided-set is Pending — this is the demote path: a re-enqueue makes
+/// the latest TL row an enqueue (not approve/reject), so the skill returns to
+/// Pending. (Review #4.)
+fn derive_state(target: &str, decided: &HashMap<String, bool>) -> SkillAdmissionState {
+    match decided.get(target) {
+        Some(true) => SkillAdmissionState::Admitted,
+        Some(false) => SkillAdmissionState::Rejected,
+        None => SkillAdmissionState::Pending,
+    }
+}
+
+/// Reconcile a set of queue entries against the TL decided-set (AC-4). Each
+/// entry's state is derived fresh from the TL. Pure + testable — the reconcile
+/// tests call THIS, not a hand-mirrored copy (Review #10).
+pub fn reconcile_entries(
+    entries: Vec<maos_skill::QueueEntry>,
+    decided: &HashMap<String, bool>,
+) -> Vec<maos_skill::QueueEntry> {
+    entries
+        .into_iter()
+        .map(|mut e| {
+            let target = maos_skill::approval_target::approval_target(&e.id, &e.version);
+            e.state = derive_state(&target, decided);
+            e
+        })
+        .collect()
+}
+
+fn load_decided_set(tl_path: &std::path::Path) -> Result<HashMap<String, bool>, String> {
+    let tl = TransparencyLogAdapter::open(tl_path, 0).map_err(|e| e.to_string())?;
+    let approvals = tl.query_approvals(None).map_err(|e| e.to_string())?;
+    Ok(decided_set(&approvals))
+}
+
+/// The reconciled admission view (AC-4). `entries` = discovered skills (state
+/// derived from the TL) + stored entries no longer on the search path. The TL
+/// is the source of truth; `queue.json` is a rebuildable cache.
+pub struct AdmissionView {
+    pub entries: Vec<maos_skill::QueueEntry>,
+    pub tl_readable: bool,
+}
+
+/// Compute the admission view from discovery + cache + TL (AC-4). Discovered
+/// skills default to Pending, then every entry's state is derived from the TL
+/// decided-set. If the TL is unreadable, the cache/discovery state is kept and
+/// `tl_readable=false` (the caller warns — Review #7).
+pub fn admission_view(
+    discovered: &[DiscoveredSkill],
+    stored: Vec<maos_skill::QueueEntry>,
+    tl_path: &std::path::Path,
+) -> AdmissionView {
+    let mut entries: Vec<maos_skill::QueueEntry> = discovered
+        .iter()
+        .map(|d| maos_skill::QueueEntry {
+            id: d.skill.manifest.skill_id(),
+            version: d.skill.manifest.skill_version(),
+            // 9.7 boundary: filesystem discovery has no provenance signal.
+            // `AuthorSelf` and `RevisionProposal` arise only from enqueue-time
+            // paths (daemon/kernel); for the CLI search path the skill is
+            // package-shipped by construction. Faithful provenance fidelity is
+            // coupled to v2 schema + Epic-10 F6b/R8 daemon-enqueue work.
+            entry_path: "package_shipped".to_string(),
+            state: SkillAdmissionState::Pending,
+        })
+        .collect();
+    let on_path: HashSet<SkillId> = discovered
+        .iter()
+        .map(|d| d.skill.manifest.skill_id())
+        .collect();
+    for e in stored {
+        if !on_path.contains(&e.id) {
+            entries.push(e);
+        }
+    }
+    match load_decided_set(tl_path) {
+        Ok(decided) => AdmissionView {
+            entries: reconcile_entries(entries, &decided),
+            tl_readable: true,
+        },
+        Err(_) => AdmissionView {
+            entries,
+            tl_readable: false,
+        },
+    }
+}
+
+/// The typed outcome of an approve/reject (testable; no `ExitCode`).
+#[derive(Debug)]
+pub enum DecideOutcome {
+    /// Pending -> Admitted/Rejected: journaled to the TL + cache rewritten.
+    Applied { new_state: SkillAdmissionState },
+    /// Already Admitted/Rejected — no-op (AC-2).
+    AlreadyResolved { state: SkillAdmissionState },
+    /// Neither discovered nor in the cache.
+    NotFound,
+    /// TL journal write failed — NOTHING mutated (no silent loss; AC-3/R2).
+    JournalFailed(String),
+}
+
+/// Journal-FIRST decide core (AC-3/R2). Loads the admission view, validates the
+/// transition, journals the decision to the TL (the commit point), and ONLY on
+/// success rewrites the `queue.json` cache. Testable via explicit params
+/// (discovered + stored + tl_path — no env vars). Persisting the view directly
+/// (not via the lossy in-mem enum round-trip) preserves entry_path labels
+/// (Review #12) and makes a discovered skill approvable (Review D1 Critical).
+pub fn decide_skill(
+    discovered: &[DiscoveredSkill],
+    stored: Vec<maos_skill::QueueEntry>,
+    store: &maos_skill::LocalFsSkillQueueStore,
+    tl_path: &std::path::Path,
+    skill_id: &str,
+    approve: bool,
+    actor: &str,
+) -> DecideOutcome {
+    let id = SkillId::from(skill_id);
+    let mut view = admission_view(discovered, stored, tl_path);
+
+    let Some(idx) = view.entries.iter().position(|e| e.id == id) else {
+        return DecideOutcome::NotFound;
+    };
+    let state_before = view.entries[idx].state;
+    if state_before != SkillAdmissionState::Pending {
+        return DecideOutcome::AlreadyResolved {
+            state: state_before,
+        };
+    }
+
+    let verb = if approve { "approve" } else { "reject" };
+    let capability = if approve {
+        "skill.admission.approve"
+    } else {
+        "skill.admission.reject"
+    };
+    let target = maos_skill::approval_target::approval_target(&view.entries[idx].id, &view.entries[idx].version);
+    let decision = ApprovalDecision {
+        actor: actor.to_string(),
+        target,
+        capability: capability.to_string(),
+        intent: "cli_operator_decision".to_string(),
+        decision: approve,
+        reasoning: Some(format!(
+            "operator {actor} {verb}d skill `{skill_id}` via maosctl skills {verb}"
+        )),
+    };
+
+    // Journal-FIRST (R2): the TL write is the commit point.
+    let tl = match TransparencyLogAdapter::open(tl_path, 0) {
+        Ok(tl) => tl,
+        Err(e) => {
+            return DecideOutcome::JournalFailed(format!("open TL at {}: {e}", tl_path.display()))
+        }
+    };
+    if let Err(e) = tl.insert_approval_decision(decision) {
+        return DecideOutcome::JournalFailed(format!("insert_approval_decision: {e}"));
+    }
+
+    // Only on a committed journal row: update the cache + persist.
+    let new_state = if approve {
+        SkillAdmissionState::Admitted
+    } else {
+        SkillAdmissionState::Rejected
+    };
+    view.entries[idx].state = new_state;
+    // Best-effort cache write — the TL is the source of truth and reconcile
+    // recovers on the next load.
+    let _ = store.save(&view.entries);
+    DecideOutcome::Applied { new_state }
 }
 
 fn dispatch_import(args: &ImportArgs, _color: ColorChoice) -> ExitCode {

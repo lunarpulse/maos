@@ -1551,6 +1551,7 @@ dependencies = [
  "hex",
  "maos-audit",
  "maos-domain",
+ "maos-iac",
  "maos-registry",
  "maos-skill",
  "rusqlite",

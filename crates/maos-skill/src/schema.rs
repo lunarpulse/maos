@@ -33,6 +33,7 @@ impl From<&str> for SkillId {
     }
 }
 
+
 /// A skill version (semver). Newtype over `String`.
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
@@ -51,6 +52,7 @@ impl From<&str> for SkillVersion {
         SkillVersion(s.to_string())
     }
 }
+
 
 /// The TOML frontmatter of a `maos.skill.v1` document.
 ///

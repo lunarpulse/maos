@@ -216,11 +216,19 @@ pub enum SkillsOp {
     Approve {
         /// The skill id (`maosctl skills list` shows ids).
         skill_id: String,
+        /// Operator identity recorded in the audit journal (AC-3 `actor`).
+        /// Defaults to `$USER`, then `operator`.
+        #[arg(long, value_name = "ACTOR")]
+        actor: Option<String>,
     },
     /// Operator-reject a pending skill by id (FR39 admission exit).
     Reject {
         /// The skill id (`maosctl skills list` shows ids).
         skill_id: String,
+        /// Operator identity recorded in the audit journal (AC-3 `actor`).
+        /// Defaults to `$USER`, then `operator`.
+        #[arg(long, value_name = "ACTOR")]
+        actor: Option<String>,
     },
 }
 

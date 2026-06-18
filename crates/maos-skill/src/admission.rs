@@ -19,6 +19,7 @@ use maos_domain::invariants::i4::ApprovalDecision;
 use crate::errors::ESkillQueue;
 use crate::proposal::SkillRevisionProposal;
 use crate::schema::{Skill, SkillId, SkillVersion};
+use crate::approval_target::approval_target;
 
 /// Admission state of a queued skill.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -51,6 +52,22 @@ impl SkillEntryPath {
             SkillEntryPath::PackageShipped => "package_shipped",
             SkillEntryPath::AuthorSelf => "author_self",
             SkillEntryPath::RevisionProposal(_) => "revision_proposal",
+        }
+    }
+
+    /// Reconstruct from a stored label.  `RevisionProposal` entries lose their
+    /// proposal payload on deserialization (the proposal content is not stored;
+    /// state transitions depend only on `id` + `state`, not the payload).
+    pub fn from_label(label: &str) -> Option<Self> {
+        match label {
+            "package_shipped" => Some(SkillEntryPath::PackageShipped),
+            "author_self" => Some(SkillEntryPath::AuthorSelf),
+            // RevisionProposal can't be reconstructed (proposal payload not
+            // persisted).  The caller falls back to PackageShipped, which
+            // preserves the state-transition semantics (approve/reject depend
+            // on id+state only).  The authoritative entry_path label is in
+            // the QueueEntry.entry_path field, not here.
+            _ => None,
         }
     }
 }
@@ -111,7 +128,7 @@ impl SkillAdmissionQueue {
         }
         self.audit.push(ApprovalDecision {
             actor: actor.into(),
-            target: format!("{}@{}", id, version),
+            target: approval_target(&id, &version),
             capability: "skill.admission.enqueue".into(),
             intent: entry_path.label().into(),
             decision: false, // pending — operator has not yet admitted
@@ -154,7 +171,7 @@ impl SkillAdmissionQueue {
         let evidence_pid = proposal.telemetry_evidence.spirit_pid;
         self.audit.push(ApprovalDecision {
             actor: actor.into(),
-            target: format!("{}@{}", id, version),
+            target: approval_target(&id, &version),
             capability: "skill.admission.enqueue".into(),
             intent: "revision_proposal".into(),
             decision: false, // pending — operator has not yet admitted
@@ -198,7 +215,7 @@ impl SkillAdmissionQueue {
         {
             entry.state = to;
             let admitted = to == SkillAdmissionState::Admitted;
-            let target = format!("{}@{}", entry.id, entry.version);
+            let target = approval_target(&entry.id, &entry.version);
             let path_label = entry.entry_path.label();
             self.audit.push(ApprovalDecision {
                 actor: "operator".into(),
@@ -242,5 +259,56 @@ impl SkillAdmissionQueue {
     /// `TransparencyLogAdapter::insert_approval_decision` records).
     pub fn audit_trail(&self) -> &[ApprovalDecision] {
         &self.audit
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Store integration (Story 9.7 AC-1)
+// ---------------------------------------------------------------------------
+
+impl SkillAdmissionQueue {
+    /// Reconstruct the queue from durable [`QueueEntry`] records loaded by the
+    /// [`SkillQueueStore`].
+    ///
+    /// The `skill` field on each entry is `None` (skill content is discovered
+    /// from the filesystem, not persisted in the store).  The in-memory audit
+    /// trail starts empty — cross-restart audit history is served by
+    /// `query_approvals()` against the Transparency Log.
+    ///
+    /// [`QueueEntry`]: crate::store::QueueEntry
+    /// [`SkillQueueStore`]: crate::store::SkillQueueStore
+    pub fn from_stored(entries: Vec<crate::store::QueueEntry>) -> Self {
+        let pending = entries
+            .into_iter()
+            .map(|e| PendingEntry {
+                id: e.id,
+                version: e.version,
+                entry_path: SkillEntryPath::from_label(&e.entry_path)
+                    .unwrap_or(SkillEntryPath::PackageShipped),
+                skill: None,
+                state: e.state,
+            })
+            .collect();
+        Self {
+            pending,
+            audit: Vec::new(),
+        }
+    }
+
+    /// Export the current queue state to durable [`QueueEntry`] records for
+    /// the [`SkillQueueStore`].
+    ///
+    /// [`QueueEntry`]: crate::store::QueueEntry
+    /// [`SkillQueueStore`]: crate::store::SkillQueueStore
+    pub fn to_stored(&self) -> Vec<crate::store::QueueEntry> {
+        self.pending
+            .iter()
+            .map(|e| crate::store::QueueEntry {
+                id: e.id.clone(),
+                version: e.version.clone(),
+                entry_path: e.entry_path.label().to_string(),
+                state: e.state,
+            })
+            .collect()
     }
 }

@@ -30,10 +30,12 @@
 //!    (the EXISTING Story 4.3 `SelfTelemetryReport`).
 
 pub mod admission;
+pub mod approval_target;
 pub mod discovery;
 pub mod errors;
 pub mod proposal;
 pub mod schema;
+pub mod store;
 
 pub use admission::{PendingEntry, SkillAdmissionQueue, SkillAdmissionState, SkillEntryPath};
 pub use discovery::{
@@ -43,3 +45,4 @@ pub use discovery::{
 pub use errors::{ESkillProposal, ESkillQueue, ESkillSchema};
 pub use proposal::{build_proposal, SkillRevisionProposal};
 pub use schema::{parse_skill, validate_manifest, Skill, SkillId, SkillManifest, SkillVersion};
+pub use store::{ESkillStore, LocalFsSkillQueueStore, QueueEntry, SkillQueueStore};

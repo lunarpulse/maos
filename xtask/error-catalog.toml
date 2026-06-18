@@ -491,6 +491,44 @@ kernel_or_spirit = "kernel"
 since_version = "0.5.0"
 
 # ---------------------------------------------------------------------------
+# ESkillStore — crates/maos-skill/src/store.rs
+# Story 9.7 — durable skill-queue store (E*-prefixed enum; all variants are part of the E* set)
+# ---------------------------------------------------------------------------
+
+[[error]]
+code = "ESkillStore::Io"
+rust_path = "ESkillStore::Io"
+source_file = "crates/maos-skill/src/store.rs"
+description = "Filesystem I/O failure reading or writing the durable skill-queue cache (queue.json)"
+severity = "infra"
+recovery_class = "retry"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "1.0.0"
+
+[[error]]
+code = "ESkillStore::Json"
+rust_path = "ESkillStore::Json"
+source_file = "crates/maos-skill/src/store.rs"
+description = "The durable skill-queue cache (queue.json) is not valid JSON / failed to (de)serialize"
+severity = "infra"
+recovery_class = "reject"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "1.0.0"
+
+[[error]]
+code = "ESkillStore::UnknownSchemaVersion"
+rust_path = "ESkillStore::UnknownSchemaVersion"
+source_file = "crates/maos-skill/src/store.rs"
+description = "queue.json carries an unknown/absent schema_version (hard error — no best-effort parse; the version stamp is a tripwire)"
+severity = "user"
+recovery_class = "reject"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "1.0.0"
+
+# ---------------------------------------------------------------------------
 # RegionError — crates/maos-domain/src/region.rs
 # Story 9.4b AC-5 region-pinning (NFR-Comp-4 / PIPL §40)
 # ---------------------------------------------------------------------------

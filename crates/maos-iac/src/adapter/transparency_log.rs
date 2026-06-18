@@ -16,6 +16,23 @@
 //! monotonic counter. The `#[i9_exempt]` attribute on `TransparencyLogAdapter`
 //! is documented at `docs/invariants/i9-exemptions.md` per the
 //! `xtask check-empty-kernel` exemption discipline.
+//!
+//! # Shared multi-writer contract (Story 9.7 AC-7)
+//!
+//! The TL is a **shared insert-only multi-writer log**.  Both the daemon
+//! (`maos-bin`) and the CLI (`maosctl skills approve/reject`) may write
+//! concurrently:
+//!
+//! - **WAL mode** — set at `open_with_policy` time.
+//! - **`busy_timeout = 5000`** — a second writer blocks up to 5 s rather
+//!   than failing immediately with `SQLITE_BUSY`.
+//! - **Append-only** — no cross-row updates; each decision is a new row.
+//! - **`ORDER BY timestamp_ns ASC, decision_id ASC`** — tie-break on the
+//!   autoincrement `decision_id` guards against NTP step-backward.
+//!
+//! The residual after-timeout race is an accepted limitation; the true
+//! retirement is routing the CLI write through the daemon (one writer) —
+//! filed as an Epic-10 follow-up.
 
 use std::path::Path;
 use std::sync::Mutex;
@@ -356,7 +373,28 @@ impl TransparencyLogAdapter {
         boot_nonce: u64,
         redaction: Box<dyn RedactionPolicy + Send + Sync>,
     ) -> Result<Self, AuditError> {
+        Self::open_with_policy_and_timeout(path, boot_nonce, redaction, 5000)
+    }
+
+    /// Open with a custom redaction policy AND a configurable `busy_timeout`
+    /// (ms). The 5000 ms default (above) is the documented multi-writer
+    /// ceiling; this entry point lets the AC-7 contention contract be proven in
+    /// BOTH directions — `busy_timeout=0` RED's immediately under contention,
+    /// `busy_timeout=5000` blocks-then-succeeds (GREEN). (Story 9.7 #8.)
+    #[doc(hidden)]
+    pub fn open_with_policy_and_timeout(
+        path: &Path,
+        boot_nonce: u64,
+ redaction: Box<dyn RedactionPolicy + Send + Sync>,
+        busy_timeout_ms: u64,
+    ) -> Result<Self, AuditError> {
         let conn = Connection::open(path)?;
+        // Story 9.7 R3 — multi-writer SQLite contract: the CLI may write to
+        // the TL concurrently with the daemon. busy_timeout lets the second
+        // writer BLOCK-then-succeed instead of failing immediately with
+        // SQLITE_BUSY; the residual true-race after the timeout is the only
+        // accepted limitation.
+        conn.busy_timeout(std::time::Duration::from_millis(busy_timeout_ms))?;
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;
         conn.execute_batch(SCHEMA_SQL)?;
         // Story 6.1 — migration: add to_spirit_id column to existing databases
@@ -376,6 +414,22 @@ impl TransparencyLogAdapter {
             redaction,
             mailbox: MailboxStub::new(),
         })
+    }
+
+    /// Open with the default redaction policy and a configurable `busy_timeout`
+    /// (ms) — test entry point for the AC-7 contention contract.
+    #[doc(hidden)]
+    pub fn open_with_busy_timeout(
+        path: &Path,
+        boot_nonce: u64,
+        busy_timeout_ms: u64,
+    ) -> Result<Self, AuditError> {
+        Self::open_with_policy_and_timeout(
+            path,
+            boot_nonce,
+            Box::new(CorpusBackedRedactionPolicy::new()),
+            busy_timeout_ms,
+        )
     }
 
     /// Open an in-memory SQLite database for tests.
@@ -1242,7 +1296,15 @@ impl TransparencyLogAdapter {
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
 
-        let sql = "SELECT actor, target, capability, intent, decision, reasoning FROM approval_decision_log ORDER BY timestamp_ns ASC";
+        // Story 9.7 #5 — order by the autoincrement `decision_id` (true
+        // insertion order, monotonic) instead of `timestamp_ns`, which is a
+        // non-monotonic wall clock (NTP/VM-suspend step-backward). Using
+        // `timestamp_ns` for LWW "latest" elects the wrong winner on a backward
+        // clock step; `decision_id ASC` is deterministic and monotonic, and
+        // reconcile picks the last row per target from this ordering.
+        let sql = "SELECT actor, target, capability, intent, decision, reasoning \
+                   FROM approval_decision_log \
+                   ORDER BY decision_id ASC";
 
         let mut stmt = inner.conn.prepare(sql).map_err(AuditError::SqliteRead)?;
 
