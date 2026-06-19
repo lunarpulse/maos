@@ -275,6 +275,8 @@ pub enum MemoryError {
     Storage(String),
     #[error("value too large: {len} bytes (max {max})")]
     ValueTooLarge { len: usize, max: usize },
+    #[error("principal namespace write unauthorized: spirit_pid {spirit_pid} not authorized")]
+    PrincipalWriteUnauthorized { spirit_pid: u32 },
 }
 
 // ---------------------------------------------------------------------------

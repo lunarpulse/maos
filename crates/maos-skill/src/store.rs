@@ -23,18 +23,12 @@
 //! this store's own helper writes to `queue.json.tmp.{pid}` (same dir)
 //! → `sync_all()` file → `fs::rename` → `sync_all()` parent dir.
 //!
-//! # Documented limitation — daemon enforcement (AC-5)
+//! # Daemon enforcement (AC-5, resolved)
 //!
-//! The `maos run` daemon does **NOT** consult persisted admission state at
-//! spirit-load time.  Persisted approve/reject is the source of truth for
-//! **audit and CLI display** (`maosctl skills list`), and the decision is
-//! journaled to the Transparency Log.  However, a rejected skill is **not
-//! yet blocked from loading** by the daemon.
-//!
-//! A follow-up story (daemon honors admitted-skill state at spirit-load) is
-//! filed in `deferred-work.md` and slotted in Epic 10.  See also: the TL is
-//! documented as a shared insert-only multi-writer log (WAL + busy_timeout +
-//! bounded retry + append-only).
+//! The `maos run` daemon now consults persisted admission state before
+//! spirit-load.  Skills in `Rejected` state block daemon startup with a
+//! typed error; `Pending` skills emit a warning.  The enforcement runs the
+//! same `admission_view` + TL reconcile as `maosctl skills list`.
 
 use std::fs;
 use std::io::{self, Write};

@@ -1675,7 +1675,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_home_region(
             maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
                 .home_region,
-        ),
+        )
+        // Sec-redteam SR-1: enable principal namespace write enforcement.
+        // Only spirit pids registered via authorize_principal_writes() may
+        // write to Principal namespaces.
+        .with_principal_write_enforcement(),
     );
 
     // Story 4.3 — SelfTelemetryAggregator (FR56).
@@ -2194,6 +2198,82 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ─────────────────────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────────
+    // Epic 10 §A3 — Daemon skill admission enforcement (deferred from 9.7 F6b).
+    //
+    // Before loading any spirit, compute the skill admission view from
+    // discovery + TL reconcile.  If any skill is Rejected, the daemon
+    // REFUSES to start — the operator must resolve the rejection first.
+    // Pending skills emit a warning (the operator has not yet decided).
+    {
+        use maos_skill::SkillQueueStore as _;
+        let skill_store = maos_skill::LocalFsSkillQueueStore::new();
+        let skill_roots = maos_skill::default_search_path();
+        let skill_outcome = maos_skill::discover_skills_detailed(&skill_roots);
+        let skill_stored = match skill_store.load() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("maos: warning: skill queue cache unreadable ({e}) — proceeding from discovery + TL");
+                Vec::new()
+            }
+        };
+        let skill_view = maos_cli::subcommands::admission_view(
+            &skill_outcome.discovered,
+            skill_stored,
+            &audit_db_path,
+        );
+        let mut rejected: Vec<String> = Vec::new();
+        let mut pending: Vec<String> = Vec::new();
+        for entry in &skill_view.entries {
+            match entry.state {
+                maos_skill::SkillAdmissionState::Rejected => {
+                    rejected.push(format!("{}@{}", entry.id, entry.version));
+                }
+                maos_skill::SkillAdmissionState::Pending => {
+                    pending.push(format!("{}@{}", entry.id, entry.version));
+                }
+                maos_skill::SkillAdmissionState::Admitted => {}
+            }
+        }
+        if !pending.is_empty() {
+            eprintln!(
+                "maos: WARNING — {} skill(s) pending operator admission: {}",
+                pending.len(),
+                pending.join(", ")
+            );
+        }
+        if !rejected.is_empty() {
+            let msg = format!(
+                "maos: FATAL — {} rejected skill(s) block daemon startup: {}\n\
+                 Use `maosctl skills approve <id>` to re-admit, or remove the skill from the search path.",
+                rejected.len(),
+                rejected.join(", ")
+            );
+            println!(
+                "{}",
+                serde_json::json!({
+                    "event": "skill_admission_enforcement",
+                    "outcome": "blocked",
+                    "rejected": rejected,
+                    "pending": pending,
+                })
+            );
+            return Err(msg.into());
+        }
+        if !skill_view.entries.is_empty() {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "event": "skill_admission_enforcement",
+                    "outcome": "passed",
+                    "total": skill_view.entries.len(),
+                    "admitted": skill_view.entries.len() - pending.len(),
+                    "pending": pending.len(),
+                })
+            );
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Story 8.11 / AC1 — `maos run <manifest> [--live] [--once]`.
     //
     // A thin manifest-driven front-end on the composition root above: admit the
@@ -2467,6 +2547,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         e.into_inner()
                     })
                     .insert(spirit_id.clone(), pid);
+                // SR-1: authorize this admitted spirit for principal namespace writes.
+                memory.authorize_principal_writes(pid);
                 println!(
                     "{}",
                     serde_json::json!({
@@ -3253,6 +3335,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .start(pid)
             .await
             .map_err(|e| format!("maos run: scheduler.start failed: {e}"))?;
+        // SR-1: authorize this admitted spirit for principal namespace writes.
+        memory.authorize_principal_writes(pid);
         println!(
             "{}",
             serde_json::json!({

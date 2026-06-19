@@ -81,6 +81,13 @@ pub struct MemoryManagerAdapter {
     /// pinning (legacy / default-region semantics).  Every store write routes
     /// through `write_entry_point::enforce_region` against this value.
     home_region: Option<maos_domain::region::Region>,
+    /// Principal write enforcement (sec-redteam SR-1 de-stub).  When `Some`,
+    /// only spirit pids in the set may write to `MemoryNamespace::Principal`
+    /// namespaces — all others receive `PrincipalWriteUnauthorized`.  When
+    /// `None` (v0.3-β default / test scaffolding), all pids are allowed.
+    /// The daemon composition root calls `.with_principal_write_enforcement()`
+    /// then `authorize_principal_writes(pid)` per admitted spirit.
+    principal_write_enforcement: Option<std::sync::RwLock<HashSet<u32>>>,
     /// Story 4.3 — cross-Spirit isolation hook (Story 4.5 corpus).
     /// Feature-gated so production builds carry zero runtime cost.
     #[cfg(feature = "spirit_test")]
@@ -101,6 +108,7 @@ impl MemoryManagerAdapter {
             transparency_log,
             next_frame_counter: AtomicU64::new(0),
             home_region: None,
+            principal_write_enforcement: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
@@ -112,6 +120,25 @@ impl MemoryManagerAdapter {
     pub fn with_home_region(mut self, home_region: Option<maos_domain::region::Region>) -> Self {
         self.home_region = home_region;
         self
+    }
+
+    /// Enable principal namespace write enforcement (sec-redteam SR-1).
+    /// Once enabled, only spirit pids registered via
+    /// [`authorize_principal_writes`] may write to `Principal` namespaces.
+    pub fn with_principal_write_enforcement(mut self) -> Self {
+        self.principal_write_enforcement =
+            Some(std::sync::RwLock::new(HashSet::new()));
+        self
+    }
+
+    /// Grant a spirit pid permission to write to `Principal` namespaces.
+    /// No-op when enforcement is disabled (the v0.3-β / test default).
+    pub fn authorize_principal_writes(&self, pid: u32) {
+        if let Some(ref lock) = self.principal_write_enforcement {
+            lock.write()
+                .expect("principal_write_enforcement RwLock poisoned")
+                .insert(pid);
+        }
     }
 
     /// Create a pid-fused memory view for a Spirit.  This is the I5
@@ -403,8 +430,8 @@ impl MemoryManagerPort for MemoryManagerAdapter {
     }
 
     fn validate_namespace_write(&self, key: &NamespaceKey<MemoryScope>) -> bool {
-        let _ = key;
-        true
+        let k = key.as_str();
+        !k.is_empty() && !k.contains('\0')
     }
 
     fn write(
@@ -433,6 +460,18 @@ impl MemoryManagerPort for MemoryManagerAdapter {
             self.home_region.as_ref(),
         )
         .map_err(|e| MemoryError::Storage(e.to_string()))?;
+
+        // Sec-redteam SR-1: principal namespace writes require explicit
+        // authorization when enforcement is enabled.
+        if let MemoryNamespace::Principal { .. } = namespace {
+            if let Some(ref lock) = self.principal_write_enforcement {
+                let authorized = lock.read()
+                    .expect("principal_write_enforcement RwLock poisoned");
+                if !authorized.contains(&spirit_pid) {
+                    return Err(MemoryError::PrincipalWriteUnauthorized { spirit_pid });
+                }
+            }
+        }
 
         match tier {
             MemoryTier::Private => {

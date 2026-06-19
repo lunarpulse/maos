@@ -58,4 +58,12 @@
 #          last-provider tracker is ephemeral switch-detection state, not learned
 #          state; +1 line. FLAG-Winston: this is an invariant-lock exemption, not a
 #          functional kernel delta.
-src_lines = 22227
+#   22266  Epic 10 §A3 security prep — validate_namespace_write de-stub (+39,
+#          charter-amended kernel delta). FLAG-Winston: authorized for
+#          sec-redteam SR-1 (Story 9.3b). De-stubs validate_namespace_write
+#          in memory/mod.rs: adds principal_write_enforcement RwLock<HashSet>,
+#          with_principal_write_enforcement() builder, authorize_principal_writes()
+#          method, and enforcement check in write(). PrincipalWriteUnauthorized
+#          error variant added in maos-domain (not counted here). All additive;
+#          no public symbols removed.
+src_lines = 22266
