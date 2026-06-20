@@ -28,7 +28,7 @@ jobs:
     # paths).
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -114,7 +114,7 @@ jobs:
   check-unsafe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -136,7 +136,7 @@ jobs:
     # kernel-core decomposition lands and the ceilings can be met honestly.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -157,7 +157,7 @@ jobs:
   abi-diff:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@v1
@@ -178,7 +178,7 @@ jobs:
   gen-abi-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -193,7 +193,7 @@ jobs:
   check-empty-kernel:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -206,7 +206,7 @@ jobs:
   check-loom:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -219,7 +219,7 @@ jobs:
   check-fr47:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -232,7 +232,7 @@ jobs:
   check-workspace-count:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -247,7 +247,7 @@ jobs:
   check-a2a-sender-completeness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -262,7 +262,7 @@ jobs:
     needs: reproducible-build
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -277,7 +277,7 @@ jobs:
   check-pub-field-constructors:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -290,7 +290,7 @@ jobs:
   check-composition-root-completeness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -303,7 +303,7 @@ jobs:
   check-service-boundary:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -324,7 +324,7 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@v1
@@ -363,7 +363,7 @@ jobs:
   check-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -376,7 +376,7 @@ jobs:
   maos-audit-read-only:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Grep for write-open patterns in maos-audit
         run: |
           set +e
@@ -393,7 +393,7 @@ jobs:
   check-judge-config:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -406,7 +406,7 @@ jobs:
   check-security-md:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -425,7 +425,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -440,7 +440,7 @@ jobs:
   audit-spine-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -453,7 +453,7 @@ jobs:
   cap-token-verify-bench:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -466,7 +466,7 @@ jobs:
   cap-registry-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -479,7 +479,7 @@ jobs:
   fr4-1000-call-fixture:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -497,7 +497,7 @@ jobs:
     # mediation) — this gate exercises the read-side surface.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -517,7 +517,7 @@ jobs:
     # verb; exit 2 + zero journal mutation on unknown-spirit).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -536,7 +536,7 @@ jobs:
     # MANIFEST_FIELDS allowlist; orphan fixtures fail the build.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -552,7 +552,7 @@ jobs:
     # script. Blocks the v0.1 release tag per the AC text.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -567,7 +567,7 @@ jobs:
   hello-spirit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -580,7 +580,7 @@ jobs:
   hello-spirit-bench:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -593,7 +593,7 @@ jobs:
   example-spirit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -613,7 +613,7 @@ jobs:
   butler-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -632,7 +632,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -652,7 +652,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -666,7 +666,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -690,7 +690,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -712,7 +712,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -730,7 +730,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -751,7 +751,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -772,7 +772,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -791,7 +791,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -808,7 +808,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -828,7 +828,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -849,7 +849,7 @@ jobs:
   safety-critical-corpus-8-5:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -862,7 +862,7 @@ jobs:
   example-spirit-drift:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -876,8 +876,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [reproducible-build, check-workspace-count]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
       - uses: dtolnay/rust-toolchain@v1
@@ -895,7 +895,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check-corpus]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -919,7 +919,7 @@ jobs:
   spirit-test-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -932,7 +932,7 @@ jobs:
   lcas-corpus-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -945,7 +945,7 @@ jobs:
   isolation-framework-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -958,7 +958,7 @@ jobs:
   onb-nfr2-timing:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -971,7 +971,7 @@ jobs:
   coverage-matrix:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -984,7 +984,7 @@ jobs:
   corpus-staleness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -997,7 +997,7 @@ jobs:
   calibrate-per-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1020,7 +1020,7 @@ jobs:
   nfr-aud-7-distillate-five-metrics-floor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1034,7 +1034,7 @@ jobs:
   nfr-sec-14-cross-spirit-isolation-200:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1047,7 +1047,7 @@ jobs:
   nfr-rel-3-hsis-95pct:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1061,7 +1061,7 @@ jobs:
   nfr-rel-1-crash-detection-2s:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1075,7 +1075,7 @@ jobs:
   nfr-rel-2-hang-detection-60s:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1089,7 +1089,7 @@ jobs:
   nfr-rel-4-silent-failure-detection:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1103,7 +1103,7 @@ jobs:
   nfr-rel-10-cold-restart:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1117,7 +1117,7 @@ jobs:
   nfr-rel-11-halt-receipt-999pct:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1131,7 +1131,7 @@ jobs:
   nfr-rel-9-revocation-5s-p99:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1145,7 +1145,7 @@ jobs:
   upgrade-policy-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1159,7 +1159,7 @@ jobs:
   revocation-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1179,7 +1179,7 @@ jobs:
     outputs:
       test_result: ${{ steps.surface.outputs.result }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1205,7 +1205,7 @@ jobs:
   t3-escape-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Podman
         run: sudo apt-get update && sudo apt-get install -y podman
       - uses: dtolnay/rust-toolchain@v1
@@ -1222,7 +1222,7 @@ jobs:
   nfr-sec-1-t3-image-signature:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1236,7 +1236,7 @@ jobs:
   t3-smoke-busybox:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Podman and busybox
         run: |
           sudo apt-get update
@@ -1255,7 +1255,7 @@ jobs:
   multi-provider-drift-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1280,7 +1280,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1302,7 +1302,7 @@ jobs:
     # `serde_json::*` + `.unwrap()/.expect()/.unwrap_or_*()` sites beyond that set.
     # Full remediation of the frozen sites is tracked as a follow-up (Story 8.x).
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1320,7 +1320,7 @@ jobs:
     timeout-minutes: 15
     continue-on-error: true  # ADVISORY (Story 8.16 §A5 triage 2026-06-12): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Hard NFR-Perf-1 verification is the maos-bench measurement track, not this CI smoke. Not masking a regression.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1338,7 +1338,7 @@ jobs:
     timeout-minutes: 15
     continue-on-error: true  # ADVISORY (Story 8.16 §A5 triage 2026-06-12; supersedes the stale "flip before Epic 6" note): NFR-Perf-8 fan-out bench is wall-clock-sensitive on shared GH runners — reports, does not gate. Hard verification is the maos-bench track. Not masking a regression.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1358,7 +1358,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1373,7 +1373,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1392,7 +1392,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1412,7 +1412,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1432,7 +1432,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1454,7 +1454,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1480,7 +1480,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1499,7 +1499,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1522,7 +1522,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1538,7 +1538,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1558,7 +1558,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1573,7 +1573,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1588,7 +1588,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1604,7 +1604,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1621,7 +1621,7 @@ jobs:
   check-manifest-schema-version:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1638,7 +1638,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1654,7 +1654,7 @@ jobs:
   check-review-findings-resolved:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1668,7 +1668,7 @@ jobs:
   check-dev-record-completeness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1682,7 +1682,7 @@ jobs:
   check-bare-review-findings:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1696,7 +1696,7 @@ jobs:
   check-dev-model-used-populated:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1710,7 +1710,7 @@ jobs:
   check-kernel-baseline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1725,7 +1725,7 @@ jobs:
   check-epic-close-green:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1747,7 +1747,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1775,7 +1775,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1789,7 +1789,7 @@ jobs:
   smoke-registry-7-2:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1806,7 +1806,7 @@ jobs:
   fr59-yank-propagation-5min:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1819,7 +1819,7 @@ jobs:
   air-gap-import-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1837,7 +1837,7 @@ jobs:
   ccac-n600-ship-gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1850,7 +1850,7 @@ jobs:
   smoke-compliance-7-3:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1864,7 +1864,7 @@ jobs:
   smoke-skill-7-4:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1884,7 +1884,7 @@ jobs:
   check-skill-schema:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1898,7 +1898,7 @@ jobs:
   smoke-abi-7-5a:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1920,7 +1920,7 @@ jobs:
   check-stability-matrix:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1934,7 +1934,7 @@ jobs:
   check-breaking-md:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1951,7 +1951,7 @@ jobs:
   nfr-onb-1-gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1968,7 +1968,7 @@ jobs:
   smoke-onb-1-7-5b:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
