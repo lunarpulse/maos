@@ -1,0 +1,36 @@
+{
+  "scenario_id": "worker/scenario-051",
+  "tier_tag": "negative-v1.0",
+  "spirit_class": "worker",
+  "swap_kind": "same_major",
+  "predecessor": {
+    "spirit_class": "worker",
+    "version": "0.1.0",
+    "state_schema_version": 1,
+    "halt_protocol_version": 0,
+    "pending_halts": [
+      "halt-neg-005"
+    ]
+  },
+  "successor": {
+    "spirit_class": "worker",
+    "version": "0.1.1",
+    "state_schema_version": 1,
+    "halt_protocol_compatibility": [
+      1
+    ],
+    "migrates_from": []
+  },
+  "preconditions": {
+    "spirit_pid": 905,
+    "swap_invariants": {
+      "rejection_class": "malformed_manifest"
+    }
+  },
+  "expected_outcome": {
+    "verdict": "HaltContinuityViolation",
+    "post_swap_invariants_held": null,
+    "auto_revert_fired": null,
+    "expected_error": "malformed_manifest"
+  }
+}

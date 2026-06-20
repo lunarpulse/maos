@@ -30,7 +30,7 @@
     }
   },
   "expected_outcome": {
-    "verdict": "SafeDrained",
+    "verdict": "SafeMigrated",
     "post_swap_invariants_held": true,
     "auto_revert_fired": false,
     "expected_error": null

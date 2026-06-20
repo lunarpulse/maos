@@ -13,6 +13,7 @@ mod check_air_gap;
 mod check_bare_review_findings;
 mod check_breaking_md;
 mod check_composition_root_completeness;
+mod check_ship_gate_completeness;
 mod check_corpus;
 mod check_deprecations_declared;
 mod check_dev_model_used_populated;
@@ -616,6 +617,12 @@ enum Commands {
         #[arg(long)]
         check: bool,
     },
+    /// Story 10.1a AC4 — assert expected gate job names present in v1.0-ship-gate needs.
+    #[command(name = "check-ship-gate-completeness")]
+    CheckShipGateCompleteness {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -918,6 +925,7 @@ fn main() {
             json,
         } => check_air_gap::run(&binary, build_first, dirty_fixture.as_deref(), json),
         Commands::GenAbiDocs { out_dir, check } => gen_abi_docs::run(Some(&out_dir), check),
+        Commands::CheckShipGateCompleteness { json } => check_ship_gate_completeness::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

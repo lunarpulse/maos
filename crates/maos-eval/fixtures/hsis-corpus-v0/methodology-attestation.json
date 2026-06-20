@@ -9,7 +9,7 @@
     "reviewer_attestation": "Story 5.2",
     "regeneration_seed": "0xHSIS_CORPUS_V0_0001"
   },
-  "scenario_count": 300,
+  "scenario_count": 305,
   "class_list": ["butler", "researcher", "observer", "orchestrator", "worker", "cliwrapper"],
   "per_class_count": 50,
   "pass_threshold": "≥95% per class, zero CVSS-7 violations",

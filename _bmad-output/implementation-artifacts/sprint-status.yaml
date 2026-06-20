@@ -1,4 +1,4 @@
-last_updated: '2026-06-19+epic-10-sprint-planning'
+last_updated: '2026-06-20+story-10-1a-done'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -153,9 +153,16 @@ development_status:
   #   - Ed25519 double-hash composition (9.4b) → document in STABILITY.md, Low
   #   - Cross-store cascade atomicity W1 (9.2) → pre-existing, monitor, Low
   #   - Magic capability string literals (9.7) → tech hygiene, Low
-  epic-10: backlog
-  10-1-execute-the-v1-0-release-gate-pen-test-ccac-cross-validation-hsis-verification: backlog  # Tier-1 opus-4-8; 6 ACs (AC: pen-test zero P0/P1, CCAC N=600 ±2%, HSIS ≥95% 6×50, STABILITY.md pub, BREAKING.md pub, 1yr LTS clock). DEPENDS ON §A3 security prep (DONE 9b8d208).
-  10-2-run-the-third-party-trial-n-12-and-adversarial-red-team-gate-at-v1-0: backlog  # Tier-1 opus-4-8; 4 ACs (AC: N=12 trial ≥10/12, cross-form equivalence if rust-inproc active, red-team 80-scenario corpus 8×10 authoring, red-team gate ≥72/80). DEPENDS ON 10.1.
+  epic-10: in-progress
+  # Story 10.1 SPLIT at party-mode preflight 2026-06-20 (Winston·Amelia·Murat·John, ratified Lunarpulse):
+  #   10.1a = automated ship gates (CCAC N=640 cross-validation, HSIS precheck gate + 5 negative scenarios, STABILITY/BREAKING publication, aggregate CI job). 4 ACs.
+  #   10.1b = pen-test engagement harness + gate infrastructure (conditional summary.toml parser, scope docs, coverage-matrix NFR-Rel-3/NFR-Sec-7). 3 ACs.
+  #   FORK 1→B (HotSwapPrecheck::check, zero-kernel-delta, 3-1). FORK 2→Modified-A (+5 negative HSIS, 4/4). FORK 3→A (conditional gate, 3-1).
+  #   Spec corrections: N=640 not 600, 140 drift not 100, 45 crates not 34, swap_kind not swap_phase, LTS="mechanism verified ready."
+  #   Sequencing: 10.1a ‖ 10.1b (parallel dev, 10.1a merges first). 10.2 DEPENDS ON 10.1b (pen-test engagement infrastructure).
+  10-1a-automated-v1-0-ship-gates-ccac-hsis-stability-aggregate: done  # Tier-1 opus-4-8; 4 ACs (AC: CCAC N=640 ±2%, HSIS precheck+5 negative, STABILITY+BREAKING pub, aggregate CI). Zero kernel-core delta. dev_model_used: claude-opus-4-6. Code review complete 2026-06-20: 4 findings (1 decision-needed + 3 patch), all resolved.
+  10-1b-pen-test-engagement-harness-and-gate-infrastructure: ready-for-dev  # Tier-1 opus-4-8; 3 ACs (AC: pen-test gate infra conditional, engagement harness docs, coverage-matrix NFR-Rel-3/NFR-Sec-7). Merges after 10.1a.
+  10-2-run-the-third-party-trial-n-12-and-adversarial-red-team-gate-at-v1-0: backlog  # Tier-1 opus-4-8; 4 ACs (AC: N=12 trial ≥10/12, cross-form equivalence if rust-inproc active, red-team 80-scenario corpus 8×10 authoring, red-team gate ≥72/80). DEPENDS ON 10.1b.
   10-3-close-v1-0-compliance-gates-export-control-fuzz-hardening-korean-docs-cna-registration: backlog  # Tier-2 opus-4-6; 5 ACs (AC: ECCN export-control, manifest fuzz 24h, wire fuzz 24h, Korean i18n, CNA registration). Korean SR runbook needed (carry-forward from 9.5).
   10-4-ship-the-v1-5-collective-tier-with-postgres-pgvector-and-sqlite-postgres-migration: backlog  # Tier-1 opus-4-8; 4 ACs (AC: Postgres+pgvector Loom-lite MCP, SQLite→Postgres 10⁶-row migration Merkle-root, Mira+Nash bilateral <10ms P95, 14-institution capacity envelope). Can parallel with 10.3.
   10-5-mature-v1-5-skill-format-conformance-jetbrains-windows-2-year-lts-japanese-cn-s-i18n: backlog  # Tier-2 opus-4-6; 6 ACs (AC: skill-format conformance ≥1 third-party, JetBrains plugin-bridge, Windows binary, 2yr LTS, Japanese+CN-S i18n, mTLS chaos 3-host + ComplianceClaim migration). NOTE: 6 ACs at limit — verify at preflight per §A5.

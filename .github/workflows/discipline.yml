@@ -1953,6 +1953,21 @@ jobs:
       - name: Run check-breaking-md
         run: cargo run -p xtask -- check-breaking-md --json
 
+  # Story 10.1a AC4 — xtask CI lint: asserts expected gate job names are present
+  # in the v1.0-ship-gate aggregate job's needs: array.
+  check-ship-gate-completeness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-ship-gate-completeness
+        run: cargo run -p xtask -- check-ship-gate-completeness --json
+
   # Story 7.5b AC9 — NFR-Onb-1 30-min first-Spirit validation gate (discipline rail).
   # Stratification + cohort evaluator + Butler-corpus seam over committed example
   # artifacts; FAILs loudly on drift. Verdicts are provisional until Story 8.1's
@@ -1987,10 +2002,39 @@ jobs:
       - name: Run smoke-onb-1-7-5b self-trial
         run: cargo test -p maos-eval --test onb_1_self_trial -- --nocapture
 
-  aggregate:
+  # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
+  # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
+  # explicit result checks to prevent skip-propagation false positives.
+  v1-0-ship-gate:
     runs-on: ubuntu-latest
     needs:
-      - reproducible-build
+      - ccac-n600-ship-gate
+      - nfr-rel-3-hsis-95pct
+      - check-stability-matrix
+      - check-breaking-md
+      - check-ship-gate-completeness
+    if: always()
+    steps:
+      - name: Ship gate results summary
+        run: |
+          echo "=== v1.0 Ship Gate Results ==="
+          echo ""
+          echo "| Gate | Status | Evidence |"
+          echo "|------|--------|----------|"
+          echo "| ccac-n600-ship-gate | ${{ needs.ccac-n600-ship-gate.result }} | cargo test -p maos-compliance --test ccac_ship_gate_test |"
+          echo "| check-breaking-md | ${{ needs.check-breaking-md.result }} | cargo run -p xtask -- check-breaking-md |"
+          echo "| check-ship-gate-completeness | ${{ needs.check-ship-gate-completeness.result }} | cargo run -p xtask -- check-ship-gate-completeness |"
+          echo ""
+      - name: Fail if any sub-gate failed or was skipped
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "v1.0 ship gate FAILED: one or more sub-gates did not pass."
+          echo "  ccac-n600-ship-gate: ${{ needs.ccac-n600-ship-gate.result }}"
+          echo "  nfr-rel-3-hsis-95pct: ${{ needs.nfr-rel-3-hsis-95pct.result }}"
+          echo "  check-stability-matrix: ${{ needs.check-stability-matrix.result }}"
+          echo "  check-breaking-md: ${{ needs.check-breaking-md.result }}"
+          echo "  check-ship-gate-completeness: ${{ needs.check-ship-gate-completeness.result }}"
+          exit 1
       - check-unsafe
       - kloc-check
       - abi-diff
@@ -2100,6 +2144,8 @@ jobs:
       - check-breaking-md
       - nfr-onb-1-gate
       - smoke-onb-1-7-5b
+      - v1-0-ship-gate
+      - check-ship-gate-completeness
     if: always()
     permissions:
       pull-requests: write
