@@ -11,6 +11,15 @@ env:
   TOKEI_VERSION: "14.0.0"
   CARGO_DENY_VERSION: "0.19.4"
   CARGO_PUBLIC_API_VERSION: "0.51.0"
+  # Best-effort hardening against transient crates.io network flakes, which
+  # spuriously failed many cargo jobs in one run (orchestrator-tests died
+  # downloading the locked `chrono` crate). CARGO_NET_RETRY (cargo net.retry)
+  # raises the retry count for "spurious" network errors during fetches.
+  # CAVEAT: harm-reduction, not a guaranteed cure — cargo's spurious-error
+  # classification may not cover every curl code, and a persistent outage
+  # won't be retried away. The reliable fix for a one-off blip is to re-run
+  # the failed jobs.
+  CARGO_NET_RETRY: "10"
 
 jobs:
   reproducible-build:
