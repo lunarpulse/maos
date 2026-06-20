@@ -1610,7 +1610,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let boot_nonce: u64 = {
         let mut buf = [0u8; 8];
         getrandom::fill(&mut buf).expect("failed to generate boot nonce");
-        u64::from_ne_bytes(buf)
+        u64::from_ne_bytes(buf) & 0x7FFF_FFFF_FFFF_FFFF // mask high bit → always fits i64 (SQLite stores boot_nonce as signed 64-bit)
     };
     let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
     let capability = Arc::new(CapabilityRegistryAdapter::new(
@@ -8236,6 +8236,18 @@ async fn smoke_discipline_7_1_5() -> Result<(), Box<dyn std::error::Error>> {
         "check-dev-model-used-populated",
     ];
 
+    // Pre-build xtask once so each gate subprocess hits a warm cache. The
+    // per-gate 30s timeout below is a hang-detector, NOT a compile budget — a
+    // cold `cargo run -p xtask` can take >30s to compile on CI, which would
+    // spuriously trip the timeout after the gate has already printed its result.
+    let build_status = Command::new("cargo")
+        .args(["build", "-q", "-p", "xtask"])
+        .current_dir(&workspace_root)
+        .status()
+        .map_err(|e| format!("xtask pre-build spawn failed: {e}"))?;
+    if !build_status.success() {
+        return Err("xtask pre-build failed".into());
+    }
     for gate in &gates {
         eprintln!("[smoke-7.1.5] Running gate: {}", gate);
         let gate_owned = gate.to_string();

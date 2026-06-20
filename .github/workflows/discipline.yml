@@ -1387,32 +1387,6 @@ jobs:
           MAOS_ONE_SHOT: smoke-orchestrator-fanout-6-2
         run: ./target/release/maos
 
-  # Story 8.4 AC6 — smoke-founder-loop-8-4 end-to-end founder-loop wedge demo.
-  smoke-founder-loop-8-4:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build maos-bin + worker-cli-fixture
-        # The founder-loop demo spawns the real `worker-cli-fixture` subprocess
-        # (resolve_cli_binary checks the daemon-sibling dir / deps/ / $PATH), so the
-        # fixture binary must be built into target/release/ alongside maos.
-        run: cargo build -p maos-bin --release --features fixture_replay && cargo build -p worker --bin worker-cli-fixture --release
-      - name: Run smoke-founder-loop-8-4
-        # 11pm assign → FR20 buffer drain → FR21 distillate-fed Architect→Reviewer
-        # loop → one deliberate EOrchestratorDispatchRawOutput rejection →
-        # halt-and-resume across the overnight pause (recall_all_pending +
-        # hot-swap state_codec) → 7am digest cites actual source_log_refs.
-        env:
-          MAOS_ONE_SHOT: smoke-founder-loop-8-4
-        run: ./target/release/maos
-
   # Story 6.3 AC7 — smoke-a2a-loopback-6-3 A2A wedge demo.
   smoke-a2a-loopback-6-3:
     runs-on: ubuntu-latest
@@ -1470,31 +1444,6 @@ jobs:
       - name: Run smoke-a2a-fail-closed-8-8
         env:
           MAOS_ONE_SHOT: smoke-a2a-fail-closed-8-8
-        run: ./target/release/maos
-
-  # Story 8.5 AC7 — smoke-mira-nash-8-5 bilateral-pair J4 journey.
-  smoke-mira-nash-8-5:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build maos-bin
-        run: cargo build -p maos-bin --release --features fixture_replay
-      - name: Run smoke-mira-nash-8-5
-        # Mira(host_a) diagnoses a prod-edge anomaly → a halt fires on Mira → the
-        # mobile-push test-double captures the Halt notification + Nash(host_b) is
-        # informed via A2A typed-intent consent (TOFU verified, allowlists admit) →
-        # the director three-tap resolves (KernelHaltResolver + journal) → the
-        # morning digest cites an actual source_log_ref against the real TL; one
-        # deliberate EIntentDenied consent rejection is observable (ConsentRupture).
-        env:
-          MAOS_ONE_SHOT: smoke-mira-nash-8-5
         run: ./target/release/maos
 
   # Story 8.6 AC-T13 — live cross-Host TCP/mTLS transport suite, hermetic + the
@@ -1812,13 +1761,11 @@ jobs:
       # sibling binary, so it MUST be built first — exactly what nightly does
       # (journey-nightly.yml builds the workspace before the suite). Omitting this
       # makes maos_bin() panic "maos binary not found" → exit 101.
-      # j1_founder_loop_smoke_wrap drives `maos MAOS_ONE_SHOT=smoke-founder-loop-8-4`,
-      # which spawns the real `worker-cli-fixture` subprocess (resolve_cli_binary
-      # checks the daemon-sibling target/debug dir first). That fixture lives in a
-      # SEPARATE package (worker), so building maos-bin alone does not produce it —
-      # nightly only passed because it builds the whole workspace (--all-targets
-      # --workspace). Build the debug fixture sibling here too, else the smoke exits
-      # with "cli_wrapper command 'worker-cli-fixture' not found".
+      # Also pre-build `worker-cli-fixture` (separate `worker` package): building
+      # maos-bin alone does not produce it, and the journey suite spawns the real
+      # `maos` binary from target/debug (see above). (The founder-loop journey smoke
+      # that originally needed it was retired by Story 9.6; the build is retained as
+      # a defensive pre-build.)
       - name: Build the maos binary + worker-cli-fixture (debug — journey tests spawn target/debug)
         run: cargo build --locked -p maos-bin --bin maos && cargo build --locked -p worker --bin worker-cli-fixture
       - name: Hermetic journey suite (replay mode — JB-7 guards + deterministic floors)
@@ -2110,11 +2057,9 @@ jobs:
       - nfr-perf-8-orchestrator-fanout
       - nfr-aud-14-intent-lineage-corpus
       - smoke-orchestrator-fanout-6-2
-      - smoke-founder-loop-8-4
       - smoke-a2a-loopback-6-3
       - smoke-a2a-consent-vocab-8-7
       - smoke-a2a-fail-closed-8-8
-      - smoke-mira-nash-8-5
       - a2a-tcp-tests-8-6
       - smoke-a2a-tcp-8-6
       - a2a-loopback-corpus-v0

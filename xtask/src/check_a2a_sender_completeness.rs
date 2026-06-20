@@ -57,7 +57,6 @@ const EXEMPT_BASELINE: usize = 0;
 /// The cross-Host smoke-arm function names scanned inside `maos-bin/src/main.rs`.
 const MAOS_BIN_CROSS_HOST_FNS: &[&str] = &[
     "smoke_a2a_loopback_6_3",
-    "smoke_mira_nash_8_5",
     "smoke_a2a_consent_vocab_8_7",
     "smoke_a2a_tcp_8_6",
     "smoke_a2a_fail_closed_8_8",
