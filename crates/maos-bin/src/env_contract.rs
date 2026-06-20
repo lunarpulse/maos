@@ -216,6 +216,51 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         purpose: "Yank-poller interval in seconds (0 disables)",
         stability: EnvStability::UserFacing,
     },
+    EnvVar {
+        name: "MAOS_DEPLOYMENT_OPERATOR_ID",
+        purpose: "Deployment operator identity for region-pinned tenancy reservation (Story 9.4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_REQUIRE_MODEL_PROVENANCE",
+        purpose: "When set, refuse inference without a valid model provenance attestation (Story 9.4b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_MODEL_PROVENANCE_MAX_AGE_SECS",
+        purpose: "Max age in seconds for a model provenance attestation before it is considered stale (Story 9.4b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_GOVERNANCE_SCHEMA_ID",
+        purpose: "Governance artifact schema identifier for ratification envelope (Story 9.3/9.3b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_GOVERNANCE_VERSION",
+        purpose: "Governance artifact monotonically-increasing version number (Story 9.3/9.3b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_GOVERNANCE_CONTENT_HASH",
+        purpose: "SHA-256 content hash of the governance artifact being ratified (Story 9.3/9.3b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_GOVERNANCE_RATIFIED_BY",
+        purpose: "Identity that ratified the governance artifact (Story 9.3/9.3b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_GOVERNANCE_EFFECTIVE_AT_NS",
+        purpose: "Effective-at timestamp in nanoseconds for the governance artifact (Story 9.3/9.3b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_GOVERNANCE_SUPERSEDES",
+        purpose: "Content hash of the governance artifact this one supersedes (Story 9.3/9.3b)",
+        stability: EnvStability::UserFacing,
+    },
 ];
 
 pub fn lookup(name: &str) -> Option<&'static EnvVar> {

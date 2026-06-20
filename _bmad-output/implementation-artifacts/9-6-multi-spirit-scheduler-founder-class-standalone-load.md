@@ -1,7 +1,7 @@
 ---
 epic: epic-9
 epic_title: "Audit & Compliance Surfaces + Operator Productionization (v0.5 → v1.0)"
-dev_model_used: claude-opus-4-8  # RECOMMENDED — composition-root integration plumbing + async-invariant scheduler wiring + env-var threading. §A6 CORRECTNESS-CRITICAL: this is the exact shape (async invariants / integration plumbing / env-var threading) where non-Opus models miss production gaps. If a non-Opus model is used, party-mode preflight + multi-layer adversarial review (incl. Test Infra Auditor / A4) is MANDATORY, not optional.
+dev_model_used: claude-opus-4-8
 ---
 
 # Story 9.6: Multi-Spirit Scheduler + Founder-Class Standalone Load

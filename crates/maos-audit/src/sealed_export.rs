@@ -197,7 +197,7 @@ pub fn sign_bundle(
     bundle_for_signing: BundleForSigning,
     seed: &[u8; 32],
 ) -> Result<AuditBundle, SealedExportError> {
-    let canonical = canonicalize(&bundle_for_signing);
+    let canonical = canonicalize(&bundle_for_signing)?;
     let digest = Sha256::digest(&canonical);
 
     // AC-5: when region-pinned, sign with the HKDF-derived region key so the
@@ -252,7 +252,7 @@ pub fn verify_bundle(
         region: bundle.region.clone(),
     };
 
-    let canonical = canonicalize(&unsigned);
+    let canonical = canonicalize(&unsigned)?;
     let digest = Sha256::digest(&canonical);
 
     let sig_bytes: [u8; 64] = hex::decode(&bundle.signature_block.signature)
@@ -275,12 +275,13 @@ pub fn verify_bundle(
 ///
 /// Public so that `replay::runner` and `maosctl audit replay` can reuse the same
 /// canonicalizer — ADR-028 D5b (one canonicalizer, not three).
-pub fn canonicalize_value<T: serde::Serialize>(value: &T) -> Vec<u8> {
-    let value = serde_json::to_value(value).expect("value is serializable");
+pub fn canonicalize_value<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, SealedExportError> {
+    let value = serde_json::to_value(value)
+        .map_err(|e| SealedExportError::Serialization(e.to_string()))?;
     let sorted = sort_value(value);
     serde_json::to_string(&sorted)
-        .expect("sorted Value is always serializable")
-        .into_bytes()
+        .map_err(|e| SealedExportError::Serialization(e.to_string()))
+        .map(|s| s.into_bytes())
 }
 
 /// Deterministic canonical serialization: sorted keys, no insignificant whitespace.
@@ -288,7 +289,7 @@ pub fn canonicalize_value<T: serde::Serialize>(value: &T) -> Vec<u8> {
 /// Serializes to `serde_json::Value`, recursively sorts all object keys via
 /// `BTreeMap` ordering, then outputs compact JSON. Ensures byte-identical
 /// output regardless of struct field declaration order.
-pub fn canonicalize(bundle: &BundleForSigning) -> Vec<u8> {
+pub fn canonicalize(bundle: &BundleForSigning) -> Result<Vec<u8>, SealedExportError> {
     canonicalize_value(bundle)
 }
 
@@ -412,7 +413,7 @@ mod tests {
     fn r_sch_region_none_omitted_from_canonical_bytes() {
         let unsigned = build_bundle(make_test_entries(), vec![], vec![], make_freshness());
         assert!(unsigned.region.is_none());
-        let canonical = String::from_utf8(canonicalize(&unsigned)).unwrap();
+        let canonical = String::from_utf8(canonicalize(&unsigned).unwrap()).unwrap();
         assert!(
             !canonical.contains("region"),
             "region-less bundle must not emit a region key: {canonical}"
@@ -507,8 +508,8 @@ mod tests {
             vec![],
             make_freshness(),
         );
-        let bytes1 = canonicalize(&unsigned);
-        let bytes2 = canonicalize(&unsigned);
+        let bytes1 = canonicalize(&unsigned).unwrap();
+        let bytes2 = canonicalize(&unsigned).unwrap();
         assert_eq!(
             bytes1, bytes2,
             "canonical serialization must be deterministic"
@@ -518,7 +519,7 @@ mod tests {
     #[test]
     fn canonical_sorted_keys() {
         let unsigned = build_bundle(make_test_entries(), vec![], vec![], make_freshness());
-        let bytes = canonicalize(&unsigned);
+        let bytes = canonicalize(&unsigned).unwrap();
         let json_str = String::from_utf8(bytes).unwrap();
 
         // The top-level keys must appear in sorted order:

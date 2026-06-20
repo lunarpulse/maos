@@ -1,4 +1,4 @@
-last_updated: '2026-06-19+epic-9-retrospective-complete'
+last_updated: '2026-06-19+epic-10-sprint-planning'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -136,10 +136,27 @@ development_status:
   9-7-durable-skill-queue-persistence-and-functional-approve-reject: done  # 2026-06-17 impl + re-review closed: all 14 review findings resolved (1 Critical + 1 High + 4 Medium + Lows); discovery-driven admission view (Critical fix), LWW by decision_id, AC-7 RED+GREEN, --actor flag, dead-code removal, atomic-write hardening. cargo test -p maos-skill/cli/iac GREEN; check-kernel-baseline PASSED (22227, zero kernel-core delta). Status corrected in-progress→done at Epic 9 retro 2026-06-19.
   # GATE (Task-0 a): epic-9-retrospective MUST NOT open until 9-7-* is done — the compounding gate that stops the 4th disappearance of the §A3 skill-queue item (8.16 epic-close-green pattern).
   epic-9-retrospective: done  # 2026-06-19 (epic-9-retro-2026-06-19.md); §A1 proven-red dev-pass gate + §A2 model-tier classification + §A3 security prep (daemon admission + namespace write before pen-test) + §A4 sprint-status tracking + §A5 6-AC sizing guard + §A6 non-Opus safety net carry-forward; epic_update_required: true (two security-prep stories before Story 10.1)
+  # === EPIC 10: v1.0 Ship Gate + v1.5 Collective Tier (v1.0 → v1.5) ===
+  # Epic 9 retro §A3 SECURITY PREP (daemon admission enforcement + validate_namespace_write de-stub) COMPLETED via commit 9b8d208 (2026-06-19). Pen-test engagement (10.1) unblocked.
+  # Epic 9 retro §A2 MODEL-TIER CLASSIFICATION:
+  #   Tier-1 (opus-4-8 mandatory): 10.1 (pen-test/CCAC/HSIS), 10.2 (adversarial red-team), 10.4 (Merkle migration/mTLS)
+  #   Tier-2 (opus-4-6 acceptable): 10.3 (compliance/docs/fuzz), 10.5 (tooling/i18n/LTS)
+  # Epic 9 retro §A1: proven-red as DEV-PASS gate (not just review checkpoint) — every gate/test must demonstrate proven-red BEFORE review submission
+  # Epic 9 retro §A5: no story exceeds 6 ACs at preflight exit — split if exceeded
+  # Critical path: 10.1 → 10.2 (pen-test engagement first, red-team reuses engagement infrastructure) → 10.3 (compliance gates close v1.0) ‖ 10.4 (v1.5 collective tier, can parallel with 10.3) → 10.5 (v1.5 maturation, last)
+  # Sub-cluster A (v1.0 ship gate): 10.1, 10.2, 10.3
+  # Sub-cluster B (v1.5 collective tier): 10.4, 10.5
+  # Carry-forward items from Epic 9 retro (not blocking unless noted):
+  #   - At-rest plaintext in foreign region (9.4b deferred) → 9.4c in E10, Medium
+  #   - OTel span erasure-scope documentation (9.5b preflight) → Medium
+  #   - Korean SR manual review runbook (9.5 R1) → before 10.3 localization ship
+  #   - Ed25519 double-hash composition (9.4b) → document in STABILITY.md, Low
+  #   - Cross-store cascade atomicity W1 (9.2) → pre-existing, monitor, Low
+  #   - Magic capability string literals (9.7) → tech hygiene, Low
   epic-10: backlog
-  10-1-execute-the-v1-0-release-gate-pen-test-ccac-cross-validation-hsis-verification: backlog
-  10-2-run-the-third-party-trial-n-12-and-adversarial-red-team-gate-at-v1-0: backlog
-  10-3-close-v1-0-compliance-gates-export-control-fuzz-hardening-korean-docs-cna-registration: backlog
-  10-4-ship-the-v1-5-collective-tier-with-postgres-pgvector-and-sqlite-postgres-migration: backlog
-  10-5-mature-v1-5-skill-format-conformance-jetbrains-windows-2-year-lts-japanese-cn-s-i18n: backlog
+  10-1-execute-the-v1-0-release-gate-pen-test-ccac-cross-validation-hsis-verification: backlog  # Tier-1 opus-4-8; 6 ACs (AC: pen-test zero P0/P1, CCAC N=600 ±2%, HSIS ≥95% 6×50, STABILITY.md pub, BREAKING.md pub, 1yr LTS clock). DEPENDS ON §A3 security prep (DONE 9b8d208).
+  10-2-run-the-third-party-trial-n-12-and-adversarial-red-team-gate-at-v1-0: backlog  # Tier-1 opus-4-8; 4 ACs (AC: N=12 trial ≥10/12, cross-form equivalence if rust-inproc active, red-team 80-scenario corpus 8×10 authoring, red-team gate ≥72/80). DEPENDS ON 10.1.
+  10-3-close-v1-0-compliance-gates-export-control-fuzz-hardening-korean-docs-cna-registration: backlog  # Tier-2 opus-4-6; 5 ACs (AC: ECCN export-control, manifest fuzz 24h, wire fuzz 24h, Korean i18n, CNA registration). Korean SR runbook needed (carry-forward from 9.5).
+  10-4-ship-the-v1-5-collective-tier-with-postgres-pgvector-and-sqlite-postgres-migration: backlog  # Tier-1 opus-4-8; 4 ACs (AC: Postgres+pgvector Loom-lite MCP, SQLite→Postgres 10⁶-row migration Merkle-root, Mira+Nash bilateral <10ms P95, 14-institution capacity envelope). Can parallel with 10.3.
+  10-5-mature-v1-5-skill-format-conformance-jetbrains-windows-2-year-lts-japanese-cn-s-i18n: backlog  # Tier-2 opus-4-6; 6 ACs (AC: skill-format conformance ≥1 third-party, JetBrains plugin-bridge, Windows binary, 2yr LTS, Japanese+CN-S i18n, mTLS chaos 3-host + ComplianceClaim migration). NOTE: 6 ACs at limit — verify at preflight per §A5.
   epic-10-retrospective: optional

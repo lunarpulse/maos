@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-6
+---
+
 # Story 9.5a: Trust-Anchor Framing ADR + STABILITY Compliance-Scope (RELEASE-BLOCK)
 
 Status: done

@@ -1,3 +1,7 @@
+---
+dev_model_used: openai-codex/gpt-5.4
+---
+
 # Story 9.5d: Playwright Behavioral Gates + axe-core WCAG AA Scan
 
 Status: done — **9.5d implementation complete; AC-0 through AC-5 verified.** All review findings patched or dismissed; `npm run gate:all` passes.

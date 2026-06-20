@@ -344,8 +344,10 @@ impl Mailbox {
                             .collect::<Vec<_>>(),
                         "reasons": rejected_recipients
                             .iter()
-                            .map(|r| serde_json::to_value(&r.reason)
-                                .unwrap_or_else(|_| serde_json::Value::String("serialization_error".into())))
+                            .map(|r| match serde_json::to_value(&r.reason) {
+                                Ok(v) => v,
+                                Err(_) => serde_json::Value::String("serialization_error".into()),
+                            })
                             .collect::<Vec<_>>(),
                         "ruptured_at_ns": maos_capability::cap_tokens::monotonic_now_ns(),
                     });

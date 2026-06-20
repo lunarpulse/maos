@@ -220,10 +220,13 @@ impl UpgradeOrchestrator {
             "latency_ns": latency_ns,
             "halt_receipts_produced": halt_receipts_produced,
         });
-        let payload_bytes = serde_json::to_vec(&payload).unwrap_or_else(|e| {
-            eprintln!("upgrade orchestrator: payload serialize failed: {e}");
-            vec![]
-        });
+        let payload_bytes = match serde_json::to_vec(&payload) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("upgrade orchestrator: payload serialize failed: {e}");
+                vec![]
+            }
+        };
         self.tl.insert_frame_event(
             FrameKind::CapabilityInvocation,
             predecessor_pid,

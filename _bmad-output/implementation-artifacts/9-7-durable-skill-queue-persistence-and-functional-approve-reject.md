@@ -1,7 +1,7 @@
 ---
 epic: epic-9
 epic_title: "Audit & Compliance Surfaces + Operator Productionization (v0.5 → v1.0)"
-dev_model_used: claude-opus-4-8  # RECOMMENDED. Persistence + audit-journal drain is correctness-adjacent (durable state, restart survival). §A6: if non-Opus, party-mode preflight + multi-layer review applies.
+dev_model_used: claude-opus-4-8
 ---
 
 # Story 9.7: Durable Skill-Queue Persistence + Functional `maosctl skills approve/reject`

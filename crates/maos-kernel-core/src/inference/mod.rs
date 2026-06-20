@@ -418,16 +418,16 @@ impl InferencePort for InferencePortAdapter {
                     attribution_confidence: confidence,
                     dimensions,
                 };
-                let cost_bytes =
-                    serde_json::to_vec(&cost_payload).expect("cost payload serialization");
-                let _cost_token = self.transparency_log.insert_frame_event(
-                    FrameKind::CostAttribution,
-                    req.spirit_pid,
-                    None,
-                    "cost:inference-attribution",
-                    &cost_bytes,
-                    FrameOrigin::Kernel,
-                );
+                if let Ok(cost_bytes) = serde_json::to_vec(&cost_payload) {
+                    let _cost_token = self.transparency_log.insert_frame_event(
+                        FrameKind::CostAttribution,
+                        req.spirit_pid,
+                        None,
+                        "cost:inference-attribution",
+                        &cost_bytes,
+                        FrameOrigin::Kernel,
+                    );
+                }
             }
             Err(_) => {
                 self.telemetry

@@ -66,4 +66,10 @@
 #          method, and enforcement check in write(). PrincipalWriteUnauthorized
 #          error variant added in maos-domain (not counted here). All additive;
 #          no public symbols removed.
-src_lines = 22266
+#   22269  Epic 9 CI-gate closure — check-serde-error-handling propagation in
+#          maos-kernel-core: inference/mod.rs cost-attribution TL row now
+#          best-effort skips on the near-infallible serde failure (was .expect);
+#          lifecycle/upgrade.rs post-success TL payload keeps its graceful
+#          fallback via a match (was .unwrap_or_else). +3 lines, additive, no
+#          public ABI change.
+src_lines = 22269

@@ -1,5 +1,6 @@
 ---
 recommended_dev_model: claude-opus-4-8
+dev_model_used: claude-opus-4-6
 ---
 
 # Story 9.4: Productionize the Operator Surface — Distribution, Backup/DR, Air-Gap (OPS HALF)

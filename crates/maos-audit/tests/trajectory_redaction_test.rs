@@ -276,7 +276,7 @@ fn sealed_export_bytes_unchanged_with_redaction_field_none() {
         freshness,
     );
 
-    let canonical = maos_audit::sealed_export::canonicalize(&unsigned);
+    let canonical = maos_audit::sealed_export::canonicalize(&unsigned).unwrap();
 
     // Golden bytes: the canonical JSON should not contain "redaction" anywhere
     // because skip_serializing_if removes it when None.

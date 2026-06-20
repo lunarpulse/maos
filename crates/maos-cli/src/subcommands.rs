@@ -644,13 +644,14 @@ fn dispatch_import(args: &ImportArgs, _color: ColorChoice) -> ExitCode {
         "effective_tier": format!("{:?}", decision.effective_tier),
         "sandbox_tier_floor": format!("{:?}", decision.sandbox_tier_floor),
     });
-    println!(
-        "{}",
-        serde_json::to_string(&summary).unwrap_or_else(|e| {
+    let summary_str = match serde_json::to_string(&summary) {
+        Ok(s) => s,
+        Err(e) => {
             eprintln!("maosctl import: failed to serialize summary: {e}");
             "{}".into()
-        })
-    );
+        }
+    };
+    println!("{}", summary_str);
     ExitCode::SUCCESS
 }
 
@@ -2369,11 +2370,14 @@ fn next_export_seq() -> Result<u64, String> {
         .parent()
         .ok_or("Transparency Log path has no parent directory")?;
     let state_path = audit_dir.join("export-seq.json");
-    let last = std::fs::read_to_string(&state_path)
+    let last = match std::fs::read_to_string(&state_path)
         .ok()
         .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
         .and_then(|v| v.get("last_export_seq").and_then(|v| v.as_u64()))
-        .unwrap_or(0);
+    {
+        Some(seq) => seq,
+        None => 0,
+    };
 
     let now_ns = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -2385,7 +2389,9 @@ fn next_export_seq() -> Result<u64, String> {
     let state = serde_json::json!({ "last_export_seq": seq });
     std::fs::create_dir_all(audit_dir)
         .map_err(|e| format!("cannot create audit state dir: {e}"))?;
-    std::fs::write(&state_path, serde_json::to_string(&state).unwrap())
+    let state_json = serde_json::to_string(&state)
+        .map_err(|e| format!("cannot serialize export-seq state: {e}"))?;
+    std::fs::write(&state_path, &state_json)
         .map_err(|e| format!("cannot write export-seq state: {e}"))?;
 
     Ok(seq)
@@ -2441,9 +2447,13 @@ fn audit_replay(bundle_path: &PathBuf, output: &Option<PathBuf>) -> ExitCode {
     }
     let canonical_bytes =
         match sort_value_with_depth_limit(bundle_for_hash, REPLAY_SORT_VALUE_MAX_DEPTH) {
-            Ok(sorted) => serde_json::to_string(&sorted)
-                .expect("sorted Value is serializable")
-                .into_bytes(),
+            Ok(sorted) => match serde_json::to_string(&sorted) {
+                Ok(s) => s.into_bytes(),
+                Err(e) => {
+                    eprintln!("maosctl: audit replay — canonical serialize failed: {e}");
+                    return ExitCode::from(2);
+                }
+            },
             Err(e) => {
                 eprintln!("maosctl: audit replay — {e}");
                 return ExitCode::from(2);

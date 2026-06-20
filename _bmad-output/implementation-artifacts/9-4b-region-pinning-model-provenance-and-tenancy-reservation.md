@@ -1,5 +1,6 @@
 ---
 recommended_dev_model: claude-opus-4-8
+dev_model_used: claude-opus-4-8
 ---
 
 # Story 9.4b: Region-Pinning + Model-Provenance + Multi-Operator Tenancy Reservation (KERNEL-TOUCHING HALF)

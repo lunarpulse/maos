@@ -1,5 +1,5 @@
 ---
-dev_model_used: "claude-opus-4-6"
+dev_model_used: claude-opus-4-6
 recommended_dev_model: claude-opus-4-8
 ---
 

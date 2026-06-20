@@ -21,20 +21,20 @@ use super::{reference_context, CcacItem, CcacSeed, REFERENCES, VARIATIONS_PER_SE
 
 /// Expand seeds into items. `n` is honored as the target count; each seed
 /// emits [`VARIATIONS_PER_SEED`] variations (60 × 10 = 600).
-pub fn expand_deterministic(seeds: &[CcacSeed], n: usize) -> Vec<CcacItem> {
+pub fn expand_deterministic(seeds: &[CcacSeed], n: usize) -> Result<Vec<CcacItem>, String> {
     let mut items = Vec::with_capacity(n);
     let mut global_idx: usize = 0;
     for (ord, seed) in seeds.iter().enumerate() {
         for v in 0..VARIATIONS_PER_SEED {
             if items.len() >= n {
-                return items;
+                return Ok(items);
             }
             let reference = REFERENCES[(ord + v) % REFERENCES.len()];
-            items.push(build_item(seed, ord, v, global_idx, reference));
+            items.push(build_item(seed, ord, v, global_idx, reference)?);
             global_idx += 1;
         }
     }
-    items
+    Ok(items)
 }
 
 #[allow(deprecated)]
@@ -44,7 +44,7 @@ fn build_item(
     variation: usize,
     global_idx: usize,
     reference: &str,
-) -> CcacItem {
+) -> Result<CcacItem, String> {
     let (manifest, ctx) =
         reference_context(reference).expect("CCAC expansion uses only valid references");
     let ref_fp = ctx.to_fingerprint();
@@ -56,16 +56,16 @@ fn build_item(
         let env = build_self_attested_envelope(&ref_fp, &kp, pk);
         (env, "admit", None, None)
     } else {
-        build_malformed(seed, &ref_fp, &kp, pk, global_idx)
-            .unwrap_or_else(|e| panic!("CCAC seed {}: {e}", seed.id))
+        build_malformed(seed, &ref_fp, &kp, pk, global_idx)?
     };
 
-    let envelope_cbor_hex =
-        hex::encode(serde_cbor::to_vec(&envelope).expect("envelope is CBOR-serializable"));
+    let envelope_cbor_hex = serde_cbor::to_vec(&envelope)
+        .map(hex::encode)
+        .map_err(|e| e.to_string())?;
 
     let _ = (ord, variation); // (kept for clarity; reference already derived)
 
-    CcacItem {
+    Ok(CcacItem {
         id,
         class: seed.class.clone(),
         expected_verdict: expected_verdict.to_string(),
@@ -75,7 +75,7 @@ fn build_item(
         envelope_cbor_hex,
         manifest_toml: manifest,
         rationale: seed.rationale.clone(),
-    }
+    })
 }
 
 /// Build a malformed envelope per the seed's `malform` op. Returns
@@ -130,7 +130,7 @@ fn build_malformed(
                 "provider_endpoint": {"provider_id": "p", "endpoint_url": "u"},
                 "crypto_provider": "ring"
             });
-            Ok(sign_json(json, kp, pk))
+            sign_json(json, kp, pk)
         }
         "missing_crypto_provider" => {
             let json = serde_json::json!({
@@ -140,7 +140,7 @@ fn build_malformed(
                 "capability_scope": [],
                 "provider_endpoint": {"provider_id": "p", "endpoint_url": "u"}
             });
-            Ok(sign_json(json, kp, pk))
+            sign_json(json, kp, pk)
         }
         "truncated_fingerprint_hash" => {
             let json = serde_json::json!({
@@ -151,7 +151,7 @@ fn build_malformed(
                 "provider_endpoint": {"provider_id": "p", "endpoint_url": "u"},
                 "crypto_provider": "ring"
             });
-            Ok(sign_json(json, kp, pk))
+            sign_json(json, kp, pk)
         }
         "unknown_trust_tier" => {
             let json = serde_json::json!({
@@ -162,7 +162,7 @@ fn build_malformed(
                 "provider_endpoint": {"provider_id": "p", "endpoint_url": "u"},
                 "crypto_provider": "ring"
             });
-            Ok(sign_json(json, kp, pk))
+            sign_json(json, kp, pk)
         }
         "unknown_sandbox_tier" => {
             let json = serde_json::json!({
@@ -173,7 +173,7 @@ fn build_malformed(
                 "provider_endpoint": {"provider_id": "p", "endpoint_url": "u"},
                 "crypto_provider": "ring"
             });
-            Ok(sign_json(json, kp, pk))
+            sign_json(json, kp, pk)
         }
         "expired_claim" => {
             let claim_bytes = encode_claim_bytes(ref_fp, Some(1_000));
@@ -204,15 +204,18 @@ fn sign_json(
     json: serde_json::Value,
     kp: &ring::signature::Ed25519KeyPair,
     pk: [u8; 32],
-) -> (
-    ComplianceClaimEnvelope,
-    &'static str,
-    Option<&'static str>,
-    Option<String>,
-) {
-    let claim_bytes = serde_json::to_vec(&json).expect("json serializes");
+) -> Result<
+    (
+        ComplianceClaimEnvelope,
+        &'static str,
+        Option<&'static str>,
+        Option<String>,
+    ),
+    String,
+> {
+    let claim_bytes = serde_json::to_vec(&json).map_err(|e| e.to_string())?;
     let env = build_signed_envelope(claim_bytes, kp, pk);
-    (env, "reject", Some("MalformedClaim"), None)
+    Ok((env, "reject", Some("MalformedClaim"), None))
 }
 
 /// Mutate exactly one structural field of `ref_fp` to a value that differs from

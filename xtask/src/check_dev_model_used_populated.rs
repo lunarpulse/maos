@@ -27,6 +27,8 @@ const KNOWN_MODELS: &[&str] = &[
     // 8.13 shipped on openai/gpt-5.5; 8.14c on kimi-code/kimi-for-coding.
     "openai/gpt-5.5",
     "kimi-code/kimi-for-coding",
+    // Epic 9 actual dev attribution (9.5d shipped on openai-codex/gpt-5.4).
+    "openai-codex/gpt-5.4",
 ];
 
 #[derive(Debug)]

@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-6
+---
+
 # Story 9.5b: OpenTelemetry SLO-Class Adapter (CODE / KERNEL-ADJACENT)
 
 Status: done

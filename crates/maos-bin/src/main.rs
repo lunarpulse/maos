@@ -1033,7 +1033,13 @@ fn emit_vetter_key_event(
             },
         ),
     };
-    let gov_bytes = serde_json::to_vec(&gov_payload).unwrap();
+    let gov_bytes = match serde_json::to_vec(&gov_payload) {
+        Ok(b) => b,
+        // Near-infallible (serializing an internally-constructed governance
+        // payload). On the impossible failure path, skip the TL write rather
+        // than panic — this helper is best-effort governance logging.
+        Err(_) => return,
+    };
     let _token = tl.insert_frame_event(
         maos_kernel_core::iac::transparency_log::FrameKind::GovernanceEvent,
         0,

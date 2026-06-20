@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-6
+---
+
 # Story 9.5: Publish Five Canonical Docs with WCAG AA, Korean i18n, and Onboarding Artifacts (DOCS HALF)
 
 Status: done — all 5 ACs met; deferred AC-1 `/abi/` generation + AC-2 axe + AC-4 behavioral gates closed by siblings 9.5c + 9.5d (both `done`); `gate:static` + `gate:behavioral` (114) + `gate:proven-red` all green at HEAD 2026-06-17.

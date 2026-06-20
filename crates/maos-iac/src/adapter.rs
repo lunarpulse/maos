@@ -534,7 +534,10 @@ impl IacBusAdapter {
         // Story 6.1 — use DRR scheduler if present, otherwise synchronous write.
         let to_spirit_id = frame.to.first().map_or("", |a| a.spirit_id.as_str());
         if let Some(ref drr) = self.drr_scheduler {
-            let lineage_bytes = serde_json::to_vec(&frame.intent_lineage).unwrap_or_default();
+            let lineage_bytes = match serde_json::to_vec(&frame.intent_lineage) {
+                Ok(b) => b,
+                Err(_) => Vec::new(),
+            };
             drr.submit(
                 frame.clone(),
                 payload_bytes,

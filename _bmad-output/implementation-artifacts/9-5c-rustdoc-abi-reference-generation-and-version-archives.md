@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-8
+---
+
 # Story 9.5c: Rustdoc ABI Reference Generation + Richness-Preserving Cutover
 
 Status: done

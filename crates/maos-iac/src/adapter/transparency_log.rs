@@ -237,6 +237,8 @@ pub enum AuditError {
     Io(#[from] std::io::Error),
     #[error("malformed frame_id blob: expected 16 bytes, got {0}")]
     MalformedFrameId(usize),
+    #[error("serialization failed: {0}")]
+    Serialization(String),
 }
 
 /// SQL schema for both tables.
@@ -929,7 +931,7 @@ impl TransparencyLogAdapter {
                         serde_json::Value::String(reason.to_string()),
                     );
                 }
-                serde_json::to_vec(&val).expect("re-serialization of redacted payload")
+                serde_json::to_vec(&val).map_err(|e| AuditError::Serialization(e.to_string()))?
             }
             Err(_) => {
                 // Cannot parse payload — fall back to full replacement tombstone
@@ -1507,7 +1509,7 @@ impl TransparencyLogAdapter {
                 ),
             };
             let payload_bytes =
-                serde_json::to_vec(&payload).expect("governance payload serialization");
+                serde_json::to_vec(&payload).map_err(|e| AuditError::Serialization(e.to_string()))?;
             let redacted = self.redaction.redact(&payload_bytes);
             let frame_id_val = Self::next_frame_id(&mut inner);
             let timestamp_ns = wall_clock_now_ns();

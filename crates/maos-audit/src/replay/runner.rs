@@ -97,7 +97,8 @@ pub fn replay(
 /// Delegates to the shared canonicalizer in `sealed_export` so the trace-shape
 /// surface and the bundle surface use identical key-ordering rules.
 pub fn replay_to_canonical_bytes(shape: &TraceShape) -> Result<Vec<u8>, ReplayError> {
-    Ok(crate::sealed_export::canonicalize_value(shape))
+    crate::sealed_export::canonicalize_value(shape)
+        .map_err(|e| ReplayError::Serialization(e.to_string()))
 }
 
 #[cfg(test)]
