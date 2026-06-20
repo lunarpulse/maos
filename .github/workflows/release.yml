@@ -75,7 +75,7 @@ jobs:
         env:
           RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
           MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
-      - name: Guardrail: production pubkey must differ from dev seed
+      - name: "Guardrail: production pubkey must differ from dev seed"
         run: |
           cargo test -p maos-audit production_pubkey_must_differ_from_dev_seed
         env:
