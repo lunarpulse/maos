@@ -14,6 +14,7 @@ mod check_bare_review_findings;
 mod check_breaking_md;
 mod check_composition_root_completeness;
 mod check_ship_gate_completeness;
+mod check_coverage_matrix_completeness;
 mod check_corpus;
 mod check_deprecations_declared;
 mod check_dev_model_used_populated;
@@ -22,6 +23,7 @@ mod check_empty_kernel;
 mod check_env_contract;
 mod check_literal_reappearance;
 mod check_epic_6_bridge;
+mod check_pentest_gate;
 mod check_epic_close_green;
 mod check_error_catalog;
 mod check_fr47;
@@ -623,6 +625,19 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 10.1b AC1 — pen-test gate: parse summary.toml, assert p0/p1 == 0,
+    /// advisory-if-absent (conditional per calibrate-per-commit).
+    #[command(name = "check-pentest-gate")]
+    CheckPentestGate {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 10.1b AC3 — coverage-matrix completeness: no v1.0 NFR has empty gates.
+    #[command(name = "check-coverage-matrix-completeness")]
+    CheckCoverageMatrixCompleteness {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -926,6 +941,8 @@ fn main() {
         } => check_air_gap::run(&binary, build_first, dirty_fixture.as_deref(), json),
         Commands::GenAbiDocs { out_dir, check } => gen_abi_docs::run(Some(&out_dir), check),
         Commands::CheckShipGateCompleteness { json } => check_ship_gate_completeness::run(json),
+        Commands::CheckPentestGate { json } => check_pentest_gate::run(json),
+        Commands::CheckCoverageMatrixCompleteness { json } => check_coverage_matrix_completeness::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

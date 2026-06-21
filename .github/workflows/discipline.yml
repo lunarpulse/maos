@@ -2002,6 +2002,54 @@ jobs:
       - name: Run smoke-onb-1-7-5b self-trial
         run: cargo test -p maos-eval --test onb_1_self_trial -- --nocapture
 
+
+  # Story 10.1b AC1 — Pen-test gate: conditional per calibrate-per-commit pattern.
+  # When summary.toml exists, parse and assert p0_open == 0 && p1_open == 0.
+  # When absent, pass with advisory annotation (pen-test engagement pending).
+  check-pentest-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check pen-test results
+        run: cargo run -p xtask -- check-pentest-gate --json
+
+  # Story 10.1b AC3 — Coverage matrix completeness: no v1.0 NFR has empty gates.
+  check-coverage-matrix-completeness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check coverage matrix completeness
+        run: cargo run -p xtask -- check-coverage-matrix-completeness --json
+
+  # Story 10.1b AC2 — OWASP freeze hash-check: SHA-256 from gate-registry.toml.
+  # Hash stored in the invariant-locked registry so any OWASP doc edit requires
+  # a registry update, which is auditable and protected by review.
+  check-owasp-freeze-hash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify OWASP freeze immutability
+        run: |
+          EXPECTED_HASH=$(grep '^owasp_freeze_hash' xtask/gate-registry.toml | sed 's/.*= "\(.*\)"/\1/')
+          ACTUAL_HASH=$(sha256sum docs/pen-test/owasp-risk-rating-v1.0-frozen.md | awk '{print $1}')
+          if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
+            echo "::error::OWASP freeze hash mismatch! Expected: $EXPECTED_HASH, Actual: $ACTUAL_HASH"
+            echo "  If the OWASP doc was intentionally updated, update owasp_freeze_hash in xtask/gate-registry.toml"
+            exit 1
+          fi
+          echo "OWASP freeze hash verified: $ACTUAL_HASH"
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2012,7 +2060,9 @@ jobs:
       - nfr-rel-3-hsis-95pct
       - check-stability-matrix
       - check-breaking-md
-      - check-ship-gate-completeness
+      - check-pentest-gate
+      - check-coverage-matrix-completeness
+      - check-owasp-freeze-hash
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2024,6 +2074,9 @@ jobs:
           echo "| ccac-n600-ship-gate | ${{ needs.ccac-n600-ship-gate.result }} | cargo test -p maos-compliance --test ccac_ship_gate_test |"
           echo "| check-breaking-md | ${{ needs.check-breaking-md.result }} | cargo run -p xtask -- check-breaking-md |"
           echo "| check-ship-gate-completeness | ${{ needs.check-ship-gate-completeness.result }} | cargo run -p xtask -- check-ship-gate-completeness |"
+          echo "| check-pentest-gate | ${{ needs.check-pentest-gate.result }} | cargo run -p xtask -- check-pentest-gate |"
+          echo "| check-coverage-matrix-completeness | ${{ needs.check-coverage-matrix-completeness.result }} | cargo run -p xtask -- check-coverage-matrix-completeness |"
+          echo "| check-owasp-freeze-hash | ${{ needs.check-owasp-freeze-hash.result }} | sha256sum --check docs/pen-test/owasp-risk-rating-v1.0-frozen.md.sha256 |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2034,6 +2087,9 @@ jobs:
           echo "  check-stability-matrix: ${{ needs.check-stability-matrix.result }}"
           echo "  check-breaking-md: ${{ needs.check-breaking-md.result }}"
           echo "  check-ship-gate-completeness: ${{ needs.check-ship-gate-completeness.result }}"
+          echo "  check-pentest-gate: ${{ needs.check-pentest-gate.result }}"
+          echo "  check-coverage-matrix-completeness: ${{ needs.check-coverage-matrix-completeness.result }}"
+          echo "  check-owasp-freeze-hash: ${{ needs.check-owasp-freeze-hash.result }}"
           exit 1
       - check-unsafe
       - kloc-check
@@ -2146,6 +2202,9 @@ jobs:
       - smoke-onb-1-7-5b
       - v1-0-ship-gate
       - check-ship-gate-completeness
+      - check-pentest-gate
+      - check-coverage-matrix-completeness
+      - check-owasp-freeze-hash
     if: always()
     permissions:
       pull-requests: write

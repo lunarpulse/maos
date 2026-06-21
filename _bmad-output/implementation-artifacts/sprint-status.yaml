@@ -1,4 +1,4 @@
-last_updated: '2026-06-20+story-10-1a-done'
+last_updated: '2026-06-20+story-10-1b-done'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -161,7 +161,7 @@ development_status:
   #   Spec corrections: N=640 not 600, 140 drift not 100, 45 crates not 34, swap_kind not swap_phase, LTS="mechanism verified ready."
   #   Sequencing: 10.1a ‖ 10.1b (parallel dev, 10.1a merges first). 10.2 DEPENDS ON 10.1b (pen-test engagement infrastructure).
   10-1a-automated-v1-0-ship-gates-ccac-hsis-stability-aggregate: done  # Tier-1 opus-4-8; 4 ACs (AC: CCAC N=640 ±2%, HSIS precheck+5 negative, STABILITY+BREAKING pub, aggregate CI). Zero kernel-core delta. dev_model_used: claude-opus-4-6. Code review complete 2026-06-20: 4 findings (1 decision-needed + 3 patch), all resolved.
-  10-1b-pen-test-engagement-harness-and-gate-infrastructure: ready-for-dev  # Tier-1 opus-4-8; 3 ACs (AC: pen-test gate infra conditional, engagement harness docs, coverage-matrix NFR-Rel-3/NFR-Sec-7). Merges after 10.1a.
+  10-1b-pen-test-engagement-harness-and-gate-infrastructure: done  # Tier-1 opus-4-8; 3 ACs (AC: pen-test gate infra conditional, engagement harness docs, coverage-matrix NFR-Rel-3/NFR-Sec-7). Merges after 10.1a. dev_model_used: claude-opus-4-6. Code review complete 2026-06-20: 10 findings (2 decision-needed + 8 patch), all resolved.
   10-2-run-the-third-party-trial-n-12-and-adversarial-red-team-gate-at-v1-0: backlog  # Tier-1 opus-4-8; 4 ACs (AC: N=12 trial ≥10/12, cross-form equivalence if rust-inproc active, red-team 80-scenario corpus 8×10 authoring, red-team gate ≥72/80). DEPENDS ON 10.1b.
   10-3-close-v1-0-compliance-gates-export-control-fuzz-hardening-korean-docs-cna-registration: backlog  # Tier-2 opus-4-6; 5 ACs (AC: ECCN export-control, manifest fuzz 24h, wire fuzz 24h, Korean i18n, CNA registration). Korean SR runbook needed (carry-forward from 9.5).
   10-4-ship-the-v1-5-collective-tier-with-postgres-pgvector-and-sqlite-postgres-migration: backlog  # Tier-1 opus-4-8; 4 ACs (AC: Postgres+pgvector Loom-lite MCP, SQLite→Postgres 10⁶-row migration Merkle-root, Mira+Nash bilateral <10ms P95, 14-institution capacity envelope). Can parallel with 10.3.

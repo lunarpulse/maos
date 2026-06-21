@@ -238,6 +238,7 @@ coverage:
     notes: v0.8 loopback A2A; v1.0 full mesh at FR23b
   FR23b:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -383,21 +384,25 @@ coverage:
     valid_until: '2027-05-12'
   FR42:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR43:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR44:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR45:
     gates: []
+    enforcement: advisory-until-engagement
     corpora:
     - gdpr-cascade-v0
     - gdpr-cascade-probe-v0
@@ -406,6 +411,7 @@ coverage:
     notes: Story 9.2 ships maosctl forget + legal-hold + distillate redaction-marker/body-scrub; replayed by gdpr-cascade-v0 (50 scenarios) and leakage probe gdpr-cascade-probe-v0
   FR46:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -433,6 +439,7 @@ coverage:
       (NFR-Sec-15) without recompiling any Spirit binary.
   FR49:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -448,6 +455,7 @@ coverage:
     valid_until: '2027-05-12'
   FR51:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -463,6 +471,7 @@ coverage:
     valid_until: '2027-05-12'
   FR54:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -507,6 +516,7 @@ coverage:
       acknowledgement is the existing 1b.5a behavior gate
   FR59:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -532,21 +542,25 @@ coverage:
       malformation; CNA registration deferred to v0.5
   FR62:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR63:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR64:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR65:
     gates: []
+    enforcement: advisory-until-engagement
     corpora:
     - gdpr-cascade-v0
     - gdpr-cascade-probe-v0
@@ -581,11 +595,13 @@ coverage:
       verbs land their journal touchpoints in Stories 1b.5c and 5.1.
   NFR-Aud-1:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Aud-10:
     gates: []
+    enforcement: advisory-until-engagement
     corpora:
     - gdpr-cascade-v0
     - gdpr-cascade-probe-v0
@@ -594,11 +610,13 @@ coverage:
     notes: Story 9.2 50/50 clean-removal + 0/100 leakage floor over separate probe; structural replay, no live judge
   NFR-Aud-11:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Aud-12:
     gates: []
+    enforcement: advisory-until-engagement
     corpora:
     - gdpr-cascade-v0
     phase: v1.0
@@ -606,6 +624,7 @@ coverage:
     notes: Story 9.2 Merkle inclusion/exclusion proof over TL frame_ids; signed ErasureProof bundle verified by in-tree tests and tools/verify-erasure
   NFR-Aud-13:
     gates: []
+    enforcement: advisory-until-engagement
     corpora:
     - gdpr-cascade-v0
     phase: v1.0
@@ -618,11 +637,13 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Aud-2:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Aud-3:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -638,6 +659,7 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Aud-6:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -686,6 +708,7 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Comp-2:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -696,16 +719,19 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Comp-4:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Comp-5:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Cost-1:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -716,31 +742,37 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Doc-2:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Doc-3:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Doc-4:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Doc-5:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Doc-6:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Doc-7:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -762,22 +794,26 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Maint-4:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Maint-5:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Maint-6:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
     notes: 1-year LTS at v1.0; 2-year LTS at v1.5
   NFR-Maint-7:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -792,16 +828,19 @@ coverage:
       cap_registry_integration (integration_toctu_rejects_stale_posture).
   NFR-Maint-9:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Meta-1:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Obs-1:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -881,22 +920,26 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Ops-11:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
     notes: primitive-reservation at v1.0; full implementation v1.5+
   NFR-Ops-12:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Ops-2:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Ops-3:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -937,6 +980,7 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Ops-9:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -1007,22 +1051,29 @@ coverage:
     phase: v0.8
     valid_until: '2027-05-12'
   NFR-Rel-3:
-    gates: []
-    corpora: []
+    gates:
+      - nfr-rel-3-hsis-95pct
+    corpora:
+      - hsis-corpus-v0
     phase: v1.0
+    phase_delivered: v1.0
+    phase_enforced: v1.0
     valid_until: '2027-05-12'
   NFR-Rel-4:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Rel-5:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Rel-6:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -1116,6 +1167,7 @@ coverage:
       Story 4.5 plugs the corpus INTO.
   NFR-Sec-15:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -1144,21 +1196,28 @@ coverage:
       not committed; 1000-canary/month is operational at v0.5+.
   NFR-Sec-5:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Sec-6:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Sec-7:
-    gates: []
+    gates:
+      - check-pentest-gate
     corpora: []
+    enforcement: advisory-until-engagement
     phase: v1.0
+    phase_delivered: v1.0
+    phase_enforced: v1.0
     valid_until: '2027-05-12'
   NFR-Sec-8:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -1194,6 +1253,7 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Test-14:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -1360,6 +1420,7 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Test-8:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'

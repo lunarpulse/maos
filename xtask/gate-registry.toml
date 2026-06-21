@@ -51,4 +51,13 @@ gates = [
     "nfr-onb-1-gate",
     # Story 9.6 AC-5 — retired founder/J4 smoke-arm literal reappearance guard.
     "check-literal-reappearance",
+    # Story 10.1b AC1 — pen-test gate (conditional: advisory-if-absent).
+    "check-pentest-gate",
+    # Story 10.1b AC3 — v1.0 NFR coverage-matrix completeness (no empty gates).
+    "check-coverage-matrix-completeness",
 ]
+
+# Story 10.1b AC2 — OWASP Risk Rating Methodology freeze hash.
+# Stored in the invariant-locked registry so any edit to the OWASP doc
+# requires a registry update, which is auditable and protected by review.
+owasp_freeze_hash = "2c4df8094d116903261320ad2999290671c3129beb71e740d690a43f56816f20"

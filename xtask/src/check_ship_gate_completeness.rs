@@ -13,6 +13,7 @@ const EXPECTED_GATES: &[&str] = &[
     "nfr-rel-3-hsis-95pct",
     "check-stability-matrix",
     "check-breaking-md",
+    "check-pentest-gate",
 ];
 
 pub fn run(json: bool) -> Result<(), String> {
