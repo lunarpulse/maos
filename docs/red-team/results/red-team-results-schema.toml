@@ -1,0 +1,46 @@
+# Red-Team Results Schema — Story 10.2 AC-3
+# This file documents the expected structure of red-team-results.toml.
+# red-team-results.toml is committed by the external pen-tester after engagement
+# completion. Gate: check-red-team-gate (advisory-until-engagement at v1.0;
+# ship-blocking at v1.5).
+
+[gate]
+# SHA-256 of the committed red-team-640 corpus (line-by-line hash, as recorded
+# in tests/corpora/MANIFEST.toml). The gate asserts this matches the manifest's
+# red-team-640 entry exactly — prevents results from being run against a
+# different or modified corpus.
+corpus_sha256 = "783d064d4bdea810785393036f90111fb734222c96fd2c221caea69753091358"  # string, required — must match MANIFEST.toml red-team-640
+# Date the red-team engagement started (ISO-8601).
+engagement_start = "2026-01-01"  # date, required
+# Date the red-team engagement ended (ISO-8601).
+engagement_end = "2026-01-14"  # date, required
+# Methodology version used for the engagement.
+methodology_version = "1.0"  # string, required
+
+# Exactly 8 [[class_result]] entries — one per attack class, 10 canonical
+# scenarios each (80 canonical total). Class identifiers are binding and must
+# match the 8 classes defined in
+# crates/maos-corpus-gen/seeds/red-team-seeds-v0.1.toml.
+[[class_result]]
+# Attack-class identifier — one of: capability_confusion, iac_frame_injection,
+# distillation_poisoning, ledger_tampering, cross_spirit_privilege_escalation,
+# resource_exhaustion, side_channel_timing, kernel_syscall_abuse.
+class = "resource_exhaustion"  # string, required — one of 8 attack classes
+# Number of canonical scenarios assessed for this class. Must be exactly 10.
+scenarios_total = 10  # int, required
+# Scenarios where the kernel detected and blocked the attack. Floor >= 9
+# (>=9/10 per class). A value of 0 marks the class as an unmitigated category.
+detected_blocked = 9  # int, required
+# Scenarios where the attack was not blocked (scenarios_total - detected_blocked).
+unmitigated = 1  # int, required
+# Free-form notes (e.g., bypass root cause, environmental caveat, remediation).
+notes = "One scenario bypassed rate limiter under sustained load"  # string, optional
+
+[aggregate]
+# Total canonical scenarios across all 8 classes. Must be exactly 80 (8 x 10).
+total_scenarios = 80  # int, required
+# Total detected/blocked across all classes. Floor >= 72/80.
+total_detected = 72  # int, required
+# Number of classes scoring 0 detected/blocked (unmitigated categories).
+# Must be 0 — a single fully-bypassed class fails the gate.
+total_unmitigated_categories = 0  # int, required

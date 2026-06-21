@@ -479,3 +479,11 @@ and `check-epic-close-green` (§A5) added. YAML re-validated.
 - **`query_approvals` ordering semantic change** — changed from `timestamp_ns ASC` to `decision_id ASC`; intentional per Review #5/R8 to eliminate non-monotonic-clock LWW hazard, but it is a behavior change to a public read API. `crates/maos-iac/src/adapter/transparency_log.rs:1305-1307`
 - **Reconcile keys on raw target string, `parse_approval_target` removed** — intentional per Review #13; safe today because `SkillId` charset excludes `@`, but it abandons the bidirectional "cannot drift" guarantee R6 originally sought. `crates/maos-cli/src/subcommands.rs:334`
 - **`entry_path` provenance fidelity for CLI-discovered skills** — filesystem discovery (`discover_skills_detailed`) has no provenance signal, so 9.7 caches discovered skills as `package_shipped`. Faithful provenance (`AuthorSelf`/`RevisionProposal`) is an enqueue-time concept owned by the Epic-10 F6b/R8 daemon-enqueue seam. **Constraint:** any future daemon admission-enforcement logic must key on the TL decided-set (approve/reject capability rows), NEVER on the cached `entry_path` label. Add a pinning test that fails when discovery gains a provenance signal or the daemon starts writing enqueue rows, forcing the follow-up. `crates/maos-cli/src/subcommands.rs:425-430`
+
+## Deferred from: code review of story-10.2 (2026-06-21) — RESOLVED pre-completion
+
+Both items below were resolved during story 10.2 completion (per Lunarpulse).
+Extracted to `xtask/src/gate_common.rs` and applied to all 4 gate modules:
+
+- ✅ **Date validation** — now uses `chrono::NaiveDate::parse_from_str("%Y-%m-%d")` in `gate_common::validate_dates`; rejects impossible dates (`2026-99-99`), enforces `start <= end` ordering.
+- ✅ **`--json` mode workflow commands** — `gate_common::emit_command` documents the stderr/stdout split; structured warning/error fields in the JSON payload (`advisory`, `failures`, `consistency_ok`) let programmatic consumers assert on JSON, not stderr.

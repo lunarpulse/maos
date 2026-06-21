@@ -2050,6 +2050,70 @@ jobs:
             exit 1
           fi
           echo "OWASP freeze hash verified: $ACTUAL_HASH"
+
+  # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
+  check-third-party-trial:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check third-party trial results
+        run: |
+          if [ -f docs/third-party-trial/results/trial-results.toml ]; then
+            cargo run -p xtask -- check-third-party-trial
+          else
+            echo "::warning::Third-party trial pending — trial-results.toml absent"
+            echo "## ⚠️ Third-Party Trial Gate: ADVISORY" >> "$GITHUB_STEP_SUMMARY"
+            echo "Trial has not yet been executed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate (ADVISORY per ADR-040).
+  check-cross-form-equiv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check cross-form equivalence results
+        run: |
+          if [ -f docs/cross-form/results/cross-form-results.json ]; then
+            cargo run -p xtask -- check-cross-form-equiv
+          else
+            echo "::warning::Cross-form equivalence pending — cross-form-results.json absent"
+            echo "## ⚠️ Cross-Form Equivalence Gate: ADVISORY" >> "$GITHUB_STEP_SUMMARY"
+            echo "Cross-form equivalence testing has not yet been executed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
+  check-red-team-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check red-team gate results
+        run: |
+          if [ -f docs/red-team/results/red-team-results.toml ]; then
+            cargo run -p xtask -- check-red-team-gate
+          else
+            echo "::warning::Red-team engagement pending — red-team-results.toml absent"
+            echo "## ⚠️ Red-Team Gate: ADVISORY" >> "$GITHUB_STEP_SUMMARY"
+            echo "Red-team engagement has not yet been executed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2063,6 +2127,9 @@ jobs:
       - check-pentest-gate
       - check-coverage-matrix-completeness
       - check-owasp-freeze-hash
+      - check-third-party-trial
+      - check-cross-form-equiv
+      - check-red-team-gate
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2077,6 +2144,9 @@ jobs:
           echo "| check-pentest-gate | ${{ needs.check-pentest-gate.result }} | cargo run -p xtask -- check-pentest-gate |"
           echo "| check-coverage-matrix-completeness | ${{ needs.check-coverage-matrix-completeness.result }} | cargo run -p xtask -- check-coverage-matrix-completeness |"
           echo "| check-owasp-freeze-hash | ${{ needs.check-owasp-freeze-hash.result }} | sha256sum --check docs/pen-test/owasp-risk-rating-v1.0-frozen.md.sha256 |"
+          echo "| check-third-party-trial | ${{ needs.check-third-party-trial.result }} | cargo run -p xtask -- check-third-party-trial |"
+          echo "| check-cross-form-equiv | ${{ needs.check-cross-form-equiv.result }} | cargo run -p xtask -- check-cross-form-equiv |"
+          echo "| check-red-team-gate | ${{ needs.check-red-team-gate.result }} | cargo run -p xtask -- check-red-team-gate |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2090,6 +2160,9 @@ jobs:
           echo "  check-pentest-gate: ${{ needs.check-pentest-gate.result }}"
           echo "  check-coverage-matrix-completeness: ${{ needs.check-coverage-matrix-completeness.result }}"
           echo "  check-owasp-freeze-hash: ${{ needs.check-owasp-freeze-hash.result }}"
+          echo "  check-third-party-trial: ${{ needs.check-third-party-trial.result }}"
+          echo "  check-cross-form-equiv: ${{ needs.check-cross-form-equiv.result }}"
+          echo "  check-red-team-gate: ${{ needs.check-red-team-gate.result }}"
           exit 1
       - check-unsafe
       - kloc-check
@@ -2205,6 +2278,9 @@ jobs:
       - check-pentest-gate
       - check-coverage-matrix-completeness
       - check-owasp-freeze-hash
+      - check-third-party-trial
+      - check-cross-form-equiv
+      - check-red-team-gate
     if: always()
     permissions:
       pull-requests: write
@@ -2413,4 +2489,38 @@ jobs:
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
           echo "One or more discipline gates failed."
+          exit 1
+
+  # Story 10.2 D3/F3→B — v1.5 Ship-Gate Aggregate: the phase-graduation mechanism.
+  # Mirrors v1.0-ship-gate membership but enforces gates whose registry disposition
+  # flips to "blocking-when-present" at v1.5 (currently: check-red-team-gate).
+  # This job exists NOW (advisory at v1.0 — all sub-gates pass advisory) so the
+  # v1.5 cutover is a disposition flip in gate-registry.toml, not an infrastructure
+  # fire-drill. Promoted to the top-level aggregate needs once phase == v1.5.
+  v1-5-ship-gate:
+    runs-on: ubuntu-latest
+    needs:
+      - v1-0-ship-gate
+      - check-red-team-gate
+      - check-cross-form-equiv
+      - check-third-party-trial
+    if: always()
+    steps:
+      - name: v1.5 ship gate summary
+        run: |
+          echo "=== v1.5 Ship Gate Results ==="
+          echo ""
+          echo "| Gate | Status | Disposition @ v1.5 |"
+          echo "|------|--------|---------------------|"
+          echo "| v1-0-ship-gate | ${{ needs.v1-0-ship-gate.result }} | blocking (inherited) |"
+          echo "| check-red-team-gate | ${{ needs.check-red-team-gate.result }} | blocking-when-present |"
+          echo "| check-cross-form-equiv | ${{ needs.check-cross-form-equiv.result }} | advisory |"
+          echo "| check-third-party-trial | ${{ needs.check-third-party-trial.result }} | blocking-when-present |"
+          echo ""
+          echo "Phase disposition source: xtask/gate-registry.toml [[ship_gate]] entries."
+      - name: Fail if any v1.5-blocking gate failed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "v1.5 ship gate FAILED: one or more v1.5-blocking sub-gates did not pass."
+          echo "  check-red-team-gate: ${{ needs.check-red-team-gate.result }}"
           exit 1

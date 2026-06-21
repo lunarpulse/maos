@@ -1,8 +1,11 @@
 #![forbid(unsafe_code)]
 
-//! Story 10.1a AC4 — xtask CI lint: asserts expected gate job names are
-//! present in the `v1.0-ship-gate` aggregate job's `needs:` array in
-//! `discipline.yml`.
+//! Story 10.1a AC4 + Story 10.2 D3 — xtask CI lint with two checks:
+//! 1. Asserts expected gate job names are present in the `v1.0-ship-gate` aggregate
+//!    job's `needs:` array in `discipline.yml`.
+//! 2. D3/F3→B: validates that every ship gate has a `[[ship_gate]]` entry in
+//!    `gate-registry.toml` with an explicit phase disposition — mechanizing the
+//!    advisory→blocking graduation so the "WILL block at v1.5" promise is testable.
 
 use std::path::Path;
 
@@ -14,6 +17,9 @@ const EXPECTED_GATES: &[&str] = &[
     "check-stability-matrix",
     "check-breaking-md",
     "check-pentest-gate",
+    "check-third-party-trial",
+    "check-cross-form-equiv",
+    "check-red-team-gate",
 ];
 
 pub fn run(json: bool) -> Result<(), String> {
@@ -29,6 +35,36 @@ pub fn run(json: bool) -> Result<(), String> {
         if !needs.contains(&gate.to_string()) {
             missing.push(gate);
         }
+    }
+
+    // D3/F3→B: validate that every ship gate has a [[ship_gate]] disposition entry
+    // in gate-registry.toml. This mechanizes the advisory→blocking graduation.
+    let registry_path = Path::new("xtask/gate-registry.toml");
+    let registry: crate::corpus_types::ShipGateRegistry = crate::corpus_types::load_toml(registry_path)
+        .map_err(|e| format!("cannot load ship-gate registry: {e}"))?;
+    let registry_names: std::collections::HashSet<&str> =
+        registry.ship_gates.iter().map(|e| e.name.as_str()).collect();
+    let mut missing_disposition: Vec<&str> = Vec::new();
+    for gate in EXPECTED_GATES {
+        // v1.0 infrastructure gates (ccac, hsis, stability, breaking) predate the
+        // disposition registry; only the Story-10.x ship gates require [[ship_gate]] entries.
+        let is_story10_ship_gate = matches!(*gate,
+            "check-pentest-gate" | "check-third-party-trial" |
+            "check-cross-form-equiv" | "check-red-team-gate"
+        );
+        if is_story10_ship_gate && !registry_names.contains(gate) {
+            missing_disposition.push(gate);
+        }
+    }
+    if !missing_disposition.is_empty() {
+        let msg = format!(
+            "ship-gate completeness check FAILED: gates missing [[ship_gate]] disposition in gate-registry.toml: [{}]",
+            missing_disposition.join(", ")
+        );
+        if !json {
+            eprintln!("{msg}");
+        }
+        return Err(msg);
     }
 
     let passed = missing.is_empty();

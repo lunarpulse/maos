@@ -1130,9 +1130,11 @@ coverage:
     valid_until: '2027-05-12'
     notes: T0/T1/T2 at v0.1; T3 at v0.5; T4 WASM at v2.0+
   NFR-Sec-10:
-    gates: []
+    gates:
+    - check-red-team-gate
     corpora:
     - red-team-640
+    enforcement: advisory-until-engagement
     phase: v1.5
     valid_until: '2027-05-12'
     notes: 80→640 items via 8× parameter expansion; consumed by Story 10.2 at v1.5
@@ -1414,13 +1416,22 @@ coverage:
       (gold_label match + per-bucket count); judge-LLM agreement layer is a
       later story.
   NFR-Test-7:
-    gates: []
+    gates:
+    - check-cross-form-equiv
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
+    notes: CLI-wrapper-only cross-form distributional equivalence per ADR-040
+      (rust-inproc deferred to v2.0+). Advisory gate.
   NFR-Test-8:
-    gates: []
-    enforcement: advisory-until-engagement
+    gates:
+    - check-third-party-trial
+    enforcement: blocking-when-present
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: Third-party trial N=12 gate. Wilson CI advisory, raw count + stratification
+      + per-participant conjunction BLOCKING when results are present (derive-from-detail:
+      successes and strata reconciled against participant records). Absent = advisory
+      (trial pending). Distinct from NFR-Test-7/NFR-Sec-10 which are advisory at v1.0.

@@ -6,6 +6,7 @@ mod abi_diff;
 mod bypass_scan;
 mod calibrate;
 mod cassette_age_gate;
+mod gate_common;
 mod check_a2a_sender_completeness;
 mod check_abi_ratification;
 mod check_adr_040_accepted;
@@ -24,6 +25,9 @@ mod check_env_contract;
 mod check_literal_reappearance;
 mod check_epic_6_bridge;
 mod check_pentest_gate;
+mod check_third_party_trial;
+mod check_cross_form_equiv;
+mod check_red_team_gate;
 mod check_epic_close_green;
 mod check_error_catalog;
 mod check_fr47;
@@ -638,6 +642,30 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 10.2 AC1 — third-party trial N=12 gate: parse trial-results.toml,
+    /// assert successes >= 10 + stratification + per-participant validation,
+    /// Wilson CI advisory (conditional per calibrate-per-commit).
+    #[command(name = "check-third-party-trial")]
+    CheckThirdPartyTrial {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate
+    /// (ADVISORY per ADR-040 rust-inproc deferral). Validates pre-committed
+    /// Mann-Whitney U-test artifact.
+    #[command(name = "check-cross-form-equiv")]
+    CheckCrossFormEquiv {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase).
+    /// Per-class floor ≥9/10, aggregate ≥72/80, 0 unmitigated categories.
+    /// Advisory at v1.0 with "WOULD HAVE BLOCKED SHIP" banner on failure.
+    #[command(name = "check-red-team-gate")]
+    CheckRedTeamGate {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -943,6 +971,9 @@ fn main() {
         Commands::CheckShipGateCompleteness { json } => check_ship_gate_completeness::run(json),
         Commands::CheckPentestGate { json } => check_pentest_gate::run(json),
         Commands::CheckCoverageMatrixCompleteness { json } => check_coverage_matrix_completeness::run(json),
+        Commands::CheckThirdPartyTrial { json } => check_third_party_trial::run(json),
+        Commands::CheckCrossFormEquiv { json } => check_cross_form_equiv::run(json),
+        Commands::CheckRedTeamGate { json } => check_red_team_gate::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

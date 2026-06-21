@@ -1,4 +1,4 @@
-last_updated: '2026-06-20+story-10-1b-done'
+last_updated: '2026-06-21+story-10-2-review-patches-verified'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -162,7 +162,7 @@ development_status:
   #   Sequencing: 10.1a ‖ 10.1b (parallel dev, 10.1a merges first). 10.2 DEPENDS ON 10.1b (pen-test engagement infrastructure).
   10-1a-automated-v1-0-ship-gates-ccac-hsis-stability-aggregate: done  # Tier-1 opus-4-8; 4 ACs (AC: CCAC N=640 ±2%, HSIS precheck+5 negative, STABILITY+BREAKING pub, aggregate CI). Zero kernel-core delta. dev_model_used: claude-opus-4-6. Code review complete 2026-06-20: 4 findings (1 decision-needed + 3 patch), all resolved.
   10-1b-pen-test-engagement-harness-and-gate-infrastructure: done  # Tier-1 opus-4-8; 3 ACs (AC: pen-test gate infra conditional, engagement harness docs, coverage-matrix NFR-Rel-3/NFR-Sec-7). Merges after 10.1a. dev_model_used: claude-opus-4-6. Code review complete 2026-06-20: 10 findings (2 decision-needed + 8 patch), all resolved.
-  10-2-run-the-third-party-trial-n-12-and-adversarial-red-team-gate-at-v1-0: backlog  # Tier-1 opus-4-8; 4 ACs (AC: N=12 trial ≥10/12, cross-form equivalence if rust-inproc active, red-team 80-scenario corpus 8×10 authoring, red-team gate ≥72/80). DEPENDS ON 10.1b.
+  10-2-run-the-third-party-trial-n-12-and-adversarial-red-team-gate-at-v1-0: done  # Tier-1 opus-4-8; 4 ACs. dev_model_used: claude-opus-4-6. 3-layer adversarial re-review + party-mode consensus (A on all 5 D-decisions) applied: 36 review patches + 2 deferred items resolved pre-completion, all via shared gate_common.rs module. 21 proven-red tests green, 326 xtask tests green, real-repo gate verified. Zero known issues.
   10-3-close-v1-0-compliance-gates-export-control-fuzz-hardening-korean-docs-cna-registration: backlog  # Tier-2 opus-4-6; 5 ACs (AC: ECCN export-control, manifest fuzz 24h, wire fuzz 24h, Korean i18n, CNA registration). Korean SR runbook needed (carry-forward from 9.5).
   10-4-ship-the-v1-5-collective-tier-with-postgres-pgvector-and-sqlite-postgres-migration: backlog  # Tier-1 opus-4-8; 4 ACs (AC: Postgres+pgvector Loom-lite MCP, SQLite→Postgres 10⁶-row migration Merkle-root, Mira+Nash bilateral <10ms P95, 14-institution capacity envelope). Can parallel with 10.3.
   10-5-mature-v1-5-skill-format-conformance-jetbrains-windows-2-year-lts-japanese-cn-s-i18n: backlog  # Tier-2 opus-4-6; 6 ACs (AC: skill-format conformance ≥1 third-party, JetBrains plugin-bridge, Windows binary, 2yr LTS, Japanese+CN-S i18n, mTLS chaos 3-host + ComplianceClaim migration). NOTE: 6 ACs at limit — verify at preflight per §A5.

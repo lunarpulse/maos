@@ -1,0 +1,27 @@
+# Trial Results Schema — Story 10.2 AC-1
+# This file documents the expected schema for trial-results.toml.
+# The actual results file will be committed after the trial completes.
+
+[trial]
+participants_total = 12  # int, >= 12
+successes = 10           # int, >= 10 (blocking gate)
+trial_start = "2026-01-01" # ISO-8601 date
+trial_end = "2026-01-14"   # ISO-8601 date
+methodology_version = "1.0" # semver string
+
+# Stratification verification — each must meet minimum
+no_prior_contribution = 4  # int, >= 4
+no_rust_spirit = 3         # int, >= 3
+no_rust = 2                # int, >= 2
+non_english = 2            # int, >= 2
+offline_only = 1           # int, >= 1
+
+[[participant]]
+id = "P001"                      # unique participant identifier
+stratum = ["no_prior_contribution", "non_english"]  # list of strata
+produced_binary = true           # bool
+binary_loads = true              # bool
+frames_run = 1500                # int, >= 1000 for success
+halt_recall = 0.92               # float, >= 0.85 for success
+sbom_verified = true             # bool (operational, not gate logic)
+signing_chain_verified = true    # bool (operational, not gate logic)

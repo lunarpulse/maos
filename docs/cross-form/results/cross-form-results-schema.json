@@ -1,0 +1,19 @@
+{
+  "$comment": "Story 10.2 AC-2 — Cross-Form Results Schema. This file documents the expected schema for cross-form-results.json. The actual results file will be committed after CLI-wrapper vs subprocess distributional equivalence testing.",
+  "test_metadata": {
+    "spirit_name": "hello",
+    "spirit_version": "0.1.0",
+    "run_date": "2026-01-01",
+    "environment": "ubuntu-24.04-x86_64",
+    "cli_wrapper_runs": 30,
+    "subprocess_runs": 30
+  },
+  "results": {
+    "u_statistic": 450.0,
+    "p_value": 0.95,
+    "sample_size_cli": 30,
+    "sample_size_sub": 30,
+    "per_run_hashes_cli": ["sha256-of-output-frame-1", "..."],
+    "per_run_hashes_sub": ["sha256-of-output-frame-1", "..."]
+  }
+}

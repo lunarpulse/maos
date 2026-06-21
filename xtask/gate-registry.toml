@@ -55,7 +55,36 @@ gates = [
     "check-pentest-gate",
     # Story 10.1b AC3 — v1.0 NFR coverage-matrix completeness (no empty gates).
     "check-coverage-matrix-completeness",
+    # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
+    "check-third-party-trial",
+    # Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate (advisory per ADR-040).
+    "check-cross-form-equiv",
+    # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
+    "check-red-team-gate",
 ]
+
+# D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
+# The flat `gates` list above is the coverage-matrix validation set (NFR-Meta-3).
+# The `[[ship_gate]]` table below records each Story-10.x ship gate's verdict
+# disposition per phase, mechanizing the advisory→blocking cutover. The
+# `check-ship-gate-completeness` lint and the `v1.5-ship-gate` aggregate job
+# consume this to enforce that a gate's phase disposition is explicit and that
+# the "WILL block at v1.5" promise is testable, not aspirational.
+[[ship_gate]]
+name = "check-pentest-gate"
+disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present" }
+
+[[ship_gate]]
+name = "check-third-party-trial"
+disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present" }
+
+[[ship_gate]]
+name = "check-cross-form-equiv"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[ship_gate]]
+name = "check-red-team-gate"
+disposition = { v1_0 = "advisory", v1_5 = "blocking-when-present" }
 
 # Story 10.1b AC2 — OWASP Risk Rating Methodology freeze hash.
 # Stored in the invariant-locked registry so any edit to the OWASP doc

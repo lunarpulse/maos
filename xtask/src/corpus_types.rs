@@ -70,6 +70,25 @@ pub struct GateRegistry {
     pub gates: Vec<String>,
 }
 
+/// D3/F3→B: per-gate phase disposition. A gate's verdict blocks ship only at/after
+/// the phase where its disposition becomes "blocking". The map is keyed by phase
+/// identifier (e.g. "v1.0", "v1.5"); absent phases inherit the nearest prior phase.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct ShipGateEntry {
+    pub name: String,
+    pub disposition: std::collections::HashMap<String, String>,
+}
+
+/// Extended registry shape: the flat `gates` list (for coverage-matrix validation)
+/// plus the structured `[[ship_gate]]` entries (for phase-graduation enforcement).
+/// `ship_gates` is optional for backward compat with registries that haven't migrated.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct ShipGateRegistry {
+    pub gates: Vec<String>,
+    #[serde(default, rename = "ship_gate")]
+    pub ship_gates: Vec<ShipGateEntry>,
+}
+
 /// Judge direct-call identifiers TOML shape.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct JudgeDirectCallIdentifiers {
