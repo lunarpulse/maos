@@ -11,7 +11,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1", features = ["derive"] }
 maos-kernel-core = { path = ".." }
-maos-domain = { path "../../maos-domain" }
+maos-domain = { path = "../../maos-domain" }
 
 [[bin]]
 name = "cap_token_verify"

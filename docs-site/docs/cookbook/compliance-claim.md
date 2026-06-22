@@ -1,7 +1,7 @@
 ---
 title: Compliance Claims
 sidebar_position: 10
-description: Attaching a ComplianceClaimEnvelope to a Spirit for auditability and trust verification.
+description: Attaching a `ComplianceClaimEnvelope` to a Spirit for auditability and trust verification.
 ---
 
 # Compliance Claims

@@ -2114,6 +2114,90 @@ jobs:
             echo "Red-team engagement has not yet been executed." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  # Story 10.3 AC-1 (NFR-Comp-1) — export-control classification gate.
+  # ECCN doc present + STABILITY.md §Export non-stub + crypto enumeration.
+  check-export-control:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check export-control classification
+        run: cargo run -p xtask -- check-export-control --json
+
+  # Story 10.3 AC-5 (NFR-Ops-4) — CNA registration gate (blocking-when-present).
+  check-cna-registration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check CNA registration
+        run: cargo run -p xtask -- check-cna-registration --json
+
+  # Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — fuzz-target existence gate (mechanics).
+  check-fuzz-targets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check fuzz targets
+        run: cargo run -p xtask -- check-fuzz-targets --json
+
+  # Story 10.3 AC-2/AC-3 — pre-merge fuzz BUILD gate (preflight F3: build-only).
+  # The 24h T1/T2/T3 runs are operational (docs/runbooks/fuzz-cadence.md); this
+  # gate only asserts the harnesses compile against libfuzzer-sys + nightly.
+  fuzz-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install nightly + cargo-fuzz
+        run: |
+          rustup toolchain install nightly --component rust-src
+          cargo install cargo-fuzz --locked
+      - name: Build manifest parser fuzz target
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-manifest/fuzz manifest_parser
+      - name: Build wire-protocol fuzz target
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-domain/fuzz frame_deser
+
+  # Story 10.3 AC-4 (NFR-Doc-6) — Korean localization ship gate.
+  # KO_COVERAGE_MIN=100 turns the coverage promise into a mechanical gate;
+  # glossary-lock enforces locked-term preservation across all ko files.
+  check-ko-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Install docs-site dependencies
+        working-directory: docs-site
+        run: npm ci
+      - name: Korean canonical-coverage gate (KO_COVERAGE_MIN=100)
+        working-directory: docs-site
+        run: KO_COVERAGE_MIN=100 npm run gate:ko-coverage
+      - name: Korean glossary-lock gate
+        working-directory: docs-site
+        run: npm run gate:glossary-lock
+
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2130,6 +2214,11 @@ jobs:
       - check-third-party-trial
       - check-cross-form-equiv
       - check-red-team-gate
+      - check-export-control
+      - check-cna-registration
+      - check-fuzz-targets
+      - fuzz-build
+      - check-ko-coverage
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2147,6 +2236,11 @@ jobs:
           echo "| check-third-party-trial | ${{ needs.check-third-party-trial.result }} | cargo run -p xtask -- check-third-party-trial |"
           echo "| check-cross-form-equiv | ${{ needs.check-cross-form-equiv.result }} | cargo run -p xtask -- check-cross-form-equiv |"
           echo "| check-red-team-gate | ${{ needs.check-red-team-gate.result }} | cargo run -p xtask -- check-red-team-gate |"
+          echo "| check-export-control | ${{ needs.check-export-control.result }} | cargo run -p xtask -- check-export-control |"
+          echo "| check-cna-registration | ${{ needs.check-cna-registration.result }} | cargo run -p xtask -- check-cna-registration |"
+          echo "| check-fuzz-targets | ${{ needs.check-fuzz-targets.result }} | cargo run -p xtask -- check-fuzz-targets |"
+          echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser) |"
+          echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2163,6 +2257,11 @@ jobs:
           echo "  check-third-party-trial: ${{ needs.check-third-party-trial.result }}"
           echo "  check-cross-form-equiv: ${{ needs.check-cross-form-equiv.result }}"
           echo "  check-red-team-gate: ${{ needs.check-red-team-gate.result }}"
+          echo "  check-export-control: ${{ needs.check-export-control.result }}"
+          echo "  check-cna-registration: ${{ needs.check-cna-registration.result }}"
+          echo "  check-fuzz-targets: ${{ needs.check-fuzz-targets.result }}"
+          echo "  fuzz-build: ${{ needs.fuzz-build.result }}"
+          echo "  check-ko-coverage: ${{ needs.check-ko-coverage.result }}"
           exit 1
       - check-unsafe
       - kloc-check

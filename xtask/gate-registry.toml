@@ -61,6 +61,13 @@ gates = [
     "check-cross-form-equiv",
     # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
     "check-red-team-gate",
+    # Story 10.3 AC-1/2/3/4/5 — v1.0 compliance ship-gates.
+    "check-export-control",
+    "check-fuzz-targets",
+    "check-cna-registration",
+    "check-ko-coverage",
+    # Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time, advisory-until-90d).
+    "check-fuzz-floor",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -85,6 +92,42 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory" }
 [[ship_gate]]
 name = "check-red-team-gate"
 disposition = { v1_0 = "advisory", v1_5 = "blocking-when-present" }
+
+[[ship_gate]]
+name = "check-export-control"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-fuzz-targets"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-cna-registration"
+disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-ko-coverage"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+# Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — pre-merge fuzz BUILD prerequisite.
+# `fuzz-build` runs `cargo +nightly fuzz build` for both targets; it is a
+# `needs:` dependency of `v1-0-ship-gate` (the aggregate fails if it fails) so
+# its disposition is recorded here for registry completeness.
+[[ship_gate]]
+name = "fuzz-build"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+# Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time, NOT per-merge).
+# `check-fuzz-floor` sums fuzz-ledger cpu_seconds over the trailing 90-day
+# window and blocks the v1.0 GA release if the per-target (>=72 CPU-hr) or
+# aggregate (>=1000 CPU-hr) floor is unmet. Advisory (warn-only) until the
+# ledger spans >= 90 days of history — the bootstrap window in which the floor
+# is logically unsatisfiable. Run via workflow_dispatch at release time; not a
+# `v1-0-ship-gate` per-merge `needs:` entry (a merge must not block on nightly
+# fuzz cadence).
+[[ship_gate]]
+name = "check-fuzz-floor"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 
 # Story 10.1b AC2 — OWASP Risk Rating Methodology freeze hash.
 # Stored in the invariant-locked registry so any edit to the OWASP doc

@@ -23,6 +23,11 @@ const KO_DOCS = path.join(
   __dirname, "..", "i18n", "ko",
   "docusaurus-plugin-content-docs", "current"
 );
+const EN_ABI = path.join(__dirname, "..", "abi", "v1");
+const KO_ABI = path.join(
+  __dirname, "..", "i18n", "ko",
+  "docusaurus-plugin-content-docs-abi", "current"
+);
 
 function parseLocalesMd(content) {
   const lockedTerms = [];
@@ -66,11 +71,22 @@ function parseLocalesMd(content) {
   return { lockedTerms, denylist };
 }
 
+// A locked term counts only at identifier boundaries so "Spirit" is NOT
+// satisfied by embedded occurrences in "SpiritVtable"/"SpiritId" (a standalone
+// "Spirit"→"스피릿" mistranslation could otherwise pass if embedded counts held).
+function isIdentChar(ch) {
+  return /[A-Za-z0-9_-]/.test(ch);
+}
+
 function countOccurrences(text, term) {
   let count = 0;
   let pos = 0;
   while ((pos = text.indexOf(term, pos)) !== -1) {
-    count++;
+    const before = pos > 0 ? text[pos - 1] : "";
+    const after = pos + term.length < text.length ? text[pos + term.length] : "";
+    if (!isIdentChar(before) && !isIdentChar(after)) {
+      count++;
+    }
     pos += term.length;
   }
   return count;
@@ -90,6 +106,38 @@ function walkMdFiles(dir) {
   return results;
 }
 
+function checkPair(enDir, koDir, label, lockedTerms, denylist) {
+  const violations = [];
+  const enFiles = walkMdFiles(enDir);
+  let koFileCount = 0;
+  for (const enFile of enFiles) {
+    const relPath = path.relative(enDir, enFile);
+    const koFile = path.join(koDir, relPath);
+    // Skip if no Korean counterpart (fallback to English is OK per AC-4).
+    if (!fs.existsSync(koFile)) continue;
+    koFileCount++;
+    const enContent = fs.readFileSync(enFile, "utf-8");
+    const koContent = fs.readFileSync(koFile, "utf-8");
+    for (const term of lockedTerms) {
+      const enCount = countOccurrences(enContent, term);
+      const koCount = countOccurrences(koContent, term);
+      if (enCount > 0 && koCount < enCount) {
+        violations.push(
+          `LOCKED_TERM [${label}]: ${relPath}: "${term}" appears ${enCount}x in en but ${koCount}x in ko`
+        );
+      }
+    }
+    for (const { english, badKorean } of denylist) {
+      if (koContent.includes(badKorean)) {
+        violations.push(
+          `DENYLIST [${label}]: ${relPath}: found forbidden translation "${badKorean}" for "${english}"`
+        );
+      }
+    }
+  }
+  return { violations, koFileCount, enFileCount: enFiles.length };
+}
+
 function main() {
   if (!fs.existsSync(LOCALES_MD)) {
     console.error("FAIL: LOCALES.md not found at", LOCALES_MD);
@@ -102,55 +150,35 @@ function main() {
     `Loaded ${lockedTerms.length} locked terms, ${denylist.length} denylist entries`
   );
 
-  const violations = [];
+  // Scan BOTH the docs plugin AND the abi plugin (Story 10.3 made abi canonical
+  // for ko-coverage, so its ko translations must pass the same locked-term gate).
+  const pairs = [
+    { en: EN_DOCS, ko: KO_DOCS, label: "docs" },
+    { en: EN_ABI, ko: KO_ABI, label: "abi" },
+  ];
 
-  const enFiles = walkMdFiles(EN_DOCS);
-  console.log(`Scanning ${enFiles.length} English doc files`);
-
-  let koFileCount = 0;
-  for (const enFile of enFiles) {
-    const relPath = path.relative(EN_DOCS, enFile);
-    const koFile = path.join(KO_DOCS, relPath);
-
-    // Skip if no Korean counterpart (fallback to English is OK per AC-4)
-    if (!fs.existsSync(koFile)) continue;
-    koFileCount++;
-
-    const enContent = fs.readFileSync(enFile, "utf-8");
-    const koContent = fs.readFileSync(koFile, "utf-8");
-
-    // Check locked terms: count(term, ko) >= count(term, en)
-    for (const term of lockedTerms) {
-      const enCount = countOccurrences(enContent, term);
-      const koCount = countOccurrences(koContent, term);
-      if (enCount > 0 && koCount < enCount) {
-        violations.push(
-          `LOCKED_TERM: ${relPath}: "${term}" appears ${enCount}x in en but ${koCount}x in ko`
-        );
-      }
-    }
-
-    // Check denylist: bad Korean terms must NOT appear
-    for (const { english, badKorean } of denylist) {
-      if (koContent.includes(badKorean)) {
-        violations.push(
-          `DENYLIST: ${relPath}: found forbidden translation "${badKorean}" for "${english}"`
-        );
-      }
-    }
+  const allViolations = [];
+  let totalKoFiles = 0;
+  for (const p of pairs) {
+    const { violations, koFileCount, enFileCount } = checkPair(
+      p.en, p.ko, p.label, lockedTerms, denylist
+    );
+    console.log(`[${p.label}] scanned ${enFileCount} en files; checked ${koFileCount} ko counterparts`);
+    allViolations.push(...violations);
+    totalKoFiles += koFileCount;
   }
 
-  console.log(`Checked ${koFileCount} ko translation files`);
-  if (koFileCount === 0) {
+  console.log(`Checked ${totalKoFiles} ko translation files total`);
+  if (totalKoFiles === 0) {
     console.error(
       "FAIL: glossary-lock — 0 ko translation files checked (i18n/ko/ missing or empty); cannot prove any locked term is preserved"
     );
     process.exit(1);
   }
 
-  if (violations.length > 0) {
-    console.error(`\nFAIL: ${violations.length} glossary-lock violations:\n`);
-    for (const v of violations) {
+  if (allViolations.length > 0) {
+    console.error(`\nFAIL: ${allViolations.length} glossary-lock violations:\n`);
+    for (const v of allViolations) {
       console.error(`  - ${v}`);
     }
     process.exit(1);

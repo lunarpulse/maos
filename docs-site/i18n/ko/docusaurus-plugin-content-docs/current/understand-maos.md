@@ -2,6 +2,7 @@
 title: "MAOS 이해"
 sidebar_position: 3
 description: "MAOS 아키텍처, 불변성, 신뢰 모델"
+review_status: machine
 ---
 
 # MAOS 이해

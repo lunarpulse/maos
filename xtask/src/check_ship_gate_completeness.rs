@@ -20,6 +20,11 @@ const EXPECTED_GATES: &[&str] = &[
     "check-third-party-trial",
     "check-cross-form-equiv",
     "check-red-team-gate",
+    // Story 10.3 AC-1/2/3/4/5 — v1.0 compliance ship-gates.
+    "check-export-control",
+    "check-fuzz-targets",
+    "check-cna-registration",
+    "check-ko-coverage",
 ];
 
 pub fn run(json: bool) -> Result<(), String> {

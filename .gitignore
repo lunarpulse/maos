@@ -5,6 +5,7 @@ _bmad
 graphify-out
 .agents
 target
+crates/*/fuzz/artifacts
 archives
 xtask/tests/fixtures/abi-diff/*/baseline/Cargo.lock
 xtask/tests/fixtures/abi-diff/*/modified/Cargo.lock

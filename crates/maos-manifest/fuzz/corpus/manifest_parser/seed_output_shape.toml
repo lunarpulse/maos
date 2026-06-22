@@ -1,0 +1,2 @@
+[output_shape]
+required_fields = ["introduction", "capability_scope", "posture", "halt_tags", "transparency_log"]

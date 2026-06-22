@@ -702,10 +702,14 @@ coverage:
       gates [] — the test job is wired into discipline.yml directly, not a
       gate-registry gate. v1.5 binding.
   NFR-Comp-1:
-    gates: []
+    gates:
+    - check-export-control
     corpora: []
-    phase: v0.8
+    phase: v1.0
     valid_until: '2027-05-12'
+    notes: Story 10.3 ships the ECCN classification artifact + STABILITY.md §Export
+      preserved fence + check-export-control gate (crypto enumeration). EAR99 ancillary
+      determination on file at docs/compliance/eccn-classification.md.
   NFR-Comp-2:
     gates: []
     enforcement: advisory-until-engagement
@@ -765,11 +769,13 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Doc-6:
-    gates: []
-    enforcement: advisory-until-engagement
+    gates:
+    - check-ko-coverage
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: Story 10.3 ships Korean translations for all canonical doc deliverables;
+      KO_COVERAGE_MIN=100 wired into the docs-site CI gate.
   NFR-Doc-7:
     gates: []
     enforcement: advisory-until-engagement
@@ -946,11 +952,13 @@ coverage:
   NFR-Ops-4:
     gates:
     - check-security-md
+    - check-cna-registration
     corpora: []
-    phase: v0.1
+    phase: v1.0
     valid_until: '2027-05-12'
-    notes: 1a.4 ships SECURITY.md ship-gate via check-security-md xtask;
-      CNA registration through MITRE moves to v0.5 per the phase-split
+    notes: 1a.4 ships SECURITY.md ship-gate via check-security-md; Story 10.3 adds
+      CNA registration evidence + check-cna-registration gate (blocking-when-present).
+      MITRE CNA application submitted 2026-06-22; docs/compliance/cna-registration.md.
   NFR-Ops-5:
     gates: []
     corpora: []
@@ -1197,17 +1205,29 @@ coverage:
     notes: 10⁴ per-commit corpus authored Story 0.5; 10⁵ quarterly is generator-regenerable
       not committed; 1000-canary/month is operational at v0.5+.
   NFR-Sec-5:
-    gates: []
-    enforcement: advisory-until-engagement
+    gates:
+    - check-fuzz-targets
+    - check-fuzz-floor
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: Story 10.3 ships the manifest parser fuzz target (23 from_toml_str entry
+      points); check-fuzz-targets validates harness mechanics; check-fuzz-floor enforces
+      the >=72 CPU-hr/target/90-day floor at release time (advisory until ledger spans
+      >=90d, then hard-fail). INSTRUMENTED — floor accumulating via the nightly
+      fuzz-cadence.yml workflow; GA-enforced, not yet floor-met.
   NFR-Sec-6:
-    gates: []
-    enforcement: advisory-until-engagement
+    gates:
+    - check-fuzz-targets
+    - check-fuzz-floor
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: Story 10.3 ships the wire-protocol fuzz target (IacFrame JSON + serde_cbor
+      deserialization); check-fuzz-targets validates harness mechanics; check-fuzz-floor
+      enforces the per-target (>=72 CPU-hr) + aggregate (>=1000 CPU-hr) floor at release
+      time (advisory until ledger spans >=90d). INSTRUMENTED — floor accumulating via
+      nightly fuzz-cadence.yml; GA-enforced, not yet floor-met.
   NFR-Sec-7:
     gates:
       - check-pentest-gate
@@ -1432,6 +1452,6 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
     notes: Third-party trial N=12 gate. Wilson CI advisory, raw count + stratification
-      + per-participant conjunction BLOCKING when results are present (derive-from-detail:
+      + per-participant conjunction BLOCKING when results are present (derive-from-detail, with
       successes and strata reconciled against participant records). Absent = advisory
       (trial pending). Distinct from NFR-Test-7/NFR-Sec-10 which are advisory at v1.0.

@@ -41,6 +41,11 @@ mod check_multi_provider_drift;
 mod check_pub_field_constructors;
 mod check_review_findings_resolved;
 mod check_security_md;
+// Story 10.3 — v1.0 compliance ship-gates (export-control, CNA, fuzz-targets).
+mod check_cna_registration;
+mod check_export_control;
+mod check_fuzz_targets;
+mod check_fuzz_floor;
 mod check_serde_error_handling;
 mod check_service_boundary;
 mod check_skill_schema;
@@ -666,6 +671,31 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 10.3 AC-1 (NFR-Comp-1) — export-control classification gate:
+    /// ECCN doc present + STABILITY.md §Export non-stub + crypto enumeration.
+    #[command(name = "check-export-control")]
+    CheckExportControl {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 10.3 AC-5 (NFR-Ops-4) — CNA registration gate: blocking-when-present.
+    #[command(name = "check-cna-registration")]
+    CheckCnaRegistration {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — fuzz-target existence gate (mechanics).
+    #[command(name = "check-fuzz-targets")]
+    CheckFuzzTargets {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time).
+    #[command(name = "check-fuzz-floor")]
+    CheckFuzzFloor {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -974,6 +1004,10 @@ fn main() {
         Commands::CheckThirdPartyTrial { json } => check_third_party_trial::run(json),
         Commands::CheckCrossFormEquiv { json } => check_cross_form_equiv::run(json),
         Commands::CheckRedTeamGate { json } => check_red_team_gate::run(json),
+        Commands::CheckExportControl { json } => check_export_control::run(json),
+        Commands::CheckCnaRegistration { json } => check_cna_registration::run(json),
+        Commands::CheckFuzzTargets { json } => check_fuzz_targets::run(json),
+        Commands::CheckFuzzFloor { json } => check_fuzz_floor::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

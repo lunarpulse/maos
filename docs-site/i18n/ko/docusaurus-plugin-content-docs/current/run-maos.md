@@ -2,6 +2,7 @@
 title: "MAOS 실행"
 sidebar_position: 2
 description: "MAOS kernel 설치 및 운영"
+review_status: machine
 ---
 
 # MAOS 실행

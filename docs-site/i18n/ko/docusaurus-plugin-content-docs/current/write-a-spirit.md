@@ -2,6 +2,7 @@
 title: "Spirit 작성하기"
 sidebar_position: 1
 description: "30분 첫 Spirit 경로"
+review_status: machine
 ---
 
 # Spirit 작성하기 — 30분 첫 Spirit 경로

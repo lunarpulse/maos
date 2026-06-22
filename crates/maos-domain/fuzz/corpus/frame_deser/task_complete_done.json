@@ -1,0 +1,1 @@
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700000000000000000,"logical_clock":7,"from":{"spirit_id":"orchestrator","host_id":null,"role":null},"to":[{"spirit_id":"worker","host_id":null,"role":null}],"kind":"TaskComplete","intent":"Standard","payload":{"TaskComplete":{"result":"done"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}

@@ -2,6 +2,7 @@
 slug: /
 title: "MAOS — Multi-Agent Orchestration Substrate"
 sidebar_position: 0
+review_status: machine
 ---
 
 # MAOS

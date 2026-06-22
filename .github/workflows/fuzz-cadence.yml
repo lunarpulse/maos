@@ -1,0 +1,164 @@
+# Fuzz runtime cadence — NFR-Sec-5 / NFR-Sec-6 (Story 10.3, code-review Option A).
+#
+# Nightly scheduled fuzz RUN job + decoupled ledger collector + release-time
+# floor gate. This is SEPARATE from discipline.yml because adding `schedule:`
+# to discipline.yml's `on:` would re-trigger the entire v1.0 ship-gate suite on
+# a timer; fuzz accrual is non-blocking and must not entangle the merge gate.
+#
+# Design (party-mode consensus, Winston·Murat·John·Amelia, 2026-06-22):
+#  1. Nightly is the floor-accrual driver — one run ≈ 0.67 CPU-hr
+#     (600 s × 4 workers); the ≥72 CPU-hr/target/90-day floor needs ~108
+#     runs/target/quarter, so on-merge alone cannot reach it.
+#  2. Ledger write-back is DECOUPLED from main — the run uploads a record
+#     artifact; a collector job appends to fuzz-ledger.json on a dedicated
+#     `fuzz-ledger` branch. No per-merge commit to main (serializes appends,
+#     kills the protected-branch write race).
+#  3. The floor gate is advisory until the ledger spans ≥ 90 days, then
+#     auto-promotes to hard-fail (see xtask check_fuzz_floor).
+#
+# PREREQUISITE (operator, one-time): create the `fuzz-ledger` branch and allow
+# the write token to push to it. If a PAT/deploy key is unavailable, set
+# FUZZ_LEDGER_WRITE_TOKEN to the default `secrets.GITHUB_TOKEN` and ensure the
+# branch has no required-reviews protection. The collector no-ops (warns) if
+# the push fails — the run evidence still lands as a workflow artifact.
+
+name: fuzz-cadence
+
+on:
+  schedule:
+    # 03:00 UTC daily — off-peak for contributor merge activity.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # Manual trigger (release-time T3 close-out, or to backfill a missed night).
+
+permissions:
+  contents: write # collector commits to the fuzz-ledger branch
+  actions: read   # collector downloads run artifacts
+
+concurrency:
+  group: fuzz-cadence
+  cancel-in-progress: false # never cancel a soak mid-run
+
+jobs:
+  # T1 — per-target 10 min / 4-worker soak. Matrix over both fuzz targets so a
+  # single target's failure does not starve the other of CPU-hour accrual.
+  fuzz-run-t1:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: manifest_parser
+            fuzz_dir: crates/maos-manifest/fuzz
+            # manifest_parser does not amplify; no rss override needed.
+            rss_flag: ""
+          - target: frame_deser
+            fuzz_dir: crates/maos-domain/fuzz
+            # serde_cbor 0.11 amplifies tiny CBOR inputs into multi-GB
+            # allocations — REQUIRED runtime config (see fuzz-cadence.md).
+            rss_flag: "-rss_limit_mb=0"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install nightly + cargo-fuzz
+        run: |
+          rustup toolchain install nightly --component rust-src
+          cargo install cargo-fuzz --locked
+      - name: T1 fuzz soak (10 min, 4 workers)
+        env:
+          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+        run: |
+          cargo +nightly fuzz run --fuzz-dir ${{ matrix.fuzz_dir }} ${{ matrix.target }} -- \
+            -max_total_time=600 -workers=4 ${{ matrix.rss_flag }}
+      - name: Record CPU-hour evidence
+        # cpu_seconds = duration_seconds (600) × workers (4) = 2400.
+        run: |
+          mkdir -p out
+          jq -n \
+            --arg target "${{ matrix.target }}" \
+            --arg commit "${{ github.sha }}" \
+            --argjson cpu_seconds 2400 \
+            '{target:$target, commit:$commit, cpu_seconds:$cpu_seconds, corpus_size:0, timestamp: (now | todate)}' \
+            > "out/record-${{ matrix.target }}.json"
+          cat "out/record-${{ matrix.target }}.json"
+      - name: Upload record artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-record-${{ matrix.target }}-${{ github.run_id }}
+          path: out/record-${{ matrix.target }}.json
+          retention-days: 90
+
+  # Ledger collector — downloads the per-target record artifacts, dedupes, and
+  # appends to fuzz-ledger.json on the dedicated fuzz-ledger branch. Decoupled
+  # from main to serialize appends and avoid protected-branch write races.
+  fuzz-ledger-collect:
+    runs-on: ubuntu-latest
+    needs: fuzz-run-t1
+    if: always()
+    steps:
+      - name: Download all record artifacts from this run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: fuzz-record-*-${{ github.run_id }}
+          merge-multiple: true
+          path: records
+      - name: Append records to fuzz-ledger.json on the fuzz-ledger branch
+        env:
+          GH_TOKEN: ${{ secrets.FUZZ_LEDGER_WRITE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Configure git for the bot commit.
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Shallow-fetch the dedicated ledger branch (or seed it from main).
+          git fetch origin fuzz-ledger || git checkout -b fuzz-ledger
+          git checkout fuzz-ledger 2>/dev/null || git checkout -B fuzz-ledger origin/main
+          # Ensure a valid (possibly empty) ledger exists.
+          [ -f fuzz-ledger.json ] || echo '{"schema_version":1,"records":[]}' > fuzz-ledger.json
+          # Append every record artifact from this run (dedupe by content hash).
+          for f in records/record-*.json; do
+            [ -f "$f" ] || continue
+            HASH=$(jq -Sc . "$f" | sha256sum | cut -d' ' -f1)
+            if jq -e --arg h "$HASH" --arg f "$(cat "$f")" \
+              'has("records") and (.records | map(@json) | index(($f | fromjson | tostring)))' \
+              fuzz-ledger.json >/dev/null 2>&1; then
+              echo "record already present, skipping: $f"
+              continue
+            fi
+            tmp=$(mktemp)
+            jq --slurpfile rec "$f" '.records += $rec[0]' fuzz-ledger.json > "$tmp" && mv "$tmp" fuzz-ledger.json
+          done
+          jq -e '.schema_version == 1 and (.records | type == "array")' fuzz-ledger.json
+          git add fuzz-ledger.json
+          if git diff --cached --quiet; then
+            echo "no new records to append"
+          else
+            git commit -m "fuzz-cadence: append T1 records (run ${{ github.run_id }})"
+            if git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:fuzz-ledger; then
+              echo "ledger updated on fuzz-ledger branch"
+            else
+              echo "::warning::fuzz-ledger push failed — record artifacts remain available for manual backfill (run ${{ github.run_id }})"
+            fi
+          fi
+
+  # Release-time floor gate — advisory until ≥ 90 days of ledger history, then
+  # hard-fails the workflow if the per-target (≥72 CPU-hr) or aggregate
+  # (≥1000 CPU-hr) floor is unmet over the trailing 90-day window.
+  check-fuzz-floor:
+    runs-on: ubuntu-latest
+    needs: fuzz-ledger-collect
+    if: always()
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fuzz-ledger
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Fuzz CPU-hour floor gate
+        run: cargo run -p xtask -- check-fuzz-floor --json

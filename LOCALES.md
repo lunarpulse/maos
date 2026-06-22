@@ -10,7 +10,7 @@ FROM this file (D5, Story 9.5).
 | Locale | Status | Notes |
 |--------|--------|-------|
 | `en` (English) | **Default** — source locale | All content authored in English |
-| `ko` (Korean) | **active — partial coverage** | Machine-translated with locked-term enforcement. Story 9.5 shipped a representative sample (journey-layer pages) + English fallback; **full canonical coverage is owned by Story 10.3** (see Page Coverage below) |
+| `ko` (Korean) | **active — full canonical coverage** | Machine-translated with locked-term enforcement. Full canonical coverage delivered by Story 10.3 (all 5 canonical doc deliverables + the generated ABI reference). Story 9.5 shipped the toolchain, the glossary lock, and a representative sample (journey-layer pages) with English fallback (see Page Coverage below) |
 | `ja` (Japanese) | **Deferred to v1.5** | Not stubbed; explicit deferral |
 | `zh-CN` (Chinese Simplified) | **Deferred to v1.5** | Not stubbed; explicit deferral |
 | RTL locales (ar, he, etc.) | **Deferred to v2.5** | Requires layout and component changes |
@@ -97,20 +97,18 @@ break the domain model.
 
 ## Page Coverage (per-locale completeness)
 
-Adding a locale (above) is distinct from *fully translating* it. Korean is **active
-but partial**: Story 9.5 deliberately shipped the toolchain, the glossary lock, and a
-representative sample (the journey-layer pages), with **English fallback** for the rest
-(`gate:fallback`, AC-4). The glossary-lock gate enforces locked terms only on pages that
-*are* translated — it does **not** require full coverage — so coverage is a permitted
-floor today, not the target.
+Adding a locale (above) is distinct from *fully translating* it. Korean is now
+**active — full canonical coverage** for v1.0: Story 9.5 shipped the toolchain,
+glossary lock, and journey-layer sample; Story 10.3 completed the canonical
+coverage set and turned coverage into a mechanical ship gate.
 
-- **Visibility now:** `npm run gate:ko-coverage` (in `docs-site/`) reports
-  translated/total per canonical doc deliverable. Report-only by default.
-- **Teeth at v1.0:** **Story 10.3** (Epic 10 v1.0 ship gate, NFR-Doc-6) requires Korean
-  present for **all 5 canonical doc deliverables**. That story wires
-  `KO_COVERAGE_MIN=100` into the `docs-site` CI to turn the promise into a mechanical
-  gate (a promise without a gate decays — Epic 8 lesson). Open scoping question for 10.3:
-  whether the 37 generated `/errors/` pages count toward the troubleshoot deliverable.
+- **Mechanical gate:** `npm run gate:ko-coverage` (in `docs-site/`) reports
+  translated/total per canonical doc deliverable and honors
+  `KO_COVERAGE_MIN=100` in CI.
+- **Canonical denominator:** all 5 canonical doc deliverables plus the generated
+  ABI reference are counted. Generated `/errors/` pages are **excluded** from
+  the denominator for v1.0 (resolved in Story 10.3; they remain English until a
+  future localization pass).
 
 ## Deferral Policy
 
@@ -120,6 +118,25 @@ floor today, not the target.
 - **v2.5:** RTL locale support (requires Docusaurus RTL theme + layout audit)
 - New locales follow the same pattern: add to `docs-site/docusaurus.config.ts`
   `i18n.locales`, populate `i18n/<locale>/`, extend locked-term checks
+
+## Translation review status
+
+Every Korean translation file (`i18n/ko/**/*.md`) carries a `review_status`
+front-matter field that tracks where it sits in the three-layer quality
+model (machine translation → glossary-lock CI gate → native/fluent reviewer):
+
+| `review_status` | Meaning |
+|---|---|
+| `machine` | Machine-translated; the glossary-lock CI gate enforces locked-term correctness, but the unit has NOT yet been reviewed by a native/fluent Korean reviewer. This is the CI floor. |
+| `human-reviewed` | Passed an initial native/fluent Korean review (`runbook:ko-a11y-manual`). |
+| `approved` | Signed off for the release; no further changes expected. |
+
+The `high_risk: true` front-matter flag marks translation units prioritized
+for native review. At v1.0 this is the two high-stakes deployment guides
+(`deploy/air-gap-deployment.md` and `deploy/release-signing.md`), where a
+translation error could mislead an operator during a safety-critical
+procedure. CI does not gate on these flags — they drive reviewer
+prioritization, since the CI gate is a floor, not a ceiling.
 
 ## CI Integration
 
@@ -131,5 +148,15 @@ The glossary-lock gate (`gate:glossary-lock`) reads this file's
    - Fails if any denylist entry appears in the Korean file
 2. Checks canonical casing (case-sensitive match for code identifiers)
 3. Reports per-file violations with line numbers
+4. Asserts canonical Korean coverage (`gate:ko-coverage`, enforced at `KO_COVERAGE_MIN=100` from Story 10.3 / v1.0)
+
+### Source-quality rule (preflight Paige P3)
+
+All configuration key names, CLI flags, and file paths MUST be wrapped in
+inline code spans in the English source **before** translation. Bare TOML
+keys, flags, and paths in prose get mangled by the machine-translation
+engine; wrapping them in inline code spans prevents that. Audit the English
+source pages and wrap obvious bare references conservatively — do not reflow
+other text.
 
 The gate runs as part of the `docs-site` CI workflow.

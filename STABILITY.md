@@ -88,8 +88,28 @@ rejected).
 
 ## Export
 
-<!-- full content: Story 10.3 (NFR-Comp-1) — this is the placeholder STUB. -->
+<!-- PRESERVED:export -->
+The MAOS substrate's cryptographic surface is classified **EAR99** under the
+U.S. Export Administration Regulations (EAR). Cryptography is **ancillary** to
+the primary AI-agent-orchestration function, so the surface falls **outside**
+ECCN 5D002 ("Information Security") per the "ancillary cryptography" Note to
+**5D002.c.1** — items whose cryptographic functionality is ancillary are not
+5D002-controlled (and thus EAR99). The open-source-software aspect is
+separately eligible under License Exception TSU, 15 CFR §740.13(e). Every
+primitive is provided by already-classified, mass-market open-source libraries
+(ring, ed25519-dalek, rustls).
 
-Export-control classification (ECCN determination — e.g. EAR99 vs 5D002 for the
-cryptographic surface) is pending the formal determination in Story 10.3. Do not
-treat this section as legal export advice until that story lands.
+Enumerated cryptographic surface (Story 10.3 AC-1): **HKDF-SHA256** key
+derivation, **Ed25519** signing, **AES-256-GCM** AEAD sealed-export (via
+`ring`), **TLS 1.3** cross-host transport, **SHA-256** content-addressing, and
+**SHA-256** digests canonically encoded in **CBOR (RFC 8949)** for
+ComplianceClaim fingerprinting (CBOR is the deterministic encoding, not a
+cryptographic primitive). The full determination, dual-use review, and BIS
+advisory citation are on file at `docs/compliance/eccn-classification.md`
+(NFR-Comp-1).
+
+This is an engineering classification, not legal export advice; it is **pending
+export-compliance counsel review before v1.0 enterprise distribution**.
+Operators and distributors must confirm applicability with their own counsel
+and the jurisdiction of distribution.
+<!-- END PRESERVED:export -->

@@ -1,7 +1,7 @@
 ---
 title: Testing with the Spirit SDK
 sidebar_position: 11
-description: Using SpiritTest harness and LocalRunner to test Spirit hooks without a kernel.
+description: Using `SpiritTest` harness and `LocalRunner` to test Spirit hooks without a kernel.
 ---
 
 # Testing with the Spirit SDK
