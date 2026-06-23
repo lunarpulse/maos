@@ -2114,6 +2114,26 @@ jobs:
             echo "Red-team engagement has not yet been executed." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  # Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate
+  # (v1.5 phase, advisory-until-engagement).
+  check-migration-merkle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check migration Merkle gate results
+        run: |
+          if [ -f tests/corpora/migration-corpus-1e6.sqlite ] || [ -n "${MAOS_TEST_POSTGRES:-}" ]; then
+            cargo run -p xtask -- check-migration-merkle
+          else
+            echo "::warning::Migration corpus absent — generate via 'cargo run --release -p maos-loom-lite --example generate_migration_corpus -- --out tests/corpora/migration-corpus-1e6.sqlite'"
+            echo "## ⚠️ Migration Gate: ADVISORY (corpus absent)" >> "$GITHUB_STEP_SUMMARY"
+          fi
   # Story 10.3 AC-1 (NFR-Comp-1) — export-control classification gate.
   # ECCN doc present + STABILITY.md §Export non-stub + crypto enumeration.
   check-export-control:
@@ -2219,6 +2239,7 @@ jobs:
       - check-fuzz-targets
       - fuzz-build
       - check-ko-coverage
+      - check-migration-merkle
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2380,6 +2401,7 @@ jobs:
       - check-third-party-trial
       - check-cross-form-equiv
       - check-red-team-gate
+      - check-migration-merkle
     if: always()
     permissions:
       pull-requests: write

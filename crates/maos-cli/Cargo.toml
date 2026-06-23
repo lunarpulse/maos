@@ -29,6 +29,9 @@ serde_json = "1"
 thiserror = "2"  # Story 9.4 AC-3 — typed backup/DR errors
 toml = "0.8"
 hex = "0.4"       # Story 9.1 FR44 — pubkey hex encoding in verify-bundle
+maos-loom-lite = { path = "../maos-loom-lite" }  # Story 10.4a — SQLite→Postgres migration CLI
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }  # Story 10.4a — async runtime for migration engine
+tokio-postgres = "0.7"  # Story 10.4a — Postgres client for migration target
 [dev-dependencies]
 # Story 1b.5b — accessibility ANSI test. Both crates are already in the
 # workspace via `maos-audit`, so `Cargo.lock` may grow by maos-iac's transitive deps.

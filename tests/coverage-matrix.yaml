@@ -920,10 +920,16 @@ coverage:
     valid_until: '2027-05-12'
     notes: install/uninstall at v0.1; upgrade/yank at v0.5; revoke at v1.0
   NFR-Ops-10:
-    gates: []
-    corpora: []
+    gates:
+    - check-migration-merkle
+    corpora:
+    - migration-corpus-1e6
     phase: v1.5
     valid_until: '2027-05-12'
+    notes: Story 10.4a — SQLite→Postgres migration triple-oracle gate (Merkle
+      root + payload oracle + row count). Advisory at v1.0 (results absent →
+      advisory pass); blocking at v1.5. The 10⁶-row corpus spans 100 batch
+      boundaries at BATCH_SIZE=10_000, exercising multi-batch proven-red vectors.
   NFR-Ops-11:
     gates: []
     enforcement: advisory-until-engagement

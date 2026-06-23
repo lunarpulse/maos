@@ -31,6 +31,7 @@
 
 pub mod a2a; // NEW — Story 6.3 A2ARouter port per ADR-003 + ADR-012
 pub mod capability;
+pub mod collective_memory; // NEW — Story 10.4a CollectiveMemoryPort per ADR-006
 pub mod distillation; // NEW — Story 4.4 DistillationPort per AC2
 pub mod epistemic_scalar; // NEW — Story 8.10 AC1 cognitive-Spirit scalar-write port
 pub mod hot_swap; // NEW — ADR-041 (Epic 6 retro §A3 2026-05-28) Phase-4 extraction prep
@@ -53,6 +54,7 @@ pub mod crypto; // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 
 pub use a2a::A2ARouter; // NEW — Story 6.3
 pub use capability::CapabilityRegistryPort;
 pub use crypto::{CryptoError, CryptoProvider};
+pub use collective_memory::{CollectiveMemoryPort, CollectivePortError}; // NEW — Story 10.4a
 pub use distillation::DistillationPort; // NEW — Story 4.4
 pub use epistemic_scalar::{EpistemicScalarPort, ScalarPortError}; // NEW — Story 8.10 AC1
 pub use hot_swap::HotSwapPort; // NEW — ADR-041 Phase-4 extraction prep

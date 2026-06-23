@@ -1,0 +1,45 @@
+[package]
+name = "maos-loom-lite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS Loom-lite — Postgres+pgvector collective memory tier (user-space, ADR-006)"
+
+[dependencies]
+# Domain types (sync trait, memory types, audit key types)
+maos-domain = { path = "../maos-domain" }
+# Merkle primitives — reuse EXACTLY (Story 10.4a preflight decision §4)
+maos-audit = { path = "../maos-audit" }
+
+# Postgres + pgvector (FORBIDDEN in maos-domain / maos-kernel-core)
+tokio-postgres = "0.7"
+deadpool-postgres = "0.14"
+pgvector = { version = "0.4", features = ["postgres"] }
+
+# Async runtime for the spawn_blocking bridge
+tokio = { version = "1", features = ["rt", "sync", "macros", "rt-multi-thread", "time"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Crypto (Merkle reuse, canonical leaf hashing)
+sha2 = "0.10"
+
+# Error handling
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+
+# Hex encoding for oracle display
+hex = "0.4"
+
+# Migration support (reads SQLite source)
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "sync", "macros", "rt-multi-thread", "test-util"] }
+tempfile = "3"

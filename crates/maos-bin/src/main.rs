@@ -1667,6 +1667,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         audit_db_path.display()
     );
 
+    // Story 10.4a — construct the collective-tier port (Loom-lite, user-space)
+    // + inject the capability registry for I1/I2 mediation.  Configured from
+    // MAOS_LOOM_POSTGRES; when absent the collective tier is disabled (ops
+    // return CollectiveNotYetAvailable).  The port goes LIVE here so the
+    // de-stub is not inert in production (AC1 review Decision A).
+    let collective_port: Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>> =
+        match std::env::var("MAOS_LOOM_POSTGRES") {
+            Ok(conn_str) => {
+                let cfg = maos_loom_lite::store::StoreConfig {
+                    connection_string: conn_str,
+                    ..Default::default()
+                };
+                match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
+                    Ok(store) => {
+                        let store = Arc::new(store);
+                        if let Err(e) = store.init_schema().await {
+                            eprintln!(
+                                "maos: warn: loom-lite schema init failed (collective tier disabled): {e}"
+                            );
+                            None
+                        } else {
+                            let adapter = Arc::new(maos_loom_lite::adapter::LoomLiteAdapter::new(
+                                store,
+                                tokio::runtime::Handle::current(),
+                                std::time::Duration::from_secs(5),
+                            ));
+                            eprintln!("maos: collective tier (Loom-lite) initialized");
+                            Some(adapter as Arc<dyn maos_domain::ports::CollectiveMemoryPort>)
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "maos: warn: loom-lite store init failed (collective tier disabled): {e}"
+                        );
+                        None
+                    }
+                }
+            }
+            Err(_) => {
+                eprintln!(
+                    "maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable"
+                );
+                None
+            }
+        };
+
     // Story 4.3 — assemble the full MemoryManagerAdapter.
     let memory = Arc::new(
         maos_kernel_core::memory::MemoryManagerAdapter::new(
@@ -1685,7 +1731,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Sec-redteam SR-1: enable principal namespace write enforcement.
         // Only spirit pids registered via authorize_principal_writes() may
         // write to Principal namespaces.
-        .with_principal_write_enforcement(),
+        .with_principal_write_enforcement()
+        // Story 10.4a — collective tier (Loom-lite) + I1/I2 mediation.
+        .with_collective_port(collective_port)
+        .with_capabilities(Some(Arc::clone(&capability))),
     );
 
     // Story 4.3 — SelfTelemetryAggregator (FR56).

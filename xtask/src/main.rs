@@ -12,6 +12,13 @@ mod check_abi_ratification;
 mod check_adr_040_accepted;
 mod check_air_gap;
 mod check_bare_review_findings;
+// Story 10.4a — dependency-closure gate (kernel-core artifact hygiene)
+mod check_dependency_closure;
+mod check_rto_gate;
+// Story 10.4a — RTO drill (performs cold-restore + timing, writes evidence for check-rto-gate).
+mod check_rto;
+// Story 10.4a — SQLite→Postgres migration triple-oracle ship gate (NFR-Ops-10).
+mod check_migration_merkle;
 mod check_breaking_md;
 mod check_composition_root_completeness;
 mod check_ship_gate_completeness;
@@ -489,6 +496,43 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 10.4a — dependency-closure gate (kernel-core artifact excludes Postgres/pgvector).
+    #[command(name = "check-dependency-closure")]
+    CheckDependencyClosure {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 10.4a — RTO ≤ 4h gate (drilled, not printed); NFR-Ops-9.
+    #[command(name = "check-rto-gate")]
+    CheckRtoGate {
+        #[arg(long, default_value = "xtask/rto-evidence.toml")]
+        evidence: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 10.4a — RTO ≤ 4h drill: performs cold-restore + timing, gates on
+    /// threshold, and writes evidence consumed by `check-rto-gate`.
+    /// NFR-Ops-2 (RTO) + NFR-Ops-1 (RPO), drilled not printed.
+    #[command(name = "rto-drill")]
+    RtoDrill {
+        /// Path to an existing source TL (omit to create a synthetic one).
+        #[arg(long)]
+        source: Option<String>,
+        /// Path to an existing backup (omit to create one from source).
+        #[arg(long)]
+        backup: Option<String>,
+        /// Number of synthetic frames (default 10000; ignored if --source).
+        #[arg(long)]
+        frames: Option<usize>,
+        /// RTO threshold in seconds (default 14400 = 4h).
+        #[arg(long)]
+        rto_threshold_secs: Option<u64>,
+        /// Write evidence to this TOML file (consumed by check-rto-gate).
+        #[arg(long)]
+        evidence_output: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 7.5b — NFR-Onb-1 30-Minute First Spirit Validation Gate discipline
     /// rail: stratification + cohort evaluator + Butler-corpus seam over the
     /// committed example cohort/outcomes/self-trial; FAILs loudly on drift.
@@ -693,6 +737,14 @@ enum Commands {
     /// Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time).
     #[command(name = "check-fuzz-floor")]
     CheckFuzzFloor {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle
+    /// ship gate: Merkle root + payload oracle + row count consistency across
+    /// source/target backends. Advisory at v1.0, blocking at v1.5.
+    #[command(name = "check-migration-merkle")]
+    CheckMigrationMerkle {
         #[arg(long)]
         json: bool,
     },
@@ -937,6 +989,23 @@ fn main() {
         Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
         Commands::CheckKernelBaseline { json } => check_kernel_baseline::run(json),
+        Commands::CheckDependencyClosure { json } => check_dependency_closure::run(json),
+        Commands::CheckRtoGate { evidence, json } => check_rto_gate::run(&evidence, json),
+        Commands::RtoDrill {
+            source,
+            backup,
+            frames,
+            rto_threshold_secs,
+            evidence_output,
+            json,
+        } => check_rto::run(
+            source.as_deref(),
+            backup.as_deref(),
+            frames,
+            rto_threshold_secs,
+            evidence_output.as_deref(),
+            json,
+        ),
         Commands::CheckEpicCloseGreen { json } => check_epic_close_green::run(json),
         Commands::StabilityMatrix { check, json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
@@ -1008,6 +1077,7 @@ fn main() {
         Commands::CheckCnaRegistration { json } => check_cna_registration::run(json),
         Commands::CheckFuzzTargets { json } => check_fuzz_targets::run(json),
         Commands::CheckFuzzFloor { json } => check_fuzz_floor::run(json),
+        Commands::CheckMigrationMerkle { json } => check_migration_merkle::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

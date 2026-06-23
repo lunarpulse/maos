@@ -99,3 +99,21 @@ description = "Story 9.2 GDPR Article 17 leakage probe N=100 — independently-a
 # The SHA-256 pin is verified by the hsis_runner test (hsis_corpus_sha256_pin).
 # SHA: 51a0f04f9679276c04edda8c087983148da45d9f79630f9324c0a0fcecebf93a
 # N=305 (300 happy-path + 5 negative)
+# Story 10.4a — NFR-Ops-10 migration corpus (generated, not committed).
+# The 10⁶-row corpus is produced by a deterministic generator seeded from
+# the parameters below.  The generator creates a SQLite Transparency Log
+# database and the check-migration-merkle gate verifies triple-oracle
+# integrity.  Not a JSONL corpus — check-corpus skips this entry.
+[corpus."migration-corpus-1e6"]
+sha256 = "a23b8a90235bb23279d4a4ecef5e5d09c28a3d3bc81002fe3aa4e0882f58a246"
+schema_version = 1
+item_count = 1000000
+valid_until = "2027-06-22"
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+description = "Story 10.4a NFR-Ops-10 migration corpus — 10^6-row deterministically generated SQLite Transparency Log (FULL 11-column production schema). Seed = 0x4A41_0D4A_A10E_CA7E; base ts 2025-01-01T00:00:00Z; BATCH_SIZE=10000 (100 batches). 8 intent templates rotated by row; payload_redacted 64-4088 bytes of repeating sha256 blocks; capability_token present every 3rd row. Triple-oracle verified: Merkle root (SET-only) + payload oracle (per-row canonical hash of all 11 cols) + row-count oracle — all independently re-derived per backend."
+generator = "maos-loom-lite::example::generate_migration_corpus"
+seed = "0x4A41_0D4A_A10E_CA7E"
+merkle_root = "dd42bbd1fdc9826a0377a8e80aa1834b78c474d56fe958e9d6744ff4802e7d69"
+payload_oracle = "6783fcaead6ff0f1d327571dd9090167d69ef661adadf2b3eb9438e4a65f0988"
+row_count = 1000000
+generated = true

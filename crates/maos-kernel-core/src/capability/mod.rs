@@ -87,6 +87,12 @@ fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
             server: server.clone(),
             tool: tool.clone(),
         },
+        // Story 10.4a — collective-tier (Loom-lite) mediation.  These scopes
+        // are checked BEFORE the CollectiveMemoryPort call (I1) and the
+        // verify_and_audit journals the TL frame (I2).
+        Scope::LoomRead => cap_policy::decision::Intent::LoomRead,
+        Scope::LoomWrite => cap_policy::decision::Intent::LoomWrite,
+        Scope::LoomScan => cap_policy::decision::Intent::LoomScan,
         // Story 8.12 AC2 / FR52 — a CliWrapperSpirit subprocess spawn IS a
         // process exec under capability authority; map to the ProcExec intent
         // keyed on the resolved CLI binary path (the argv_prefix_hash binding is

@@ -35,7 +35,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::capability::cap_policy::decision::Intent",
-      "signature_hash": "c1aec1b4560df26de0ad530417695d703308a02d3a7caf5274e4a052e0d8c08d"
+      "signature_hash": "03389145fd37ce0ead60e51bc3f73b10309829f3c81fb522b18dc9e68308c920"
     },
     {
       "kind": "enum",
@@ -685,7 +685,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::memory::MemoryManagerAdapter",
-      "signature_hash": "c507b054ca7fab95eebc3c0a421d6b3a3e72f123c283750d9827f43b5b7251f1"
+      "signature_hash": "fd99fad4c9d66ba48b2bdc1ff9deec90c25081b251bceeb9a1e2fcd2bc81b87b"
     },
     {
       "kind": "struct",

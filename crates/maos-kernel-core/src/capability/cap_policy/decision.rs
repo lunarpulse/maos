@@ -63,6 +63,13 @@ pub enum Intent {
     DistillateWrite,
     /// MCP tool invocation — Story 5.5c.
     McpCall { server: String, tool: String },
+    /// Story 10.4a — collective-tier (Loom-lite) read/scan mediation.
+    LoomRead,
+    /// Story 10.4a — collective-tier (Loom-lite) write (high-privilege pattern
+    /// write; TTL ≤ 60s per AC1).
+    LoomWrite,
+    /// Story 10.4a — collective-tier (Loom-lite) scan.
+    LoomScan,
 }
 
 /// Trust tier classification.

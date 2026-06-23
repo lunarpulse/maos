@@ -9,8 +9,10 @@
 
 use std::path::Path;
 
-/// The authoritative list of sub-gate jobs that must appear in the
-/// `v1.0-ship-gate` aggregate `needs:` array.
+/// The authoritative list of known gate jobs. Per-commit gates MUST appear in
+/// the `v1.0-ship-gate` aggregate `needs:` array (check #1); weekly-cadence
+/// gates enumerated in `WEEKLY_ONLY_GATES` are exempt from that check but
+/// still require a `[[ship_gate]]` disposition entry (check #2).
 const EXPECTED_GATES: &[&str] = &[
     "ccac-n600-ship-gate",
     "nfr-rel-3-hsis-95pct",
@@ -25,7 +27,23 @@ const EXPECTED_GATES: &[&str] = &[
     "check-fuzz-targets",
     "check-cna-registration",
     "check-ko-coverage",
+    // Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate.
+    "check-migration-merkle",
+    // Story 10.4a (NFR-Ops-2) — RTO ≤ 4h weekly cadence gates (rpo-rto-cadence.yml).
+    // Weekly-only: exempt from the per-commit v1.0-ship-gate `needs:` check
+    // below; they still require a [[ship_gate]] disposition in gate-registry.toml.
+    "rto-drill",
+    "check-rto-gate",
 ];
+
+/// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.
+///
+/// These gates run on the Sunday 04:00 UTC schedule, so they do NOT appear in
+/// discipline.yml's `v1.0-ship-gate` `needs:` array and are skipped by the
+/// per-commit needs check. They DO require an explicit `[[ship_gate]]`
+/// disposition entry in gate-registry.toml (validated alongside the
+/// Story-10.x ship gates), mechanizing their advisory→blocking graduation.
+const WEEKLY_ONLY_GATES: &[&str] = &["rto-drill", "check-rto-gate"];
 
 pub fn run(json: bool) -> Result<(), String> {
     let workflow_path = Path::new(".github/workflows/discipline.yml");
@@ -37,6 +55,9 @@ pub fn run(json: bool) -> Result<(), String> {
 
     let mut missing: Vec<&str> = Vec::new();
     for gate in EXPECTED_GATES {
+        if WEEKLY_ONLY_GATES.contains(gate) {
+            continue; // weekly-cadence gate (rpo-rto-cadence.yml) — not a per-commit needs entry
+        }
         if !needs.contains(&gate.to_string()) {
             missing.push(gate);
         }
@@ -57,7 +78,7 @@ pub fn run(json: bool) -> Result<(), String> {
             "check-pentest-gate" | "check-third-party-trial" |
             "check-cross-form-equiv" | "check-red-team-gate"
         );
-        if is_story10_ship_gate && !registry_names.contains(gate) {
+        if (is_story10_ship_gate || WEEKLY_ONLY_GATES.contains(gate)) && !registry_names.contains(gate) {
             missing_disposition.push(gate);
         }
     }

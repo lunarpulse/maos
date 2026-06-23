@@ -72,4 +72,45 @@
 #          lifecycle/upgrade.rs post-success TL payload keeps its graceful
 #          fallback via a match (was .unwrap_or_else). +3 lines, additive, no
 #          public ABI change.
-src_lines = 22269
+#   22300  Story 10.4a — Loom-lite collective tier kernel de-stub (+31,
+#          charter-amended kernel delta, FIRST authorized kernel delta in
+#          Epic 10). FLAG-Winston: authorized 2026-06-22 (party-mode
+#          preflight ratified). Added CollectiveMemoryPort injection seam:
+#          +1 field (Option<Arc<dyn CollectiveMemoryPort>>), +1 builder
+#          method (with_collective_port), +3 delegating match arms in
+#          write/read/scan (MemoryTier::Collective → port.{write,read,scan}).
+#          The `:709` error variant STAYS (port-absent return). Dependency
+#          arrow: maos-loom-lite → maos-domain (trait) ← maos-kernel-core;
+#          adapter injected at daemon composition root. ADR-006 ref.
+#          22488  Story 10.4a review rework (2026-06-22, glm-5.2) — AC1
+#          collective-tier mediation completion (+188, charter-amended kernel
+#          delta). FLAG-Winston: authorized under Decision A (party-mode
+#          ratified 2026-06-22) — the cap-gated I1/I2 mediation that the
+#          de-stub required to not be inert. Adds: `capabilities` field +
+#          `with_capabilities` builder; cap-gated `collective_write/read/scan`
+#          (verify_and_audit = I2 + scope-check = I1); `reject_principal`
+#          guard (Decision D — Principal partitioned out of the Collective
+#          tier) in the 3 trait arms; MemoryError::Collective variant
+#          (maos-domain); Intent::Loom{Read,Write,Scan} (cap_policy) +
+#          scope_to_intent arms. All additive; no public symbols removed.
+#   22574  Story 10.4a review patches (2026-06-23, patch group A) — wire
+#          I1/I2 into the LIVE dispatch path + LoomWrite TTL + typed
+#          Collective error (+86, charter-amended kernel delta).
+#          FLAG-Winston: authorized under the Story 10.4a Decision-A rework
+#          ratification — the prior rework left the cap-gated
+#          collective_write/read/scan with ZERO callers and the three trait
+#          arms calling the port DIRECTLY with no capability check; this delta
+#          closes that gap so AC1's "capability check BEFORE the port call"
+#          holds on the live path. P1: the three MemoryTier::Collective trait
+#          arms now DENY fail-closed when `self.capabilities` is wired (the
+#          MemoryManagerPort ABI carries no token/posture, so the unmediated
+#          trait path CANNOT mediate — callers MUST use the cap-gated
+#          collective_write/read/scan); only the legacy/test path (no caps
+#          injected) falls through to the direct port delegation. P8:
+#          collective_write asserts a LoomWrite token's remaining TTL ≤ 60s
+#          before the port call (belt-and-braces over the issuance-side cap).
+#          P12: a collective_port_error helper maps CollectivePortError → the
+#          typed MemoryError::Collective{kind,reason} discriminant. The
+#          CollectiveErrorKind enum lives in maos-domain (not counted here).
+#          ADR-006 / AC1 ref. All additive; no public symbols removed.
+src_lines = 22574

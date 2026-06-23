@@ -253,6 +253,25 @@ impl MemoryEntry {
 // MemoryError
 // ---------------------------------------------------------------------------
 
+/// Story 10.4a review (P12) — typed discriminant for collective-tier failures.
+///
+/// Carries the `CollectivePortError` category so callers can distinguish a
+/// capability denial / transport outage / timeout from a generic fault,
+/// without re-parsing the `reason` string (AC1 §6 — typed, halt-safe).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CollectiveErrorKind {
+    /// The Loom-lite service is unreachable (connection refused, DNS failure).
+    Unreachable,
+    /// The operation timed out waiting for the Loom-lite service.
+    Timeout,
+    /// An internal transport / protocol error from the backing store.
+    Transport,
+    /// I1/I2 capability mediation denied the op (no / invalid / expired Loom
+    /// token, or the unmediated trait path was reached while caps are wired).
+    CapabilityDenied,
+    /// Any other collective-tier failure (e.g. a forwarded `MemoryError`).
+    Other,
+}
 /// Typed error taxonomy for Memory Manager operations.
 #[derive(Debug, thiserror::Error)]
 pub enum MemoryError {
@@ -273,6 +292,15 @@ pub enum MemoryError {
     Io(#[from] std::io::Error),
     #[error("storage error: {0}")]
     Storage(String),
+    /// Story 10.4a — collective-tier (Loom-lite) failure.  Carries the typed
+    /// `CollectivePortError` detail (Unreachable/Timeout/Transport) so callers
+    /// can distinguish a collective-tier outage from a generic storage fault;
+    /// not flattened to `Storage` (AC1 §6 — typed, halt-safe).
+    #[error("collective tier error ({kind:?}): {reason}")]
+    Collective {
+        kind: CollectiveErrorKind,
+        reason: String,
+    },
     #[error("value too large: {len} bytes (max {max})")]
     ValueTooLarge { len: usize, max: usize },
     #[error("principal namespace write unauthorized: spirit_pid {spirit_pid} not authorized")]

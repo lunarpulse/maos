@@ -115,6 +115,37 @@ pub enum Subcommand {
     Governance(GovernanceArgs),
     /// Story 9.4 AC-3 — Transparency Log backup/DR (region-scoped).
     Backup(BackupArgs),
+    /// Story 10.4a AC2 (NFR-Ops-10) — migrate a frozen SQLite Transparency Log
+    /// to Postgres with triple-oracle verification (Merkle root, payload
+    /// oracle, row count). The source MUST be quiesced (no active writers)
+    /// before invoking — the migration engine does not take a write lock.
+    Migrate(MigrateArgs),
+}
+
+/// Story 10.4a — `maosctl migrate sqlite-to-postgres`.
+#[derive(clap::Args, Debug)]
+pub struct MigrateArgs {
+    #[command(subcommand)]
+    pub op: MigrateOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum MigrateOp {
+    /// Migrate a frozen SQLite Transparency Log to Postgres.
+    SqliteToPostgres {
+        /// Path to the source SQLite TL database (must be quiesced — no active writers).
+        #[arg(long)]
+        from: String,
+        /// Target Postgres connection string (libpq format):
+        /// `postgresql://user:pass@host:5432/dbname`
+        #[arg(long)]
+        to: String,
+        /// Optional: rollback on verification failure (default: true).
+        /// When true, if any of the three oracles fail, the Postgres target
+        /// table is dropped and the command exits non-zero.
+        #[arg(long, default_value_t = true)]
+        rollback_on_failure: bool,
+    },
 }
 
 /// Story 9.4 — `maosctl backup <create|verify|restore>`.

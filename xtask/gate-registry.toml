@@ -68,6 +68,16 @@ gates = [
     "check-ko-coverage",
     # Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time, advisory-until-90d).
     "check-fuzz-floor",
+    # Story 10.4a — kernel-core dependency-closure gate (NFR-Test-9 artifact hygiene).
+    "check-dependency-closure",
+    # Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle
+    # ship gate (Merkle root + payload oracle + row count; advisory at v1.0).
+    "check-migration-merkle",
+    # Story 10.4a (NFR-Ops-2) — RTO ≤ 4h drilled gate. The drill
+    # (`rto-drill`) performs a cold-restore and writes evidence; the gate
+    # (`check-rto-gate`) reads the evidence and gates on the threshold.
+    "rto-drill",
+    "check-rto-gate",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -128,6 +138,26 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 [[ship_gate]]
 name = "check-fuzz-floor"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+# Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate.
+# Advisory at v1.0 (results absent → advisory pass); blocking at v1.5.
+[[ship_gate]]
+name = "check-migration-merkle"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+# Story 10.4a (NFR-Ops-2) — RTO ≤ 4h drilled gate. The drill (`rto-drill`)
+# performs a cold-restore + timing and writes evidence; the gate
+# (`check-rto-gate`) reads the accumulated evidence and gates on the ≤ 4h
+# threshold. Both run on the weekly rpo-rto-cadence.yml schedule, NOT
+# per-commit, so they are advisory at v1.0 (no weekly evidence yet) and
+# graduate to blocking at v1.5 (matching the RTO gate posture). Weekly-only:
+# intentionally NOT in discipline.yml's v1.0-ship-gate `needs:` array.
+[[ship_gate]]
+name = "rto-drill"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-rto-gate"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 
 # Story 10.1b AC2 — OWASP Risk Rating Methodology freeze hash.
 # Stored in the invariant-locked registry so any edit to the OWASP doc
