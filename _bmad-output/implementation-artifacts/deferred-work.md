@@ -382,6 +382,9 @@ now ADVISORY (continue-on-error in discipline.yml) until a dedicated story close
 ## Deferred from: CI remediation 2026-06-12 (round 5 — nfr-perf compile regression)
 
 ### NEW STORY NEEDED — rebuild J4/J6 real `kernel_measurement` harnesses (maos-bench)
+
+> **NOW OWNED — Story 10.4c** (`10-4c-j4-j6-real-kernel-measurement-harness-rebuild.md`), opened at the Story 10.4b Round-2 party-mode preflight 2026-06-23. 10.4c is a HARD BLOCKER on the v1.5-GA "`<10ms` achieved" latency claim; 10.4b carries a J4 **proven-RED placeholder** until 10.4c lands the real harness. This entry closes when 10.4c is `done`.
+
 The `kernel_measurement` feature of `maos-bench` failed to COMPILE (17 errors),
 silently masked by the nfr-perf jobs' `continue-on-error`. Root cause: the J4/J6
 real-measurement harnesses authored in Story 8.5 (`201f95b`) drifted against

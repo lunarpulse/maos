@@ -1108,10 +1108,18 @@ coverage:
       Story 1b.1 ships the criterion bench for ring-buffer flush P99 < 1ms.
       Raw file + sync_data chosen over SQLite WAL for deterministic latency.
   NFR-Rel-9:
-    gates: []
+    gates: [check-rotation-real-timing]
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: |
+      Revocation-propagation latency under mTLS cert-rotation churn. The
+      `check-rotation-real-timing` gate (Story 10.4b) asserts the
+      `RotationDrillReport` revocation-propagation floors by name (p50 ≤30s /
+      p99 ≤90s) over REAL `AgentRotationTimestamps` from the live 3-host
+      rotation chaos drill — the falsifiable enforcement of this NFR. The same
+      gate is cross-listed under NFR-Sec-13, which owns the chaos structure that
+      produces the revocation events.
   NFR-Scale-1:
     gates: []
     corpora: []
@@ -1164,7 +1172,7 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Sec-13:
-    gates: []
+    gates: [check-live-bilateral-consent, check-rotation-real-timing]
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'

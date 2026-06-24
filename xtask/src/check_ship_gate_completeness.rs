@@ -34,6 +34,13 @@ const EXPECTED_GATES: &[&str] = &[
     // below; they still require a [[ship_gate]] disposition in gate-registry.toml.
     "rto-drill",
     "check-rto-gate",
+    // Story 10.4b (NFR-Sec-13 / NFR-Rel-9) — live bilateral A2A consent,
+    // rotation real-timing, mobile-push-on-halt, and J4 proven-RED placeholder
+    // ship gates.
+    "check-live-bilateral-consent",
+    "check-rotation-real-timing",
+    "check-mobile-push-on-halt",
+    "check-j4-placeholder-red",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.
@@ -66,19 +73,28 @@ pub fn run(json: bool) -> Result<(), String> {
     // D3/F3→B: validate that every ship gate has a [[ship_gate]] disposition entry
     // in gate-registry.toml. This mechanizes the advisory→blocking graduation.
     let registry_path = Path::new("xtask/gate-registry.toml");
-    let registry: crate::corpus_types::ShipGateRegistry = crate::corpus_types::load_toml(registry_path)
-        .map_err(|e| format!("cannot load ship-gate registry: {e}"))?;
-    let registry_names: std::collections::HashSet<&str> =
-        registry.ship_gates.iter().map(|e| e.name.as_str()).collect();
+    let registry: crate::corpus_types::ShipGateRegistry =
+        crate::corpus_types::load_toml(registry_path)
+            .map_err(|e| format!("cannot load ship-gate registry: {e}"))?;
+    let registry_names: std::collections::HashSet<&str> = registry
+        .ship_gates
+        .iter()
+        .map(|e| e.name.as_str())
+        .collect();
     let mut missing_disposition: Vec<&str> = Vec::new();
     for gate in EXPECTED_GATES {
         // v1.0 infrastructure gates (ccac, hsis, stability, breaking) predate the
         // disposition registry; only the Story-10.x ship gates require [[ship_gate]] entries.
-        let is_story10_ship_gate = matches!(*gate,
-            "check-pentest-gate" | "check-third-party-trial" |
-            "check-cross-form-equiv" | "check-red-team-gate"
+        let is_story10_ship_gate = matches!(
+            *gate,
+            "check-pentest-gate"
+                | "check-third-party-trial"
+                | "check-cross-form-equiv"
+                | "check-red-team-gate"
         );
-        if (is_story10_ship_gate || WEEKLY_ONLY_GATES.contains(gate)) && !registry_names.contains(gate) {
+        if (is_story10_ship_gate || WEEKLY_ONLY_GATES.contains(gate))
+            && !registry_names.contains(gate)
+        {
             missing_disposition.push(gate);
         }
     }
@@ -170,8 +186,7 @@ fn extract_ship_gate_needs(content: &str) -> Result<Vec<String>, String> {
         }
     }
 
-    let needs_idx =
-        needs_line.ok_or("needs: block not found in v1-0-ship-gate job")?;
+    let needs_idx = needs_line.ok_or("needs: block not found in v1-0-ship-gate job")?;
 
     // Collect the `- item` entries after needs:.
     let mut needs = Vec::new();

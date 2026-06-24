@@ -24,6 +24,8 @@
 use crate::harness::build_journey_result;
 use crate::report::JourneyResult;
 
+/// §13.1 Mira-Nash Observer colocation-latency P95 budget (10ms). Its authority
+/// is the §13.1 floor, not a mirror test — so it is not re-asserted by a test.
 const J4_P95_BUDGET_US: u64 = 10_000;
 
 #[derive(Debug, thiserror::Error)]
@@ -46,6 +48,18 @@ impl Default for J4Config {
     }
 }
 
+/// Canonical marker every placeholder (canned/deferred) J4 path emits. Matching
+/// this substring proves the run produced NO real numbers, regardless of which
+/// fallback ran (feature-off smoke vs. feature-on DEFERRED kernel path).
+const J4_PLACEHOLDER_MARKER: &str = "J4 placeholder — NOT real measurements";
+
+/// Emit the placeholder WARNING with a path-specific `detail`. Both fallback
+/// paths funnel through here so the NOT-real marker is guaranteed identical,
+/// avoiding string drift between the feature-off and feature-on paths.
+fn warn_placeholder(detail: &str) {
+    eprintln!("WARNING: {J4_PLACEHOLDER_MARKER} ({detail})");
+}
+
 /// Run J4 measurement.
 ///
 /// Without the `kernel_measurement` feature, falls back to smoke mode.
@@ -58,10 +72,7 @@ pub fn run_j4_measurement(config: &J4Config) -> Result<JourneyResult, BenchError
     #[cfg(not(feature = "kernel_measurement"))]
     {
         let _ = config;
-        eprintln!(
-            "WARNING: J4 measurement running in smoke mode (no kernel_measurement feature). \
-             Results are NOT real measurements."
-        );
+        warn_placeholder("no kernel_measurement feature — smoke-mode canned samples");
         Ok(run_j4_smoke_with_count(config.invocation_count))
     }
 }
@@ -96,9 +107,8 @@ fn run_j4_kernel(config: &J4Config) -> Result<JourneyResult, BenchError> {
     // back to the SMOKE sample with a loud warning — this keeps the maos-bench lib
     // compiling so the iac_routing_budget / orchestrator_fanout perf benches (which
     // do NOT use J4) can build and run, WITHOUT presenting smoke numbers as real.
-    eprintln!(
-        "WARNING: J4 real kernel measurement is DEFERRED (harness drift since Story 8.5); \
-         returning a SMOKE sample — these are NOT real measurements."
+    warn_placeholder(
+        "real kernel measurement DEFERRED — harness drift since Story 8.5, returning smoke samples",
     );
     Ok(run_j4_smoke_with_count(config.invocation_count))
 }
@@ -111,11 +121,6 @@ mod tests {
     fn j4_config_defaults() {
         let cfg = J4Config::default();
         assert_eq!(cfg.invocation_count, 1000);
-    }
-
-    #[test]
-    fn j4_budget_constant() {
-        assert_eq!(J4_P95_BUDGET_US, 10_000);
     }
 
     #[test]

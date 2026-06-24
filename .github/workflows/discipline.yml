@@ -2218,6 +2218,94 @@ jobs:
         working-directory: docs-site
         run: npm run gate:glossary-lock
 
+  # Story 10.4b (NFR-Sec-13) — live bilateral A2A consent + binding_checked gate.
+  check-live-bilateral-consent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-live-bilateral-consent
+        run: cargo test -p maos-a2a-tcp --test t_10_4b_live_bilateral -- --test-threads=1
+
+  # Story 10.4b (NFR-Rel-9) — rotation real-timing RotationDrillReport gate.
+  check-rotation-real-timing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-rotation-real-timing
+        run: cargo test -p maos-a2a-tcp --test t_10_4b_rotation_real_timing -- --test-threads=1
+
+  # Story 10.4b — J4 §13.1 Mira-Nash colocation-latency proven-RED placeholder
+  # gate (ADR-040). Mechanically RED: the verdict test is #[ignore]'d and run
+  # via --ignored expecting FAILURE; the job turns green only if the placeholder
+  # stays correctly RED. Flipped GREEN in Story 10.4c (real in-kernel measurement).
+  check-j4-placeholder-red:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-j4-placeholder-red
+        run: |
+          set +e
+          # Pinned to --no-default-features: the real in-kernel measurement is
+          # deferred to Story 10.4c (ADR-040), so the gate MUST run the canned
+          # smoke path and emit the NOT-real marker.
+          cargo test -p maos-bench --no-default-features --test t_10_4b_j4_placeholder_gate
+          smoke_rc=$?
+          # The proven-RED verdict test is #[ignore]'d in the run above; execute
+          # it explicitly and assert it FAILS — the gate is RED by construction.
+          # A PASS means the placeholder silently turned green without a real
+          # in-kernel measurement (the regression this gate exists to prevent).
+          cargo test -p maos-bench --no-default-features --test t_10_4b_j4_placeholder_gate t_10_4b_j4_placeholder_gate_red -- --ignored
+          red_rc=$?
+          if [ "$smoke_rc" -ne 0 ]; then
+            echo "J4 smoke-mode marker test FAILED — placeholder integrity broken."
+            exit 1
+          fi
+          if [ "$red_rc" -eq 0 ]; then
+            echo "J4 proven-RED verdict test PASSED unexpectedly — the gate turned"
+            echo "green without a real in-kernel measurement (Story 10.4c not landed)."
+            echo "Do not silence this: land the real measurement path first."
+            exit 1
+          fi
+          echo "check-j4-placeholder-red: PROVEN-RED (verdict test fails as expected;"
+          echo "in-kernel measurement deferred to Story 10.4c per ADR-040)."
+
+  # Story 10.4b — mobile push fires on Mira halt over the real MobilePushHttp
+  # transport (operator-facing halt wire).
+  check-mobile-push-on-halt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-mobile-push-on-halt
+        run: cargo test -p maos-notify-push --test t_10_4b_mobile_push_halt
+
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2240,6 +2328,10 @@ jobs:
       - fuzz-build
       - check-ko-coverage
       - check-migration-merkle
+      - check-live-bilateral-consent
+      - check-rotation-real-timing
+      - check-j4-placeholder-red
+      - check-mobile-push-on-halt
     if: always()
     steps:
       - name: Ship gate results summary

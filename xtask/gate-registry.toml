@@ -78,6 +78,14 @@ gates = [
     # (`check-rto-gate`) reads the evidence and gates on the threshold.
     "rto-drill",
     "check-rto-gate",
+    # Story 10.4b — live bilateral A2A consent (NFR-Sec-13), rotation real-timing
+    # (NFR-Rel-9), mobile-push-on-halt (operator-facing halt wire), and the J4
+    # §13.1 Mira-Nash colocation-latency proven-RED placeholder gate (ADR-040;
+    # real in-kernel measurement → Story 10.4c).
+    "check-live-bilateral-consent",
+    "check-rotation-real-timing",
+    "check-mobile-push-on-halt",
+    "check-j4-placeholder-red",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -157,6 +165,34 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 
 [[ship_gate]]
 name = "check-rto-gate"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+# Story 10.4b (NFR-Sec-13 / NFR-Rel-9) — live bilateral A2A consent gate.
+# Advisory at v1.0 (gate GREEN now); blocking at v1.5.
+[[ship_gate]]
+name = "check-live-bilateral-consent"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+# Story 10.4b (NFR-Rel-9) — rotation real-timing RotationDrillReport gate.
+# Advisory at v1.0; blocking at v1.5.
+[[ship_gate]]
+name = "check-rotation-real-timing"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+# Story 10.4b — J4 §13.1 Mira-Nash colocation-latency proven-RED placeholder gate
+# (ADR-040). Created RED in 10.4b (in-kernel scalar.tap measurement deferred);
+# flipped GREEN in Story 10.4c, at which point v1.5 graduates to blocking.
+# Advisory at both phases while the real measurement is outstanding: a proven-RED
+# placeholder never blocks on canned/deferred samples.
+[[ship_gate]]
+name = "check-j4-placeholder-red"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+# Story 10.4b — mobile push fires on Mira halt over the real MobilePushHttp
+# transport (operator-facing halt wire). Advisory at v1.0 (feature ships at
+# v1.5); blocking at v1.5.
+[[ship_gate]]
+name = "check-mobile-push-on-halt"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 
 # Story 10.1b AC2 — OWASP Risk Rating Methodology freeze hash.
