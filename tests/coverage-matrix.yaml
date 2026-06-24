@@ -999,10 +999,14 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Perf-1:
-    gates: []
+    gates: [check-j4-latency]
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: >
+      Story 10.4c adds check-j4-latency — real in-kernel scalar.tap
+      colocation-latency P95 ≤ 10ms gate (§13.1). Advisory at v1.0,
+      blocking at v1.5.
   NFR-Perf-2:
     gates: []
     corpora: []

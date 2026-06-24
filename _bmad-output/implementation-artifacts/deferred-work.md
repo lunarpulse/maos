@@ -381,28 +381,11 @@ now ADVISORY (continue-on-error in discipline.yml) until a dedicated story close
 
 ## Deferred from: CI remediation 2026-06-12 (round 5 — nfr-perf compile regression)
 
-### NEW STORY NEEDED — rebuild J4/J6 real `kernel_measurement` harnesses (maos-bench)
+### ~~NEW STORY NEEDED — rebuild J4/J6 real `kernel_measurement` harnesses (maos-bench)~~ CLOSED
 
-> **NOW OWNED — Story 10.4c** (`10-4c-j4-j6-real-kernel-measurement-harness-rebuild.md`), opened at the Story 10.4b Round-2 party-mode preflight 2026-06-23. 10.4c is a HARD BLOCKER on the v1.5-GA "`<10ms` achieved" latency claim; 10.4b carries a J4 **proven-RED placeholder** until 10.4c lands the real harness. This entry closes when 10.4c is `done`.
-
-The `kernel_measurement` feature of `maos-bench` failed to COMPILE (17 errors),
-silently masked by the nfr-perf jobs' `continue-on-error`. Root cause: the J4/J6
-real-measurement harnesses authored in Story 8.5 (`201f95b`) drifted against
-current APIs and never recompiled (main had no CI between 7.1.5 and Epic 8). The
-real bodies were temporarily NEUTRALIZED to a smoke fallback + loud "NOT real"
-warning so the lib compiles and the (unrelated) iac_routing_budget /
-orchestrator_fanout perf benches can build and run. A story should REBUILD the
-real measurement paths:
-- `harness/j4.rs::run_j4_kernel` — `CryptoProvider` trait reshaped (now
-  `verify_signature`/`seal_for_export`/`sign_capability_token`; dropped
-  `sign`/`sign_detached`/`generate_keypair`); `CapabilityRegistryAdapter::new`
-  grew 3→8 args; `TransparencyLogAdapter::new`→`open_in_memory`;
-  `Ed25519SigningKey::generate` moved; `Mailbox`/`TelemetryStreamAdapter` ctors.
-- `harness/j6.rs::run_j6_kernel` — references `mira`/`nash` crates that are NOT
-  maos-bench deps (add as dev-deps), and the private `maos_domain::frame::FrameOrigin`
-  (use `maos_domain::invariants::i3::FrameOrigin`); current substrate ctors.
-- Until rebuilt, J4/J6 REAL measurement (section_13_1 / j6-real-measurement
-  nightly) returns smoke samples with a warning — honest but not a real number.
+> **CLOSED by Story 10.4c** (2026-06-24):
+> - **J4 (`harness/j4.rs::run_j4_kernel`) → DONE.** Real in-kernel `scalar.tap` measurement rebuilt from the verified template (`scalar_tap_subscriber.rs:24-77`). Gate renamed `check-j4-placeholder-red` → `check-j4-latency`. P95=1µs at HEAD (well within 10ms budget). Falsifiability proven: `bench-fault-inject` feature injects ≥15ms delay → P95 crosses 10000µs → RED.
+> - **J6 (`harness/j6.rs::run_j6_kernel`) → CUT, FF-J6-guarded.** J6 cold-start latency harness is CUT from 10.4c — §13.1 declares it non-binding ("correctness gate dominates") and it is out of v1.5 scope; it is revived only when a J6 latency assertion or user-facing J6 latency claim is introduced, which CI guard FF-J6 (`xtask check-ff-j6`) blocks until the harness is rebuilt. `run_j6_kernel` now returns `JourneyResult::not_measured("J6")` instead of a plausible fake number. `mira`/`nash` dev-deps and the `FrameOrigin` path fix were NOT pulled in.
 
 ### FIXED in this round (nfr-perf gates now build + RUN)
 - `orchestrator_fanout_nfr_perf_8.rs`: (a) `handle.recv()` now yields
@@ -513,3 +496,7 @@ Extracted to `xtask/src/gate_common.rs` and applied to all 4 gate modules:
 - **W3 — AC2 live cross-backend tests are #[ignore]-only — no CI Postgres service** [crates/maos-loom-lite/tests/migration_live.rs]. Skipped-not-silent-PASS semantics are honest. Missing piece is a scheduled live Postgres environment in CI. Pre-existing infrastructure gap; not a code defect.
 - **W4 — frames_25k theatrical for in-memory proven-red vectors** [xtask/tests/story_10_4a_proven_red.rs:37-43]. Batch-boundary coverage genuinely met by migration_live.rs (#[ignore]). In-memory vectors don't exercise batching despite header claim. Minor documentation inaccuracy.
 - **W5 — RPO≤1h not independently gate-enforced on weekly cadence** [xtask/src/check_rto_gate.rs]. Drill folds `rpo_ok` into `passed` (immediate fix applied), but the weekly gate only checks drill_success + rto_seconds. RPO enforcement is drill-scoped, not gate-scoped. Minor gap.
+
+## Deferred from: code review of 10-4c-j4-j6-real-kernel-measurement-harness-rebuild (2026-06-24)
+
+- **2-of-3 reproduce-to-block de-flaking control (AC3/D2)** [crates/maos-bench/src/harness/j4.rs; t_10_4c_j4_latency_gate.rs]. The spec-mandated "a RED must reproduce 2-of-3 in-process passes before the gate fails" retry loop is unimplemented — the J4 measurement runs once per test. *Reason deferred:* at HEAD the measured P95 is ~1µs vs the 10ms budget (~10000× headroom), so a flake-induced false-RED is implausible near-term; revisit when J4 latency approaches the budget. The absolute-budget gate (AC3) and the Gate-1 mutation falsifier (AC2) remain load-bearing every PR.

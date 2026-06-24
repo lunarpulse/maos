@@ -1339,6 +1339,27 @@ jobs:
       - name: Run iac-routing-budget bench
         run: cargo bench -p maos-bench --bench iac_routing_budget --features kernel_measurement -- --quick
 
+  # Story 10.4c AC3 / Task-3.1 (review D3) — J4 §13.1 latency regression track
+  # (Gate 2a decay/regression). Mirrors the NFR-Perf-* bench idiom: reuses the
+  # real run_j4_measurement, reports the J4 P95 for trendable regression
+  # tracking. Advisory on shared GH runners (continue-on-error) — identical
+  # posture to nfr-perf-1/8; hard blocking-regression-vs-committed-baseline is
+  # the v1.5 hardening. Catches silent decay below the absolute 10ms budget.
+  nfr-perf-j4-latency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true  # ADVISORY (review D3): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Mirrors nfr-perf-1/8. Not masking a regression.
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run J4 latency regression bench
+        run: cargo bench -p maos-bench --bench j4_latency_regression --features kernel_measurement -- --quick
+
   # Story 6.2 AC3 — NFR-Perf-8: 50-concurrent Worker fan-out / 10 tasks/sec
   # sustained / P99 ≤500ms / 0 dropped. CI-quick mode runs 60s; the full 1h
   # is gated to weekly schedule.
@@ -2248,11 +2269,16 @@ jobs:
       - name: Run check-rotation-real-timing
         run: cargo test -p maos-a2a-tcp --test t_10_4b_rotation_real_timing -- --test-threads=1
 
-  # Story 10.4b — J4 §13.1 Mira-Nash colocation-latency proven-RED placeholder
-  # gate (ADR-040). Mechanically RED: the verdict test is #[ignore]'d and run
-  # via --ignored expecting FAILURE; the job turns green only if the placeholder
-  # stays correctly RED. Flipped GREEN in Story 10.4c (real in-kernel measurement).
-  check-j4-placeholder-red:
+  # Story 10.4c — J4 §13.1 Mira-Nash Observer colocation-latency gate.
+  # Real in-kernel scalar.tap measurement via `kernel_measurement` feature.
+  # Gate scalar: cross-task delivery latency P95 ≤ 10ms. De-flaking: warmup
+  # discard, N≥200 post-warmup, pinned tokio workers (D2).
+  # The mutation test (bench-fault-inject) runs separately to verify falsifiability.
+  # AC3/D5 (review D1): ADVISORY at v1.0 — the gate test prints a "WOULD BLOCK
+  # at v1.5" banner on over-budget instead of failing (v1_0=advisory). The
+  # load-bearing falsifier is the mutation test step below. Graduation to
+  # v1_5=blocking is a disposition flip in gate-registry.toml.
+  check-j4-latency:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -2263,32 +2289,50 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-j4-placeholder-red
+      - name: Run check-j4-latency (real measurement)
         run: |
-          set +e
-          # Pinned to --no-default-features: the real in-kernel measurement is
-          # deferred to Story 10.4c (ADR-040), so the gate MUST run the canned
-          # smoke path and emit the NOT-real marker.
-          cargo test -p maos-bench --no-default-features --test t_10_4b_j4_placeholder_gate
-          smoke_rc=$?
-          # The proven-RED verdict test is #[ignore]'d in the run above; execute
-          # it explicitly and assert it FAILS — the gate is RED by construction.
-          # A PASS means the placeholder silently turned green without a real
-          # in-kernel measurement (the regression this gate exists to prevent).
-          cargo test -p maos-bench --no-default-features --test t_10_4b_j4_placeholder_gate t_10_4b_j4_placeholder_gate_red -- --ignored
-          red_rc=$?
-          if [ "$smoke_rc" -ne 0 ]; then
-            echo "J4 smoke-mode marker test FAILED — placeholder integrity broken."
+          # Real in-kernel scalar.tap measurement with kernel_measurement feature.
+          cargo test -p maos-bench --features kernel_measurement --test t_10_4c_j4_latency_gate -- --nocapture
+          echo "check-j4-latency: PASSED (real in-kernel scalar.tap measurement; Story 10.4c)."
+      - name: Run Gate 1 integrity tests
+        run: |
+          cargo test -p maos-bench --features kernel_measurement --test t_10_4c_j4_gate_integrity -- --nocapture
+          echo "check-j4-latency: Gate 1 integrity tests PASSED."
+      - name: Run mutation test (bench-fault-inject)
+        run: |
+          output=$(cargo test -p maos-bench --features bench-fault-inject --test t_10_4c_j4_mutation -- --nocapture 2>&1)
+          echo "$output"
+          # Review P4: assert the mutation tests actually RAN. A dropped/typo'd
+          # --features bench-fault-inject would compile this target to ZERO tests
+          # and `cargo test` would exit 0 — a silent vacuous GREEN. Require ≥1
+          # passed test so the AC2 falsifier cannot vanish without alarm.
+          echo "$output" | grep -Eq "test result: ok\. [1-9][0-9]* passed" \
+            || { echo "FAIL: mutation tests did not run (0 tests — is --features bench-fault-inject set?)"; exit 1; }
+          echo "check-j4-latency: mutation test PASSED (injection moves the number → RED)."
+      - name: Verify bench-fault-inject absent from release graph (D3)
+        run: |
+          if cargo tree -p maos-bench -e features --release 2>&1 | grep -q "bench-fault-inject"; then
+            echo "FAIL: bench-fault-inject present in release feature graph"
             exit 1
           fi
-          if [ "$red_rc" -eq 0 ]; then
-            echo "J4 proven-RED verdict test PASSED unexpectedly — the gate turned"
-            echo "green without a real in-kernel measurement (Story 10.4c not landed)."
-            echo "Do not silence this: land the real measurement path first."
-            exit 1
-          fi
-          echo "check-j4-placeholder-red: PROVEN-RED (verdict test fails as expected;"
-          echo "in-kernel measurement deferred to Story 10.4c per ADR-040)."
+          echo "check-j4-latency: bench-fault-inject absent from release graph (D3 verified)."
+
+  # Story 10.4c AC5 (D8) — FF-J6 CI guard. Mechanically enforces the J6
+  # cold-start latency harness revival trigger: FAILS if a J6 latency binding
+  # (assertion / binding AC / user-facing claim) appears while the J6 harness is
+  # still CUT (not_measured). Blocking — a J6 latency claim requires the harness.
+  check-ff-j6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run FF-J6 guard
+        run: cargo run -p xtask -- check-ff-j6
 
   # Story 10.4b — mobile push fires on Mira halt over the real MobilePushHttp
   # transport (operator-facing halt wire).
@@ -2330,8 +2374,9 @@ jobs:
       - check-migration-merkle
       - check-live-bilateral-consent
       - check-rotation-real-timing
-      - check-j4-placeholder-red
+      - check-j4-latency
       - check-mobile-push-on-halt
+      - check-ff-j6
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2354,6 +2399,7 @@ jobs:
           echo "| check-fuzz-targets | ${{ needs.check-fuzz-targets.result }} | cargo run -p xtask -- check-fuzz-targets |"
           echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
+          echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}

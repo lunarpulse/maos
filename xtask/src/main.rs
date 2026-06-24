@@ -53,6 +53,8 @@ mod check_cna_registration;
 mod check_export_control;
 mod check_fuzz_targets;
 mod check_fuzz_floor;
+// Story 10.4c AC5 (D8) — FF-J6 guard: J6 latency harness revival trigger.
+mod check_ff_j6;
 mod check_serde_error_handling;
 mod check_service_boundary;
 mod check_skill_schema;
@@ -748,6 +750,14 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 10.4c AC5 (D8) — FF-J6 guard: enforces J6 cold-start latency
+    /// harness revival trigger. Greps for J6 latency bindings; fails if one
+    /// appears with no J6 harness present.
+    #[command(name = "check-ff-j6")]
+    CheckFfJ6 {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -1078,6 +1088,7 @@ fn main() {
         Commands::CheckFuzzTargets { json } => check_fuzz_targets::run(json),
         Commands::CheckFuzzFloor { json } => check_fuzz_floor::run(json),
         Commands::CheckMigrationMerkle { json } => check_migration_merkle::run(json),
+        Commands::CheckFfJ6 { json } => check_ff_j6::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

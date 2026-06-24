@@ -35,12 +35,13 @@ const EXPECTED_GATES: &[&str] = &[
     "rto-drill",
     "check-rto-gate",
     // Story 10.4b (NFR-Sec-13 / NFR-Rel-9) — live bilateral A2A consent,
-    // rotation real-timing, mobile-push-on-halt, and J4 proven-RED placeholder
-    // ship gates.
+    // rotation real-timing, mobile-push-on-halt ship gates.
     "check-live-bilateral-consent",
     "check-rotation-real-timing",
     "check-mobile-push-on-halt",
-    "check-j4-placeholder-red",
+    // Story 10.4c — J4 §13.1 real in-kernel scalar.tap latency gate (replaces
+    // the 10.4b proven-RED placeholder `check-j4-placeholder-red`).
+    "check-j4-latency",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.
