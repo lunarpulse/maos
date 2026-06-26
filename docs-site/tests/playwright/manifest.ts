@@ -35,6 +35,14 @@ export function koPath(route: string): string {
   return route === "/" ? "/ko/" : `/ko${route}`;
 }
 
+export function jaPath(route: string): string {
+  return route === "/" ? "/ja/" : `/ja${route}`;
+}
+
+export function zhPath(route: string): string {
+  return route === "/" ? "/zh-Hans/" : `/zh-Hans${route}`;
+}
+
 export function buildPageRoutes(buildRoot = buildDir): string[] {
   const routes: string[] = [];
   function walk(dir: string, prefix: string) {
@@ -54,7 +62,11 @@ export function buildPageRoutes(buildRoot = buildDir): string[] {
     }
   }
   walk(buildRoot, "");
-  const skip = new Set(["/404", "/ko/404", "/markdown-page", "/ko/markdown-page", "/manifest", "/ko/manifest"]);
+  const skip = new Set([
+    "/404", "/ko/404", "/ja/404", "/zh-Hans/404",
+    "/markdown-page", "/ko/markdown-page", "/ja/markdown-page", "/zh-Hans/markdown-page",
+    "/manifest", "/ko/manifest", "/ja/manifest", "/zh-Hans/manifest"
+  ]);
   return routes.filter((r) => !skip.has(r.replace(/\/$/, "")));
 }
 

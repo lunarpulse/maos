@@ -4,7 +4,6 @@ sidebar_position: 4
 description: Ed25519 릴리스 아티팩트 서명, 검증, 키 순환 절차.
 review_status: machine
 high_risk: true
-high_risk: true
 ---
 
 # 릴리스 서명

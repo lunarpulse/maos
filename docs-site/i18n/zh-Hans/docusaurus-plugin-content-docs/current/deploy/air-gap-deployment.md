@@ -4,7 +4,6 @@ sidebar_position: 2
 description: 컴파일 타임 네트워크 표면 제거로 네트워크 격리 환경에 MAOS 배포.
 review_status: machine
 high_risk: true
-high_risk: true
 ---
 
 # 에어갭 배포

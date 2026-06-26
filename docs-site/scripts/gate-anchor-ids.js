@@ -22,6 +22,20 @@ const ABI_DIRS = [
     "docusaurus-plugin-content-docs-abi",
     "current"
   ),
+  path.join(
+    SITE_DIR,
+    "i18n",
+    "ja",
+    "docusaurus-plugin-content-docs-abi",
+    "current"
+  ),
+  path.join(
+    SITE_DIR,
+    "i18n",
+    "zh-Hans",
+    "docusaurus-plugin-content-docs-abi",
+    "current"
+  ),
 ];
 
 function markdownFiles(dir) {

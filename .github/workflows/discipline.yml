@@ -2509,6 +2509,11 @@ jobs:
           echo "  fuzz-build: ${{ needs.fuzz-build.result }}"
           echo "  check-ko-coverage: ${{ needs.check-ko-coverage.result }}"
           exit 1
+
+  aggregate:
+    runs-on: ubuntu-latest
+    needs:
+      - reproducible-build
       - check-unsafe
       - kloc-check
       - abi-diff

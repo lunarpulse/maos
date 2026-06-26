@@ -203,7 +203,7 @@ pub enum Verdict {
 }
 ```
 
-## 한국 규제 참고사항
+## 한국 규제 참고사항 {#abi-compliance-korean-regulations}
 
 <!-- TODO: 한국 규제/운영 검토는 v1.0 이후 네이티브 리뷰어와 함께 보강합니다. -->
 

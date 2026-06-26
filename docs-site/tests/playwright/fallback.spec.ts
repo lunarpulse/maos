@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("gate:fallback", () => {
-  test("untranslated ko ABI route serves English content with English page lang and Korean banner", async ({ page }) => {
-    await page.goto("/ko/abi/v1/lifecycle", { waitUntil: "domcontentloaded" });
+  test("untranslated ko route serves English content with English page lang and Korean banner", async ({ page }) => {
+    await page.goto("/ko/errors/EAbiTooNew", { waitUntil: "domcontentloaded" });
 
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByText("The Spirit lifecycle trait.")).toBeVisible();
+    await expect(page.getByText("Manifest schema version above maximum supported")).toBeVisible();
 
     const banner = page.locator('[data-maos-fallback-banner="ko"]');
     await expect(banner).toBeVisible();
