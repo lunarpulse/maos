@@ -36,9 +36,7 @@ const NOT_MEASURED_MARKER: &str = "JourneyResult::not_measured";
 /// We scan docs (user-facing) and test code. Story spec files in
 /// `_bmad-output/implementation-artifacts/` are historical references,
 /// not active code-level bindings — excluded.
-const SCAN_DIRS: &[&str] = &[
-    "docs",
-];
+const SCAN_DIRS: &[&str] = &["docs"];
 
 /// File extensions to scan.
 const SCAN_EXTENSIONS: &[&str] = &["md", "yaml", "yml", "toml", "rs"];
@@ -55,8 +53,8 @@ const EXCLUDE_PATHS: &[&str] = &[
 pub fn run(json: bool) -> Result<(), String> {
     // Check if J6 harness is still NOT MEASURED
     let j6_path = Path::new("crates/maos-bench/src/harness/j6.rs");
-    let j6_content = std::fs::read_to_string(j6_path)
-        .map_err(|e| format!("cannot read j6.rs: {e}"))?;
+    let j6_content =
+        std::fs::read_to_string(j6_path).map_err(|e| format!("cannot read j6.rs: {e}"))?;
 
     let harness_is_stub = j6_content.contains(NOT_MEASURED_MARKER);
 
@@ -150,8 +148,8 @@ fn pattern_matches(content: &str, pattern: &str) -> bool {
 }
 
 fn scan_dir(dir: &Path, violations: &mut Vec<String>) -> Result<(), String> {
-    let entries = std::fs::read_dir(dir)
-        .map_err(|e| format!("cannot read dir {}: {e}", dir.display()))?;
+    let entries =
+        std::fs::read_dir(dir).map_err(|e| format!("cannot read dir {}: {e}", dir.display()))?;
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("readdir error: {e}"))?;
@@ -162,10 +160,7 @@ fn scan_dir(dir: &Path, violations: &mut Vec<String>) -> Result<(), String> {
             continue;
         }
 
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if !SCAN_EXTENSIONS.contains(&ext) {
             continue;
         }

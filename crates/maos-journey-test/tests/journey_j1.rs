@@ -38,11 +38,7 @@ fn parse_json_lines(stdout: &str) -> Vec<serde_json::Value> {
 fn j1_founder_loop_topology_run_once() {
     let home = tempfile::TempDir::new().unwrap();
     let output = Command::new(maos_bin())
-        .args([
-            "run",
-            "spirits/topologies/j1-founder-loop.toml",
-            "--once",
-        ])
+        .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
         .env("XDG_DATA_HOME", home.path())
         .env("MAOS_HOME", home.path())
         .current_dir(workspace_root())
@@ -111,12 +107,10 @@ fn j1_founder_class_standalone_load_succeeds() {
     let events = parse_json_lines(&stdout);
 
     // Verify spirit_loaded event for orchestrator.
-    let loaded = events
-        .iter()
-        .any(|e| {
-            e.get("event").and_then(|v| v.as_str()) == Some("spirit_loaded")
-                && e.get("spirit_id").and_then(|v| v.as_str()) == Some("orchestrator")
-        });
+    let loaded = events.iter().any(|e| {
+        e.get("event").and_then(|v| v.as_str()) == Some("spirit_loaded")
+            && e.get("spirit_id").and_then(|v| v.as_str()) == Some("orchestrator")
+    });
     assert!(
         loaded,
         "standalone founder-class load should emit spirit_loaded for orchestrator; events:\n{events:?}"
@@ -137,11 +131,7 @@ fn j1_resume_continuity_ref_identity_oracle() {
     // Run 1: first topology run in a fresh temp home.
     let home1 = tempfile::TempDir::new().unwrap();
     let output1 = Command::new(maos_bin())
-        .args([
-            "run",
-            "spirits/topologies/j1-founder-loop.toml",
-            "--once",
-        ])
+        .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
         .env("XDG_DATA_HOME", home1.path())
         .env("MAOS_HOME", home1.path())
         .current_dir(workspace_root())
@@ -156,19 +146,15 @@ fn j1_resume_continuity_ref_identity_oracle() {
     );
 
     let events1 = parse_json_lines(&stdout1);
-    let has_drain1 = events1.iter().any(|e| {
-        e.get("event").and_then(|v| v.as_str()) == Some("drain")
-    });
+    let has_drain1 = events1
+        .iter()
+        .any(|e| e.get("event").and_then(|v| v.as_str()) == Some("drain"));
     assert!(has_drain1, "run 1 must produce a drain event");
 
     // Run 2: second topology run in a DIFFERENT temp home (cold-start negative control).
     let home2 = tempfile::TempDir::new().unwrap();
     let output2 = Command::new(maos_bin())
-        .args([
-            "run",
-            "spirits/topologies/j1-founder-loop.toml",
-            "--once",
-        ])
+        .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
         .env("XDG_DATA_HOME", home2.path())
         .env("MAOS_HOME", home2.path())
         .current_dir(workspace_root())
@@ -183,9 +169,9 @@ fn j1_resume_continuity_ref_identity_oracle() {
     );
 
     let events2 = parse_json_lines(&stdout2);
-    let has_drain2 = events2.iter().any(|e| {
-        e.get("event").and_then(|v| v.as_str()) == Some("drain")
-    });
+    let has_drain2 = events2
+        .iter()
+        .any(|e| e.get("event").and_then(|v| v.as_str()) == Some("drain"));
     assert!(has_drain2, "run 2 must produce a drain event");
 
     // Negative control: the two cold-start runs must produce non-identical

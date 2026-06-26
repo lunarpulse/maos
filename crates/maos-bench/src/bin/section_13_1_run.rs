@@ -60,7 +60,10 @@ fn run() -> Result<(), String> {
         "section_13_1_run: starting J4 measurement (N={})...",
         invocation_count
     );
-    let j4_config = harness::j4::J4Config { invocation_count, warmup_count: 50 };
+    let j4_config = harness::j4::J4Config {
+        invocation_count,
+        warmup_count: 50,
+    };
     let j4 = harness::j4::run_j4_measurement(&j4_config)
         .map_err(|e| format!("J4 measurement failed: {}", e))?;
     eprintln!(

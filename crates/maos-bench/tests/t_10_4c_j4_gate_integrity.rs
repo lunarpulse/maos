@@ -16,11 +16,7 @@ const PRODUCER_MARKER: &str = "__J4_RESULT_JSON__";
 fn run_j4_in_subprocess() -> (JourneyResult, String) {
     let exe = std::env::current_exe().expect("resolve test bin");
     let output = Command::new(exe)
-        .args([
-            "j4_gate1_producer_inner",
-            "--exact",
-            "--nocapture",
-        ])
+        .args(["j4_gate1_producer_inner", "--exact", "--nocapture"])
         .output()
         .expect("spawn J4 producer subprocess");
 

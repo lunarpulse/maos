@@ -185,8 +185,7 @@ fn drill(
     };
 
     // 3. Verify backup integrity BEFORE the restore (Merkle root cross-check).
-    let integrity_ok =
-        verify_backup_integrity(&source_path, &backup_path).is_ok();
+    let integrity_ok = verify_backup_integrity(&source_path, &backup_path).is_ok();
 
     // 4. Cold-restore: copy backup → fresh destination, timed.
     let restored_path = temp.path().join("restored.sqlite");
@@ -215,10 +214,8 @@ fn drill(
     };
     let rpo_ok = verify_rpo(last_backup_ts, crash_ns, DEFAULT_RPO_THRESHOLD_NS).is_ok();
 
-    let passed = rto_seconds <= rto_threshold_secs as f64
-        && integrity_ok
-        && restored_integrity
-        && rpo_ok;
+    let passed =
+        rto_seconds <= rto_threshold_secs as f64 && integrity_ok && restored_integrity && rpo_ok;
 
     Ok(Report {
         passed,
@@ -240,8 +237,8 @@ fn drill(
 /// verify (re-derives BOTH backends).  This measures the v1.5 persistence
 /// target, not the SQLite backend being migrated away from.
 fn drill_postgres(n_frames: usize, rto_threshold_secs: u64) -> Result<Report, String> {
-    let conn_str = std::env::var("MAOS_TEST_POSTGRES")
-        .map_err(|_| "MAOS_TEST_POSTGRES unset".to_string())?;
+    let conn_str =
+        std::env::var("MAOS_TEST_POSTGRES").map_err(|_| "MAOS_TEST_POSTGRES unset".to_string())?;
     let temp = tempfile::tempdir().map_err(|e| format!("tempdir: {e}"))?;
 
     let source_path = temp.path().join("source.sqlite");
@@ -272,9 +269,12 @@ fn drill_postgres(n_frames: usize, rto_threshold_secs: u64) -> Result<Report, St
     let last_backup_ts = latest_timestamp(&source_path)
         .map_err(|e| format!("source latest_timestamp: {e}"))?
         .unwrap_or(0);
-    let rpo_ok =
-        verify_rpo(last_backup_ts, last_backup_ts.saturating_add(1), DEFAULT_RPO_THRESHOLD_NS)
-            .is_ok();
+    let rpo_ok = verify_rpo(
+        last_backup_ts,
+        last_backup_ts.saturating_add(1),
+        DEFAULT_RPO_THRESHOLD_NS,
+    )
+    .is_ok();
 
     let passed = rto_seconds <= rto_threshold_secs as f64 && rpo_ok;
 
@@ -334,17 +334,14 @@ fn create_synthetic_tl(path: &Path, n: usize) -> Result<(), String> {
 /// `maos-cli::backup::backup_transparency_log`).
 fn backup_tl(source: &Path, dest: &Path) -> Result<(), String> {
     if dest.exists() {
-        return Err(format!(
-            "destination already exists: {}",
-            dest.display()
-        ));
+        return Err(format!("destination already exists: {}", dest.display()));
     }
     let src = Connection::open_with_flags(source, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .map_err(|e| format!("open source {}: {e}", source.display()))?;
-    let mut dst = Connection::open(dest)
-        .map_err(|e| format!("open dest {}: {e}", dest.display()))?;
-    let backup = rusqlite::backup::Backup::new(&src, &mut dst)
-        .map_err(|e| format!("init backup: {e}"))?;
+    let mut dst =
+        Connection::open(dest).map_err(|e| format!("open dest {}: {e}", dest.display()))?;
+    let backup =
+        rusqlite::backup::Backup::new(&src, &mut dst).map_err(|e| format!("init backup: {e}"))?;
     backup
         .run_to_completion(100, std::time::Duration::from_millis(250), None)
         .map_err(|e| format!("backup run: {e}"))?;
@@ -356,7 +353,9 @@ fn count_frames(path: &Path) -> Result<usize, String> {
     let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .map_err(|e| format!("open {}: {e}", path.display()))?;
     let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM transparency_log", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM transparency_log", [], |row| {
+            row.get(0)
+        })
         .map_err(|e| format!("count frames: {e}"))?;
     Ok(count as usize)
 }
@@ -406,7 +405,7 @@ mod tests {
     #[test]
     fn rpo_violation_detected() {
         let result = verify_rpo(
-            1_000_000_000_000,                               // last backup
+            1_000_000_000_000,                                // last backup
             1_000_000_000_000 + 2 * DEFAULT_RPO_THRESHOLD_NS, // crash 2h after threshold
             DEFAULT_RPO_THRESHOLD_NS,
         );
@@ -427,6 +426,10 @@ mod tests {
         assert!(report.backup_integrity_verified);
         assert!(report.rpo_verified);
         assert_eq!(report.frame_count, 500);
-        assert!(report.rto_seconds < 60.0, "RTO should be fast: {}s", report.rto_seconds);
+        assert!(
+            report.rto_seconds < 60.0,
+            "RTO should be fast: {}s",
+            report.rto_seconds
+        );
     }
 }

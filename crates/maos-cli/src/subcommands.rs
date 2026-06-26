@@ -7,11 +7,11 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 // Story 9.7 — trait must be in scope for `load()`/`save()` on the store.
-use maos_skill::SkillQueueStore;
-use std::collections::{HashMap, HashSet};
 use maos_domain::invariants::i4::ApprovalDecision;
 use maos_iac::adapter::transparency_log::TransparencyLogAdapter;
+use maos_skill::SkillQueueStore;
 use maos_skill::{DiscoveredSkill, SkillAdmissionState, SkillId};
+use std::collections::{HashMap, HashSet};
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
@@ -205,7 +205,9 @@ fn dispatch_migrate(args: &MigrateArgs, _color: ColorChoice) -> ExitCode {
                 // unreachable host must not hang the CLI forever).
                 let connect_fut = tokio_postgres::connect(to, tokio_postgres::NoTls);
                 let (mut client, connection) =
-                    match tokio::time::timeout(std::time::Duration::from_secs(30), connect_fut).await {
+                    match tokio::time::timeout(std::time::Duration::from_secs(30), connect_fut)
+                        .await
+                    {
                         Ok(Ok(c)) => c,
                         Ok(Err(e)) => {
                             eprintln!("error: failed to connect to Postgres: {e}");
@@ -222,30 +224,41 @@ fn dispatch_migrate(args: &MigrateArgs, _color: ColorChoice) -> ExitCode {
                     }
                 });
                 // Bound per-statement execution too (B19).
-                if let Err(e) = client
-                    .batch_execute("SET statement_timeout = 60000")
-                    .await
-                {
+                if let Err(e) = client.batch_execute("SET statement_timeout = 60000").await {
                     eprintln!("error: failed to set statement_timeout: {e}");
                     return ExitCode::FAILURE;
                 }
 
                 // Run the forward migration (transactional, triple-oracle verified).
-                match maos_loom_lite::migration::migrate_sqlite_to_postgres(sqlite_path, &mut client)
-                    .await
+                match maos_loom_lite::migration::migrate_sqlite_to_postgres(
+                    sqlite_path,
+                    &mut client,
+                )
+                .await
                 {
                     Ok(result) => {
                         eprintln!(
                             "migration complete: {} rows transferred ({} batches)",
                             result.target_row_count,
-                            (result.target_row_count as usize).div_ceil(
-                                maos_loom_lite::migration::BATCH_SIZE
-                            )
+                            (result.target_row_count as usize)
+                                .div_ceil(maos_loom_lite::migration::BATCH_SIZE)
                         );
-                        eprintln!("  source merkle root:    {}", hex::encode(result.source_merkle_root));
-                        eprintln!("  target merkle root:    {}", hex::encode(result.target_merkle_root));
-                        eprintln!("  source payload oracle: {}", hex::encode(result.source_payload_oracle));
-                        eprintln!("  target payload oracle: {}", hex::encode(result.target_payload_oracle));
+                        eprintln!(
+                            "  source merkle root:    {}",
+                            hex::encode(result.source_merkle_root)
+                        );
+                        eprintln!(
+                            "  target merkle root:    {}",
+                            hex::encode(result.target_merkle_root)
+                        );
+                        eprintln!(
+                            "  source payload oracle: {}",
+                            hex::encode(result.source_payload_oracle)
+                        );
+                        eprintln!(
+                            "  target payload oracle: {}",
+                            hex::encode(result.target_payload_oracle)
+                        );
                         eprintln!("triple-oracle verification: PASS");
                         ExitCode::SUCCESS
                     }
@@ -477,15 +490,11 @@ fn dispatch_skills_decide(skill_id: &str, approve: bool, actor: Option<&str>) ->
         &actor,
     ) {
         DecideOutcome::Applied { new_state } => {
-            println!(
-                "maosctl skills: skill `{skill_id}` {verb}d by `{actor}` — now {new_state:?}"
-            );
+            println!("maosctl skills: skill `{skill_id}` {verb}d by `{actor}` — now {new_state:?}");
             ExitCode::SUCCESS
         }
         DecideOutcome::AlreadyResolved { state } => {
-            eprintln!(
-                "maosctl skills: skill `{skill_id}` is already {state:?} — no action taken"
-            );
+            eprintln!("maosctl skills: skill `{skill_id}` is already {state:?} — no action taken");
             ExitCode::SUCCESS
         }
         DecideOutcome::NotFound => {
@@ -660,7 +669,10 @@ pub fn decide_skill(
     } else {
         "skill.admission.reject"
     };
-    let target = maos_skill::approval_target::approval_target(&view.entries[idx].id, &view.entries[idx].version);
+    let target = maos_skill::approval_target::approval_target(
+        &view.entries[idx].id,
+        &view.entries[idx].version,
+    );
     let decision = ApprovalDecision {
         actor: actor.to_string(),
         target,
@@ -899,6 +911,8 @@ fn platform_binary_name() -> Result<&'static str, String> {
         Ok("maos-linux-arm64")
     } else if cfg!(target_arch = "aarch64") && cfg!(target_os = "macos") {
         Ok("maos-darwin-arm64")
+    } else if cfg!(target_arch = "x86_64") && cfg!(target_os = "windows") {
+        Ok("maos-windows-amd64.exe")
     } else {
         Err(format!(
             "unsupported platform for release install: {}-{}",
@@ -3062,7 +3076,8 @@ fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) ->
 /// precedence.  Matches `RegionSection::resolve_from_env_and_disk()` semantics so
 /// CLI sealed-exports region-pin identically to the in-process memory manager
 /// (Story 9.4b split-brain fix).
-fn resolve_region_home() -> Result<Option<maos_domain::region::Region>, maos_domain::region::RegionError> {
+fn resolve_region_home(
+) -> Result<Option<maos_domain::region::Region>, maos_domain::region::RegionError> {
     let disk_tag = read_operator_toml_region_tag();
     maos_domain::region::Region::resolve_home(disk_tag.as_deref())
 }
@@ -3077,7 +3092,10 @@ fn read_operator_toml_region_tag() -> Option<String> {
         .join("operator.toml");
     let contents = std::fs::read_to_string(path).ok()?;
     let val: toml::Value = contents.parse().ok()?;
-    val.get("region")?.get("home_region")?.as_str().map(String::from)
+    val.get("region")?
+        .get("home_region")?
+        .as_str()
+        .map(String::from)
 }
 
 #[cfg(test)]

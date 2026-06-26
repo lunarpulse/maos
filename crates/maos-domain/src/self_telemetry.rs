@@ -104,10 +104,7 @@ impl HaltTelemetryEntry {
     ///
     /// The raw `value` is bucketed to `value_band` (R2-5: principal-correlatable
     /// scalar → coarse band). `frame_id` is the halt→frame correlation key (R2-4).
-    pub fn to_span_attrs(
-        &self,
-        frame_id: [u8; 16],
-    ) -> crate::ports::trace_sink::HaltSpanAttrs {
+    pub fn to_span_attrs(&self, frame_id: [u8; 16]) -> crate::ports::trace_sink::HaltSpanAttrs {
         crate::ports::trace_sink::HaltSpanAttrs {
             halt_id: self.halt_id.clone(),
             tag: self.tag.clone(),

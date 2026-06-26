@@ -16,8 +16,6 @@ name = "xtask"
 path = "src/lib.rs"
 
 [dev-dependencies]
-# Story 10.4a AC1 — proven-red vectors exercise the live kernel adapter + Loom-lite.
-maos-kernel-core = { path = "../crates/maos-kernel-core" }
 # Mock port interior mutability (rule rs-parking-lot: lock guards, no unwrap).
 parking_lot = "0.12"
 
@@ -26,6 +24,7 @@ tempfile = "3"
 # Story 10.4a — check-migration-merkle re-derives oracles in-process from the
 # SQLite corpus (canonical read + payload oracle) and, when a live Postgres is
 # configured, runs the migration engine cross-check (re-derives BOTH backends).
+maos-kernel-core = { path = "../crates/maos-kernel-core" }
 maos-loom-lite = { path = "../crates/maos-loom-lite" }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time"] }
 maos-skill = { path = "../crates/maos-skill" }   # Story 7.4 — check-skill-schema round-trip gate

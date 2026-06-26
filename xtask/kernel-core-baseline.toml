@@ -113,4 +113,17 @@
 #          typed MemoryError::Collective{kind,reason} discriminant. The
 #          CollectiveErrorKind enum lives in maos-domain (not counted here).
 #          ADR-006 / AC1 ref. All additive; no public symbols removed.
-src_lines = 22574
+#   22726  Story 10.5 AC3 — Windows binary sandbox body (windows.rs) + mod.rs
+#          Windows drop/classify_exit paths (+152, AUTHORIZED kernel-core delta).
+#          FLAG-Winston: AC3 is the single AC in Story 10.5 permitted to touch
+#          kernel-core (per story preflight flag #4). Initial implementation
+#          added the Windows sandbox body; code review immediately found stub
+#          token usage and post-spawn Job Object assignment.
+#   22929  Story 10.5 code-review patches — Windows sandbox enforcement hardening
+#          (+203, AUTHORIZED AC3 kernel-core delta). FLAG-Winston: closes review
+#          findings by running children through CreateProcessAsUserW with the
+#          restricted low-integrity token, creating the process suspended,
+#          assigning the Job Object before ResumeThread, enabling kill-on-close,
+#          and using Job Object CPU rate control instead of a fixed lifetime
+#          CPU-time budget. All additive; no public symbols removed.
+src_lines = 22929

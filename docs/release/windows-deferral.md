@@ -1,34 +1,36 @@
-# Windows Binary Deferral — v1.5 (E10 Story 10.5)
+# Windows Binary Support — v1.5 (Story 10.5 AC3)
 
-**Decision:** Windows binary support is explicitly deferred to v1.5 (Epic 10 Story 10.5).
+**Status:** IMPLEMENTED at v1.5 (Story 10.5 AC3, 2026-06-25).
 
-## Rationale
+## History
 
-1. **Target audience at v0.5/v1.0:** Enterprise operators deploying MAOS run
-   Linux (amd64/arm64) and macOS (arm64). Windows deployments are not part
-   of the v1.0 launch cohort identified in NFR-Onb-1.
+Windows binary support was deferred from v1.0 to v1.5 per the phased roadmap.
+The deferral rationale (pre-v1.5):
 
-2. **CI cost:** Windows CI runners are more expensive and slower. Adding a
-   Windows target to the release matrix doubles the build time without
-   serving any v1.0 customer.
+1. Target audience at v0.5/v1.0 was Linux/macOS operators only.
+2. CI cost of Windows runners.
+3. Unix-specific APIs needed `#[cfg]` gating.
+4. T3 container isolation assumes Linux runtime.
 
-3. **Dependency surface:** Several workspace crates (`maos-iac`, `maos-audit`)
-   use Unix-specific APIs (`std::os::unix::fs::PermissionsExt`) that would
-   require `#[cfg(unix)]` / `#[cfg(windows)]` gates.
+## v1.5 Implementation (Story 10.5 AC3)
 
-4. **Sandbox tier T3** (container isolation via Docker/Podman, Story 5.5a)
-   assumes a Linux container runtime. Windows container support is a
-   separate effort.
+- `platform_binary_name()` returns `maos-windows-amd64.exe` on Windows x86_64
+- `windows.rs` sandbox body: T2 restricted-token via `CreateRestrictedToken` +
+  per-Spirit resource caps via `win32job` Job Object
+- `mod.rs` extended: `Cleanup::JobObject` drop path + `classify_exit` Windows arm
+- Unix-specific APIs already `#[cfg(unix)]` gated (no changes needed)
+- Kernel-core baseline re-pinned: 22574 → 22726 (+152 lines, FLAG-Winston)
+- `x86_64-pc-windows-msvc` added to release/CI matrix
+- Sandbox tests are `#[cfg(target_os = "windows")]` gated (won't run in Linux CI)
 
-## v1.5 plan (Story 10.5)
+## Packaging (v1.5+)
 
-- Add `x86_64-pc-windows-msvc` target to the release matrix
-- Gate Unix-specific APIs with `#[cfg(unix)]`
-- Test on Windows CI (GitHub Actions `windows-latest`)
-- Ship `.msi` installer + `winget` manifest
-- Scoop bucket as community contribution
+- `.msi` installer + `winget` manifest: release-time CI job
+- Scoop bucket: community contribution
+- Ed25519 signature verification pipeline is OS-agnostic (same as Linux/macOS)
 
 ## Reference
 
-- AC-2: "Windows binary explicitly deferred to v1.5 (E10 Story 10.5) with a recorded rationale"
-- Story 10.5: `10-5-mature-v1-5-skill-format-conformance-jetbrains-windows-2-year-lts-japanese-cn-s-i18n`
+- Story 10.5 AC3: Windows binary (v1.5)
+- Story 1b.3 §AC4: per-Spirit resource caps cross-reference
+- ADR-004: hexagonal sandboxing with OS-native primitives

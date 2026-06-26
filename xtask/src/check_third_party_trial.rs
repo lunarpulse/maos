@@ -85,7 +85,11 @@ pub fn run(json: bool) -> Result<(), String> {
 
     if !path.exists() {
         // Advisory: trial-results.toml absent — third-party trial still pending.
-        emit_command(json, "warning", "Third-party trial pending — trial-results.toml absent");
+        emit_command(
+            json,
+            "warning",
+            "Third-party trial pending — trial-results.toml absent",
+        );
         if let Ok(summary_path) = std::env::var("GITHUB_STEP_SUMMARY") {
             let summary = "## ⚠️ Third-Party Trial Gate: ADVISORY\n\
                 Trial has not yet been executed. \
@@ -118,8 +122,8 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     // trial-results.toml exists — parse it.
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {RESULTS_PATH}: {e}"))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("cannot read {RESULTS_PATH}: {e}"))?;
 
     let results: TrialResults = toml::from_str(&content).map_err(|e| {
         let msg = format!("check-third-party-trial: FAIL — malformed trial-results.toml: {e}");
@@ -157,7 +161,8 @@ pub fn run(json: bool) -> Result<(), String> {
         return Err(format!(
             "check-third-party-trial: FAIL — participant records={} != participants_total={} \
              (cohort must be fully enumerated; self-reported count is not trusted)",
-            results.participant.len(), t.participants_total
+            results.participant.len(),
+            t.participants_total
         ));
     }
     {
@@ -188,9 +193,15 @@ pub fn run(json: bool) -> Result<(), String> {
     for p in &results.participant {
         // halt_recall must be a finite probability in [0,1] regardless of producer status.
         if !p.halt_recall.is_finite() {
-            failures.push(format!("participant {} halt_recall={:.3} (not finite)", p.id, p.halt_recall));
+            failures.push(format!(
+                "participant {} halt_recall={:.3} (not finite)",
+                p.id, p.halt_recall
+            ));
         } else if !(0.0..=1.0).contains(&p.halt_recall) {
-            failures.push(format!("participant {} halt_recall={:.3} (out of [0,1])", p.id, p.halt_recall));
+            failures.push(format!(
+                "participant {} halt_recall={:.3} (out of [0,1])",
+                p.id, p.halt_recall
+            ));
         }
 
         // Success conjunction (README §4): produced_binary && binary_loads && frames_run>=1000
@@ -206,10 +217,16 @@ pub fn run(json: bool) -> Result<(), String> {
         } else if p.produced_binary && p.binary_loads {
             // Producer that didn't clear the quality bar — flag the specific shortfall.
             if p.frames_run < 1000 {
-                failures.push(format!("participant {} ran {} frames (< 1000)", p.id, p.frames_run));
+                failures.push(format!(
+                    "participant {} ran {} frames (< 1000)",
+                    p.id, p.frames_run
+                ));
             }
             if p.halt_recall.is_finite() && p.halt_recall < 0.85 {
-                failures.push(format!("participant {} halt_recall={:.3} (< 0.85)", p.id, p.halt_recall));
+                failures.push(format!(
+                    "participant {} halt_recall={:.3} (< 0.85)",
+                    p.id, p.halt_recall
+                ));
             }
         }
     }
@@ -223,7 +240,9 @@ pub fn run(json: bool) -> Result<(), String> {
         ));
     }
     if derived_successes < 10 {
-        failures.push(format!("derived_successes={derived_successes} (< 10 floor)"));
+        failures.push(format!(
+            "derived_successes={derived_successes} (< 10 floor)"
+        ));
     }
 
     // ── D4: stratification counts derived from participant[].stratum, reconciled ────
@@ -273,7 +292,9 @@ pub fn run(json: bool) -> Result<(), String> {
         }
         // AC-1 minimum coverage.
         if derived < floor {
-            failures.push(format!("stratum '{name}' derived={derived} (< {floor} floor)"));
+            failures.push(format!(
+                "stratum '{name}' derived={derived} (< {floor} floor)"
+            ));
         }
     }
 

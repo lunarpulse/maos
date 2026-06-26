@@ -79,7 +79,11 @@ fn build_sqlite_source(dir: &TempDir, n: u64) -> std::path::PathBuf {
                 "spirit-a",
                 "spirit-b",
                 99i64,
-                if i % 3 == 0 { Some([0xAAu8; 32].as_slice()) } else { None::<&[u8]> },
+                if i % 3 == 0 {
+                    Some([0xAAu8; 32].as_slice())
+                } else {
+                    None::<&[u8]>
+                },
                 (i % 5) as i64,
                 "memory.write",
                 format!("payload-{i}-body").as_bytes(),
@@ -157,7 +161,10 @@ async fn red_corrupt_payload_byte_root_matches_payload_oracle_fails() {
     client
         .execute(
             "UPDATE transparency_log SET payload_redacted = $1 WHERE frame_id = $2",
-            &[&b"tampered-payload-CORRUPT".as_slice(), &target_fid.as_slice()],
+            &[
+                &b"tampered-payload-CORRUPT".as_slice(),
+                &target_fid.as_slice(),
+            ],
         )
         .await
         .expect("corrupt");

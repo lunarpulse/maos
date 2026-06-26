@@ -169,7 +169,9 @@ pub fn check_fuzz_floor(workspace_root: &Path, now: chrono::DateTime<chrono::Utc
 
     for target in REQUIRED_TARGETS {
         let secs = per_target.get(*target).copied().unwrap_or(0);
-        summary.push(format!("{target}: {secs} s / {PER_TARGET_FLOOR_S} s (90d window)"));
+        summary.push(format!(
+            "{target}: {secs} s / {PER_TARGET_FLOOR_S} s (90d window)"
+        ));
         if !advisory && secs < PER_TARGET_FLOOR_S {
             failures.push(format!(
                 "target '{target}' below floor: {secs} s < {PER_TARGET_FLOOR_S} s (72 CPU-hr / 90d)"
@@ -304,10 +306,18 @@ mod tests {
         // 10 days of history, far below floor — still advisory (bootstrapping).
         write_ledger(
             tmp.path(),
-            &format!("[{},{}]", rec("manifest_parser", 100, 10), rec("frame_deser", 100, 10)),
+            &format!(
+                "[{},{}]",
+                rec("manifest_parser", 100, 10),
+                rec("frame_deser", 100, 10)
+            ),
         );
         let r = check_fuzz_floor(tmp.path(), now());
-        assert!(r.passed, "must not hard-fail during bootstrap: {:?}", r.failures);
+        assert!(
+            r.passed,
+            "must not hard-fail during bootstrap: {:?}",
+            r.failures
+        );
         assert!(r.advisory);
     }
 
@@ -326,7 +336,11 @@ mod tests {
         );
         let r = check_fuzz_floor(tmp.path(), now());
         assert!(!r.advisory, "100 d of history must promote to hard-enforce");
-        assert!(!r.passed, "must fail when in-window sum is 0: {:?}", r.failures);
+        assert!(
+            !r.passed,
+            "must fail when in-window sum is 0: {:?}",
+            r.failures
+        );
         assert!(r.failures.iter().any(|f| f.contains("manifest_parser")));
         assert!(r.failures.iter().any(|f| f.contains("frame_deser")));
         assert!(r.failures.iter().any(|f| f.contains("aggregate")));
@@ -390,16 +404,16 @@ mod tests {
         );
         let r = check_fuzz_floor(tmp.path(), now());
         assert!(!r.advisory);
-        assert!(!r.passed, "out-of-window CPU time must not satisfy the floor");
+        assert!(
+            !r.passed,
+            "out-of-window CPU time must not satisfy the floor"
+        );
     }
 
     #[test]
     fn rejects_unknown_target() {
         let tmp = TempDir::new().unwrap();
-        write_ledger(
-            tmp.path(),
-            &format!("[{}]", rec("bogus_target", 9999, 5)),
-        );
+        write_ledger(tmp.path(), &format!("[{}]", rec("bogus_target", 9999, 5)));
         let r = check_fuzz_floor(tmp.path(), now());
         assert!(!r.passed);
         assert!(r.failures.iter().any(|f| f.contains("unknown target")));

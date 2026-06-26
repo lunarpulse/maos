@@ -157,8 +157,10 @@ pub async fn migrate_sqlite_to_postgres(
     // open of the SQLite file), so a concurrent writer between a separate
     // Phase 0 root read and the frame read cannot go undetected — the snapshot
     // is exactly what was migrated.
-    let source_frames = canonical::read_sqlite_frames(sqlite_path).map_err(MigrationError::Source)?;
-    let (source_merkle_root, source_payload_oracle, source_row_count) = derive_source_oracles(&source_frames);
+    let source_frames =
+        canonical::read_sqlite_frames(sqlite_path).map_err(MigrationError::Source)?;
+    let (source_merkle_root, source_payload_oracle, source_row_count) =
+        derive_source_oracles(&source_frames);
 
     // Phase 0 (P13) — pre-migration source root captured BEFORE any target
     // write (B13 — non-tautological rollback snapshot).  Computed from the same
@@ -180,7 +182,9 @@ pub async fn migrate_sqlite_to_postgres(
     txn.batch_execute(POSTGRES_TL_SCHEMA)
         .await
         .map_err(|e| MigrationError::Target(format!("schema: {e}")))?;
-    insert_frames(&txn, &source_frames).await.map_err(MigrationError::Target)?;
+    insert_frames(&txn, &source_frames)
+        .await
+        .map_err(MigrationError::Target)?;
 
     // Phase 3 (P4) — re-derive the target oracles from the UNCOMMITTED
     // transaction rows, then verify BEFORE committing.  Reading through the
@@ -214,8 +218,10 @@ pub async fn verify_migration_integrity(
     sqlite_path: &Path,
     pg_client: &tokio_postgres::Client,
 ) -> Result<MigrationResult, MigrationError> {
-    let source_frames = canonical::read_sqlite_frames(sqlite_path).map_err(MigrationError::Source)?;
-    let (source_merkle_root, source_payload_oracle, source_row_count) = derive_source_oracles(&source_frames);
+    let source_frames =
+        canonical::read_sqlite_frames(sqlite_path).map_err(MigrationError::Source)?;
+    let (source_merkle_root, source_payload_oracle, source_row_count) =
+        derive_source_oracles(&source_frames);
 
     // P13 — pre-migration source root derived from the same in-memory frames
     // (single read); identical to `source_merkle_root`.  `merkle_root_from_frame_ids`
@@ -327,9 +333,7 @@ pub async fn rollback_migration(
 }
 
 /// Compute the three source (SQLite-side) oracles from canonical frames.
-fn derive_source_oracles(
-    source_frames: &[CanonicalFrame],
-) -> ([u8; 32], [u8; 32], u64) {
+fn derive_source_oracles(source_frames: &[CanonicalFrame]) -> ([u8; 32], [u8; 32], u64) {
     let frame_ids: Vec<[u8; 16]> = source_frames.iter().map(|f| f.frame_id).collect();
     let root = canonical::merkle_root_from_frame_ids(&frame_ids);
     let payload = canonical::compute_payload_oracle(source_frames);
@@ -379,8 +383,8 @@ async fn insert_frames(
                 .map_err(|e| format!("from_spirit_id non-utf8: {e}"))?;
             let to_spirit_id = vec_u8_to_str(&frame.to_spirit_id)
                 .map_err(|e| format!("to_spirit_id non-utf8: {e}"))?;
-            let intent = vec_u8_to_str(&frame.intent)
-                .map_err(|e| format!("intent non-utf8: {e}"))?;
+            let intent =
+                vec_u8_to_str(&frame.intent).map_err(|e| format!("intent non-utf8: {e}"))?;
             let cap: Option<&[u8]> = frame.capability_token.as_deref();
 
             txn.execute(

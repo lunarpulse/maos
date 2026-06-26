@@ -66,6 +66,11 @@ gates = [
     "check-fuzz-targets",
     "check-cna-registration",
     "check-ko-coverage",
+    # Story 10.5 AC5 (NFR-Doc-6 v1.5) — ja/zh-Hans coverage gates.
+    "check-ja-coverage",
+    "check-zh-coverage",
+    # Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
+    "windows-check",
     # Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time, advisory-until-90d).
     "check-fuzz-floor",
     # Story 10.4a — kernel-core dependency-closure gate (NFR-Test-9 artifact hygiene).
@@ -86,6 +91,8 @@ gates = [
     "check-rotation-real-timing",
     "check-mobile-push-on-halt",
     "check-j4-latency",
+    # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
+    "check-skill-conformance",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -126,6 +133,18 @@ disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking" }
 [[ship_gate]]
 name = "check-ko-coverage"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-ja-coverage"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-zh-coverage"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "windows-check"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 
 # Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — pre-merge fuzz BUILD prerequisite.
 # `fuzz-build` runs `cargo +nightly fuzz build` for both targets; it is a
@@ -197,4 +216,10 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 # Story 10.1b AC2 — OWASP Risk Rating Methodology freeze hash.
 # Stored in the invariant-locked registry so any edit to the OWASP doc
 # requires a registry update, which is auditable and protected by review.
+# Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
+# Advisory at v1.0 (results may be absent); blocking at v1.5 per ADR-027 posture.
+[[ship_gate]]
+name = "check-skill-conformance"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
 owasp_freeze_hash = "2c4df8094d116903261320ad2999290671c3129beb71e740d690a43f56816f20"

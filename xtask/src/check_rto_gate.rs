@@ -85,10 +85,9 @@ fn check_rto(evidence_path: &Path) -> Result<Report, String> {
         });
     }
 
-    let content = std::fs::read_to_string(evidence_path)
-        .map_err(|e| format!("read evidence: {e}"))?;
-    let ledger: RtoLedger =
-        toml::from_str(&content).map_err(|e| format!("parse evidence: {e}"))?;
+    let content =
+        std::fs::read_to_string(evidence_path).map_err(|e| format!("read evidence: {e}"))?;
+    let ledger: RtoLedger = toml::from_str(&content).map_err(|e| format!("parse evidence: {e}"))?;
 
     // Pick the MOST RECENT drill by date (not just ledger.last()), so a stale
     // or cherry-picked ordering cannot satisfy the gate.
@@ -111,7 +110,10 @@ fn check_rto(evidence_path: &Path) -> Result<Report, String> {
                 skipped: false,
                 threshold_secs: RTO_THRESHOLD_SECS,
                 latest_drill: Some(latest.clone()),
-                verdict: format!("latest drill_date '{}' is not a valid date", latest.drill_date),
+                verdict: format!(
+                    "latest drill_date '{}' is not a valid date",
+                    latest.drill_date
+                ),
             });
         }
     };
@@ -159,12 +161,15 @@ mod tests {
     use std::io::Write;
 
     fn today() -> String {
-        chrono::Utc::now().date_naive().format("%Y-%m-%d").to_string()
+        chrono::Utc::now()
+            .date_naive()
+            .format("%Y-%m-%d")
+            .to_string()
     }
 
     #[test]
     fn rto_within_threshold_passes() {
-    let today = today();
+        let today = today();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("rto-evidence.toml");
         let mut f = std::fs::File::create(&path).unwrap();
@@ -179,12 +184,16 @@ drill_success = true
         )
         .unwrap();
         let report = check_rto(&path).unwrap();
-        assert!(report.passed && !report.skipped, "verdict: {}", report.verdict);
+        assert!(
+            report.passed && !report.skipped,
+            "verdict: {}",
+            report.verdict
+        );
     }
 
     #[test]
     fn rto_exceeds_threshold_fails() {
-    let today = today();
+        let today = today();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("rto-evidence.toml");
         let mut f = std::fs::File::create(&path).unwrap();
@@ -231,7 +240,11 @@ drill_success = true
         )
         .unwrap();
         let report = check_rto(&path).unwrap();
-        assert!(!report.passed, "stale evidence must fail: {}", report.verdict);
+        assert!(
+            !report.passed,
+            "stale evidence must fail: {}",
+            report.verdict
+        );
         assert!(report.verdict.contains("STALE"));
     }
 
@@ -271,7 +284,7 @@ drill_success = true
 
     #[test]
     fn rto_drill_failure_fails() {
-    let today = today();
+        let today = today();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("rto-evidence.toml");
         let mut f = std::fs::File::create(&path).unwrap();

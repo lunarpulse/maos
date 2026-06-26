@@ -135,7 +135,11 @@ fn re_enqueue_after_reject_demotes_decided_entry_to_pending() {
     reject(&tl, "skill.x", &v, "operator");
     enqueue(&tl, "skill.x", &v); // re-enqueue: latest row is now an enqueue
 
-    let stale = vec![make_entry("skill.x", "1.0.0", SkillAdmissionState::Rejected)];
+    let stale = vec![make_entry(
+        "skill.x",
+        "1.0.0",
+        SkillAdmissionState::Rejected,
+    )];
     let reconciled = reconcile_entries(stale, &decided_from(&tl));
 
     assert_eq!(
@@ -165,12 +169,15 @@ fn plain_approve_with_no_re_enqueue_keeps_entry_decided() {
 fn discovered_skill_with_no_tl_row_is_pending() {
     let dir = tempfile::tempdir().unwrap();
     let tl = TransparencyLogAdapter::open(&dir.path().join("tl.db"), 0).unwrap();
-    let stale = vec![make_entry("skill.new", "1.0.0", SkillAdmissionState::Pending)];
+    let stale = vec![make_entry(
+        "skill.new",
+        "1.0.0",
+        SkillAdmissionState::Pending,
+    )];
     let reconciled = reconcile_entries(stale, &decided_from(&tl));
     assert_eq!(reconciled.len(), 1);
     assert_eq!(reconciled[0].state, SkillAdmissionState::Pending);
 }
-
 
 // ─── F3 pinning test: discovered skills are cached with package_shipped ──
 
@@ -184,7 +191,11 @@ fn discovered_skill_with_no_tl_row_is_pending() {
 fn discovered_skill_entry_path_is_package_shipped_9_7_boundary() {
     let dir = tempfile::tempdir().unwrap();
     let tl = TransparencyLogAdapter::open(&dir.path().join("tl.db"), 0).unwrap();
-    let stale = vec![make_entry("skill.discovered", "1.0.0", SkillAdmissionState::Pending)];
+    let stale = vec![make_entry(
+        "skill.discovered",
+        "1.0.0",
+        SkillAdmissionState::Pending,
+    )];
     let reconciled = reconcile_entries(stale, &decided_from(&tl));
     assert_eq!(reconciled.len(), 1);
     assert_eq!(
@@ -198,7 +209,11 @@ fn discovered_skill_entry_path_is_package_shipped_9_7_boundary() {
 fn discovered_skill_entry_path_is_never_fabricated() {
     let dir = tempfile::tempdir().unwrap();
     let tl = TransparencyLogAdapter::open(&dir.path().join("tl.db"), 0).unwrap();
-    let stale = vec![make_entry("skill.discovered", "1.0.0", SkillAdmissionState::Pending)];
+    let stale = vec![make_entry(
+        "skill.discovered",
+        "1.0.0",
+        SkillAdmissionState::Pending,
+    )];
     let reconciled = reconcile_entries(stale, &decided_from(&tl));
     assert!(reconciled[0].entry_path != "author_self");
     assert!(reconciled[0].entry_path != "revision_proposal");

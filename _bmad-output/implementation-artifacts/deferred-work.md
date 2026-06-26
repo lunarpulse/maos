@@ -103,7 +103,7 @@ dev_model_used: claude-opus-4-7
 - `maosctl skills approve/reject` are acknowledgement-only stubs (no real queue interaction) — acknowledged v0.5 limitation; queue logic IS tested in-unit. Persistent queue store is future work.
 - `parse_skill` unknown-field classification depends on serde error message string (`"unknown field"`) — bounded by `check-skill-schema` xtask gate but fragile coupling to serde internals.
 - Queue is in-process only (`Vec<PendingEntry>`) — no cross-invocation persistence; audit trail lives only as long as the process. Acknowledged v0.5 gap per dev record.
-- Discovery scans only top-level files (`read_dir`, flat, non-recursive) — skills in subdirectories silently skipped. Deferred per team discussion (Winston/John): add doc comment documenting flat-only semantics now; make recursive only after spec clarification on whether nested skill directories are intended. `crates/maos-skill/src/discovery.rs`
+- ~~Discovery scans only top-level files (`read_dir`, flat, non-recursive)~~ — **RESOLVED by Story 10.5 (2026-06-25)**: `crates/maos-skill/src/discovery.rs` now supports directory-aware `dir/SKILL.md` bundles for Anthropic Skills conformance while keeping top-level file discovery intact.
 
 ## Deferred from: code review of 5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers (2026-05-24)
 

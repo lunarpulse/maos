@@ -141,7 +141,6 @@ async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
         found,
         "expected budget warning for spirit a with backlog >= 8 KiB"
     );
-
 }
 
 #[tokio::test(flavor = "multi_thread")]

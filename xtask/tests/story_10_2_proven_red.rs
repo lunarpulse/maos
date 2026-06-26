@@ -10,7 +10,10 @@ use std::io::Write;
 // Helpers
 // ═══════════════════════════════════════════════════════════════════
 
-fn run_in_tempdir(subcommand: &str, fixture_setup: impl FnOnce(&std::path::Path)) -> std::process::Output {
+fn run_in_tempdir(
+    subcommand: &str,
+    fixture_setup: impl FnOnce(&std::path::Path),
+) -> std::process::Output {
     let dir = tempfile::tempdir().unwrap();
     fixture_setup(dir.path());
     std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
@@ -183,8 +186,11 @@ signing_chain_verified = false
 #[test]
 fn trial_gate_fails_on_low_successes() {
     let out = run_in_tempdir("check-third-party-trial", |root| {
-        write_file(root, "docs/third-party-trial/results/trial-results.toml",
-            &make_trial(8, [4, 3, 2, 2, 1], VALID_PARTICIPANTS));
+        write_file(
+            root,
+            "docs/third-party-trial/results/trial-results.toml",
+            &make_trial(8, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+        );
     });
     assert!(!out.status.success(), "gate should fail with successes=8");
 }
@@ -193,21 +199,33 @@ fn trial_gate_fails_on_low_successes() {
 #[test]
 fn trial_gate_fails_on_low_stratification() {
     let out = run_in_tempdir("check-third-party-trial", |root| {
-        write_file(root, "docs/third-party-trial/results/trial-results.toml",
-            &make_trial(10, [3, 3, 2, 2, 1], VALID_PARTICIPANTS));
+        write_file(
+            root,
+            "docs/third-party-trial/results/trial-results.toml",
+            &make_trial(10, [3, 3, 2, 2, 1], VALID_PARTICIPANTS),
+        );
     });
-    assert!(!out.status.success(), "gate should fail with no_prior_contribution=3");
+    assert!(
+        !out.status.success(),
+        "gate should fail with no_prior_contribution=3"
+    );
 }
 
 /// Vector (c): all valid, successes = 10, all strata met → pass.
 #[test]
 fn trial_gate_passes_on_valid_results() {
     let out = run_in_tempdir("check-third-party-trial", |root| {
-        write_file(root, "docs/third-party-trial/results/trial-results.toml",
-            &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS));
+        write_file(
+            root,
+            "docs/third-party-trial/results/trial-results.toml",
+            &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+        );
     });
-    assert!(out.status.success(), "gate should pass with valid results: {}",
-        String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "gate should pass with valid results: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 /// Vector (d): absent → pass with advisory.
@@ -226,8 +244,11 @@ fn trial_gate_passes_advisory_when_absent() {
 #[test]
 fn trial_gate_fails_on_malformed_toml() {
     let out = run_in_tempdir("check-third-party-trial", |root| {
-        write_file(root, "docs/third-party-trial/results/trial-results.toml",
-            "this is not valid TOML {{{{");
+        write_file(
+            root,
+            "docs/third-party-trial/results/trial-results.toml",
+            "this is not valid TOML {{{{",
+        );
     });
     assert!(!out.status.success(), "gate should fail on malformed TOML");
 }
@@ -262,14 +283,19 @@ fn make_cross_form(p_value: f64) -> String {
 fn cross_form_gate_warns_on_low_p_value() {
     let out = run_in_tempdir("check-cross-form-equiv", |root| {
         write_adr_040_fixture(root);
-        write_file(root, "docs/cross-form/results/cross-form-results.json",
-            &make_cross_form(0.03));
+        write_file(
+            root,
+            "docs/cross-form/results/cross-form-results.json",
+            &make_cross_form(0.03),
+        );
     });
     // Gate always passes (advisory), but should log warning
     assert!(out.status.success(), "advisory gate should always pass");
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("warning") || stderr.contains("WARNING") || stderr.contains("p_value"),
-        "should log a warning for low p-value: {stderr}");
+    assert!(
+        stderr.contains("warning") || stderr.contains("WARNING") || stderr.contains("p_value"),
+        "should log a warning for low p-value: {stderr}"
+    );
 }
 
 /// Vector (b): valid results with p > 0.05 → advisory passes clean.
@@ -277,8 +303,11 @@ fn cross_form_gate_warns_on_low_p_value() {
 fn cross_form_gate_passes_clean() {
     let out = run_in_tempdir("check-cross-form-equiv", |root| {
         write_adr_040_fixture(root);
-        write_file(root, "docs/cross-form/results/cross-form-results.json",
-            &make_cross_form(0.95));
+        write_file(
+            root,
+            "docs/cross-form/results/cross-form-results.json",
+            &make_cross_form(0.95),
+        );
     });
     assert!(out.status.success(), "gate should pass with valid results");
 }
@@ -312,7 +341,11 @@ description = "test"
     )
 }
 
-fn make_red_team(class_scores: &[(& str, i64)], aggregate_detected: i64, unmitigated_cats: i64) -> String {
+fn make_red_team(
+    class_scores: &[(&str, i64)],
+    aggregate_detected: i64,
+    unmitigated_cats: i64,
+) -> String {
     let mut s = format!(
         r#"[gate]
 corpus_sha256 = "{RED_TEAM_SHA}"
@@ -365,11 +398,17 @@ fn red_team_gate_logs_would_block_on_low_class() {
     classes[0].1 = 7; // capability_confusion below floor
     let out = run_in_tempdir("check-red-team-gate", |root| {
         write_file(root, "tests/corpora/MANIFEST.toml", &make_manifest());
-        write_file(root, "docs/red-team/results/red-team-results.toml",
-            &make_red_team(&classes, 77, 0));
+        write_file(
+            root,
+            "docs/red-team/results/red-team-results.toml",
+            &make_red_team(&classes, 77, 0),
+        );
     });
     // Gate is advisory — should still pass
-    assert!(out.status.success(), "advisory gate should pass even with threshold failure");
+    assert!(
+        out.status.success(),
+        "advisory gate should pass even with threshold failure"
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(json["threshold_met"], false, "threshold should not be met");
@@ -382,8 +421,11 @@ fn red_team_gate_logs_would_block_on_unmitigated() {
     classes[0].1 = 0; // capability_confusion completely unmitigated
     let out = run_in_tempdir("check-red-team-gate", |root| {
         write_file(root, "tests/corpora/MANIFEST.toml", &make_manifest());
-        write_file(root, "docs/red-team/results/red-team-results.toml",
-            &make_red_team(&classes, 70, 1));
+        write_file(
+            root,
+            "docs/red-team/results/red-team-results.toml",
+            &make_red_team(&classes, 70, 1),
+        );
     });
     assert!(out.status.success(), "advisory gate should pass");
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -406,8 +448,11 @@ fn red_team_gate_logs_would_block_on_low_classes() {
     // sum(detected) = 8+8+8+8+8+10+10+10 = 70; aggregate.total_detected = 70 (cross-validates)
     let out = run_in_tempdir("check-red-team-gate", |root| {
         write_file(root, "tests/corpora/MANIFEST.toml", &make_manifest());
-        write_file(root, "docs/red-team/results/red-team-results.toml",
-            &make_red_team(&classes, 70, 0));
+        write_file(
+            root,
+            "docs/red-team/results/red-team-results.toml",
+            &make_red_team(&classes, 70, 0),
+        );
     });
     assert!(out.status.success(), "advisory gate should pass");
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -421,11 +466,17 @@ fn red_team_gate_passes_clean() {
     let classes = all_classes();
     let out = run_in_tempdir("check-red-team-gate", |root| {
         write_file(root, "tests/corpora/MANIFEST.toml", &make_manifest());
-        write_file(root, "docs/red-team/results/red-team-results.toml",
-            &make_red_team(&classes, 80, 0));
+        write_file(
+            root,
+            "docs/red-team/results/red-team-results.toml",
+            &make_red_team(&classes, 80, 0),
+        );
     });
-    assert!(out.status.success(), "gate should pass with all thresholds met: {}",
-        String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "gate should pass with all thresholds met: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(json["threshold_met"], true, "threshold should be met");
@@ -453,14 +504,19 @@ fn red_team_gate_passes_advisory_when_absent() {
 #[test]
 fn ship_gate_completeness_passes_with_all_gates() {
     // Run against the real repo — all 8 gates should be present.
-    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap();
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(["check-ship-gate-completeness", "--json"])
         .current_dir(workspace_root)
         .output()
         .expect("failed to run xtask");
-    assert!(out.status.success(), "completeness check should pass with all gates present: {}",
-        String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "completeness check should pass with all gates present: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 /// Create a discipline.yml missing one gate → completeness must fail.
@@ -495,7 +551,10 @@ jobs:
         .current_dir(dir.path())
         .output()
         .expect("failed to run xtask");
-    assert!(!out.status.success(), "completeness check should fail when check-red-team-gate is missing");
+    assert!(
+        !out.status.success(),
+        "completeness check should fail when check-red-team-gate is missing"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -532,14 +591,27 @@ fn cross_form_recompute_path_with_hashes() {
     );
     let out = run_in_tempdir("check-cross-form-equiv", |root| {
         write_adr_040_fixture(root);
-        write_file(root, "docs/cross-form/results/cross-form-results.json", &artifact);
+        write_file(
+            root,
+            "docs/cross-form/results/cross-form-results.json",
+            &artifact,
+        );
     });
-    assert!(out.status.success(), "gate should pass with consistent hashes: {}",
-        String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "gate should pass with consistent hashes: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert!(json["u_statistic_recomputed"].is_number(), "recompute should produce a U value");
-    assert_eq!(json["consistency_ok"], true, "recomputed U should match reported within tolerance");
+    assert!(
+        json["u_statistic_recomputed"].is_number(),
+        "recompute should produce a U value"
+    );
+    assert_eq!(
+        json["consistency_ok"], true,
+        "recomputed U should match reported within tolerance"
+    );
 }
 
 /// #19: corpus_sha256 mismatch → hard-fail (provenance enforcement).
@@ -559,11 +631,21 @@ engagement_end = "2026-06-14"
 methodology_version = "1.0"
 
 {}"#,
-            make_red_team(&classes, 80, 0).splitn(2, "\n\n").nth(1).unwrap_or("")
+            make_red_team(&classes, 80, 0)
+                .splitn(2, "\n\n")
+                .nth(1)
+                .unwrap_or("")
         );
-        write_file(root, "docs/red-team/results/red-team-results.toml", &results);
+        write_file(
+            root,
+            "docs/red-team/results/red-team-results.toml",
+            &results,
+        );
     });
-    assert!(!out.status.success(), "gate should hard-fail on corpus SHA mismatch");
+    assert!(
+        !out.status.success(),
+        "gate should hard-fail on corpus SHA mismatch"
+    );
 }
 
 /// #22: malformed JSON → hard-fail (cross-form).
@@ -571,7 +653,11 @@ methodology_version = "1.0"
 fn cross_form_gate_fails_on_malformed_json() {
     let out = run_in_tempdir("check-cross-form-equiv", |root| {
         write_adr_040_fixture(root);
-        write_file(root, "docs/cross-form/results/cross-form-results.json", "{{{not valid JSON");
+        write_file(
+            root,
+            "docs/cross-form/results/cross-form-results.json",
+            "{{{not valid JSON",
+        );
     });
     assert!(!out.status.success(), "gate should fail on malformed JSON");
 }
@@ -581,7 +667,11 @@ fn cross_form_gate_fails_on_malformed_json() {
 fn red_team_gate_fails_on_malformed_toml() {
     let out = run_in_tempdir("check-red-team-gate", |root| {
         write_file(root, "tests/corpora/MANIFEST.toml", &make_manifest());
-        write_file(root, "docs/red-team/results/red-team-results.toml", "this is not valid TOML {{{{");
+        write_file(
+            root,
+            "docs/red-team/results/red-team-results.toml",
+            "this is not valid TOML {{{{",
+        );
     });
     assert!(!out.status.success(), "gate should fail on malformed TOML");
 }
@@ -590,10 +680,16 @@ fn red_team_gate_fails_on_malformed_toml() {
 #[test]
 fn trial_gate_fails_on_empty_participants_with_fabricated_successes() {
     let out = run_in_tempdir("check-third-party-trial", |root| {
-        write_file(root, "docs/third-party-trial/results/trial-results.toml",
-            &make_trial(12, [4, 3, 2, 2, 1], "")); // empty participants, successes=12
+        write_file(
+            root,
+            "docs/third-party-trial/results/trial-results.toml",
+            &make_trial(12, [4, 3, 2, 2, 1], ""),
+        ); // empty participants, successes=12
     });
-    assert!(!out.status.success(), "gate must hard-fail: fabricated successes with no participant records");
+    assert!(
+        !out.status.success(),
+        "gate must hard-fail: fabricated successes with no participant records"
+    );
 }
 
 /// #3 pin: red-team gate with 8 identical class names → hard-fail (canonical enforcement).
@@ -602,8 +698,14 @@ fn red_team_gate_fails_on_duplicate_classes() {
     let fake_classes: Vec<(&str, i64)> = (0..8).map(|_| ("resource_exhaustion", 10)).collect();
     let out = run_in_tempdir("check-red-team-gate", |root| {
         write_file(root, "tests/corpora/MANIFEST.toml", &make_manifest());
-        write_file(root, "docs/red-team/results/red-team-results.toml",
-            &make_red_team(&fake_classes, 80, 0));
+        write_file(
+            root,
+            "docs/red-team/results/red-team-results.toml",
+            &make_red_team(&fake_classes, 80, 0),
+        );
     });
-    assert!(!out.status.success(), "gate must hard-fail: 8 identical class names (not distinct canonical)");
+    assert!(
+        !out.status.success(),
+        "gate must hard-fail: 8 identical class names (not distinct canonical)"
+    );
 }

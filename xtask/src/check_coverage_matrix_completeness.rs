@@ -30,8 +30,7 @@ struct NfrEntry {
 
 /// Parse a single NFR entry from raw YAML Value, reporting the NFR ID on failure.
 fn parse_entry(nfr_id: &str, value: &serde_yaml::Value) -> Result<NfrEntry, String> {
-    serde_yaml::from_value(value.clone())
-        .map_err(|e| format!("NFR '{nfr_id}': {e}"))
+    serde_yaml::from_value(value.clone()).map_err(|e| format!("NFR '{nfr_id}': {e}"))
 }
 
 const COVERAGE_MATRIX_PATH: &str = "tests/coverage-matrix.yaml";

@@ -70,8 +70,8 @@ pub struct AggregateSection {
 fn extract_corpus_sha() -> Result<String, String> {
     let content = std::fs::read_to_string(MANIFEST_PATH)
         .map_err(|e| format!("cannot read {MANIFEST_PATH}: {e}"))?;
-    let manifest: toml::Value = toml::from_str(&content)
-        .map_err(|e| format!("malformed {MANIFEST_PATH}: {e}"))?;
+    let manifest: toml::Value =
+        toml::from_str(&content).map_err(|e| format!("malformed {MANIFEST_PATH}: {e}"))?;
     let sha = manifest
         .get("corpus")
         .and_then(|c| c.get(CORPUS_KEY))
@@ -108,7 +108,11 @@ pub fn run(json: bool) -> Result<(), String> {
 
     if !path.exists() {
         // Advisory: results absent — red-team engagement pending (v1.5 phase).
-        emit_command(json, "warning", "Red-team engagement pending — results.toml absent");
+        emit_command(
+            json,
+            "warning",
+            "Red-team engagement pending — results.toml absent",
+        );
         write_step_summary(
             "## ⚠️ Red-Team Gate: ADVISORY\n\
              Red-team engagement has not yet been executed. \
@@ -132,8 +136,8 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     // Results exist — parse via typed serde.
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {RESULTS_PATH}: {e}"))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("cannot read {RESULTS_PATH}: {e}"))?;
     let results: RedTeamResults = match toml::from_str(&content) {
         Ok(r) => r,
         Err(e) => {
@@ -202,7 +206,10 @@ pub fn run(json: bool) -> Result<(), String> {
     let mut zero_detection_classes: i64 = 0;
     for c in &results.class_result {
         if c.scenarios_total < 0 || c.detected_blocked < 0 || c.unmitigated < 0 {
-            return Err(format!("class '{}' has a negative count — invalid input", c.class));
+            return Err(format!(
+                "class '{}' has a negative count — invalid input",
+                c.class
+            ));
         }
         // #5: scenarios_total must be exactly 10 (AC-3 "10 per class"); detected cannot exceed it.
         if c.scenarios_total != 10 {
@@ -282,12 +289,19 @@ pub fn run(json: bool) -> Result<(), String> {
     let threshold_met = failures.is_empty();
     if !threshold_met {
         // F3→B: advisory at v1.0 — surface loudly but do not block.
-        let detail = failures.iter().map(|f| format!("- {f}\n")).collect::<String>();
+        let detail = failures
+            .iter()
+            .map(|f| format!("- {f}\n"))
+            .collect::<String>();
         let banner = format!(
             "## ⚠️ Red-Team Gate: WOULD HAVE BLOCKED SHIP (v1.5)\n\
              {detail}- This gate is advisory at v1.0. It WILL block at v1.5.\n"
         );
-        emit_command(json, "warning", "Red-team thresholds NOT met — would block ship at v1.5");
+        emit_command(
+            json,
+            "warning",
+            "Red-team thresholds NOT met — would block ship at v1.5",
+        );
         write_step_summary(&banner);
     }
 

@@ -81,8 +81,22 @@ impl CanonicalFrame {
     pub fn to_canonical_bytes(&self) -> Vec<u8> {
         let cap_len = self.capability_token.as_ref().map_or(0, |c| c.len());
         let mut buf = Vec::with_capacity(
-            16 + 8 + 4 + 4 + self.from_spirit_id.len() + 4 + self.to_spirit_id.len() + 8 + 1
-                + 4 + cap_len + 8 + 4 + self.intent.len() + 4 + self.payload.len() + 8,
+            16 + 8
+                + 4
+                + 4
+                + self.from_spirit_id.len()
+                + 4
+                + self.to_spirit_id.len()
+                + 8
+                + 1
+                + 4
+                + cap_len
+                + 8
+                + 4
+                + self.intent.len()
+                + 4
+                + self.payload.len()
+                + 8,
         );
         buf.extend_from_slice(&self.frame_id);
         buf.extend_from_slice(&self.timestamp_ns.to_be_bytes());
@@ -264,9 +278,7 @@ pub fn read_sqlite_frames(db_path: &std::path::Path) -> Result<Vec<CanonicalFram
 /// before committing (P4: verify-before-commit; a failed triple-oracle check
 /// then rolls the whole cutover back automatically).  Both `Client` and
 /// `Transaction` are `GenericClient + Sync`.
-pub async fn read_postgres_frames<C>(
-    client: &C,
-) -> Result<Vec<CanonicalFrame>, String>
+pub async fn read_postgres_frames<C>(client: &C) -> Result<Vec<CanonicalFrame>, String>
 where
     C: GenericClient + Sync,
 {
@@ -284,8 +296,7 @@ where
     let mut out = Vec::with_capacity(rows.len());
     for row in &rows {
         let frame_id_blob: Vec<u8> = row.get(0);
-        let frame_id =
-            blob_to_frame_id(&frame_id_blob).map_err(|e| format!("postgres: {e}"))?;
+        let frame_id = blob_to_frame_id(&frame_id_blob).map_err(|e| format!("postgres: {e}"))?;
         let timestamp_ns: i64 = row.get(1);
         let spirit_pid: i64 = row.get(2);
         let from_spirit_id: String = row.get(3);
@@ -350,12 +361,10 @@ mod tests {
         let mut tampered = set.clone();
         tampered[1].payload[0] ^= 0xFF;
 
-        let root_clean = merkle_root_from_frame_ids(
-            &set.iter().map(|f| f.frame_id).collect::<Vec<_>>(),
-        );
-        let root_tamp = merkle_root_from_frame_ids(
-            &tampered.iter().map(|f| f.frame_id).collect::<Vec<_>>(),
-        );
+        let root_clean =
+            merkle_root_from_frame_ids(&set.iter().map(|f| f.frame_id).collect::<Vec<_>>());
+        let root_tamp =
+            merkle_root_from_frame_ids(&tampered.iter().map(|f| f.frame_id).collect::<Vec<_>>());
         assert_eq!(root_clean, root_tamp, "root is SET-only — blind to payload");
 
         let oracle_clean = compute_payload_oracle(&set);

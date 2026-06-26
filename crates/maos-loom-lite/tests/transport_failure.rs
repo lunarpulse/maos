@@ -36,8 +36,7 @@ use maos_loom_lite::store::{LoomLiteStore, StoreConfig};
 async fn make_broken_adapter() -> Arc<LoomLiteAdapter> {
     let config = StoreConfig {
         // Port 1 — TCP reserved, nothing listens here.
-        connection_string: "host=127.0.0.1 port=1 dbname=loom_lite connect_timeout=1"
-            .to_string(),
+        connection_string: "host=127.0.0.1 port=1 dbname=loom_lite connect_timeout=1".to_string(),
         vector_dim: 1536,
         pool_size: 2,
         timeout_ms: 3000,
@@ -75,10 +74,7 @@ async fn write_broken_connection_returns_typed_error() {
     let ns = MemoryNamespace::Default;
     let value = MemoryValue::Text("test".to_string());
 
-    let result = call_via_spawn_blocking(adapter, move |a| {
-            a.write(42, &ns, "key", value)
-        })
-    .await;
+    let result = call_via_spawn_blocking(adapter, move |a| a.write(42, &ns, "key", value)).await;
 
     assert!(
         result.is_err(),
@@ -105,10 +101,7 @@ async fn read_broken_connection_returns_typed_error() {
     let adapter = make_broken_adapter().await;
     let ns = MemoryNamespace::Default;
 
-    let result = call_via_spawn_blocking(adapter, move |a| {
-            a.read(42, &ns, "key")
-        })
-    .await;
+    let result = call_via_spawn_blocking(adapter, move |a| a.read(42, &ns, "key")).await;
 
     assert!(
         result.is_err(),
@@ -131,10 +124,7 @@ async fn scan_broken_connection_returns_typed_error() {
     let adapter = make_broken_adapter().await;
     let ns = MemoryNamespace::Default;
 
-    let result = call_via_spawn_blocking(adapter, move |a| {
-            a.scan(42, &ns, "prefix", 10)
-        })
-    .await;
+    let result = call_via_spawn_blocking(adapter, move |a| a.scan(42, &ns, "prefix", 10)).await;
 
     assert!(
         result.is_err(),
@@ -172,5 +162,8 @@ async fn broken_connection_does_not_hang() {
         "broken-connection write must not hang (exceeded 15s outer guard)"
     );
     let port_result = result.unwrap();
-    assert!(port_result.is_err(), "port call must fail on broken connection");
+    assert!(
+        port_result.is_err(),
+        "port call must fail on broken connection"
+    );
 }

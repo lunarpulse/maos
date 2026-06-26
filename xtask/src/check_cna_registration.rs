@@ -194,7 +194,10 @@ mod tests {
     #[test]
     fn passes_when_cna_doc_present_and_security_valid() {
         let tmp = TempDir::new().unwrap();
-        write_cna(tmp.path(), "# CNA Registration\n\nMITRE CNA scope: lunarpulse/maos.");
+        write_cna(
+            tmp.path(),
+            "# CNA Registration\n\nMITRE CNA scope: lunarpulse/maos.",
+        );
         write_security(tmp.path(), VALID_SECURITY);
         let r = check_cna_registration(tmp.path());
         assert!(r.passed, "failures: {:?}", r.failures);
@@ -219,10 +222,7 @@ mod tests {
         write_security(tmp.path(), &sec);
         let r = check_cna_registration(tmp.path());
         assert!(!r.passed);
-        assert!(r
-            .failures
-            .iter()
-            .any(|f| f.contains(GPG_PLACEHOLDER)));
+        assert!(r.failures.iter().any(|f| f.contains(GPG_PLACEHOLDER)));
     }
 
     #[test]
@@ -242,7 +242,10 @@ mod tests {
         // No SECURITY.md written.
         let r = check_cna_registration(tmp.path());
         assert!(!r.passed);
-        assert!(r.failures.iter().any(|f| f.contains("SECURITY.md not found")));
+        assert!(r
+            .failures
+            .iter()
+            .any(|f| f.contains("SECURITY.md not found")));
     }
     #[test]
     fn fails_when_version_only_as_substring() {

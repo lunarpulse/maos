@@ -6,58 +6,60 @@ mod abi_diff;
 mod bypass_scan;
 mod calibrate;
 mod cassette_age_gate;
-mod gate_common;
 mod check_a2a_sender_completeness;
 mod check_abi_ratification;
 mod check_adr_040_accepted;
 mod check_air_gap;
 mod check_bare_review_findings;
+mod gate_common;
 // Story 10.4a — dependency-closure gate (kernel-core artifact hygiene)
 mod check_dependency_closure;
 mod check_rto_gate;
 // Story 10.4a — RTO drill (performs cold-restore + timing, writes evidence for check-rto-gate).
 mod check_rto;
 // Story 10.4a — SQLite→Postgres migration triple-oracle ship gate (NFR-Ops-10).
-mod check_migration_merkle;
 mod check_breaking_md;
 mod check_composition_root_completeness;
-mod check_ship_gate_completeness;
-mod check_coverage_matrix_completeness;
 mod check_corpus;
+mod check_coverage_matrix_completeness;
+mod check_cross_form_equiv;
 mod check_deprecations_declared;
 mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
 mod check_empty_kernel;
 mod check_env_contract;
-mod check_literal_reappearance;
 mod check_epic_6_bridge;
-mod check_pentest_gate;
-mod check_third_party_trial;
-mod check_cross_form_equiv;
-mod check_red_team_gate;
 mod check_epic_close_green;
 mod check_error_catalog;
 mod check_fr47;
 mod check_governance_categories;
 mod check_judge_config;
 mod check_kernel_baseline;
+mod check_literal_reappearance;
 mod check_loom;
 mod check_manifest_schema_version;
+mod check_migration_merkle;
 pub mod check_mock_not_in_release;
 mod check_multi_provider_drift;
+mod check_pentest_gate;
 mod check_pub_field_constructors;
+mod check_red_team_gate;
 mod check_review_findings_resolved;
 mod check_security_md;
+mod check_ship_gate_completeness;
+mod check_third_party_trial;
 // Story 10.3 — v1.0 compliance ship-gates (export-control, CNA, fuzz-targets).
 mod check_cna_registration;
 mod check_export_control;
-mod check_fuzz_targets;
 mod check_fuzz_floor;
+mod check_fuzz_targets;
 // Story 10.4c AC5 (D8) — FF-J6 guard: J6 latency harness revival trigger.
 mod check_ff_j6;
 mod check_serde_error_handling;
 mod check_service_boundary;
 mod check_skill_schema;
+// Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
+mod check_skill_conformance;
 mod check_unsafe;
 mod check_workspace_count;
 mod corpus_staleness;
@@ -758,6 +760,14 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate: validates
+    /// that ≥1 third-party skill format executes via Spirit-form adapter without
+    /// kernel modification. Parses real Anthropic fixture + proven-red invalid.
+    #[command(name = "check-skill-conformance")]
+    CheckSkillConformance {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -1033,10 +1043,10 @@ fn main() {
         } => cassette_age_gate::run(&cassette_dir, json, stamp_dir.as_deref()),
         Commands::CheckEnvContract { maos_bin_dir, json } => {
             check_env_contract::run(&maos_bin_dir, json)
-        },
+        }
         Commands::CheckLiteralReappearance { path, json } => {
             check_literal_reappearance::run(&path, json)
-        },
+        }
         Commands::ErrorCatalogCheck { catalog, json } => check_error_catalog::run(&catalog, json),
         Commands::ErrorCatalogGenerate { catalog, output } => {
             check_error_catalog::run_generate(&catalog, &output)
@@ -1079,7 +1089,9 @@ fn main() {
         Commands::GenAbiDocs { out_dir, check } => gen_abi_docs::run(Some(&out_dir), check),
         Commands::CheckShipGateCompleteness { json } => check_ship_gate_completeness::run(json),
         Commands::CheckPentestGate { json } => check_pentest_gate::run(json),
-        Commands::CheckCoverageMatrixCompleteness { json } => check_coverage_matrix_completeness::run(json),
+        Commands::CheckCoverageMatrixCompleteness { json } => {
+            check_coverage_matrix_completeness::run(json)
+        }
         Commands::CheckThirdPartyTrial { json } => check_third_party_trial::run(json),
         Commands::CheckCrossFormEquiv { json } => check_cross_form_equiv::run(json),
         Commands::CheckRedTeamGate { json } => check_red_team_gate::run(json),
@@ -1089,6 +1101,7 @@ fn main() {
         Commands::CheckFuzzFloor { json } => check_fuzz_floor::run(json),
         Commands::CheckMigrationMerkle { json } => check_migration_merkle::run(json),
         Commands::CheckFfJ6 { json } => check_ff_j6::run(json),
+        Commands::CheckSkillConformance { json } => check_skill_conformance::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

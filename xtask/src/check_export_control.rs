@@ -145,9 +145,8 @@ pub fn check_export_control(workspace_root: &Path) -> Report {
                     );
                 }
             }
-            None => failures.push(
-                "STABILITY.md §Export `<!-- PRESERVED:export -->` fence missing".into(),
-            ),
+            None => failures
+                .push("STABILITY.md §Export `<!-- PRESERVED:export -->` fence missing".into()),
         },
         Err(_) => failures.push("STABILITY.md not found".into()),
     }
@@ -223,7 +222,8 @@ mod tests {
     use tempfile::TempDir;
 
     const VALID_ECCN: &str = "HKDF-SHA256, Ed25519, AEAD, TLS 1.3, SHA-256, CBOR. Host crates: maos-iac, maos-kernel-core, maos-a2a-tcp, maos-compliance.";
-    const NON_STUB_FENCE: &str = "<!-- PRESERVED:export -->\nEAR99 — ancillary cryptography.\n<!-- END PRESERVED:export -->";
+    const NON_STUB_FENCE: &str =
+        "<!-- PRESERVED:export -->\nEAR99 — ancillary cryptography.\n<!-- END PRESERVED:export -->";
 
     fn write_eccn(dir: &Path, body: &str) {
         let p = dir.join("docs/compliance");
@@ -283,9 +283,8 @@ mod tests {
     fn fails_when_fence_is_stub() {
         let tmp = TempDir::new().unwrap();
         write_eccn(tmp.path(), VALID_ECCN);
-        let stub = format!(
-            "<!-- PRESERVED:export -->\n{STUB_MARKER}\n<!-- END PRESERVED:export -->"
-        );
+        let stub =
+            format!("<!-- PRESERVED:export -->\n{STUB_MARKER}\n<!-- END PRESERVED:export -->");
         write_stability(tmp.path(), &stub);
         let r = check_export_control(tmp.path());
         assert!(!r.passed);
@@ -300,10 +299,7 @@ mod tests {
         write_stability(tmp.path(), NON_STUB_FENCE);
         let r = check_export_control(tmp.path());
         assert!(!r.passed);
-        assert!(r
-            .failures
-            .iter()
-            .any(|f| f.contains("Ed25519")));
+        assert!(r.failures.iter().any(|f| f.contains("Ed25519")));
     }
 
     #[test]
@@ -313,7 +309,8 @@ mod tests {
 
     #[test]
     fn extract_fence_returns_inner_content() {
-        let body = "head\n<!-- PRESERVED:export -->\ninner content\n<!-- END PRESERVED:export -->\ntail";
+        let body =
+            "head\n<!-- PRESERVED:export -->\ninner content\n<!-- END PRESERVED:export -->\ntail";
         assert_eq!(extract_export_fence(body), Some("inner content"));
     }
     #[test]
@@ -327,10 +324,7 @@ mod tests {
         write_stability(tmp.path(), NON_STUB_FENCE);
         let r = check_export_control(tmp.path());
         assert!(!r.passed);
-        assert!(r
-            .failures
-            .iter()
-            .any(|f| f.contains("maos-compliance")));
+        assert!(r.failures.iter().any(|f| f.contains("maos-compliance")));
     }
 
     #[test]

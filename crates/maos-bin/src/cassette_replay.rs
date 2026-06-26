@@ -281,10 +281,8 @@ mod tests {
         static NEXT_CASSETTE_TEST_ID: std::sync::atomic::AtomicU64 =
             std::sync::atomic::AtomicU64::new(0);
         let id = NEXT_CASSETTE_TEST_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "maos-cassette-test-{}-{id}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("maos-cassette-test-{}-{id}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("test.json");
         let data = serde_json::json!({

@@ -2239,6 +2239,46 @@ jobs:
         working-directory: docs-site
         run: npm run gate:glossary-lock
 
+
+  # Story 10.5 AC5 (NFR-Doc-6 v1.5) — Japanese coverage + glossary-lock gate.
+  check-ja-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Install docs-site dependencies
+        working-directory: docs-site
+        run: npm ci
+      - name: Japanese canonical-coverage gate (JA_COVERAGE_MIN=100)
+        working-directory: docs-site
+        run: JA_COVERAGE_MIN=100 npm run gate:ja-coverage
+      - name: Japanese glossary-lock gate
+        working-directory: docs-site
+        run: npm run gate:ja-glossary-lock
+
+  # Story 10.5 AC5 (NFR-Doc-6 v1.5) — zh-Hans coverage + glossary-lock gate.
+  check-zh-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Install docs-site dependencies
+        working-directory: docs-site
+        run: npm ci
+      - name: zh-Hans canonical-coverage gate (ZHHANS_COVERAGE_MIN=100)
+        working-directory: docs-site
+        run: ZHHANS_COVERAGE_MIN=100 npm run gate:zh-coverage
+      - name: zh-Hans glossary-lock gate
+        working-directory: docs-site
+        run: npm run gate:zh-glossary-lock
   # Story 10.4b (NFR-Sec-13) — live bilateral A2A consent + binding_checked gate.
   check-live-bilateral-consent:
     runs-on: ubuntu-latest
@@ -2350,6 +2390,37 @@ jobs:
       - name: Run check-mobile-push-on-halt
         run: cargo test -p maos-notify-push --test t_10_4b_mobile_push_halt
 
+  # Story 10.5 AC3 — Windows binary + sandbox compile and install verification.
+  windows-check:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check Windows kernel sandbox and CLI crates
+        run: cargo check -p maos-kernel-core -p maos-cli
+      - name: Verify Windows local release signature path
+        run: cargo test -p maos-cli install_verify_local_release_artifact -- --exact
+
+  # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
+  check-skill-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-skill-conformance
+        run: cargo run -p xtask -- check-skill-conformance
+
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2371,12 +2442,16 @@ jobs:
       - check-fuzz-targets
       - fuzz-build
       - check-ko-coverage
+      - check-ja-coverage
+      - check-zh-coverage
+      - windows-check
       - check-migration-merkle
       - check-live-bilateral-consent
       - check-rotation-real-timing
       - check-j4-latency
       - check-mobile-push-on-halt
       - check-ff-j6
+      - check-skill-conformance
     if: always()
     steps:
       - name: Ship gate results summary

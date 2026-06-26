@@ -64,10 +64,18 @@ fn resolve_manifest_path() -> std::path::PathBuf {
 /// must be present and non-empty — the gate has no GREEN input otherwise).
 fn load_corpus_entry() -> Result<CorpusEntry, String> {
     let path = resolve_manifest_path();
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("check-migration-merkle: cannot read {}: {e}", path.display()))?;
-    let manifest: Manifest = toml::from_str(&content)
-        .map_err(|e| format!("check-migration-merkle: cannot parse {}: {e}", path.display()))?;
+    let content = std::fs::read_to_string(&path).map_err(|e| {
+        format!(
+            "check-migration-merkle: cannot read {}: {e}",
+            path.display()
+        )
+    })?;
+    let manifest: Manifest = toml::from_str(&content).map_err(|e| {
+        format!(
+            "check-migration-merkle: cannot parse {}: {e}",
+            path.display()
+        )
+    })?;
     let entry = manifest.corpus.get(CORPUS_KEY).ok_or_else(|| {
         format!(
             "check-migration-merkle: FAIL — corpus key '{CORPUS_KEY}' missing from {MANIFEST_PATH}"
@@ -76,7 +84,9 @@ fn load_corpus_entry() -> Result<CorpusEntry, String> {
     let require_hex = |name: &str, val: &Option<String>| -> Result<String, String> {
         let v = val
             .as_ref()
-            .ok_or_else(|| format!("check-migration-merkle: FAIL — corpus[{CORPUS_KEY}].{name} missing (B4)"))?
+            .ok_or_else(|| {
+                format!("check-migration-merkle: FAIL — corpus[{CORPUS_KEY}].{name} missing (B4)")
+            })?
             .trim()
             .to_lowercase();
         if v.is_empty() {
@@ -152,8 +162,8 @@ pub fn run(json: bool) -> Result<(), String> {
     // B4: a real GREEN requires all pin fields present + valid.
     let pinned = load_corpus_entry()?;
 
-    let corpus_path = std::env::var("MAOS_MIGRATION_CORPUS")
-        .unwrap_or_else(|_| DEFAULT_CORPUS_PATH.to_string());
+    let corpus_path =
+        std::env::var("MAOS_MIGRATION_CORPUS").unwrap_or_else(|_| DEFAULT_CORPUS_PATH.to_string());
     let path = Path::new(&corpus_path);
 
     if !path.exists() {
@@ -163,7 +173,11 @@ pub fn run(json: bool) -> Result<(), String> {
              --example generate_migration_corpus -- --out {DEFAULT_CORPUS_PATH}` and (optionally) \
              set MAOS_TEST_POSTGRES for the live cross-backend check"
         );
-        emit_command(json, "notice", &format!("check-migration-merkle: SKIPPED — {reason}"));
+        emit_command(
+            json,
+            "notice",
+            &format!("check-migration-merkle: SKIPPED — {reason}"),
+        );
         if json {
             println!(
                 "{}",
@@ -194,7 +208,9 @@ pub fn run(json: bool) -> Result<(), String> {
         failures.push(format!("merkle_root: derived={root} pinned={p_root}"));
     }
     if payload != p_payload {
-        failures.push(format!("payload_oracle: derived={payload} pinned={p_payload}"));
+        failures.push(format!(
+            "payload_oracle: derived={payload} pinned={p_payload}"
+        ));
     }
     if count != p_count {
         failures.push(format!("row_count: derived={count} pinned={p_count}"));
@@ -222,8 +238,13 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     if !failures.is_empty() {
-        let detail = failures.iter().map(|f| format!("- {f}\n")).collect::<String>();
-        let msg = format!("check-migration-merkle: FAIL — re-derived oracles mismatch manifest\n{detail}");
+        let detail = failures
+            .iter()
+            .map(|f| format!("- {f}\n"))
+            .collect::<String>();
+        let msg = format!(
+            "check-migration-merkle: FAIL — re-derived oracles mismatch manifest\n{detail}"
+        );
         emit_command(json, "error", &msg);
         write_step_summary(&format!("## ❌ Migration Gate: RED\n{detail}"));
         return Err(msg);
@@ -236,7 +257,11 @@ pub fn run(json: bool) -> Result<(), String> {
         &format!(
             "check-migration-merkle: PASS — corpus provenance re-derived ({} rows){}",
             count,
-            if live_checked { " + live Postgres cross-check GREEN" } else { "" }
+            if live_checked {
+                " + live Postgres cross-check GREEN"
+            } else {
+                ""
+            }
         ),
     );
     if json {
@@ -260,7 +285,11 @@ pub fn run(json: bool) -> Result<(), String> {
         eprintln!(
             "check-migration-merkle: PASS — corpus provenance re-derived ({} rows){}",
             count,
-            if live_checked { " + live Postgres cross-check GREEN" } else { "" }
+            if live_checked {
+                " + live Postgres cross-check GREEN"
+            } else {
+                ""
+            }
         );
     }
     Ok(())
@@ -363,7 +392,10 @@ CREATE TABLE IF NOT EXISTS transparency_log (
         // sha256 of the file bytes differs (different frame_ids).
         assert_ne!(sha_o, sha_t, "sha256 must differ on a tampered frame_id");
         // Merkle root differs (the frame_id set changed).
-        assert_ne!(root_o, root_t, "merkle root must differ on a tampered frame_id");
+        assert_ne!(
+            root_o, root_t,
+            "merkle root must differ on a tampered frame_id"
+        );
         // Payload oracle differs (frame_id is part of the canonical row hash).
         assert_ne!(
             payload_o, payload_t,
@@ -389,5 +421,4 @@ CREATE TABLE IF NOT EXISTS transparency_log (
         assert_eq!(first.2, second.2, "payload oracle must be deterministic");
         assert_eq!(first.3, second.3, "row count must be deterministic");
     }
-
 }

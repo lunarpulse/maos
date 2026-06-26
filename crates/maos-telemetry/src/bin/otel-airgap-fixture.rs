@@ -9,7 +9,10 @@ fn main() {
     match mode.as_str() {
         "off" => {}
         "on" => {
-            let sink = OtelTraceSink::new(InMemorySpanExporter::default(), OtelTraceSinkConfig::default());
+            let sink = OtelTraceSink::new(
+                InMemorySpanExporter::default(),
+                OtelTraceSinkConfig::default(),
+            );
             let guard = sink.iac_frame_span(IacFrameSpanAttrs {
                 frame_id: [0u8; 16],
                 kind: "task_assign",

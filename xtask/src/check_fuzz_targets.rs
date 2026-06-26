@@ -110,7 +110,11 @@ pub fn check_fuzz_targets(workspace_root: &Path) -> Report {
         let cargo = match std::fs::read_to_string(&cargo_path) {
             Ok(s) => s,
             Err(_) => {
-                failures.push(format!("{}/{}/Cargo.toml not found", workspace_root.display(), t.crate_dir));
+                failures.push(format!(
+                    "{}/{}/Cargo.toml not found",
+                    workspace_root.display(),
+                    t.crate_dir
+                ));
                 continue;
             }
         };
@@ -124,7 +128,9 @@ pub fn check_fuzz_targets(workspace_root: &Path) -> Report {
             Err(e) => failures.push(format!("{}/Cargo.toml: {e}", t.crate_dir)),
         }
 
-        let target_src = crate_dir.join("fuzz_targets").join(format!("{}.rs", t.bin_name));
+        let target_src = crate_dir
+            .join("fuzz_targets")
+            .join(format!("{}.rs", t.bin_name));
         if !target_src.exists() {
             failures.push(format!(
                 "{}/fuzz_targets/{}.rs not found",
@@ -266,10 +272,7 @@ mod tests {
         .unwrap();
         let r = check_fuzz_targets(tmp.path());
         assert!(!r.passed);
-        assert!(r
-            .failures
-            .iter()
-            .any(|f| f.contains("manifest_parser")));
+        assert!(r.failures.iter().any(|f| f.contains("manifest_parser")));
     }
 
     #[test]
@@ -326,7 +329,11 @@ mod tests {
             r#"{"schema_version":1,"records":[{"target":"frame_deser","commit":"abc","cpu_seconds":3600,"corpus_size":12,"timestamp":"2026-06-22T00:00:00Z"}]}"#,
         );
         let r = check_fuzz_targets(tmp.path());
-        assert!(r.passed, "a populated ledger must still be valid: {:?}", r.failures);
+        assert!(
+            r.passed,
+            "a populated ledger must still be valid: {:?}",
+            r.failures
+        );
     }
     #[test]
     fn fails_when_corpus_only_gitkeep() {

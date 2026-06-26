@@ -202,8 +202,9 @@ impl CorpusGenerator for CcacGenerator {
     }
 
     fn expand(&self, n: usize) -> Vec<Self::Item> {
-        expansion::expand_deterministic(&self.seeds, n)
-            .expect("CCAC expansion is deterministic and the envelopes are serializable by construction")
+        expansion::expand_deterministic(&self.seeds, n).expect(
+            "CCAC expansion is deterministic and the envelopes are serializable by construction",
+        )
     }
 
     fn validate(&self, item: &Self::Item) -> ValidationOutcome {

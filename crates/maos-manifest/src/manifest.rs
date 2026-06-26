@@ -202,7 +202,8 @@ impl ClassSection {
 /// schema-v3 bump (Story 9.4b AC-6): `[model_provenance]`. A manifest authored
 /// at the N-1 floor omits these; they default via `#[serde(default)]` /
 /// optional-on-read.
-const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance"];
+const POST_V1_SCHEMA_SECTIONS: &[&str] =
+    &["cli_wrapper", "schedule", "gateway", "model_provenance"];
 
 /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
 /// newer-than-declared schema section that an N-1 manifest omits (and thus
@@ -1843,9 +1844,10 @@ impl RawModelProvenanceSection {
                 )));
             }
         }
-        let last_eval_unix_secs = parse_rfc3339_utc_secs(&self.last_eval_timestamp).map_err(|e| {
-            ManifestError::Toml(validation_msg("model_provenance.last_eval_timestamp", &e))
-        })?;
+        let last_eval_unix_secs =
+            parse_rfc3339_utc_secs(&self.last_eval_timestamp).map_err(|e| {
+                ManifestError::Toml(validation_msg("model_provenance.last_eval_timestamp", &e))
+            })?;
         Ok(ModelProvenanceSection {
             covered_model_id: self.covered_model_id,
             training_data_lineage: self.training_data_lineage,
@@ -4732,11 +4734,11 @@ extra_field = "nope"
     #[test]
     fn malformed_timestamp_rejected() {
         for bad in [
-            "2026-06-01",                 // date only
-            "2026-06-01T00:00:00+02:00",  // offset not allowed
-            "2026-13-01T00:00:00Z",       // month OOR
-            "2026-02-30T00:00:00Z",       // day OOR (Feb)
-            "2026-06-01T24:00:00Z",       // hour OOR
+            "2026-06-01",                // date only
+            "2026-06-01T00:00:00+02:00", // offset not allowed
+            "2026-13-01T00:00:00Z",      // month OOR
+            "2026-02-30T00:00:00Z",      // day OOR (Feb)
+            "2026-06-01T24:00:00Z",      // hour OOR
             "not-a-date",
         ] {
             let toml = format!(
@@ -4768,9 +4770,8 @@ extra_field = "nope"
 
     #[test]
     fn present_section_extracted_from_full_manifest() {
-        let manifest = format!(
-            "[class]\nname = \"x\"\nversion = \"0.1.0\"\n[model_provenance]\n{VALID}"
-        );
+        let manifest =
+            format!("[class]\nname = \"x\"\nversion = \"0.1.0\"\n[model_provenance]\n{VALID}");
         let got = ModelProvenanceSection::from_manifest_toml(&manifest)
             .expect("ok")
             .expect("present");
@@ -4786,7 +4787,9 @@ extra_field = "nope"
         let err = s.validate_staleness(now, 30 * 86_400).unwrap_err();
         assert!(matches!(err, ProvenanceError::EModelProvenanceStale { .. }));
         // fresh within window → ok.
-        assert!(s.validate_staleness(s.last_eval_unix_secs + 10 * 86_400, 30 * 86_400).is_ok());
+        assert!(s
+            .validate_staleness(s.last_eval_unix_secs + 10 * 86_400, 30 * 86_400)
+            .is_ok());
     }
 
     #[test]

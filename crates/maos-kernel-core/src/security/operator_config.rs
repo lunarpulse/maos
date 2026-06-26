@@ -323,7 +323,10 @@ mod tests {
         let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var("MAOS_REGION_HOME", "US-EAST-1");
         let s = RegionSection::resolve_from_env_and_disk();
-        assert_eq!(s.home_region.as_ref().map(|r| r.as_str()), Some("us-east-1"));
+        assert_eq!(
+            s.home_region.as_ref().map(|r| r.as_str()),
+            Some("us-east-1")
+        );
         std::env::remove_var("MAOS_REGION_HOME");
     }
 

@@ -107,7 +107,10 @@ fn walk_rust_files(dir: &Path, out: &mut Vec<String>) {
         if p.is_dir() {
             // Skip vendored / generated trees.
             let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if matches!(name, "node_modules" | "build" | ".docusaurus" | ".git" | "target") {
+            if matches!(
+                name,
+                "node_modules" | "build" | ".docusaurus" | ".git" | "target"
+            ) {
                 continue;
             }
             walk_rust_files(&p, out);

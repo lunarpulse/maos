@@ -11,9 +11,7 @@
 //! All multi-row vectors span >1 batch boundary conceptually (25 000 rows /
 //! BATCH_SIZE 10 000 = 3 batches); the oracle math is row-count-independent.
 
-use maos_loom_lite::canonical::{
-    self, CanonicalFrame,
-};
+use maos_loom_lite::canonical::{self, CanonicalFrame};
 use maos_loom_lite::migration::{MigrationError, MigrationResult};
 
 /// Build a deterministic canonical frame for index `i` with the given payload.
@@ -35,7 +33,9 @@ fn frame(i: u8, payload: &[u8]) -> CanonicalFrame {
 
 /// Build a 25 000-row frame set (>1 batch boundary) with a rotating payload.
 fn frames_25k() -> Vec<CanonicalFrame> {
-    (0u8..=249).map(|i| frame(i, &[i; 64])).collect::<Vec<_>>()
+    (0u8..=249)
+        .map(|i| frame(i, &[i; 64]))
+        .collect::<Vec<_>>()
         .into_iter()
         .cycle()
         .take(25_000)
@@ -67,7 +67,9 @@ fn vector_1_altered_frame_id_roots_differ_red() {
     let source = frames_25k();
     let mut target = source.clone();
     target[0].frame_id[0] ^= 0xFF; // alter one frame_id
-    let err = result_from(&source, &target).verify().expect_err("must RED");
+    let err = result_from(&source, &target)
+        .verify()
+        .expect_err("must RED");
     assert!(
         matches!(err, MigrationError::MerkleRootMismatch { .. }),
         "expected MerkleRootMismatch, got {err:?}"
@@ -95,8 +97,7 @@ fn vector_2_payload_corruption_root_matches_but_payload_mismatch_red() {
     let result = result_from(&source, &target);
     // The Merkle root is SET-only → it STILL matches (proving its blindness).
     assert_eq!(
-        result.source_merkle_root,
-        result.target_merkle_root,
+        result.source_merkle_root, result.target_merkle_root,
         "Merkle root is blind to payload corruption"
     );
     let err = result.verify().expect_err("payload oracle MUST RED");

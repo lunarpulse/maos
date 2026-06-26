@@ -71,7 +71,10 @@ impl BoundedExportState {
     fn wait_until_resumed(&self) {
         let mut paused = self.paused.lock().unwrap_or_else(|p| p.into_inner());
         while *paused {
-            paused = self.pause_cv.wait(paused).unwrap_or_else(|p| p.into_inner());
+            paused = self
+                .pause_cv
+                .wait(paused)
+                .unwrap_or_else(|p| p.into_inner());
         }
     }
 
@@ -192,7 +195,12 @@ impl QueueingSpanExporter {
         OTelSdkError::InternalFailure(format!("{label} control reply failed"))
     }
 
-    fn send_control(&self, mut message: QueueMessage, label: &str, timeout: Duration) -> OTelSdkResult {
+    fn send_control(
+        &self,
+        mut message: QueueMessage,
+        label: &str,
+        timeout: Duration,
+    ) -> OTelSdkResult {
         let deadline = std::time::Instant::now() + timeout;
         loop {
             match self.tx.try_send(message) {
@@ -217,11 +225,15 @@ impl SpanExporter for QueueingSpanExporter {
             return Ok(());
         }
 
-        self.shared.queued_spans.fetch_add(span_count, Ordering::AcqRel);
+        self.shared
+            .queued_spans
+            .fetch_add(span_count, Ordering::AcqRel);
         match self.tx.try_send(QueueMessage::Batch(batch)) {
             Ok(()) => Ok(()),
             Err(_err) => {
-                self.shared.queued_spans.fetch_sub(span_count, Ordering::AcqRel);
+                self.shared
+                    .queued_spans
+                    .fetch_sub(span_count, Ordering::AcqRel);
                 self.shared
                     .drop_count
                     .fetch_add(span_count as u64, Ordering::AcqRel);
@@ -403,7 +415,9 @@ impl TraceSink for OtelTraceSink {
             .with_kind(SpanKind::Internal)
             .with_attributes(kv);
 
-        let span = self.tracer.build_with_context(span_builder, &Context::new());
+        let span = self
+            .tracer
+            .build_with_context(span_builder, &Context::new());
 
         use opentelemetry::trace::Span as _;
         let otel_span_ctx = span.span_context().clone();
@@ -478,7 +492,9 @@ impl TraceSink for OtelTraceSink {
             .with_kind(SpanKind::Internal)
             .with_attributes(kv);
 
-        let mut span = self.tracer.build_with_context(span_builder, &Context::new());
+        let mut span = self
+            .tracer
+            .build_with_context(span_builder, &Context::new());
         use opentelemetry::trace::Span;
         span.set_status(Status::error("halt"));
         drop(span);

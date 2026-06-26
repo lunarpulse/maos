@@ -78,6 +78,11 @@ pub struct RotationDrillReport {
     /// Pass/fail per §7.2.1.b floors.
     pub passes_v07_floors: bool,
     pub passes_v10_floors: bool,
+    /// v1.5 NFR-Sec-13 floors: ≥ as strict as existing v0.7/v1.0 floors.
+    /// The literal NFR-Sec-13 numbers (median ≤60s / p99 ≤5min) are LOOSER
+    /// than the ratified v0.7/v1.0 floors; passes_v15_floors inherits all
+    /// existing strictness (passes_v10_floors implies passes_v07_floors).
+    pub passes_v15_floors: bool,
 }
 
 impl RotationDrillReport {
@@ -122,6 +127,12 @@ impl RotationDrillReport {
             && e2e_p99 <= 150_000
             && post_grace_reject_rate <= 0.001;
 
+        // v1.5: NFR-Sec-13 by name — MUST be ≥ as strict as existing v0.7/v1.0
+        // floors. The literal NFR-Sec-13 numbers (median ≤60s / p99 ≤5min) are
+        // LOOSER than the existing floors; adopting those alone would REGRESS
+        // the gate. passes_v15_floors inherits passes_v10_floors strictness.
+        let passes_v15_floors = passes_v10_floors;
+
         Self {
             drill_id: drill_id.into(),
             host_count,
@@ -137,6 +148,7 @@ impl RotationDrillReport {
             post_grace_reject_rate,
             passes_v07_floors,
             passes_v10_floors,
+            passes_v15_floors,
         }
     }
 }

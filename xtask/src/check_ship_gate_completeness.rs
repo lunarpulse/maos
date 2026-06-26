@@ -27,6 +27,11 @@ const EXPECTED_GATES: &[&str] = &[
     "check-fuzz-targets",
     "check-cna-registration",
     "check-ko-coverage",
+    // Story 10.5 AC5 — Japanese and zh-Hans v1.5 localization gates.
+    "check-ja-coverage",
+    "check-zh-coverage",
+    // Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
+    "windows-check",
     // Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate.
     "check-migration-merkle",
     // Story 10.4a (NFR-Ops-2) — RTO ≤ 4h weekly cadence gates (rpo-rto-cadence.yml).
@@ -42,6 +47,8 @@ const EXPECTED_GATES: &[&str] = &[
     // Story 10.4c — J4 §13.1 real in-kernel scalar.tap latency gate (replaces
     // the 10.4b proven-RED placeholder `check-j4-placeholder-red`).
     "check-j4-latency",
+    // Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
+    "check-skill-conformance",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.
@@ -92,6 +99,15 @@ pub fn run(json: bool) -> Result<(), String> {
                 | "check-third-party-trial"
                 | "check-cross-form-equiv"
                 | "check-red-team-gate"
+                | "check-ja-coverage"
+                | "check-zh-coverage"
+                | "windows-check"
+                | "check-migration-merkle"
+                | "check-live-bilateral-consent"
+                | "check-rotation-real-timing"
+                | "check-mobile-push-on-halt"
+                | "check-j4-latency"
+                | "check-skill-conformance"
         );
         if (is_story10_ship_gate || WEEKLY_ONLY_GATES.contains(gate))
             && !registry_names.contains(gate)

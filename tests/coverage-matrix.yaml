@@ -771,11 +771,13 @@ coverage:
   NFR-Doc-6:
     gates:
     - check-ko-coverage
+    - check-ja-coverage
+    - check-zh-coverage
     corpora: []
-    phase: v1.0
+    phase: v1.5
     valid_until: '2027-05-12'
-    notes: Story 10.3 ships Korean translations for all canonical doc deliverables;
-      KO_COVERAGE_MIN=100 wired into the docs-site CI gate.
+    notes: Story 10.3 ships Korean; Story 10.5 AC5 ships Japanese + zh-Hans.
+      KO/JA/ZHHANS_COVERAGE_MIN=100 wired into docs-site CI gates.
   NFR-Doc-7:
     gates: []
     enforcement: advisory-until-engagement
@@ -1272,10 +1274,13 @@ coverage:
     phase: v0.1
     valid_until: '2027-05-12'
   NFR-Test-10:
-    gates: []
+    gates:
+    - check-skill-conformance
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
+    notes: Story 10.5 AC1 ships Anthropic Skills format adapter; check-skill-conformance
+      validates live adapter execution + proven-red. Zero kernel-core delta.
   NFR-Test-11:
     gates: []
     corpora: []

@@ -140,10 +140,7 @@ pub fn value_to_parts(
 }
 
 /// Deserialize (kind, data) back into a `MemoryValue`.
-pub fn parts_to_value(
-    kind: &str,
-    data: &[u8],
-) -> Result<maos_domain::memory::MemoryValue, String> {
+pub fn parts_to_value(kind: &str, data: &[u8]) -> Result<maos_domain::memory::MemoryValue, String> {
     use maos_domain::memory::MemoryValue;
     match kind {
         "json" => {

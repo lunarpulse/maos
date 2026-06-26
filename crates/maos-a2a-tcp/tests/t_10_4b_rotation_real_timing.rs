@@ -28,7 +28,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::{
-    AgentRotationTimestamps, HandshakeRetryPolicy, RotationDrillReport, compute_t_grace,
+    compute_t_grace, AgentRotationTimestamps, HandshakeRetryPolicy, RotationDrillReport,
 };
 use maos_a2a_tcp::{TcpA2ATransport, TcpTimeouts};
 use maos_domain::invariants::i1::IntentClass;
@@ -328,8 +328,8 @@ async fn t_10_4b_rotation_real_timing_3_host_drill() {
         report.post_grace_reject_rate
     );
     eprintln!(
-        "  => passes_v07_floors={}  passes_v10_floors={}",
-        report.passes_v07_floors, report.passes_v10_floors
+        "  => passes_v07_floors={}  passes_v10_floors={}  passes_v15_floors={}",
+        report.passes_v07_floors, report.passes_v10_floors, report.passes_v15_floors
     );
 
     // localhost timings are sub-second → far under every floor.
@@ -340,6 +340,10 @@ async fn t_10_4b_rotation_real_timing_3_host_drill() {
     assert!(
         report.passes_v10_floors,
         "v1.0 floors MUST pass: end-to-end < 60s/150s and post-grace reject rate is 0"
+    );
+    assert!(
+        report.passes_v15_floors,
+        "v1.5 NFR-Sec-13 floors MUST pass (inherits v1.0 strictness; localhost timings far under)"
     );
     // Explicit zero-drop invariant across both phases.
     assert_eq!(
@@ -460,8 +464,8 @@ fn t_10_4b_rotation_proven_red_p99_exceeds_floor() {
     const PROP_A_MS: u64 = 20_000;
     const PROP_B_MS: u64 = 30_000;
     const PROP_C_MS: u64 = 95_000; // exceeds the 90s v0.7 p99 floor
-    // re-handshake = t_2 − t_1 (kept under the 60s floor so the failure
-    // isolates to revocation-propagation p99).
+                                   // re-handshake = t_2 − t_1 (kept under the 60s floor so the failure
+                                   // isolates to revocation-propagation p99).
     const RH_MS: u64 = 10_000;
     let mk = |prop_ms: u64| -> (u64, u64) {
         (t0 + prop_ms * NS_PER_MS, t0 + (prop_ms + RH_MS) * NS_PER_MS)
@@ -516,5 +520,9 @@ fn t_10_4b_rotation_proven_red_p99_exceeds_floor() {
     assert!(
         !report.passes_v10_floors,
         "v1.0 floors (which require v0.7) MUST also be RED"
+    );
+    assert!(
+        !report.passes_v15_floors,
+        "v1.5 floors (which inherit v1.0) MUST also be RED"
     );
 }

@@ -210,10 +210,9 @@ surface MUST appear as a row below AND carry a dated entry in `BREAKING.md`; CI
 
 ## LTS Policy
 
-MAOS v1.0 carries a **1-year LTS commitment** (NFR-Maint-6): the v1.0 line
-receives **security-only patches for 1 year** from the LTS clock-start below. The
-2-year LTS term is **deferred to v1.5** — v1.0 publishes the term "the v0.8 team
-can cash," not an over-promised window.
+MAOS v1.5 carries a **2-year LTS commitment** (NFR-Maint-6): the v1.0 line
+receives **security-only patches for 2 years** from the LTS clock-start below.
+The 2-year term takes effect at v1.5, extending the original v1.0 1-year window.
 
 <!-- lts-clock-start: filled by `stability-matrix` IFF a `1.0.0`/`v1.0.0` git tag exists (Epic 10 cuts the tag); placeholder until then — do NOT fabricate a SHA/tag. -->
 - **LTS clock-start:** {lts_clock}
@@ -316,8 +315,7 @@ fn export_non_stub_issue(stability_md: &str) -> Option<String> {
     }
     if inner.contains(EXPORT_FENCE_START) || inner.contains(EXPORT_FENCE_END) {
         return Some(
-            "STABILITY.md §Export fence contains a nested fence marker — repair the content"
-                .into(),
+            "STABILITY.md §Export fence contains a nested fence marker — repair the content".into(),
         );
     }
     if inner.contains(STUB_MARKER) {
@@ -469,7 +467,7 @@ mod tests {
         assert_eq!(a, b, "render must be byte-deterministic for --check");
         assert!(a.contains("## Compatibility Matrix"));
         assert!(a.contains("## LTS Policy"));
-        assert!(a.contains("1-year LTS"));
+        assert!(a.contains("2-year LTS"));
         assert!(a.contains("## Substrate-Self Compliance Scope"));
         assert!(a.contains("SOC 2") && a.contains("ISO 27001") && a.contains("FedRAMP"));
         assert!(a.contains("## Export"));
@@ -528,10 +526,7 @@ mod tests {
         let rendered = render(&tmp).expect("render succeeds");
 
         // Mutate the compliance-scope section — the exact text this story added.
-        let mutated = rendered.replace(
-            "OPERATOR's responsibility",
-            "SUBSTRATE's responsibility",
-        );
+        let mutated = rendered.replace("OPERATOR's responsibility", "SUBSTRATE's responsibility");
         assert_ne!(
             rendered, mutated,
             "mutation must produce different output (pre-condition)"
@@ -587,9 +582,8 @@ mod tests {
 
     #[test]
     fn export_non_stub_issue_flags_placeholder() {
-        let stub = format!(
-            "<!-- PRESERVED:export -->\n{STUB_MARKER}\n<!-- END PRESERVED:export -->"
-        );
+        let stub =
+            format!("<!-- PRESERVED:export -->\n{STUB_MARKER}\n<!-- END PRESERVED:export -->");
         let issue = export_non_stub_issue(&stub).expect("stub must be flagged");
         assert!(issue.contains("stub"), "issue must name the stub: {issue}");
     }
@@ -604,7 +598,10 @@ mod tests {
     fn export_non_stub_issue_flags_empty_fence() {
         let empty = "<!-- PRESERVED:export -->\n<!-- END PRESERVED:export -->";
         let issue = export_non_stub_issue(empty).expect("empty fence must be flagged");
-        assert!(issue.contains("empty"), "issue must name emptiness: {issue}");
+        assert!(
+            issue.contains("empty"),
+            "issue must name emptiness: {issue}"
+        );
     }
 
     /// Copy the real workspace inputs a self-consistent render reads, into a
@@ -664,7 +661,11 @@ mod tests {
         );
         std::fs::write(tmp.join(STABILITY_MD), &non_stub).unwrap();
         let result = run(&tmp, true, false);
-        assert!(result.is_ok(), "non-stub export fence must pass --check: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "non-stub export fence must pass --check: {:?}",
+            result
+        );
     }
 
     /// Proven-red (Epic 9 §A1): the §Export fence carrying the placeholder
@@ -690,10 +691,14 @@ mod tests {
         // existing STABILITY.md must make render() REFUSE (Err), NOT silently
         // substitute the stub and overwrite the hand-authored content.
         let (_guard, tmp) = isolated_workspace();
-        let partial = "## Export\n\n<!-- PRESERVED:export -->\nEAR99 hand-authored classification.\n";
+        let partial =
+            "## Export\n\n<!-- PRESERVED:export -->\nEAR99 hand-authored classification.\n";
         std::fs::write(tmp.join(STABILITY_MD), partial).unwrap();
         let result = render(&tmp);
-        assert!(result.is_err(), "a partial fence must make render refuse (not destroy content)");
+        assert!(
+            result.is_err(),
+            "a partial fence must make render refuse (not destroy content)"
+        );
         let err = result.unwrap_err();
         assert!(
             err.contains("refusing to regenerate"),

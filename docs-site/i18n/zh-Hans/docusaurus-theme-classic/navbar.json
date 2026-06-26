@@ -1,0 +1,42 @@
+{
+  "title": {
+    "message": "MAOS",
+    "description": "The title in navbar"
+  },
+  "logo.alt": {
+    "message": "MAOS 로고",
+    "description": "Logo alt text"
+  },
+  "item.label.Manifest": {
+    "message": "Manifest",
+    "description": "Navbar manifest link"
+  },
+  "item.label.Cookbook": {
+    "message": "Cookbook",
+    "description": "Navbar cookbook link"
+  },
+  "item.label.Migrate": {
+    "message": "Migrate",
+    "description": "Navbar migrate link"
+  },
+  "item.label.Troubleshoot": {
+    "message": "Troubleshoot",
+    "description": "Navbar troubleshoot link"
+  },
+  "item.label.Deploy": {
+    "message": "Deploy",
+    "description": "Navbar deploy link"
+  },
+  "item.label.ABI Reference": {
+    "message": "ABI Reference",
+    "description": "Navbar ABI ref link"
+  },
+  "item.label.Community": {
+    "message": "커뮤니티",
+    "description": "Navbar community link"
+  },
+  "item.label.GitHub": {
+    "message": "GitHub",
+    "description": "Navbar GitHub link"
+  }
+}

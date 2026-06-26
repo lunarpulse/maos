@@ -276,8 +276,8 @@ pub fn verify_bundle(
 /// Public so that `replay::runner` and `maosctl audit replay` can reuse the same
 /// canonicalizer — ADR-028 D5b (one canonicalizer, not three).
 pub fn canonicalize_value<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, SealedExportError> {
-    let value = serde_json::to_value(value)
-        .map_err(|e| SealedExportError::Serialization(e.to_string()))?;
+    let value =
+        serde_json::to_value(value).map_err(|e| SealedExportError::Serialization(e.to_string()))?;
     let sorted = sort_value(value);
     serde_json::to_string(&sorted)
         .map_err(|e| SealedExportError::Serialization(e.to_string()))
@@ -373,12 +373,18 @@ mod tests {
 
         // home (eu) attester key -> ALLOW
         let eu_pub = derive_region_pubkey(&seed, &region("eu"));
-        assert!(verify_bundle(&signed, &eu_pub).is_ok(), "home region must verify");
+        assert!(
+            verify_bundle(&signed, &eu_pub).is_ok(),
+            "home region must verify"
+        );
 
         // foreign (us) attester key -> region violation (verification fails)
         let us_pub = derive_region_pubkey(&seed, &region("us"));
         assert!(
-            matches!(verify_bundle(&signed, &us_pub), Err(SealedExportError::VerificationFailed)),
+            matches!(
+                verify_bundle(&signed, &us_pub),
+                Err(SealedExportError::VerificationFailed)
+            ),
             "foreign-region key must fail verification (R-RG1)"
         );
     }

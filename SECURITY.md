@@ -53,12 +53,11 @@ Backports of security patches target the following versions:
 
 | Version range | Status               | Backport window  |
 |---------------|----------------------|------------------|
-| `1.0.x`       | LTS (security-only)  | 1-year LTS window from the v1.0 tag (NFR-Maint-6) |
+| `1.0.x`       | LTS (security-only)  | 2-year LTS window from the v1.0 tag (NFR-Maint-6) |
 | `0.1.x`       | Superseded by 1.0.x  | Security-only backports on request during the v1.0 LTS window |
 | `< 0.1.0`     | Pre-release / unsupported | None       |
 
-At v1.0+ the MAOS substrate will maintain a 2-year LTS branch policy
-per NFR-Ops-2 (deferred to v1.5 maturation per the phased roadmap).
+At v1.5 the MAOS substrate maintains a 2-year LTS branch policy per NFR-Maint-6.
 
 ## Advisory channel
 

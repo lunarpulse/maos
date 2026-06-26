@@ -358,20 +358,20 @@ fn queue_json_contains_no_principal_data() {
     q.enqueue_skill(
         skill("skill.pending"),
         SkillEntryPath::PackageShipped,
-        "real-operator-name",  // actor — this is principal data
+        "real-operator-name", // actor — this is principal data
     )
     .unwrap();
     q.enqueue_skill(
         skill("skill.admitted"),
         SkillEntryPath::AuthorSelf,
-        "spirit:42",  // actor — this is principal data
+        "spirit:42", // actor — this is principal data
     )
     .unwrap();
     q.approve(&SkillId::from("skill.admitted"));
     q.enqueue_skill(
         skill("skill.rejected"),
         SkillEntryPath::PackageShipped,
-        "admin-user",  // actor — this is principal data
+        "admin-user", // actor — this is principal data
     )
     .unwrap();
     q.reject(&SkillId::from("skill.rejected"));

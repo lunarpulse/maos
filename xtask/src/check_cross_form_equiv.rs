@@ -186,8 +186,8 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     // Artifact present — parse and validate.
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {RESULTS_PATH}: {e}"))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("cannot read {RESULTS_PATH}: {e}"))?;
 
     let artifact: CrossFormResults = serde_json::from_str(&content).map_err(|e| {
         let msg = format!("check-cross-form-equiv: FAIL — malformed cross-form-results.json: {e}");
@@ -266,7 +266,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 return Err(format!(
                     "check-cross-form-equiv: FAIL — per_run_hashes length mismatch: \
                      cli={} (expected {n1}), sub={} (expected {n2})",
-                    h_cli.len(), h_sub.len()
+                    h_cli.len(),
+                    h_sub.len()
                 ));
             }
             let g1: Vec<u128> = h_cli.iter().map(|h| hash_to_rank_key(h)).collect();

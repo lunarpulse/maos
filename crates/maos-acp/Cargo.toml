@@ -17,3 +17,7 @@ crossbeam-channel = "0.5"
 [features]
 default = []
 fixture_replay = []
+
+[dev-dependencies]
+maos-domain = { path = "../maos-domain" }
+serde_json = "1.0"

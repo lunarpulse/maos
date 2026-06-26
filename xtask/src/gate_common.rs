@@ -12,7 +12,12 @@ use chrono::NaiveDate;
 /// #32 (was deferred): the prior copy only checked `contains('-') && len >= 10`,
 /// accepting impossible dates like `'2026-99-99'` and ignoring start<=end ordering.
 /// Now uses `chrono::NaiveDate::parse_from_str` for real ISO-8601 validation.
-pub fn validate_dates(start_label: &str, start: &str, end_label: &str, end: &str) -> Result<(), String> {
+pub fn validate_dates(
+    start_label: &str,
+    start: &str,
+    end_label: &str,
+    end: &str,
+) -> Result<(), String> {
     let parse = |label: &str, s: &str| -> Result<NaiveDate, String> {
         if s.is_empty() {
             return Err(format!("{label} is empty"));

@@ -387,7 +387,7 @@ impl TransparencyLogAdapter {
     pub fn open_with_policy_and_timeout(
         path: &Path,
         boot_nonce: u64,
- redaction: Box<dyn RedactionPolicy + Send + Sync>,
+        redaction: Box<dyn RedactionPolicy + Send + Sync>,
         busy_timeout_ms: u64,
     ) -> Result<Self, AuditError> {
         let conn = Connection::open(path)?;
@@ -1508,8 +1508,8 @@ impl TransparencyLogAdapter {
                     },
                 ),
             };
-            let payload_bytes =
-                serde_json::to_vec(&payload).map_err(|e| AuditError::Serialization(e.to_string()))?;
+            let payload_bytes = serde_json::to_vec(&payload)
+                .map_err(|e| AuditError::Serialization(e.to_string()))?;
             let redacted = self.redaction.redact(&payload_bytes);
             let frame_id_val = Self::next_frame_id(&mut inner);
             let timestamp_ns = wall_clock_now_ns();

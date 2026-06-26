@@ -11,8 +11,8 @@ FROM this file (D5, Story 9.5).
 |--------|--------|-------|
 | `en` (English) | **Default** — source locale | All content authored in English |
 | `ko` (Korean) | **active — full canonical coverage** | Machine-translated with locked-term enforcement. Full canonical coverage delivered by Story 10.3 (all 5 canonical doc deliverables + the generated ABI reference). Story 9.5 shipped the toolchain, the glossary lock, and a representative sample (journey-layer pages) with English fallback (see Page Coverage below) |
-| `ja` (Japanese) | **Deferred to v1.5** | Not stubbed; explicit deferral |
-| `zh-CN` (Chinese Simplified) | **Deferred to v1.5** | Not stubbed; explicit deferral |
+| `ja` (Japanese) | **Active (v1.5)** | Machine-translated with locked-term enforcement; Story 10.5 AC5 |
+| `zh-Hans` (Chinese Simplified) | **Active (v1.5)** | Machine-translated with locked-term enforcement; Story 10.5 AC5 |
 | RTL locales (ar, he, etc.) | **Deferred to v2.5** | Requires layout and component changes |
 
 ## Locked-Term Registry
@@ -83,6 +83,30 @@ break the domain model.
 | Worker | 노동자 (勞動者) | "Worker" is a Spirit role class, not a "laborer" |
 | kernel | 커널 | While 커널 is the standard Korean for "kernel", in MAOS docs it MUST remain as the English "kernel" to match code identifiers and error messages |
 <!-- END DENYLIST -->
+
+### Japanese (日本語) denylist
+
+These Japanese translations MUST NEVER appear in `i18n/ja/` strings.
+
+<!-- BEGIN DENYLIST JA -->
+| English Term | Bad Japanese | Why |
+|---|---|---|
+| Spirit | 精霊 / スピリット | "Spirit" is a proper noun in MAOS (an agent), not a supernatural entity |
+| Worker | ワーカー | "Worker" is a Spirit role class; must remain English to match code identifiers |
+| kernel | カーネル | "kernel" must remain English in MAOS docs to match code and error messages |
+<!-- END DENYLIST JA -->
+
+### Chinese Simplified (简体中文) denylist
+
+These Chinese translations MUST NEVER appear in `i18n/zh-Hans/` strings.
+
+<!-- BEGIN DENYLIST ZH-HANS -->
+| English Term | Bad Chinese | Why |
+|---|---|---|
+| Spirit | 精神 / 灵魂 | "Spirit" is a proper noun in MAOS (an agent), not a conceptual term |
+| Worker | 工人 / 工作者 | "Worker" is a Spirit role class; must remain English |
+| kernel | 内核 | "kernel" must remain English in MAOS docs to match code and error messages |
+<!-- END DENYLIST ZH-HANS -->
 
 ## Green ≠ Correct Korean
 

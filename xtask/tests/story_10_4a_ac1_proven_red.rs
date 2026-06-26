@@ -30,9 +30,7 @@ use std::time::{Duration, Instant};
 use maos_domain::memory::{
     CollectiveErrorKind, MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue,
 };
-use maos_domain::ports::{
-    CollectiveMemoryPort, CollectivePortError, MemoryManagerPort,
-};
+use maos_domain::ports::{CollectiveMemoryPort, CollectivePortError, MemoryManagerPort};
 use maos_kernel_core::api::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
     TransparencyLogAdapter,
@@ -40,7 +38,6 @@ use maos_kernel_core::api::{
 use maos_loom_lite::adapter::LoomLiteAdapter;
 use maos_loom_lite::store::{LoomLiteStore, StoreConfig};
 
-use parking_lot::Mutex;
 use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::crypto::CryptoProvider;
@@ -49,9 +46,12 @@ use maos_kernel_core::capability::cap_policy::{
     ManifestCapabilityScope, PolicyTable, PolicyTableInner,
 };
 use maos_kernel_core::capability::cap_tokens::Ed25519SigningKey;
-use maos_kernel_core::capability::{cap_audit, cap_quota, CapabilityRegistryAdapter, WorkingMemoryStore};
+use maos_kernel_core::capability::{
+    cap_audit, cap_quota, CapabilityRegistryAdapter, WorkingMemoryStore,
+};
 use maos_kernel_core::security::RingCryptoProvider;
 use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+use parking_lot::Mutex;
 
 // ═══════════════════════════════════════════════════════════════════════
 // Shared helpers
@@ -91,7 +91,11 @@ fn story_10_4a_ac1_nfr_test_9_grep_red() {
     // Inject a backing-store/orchestration symbol the gate is sworn to keep
     // out of kernel-core.  (The gate is a syn AST visitor, so the violation is
     // an identifier, not a comment.)
-    write_file(dir.path(), "src/leak.rs", "pub struct Planner { id: u32 }\n");
+    write_file(
+        dir.path(),
+        "src/leak.rs",
+        "pub struct Planner { id: u32 }\n",
+    );
 
     let blocklist = workspace_root().join("xtask/loom-blocklist.toml");
     let allowlist = workspace_root().join("xtask/loom-allowlist.toml");
@@ -155,8 +159,7 @@ fn story_10_4a_ac1_nfr_test_9_backing_store_red() {
         "RED: gate MUST fail when 'sqlx' leaks into kernel source"
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let report: serde_json::Value =
-        serde_json::from_str(&stdout).expect("gate emits JSON report");
+    let report: serde_json::Value = serde_json::from_str(&stdout).expect("gate emits JSON report");
     assert_eq!(report["passed"], false);
     let violations = report["violations"].as_array().expect("violations array");
     assert!(
@@ -249,8 +252,7 @@ fn story_10_4a_ac1_dependency_closure_red() {
     );
 
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let report: serde_json::Value =
-        serde_json::from_str(&stdout).expect("gate emits JSON report");
+    let report: serde_json::Value = serde_json::from_str(&stdout).expect("gate emits JSON report");
     assert_eq!(report["passed"], false);
     let violations = report["violations"].as_array().unwrap();
     assert!(
@@ -276,8 +278,7 @@ fn story_10_4a_ac1_dependency_closure_green() {
     );
 
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let report: serde_json::Value =
-        serde_json::from_str(&stdout).expect("gate emits JSON report");
+    let report: serde_json::Value = serde_json::from_str(&stdout).expect("gate emits JSON report");
     assert_eq!(report["passed"], true);
     assert_eq!(report["violations"], serde_json::Value::Array(vec![]));
 }
@@ -315,7 +316,9 @@ impl CollectiveMemoryPort for RecordingPort {
         key: &str,
         value: MemoryValue,
     ) -> Result<(), CollectivePortError> {
-        self.kv.lock().push((spirit_pid, namespace.clone(), key.to_string(), value));
+        self.kv
+            .lock()
+            .push((spirit_pid, namespace.clone(), key.to_string(), value));
         *self.write_count.lock() += 1;
         Ok(())
     }
@@ -420,7 +423,11 @@ fn story_10_4a_ac1_i9_zero_kernel_retention() {
     }
 
     // The backing store received every write.
-    assert_eq!(port.writes(), n, "mock must observe all {n} collective writes");
+    assert_eq!(
+        port.writes(),
+        n,
+        "mock must observe all {n} collective writes"
+    );
 
     // ── Zero retention in the kernel's own stores ───────────────────────
     // Private and Shared reads of the SAME keys return None: the kernel never
@@ -445,17 +452,34 @@ fn story_10_4a_ac1_i9_zero_kernel_retention() {
 
     // Scans of the kernel-local tiers return nothing for the collective keys.
     let private_scan = adapter
-        .scan(1, MemoryTier::Private, &MemoryNamespace::Default, "pattern-", 100)
+        .scan(
+            1,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "pattern-",
+            100,
+        )
         .unwrap();
     let shared_scan = adapter
-        .scan(1, MemoryTier::Shared, &MemoryNamespace::Default, "pattern-", 100)
+        .scan(
+            1,
+            MemoryTier::Shared,
+            &MemoryNamespace::Default,
+            "pattern-",
+            100,
+        )
         .unwrap();
     assert!(private_scan.is_empty(), "Private scan must be empty");
     assert!(shared_scan.is_empty(), "Shared scan must be empty");
 
     // ── The data lives ONLY behind the collective tier (round-trips via port) ──
     let read_back = adapter
-        .read(1, MemoryTier::Collective, &MemoryNamespace::Default, "pattern-0")
+        .read(
+            1,
+            MemoryTier::Collective,
+            &MemoryNamespace::Default,
+            "pattern-0",
+        )
         .unwrap();
     assert_eq!(
         read_back,
@@ -464,7 +488,13 @@ fn story_10_4a_ac1_i9_zero_kernel_retention() {
     );
 
     let collective_scan = adapter
-        .scan(1, MemoryTier::Collective, &MemoryNamespace::Default, "pattern-", 100)
+        .scan(
+            1,
+            MemoryTier::Collective,
+            &MemoryNamespace::Default,
+            "pattern-",
+            100,
+        )
         .unwrap();
     assert_eq!(
         collective_scan.len(),
@@ -537,11 +567,7 @@ fn story_10_4a_ac1_loom_down_typed_timeout() {
         })
         .expect("store pool creation must NOT connect eagerly");
 
-    let adapter = LoomLiteAdapter::new(
-        Arc::new(store),
-        handle,
-        Duration::from_millis(2500),
-    );
+    let adapter = LoomLiteAdapter::new(Arc::new(store), handle, Duration::from_millis(2500));
 
     let start = Instant::now();
     // Drive the SYNC trait method from spawn_blocking — the production edge.
@@ -600,7 +626,11 @@ fn rto_evidence_toml(rto_seconds: u64) -> String {
 #[test]
 fn story_10_4a_ac1_rto_drill_red() {
     let dir = tempfile::tempdir().unwrap();
-    write_file(dir.path(), "rto-evidence.toml", &rto_evidence_toml(5 * 3600));
+    write_file(
+        dir.path(),
+        "rto-evidence.toml",
+        &rto_evidence_toml(5 * 3600),
+    );
 
     let out = run_xtask(&[
         "check-rto-gate",
@@ -614,8 +644,7 @@ fn story_10_4a_ac1_rto_drill_red() {
         "RED: a 5 h drill MUST breach the 4 h RTO SLA"
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let report: serde_json::Value =
-        serde_json::from_str(&stdout).expect("gate emits JSON report");
+    let report: serde_json::Value = serde_json::from_str(&stdout).expect("gate emits JSON report");
     assert_eq!(report["passed"], false);
     assert_eq!(report["threshold_secs"], 14400);
     assert_eq!(report["latest_drill"]["rto_seconds"], 5 * 3600);
@@ -626,7 +655,11 @@ fn story_10_4a_ac1_rto_drill_red() {
 #[test]
 fn story_10_4a_ac1_rto_drill_green() {
     let within = tempfile::tempdir().unwrap();
-    write_file(within.path(), "rto-evidence.toml", &rto_evidence_toml(2 * 3600));
+    write_file(
+        within.path(),
+        "rto-evidence.toml",
+        &rto_evidence_toml(2 * 3600),
+    );
     let out = run_xtask(&[
         "check-rto-gate",
         "--json",
@@ -641,7 +674,11 @@ fn story_10_4a_ac1_rto_drill_green() {
 
     // Boundary: exactly 4 h (14400 s) is the inclusive ≤ edge → GREEN.
     let boundary = tempfile::tempdir().unwrap();
-    write_file(boundary.path(), "rto-evidence.toml", &rto_evidence_toml(4 * 3600));
+    write_file(
+        boundary.path(),
+        "rto-evidence.toml",
+        &rto_evidence_toml(4 * 3600),
+    );
     let out = run_xtask(&[
         "check-rto-gate",
         "--json",
@@ -698,9 +735,14 @@ fn build_tl(path: &std::path::Path, n: u8, tamper_idx: Option<u8>) {
                 fid.as_slice(),
                 1i64 + i as i64,
                 1i64,
-                "a", "b", 1i64,
+                "a",
+                "b",
+                1i64,
                 None::<&[u8]>,
-                0i64, "intent", b"p".as_ref(), 0i64,
+                0i64,
+                "intent",
+                b"p".as_ref(),
+                0i64,
             ],
         )
         .unwrap();
@@ -720,7 +762,10 @@ fn story_10_4a_ac1_weekly_backup_tamper_red() {
     let err = maos_audit::backup::verify_backup_integrity(&source, &backup)
         .expect_err("tampered backup MUST RED");
     assert!(
-        matches!(err, maos_audit::backup::BackupError::MerkleRootMismatch { .. }),
+        matches!(
+            err,
+            maos_audit::backup::BackupError::MerkleRootMismatch { .. }
+        ),
         "expected MerkleRootMismatch, got {err:?}"
     );
 }

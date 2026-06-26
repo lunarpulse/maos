@@ -1,0 +1,17 @@
+# Story 10.5 AC1 — NFR-Test-10 skill-format conformance results.
+#
+# This file is the journaled v1.5 release artifact for the skill-format
+# conformance gate (check-skill-conformance).  It records that at least one
+# third-party skill format (Anthropic Skills) was successfully loaded via a
+# Spirit-form adapter without kernel modification.
+
+[conformance]
+adapter_name = "anthropic_adapter"
+source_format = "anthropic-skills-yaml-frontmatter"
+target_format = "maos.skill.v1"
+executed_without_kernel_modification = true
+abi_unchanged = true
+fixture_path = "tests/fixtures/anthropic-skill/SKILL.md"
+conformance_date = "2026-06-25"
+source_url = "https://skills.pub/en/skills/anthropics-skills::example-skills::skill-creator::"
+execution_surface = "maos-kernel-core::lifecycle::cli_wrapper::runtime::spawn_and_bridge"

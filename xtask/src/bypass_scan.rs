@@ -35,9 +35,11 @@ pub fn run(json: bool) -> Result<(), String> {
     // Regex: wildcard match arm `_ =>` (with optional whitespace).
     let re_wildcard_arm = Regex::new(r"\b_\s*=>").expect("bypass-scan: bad regex");
     // Regex: `fn enforce_region` with word boundaries.
-    let re_enforce_region_def = Regex::new(r"\bfn\s+enforce_region\b").expect("bypass-scan: bad regex");
+    let re_enforce_region_def =
+        Regex::new(r"\bfn\s+enforce_region\b").expect("bypass-scan: bad regex");
     // Regex: call to `enforce_region(`.
-    let re_enforce_region_call = Regex::new(r"\benforce_region\s*\(").expect("bypass-scan: bad regex");
+    let re_enforce_region_call =
+        Regex::new(r"\benforce_region\s*\(").expect("bypass-scan: bad regex");
 
     // (1) Raw store writers/readers must never be bare `pub`.
     for (file, methods) in GUARDED_METHODS {
@@ -45,16 +47,17 @@ pub fn run(json: bool) -> Result<(), String> {
         let src = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         for method in *methods {
             // Build a regex for this specific method signature, e.g. `\bfn\s+write\s*\(`
-            let fn_name = method
-                .trim_start_matches("fn ")
-                .trim_end_matches('(');
+            let fn_name = method.trim_start_matches("fn ").trim_end_matches('(');
             let re_method = Regex::new(&format!(r"\bfn\s+{}\s*\(", regex::escape(fn_name)))
                 .expect("bypass-scan: bad method regex");
             let mut found = false;
             for (i, line) in src.lines().enumerate() {
                 // Skip comment lines entirely — doc comments may mention method names.
                 let trimmed = line.trim_start();
-                if trimmed.starts_with("//") || trimmed.starts_with('*') || trimmed.starts_with("/*") {
+                if trimmed.starts_with("//")
+                    || trimmed.starts_with('*')
+                    || trimmed.starts_with("/*")
+                {
                     continue;
                 }
                 if re_method.is_match(line) {
@@ -104,7 +107,8 @@ pub fn run(json: bool) -> Result<(), String> {
 
     // (3) The adapter write path must route through the chokepoint.
     let modrs_path = mem.join("mod.rs");
-    let modrs = fs::read_to_string(&modrs_path).map_err(|e| format!("{}: {e}", modrs_path.display()))?;
+    let modrs =
+        fs::read_to_string(&modrs_path).map_err(|e| format!("{}: {e}", modrs_path.display()))?;
     if !re_enforce_region_call.is_match(&modrs) {
         violations.push(
             "memory/mod.rs: the store write path does not call \
@@ -138,6 +142,9 @@ pub fn run(json: bool) -> Result<(), String> {
     if passed {
         Ok(())
     } else {
-        Err(format!("bypass-scan failed: {} violation(s)", violations.len()))
+        Err(format!(
+            "bypass-scan failed: {} violation(s)",
+            violations.len()
+        ))
     }
 }

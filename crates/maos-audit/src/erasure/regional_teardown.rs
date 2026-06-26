@@ -113,7 +113,10 @@ pub struct KeyDecommissionAttestation {
 /// Derive the phase-(b) attestation: which region signing key is being revoked.
 /// Pure — names the region-derived pubkey (from [`derive_region_pubkey`]) so a
 /// verifier can bind the receipt to the exact decommissioned key.
-pub fn decommission_region_key(base_seed: &[u8; 32], region: &Region) -> KeyDecommissionAttestation {
+pub fn decommission_region_key(
+    base_seed: &[u8; 32],
+    region: &Region,
+) -> KeyDecommissionAttestation {
     KeyDecommissionAttestation {
         decommissioned_region_pubkey: hex::encode(derive_region_pubkey(base_seed, region)),
         method: KEY_DECOMMISSION_METHOD.to_string(),
@@ -149,7 +152,9 @@ struct ReceiptForSigning<'a> {
 #[derive(Debug, thiserror::Error)]
 pub enum RegionalTeardownError {
     /// AC-14 fail-closed: a phase did not complete, so no success is reported.
-    #[error("regional teardown incomplete — phase '{phase}' did not complete; fail-closed (AC-14)")]
+    #[error(
+        "regional teardown incomplete — phase '{phase}' did not complete; fail-closed (AC-14)"
+    )]
     IncompletePhase { phase: String },
     #[error("unknown store name(s) in forget-cascade attestation: {names:?}")]
     UnknownStoreName { names: Vec<String> },
@@ -299,7 +304,12 @@ mod tests {
     #[test]
     fn from_outcome_rejects_unknown_store_names() {
         let err = ForgetCascadeAttestation::from_outcome(
-            vec!["private".into(), "principal_index".into(), "shared".into(), "bogus".into()],
+            vec![
+                "private".into(),
+                "principal_index".into(),
+                "shared".into(),
+                "bogus".into(),
+            ],
             3,
         )
         .unwrap_err();
@@ -327,8 +337,9 @@ mod tests {
         let home = [7u8; 32];
         let mut key = decommission_region_key(&[9u8; 32], &region("eu"));
         key.completed = false; // phase (b) did not complete
-        let err = build_regional_teardown_receipt(&home, &region("eu"), 100, complete_cascade(), key)
-            .unwrap_err();
+        let err =
+            build_regional_teardown_receipt(&home, &region("eu"), 100, complete_cascade(), key)
+                .unwrap_err();
         assert!(matches!(
             err,
             RegionalTeardownError::IncompletePhase { ref phase } if phase == "key_decommission"

@@ -53,8 +53,8 @@ pub mod crypto; // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 
 
 pub use a2a::A2ARouter; // NEW — Story 6.3
 pub use capability::CapabilityRegistryPort;
-pub use crypto::{CryptoError, CryptoProvider};
 pub use collective_memory::{CollectiveMemoryPort, CollectivePortError}; // NEW — Story 10.4a
+pub use crypto::{CryptoError, CryptoProvider};
 pub use distillation::DistillationPort; // NEW — Story 4.4
 pub use epistemic_scalar::{EpistemicScalarPort, ScalarPortError}; // NEW — Story 8.10 AC1
 pub use hot_swap::HotSwapPort; // NEW — ADR-041 Phase-4 extraction prep

@@ -131,12 +131,12 @@ fn run_j4_kernel(config: &J4Config) -> Result<JourneyResult, BenchError> {
 
     use maos_domain::invariants::i7::TelemetryTopic;
     use maos_domain::ports::crypto::CryptoProvider;
+    use maos_domain::ports::TelemetryStreamPort;
     use maos_kernel_core::capability::{
         cap_audit, cap_policy::PolicyTable, cap_quota::CapQuotaTracker,
         cap_tokens::Ed25519SigningKey, CapabilityRegistryAdapter, WorkingMemoryStore,
     };
     use maos_kernel_core::telemetry::TelemetryStreamAdapter;
-    use maos_domain::ports::TelemetryStreamPort;
 
     // D2: pinned tokio worker count for reproducibility.
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -148,8 +148,7 @@ fn run_j4_kernel(config: &J4Config) -> Result<JourneyResult, BenchError> {
     rt.block_on(async {
         // ── Kernel substrate (verified template: scalar_tap_subscriber.rs:24-77) ──
         let telemetry = Arc::new(TelemetryStreamAdapter::new(2048));
-        let crypto: Arc<dyn CryptoProvider> =
-            Arc::new(maos_kernel_core::api::RingCryptoProvider);
+        let crypto: Arc<dyn CryptoProvider> = Arc::new(maos_kernel_core::api::RingCryptoProvider);
         let signing_key = Ed25519SigningKey::new([0u8; 32]);
         let policy = Arc::new(PolicyTable::new());
         let (audit_tx, _audit_rx) = cap_audit::channel();
@@ -173,7 +172,10 @@ fn run_j4_kernel(config: &J4Config) -> Result<JourneyResult, BenchError> {
         let tag = "bench";
         let topic = TelemetryTopic::new(&format!("scalar.tap.{tag}"));
         let is_new = telemetry.subscribe_topic("j4-observer", &topic);
-        assert!(is_new, "subscribe_topic must return true on first subscribe");
+        assert!(
+            is_new,
+            "subscribe_topic must return true on first subscribe"
+        );
 
         let mut rx = telemetry
             .subscribe(&topic)
@@ -181,10 +183,8 @@ fn run_j4_kernel(config: &J4Config) -> Result<JourneyResult, BenchError> {
 
         // ── Serial measurement loop ──
         let total = config.invocation_count + config.warmup_count;
-        let mut latency_samples =
-            Vec::with_capacity(config.invocation_count as usize);
-        let mut emit_cost_samples =
-            Vec::with_capacity(config.invocation_count as usize);
+        let mut latency_samples = Vec::with_capacity(config.invocation_count as usize);
+        let mut emit_cost_samples = Vec::with_capacity(config.invocation_count as usize);
         let mut samples_received: u64 = 0;
 
         for i in 0..total {
@@ -249,7 +249,9 @@ fn run_j4_kernel(config: &J4Config) -> Result<JourneyResult, BenchError> {
             let mut sorted_emit = emit_cost_samples;
             sorted_emit.sort_unstable();
             let n = sorted_emit.len();
-            let emit_p95_idx = ((n as f64 * 0.95).ceil() as usize).saturating_sub(1).min(n - 1);
+            let emit_p95_idx = ((n as f64 * 0.95).ceil() as usize)
+                .saturating_sub(1)
+                .min(n - 1);
             let emit_p95 = sorted_emit[emit_p95_idx];
             let emit_mean: u64 = sorted_emit.iter().sum::<u64>() / n as u64;
             eprintln!(

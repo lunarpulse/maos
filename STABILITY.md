@@ -24,7 +24,7 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 | `abi_version` | `1` |
 | `manifest_schema_version` (current) | `3` |
 | supported schema window | `1..=3` |
-| workspace crates | `45` |
+| workspace crates | `46` |
 
 | Manifest schema | Kernel behavior |
 |---|---|
@@ -52,10 +52,9 @@ surface MUST appear as a row below AND carry a dated entry in `BREAKING.md`; CI
 
 ## LTS Policy
 
-MAOS v1.0 carries a **1-year LTS commitment** (NFR-Maint-6): the v1.0 line
-receives **security-only patches for 1 year** from the LTS clock-start below. The
-2-year LTS term is **deferred to v1.5** — v1.0 publishes the term "the v0.8 team
-can cash," not an over-promised window.
+MAOS v1.5 carries a **2-year LTS commitment** (NFR-Maint-6): the v1.0 line
+receives **security-only patches for 2 years** from the LTS clock-start below.
+The 2-year term takes effect at v1.5, extending the original v1.0 1-year window.
 
 <!-- lts-clock-start: filled by `stability-matrix` IFF a `1.0.0`/`v1.0.0` git tag exists (Epic 10 cuts the tag); placeholder until then — do NOT fabricate a SHA/tag. -->
 - **LTS clock-start:** pending — the `1.0.0` tag is cut in Epic 10 (`epic-10-v10-ship-gate`); this fills automatically when the tag exists.

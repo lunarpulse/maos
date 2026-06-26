@@ -20,8 +20,7 @@ pub use manifest::{
     HaltProtocolCompatibilitySection, HotSwapManifestSection, LifecycleSection, ManifestError,
     McpCapabilities, McpCapabilityServerEntry, McpSection, McpServerEntry, MigratesFromSection,
     ModelProvenanceSection, OnCrashSection, OnInboundHook, OnRevocationSection, OutputShape,
-    OutputShapePredicate,
-    OutputShapeViolation, Posture, PostureSection, ProviderCapabilities, ProviderConfig,
-    ProvidersSection, ResolvedCaps, ResourceCaps, SandboxConfig, ScalarPredicate, ScheduleEntry,
-    SchedulesSection, SchedulingSection, SupervisionSection,
+    OutputShapePredicate, OutputShapeViolation, Posture, PostureSection, ProviderCapabilities,
+    ProviderConfig, ProvidersSection, ResolvedCaps, ResourceCaps, SandboxConfig, ScalarPredicate,
+    ScheduleEntry, SchedulesSection, SchedulingSection, SupervisionSection,
 };

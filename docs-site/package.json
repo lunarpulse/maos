@@ -15,10 +15,14 @@
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc",
     "gate:routes": "node scripts/gate-routes.js",
-    "gate:glossary-lock": "node scripts/gate-glossary-lock.js",
+    "gate:glossary-lock": "LOCALE=ko node scripts/gate-glossary-lock.js",
+    "gate:ja-glossary-lock": "LOCALE=ja node scripts/gate-glossary-lock.js",
+    "gate:zh-glossary-lock": "LOCALE=zh-Hans node scripts/gate-glossary-lock.js",
     "gate:troubleshoot": "node scripts/gate-troubleshoot-bidi.js",
     "gate:anchor-ids": "node scripts/gate-anchor-ids.js",
-    "gate:ko-coverage": "node scripts/gate-ko-coverage.js",
+    "gate:ko-coverage": "LOCALE=ko node scripts/gate-ko-coverage.js",
+    "gate:ja-coverage": "LOCALE=ja node scripts/gate-ko-coverage.js",
+    "gate:zh-coverage": "LOCALE=zh-Hans node scripts/gate-ko-coverage.js",
     "gate:links": "playwright test tests/playwright/links.spec.ts --project=behavioral",
     "gate:fallback": "playwright test tests/playwright/fallback.spec.ts --project=behavioral",
     "gate:switcher": "playwright test tests/playwright/switcher.spec.ts --project=behavioral",
@@ -28,8 +32,9 @@
     "gate:a11y": "node scripts/gate-a11y.js",
     "gate:behavioral": "playwright test --project=behavioral --project=a11y",
     "gate:static": "npm run gate:routes && npm run gate:troubleshoot && npm run gate:glossary-lock && npm run gate:anchor-ids",
+    "gate:locale-v15": "JA_COVERAGE_MIN=100 npm run gate:ja-coverage && npm run gate:ja-glossary-lock && ZHHANS_COVERAGE_MIN=100 npm run gate:zh-coverage && npm run gate:zh-glossary-lock",
     "gate:proven-red": "node scripts/proven-red.js && playwright test --project=proven-red",
-    "gate:all": "npm run build && npm run gate:static && npm run gate:behavioral && npm run gate:proven-red"
+    "gate:all": "npm run build && npm run gate:static && npm run gate:locale-v15 && npm run gate:behavioral && npm run gate:proven-red"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.1",

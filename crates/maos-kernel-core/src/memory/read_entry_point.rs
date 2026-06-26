@@ -76,7 +76,7 @@ pub fn enforce_region(entry: &ReadEntryPoint, home: Option<&Region>) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::memory::{PrivateMemoryStore, SharedMemoryStore, PrincipalNamespaceIndex};
+    use crate::memory::{PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore};
 
     /// R1-COND proof: the `ReadEntryPoint` enum is exhaustive (no wildcard),
     /// and every variant is handled with an explicit region-provenance decision.
@@ -199,8 +199,10 @@ mod tests {
             u32,
             &maos_domain::memory::MemoryNamespace,
             &str,
-        ) -> Result<Option<maos_domain::memory::MemoryValue>, maos_domain::memory::MemoryError> =
-            PrivateMemoryStore::read;
+        ) -> Result<
+            Option<maos_domain::memory::MemoryValue>,
+            maos_domain::memory::MemoryError,
+        > = PrivateMemoryStore::read;
 
         let _: fn(
             &PrivateMemoryStore,
@@ -208,8 +210,10 @@ mod tests {
             &maos_domain::memory::MemoryNamespace,
             &str,
             usize,
-        ) -> Result<Vec<maos_domain::memory::MemoryEntry>, maos_domain::memory::MemoryError> =
-            PrivateMemoryStore::scan;
+        ) -> Result<
+            Vec<maos_domain::memory::MemoryEntry>,
+            maos_domain::memory::MemoryError,
+        > = PrivateMemoryStore::scan;
 
         // SharedMemoryStore read methods
         let _: fn(
@@ -217,8 +221,10 @@ mod tests {
             u32,
             &maos_domain::memory::MemoryNamespace,
             &str,
-        ) -> Result<Option<maos_domain::memory::MemoryValue>, maos_domain::memory::MemoryError> =
-            SharedMemoryStore::read;
+        ) -> Result<
+            Option<maos_domain::memory::MemoryValue>,
+            maos_domain::memory::MemoryError,
+        > = SharedMemoryStore::read;
 
         let _: fn(
             &SharedMemoryStore,
@@ -226,15 +232,18 @@ mod tests {
             &maos_domain::memory::MemoryNamespace,
             &str,
             usize,
-        ) -> Result<Vec<maos_domain::memory::MemoryEntry>, maos_domain::memory::MemoryError> =
-            SharedMemoryStore::scan;
+        ) -> Result<
+            Vec<maos_domain::memory::MemoryEntry>,
+            maos_domain::memory::MemoryError,
+        > = SharedMemoryStore::scan;
 
         // PrincipalNamespaceIndex lookup method
         let _: fn(
             &PrincipalNamespaceIndex,
             &str,
-        )
-            -> Result<Vec<maos_domain::memory::PrincipalIndexRow>, maos_domain::memory::MemoryError> =
-            PrincipalNamespaceIndex::lookup;
+        ) -> Result<
+            Vec<maos_domain::memory::PrincipalIndexRow>,
+            maos_domain::memory::MemoryError,
+        > = PrincipalNamespaceIndex::lookup;
     }
 }

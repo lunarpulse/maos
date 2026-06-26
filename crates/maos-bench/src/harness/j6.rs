@@ -146,7 +146,10 @@ mod tests {
         // Without: smoke samples (p95 > 0).
         #[cfg(feature = "kernel_measurement")]
         {
-            assert!(r.not_measured, "J6 must be NOT MEASURED with kernel_measurement ON");
+            assert!(
+                r.not_measured,
+                "J6 must be NOT MEASURED with kernel_measurement ON"
+            );
             assert_eq!(r.p95_us, 0);
         }
         #[cfg(not(feature = "kernel_measurement"))]

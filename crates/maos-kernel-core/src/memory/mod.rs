@@ -15,10 +15,10 @@
 pub mod for_spirit;
 pub mod principal;
 pub mod private;
+pub mod read_entry_point;
 pub mod self_telemetry;
 pub mod shared;
-pub mod write_entry_point; // Story 9.4b AC-5/AC-9 — region-enforcement chokepoint
-pub mod read_entry_point; // Story 9.4b R1-COND / AC-9 — region-enforcement chokepoint (read side)
+pub mod write_entry_point; // Story 9.4b AC-5/AC-9 — region-enforcement chokepoint // Story 9.4b R1-COND / AC-9 — region-enforcement chokepoint (read side)
 
 pub use maos_domain::ports::MemoryManagerPort;
 
@@ -191,12 +191,8 @@ impl MemoryManagerAdapter {
             maos_domain::ports::CollectivePortError::Unreachable { .. } => {
                 CollectiveErrorKind::Unreachable
             }
-            maos_domain::ports::CollectivePortError::Timeout { .. } => {
-                CollectiveErrorKind::Timeout
-            }
-            maos_domain::ports::CollectivePortError::Transport(_) => {
-                CollectiveErrorKind::Transport
-            }
+            maos_domain::ports::CollectivePortError::Timeout { .. } => CollectiveErrorKind::Timeout,
+            maos_domain::ports::CollectivePortError::Transport(_) => CollectiveErrorKind::Transport,
             maos_domain::ports::CollectivePortError::Memory(_) => CollectiveErrorKind::Other,
         };
         MemoryError::Collective {
@@ -222,12 +218,13 @@ impl MemoryManagerAdapter {
         sandbox: maos_domain::invariants::i9::SandboxTier,
     ) -> Result<(), MemoryError> {
         Self::reject_principal_collective(namespace)?;
-        let caps = self.capabilities.as_ref().ok_or_else(|| {
-            MemoryError::CollectiveNotYetAvailable {
-                ship_target: "v1.5",
-                landing_story: "E10 Story 10.4",
-            }
-        })?;
+        let caps =
+            self.capabilities
+                .as_ref()
+                .ok_or_else(|| MemoryError::CollectiveNotYetAvailable {
+                    ship_target: "v1.5",
+                    landing_story: "E10 Story 10.4",
+                })?;
         let port = self.collective_port.as_ref().ok_or_else(|| {
             MemoryError::CollectiveNotYetAvailable {
                 ship_target: "v1.5",
@@ -284,12 +281,13 @@ impl MemoryManagerAdapter {
         sandbox: maos_domain::invariants::i9::SandboxTier,
     ) -> Result<Option<MemoryValue>, MemoryError> {
         Self::reject_principal_collective(namespace)?;
-        let caps = self.capabilities.as_ref().ok_or_else(|| {
-            MemoryError::CollectiveNotYetAvailable {
-                ship_target: "v1.5",
-                landing_story: "E10 Story 10.4",
-            }
-        })?;
+        let caps =
+            self.capabilities
+                .as_ref()
+                .ok_or_else(|| MemoryError::CollectiveNotYetAvailable {
+                    ship_target: "v1.5",
+                    landing_story: "E10 Story 10.4",
+                })?;
         let port = self.collective_port.as_ref().ok_or_else(|| {
             MemoryError::CollectiveNotYetAvailable {
                 ship_target: "v1.5",
@@ -327,12 +325,13 @@ impl MemoryManagerAdapter {
         sandbox: maos_domain::invariants::i9::SandboxTier,
     ) -> Result<Vec<MemoryEntry>, MemoryError> {
         Self::reject_principal_collective(namespace)?;
-        let caps = self.capabilities.as_ref().ok_or_else(|| {
-            MemoryError::CollectiveNotYetAvailable {
-                ship_target: "v1.5",
-                landing_story: "E10 Story 10.4",
-            }
-        })?;
+        let caps =
+            self.capabilities
+                .as_ref()
+                .ok_or_else(|| MemoryError::CollectiveNotYetAvailable {
+                    ship_target: "v1.5",
+                    landing_story: "E10 Story 10.4",
+                })?;
         let port = self.collective_port.as_ref().ok_or_else(|| {
             MemoryError::CollectiveNotYetAvailable {
                 ship_target: "v1.5",
@@ -691,7 +690,8 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         // authorization when enforcement is enabled.
         if let MemoryNamespace::Principal { .. } = namespace {
             if let Some(ref lock) = self.principal_write_enforcement {
-                let authorized = lock.read()
+                let authorized = lock
+                    .read()
                     .expect("principal_write_enforcement RwLock poisoned");
                 if !authorized.contains(&spirit_pid) {
                     return Err(MemoryError::PrincipalWriteUnauthorized { spirit_pid });
@@ -730,10 +730,11 @@ impl MemoryManagerPort for MemoryManagerAdapter {
                 if self.capabilities.is_some() {
                     return Err(MemoryError::Collective {
                         kind: CollectiveErrorKind::CapabilityDenied,
-                        reason: "unmediated collective write via the trait path denied while I1/I2 \
+                        reason:
+                            "unmediated collective write via the trait path denied while I1/I2 \
                                  capability mediation is wired; use the cap-gated collective_write \
                                  (carries the LoomWrite token + posture)"
-                            .into(),
+                                .into(),
                     });
                 }
                 match &self.collective_port {

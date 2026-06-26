@@ -237,10 +237,7 @@ async fn gate_otel_spans_three_kinds_correct_linkage() {
     // Linkage edge 1: capability.parent_span_id == iac_frame.span_id
     // AND shared trace_id.
     let frame_span = spans.iter().find(|s| s.name == "maos.iac_frame").unwrap();
-    let cap_span = spans
-        .iter()
-        .find(|s| s.name == "maos.capability")
-        .unwrap();
+    let cap_span = spans.iter().find(|s| s.name == "maos.capability").unwrap();
     let halt_span = spans.iter().find(|s| s.name == "maos.halt").unwrap();
 
     assert_eq!(
@@ -302,10 +299,7 @@ async fn gate_otel_spans_proven_red_flat_siblings_fail() {
 
     let spans = finished_spans(&exporter, &probe, 2).await;
     let frame_span = spans.iter().find(|s| s.name == "maos.iac_frame").unwrap();
-    let cap_span = spans
-        .iter()
-        .find(|s| s.name == "maos.capability")
-        .unwrap();
+    let cap_span = spans.iter().find(|s| s.name == "maos.capability").unwrap();
 
     // PROVEN-RED: capability is NOT a child of frame when given EMPTY parent.
     assert_ne!(
@@ -403,7 +397,10 @@ async fn gate_otel_attr_contract_proven_red_subject_id_rejected() {
     drop(guard);
 
     let spans = finished_spans(&exporter, &probe, 1).await;
-    let frame_span = spans.iter().find(|span| span.name == "maos.iac_frame").unwrap();
+    let frame_span = spans
+        .iter()
+        .find(|span| span.name == "maos.iac_frame")
+        .unwrap();
     let mut keys = emitted_keys(frame_span);
     keys.push("subject_id");
     let err = assert_keys_within_allowlist("maos.iac_frame", &keys)
@@ -678,10 +675,7 @@ async fn gate_otel_slo_class_correlates_with_iac_histogram() {
 
     let spans = finished_spans(&exporter, &probe, 3).await;
     let frame_span = spans.iter().find(|s| s.name == "maos.iac_frame").unwrap();
-    let cap_span = spans
-        .iter()
-        .find(|s| s.name == "maos.capability")
-        .unwrap();
+    let cap_span = spans.iter().find(|s| s.name == "maos.capability").unwrap();
 
     assert_eq!(
         cap_span.span_context.trace_id(),
@@ -689,7 +683,9 @@ async fn gate_otel_slo_class_correlates_with_iac_histogram() {
         "SLO-class trace path must correlate capability work to the IAC frame"
     );
     assert!(
-        spans.iter().all(|span| !span.name.as_ref().contains("metric")),
+        spans
+            .iter()
+            .all(|span| !span.name.as_ref().contains("metric")),
         "trace tier must not invent a new metric family"
     );
 }
@@ -737,8 +733,7 @@ async fn gate_otel_schema_ssot_matches_emitted() {
             .find(|e| e.span_name == span.name.as_ref())
             .unwrap_or_else(|| panic!("span '{}' has no SSOT entry", span.name));
 
-        let emitted_keys: Vec<&str> =
-            span.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        let emitted_keys: Vec<&str> = span.attributes.iter().map(|kv| kv.key.as_str()).collect();
 
         for required_key in schema_entry.required_attrs {
             assert!(
@@ -768,11 +763,8 @@ fn gate_otel_schema_ssot_proven_red_unknown_span() {
 #[tokio::test]
 async fn gate_otel_degradation_hot_path_completes() {
     let exporter = InMemorySpanExporter::default();
-    let (sink, probe) = OtelTraceSink::with_bounded_channel(
-        exporter,
-        OtelTraceSinkConfig::default(),
-        2,
-    );
+    let (sink, probe) =
+        OtelTraceSink::with_bounded_channel(exporter, OtelTraceSinkConfig::default(), 2);
     probe.pause_consumer();
 
     for i in 0..2u8 {
@@ -806,22 +798,27 @@ async fn gate_otel_degradation_hot_path_completes() {
     }
 
     assert_eq!(probe.queued_spans(), 2, "queue must saturate at capacity");
-    assert_eq!(probe.drop_count(), 3, "overflow spans must be counted as dropped");
+    assert_eq!(
+        probe.drop_count(),
+        3,
+        "overflow spans must be counted as dropped"
+    );
 
     probe.resume_consumer();
     probe.wait_until_exported(2).await;
-    assert_eq!(probe.drop_count(), 3, "drain must not change prior drop accounting");
+    assert_eq!(
+        probe.drop_count(),
+        3,
+        "drain must not change prior drop accounting"
+    );
 }
 
 /// gate:otel-degradation — PROVEN-RED: overflow increments the drop counter.
 #[tokio::test]
 async fn gate_otel_degradation_proven_red_drop_counter() {
     let exporter = InMemorySpanExporter::default();
-    let (sink, probe) = OtelTraceSink::with_bounded_channel(
-        exporter,
-        OtelTraceSinkConfig::default(),
-        1,
-    );
+    let (sink, probe) =
+        OtelTraceSink::with_bounded_channel(exporter, OtelTraceSinkConfig::default(), 1);
     probe.pause_consumer();
 
     let first = sink.iac_frame_span(IacFrameSpanAttrs {
@@ -838,8 +835,16 @@ async fn gate_otel_degradation_proven_red_drop_counter() {
     });
     drop(second);
 
-    assert_eq!(probe.queued_spans(), 1, "first span should occupy the only slot");
-    assert_eq!(probe.drop_count(), 1, "second span must trip the proven-red overflow path");
+    assert_eq!(
+        probe.queued_spans(),
+        1,
+        "first span should occupy the only slot"
+    );
+    assert_eq!(
+        probe.drop_count(),
+        1,
+        "second span must trip the proven-red overflow path"
+    );
 
     probe.resume_consumer();
 }

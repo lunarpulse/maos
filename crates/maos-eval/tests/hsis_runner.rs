@@ -244,8 +244,10 @@ fn hsis_corpus_load_errors_on_missing_class_dir() {
 fn hsis_corpus_sha256_pin() {
     use sha2::{Digest, Sha256};
 
-    let corpus_path =
-        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/hsis-corpus-v0"));
+    let corpus_path = std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/fixtures/hsis-corpus-v0"
+    ));
 
     // Collect all scenario JSON files in sorted order.
     let classes = [
@@ -259,7 +261,11 @@ fn hsis_corpus_sha256_pin() {
     let mut files: Vec<std::path::PathBuf> = Vec::new();
     for class in &classes {
         let class_dir = corpus_path.join(class);
-        assert!(class_dir.is_dir(), "HSIS class directory missing: {class} (expected at {})", class_dir.display());
+        assert!(
+            class_dir.is_dir(),
+            "HSIS class directory missing: {class} (expected at {})",
+            class_dir.display()
+        );
         for entry in std::fs::read_dir(&class_dir).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
@@ -282,7 +288,11 @@ fn hsis_corpus_sha256_pin() {
         let content = std::fs::read(file).unwrap();
         hasher.update(&content);
     }
-    let computed: String = hasher.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    let computed: String = hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
 
     const EXPECTED: &str = "51a0f04f9679276c04edda8c087983148da45d9f79630f9324c0a0fcecebf93a";
     assert_eq!(

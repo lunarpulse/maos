@@ -167,6 +167,9 @@ mod tests {
         j6.not_measured = false; // now a real (breached) measurement
         j6.budget_met = false;
         let d = decide(&j1, &j4, Some(&j6));
-        assert!(!d.j6_p95_met, "a measured-but-breached J6 must read j6_p95_met=false");
+        assert!(
+            !d.j6_p95_met,
+            "a measured-but-breached J6 must read j6_p95_met=false"
+        );
     }
 }
