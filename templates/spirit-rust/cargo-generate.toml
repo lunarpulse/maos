@@ -2,12 +2,11 @@
 cargo_generate_version = ">=0.18.0"
 ignore = []
 
+# NOTE: `crate_name` / `project-name` are RESERVED built-ins in cargo-generate >=0.19
+# (fed by `--name`); declaring them as [placeholders] aborts generation on 0.23+.
+# Do not re-add a `crate_name` placeholder here.
 [placeholders]
-crate_name = { type = "string", prompt = "Spirit crate name (kebab-case, e.g., 'my-spirit')", regex = "^[a-z][a-z0-9-]+$" }
 class_name = { type = "string", prompt = "Spirit struct name (PascalCase, e.g., 'MySpirit')", regex = "^[A-Z][a-zA-Z0-9]+$" }
-
-[hooks]
-post = ["post-generate.rhai"]
 
 [template.scripts]
 post-generate = '''

@@ -356,16 +356,22 @@ dev_model_used: claude-opus-4-7
 ## Deferred from: CI remediation 2026-06-11 (first Epic-8 CI validation, round 3)
 
 ### NEW STORY NEEDED — spirit-authoring template suite repair (templates/spirit-{rust,ts})
+> **GENERATION-ABORT HALF CLOSED 2026-06-26 (Epic 10 retro §A4) — VERIFIED.** Both
+> `templates/spirit-{rust,ts}` now generate clean on cargo-generate **0.23.11**
+> (`cargo generate --path templates/spirit-rust --name test-spirit --define class_name=MySpirit --silent`
+> → Done; spirit-ts produces a valid `"name": "@local/test-spirit-ts"`). Fixes applied:
+> dropped the reserved `crate_name` placeholder (both), removed the dead `[hooks]
+> post-generate.rhai` reference (both), and — found by actually running it, beyond the
+> notes below — fixed ts `package_name` (0.23 does NOT interpolate `default` values and
+> regex-validates them as literals; dropped the placeholder, `package.json` now uses the
+> built-in `{{project-name}}` directly). REMAINING (do NOT flip `smoke-spirit-author-7-1`
+> to blocking until closed): the TS npm-publication blocker below. Once that lands, run the
+> smoke green and graduate the gate.
 The author-side scaffolding has bit-rotted since Story 7.1 and was never CI-validated
 (main had no CI run from the 7.1.5 freeze through Epic 8). `smoke-spirit-author-7-1` is
 now ADVISORY (continue-on-error in discipline.yml) until a dedicated story closes:
-- **cargo-generate 0.23 compat**: both `templates/spirit-{rust,ts}/cargo-generate.toml`
-  declare a `[placeholders] crate_name` that newer cargo-generate RESERVES → generation
-  aborts ("you can't override `project-name`/`crate_name`/..."). Drop the placeholder;
-  use the built-in `crate_name`/`project-name` (fed by `--name`).
-- **Missing hook file**: both tomls reference `[hooks] post = ["post-generate.rhai"]` but
-  no `.rhai` exists. Either add the hook files or remove the `[hooks]` block (the inline
-  `[template.scripts] post-generate` already prints the next-step guidance).
+- ~~**cargo-generate 0.23 compat**: reserved `crate_name` placeholder aborts generation.~~ FIXED+VERIFIED 2026-06-26 (§A4).
+- ~~**Missing hook file**: dangling `[hooks] post = ["post-generate.rhai"]`.~~ FIXED 2026-06-26 (§A4, `[hooks]` block removed; inline `[template.scripts]` retained).
 - **TS template npm path blocked on SDK publication**: `templates/spirit-ts/package.json`
   declares `@maos/spirit-ts: "^0.5.0"` (unpublished) and the scaffolded output runs
   `npm ci` (needs a lockfile). A scaffold-local `file:` path + `npm install` would fix the

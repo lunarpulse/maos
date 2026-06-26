@@ -2393,7 +2393,7 @@ jobs:
   # Story 10.5 AC3 — Windows binary + sandbox compile and install verification.
   windows-check:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2402,8 +2402,20 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Check Windows kernel sandbox and CLI crates
-        run: cargo check -p maos-kernel-core -p maos-cli
+      # R1/AC3: a REAL build on Windows, not just `cargo check`. This is the only
+      # place the kernel's unsafe Windows sandbox FFI actually compiles for its
+      # target (the dev host cannot cross-build it — ring/libsqlite3-sys need a
+      # Windows C toolchain).
+      - name: Build Windows kernel-core + CLI (real compile)
+        run: cargo build -p maos-kernel-core -p maos-cli
+      # R4: execute the unsafe FFI spawn path at runtime (was compile-only).
+      - name: Run Windows sandbox enforcement tests
+        run: cargo test -p maos-kernel-core --test sandbox_enforcement_windows -- --nocapture
+      # R5: the JetBrains/ACP bridge tests were wired into NO CI job. Run them here.
+      - name: Run ACP JetBrains bridge test
+        run: cargo test -p maos-acp --test jetbrains_bridge_test
+      - name: Run JetBrains ACP server e2e
+        run: cargo test -p maos-bin --test jetbrains_acp_server
       - name: Verify Windows local release signature path
         run: cargo test -p maos-cli install_verify_local_release_artifact -- --exact
 

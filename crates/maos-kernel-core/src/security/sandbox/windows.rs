@@ -25,10 +25,10 @@ use windows::Win32::Foundation::{
     CloseHandle, BOOL, HANDLE, STILL_ACTIVE, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Security::{
-    CreateRestrictedToken, CreateWellKnownSid, OpenProcessToken, SetTokenInformation,
-    SidAndAttributesHash, TokenIntegrityLevel, WinLowLabelSid, DISABLE_MAX_PRIVILEGE, PSID,
-    SID_AND_ATTRIBUTES, TOKEN_ADJUST_DEFAULT, TOKEN_ADJUST_SESSIONID, TOKEN_ASSIGN_PRIMARY,
-    TOKEN_DUPLICATE, TOKEN_MANDATORY_LABEL, TOKEN_QUERY,
+    CreateRestrictedToken, CreateWellKnownSid, SetTokenInformation, TokenIntegrityLevel,
+    WinLowLabelSid, DISABLE_MAX_PRIVILEGE, PSID, SID_AND_ATTRIBUTES, TOKEN_ADJUST_DEFAULT,
+    TOKEN_ADJUST_SESSIONID, TOKEN_ASSIGN_PRIMARY, TOKEN_DUPLICATE, TOKEN_MANDATORY_LABEL,
+    TOKEN_QUERY,
 };
 use windows::Win32::System::JobObjects::{
     JobObjectCpuRateControlInformation, SetInformationJobObject,
@@ -36,8 +36,8 @@ use windows::Win32::System::JobObjects::{
     JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP,
 };
 use windows::Win32::System::Threading::{
-    CreateProcessAsUserW, GetCurrentProcess, GetExitCodeProcess, ResumeThread, TerminateProcess,
-    WaitForSingleObject, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOW,
+    CreateProcessAsUserW, GetCurrentProcess, GetExitCodeProcess, OpenProcessToken, ResumeThread,
+    TerminateProcess, WaitForSingleObject, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOW,
 };
 
 /// Windows child process handle set owned by [`SandboxedChild`].

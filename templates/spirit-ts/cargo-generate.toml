@@ -2,13 +2,14 @@
 cargo_generate_version = ">=0.18.0"
 ignore = []
 
+# NOTE: `crate_name` / `project-name` are RESERVED built-ins in cargo-generate >=0.19
+# (fed by `--name`); declaring them as [placeholders] aborts generation on 0.23+.
+# Do not re-add a `crate_name` placeholder here. `{{crate_name}}` below is the built-in.
 [placeholders]
-crate_name = { type = "string", prompt = "Spirit project name (kebab-case, e.g., 'my-spirit')", regex = "^[a-z][a-z0-9-]+$" }
 class_name = { type = "string", prompt = "Spirit class name (PascalCase, e.g., 'MySpirit')", regex = "^[A-Z][a-zA-Z0-9]+$" }
-package_name = { type = "string", prompt = "npm package scope+name (e.g., '@my-org/my-spirit')", default = "@local/{{crate_name}}", regex = "^@[a-z][a-z0-9-]+/[a-z][a-z0-9-]+$" }
-
-[hooks]
-post = ["post-generate.rhai"]
+# No `package_name` placeholder: cargo-generate >=0.23 does NOT interpolate `default` values,
+# so a templated default renders the literal `{{...}}` into package.json (an invalid npm name).
+# package.json instead interpolates the built-in `project-name` directly (`@local/<name>`).
 
 [template.scripts]
 post-generate = '''
