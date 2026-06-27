@@ -17,7 +17,8 @@ Cortex-ready: ≥3 regions, ≥10 agents, multi-instance Loom with cross-region 
 - **Mira–Nash bilateral A2A latency SLO** (10.4b, J4 P95) → Cortex multi-region SLO baseline.
 - **Skill-format adapter** (10.5 AC1, ADR-027) → justification + scaffolding for the WASM Component-Model Spirit form.
 - **3-host rotation chaos floor** (10.4b/10.5 AC6, ADR-022) → 28-Spirit / 3-region failure semantics.
-- **Windows sandbox + restricted-token model** (10.5 AC3, once R1/R4 fixed) → cross-platform enterprise deployment.
+- **Windows sandbox + restricted-token model** (10.5 AC3, R1/R4 fixed + CI-verified green) → cross-platform enterprise deployment.
+- **ja/zh-Hans i18n scaffold** (10.5 AC5, DESCOPED per Epic-10 retro §A2 finding R2) → real Japanese + Chinese translation. The `i18n/{ja,zh-Hans}` trees exist only as untranslated Korean-placeholder scaffold (coverage gates report-only at v1.5); v2.0 replaces the content and re-instates 100% enforcement.
 
 ## Proposed stories (decompose at preflight; target 4–6 ACs each)
 
@@ -28,6 +29,7 @@ Cortex-ready: ≥3 regions, ≥10 agents, multi-instance Loom with cross-region 
 | **11.3** | Scale envelope (the cut 10.4 AC4) | 100-host churn at 10% turnover/week — detection ≤1h, recovery ≤24h (NFR-Scale-2/5); RTO-at-scale 4h-breach falsifiability (deferred from 10.4a). Decide real-hosts vs synthetic scaffold at preflight (10.4 used a synthetic 3-host scaffold). | scale/chaos → opus-4-8 preferred |
 | **11.4** | Enterprise hardening | PDP integration (OPA / Cedar / Vault-style) for the Enterprise Spirit class; ADR-024 sandbox-escape detection (anomaly detector on Landlock/seccomp/Job-Object syscall patterns). | security → **opus-4-8** |
 | **11.5** | FKCS protocol validation | 3 external-authored Spirits; ≥27/30 success per Spirit, ≥85/90 aggregate; diff-oracle confirms **zero kernel changes** from external authoring. | integration/validation → opus-4-6 + §A6 review |
+| **11.6** | Real ja/zh-Hans localization (descoped 10.5 AC5 / R2) | Replace the untranslated Korean-placeholder scaffold in `i18n/{ja,zh-Hans}` with real machine translation under the locked-term model; **add a language-identity gate dimension** (the file-presence coverage + glossary-lock gates provably cannot detect wrong-language content — the root cause of the R2 fabrication); re-instate `JA_COVERAGE_MIN=100` / `ZHHANS_COVERAGE_MIN=100` as blocking. | docs/i18n → opus-4-6 + §A6 review |
 
 ## Cut / deferred to v2.5 (ecosystem phase, separate planning)
 First third-party ComplianceClaim issuance, ≥20 external Spirits in registry, certification-body engagement, Cortex consortium case study, RTL layout localization. DevRel/BD-driven, parallelizable from v1.5 — **not** in Epic 11.

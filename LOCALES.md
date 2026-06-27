@@ -11,8 +11,8 @@ FROM this file (D5, Story 9.5).
 |--------|--------|-------|
 | `en` (English) | **Default** — source locale | All content authored in English |
 | `ko` (Korean) | **active — full canonical coverage** | Machine-translated with locked-term enforcement. Full canonical coverage delivered by Story 10.3 (all 5 canonical doc deliverables + the generated ABI reference). Story 9.5 shipped the toolchain, the glossary lock, and a representative sample (journey-layer pages) with English fallback (see Page Coverage below) |
-| `ja` (Japanese) | **Active (v1.5)** | Machine-translated with locked-term enforcement; Story 10.5 AC5 |
-| `zh-Hans` (Chinese Simplified) | **Active (v1.5)** | Machine-translated with locked-term enforcement; Story 10.5 AC5 |
+| `ja` (Japanese) | **Deferred to v2.0 (Epic 11)** | NOT yet translated. `i18n/ja/` currently holds untranslated WIP scaffold (Korean placeholder content cloned from `ko`), so the coverage gate is report-only at v1.5. Real Japanese translation + 100% gate enforcement is Epic 11 (Story 10.5 AC5 descoped per Epic-10 retro §A2 finding R2) |
+| `zh-Hans` (Chinese Simplified) | **Deferred to v2.0 (Epic 11)** | NOT yet translated. `i18n/zh-Hans/` currently holds untranslated WIP scaffold (Korean placeholder content cloned from `ko`), so the coverage gate is report-only at v1.5. Real Chinese translation + 100% gate enforcement is Epic 11 (Story 10.5 AC5 descoped per Epic-10 retro §A2 finding R2) |
 | RTL locales (ar, he, etc.) | **Deferred to v2.5** | Requires layout and component changes |
 
 ## Locked-Term Registry
@@ -138,7 +138,13 @@ coverage set and turned coverage into a mechanical ship gate.
 
 - **v1.0:** English (source) + Korean (locked-term-enforced, CI-gated; **full canonical
   page coverage at Story 10.3** — see Page Coverage above)
-- **v1.5:** Japanese + Chinese Simplified (same locked-term model)
+- **v1.5:** _(Japanese + Chinese Simplified were planned here but DESCOPED to v2.0
+  per Epic-10 retro §A2 finding R2 — `i18n/ja` & `i18n/zh-Hans` are untranslated WIP
+  scaffold, coverage gates report-only; see the status table above)_
+- **v2.0 (Epic 11):** Japanese + Chinese Simplified — real machine translation with the
+  same locked-term model, **plus a new language-identity gate dimension** (the existing
+  file-presence coverage + glossary-lock gates provably cannot detect wrong-language
+  content, which is how the Korean-placeholder scaffold passed tautologically)
 - **v2.5:** RTL locale support (requires Docusaurus RTL theme + layout audit)
 - New locales follow the same pattern: add to `docs-site/docusaurus.config.ts`
   `i18n.locales`, populate `i18n/<locale>/`, extend locked-term checks

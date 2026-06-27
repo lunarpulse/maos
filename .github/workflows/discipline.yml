@@ -2253,9 +2253,14 @@ jobs:
       - name: Install docs-site dependencies
         working-directory: docs-site
         run: npm ci
-      - name: Japanese canonical-coverage gate (JA_COVERAGE_MIN=100)
+      # R2 (Epic-10 retro §A2): real ja translations DEFERRED to v2.0 (Epic 11).
+      # The i18n/ja tree is untranslated WIP scaffold (Korean placeholder content),
+      # so 100% enforcement is dropped to REPORT-ONLY for v1.5 — it prints
+      # file-presence coverage but cannot block. Re-instate JA_COVERAGE_MIN=100 in
+      # Epic 11 when real Japanese translations land. See LOCALES.md + epic-11 DRAFT.
+      - name: Japanese canonical-coverage (report-only — real ja deferred to v2.0/Epic 11)
         working-directory: docs-site
-        run: JA_COVERAGE_MIN=100 npm run gate:ja-coverage
+        run: npm run gate:ja-coverage
       - name: Japanese glossary-lock gate
         working-directory: docs-site
         run: npm run gate:ja-glossary-lock
@@ -2273,9 +2278,14 @@ jobs:
       - name: Install docs-site dependencies
         working-directory: docs-site
         run: npm ci
-      - name: zh-Hans canonical-coverage gate (ZHHANS_COVERAGE_MIN=100)
+      # R2 (Epic-10 retro §A2): real zh-Hans translations DEFERRED to v2.0 (Epic 11).
+      # The i18n/zh-Hans tree is untranslated WIP scaffold (Korean placeholder
+      # content), so 100% enforcement is dropped to REPORT-ONLY for v1.5 — it prints
+      # file-presence coverage but cannot block. Re-instate ZHHANS_COVERAGE_MIN=100 in
+      # Epic 11 when real Chinese translations land. See LOCALES.md + epic-11 DRAFT.
+      - name: zh-Hans canonical-coverage (report-only — real zh deferred to v2.0/Epic 11)
         working-directory: docs-site
-        run: ZHHANS_COVERAGE_MIN=100 npm run gate:zh-coverage
+        run: npm run gate:zh-coverage
       - name: zh-Hans glossary-lock gate
         working-directory: docs-site
         run: npm run gate:zh-glossary-lock
