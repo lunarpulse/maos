@@ -126,4 +126,18 @@
 #          assigning the Job Object before ResumeThread, enabling kill-on-close,
 #          and using Job Object CPU rate control instead of a fixed lifetime
 #          CPU-time budget. All additive; no public symbols removed.
-src_lines = 22929
+#   22955  Story 10.5 AC3 windows.rs compile-correctness fix (+26, AUTHORIZED AC3
+#          kernel-core delta). FLAG-Winston: the 22929 pin was recorded for a
+#          windows.rs that DID NOT COMPILE — Epic-10 retro §A2 re-review finding R1
+#          (missing `Win32_System_JobObjects` feature + `HANDLE(x as isize)`, which
+#          is invalid under windows 0.58 where `HANDLE` wraps `*mut c_void`, not
+#          `isize`). This delta makes the AC3 Windows binary-sandbox body actually
+#          build on x86_64-pc-windows-msvc (compile-proven via an isolated
+#          cross-target check of windows.rs + stubbed super:: types), and replaces
+#          the inert working-set memory hint with a real commit cap (retro finding
+#          H1: `JOB_OBJECT_LIMIT_PROCESS_MEMORY` set via `SetInformationJobObject`,
+#          re-asserting `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`). Net +26 confined to
+#          windows.rs (+34/-8). All additive; no public symbols removed. Windows
+#          RUNTIME (R4/R5) still requires a CI windows-latest runner — compile is
+#          proven from this Linux host, runtime is not.
+src_lines = 22955
