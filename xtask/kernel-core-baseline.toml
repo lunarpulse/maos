@@ -158,4 +158,18 @@
 #   authorized as a behavior-preserving after-the-fact disclosure. Hardening
 #   follow-up (separate, may surface drift elsewhere): add a workspace
 #   `cargo fmt --check` gate so future fmt churn cannot draw the budget silently.
-src_lines = 22955
+#   22964  Story 10.5 R4-bundle hardening in windows.rs (+9, AUTHORIZED AC3
+#          kernel-core delta). FLAG-Winston: two correctness fixes the §A2
+#          re-review folded into the R4 close (next_actions LOW hardening):
+#          (1) `spawn_sandboxed` now closes the restricted token via
+#          `.map_err(|e| { CloseHandle(restricted_token); e })` if
+#          `create_limited_job` fails — previously the token handle leaked on a
+#          Job-setup error (windows.rs error path). (2) the per-process commit
+#          cap is skipped when `memory_max_mb == 0` (`.filter(|mb| *mb > 0)`) —
+#          a zero cap is rejected by SetInformationJobObject (ERROR_INVALID_PARAMETER).
+#          Confined to windows.rs; behavior-preserving on the success path. The
+#          R4 enforcement negative controls themselves live in
+#          tests/sandbox_enforcement_windows.rs (NOT counted — tests/, not src/).
+#          All additive; no public symbols removed. Windows compile/runtime still
+#          CI-only (windows-latest); not verifiable from this Linux host.
+src_lines = 22964

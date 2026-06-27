@@ -111,7 +111,14 @@ pub fn spawn_sandboxed(
     command: &mut Command,
 ) -> Result<SandboxedChild, SpawnError> {
     let restricted_token = create_low_integrity_restricted_token()?;
-    let job = create_limited_job(spec)?;
+    let job = create_limited_job(spec).map_err(|e| {
+        // SAFETY: `restricted_token` is a valid handle we own; close it so a
+        // Job-setup failure does not leak the token handle.
+        unsafe {
+            let _ = CloseHandle(restricted_token);
+        }
+        e
+    })?;
     let mut cmdline = command_line(command);
     let current_dir = command
         .get_current_dir()
@@ -267,7 +274,9 @@ fn create_limited_job(spec: &SandboxSpec) -> Result<win32job::Job, SpawnError> {
     // commit limit directly via SetInformationJobObject, re-asserting
     // KILL_ON_JOB_CLOSE in the same call so the extended-limit write does not
     // clear the flag win32job applied at creation.
-    if let Some(memory_mb) = spec.resolved_caps.memory_max_mb {
+    // A zero cap is not a valid commit limit — SetInformationJobObject rejects
+    // ProcessMemoryLimit == 0 with ERROR_INVALID_PARAMETER; treat it as "no cap".
+    if let Some(memory_mb) = spec.resolved_caps.memory_max_mb.filter(|mb| *mb > 0) {
         let bytes = (memory_mb as usize).saturating_mul(1024 * 1024);
         let mut ext = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         ext.BasicLimitInformation.LimitFlags =

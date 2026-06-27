@@ -2418,9 +2418,13 @@ jobs:
       # Windows C toolchain).
       - name: Build Windows kernel-core + CLI (real compile)
         run: cargo build -p maos-kernel-core -p maos-cli
-      # R4: execute the unsafe FFI spawn path at runtime (was compile-only).
+      # R4: execute the unsafe FFI spawn path at runtime (was compile-only) —
+      # now including ENFORCEMENT negative controls (memory commit cap actually
+      # kills an over-budget child; low-integrity label actually applies). Run
+      # single-threaded: each memory test commits ~1 GiB and the tests spawn
+      # restricted-token child processes, so serialize for determinism.
       - name: Run Windows sandbox enforcement tests
-        run: cargo test -p maos-kernel-core --test sandbox_enforcement_windows -- --nocapture
+        run: cargo test -p maos-kernel-core --test sandbox_enforcement_windows -- --nocapture --test-threads=1
       # R5: the JetBrains/ACP bridge tests were wired into NO CI job. Run them here.
       - name: Run ACP JetBrains bridge test
         run: cargo test -p maos-acp --test jetbrains_bridge_test
@@ -2442,6 +2446,13 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-skill-conformance
         run: cargo run -p xtask -- check-skill-conformance
+      # Story 10.5 H2 (§A2 re-review): mechanically enforce the gate's failure
+      # branches in CI, not dev-pass-only. These invert the pass condition
+      # (false booleans / malformed TOML / corrupt fixture / defeated proven-red
+      # guard) and assert the gate goes red — so weakening check-skill-conformance
+      # can no longer stay green.
+      - name: Run skill-conformance proven-red vectors (H2)
+        run: cargo test -p xtask --test story_10_5_proven_red -- --test-threads=1
 
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
