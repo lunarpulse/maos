@@ -140,4 +140,22 @@
 #          windows.rs (+34/-8). All additive; no public symbols removed. Windows
 #          RUNTIME (R4/R5) still requires a CI windows-latest runner — compile is
 #          proven from this Linux host, runtime is not.
+#   ── Story 10.5 R3 DISCLOSURE (Epic-10 retro §A2 re-review; 2026-06-27) ──
+#   The Story 10.5 squashed commit (0d2b18e) also drew the kernel budget in SIX
+#   files OUTSIDE the authorized windows.rs / sandbox surface, via a
+#   behavior-preserving `cargo fmt` line-wrap reflow that the 22726 and 22929
+#   entries above attributed WHOLLY to windows.rs. This note discloses that
+#   churn — the exact "silent budget draw" the D7 tripwire exists to surface
+#   (re-review finding R3). Affected files, net +25 lines (71 insertions /
+#   46 deletions), reflow ONLY, no functional change:
+#     memory/mod.rs, memory/principal.rs, memory/read_entry_point.rs,
+#     memory/write_entry_point.rs, security/mod.rs, security/operator_config.rs
+#   (e.g. operator_config.rs:323 — one assert_eq! split across four lines).
+#   RETAINED, not reverted: there is NO `cargo fmt --check` gate, so a revert is
+#   non-durable (the next `cargo fmt` reintroduces it), and these lines are
+#   ALREADY inside the pinned count below — so this disclosure changes the
+#   NARRATIVE, not the number (pin stays 22955; gate remains green). FLAG-Winston:
+#   authorized as a behavior-preserving after-the-fact disclosure. Hardening
+#   follow-up (separate, may surface drift elsewhere): add a workspace
+#   `cargo fmt --check` gate so future fmt churn cannot draw the budget silently.
 src_lines = 22955
