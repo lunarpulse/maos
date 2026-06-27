@@ -13,7 +13,6 @@
 //!   2. `--signing-key-env <var>` (env var holds the same content as the file)
 //!   3. `~/.config/maos/spirit-signing.key` (default fallback)
 
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use base64::Engine;
@@ -72,6 +71,7 @@ fn read_key_file(path: &Path) -> Result<Vec<u8>, CliError> {
 
     #[cfg(unix)]
     {
+        use std::os::unix::fs::PermissionsExt;
         let mode = metadata.permissions().mode();
         if mode & 0o077 != 0 {
             return Err(CliError::SigningKeyLoad(format!(
