@@ -261,6 +261,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         purpose: "Content hash of the governance artifact this one supersedes (Story 9.3/9.3b)",
         stability: EnvStability::UserFacing,
     },
+    EnvVar {
+        name: "MAOS_LOOM_POSTGRES",
+        purpose: "Collective-tier (Loom-lite) Postgres connection string; absent disables the collective tier (Story 10.4a)",
+        stability: EnvStability::UserFacing,
+    },
 ];
 
 pub fn lookup(name: &str) -> Option<&'static EnvVar> {

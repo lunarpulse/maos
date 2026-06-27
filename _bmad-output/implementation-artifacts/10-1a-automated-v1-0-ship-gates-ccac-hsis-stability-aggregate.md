@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-6
+---
+
 # Story 10.1a: Automated v1.0 Ship Gates — CCAC, HSIS, STABILITY, Aggregate
 
 Status: done

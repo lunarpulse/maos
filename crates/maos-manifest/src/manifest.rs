@@ -202,8 +202,14 @@ impl ClassSection {
 /// schema-v3 bump (Story 9.4b AC-6): `[model_provenance]`. A manifest authored
 /// at the N-1 floor omits these; they default via `#[serde(default)]` /
 /// optional-on-read.
-const POST_V1_SCHEMA_SECTIONS: &[&str] =
-    &["cli_wrapper", "schedule", "gateway", "model_provenance"];
+///
+/// NOTE: kept on a single line via `rustfmt::skip`. The
+/// `check-manifest-schema-version` xtask gate parses this constant with a
+/// single-line matcher; without the skip, rustfmt wraps it at 101 cols and the
+/// gate reports the constant as missing. Keep the declaration on one physical
+/// line and out of doc comments above it.
+#[rustfmt::skip]
+const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance"];
 
 /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
 /// newer-than-declared schema section that an N-1 manifest omits (and thus

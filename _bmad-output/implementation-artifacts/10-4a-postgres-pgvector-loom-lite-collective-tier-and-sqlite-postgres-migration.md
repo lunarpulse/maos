@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-6
+---
+
 # Story 10.4a: Postgres+pgvector Loom-lite Collective Tier and SQLite→Postgres Migration
 
 Status: done

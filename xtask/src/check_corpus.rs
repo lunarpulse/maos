@@ -76,6 +76,15 @@ fn check_corpus(manifest_path: &Path, corpora_dir: &Path) -> Result<Report, Stri
     let manifest_keys: HashSet<String> = manifest.corpus.keys().cloned().collect();
 
     for (name, entry) in &manifest.corpus {
+        // Story 10.4a — deterministically GENERATED corpora (e.g. the
+        // `migration-corpus-1e6` SQLite Transparency-Log fixture) are not
+        // committed `.jsonl` files; their integrity is verified by the
+        // dedicated `check-migration-merkle` triple-oracle gate. Skip the
+        // JSONL existence/hash checks here so a generated SQLite corpus is not
+        // reported as a missing `.jsonl`.
+        if entry.generated {
+            continue;
+        }
         checked += 1;
         let path = corpora_dir.join(format!("{}.jsonl", name));
         let path_str = path.display().to_string();

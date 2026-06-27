@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-6
+---
+
 # Story 10.2: V1.0/V1.5 Ship-Gate Infrastructure — Trial, Cross-Form, Red-Team
 
 Status: done

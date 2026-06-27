@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-6
+---
+
 # Story 10.1b: Pen-Test Engagement Harness and Gate Infrastructure
 
 Status: done

@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-6
+---
+
 # Story 10.3: Close v1.0 Compliance Gates — Export-Control, Fuzz Hardening, Korean Docs, CNA Registration
 
 Status: done

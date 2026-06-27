@@ -48,7 +48,10 @@ fn windows_benign_child_exits_zero() {
     let mut child = spawn_sandboxed(&s, &mut cmd)
         .expect("spawn_sandboxed under restricted token + Job Object must succeed");
     let status = child.wait().expect("wait on sandboxed child");
-    assert!(status.success(), "benign child must exit 0 under T2 sandbox");
+    assert!(
+        status.success(),
+        "benign child must exit 0 under T2 sandbox"
+    );
 }
 
 /// The sandbox must preserve the child's real exit code through the

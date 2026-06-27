@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-8
+---
+
 # Story 10.5: Mature v1.5 — Skill-Format Conformance, JetBrains, Windows, 2-Year LTS, Japanese/CN-S i18n
 
 Status: done

@@ -18,6 +18,13 @@ pub struct CorpusEntry {
     pub prompt_version_hash: String,
     pub description: String,
     pub judge_id: Option<String>,
+    /// Story 10.4a — `true` for deterministically GENERATED corpora (e.g. the
+    /// `migration-corpus-1e6` SQLite Transparency-Log fixture). These are not
+    /// committed `.jsonl` files; integrity is verified by a dedicated
+    /// triple-oracle gate (`check-migration-merkle`), so the JSONL
+    /// existence/hash checks in `check-corpus` skip them.
+    #[serde(default)]
+    pub generated: bool,
 }
 
 /// Shared coverage-matrix types used by coverage-matrix and corpus-staleness.

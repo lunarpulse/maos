@@ -390,7 +390,7 @@
     {
       "kind": "fn",
       "path": "maos_kernel_core::security::sandbox::classify_exit",
-      "signature_hash": "9553f8e213fb58cf6838b403403bdcad27d0e20a9ef4cd95de595e699030e740"
+      "signature_hash": "77e9179f25b2e7b6c4f56b436f35bc416a4a68c8e8bd9863603341a9d7293754"
     },
     {
       "kind": "fn",
@@ -475,7 +475,7 @@
     {
       "kind": "fn",
       "path": "maos_kernel_core::security::sandbox::windows::spawn_sandboxed",
-      "signature_hash": "58caa4fdc8f53d5e9e6c88721fd048835e830fc0572ed15977b576578e76289c"
+      "signature_hash": "99f8aaa8b7211e543ef80a4b4ee2ffec546ffca36f53d9e39260e1f6f0c37eae"
     },
     {
       "kind": "fn",
@@ -855,7 +855,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::security::sandbox::SandboxedChild",
-      "signature_hash": "700807dcfefa7a58327786be9961c054c78170e267b2de40599f51ffba46f59d"
+      "signature_hash": "6a11affd329eea3230599baf1d0759f103a797d5064cb64192c547a762db6a26"
     },
     {
       "kind": "struct",
@@ -1851,6 +1851,11 @@
       "kind": "use",
       "path": "maos_kernel_core::telemetry::maos_iac::metrics (as iac_rt)",
       "signature_hash": "f76509cb67f8d14cfd007356708ef18679d39c1bded0a164c623a492173c93ee"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::sandbox::windows::WindowsChild",
+      "signature_hash": "bfee0dfaff7f4d7fa1b1170c8978bacfd8dbaf2ee617f4ea68b47f830cf77cfb"
     }
   ]
 }

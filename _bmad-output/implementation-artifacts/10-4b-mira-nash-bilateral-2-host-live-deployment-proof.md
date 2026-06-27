@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-6
+---
+
 # Story 10.4b: Mira+Nash Bilateral 2-Host Live Deployment Proof
 
 Status: done

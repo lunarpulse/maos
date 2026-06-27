@@ -1,3 +1,7 @@
+---
+dev_model_used: claude-opus-4-6
+---
+
 # Story 10.4c: J4/J6 Real `kernel_measurement` Harness Rebuild
 
 Status: done

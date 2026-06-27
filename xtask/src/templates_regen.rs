@@ -56,6 +56,10 @@ pub fn run(
                 workspace_root.join("examples/example-spirit"),
                 vec![
                     ("{{crate_name}}", "example-spirit"),
+                    // cargo-generate built-in (0.23): the generated project
+                    // directory name. Mirrored here so the drift renderer
+                    // resolves it the same way `cargo generate` does.
+                    ("{{project-name}}", "example-spirit"),
                     ("{{class_name}}", "ExampleSpirit"),
                     ("{{crate_name | snake_case}}", "example_spirit"),
                 ],
@@ -65,6 +69,14 @@ pub fn run(
                 workspace_root.join("examples/example-spirit-ts"),
                 vec![
                     ("{{crate_name}}", "example-spirit-ts"),
+                    // cargo-generate built-in (0.23): the generated project
+                    // directory name. The TS package.json names the package
+                    // `@local/{{project-name}}`; mirror the built-in here so the
+                    // drift renderer resolves it the same way `cargo generate`
+                    // does (the `package_name` placeholder was removed in the
+                    // Epic-10 retro template repair — 0.23 does not interpolate
+                    // `default` values).
+                    ("{{project-name}}", "example-spirit-ts"),
                     ("{{class_name}}", "ExampleTsSpirit"),
                     ("{{package_name}}", "@local/example-spirit-ts"),
                 ],

@@ -147,8 +147,9 @@ name = "windows-check"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 
 # Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — pre-merge fuzz BUILD prerequisite.
-# `fuzz-build` runs `cargo +nightly fuzz build` for both targets; it is a
-# `needs:` dependency of `v1-0-ship-gate` (the aggregate fails if it fails) so
+# `fuzz-build` runs the fuzz build for both targets under the nightly toolchain
+# (selected via the rustup nightly channel, not an inline toolchain override); it
+# is a `needs:` dependency of `v1-0-ship-gate` (the aggregate fails if it fails) so
 # its disposition is recorded here for registry completeness.
 [[ship_gate]]
 name = "fuzz-build"

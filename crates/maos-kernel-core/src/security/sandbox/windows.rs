@@ -31,9 +31,10 @@ use windows::Win32::Security::{
     TOKEN_QUERY,
 };
 use windows::Win32::System::JobObjects::{
-    JobObjectCpuRateControlInformation, SetInformationJobObject,
-    JOBOBJECT_CPU_RATE_CONTROL_INFORMATION, JOB_OBJECT_CPU_RATE_CONTROL_ENABLE,
-    JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP,
+    JobObjectCpuRateControlInformation, JobObjectExtendedLimitInformation, SetInformationJobObject,
+    JOBOBJECT_CPU_RATE_CONTROL_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JOB_OBJECT_CPU_RATE_CONTROL_ENABLE, JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP,
+    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_PROCESS_MEMORY,
 };
 use windows::Win32::System::Threading::{
     CreateProcessAsUserW, GetCurrentProcess, GetExitCodeProcess, OpenProcessToken, ResumeThread,
@@ -99,7 +100,7 @@ impl Drop for WindowsChild {
             let _ = TerminateProcess(self.process, 1);
             let _ = CloseHandle(self.thread);
             let _ = CloseHandle(self.process);
-            let _ = CloseHandle(HANDLE(self.job_handle as isize));
+            let _ = CloseHandle(HANDLE(self.job_handle as *mut core::ffi::c_void));
         }
     }
 }
@@ -254,12 +255,37 @@ fn create_low_integrity_restricted_token() -> Result<HANDLE, SpawnError> {
 fn create_limited_job(spec: &SandboxSpec) -> Result<win32job::Job, SpawnError> {
     let mut limits = win32job::ExtendedLimitInfo::new();
     limits.limit_kill_on_job_close();
-    if let Some(memory_mb) = spec.resolved_caps.memory_max_mb {
-        let bytes = (memory_mb as usize).saturating_mul(1024 * 1024);
-        limits.limit_working_memory(0, bytes);
-    }
     let job = win32job::Job::create_with_limit_info(&limits)
         .map_err(|e| SpawnError::SandboxSetup(format!("Job::create_with_limit_info: {e}")))?;
+
+    // H1 fix (review finding): the memory cap must be a hard COMMIT cap
+    // (JOB_OBJECT_LIMIT_PROCESS_MEMORY), not a working-set limit. win32job only
+    // exposes `limit_working_memory`, which sets JOB_OBJECT_LIMIT_WORKINGSET with
+    // a zero minimum — SetInformationJobObject rejects min=0/max>0 with
+    // ERROR_INVALID_PARAMETER, so the previous code failed every capped spawn.
+    // Working-set is also swappable (not a real ceiling). Set the per-process
+    // commit limit directly via SetInformationJobObject, re-asserting
+    // KILL_ON_JOB_CLOSE in the same call so the extended-limit write does not
+    // clear the flag win32job applied at creation.
+    if let Some(memory_mb) = spec.resolved_caps.memory_max_mb {
+        let bytes = (memory_mb as usize).saturating_mul(1024 * 1024);
+        let mut ext = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        ext.BasicLimitInformation.LimitFlags =
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_PROCESS_MEMORY;
+        ext.ProcessMemoryLimit = bytes;
+        // SAFETY: `job.handle()` is a valid Job Object handle; `ext` has the exact
+        // layout expected for JobObjectExtendedLimitInformation and lives through
+        // the call.
+        unsafe {
+            SetInformationJobObject(
+                HANDLE(job.handle() as *mut core::ffi::c_void),
+                JobObjectExtendedLimitInformation,
+                (&ext as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            )
+        }
+        .map_err(|e| SpawnError::SandboxSetup(format!("set process memory limit: {e}")))?;
+    }
 
     if let Some(cpu_pct) = spec.resolved_caps.cpu_max_pct {
         if cpu_pct > 0 && cpu_pct < 100 {
@@ -276,7 +302,7 @@ fn create_limited_job(spec: &SandboxSpec) -> Result<win32job::Job, SpawnError> {
             // exact layout expected for JobObjectCpuRateControlInformation.
             unsafe {
                 SetInformationJobObject(
-                    HANDLE(job.handle() as isize),
+                    HANDLE(job.handle() as *mut core::ffi::c_void),
                     JobObjectCpuRateControlInformation,
                     (&cpu as *const JOBOBJECT_CPU_RATE_CONTROL_INFORMATION).cast(),
                     mem::size_of::<JOBOBJECT_CPU_RATE_CONTROL_INFORMATION>() as u32,

@@ -81,6 +81,13 @@ function main() {
   for (const { enDir, localeDir } of PLUGINS) {
     for (const enFile of walkMdFiles(enDir)) {
       const relPath = path.relative(enDir, enFile);
+      // Skip `_related_*` partials: these are Docusaurus partials (leading
+      // underscore = not a standalone route). Their "## Related" content is
+      // already inlined — and translated — into each main page, so a separate
+      // locale copy is redundant. This matches the convention already used by
+      // gate-anchor-ids.js and postbuild-fallback-lang.js, which both exclude
+      // `_related_*`. Counting them here over-stated the canonical denominator.
+      if (path.basename(relPath).startsWith("_related_")) continue;
       const localeFile = path.join(localeDir, relPath);
       const name = enDir.endsWith(path.join("abi", "v1")) ? "abi" : sectionOf(relPath);
       bump(name, fs.existsSync(localeFile));
