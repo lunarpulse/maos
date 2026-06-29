@@ -475,7 +475,7 @@
     {
       "kind": "fn",
       "path": "maos_kernel_core::security::sandbox::windows::spawn_sandboxed",
-      "signature_hash": "99f8aaa8b7211e543ef80a4b4ee2ffec546ffca36f53d9e39260e1f6f0c37eae"
+      "signature_hash": "7e620e6e117d94fc75c4d020edd9a451a64024380fe2ee2860a6028694b91df2"
     },
     {
       "kind": "fn",
