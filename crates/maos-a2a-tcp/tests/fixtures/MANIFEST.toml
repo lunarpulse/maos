@@ -1,0 +1,12 @@
+# Story 10.4b — content address of the deterministic 50-scenario diagnostic
+# corpus produced by `build_corpus()` in t_10_4b_live_bilateral.rs.
+#
+# Value = SHA-256 of serde_json::to_vec(&corpus): compact JSON, BTreeMap
+# (alphabetical) key order, non-ASCII written as raw UTF-8. Any drift in the
+# generator (a changed seed value, a different float, a reordered field)
+# changes this digest and turns `t_10_4b_corpus_content_addressed` RED —
+# regenerate by recomputing corpus_sha256(&build_corpus()).
+#
+# This is a test-local fixture (NOT the top-level ship manifest); it lives
+# under tests/fixtures/ and is read only by the live-bilateral test.
+corpus_sha256 = "b1debf21fb5c3b39d0877267bd079a53bd639b5d26a70f0a36db089803e9b168"

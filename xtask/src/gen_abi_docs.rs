@@ -148,8 +148,13 @@ struct StructInner {
 enum StructKind {
     #[default]
     Unit,
-    Tuple { fields: Vec<StructField> },
-    Plain { fields: Vec<StructField>, has_stripped_fields: bool },
+    Tuple {
+        fields: Vec<StructField>,
+    },
+    Plain {
+        fields: Vec<StructField>,
+        has_stripped_fields: bool,
+    },
 }
 
 #[derive(Deserialize, Debug)]
@@ -243,9 +248,16 @@ struct GenericParam {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 enum GenericParamKind {
-    Lifetime { outlives: Vec<String> },
-    Type { bounds: Vec<TypeBound> },
-    Const { #[serde(rename = "type")] ty: Type },
+    Lifetime {
+        outlives: Vec<String>,
+    },
+    Type {
+        bounds: Vec<TypeBound>,
+    },
+    Const {
+        #[serde(rename = "type")]
+        ty: Type,
+    },
 }
 
 #[derive(Deserialize, Debug)]
@@ -258,7 +270,11 @@ struct WherePredicate {
 #[serde(tag = "bound_predicate")]
 enum WherePredicateInner {
     #[serde(rename = "bound_predicate")]
-    BoundPredicate { #[serde(rename = "type")] ty: Type, bounds: Vec<TypeBound> },
+    BoundPredicate {
+        #[serde(rename = "type")]
+        ty: Type,
+        bounds: Vec<TypeBound>,
+    },
 }
 
 #[derive(Deserialize, Debug)]
@@ -270,7 +286,9 @@ struct TypeBound {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 enum TypeBoundInner {
-    TraitBound { trait_: TraitPath },
+    TraitBound {
+        trait_: TraitPath,
+    },
     #[serde(other)]
     Other,
 }
@@ -302,7 +320,11 @@ enum Type {
     },
     DynTrait(DynTrait),
     Slice(Box<Type>),
-    Array { #[serde(rename = "type")] ty: Box<Type>, len: String },
+    Array {
+        #[serde(rename = "type")]
+        ty: Box<Type>,
+        len: String,
+    },
     Tuple(Vec<Type>),
     #[serde(other)]
     Other,
@@ -356,7 +378,11 @@ fn render_type(ty: &Type) -> String {
     match ty {
         Type::Primitive(s) | Type::Generic(s) => s.clone(),
         Type::ResolvedPath(rp) => render_resolved_path(rp),
-        Type::BorrowedRef { lifetime, is_mutable, ty } => {
+        Type::BorrowedRef {
+            lifetime,
+            is_mutable,
+            ty,
+        } => {
             let mut s = "&".to_string();
             if let Some(lt) = lifetime {
                 s.push_str(lt);
@@ -499,11 +525,15 @@ struct RenderContext<'a> {
 
 impl<'a> RenderContext<'a> {
     fn item_by_id(&self, id: u32) -> Option<&Item> {
-        self.id_to_key.get(&id.to_string()).and_then(|k| self.index.get(k))
+        self.id_to_key
+            .get(&id.to_string())
+            .and_then(|k| self.index.get(k))
     }
 
     fn item_path(&self, item: &Item) -> Option<&[String]> {
-        self.paths.get(&item.id.to_string()).map(|path| path.path.as_slice())
+        self.paths
+            .get(&item.id.to_string())
+            .map(|path| path.path.as_slice())
     }
 }
 
@@ -515,7 +545,12 @@ fn header() -> String {
     "<!-- AUTO-GENERATED from maos-spirit-abi rustdoc — do not edit; regenerate via: cargo run -p xtask -- gen-abi-docs -->\n".to_string()
 }
 
-fn write_page(path: &Path, title: &str, body: &str, related_partial: Option<&Path>) -> Result<(), String> {
+fn write_page(
+    path: &Path,
+    title: &str,
+    body: &str,
+    related_partial: Option<&Path>,
+) -> Result<(), String> {
     let out = assemble_page_text(title, body, related_partial)?;
     fs::write(path, out).map_err(|e| format!("write {}: {e}", path.display()))?;
     Ok(())
@@ -660,7 +695,11 @@ fn add_explicit_ids_to_markdown_headings(markdown: &str, prefix: &str) -> String
 }
 
 /// Assemble the canonical text of a generated page (used by `--check` and for writing).
-fn assemble_page_text(title: &str, body: &str, related_partial: Option<&Path>) -> Result<String, String> {
+fn assemble_page_text(
+    title: &str,
+    body: &str,
+    related_partial: Option<&Path>,
+) -> Result<String, String> {
     let mut out = header();
     out.push('\n');
     out.push_str(&format!(
@@ -682,7 +721,6 @@ fn assemble_page_text(title: &str, body: &str, related_partial: Option<&Path>) -
     out.push_str(body);
     Ok(deduplicate_anchor_ids(&out))
 }
-
 
 fn render_item(item: &Item, ctx: &RenderContext) -> Option<String> {
     let name = item.name.as_deref()?;
@@ -737,11 +775,18 @@ fn render_struct(name: &str, s: &StructInner) -> String {
         StructKind::Tuple { fields } => {
             let types: Vec<String> = fields
                 .iter()
-                .map(|f| f.ty.as_ref().map(render_type).unwrap_or_else(|| "_".to_string()))
+                .map(|f| {
+                    f.ty.as_ref()
+                        .map(render_type)
+                        .unwrap_or_else(|| "_".to_string())
+                })
                 .collect();
             format!("pub struct {}{}({});", name, generics, types.join(", "))
         }
-        StructKind::Plain { fields, has_stripped_fields } => {
+        StructKind::Plain {
+            fields,
+            has_stripped_fields,
+        } => {
             if fields.is_empty() {
                 if *has_stripped_fields {
                     format!("pub struct {}{} {{ /* private fields */ }}", name, generics)
@@ -751,7 +796,10 @@ fn render_struct(name: &str, s: &StructInner) -> String {
             } else {
                 let mut lines = vec![format!("pub struct {}{} {{", name, generics)];
                 for f in fields {
-                    let ty = f.ty.as_ref().map(render_type).unwrap_or_else(|| "_".to_string());
+                    let ty =
+                        f.ty.as_ref()
+                            .map(render_type)
+                            .unwrap_or_else(|| "_".to_string());
                     lines.push(format!("    pub {}: {},", f.name, ty));
                 }
                 lines.push("}".to_string());
@@ -768,20 +816,33 @@ fn render_enum(name: &str, e: &EnumInner, ctx: &RenderContext) -> String {
         if let Some(v) = ctx.item_by_id(*vid) {
             if let Some(vname) = &v.name {
                 match &v.inner {
-                    ItemInner::Struct(StructInner { kind: StructKind::Tuple { fields }, .. }) => {
+                    ItemInner::Struct(StructInner {
+                        kind: StructKind::Tuple { fields },
+                        ..
+                    }) => {
                         let types: Vec<String> = fields
                             .iter()
-                            .map(|f| f.ty.as_ref().map(render_type).unwrap_or_else(|| "_".to_string()))
+                            .map(|f| {
+                                f.ty.as_ref()
+                                    .map(render_type)
+                                    .unwrap_or_else(|| "_".to_string())
+                            })
                             .collect();
                         lines.push(format!("    {}({}),", vname, types.join(", ")));
                     }
-                    ItemInner::Struct(StructInner { kind: StructKind::Plain { fields, .. }, .. }) => {
+                    ItemInner::Struct(StructInner {
+                        kind: StructKind::Plain { fields, .. },
+                        ..
+                    }) => {
                         if fields.is_empty() {
                             lines.push(format!("    {},", vname));
                         } else {
                             lines.push(format!("    {} {{", vname));
                             for f in fields {
-                                let ty = f.ty.as_ref().map(render_type).unwrap_or_else(|| "_".to_string());
+                                let ty =
+                                    f.ty.as_ref()
+                                        .map(render_type)
+                                        .unwrap_or_else(|| "_".to_string());
                                 lines.push(format!("        pub {}: {},", f.name, ty));
                             }
                             lines.push("    },".to_string());
@@ -892,7 +953,12 @@ fn render_constant(name: &str, c: &ConstantInner) -> String {
     format!("pub const {}: {} = {};", name, render_type(&c.ty), value)
 }
 
-fn render_inherent_impl_items(out: &mut String, impl_ids: &[u32], ctx: &RenderContext, parent_anchor: &str) {
+fn render_inherent_impl_items(
+    out: &mut String,
+    impl_ids: &[u32],
+    ctx: &RenderContext,
+    parent_anchor: &str,
+) {
     let mut sections: Vec<String> = Vec::new();
     for impl_id in impl_ids {
         let Some(item) = ctx.item_by_id(*impl_id) else {
@@ -1023,8 +1089,8 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
     // 3. Parse.
     let json_text = fs::read_to_string(&json_path)
         .map_err(|e| format!("read rustdoc json {}: {e}", json_path.display()))?;
-    let krate: CrateJson = serde_json::from_str(&json_text)
-        .map_err(|e| format!("parse rustdoc json: {e}"))?;
+    let krate: CrateJson =
+        serde_json::from_str(&json_text).map_err(|e| format!("parse rustdoc json: {e}"))?;
 
     if krate.format_version != EXPECTED_FORMAT_VERSION {
         return Err(format!(
@@ -1082,7 +1148,11 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
     if check {
         let existing = fs::read_to_string(&constants_path)
             .map_err(|e| format!("read existing {}: {e}", constants_path.display()))?;
-        let generated = assemble_page_text("constants", &constants_body, constants_partial.exists().then_some(&constants_partial))?;
+        let generated = assemble_page_text(
+            "constants",
+            &constants_body,
+            constants_partial.exists().then_some(&constants_partial),
+        )?;
         if normalize_md(&existing) != normalize_md(&generated) {
             return Err(format!(
                 "abi reference page {} is stale; regenerate with `cargo run -p xtask -- gen-abi-docs`",
@@ -1123,7 +1193,8 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
         if check {
             let existing = fs::read_to_string(&out_path)
                 .map_err(|e| format!("read existing {}: {e}", out_path.display()))?;
-            let generated = assemble_page_text(mod_name, &body, partial.exists().then_some(&partial))?;
+            let generated =
+                assemble_page_text(mod_name, &body, partial.exists().then_some(&partial))?;
             if normalize_md(&existing) != normalize_md(&generated) {
                 return Err(format!(
                     "abi reference page {} is stale; regenerate with `cargo run -p xtask -- gen-abi-docs`",
@@ -1131,7 +1202,12 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
                 ));
             }
         } else {
-            write_page(&out_path, mod_name, &body, partial.exists().then_some(&partial))?;
+            write_page(
+                &out_path,
+                mod_name,
+                &body,
+                partial.exists().then_some(&partial),
+            )?;
         }
     }
     // 6. Reject or clean up orphaned generated pages (leave _related_*.md hand-curated partials alone).
@@ -1143,7 +1219,7 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
             (fname.ends_with(".md")
                 && !fname.starts_with("_related_")
                 && !expected_files.contains(&fname))
-                .then_some((fname, entry.path()))
+            .then_some((fname, entry.path()))
         })
         .collect::<Vec<_>>();
     if check {
@@ -1155,8 +1231,7 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
         }
     } else {
         for (_fname, path) in orphaned {
-            fs::remove_file(&path)
-                .map_err(|e| format!("remove orphan {}: {e}", path.display()))?;
+            fs::remove_file(&path).map_err(|e| format!("remove orphan {}: {e}", path.display()))?;
         }
     }
 
@@ -1176,8 +1251,8 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
 
 /// Resolve the crate version, handling `version.workspace = true`.
 fn read_crate_version() -> Result<String, String> {
-    let manifest_contents = fs::read_to_string(MANIFEST_PATH)
-        .map_err(|e| format!("read manifest: {e}"))?;
+    let manifest_contents =
+        fs::read_to_string(MANIFEST_PATH).map_err(|e| format!("read manifest: {e}"))?;
     let manifest: toml::Value = manifest_contents
         .parse()
         .map_err(|e| format!("parse manifest: {e}"))?;
@@ -1190,8 +1265,8 @@ fn read_crate_version() -> Result<String, String> {
     }
 
     // workspace-inherited version
-    let workspace_manifest = fs::read_to_string("Cargo.toml")
-        .map_err(|e| format!("read workspace Cargo.toml: {e}"))?;
+    let workspace_manifest =
+        fs::read_to_string("Cargo.toml").map_err(|e| format!("read workspace Cargo.toml: {e}"))?;
     let workspace: toml::Value = workspace_manifest
         .parse()
         .map_err(|e| format!("parse workspace Cargo.toml: {e}"))?;
@@ -1209,7 +1284,8 @@ fn read_abi_constants() -> Result<(u32, u32), String> {
     let src = fs::read_to_string("crates/maos-spirit-abi/src/lib.rs")
         .map_err(|e| format!("read maos-spirit-abi/src/lib.rs: {e}"))?;
     let abi_re = regex::Regex::new(r"pub\s+const\s+ABI_VERSION\s*:\s*u32\s*=\s*(\d+)").unwrap();
-    let schema_re = regex::Regex::new(r"pub\s+const\s+MANIFEST_SCHEMA_VERSION\s*:\s*u32\s*=\s*(\d+)").unwrap();
+    let schema_re =
+        regex::Regex::new(r"pub\s+const\s+MANIFEST_SCHEMA_VERSION\s*:\s*u32\s*=\s*(\d+)").unwrap();
     let abi = abi_re
         .captures(&src)
         .and_then(|c| c.get(1))
@@ -1332,7 +1408,10 @@ mod tests {
         // Mutate a semantic value: flip ABI_VERSION from 1 to 99.
         let idx_path = temp_path.join("constants.md");
         let mut idx = fs::read_to_string(&idx_path).expect("read temp constants.md");
-        idx = idx.replace("pub const ABI_VERSION: u32 = 1;", "pub const ABI_VERSION: u32 = 99;");
+        idx = idx.replace(
+            "pub const ABI_VERSION: u32 = 1;",
+            "pub const ABI_VERSION: u32 = 99;",
+        );
         fs::write(&idx_path, idx).expect("write mutated constants.md");
 
         let result = super::run(Some(temp_path.to_str().unwrap()), true);
@@ -1455,7 +1534,8 @@ mod tests {
         let baseline = workspace_root().join("abi-baseline/v1-pre-bump.txt");
         let baseline = fs::read_to_string(baseline).expect("read abi baseline");
 
-        let mut baseline_modules: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        let mut baseline_modules: std::collections::BTreeSet<String> =
+            std::collections::BTreeSet::new();
         for line in baseline.lines() {
             if let Some(rest) = line.strip_prefix("pub mod maos_spirit_abi::") {
                 // Skip nested modules; we only care about top-level modules.
@@ -1466,7 +1546,8 @@ mod tests {
         }
 
         let abi_dir = workspace_root().join("docs-site/abi/v1");
-        let mut generated_modules: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        let mut generated_modules: std::collections::BTreeSet<String> =
+            std::collections::BTreeSet::new();
         for entry in fs::read_dir(abi_dir).expect("read abi dir") {
             let entry = entry.expect("dir entry");
             let name = entry.file_name().to_string_lossy().to_string();

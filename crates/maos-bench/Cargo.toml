@@ -28,6 +28,10 @@ parking_lot = "0.12"
 [features]
 fixture_replay = []
 kernel_measurement = ["tokio"]
+# Story 10.4c AC2/D3: fault-injection for falsifiability gate. Implies
+# kernel_measurement so injection lands on the real path, not smoke. MUST NOT
+# appear in any release/GA feature set (compile_error! + CI cargo-tree check).
+bench-fault-inject = ["kernel_measurement"]
 
 [dependencies.tokio]
 version = "1"
@@ -65,3 +69,10 @@ required-features = ["kernel_measurement"]
 [[bench]]
 name = "audit_query_latency"
 harness = false
+
+# Story 10.4c AC3 (review D3) — J4 §13.1 latency regression track (Gate 2a).
+# Mirrors iac_routing_budget / orchestrator_fanout_nfr_perf_8 (NFR-Perf-* idiom).
+[[bench]]
+name = "j4_latency_regression"
+harness = false
+required-features = ["kernel_measurement"]

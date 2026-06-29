@@ -1,7 +1,7 @@
 ---
 title: Scheduled Invocations
 sidebar_position: 8
-description: Using on_schedule and manifest schedule entries for periodic Spirit tasks.
+description: Using `on_schedule` and manifest schedule entries for periodic Spirit tasks.
 ---
 
 # Scheduled Invocations

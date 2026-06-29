@@ -1245,18 +1245,27 @@ fn load_expected_hook_count(workspace_root: &Path, config_path: Option<&Path>) -
 }
 
 fn load_hook_count_from_file(path: &Path) -> usize {
-    let content = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("load_expected_hook_count: cannot read {}: {e}", path.display()));
-    let toml: toml::Value = content
-        .parse()
-        .unwrap_or_else(|e| panic!("load_expected_hook_count: invalid TOML in {}: {e}", path.display()));
+    let content = fs::read_to_string(path).unwrap_or_else(|e| {
+        panic!(
+            "load_expected_hook_count: cannot read {}: {e}",
+            path.display()
+        )
+    });
+    let toml: toml::Value = content.parse().unwrap_or_else(|e| {
+        panic!(
+            "load_expected_hook_count: invalid TOML in {}: {e}",
+            path.display()
+        )
+    });
     toml.get("expected_count")
         .and_then(|v| v.as_integer())
         .map(|n| n as usize)
-        .unwrap_or_else(|| panic!(
-            "load_expected_hook_count: missing `expected_count` key in {}",
-            path.display(),
-        ))
+        .unwrap_or_else(|| {
+            panic!(
+                "load_expected_hook_count: missing `expected_count` key in {}",
+                path.display(),
+            )
+        })
 }
 
 /// AST-walk `maos-spirit-abi/src/lifecycle.rs` + `maos-spirit-derive/src/lib.rs`

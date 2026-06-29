@@ -30,10 +30,16 @@ db_path = '$DB_PATH'
 if os.path.exists(db_path):
     os.remove(db_path)
 conn = sqlite3.connect(db_path)
+# Schema mirrors the production TransparencyLogAdapter (maos-iac
+# adapter/transparency_log.rs SCHEMA_SQL): 11 columns, including the
+# from_spirit_id / to_spirit_id A2A routing columns. Keep in sync — the CLI
+# audit query SELECTs all of them.
 conn.execute('''CREATE TABLE IF NOT EXISTS transparency_log (
     frame_id BLOB NOT NULL PRIMARY KEY,
     timestamp_ns INTEGER NOT NULL,
     spirit_pid INTEGER NOT NULL,
+    from_spirit_id TEXT NOT NULL DEFAULT '',
+    to_spirit_id TEXT NOT NULL DEFAULT '',
     boot_nonce INTEGER NOT NULL,
     capability_token BLOB,
     kind INTEGER NOT NULL,
@@ -41,7 +47,7 @@ conn.execute('''CREATE TABLE IF NOT EXISTS transparency_log (
     payload_redacted BLOB NOT NULL,
     origin INTEGER NOT NULL)''')
 conn.execute('''INSERT INTO transparency_log VALUES
-    (?, 1700000000000000000, 7, 3735928559, ?, 7, 'delegate', ?, 0)''',
+    (?, 1700000000000000000, 7, '', '', 3735928559, ?, 7, 'delegate', ?, 0)''',
     (b'\xaa' * 16, b'\xbb' * 32, b'REDACTED'))
 conn.commit()
 conn.close()

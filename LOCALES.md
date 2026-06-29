@@ -10,9 +10,9 @@ FROM this file (D5, Story 9.5).
 | Locale | Status | Notes |
 |--------|--------|-------|
 | `en` (English) | **Default** — source locale | All content authored in English |
-| `ko` (Korean) | **active — partial coverage** | Machine-translated with locked-term enforcement. Story 9.5 shipped a representative sample (journey-layer pages) + English fallback; **full canonical coverage is owned by Story 10.3** (see Page Coverage below) |
-| `ja` (Japanese) | **Deferred to v1.5** | Not stubbed; explicit deferral |
-| `zh-CN` (Chinese Simplified) | **Deferred to v1.5** | Not stubbed; explicit deferral |
+| `ko` (Korean) | **active — full canonical coverage** | Machine-translated with locked-term enforcement. Full canonical coverage delivered by Story 10.3 (all 5 canonical doc deliverables + the generated ABI reference). Story 9.5 shipped the toolchain, the glossary lock, and a representative sample (journey-layer pages) with English fallback (see Page Coverage below) |
+| `ja` (Japanese) | **Deferred to v2.0 (Epic 11)** | NOT yet translated. `i18n/ja/` currently holds untranslated WIP scaffold (Korean placeholder content cloned from `ko`), so the coverage gate is report-only at v1.5. Real Japanese translation + 100% gate enforcement is Epic 11 (Story 10.5 AC5 descoped per Epic-10 retro §A2 finding R2) |
+| `zh-Hans` (Chinese Simplified) | **Deferred to v2.0 (Epic 11)** | NOT yet translated. `i18n/zh-Hans/` currently holds untranslated WIP scaffold (Korean placeholder content cloned from `ko`), so the coverage gate is report-only at v1.5. Real Chinese translation + 100% gate enforcement is Epic 11 (Story 10.5 AC5 descoped per Epic-10 retro §A2 finding R2) |
 | RTL locales (ar, he, etc.) | **Deferred to v2.5** | Requires layout and component changes |
 
 ## Locked-Term Registry
@@ -84,6 +84,30 @@ break the domain model.
 | kernel | 커널 | While 커널 is the standard Korean for "kernel", in MAOS docs it MUST remain as the English "kernel" to match code identifiers and error messages |
 <!-- END DENYLIST -->
 
+### Japanese (日本語) denylist
+
+These Japanese translations MUST NEVER appear in `i18n/ja/` strings.
+
+<!-- BEGIN DENYLIST JA -->
+| English Term | Bad Japanese | Why |
+|---|---|---|
+| Spirit | 精霊 / スピリット | "Spirit" is a proper noun in MAOS (an agent), not a supernatural entity |
+| Worker | ワーカー | "Worker" is a Spirit role class; must remain English to match code identifiers |
+| kernel | カーネル | "kernel" must remain English in MAOS docs to match code and error messages |
+<!-- END DENYLIST JA -->
+
+### Chinese Simplified (简体中文) denylist
+
+These Chinese translations MUST NEVER appear in `i18n/zh-Hans/` strings.
+
+<!-- BEGIN DENYLIST ZH-HANS -->
+| English Term | Bad Chinese | Why |
+|---|---|---|
+| Spirit | 精神 / 灵魂 | "Spirit" is a proper noun in MAOS (an agent), not a conceptual term |
+| Worker | 工人 / 工作者 | "Worker" is a Spirit role class; must remain English |
+| kernel | 内核 | "kernel" must remain English in MAOS docs to match code and error messages |
+<!-- END DENYLIST ZH-HANS -->
+
 ## Green ≠ Correct Korean
 
 > **Caveat:** A green CI glossary-lock gate proves that a locked term is
@@ -97,29 +121,52 @@ break the domain model.
 
 ## Page Coverage (per-locale completeness)
 
-Adding a locale (above) is distinct from *fully translating* it. Korean is **active
-but partial**: Story 9.5 deliberately shipped the toolchain, the glossary lock, and a
-representative sample (the journey-layer pages), with **English fallback** for the rest
-(`gate:fallback`, AC-4). The glossary-lock gate enforces locked terms only on pages that
-*are* translated — it does **not** require full coverage — so coverage is a permitted
-floor today, not the target.
+Adding a locale (above) is distinct from *fully translating* it. Korean is now
+**active — full canonical coverage** for v1.0: Story 9.5 shipped the toolchain,
+glossary lock, and journey-layer sample; Story 10.3 completed the canonical
+coverage set and turned coverage into a mechanical ship gate.
 
-- **Visibility now:** `npm run gate:ko-coverage` (in `docs-site/`) reports
-  translated/total per canonical doc deliverable. Report-only by default.
-- **Teeth at v1.0:** **Story 10.3** (Epic 10 v1.0 ship gate, NFR-Doc-6) requires Korean
-  present for **all 5 canonical doc deliverables**. That story wires
-  `KO_COVERAGE_MIN=100` into the `docs-site` CI to turn the promise into a mechanical
-  gate (a promise without a gate decays — Epic 8 lesson). Open scoping question for 10.3:
-  whether the 37 generated `/errors/` pages count toward the troubleshoot deliverable.
+- **Mechanical gate:** `npm run gate:ko-coverage` (in `docs-site/`) reports
+  translated/total per canonical doc deliverable and honors
+  `KO_COVERAGE_MIN=100` in CI.
+- **Canonical denominator:** all 5 canonical doc deliverables plus the generated
+  ABI reference are counted. Generated `/errors/` pages are **excluded** from
+  the denominator for v1.0 (resolved in Story 10.3; they remain English until a
+  future localization pass).
 
 ## Deferral Policy
 
 - **v1.0:** English (source) + Korean (locked-term-enforced, CI-gated; **full canonical
   page coverage at Story 10.3** — see Page Coverage above)
-- **v1.5:** Japanese + Chinese Simplified (same locked-term model)
+- **v1.5:** _(Japanese + Chinese Simplified were planned here but DESCOPED to v2.0
+  per Epic-10 retro §A2 finding R2 — `i18n/ja` & `i18n/zh-Hans` are untranslated WIP
+  scaffold, coverage gates report-only; see the status table above)_
+- **v2.0 (Epic 11):** Japanese + Chinese Simplified — real machine translation with the
+  same locked-term model, **plus a new language-identity gate dimension** (the existing
+  file-presence coverage + glossary-lock gates provably cannot detect wrong-language
+  content, which is how the Korean-placeholder scaffold passed tautologically)
 - **v2.5:** RTL locale support (requires Docusaurus RTL theme + layout audit)
 - New locales follow the same pattern: add to `docs-site/docusaurus.config.ts`
   `i18n.locales`, populate `i18n/<locale>/`, extend locked-term checks
+
+## Translation review status
+
+Every Korean translation file (`i18n/ko/**/*.md`) carries a `review_status`
+front-matter field that tracks where it sits in the three-layer quality
+model (machine translation → glossary-lock CI gate → native/fluent reviewer):
+
+| `review_status` | Meaning |
+|---|---|
+| `machine` | Machine-translated; the glossary-lock CI gate enforces locked-term correctness, but the unit has NOT yet been reviewed by a native/fluent Korean reviewer. This is the CI floor. |
+| `human-reviewed` | Passed an initial native/fluent Korean review (`runbook:ko-a11y-manual`). |
+| `approved` | Signed off for the release; no further changes expected. |
+
+The `high_risk: true` front-matter flag marks translation units prioritized
+for native review. At v1.0 this is the two high-stakes deployment guides
+(`deploy/air-gap-deployment.md` and `deploy/release-signing.md`), where a
+translation error could mislead an operator during a safety-critical
+procedure. CI does not gate on these flags — they drive reviewer
+prioritization, since the CI gate is a floor, not a ceiling.
 
 ## CI Integration
 
@@ -131,5 +178,15 @@ The glossary-lock gate (`gate:glossary-lock`) reads this file's
    - Fails if any denylist entry appears in the Korean file
 2. Checks canonical casing (case-sensitive match for code identifiers)
 3. Reports per-file violations with line numbers
+4. Asserts canonical Korean coverage (`gate:ko-coverage`, enforced at `KO_COVERAGE_MIN=100` from Story 10.3 / v1.0)
+
+### Source-quality rule (preflight Paige P3)
+
+All configuration key names, CLI flags, and file paths MUST be wrapped in
+inline code spans in the English source **before** translation. Bare TOML
+keys, flags, and paths in prose get mangled by the machine-translation
+engine; wrapping them in inline code spans prevents that. Audit the English
+source pages and wrap obvious bare references conservatively — do not reflow
+other text.
 
 The gate runs as part of the `docs-site` CI workflow.

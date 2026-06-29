@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import {
   buildPageRoutes,
   koPath,
+  jaPath,
+  zhPath,
   loadManifest,
   manifestRoutePaths,
   type RouteManifest,
@@ -17,10 +19,14 @@ function expectedPageRoutes(manifest: RouteManifest): Set<string> {
   for (const route of enRoutes) {
     expected.add(normalizeRoute(route));
     expected.add(normalizeRoute(koPath(route)));
+    expected.add(normalizeRoute(jaPath(route)));
+    expected.add(normalizeRoute(zhPath(route)));
   }
   for (const redirect of manifest.redirects ?? []) {
     expected.add(normalizeRoute(redirect.from));
     expected.add(normalizeRoute(koPath(redirect.from)));
+    expected.add(normalizeRoute(jaPath(redirect.from)));
+    expected.add(normalizeRoute(zhPath(redirect.from)));
   }
   return expected;
 }

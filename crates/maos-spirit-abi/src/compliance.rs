@@ -573,4 +573,58 @@ mod tests {
             "Claim JSON snapshot changed; if intentional, bump ABI_VERSION and update this golden value"
         );
     }
+
+    /// §8.5 additive-tolerance: optional fields with `#[serde(default, skip_serializing_if)]`
+    /// and `#[serde(other)]` enum fallback variants deserialize forward-compatibly
+    /// WITHOUT requiring an `ABI_VERSION` bump. This is the missing half of the
+    /// §8.5 self-test — the breaking-detection half is `claim_json_snapshot_is_unchanged`.
+    #[test]
+    fn additive_fields_and_unknown_variants_no_bump() {
+        // 1. Serialize a Claim WITHOUT the optional `expires_at_unix_ms` field,
+        //    then deserialize back — proves #[serde(default, skip_serializing_if)]
+        //    round-trips cleanly.
+        let claim_no_expiry = Claim {
+            claim_id: Uuid::from_bytes([0u8; 16]),
+            issued_at_unix_ms: 1_700_000_000_000,
+            expires_at_unix_ms: None,
+            principle_refs: vec![PrincipleRef::Hipaa164308],
+            evidence: vec![],
+            verdict: Verdict::Admit,
+        };
+        let json = serde_json::to_string(&claim_no_expiry).unwrap();
+        // The optional field must be ABSENT from the JSON (skip_serializing_if).
+        assert!(
+            !json.contains("expires_at_unix_ms"),
+            "optional None field must be skipped in serialization"
+        );
+        let roundtrip: Claim = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.expires_at_unix_ms, None);
+
+        // 2. Feed an unknown enum tag to PrincipleRef → must deserialize to
+        //    UnknownPrinciple (the #[serde(other)] fallback), proving forward-compat
+        //    for additive enum variants.
+        let unknown_principle_json = r#""some_future_principle""#;
+        let p: PrincipleRef = serde_json::from_str(unknown_principle_json).unwrap();
+        assert_eq!(p, PrincipleRef::UnknownPrinciple);
+
+        // 3. Feed an unknown verdict tag → must deserialize to UnknownVerdict.
+        let unknown_verdict_json = r#""some_future_verdict""#;
+        let v: Verdict = serde_json::from_str(unknown_verdict_json).unwrap();
+        assert!(matches!(v, Verdict::UnknownVerdict));
+
+        // 4. ProviderEndpointPin.model_id with #[serde(default, skip_serializing_if)]
+        //    round-trips None cleanly.
+        let pin = ProviderEndpointPin {
+            provider_id: "anthropic".into(),
+            endpoint_url: "https://api.anthropic.com".into(),
+            model_id: None,
+        };
+        let pin_json = serde_json::to_string(&pin).unwrap();
+        assert!(
+            !pin_json.contains("model_id"),
+            "optional None model_id must be skipped"
+        );
+        let pin_rt: ProviderEndpointPin = serde_json::from_str(&pin_json).unwrap();
+        assert_eq!(pin_rt.model_id, None);
+    }
 }

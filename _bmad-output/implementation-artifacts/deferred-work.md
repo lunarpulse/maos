@@ -1,3 +1,11 @@
+## Deferred from: Story 10.5 R4-only re-review (2026-06-29) — non-blocking hardening follow-ups (GO logged these, did not block)
+
+> Surfaced by the §A2/§A6 R4-only re-review (run `wcw24wqlm`, unanimous GO). All three are hardening items the synthesis lead explicitly **dismissed as 10.5 GO blockers** after independent re-confirmation — filed here so the gaps are owned, not assumed-closed. See `story-10-5-r4-rereview-2026-06-29.md`.
+
+- **cargo-deny is effectively NON-BLOCKING.** `cargo deny check` runs as a step **inside** the `reproducible-build` job, which is `continue-on-error: true` (the aggregate's `contains(needs.*.result,'failure')` check is neutralized for a continue-on-error job — proven in the Epic-10 5th-push iteration). So the "NON-NEGOTIABLE" supply-chain dependency-closure gate (10.4b) is currently advisory. Pre-existing (continue-on-error dated 2026-06-12, FLAG-Winston); masks nothing **at HEAD** because `cargo deny check` genuinely passes (exit 0). **Action:** move `cargo deny check` into its **own** `continue-on-error: false` job so a future supply-chain failure cannot be silently swallowed. Owner: Winston/John.
+- **windows-check sandbox step has no vacuous-green guard.** The step `cargo test -p maos-kernel-core --test sandbox_enforcement_windows ...` has no `>=1 test ran` assertion. On windows-latest `#![cfg(target_os="windows")]` is satisfied so all 6 tests run today; but a future cfg/target drift compiling the suite to **zero tests** would `exit 0` silently. **Action:** add a `test result: ok. [1-9]` grep guard, the idiom already used by `check-j4-latency`. Owner: test-infra.
+- **Epic 11 must carry REAL ja/zh-Hans + a language-identity gate.** AC5 i18n is honestly DESCOPED to v2.0/Epic 11 (Korean placeholders + DO-NOT-SHIP markers; coverage+glossary gates report-only because they tautologically pass on wrong-language content). Epic-11 Story 11.6 must add real translations **and** a language-identity gate that detects wrong-language content (Hangul-in-ja, etc.) — coverage/glossary-lock provably cannot. Owner: Epic 11 party-mode ratification.
+
 ## Deferred from: Story 9.5b preflight party-mode Round 2 (2026-06-16) — OTel spans are a new telemetry data-sink the GDPR erasure scope must acknowledge
 
 > Surfaced by Murat in the 9.5b OpenTelemetry-adapter preflight (Winston·Amelia·Murat·John, ratified Lunarpulse). Cross-story finding — out of 9.5b's own ACs by design, filed here so the gap is owned, not assumed-closed.
@@ -103,7 +111,7 @@ dev_model_used: claude-opus-4-7
 - `maosctl skills approve/reject` are acknowledgement-only stubs (no real queue interaction) — acknowledged v0.5 limitation; queue logic IS tested in-unit. Persistent queue store is future work.
 - `parse_skill` unknown-field classification depends on serde error message string (`"unknown field"`) — bounded by `check-skill-schema` xtask gate but fragile coupling to serde internals.
 - Queue is in-process only (`Vec<PendingEntry>`) — no cross-invocation persistence; audit trail lives only as long as the process. Acknowledged v0.5 gap per dev record.
-- Discovery scans only top-level files (`read_dir`, flat, non-recursive) — skills in subdirectories silently skipped. Deferred per team discussion (Winston/John): add doc comment documenting flat-only semantics now; make recursive only after spec clarification on whether nested skill directories are intended. `crates/maos-skill/src/discovery.rs`
+- ~~Discovery scans only top-level files (`read_dir`, flat, non-recursive)~~ — **RESOLVED by Story 10.5 (2026-06-25)**: `crates/maos-skill/src/discovery.rs` now supports directory-aware `dir/SKILL.md` bundles for Anthropic Skills conformance while keeping top-level file discovery intact.
 
 ## Deferred from: code review of 5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers (2026-05-24)
 
@@ -356,16 +364,22 @@ dev_model_used: claude-opus-4-7
 ## Deferred from: CI remediation 2026-06-11 (first Epic-8 CI validation, round 3)
 
 ### NEW STORY NEEDED — spirit-authoring template suite repair (templates/spirit-{rust,ts})
+> **GENERATION-ABORT HALF CLOSED 2026-06-26 (Epic 10 retro §A4) — VERIFIED.** Both
+> `templates/spirit-{rust,ts}` now generate clean on cargo-generate **0.23.11**
+> (`cargo generate --path templates/spirit-rust --name test-spirit --define class_name=MySpirit --silent`
+> → Done; spirit-ts produces a valid `"name": "@local/test-spirit-ts"`). Fixes applied:
+> dropped the reserved `crate_name` placeholder (both), removed the dead `[hooks]
+> post-generate.rhai` reference (both), and — found by actually running it, beyond the
+> notes below — fixed ts `package_name` (0.23 does NOT interpolate `default` values and
+> regex-validates them as literals; dropped the placeholder, `package.json` now uses the
+> built-in `{{project-name}}` directly). REMAINING (do NOT flip `smoke-spirit-author-7-1`
+> to blocking until closed): the TS npm-publication blocker below. Once that lands, run the
+> smoke green and graduate the gate.
 The author-side scaffolding has bit-rotted since Story 7.1 and was never CI-validated
 (main had no CI run from the 7.1.5 freeze through Epic 8). `smoke-spirit-author-7-1` is
 now ADVISORY (continue-on-error in discipline.yml) until a dedicated story closes:
-- **cargo-generate 0.23 compat**: both `templates/spirit-{rust,ts}/cargo-generate.toml`
-  declare a `[placeholders] crate_name` that newer cargo-generate RESERVES → generation
-  aborts ("you can't override `project-name`/`crate_name`/..."). Drop the placeholder;
-  use the built-in `crate_name`/`project-name` (fed by `--name`).
-- **Missing hook file**: both tomls reference `[hooks] post = ["post-generate.rhai"]` but
-  no `.rhai` exists. Either add the hook files or remove the `[hooks]` block (the inline
-  `[template.scripts] post-generate` already prints the next-step guidance).
+- ~~**cargo-generate 0.23 compat**: reserved `crate_name` placeholder aborts generation.~~ FIXED+VERIFIED 2026-06-26 (§A4).
+- ~~**Missing hook file**: dangling `[hooks] post = ["post-generate.rhai"]`.~~ FIXED 2026-06-26 (§A4, `[hooks]` block removed; inline `[template.scripts]` retained).
 - **TS template npm path blocked on SDK publication**: `templates/spirit-ts/package.json`
   declares `@maos/spirit-ts: "^0.5.0"` (unpublished) and the scaffolded output runs
   `npm ci` (needs a lockfile). A scaffold-local `file:` path + `npm install` would fix the
@@ -381,25 +395,11 @@ now ADVISORY (continue-on-error in discipline.yml) until a dedicated story close
 
 ## Deferred from: CI remediation 2026-06-12 (round 5 — nfr-perf compile regression)
 
-### NEW STORY NEEDED — rebuild J4/J6 real `kernel_measurement` harnesses (maos-bench)
-The `kernel_measurement` feature of `maos-bench` failed to COMPILE (17 errors),
-silently masked by the nfr-perf jobs' `continue-on-error`. Root cause: the J4/J6
-real-measurement harnesses authored in Story 8.5 (`201f95b`) drifted against
-current APIs and never recompiled (main had no CI between 7.1.5 and Epic 8). The
-real bodies were temporarily NEUTRALIZED to a smoke fallback + loud "NOT real"
-warning so the lib compiles and the (unrelated) iac_routing_budget /
-orchestrator_fanout perf benches can build and run. A story should REBUILD the
-real measurement paths:
-- `harness/j4.rs::run_j4_kernel` — `CryptoProvider` trait reshaped (now
-  `verify_signature`/`seal_for_export`/`sign_capability_token`; dropped
-  `sign`/`sign_detached`/`generate_keypair`); `CapabilityRegistryAdapter::new`
-  grew 3→8 args; `TransparencyLogAdapter::new`→`open_in_memory`;
-  `Ed25519SigningKey::generate` moved; `Mailbox`/`TelemetryStreamAdapter` ctors.
-- `harness/j6.rs::run_j6_kernel` — references `mira`/`nash` crates that are NOT
-  maos-bench deps (add as dev-deps), and the private `maos_domain::frame::FrameOrigin`
-  (use `maos_domain::invariants::i3::FrameOrigin`); current substrate ctors.
-- Until rebuilt, J4/J6 REAL measurement (section_13_1 / j6-real-measurement
-  nightly) returns smoke samples with a warning — honest but not a real number.
+### ~~NEW STORY NEEDED — rebuild J4/J6 real `kernel_measurement` harnesses (maos-bench)~~ CLOSED
+
+> **CLOSED by Story 10.4c** (2026-06-24):
+> - **J4 (`harness/j4.rs::run_j4_kernel`) → DONE.** Real in-kernel `scalar.tap` measurement rebuilt from the verified template (`scalar_tap_subscriber.rs:24-77`). Gate renamed `check-j4-placeholder-red` → `check-j4-latency`. P95=1µs at HEAD (well within 10ms budget). Falsifiability proven: `bench-fault-inject` feature injects ≥15ms delay → P95 crosses 10000µs → RED.
+> - **J6 (`harness/j6.rs::run_j6_kernel`) → CUT, FF-J6-guarded.** J6 cold-start latency harness is CUT from 10.4c — §13.1 declares it non-binding ("correctness gate dominates") and it is out of v1.5 scope; it is revived only when a J6 latency assertion or user-facing J6 latency claim is introduced, which CI guard FF-J6 (`xtask check-ff-j6`) blocks until the harness is rebuilt. `run_j6_kernel` now returns `JourneyResult::not_measured("J6")` instead of a plausible fake number. `mira`/`nash` dev-deps and the `FrameOrigin` path fix were NOT pulled in.
 
 ### FIXED in this round (nfr-perf gates now build + RUN)
 - `orchestrator_fanout_nfr_perf_8.rs`: (a) `handle.recv()` now yields
@@ -479,3 +479,38 @@ and `check-epic-close-green` (§A5) added. YAML re-validated.
 - **`query_approvals` ordering semantic change** — changed from `timestamp_ns ASC` to `decision_id ASC`; intentional per Review #5/R8 to eliminate non-monotonic-clock LWW hazard, but it is a behavior change to a public read API. `crates/maos-iac/src/adapter/transparency_log.rs:1305-1307`
 - **Reconcile keys on raw target string, `parse_approval_target` removed** — intentional per Review #13; safe today because `SkillId` charset excludes `@`, but it abandons the bidirectional "cannot drift" guarantee R6 originally sought. `crates/maos-cli/src/subcommands.rs:334`
 - **`entry_path` provenance fidelity for CLI-discovered skills** — filesystem discovery (`discover_skills_detailed`) has no provenance signal, so 9.7 caches discovered skills as `package_shipped`. Faithful provenance (`AuthorSelf`/`RevisionProposal`) is an enqueue-time concept owned by the Epic-10 F6b/R8 daemon-enqueue seam. **Constraint:** any future daemon admission-enforcement logic must key on the TL decided-set (approve/reject capability rows), NEVER on the cached `entry_path` label. Add a pinning test that fails when discovery gains a provenance signal or the daemon starts writing enqueue rows, forcing the follow-up. `crates/maos-cli/src/subcommands.rs:425-430`
+
+## Deferred from: code review of story-10.2 (2026-06-21) — RESOLVED pre-completion
+
+Both items below were resolved during story 10.2 completion (per Lunarpulse).
+Extracted to `xtask/src/gate_common.rs` and applied to all 4 gate modules:
+
+- ✅ **Date validation** — now uses `chrono::NaiveDate::parse_from_str("%Y-%m-%d")` in `gate_common::validate_dates`; rejects impossible dates (`2026-99-99`), enforces `start <= end` ordering.
+- ✅ **`--json` mode workflow commands** — `gate_common::emit_command` documents the stderr/stdout split; structured warning/error fields in the JSON payload (`advisory`, `failures`, `consistency_ok`) let programmatic consumers assert on JSON, not stderr.
+
+## Deferred from: code review of 10-3-close-v1-0-compliance-gates-export-control-fuzz-hardening-korean-docs-cna-registration (2026-06-22)
+
+- **Unmaintained `serde_cbor` 0.11 (RUSTSEC-flagged) re-used as a new fuzz-crate dependency.** Story 10.3 wire-protocol fuzz crate `crates/maos-domain/fuzz/Cargo.toml` depends on `serde_cbor = "0.11"` per ratified preflight N6 (fuzz harness MUST use the same CBOR crate as production code; `maos-compliance`/`canonical_cbor.rs` already depends on `serde_cbor` 0.11). The crate is deprecated and carries a known amplification DoS (mitigated operationally via `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0` + `-rss_limit_mb=0`, documented in `docs/runbooks/fuzz-cadence.md`). Resolution = migrate `maos-compliance` canonical-CBOR off `serde_cbor` → `ciborium` (already used by `maos-kernel-core`) and update the fuzz harness to match — a supply-chain/modernization effort that spans production code, out of 10.3's docs/fuzz-i18n scope. Owner: future hardening story; flag to Winston/security.
+
+## Deferred from: Story 10.3 code review — export classification counsel confirmation (2026-06-22)
+
+- **Export-compliance counsel confirmation before v1.0 enterprise distribution.** Story 10.3 corrected the engineering self-classification citation in `STABILITY.md` §Export and `docs/compliance/eccn-classification.md`: the classification basis is now the "ancillary cryptography" Note to ECCN 5D002.c.1, while 15 CFR §740.13(e) is scoped to the open-source-software / License Exception TSU aspect. The team consensus (Winston·Murat·John·Mary, 2026-06-22) was **A-now + C-distribution-gate**: the citation correction is a verifiable regulatory-text read, but "MAOS qualifies for EAR99" remains a legal applicability opinion. **Gate:** export-compliance counsel must confirm (or amend) the EAR99/5D002 determination before v1.0 enterprise distribution. This does not block code completion, but it blocks enterprise distribution materials and final legal sign-off.
+## Deferred from: code review of 10-4a-postgres-pgvector-loom-lite-collective-tier-and-sqlite-postgres-migration (2026-06-22, Chunk A)
+
+- **`LoomLiteAdapter::handle.block_on` latent deadlock under tokio blocking-pool saturation** [crates/maos-loom-lite/src/adapter.rs write/read/scan impls]. Each sync port method parks a `spawn_blocking` worker via `Handle::block_on` for the whole async op; the blocking pool is bounded (default 512). A burst of collective-tier calls that saturates the pool, where parked futures themselves need blocking threads, can deadlock. This is the pre-existing topology risk acknowledged in ratified preflight §3 (the async boundary lives in `maos-loom-lite`, never kernel-core); no AC covers pool-saturation deadlock at v1.5. Monitor at scale; consider a bounded semaphore / timeout budget around collective-tier calls if concurrency rises. (The related panic-on-runtime-shutdown gap is filed as a Chunk A patch, not deferred.)
+- **J — Kernel-port-sig Provenance threading** (`crates/maos-domain/src/ports/collective_memory.rs` `write` sig). I11 is enforced NOW via a Postgres store-layer CHECK constraint (`kind='pattern' => source_log_ref<>'' AND distillation_depth>0`). The kernel-sig threading (adding a `Provenance { kind, source_log_ref, distillation_depth }` param) is DEFERRED to the pattern-distillation story — threading `distillation_depth` through the kernel would blur ADR-006 ("kernel learns nothing"; distillation depth is a Loom concept) and force a speculative FLAG-Winston re-pin (YAGNI). Party-mode consensus 3/4 (Winston/Murat/John vs Amelia); the CHECK constraint makes a future violation un-mergable.
+- **R — pgvector/HNSW similarity-search + embedding population** (`crates/maos-loom-lite/src/store.rs`, `schema.rs`). AC1's operational clauses are KV mediation + I9 + transport — no similarity-search requirement; populating embeddings needs an embedding-provider (excluded from the kernel per ADR-006) with no v1.5 consumer. DEFERRED to a named pattern-retrieval/distillation story; v1.5 ships KV-only. Document staging in the story + ADR; no gate/proven-red may claim similarity-search works at v1.5. Party-mode consensus 4/4.
+- **HNSW session `SET`s apply to ONE pooled connection, not the whole pool** (`crates/maos-loom-lite/src/store.rs` `init_schema`). `init_schema` runs `SET hnsw.iterative_scan='relaxed_order'` on one checked-out connection; lazily-created pool connections run with the default (off). No per-connection init/recycle hook is wired. DEFERRED WITH R as latent-until-embeddings (no v1.5 op issues a vector query); wire a deadpool `Manager`/`recycle` per-connection init when embeddings land.
+- **AF — At-scale 4h-breaching RTO-timing falsifiability** (`xtask/src/check_rto.rs` drill). At v1.5 scale (10⁶ rows) no restore of either SQLite or Postgres approaches the 4h SLA — the 4h target is a v2.0-capacity-envelope NFR (CUT to v2.0 in the 10.4 preflight). 10.4a lands the Postgres collective-tier drill (representativeness) + the §A1 timing-branch gate-mechanics proven-red (injected delay / threshold=0 → RED, falsifiable in principle) + the surrounding RTO patches. True 4h-breaching falsifiability DEFERRED to v2.0; v1.5 RTO timing documented as nominal. Party-mode consensus 3/4 (Winston/Murat/John vs Amelia).
+
+## Deferred from: code review of 10-4a re-review (2026-06-23)
+
+- **W1 — B18 per-row INSERT performance (~300s for 10⁶ rows)** [crates/maos-loom-lite/src/migration.rs]. Acknowledged correctness-OK. COPY batch optimization tracked as future performance improvement. Pre-existing design choice; ~300s functional at engagement scale.
+- **W2 — Manifest corpus pins derived from same generator — not independently anchored** [tests/corpora/MANIFEST.toml]. No production TL exists yet at v1.5. Generator is deterministic; pins are internally consistent. Document limitation for future production-sample anchoring when real TL data exists.
+- **W3 — AC2 live cross-backend tests are #[ignore]-only — no CI Postgres service** [crates/maos-loom-lite/tests/migration_live.rs]. Skipped-not-silent-PASS semantics are honest. Missing piece is a scheduled live Postgres environment in CI. Pre-existing infrastructure gap; not a code defect.
+- **W4 — frames_25k theatrical for in-memory proven-red vectors** [xtask/tests/story_10_4a_proven_red.rs:37-43]. Batch-boundary coverage genuinely met by migration_live.rs (#[ignore]). In-memory vectors don't exercise batching despite header claim. Minor documentation inaccuracy.
+- **W5 — RPO≤1h not independently gate-enforced on weekly cadence** [xtask/src/check_rto_gate.rs]. Drill folds `rpo_ok` into `passed` (immediate fix applied), but the weekly gate only checks drill_success + rto_seconds. RPO enforcement is drill-scoped, not gate-scoped. Minor gap.
+
+## Deferred from: code review of 10-4c-j4-j6-real-kernel-measurement-harness-rebuild (2026-06-24)
+
+- **2-of-3 reproduce-to-block de-flaking control (AC3/D2)** [crates/maos-bench/src/harness/j4.rs; t_10_4c_j4_latency_gate.rs]. The spec-mandated "a RED must reproduce 2-of-3 in-process passes before the gate fails" retry loop is unimplemented — the J4 measurement runs once per test. *Reason deferred:* at HEAD the measured P95 is ~1µs vs the 10ms budget (~10000× headroom), so a flake-induced false-RED is implausible near-term; revisit when J4 latency approaches the budget. The absolute-budget gate (AC3) and the Gate-1 mutation falsifier (AC2) remain load-bearing every PR.

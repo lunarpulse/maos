@@ -879,8 +879,7 @@ mod tests {
     #[test]
     fn provenance_absent_admits_when_not_required_ac11() {
         let manifest = b"[class]\nname = \"x\"\nversion = \"0.1.0\"\n".to_vec();
-        let got =
-            validate_model_provenance(&manifest, &ModelProvenancePolicy::default()).unwrap();
+        let got = validate_model_provenance(&manifest, &ModelProvenancePolicy::default()).unwrap();
         assert!(got.is_none(), "pre-v3 manifest must stay admissible");
     }
 
@@ -933,8 +932,8 @@ mod tests {
     fn provenance_free_text_lineage_rejects_malformed() {
         let manifest =
             manifest_with_provenance("trained on private emails", "2026-06-01T00:00:00Z");
-        let err = validate_model_provenance(&manifest, &ModelProvenancePolicy::default())
-            .unwrap_err();
+        let err =
+            validate_model_provenance(&manifest, &ModelProvenancePolicy::default()).unwrap_err();
         assert!(matches!(err, AdmissionError::ModelProvenanceMalformed(_)));
     }
 

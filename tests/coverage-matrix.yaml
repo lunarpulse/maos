@@ -238,6 +238,7 @@ coverage:
     notes: v0.8 loopback A2A; v1.0 full mesh at FR23b
   FR23b:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -383,21 +384,25 @@ coverage:
     valid_until: '2027-05-12'
   FR42:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR43:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR44:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR45:
     gates: []
+    enforcement: advisory-until-engagement
     corpora:
     - gdpr-cascade-v0
     - gdpr-cascade-probe-v0
@@ -406,6 +411,7 @@ coverage:
     notes: Story 9.2 ships maosctl forget + legal-hold + distillate redaction-marker/body-scrub; replayed by gdpr-cascade-v0 (50 scenarios) and leakage probe gdpr-cascade-probe-v0
   FR46:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -433,6 +439,7 @@ coverage:
       (NFR-Sec-15) without recompiling any Spirit binary.
   FR49:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -448,6 +455,7 @@ coverage:
     valid_until: '2027-05-12'
   FR51:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -463,6 +471,7 @@ coverage:
     valid_until: '2027-05-12'
   FR54:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -507,6 +516,7 @@ coverage:
       acknowledgement is the existing 1b.5a behavior gate
   FR59:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -532,21 +542,25 @@ coverage:
       malformation; CNA registration deferred to v0.5
   FR62:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR63:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR64:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   FR65:
     gates: []
+    enforcement: advisory-until-engagement
     corpora:
     - gdpr-cascade-v0
     - gdpr-cascade-probe-v0
@@ -581,11 +595,13 @@ coverage:
       verbs land their journal touchpoints in Stories 1b.5c and 5.1.
   NFR-Aud-1:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Aud-10:
     gates: []
+    enforcement: advisory-until-engagement
     corpora:
     - gdpr-cascade-v0
     - gdpr-cascade-probe-v0
@@ -594,11 +610,13 @@ coverage:
     notes: Story 9.2 50/50 clean-removal + 0/100 leakage floor over separate probe; structural replay, no live judge
   NFR-Aud-11:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Aud-12:
     gates: []
+    enforcement: advisory-until-engagement
     corpora:
     - gdpr-cascade-v0
     phase: v1.0
@@ -606,6 +624,7 @@ coverage:
     notes: Story 9.2 Merkle inclusion/exclusion proof over TL frame_ids; signed ErasureProof bundle verified by in-tree tests and tools/verify-erasure
   NFR-Aud-13:
     gates: []
+    enforcement: advisory-until-engagement
     corpora:
     - gdpr-cascade-v0
     phase: v1.0
@@ -618,11 +637,13 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Aud-2:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Aud-3:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -638,6 +659,7 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Aud-6:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -680,12 +702,17 @@ coverage:
       gates [] — the test job is wired into discipline.yml directly, not a
       gate-registry gate. v1.5 binding.
   NFR-Comp-1:
-    gates: []
+    gates:
+    - check-export-control
     corpora: []
-    phase: v0.8
+    phase: v1.0
     valid_until: '2027-05-12'
+    notes: Story 10.3 ships the ECCN classification artifact + STABILITY.md §Export
+      preserved fence + check-export-control gate (crypto enumeration). EAR99 ancillary
+      determination on file at docs/compliance/eccn-classification.md.
   NFR-Comp-2:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -696,16 +723,19 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Comp-4:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Comp-5:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Cost-1:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -716,31 +746,41 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Doc-2:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Doc-3:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Doc-4:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Doc-5:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Doc-6:
-    gates: []
+    gates:
+    - check-ko-coverage
+    - check-ja-coverage
+    - check-zh-coverage
     corpora: []
-    phase: v1.0
+    phase: v1.5
     valid_until: '2027-05-12'
+    notes: Story 10.3 ships Korean; Story 10.5 AC5 ships Japanese + zh-Hans.
+      KO/JA/ZHHANS_COVERAGE_MIN=100 wired into docs-site CI gates.
   NFR-Doc-7:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -762,22 +802,26 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Maint-4:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Maint-5:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Maint-6:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
     notes: 1-year LTS at v1.0; 2-year LTS at v1.5
   NFR-Maint-7:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -792,16 +836,19 @@ coverage:
       cap_registry_integration (integration_toctu_rejects_stale_posture).
   NFR-Maint-9:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Meta-1:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Obs-1:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -875,39 +922,51 @@ coverage:
     valid_until: '2027-05-12'
     notes: install/uninstall at v0.1; upgrade/yank at v0.5; revoke at v1.0
   NFR-Ops-10:
-    gates: []
-    corpora: []
+    gates:
+    - check-migration-merkle
+    corpora:
+    - migration-corpus-1e6
     phase: v1.5
     valid_until: '2027-05-12'
+    notes: Story 10.4a — SQLite→Postgres migration triple-oracle gate (Merkle
+      root + payload oracle + row count). Advisory at v1.0 (results absent →
+      advisory pass); blocking at v1.5. The 10⁶-row corpus spans 100 batch
+      boundaries at BATCH_SIZE=10_000, exercising multi-batch proven-red vectors.
   NFR-Ops-11:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
     notes: primitive-reservation at v1.0; full implementation v1.5+
   NFR-Ops-12:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Ops-2:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Ops-3:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Ops-4:
     gates:
     - check-security-md
+    - check-cna-registration
     corpora: []
-    phase: v0.1
+    phase: v1.0
     valid_until: '2027-05-12'
-    notes: 1a.4 ships SECURITY.md ship-gate via check-security-md xtask;
-      CNA registration through MITRE moves to v0.5 per the phase-split
+    notes: 1a.4 ships SECURITY.md ship-gate via check-security-md; Story 10.3 adds
+      CNA registration evidence + check-cna-registration gate (blocking-when-present).
+      MITRE CNA application submitted 2026-06-22; docs/compliance/cna-registration.md.
   NFR-Ops-5:
     gates: []
     corpora: []
@@ -937,14 +996,19 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Ops-9:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Perf-1:
-    gates: []
+    gates: [check-j4-latency]
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: >
+      Story 10.4c adds check-j4-latency — real in-kernel scalar.tap
+      colocation-latency P95 ≤ 10ms gate (§13.1). Advisory at v1.0,
+      blocking at v1.5.
   NFR-Perf-2:
     gates: []
     corpora: []
@@ -1007,22 +1071,29 @@ coverage:
     phase: v0.8
     valid_until: '2027-05-12'
   NFR-Rel-3:
-    gates: []
-    corpora: []
+    gates:
+      - nfr-rel-3-hsis-95pct
+    corpora:
+      - hsis-corpus-v0
     phase: v1.0
+    phase_delivered: v1.0
+    phase_enforced: v1.0
     valid_until: '2027-05-12'
   NFR-Rel-4:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Rel-5:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Rel-6:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -1043,10 +1114,18 @@ coverage:
       Story 1b.1 ships the criterion bench for ring-buffer flush P99 < 1ms.
       Raw file + sync_data chosen over SQLite WAL for deterministic latency.
   NFR-Rel-9:
-    gates: []
+    gates: [check-rotation-real-timing]
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: |
+      Revocation-propagation latency under mTLS cert-rotation churn. The
+      `check-rotation-real-timing` gate (Story 10.4b) asserts the
+      `RotationDrillReport` revocation-propagation floors by name (p50 ≤30s /
+      p99 ≤90s) over REAL `AgentRotationTimestamps` from the live 3-host
+      rotation chaos drill — the falsifiable enforcement of this NFR. The same
+      gate is cross-listed under NFR-Sec-13, which owns the chaos structure that
+      produces the revocation events.
   NFR-Scale-1:
     gates: []
     corpora: []
@@ -1079,9 +1158,11 @@ coverage:
     valid_until: '2027-05-12'
     notes: T0/T1/T2 at v0.1; T3 at v0.5; T4 WASM at v2.0+
   NFR-Sec-10:
-    gates: []
+    gates:
+    - check-red-team-gate
     corpora:
     - red-team-640
+    enforcement: advisory-until-engagement
     phase: v1.5
     valid_until: '2027-05-12'
     notes: 80→640 items via 8× parameter expansion; consumed by Story 10.2 at v1.5
@@ -1097,7 +1178,7 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Sec-13:
-    gates: []
+    gates: [check-live-bilateral-consent, check-rotation-real-timing]
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
@@ -1116,6 +1197,7 @@ coverage:
       Story 4.5 plugs the corpus INTO.
   NFR-Sec-15:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -1143,22 +1225,41 @@ coverage:
     notes: 10⁴ per-commit corpus authored Story 0.5; 10⁵ quarterly is generator-regenerable
       not committed; 1000-canary/month is operational at v0.5+.
   NFR-Sec-5:
-    gates: []
+    gates:
+    - check-fuzz-targets
+    - check-fuzz-floor
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: Story 10.3 ships the manifest parser fuzz target (23 from_toml_str entry
+      points); check-fuzz-targets validates harness mechanics; check-fuzz-floor enforces
+      the >=72 CPU-hr/target/90-day floor at release time (advisory until ledger spans
+      >=90d, then hard-fail). INSTRUMENTED — floor accumulating via the nightly
+      fuzz-cadence.yml workflow; GA-enforced, not yet floor-met.
   NFR-Sec-6:
-    gates: []
+    gates:
+    - check-fuzz-targets
+    - check-fuzz-floor
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: Story 10.3 ships the wire-protocol fuzz target (IacFrame JSON + serde_cbor
+      deserialization); check-fuzz-targets validates harness mechanics; check-fuzz-floor
+      enforces the per-target (>=72 CPU-hr) + aggregate (>=1000 CPU-hr) floor at release
+      time (advisory until ledger spans >=90d). INSTRUMENTED — floor accumulating via
+      nightly fuzz-cadence.yml; GA-enforced, not yet floor-met.
   NFR-Sec-7:
-    gates: []
+    gates:
+      - check-pentest-gate
     corpora: []
+    enforcement: advisory-until-engagement
     phase: v1.0
+    phase_delivered: v1.0
+    phase_enforced: v1.0
     valid_until: '2027-05-12'
   NFR-Sec-8:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -1173,10 +1274,13 @@ coverage:
     phase: v0.1
     valid_until: '2027-05-12'
   NFR-Test-10:
-    gates: []
+    gates:
+    - check-skill-conformance
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
+    notes: Story 10.5 AC1 ships Anthropic Skills format adapter; check-skill-conformance
+      validates live adapter execution + proven-red. Zero kernel-core delta.
   NFR-Test-11:
     gates: []
     corpora: []
@@ -1194,6 +1298,7 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Test-14:
     gates: []
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
@@ -1354,12 +1459,22 @@ coverage:
       (gold_label match + per-bucket count); judge-LLM agreement layer is a
       later story.
   NFR-Test-7:
-    gates: []
+    gates:
+    - check-cross-form-equiv
+    enforcement: advisory-until-engagement
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
+    notes: CLI-wrapper-only cross-form distributional equivalence per ADR-040
+      (rust-inproc deferred to v2.0+). Advisory gate.
   NFR-Test-8:
-    gates: []
+    gates:
+    - check-third-party-trial
+    enforcement: blocking-when-present
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: Third-party trial N=12 gate. Wilson CI advisory, raw count + stratification
+      + per-participant conjunction BLOCKING when results are present (derive-from-detail, with
+      successes and strata reconciled against participant records). Absent = advisory
+      (trial pending). Distinct from NFR-Test-7/NFR-Sec-10 which are advisory at v1.0.

@@ -242,13 +242,20 @@ fn caps_required_or_empty(
         .get("capabilities")
         .and_then(|c| c.get("required"))
     {
-        return Ok(maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
-            &toml::to_string(v).map_err(|e| format!("serialize [capabilities.required]: {e}"))?,
-        )?);
+        return Ok(
+            maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
+                &toml::to_string(v)
+                    .map_err(|e| format!("serialize [capabilities.required]: {e}"))?,
+            )?,
+        );
     }
     Ok(maos_kernel_core::security::CapabilitiesRequired {
-        provider: maos_kernel_core::security::ProviderCapabilities { complete: Vec::new() },
-        mcp: maos_kernel_core::security::McpCapabilities { servers: Vec::new() },
+        provider: maos_kernel_core::security::ProviderCapabilities {
+            complete: Vec::new(),
+        },
+        mcp: maos_kernel_core::security::McpCapabilities {
+            servers: Vec::new(),
+        },
     })
 }
 
@@ -1116,8 +1123,9 @@ fn emit_model_provenance_event(
             },
         ),
     };
-    let gov_bytes = serde_json::to_vec(&gov_payload)
-        .map_err(|e| format!("model-provenance governance serialization failed (fail-closed): {e}"))?;
+    let gov_bytes = serde_json::to_vec(&gov_payload).map_err(|e| {
+        format!("model-provenance governance serialization failed (fail-closed): {e}")
+    })?;
     let _token = tl.insert_frame_event(
         maos_kernel_core::iac::transparency_log::FrameKind::GovernanceEvent,
         0,
@@ -1667,6 +1675,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         audit_db_path.display()
     );
 
+    // Story 10.4a — construct the collective-tier port (Loom-lite, user-space)
+    // + inject the capability registry for I1/I2 mediation.  Configured from
+    // MAOS_LOOM_POSTGRES; when absent the collective tier is disabled (ops
+    // return CollectiveNotYetAvailable).  The port goes LIVE here so the
+    // de-stub is not inert in production (AC1 review Decision A).
+    let collective_port: Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>> =
+        match std::env::var("MAOS_LOOM_POSTGRES") {
+            Ok(conn_str) => {
+                let cfg = maos_loom_lite::store::StoreConfig {
+                    connection_string: conn_str,
+                    ..Default::default()
+                };
+                match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
+                    Ok(store) => {
+                        let store = Arc::new(store);
+                        if let Err(e) = store.init_schema().await {
+                            eprintln!(
+                                "maos: warn: loom-lite schema init failed (collective tier disabled): {e}"
+                            );
+                            None
+                        } else {
+                            let adapter = Arc::new(maos_loom_lite::adapter::LoomLiteAdapter::new(
+                                store,
+                                tokio::runtime::Handle::current(),
+                                std::time::Duration::from_secs(5),
+                            ));
+                            eprintln!("maos: collective tier (Loom-lite) initialized");
+                            Some(adapter as Arc<dyn maos_domain::ports::CollectiveMemoryPort>)
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "maos: warn: loom-lite store init failed (collective tier disabled): {e}"
+                        );
+                        None
+                    }
+                }
+            }
+            Err(_) => {
+                eprintln!(
+                    "maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable"
+                );
+                None
+            }
+        };
+
     // Story 4.3 — assemble the full MemoryManagerAdapter.
     let memory = Arc::new(
         maos_kernel_core::memory::MemoryManagerAdapter::new(
@@ -1685,7 +1739,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Sec-redteam SR-1: enable principal namespace write enforcement.
         // Only spirit pids registered via authorize_principal_writes() may
         // write to Principal namespaces.
-        .with_principal_write_enforcement(),
+        .with_principal_write_enforcement()
+        // Story 10.4a — collective tier (Loom-lite) + I1/I2 mediation.
+        .with_collective_port(collective_port)
+        .with_capabilities(Some(Arc::clone(&capability))),
     );
 
     // Story 4.3 — SelfTelemetryAggregator (FR56).
@@ -2318,12 +2375,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .and_then(|v| toml::to_string(v).ok())
         };
         if let Some(topology_entries) = topology_manifest_entries(&manifest_root)? {
-            let topology_base = manifest_path.parent().unwrap_or_else(|| std::path::Path::new("."));
+            let topology_base = manifest_path
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."));
             let mut loaded_pids: Vec<(String, u32)> = Vec::with_capacity(topology_entries.len());
             for entry in topology_entries {
                 let child_path = {
                     let p = std::path::PathBuf::from(&entry);
-                    if p.is_absolute() { p } else { topology_base.join(p) }
+                    if p.is_absolute() {
+                        p
+                    } else {
+                        topology_base.join(p)
+                    }
                 };
                 let child_toml = std::fs::read_to_string(&child_path).map_err(|e| {
                     format!(
@@ -2354,7 +2417,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(toml::to_string(v).map_err(|e| format!("serialize [{section}]: {e}"))?)
                 };
                 let child_opt_section = |section: &str| -> Option<String> {
-                    child_root.get(section).and_then(|v| toml::to_string(v).ok())
+                    child_root
+                        .get(section)
+                        .and_then(|v| toml::to_string(v).ok())
                 };
                 let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
                     &child_extract("class")?,
@@ -2426,7 +2491,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             boot_nonce,
                         )
                         .await
-                        .map_err(|e| format!("maos run: scheduler.load failed for {spirit_id}: {e}"))?,
+                        .map_err(|e| {
+                            format!("maos run: scheduler.load failed for {spirit_id}: {e}")
+                        })?,
                     LoadedSpiritKind::Architect => scheduler
                         .load(
                             &spirit_id,
@@ -2436,18 +2503,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             boot_nonce,
                         )
                         .await
-                        .map_err(|e| format!("maos run: scheduler.load failed for {spirit_id}: {e}"))?,
+                        .map_err(|e| {
+                            format!("maos run: scheduler.load failed for {spirit_id}: {e}")
+                        })?,
                     LoadedSpiritKind::Reviewer => scheduler
                         .load(
                             &spirit_id,
                             bundle,
-                            reviewer::Reviewer::new(&spirit_id).with_pending_design(
-                                reviewer::DesignUnderReview::default(),
-                            ),
+                            reviewer::Reviewer::new(&spirit_id)
+                                .with_pending_design(reviewer::DesignUnderReview::default()),
                             boot_nonce,
                         )
                         .await
-                        .map_err(|e| format!("maos run: scheduler.load failed for {spirit_id}: {e}"))?,
+                        .map_err(|e| {
+                            format!("maos run: scheduler.load failed for {spirit_id}: {e}")
+                        })?,
                     LoadedSpiritKind::Mira => {
                         // Story 9.6 — Mira declares a synchronous diagnostic scalar
                         // halt transport. Wire the production EpistemicScalarPort
@@ -2461,9 +2531,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             )
                             .into());
                         }
-                        let policy = epistemic_policy.clone().ok_or(
-                            "maos run: Mira manifest must declare [epistemic_policy]",
-                        )?;
+                        let policy = epistemic_policy
+                            .clone()
+                            .ok_or("maos run: Mira manifest must declare [epistemic_policy]")?;
                         let last_receipt = Arc::new(std::sync::Mutex::new(None));
                         let adapter: Arc<dyn maos_domain::ports::EpistemicScalarPort> =
                             Arc::new(ButlerOrchestratorAdapter {
@@ -2484,7 +2554,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 boot_nonce,
                             )
                             .await
-                            .map_err(|e| format!("maos run: scheduler.load failed for {spirit_id}: {e}"))?
+                            .map_err(|e| {
+                                format!("maos run: scheduler.load failed for {spirit_id}: {e}")
+                            })?
                     }
                     LoadedSpiritKind::Nash => scheduler
                         .load(
@@ -2494,7 +2566,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             boot_nonce,
                         )
                         .await
-                        .map_err(|e| format!("maos run: scheduler.load failed for {spirit_id}: {e}"))?,
+                        .map_err(|e| {
+                            format!("maos run: scheduler.load failed for {spirit_id}: {e}")
+                        })?,
                     LoadedSpiritKind::Butler | LoadedSpiritKind::Researcher => {
                         return Err(format!(
                             "maos run: topology manifests currently accept deterministic class Spirits only; got {spirit_id}"
@@ -2522,7 +2596,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         None,
                         Some(&class_section),
                     )
-                    .map_err(|e| format!("maos run: topology admission failed for {spirit_id}: {e}"))?;
+                    .map_err(|e| {
+                        format!("maos run: topology admission failed for {spirit_id}: {e}")
+                    })?;
                 emit_vetter_key_event(
                     &transparency_log,
                     &spirit_id,
@@ -2536,16 +2612,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     &resolve_model_provenance_policy(),
                 )
                 .map_err(|e| {
-                    format!("maos run: topology model-provenance admission failed for {spirit_id}: {e}")
-                })?
-                {
+                    format!(
+                        "maos run: topology model-provenance admission failed for {spirit_id}: {e}"
+                    )
+                })? {
                     emit_model_provenance_event(&transparency_log, &rec)
                         .map_err(|e| format!("maos run: {e}"))?;
                 }
-                scheduler
-                    .start(pid)
-                    .await
-                    .map_err(|e| format!("maos run: scheduler.start failed for {spirit_id}: {e}"))?;
+                scheduler.start(pid).await.map_err(|e| {
+                    format!("maos run: scheduler.start failed for {spirit_id}: {e}")
+                })?;
                 pid_by_spirit_id
                     .write()
                     .unwrap_or_else(|e| {
@@ -2581,11 +2657,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Patch 8 — fallback also skips already-fired SCBs.
                     let scb = scheduled_pid
                         .and_then(|spid| {
-                            scbs.iter().find(|scb| scb.pid == spid && !fired_pids.contains(&scb.pid))
+                            scbs.iter()
+                                .find(|scb| scb.pid == spid && !fired_pids.contains(&scb.pid))
                         })
-                        .or_else(|| {
-                            scbs.iter().find(|scb| !fired_pids.contains(&scb.pid))
-                        })
+                        .or_else(|| scbs.iter().find(|scb| !fired_pids.contains(&scb.pid)))
                         .cloned();
                     let Some(scb) = scb else {
                         break;
@@ -2617,9 +2692,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 drop(orchestrator);
                 drop(scheduler);
                 drop(lifecycle_resolver);
-                match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+                match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
+                    .await
+                {
                     Ok(Ok(())) => {}
-                    Ok(Err(e)) => eprintln!("maos run: audit writer task failed during topology drain: {e}"),
+                    Ok(Err(e)) => {
+                        eprintln!("maos run: audit writer task failed during topology drain: {e}")
+                    }
                     Err(_) => eprintln!("maos run: audit writer topology drain timed out after 5s"),
                 }
                 eprintln!("maos run: topology --once complete — exiting cleanly");
@@ -2633,317 +2712,317 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
 
-
         if manifest_root.get("topology").is_none() {
-        // ── Story 8.12 AC3 — [cli_wrapper] load fork, BEFORE extract("class"). ──
-        // A [cli_wrapper] manifest has no [class] section, so the class recipe
-        // below cannot load it. The fork lives here in the composition root
-        // (maos-bin); the kernel receives an already-constructed bridge handle
-        // and never reads a manifest to decide topology (Winston trip-wire).
-        // [cli_wrapper] and [class] are mutually exclusive (architecture §6.7).
-        if manifest_root.get("cli_wrapper").is_some() {
-            if manifest_root.get("class").is_some() {
-                return Err(
-                    "maos run: manifest declares both [cli_wrapper] and [class] — \
+            // ── Story 8.12 AC3 — [cli_wrapper] load fork, BEFORE extract("class"). ──
+            // A [cli_wrapper] manifest has no [class] section, so the class recipe
+            // below cannot load it. The fork lives here in the composition root
+            // (maos-bin); the kernel receives an already-constructed bridge handle
+            // and never reads a manifest to decide topology (Winston trip-wire).
+            // [cli_wrapper] and [class] are mutually exclusive (architecture §6.7).
+            if manifest_root.get("cli_wrapper").is_some() {
+                if manifest_root.get("class").is_some() {
+                    return Err(
+                        "maos run: manifest declares both [cli_wrapper] and [class] — \
                             mutually exclusive (architecture §6.7, EManifestSchemaConflict)"
-                        .into(),
-                );
+                            .into(),
+                    );
+                }
+                run_cli_wrapper_manifest(
+                    &manifest_root,
+                    &run,
+                    Arc::clone(&transparency_log),
+                    Arc::clone(&capability),
+                )?;
+                return Ok(());
             }
-            run_cli_wrapper_manifest(
-                &manifest_root,
-                &run,
-                Arc::clone(&transparency_log),
-                Arc::clone(&capability),
-            )?;
-            return Ok(());
-        }
 
-        let class_section =
-            maos_kernel_core::security::ClassSection::from_toml_str(&extract("class")?)?;
-        let kind = classify_spirit(&class_section.name).ok_or_else(|| {
-            format!(
-                "maos run: unknown Spirit class '{}' (known: butler, researcher, \
+            let class_section =
+                maos_kernel_core::security::ClassSection::from_toml_str(&extract("class")?)?;
+            let kind = classify_spirit(&class_section.name).ok_or_else(|| {
+                format!(
+                    "maos run: unknown Spirit class '{}' (known: butler, researcher, \
                  orchestrator, architect, reviewer, mira, nash)",
-                class_section.name
-            )
-        })?;
-        let sandbox_cfg =
-            maos_kernel_core::security::SandboxConfig::from_toml_str(&extract("sandbox")?)?;
-        let resource_caps =
-            maos_kernel_core::security::ResourceCaps::from_toml_str(&extract("resources")?)?;
-        let caps_required = caps_required_or_empty(&manifest_root)?;
-        let output_shape =
-            maos_kernel_core::security::OutputShape::from_toml_str(&extract("output_shape")?)?;
-        let posture_section = PostureSection::from_toml_str(&extract("posture")?)
-            .map_err(|e| format!("posture parse: {e}"))?;
-        let epistemic_policy = opt_section("epistemic_policy")
-            .map(|s| {
-                maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
-                    .map_err(|e| format!("epistemic_policy parse: {e}"))
-            })
-            .transpose()?;
-        // The scheduling/lifecycle sections are optional for the reference
-        // cognitive Spirits (they fire on_idle, not scheduled hooks); default to
-        // the empty sections so `on_idle` is allowed (empty enabled_hooks = all).
-        let scheduling = match opt_section("scheduling") {
-            Some(s) => SchedulingSection::from_toml_str(&s)?,
-            None => SchedulingSection::default(),
-        };
-        let lifecycle = match opt_section("lifecycle") {
-            Some(s) => LifecycleSection::from_toml_str(&s)?,
-            None => LifecycleSection::default(),
-        };
-        // Story 8.11 / AC3 — the parsed `[budget]` (per-Spirit hook cap).
-        let budget = opt_section("budget")
-            .map(|s| {
-                maos_kernel_core::security::manifest::Budget::from_toml_str(&s)
-                    .map_err(|e| format!("budget parse: {e}"))
-            })
-            .transpose()?;
-
-        // 2. Admit through the canonical SecurityManagerAdapter path.
-        // Reuse the composition root's shared journal (Story 8.11 review patch:
-        // opening a second JournalAdapter at the same SQLite path risks
-        // concurrent-write corruption).
-        let journal = Arc::clone(&shared_journal);
-        let spirit_id = class_section.name.clone();
-        let _run_spec = security
-            .admit_spirit(
-                0,
-                &spirit_id,
-                &sandbox_cfg,
-                &resource_caps,
-                &caps_required,
-                Some(&output_shape),
-                journal.as_ref(),
-                &posture_section,
-                epistemic_policy.as_ref(),
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(&class_section),
-            )
-            .map_err(|e| {
-                emit_vetter_key_event(
-                    &transparency_log,
-                    &spirit_id,
-                    &class_section.version,
-                    false,
-                    "N/A",
-                    &format!("maos run: admission rejected: {e}"),
-                );
-                format!("maos run: admission failed: {e}")
+                    class_section.name
+                )
             })?;
-        emit_vetter_key_event(
-            &transparency_log,
-            &spirit_id,
-            &class_section.version,
-            true,
-            &format!("{:?}", _run_spec.tier),
-            "maos run: admission granted",
-        );
+            let sandbox_cfg =
+                maos_kernel_core::security::SandboxConfig::from_toml_str(&extract("sandbox")?)?;
+            let resource_caps =
+                maos_kernel_core::security::ResourceCaps::from_toml_str(&extract("resources")?)?;
+            let caps_required = caps_required_or_empty(&manifest_root)?;
+            let output_shape =
+                maos_kernel_core::security::OutputShape::from_toml_str(&extract("output_shape")?)?;
+            let posture_section = PostureSection::from_toml_str(&extract("posture")?)
+                .map_err(|e| format!("posture parse: {e}"))?;
+            let epistemic_policy = opt_section("epistemic_policy")
+                .map(|s| {
+                    maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
+                        .map_err(|e| format!("epistemic_policy parse: {e}"))
+                })
+                .transpose()?;
+            // The scheduling/lifecycle sections are optional for the reference
+            // cognitive Spirits (they fire on_idle, not scheduled hooks); default to
+            // the empty sections so `on_idle` is allowed (empty enabled_hooks = all).
+            let scheduling = match opt_section("scheduling") {
+                Some(s) => SchedulingSection::from_toml_str(&s)?,
+                None => SchedulingSection::default(),
+            };
+            let lifecycle = match opt_section("lifecycle") {
+                Some(s) => LifecycleSection::from_toml_str(&s)?,
+                None => LifecycleSection::default(),
+            };
+            // Story 8.11 / AC3 — the parsed `[budget]` (per-Spirit hook cap).
+            let budget = opt_section("budget")
+                .map(|s| {
+                    maos_kernel_core::security::manifest::Budget::from_toml_str(&s)
+                        .map_err(|e| format!("budget parse: {e}"))
+                })
+                .transpose()?;
 
-        // Story 9.4b AC-6 (D6/D7) — model-provenance admission gate + FR62
-        // journaling. Fail-closed: a required/stale/malformed [model_provenance]
-        // section blocks the run BEFORE the Spirit is constructed below. A
-        // permissive default policy (require=false) leaves pre-v3 manifests
-        // untouched (AC-11). When present-and-valid, emit the governance event.
-        if let Some(rec) = maos_registry::admission::validate_model_provenance(
-            manifest_toml.as_bytes(),
-            &resolve_model_provenance_policy(),
-        )
-        .map_err(|e| format!("maos run: model-provenance admission failed: {e}"))?
-        {
-            emit_model_provenance_event(&transparency_log, &rec)
-                .map_err(|e| format!("maos run: {e}"))?;
-        }
+            // 2. Admit through the canonical SecurityManagerAdapter path.
+            // Reuse the composition root's shared journal (Story 8.11 review patch:
+            // opening a second JournalAdapter at the same SQLite path risks
+            // concurrent-write corruption).
+            let journal = Arc::clone(&shared_journal);
+            let spirit_id = class_section.name.clone();
+            let _run_spec = security
+                .admit_spirit(
+                    0,
+                    &spirit_id,
+                    &sandbox_cfg,
+                    &resource_caps,
+                    &caps_required,
+                    Some(&output_shape),
+                    journal.as_ref(),
+                    &posture_section,
+                    epistemic_policy.as_ref(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(&class_section),
+                )
+                .map_err(|e| {
+                    emit_vetter_key_event(
+                        &transparency_log,
+                        &spirit_id,
+                        &class_section.version,
+                        false,
+                        "N/A",
+                        &format!("maos run: admission rejected: {e}"),
+                    );
+                    format!("maos run: admission failed: {e}")
+                })?;
+            emit_vetter_key_event(
+                &transparency_log,
+                &spirit_id,
+                &class_section.version,
+                true,
+                &format!("{:?}", _run_spec.tier),
+                "maos run: admission granted",
+            );
 
-        let bundle = SpiritManifestBundle {
-            scheduling,
-            lifecycle,
-            class: Some(class_section.clone()),
-            budget,
-            ..Default::default()
-        };
+            // Story 9.4b AC-6 (D6/D7) — model-provenance admission gate + FR62
+            // journaling. Fail-closed: a required/stale/malformed [model_provenance]
+            // section blocks the run BEFORE the Spirit is constructed below. A
+            // permissive default policy (require=false) leaves pre-v3 manifests
+            // untouched (AC-11). When present-and-valid, emit the governance event.
+            if let Some(rec) = maos_registry::admission::validate_model_provenance(
+                manifest_toml.as_bytes(),
+                &resolve_model_provenance_policy(),
+            )
+            .map_err(|e| format!("maos run: model-provenance admission failed: {e}"))?
+            {
+                emit_model_provenance_event(&transparency_log, &rec)
+                    .map_err(|e| format!("maos run: {e}"))?;
+            }
 
-        // 3. Construct the Spirit with its injected ports, then load + start.
-        //    `--once` test seam: `MAOS_TEST_ONLY_STRIP_SCALAR_PORT` forces the
-        //    port to `None` so the boot-loud guard can be proven RED (the
-        //    negative-boot test). It is NEVER set in production; if it is, a
-        //    loud warning is emitted and boot still proceeds (the override wins).
-        let strip_port = std::env::var_os("MAOS_TEST_ONLY_STRIP_SCALAR_PORT").is_some();
-        if strip_port {
-            eprintln!(
+            let bundle = SpiritManifestBundle {
+                scheduling,
+                lifecycle,
+                class: Some(class_section.clone()),
+                budget,
+                ..Default::default()
+            };
+
+            // 3. Construct the Spirit with its injected ports, then load + start.
+            //    `--once` test seam: `MAOS_TEST_ONLY_STRIP_SCALAR_PORT` forces the
+            //    port to `None` so the boot-loud guard can be proven RED (the
+            //    negative-boot test). It is NEVER set in production; if it is, a
+            //    loud warning is emitted and boot still proceeds (the override wins).
+            let strip_port = std::env::var_os("MAOS_TEST_ONLY_STRIP_SCALAR_PORT").is_some();
+            if strip_port {
+                eprintln!(
                 "maos run: WARNING — MAOS_TEST_ONLY_STRIP_SCALAR_PORT is set.                  This is a test-only seam and must NEVER be used in production."
             );
-        }
-        let needs_port = requires_epistemic_halt_port(epistemic_policy.as_ref());
-        let mut halt_receipt_handle: Option<
-            Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>,
-        > = None;
+            }
+            let needs_port = requires_epistemic_halt_port(epistemic_policy.as_ref());
+            let mut halt_receipt_handle: Option<
+                Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>,
+            > = None;
 
-        // JB-5 — shared output channel for output_shape validation (only
-        // populated for Butler-class Spirits).
-        let butler_output_ch: Arc<std::sync::Mutex<Option<serde_json::Value>>> =
-            Arc::new(std::sync::Mutex::new(None));
-        let pid = match kind {
-            LoadedSpiritKind::Butler => {
-                // Boot-loud: a halt-posture Spirit MUST have a production
-                // EpistemicScalarPort, or boot fails LOUDLY (the 8.1 None-footgun
-                // closed — "forgot to wire it" is now un-green).
-                let scalar_port: Option<Arc<dyn maos_domain::ports::EpistemicScalarPort>> =
-                    if strip_port {
-                        None
-                    } else {
-                        let last_receipt = Arc::new(std::sync::Mutex::new(None));
-                        halt_receipt_handle = Some(Arc::clone(&last_receipt));
-                        let adapter = Arc::new(ButlerOrchestratorAdapter {
-                            orchestrator: Arc::clone(&orchestrator),
-                            tl: Arc::clone(&transparency_log),
-                            journal: Arc::clone(&journal),
-                            policy: epistemic_policy.clone().ok_or(
-                                "maos run: butler manifest must declare [epistemic_policy]",
-                            )?,
-                            boot_nonce,
-                            last_receipt,
-                        });
-                        Some(adapter)
-                    };
-                if needs_port && scalar_port.is_none() {
-                    return Err(format!(
-                        "maos run: FATAL boot — Spirit '{spirit_id}' declares a self-halting \
+            // JB-5 — shared output channel for output_shape validation (only
+            // populated for Butler-class Spirits).
+            let butler_output_ch: Arc<std::sync::Mutex<Option<serde_json::Value>>> =
+                Arc::new(std::sync::Mutex::new(None));
+            let pid = match kind {
+                LoadedSpiritKind::Butler => {
+                    // Boot-loud: a halt-posture Spirit MUST have a production
+                    // EpistemicScalarPort, or boot fails LOUDLY (the 8.1 None-footgun
+                    // closed — "forgot to wire it" is now un-green).
+                    let scalar_port: Option<Arc<dyn maos_domain::ports::EpistemicScalarPort>> =
+                        if strip_port {
+                            None
+                        } else {
+                            let last_receipt = Arc::new(std::sync::Mutex::new(None));
+                            halt_receipt_handle = Some(Arc::clone(&last_receipt));
+                            let adapter = Arc::new(ButlerOrchestratorAdapter {
+                                orchestrator: Arc::clone(&orchestrator),
+                                tl: Arc::clone(&transparency_log),
+                                journal: Arc::clone(&journal),
+                                policy: epistemic_policy.clone().ok_or(
+                                    "maos run: butler manifest must declare [epistemic_policy]",
+                                )?,
+                                boot_nonce,
+                                last_receipt,
+                            });
+                            Some(adapter)
+                        };
+                    if needs_port && scalar_port.is_none() {
+                        return Err(format!(
+                            "maos run: FATAL boot — Spirit '{spirit_id}' declares a self-halting \
                          posture (allowed_max={:?}) but no EpistemicScalarPort could be wired \
                          (the 8.1 None-footgun is fail-closed by construction). Serving loop NOT \
                          entered.",
-                        posture_section.allowed_max
-                    )
-                    .into());
-                }
-                // Seed a calendar-conflict scenario (the fixture-replay MCP input
-                // seam): two overlapping Confirmed events → belief_variance 0.8
-                // (> the 0.7 [epistemic_policy] halt threshold).
-                let scenario = butler::ScenarioInput {
-                    calendar: vec![
-                        butler::CalendarEvent {
-                            id: "evt-a".into(),
-                            title: "Board review".into(),
-                            start_min: 540,
-                            end_min: 600,
-                            status: butler::EventStatus::Confirmed,
-                        },
-                        butler::CalendarEvent {
-                            id: "evt-b".into(),
-                            title: "Investor call".into(),
-                            start_min: 570,
-                            end_min: 630,
-                            status: butler::EventStatus::Confirmed,
-                        },
-                    ],
-                    comms: vec![],
-                    preference_alignment: None,
-                };
-                // JB-5 — output_shape channel already hoisted before match arm.
-                let mut butler = butler::Butler::with_scenario(scenario)
-                    .with_output_channel(Arc::clone(&butler_output_ch));
-                if let Some(port) = scalar_port {
-                    butler = butler.with_scalar_port(port);
-                }
-                // Story 8.14b FORK 1 — wire LiveButlerMcpPort when --live.
-                let mut butler_mcp_ref: Option<Arc<LiveButlerMcpPort>> = None;
-                if run.live {
-                    use maos_domain::ports::mcp::McpTransportId;
-                    use maos_mcp::client::{McpClientImpl, McpServerEntry};
-                    use maos_mcp::transport::streamable_http::StreamableHttpTransport;
-                    use maos_mcp::transport::McpTransport;
-                    use std::collections::BTreeMap;
-
-                    struct ButlerLiveMcpClient {
-                        calendar: Option<McpClientImpl>,
-                        slack: Option<McpClientImpl>,
-                        linear: Option<McpClientImpl>,
-                        figma: Option<McpClientImpl>,
+                            posture_section.allowed_max
+                        )
+                        .into());
                     }
+                    // Seed a calendar-conflict scenario (the fixture-replay MCP input
+                    // seam): two overlapping Confirmed events → belief_variance 0.8
+                    // (> the 0.7 [epistemic_policy] halt threshold).
+                    let scenario = butler::ScenarioInput {
+                        calendar: vec![
+                            butler::CalendarEvent {
+                                id: "evt-a".into(),
+                                title: "Board review".into(),
+                                start_min: 540,
+                                end_min: 600,
+                                status: butler::EventStatus::Confirmed,
+                            },
+                            butler::CalendarEvent {
+                                id: "evt-b".into(),
+                                title: "Investor call".into(),
+                                start_min: 570,
+                                end_min: 630,
+                                status: butler::EventStatus::Confirmed,
+                            },
+                        ],
+                        comms: vec![],
+                        preference_alignment: None,
+                    };
+                    // JB-5 — output_shape channel already hoisted before match arm.
+                    let mut butler = butler::Butler::with_scenario(scenario)
+                        .with_output_channel(Arc::clone(&butler_output_ch));
+                    if let Some(port) = scalar_port {
+                        butler = butler.with_scalar_port(port);
+                    }
+                    // Story 8.14b FORK 1 — wire LiveButlerMcpPort when --live.
+                    let mut butler_mcp_ref: Option<Arc<LiveButlerMcpPort>> = None;
+                    if run.live {
+                        use maos_domain::ports::mcp::McpTransportId;
+                        use maos_mcp::client::{McpClientImpl, McpServerEntry};
+                        use maos_mcp::transport::streamable_http::StreamableHttpTransport;
+                        use maos_mcp::transport::McpTransport;
+                        use std::collections::BTreeMap;
 
-                    impl maos_mcp::McpClient for ButlerLiveMcpClient {
-                        fn call(
-                            &self,
-                            server_name: &str,
-                            tool: &str,
-                            args: serde_json::Value,
-                        ) -> Result<
-                            maos_domain::ports::mcp::McpCallResponse,
-                            maos_domain::ports::mcp::McpError,
-                        > {
-                        match server_name {
-                                "calendar" => self
-                                    .calendar
-                                    .as_ref()
-                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                    .call(server_name, tool, args),
-                                "slack" => self
-                                    .slack
-                                    .as_ref()
-                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                    .call(server_name, tool, args),
-                                "linear" => self
-                                    .linear
-                                    .as_ref()
-                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                    .call(server_name, tool, args),
-                                "figma" => self
-                                    .figma
-                                    .as_ref()
-                                    .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                    .call(server_name, tool, args),
-                                _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(
-                                    server_name.into(),
-                                )),
+                        struct ButlerLiveMcpClient {
+                            calendar: Option<McpClientImpl>,
+                            slack: Option<McpClientImpl>,
+                            linear: Option<McpClientImpl>,
+                            figma: Option<McpClientImpl>,
+                        }
+
+                        impl maos_mcp::McpClient for ButlerLiveMcpClient {
+                            fn call(
+                                &self,
+                                server_name: &str,
+                                tool: &str,
+                                args: serde_json::Value,
+                            ) -> Result<
+                                maos_domain::ports::mcp::McpCallResponse,
+                                maos_domain::ports::mcp::McpError,
+                            > {
+                                match server_name {
+                                    "calendar" => self
+                                        .calendar
+                                        .as_ref()
+                                        .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                        .call(server_name, tool, args),
+                                    "slack" => self
+                                        .slack
+                                        .as_ref()
+                                        .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                        .call(server_name, tool, args),
+                                    "linear" => self
+                                        .linear
+                                        .as_ref()
+                                        .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                        .call(server_name, tool, args),
+                                    "figma" => self
+                                        .figma
+                                        .as_ref()
+                                        .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                        .call(server_name, tool, args),
+                                    _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(
+                                        server_name.into(),
+                                    )),
+                                }
                             }
                         }
-                    }
 
-                    let mcp_io = Arc::clone(&io_arc);
+                        let mcp_io = Arc::clone(&io_arc);
 
-                    let make_client = |server_name: &str,
-                                       uri: String|
-                     -> Result<
-                        Option<McpClientImpl>,
-                        maos_domain::ports::mcp::McpError,
-                    > {
-                        if uri.is_empty() {
-                            return Ok(None);
-                        }
-                        let mut transports = BTreeMap::new();
-                        transports.insert(
-                            McpTransportId::StreamableHttp,
-                            Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri))
-                                as Arc<dyn McpTransport>,
-                        );
-                        let mut servers = BTreeMap::new();
-                        servers.insert(
-                            server_name.into(),
-                            McpServerEntry {
-                                name: server_name.into(),
-                                transport: McpTransportId::StreamableHttp,
-                                fallback_transport: None,
-                            },
-                        );
-                        let client = McpClientImpl::new(
-                            transports,
-                            McpTransportId::StreamableHttp,
-                            servers,
-                        )?;
-                        Ok(Some(client))
-                    };
+                        let make_client = |server_name: &str,
+                                           uri: String|
+                         -> Result<
+                            Option<McpClientImpl>,
+                            maos_domain::ports::mcp::McpError,
+                        > {
+                            if uri.is_empty() {
+                                return Ok(None);
+                            }
+                            let mut transports = BTreeMap::new();
+                            transports.insert(
+                                McpTransportId::StreamableHttp,
+                                Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri))
+                                    as Arc<dyn McpTransport>,
+                            );
+                            let mut servers = BTreeMap::new();
+                            servers.insert(
+                                server_name.into(),
+                                McpServerEntry {
+                                    name: server_name.into(),
+                                    transport: McpTransportId::StreamableHttp,
+                                    fallback_transport: None,
+                                },
+                            );
+                            let client = McpClientImpl::new(
+                                transports,
+                                McpTransportId::StreamableHttp,
+                                servers,
+                            )?;
+                            Ok(Some(client))
+                        };
 
-                    let calendar_uri = std::env::var("MAOS_MCP_CALENDAR_URI").unwrap_or_default();
-                    let slack_uri = std::env::var("MAOS_MCP_SLACK_URI").unwrap_or_default();
-                    let linear_uri = std::env::var("MAOS_MCP_LINEAR_URI").unwrap_or_default();
-                    let figma_uri = std::env::var("MAOS_MCP_FIGMA_URI").unwrap_or_default();
+                        let calendar_uri =
+                            std::env::var("MAOS_MCP_CALENDAR_URI").unwrap_or_default();
+                        let slack_uri = std::env::var("MAOS_MCP_SLACK_URI").unwrap_or_default();
+                        let linear_uri = std::env::var("MAOS_MCP_LINEAR_URI").unwrap_or_default();
+                        let figma_uri = std::env::var("MAOS_MCP_FIGMA_URI").unwrap_or_default();
 
-                    let mcp_adapter = match (|| -> Result<Option<Arc<dyn maos_domain::ports::mcp::McpClientPort>>, maos_domain::ports::mcp::McpError> {
+                        let mcp_adapter = match (|| -> Result<Option<Arc<dyn maos_domain::ports::mcp::McpClientPort>>, maos_domain::ports::mcp::McpError> {
                         let calendar = make_client("calendar", calendar_uri)?;
                         let slack = make_client("slack", slack_uri)?;
                         let linear = make_client("linear", linear_uri)?;
@@ -2976,140 +3055,143 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     };
 
-                    if let Some(adapter) = mcp_adapter {
-                        // Hardcode [0u8;32] to match the kernel McpClientAdapter
-                        // check_capability verification (which also uses [0u8;32]).
-                        let posture_hash = [0u8; 32];
-                        let live_mcp = Arc::new(LiveButlerMcpPort::new(
-                            0,
-                            posture_hash,
-                            adapter,
-                            Arc::clone(&capability),
-                        ));
-                        butler = butler.with_mcp_port(Arc::clone(&live_mcp) as Arc<dyn butler::ButlerMcpPort>);
-                        butler_mcp_ref = Some(live_mcp);
-                        eprintln!("maos run: butler live MCP port wired (--live)");
+                        if let Some(adapter) = mcp_adapter {
+                            // Hardcode [0u8;32] to match the kernel McpClientAdapter
+                            // check_capability verification (which also uses [0u8;32]).
+                            let posture_hash = [0u8; 32];
+                            let live_mcp = Arc::new(LiveButlerMcpPort::new(
+                                0,
+                                posture_hash,
+                                adapter,
+                                Arc::clone(&capability),
+                            ));
+                            butler = butler.with_mcp_port(
+                                Arc::clone(&live_mcp) as Arc<dyn butler::ButlerMcpPort>
+                            );
+                            butler_mcp_ref = Some(live_mcp);
+                            eprintln!("maos run: butler live MCP port wired (--live)");
+                        }
                     }
+                    let pid = scheduler
+                        .load(&spirit_id, bundle, butler, boot_nonce)
+                        .await
+                        .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?;
+                    // Patch 4 — update the MCP port's spirit_pid to the real
+                    // scheduler-allocated value (was hardcoded 0 at construction time).
+                    if let Some(ref mcp) = butler_mcp_ref {
+                        mcp.spirit_pid
+                            .store(pid, std::sync::atomic::Ordering::SeqCst);
+                    }
+                    pid
                 }
-                let pid = scheduler
-                    .load(&spirit_id, bundle, butler, boot_nonce)
-                    .await
-                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?;
-                // Patch 4 — update the MCP port's spirit_pid to the real
-                // scheduler-allocated value (was hardcoded 0 at construction time).
-                if let Some(ref mcp) = butler_mcp_ref {
-                    mcp.spirit_pid.store(pid, std::sync::atomic::Ordering::SeqCst);
-                }
-                pid
-            }
-            LoadedSpiritKind::Researcher => {
-                if needs_port {
-                    // Defensive: a Researcher-shaped manifest in the halt-set is
-                    // a misconfiguration — fail loud rather than boot a deterministic
-                    // Spirit that silently can't honor its declared posture.
-                    return Err(format!(
-                        "maos run: FATAL boot — '{spirit_id}' declares a self-halting posture \
+                LoadedSpiritKind::Researcher => {
+                    if needs_port {
+                        // Defensive: a Researcher-shaped manifest in the halt-set is
+                        // a misconfiguration — fail loud rather than boot a deterministic
+                        // Spirit that silently can't honor its declared posture.
+                        return Err(format!(
+                            "maos run: FATAL boot — '{spirit_id}' declares a self-halting posture \
                          but has no EpistemicScalarPort wiring"
-                    )
-                    .into());
-                }
-                let mut researcher = researcher::Researcher::new();
-                let mut researcher_mcp_ref: Option<Arc<LiveResearcherMcpPort>> = None;
-                if run.live {
-                    // Story 8.14c — wire LiveResearcherMcpPort + LogRecallPort when --live.
-                    use maos_domain::ports::mcp::McpTransportId;
-                    use maos_domain::ports::LogRecallPort;
-                    use maos_mcp::client::{McpClientImpl, McpServerEntry};
-                    use maos_mcp::transport::streamable_http::StreamableHttpTransport;
-                    use maos_mcp::transport::McpTransport;
-                    use std::collections::BTreeMap;
-
-                    struct ResearcherLiveMcpClient {
-                        web: Option<McpClientImpl>,
-                        arxiv: Option<McpClientImpl>,
-                        github: Option<McpClientImpl>,
-                        citation_graph: Option<McpClientImpl>,
+                        )
+                        .into());
                     }
+                    let mut researcher = researcher::Researcher::new();
+                    let mut researcher_mcp_ref: Option<Arc<LiveResearcherMcpPort>> = None;
+                    if run.live {
+                        // Story 8.14c — wire LiveResearcherMcpPort + LogRecallPort when --live.
+                        use maos_domain::ports::mcp::McpTransportId;
+                        use maos_domain::ports::LogRecallPort;
+                        use maos_mcp::client::{McpClientImpl, McpServerEntry};
+                        use maos_mcp::transport::streamable_http::StreamableHttpTransport;
+                        use maos_mcp::transport::McpTransport;
+                        use std::collections::BTreeMap;
 
-                    impl maos_mcp::McpClient for ResearcherLiveMcpClient {
-                        fn call(
-                            &self,
-                            server_name: &str,
-                            tool: &str,
-                            args: serde_json::Value,
-                        ) -> Result<
-                            maos_domain::ports::mcp::McpCallResponse,
+                        struct ResearcherLiveMcpClient {
+                            web: Option<McpClientImpl>,
+                            arxiv: Option<McpClientImpl>,
+                            github: Option<McpClientImpl>,
+                            citation_graph: Option<McpClientImpl>,
+                        }
+
+                        impl maos_mcp::McpClient for ResearcherLiveMcpClient {
+                            fn call(
+                                &self,
+                                server_name: &str,
+                                tool: &str,
+                                args: serde_json::Value,
+                            ) -> Result<
+                                maos_domain::ports::mcp::McpCallResponse,
+                                maos_domain::ports::mcp::McpError,
+                            > {
+                                match server_name {
+                                    "web" => self
+                                        .web
+                                        .as_ref()
+                                        .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                        .call(server_name, tool, args),
+                                    "arxiv" => self
+                                        .arxiv
+                                        .as_ref()
+                                        .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                        .call(server_name, tool, args),
+                                    "github" => self
+                                        .github
+                                        .as_ref()
+                                        .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                        .call(server_name, tool, args),
+                                    "citation-graph" => self
+                                        .citation_graph
+                                        .as_ref()
+                                        .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
+                                        .call(server_name, tool, args),
+                                    _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(
+                                        server_name.into(),
+                                    )),
+                                }
+                            }
+                        }
+
+                        let mcp_io = Arc::clone(&io_arc);
+
+                        let make_client = |server_name: &str,
+                                           uri: String|
+                         -> Result<
+                            Option<McpClientImpl>,
                             maos_domain::ports::mcp::McpError,
                         > {
-                        match server_name {
-                            "web" => self
-                                .web
-                                .as_ref()
-                                .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                .call(server_name, tool, args),
-                            "arxiv" => self
-                                .arxiv
-                                .as_ref()
-                                .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                .call(server_name, tool, args),
-                            "github" => self
-                                .github
-                                .as_ref()
-                                .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                .call(server_name, tool, args),
-                            "citation-graph" => self
-                                .citation_graph
-                                .as_ref()
-                                .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                .call(server_name, tool, args),
-                            _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(
+                            if uri.is_empty() {
+                                return Ok(None);
+                            }
+                            let mut transports = BTreeMap::new();
+                            transports.insert(
+                                McpTransportId::StreamableHttp,
+                                Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri))
+                                    as Arc<dyn McpTransport>,
+                            );
+                            let mut servers = BTreeMap::new();
+                            servers.insert(
                                 server_name.into(),
-                            )),
-                        }
-                    }
-                }
+                                McpServerEntry {
+                                    name: server_name.into(),
+                                    transport: McpTransportId::StreamableHttp,
+                                    fallback_transport: None,
+                                },
+                            );
+                            let client = McpClientImpl::new(
+                                transports,
+                                McpTransportId::StreamableHttp,
+                                servers,
+                            )?;
+                            Ok(Some(client))
+                        };
 
-                    let mcp_io = Arc::clone(&io_arc);
+                        let web_uri = std::env::var("MAOS_MCP_WEB_URI").unwrap_or_default();
+                        let arxiv_uri = std::env::var("MAOS_MCP_ARXIV_URI").unwrap_or_default();
+                        let github_uri = std::env::var("MAOS_MCP_GITHUB_URI").unwrap_or_default();
+                        let citation_graph_uri =
+                            std::env::var("MAOS_MCP_CITATION_GRAPH_URI").unwrap_or_default();
 
-                    let make_client = |server_name: &str,
-                                       uri: String|
-                     -> Result<
-                        Option<McpClientImpl>,
-                        maos_domain::ports::mcp::McpError,
-                    > {
-                        if uri.is_empty() {
-                            return Ok(None);
-                        }
-                        let mut transports = BTreeMap::new();
-                        transports.insert(
-                            McpTransportId::StreamableHttp,
-                            Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri))
-                                as Arc<dyn McpTransport>,
-                        );
-                        let mut servers = BTreeMap::new();
-                        servers.insert(
-                            server_name.into(),
-                            McpServerEntry {
-                                name: server_name.into(),
-                                transport: McpTransportId::StreamableHttp,
-                                fallback_transport: None,
-                            },
-                        );
-                        let client = McpClientImpl::new(
-                            transports,
-                            McpTransportId::StreamableHttp,
-                            servers,
-                        )?;
-                        Ok(Some(client))
-                    };
-
-                    let web_uri = std::env::var("MAOS_MCP_WEB_URI").unwrap_or_default();
-                    let arxiv_uri = std::env::var("MAOS_MCP_ARXIV_URI").unwrap_or_default();
-                    let github_uri = std::env::var("MAOS_MCP_GITHUB_URI").unwrap_or_default();
-                    let citation_graph_uri =
-                        std::env::var("MAOS_MCP_CITATION_GRAPH_URI").unwrap_or_default();
-
-                    let mcp_adapter = match (|| -> Result<Option<Arc<dyn maos_domain::ports::mcp::McpClientPort>>, maos_domain::ports::mcp::McpError> {
+                        let mcp_adapter = match (|| -> Result<Option<Arc<dyn maos_domain::ports::mcp::McpClientPort>>, maos_domain::ports::mcp::McpError> {
                         let web = make_client("web", web_uri)?;
                         let arxiv = make_client("arxiv", arxiv_uri)?;
                         let github = make_client("github", github_uri)?;
@@ -3142,295 +3224,303 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     };
 
-                    if let Some(adapter) = mcp_adapter {
-                        // Hardcode [0u8;32] to match the kernel McpClientAdapter
-                        // check_capability verification (which also uses [0u8;32]).
-                        let posture_hash = [0u8; 32];
-                        let live_mcp = Arc::new(LiveResearcherMcpPort::new(
-                            0,
-                            posture_hash,
-                            adapter,
-                            Arc::clone(&capability),
-                        ));
-                        researcher = researcher
-                            .with_mcp_port(Arc::clone(&live_mcp) as Arc<dyn researcher::ResearcherMcpPort>)
-                            .with_log_recall_port(
-                                Arc::clone(&log_recall_adapter) as Arc<dyn LogRecallPort>,
-                                // FIXME(Patch 4): spirit_pid is 0 because the real pid
-                                // is not allocated until scheduler.load() below. Fixing
-                                // requires making allocate_pid() pub or restructuring
-                                // the Researcher to accept deferred pid.
+                        if let Some(adapter) = mcp_adapter {
+                            // Hardcode [0u8;32] to match the kernel McpClientAdapter
+                            // check_capability verification (which also uses [0u8;32]).
+                            let posture_hash = [0u8; 32];
+                            let live_mcp = Arc::new(LiveResearcherMcpPort::new(
                                 0,
-                            );
-                        researcher_mcp_ref = Some(live_mcp);
-                        eprintln!("maos run: researcher live MCP port wired (--live)");
-                    }
+                                posture_hash,
+                                adapter,
+                                Arc::clone(&capability),
+                            ));
+                            researcher = researcher
+                                .with_mcp_port(
+                                    Arc::clone(&live_mcp) as Arc<dyn researcher::ResearcherMcpPort>
+                                )
+                                .with_log_recall_port(
+                                    Arc::clone(&log_recall_adapter) as Arc<dyn LogRecallPort>,
+                                    // FIXME(Patch 4): spirit_pid is 0 because the real pid
+                                    // is not allocated until scheduler.load() below. Fixing
+                                    // requires making allocate_pid() pub or restructuring
+                                    // the Researcher to accept deferred pid.
+                                    0,
+                                );
+                            researcher_mcp_ref = Some(live_mcp);
+                            eprintln!("maos run: researcher live MCP port wired (--live)");
+                        }
 
-                    // --live also wires the inference seam (pre-existing, unchanged).
-                    let provider = router
-                        .default_id()
-                        .ok_or_else(|| {
-                            "maos run: --live requested but no inference provider is configured"
-                        })?
-                        .to_string();
-                    let token = capability
-                        .issue_with_mediation(
-                            // FIXME(Patch 4): spirit_pid is 0 because pid is not yet
-                            // allocated; requires pre-alloc or deferred binding.
-                            0,
-                            Scope::ProviderInfer { provider },
-                            60,
-                            [0u8; 32],
-                            IntentClass::Standard,
+                        // --live also wires the inference seam (pre-existing, unchanged).
+                        let provider = router
+                            .default_id()
+                            .ok_or_else(|| {
+                                "maos run: --live requested but no inference provider is configured"
+                            })?
+                            .to_string();
+                        let token = capability
+                            .issue_with_mediation(
+                                // FIXME(Patch 4): spirit_pid is 0 because pid is not yet
+                                // allocated; requires pre-alloc or deferred binding.
+                                0,
+                                Scope::ProviderInfer { provider },
+                                60,
+                                [0u8; 32],
+                                IntentClass::Standard,
+                            )
+                            .map_err(|e| format!("maos run: token issue failed: {e}"))?;
+                        let researcher_inference = InferencePortAdapter::new(
+                            Arc::clone(&router),
+                            Arc::clone(&capability),
+                            Arc::clone(&transparency_log),
+                            Arc::clone(&telemetry),
                         )
-                        .map_err(|e| format!("maos run: token issue failed: {e}"))?;
-                    let researcher_inference = InferencePortAdapter::new(
-                        Arc::clone(&router),
-                        Arc::clone(&capability),
-                        Arc::clone(&transparency_log),
-                        Arc::clone(&telemetry),
-                    )
-                    .with_rate_limiter(Arc::clone(&rate_limiter))
-                    .with_iac(Arc::clone(&iac));
-                    let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
-                        if std::env::var("MAOS_JOURNEY_MODE").as_deref() == Ok("record") {
-                            let cassette_path = std::env::var("MAOS_REPLAY_CASSETTE")
+                        .with_rate_limiter(Arc::clone(&rate_limiter))
+                        .with_iac(Arc::clone(&iac));
+                        let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
+                            if std::env::var("MAOS_JOURNEY_MODE").as_deref() == Ok("record") {
+                                let cassette_path = std::env::var("MAOS_REPLAY_CASSETTE")
                                 .map_err(|_| "maos run: MAOS_JOURNEY_MODE=record requires MAOS_REPLAY_CASSETTE".to_string())?;
-                            eprintln!("maos run: researcher record-mode → {cassette_path}");
-                            Arc::new(cassette_replay::CassetteRecordPort::new(
-                                Box::new(researcher_inference),
-                                std::path::PathBuf::from(&cassette_path),
-                                spirit_id.to_string(),
-                                "live-record".into(),
-                            ))
-                        } else {
-                            Arc::new(researcher_inference)
-                        };
-                    // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
-                    researcher = researcher.with_inference_port(port, token, 0);
-                    eprintln!("maos run: researcher live-inference seam wired (--live)");
-                } else if let Ok(cassette_path) = std::env::var("MAOS_REPLAY_CASSETTE") {
-                    let strict = std::env::var("MAOS_REPLAY_STRICT")
-                        .map(|v| v == "1")
-                        .unwrap_or(false);
-                    let replay = cassette_replay::CassetteReplayPort::from_file(
-                        std::path::Path::new(&cassette_path),
-                        strict,
-                    )
-                    .map_err(|e| format!("maos run: cassette replay init failed: {e}"))?;
-                    let token = capability
-                        .issue_with_mediation(
-                            // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
-                            0,
-                            Scope::ProviderInfer {
-                                provider: "replay".into(),
-                            },
-                            60,
-                            [0u8; 32],
-                            IntentClass::Standard,
+                                eprintln!("maos run: researcher record-mode → {cassette_path}");
+                                Arc::new(cassette_replay::CassetteRecordPort::new(
+                                    Box::new(researcher_inference),
+                                    std::path::PathBuf::from(&cassette_path),
+                                    spirit_id.to_string(),
+                                    "live-record".into(),
+                                ))
+                            } else {
+                                Arc::new(researcher_inference)
+                            };
+                        // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
+                        researcher = researcher.with_inference_port(port, token, 0);
+                        eprintln!("maos run: researcher live-inference seam wired (--live)");
+                    } else if let Ok(cassette_path) = std::env::var("MAOS_REPLAY_CASSETTE") {
+                        let strict = std::env::var("MAOS_REPLAY_STRICT")
+                            .map(|v| v == "1")
+                            .unwrap_or(false);
+                        let replay = cassette_replay::CassetteReplayPort::from_file(
+                            std::path::Path::new(&cassette_path),
+                            strict,
                         )
-                        .map_err(|e| format!("maos run: token issue failed: {e}"))?;
-                    let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
-                        Arc::new(replay);
-                    // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
-                    researcher = researcher.with_inference_port(port, token, 0);
-                    eprintln!(
-                        "maos run: researcher cassette-replay inference wired ({})",
-                        cassette_path
-                    );
-                } else {
-                    eprintln!(
-                        "maos run: researcher deterministic survey (no --live; zero network)"
-                    );
+                        .map_err(|e| format!("maos run: cassette replay init failed: {e}"))?;
+                        let token = capability
+                            .issue_with_mediation(
+                                // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
+                                0,
+                                Scope::ProviderInfer {
+                                    provider: "replay".into(),
+                                },
+                                60,
+                                [0u8; 32],
+                                IntentClass::Standard,
+                            )
+                            .map_err(|e| format!("maos run: token issue failed: {e}"))?;
+                        let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
+                            Arc::new(replay);
+                        // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
+                        researcher = researcher.with_inference_port(port, token, 0);
+                        eprintln!(
+                            "maos run: researcher cassette-replay inference wired ({})",
+                            cassette_path
+                        );
+                    } else {
+                        eprintln!(
+                            "maos run: researcher deterministic survey (no --live; zero network)"
+                        );
+                    }
+                    let pid = scheduler
+                        .load(&spirit_id, bundle, researcher, boot_nonce)
+                        .await
+                        .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?;
+                    // Patch 4 — update the MCP port's spirit_pid to the real
+                    // scheduler-allocated value (was hardcoded 0 at construction time).
+                    if let Some(ref mcp) = researcher_mcp_ref {
+                        mcp.spirit_pid
+                            .store(pid, std::sync::atomic::Ordering::SeqCst);
+                    }
+                    pid
                 }
-                let pid = scheduler
-                    .load(&spirit_id, bundle, researcher, boot_nonce)
-                    .await
-                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?;
-                // Patch 4 — update the MCP port's spirit_pid to the real
-                // scheduler-allocated value (was hardcoded 0 at construction time).
-                if let Some(ref mcp) = researcher_mcp_ref {
-                    mcp.spirit_pid.store(pid, std::sync::atomic::Ordering::SeqCst);
-                }
-                pid
-            }
-            LoadedSpiritKind::Orchestrator => scheduler
-                .load(
-                    &spirit_id,
-                    bundle,
-                    orchestrator::Orchestrator::new(&spirit_id),
-                    boot_nonce,
-                )
-                .await
-                .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
-            LoadedSpiritKind::Architect => scheduler
-                .load(
-                    &spirit_id,
-                    bundle,
-                    architect::Architect::new(&spirit_id)
-                        .with_pending_spec("founder-loop topology manifest load"),
-                    boot_nonce,
-                )
-                .await
-                .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
-            LoadedSpiritKind::Reviewer => scheduler
-                .load(
-                    &spirit_id,
-                    bundle,
-                    reviewer::Reviewer::new(&spirit_id).with_pending_design(
-                        reviewer::DesignUnderReview::default(),
-                    ),
-                    boot_nonce,
-                )
-                .await
-                .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
-            LoadedSpiritKind::Mira => {
-                // Story 9.6 — Mira declares a synchronous diagnostic scalar halt
-                // transport. Wire the production EpistemicScalarPort adapter.
-                if needs_port && strip_port {
-                    return Err(format!(
-                        "maos run: FATAL boot — Spirit '{spirit_id}' declares synchronous \
-                         diagnostic scalar halt transport but no EpistemicScalarPort could be wired"
-                    )
-                    .into());
-                }
-                let policy = epistemic_policy.clone().ok_or(
-                    "maos run: Mira manifest must declare [epistemic_policy]",
-                )?;
-                let last_receipt = Arc::new(std::sync::Mutex::new(None));
-                halt_receipt_handle = Some(Arc::clone(&last_receipt));
-                let adapter: Arc<dyn maos_domain::ports::EpistemicScalarPort> =
-                    Arc::new(ButlerOrchestratorAdapter {
-                        orchestrator: Arc::clone(&orchestrator),
-                        tl: Arc::clone(&transparency_log),
-                        journal: Arc::clone(&journal),
-                        policy,
-                        boot_nonce,
-                        last_receipt,
-                    });
-                scheduler
+                LoadedSpiritKind::Orchestrator => scheduler
                     .load(
                         &spirit_id,
                         bundle,
-                        mira::Mira::default()
-                            .with_id(&spirit_id)
-                            .with_scalar_port(adapter),
+                        orchestrator::Orchestrator::new(&spirit_id),
                         boot_nonce,
                     )
                     .await
-                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?
-            }
-            LoadedSpiritKind::Nash => scheduler
-                .load(
-                    &spirit_id,
-                    bundle,
-                    nash::Nash::default().with_id(&spirit_id),
-                    boot_nonce,
-                )
+                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
+                LoadedSpiritKind::Architect => scheduler
+                    .load(
+                        &spirit_id,
+                        bundle,
+                        architect::Architect::new(&spirit_id)
+                            .with_pending_spec("founder-loop topology manifest load"),
+                        boot_nonce,
+                    )
+                    .await
+                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
+                LoadedSpiritKind::Reviewer => scheduler
+                    .load(
+                        &spirit_id,
+                        bundle,
+                        reviewer::Reviewer::new(&spirit_id)
+                            .with_pending_design(reviewer::DesignUnderReview::default()),
+                        boot_nonce,
+                    )
+                    .await
+                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
+                LoadedSpiritKind::Mira => {
+                    // Story 9.6 — Mira declares a synchronous diagnostic scalar halt
+                    // transport. Wire the production EpistemicScalarPort adapter.
+                    if needs_port && strip_port {
+                        return Err(format!(
+                        "maos run: FATAL boot — Spirit '{spirit_id}' declares synchronous \
+                         diagnostic scalar halt transport but no EpistemicScalarPort could be wired"
+                    )
+                        .into());
+                    }
+                    let policy = epistemic_policy
+                        .clone()
+                        .ok_or("maos run: Mira manifest must declare [epistemic_policy]")?;
+                    let last_receipt = Arc::new(std::sync::Mutex::new(None));
+                    halt_receipt_handle = Some(Arc::clone(&last_receipt));
+                    let adapter: Arc<dyn maos_domain::ports::EpistemicScalarPort> =
+                        Arc::new(ButlerOrchestratorAdapter {
+                            orchestrator: Arc::clone(&orchestrator),
+                            tl: Arc::clone(&transparency_log),
+                            journal: Arc::clone(&journal),
+                            policy,
+                            boot_nonce,
+                            last_receipt,
+                        });
+                    scheduler
+                        .load(
+                            &spirit_id,
+                            bundle,
+                            mira::Mira::default()
+                                .with_id(&spirit_id)
+                                .with_scalar_port(adapter),
+                            boot_nonce,
+                        )
+                        .await
+                        .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?
+                }
+                LoadedSpiritKind::Nash => scheduler
+                    .load(
+                        &spirit_id,
+                        bundle,
+                        nash::Nash::default().with_id(&spirit_id),
+                        boot_nonce,
+                    )
+                    .await
+                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
+            };
+            pid_by_spirit_id
+                .write()
+                .unwrap_or_else(|e| {
+                    eprintln!("CRITICAL: pid_by_spirit_id RwLock poisoned (single-spirit insert)");
+                    e.into_inner()
+                })
+                .insert(spirit_id.clone(), pid);
+            scheduler
+                .start(pid)
                 .await
-                .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?
-        };
-        pid_by_spirit_id
-            .write()
-            .unwrap_or_else(|e| {
-                eprintln!("CRITICAL: pid_by_spirit_id RwLock poisoned (single-spirit insert)");
-                e.into_inner()
-            })
-            .insert(spirit_id.clone(), pid);
-        scheduler
-            .start(pid)
-            .await
-            .map_err(|e| format!("maos run: scheduler.start failed: {e}"))?;
-        // SR-1: authorize this admitted spirit for principal namespace writes.
-        memory.authorize_principal_writes(pid);
-        println!(
-            "{}",
-            serde_json::json!({
-                "event": "spirit_loaded",
-                "spirit_id": spirit_id,
-                "pid": pid,
-                "live": run.live,
-                "boot_loud_port": needs_port && !strip_port,
-            })
-        );
-
-        if run.once {
-            // Drive a single on_idle pass through the dispatcher (per-Spirit
-            // budget applies via the SCB bundle), then render the halt + drain.
-            let scb = {
-                let scbs = scheduler.scbs();
-                let guard = scbs.read().unwrap();
-                guard.get(&pid).map(Arc::clone)
-            }
-            .ok_or("maos run: loaded SCB not found")?;
-            let outcome = scheduler.dispatcher_arc().fire_on_idle(&scb).await;
+                .map_err(|e| format!("maos run: scheduler.start failed: {e}"))?;
+            // SR-1: authorize this admitted spirit for principal namespace writes.
+            memory.authorize_principal_writes(pid);
             println!(
                 "{}",
-                serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
+                serde_json::json!({
+                    "event": "spirit_loaded",
+                    "spirit_id": spirit_id,
+                    "pid": pid,
+                    "live": run.live,
+                    "boot_loud_port": needs_port && !strip_port,
+                })
             );
-            // JB-5 — output_shape enforcement: validate the Spirit's notification
-            // output against the manifest's OutputShapePredicate. The Spirit writes
-            // to the shared output channel during on_idle; the daemon validates here.
-            {
-                let predicate =
-                    maos_kernel_core::security::OutputShapePredicate::from(&output_shape);
-                let output_guard = butler_output_ch.lock().unwrap();
-                if let Some(ref output_json) = *output_guard {
-                    if let Err(violation) = predicate.check(output_json) {
-                        eprintln!("maos run: output_shape violation: {violation}");
+
+            if run.once {
+                // Drive a single on_idle pass through the dispatcher (per-Spirit
+                // budget applies via the SCB bundle), then render the halt + drain.
+                let scb = {
+                    let scbs = scheduler.scbs();
+                    let guard = scbs.read().unwrap();
+                    guard.get(&pid).map(Arc::clone)
+                }
+                .ok_or("maos run: loaded SCB not found")?;
+                let outcome = scheduler.dispatcher_arc().fire_on_idle(&scb).await;
+                println!(
+                    "{}",
+                    serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
+                );
+                // JB-5 — output_shape enforcement: validate the Spirit's notification
+                // output against the manifest's OutputShapePredicate. The Spirit writes
+                // to the shared output channel during on_idle; the daemon validates here.
+                {
+                    let predicate =
+                        maos_kernel_core::security::OutputShapePredicate::from(&output_shape);
+                    let output_guard = butler_output_ch.lock().unwrap();
+                    if let Some(ref output_json) = *output_guard {
+                        if let Err(violation) = predicate.check(output_json) {
+                            eprintln!("maos run: output_shape violation: {violation}");
+                        }
+                    }
+                    drop(output_guard);
+                }
+                if let Some(handle) = &halt_receipt_handle {
+                    if let Some(receipt) = handle
+                        .lock()
+                        .unwrap_or_else(|e| {
+                            eprintln!("CRITICAL: halt_receipt Mutex poisoned");
+                            e.into_inner()
+                        })
+                        .clone()
+                    {
+                        // AC5(f) — render the halt screen-string from the SHARED
+                        // constants so production output and the JB-3 assertion can
+                        // never drift (compile-error on rename).
+                        let render = butler::halt_screen_line(butler::SCALAR_TAG_BELIEF_VARIANCE);
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "event": "halt",
+                                "render": render,
+                                "halt_id": format!("{:?}", receipt.halt_id),
+                                "spirit_pid": receipt.spirit_pid,
+                            })
+                        );
+                        eprintln!("maos run: {render}");
                     }
                 }
-                drop(output_guard);
-            }
-            if let Some(handle) = &halt_receipt_handle {
-                if let Some(receipt) = handle.lock().unwrap_or_else(|e| {
-                    eprintln!("CRITICAL: halt_receipt Mutex poisoned");
-                    e.into_inner()
-                }).clone() {
-                    // AC5(f) — render the halt screen-string from the SHARED
-                    // constants so production output and the JB-3 assertion can
-                    // never drift (compile-error on rename).
-                    let render = butler::halt_screen_line(butler::SCALAR_TAG_BELIEF_VARIANCE);
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "event": "halt",
-                            "render": render,
-                            "halt_id": format!("{:?}", receipt.halt_id),
-                            "spirit_pid": receipt.spirit_pid,
-                        })
-                    );
-                    eprintln!("maos run: {render}");
+                println!(
+                    "{}",
+                    serde_json::json!({ "event": "drain", "spirit_id": spirit_id })
+                );
+                // Deterministic drain (mirrors the one-shot arm): signal the yank
+                // poller to exit, then release every cap-audit sender so the writer
+                // task sees channel-close.
+                yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
+                drop(journal);
+                drop(audit_tx);
+                drop(inference);
+                drop(capability);
+                drop(orchestrator);
+                drop(scheduler);
+                drop(lifecycle_resolver);
+                match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
+                    .await
+                {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => eprintln!("maos run: audit writer task failed during drain: {e}"),
+                    Err(_) => eprintln!("maos run: audit writer drain timed out after 5s"),
                 }
+                eprintln!("maos run: --once complete — exiting cleanly");
+                return Ok(());
             }
-            println!(
-                "{}",
-                serde_json::json!({ "event": "drain", "spirit_id": spirit_id })
-            );
-            // Deterministic drain (mirrors the one-shot arm): signal the yank
-            // poller to exit, then release every cap-audit sender so the writer
-            // task sees channel-close.
-            yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
-            drop(journal);
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            drop(orchestrator);
-            drop(scheduler);
-            drop(lifecycle_resolver);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos run: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos run: audit writer drain timed out after 5s"),
-            }
-            eprintln!("maos run: --once complete — exiting cleanly");
-            return Ok(());
-        }
 
-        // Non-`--once`: fall through to the existing serving loop below so the
-        // IdleWatchdog drives on_idle against real time. `MAOS_ONE_SHOT` is unset
-        // on the `maos run` path, so the block below is skipped.
-        eprintln!("maos run: '{spirit_id}' loaded — entering serving loop");
+            // Non-`--once`: fall through to the existing serving loop below so the
+            // IdleWatchdog drives on_idle against real time. `MAOS_ONE_SHOT` is unset
+            // on the `maos run` path, so the block below is skipped.
+            eprintln!("maos run: '{spirit_id}' loaded — entering serving loop");
         }
     }
     // ─────────────────────────────────────────────────────────────
@@ -5578,34 +5668,22 @@ description = "smoke test spirit successor"
         }
 
         if mode == "acp-server" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
             use maos_acp::AcpServer;
-            struct StubLifecycleResolver;
-            impl maos_domain::lifecycle::LifecycleResolver for StubLifecycleResolver {
-                fn resolve_verb(
-                    &self,
-                    spirit_id: &str,
-                    _verb: maos_domain::lifecycle::LifecycleVerb,
-                ) -> Result<
-                    maos_domain::lifecycle::LifecycleReceipt,
-                    maos_domain::lifecycle::LifecycleError,
-                > {
-                    Err(maos_domain::lifecycle::LifecycleError::NotLoaded {
-                        spirit_id: spirit_id.into(),
-                    })
-                }
-            }
-            struct StubHaltResolver;
-            impl maos_domain::halt::HaltResolver for StubHaltResolver {
-                fn resolve(
-                    &self,
-                    _halt_id: &maos_domain::halt::HaltId,
-                    _resolution: maos_domain::halt::Resolution,
-                ) -> Result<(), maos_domain::halt::ResolveError> {
-                    Ok(())
-                }
-            }
-            let mut server =
-                AcpServer::new(Arc::new(StubLifecycleResolver), Arc::new(StubHaltResolver));
+            let output_markers = Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new());
+            let halt_resolver: Arc<dyn maos_domain::halt::HaltResolver> =
+                Arc::new(maos_kernel_core::halt::KernelHaltResolver::new(
+                    Arc::clone(&halt_registry),
+                    Arc::clone(&transparency_log),
+                    output_markers,
+                    Arc::clone(&mailbox),
+                    boot_nonce,
+                    Arc::clone(&memory),
+                    Arc::clone(&orchestrator),
+                ));
+            let lifecycle: Arc<dyn maos_domain::lifecycle::LifecycleResolver> =
+                lifecycle_resolver.clone();
+            let mut server = AcpServer::new(lifecycle, halt_resolver);
             server.run(std::io::stdin(), std::io::stdout())?;
             return Ok(());
         }
@@ -5999,7 +6077,10 @@ description = "smoke test spirit successor"
             bench_harness.add_journey(j1.clone());
 
             // J4 measurement
-            let j4_config = J4Config { invocation_count };
+            let j4_config = J4Config {
+                invocation_count,
+                warmup_count: 10,
+            };
             let j4 = harness::j4::run_j4_measurement(&j4_config)
                 .map_err(|e| format!("J4 measurement failed: {e}"))?;
             bench_harness.add_journey(j4.clone());
@@ -6039,14 +6120,12 @@ description = "smoke test spirit successor"
             return smoke_orchestrator_fanout_6_2().await;
         }
 
-
         // Story 8.6 AC-T13/AC-A7 — `smoke-a2a-tcp-8-6`: live cross-Host
         // Mira(host_a) → Nash(host_b) advisory over a REAL TCP/mTLS socket
         // (two independent `TcpA2ATransport` endpoints, genuine handshake + wire).
         if mode == "smoke-a2a-tcp-8-6" {
             return smoke_a2a_tcp_8_6().await;
         }
-
 
         // Story 6.3 AC7 — `smoke-a2a-loopback-6-3` end-to-end A2A wedge demo.
         if mode == "smoke-a2a-loopback-6-3" {
@@ -6611,7 +6690,10 @@ fn run_uninstall_cascade(
     // Fail-closed: a teardown that cannot attest BOTH phases is an error, never
     // a silent success (AC-14). The receipt is HOME-key-signed, hence
     // region-NEUTRAL — it survives the region decommission (AC-10/AC-15).
-    if let Some(region) = maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk().home_region {
+    if let Some(region) =
+        maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
+            .home_region
+    {
         use maos_audit::erasure::regional_teardown::{
             build_regional_teardown_receipt, decommission_region_key, ForgetCascadeAttestation,
             REQUIRED_STORES,
@@ -7909,8 +7991,8 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
 ///      (NFR-Scale-4)
 async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, RuptureReason};
-    use maos_domain::invariants::i3::FrameOrigin;
     use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
     use maos_kernel_core::iac::mailbox::{ConsentGate, Mailbox};
     use maos_kernel_core::iac::transparency_log::{
         FrameFilter, FrameKind as TlFrameKind, TransparencyLogAdapter,
@@ -9270,9 +9352,18 @@ mod tests {
 
     #[test]
     fn story_9_6_classifies_founder_and_diagnostic_spirits() {
-        assert_eq!(classify_spirit("orchestrator"), Some(LoadedSpiritKind::Orchestrator));
-        assert_eq!(classify_spirit("architect"), Some(LoadedSpiritKind::Architect));
-        assert_eq!(classify_spirit("reviewer"), Some(LoadedSpiritKind::Reviewer));
+        assert_eq!(
+            classify_spirit("orchestrator"),
+            Some(LoadedSpiritKind::Orchestrator)
+        );
+        assert_eq!(
+            classify_spirit("architect"),
+            Some(LoadedSpiritKind::Architect)
+        );
+        assert_eq!(
+            classify_spirit("reviewer"),
+            Some(LoadedSpiritKind::Reviewer)
+        );
         assert_eq!(classify_spirit("mira"), Some(LoadedSpiritKind::Mira));
         assert_eq!(classify_spirit("nash"), Some(LoadedSpiritKind::Nash));
     }
@@ -9293,8 +9384,9 @@ mod tests {
 
     #[test]
     fn story_9_6_port_requirement_uses_halt_transport_not_posture() {
-        let orchestrator_policy = maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
-            r#"
+        let orchestrator_policy =
+            maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
+                r#"
             default_action = "verbalize_only"
 
             [[rules]]
@@ -9302,8 +9394,8 @@ mod tests {
             action = "halt"
             on_value_above = { threshold = 0.5 }
             "#,
-        )
-        .unwrap();
+            )
+            .unwrap();
         assert!(
             !requires_epistemic_halt_port(Some(&orchestrator_policy)),
             "deterministic founder-loop policy must not require a scalar port"
@@ -9342,10 +9434,13 @@ mod tests {
         )
         .unwrap();
         let entries = topology_manifest_entries(&root).unwrap().unwrap();
-        assert_eq!(entries, vec![
-            "spirits/orchestrator/manifest.toml".to_string(),
-            "spirits/architect/manifest.toml".to_string(),
-        ]);
+        assert_eq!(
+            entries,
+            vec![
+                "spirits/orchestrator/manifest.toml".to_string(),
+                "spirits/architect/manifest.toml".to_string(),
+            ]
+        );
     }
     #[tokio::test]
     async fn test_live_butler_mcp_port_new() {

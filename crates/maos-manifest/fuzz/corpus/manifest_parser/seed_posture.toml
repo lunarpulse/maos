@@ -1,0 +1,3 @@
+[posture]
+default = "assistive"
+allowed_max = "assistive"

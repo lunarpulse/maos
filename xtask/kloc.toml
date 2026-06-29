@@ -44,8 +44,47 @@
 # extract a candidate module netting to ≤0 added LOC. The gate's continuing
 # failure on every CI run keeps the breach visible until decomposition lands.
 # -----------------------------------------------------------------------------
+# Epic 10 retrospective ceiling review (2026-06-26)
+# -----------------------------------------------------------------------------
+# The Epic-10 branch (12 commits: 10.1a..10.5 + retro) is the first time the
+# WHOLE epic ran the blocking `kloc-check` aggregate together. Eight crates +
+# the aggregate breached the prior ceilings. Per the established epic-retro
+# process (cf. the maos-a2a-core 3050→3144→3200 surfaced bumps), ceilings are
+# reviewed and set to the TIGHT measured residual — NOT round headroom.
+#
+#   crate            prev    measured  new ceiling   driver
+#   maos-kernel-core 17000   17687     17750         Story 10.5 AC3 (Windows
+#                                                     sandbox: WindowsChild
+#                                                     extraction) — the ONLY
+#                                                     authorized kernel delta
+#                                                     this epic, FLAG-Winston
+#                                                     22574→22929. Phase-4
+#                                                     decomposition (scheduler/
+#                                                     memory/hot-swap/supervision)
+#                                                     REMAINS the standing debt
+#                                                     — this bump fits the
+#                                                     authorized delta, it does
+#                                                     NOT retire the plan.
+#   xtask            15000   22389     22500         +7,873 LOC of v1.0/v1.5 gate
+#                                                     infrastructure (red-team,
+#                                                     RTO, skill-conformance,
+#                                                     third-party-trial gates +
+#                                                     proven-red suites). Tooling,
+#                                                     not shipped kernel.
+#   maos-cli         2000    3689      3750          skill-queue + audit
+#                                                     subcommands (Epic 9/10).
+#   maos-domain      7000    8045      8100          collective-tier ports +
+#                                                     i9 invariants growth.
+#   maos-iac         5500    5736      5800          transparency-log + bus.
+#   maos-manifest    4000    4012      4050          schema-version surface.
+#   maos-bench       1500    1512      1550          J4/J6 harness rebuild.
+#   _aggregate       90000   102171    103000        sum of the above.
+#
+# FLAG-Winston: ratify the kernel-core 17000→17750 bump in the Epic-10 retro
+# (authorized AC3 delta) — the others are tooling/CLI/domain growth.
+# -----------------------------------------------------------------------------
 
-maos-kernel-core = 17000
+maos-kernel-core = 17750
 maos-capability = 2000
 maos-cap-registry = 3000
 maos-corpus-gen = 3000
@@ -53,13 +92,13 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 15000
+xtask = 22500          # Epic-10 retro 2026-06-26: +7,873 LOC v1.0/v1.5 gate infra (tooling, not kernel)
 # Story 6.5 — Phase 1 extraction
-maos-iac = 5500        # ~5,062 actual code lines (13 files extracted); ceiling updated per actual count
-maos-manifest = 4000   # ~3,224 actual code lines (3829 LOC file extracted); ceiling adjusted to actual
+maos-iac = 5800        # Epic-10 retro 2026-06-26: 5500→5800 (TL + bus growth; measured 5,736)
+maos-manifest = 4050   # Epic-10 retro 2026-06-26: 4000→4050 (schema-version surface; measured 4,012)
 
 # Story 1a.1 — 13 new crate stubs
-maos-domain = 7000
+maos-domain = 8100     # Epic-10 retro 2026-06-26: 7000→8100 (collective-tier ports + i9; measured 8,045)
 maos-spirit-hello = 1000
 maos-providers = 2000
 maos-mcp = 1100
@@ -104,12 +143,12 @@ maos-persistence = 2000
 maos-secrets = 1000
 maos-compliance = 2000
 maos-control = 1500
-maos-cli = 2000
+maos-cli = 3750        # Epic-10 retro 2026-06-26: 2000→3750 (skill-queue + audit subcommands; measured 3,689)
 maos-bin = 9000
-maos-bench = 1500
+maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
 
 _aggregate_alarm = 16000
-_aggregate_hardfail = 90000
+_aggregate_hardfail = 103000  # Epic-10 retro 2026-06-26: 90000→103000 (measured aggregate 102,171)
 
 # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
 # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a

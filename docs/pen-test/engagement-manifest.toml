@@ -1,0 +1,50 @@
+# MAOS Pen-Test Engagement Manifest
+#
+# Authoritative environment and artifact manifest for the MAOS security
+# penetration-test engagement (Story 10.1b). All paths are relative to the
+# repository root unless otherwise noted. The engagement coordinator fills in
+# `pinned_commit_sha` at kickoff; until then the placeholder MUST remain intact.
+
+[environment]
+# Git commit SHA the engagement is scoped against. Replaced verbatim by the
+# engagement coordinator at kickoff; the placeholder guarantees no engagement
+# activity begins against an unpinned tree.
+pinned_commit_sha = "TBD-AT-ENGAGEMENT-START"
+# Build every workspace crate using the locked dependency set. No crate count
+# is hardcoded so workspace growth does not invalidate this manifest.
+build_command = "cargo build --locked --workspace"
+# Built daemon binary produced by `build_command` (debug profile).
+binary_path = "target/debug/maos"
+# Built `maosctl` control-plane binary produced by `build_command`.
+maosctl_path = "target/debug/maosctl"
+# Smoke check confirming the control-plane binary is runnable post-build.
+maosctl_verify = "maosctl --version"
+
+[reference_spirits]
+# Reference spirit manifests used as known-good fixtures across the engagement.
+# Each value is the repository-relative path to the spirit's manifest.
+hello_spirit = "spirits/hello-spirit/manifest.toml"
+butler = "spirits/butler/manifest.toml"
+worker = "spirits/worker/manifest.toml"
+mira = "spirits/mira/manifest.toml"
+nash = "spirits/nash/manifest.toml"
+
+[reproducibility]
+# Toolchain channel pinned for reproducible builds.
+rust_toolchain = "stable"
+# Lockfile guaranteeing deterministic dependency resolution.
+cargo_lock = "Cargo.lock"
+# Reference operating environment for the engagement.
+os = "ubuntu-latest"
+# End-to-end reproduction steps for any finding observed during the engagement.
+instructions = "Clone repo, checkout pinned_commit_sha, run build_command, verify maosctl_verify succeeds"
+
+[methodology]
+# Frozen OWASP risk-rating methodology; changes are prohibited mid-engagement.
+owasp_frozen_doc = "docs/pen-test/owasp-risk-rating-v1.0-frozen.md"
+# In-scope attack surface and crate mapping.
+scope_doc = "docs/pen-test/scope.md"
+# Triage protocol governing finding classification and disposition.
+triage_protocol = "docs/pen-test/triage-protocol.md"
+# Structured schema every finding summary MUST conform to.
+findings_schema = "docs/pen-test/findings/summary-schema.toml"

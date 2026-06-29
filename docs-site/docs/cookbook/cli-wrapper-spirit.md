@@ -1,7 +1,7 @@
 ---
 title: CLI Wrapper Spirit
 sidebar_position: 12
-description: Wrapping an external CLI tool as a MAOS Spirit using the cli_wrapper manifest section.
+description: Wrapping an external CLI tool as a MAOS Spirit using the `cli_wrapper` manifest section.
 ---
 
 # CLI Wrapper Spirit

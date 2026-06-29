@@ -51,4 +51,176 @@ gates = [
     "nfr-onb-1-gate",
     # Story 9.6 AC-5 — retired founder/J4 smoke-arm literal reappearance guard.
     "check-literal-reappearance",
+    # Story 10.1b AC1 — pen-test gate (conditional: advisory-if-absent).
+    "check-pentest-gate",
+    # Story 10.1b AC3 — v1.0 NFR coverage-matrix completeness (no empty gates).
+    "check-coverage-matrix-completeness",
+    # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
+    "check-third-party-trial",
+    # Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate (advisory per ADR-040).
+    "check-cross-form-equiv",
+    # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
+    "check-red-team-gate",
+    # Story 10.3 AC-1/2/3/4/5 — v1.0 compliance ship-gates.
+    "check-export-control",
+    "check-fuzz-targets",
+    "check-cna-registration",
+    "check-ko-coverage",
+    # Story 10.5 AC5 (NFR-Doc-6 v1.5) — ja/zh-Hans coverage gates.
+    "check-ja-coverage",
+    "check-zh-coverage",
+    # Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
+    "windows-check",
+    # Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time, advisory-until-90d).
+    "check-fuzz-floor",
+    # Story 10.4a — kernel-core dependency-closure gate (NFR-Test-9 artifact hygiene).
+    "check-dependency-closure",
+    # Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle
+    # ship gate (Merkle root + payload oracle + row count; advisory at v1.0).
+    "check-migration-merkle",
+    # Story 10.4a (NFR-Ops-2) — RTO ≤ 4h drilled gate. The drill
+    # (`rto-drill`) performs a cold-restore and writes evidence; the gate
+    # (`check-rto-gate`) reads the evidence and gates on the threshold.
+    "rto-drill",
+    "check-rto-gate",
+    # Story 10.4b — live bilateral A2A consent (NFR-Sec-13), rotation real-timing
+    # (NFR-Rel-9), mobile-push-on-halt (operator-facing halt wire), and the J4
+    # §13.1 Mira-Nash colocation-latency gate (Story 10.4c — real in-kernel
+    # scalar.tap measurement, replacing the 10.4b proven-RED placeholder).
+    "check-live-bilateral-consent",
+    "check-rotation-real-timing",
+    "check-mobile-push-on-halt",
+    "check-j4-latency",
+    # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
+    "check-skill-conformance",
 ]
+
+# D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
+# The flat `gates` list above is the coverage-matrix validation set (NFR-Meta-3).
+# The `[[ship_gate]]` table below records each Story-10.x ship gate's verdict
+# disposition per phase, mechanizing the advisory→blocking cutover. The
+# `check-ship-gate-completeness` lint and the `v1.5-ship-gate` aggregate job
+# consume this to enforce that a gate's phase disposition is explicit and that
+# the "WILL block at v1.5" promise is testable, not aspirational.
+[[ship_gate]]
+name = "check-pentest-gate"
+disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present" }
+
+[[ship_gate]]
+name = "check-third-party-trial"
+disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present" }
+
+[[ship_gate]]
+name = "check-cross-form-equiv"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[ship_gate]]
+name = "check-red-team-gate"
+disposition = { v1_0 = "advisory", v1_5 = "blocking-when-present" }
+
+[[ship_gate]]
+name = "check-export-control"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-fuzz-targets"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-cna-registration"
+disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-ko-coverage"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-ja-coverage"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-zh-coverage"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "windows-check"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+# Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — pre-merge fuzz BUILD prerequisite.
+# `fuzz-build` runs the fuzz build for both targets under the nightly toolchain
+# (selected via the rustup nightly channel, not an inline toolchain override); it
+# is a `needs:` dependency of `v1-0-ship-gate` (the aggregate fails if it fails) so
+# its disposition is recorded here for registry completeness.
+[[ship_gate]]
+name = "fuzz-build"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+# Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time, NOT per-merge).
+# `check-fuzz-floor` sums fuzz-ledger cpu_seconds over the trailing 90-day
+# window and blocks the v1.0 GA release if the per-target (>=72 CPU-hr) or
+# aggregate (>=1000 CPU-hr) floor is unmet. Advisory (warn-only) until the
+# ledger spans >= 90 days of history — the bootstrap window in which the floor
+# is logically unsatisfiable. Run via workflow_dispatch at release time; not a
+# `v1-0-ship-gate` per-merge `needs:` entry (a merge must not block on nightly
+# fuzz cadence).
+[[ship_gate]]
+name = "check-fuzz-floor"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+# Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate.
+# Advisory at v1.0 (results absent → advisory pass); blocking at v1.5.
+[[ship_gate]]
+name = "check-migration-merkle"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+# Story 10.4a (NFR-Ops-2) — RTO ≤ 4h drilled gate. The drill (`rto-drill`)
+# performs a cold-restore + timing and writes evidence; the gate
+# (`check-rto-gate`) reads the accumulated evidence and gates on the ≤ 4h
+# threshold. Both run on the weekly rpo-rto-cadence.yml schedule, NOT
+# per-commit, so they are advisory at v1.0 (no weekly evidence yet) and
+# graduate to blocking at v1.5 (matching the RTO gate posture). Weekly-only:
+# intentionally NOT in discipline.yml's v1.0-ship-gate `needs:` array.
+[[ship_gate]]
+name = "rto-drill"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+[[ship_gate]]
+name = "check-rto-gate"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+# Story 10.4b (NFR-Sec-13 / NFR-Rel-9) — live bilateral A2A consent gate.
+# Advisory at v1.0 (gate GREEN now); blocking at v1.5.
+[[ship_gate]]
+name = "check-live-bilateral-consent"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+# Story 10.4b (NFR-Rel-9) — rotation real-timing RotationDrillReport gate.
+# Advisory at v1.0; blocking at v1.5.
+[[ship_gate]]
+name = "check-rotation-real-timing"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+# Story 10.4c — J4 §13.1 Mira-Nash colocation-latency gate (real in-kernel
+# scalar.tap measurement). Advisory at v1.0; blocking at v1.5 (the §13.1
+# <10ms P95 obligation is a v1.5 binding AC per epic-10…md:189). Replaces
+# the 10.4b proven-RED placeholder `check-j4-placeholder-red`.
+[[ship_gate]]
+name = "check-j4-latency"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+# Story 10.4b — mobile push fires on Mira halt over the real MobilePushHttp
+# transport (operator-facing halt wire). Advisory at v1.0 (feature ships at
+# v1.5); blocking at v1.5.
+[[ship_gate]]
+name = "check-mobile-push-on-halt"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+# Story 10.1b AC2 — OWASP Risk Rating Methodology freeze hash.
+# Stored in the invariant-locked registry so any edit to the OWASP doc
+# requires a registry update, which is auditable and protected by review.
+# Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
+# Advisory at v1.0 (results may be absent); blocking at v1.5 per ADR-027 posture.
+[[ship_gate]]
+name = "check-skill-conformance"
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+owasp_freeze_hash = "2c4df8094d116903261320ad2999290671c3129beb71e740d690a43f56816f20"

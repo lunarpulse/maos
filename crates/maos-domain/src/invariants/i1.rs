@@ -117,6 +117,17 @@ pub enum Scope {
     /// grants ONLY the write-to-queue; activation still requires the FR39
     /// operator-admission path (the kernel does not auto-admit the skill).
     SkillAuthorSelf,
+    /// Story 10.4a — collective-tier (Loom-lite) read access.
+    /// Mediated via `CollectiveMemoryPort`; ADR-006 user-space service.
+    /// I1: capability check BEFORE the port call.
+    LoomRead,
+    /// Story 10.4a — collective-tier (Loom-lite) write access.
+    /// High-privilege pattern-write tokens: TTL ≤ 60s per AC1.
+    /// I1: capability check BEFORE the port call.
+    LoomWrite,
+    /// Story 10.4a — collective-tier (Loom-lite) scan access.
+    /// Same privilege as LoomRead.
+    LoomScan,
 }
 
 /// Intent classification for approval policy.

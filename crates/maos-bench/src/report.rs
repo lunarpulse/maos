@@ -69,6 +69,12 @@ pub struct JourneyResult {
     pub rss_max_mb: u64,
     #[doc = "Construct via [`JourneyResult::new`] — true iff p95_us ≤ journey-specific budget."]
     pub budget_met: bool,
+    /// Story 10.4c AC5 (D8): when true, the journey was NOT measured — the
+    /// latency fields are zero and should be rendered as `NOT MEASURED` instead
+    /// of a number. Non-ABI: `#[serde(default)]` keeps existing JSON consumers
+    /// compatible (absent field → false).
+    #[serde(default)]
+    pub not_measured: bool,
 }
 
 impl JourneyResult {
@@ -97,6 +103,27 @@ impl JourneyResult {
             cpu_sys_pct: 0,
             rss_max_mb: 0,
             budget_met,
+            not_measured: false,
+        }
+    }
+
+    /// Construct a `JourneyResult` for a journey that was NOT measured (AC5/D8).
+    /// All latency fields are zero; `not_measured = true`.
+    pub fn not_measured(name: String) -> Self {
+        Self {
+            name,
+            invocation_count: 0,
+            p50_us: 0,
+            p95_us: 0,
+            p99_us: 0,
+            max_us: 0,
+            mean_us: 0,
+            std_dev_us: 0,
+            cpu_user_pct: 0,
+            cpu_sys_pct: 0,
+            rss_max_mb: 0,
+            budget_met: false,
+            not_measured: true,
         }
     }
 }

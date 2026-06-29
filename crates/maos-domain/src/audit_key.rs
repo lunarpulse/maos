@@ -3,7 +3,6 @@
 //! Shared by `maos-cli` (sealed-export) and future `maos-spirit-cli` audit paths.
 //! Decision B: DISTINCT key from publishing/capability keys.
 
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 /// Maximum file size for audit key files (1 MiB).
@@ -109,7 +108,9 @@ fn dirs_config_home() -> PathBuf {
     PathBuf::from("/etc/maos")
 }
 
+#[cfg(unix)]
 fn check_permissions(path: &Path) -> Result<(), AuditKeyError> {
+    use std::os::unix::fs::PermissionsExt;
     let meta = std::fs::metadata(path)?;
     let mode = meta.permissions().mode() & 0o777;
     // Accept any mode where group and other permission bits are zero
@@ -122,10 +123,31 @@ fn check_permissions(path: &Path) -> Result<(), AuditKeyError> {
     Ok(())
 }
 
+#[cfg(not(unix))]
+fn check_permissions(path: &Path) -> Result<(), AuditKeyError> {
+    // POSIX permission bits do not exist on non-Unix targets (Windows uses
+    // ACLs, not a 9-bit mode). Confirm the file is present/readable; ACL
+    // hardening is the operator's responsibility there. Mirrors the
+    // `#[cfg(unix)]`-gated permission handling in maos-kernel-core hot_swap.
+    let _ = std::fs::metadata(path)?;
+    Ok(())
+}
+
+#[cfg(unix)]
 fn set_permissions_0600(path: &Path) -> Result<(), AuditKeyError> {
+    use std::os::unix::fs::PermissionsExt;
     let mut perms = std::fs::metadata(path)?.permissions();
     perms.set_mode(0o600);
     std::fs::set_permissions(path, perms)?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn set_permissions_0600(path: &Path) -> Result<(), AuditKeyError> {
+    // No POSIX 0600 mode to set on non-Unix targets; the freshly written key
+    // file inherits the (user-profile) parent-directory ACL. Best-effort no-op
+    // so audit keygen still functions on Windows.
+    let _ = path;
     Ok(())
 }
 

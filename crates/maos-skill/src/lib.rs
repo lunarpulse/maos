@@ -30,6 +30,7 @@
 //!    (the EXISTING Story 4.3 `SelfTelemetryReport`).
 
 pub mod admission;
+pub mod anthropic_adapter;
 pub mod approval_target;
 pub mod discovery;
 pub mod errors;
@@ -38,6 +39,7 @@ pub mod schema;
 pub mod store;
 
 pub use admission::{PendingEntry, SkillAdmissionQueue, SkillAdmissionState, SkillEntryPath};
+pub use anthropic_adapter::parse_anthropic_skill;
 pub use discovery::{
     default_search_path, discover_skills, discover_skills_detailed, DiscoveredSkill,
     DiscoveryOutcome,

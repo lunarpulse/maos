@@ -21,7 +21,7 @@ pub fn decide(
 ) -> DecisionRecord {
     let j1_met = j1.p95_us <= J1_P95_BUDGET_US;
     let j4_met = j4.p95_us <= J4_P95_BUDGET_US;
-    let j6_met = j6.map_or(true, |j| j.budget_met);
+    let j6_met = j6.map_or(true, |j| j.not_measured || j.budget_met);
     let outcome = if j1_met && j4_met {
         "defer-rust-inproc-to-v2.0+".to_string()
     } else {
@@ -143,5 +143,33 @@ mod tests {
         let j4 = j4_with_p95(8_200);
         let d = decide(&j1, &j4, None);
         assert_eq!(d.adr_id, "ADR-040");
+    }
+    #[test]
+    fn j6_not_measured_is_not_a_false_red() {
+        // Story 10.4c review P2: a CUT (not_measured) J6 must NOT record
+        // j6_p95_met=false — budget_met is false only because it was never
+        // measured, not because it breached.
+        let j1 = j1_with_p95(18_500);
+        let j4 = j4_with_p95(8_200);
+        let j6 = JourneyResult::not_measured("J6".into());
+        let d = decide(&j1, &j4, Some(&j6));
+        assert_eq!(d.outcome, "defer-rust-inproc-to-v2.0+");
+        assert!(d.j6_p95_met, "a not_measured J6 must read j6_p95_met=true");
+    }
+
+    #[test]
+    fn j6_measured_but_breached_is_a_real_red() {
+        // The guard must not over-broaden: a MEASURED J6 that genuinely
+        // breached (not_measured=false, budget_met=false) still reads false.
+        let j1 = j1_with_p95(18_500);
+        let j4 = j4_with_p95(8_200);
+        let mut j6 = JourneyResult::not_measured("J6".into());
+        j6.not_measured = false; // now a real (breached) measurement
+        j6.budget_met = false;
+        let d = decide(&j1, &j4, Some(&j6));
+        assert!(
+            !d.j6_p95_met,
+            "a measured-but-breached J6 must read j6_p95_met=false"
+        );
     }
 }

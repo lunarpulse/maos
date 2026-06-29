@@ -1,6 +1,22 @@
-# Loom-not-in-kernel blocklist — canonical orchestration symbols from architecture §3.2 I9.
-# At v0.1-alpha there are exactly four entries.
+# Loom-not-in-kernel blocklist — canonical orchestration symbols from
+# architecture §3.2 I9, plus backing-store vocabulary (Story 10.4a).
 #
-# Extending the blocklist tightens the gate and requires invariant-lock review per ADR-037.
-# Do NOT add LoomLite, Plan, Strategy, or Schedule at v0.1-alpha.
-blocklist = ["Loom", "Planner", "Goal", "Orchestrator"]
+# The first four entries are orchestration symbols; the remaining five
+# are backing-store vocabulary that MUST NOT appear in kernel-core code
+# (the kernel mediates but does not embed/know the backing store).
+# Extending the blocklist tightens the gate and requires invariant-lock
+# review per ADR-037.
+blocklist = [
+    # Orchestration symbols (§3.2 I9)
+    "Loom",
+    "Planner",
+    "Goal",
+    "Orchestrator",
+    # Backing-store vocabulary (Story 10.4a — NFR-Test-9 expanded denominator).
+    # Only SPECIFIC crate names — the generic `embed`/`vector` tokens were
+    # removed (AC1 review: they false-RED on legitimate kernel identifiers;
+    # the crate-level leak is caught by `check-dependency-closure`).
+    "pgvector",
+    "postgres",
+    "sqlx",
+]

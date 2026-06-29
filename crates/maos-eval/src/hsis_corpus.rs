@@ -118,7 +118,10 @@ impl HsisCorpus {
         ] {
             let class_dir = base.join(class);
             if !class_dir.is_dir() {
-                continue;
+                return Err(CorpusError::NotFound(format!(
+                    "HSIS class directory missing: {class} (expected at {})",
+                    class_dir.display()
+                )));
             }
             let mut entries: Vec<_> =
                 std::fs::read_dir(&class_dir)?.collect::<Result<Vec<_>, _>>()?;

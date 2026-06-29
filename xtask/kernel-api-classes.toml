@@ -154,6 +154,10 @@
 "maos_kernel_core::security::SecurityError"                       = "supervision"
 "maos_kernel_core::security::sandbox::macos::spawn_sandboxed"     = "supervision"
 "maos_kernel_core::security::sandbox::windows::spawn_sandboxed"   = "supervision"
+# Story 10.5 AC3 — Windows child-handle struct extracted from SandboxedChild
+# (restricted token + Job Object handle set). Same class as its sibling child
+# types; the kernel-surface baseline was re-blessed for the 10.5 sandbox refactor.
+"maos_kernel_core::security::sandbox::windows::WindowsChild"      = "supervision"
 
 # Story 1b.3 — OperatorPolicyConfig (cap_policy)
 "maos_kernel_core::capability::cap_policy::OperatorPolicyConfig"  = "universal-arithmetic"

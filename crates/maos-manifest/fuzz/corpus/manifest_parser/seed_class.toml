@@ -1,0 +1,9 @@
+[class]
+name = "hello-spirit"
+version = "0.1.0"
+abi = "1.0"
+manifest_schema_version = 1
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "MAOS reference Spirit — structured acknowledgement"

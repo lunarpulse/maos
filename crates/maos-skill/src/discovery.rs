@@ -72,14 +72,16 @@ pub fn discover_skills(roots: &[PathBuf]) -> Vec<DiscoveredSkill> {
 /// Discover skills under `roots`, returning both the discovered skills AND the
 /// observable list of skipped files with their `ESkillSchema` reasons.
 ///
-/// **Flat-only scan:** each root is scanned with `read_dir` (top-level `*.md`
-/// files only). Subdirectories are NOT recursed — skills must reside directly
-/// under the configured search-path roots. This is a v0.5 constraint; recursive
-/// discovery may be introduced when the spec clarifies nested-directory semantics.
+/// **Directory-aware scan (v1.5):** if a top-level entry is a directory
+/// containing a `SKILL.md` file, the directory is treated as a skill bundle
+/// and the `SKILL.md` is parsed. This supports the Anthropic Skills format
+/// (`dir/SKILL.md` with YAML frontmatter) via the `anthropic_adapter`.
+/// Flat `*.md` files continue to be parsed as `maos.skill.v1` (TOML frontmatter).
 pub fn discover_skills_detailed(roots: &[PathBuf]) -> DiscoveryOutcome {
     let mut outcome = DiscoveryOutcome::default();
 
     // Collect candidate `*.md` paths deterministically (sorted) across all roots.
+    let mut dir_bundles: Vec<PathBuf> = Vec::new();
     let mut candidates: Vec<PathBuf> = Vec::new();
     for root in roots {
         let Ok(entries) = std::fs::read_dir(root) else {
@@ -90,10 +92,57 @@ pub fn discover_skills_detailed(roots: &[PathBuf]) -> DiscoveryOutcome {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("md") && path.is_file() {
                 candidates.push(path);
+            } else if path.is_dir() {
+                // v1.5: directory-aware discovery — look for SKILL.md inside.
+                let skill_md = path.join("SKILL.md");
+                if skill_md.is_file() {
+                    dir_bundles.push(skill_md);
+                }
             }
         }
     }
     candidates.sort();
+    dir_bundles.sort();
+
+    // Process directory bundles — try Anthropic adapter (YAML) first, then
+    // fall back to maos.skill.v1 (TOML).
+    for path in dir_bundles {
+        let src = match std::fs::read_to_string(&path) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(path = %path.display(), error = %e, "skill discovery: unreadable bundle SKILL.md skipped");
+                outcome
+                    .skipped
+                    .push((path, ESkillSchema::TomlParse(format!("io: {e}"))));
+                continue;
+            }
+        };
+        // Try Anthropic adapter (YAML frontmatter) first.
+        match crate::anthropic_adapter::parse_anthropic_skill(&src) {
+            Ok(skill) => {
+                tracing::info!(path = %path.display(), id = %skill.manifest.id, "skill discovery: Anthropic-format bundle discovered");
+                outcome.discovered.push(DiscoveredSkill {
+                    skill,
+                    source_path: path,
+                    state: SkillAdmissionState::Pending,
+                });
+            }
+            Err(_yaml_err) => {
+                // Fall back to maos.skill.v1 (TOML frontmatter).
+                match parse_skill(&src) {
+                    Ok(skill) => outcome.discovered.push(DiscoveredSkill {
+                        skill,
+                        source_path: path,
+                        state: SkillAdmissionState::Pending,
+                    }),
+                    Err(reason) => {
+                        tracing::warn!(path = %path.display(), reason = %reason, "skill discovery: malformed bundle SKILL.md skipped");
+                        outcome.skipped.push((path, reason));
+                    }
+                }
+            }
+        }
+    }
 
     for path in candidates {
         let src = match std::fs::read_to_string(&path) {

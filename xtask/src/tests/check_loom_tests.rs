@@ -1,15 +1,24 @@
 use super::*;
 
 #[test]
-fn blocklist_has_exactly_four_entries() {
+fn blocklist_has_expected_entries() {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let blocklist: Blocklist =
         load_toml(&std::path::Path::new(manifest_dir).parent().unwrap().join("xtask/loom-blocklist.toml")).expect("blocklist must parse");
+    // 4 orchestration symbols + 3 SPECIFIC backing-store crate names.  The
+    // generic `embed`/`vector` tokens were removed (AC1 review: false-RED on
+    // legitimate kernel identifiers; crate leaks are caught by the closure gate).
     assert_eq!(
         blocklist.blocklist.len(),
-        4,
-        "loom-blocklist.toml must have exactly 4 entries at v0.1-alpha"
+        7,
+        "loom-blocklist.toml must have 7 entries: 4 orchestration + 3 backing-store crate names"
     );
+    // Verify backing-store vocabulary is present (Story 10.4a NFR-Test-9)
+    assert!(blocklist.blocklist.contains(&"pgvector".to_string()));
+    assert!(blocklist.blocklist.contains(&"postgres".to_string()));
+    assert!(blocklist.blocklist.contains(&"sqlx".to_string()));
+    assert!(!blocklist.blocklist.contains(&"embed".to_string()));
+    assert!(!blocklist.blocklist.contains(&"vector".to_string()));
 }
 
 #[test]

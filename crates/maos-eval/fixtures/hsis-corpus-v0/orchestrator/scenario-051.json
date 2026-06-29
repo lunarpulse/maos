@@ -1,0 +1,38 @@
+{
+  "scenario_id": "orchestrator/scenario-051",
+  "tier_tag": "negative-v1.0",
+  "spirit_class": "orchestrator",
+  "swap_kind": "same_major",
+  "predecessor": {
+    "spirit_class": "orchestrator",
+    "version": "0.3.0",
+    "state_schema_version": 1,
+    "halt_protocol_version": 1,
+    "pending_halts": [
+      "halt-neg-004a",
+      "halt-neg-004b",
+      "halt-neg-004c"
+    ]
+  },
+  "successor": {
+    "spirit_class": "orchestrator",
+    "version": "0.3.1",
+    "state_schema_version": 1,
+    "halt_protocol_compatibility": [
+      2
+    ],
+    "migrates_from": []
+  },
+  "preconditions": {
+    "spirit_pid": 904,
+    "swap_invariants": {
+      "rejection_class": "circular_dependency"
+    }
+  },
+  "expected_outcome": {
+    "verdict": "HaltContinuityViolation",
+    "post_swap_invariants_held": null,
+    "auto_revert_fired": null,
+    "expected_error": "circular_dependency"
+  }
+}

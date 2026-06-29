@@ -146,8 +146,8 @@ fn j4_earned_consent_rupture_typed_oracle_deferred() {
         tl_path.exists(),
         "transparency log must be created by the topology run at {tl_path:?}"
     );
-    let conn =
-        rusqlite::Connection::open(&tl_path).expect("open transparency log for ConsentRupture query");
+    let conn = rusqlite::Connection::open(&tl_path)
+        .expect("open transparency log for ConsentRupture query");
     let rupture_count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM transparency_log WHERE kind = ?1",

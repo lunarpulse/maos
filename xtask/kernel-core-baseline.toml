@@ -72,4 +72,104 @@
 #          lifecycle/upgrade.rs post-success TL payload keeps its graceful
 #          fallback via a match (was .unwrap_or_else). +3 lines, additive, no
 #          public ABI change.
-src_lines = 22269
+#   22300  Story 10.4a — Loom-lite collective tier kernel de-stub (+31,
+#          charter-amended kernel delta, FIRST authorized kernel delta in
+#          Epic 10). FLAG-Winston: authorized 2026-06-22 (party-mode
+#          preflight ratified). Added CollectiveMemoryPort injection seam:
+#          +1 field (Option<Arc<dyn CollectiveMemoryPort>>), +1 builder
+#          method (with_collective_port), +3 delegating match arms in
+#          write/read/scan (MemoryTier::Collective → port.{write,read,scan}).
+#          The `:709` error variant STAYS (port-absent return). Dependency
+#          arrow: maos-loom-lite → maos-domain (trait) ← maos-kernel-core;
+#          adapter injected at daemon composition root. ADR-006 ref.
+#          22488  Story 10.4a review rework (2026-06-22, glm-5.2) — AC1
+#          collective-tier mediation completion (+188, charter-amended kernel
+#          delta). FLAG-Winston: authorized under Decision A (party-mode
+#          ratified 2026-06-22) — the cap-gated I1/I2 mediation that the
+#          de-stub required to not be inert. Adds: `capabilities` field +
+#          `with_capabilities` builder; cap-gated `collective_write/read/scan`
+#          (verify_and_audit = I2 + scope-check = I1); `reject_principal`
+#          guard (Decision D — Principal partitioned out of the Collective
+#          tier) in the 3 trait arms; MemoryError::Collective variant
+#          (maos-domain); Intent::Loom{Read,Write,Scan} (cap_policy) +
+#          scope_to_intent arms. All additive; no public symbols removed.
+#   22574  Story 10.4a review patches (2026-06-23, patch group A) — wire
+#          I1/I2 into the LIVE dispatch path + LoomWrite TTL + typed
+#          Collective error (+86, charter-amended kernel delta).
+#          FLAG-Winston: authorized under the Story 10.4a Decision-A rework
+#          ratification — the prior rework left the cap-gated
+#          collective_write/read/scan with ZERO callers and the three trait
+#          arms calling the port DIRECTLY with no capability check; this delta
+#          closes that gap so AC1's "capability check BEFORE the port call"
+#          holds on the live path. P1: the three MemoryTier::Collective trait
+#          arms now DENY fail-closed when `self.capabilities` is wired (the
+#          MemoryManagerPort ABI carries no token/posture, so the unmediated
+#          trait path CANNOT mediate — callers MUST use the cap-gated
+#          collective_write/read/scan); only the legacy/test path (no caps
+#          injected) falls through to the direct port delegation. P8:
+#          collective_write asserts a LoomWrite token's remaining TTL ≤ 60s
+#          before the port call (belt-and-braces over the issuance-side cap).
+#          P12: a collective_port_error helper maps CollectivePortError → the
+#          typed MemoryError::Collective{kind,reason} discriminant. The
+#          CollectiveErrorKind enum lives in maos-domain (not counted here).
+#          ADR-006 / AC1 ref. All additive; no public symbols removed.
+#   22726  Story 10.5 AC3 — Windows binary sandbox body (windows.rs) + mod.rs
+#          Windows drop/classify_exit paths (+152, AUTHORIZED kernel-core delta).
+#          FLAG-Winston: AC3 is the single AC in Story 10.5 permitted to touch
+#          kernel-core (per story preflight flag #4). Initial implementation
+#          added the Windows sandbox body; code review immediately found stub
+#          token usage and post-spawn Job Object assignment.
+#   22929  Story 10.5 code-review patches — Windows sandbox enforcement hardening
+#          (+203, AUTHORIZED AC3 kernel-core delta). FLAG-Winston: closes review
+#          findings by running children through CreateProcessAsUserW with the
+#          restricted low-integrity token, creating the process suspended,
+#          assigning the Job Object before ResumeThread, enabling kill-on-close,
+#          and using Job Object CPU rate control instead of a fixed lifetime
+#          CPU-time budget. All additive; no public symbols removed.
+#   22955  Story 10.5 AC3 windows.rs compile-correctness fix (+26, AUTHORIZED AC3
+#          kernel-core delta). FLAG-Winston: the 22929 pin was recorded for a
+#          windows.rs that DID NOT COMPILE — Epic-10 retro §A2 re-review finding R1
+#          (missing `Win32_System_JobObjects` feature + `HANDLE(x as isize)`, which
+#          is invalid under windows 0.58 where `HANDLE` wraps `*mut c_void`, not
+#          `isize`). This delta makes the AC3 Windows binary-sandbox body actually
+#          build on x86_64-pc-windows-msvc (compile-proven via an isolated
+#          cross-target check of windows.rs + stubbed super:: types), and replaces
+#          the inert working-set memory hint with a real commit cap (retro finding
+#          H1: `JOB_OBJECT_LIMIT_PROCESS_MEMORY` set via `SetInformationJobObject`,
+#          re-asserting `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`). Net +26 confined to
+#          windows.rs (+34/-8). All additive; no public symbols removed. Windows
+#          RUNTIME (R4/R5) still requires a CI windows-latest runner — compile is
+#          proven from this Linux host, runtime is not.
+#   ── Story 10.5 R3 DISCLOSURE (Epic-10 retro §A2 re-review; 2026-06-27) ──
+#   The Story 10.5 squashed commit (0d2b18e) also drew the kernel budget in SIX
+#   files OUTSIDE the authorized windows.rs / sandbox surface, via a
+#   behavior-preserving `cargo fmt` line-wrap reflow that the 22726 and 22929
+#   entries above attributed WHOLLY to windows.rs. This note discloses that
+#   churn — the exact "silent budget draw" the D7 tripwire exists to surface
+#   (re-review finding R3). Affected files, net +25 lines (71 insertions /
+#   46 deletions), reflow ONLY, no functional change:
+#     memory/mod.rs, memory/principal.rs, memory/read_entry_point.rs,
+#     memory/write_entry_point.rs, security/mod.rs, security/operator_config.rs
+#   (e.g. operator_config.rs:323 — one assert_eq! split across four lines).
+#   RETAINED, not reverted: there is NO `cargo fmt --check` gate, so a revert is
+#   non-durable (the next `cargo fmt` reintroduces it), and these lines are
+#   ALREADY inside the pinned count below — so this disclosure changes the
+#   NARRATIVE, not the number (pin stays 22955; gate remains green). FLAG-Winston:
+#   authorized as a behavior-preserving after-the-fact disclosure. Hardening
+#   follow-up (separate, may surface drift elsewhere): add a workspace
+#   `cargo fmt --check` gate so future fmt churn cannot draw the budget silently.
+#   22964  Story 10.5 R4-bundle hardening in windows.rs (+9, AUTHORIZED AC3
+#          kernel-core delta). FLAG-Winston: two correctness fixes the §A2
+#          re-review folded into the R4 close (next_actions LOW hardening):
+#          (1) `spawn_sandboxed` now closes the restricted token via
+#          `.map_err(|e| { CloseHandle(restricted_token); e })` if
+#          `create_limited_job` fails — previously the token handle leaked on a
+#          Job-setup error (windows.rs error path). (2) the per-process commit
+#          cap is skipped when `memory_max_mb == 0` (`.filter(|mb| *mb > 0)`) —
+#          a zero cap is rejected by SetInformationJobObject (ERROR_INVALID_PARAMETER).
+#          Confined to windows.rs; behavior-preserving on the success path. The
+#          R4 enforcement negative controls themselves live in
+#          tests/sandbox_enforcement_windows.rs (NOT counted — tests/, not src/).
+#          All additive; no public symbols removed. Windows compile/runtime still
+#          CI-only (windows-latest); not verifiable from this Linux host.
+src_lines = 22964

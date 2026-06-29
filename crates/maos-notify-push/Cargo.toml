@@ -15,3 +15,10 @@ maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
 serde_json = "1"
 ureq = { version = "2", features = ["tls"] }
+
+[dev-dependencies]
+# Story 10.4b — the mobile-push-on-halt integration test sources Mira's
+# diagnostic-confidence floor + tag from the Spirit's published constants
+# (each validated against manifest.toml by mira's `threshold_drift_guard`
+# test) rather than re-hardcoding the policy values here.
+mira = { path = "../../spirits/mira" }

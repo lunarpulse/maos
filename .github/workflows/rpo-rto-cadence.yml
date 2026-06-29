@@ -1,0 +1,142 @@
+# RPO/RTO weekly cadence — NFR-Ops-1 (RPO ≤ 1h) + NFR-Ops-2 (RTO ≤ 4h).
+#
+# Weekly scheduled DR drill + decoupled evidence collector + RTO gate. This is
+# SEPARATE from discipline.yml because adding `schedule:` to discipline.yml's
+# `on:` would re-trigger the entire v1.0 ship-gate suite on a timer; the DR
+# drill is non-blocking and must not entangle the merge gate.
+#
+# Design (modeled on fuzz-cadence.yml):
+#  1. Weekly is the drill driver — performs a cold-restore of a synthetic TL
+#     (10k frames), times it, and verifies backup integrity (Merkle root
+#     cross-check) + RPO (gap between last backup timestamp and crash point).
+#  2. Evidence write-back is DECOUPLED from main — the drill uploads a record
+#     artifact; a collector job appends to rto-evidence.toml on a dedicated
+#     `rto-ledger` branch. No per-merge commit to main.
+#  3. The RTO gate reads the evidence and gates on the ≤ 4h threshold.
+#
+# PREREQUISITE (operator, one-time): create the `rto-ledger` branch and allow
+# the write token to push to it. Same setup as the fuzz-ledger branch.
+
+name: rpo-rto-cadence
+
+on:
+  schedule:
+    # 04:00 UTC every Sunday — off-peak, weekly cadence per NFR-Ops-1/2.
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+    # Manual trigger (release-time DR close-out, or to backfill a missed week).
+
+permissions:
+  contents: write # collector commits to the rto-ledger branch
+  actions: read   # collector downloads run artifacts
+
+concurrency:
+  group: rpo-rto-cadence
+  cancel-in-progress: false # never cancel a drill mid-run
+
+jobs:
+  # T1 — RTO drill: cold-restore a synthetic TL, time it, verify integrity + RPO.
+  rto-drill-t1:
+    runs-on: ubuntu-latest
+    # P15 — Postgres service container so the weekly drill exercises the
+    # Postgres COLLECTIVE-tier restore path (drill_postgres in check_rto.rs),
+    # which only runs when MAOS_TEST_POSTGRES is set. Without this the weekly
+    # cadence drills the SQLite backend only. The drill is self-contained: it
+    # builds a synthetic SQLite TL and migrates it into this Postgres instance.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maos_rto
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d maos_rto"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: RTO drill (cold-restore + timing)
+        env:
+          MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_rto
+        run: |
+          cargo run -p xtask -- rto-drill \
+            --frames 10000 \
+            --evidence-output out/rto-evidence-entry.toml \
+            --json > out/rto-drill-report.json
+          cat out/rto-drill-report.json
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rto-evidence-${{ github.run_id }}
+          path: |
+            out/rto-evidence-entry.toml
+            out/rto-drill-report.json
+          retention-days: 90
+
+  # Evidence collector — downloads the drill artifact, appends to
+  # rto-evidence.toml on the dedicated rto-ledger branch. Decoupled from
+  # main to serialize appends and avoid protected-branch write races.
+  rto-ledger-collect:
+    runs-on: ubuntu-24.04
+    needs: rto-drill-t1
+    if: always()
+    steps:
+      - name: Download evidence artifact from this run
+        uses: actions/download-artifact@v4
+        with:
+          name: rto-evidence-${{ github.run_id }}
+          path: evidence
+      - name: Append evidence to rto-evidence.toml on the rto-ledger branch
+        env:
+          GH_TOKEN: ${{ secrets.RTO_LEDGER_WRITE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin rto-ledger || git checkout -b rto-ledger
+          git checkout rto-ledger 2>/dev/null || git checkout -B rto-ledger origin/main
+          [ -f rto-evidence.toml ] || echo -e '[[evidence]]\ndrill_date = "1970-01-01"\nrto_seconds = 0\ndrill_success = false\nnotes = "seed entry — no drill run yet"\n' > rto-evidence.toml
+          # Append the new entry from the drill artifact.
+          if [ -f evidence/rto-evidence-entry.toml ]; then
+            cat evidence/rto-evidence-entry.toml >> rto-evidence.toml
+          fi
+          git add rto-evidence.toml
+          if git diff --cached --quiet; then
+            echo "no new evidence to append"
+          else
+            git commit -m "rpo-rto-cadence: append RTO drill evidence (run ${{ github.run_id }})"
+            if git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:rto-ledger; then
+              echo "ledger updated on rto-ledger branch"
+            else
+              echo "::warning::rto-ledger push failed — evidence artifact remains available for manual backfill (run ${{ github.run_id }})"
+            fi
+          fi
+
+  # RTO gate — reads the accumulated evidence and gates on the ≤ 4h threshold.
+  # Advisory (pass) until the first weekly drill has run and produced evidence.
+  check-rto-gate:
+    runs-on: ubuntu-latest
+    needs: rto-ledger-collect
+    if: always()
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: rto-ledger
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: RTO ≤ 4h gate (evidence-based)
+        run: cargo run -p xtask -- check-rto-gate --evidence rto-evidence.toml --json

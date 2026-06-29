@@ -1,0 +1,15 @@
+# Pen-Test Findings Summary Schema
+# This file documents the expected structure of summary.toml.
+# summary.toml is committed by the security team after engagement completion.
+
+[gate]
+# Number of open P0 (Critical) findings. Gate fails if > 0.
+p0_open = 0  # int, required
+# Number of open P1 (High) findings. Gate fails if > 0.
+p1_open = 0  # int, required
+# Date the pen-test engagement started (ISO 8601).
+engagement_start = "2026-01-01"  # date, required
+# Date the pen-test engagement ended (ISO 8601).
+engagement_end = "2026-01-15"  # date, required
+# Commit SHA that froze the OWASP methodology document.
+owasp_methodology_commit = "abc123"  # string, required

@@ -7,19 +7,19 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 // Story 9.7 — trait must be in scope for `load()`/`save()` on the store.
-use maos_skill::SkillQueueStore;
-use std::collections::{HashMap, HashSet};
 use maos_domain::invariants::i4::ApprovalDecision;
 use maos_iac::adapter::transparency_log::TransparencyLogAdapter;
+use maos_skill::SkillQueueStore;
 use maos_skill::{DiscoveredSkill, SkillAdmissionState, SkillId};
+use std::collections::{HashMap, HashSet};
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
     AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs, GovernanceArgs, GovernanceOp,
-    HaltArgs, HaltOp, ImportArgs, InstallArgs, OrchestratorArgs, OrchestratorOp, PauseArgs,
-    PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs, RevocationsArgs, RevocationsOp,
-    RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs, SpiritOp, Subcommand,
-    UpgradePolicyArg,
+    HaltArgs, HaltOp, ImportArgs, InstallArgs, MigrateArgs, MigrateOp, OrchestratorArgs,
+    OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs,
+    RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs,
+    SpiritOp, Subcommand, UpgradePolicyArg,
 };
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
@@ -44,6 +44,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Skills(args) => dispatch_skills(args, color),
         Subcommand::Governance(args) => dispatch_governance(args, color),
         Subcommand::Backup(args) => dispatch_backup(args, color),
+        Subcommand::Migrate(args) => dispatch_migrate(args, color),
     }
 }
 
@@ -132,6 +133,179 @@ fn verify_backup_via_cold_restore(
         ));
     }
     Ok(())
+}
+
+/// Story 10.4a AC2 (NFR-Ops-10) — `maosctl migrate sqlite-to-postgres`.
+///
+/// Drives the triple-oracle migration engine in `maos-loom-lite`. The SQLite
+/// source MUST be quiesced (no active writers) before invocation. The engine:
+///   1. Reads all frames from SQLite (canonical serialization).
+///   2. Computes source oracles (Merkle root, payload oracle, row count).
+///   3. Creates the Postgres TL schema.
+///   4. Inserts in batches of 10 000 (multiple batch boundaries for proven-red).
+///   5. Independently re-derives target oracles from Postgres.
+///   6. Verifies all three oracles pass.
+///
+/// On verification failure with `--rollback-on-failure` (default), the Postgres
+/// target table is dropped and the SQLite source is verified intact.
+fn dispatch_migrate(args: &MigrateArgs, _color: ColorChoice) -> ExitCode {
+    match &args.op {
+        MigrateOp::SqliteToPostgres {
+            from,
+            to,
+            rollback_on_failure,
+        } => {
+            let sqlite_path = std::path::Path::new(from);
+            if !sqlite_path.exists() {
+                eprintln!("error: source SQLite database not found: {from}");
+                return ExitCode::FAILURE;
+            }
+
+            // P14 — sslmode guard.  `maos migrate` connects with `NoTls`, which
+            // cannot honour an encryption request.  An operator passing
+            // sslmode=require/verify-ca/verify-full/prefer would otherwise get a
+            // silent cleartext downgrade of credentials + payloads.  Mirrors the
+            // guard in `maos_loom_lite::store` (`StoreConfig`); refuses rather
+            // than silently send plaintext over an unencrypted link.
+            if requests_tls_unsupported_by_notls(to) {
+                eprintln!(
+                    "error: '{to}' requests sslmode=require/verify-ca/verify-full/prefer, \
+                     but `maos migrate` ships NoTls-only. Set sslmode=disable (e.g. loopback) \
+                     or front Postgres with a TLS-terminating sidecar. Refusing to send \
+                     plaintext credentials over an unencrypted link."
+                );
+                return ExitCode::FAILURE;
+            }
+
+            // The migration engine is async (tokio-postgres). We need a runtime
+            // to drive it from the sync CLI entry point.
+            let runtime = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    eprintln!("error: failed to create async runtime: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+
+            runtime.block_on(async move {
+                // Capture the pre-migration source root BEFORE any target write
+                // (B13 — non-tautological rollback snapshot).
+                let pre_source_root = match maos_audit::backup::compute_merkle_root(sqlite_path) {
+                    Ok(root) => root,
+                    Err(e) => {
+                        eprintln!("error: cannot read pre-migration source root: {e}");
+                        return ExitCode::FAILURE;
+                    }
+                };
+
+                // Connect to Postgres with a bounded connect timeout (B19 — an
+                // unreachable host must not hang the CLI forever).
+                let connect_fut = tokio_postgres::connect(to, tokio_postgres::NoTls);
+                let (mut client, connection) =
+                    match tokio::time::timeout(std::time::Duration::from_secs(30), connect_fut)
+                        .await
+                    {
+                        Ok(Ok(c)) => c,
+                        Ok(Err(e)) => {
+                            eprintln!("error: failed to connect to Postgres: {e}");
+                            return ExitCode::FAILURE;
+                        }
+                        Err(_) => {
+                            eprintln!("error: timed out connecting to Postgres after 30s");
+                            return ExitCode::FAILURE;
+                        }
+                    };
+                tokio::spawn(async move {
+                    if let Err(e) = connection.await {
+                        eprintln!("warn: postgres connection error: {e}");
+                    }
+                });
+                // Bound per-statement execution too (B19).
+                if let Err(e) = client.batch_execute("SET statement_timeout = 60000").await {
+                    eprintln!("error: failed to set statement_timeout: {e}");
+                    return ExitCode::FAILURE;
+                }
+
+                // Run the forward migration (transactional, triple-oracle verified).
+                match maos_loom_lite::migration::migrate_sqlite_to_postgres(
+                    sqlite_path,
+                    &mut client,
+                )
+                .await
+                {
+                    Ok(result) => {
+                        eprintln!(
+                            "migration complete: {} rows transferred ({} batches)",
+                            result.target_row_count,
+                            (result.target_row_count as usize)
+                                .div_ceil(maos_loom_lite::migration::BATCH_SIZE)
+                        );
+                        eprintln!(
+                            "  source merkle root:    {}",
+                            hex::encode(result.source_merkle_root)
+                        );
+                        eprintln!(
+                            "  target merkle root:    {}",
+                            hex::encode(result.target_merkle_root)
+                        );
+                        eprintln!(
+                            "  source payload oracle: {}",
+                            hex::encode(result.source_payload_oracle)
+                        );
+                        eprintln!(
+                            "  target payload oracle: {}",
+                            hex::encode(result.target_payload_oracle)
+                        );
+                        eprintln!("triple-oracle verification: PASS");
+                        ExitCode::SUCCESS
+                    }
+                    Err(e) => {
+                        eprintln!("error: migration verification failed: {e}");
+                        if *rollback_on_failure {
+                            // Rollback using the PRE-migration snapshot (B13).
+                            match maos_loom_lite::migration::rollback_migration(
+                                sqlite_path,
+                                &client,
+                                pre_source_root,
+                            )
+                            .await
+                            {
+                                Ok(()) => {
+                                    eprintln!(
+                                        "rollback complete: Postgres target dropped, \
+                                         SQLite source verified intact (pre-migration root matched)"
+                                    );
+                                }
+                                Err(re) => {
+                                    eprintln!("error: rollback failed: {re}");
+                                }
+                            }
+                        }
+                        ExitCode::FAILURE
+                    }
+                }
+            })
+        }
+    }
+}
+
+/// P14 — detect an `sslmode` that requests encryption `NoTls` cannot provide.
+///
+/// `maos migrate` connects with `tokio_postgres::NoTls` directly (it does not
+/// route through the Loom-lite deadpool, so the store-level guard does not
+/// apply).  An operator EXPLICITLY requesting `sslmode=require`/`verify-ca`/
+/// `verify-full`/`prefer` must be refused rather than silently downgraded to a
+/// cleartext connection that leaks credentials + payloads.  Detected at the
+/// string level (mirroring `maos_loom_lite::store`) because the CLI uses `NoTls`
+/// and never parses the connection string's sslmode.
+fn requests_tls_unsupported_by_notls(conn_str: &str) -> bool {
+    conn_str.to_lowercase().split_whitespace().any(|kv| {
+        kv.strip_prefix("sslmode=")
+            .is_some_and(|v| matches!(v, "require" | "verify-ca" | "verify-full" | "prefer"))
+    })
 }
 
 /// Story 9.3b — `maosctl governance admit` shells to `maos-bin` via the
@@ -316,15 +490,11 @@ fn dispatch_skills_decide(skill_id: &str, approve: bool, actor: Option<&str>) ->
         &actor,
     ) {
         DecideOutcome::Applied { new_state } => {
-            println!(
-                "maosctl skills: skill `{skill_id}` {verb}d by `{actor}` — now {new_state:?}"
-            );
+            println!("maosctl skills: skill `{skill_id}` {verb}d by `{actor}` — now {new_state:?}");
             ExitCode::SUCCESS
         }
         DecideOutcome::AlreadyResolved { state } => {
-            eprintln!(
-                "maosctl skills: skill `{skill_id}` is already {state:?} — no action taken"
-            );
+            eprintln!("maosctl skills: skill `{skill_id}` is already {state:?} — no action taken");
             ExitCode::SUCCESS
         }
         DecideOutcome::NotFound => {
@@ -499,7 +669,10 @@ pub fn decide_skill(
     } else {
         "skill.admission.reject"
     };
-    let target = maos_skill::approval_target::approval_target(&view.entries[idx].id, &view.entries[idx].version);
+    let target = maos_skill::approval_target::approval_target(
+        &view.entries[idx].id,
+        &view.entries[idx].version,
+    );
     let decision = ApprovalDecision {
         actor: actor.to_string(),
         target,
@@ -738,6 +911,8 @@ fn platform_binary_name() -> Result<&'static str, String> {
         Ok("maos-linux-arm64")
     } else if cfg!(target_arch = "aarch64") && cfg!(target_os = "macos") {
         Ok("maos-darwin-arm64")
+    } else if cfg!(target_arch = "x86_64") && cfg!(target_os = "windows") {
+        Ok("maos-windows-amd64.exe")
     } else {
         Err(format!(
             "unsupported platform for release install: {}-{}",
@@ -2901,7 +3076,8 @@ fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) ->
 /// precedence.  Matches `RegionSection::resolve_from_env_and_disk()` semantics so
 /// CLI sealed-exports region-pin identically to the in-process memory manager
 /// (Story 9.4b split-brain fix).
-fn resolve_region_home() -> Result<Option<maos_domain::region::Region>, maos_domain::region::RegionError> {
+fn resolve_region_home(
+) -> Result<Option<maos_domain::region::Region>, maos_domain::region::RegionError> {
     let disk_tag = read_operator_toml_region_tag();
     maos_domain::region::Region::resolve_home(disk_tag.as_deref())
 }
@@ -2916,7 +3092,10 @@ fn read_operator_toml_region_tag() -> Option<String> {
         .join("operator.toml");
     let contents = std::fs::read_to_string(path).ok()?;
     let val: toml::Value = contents.parse().ok()?;
-    val.get("region")?.get("home_region")?.as_str().map(String::from)
+    val.get("region")?
+        .get("home_region")?
+        .as_str()
+        .map(String::from)
 }
 
 #[cfg(test)]

@@ -38,7 +38,12 @@ pub fn run(path: &str, json: bool) -> Result<(), String> {
     } else {
         eprintln!("check-literal-reappearance: FAIL");
         for v in &violations {
-            eprintln!("{}:{} contains forbidden literal {}", v.path.display(), v.line, v.literal);
+            eprintln!(
+                "{}:{} contains forbidden literal {}",
+                v.path.display(),
+                v.line,
+                v.literal
+            );
         }
     }
 
@@ -53,11 +58,16 @@ pub fn run(path: &str, json: bool) -> Result<(), String> {
 }
 
 fn scan_dir(path: &Path, violations: &mut Vec<Violation>) {
-    let Ok(entries) = fs::read_dir(path) else { return; };
+    let Ok(entries) = fs::read_dir(path) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            let name = path.file_name().and_then(|s| s.to_str()).unwrap_or_default();
+            let name = path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default();
             if matches!(name, "target" | ".git") {
                 continue;
             }
@@ -90,7 +100,9 @@ fn is_test_or_bench_file(path: &Path) -> bool {
 }
 
 fn scan_file(path: &Path, violations: &mut Vec<Violation>) {
-    let Ok(src) = fs::read_to_string(path) else { return; };
+    let Ok(src) = fs::read_to_string(path) else {
+        return;
+    };
     // Track whether we are inside a `#[cfg(test)]` module to avoid flagging
     // test-only references. This is a simple brace-depth heuristic, not a
     // full parser: it looks for `#[cfg(test)]` followed by `mod … {` and

@@ -182,7 +182,10 @@ mod tests {
         ];
         for ep in &all {
             // Disabled pinning → every variant is permitted (legacy semantics).
-            assert!(enforce_region(ep, None).is_ok(), "disabled pinning must allow {ep:?}");
+            assert!(
+                enforce_region(ep, None).is_ok(),
+                "disabled pinning must allow {ep:?}"
+            );
         }
     }
 

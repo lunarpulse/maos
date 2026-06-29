@@ -15,7 +15,9 @@ pub mod macos;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
-use std::process::{Child, Command, ExitStatus};
+#[cfg(not(target_os = "windows"))]
+use std::process::Child;
+use std::process::{Command, ExitStatus};
 
 use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i9::SandboxTier;
@@ -78,9 +80,13 @@ pub struct SandboxViolation {
 /// RAII guard for a sandboxed child process.
 ///
 /// On Linux: owns the cgroup directory; `Drop` removes it after the
-/// child has exited. On Windows: owns the Job Object handle.
+/// child has exited. On Windows: owns the process/thread/job handles and
+/// closes the Job Object last so kill-on-close remains effective.
 pub struct SandboxedChild {
+    #[cfg(not(target_os = "windows"))]
     child: Child,
+    #[cfg(target_os = "windows")]
+    child: windows::WindowsChild,
     #[allow(dead_code)]
     cleanup: Cleanup,
 }
@@ -88,10 +94,6 @@ pub struct SandboxedChild {
 enum Cleanup {
     #[cfg(target_os = "linux")]
     Cgroup { path: std::path::PathBuf },
-    #[cfg(target_os = "windows")]
-    JobObject {
-        handle: std::os::windows::io::RawHandle,
-    },
     #[allow(dead_code)]
     None,
 }
@@ -174,6 +176,19 @@ pub fn classify_exit(status: ExitStatus) -> Option<SandboxViolation> {
             if signal == libc::SIGKILL {
                 return Some(SandboxViolation {
                     attempted_syscall: "possible-oom-or-resource-cap".into(),
+                    sandbox_tier: SandboxTier::T2,
+                });
+            }
+        }
+    }
+    #[cfg(windows)]
+    {
+        // On Windows, Job Object termination uses exit code 1.
+        // STATUS_ACCESS_VIOLATION (0xC0000005) may indicate sandbox violation.
+        if let Some(code) = status.code() {
+            if code == 0xC0000005u32 as i32 {
+                return Some(SandboxViolation {
+                    attempted_syscall: "access-violation-possible-sandbox".into(),
                     sandbox_tier: SandboxTier::T2,
                 });
             }

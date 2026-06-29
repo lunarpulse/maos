@@ -60,7 +60,10 @@ fn run() -> Result<(), String> {
         "section_13_1_run: starting J4 measurement (N={})...",
         invocation_count
     );
-    let j4_config = harness::j4::J4Config { invocation_count };
+    let j4_config = harness::j4::J4Config {
+        invocation_count,
+        warmup_count: 50,
+    };
     let j4 = harness::j4::run_j4_measurement(&j4_config)
         .map_err(|e| format!("J4 measurement failed: {}", e))?;
     eprintln!(
@@ -79,10 +82,16 @@ fn run() -> Result<(), String> {
     let j6_config = harness::j6::J6Config { invocation_count };
     let j6 = harness::j6::run_j6_measurement(&j6_config)
         .map_err(|e| format!("J6 measurement failed: {}", e))?;
-    eprintln!(
-        "section_13_1_run: J6 complete — P50={}us P95={}us budget_met={}",
-        j6.p50_us, j6.p95_us, j6.budget_met
-    );
+    if j6.not_measured {
+        eprintln!(
+            "section_13_1_run: J6: NOT MEASURED — v1.0 journey, correctness-gated (Story 10.4c)"
+        );
+    } else {
+        eprintln!(
+            "section_13_1_run: J6 complete — P50={}us P95={}us budget_met={}",
+            j6.p50_us, j6.p95_us, j6.budget_met
+        );
+    }
     harness.add_journey(j6.clone());
 
     // Decision

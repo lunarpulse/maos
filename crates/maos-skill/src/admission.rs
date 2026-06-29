@@ -16,10 +16,10 @@
 
 use maos_domain::invariants::i4::ApprovalDecision;
 
+use crate::approval_target::approval_target;
 use crate::errors::ESkillQueue;
 use crate::proposal::SkillRevisionProposal;
 use crate::schema::{Skill, SkillId, SkillVersion};
-use crate::approval_target::approval_target;
 
 /// Admission state of a queued skill.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

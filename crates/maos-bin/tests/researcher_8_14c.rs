@@ -226,12 +226,10 @@ const CITATION_FETCH_RESP: &str = r#"{"jsonrpc":"2.0","result":{"claim":{"claim_
 #[test]
 fn researcher_8_14c_mcp_fanout() {
     let (web_url, web_rx) = spawn_mock_mcp_server(vec![WEB_SEARCH_RESP, WEB_FETCH_RESP]);
-    let (arxiv_url, arxiv_rx) =
-        spawn_mock_mcp_server(vec![ARXIV_SEARCH_RESP, ARXIV_FETCH_RESP]);
+    let (arxiv_url, arxiv_rx) = spawn_mock_mcp_server(vec![ARXIV_SEARCH_RESP, ARXIV_FETCH_RESP]);
     let (github_url, github_rx) =
         spawn_mock_mcp_server(vec![GITHUB_SEARCH_RESP, GITHUB_FETCH_RESP]);
-    let (cit_url, cit_rx) =
-        spawn_mock_mcp_server(vec![CITATION_SEARCH_RESP, CITATION_FETCH_RESP]);
+    let (cit_url, cit_rx) = spawn_mock_mcp_server(vec![CITATION_SEARCH_RESP, CITATION_FETCH_RESP]);
 
     let home = isolated_data_home("fanout");
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))

@@ -1,0 +1,3 @@
+[resources]
+cpu_max_pct = 10
+memory_max_mb = 64

@@ -11,6 +11,15 @@ env:
   TOKEI_VERSION: "14.0.0"
   CARGO_DENY_VERSION: "0.19.4"
   CARGO_PUBLIC_API_VERSION: "0.51.0"
+  # Best-effort hardening against transient crates.io network flakes, which
+  # spuriously failed many cargo jobs in one run (orchestrator-tests died
+  # downloading the locked `chrono` crate). CARGO_NET_RETRY (cargo net.retry)
+  # raises the retry count for "spurious" network errors during fetches.
+  # CAVEAT: harm-reduction, not a guaranteed cure — cargo's spurious-error
+  # classification may not cover every curl code, and a persistent outage
+  # won't be retried away. The reliable fix for a one-off blip is to re-run
+  # the failed jobs.
+  CARGO_NET_RETRY: "10"
 
 jobs:
   reproducible-build:
@@ -28,7 +37,7 @@ jobs:
     # paths).
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -114,7 +123,7 @@ jobs:
   check-unsafe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -136,7 +145,7 @@ jobs:
     # kernel-core decomposition lands and the ceilings can be met honestly.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -157,7 +166,7 @@ jobs:
   abi-diff:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@v1
@@ -178,7 +187,7 @@ jobs:
   gen-abi-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -193,7 +202,7 @@ jobs:
   check-empty-kernel:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -206,7 +215,7 @@ jobs:
   check-loom:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -219,7 +228,7 @@ jobs:
   check-fr47:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -232,7 +241,7 @@ jobs:
   check-workspace-count:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -247,7 +256,7 @@ jobs:
   check-a2a-sender-completeness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -262,7 +271,7 @@ jobs:
     needs: reproducible-build
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -277,7 +286,7 @@ jobs:
   check-pub-field-constructors:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -290,7 +299,7 @@ jobs:
   check-composition-root-completeness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -303,7 +312,7 @@ jobs:
   check-service-boundary:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -324,7 +333,7 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@v1
@@ -363,7 +372,7 @@ jobs:
   check-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -376,7 +385,7 @@ jobs:
   maos-audit-read-only:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Grep for write-open patterns in maos-audit
         run: |
           set +e
@@ -393,7 +402,7 @@ jobs:
   check-judge-config:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -406,7 +415,7 @@ jobs:
   check-security-md:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -425,7 +434,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -440,7 +449,7 @@ jobs:
   audit-spine-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -453,7 +462,7 @@ jobs:
   cap-token-verify-bench:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -466,7 +475,7 @@ jobs:
   cap-registry-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -479,7 +488,7 @@ jobs:
   fr4-1000-call-fixture:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -497,7 +506,7 @@ jobs:
     # mediation) — this gate exercises the read-side surface.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -517,7 +526,7 @@ jobs:
     # verb; exit 2 + zero journal mutation on unknown-spirit).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -536,7 +545,7 @@ jobs:
     # MANIFEST_FIELDS allowlist; orphan fixtures fail the build.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -552,7 +561,7 @@ jobs:
     # script. Blocks the v0.1 release tag per the AC text.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -567,7 +576,7 @@ jobs:
   hello-spirit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -580,7 +589,7 @@ jobs:
   hello-spirit-bench:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -593,7 +602,7 @@ jobs:
   example-spirit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -613,7 +622,7 @@ jobs:
   butler-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -632,7 +641,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -652,7 +661,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -666,7 +675,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -690,7 +699,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -712,7 +721,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -730,7 +739,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -751,7 +760,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -772,7 +781,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -791,7 +800,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -808,7 +817,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -828,7 +837,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -849,7 +858,7 @@ jobs:
   safety-critical-corpus-8-5:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -862,7 +871,7 @@ jobs:
   example-spirit-drift:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -876,8 +885,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [reproducible-build, check-workspace-count]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
       - uses: dtolnay/rust-toolchain@v1
@@ -895,7 +904,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check-corpus]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -919,7 +928,7 @@ jobs:
   spirit-test-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -932,7 +941,7 @@ jobs:
   lcas-corpus-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -945,7 +954,7 @@ jobs:
   isolation-framework-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -958,7 +967,7 @@ jobs:
   onb-nfr2-timing:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -971,7 +980,7 @@ jobs:
   coverage-matrix:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -984,7 +993,7 @@ jobs:
   corpus-staleness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -997,7 +1006,7 @@ jobs:
   calibrate-per-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1020,7 +1029,7 @@ jobs:
   nfr-aud-7-distillate-five-metrics-floor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1034,7 +1043,7 @@ jobs:
   nfr-sec-14-cross-spirit-isolation-200:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1047,7 +1056,7 @@ jobs:
   nfr-rel-3-hsis-95pct:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1061,7 +1070,7 @@ jobs:
   nfr-rel-1-crash-detection-2s:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1075,7 +1084,7 @@ jobs:
   nfr-rel-2-hang-detection-60s:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1089,7 +1098,7 @@ jobs:
   nfr-rel-4-silent-failure-detection:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1103,7 +1112,7 @@ jobs:
   nfr-rel-10-cold-restart:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1117,7 +1126,7 @@ jobs:
   nfr-rel-11-halt-receipt-999pct:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1131,7 +1140,7 @@ jobs:
   nfr-rel-9-revocation-5s-p99:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1145,7 +1154,7 @@ jobs:
   upgrade-policy-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1159,7 +1168,7 @@ jobs:
   revocation-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1179,7 +1188,7 @@ jobs:
     outputs:
       test_result: ${{ steps.surface.outputs.result }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1205,7 +1214,7 @@ jobs:
   t3-escape-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Podman
         run: sudo apt-get update && sudo apt-get install -y podman
       - uses: dtolnay/rust-toolchain@v1
@@ -1222,7 +1231,7 @@ jobs:
   nfr-sec-1-t3-image-signature:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1236,7 +1245,7 @@ jobs:
   t3-smoke-busybox:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Podman and busybox
         run: |
           sudo apt-get update
@@ -1255,7 +1264,7 @@ jobs:
   multi-provider-drift-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1280,7 +1289,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1302,7 +1311,7 @@ jobs:
     # `serde_json::*` + `.unwrap()/.expect()/.unwrap_or_*()` sites beyond that set.
     # Full remediation of the frozen sites is tracked as a follow-up (Story 8.x).
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1320,7 +1329,7 @@ jobs:
     timeout-minutes: 15
     continue-on-error: true  # ADVISORY (Story 8.16 §A5 triage 2026-06-12): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Hard NFR-Perf-1 verification is the maos-bench measurement track, not this CI smoke. Not masking a regression.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1330,6 +1339,27 @@ jobs:
       - name: Run iac-routing-budget bench
         run: cargo bench -p maos-bench --bench iac_routing_budget --features kernel_measurement -- --quick
 
+  # Story 10.4c AC3 / Task-3.1 (review D3) — J4 §13.1 latency regression track
+  # (Gate 2a decay/regression). Mirrors the NFR-Perf-* bench idiom: reuses the
+  # real run_j4_measurement, reports the J4 P95 for trendable regression
+  # tracking. Advisory on shared GH runners (continue-on-error) — identical
+  # posture to nfr-perf-1/8; hard blocking-regression-vs-committed-baseline is
+  # the v1.5 hardening. Catches silent decay below the absolute 10ms budget.
+  nfr-perf-j4-latency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true  # ADVISORY (review D3): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Mirrors nfr-perf-1/8. Not masking a regression.
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run J4 latency regression bench
+        run: cargo bench -p maos-bench --bench j4_latency_regression --features kernel_measurement -- --quick
+
   # Story 6.2 AC3 — NFR-Perf-8: 50-concurrent Worker fan-out / 10 tasks/sec
   # sustained / P99 ≤500ms / 0 dropped. CI-quick mode runs 60s; the full 1h
   # is gated to weekly schedule.
@@ -1338,7 +1368,7 @@ jobs:
     timeout-minutes: 15
     continue-on-error: true  # ADVISORY (Story 8.16 §A5 triage 2026-06-12; supersedes the stale "flip before Epic 6" note): NFR-Perf-8 fan-out bench is wall-clock-sensitive on shared GH runners — reports, does not gate. Hard verification is the maos-bench track. Not masking a regression.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1358,7 +1388,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1373,7 +1403,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1392,7 +1422,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1412,7 +1442,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1432,7 +1462,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1454,7 +1484,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1480,7 +1510,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1499,7 +1529,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1522,7 +1552,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1538,7 +1568,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1558,7 +1588,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1573,7 +1603,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1588,7 +1618,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1604,7 +1634,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1621,7 +1651,7 @@ jobs:
   check-manifest-schema-version:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1638,7 +1668,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1654,7 +1684,7 @@ jobs:
   check-review-findings-resolved:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1668,7 +1698,7 @@ jobs:
   check-dev-record-completeness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1682,7 +1712,7 @@ jobs:
   check-bare-review-findings:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1696,7 +1726,7 @@ jobs:
   check-dev-model-used-populated:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1710,7 +1740,7 @@ jobs:
   check-kernel-baseline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1725,7 +1755,7 @@ jobs:
   check-epic-close-green:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1747,7 +1777,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1775,7 +1805,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1789,7 +1819,7 @@ jobs:
   smoke-registry-7-2:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1806,7 +1836,7 @@ jobs:
   fr59-yank-propagation-5min:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1819,7 +1849,7 @@ jobs:
   air-gap-import-corpus:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1837,7 +1867,7 @@ jobs:
   ccac-n600-ship-gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1850,7 +1880,7 @@ jobs:
   smoke-compliance-7-3:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1864,7 +1894,7 @@ jobs:
   smoke-skill-7-4:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1884,7 +1914,7 @@ jobs:
   check-skill-schema:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1898,7 +1928,7 @@ jobs:
   smoke-abi-7-5a:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1920,7 +1950,7 @@ jobs:
   check-stability-matrix:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1934,7 +1964,7 @@ jobs:
   check-breaking-md:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1944,6 +1974,21 @@ jobs:
       - name: Run check-breaking-md
         run: cargo run -p xtask -- check-breaking-md --json
 
+  # Story 10.1a AC4 — xtask CI lint: asserts expected gate job names are present
+  # in the v1.0-ship-gate aggregate job's needs: array.
+  check-ship-gate-completeness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-ship-gate-completeness
+        run: cargo run -p xtask -- check-ship-gate-completeness --json
+
   # Story 7.5b AC9 — NFR-Onb-1 30-min first-Spirit validation gate (discipline rail).
   # Stratification + cohort evaluator + Butler-corpus seam over committed example
   # artifacts; FAILs loudly on drift. Verdicts are provisional until Story 8.1's
@@ -1951,7 +1996,7 @@ jobs:
   nfr-onb-1-gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1968,7 +2013,7 @@ jobs:
   smoke-onb-1-7-5b:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -1977,6 +2022,514 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run smoke-onb-1-7-5b self-trial
         run: cargo test -p maos-eval --test onb_1_self_trial -- --nocapture
+
+
+  # Story 10.1b AC1 — Pen-test gate: conditional per calibrate-per-commit pattern.
+  # When summary.toml exists, parse and assert p0_open == 0 && p1_open == 0.
+  # When absent, pass with advisory annotation (pen-test engagement pending).
+  check-pentest-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check pen-test results
+        run: cargo run -p xtask -- check-pentest-gate --json
+
+  # Story 10.1b AC3 — Coverage matrix completeness: no v1.0 NFR has empty gates.
+  check-coverage-matrix-completeness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check coverage matrix completeness
+        run: cargo run -p xtask -- check-coverage-matrix-completeness --json
+
+  # Story 10.1b AC2 — OWASP freeze hash-check: SHA-256 from gate-registry.toml.
+  # Hash stored in the invariant-locked registry so any OWASP doc edit requires
+  # a registry update, which is auditable and protected by review.
+  check-owasp-freeze-hash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify OWASP freeze immutability
+        run: |
+          EXPECTED_HASH=$(grep '^owasp_freeze_hash' xtask/gate-registry.toml | sed 's/.*= "\(.*\)"/\1/')
+          ACTUAL_HASH=$(sha256sum docs/pen-test/owasp-risk-rating-v1.0-frozen.md | awk '{print $1}')
+          if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
+            echo "::error::OWASP freeze hash mismatch! Expected: $EXPECTED_HASH, Actual: $ACTUAL_HASH"
+            echo "  If the OWASP doc was intentionally updated, update owasp_freeze_hash in xtask/gate-registry.toml"
+            exit 1
+          fi
+          echo "OWASP freeze hash verified: $ACTUAL_HASH"
+
+  # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
+  check-third-party-trial:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check third-party trial results
+        run: |
+          if [ -f docs/third-party-trial/results/trial-results.toml ]; then
+            cargo run -p xtask -- check-third-party-trial
+          else
+            echo "::warning::Third-party trial pending — trial-results.toml absent"
+            echo "## ⚠️ Third-Party Trial Gate: ADVISORY" >> "$GITHUB_STEP_SUMMARY"
+            echo "Trial has not yet been executed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate (ADVISORY per ADR-040).
+  check-cross-form-equiv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check cross-form equivalence results
+        run: |
+          if [ -f docs/cross-form/results/cross-form-results.json ]; then
+            cargo run -p xtask -- check-cross-form-equiv
+          else
+            echo "::warning::Cross-form equivalence pending — cross-form-results.json absent"
+            echo "## ⚠️ Cross-Form Equivalence Gate: ADVISORY" >> "$GITHUB_STEP_SUMMARY"
+            echo "Cross-form equivalence testing has not yet been executed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
+  check-red-team-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check red-team gate results
+        run: |
+          if [ -f docs/red-team/results/red-team-results.toml ]; then
+            cargo run -p xtask -- check-red-team-gate
+          else
+            echo "::warning::Red-team engagement pending — red-team-results.toml absent"
+            echo "## ⚠️ Red-Team Gate: ADVISORY" >> "$GITHUB_STEP_SUMMARY"
+            echo "Red-team engagement has not yet been executed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate
+  # (v1.5 phase, advisory-until-engagement).
+  check-migration-merkle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check migration Merkle gate results
+        run: |
+          if [ -f tests/corpora/migration-corpus-1e6.sqlite ] || [ -n "${MAOS_TEST_POSTGRES:-}" ]; then
+            cargo run -p xtask -- check-migration-merkle
+          else
+            echo "::warning::Migration corpus absent — generate via 'cargo run --release -p maos-loom-lite --example generate_migration_corpus -- --out tests/corpora/migration-corpus-1e6.sqlite'"
+            echo "## ⚠️ Migration Gate: ADVISORY (corpus absent)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+  # Story 10.3 AC-1 (NFR-Comp-1) — export-control classification gate.
+  # ECCN doc present + STABILITY.md §Export non-stub + crypto enumeration.
+  check-export-control:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check export-control classification
+        run: cargo run -p xtask -- check-export-control --json
+
+  # Story 10.3 AC-5 (NFR-Ops-4) — CNA registration gate (blocking-when-present).
+  check-cna-registration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check CNA registration
+        run: cargo run -p xtask -- check-cna-registration --json
+
+  # Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — fuzz-target existence gate (mechanics).
+  check-fuzz-targets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Check fuzz targets
+        run: cargo run -p xtask -- check-fuzz-targets --json
+
+  # Story 10.3 AC-2/AC-3 — pre-merge fuzz BUILD gate (preflight F3: build-only).
+  # The 24h T1/T2/T3 runs are operational (docs/runbooks/fuzz-cadence.md); this
+  # gate only asserts the harnesses compile against libfuzzer-sys + nightly.
+  fuzz-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install nightly + cargo-fuzz
+        run: |
+          rustup toolchain install nightly --component rust-src
+          cargo install cargo-fuzz --locked
+      - name: Build manifest parser fuzz target
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-manifest/fuzz manifest_parser
+      - name: Build wire-protocol fuzz target
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-domain/fuzz frame_deser
+
+  # Story 10.3 AC-4 (NFR-Doc-6) — Korean localization ship gate.
+  # KO_COVERAGE_MIN=100 turns the coverage promise into a mechanical gate;
+  # glossary-lock enforces locked-term preservation across all ko files.
+  check-ko-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Install docs-site dependencies
+        working-directory: docs-site
+        run: npm ci
+      - name: Korean canonical-coverage gate (KO_COVERAGE_MIN=100)
+        working-directory: docs-site
+        run: KO_COVERAGE_MIN=100 npm run gate:ko-coverage
+      - name: Korean glossary-lock gate
+        working-directory: docs-site
+        run: npm run gate:glossary-lock
+
+
+  # Story 10.5 AC5 (NFR-Doc-6 v1.5) — Japanese coverage + glossary-lock gate.
+  check-ja-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Install docs-site dependencies
+        working-directory: docs-site
+        run: npm ci
+      # R2 (Epic-10 retro §A2): real ja translations DEFERRED to v2.0 (Epic 11).
+      # The i18n/ja tree is untranslated WIP scaffold (Korean placeholder content),
+      # so 100% enforcement is dropped to REPORT-ONLY for v1.5 — it prints
+      # file-presence coverage but cannot block. Re-instate JA_COVERAGE_MIN=100 in
+      # Epic 11 when real Japanese translations land. See LOCALES.md + epic-11 DRAFT.
+      - name: Japanese canonical-coverage (report-only — real ja deferred to v2.0/Epic 11)
+        working-directory: docs-site
+        run: npm run gate:ja-coverage
+      - name: Japanese glossary-lock gate
+        working-directory: docs-site
+        run: npm run gate:ja-glossary-lock
+
+  # Story 10.5 AC5 (NFR-Doc-6 v1.5) — zh-Hans coverage + glossary-lock gate.
+  check-zh-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Install docs-site dependencies
+        working-directory: docs-site
+        run: npm ci
+      # R2 (Epic-10 retro §A2): real zh-Hans translations DEFERRED to v2.0 (Epic 11).
+      # The i18n/zh-Hans tree is untranslated WIP scaffold (Korean placeholder
+      # content), so 100% enforcement is dropped to REPORT-ONLY for v1.5 — it prints
+      # file-presence coverage but cannot block. Re-instate ZHHANS_COVERAGE_MIN=100 in
+      # Epic 11 when real Chinese translations land. See LOCALES.md + epic-11 DRAFT.
+      - name: zh-Hans canonical-coverage (report-only — real zh deferred to v2.0/Epic 11)
+        working-directory: docs-site
+        run: npm run gate:zh-coverage
+      - name: zh-Hans glossary-lock gate
+        working-directory: docs-site
+        run: npm run gate:zh-glossary-lock
+  # Story 10.4b (NFR-Sec-13) — live bilateral A2A consent + binding_checked gate.
+  check-live-bilateral-consent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-live-bilateral-consent
+        run: cargo test -p maos-a2a-tcp --test t_10_4b_live_bilateral -- --test-threads=1
+
+  # Story 10.4b (NFR-Rel-9) — rotation real-timing RotationDrillReport gate.
+  check-rotation-real-timing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-rotation-real-timing
+        run: cargo test -p maos-a2a-tcp --test t_10_4b_rotation_real_timing -- --test-threads=1
+
+  # Story 10.4c — J4 §13.1 Mira-Nash Observer colocation-latency gate.
+  # Real in-kernel scalar.tap measurement via `kernel_measurement` feature.
+  # Gate scalar: cross-task delivery latency P95 ≤ 10ms. De-flaking: warmup
+  # discard, N≥200 post-warmup, pinned tokio workers (D2).
+  # The mutation test (bench-fault-inject) runs separately to verify falsifiability.
+  # AC3/D5 (review D1): ADVISORY at v1.0 — the gate test prints a "WOULD BLOCK
+  # at v1.5" banner on over-budget instead of failing (v1_0=advisory). The
+  # load-bearing falsifier is the mutation test step below. Graduation to
+  # v1_5=blocking is a disposition flip in gate-registry.toml.
+  check-j4-latency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-j4-latency (real measurement)
+        run: |
+          # Real in-kernel scalar.tap measurement with kernel_measurement feature.
+          cargo test -p maos-bench --features kernel_measurement --test t_10_4c_j4_latency_gate -- --nocapture
+          echo "check-j4-latency: PASSED (real in-kernel scalar.tap measurement; Story 10.4c)."
+      - name: Run Gate 1 integrity tests
+        run: |
+          cargo test -p maos-bench --features kernel_measurement --test t_10_4c_j4_gate_integrity -- --nocapture
+          echo "check-j4-latency: Gate 1 integrity tests PASSED."
+      - name: Run mutation test (bench-fault-inject)
+        run: |
+          output=$(cargo test -p maos-bench --features bench-fault-inject --test t_10_4c_j4_mutation -- --nocapture 2>&1)
+          echo "$output"
+          # Review P4: assert the mutation tests actually RAN. A dropped/typo'd
+          # --features bench-fault-inject would compile this target to ZERO tests
+          # and `cargo test` would exit 0 — a silent vacuous GREEN. Require ≥1
+          # passed test so the AC2 falsifier cannot vanish without alarm.
+          echo "$output" | grep -Eq "test result: ok\. [1-9][0-9]* passed" \
+            || { echo "FAIL: mutation tests did not run (0 tests — is --features bench-fault-inject set?)"; exit 1; }
+          echo "check-j4-latency: mutation test PASSED (injection moves the number → RED)."
+      - name: Verify bench-fault-inject absent from release graph (D3)
+        run: |
+          if cargo tree -p maos-bench -e features --release 2>&1 | grep -q "bench-fault-inject"; then
+            echo "FAIL: bench-fault-inject present in release feature graph"
+            exit 1
+          fi
+          echo "check-j4-latency: bench-fault-inject absent from release graph (D3 verified)."
+
+  # Story 10.4c AC5 (D8) — FF-J6 CI guard. Mechanically enforces the J6
+  # cold-start latency harness revival trigger: FAILS if a J6 latency binding
+  # (assertion / binding AC / user-facing claim) appears while the J6 harness is
+  # still CUT (not_measured). Blocking — a J6 latency claim requires the harness.
+  check-ff-j6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run FF-J6 guard
+        run: cargo run -p xtask -- check-ff-j6
+
+  # Story 10.4b — mobile push fires on Mira halt over the real MobilePushHttp
+  # transport (operator-facing halt wire).
+  check-mobile-push-on-halt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-mobile-push-on-halt
+        run: cargo test -p maos-notify-push --test t_10_4b_mobile_push_halt
+
+  # Story 10.5 AC3 — Windows binary + sandbox compile and install verification.
+  windows-check:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      # R1/AC3: a REAL build on Windows, not just `cargo check`. This is the only
+      # place the kernel's unsafe Windows sandbox FFI actually compiles for its
+      # target (the dev host cannot cross-build it — ring/libsqlite3-sys need a
+      # Windows C toolchain).
+      - name: Build Windows kernel-core + CLI (real compile)
+        run: cargo build -p maos-kernel-core -p maos-cli
+      # R4: execute the unsafe FFI spawn path at runtime (was compile-only) —
+      # now including ENFORCEMENT negative controls (memory commit cap actually
+      # kills an over-budget child; low-integrity label actually applies). Run
+      # single-threaded: each memory test commits ~1 GiB and the tests spawn
+      # restricted-token child processes, so serialize for determinism.
+      - name: Run Windows sandbox enforcement tests
+        run: cargo test -p maos-kernel-core --test sandbox_enforcement_windows -- --nocapture --test-threads=1
+      # R5: the JetBrains/ACP bridge tests were wired into NO CI job. Run them here.
+      - name: Run ACP JetBrains bridge test
+        run: cargo test -p maos-acp --test jetbrains_bridge_test
+      - name: Run JetBrains ACP server e2e
+        run: cargo test -p maos-bin --test jetbrains_acp_server
+      - name: Verify Windows local release signature path
+        run: cargo test -p maos-cli install_verify_local_release_artifact -- --exact
+
+  # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
+  check-skill-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-skill-conformance
+        run: cargo run -p xtask -- check-skill-conformance
+      # Story 10.5 H2 (§A2 re-review): mechanically enforce the gate's failure
+      # branches in CI, not dev-pass-only. These invert the pass condition
+      # (false booleans / malformed TOML / corrupt fixture / defeated proven-red
+      # guard) and assert the gate goes red — so weakening check-skill-conformance
+      # can no longer stay green.
+      - name: Run skill-conformance proven-red vectors (H2)
+        run: cargo test -p xtask --test story_10_5_proven_red -- --test-threads=1
+
+  # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
+  # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
+  # explicit result checks to prevent skip-propagation false positives.
+  v1-0-ship-gate:
+    runs-on: ubuntu-latest
+    needs:
+      - ccac-n600-ship-gate
+      - nfr-rel-3-hsis-95pct
+      - check-stability-matrix
+      - check-breaking-md
+      - check-pentest-gate
+      - check-coverage-matrix-completeness
+      - check-owasp-freeze-hash
+      - check-third-party-trial
+      - check-cross-form-equiv
+      - check-red-team-gate
+      - check-export-control
+      - check-cna-registration
+      - check-fuzz-targets
+      - fuzz-build
+      - check-ko-coverage
+      - check-ja-coverage
+      - check-zh-coverage
+      - windows-check
+      - check-migration-merkle
+      - check-live-bilateral-consent
+      - check-rotation-real-timing
+      - check-j4-latency
+      - check-mobile-push-on-halt
+      - check-ff-j6
+      - check-skill-conformance
+    if: always()
+    steps:
+      - name: Ship gate results summary
+        run: |
+          echo "=== v1.0 Ship Gate Results ==="
+          echo ""
+          echo "| Gate | Status | Evidence |"
+          echo "|------|--------|----------|"
+          echo "| ccac-n600-ship-gate | ${{ needs.ccac-n600-ship-gate.result }} | cargo test -p maos-compliance --test ccac_ship_gate_test |"
+          echo "| check-breaking-md | ${{ needs.check-breaking-md.result }} | cargo run -p xtask -- check-breaking-md |"
+          echo "| check-ship-gate-completeness | ${{ needs.check-ship-gate-completeness.result }} | cargo run -p xtask -- check-ship-gate-completeness |"
+          echo "| check-pentest-gate | ${{ needs.check-pentest-gate.result }} | cargo run -p xtask -- check-pentest-gate |"
+          echo "| check-coverage-matrix-completeness | ${{ needs.check-coverage-matrix-completeness.result }} | cargo run -p xtask -- check-coverage-matrix-completeness |"
+          echo "| check-owasp-freeze-hash | ${{ needs.check-owasp-freeze-hash.result }} | sha256sum --check docs/pen-test/owasp-risk-rating-v1.0-frozen.md.sha256 |"
+          echo "| check-third-party-trial | ${{ needs.check-third-party-trial.result }} | cargo run -p xtask -- check-third-party-trial |"
+          echo "| check-cross-form-equiv | ${{ needs.check-cross-form-equiv.result }} | cargo run -p xtask -- check-cross-form-equiv |"
+          echo "| check-red-team-gate | ${{ needs.check-red-team-gate.result }} | cargo run -p xtask -- check-red-team-gate |"
+          echo "| check-export-control | ${{ needs.check-export-control.result }} | cargo run -p xtask -- check-export-control |"
+          echo "| check-cna-registration | ${{ needs.check-cna-registration.result }} | cargo run -p xtask -- check-cna-registration |"
+          echo "| check-fuzz-targets | ${{ needs.check-fuzz-targets.result }} | cargo run -p xtask -- check-fuzz-targets |"
+          echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser) |"
+          echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
+          echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
+          echo ""
+      - name: Fail if any sub-gate failed or was skipped
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "v1.0 ship gate FAILED: one or more sub-gates did not pass."
+          echo "  ccac-n600-ship-gate: ${{ needs.ccac-n600-ship-gate.result }}"
+          echo "  nfr-rel-3-hsis-95pct: ${{ needs.nfr-rel-3-hsis-95pct.result }}"
+          echo "  check-stability-matrix: ${{ needs.check-stability-matrix.result }}"
+          echo "  check-breaking-md: ${{ needs.check-breaking-md.result }}"
+          echo "  check-ship-gate-completeness: ${{ needs.check-ship-gate-completeness.result }}"
+          echo "  check-pentest-gate: ${{ needs.check-pentest-gate.result }}"
+          echo "  check-coverage-matrix-completeness: ${{ needs.check-coverage-matrix-completeness.result }}"
+          echo "  check-owasp-freeze-hash: ${{ needs.check-owasp-freeze-hash.result }}"
+          echo "  check-third-party-trial: ${{ needs.check-third-party-trial.result }}"
+          echo "  check-cross-form-equiv: ${{ needs.check-cross-form-equiv.result }}"
+          echo "  check-red-team-gate: ${{ needs.check-red-team-gate.result }}"
+          echo "  check-export-control: ${{ needs.check-export-control.result }}"
+          echo "  check-cna-registration: ${{ needs.check-cna-registration.result }}"
+          echo "  check-fuzz-targets: ${{ needs.check-fuzz-targets.result }}"
+          echo "  fuzz-build: ${{ needs.fuzz-build.result }}"
+          echo "  check-ko-coverage: ${{ needs.check-ko-coverage.result }}"
+          exit 1
 
   aggregate:
     runs-on: ubuntu-latest
@@ -2091,6 +2644,15 @@ jobs:
       - check-breaking-md
       - nfr-onb-1-gate
       - smoke-onb-1-7-5b
+      - v1-0-ship-gate
+      - check-ship-gate-completeness
+      - check-pentest-gate
+      - check-coverage-matrix-completeness
+      - check-owasp-freeze-hash
+      - check-third-party-trial
+      - check-cross-form-equiv
+      - check-red-team-gate
+      - check-migration-merkle
     if: always()
     permissions:
       pull-requests: write
@@ -2299,4 +2861,38 @@ jobs:
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
           echo "One or more discipline gates failed."
+          exit 1
+
+  # Story 10.2 D3/F3→B — v1.5 Ship-Gate Aggregate: the phase-graduation mechanism.
+  # Mirrors v1.0-ship-gate membership but enforces gates whose registry disposition
+  # flips to "blocking-when-present" at v1.5 (currently: check-red-team-gate).
+  # This job exists NOW (advisory at v1.0 — all sub-gates pass advisory) so the
+  # v1.5 cutover is a disposition flip in gate-registry.toml, not an infrastructure
+  # fire-drill. Promoted to the top-level aggregate needs once phase == v1.5.
+  v1-5-ship-gate:
+    runs-on: ubuntu-latest
+    needs:
+      - v1-0-ship-gate
+      - check-red-team-gate
+      - check-cross-form-equiv
+      - check-third-party-trial
+    if: always()
+    steps:
+      - name: v1.5 ship gate summary
+        run: |
+          echo "=== v1.5 Ship Gate Results ==="
+          echo ""
+          echo "| Gate | Status | Disposition @ v1.5 |"
+          echo "|------|--------|---------------------|"
+          echo "| v1-0-ship-gate | ${{ needs.v1-0-ship-gate.result }} | blocking (inherited) |"
+          echo "| check-red-team-gate | ${{ needs.check-red-team-gate.result }} | blocking-when-present |"
+          echo "| check-cross-form-equiv | ${{ needs.check-cross-form-equiv.result }} | advisory |"
+          echo "| check-third-party-trial | ${{ needs.check-third-party-trial.result }} | blocking-when-present |"
+          echo ""
+          echo "Phase disposition source: xtask/gate-registry.toml [[ship_gate]] entries."
+      - name: Fail if any v1.5-blocking gate failed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "v1.5 ship gate FAILED: one or more v1.5-blocking sub-gates did not pass."
+          echo "  check-red-team-gate: ${{ needs.check-red-team-gate.result }}"
           exit 1

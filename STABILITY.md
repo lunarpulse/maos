@@ -24,7 +24,7 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 | `abi_version` | `1` |
 | `manifest_schema_version` (current) | `3` |
 | supported schema window | `1..=3` |
-| workspace crates | `45` |
+| workspace crates | `46` |
 
 | Manifest schema | Kernel behavior |
 |---|---|
@@ -52,10 +52,9 @@ surface MUST appear as a row below AND carry a dated entry in `BREAKING.md`; CI
 
 ## LTS Policy
 
-MAOS v1.0 carries a **1-year LTS commitment** (NFR-Maint-6): the v1.0 line
-receives **security-only patches for 1 year** from the LTS clock-start below. The
-2-year LTS term is **deferred to v1.5** — v1.0 publishes the term "the v0.8 team
-can cash," not an over-promised window.
+MAOS v1.5 carries a **2-year LTS commitment** (NFR-Maint-6): the v1.0 line
+receives **security-only patches for 2 years** from the LTS clock-start below.
+The 2-year term takes effect at v1.5, extending the original v1.0 1-year window.
 
 <!-- lts-clock-start: filled by `stability-matrix` IFF a `1.0.0`/`v1.0.0` git tag exists (Epic 10 cuts the tag); placeholder until then — do NOT fabricate a SHA/tag. -->
 - **LTS clock-start:** pending — the `1.0.0` tag is cut in Epic 10 (`epic-10-v10-ship-gate`); this fills automatically when the tag exists.
@@ -88,8 +87,28 @@ rejected).
 
 ## Export
 
-<!-- full content: Story 10.3 (NFR-Comp-1) — this is the placeholder STUB. -->
+<!-- PRESERVED:export -->
+The MAOS substrate's cryptographic surface is classified **EAR99** under the
+U.S. Export Administration Regulations (EAR). Cryptography is **ancillary** to
+the primary AI-agent-orchestration function, so the surface falls **outside**
+ECCN 5D002 ("Information Security") per the "ancillary cryptography" Note to
+**5D002.c.1** — items whose cryptographic functionality is ancillary are not
+5D002-controlled (and thus EAR99). The open-source-software aspect is
+separately eligible under License Exception TSU, 15 CFR §740.13(e). Every
+primitive is provided by already-classified, mass-market open-source libraries
+(ring, ed25519-dalek, rustls).
 
-Export-control classification (ECCN determination — e.g. EAR99 vs 5D002 for the
-cryptographic surface) is pending the formal determination in Story 10.3. Do not
-treat this section as legal export advice until that story lands.
+Enumerated cryptographic surface (Story 10.3 AC-1): **HKDF-SHA256** key
+derivation, **Ed25519** signing, **AES-256-GCM** AEAD sealed-export (via
+`ring`), **TLS 1.3** cross-host transport, **SHA-256** content-addressing, and
+**SHA-256** digests canonically encoded in **CBOR (RFC 8949)** for
+ComplianceClaim fingerprinting (CBOR is the deterministic encoding, not a
+cryptographic primitive). The full determination, dual-use review, and BIS
+advisory citation are on file at `docs/compliance/eccn-classification.md`
+(NFR-Comp-1).
+
+This is an engineering classification, not legal export advice; it is **pending
+export-compliance counsel review before v1.0 enterprise distribution**.
+Operators and distributors must confirm applicability with their own counsel
+and the jurisdiction of distribution.
+<!-- END PRESERVED:export -->

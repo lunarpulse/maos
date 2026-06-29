@@ -281,7 +281,13 @@ fn collect_use_names(tree: &syn::UseTree, on_glob: &mut dyn FnMut(&str)) -> Vec<
             .iter()
             .flat_map(|t| collect_use_names(t, on_glob))
             .collect(),
-        syn::UseTree::Path(path) => collect_use_names(&path.tree, on_glob),
+        // AC1 review: collect EVERY path segment so `use sqlx::query` flags the
+        // leading `sqlx` (the forbidden crate), not just the rightmost `query`.
+        syn::UseTree::Path(path) => {
+            let mut names = vec![path.ident.to_string()];
+            names.extend(collect_use_names(&path.tree, on_glob));
+            names
+        }
     }
 }
 

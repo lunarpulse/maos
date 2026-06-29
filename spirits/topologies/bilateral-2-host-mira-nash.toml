@@ -1,0 +1,22 @@
+# Story 10.4b — 2-Host bilateral deployment manifest pair.
+# Host A = Mira (prod-edge diagnostic), Host B = Nash (dev-environment architect).
+# v1.5 supported topology: 2-Host bilateral pair.
+# 14-institution Cortex / 25-host churn = v2.0, NOT YET SUPPORTED.
+#
+# The pre-paired A2A peer cert fingerprints + ConsentAllowlists are NOT manifest
+# fields (ADR-003 — the manifest is deployment-topology-agnostic); they live in
+# the per-side A2APeerConfig constructed by the host operator at deploy time
+# (see crates/maos-a2a-tcp/tests for the live bilateral pairing).
+
+[topology]
+name = "bilateral-2-host-mira-nash"
+
+[[topology.spirits]]
+manifest = "../mira/manifest.toml"
+priority_weight = 2
+host = "host-a-prod-edge"
+
+[[topology.spirits]]
+manifest = "../nash/manifest.toml"
+priority_weight = 1
+host = "host-b-dev"

@@ -18,6 +18,13 @@ pub struct CorpusEntry {
     pub prompt_version_hash: String,
     pub description: String,
     pub judge_id: Option<String>,
+    /// Story 10.4a — `true` for deterministically GENERATED corpora (e.g. the
+    /// `migration-corpus-1e6` SQLite Transparency-Log fixture). These are not
+    /// committed `.jsonl` files; integrity is verified by a dedicated
+    /// triple-oracle gate (`check-migration-merkle`), so the JSONL
+    /// existence/hash checks in `check-corpus` skip them.
+    #[serde(default)]
+    pub generated: bool,
 }
 
 /// Shared coverage-matrix types used by coverage-matrix and corpus-staleness.
@@ -68,6 +75,25 @@ pub struct JudgeEntry {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct GateRegistry {
     pub gates: Vec<String>,
+}
+
+/// D3/F3→B: per-gate phase disposition. A gate's verdict blocks ship only at/after
+/// the phase where its disposition becomes "blocking". The map is keyed by phase
+/// identifier (e.g. "v1.0", "v1.5"); absent phases inherit the nearest prior phase.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct ShipGateEntry {
+    pub name: String,
+    pub disposition: std::collections::HashMap<String, String>,
+}
+
+/// Extended registry shape: the flat `gates` list (for coverage-matrix validation)
+/// plus the structured `[[ship_gate]]` entries (for phase-graduation enforcement).
+/// `ship_gates` is optional for backward compat with registries that haven't migrated.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct ShipGateRegistry {
+    pub gates: Vec<String>,
+    #[serde(default, rename = "ship_gate")]
+    pub ship_gates: Vec<ShipGateEntry>,
 }
 
 /// Judge direct-call identifiers TOML shape.

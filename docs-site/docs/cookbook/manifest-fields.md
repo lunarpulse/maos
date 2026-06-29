@@ -1,7 +1,7 @@
 ---
 title: Manifest Fields
 sidebar_position: 3
-description: Complete spirit.toml manifest with all schema v3 sections explained.
+description: Complete `spirit.toml` manifest with all schema v3 sections explained.
 ---
 
 # Manifest Fields

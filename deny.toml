@@ -69,6 +69,31 @@ skip = [
     # upgrades upstream. Not present on the deny graph's linux targets at runtime.
     { name = "thiserror" },
     { name = "thiserror-impl" },
+    # Story 10.4a collective tier — the Postgres/pgvector stack
+    # (pgvector → postgres-protocol / postgres-types / tokio-postgres →
+    # maos-loom-lite) brings a NEWER crypto+rand cluster that coexists with the
+    # workspace's established one. Provenance (verified via `cargo deny check
+    # bans` graph):
+    #   sha2 0.11, digest 0.11, block-buffer 0.12, crypto-common 0.2,
+    #   hmac 0.13, cpufeatures 0.3 (via chacha20 → rand 0.10), rand 0.10,
+    #   rand_core 0.10  ← postgres-protocol subtree
+    #   vs sha2 0.10 (ed25519-dalek/hkdf), hmac 0.12 (hkdf),
+    #   rand 0.9 / rand_core 0.9 (opentelemetry_sdk + ulid)  ← workspace
+    #   fallible-iterator: 0.3 (rusqlite 0.31) vs 0.2 (postgres-protocol)
+    # None is a vulnerability — `advisories`, `licenses`, `sources` all pass;
+    # this trips only the `multiple-versions` hygiene rule. Unifying would mean
+    # upgrading the frozen-ABI crypto stack to sha2 0.11 / rand 0.10 across the
+    # whole workspace: a dedicated v2.0 migration, not a CI-green patch.
+    # FLAG-Winston/John: ratify; drop each entry as the upstreams converge.
+    { name = "sha2" },
+    { name = "digest" },
+    { name = "block-buffer" },
+    { name = "crypto-common" },
+    { name = "hmac" },
+    { name = "cpufeatures" },
+    { name = "rand" },
+    { name = "rand_core" },
+    { name = "fallible-iterator" },
 ]
 skip-tree = []
 

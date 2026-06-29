@@ -47,7 +47,9 @@ impl Default for J6Config {
 /// Run J6 measurement.
 ///
 /// Without the `kernel_measurement` feature, falls back to smoke mode.
-/// With `kernel_measurement`, runs the real cold-load loop.
+/// With `kernel_measurement`, returns a NOT MEASURED disposition (Story 10.4c
+/// AC5/D8: J6 cold-start latency harness is CUT — §13.1 declares it
+/// non-binding and it is out of v1.5 scope).
 pub fn run_j6_measurement(config: &J6Config) -> Result<JourneyResult, J6Error> {
     #[cfg(feature = "kernel_measurement")]
     {
@@ -92,27 +94,20 @@ pub fn run_j6_smoke() -> JourneyResult {
     run_j6_smoke_with_count(50)
 }
 
-/// Real J6 cold-load measurement.
+/// J6 cold-start measurement: NOT MEASURED (Story 10.4c AC5/D8).
 ///
-/// Requires `kernel_measurement` feature. For each iteration, cold-constructs the
-/// kernel substrate AND instantiates the actual Mira/Nash Spirits, measuring the
-/// full cold-start from empty process to Spirit-ready.
+/// J6 cold-start latency harness is CUT from 10.4c — §13.1 (line 58) declares
+/// it non-binding ("< 500ms acceptable | Not latency-sensitive; correctness
+/// gate dominates") and it is out of v1.5 scope. Returns a typed
+/// `JourneyResult::not_measured` disposition instead of a plausible fake number.
+/// Revived only when CI guard FF-J6 detects a J6 latency binding.
 #[cfg(feature = "kernel_measurement")]
-fn run_j6_kernel(config: &J6Config) -> Result<JourneyResult, J6Error> {
-    // DEFERRED (CI remediation 2026-06-12). The real cold-load path authored in
-    // Story 8.5 references the `mira` and `nash` Spirit crates, which are NOT
-    // maos-bench dependencies, plus the private `maos_domain::frame::FrameOrigin`
-    // path — it no longer compiles. Rebuilding it (add mira/nash dev-deps, use the
-    // current substrate constructors + `invariants::i3::FrameOrigin`) is a tracked
-    // story (see deferred-work.md). Until then the `kernel_measurement` build falls
-    // back to the SMOKE sample with a loud warning — this keeps the maos-bench lib
-    // compiling so the perf benches (which do NOT use J6) build and run, WITHOUT
-    // presenting smoke numbers as real.
+fn run_j6_kernel(_config: &J6Config) -> Result<JourneyResult, J6Error> {
     eprintln!(
-        "WARNING: J6 real cold-start measurement is DEFERRED (harness drift since Story 8.5); \
-         returning a SMOKE sample — these are NOT real measurements."
+        "J6: NOT MEASURED — v1.0 journey, correctness-gated (Story 10.4c AC5/D8). \
+         J6 cold-start latency harness CUT; revived by CI guard FF-J6."
     );
-    Ok(run_j6_smoke_with_count(config.invocation_count))
+    Ok(JourneyResult::not_measured("J6".into()))
 }
 
 #[cfg(test)]
@@ -144,10 +139,23 @@ mod tests {
     }
 
     #[test]
-    fn j6_measurement_falls_back_to_smoke_without_feature() {
+    fn j6_measurement_returns_expected_disposition() {
         let r = run_j6_measurement(&J6Config::default()).expect("J6 measurement");
         assert_eq!(r.name, "J6");
-        // Either smoke (no feature) or real (feature) — both must report a budget.
-        assert!(r.p95_us > 0);
+        // With kernel_measurement ON: NOT MEASURED disposition (Story 10.4c AC5).
+        // Without: smoke samples (p95 > 0).
+        #[cfg(feature = "kernel_measurement")]
+        {
+            assert!(
+                r.not_measured,
+                "J6 must be NOT MEASURED with kernel_measurement ON"
+            );
+            assert_eq!(r.p95_us, 0);
+        }
+        #[cfg(not(feature = "kernel_measurement"))]
+        {
+            assert!(!r.not_measured);
+            assert!(r.p95_us > 0);
+        }
     }
 }

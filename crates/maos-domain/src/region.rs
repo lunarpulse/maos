@@ -33,7 +33,9 @@ use thiserror::Error;
 /// Construct **only** via [`Region::canonicalize`] — the inner string is always
 /// in frozen `ascii-v1` form, so any two [`Region`]s comparing equal derive the
 /// identical key (AC-12).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub struct Region(String);
 
 impl Region {
@@ -178,8 +180,14 @@ mod tests {
 
     #[test]
     fn canonicalize_accepts_hyphenated_and_digits() {
-        assert_eq!(Region::canonicalize("us-east-1").unwrap().as_str(), "us-east-1");
-        assert_eq!(Region::canonicalize("ap-northeast-2").unwrap().as_str(), "ap-northeast-2");
+        assert_eq!(
+            Region::canonicalize("us-east-1").unwrap().as_str(),
+            "us-east-1"
+        );
+        assert_eq!(
+            Region::canonicalize("ap-northeast-2").unwrap().as_str(),
+            "ap-northeast-2"
+        );
     }
 
     #[test]
@@ -196,7 +204,10 @@ mod tests {
     #[test]
     fn canonicalize_trims_surrounding_whitespace() {
         assert_eq!(Region::canonicalize("  eu \t\n").unwrap().as_str(), "eu");
-        assert_eq!(Region::canonicalize("  US-EAST  ").unwrap(), Region::canonicalize("us-east").unwrap());
+        assert_eq!(
+            Region::canonicalize("  US-EAST  ").unwrap(),
+            Region::canonicalize("us-east").unwrap()
+        );
     }
 
     #[test]
@@ -229,9 +240,14 @@ mod tests {
 
     #[test]
     fn canonicalize_rejects_disallowed_ascii() {
-        for bad in ["eu_west", "eu.west", "eu/west", "eu west", "eu:west", "eu;west"] {
+        for bad in [
+            "eu_west", "eu.west", "eu/west", "eu west", "eu:west", "eu;west",
+        ] {
             assert!(
-                matches!(Region::canonicalize(bad), Err(RegionError::ERegionTagInvalid { .. })),
+                matches!(
+                    Region::canonicalize(bad),
+                    Err(RegionError::ERegionTagInvalid { .. })
+                ),
                 "expected reject for {bad:?}"
             );
         }
@@ -248,7 +264,10 @@ mod tests {
         // Full-width latin, emoji, NUL, control chars.
         for bad in ["ＵＳ", "eu\u{0}", "eu\u{007f}", "café"] {
             assert!(
-                matches!(Region::canonicalize(bad), Err(RegionError::ERegionTagInvalid { .. })),
+                matches!(
+                    Region::canonicalize(bad),
+                    Err(RegionError::ERegionTagInvalid { .. })
+                ),
                 "expected reject for {bad:?}"
             );
         }
@@ -273,7 +292,9 @@ mod tests {
         let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var("MAOS_REGION_HOME", "US-EAST-1");
         assert_eq!(
-            Region::home_from_env().unwrap().map(|r| r.as_str().to_string()),
+            Region::home_from_env()
+                .unwrap()
+                .map(|r| r.as_str().to_string()),
             Some("us-east-1".to_string()),
         );
         std::env::set_var("MAOS_REGION_HOME", "  ");
@@ -293,13 +314,19 @@ mod tests {
         // env wins over disk_tag
         std::env::set_var("MAOS_REGION_HOME", "eu");
         assert_eq!(
-            Region::resolve_home(Some("us-west")).unwrap().unwrap().as_str(),
+            Region::resolve_home(Some("us-west"))
+                .unwrap()
+                .unwrap()
+                .as_str(),
             "eu",
         );
         // env unset: disk_tag used
         std::env::remove_var("MAOS_REGION_HOME");
         assert_eq!(
-            Region::resolve_home(Some("us-west")).unwrap().unwrap().as_str(),
+            Region::resolve_home(Some("us-west"))
+                .unwrap()
+                .unwrap()
+                .as_str(),
             "us-west",
         );
         // both absent: None

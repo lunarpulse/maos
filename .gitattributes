@@ -1,0 +1,35 @@
+# Force LF line endings for all text files, in the repository AND on checkout,
+# for EVERY platform. This is required for cross-platform build correctness.
+#
+# WHY: GitHub's `windows-latest` runner ships with `core.autocrlf=true`, so a
+# fresh `actions/checkout` rewrites LF -> CRLF for text files on disk. Any file
+# whose RAW BYTES are hashed at build time then hashes differently on Windows
+# than on Linux. Concretely, `crates/maos-corpus-gen/build.rs` SHA256-pins the
+# seed `*.toml` files (emitting `sha_check_{sr,rt,ccac}.rs`); the pins are the
+# LF hashes, so a CRLF checkout fails the `windows-check` build only. The same
+# trap applies to any other byte-hashed text fixture (corpora `*.jsonl`,
+# manifests, include_str!/include_bytes! data).
+#
+# `text=auto` lets git auto-detect binaries (files containing NUL bytes are
+# left untouched); `eol=lf` overrides `core.autocrlf` per-path so checkouts are
+# LF everywhere. All tracked text in this repo is already LF, so enabling this
+# produces no working-tree churn — it only pins the Windows-runner behaviour.
+* text=auto eol=lf
+
+# Binary assets — never apply any line-ending conversion (belt-and-braces over
+# `text=auto`'s NUL-byte heuristic).
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.pdf   binary
+*.gz    binary
+*.zip   binary
+*.tar   binary
+*.wasm  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary

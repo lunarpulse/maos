@@ -15,10 +15,10 @@
 pub mod for_spirit;
 pub mod principal;
 pub mod private;
+pub mod read_entry_point;
 pub mod self_telemetry;
 pub mod shared;
-pub mod write_entry_point; // Story 9.4b AC-5/AC-9 — region-enforcement chokepoint
-pub mod read_entry_point; // Story 9.4b R1-COND / AC-9 — region-enforcement chokepoint (read side)
+pub mod write_entry_point; // Story 9.4b AC-5/AC-9 — region-enforcement chokepoint // Story 9.4b R1-COND / AC-9 — region-enforcement chokepoint (read side)
 
 pub use maos_domain::ports::MemoryManagerPort;
 
@@ -56,8 +56,8 @@ use crate::iac::transparency_log::TransparencyLogAdapter;
 use maos_domain::cost::{CostAttributionPayload, PrincipalRef};
 use maos_domain::governance::GovernanceEventPayload;
 use maos_domain::memory::{
-    ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord, MemoryEntry,
-    MemoryError, MemoryNamespace, MemoryTier, MemoryValue, PrincipalIndexRow,
+    CollectiveErrorKind, ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord,
+    MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue, PrincipalIndexRow,
 };
 
 // Re-exports above make PrivateMemoryStore, SharedMemoryStore,
@@ -88,6 +88,15 @@ pub struct MemoryManagerAdapter {
     /// The daemon composition root calls `.with_principal_write_enforcement()`
     /// then `authorize_principal_writes(pid)` per admitted spirit.
     principal_write_enforcement: Option<std::sync::RwLock<HashSet<u32>>>,
+    /// Story 10.4a — injected collective memory port (Loom-lite, user-space).
+    /// When `Some`, collective-tier operations delegate to this port.
+    /// When `None`, they return `MemoryError::CollectiveNotYetAvailable`.
+    collective_port: Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>>,
+    /// Story 10.4a — injected capability registry for I1 mediation of
+    /// collective-tier ops.  When `Some`, the cap-gated `collective_*`
+    /// methods verify+audit the Spirit's token (I2) and scope-check before
+    /// the port call.  When `None`, the mediated path is unavailable.
+    capabilities: Option<Arc<crate::capability::CapabilityRegistryAdapter>>,
     /// Story 4.3 — cross-Spirit isolation hook (Story 4.5 corpus).
     /// Feature-gated so production builds carry zero runtime cost.
     #[cfg(feature = "spirit_test")]
@@ -105,6 +114,8 @@ impl MemoryManagerAdapter {
             private,
             shared,
             principal_index,
+            collective_port: None,
+            capabilities: None,
             transparency_log,
             next_frame_counter: AtomicU64::new(0),
             home_region: None,
@@ -126,9 +137,223 @@ impl MemoryManagerAdapter {
     /// Once enabled, only spirit pids registered via
     /// [`authorize_principal_writes`] may write to `Principal` namespaces.
     pub fn with_principal_write_enforcement(mut self) -> Self {
-        self.principal_write_enforcement =
-            Some(std::sync::RwLock::new(HashSet::new()));
+        self.principal_write_enforcement = Some(std::sync::RwLock::new(HashSet::new()));
         self
+    }
+
+    /// Story 10.4a — inject the collective memory port (Loom-lite adapter).
+    /// Set at the daemon composition root.  When `None` (default), collective
+    /// operations return `MemoryError::CollectiveNotYetAvailable`.
+    pub fn with_collective_port(
+        mut self,
+        port: Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>>,
+    ) -> Self {
+        self.collective_port = port;
+        self
+    }
+
+    /// Story 10.4a — inject the capability registry for I1/I2 mediation of
+    /// collective-tier ops.  Set at the daemon composition root alongside
+    /// [`with_collective_port`].  The cap-gated `collective_*` methods require
+    /// this to enforce I1 (capability check before the port call) and I2
+    /// (verify_and_audit journals the TL frame).
+    pub fn with_capabilities(
+        mut self,
+        capabilities: Option<Arc<crate::capability::CapabilityRegistryAdapter>>,
+    ) -> Self {
+        self.capabilities = capabilities;
+        self
+    }
+
+    /// Reject `Principal` namespace at the collective edge (Decision D).
+    /// The collective tier holds cross-Spirit patterns, NOT subject-scoped
+    /// PII; extending the principal_index / forget cascade into it would open
+    /// a GDPR Art.15/17 hole.  Partitioned by construction.
+    fn reject_principal_collective(namespace: &MemoryNamespace) -> Result<(), MemoryError> {
+        if matches!(namespace, MemoryNamespace::Principal { .. }) {
+            return Err(MemoryError::NamespaceViolation(
+                "Principal namespace is partitioned out of the Collective tier \
+                 (GDPR Art.15/17 — the collective tier holds cross-Spirit patterns, \
+                 not subject-scoped PII)"
+                    .into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Map a backing-store `CollectivePortError` into the typed
+    /// `MemoryError::Collective` discriminant (P12), preserving the error
+    /// category (Unreachable/Timeout/Transport/Other) instead of flattening to
+    /// a bare string.  Shared by the cap-gated `collective_*` methods and the
+    /// three `MemoryTier::Collective` trait arms.
+    fn collective_port_error(e: maos_domain::ports::CollectivePortError) -> MemoryError {
+        let kind = match &e {
+            maos_domain::ports::CollectivePortError::Unreachable { .. } => {
+                CollectiveErrorKind::Unreachable
+            }
+            maos_domain::ports::CollectivePortError::Timeout { .. } => CollectiveErrorKind::Timeout,
+            maos_domain::ports::CollectivePortError::Transport(_) => CollectiveErrorKind::Transport,
+            maos_domain::ports::CollectivePortError::Memory(_) => CollectiveErrorKind::Other,
+        };
+        MemoryError::Collective {
+            kind,
+            reason: e.to_string(),
+        }
+    }
+
+    /// Story 10.4a — Spirit-facing collective-tier WRITE, I1/I2 mediated.
+    ///
+    /// I1: `verify_and_audit` checks the token (and I2: journals the
+    /// `CapabilityInvocation` TL frame) BEFORE the port call.  The scope must
+    /// be `LoomWrite` (high-privilege pattern write; TTL ≤ 60s per AC1).
+    /// Principal namespace is rejected (Decision D).
+    pub fn collective_write(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+        token: &maos_domain::invariants::i1::CapabilityToken,
+        posture_hash: [u8; 32],
+        sandbox: maos_domain::invariants::i9::SandboxTier,
+    ) -> Result<(), MemoryError> {
+        Self::reject_principal_collective(namespace)?;
+        let caps =
+            self.capabilities
+                .as_ref()
+                .ok_or_else(|| MemoryError::CollectiveNotYetAvailable {
+                    ship_target: "v1.5",
+                    landing_story: "E10 Story 10.4",
+                })?;
+        let port = self.collective_port.as_ref().ok_or_else(|| {
+            MemoryError::CollectiveNotYetAvailable {
+                ship_target: "v1.5",
+                landing_story: "E10 Story 10.4",
+            }
+        })?;
+        caps.verify_and_audit(token, posture_hash, sandbox)
+            .map_err(|e| MemoryError::Collective {
+                kind: CollectiveErrorKind::CapabilityDenied,
+                reason: format!("capability denied: {e}"),
+            })?;
+        match caps.get_token_scope(&token.token_id) {
+            Some(maos_domain::invariants::i1::Scope::LoomWrite) => {}
+            other => {
+                return Err(MemoryError::Collective {
+                    kind: CollectiveErrorKind::CapabilityDenied,
+                    reason: format!("expected LoomWrite scope, got {other:?}"),
+                })
+            }
+        }
+        // P8 — LoomWrite TTL ≤ 60s enforcement (AC1: high-privilege pattern-write
+        // tokens are capped at 60s).  The token carries an absolute `expiry_ns`;
+        // the gap to `monotonic_now_ns()` is the live remaining TTL.  Token
+        // issuance (`cap_tokens::issue`) already caps HighPrivilege TTL at 60s —
+        // this is the runtime belt-and-braces re-check so a registry bug or a
+        // forged/long-lived LoomWrite can never reach the port call.
+        // TODO(issuance-side): assert the registry refuses to issue a LoomWrite
+        // token with ttl_secs > 60 at the `issue_with_mediation` entry point.
+        let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+        if token.expiry_ns > now_ns {
+            let remaining_secs = (token.expiry_ns - now_ns) / 1_000_000_000;
+            if remaining_secs > 60 {
+                return Err(MemoryError::Collective {
+                    kind: CollectiveErrorKind::CapabilityDenied,
+                    reason: format!(
+                        "LoomWrite token remaining TTL {remaining_secs}s exceeds the 60s cap (AC1)"
+                    ),
+                });
+            }
+        }
+        port.write(spirit_pid, namespace, key, value)
+            .map_err(Self::collective_port_error)
+    }
+
+    /// Story 10.4a — Spirit-facing collective-tier READ, I1/I2 mediated.
+    /// Scope must be `LoomRead`.
+    pub fn collective_read(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        token: &maos_domain::invariants::i1::CapabilityToken,
+        posture_hash: [u8; 32],
+        sandbox: maos_domain::invariants::i9::SandboxTier,
+    ) -> Result<Option<MemoryValue>, MemoryError> {
+        Self::reject_principal_collective(namespace)?;
+        let caps =
+            self.capabilities
+                .as_ref()
+                .ok_or_else(|| MemoryError::CollectiveNotYetAvailable {
+                    ship_target: "v1.5",
+                    landing_story: "E10 Story 10.4",
+                })?;
+        let port = self.collective_port.as_ref().ok_or_else(|| {
+            MemoryError::CollectiveNotYetAvailable {
+                ship_target: "v1.5",
+                landing_story: "E10 Story 10.4",
+            }
+        })?;
+        caps.verify_and_audit(token, posture_hash, sandbox)
+            .map_err(|e| MemoryError::Collective {
+                kind: CollectiveErrorKind::CapabilityDenied,
+                reason: format!("capability denied: {e}"),
+            })?;
+        match caps.get_token_scope(&token.token_id) {
+            Some(maos_domain::invariants::i1::Scope::LoomRead) => {}
+            other => {
+                return Err(MemoryError::Collective {
+                    kind: CollectiveErrorKind::CapabilityDenied,
+                    reason: format!("expected LoomRead scope, got {other:?}"),
+                })
+            }
+        }
+        port.read(spirit_pid, namespace, key)
+            .map_err(Self::collective_port_error)
+    }
+
+    /// Story 10.4a — Spirit-facing collective-tier SCAN, I1/I2 mediated.
+    /// Scope must be `LoomScan`.
+    pub fn collective_scan(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        prefix: &str,
+        limit: usize,
+        token: &maos_domain::invariants::i1::CapabilityToken,
+        posture_hash: [u8; 32],
+        sandbox: maos_domain::invariants::i9::SandboxTier,
+    ) -> Result<Vec<MemoryEntry>, MemoryError> {
+        Self::reject_principal_collective(namespace)?;
+        let caps =
+            self.capabilities
+                .as_ref()
+                .ok_or_else(|| MemoryError::CollectiveNotYetAvailable {
+                    ship_target: "v1.5",
+                    landing_story: "E10 Story 10.4",
+                })?;
+        let port = self.collective_port.as_ref().ok_or_else(|| {
+            MemoryError::CollectiveNotYetAvailable {
+                ship_target: "v1.5",
+                landing_story: "E10 Story 10.4",
+            }
+        })?;
+        caps.verify_and_audit(token, posture_hash, sandbox)
+            .map_err(|e| MemoryError::Collective {
+                kind: CollectiveErrorKind::CapabilityDenied,
+                reason: format!("capability denied: {e}"),
+            })?;
+        match caps.get_token_scope(&token.token_id) {
+            Some(maos_domain::invariants::i1::Scope::LoomScan) => {}
+            other => {
+                return Err(MemoryError::Collective {
+                    kind: CollectiveErrorKind::CapabilityDenied,
+                    reason: format!("expected LoomScan scope, got {other:?}"),
+                })
+            }
+        }
+        port.scan(spirit_pid, namespace, prefix, limit)
+            .map_err(Self::collective_port_error)
     }
 
     /// Grant a spirit pid permission to write to `Principal` namespaces.
@@ -465,7 +690,8 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         // authorization when enforcement is enabled.
         if let MemoryNamespace::Principal { .. } = namespace {
             if let Some(ref lock) = self.principal_write_enforcement {
-                let authorized = lock.read()
+                let authorized = lock
+                    .read()
                     .expect("principal_write_enforcement RwLock poisoned");
                 if !authorized.contains(&spirit_pid) {
                     return Err(MemoryError::PrincipalWriteUnauthorized { spirit_pid });
@@ -490,10 +716,37 @@ impl MemoryManagerPort for MemoryManagerAdapter {
                 Ok(())
             }
             MemoryTier::Shared => self.shared.write(spirit_pid, namespace, key, value),
-            MemoryTier::Collective => Err(MemoryError::CollectiveNotYetAvailable {
-                ship_target: "v1.5",
-                landing_story: "E10 Story 10.4",
-            }),
+            MemoryTier::Collective => {
+                Self::reject_principal_collective(namespace)?;
+                // P1 — I1/I2 fail-closed.  The trait path carries NO token /
+                // posture_hash / sandbox (the `MemoryManagerPort` ABI cannot
+                // change), so it CANNOT perform capability mediation.  When
+                // I1/I2 mediation is wired (`self.capabilities` is `Some`, i.e.
+                // the production composition root), the unmediated path is
+                // DENIED — callers MUST use the cap-gated `collective_write`
+                // (which verifies+audits the LoomWrite token before the port
+                // call).  Only the legacy/test path (no capabilities injected)
+                // falls through to the direct port delegation.
+                if self.capabilities.is_some() {
+                    return Err(MemoryError::Collective {
+                        kind: CollectiveErrorKind::CapabilityDenied,
+                        reason:
+                            "unmediated collective write via the trait path denied while I1/I2 \
+                                 capability mediation is wired; use the cap-gated collective_write \
+                                 (carries the LoomWrite token + posture)"
+                                .into(),
+                    });
+                }
+                match &self.collective_port {
+                    Some(port) => port
+                        .write(spirit_pid, namespace, key, value)
+                        .map_err(Self::collective_port_error),
+                    None => Err(MemoryError::CollectiveNotYetAvailable {
+                        ship_target: "v1.5",
+                        landing_story: "E10 Story 10.4",
+                    }),
+                }
+            }
         }
     }
 
@@ -523,10 +776,30 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         match tier {
             MemoryTier::Private => self.private.read(spirit_pid, namespace, key),
             MemoryTier::Shared => self.shared.read(spirit_pid, namespace, key),
-            MemoryTier::Collective => Err(MemoryError::CollectiveNotYetAvailable {
-                ship_target: "v1.5",
-                landing_story: "E10 Story 10.4",
-            }),
+            MemoryTier::Collective => {
+                Self::reject_principal_collective(namespace)?;
+                // P1 — I1/I2 fail-closed (see the write arm for the rationale):
+                // the trait path cannot carry the LoomRead token, so when
+                // capability mediation is wired the unmediated read is DENIED.
+                if self.capabilities.is_some() {
+                    return Err(MemoryError::Collective {
+                        kind: CollectiveErrorKind::CapabilityDenied,
+                        reason: "unmediated collective read via the trait path denied while I1/I2 \
+                                 capability mediation is wired; use the cap-gated collective_read \
+                                 (carries the LoomRead token + posture)"
+                            .into(),
+                    });
+                }
+                match &self.collective_port {
+                    Some(port) => port
+                        .read(spirit_pid, namespace, key)
+                        .map_err(Self::collective_port_error),
+                    None => Err(MemoryError::CollectiveNotYetAvailable {
+                        ship_target: "v1.5",
+                        landing_story: "E10 Story 10.4",
+                    }),
+                }
+            }
         }
     }
 
@@ -557,10 +830,30 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         match tier {
             MemoryTier::Private => self.private.scan(spirit_pid, namespace, prefix, limit),
             MemoryTier::Shared => self.shared.scan(spirit_pid, namespace, prefix, limit),
-            MemoryTier::Collective => Err(MemoryError::CollectiveNotYetAvailable {
-                ship_target: "v1.5",
-                landing_story: "E10 Story 10.4",
-            }),
+            MemoryTier::Collective => {
+                Self::reject_principal_collective(namespace)?;
+                // P1 — I1/I2 fail-closed (see the write arm for the rationale):
+                // the trait path cannot carry the LoomScan token, so when
+                // capability mediation is wired the unmediated scan is DENIED.
+                if self.capabilities.is_some() {
+                    return Err(MemoryError::Collective {
+                        kind: CollectiveErrorKind::CapabilityDenied,
+                        reason: "unmediated collective scan via the trait path denied while I1/I2 \
+                                 capability mediation is wired; use the cap-gated collective_scan \
+                                 (carries the LoomScan token + posture)"
+                            .into(),
+                    });
+                }
+                match &self.collective_port {
+                    Some(port) => port
+                        .scan(spirit_pid, namespace, prefix, limit)
+                        .map_err(Self::collective_port_error),
+                    None => Err(MemoryError::CollectiveNotYetAvailable {
+                        ship_target: "v1.5",
+                        landing_story: "E10 Story 10.4",
+                    }),
+                }
+            }
         }
     }
 

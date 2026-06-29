@@ -93,7 +93,10 @@ impl PrincipalNamespaceIndex {
     /// Subject-access query — returns every `(writer_spirit_pid, schema,
     /// key, timestamp_ns)` indexed for the given `principal_id` across
     /// ALL Spirits on this Host.  Sorted by `(writer_spirit_pid, schema, key)`.
-    pub(in crate::memory) fn lookup(&self, principal_id: &str) -> Result<Vec<PrincipalIndexRow>, MemoryError> {
+    pub(in crate::memory) fn lookup(
+        &self,
+        principal_id: &str,
+    ) -> Result<Vec<PrincipalIndexRow>, MemoryError> {
         let conn = self
             .conn
             .lock()

@@ -93,7 +93,6 @@ pub enum ESkillStore {
     /// version.  This is a hard error — no best-effort parse.
     #[error("unknown skill queue schema version `{0}` (expected `{SCHEMA_VERSION}`)")]
     UnknownSchemaVersion(String),
-
 }
 
 // ---------------------------------------------------------------------------

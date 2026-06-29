@@ -12,8 +12,8 @@ use maos_domain::invariants::i4::ApprovalDecision;
 use maos_iac::adapter::transparency_log::TransparencyLogAdapter;
 use maos_skill::approval_target::approval_target;
 use maos_skill::{
-    discover_skills_detailed, LocalFsSkillQueueStore, SkillAdmissionState, SkillId, SkillQueueStore,
-    SkillVersion,
+    discover_skills_detailed, LocalFsSkillQueueStore, SkillAdmissionState, SkillId,
+    SkillQueueStore, SkillVersion,
 };
 
 /// Write a valid `maos.skill.v1` file `{id}.md` under `root` (flat discovery).
@@ -75,13 +75,17 @@ fn double_journal_guard_keyed_on_target_capability() {
     // NOT decision_id (which query_approvals never surfaces — R4).
     let x_approve: Vec<_> = all
         .iter()
-        .filter(|d| d.target == approval_target(&id_x, &v) && d.capability == "skill.admission.approve")
+        .filter(|d| {
+            d.target == approval_target(&id_x, &v) && d.capability == "skill.admission.approve"
+        })
         .collect();
     assert_eq!(x_approve.len(), 1);
 
     let y_reject: Vec<_> = all
         .iter()
-        .filter(|d| d.target == approval_target(&id_y, &v) && d.capability == "skill.admission.reject")
+        .filter(|d| {
+            d.target == approval_target(&id_y, &v) && d.capability == "skill.admission.reject"
+        })
         .collect();
     assert_eq!(y_reject.len(), 1);
 
@@ -107,7 +111,11 @@ fn discovered_skill_is_approvable_end_to_end() {
     let skills_root = dir.path().join("skills");
     write_skill(&skills_root, "skill.e2e");
     let discovered = discover_skills_detailed(&[skills_root]);
-    assert_eq!(discovered.discovered.len(), 1, "the skill must be discovered");
+    assert_eq!(
+        discovered.discovered.len(),
+        1,
+        "the skill must be discovered"
+    );
 
     let store = LocalFsSkillQueueStore::at_path(dir.path().join("queue.json"));
     let tl_path = dir.path().join("tl.db");
@@ -123,7 +131,12 @@ fn discovered_skill_is_approvable_end_to_end() {
         "alice",
     );
     assert!(
-        matches!(out, DecideOutcome::Applied { new_state: SkillAdmissionState::Admitted }),
+        matches!(
+            out,
+            DecideOutcome::Applied {
+                new_state: SkillAdmissionState::Admitted
+            }
+        ),
         "a discovered skill must be approvable: {out:?}"
     );
 
@@ -295,7 +308,6 @@ fn busy_timeout_5000_blocks_then_succeeds_green() {
     );
 }
 
-
 // ─── F2 self-heal: unknown-schema cache does not corrupt TL-derived decide ─
 
 #[test]
@@ -335,7 +347,12 @@ fn schema_mismatch_cache_self_heals_through_decide() {
         "healer",
     );
     assert!(
-        matches!(out, DecideOutcome::Applied { new_state: SkillAdmissionState::Admitted }),
+        matches!(
+            out,
+            DecideOutcome::Applied {
+                new_state: SkillAdmissionState::Admitted
+            }
+        ),
         "decide must succeed despite a bad cache: {out:?}"
     );
 
@@ -343,7 +360,9 @@ fn schema_mismatch_cache_self_heals_through_decide() {
     let tl = TransparencyLogAdapter::open(&tl_path, 0).unwrap();
     let rows = tl.query_approvals(None).unwrap();
     assert_eq!(
-        rows.iter().filter(|d| d.target == "skill.heal@1.0.0").count(),
+        rows.iter()
+            .filter(|d| d.target == "skill.heal@1.0.0")
+            .count(),
         1,
         "exactly one approve row must be journaled"
     );
@@ -351,7 +370,9 @@ fn schema_mismatch_cache_self_heals_through_decide() {
     // Cache was rewritten as valid v1.
     let cached = store.load().unwrap();
     assert!(
-        cached.iter().any(|e| e.id == SkillId::from("skill.heal") && e.state == SkillAdmissionState::Admitted),
+        cached.iter().any(
+            |e| e.id == SkillId::from("skill.heal") && e.state == SkillAdmissionState::Admitted
+        ),
         "cache must be rewritten with the admitted skill"
     );
 

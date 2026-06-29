@@ -13,6 +13,7 @@ maos-domain = { path = "../maos-domain" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"  # Story 9.7 — durable skill queue store
 toml = "0.8"
+serde_yaml = "0.9"
 semver = "1"
 thiserror = "2.0"
 tracing = "0.1"

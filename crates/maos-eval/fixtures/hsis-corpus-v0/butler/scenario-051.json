@@ -1,0 +1,36 @@
+{
+  "scenario_id": "butler/scenario-051",
+  "tier_tag": "negative-v1.0",
+  "spirit_class": "butler",
+  "swap_kind": "same_major",
+  "predecessor": {
+    "spirit_class": "butler",
+    "version": "0.3.1",
+    "state_schema_version": 1,
+    "halt_protocol_version": 2,
+    "pending_halts": [
+      "halt-neg-001"
+    ]
+  },
+  "successor": {
+    "spirit_class": "butler",
+    "version": "0.3.2",
+    "state_schema_version": 1,
+    "halt_protocol_compatibility": [
+      1
+    ],
+    "migrates_from": []
+  },
+  "preconditions": {
+    "spirit_pid": 901,
+    "swap_invariants": {
+      "rejection_class": "version_mismatch"
+    }
+  },
+  "expected_outcome": {
+    "verdict": "HaltContinuityViolation",
+    "post_swap_invariants_held": null,
+    "auto_revert_fired": null,
+    "expected_error": "version_mismatch"
+  }
+}

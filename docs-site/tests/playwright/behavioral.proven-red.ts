@@ -47,13 +47,13 @@ test.describe("behavioral proven-red", () => {
 
     runCount++;
     // Green baseline: fallback route resolves 200 with banner.
-    const fallbackPath = "**/ko/abi/v1/lifecycle";
+    const fallbackPath = "**/ko/errors/EAbiTooNew";
     const fallbackHandler = (route: Route) =>
       route.fulfill({ status: 404, body: "forced missing fallback" });
-    await page.goto("/ko/abi/v1/lifecycle", { waitUntil: "domcontentloaded" });
+    await page.goto("/ko/errors/EAbiTooNew", { waitUntil: "domcontentloaded" });
     await expect(page.locator("[data-maos-fallback-banner='ko']")).toBeVisible();
     await page.route(fallbackPath, fallbackHandler);
-    const forcedMissing = await page.goto("/ko/abi/v1/lifecycle", { waitUntil: "domcontentloaded" });
+    const forcedMissing = await page.goto("/ko/errors/EAbiTooNew", { waitUntil: "domcontentloaded" });
     expect(forcedMissing?.status()).toBe(404);
     await page.unroute(fallbackPath, fallbackHandler);
 
