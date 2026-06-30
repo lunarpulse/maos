@@ -30,12 +30,14 @@ const config: Config = {
 
   i18n: {
     defaultLocale: "en",
-    locales: ["en", "ko", "ja", "zh-Hans"],
+    // ja + zh-Hans deferred indefinitely (Epic 11 hold-window decision 2026-06-29):
+    // the Korean-placeholder scaffold was removed; en + ko are the supported locales.
+    // See LOCALES.md "Deferral Policy". Re-adding a locale requires real translation
+    // + the language-identity gate (LOCALES.md), never machine-translated placeholder.
+    locales: ["en", "ko"],
     localeConfigs: {
       en: { label: "English", htmlLang: "en" },
       ko: { label: "한국어", htmlLang: "ko" },
-      ja: { label: "日本語", htmlLang: "ja" },
-      "zh-Hans": { label: "简体中文", htmlLang: "zh-Hans" },
     },
   },
 

@@ -2,7 +2,7 @@
 
 **Status:** RATIFIED 2026-06-29 — party-mode preflight (Winston · John · Murat · Amelia) + Lunarpulse sign-off. Supersedes the 2026-06-29 DRAFT (Epic 10 retro §A1, `epic_update_required: true`). Full party-mode record: workflow `wyksr4yce`.
 
-**Hard dev-gate:** Epic 11 **dev/merge** must NOT open while v1.5 is held. Remaining v1.5 holds = (1) real external pen-test returning zero P0/P1, (2) export-compliance counsel (5D002.c.1). The §A2 10.5 re-review hold is **CLEARED** (GO, 2026-06-29). **Ratified hold-window carve-outs (no Epic-11-dev dependency, may proceed now):** the 11.0 WASM de-risk spike (no-merge), ADR authoring (ADR-024 / WASM-component-form supersession / Q2 consensus), and **11.6** (reclassified as v1.5-debt-paydown — it remediates the R2 fabrication of a v1.5 commitment, zero kernel coupling). **Entanglement:** 11.1's distributable form must not be finalized before export counsel clears — a WASM runtime can change the 5D002.c.1 classification.
+**Hard dev-gate:** Epic 11 **dev/merge** must NOT open while v1.5 is held. Remaining v1.5 holds = (1) real external pen-test returning zero P0/P1, (2) export-compliance counsel (5D002.c.1). The §A2 10.5 re-review hold is **CLEARED** (GO, 2026-06-29). **Ratified hold-window carve-outs (no Epic-11-dev dependency):** the 11.0 WASM de-risk spike (no-merge) ✓ DONE, ADR authoring (ADR-024 / ADR-031 WASM-component-form / ADR-049 Q2 consensus) ✓ DONE 2026-06-29, and the **ja/zh placeholder cleanup** ✓ DONE 2026-06-29 — the Korean-placeholder scaffold was **removed** and **ja/zh-Hans translation is deferred INDEFINITELY**; en + ko are the supported locales (LOCALES.md). _Story 11.6 (real ja/zh translation + language-identity gate) is **dropped from Epic 11**; only the cleanup + the deferral were kept._ **Entanglement:** 11.1's distributable form must not be finalized before export counsel clears — a WASM runtime can change the 5D002.c.1 classification.
 
 ---
 
@@ -10,9 +10,9 @@
 Take MAOS from a 2-host bilateral deployment (v1.5) to a **multi-region, multi-instance, externally-extensible** platform — a WASM Spirit form, a 3-region Cortex pilot with cross-region collective memory, enterprise policy/identity integration, and a proven third-party authoring path — **all without breaking the v1.0-frozen ABI**. v2.0 is the **technical** phase only; ecosystem adoption (v2.5) is decoupled and planned separately (John's rule — engineering must not gate on cert-body MOUs / author recruitment).
 
 ## Structure — single Epic 11, two waves (ratified)
-~12 stories after the honest splits, sequenced into two waves to pace the §A6 review load without renumbering v2.5:
+~11 stories after the honest splits (Story 11.6 dropped — ja/zh deferred indefinitely, 2026-06-29), sequenced into two waves to pace the §A6 review load without renumbering v2.5:
 - **Wave 1 — Foundation:** 11.0 → 11.1a → 11.1b · 11.2a → 11.2b
-- **Wave 2 — Hardening / Validation:** 11.3 · 11.4a · 11.4b · 11.4c · 11.5 · 11.6 · 11.7
+- **Wave 2 — Hardening / Validation:** 11.3 · 11.4a · 11.4b · 11.4c · 11.5 · 11.7
 
 ---
 
@@ -25,7 +25,7 @@ Take MAOS from a 2-host bilateral deployment (v1.5) to a **multi-region, multi-i
 5. **Story splits** (§A5 ≤6-AC ceiling): 11.1→a/b, 11.2→a/b, 11.4→a/b/c (enterprise full-bundle, ratified).
 6. **11.1b equivalence metric** = behavioral-oracle **tiered** (100% on invariant-bearing effects — halt, frame sequence, capability denials, region-pin, audit frames; ≥75% slack only on cosmetic/latency surface), scoped to deterministic fixture Spirits, with a known-divergent component as the proven-red. The DRAFT's flat distributional ≥75% is **rejected** (it hits the `check_cross_form_equiv.rs` U-test NOT-APPLICABLE branch → vacuous on deterministic Spirits).
 7. **FKCS diff-oracle honesty:** derive "zero kernel changes" from `abi-diff` vs `kernel-core-baseline.toml` named surfaces + `cargo-public-api` additive-only, measured before/after each admission — never a self-reported `abi_unchanged` flag. A negative-control "fourth Spirit" using an undocumented kernel internal MUST fail. Admission via the unmodified `SkillAdmissionQueue` (ADR-027).
-8. **11.6 language assurance** = automated Unicode-**script-identity** gate (BLOCKING) — ja requires kana + zero Hangul; zh-Hans requires simplified-Han + zero kana + zero Hangul + a simplified-vs-traditional residual; glossary-locked Latin spans excluded from the denominator — plus a native-reviewer sign-off **runbook** (release-gate, models the §A3 ko SR runbook) for wrong-*meaning*. Proven-red: Hangul-in-ja → RED, ja-in-zh-Hans → RED, English-fallback → RED. Then re-instate `JA_COVERAGE_MIN=100`/`ZHHANS_COVERAGE_MIN=100` as blocking. "MT + script-pass" must NOT be claimed as "real translation."
+8. **Language assurance — ja/zh-Hans DEFERRED INDEFINITELY** (2026-06-29; supersedes the original 11.6 plan). The Korean-placeholder scaffold (the R2 fabrication) was **removed**, ja/zh are **no longer configured locales**, and en + ko are the supported set (LOCALES.md). Story 11.6's "real ja/zh translation" is **dropped from Epic 11** — no committed target. The gate design is **retained in LOCALES.md as a hard precondition for any future re-introduction, not built now**: an automated Unicode-**script-identity** gate (ja = kana + 0 Hangul; zh-Hans = simplified-Han + 0 kana + 0 Hangul + a simp-vs-trad residual) + a native-reviewer runbook; **"MT + script-pass" must NEVER be claimed as "real translation."** Re-adding a locale without real human translation + this gate is forbidden.
 9. **§A7 reflexes bind every new gate**, named per-gate at preflight, PLUS a **new region-identity reflex** (a count gate over propagated patterns must verify each pattern's source-region identity — the direct analogue of the language-identity reflex).
 10. **Absent-result flips to BLOCK at the v2.0 ship gate** for every new Epic-11 gate (record `{v1_0, v1_5, v2_0}` per gate in `gate-registry.toml`; emit the §A7.5 "WOULD HAVE BLOCKED" banner during any advisory window).
 11. **Model tiers + §A6 concentration:** 11.1a, 11.2a, 11.4b are **opus-4-8** and MUST hold the tier — pre-book the full multi-layer review **including the Test-Infra layer + a runtime-execution check** (the exact net that degraded on 10.5). A degraded/rate-limited review is not a review and hard-blocks completion.
@@ -47,7 +47,7 @@ Take MAOS from a 2-host bilateral deployment (v1.5) to a **multi-region, multi-i
 | **11.4b** | ADR-024 sandbox-escape structural detector | Author ADR-024 first; out-of-kernel detector subscribing the SandboxViolation/seccomp/TraceSink stream; TP-floor + FP-ceiling; live-syscall proven-red (no mock); Windows runtime proven-red is windows-latest-CI-only. | 5 | opus-4-8 | FLAG-Winston bounded to an emission-seam ONLY if `SandboxViolation` lacks a subscribable sink (verify at prep; possibly ZERO) | ADR-024 |
 | **11.4c** | Enterprise identity + at-rest + SIEM *(full PRD bundle, ratified)* | SSO/OIDC identity assertions + org-KMS encrypted-at-rest + SIEM export (NFR-Aud-11). The SSO→capability-token-issuance slice is security-adjacent → opus-4-8. | 5 | opus-4-6 *(token-issuance slice opus-4-8)* + §A6 | ZERO | 11.4a |
 | **11.5** | FKCS infrastructure *(NFR-Test-5 first half)* | diff-oracle + harness + kernel-frozen-vN.0 tag; oracle derives zero-kernel-change from abi-diff/cargo-public-api; negative-control 4th Spirit MUST fail; counts derive-and-reconcile; absent→BLOCK@v2.0. **Infra-only** — 3 genuine external Spirits + N=12 → v2.5; validate in-house via Chinese-wall proxy authors. | 5 | opus-4-6 + §A6 | ZERO (by construction) | 11.1a + frozen-kernel-vN.0 tag (**sequence LAST**) |
-| **11.6** | Real ja/zh-Hans + language-identity gate *(v1.5-debt; hold-window)* | Replace the Korean-placeholder scaffold (53×2 files) with real translation; Unicode-script-identity gate (blocking) + native-review runbook; re-instate coverage=100 blocking. | 5 | opus-4-6 + §A6 (Test-Infra scrutiny on the gate) | ZERO | — |
+| ~~**11.6**~~ | ~~Real ja/zh-Hans + language-identity gate~~ **— DROPPED 2026-06-29** | ja/zh-Hans translation **deferred indefinitely**; Korean-placeholder scaffold removed; en + ko are the supported locales (LOCALES.md). No committed target. | — | — | — | — |
 | **11.7** | v2.0 third-party trial infrastructure *(NFR-Test-8)* | Build the v2.0 black-box trial infra (SBOM + signing-chain re-load on a clean VM by CI bot, halt-recall ≥0.85) + internal Chinese-wall proxy; genuine external N=12 → v2.5. May fold into 11.5. | 4 | opus-4-6 + §A6 | ZERO | 11.5 |
 
 ---
@@ -64,6 +64,8 @@ Baseline verified at `src_lines = 22964`. Two ceilings both bind: the line-count
 
 ## Cut / deferred to v2.5 (ecosystem phase, separate planning)
 First third-party ComplianceClaim issuance, ≥20 external Spirits in registry, certification-body engagement, Cortex consortium case study, RTL layout localization, **100-host churn**, the **3 genuine external-authored FKCS Spirits + the external N=12 trial cohort**. DevRel/BD-driven, parallelizable from v1.5 — not in Epic 11.
+
+**Deferred INDEFINITELY (no committed target):** Japanese + Chinese Simplified documentation translation. The Korean-placeholder scaffold was removed 2026-06-29; en + ko are the supported locales (LOCALES.md). Re-introduction requires real human translation + a language-identity gate — see LOCALES.md "Deferral Policy."
 
 ## Pre-dev checklist (per story, at preflight)
 1. Name each gate's §A7 source (derive-and-reconcile numerator, real-subsystem proven-red, feature-flag≠measurement, region/language-identity where relevant).
