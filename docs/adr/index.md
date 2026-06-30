@@ -14,9 +14,11 @@ Committed ADRs for the MAOS project.
 | [ADR-014](ADR-014-distillation-audit-chain.md) | Distillation audit-chain (introduces I11) | binding-v0.1 | Capability Registry rejects digest writes with EDigestAuditChainMissing (at v0.5) |
 | [ADR-022](ADR-022-tagged-scalar-working-memory-slot.md) | Tagged-scalar working-memory slot | binding-v0.1 | [epistemic_policy] rules trigger halts via four universal-arithmetic predicates (at v0.3) |
 | [ADR-023](ADR-023-capability-token-ttl-bind-to-pid.md) | Capability-token TTL + bind-to-PID | binding-v0.1 | TTL ≤60s; tokens bound to (Spirit-PID + boot-nonce + expiry) |
+| [ADR-024](ADR-024-out-of-kernel-sandbox-escape-structural-detector.md) | Out-of-kernel sandbox-escape structural detector (NFR-Sec-3) | Accepted (arch 2026-06-29); binding-v2.0 at Story 11.4b | Story 11.4b — out-of-kernel detector (no `maos-kernel-core` dep); TP-floor/FP-ceiling on a live-syscall proven-red; no-verdict (structural-not-semantic) test; producer-wired proven-red |
 | [ADR-026](ADR-026-principal-memory-namespace.md) | Principal Memory Namespace | binding-v0.1 | subject-access query / right-to-be-forgotten (at v0.5) |
 | [ADR-028](ADR-028-replay-determinism-trace-shape.md) | Replay determinism over trace-shape | binding-v1.0 | `replay_byte_identical_two_process` + `redaction_k_anonymity` CI gate |
 | [ADR-030](ADR-030-capability-registry-decomposition.md) | Capability Registry decomposition | binding-v0.1 | hot-path token verify <5µs P99 benchmark |
+| [ADR-031](ADR-031-wasm-component-model-spirit-form.md) | WASM Component-Model Spirit form (host-as-adapter; resolves Cross-Form Equivalence) | Proposed (Story 11.0 spike 2026-06-29); binding-v2.0 at Story 11.1b | Story 11.1a host+WIT (launcher-seam abi-diff proven-red ≤+150 LOC; WIT byte-equal corpus vs ADR-032 frame set); Story 11.1b tiered cross-form equivalence |
 | [ADR-032](ADR-032-spirit-wire-protocol-bytes-on-wire.md) | Spirit Wire Protocol bytes-on-wire | binding-v0.1 | byte-equal golden corpus per frame variant per SDK |
 | [ADR-037](ADR-037-constitutional-amendment-process.md) | Constitutional amendment process | binding-v0.1 | invariant-lock CI gate |
 | [ADR-038](ADR-038-per-service-kloc-ceiling.md) | Per-service KLOC ceiling | binding-v0.1 | xtask/kloc.toml enforced by tokei |
@@ -30,7 +32,11 @@ Committed ADRs for the MAOS project.
 
 > 16 `binding-v0.1` ADRs as of Story 1a.1; **15 as of Story 1b.6** (ADR-039 — per-module unsafe policy, accepts the 1b.3 relaxation).
 > **17 as of Story 5.5e** (ADR-040 — §13.1 rust-inproc measurement gate, binding-v0.5).
-> The `speculative-vNext` and post-v0.1 ADRs (ADR-008, 009, 014 [runtime], 015,
-> 016–021, 024, 025, 027–029, 031, 033–036) are tracked in
+> ADR-024 (out-of-kernel escape detector) and ADR-031 (WASM component-model form)
+> were resolved from `speculative-vNext` in the Epic 11 v1.5 hold-window (2026-06-29):
+> ADR-024 architecture-accepted (binding-v2.0 at Story 11.4b), ADR-031 proposed via
+> the Story 11.0 spike (binding-v2.0 at Story 11.1b).
+> The remaining `speculative-vNext` and post-v0.1 ADRs (ADR-008, 009, 014 [runtime],
+> 015, 016–021, 025, 027–029, 033–036) are tracked in
 > `architecture-maos-minimal-opus/12-architecture-decision-records.md` and land
 > at their respective phase epics.
