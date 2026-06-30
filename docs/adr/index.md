@@ -29,6 +29,7 @@ Committed ADRs for the MAOS project.
 | [ADR-046](ADR-046-cost-attribution-and-reconciliation.md) | Cost attribution + reconciliation (FR64) | binding-v0.5 (Story 9.3b Task 0) | observability-not-invoice posture; CI golden-vector oracle (no `f64`/no pricing-fn import, sum-then-round); SR-3 forget-cascade coverage; kernel re-pin ~21400–21440 |
 | [ADR-047](ADR-047-trust-anchor-framing-carry-forward.md) | Trust-anchor framing carry-forward (NFR-Ops-8) | binding-v0.3 (Story 9.5a) | STABILITY.md NFR-Comp-3 scope references this ADR; no runtime gate (framing decision) |
 | [ADR-048](ADR-048-doc-site-toolchain-docusaurus.md) | Doc-site toolchain — Docusaurus (NFR-Doc-7) | binding-v1.0 (Story 9.5) | `docs-site` builds for all locales; isolation contract in `xtask/kloc.toml`; frozen URL contract via redirects plugin |
+| [ADR-049](ADR-049-cross-region-collective-memory-consensus.md) | Cross-region collective-memory consensus — TL-anchored CRDT + mediated re-attestation | Proposed (arch 2026-06-29); binding-v2.0 at Story 11.2a | Story 11.2a — mediated re-attestation (no transparent replication); independent per-region 10.4b convergence oracle; region-identity reflex; AP-local-degrade proven-red; kernel-core abi-diff ~0 (`maos-loom-lite` + `maos-audit`) |
 
 > 16 `binding-v0.1` ADRs as of Story 1a.1; **15 as of Story 1b.6** (ADR-039 — per-module unsafe policy, accepts the 1b.3 relaxation).
 > **17 as of Story 5.5e** (ADR-040 — §13.1 rust-inproc measurement gate, binding-v0.5).
