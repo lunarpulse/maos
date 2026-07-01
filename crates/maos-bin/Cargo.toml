@@ -23,6 +23,7 @@ network = [
     "dep:maos-a2a",
 ]
 air-gap = []  # Compile-out all networking: reqwest, hyper client, tokio::net, DNS resolvers
+wasm-host = ["dep:maos-wasm-host"]  # Story 11.1a — OFF by default. Gates the vendored `wasmtime` engine + maos-wasm-host/maos-wasm-runner. OFF-by-default is the export-control precondition (5D002.c.1) — see docs/compliance/export-counsel-precondition.md.
 spirit_test = ["network", "maos-kernel-core/spirit_test", "maos-spirit-sdk/spirit_test"]
 fixture_replay = ["network", "maos-mcp/fixture_replay", "maos-acp/fixture_replay", "maos-providers/fixture_replay", "maos-registry/fixture_replay", "maos-bench/fixture_replay"]
 smoke_schedule = ["tokio/test-util"]
@@ -35,6 +36,8 @@ maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-loom-lite = { path = "../maos-loom-lite" }
+maos-host = { path = "../maos-host" }   # Story 11.1a — Spirit Host Port trait types (needed even without wasmtime; the host abstraction is engine-agnostic)
+maos-wasm-host = { path = "../maos-wasm-host", optional = true }   # Story 11.1a — wasmtime component adapter, behind `wasm-host` feature (export-control OFF-by-default, AC6)
 maos-mcp = { path = "../maos-mcp", optional = true }
 maos-notify-push = { path = "../maos-notify-push", optional = true }
 maos-registry = { path = "../maos-registry", optional = true }

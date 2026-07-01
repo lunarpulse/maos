@@ -382,6 +382,7 @@ fn run_cli_wrapper_manifest(
     run: &RunArgs,
     transparency_log: Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    spirit_host: Option<Arc<dyn maos_host::SpiritHostPort>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use maos_domain::host_grant::{HostGrant, StaticHostGrantAllowlist};
     use maos_domain::invariants::i9::SandboxTier;
@@ -451,6 +452,26 @@ fn run_cli_wrapper_manifest(
     // 5. Resolve the CLI binary path; pin it into the config for the probe.
     let resolved = resolve_cli_binary(&config.command)?;
     config.command = resolved.clone();
+
+    // Story 11.1a AC1 — invoke the SpiritHostPort at the exact point the
+    // kernel's BridgeSpawnSpec.program is computed. `[cli_wrapper]` manifests
+    // declare no authoring form field (schema extension is out of 11.1a's
+    // scope — see story "Explicitly NOT in 11.1a"), so every request here is
+    // `NativeSubprocess`; when `spirit_host` is `Some`, this is a REAL,
+    // non-inert call (identity resolution) rather than dead code. Absent a
+    // port (native-only default build), `resolved` is used directly —
+    // byte-identical to pre-11.1a behavior.
+    let resolved = match &spirit_host {
+        Some(host) => host
+            .resolve_launch(&maos_host::SpiritLaunchRequest {
+                form: maos_host::SpiritForm::NativeSubprocess,
+                artifact: resolved,
+                form_config: vec![],
+            })
+            .map_err(|e| format!("maos run: spirit host resolve_launch: {e}"))?
+            .program,
+        None => resolved,
+    };
 
     // 6. Journaled admission (Story 7.4 path: probe + shape assert + T3 floor).
     admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
@@ -1721,6 +1742,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
+    // Story 11.1a — construct the SpiritHostPort (ADR-031). `None` when the
+    // `wasm-host` feature is off (the export-control default, AC6) or when
+    // the runner binary is not resolvable — only the native form is
+    // launchable in that case (the kernel default per maos-host's doc).
+    // Real, non-inert wiring: `run_cli_wrapper_manifest` calls
+    // `resolve_launch(NativeSubprocess)` on this port at the exact spot
+    // `BridgeSpawnSpec.program` is computed (mirrors AC1's Given clause).
+    #[cfg(feature = "wasm-host")]
+    let spirit_host: Option<Arc<dyn maos_host::SpiritHostPort>> = {
+        match std::env::current_exe() {
+            Ok(exe) => {
+                let mut runner_path = exe;
+                runner_path.pop();
+                runner_path.push("maos-wasm-runner");
+                if runner_path.exists() {
+                    let cfg = Arc::new(maos_wasm_host::config::WasmHostConfig::new(
+                        runner_path,
+                        10_000_000,
+                    ));
+                    let adapter = Arc::new(maos_wasm_host::WasmHostAdapter::new(
+                        cfg,
+                        std::time::Duration::from_secs(5),
+                    ));
+                    eprintln!("maos: Spirit host (WASM component form, ADR-031) initialized");
+                    Some(adapter as Arc<dyn maos_host::SpiritHostPort>)
+                } else {
+                    eprintln!(
+                        "maos: warn: wasm-host feature enabled but maos-wasm-runner not found \
+                         next to the daemon binary — WASM Spirit form disabled, native form only"
+                    );
+                    None
+                }
+            }
+            Err(e) => {
+                eprintln!(
+                    "maos: warn: cannot resolve daemon binary path ({e}) — \
+                     WASM Spirit form disabled, native form only"
+                );
+                None
+            }
+        }
+    };
+    #[cfg(not(feature = "wasm-host"))]
+    let spirit_host: Option<Arc<dyn maos_host::SpiritHostPort>> = None;
+
     // Story 4.3 — assemble the full MemoryManagerAdapter.
     let memory = Arc::new(
         maos_kernel_core::memory::MemoryManagerAdapter::new(
@@ -2732,6 +2798,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     &run,
                     Arc::clone(&transparency_log),
                     Arc::clone(&capability),
+                    spirit_host.clone(),
                 )?;
                 return Ok(());
             }

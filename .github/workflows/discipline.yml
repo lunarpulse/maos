@@ -2170,6 +2170,70 @@ jobs:
       - name: Check export-control classification
         run: cargo run -p xtask -- check-export-control --json
 
+  # Story 11.1a AC1/D4 — maos-host public-API baseline gate (ADR-031 Spirit
+  # Host Port). Pinned against abi-baseline/maos-host-v1.txt; removed items
+  # RED, added items reported but GREEN (F2: NOT the vacuous "empty abi-diff
+  # in a non-scanned crate" pattern — this is a dedicated baseline for a
+  # crate abi-diff never touches).
+  check-host-surface:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Install nightly toolchain for cargo-public-api
+        run: rustup toolchain install nightly --profile minimal
+      - name: Install cargo-public-api
+        run: |
+          cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
+      - name: Run check-host-surface
+        run: cargo run -p xtask -- check-host-surface --json
+
+  # Story 10.4a / 11.1a — dependency-closure gate: kernel-core + domain
+  # trees exclude the Postgres/pgvector stack AND the WASM runtime stack
+  # (wasmtime/wasmtime-wasi/wit-bindgen, ADR-031/ADR-041 isolation).
+  check-dependency-closure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-dependency-closure
+        run: cargo run -p xtask -- check-dependency-closure --json
+
+  # Story 11.1a AC2/AC3/AC4 — WASM host adapter BEHAVIORAL tests. The four
+  # xtask gates above (check-host-surface / check-dependency-closure /
+  # check-export-control / check-kernel-baseline) guard the SHAPE of 11.1a
+  # (API surface, dependency isolation, packaging); this job guards the
+  # BEHAVIOR — the real guest ADR-032 round-trip (AC3), the fuel/T2 kill
+  # matrix (AC4), and the frame_bridge lower/lift conversions for all 15
+  # FrameKinds (AC2). Without it the 11.1a test suite never executes in CI
+  # at all — the CONCERNS finding from the Murat trace audit (2026-07-01).
+  # The T2 column (t2_sandbox_kill.rs) self-skips without CAP_SYS_ADMIN,
+  # mirroring the kernel's own sandbox_enforcement_linux.rs pattern.
+  wasm-host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm-host-tests-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build forbidden-syscall-probe fixture (AC4 T2 column)
+        run: cargo build --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Run maos-host + maos-wasm-host test suites
+        run: cargo test -p maos-host -p maos-wasm-host --locked
+
   # Story 10.3 AC-5 (NFR-Ops-4) — CNA registration gate (blocking-when-present).
   check-cna-registration:
     runs-on: ubuntu-latest
@@ -2422,6 +2486,8 @@ jobs:
       - check-cross-form-equiv
       - check-red-team-gate
       - check-export-control
+      - check-host-surface
+      - check-dependency-closure
       - check-cna-registration
       - check-fuzz-targets
       - fuzz-build
@@ -2434,6 +2500,7 @@ jobs:
       - check-mobile-push-on-halt
       - check-ff-j6
       - check-skill-conformance
+      - wasm-host-tests
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2452,11 +2519,14 @@ jobs:
           echo "| check-cross-form-equiv | ${{ needs.check-cross-form-equiv.result }} | cargo run -p xtask -- check-cross-form-equiv |"
           echo "| check-red-team-gate | ${{ needs.check-red-team-gate.result }} | cargo run -p xtask -- check-red-team-gate |"
           echo "| check-export-control | ${{ needs.check-export-control.result }} | cargo run -p xtask -- check-export-control |"
+          echo "| check-host-surface | ${{ needs.check-host-surface.result }} | cargo run -p xtask -- check-host-surface |"
+          echo "| check-dependency-closure | ${{ needs.check-dependency-closure.result }} | cargo run -p xtask -- check-dependency-closure |"
           echo "| check-cna-registration | ${{ needs.check-cna-registration.result }} | cargo run -p xtask -- check-cna-registration |"
           echo "| check-fuzz-targets | ${{ needs.check-fuzz-targets.result }} | cargo run -p xtask -- check-fuzz-targets |"
           echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
           echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
+          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | cargo test -p maos-host -p maos-wasm-host |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2478,6 +2548,7 @@ jobs:
           echo "  check-fuzz-targets: ${{ needs.check-fuzz-targets.result }}"
           echo "  fuzz-build: ${{ needs.fuzz-build.result }}"
           echo "  check-ko-coverage: ${{ needs.check-ko-coverage.result }}"
+          echo "  wasm-host-tests: ${{ needs.wasm-host-tests.result }}"
           exit 1
 
   aggregate:

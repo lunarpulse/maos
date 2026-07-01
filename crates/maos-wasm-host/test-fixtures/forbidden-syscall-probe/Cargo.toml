@@ -1,0 +1,11 @@
+[workspace]
+
+[package]
+name = "forbidden-syscall-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Test-only probe: issues a raw ptrace(2) syscall (on the kernel T2 seccomp hostile-list) to prove SIGSYS kill attribution under T2 (Story 11.1a AC4). NOT part of any shipped artifact."
+
+[dependencies]
+libc = "0.2"

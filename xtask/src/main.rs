@@ -14,6 +14,8 @@ mod check_bare_review_findings;
 mod gate_common;
 // Story 10.4a — dependency-closure gate (kernel-core artifact hygiene)
 mod check_dependency_closure;
+// Story 11.1a — maos-host public-API baseline gate (ADR-031 Spirit Host Port).
+mod check_host_surface;
 mod check_rto_gate;
 // Story 10.4a — RTO drill (performs cold-restore + timing, writes evidence for check-rto-gate).
 mod check_rto;
@@ -503,6 +505,13 @@ enum Commands {
     /// Story 10.4a — dependency-closure gate (kernel-core artifact excludes Postgres/pgvector).
     #[command(name = "check-dependency-closure")]
     CheckDependencyClosure {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.1a — maos-host public-API baseline gate (ADR-031 Spirit Host
+    /// Port); removed items RED, added items reported but GREEN.
+    #[command(name = "check-host-surface")]
+    CheckHostSurface {
         #[arg(long)]
         json: bool,
     },
@@ -1010,6 +1019,7 @@ fn main() {
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
         Commands::CheckKernelBaseline { json } => check_kernel_baseline::run(json),
         Commands::CheckDependencyClosure { json } => check_dependency_closure::run(json),
+        Commands::CheckHostSurface { json } => check_host_surface::run(json),
         Commands::CheckRtoGate { evidence, json } => check_rto_gate::run(&evidence, json),
         Commands::RtoDrill {
             source,

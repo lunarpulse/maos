@@ -1,5 +1,6 @@
 ---
 Status: binding-v0.1
+Superseded-by: ADR-031 (single-form clause only; subprocess + ADR-032 substrate + T2 path reaffirmed)
 Phase: binding-v0.1
 Gate: §13 measurement gate (benches/iac_roundtrip.rs); promotion to inproc requires three-condition check + superseding ADR
 Decided: 2026-04-15

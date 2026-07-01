@@ -5,7 +5,7 @@ Committed ADRs for the MAOS project.
 | ADR | Title | Status | Gate |
 |-----|-------|--------|------|
 | [ADR-001](ADR-001-kernel-language-is-rust-tokio.md) | Kernel language is Rust + Tokio | binding-v0.1 | v0.1 ships in Rust + Tokio |
-| [ADR-002](ADR-002-spirit-form-at-v01-subprocess-only-inproc-gated-on-measurement.md) | Spirit form at v0.1 — subprocess only, inproc gated on measurement | binding-v0.1 | §13 measurement gate |
+| [ADR-002](ADR-002-spirit-form-at-v01-subprocess-only-inproc-gated-on-measurement.md) | Spirit form at v0.1 — subprocess only, inproc gated on measurement | binding-v0.1; single-form clause superseded by ADR-031 | §13 measurement gate |
 | [ADR-004](ADR-004-hexagonal-sandboxing-with-os-native-primitives.md) | Hexagonal sandboxing with OS-native primitives | binding-v0.1 | T0/T1 at v0.1; T2 at v0.3; T3 at v0.5 |
 | [ADR-006](ADR-006-kernel-learns-no-patterns.md) | The kernel learns no patterns | binding-v0.1 | structural-state lint |
 | [ADR-010](ADR-010-hexagonal-architecture-for-static-structure.md) | Hexagonal architecture for static structure | binding-v0.1 | crate boundary lint |
@@ -18,12 +18,12 @@ Committed ADRs for the MAOS project.
 | [ADR-026](ADR-026-principal-memory-namespace.md) | Principal Memory Namespace | binding-v0.1 | subject-access query / right-to-be-forgotten (at v0.5) |
 | [ADR-028](ADR-028-replay-determinism-trace-shape.md) | Replay determinism over trace-shape | binding-v1.0 | `replay_byte_identical_two_process` + `redaction_k_anonymity` CI gate |
 | [ADR-030](ADR-030-capability-registry-decomposition.md) | Capability Registry decomposition | binding-v0.1 | hot-path token verify <5µs P99 benchmark |
-| [ADR-031](ADR-031-wasm-component-model-spirit-form.md) | WASM Component-Model Spirit form (host-as-adapter; resolves Cross-Form Equivalence) | Proposed (Story 11.0 spike 2026-06-29); binding-v2.0 at Story 11.1b | Story 11.1a host+WIT (launcher-seam abi-diff proven-red ≤+150 LOC; WIT byte-equal corpus vs ADR-032 frame set); Story 11.1b tiered cross-form equivalence |
+| [ADR-031](ADR-031-wasm-component-model-spirit-form.md) | WASM Component-Model Spirit form (host-as-adapter; resolves Cross-Form Equivalence) | Accepted (Story 11.1a WASM form + host); binding-v2.0 deferred to Story 11.1b | Story 11.1a host+WIT (kernel-core HARD 0 via check-kernel-baseline; NEW maos-host public-API baseline via check-host-surface; WIT byte-equal corpus vs ADR-032 frame set); Story 11.1b tiered cross-form equivalence |
 | [ADR-032](ADR-032-spirit-wire-protocol-bytes-on-wire.md) | Spirit Wire Protocol bytes-on-wire | binding-v0.1 | byte-equal golden corpus per frame variant per SDK |
 | [ADR-037](ADR-037-constitutional-amendment-process.md) | Constitutional amendment process | binding-v0.1 | invariant-lock CI gate |
 | [ADR-038](ADR-038-per-service-kloc-ceiling.md) | Per-service KLOC ceiling | binding-v0.1 | xtask/kloc.toml enforced by tokei |
 | [ADR-039](ADR-039-per-module-unsafe-code-policy.md) | Per-module `#![forbid(unsafe_code)]` policy | binding-v0.1 | `xtask check-unsafe` + `xtask/unsafe-allowlist.toml` |
-| [ADR-040](ADR-040-rust-inproc-measurement-gate-v05-decision.md) | §13.1 rust-inproc measurement gate — v0.5 decision | binding-v0.5 | `xtask check-adr-040-accepted` + `crates/maos-bench/` |
+| [ADR-040](ADR-040-rust-inproc-measurement-gate-v05-decision.md) | §13.1 rust-inproc measurement gate — v0.5 decision | binding-v0.5; superseded by ADR-031 | `xtask check-adr-040-accepted` + `crates/maos-bench/` |
 | [ADR-041](ADR-041-phase-3-4-kernel-core-extraction-via-port-traits.md) | Phase 3/4 `maos-kernel-core` extraction via port traits | binding-v0.7 | `xtask/kloc.toml [in_progress_decomposition]` + `xtask check-service-boundary` P1 per extracted crate |
 | [ADR-045](ADR-045-governance-audit-artifacts.md) | Governance audit artifacts (FR62) | binding-v0.5 (Story 9.3b Task 0) | abi-diff⊆ratified one-directional reconciliation (3-test) + `--kind governance` completeness round-trip; frozen-`Claim` regression |
 | [ADR-046](ADR-046-cost-attribution-and-reconciliation.md) | Cost attribution + reconciliation (FR64) | binding-v0.5 (Story 9.3b Task 0) | observability-not-invoice posture; CI golden-vector oracle (no `f64`/no pricing-fn import, sum-then-round); SR-3 forget-cascade coverage; kernel re-pin ~21400–21440 |
@@ -35,8 +35,8 @@ Committed ADRs for the MAOS project.
 > **17 as of Story 5.5e** (ADR-040 — §13.1 rust-inproc measurement gate, binding-v0.5).
 > ADR-024 (out-of-kernel escape detector) and ADR-031 (WASM component-model form)
 > were resolved from `speculative-vNext` in the Epic 11 v1.5 hold-window (2026-06-29):
-> ADR-024 architecture-accepted (binding-v2.0 at Story 11.4b), ADR-031 proposed via
-> the Story 11.0 spike (binding-v2.0 at Story 11.1b).
+> ADR-024 architecture-accepted (binding-v2.0 at Story 11.4b), ADR-031 accepted at
+> Story 11.1a (binding-v2.0 deferred to Story 11.1b).
 > The remaining `speculative-vNext` and post-v0.1 ADRs (ADR-008, 009, 014 [runtime],
 > 015, 016–021, 025, 027–029, 033–036) are tracked in
 > `architecture-maos-minimal-opus/12-architecture-decision-records.md` and land
