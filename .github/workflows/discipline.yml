@@ -2469,6 +2469,70 @@ jobs:
       - name: Run skill-conformance proven-red vectors (H2)
         run: cargo test -p xtask --test story_10_5_proven_red -- --test-threads=1
 
+  # Story 11.1b AC3 — tiered behavioral-oracle cross-form equivalence gate.
+  # The binding row for ADR-031: deterministic tiered oracle, live cargo test
+  # (base + equiv-fault-inject legs), advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED
+  # banner) and blocking at v2.0. Runs the equiv harness as real subprocesses
+  # over real pipes. Review findings #3/#5- CI/#13: the xtask INVOKES the live
+  # oracle and parses its output (not a stub); the native twin is built to the
+  # standalone-workspace path the harness resolves; the anti-canned leg runs
+  # with a ≥1-test guard; the fault-inject feature is excluded from release.
+  check-wasm-form-equiv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-wasm-form-equiv-${{ hashFiles('**/Cargo.lock') }}
+      # Finding #5: build the native twin in its OWN standalone workspace. It
+      # emits native-twin/target/release/equiv-native-twin, which the harness
+      # resolves directly (require_binary probes the standalone target dir, with
+      # a build-on-demand fallback). No copy to the main target/ is needed.
+      - name: Build equiv-fixture native twin
+        run: cargo build --release --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml
+      # Finding #3: the xtask invokes the live oracle as `cargo test` (BOTH the
+      # base tiered-oracle leg and the equiv-fault-inject anti-canned leg) and
+      # parses `test result:` lines — it is not an unconditional-pass stub. Its
+      # exit code enforces the disposition (advisory banner at v1.0/v1.5;
+      # BLOCKING at v2.0) and hard-fails if either leg compiles to ZERO tests.
+      - name: Run check-wasm-form-equiv gate (live tiered oracle + disposition)
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-wasm-form-equiv --json 2>&1 | tee /tmp/equiv-gate.json
+      # Finding #13 (J4 pattern, cf. discipline.yml:2374): assert the
+      # equiv-fault-inject anti-canned leg actually added and ran feature-only
+      # tests, not merely the shared base harness. A cfg-attribute regression
+      # must be RED even if the base leg still reports nonzero tests.
+      - name: Anti-canned tripwire guard (equiv-fault-inject leg added tests)
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          data = json.load(open("/tmp/equiv-gate.json"))
+          base = int(data.get("base_passed", 0))
+          fault = int(data.get("fault_inject_passed", 0))
+          if fault <= base:
+              print(f"FAIL: equiv-fault-inject did not add tests (base_passed={base}, fault_inject_passed={fault})")
+              sys.exit(1)
+          print(f"check-wasm-form-equiv: anti-canned tripwire RAN (fault_inject_passed={fault} > base_passed={base}).")
+          PY
+      # Finding #13 (D7): the fault-inject feature MUST be absent from the
+      # release feature graph so it can never weaken a shipped build.
+      - name: Verify equiv-fault-inject absent from release graph (D7)
+        run: |
+          if cargo tree -p maos-wasm-host -e features --release 2>&1 | grep -q "equiv-fault-inject"; then
+            echo "FAIL: equiv-fault-inject present in release feature graph"
+            exit 1
+          fi
+          echo "check-wasm-form-equiv: equiv-fault-inject absent from release graph (D7 verified)."
+      # Finding #21: WASM fixture drift/provenance guard. Pins each committed
+      # equiv-*.wasm to its binary + source SHA-256; fails if a source edit left
+      # a stale .wasm blob the gate would otherwise keep consuming.
+      - name: Verify equiv WASM fixture provenance (no stale .wasm drift)
+        run: cargo run -p xtask -- check-equiv-fixture-provenance --json
+
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2501,6 +2565,7 @@ jobs:
       - check-ff-j6
       - check-skill-conformance
       - wasm-host-tests
+      - check-wasm-form-equiv
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2527,6 +2592,7 @@ jobs:
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
           echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
           echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | cargo test -p maos-host -p maos-wasm-host |"
+          echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2549,6 +2615,7 @@ jobs:
           echo "  fuzz-build: ${{ needs.fuzz-build.result }}"
           echo "  check-ko-coverage: ${{ needs.check-ko-coverage.result }}"
           echo "  wasm-host-tests: ${{ needs.wasm-host-tests.result }}"
+          echo "  check-wasm-form-equiv: ${{ needs.check-wasm-form-equiv.result }}"
           exit 1
 
   aggregate:

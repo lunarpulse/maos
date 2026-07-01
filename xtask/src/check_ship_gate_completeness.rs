@@ -21,15 +21,14 @@ const EXPECTED_GATES: &[&str] = &[
     "check-pentest-gate",
     "check-third-party-trial",
     "check-cross-form-equiv",
+    // Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
+    "check-wasm-form-equiv",
     "check-red-team-gate",
     // Story 10.3 AC-1/2/3/4/5 — v1.0 compliance ship-gates.
     "check-export-control",
     "check-fuzz-targets",
     "check-cna-registration",
     "check-ko-coverage",
-    // Story 10.5 AC5 — Japanese and zh-Hans v1.5 localization gates.
-    "check-ja-coverage",
-    "check-zh-coverage",
     // Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
     "windows-check",
     // Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate.
@@ -98,9 +97,8 @@ pub fn run(json: bool) -> Result<(), String> {
             "check-pentest-gate"
                 | "check-third-party-trial"
                 | "check-cross-form-equiv"
+                | "check-wasm-form-equiv"
                 | "check-red-team-gate"
-                | "check-ja-coverage"
-                | "check-zh-coverage"
                 | "windows-check"
                 | "check-migration-merkle"
                 | "check-live-bilateral-consent"

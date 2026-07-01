@@ -25,6 +25,10 @@ mod check_composition_root_completeness;
 mod check_corpus;
 mod check_coverage_matrix_completeness;
 mod check_cross_form_equiv;
+// Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
+mod check_wasm_form_equiv;
+// Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
+mod check_equiv_fixture_provenance;
 mod check_deprecations_declared;
 mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
@@ -720,6 +724,22 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 11.1b AC3 — authoritative tiered behavioral-oracle cross-form
+    /// equivalence gate (binding). Reads the live `cargo test` tiered oracle
+    /// results and enforces the ADR-031 equivalence-binding disposition.
+    #[command(name = "check-wasm-form-equiv")]
+    CheckWasmFormEquiv {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.1b (review finding #21) — WASM fixture provenance / drift
+    /// guard. Verifies each committed equiv-*.wasm fixture's binary + source
+    /// SHA-256 against the sidecar provenance manifest (stale-blob detection).
+    #[command(name = "check-equiv-fixture-provenance")]
+    CheckEquivFixtureProvenance {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase).
     /// Per-class floor ≥9/10, aggregate ≥72/80, 0 unmitigated categories.
     /// Advisory at v1.0 with "WOULD HAVE BLOCKED SHIP" banner on failure.
@@ -1104,6 +1124,10 @@ fn main() {
         }
         Commands::CheckThirdPartyTrial { json } => check_third_party_trial::run(json),
         Commands::CheckCrossFormEquiv { json } => check_cross_form_equiv::run(json),
+        Commands::CheckWasmFormEquiv { json } => check_wasm_form_equiv::run(json),
+        Commands::CheckEquivFixtureProvenance { json } => {
+            check_equiv_fixture_provenance::run(json)
+        }
         Commands::CheckRedTeamGate { json } => check_red_team_gate::run(json),
         Commands::CheckExportControl { json } => check_export_control::run(json),
         Commands::CheckCnaRegistration { json } => check_cna_registration::run(json),

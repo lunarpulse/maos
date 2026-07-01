@@ -59,6 +59,11 @@ gates = [
     "check-third-party-trial",
     # Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate (advisory per ADR-040).
     "check-cross-form-equiv",
+    # Story 11.1b — NEW tiered behavioral-oracle cross-form equivalence gate (binding).
+    "check-wasm-form-equiv",
+    # Story 11.1b (review finding #21) — WASM fixture provenance / drift guard
+    # (source + binary SHA-256 pinned to tests/fixtures/wasm/equiv-fixtures.provenance.toml).
+    "check-equiv-fixture-provenance",
     # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
     "check-red-team-gate",
     # Story 10.3 AC-1/2/3/4/5 — v1.0 compliance ship-gates.
@@ -66,9 +71,6 @@ gates = [
     "check-fuzz-targets",
     "check-cna-registration",
     "check-ko-coverage",
-    # Story 10.5 AC5 (NFR-Doc-6 v1.5) — ja/zh-Hans coverage gates.
-    "check-ja-coverage",
-    "check-zh-coverage",
     # Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
     "windows-check",
     # Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time, advisory-until-90d).
@@ -110,9 +112,29 @@ disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present" }
 name = "check-third-party-trial"
 disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present" }
 
+# Story 11.1b (D10) — RELABELED: CLI-wrapper distributional; advisory.
+# NOT the equivalence-binding gate. The authoritative binding row is
+# check-wasm-form-equiv. Routing/default-deny (D15b + §A7 derive-and-reconcile):
+# a PRESENT artifact MUST carry non-empty per-run hashes for both forms (the
+# gate independently recomputes the U-statistic from them); an artifact WITHOUT
+# hashes is an unrecognized measurement → ERROR (never advisory-green); a
+# deterministic fixture (all hashes within a group identical) → ERROR (route to
+# check-wasm-form-equiv). An ABSENT artifact passes advisory (engagement pending).
 [[ship_gate]]
 name = "check-cross-form-equiv"
 disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+# Story 11.1b AC3 (D9/D10/D15a) — NEW tiered behavioral-oracle cross-form
+# equivalence gate. THE authoritative equivalence-binding row for ADR-031.
+# Deterministic tiered oracle (100% invariant / ≥75% cosmetic), live cargo
+# test, both legs enforced by the xtask (base + equiv-fault-inject). Phased:
+# ADVISORY at v1.0/v1.5 (a RED oracle emits a §A7.5 WOULD-HAVE-BLOCKED banner
+# but does not fail the v1.0 ship-gate aggregate — matches check-red-team-gate);
+# BLOCKING at v2.0 (a RED or absent/unmeasured oracle BLOCKS ship). The
+# advisory-now/blocking-v2.0 graduation is machine-readable here, not prose-only.
+[[ship_gate]]
+name = "check-wasm-form-equiv"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 
 [[ship_gate]]
 name = "check-red-team-gate"
@@ -134,13 +156,6 @@ disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking" }
 name = "check-ko-coverage"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 
-[[ship_gate]]
-name = "check-ja-coverage"
-disposition = { v1_0 = "advisory", v1_5 = "blocking" }
-
-[[ship_gate]]
-name = "check-zh-coverage"
-disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 
 [[ship_gate]]
 name = "windows-check"

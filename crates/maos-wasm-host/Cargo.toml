@@ -11,6 +11,14 @@ description = "MAOS WASM Host — wasmtime component adapter + runner (Story 11.
 name = "maos-wasm-runner"
 path = "src/runner.rs"
 
+[features]
+# Story 11.1b — anti-canned tripwire for the cross-form equivalence gate.
+# When active, `tests/equiv_harness.rs` perturbs a captured invariant-tier
+# effect AFTER capture but BEFORE comparison, proving the comparator actually
+# responds to its inputs rather than rubber-stamping a canned GREEN.
+# Off by default (dev-only; never shipped).
+equiv-fault-inject = []
+
 [dependencies]
 # Host port trait + plan types (daemon-side, Story 11.1a D1)
 maos-host = { path = "../maos-host" }

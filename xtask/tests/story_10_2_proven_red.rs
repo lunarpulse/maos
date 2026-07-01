@@ -258,6 +258,12 @@ fn trial_gate_fails_on_malformed_toml() {
 // ═══════════════════════════════════════════════════════════════════
 
 fn make_cross_form(p_value: f64) -> String {
+    // Per-run hashes are MANDATORY (§A7 derive-and-reconcile; review finding
+    // #6 default-deny): 30+30 interleaved values — cli={0,2,..58},
+    // sub={1,3,..59} → U1=465 (see `cross_form_recompute_path_with_hashes`).
+    // The reported u_statistic matches the recomputed value.
+    let hashes_cli: Vec<String> = (0..30).map(|i| format!("{:064x}", i * 2)).collect();
+    let hashes_sub: Vec<String> = (0..30).map(|i| format!("{:064x}", i * 2 + 1)).collect();
     format!(
         r#"{{
   "test_metadata": {{
@@ -269,10 +275,12 @@ fn make_cross_form(p_value: f64) -> String {
     "subprocess_runs": 30
   }},
   "results": {{
-    "u_statistic": 450.0,
+    "u_statistic": 465.0,
     "p_value": {p_value},
     "sample_size_cli": 30,
-    "sample_size_sub": 30
+    "sample_size_sub": 30,
+    "per_run_hashes_cli": {hashes_cli:?},
+    "per_run_hashes_sub": {hashes_sub:?}
   }}
 }}"#
     )
@@ -321,6 +329,42 @@ fn cross_form_gate_passes_advisory_when_absent() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(json["advisory"], true, "should be advisory");
+}
+
+/// Review finding #6 / D15b default-deny: a PRESENT artifact WITHOUT per-run
+/// hashes is an unrecognized measurement — it cannot be derive-and-reconciled,
+/// and a deterministic fixture routed here must not slip through the advisory
+/// path. Must hard-ERROR (never advisory-green).
+#[test]
+fn cross_form_gate_errors_when_hashes_absent() {
+    let artifact = r#"{
+  "test_metadata": {
+    "spirit_name": "hello", "spirit_version": "0.1.0",
+    "run_date": "2026-06-01", "environment": "test",
+    "cli_wrapper_runs": 30, "subprocess_runs": 30
+  },
+  "results": {
+    "u_statistic": 450.0, "p_value": 0.95,
+    "sample_size_cli": 30, "sample_size_sub": 30
+  }
+}"#;
+    let out = run_in_tempdir("check-cross-form-equiv", |root| {
+        write_adr_040_fixture(root);
+        write_file(
+            root,
+            "docs/cross-form/results/cross-form-results.json",
+            artifact,
+        );
+    });
+    assert!(
+        !out.status.success(),
+        "a present hashless artifact must default-deny ERROR, not advisory-pass"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("per-run hashes") || stderr.contains("default-deny"),
+        "error should cite the missing per-run hashes / default-deny: {stderr}"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════

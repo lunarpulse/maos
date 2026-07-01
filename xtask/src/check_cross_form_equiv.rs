@@ -13,12 +13,18 @@
 //! Integrity failures (axis-1) — malformed JSON, schema violations, sample-size
 //! mismatches, NaN statistical fields, hash-length mismatches, and detected
 //! U-statistic divergence — are ALWAYS hard fails at every phase (tampering/corruption
-//! is not advisory). When raw per-run hashes are present, the gate independently
-//! recomputes the U-statistic from ranks using both U1/U2 conventions and flags any
-//! divergence from the reported value (consistency check). If the artifact is absent
-//! the gate passes advisory (engagement pending). D5: if all per-run hashes within a
-//! group are identical (deterministic Spirit output), the U-test is vacuous and the
-//! gate emits an explicit NOT-APPLICABLE verdict rather than a misleading equivalence.
+//! Recompute-and-reconcile (§A7): a PRESENT artifact MUST carry non-empty
+//! per-run hashes for BOTH forms — the gate independently recomputes the
+//! U-statistic from ranks using both U1/U2 conventions and flags any divergence
+//! from the reported value. A present artifact WITHOUT hashes is an unrecognized
+//! measurement (the gate could only trust reported numbers — the cannable
+//! derive-not-reconcile pattern) and DEFAULT-DENIES with a hard ERROR (D15b):
+//! a deterministic fixture, which belongs on `check-wasm-form-equiv`, must not
+//! slip through this advisory path. An ABSENT artifact passes advisory
+//! (engagement pending). D5/D10: if all per-run hashes within a group are
+//! identical (deterministic Spirit output), the U-test is vacuous and the gate
+//! ERRORs (route to `check-wasm-form-equiv`) rather than emit a misleading
+//! NOT-APPLICABLE→green verdict.
 
 use serde::Deserialize;
 use std::path::Path;
@@ -255,62 +261,79 @@ pub fn run(json: bool) -> Result<(), String> {
     let mut advisory = false;
     let mut consistency_ok = true;
     let mut u_recomputed: Option<f64> = None;
-    let mut degenerate = false; // D5: deterministic output collapses all hashes to a tie.
+    let degenerate = false; // D5: deterministic output — ERRORs below (routes to check-wasm-form-equiv).
 
-    // Recompute U from raw per-run hashes when both groups are present.
-    if let (Some(h_cli), Some(h_sub)) = (&res.per_run_hashes_cli, &res.per_run_hashes_sub) {
-        if !h_cli.is_empty() && !h_sub.is_empty() {
-            // #10: length must match the declared sample sizes — a mismatch is tampering/corruption,
-            // not a reason to silently skip the only internal-consistency control.
-            if h_cli.len() != n1 || h_sub.len() != n2 {
-                return Err(format!(
-                    "check-cross-form-equiv: FAIL — per_run_hashes length mismatch: \
-                     cli={} (expected {n1}), sub={} (expected {n2})",
-                    h_cli.len(),
-                    h_sub.len()
-                ));
-            }
-            let g1: Vec<u128> = h_cli.iter().map(|h| hash_to_rank_key(h)).collect();
-            let g2: Vec<u128> = h_sub.iter().map(|h| hash_to_rank_key(h)).collect();
+    // D15b default-deny + §A7 derive-and-reconcile: a PRESENT artifact MUST
+    // carry non-empty per-run hashes for BOTH forms, so the gate can
+    // independently recompute the U-statistic from ranks. Without them the
+    // gate can only trust reported numbers (the cannable derive-not-reconcile
+    // pattern), and a deterministic fixture — which belongs on
+    // check-wasm-form-equiv — could slip through the advisory path. A hashless
+    // (or one-sided-hash) present artifact is an unrecognized measurement:
+    // default-deny ERROR, never advisory-green.
+    let (Some(h_cli), Some(h_sub)) = (&res.per_run_hashes_cli, &res.per_run_hashes_sub) else {
+        let msg = "check-cross-form-equiv: ERROR — present artifact lacks per-run hashes \
+            (derive-and-reconcile substrate). The gate cannot independently verify the \
+            U-statistic; if this is a deterministic fixture, route it to \
+            check-wasm-form-equiv (the tiered oracle). (default-deny, D15b)";
+        emit_command(json, "error", msg);
+        return Err(msg.into());
+    };
+    if h_cli.is_empty() || h_sub.is_empty() {
+        let msg = "check-cross-form-equiv: ERROR — present artifact has empty per-run hashes \
+            (derive-and-reconcile substrate). (default-deny, D15b)";
+        emit_command(json, "error", msg);
+        return Err(msg.into());
+    }
 
-            // D5: deterministic-Spirit degeneracy detection. If all hashes within a group are
-            // identical, every observation ties and U degenerates to a vacuous constant — the
-            // gate reports "perfect consistency" while measuring nothing. Emit an explicit
-            // Skipped-style advisory rather than a misleading equivalence verdict.
-            let distinct_cli = g1.iter().collect::<std::collections::HashSet<_>>().len();
-            let distinct_sub = g2.iter().collect::<std::collections::HashSet<_>>().len();
-            if distinct_cli < 2 || distinct_sub < 2 {
-                degenerate = true;
-                let msg = format!(
-                    "check-cross-form-equiv: WARNING — deterministic output detected \
-                     (distinct hashes: cli={distinct_cli}, sub={distinct_sub}); U-test is vacuous \
-                     (all observations tie). Equivalence verdict is NOT meaningful — \
-                     deterministic Spirits require byte-identical comparison, not a U-test."
-                );
-                emit_command(json, "warning", &msg);
-                advisory = true;
-            }
+    // #10: length must match the declared sample sizes — a mismatch is
+    // tampering/corruption, not a reason to silently skip the consistency control.
+    if h_cli.len() != n1 || h_sub.len() != n2 {
+        return Err(format!(
+            "check-cross-form-equiv: FAIL — per_run_hashes length mismatch: \
+             cli={} (expected {n1}), sub={} (expected {n2})",
+            h_cli.len(),
+            h_sub.len()
+        ));
+    }
+    let g1: Vec<u128> = h_cli.iter().map(|h| hash_to_rank_key(h)).collect();
+    let g2: Vec<u128> = h_sub.iter().map(|h| hash_to_rank_key(h)).collect();
 
-            let (u1, u2) = mann_whitney_u(&g1, &g2);
-            // #15: accept either U1 or U2 convention (both are valid; differ by n1*n2 sign).
-            let tolerance = (0.05 * (n1 * n2) as f64).max(2.0);
-            let matches_u1 = (u1 - u_reported).abs() <= tolerance;
-            let matches_u2 = (u2 - u_reported).abs() <= tolerance;
-            // Report U1 as the canonical recomputed value.
-            u_recomputed = Some(u1);
-            if !matches_u1 && !matches_u2 {
-                consistency_ok = false;
-                // D2 (consensus A): detected divergence is axis-1 integrity failure
-                // (tampering/corruption), NOT an advisory verdict. Fail hard.
-                let msg = format!(
-                    "check-cross-form-equiv: FAIL — recomputed U (U1={u1:.3}, U2={u2:.3}) \
-                     diverges from reported U ({u_reported:.3}) beyond tolerance (±{tolerance:.2}) \
-                     — artifact is inconsistent (tampering or corruption suspected)"
-                );
-                emit_command(json, "error", &msg);
-                return Err(msg);
-            }
-        }
+    // D5/D10 routing assertion: a deterministic-Spirit form-pair (all hashes
+    // within a group identical → U-test is vacuous) belongs on the
+    // check-wasm-form-equiv tiered oracle, NOT this distributional gate.
+    // Default-deny (D15b): handed a deterministic fixture, ERROR rather than
+    // emit a misleading advisory-green verdict.
+    let distinct_cli = g1.iter().collect::<std::collections::HashSet<_>>().len();
+    let distinct_sub = g2.iter().collect::<std::collections::HashSet<_>>().len();
+    if distinct_cli < 2 || distinct_sub < 2 {
+        let msg = format!(
+            "check-cross-form-equiv: ERROR — deterministic fixture form-pair routed to \
+             wrong gate. Use check-wasm-form-equiv for the deterministic tiered oracle. \
+             (distinct hashes: cli={distinct_cli}, sub={distinct_sub})"
+        );
+        emit_command(json, "error", &msg);
+        return Err(msg);
+    }
+
+    let (u1, u2) = mann_whitney_u(&g1, &g2);
+    // #15: accept either U1 or U2 convention (both are valid; differ by n1*n2 sign).
+    let tolerance = (0.05 * (n1 * n2) as f64).max(2.0);
+    let matches_u1 = (u1 - u_reported).abs() <= tolerance;
+    let matches_u2 = (u2 - u_reported).abs() <= tolerance;
+    // Report U1 as the canonical recomputed value.
+    u_recomputed = Some(u1);
+    if !matches_u1 && !matches_u2 {
+        consistency_ok = false;
+        // D2 (consensus A): detected divergence is axis-1 integrity failure
+        // (tampering/corruption), NOT an advisory verdict. Fail hard.
+        let msg = format!(
+            "check-cross-form-equiv: FAIL — recomputed U (U1={u1:.3}, U2={u2:.3}) \
+             diverges from reported U ({u_reported:.3}) beyond tolerance (±{tolerance:.2}) \
+             — artifact is inconsistent (tampering or corruption suspected)"
+        );
+        emit_command(json, "error", &msg);
+        return Err(msg);
     }
 
     // Advisory verdict: flag distributional divergence when p ≤ 0.05 (non-blocking).

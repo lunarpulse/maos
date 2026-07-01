@@ -771,13 +771,11 @@ coverage:
   NFR-Doc-6:
     gates:
     - check-ko-coverage
-    - check-ja-coverage
-    - check-zh-coverage
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
-    notes: Story 10.3 ships Korean; Story 10.5 AC5 ships Japanese + zh-Hans.
-      KO/JA/ZHHANS_COVERAGE_MIN=100 wired into docs-site CI gates.
+    notes: Story 10.3 ships Korean. Japanese and zh-Hans gates are intentionally
+      not tracked indefinitely; KO_COVERAGE_MIN=100 remains the active docs-site coverage gate.
   NFR-Doc-7:
     gates: []
     enforcement: advisory-until-engagement
@@ -1458,6 +1456,10 @@ coverage:
       the three 70-item buckets). Gate-verified by structural assertion
       (gold_label match + per-bucket count); judge-LLM agreement layer is a
       later story.
+  # NFR-Test-7 is split into its two legs so each carries machine-readable
+  # phase + gate metadata (review finding #19): the v1.5 advisory CLI-wrapper
+  # distributional leg and the v2.0+ blocking any-rust↔wasm-component binding
+  # leg are distinct rows, not one conflated entry hiding the binding in prose.
   NFR-Test-7:
     gates:
     - check-cross-form-equiv
@@ -1465,8 +1467,26 @@ coverage:
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
-    notes: CLI-wrapper-only cross-form distributional equivalence per ADR-040
-      (rust-inproc deferred to v2.0+). Advisory gate.
+    notes: |
+      CLI-wrapper distributional leg (Story 10.2, advisory per ADR-040).
+      Mann-Whitney U-test over 30+30 per-run hashes (derive-and-reconcile);
+      advisory at v1.0/v1.5. NOT the equivalence-binding gate — the binding
+      leg is NFR-Test-7-binding (check-wasm-form-equiv).
+  NFR-Test-7-binding:
+    gates:
+    - check-wasm-form-equiv
+    enforcement: blocking
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-05-12'
+    notes: |
+      v2.0 any-rust ↔ wasm-component BINDING leg (Story 11.1b, ADR-031).
+      Tiered behavioral-oracle deterministic equivalence (100% invariant /
+      ≥75% cosmetic), live cargo test (base + equiv-fault-inject legs).
+      Machine-readable phase graduation: advisory at v1.0/v1.5 (emits a
+      §A7.5 WOULD-HAVE-BLOCKED banner, does not fail the aggregate), BLOCKING
+      at v2.0 — gate-registry.toml disposition
+      {v1_0="advisory", v1_5="advisory", v2_0="blocking"}.
   NFR-Test-8:
     gates:
     - check-third-party-trial

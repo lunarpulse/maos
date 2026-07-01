@@ -18,7 +18,7 @@ Committed ADRs for the MAOS project.
 | [ADR-026](ADR-026-principal-memory-namespace.md) | Principal Memory Namespace | binding-v0.1 | subject-access query / right-to-be-forgotten (at v0.5) |
 | [ADR-028](ADR-028-replay-determinism-trace-shape.md) | Replay determinism over trace-shape | binding-v1.0 | `replay_byte_identical_two_process` + `redaction_k_anonymity` CI gate |
 | [ADR-030](ADR-030-capability-registry-decomposition.md) | Capability Registry decomposition | binding-v0.1 | hot-path token verify <5µs P99 benchmark |
-| [ADR-031](ADR-031-wasm-component-model-spirit-form.md) | WASM Component-Model Spirit form (host-as-adapter; resolves Cross-Form Equivalence) | Accepted (Story 11.1a WASM form + host); binding-v2.0 deferred to Story 11.1b | Story 11.1a host+WIT (kernel-core HARD 0 via check-kernel-baseline; NEW maos-host public-API baseline via check-host-surface; WIT byte-equal corpus vs ADR-032 frame set); Story 11.1b tiered cross-form equivalence |
+| [ADR-031](ADR-031-wasm-component-model-spirit-form.md) | WASM Component-Model Spirit form (host-as-adapter; resolves Cross-Form Equivalence) | binding-v2.0 | Story 11.1a host+WIT (kernel-core HARD 0 via check-kernel-baseline; NEW maos-host public-API baseline via check-host-surface; WIT byte-equal corpus vs ADR-032 frame set); Story 11.1b `check-wasm-form-equiv` tiered cross-form equivalence GREEN (blocking at v2.0); `check-cross-form-equiv` relabeled CLI-wrapper distributional advisory |
 | [ADR-032](ADR-032-spirit-wire-protocol-bytes-on-wire.md) | Spirit Wire Protocol bytes-on-wire | binding-v0.1 | byte-equal golden corpus per frame variant per SDK |
 | [ADR-037](ADR-037-constitutional-amendment-process.md) | Constitutional amendment process | binding-v0.1 | invariant-lock CI gate |
 | [ADR-038](ADR-038-per-service-kloc-ceiling.md) | Per-service KLOC ceiling | binding-v0.1 | xtask/kloc.toml enforced by tokei |
@@ -35,8 +35,8 @@ Committed ADRs for the MAOS project.
 > **17 as of Story 5.5e** (ADR-040 — §13.1 rust-inproc measurement gate, binding-v0.5).
 > ADR-024 (out-of-kernel escape detector) and ADR-031 (WASM component-model form)
 > were resolved from `speculative-vNext` in the Epic 11 v1.5 hold-window (2026-06-29):
-> ADR-024 architecture-accepted (binding-v2.0 at Story 11.4b), ADR-031 accepted at
-> Story 11.1a (binding-v2.0 deferred to Story 11.1b).
+> ADR-024 architecture-accepted (binding-v2.0 at Story 11.4b), ADR-031 binding-v2.0
+> after Story 11.1b `check-wasm-form-equiv` GREEN.
 > The remaining `speculative-vNext` and post-v0.1 ADRs (ADR-008, 009, 014 [runtime],
 > 015, 016–021, 025, 027–029, 033–036) are tracked in
 > `architecture-maos-minimal-opus/12-architecture-decision-records.md` and land

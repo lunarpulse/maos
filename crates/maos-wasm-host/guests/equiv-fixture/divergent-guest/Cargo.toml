@@ -1,0 +1,20 @@
+[workspace]
+
+[package]
+name = "equiv-divergent-spirit"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Story 11.1b cross-form equivalence gate — WASM divergent fixture (logical_clock += 1)"
+
+[dependencies]
+wit-bindgen = "0.44"
+equiv-fixture-logic = { path = "../logic" }
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = "s"
+panic = "abort"
+strip = true

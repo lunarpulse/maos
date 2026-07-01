@@ -98,6 +98,7 @@ fn story_key_from_filename(path: &Path) -> Option<String> {
 fn parse_story(path: &Path) -> Option<StoryReview> {
     let story_key = story_key_from_filename(path)?;
     let content = fs::read_to_string(path).ok()?;
+    let checklist_gated = content.contains("<!-- review-findings-checklist-gated -->");
     let lines: Vec<&str> = content.lines().collect();
 
     let mut review = StoryReview {
@@ -161,6 +162,14 @@ fn parse_story(path: &Path) -> Option<StoryReview> {
             }
             if trimmed.starts_with('|') && !trimmed.starts_with("|---") {
                 findings_rows.push(trimmed);
+            }
+            if checklist_gated && trimmed.starts_with("- [ ]") && trimmed.contains("[Review]") {
+                review.open_count += 1;
+            } else if checklist_gated
+                && (trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]"))
+                && trimmed.contains("[Review]")
+            {
+                review.closed_count += 1;
             }
         }
     }

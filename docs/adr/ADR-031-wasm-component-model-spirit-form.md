@@ -1,15 +1,15 @@
 ---
-Status: Accepted — Story 11.1a (WASM component form + host). Binding-v2.0 deferred to Story 11.1b (cross-form equivalence gate).
-Gate: Story 11.1a — `maos-wasm-host` adapter behind `SpiritHostPort`; kernel-core delta HARD 0 (`check-kernel-baseline` — NOT abi-diff, which scans `maos-spirit-abi` only and cannot see this trait) + a dedicated `maos-host` public-API baseline gate (`check-host-surface`); WIT `maos:spirit@1.0` byte-equal corpus vs the ADR-032 frame set. Story 11.1b — behavioral-oracle tiered cross-form equivalence (100% on invariant-bearing effects; known-divergent component proven-red) → binding.
+Status: Accepted (architecture ratified 2026-06-29); **binding-v2.0** after Story 11.1b `check-wasm-form-equiv` returned a live GREEN tiered oracle (base 20p/0f + fault-inject 23p/0f), real in-process kernel observation covered halt / frame sequence / capability denial / region-pin / audit, forged in-band consent was proven non-invariant, review findings were closed, and `check-kernel-baseline` reconfirmed kernel-core delta 0 (`22964`). Binding envelope (D9): invariant-bearing behavior — halt, capability denials, region-pin, audit frames, frame sequence — is identical across native and WASM forms; consent and intent are kernel-mediated and not Spirit-asserted in either form; cosmetic/process fields remain outside the binding.
+Gate: Story 11.1a — `maos-wasm-host` adapter behind `SpiritHostPort`; kernel-core delta HARD 0 (`check-kernel-baseline` — NOT abi-diff, which scans `maos-spirit-abi` only and cannot see this trait) + a dedicated `maos-host` public-API baseline gate (`check-host-surface`); WIT `maos:spirit@1.0` byte-equal corpus vs the ADR-032 frame set. Story 11.1b — NEW check-wasm-form-equiv gate (tiered behavioral oracle, blocking at v2.0); check-cross-form-equiv relabeled to CLI-wrapper distributional (advisory).
 Decided: 2026-06-29 (architecture); form + equivalence land at 11.1a / 11.1b
-Accepted-in-PR: <PR_NUMBER>
+Accepted-in-PR: pending
 Supersedes: ADR-002 (single-form "subprocess-only" posture) and ADR-040 (`defer-rust-inproc-to-v2.0+` outcome) — see §Supersession. ADR-004 (sandbox tiers), ADR-032 (wire protocol), ADR-038 (kernel ceiling) are PRESERVED unchanged.
 Revisits: ADR-002 §revisit; ADR-040 §rollback; §13.1 measurement gate
 ---
 
 # ADR-031 — WASM Component-Model Spirit form (host-as-adapter; resolves Cross-Form Equivalence)
 
-**Decision.** v2.0 introduces a **second Spirit authoring form** — the **WASM Component Model** — hosted as a **subprocess**: a wasmtime/component runner that *is* `spec.program`, sandboxed by the existing T2 path, speaking the unchanged ADR-032 wire (Content-Length + CBOR over stdio). The host (WIT bindings, component instantiation, fuel/epoch limits) lives in a NEW out-of-kernel crate `maos-wasm-host`, behind a `SpiritHostPort` trait in `crates/maos-host`, injected at the daemon composition root (the Story-10.4a / ADR-041 pattern). **In-kernel / in-process wasmtime embedding is FORBIDDEN** at v2.0. Because two forms now exist, ADR-031's original reserved topic — **cross-form equivalence** — becomes real and is proven by the Story 11.1b gate.
+**Decision.** v2.0 introduces a **second Spirit authoring form** — the **WASM Component Model** — hosted as a **subprocess**: a wasmtime/component runner that *is* `spec.program`, sandboxed by the existing T2 path, speaking the unchanged ADR-032 wire (Content-Length + CBOR over stdio). The host (WIT bindings, component instantiation, fuel/epoch limits) lives in a NEW out-of-kernel crate `maos-wasm-host`, behind a `SpiritHostPort` trait in `crates/maos-host`, injected at the daemon composition root (the Story-10.4a / ADR-041 pattern). **In-kernel / in-process wasmtime embedding is FORBIDDEN** at v2.0. Because two forms now exist, ADR-031's original reserved topic — **cross-form equivalence** — becomes real and is to be proven by the Story 11.1b gate (PENDING — not yet green; see §5).
 
 ## Context
 
@@ -55,7 +55,7 @@ The wire stays ADR-032. WASM Spirits get a typed WIT binding **generated from th
 
 ### 5. Cross-form equivalence becomes real (ADR-031's reserved topic)
 
-With two forms, "do they behave equivalently?" is now a binding question. Story 11.1b proves **behavioral-oracle tiered equivalence**: 100% on invariant-bearing effects (halt, frame sequence, capability denials, region-pin, audit frames) and ≥ 75% slack only on cosmetic/latency surface, scoped to deterministic fixture Spirits, with a **known-divergent component as the proven-red**. (The Epic-11 plan §6 rejects a flat distributional ≥ 75% metric — it hits the `check_cross_form_equiv.rs` U-test NOT-APPLICABLE branch and is vacuous on deterministic Spirits.) ADR-031 transitions to **binding-v2.0** when that gate is green.
+With two forms, "do they behave equivalently?" is now a binding question. Story 11.1b proves **behavioral-oracle tiered equivalence**: 100% on invariant-bearing effects (halt, frame sequence, capability denials, region-pin, audit frames) and ≥ 75% slack only on cosmetic/latency surface, scoped to deterministic fixture Spirits, with a **known-divergent component as the proven-red**. (The Epic-11 plan §6 rejects a flat distributional ≥ 75% metric — it hits the `check_cross_form_equiv.rs` U-test NOT-APPLICABLE branch and is vacuous on deterministic Spirits.) The Story 11.1b gate is GREEN at the v1.5 advisory window and registered blocking at v2.0; ADR-031 is therefore the binding v2.0 equivalence envelope.
 
 ## Alternatives considered and rejected
 
@@ -70,12 +70,12 @@ With two forms, "do they behave equivalently?" is now a binding question. Story 
 - **Kernel-core delta HARD 0** (spike-validated, and delivered at Story 11.1a): `check-kernel-baseline` re-confirms 22964 unchanged; the trait `SpiritHostPort` lives in the daemon-side `maos-host` crate, never touching `maos-kernel-core`/`maos-domain`. `abi-diff` is NOT the gate for this surface (it scans `maos-spirit-abi` only) — the dedicated `check-host-surface` public-API baseline covers `maos-host` instead.
 - **ADR-002 and ADR-040 forward-references to ADR-031 are resolved.** The §13.1 in-process measurement gate remains untripped (this ADR does not promote an in-process form).
 - **Export-control entanglement (dev-gate).** A WASM runtime can change the 5D002.c.1 export classification. Per the Epic-11 ratification, **Story 11.1a's distributable form must NOT be finalized before export-compliance counsel clears** — one of the two external v1.5 holds gating Epic-11 dev.
-- **Story 11.1b's cross-form equivalence gate becomes binding** and is the precondition for ADR-031 → binding-v2.0.
+- **Story 11.1b's cross-form equivalence gate is GREEN** — ADR-031 is **binding-v2.0**. `check-wasm-form-equiv` is the authoritative equivalence-binding row and `check-cross-form-equiv` is relabeled to its CLI-wrapper distributional (advisory) scope.
 
 ## Gate
 
 - **Story 11.1a** (form + host): `maos-wasm-host` adapter behind `SpiritHostPort`; subprocess launch via the existing T2 path; kernel-core delta HARD 0 via `check-kernel-baseline` (22964, unchanged) + a NEW `maos-host` public-API baseline gate (`check-host-surface`, pinned against `abi-baseline/maos-host-v1.txt`) — out-of-surface churn is RED; WIT `maos:spirit@1.0` **byte-equal corpus** vs the ADR-032 frame set (extends ADR-032's gate, does not replace it).
-- **Story 11.1b** (equivalence): behavioral-oracle **tiered** cross-form equivalence (100% invariant-bearing; known-divergent component proven-red; anti-canned tripwire) → ADR-031 **binding-v2.0**.
+- **Story 11.1b** (equivalence): behavioral-oracle **tiered** cross-form equivalence (100% invariant-bearing; known-divergent component proven-red; anti-canned tripwire) via the NEW `check-wasm-form-equiv` gate (blocking at v2.0) — the authoritative equivalence-binding row; `check-cross-form-equiv` is relabeled to its CLI-wrapper distributional (advisory) scope. **ADR-031 is binding-v2.0 because this gate is genuinely GREEN.**
 - Registered in `docs/adr/index.md`.
 
 ## Ratification
