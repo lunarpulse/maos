@@ -27,6 +27,9 @@ mod check_coverage_matrix_completeness;
 mod check_cross_form_equiv;
 // Story 11.2a — cross-region convergent replication gate (ADR-049).
 mod check_cross_region_consensus;
+// Story 11.2b — multi-region SLO gate (3-region pilot + cross-region round-trip
+// SLO + halt-presence + fail-closed read path). Per-leg independence (ADR-049 ops).
+mod check_multi_region_slo;
 // Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
 mod check_wasm_form_equiv;
 // Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
@@ -740,6 +743,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 11.2b — multi-region SLO gate (per-leg independence).
+    #[command(name = "check-multi-region-slo")]
+    CheckMultiRegionSlo {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.1b (review finding #21) — WASM fixture provenance / drift
     /// guard. Verifies each committed equiv-*.wasm fixture's binary + source
     /// SHA-256 against the sidecar provenance manifest (stale-blob detection).
@@ -1145,6 +1154,7 @@ fn main() {
         Commands::CheckFfJ6 { json } => check_ff_j6::run(json),
         Commands::CheckSkillConformance { json } => check_skill_conformance::run(json),
         Commands::CheckCrossRegionConsensus { json } => check_cross_region_consensus::run(json),
+        Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

@@ -50,6 +50,8 @@ const EXPECTED_GATES: &[&str] = &[
     "check-skill-conformance",
     // Story 11.2a (AC5, D10) — cross-region convergent replication gate (ADR-049).
     "check-cross-region-consensus",
+    // Story 11.2b (AC5, D5) — multi-region SLO gate (3-region Cortex pilot).
+    "check-multi-region-slo",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.
@@ -110,6 +112,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 | "check-skill-conformance"
                 // Story 11.2a (AC5) — cross-region convergent replication gate.
                 | "check-cross-region-consensus"
+                // Story 11.2b (AC5) — multi-region SLO gate.
+                | "check-multi-region-slo"
         );
         if (is_story10_ship_gate || WEEKLY_ONLY_GATES.contains(gate))
             && !registry_names.contains(gate)

@@ -1125,7 +1125,7 @@ coverage:
       gate is cross-listed under NFR-Sec-13, which owns the chaos structure that
       produces the revocation events.
   NFR-Scale-1:
-    gates: [check-cross-region-consensus]
+    gates: [check-cross-region-consensus, check-multi-region-slo]
     corpora: []
     phase: v2.0+
     valid_until: '2027-05-12'

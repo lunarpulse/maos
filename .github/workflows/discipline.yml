@@ -2553,6 +2553,37 @@ jobs:
           set -o pipefail
           cargo run -p xtask -- check-cross-region-consensus --json 2>&1 | tee /tmp/cross-region-gate.json
 
+  # Story 11.2b (AC5, D5) — multi-region SLO gate. ONE gate / ONE disposition /
+  # FIVE independently-falsifiable legs with PER-LEG independence (each leg reads
+  # its own oracle — NOT appended to the consensus gate's single-binary
+  # broadcast). Legs: three-region-convergence, roundtrip-slo (+slo-fault-inject),
+  # halt-presence, live-read-region-identity (+chokepoint), kernel-abi-diff.
+  # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-multi-region-slo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-multi-region-slo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-multi-region-slo gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-multi-region-slo --json 2>&1 | tee /tmp/multi-region-slo-gate.json
+      # Story 11.2b (F7) SHIP-BLOCKER: slo-fault-inject MUST NOT leak into the
+      # release feature graph (a release build with fault injection active would
+      # inject spurious latency into a production measurement path). Mirrors the
+      # j4-latency / wasm-form-equiv cargo-tree absence idiom.
+      - name: slo-fault-inject absent from release feature graph
+        run: |
+          if cargo tree -p maos-bench -e features --release 2>&1 | grep -q "slo-fault-inject"; then
+            echo "FAIL: slo-fault-inject leaked into the maos-bench release feature graph (Story 11.2b ship-blocker)"
+            exit 1
+          fi
+          echo "OK: slo-fault-inject absent from the release feature graph"
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2587,6 +2618,7 @@ jobs:
       - wasm-host-tests
       - check-wasm-form-equiv
       - check-cross-region-consensus
+      - check-multi-region-slo
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2615,6 +2647,7 @@ jobs:
           echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | cargo test -p maos-host -p maos-wasm-host |"
           echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
           echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
+          echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2639,6 +2672,7 @@ jobs:
           echo "  wasm-host-tests: ${{ needs.wasm-host-tests.result }}"
           echo "  check-wasm-form-equiv: ${{ needs.check-wasm-form-equiv.result }}"
           echo "  check-cross-region-consensus: ${{ needs.check-cross-region-consensus.result }}"
+          echo "  check-multi-region-slo: ${{ needs.check-multi-region-slo.result }}"
           exit 1
 
   aggregate:

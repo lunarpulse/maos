@@ -2058,7 +2058,9 @@ dependencies = [
  "criterion",
  "maos-audit",
  "maos-domain",
+ "maos-eval",
  "maos-kernel-core",
+ "maos-loom-lite",
  "maos-spirit-abi",
  "maos-spirit-hello",
  "parking_lot",
@@ -2070,6 +2072,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-postgres",
 ]
 
 [[package]]

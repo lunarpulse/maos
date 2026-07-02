@@ -162,15 +162,25 @@ async fn reattest_copy_fails_then_reattest_succeeds() {
     assert_eq!(apply.applied_count, 1, "one row applied");
     assert_eq!(apply.skipped_count, 0, "no rows skipped");
 
-    // Verify the row is readable in region B.
-    let val = store_b
-        .read(1, &MemoryNamespace::Default, "key-1")
-        .await
-        .expect("read from region-b");
+    // Verify the row is present in region-b's store via the PROVENANCE path
+    // (read_all_leaves). NOTE: this shared-table test verifies the re-
+    // attestation MECHANISM (copy fails, real re-attestation succeeds); the
+    // Spirit READ-path serving of a foreign row is exercised separately on the
+    // 3-region separate-table rig (Story 11.2b read-region-identity tests),
+    // where apply lands a fresh non-empty source_log_ref the guard accepts.
+    let leaves_b = read_all_leaves(&store_b).await;
+    let val_b = leaves_b
+        .iter()
+        .find(|l| l.key == "key-1")
+        .map(|l| {
+            maos_loom_lite::schema::parts_to_value(&l.value_kind, &l.value_data)
+                .expect("decode value")
+        })
+        .expect("region-b must hold the re-attested key-1");
     assert_eq!(
-        val,
-        Some(MemoryValue::Text("hello from A".to_string())),
-        "region-b must see the re-attested value from region-a"
+        val_b,
+        MemoryValue::Text("hello from A".to_string()),
+        "region-b must hold the re-attested value from region-a"
     );
 
     // Build and verify a re-attestation receipt.
@@ -946,11 +956,20 @@ async fn blind_overwrite_regression_detected() {
             .await
             .unwrap();
     }
-    let val_fwd = store_fwd
-        .read(1, &MemoryNamespace::Default, "regr-key")
-        .await
-        .unwrap()
-        .expect("row exists");
+    // Read the converged winner via the PROVENANCE path (read_all_leaves) —
+    // NOT the guarded Spirit read path. The blind-overwrite regression is a
+    // STORE-STATE property (which row the LWW merge kept), verified by reading
+    // the stored leaf set directly. (Story 11.2b: store.read now enforces
+    // fail-closed region-identity on foreign rows — the raw cross-region writes
+    // above would be refused on the Spirit read path; the merge winner is still
+    // observable via the provenance path, which is the correct oracle here.)
+    let leaves_fwd = read_all_leaves(&store_fwd).await;
+    assert_eq!(leaves_fwd.len(), 1, "one converged row after forward writes");
+    let val_fwd = maos_loom_lite::schema::parts_to_value(
+        &leaves_fwd[0].value_kind,
+        &leaves_fwd[0].value_data,
+    )
+    .expect("decode forward winner");
 
     // Reset and reverse order.
     reset_collective(&store_rev).await;
@@ -968,11 +987,13 @@ async fn blind_overwrite_regression_detected() {
             .await
             .unwrap();
     }
-    let val_rev = store_rev
-        .read(1, &MemoryNamespace::Default, "regr-key")
-        .await
-        .unwrap()
-        .expect("row exists");
+    let leaves_rev = read_all_leaves(&store_rev).await;
+    assert_eq!(leaves_rev.len(), 1, "one converged row after reverse writes");
+    let val_rev = maos_loom_lite::schema::parts_to_value(
+        &leaves_rev[0].value_kind,
+        &leaves_rev[0].value_data,
+    )
+    .expect("decode reverse winner");
 
     // With a correct CRDT LWW merge, both must converge to "new" (higher ts).
     // A blind overwrite would produce "old" in the reverse case.
@@ -1032,5 +1053,745 @@ async fn source_ts_preserved_across_reattestation() {
     assert_eq!(
         leaves_b[0].source_region, "region-a",
         "source_region must be preserved (provenance of origin)"
+    );
+}
+
+// ─── Story 11.2b — 3-region pilot (F2: three real Postgres DBs) ────────────
+//
+// The whole delta of 11.2b over 11.2a IS the topology (F2 RESOLVED,
+// party-mode 2026-07-02). The helpers below parameterize per region over
+// `MAOS_TEST_POSTGRES_{A,B,C}` — three SEPARATE `collective_memory` tables on
+// three SEPARATE databases. A single-shared-table stand-in (the pre-existing
+// `make_store`/`pg_conn` model) CANNOT express the two topology-fraud negative
+// controls these tests assert (distinct-datname + pre-replication physical-
+// absence), so it is rejected for the 3-region pilot legs.
+
+/// Read one of the three physically-distinct region connection strings.
+/// `tag` ∈ {a,b,c} → `MAOS_TEST_POSTGRES_{A,B,C}`.
+fn pg_conn_for(tag: char) -> String {
+    let key = match tag {
+        'a' => "MAOS_TEST_POSTGRES_A",
+        'b' => "MAOS_TEST_POSTGRES_B",
+        'c' => "MAOS_TEST_POSTGRES_C",
+        other => panic!("region tag must be a|b|c, got {other:?}"),
+    };
+    std::env::var(key).unwrap_or_else(|_| {
+        panic!(
+            "{key} must be set for the 3-region pilot tests \
+             (F2 — three real Postgres DBs)"
+        )
+    })
+}
+
+/// Build a store whose backing table lives on the tag's OWN database (NOT the
+/// shared `maos_test` table the pre-existing tests use). `home_region` is the
+/// store's CRDT stamp; `tag` selects the physical DB.
+async fn make_store_for(tag: char, region: &str) -> LoomLiteStore {
+    let store = LoomLiteStore::new(StoreConfig {
+        connection_string: pg_conn_for(tag),
+        home_region: region.to_string(),
+        ..StoreConfig::default()
+    })
+    .await
+    .expect("store creation must succeed");
+    store.init_schema().await.expect("schema init must succeed");
+    store
+}
+
+/// Read all `CollectiveRow`s (with full provenance incl. `source_log_ref`) from
+/// the tag's DB — the unguarded provenance path used to prove a refused row is
+/// physically present (the guard hides it, not absence).
+async fn read_all_rows_for(tag: char) -> Vec<maos_loom_lite::store::CollectiveRow> {
+    let raw = raw_connect_for(tag).await;
+    LoomLiteStore::read_all_rows_from(&raw)
+        .await
+        .expect("read_all_rows_from")
+}
+
+/// Raw `tokio_postgres::Client` on the tag's DB (for `read_all_rows_from` +
+/// `current_database()`).
+async fn raw_connect_for(tag: char) -> tokio_postgres::Client {
+    let conn_str = pg_conn_for(tag);
+    let (client, conn) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .expect("raw connect");
+    tokio::spawn(async move {
+        let _ = conn.await;
+    });
+    client
+}
+
+/// Drop all rows from the tag's `collective_memory` table for a clean state.
+async fn reset_collective_for(tag: char) {
+    let raw = raw_connect_for(tag).await;
+    raw.execute("DELETE FROM collective_memory", &[])
+        .await
+        .expect("DELETE must succeed");
+}
+
+/// Read all leaves from the tag's DB for oracle comparison.
+async fn read_all_leaves_for(tag: char) -> Vec<CollectiveKvLeaf> {
+    let raw = raw_connect_for(tag).await;
+    let rows = LoomLiteStore::read_all_rows_from(&raw)
+        .await
+        .expect("read_all_rows_from");
+    rows.iter().map(CollectiveKvLeaf::from_row).collect()
+}
+
+/// Distinct-datname witness (F2 negative control #1): the tag's
+/// `current_database()`. The pilot asserts A≠B≠C — a shared-table stand-in
+/// cannot fake three distinct datnames.
+async fn current_database_for(tag: char) -> String {
+    let raw = raw_connect_for(tag).await;
+    let row = raw
+        .query_one("SELECT current_database()", &[])
+        .await
+        .expect("current_database()");
+    row.get::<_, String>(0)
+}
+
+/// Home-write a single agent row (CRDT-stamped with the home region + empty
+/// `source_log_ref`, the local-write shape — distinct from the mediator's
+/// re-attestation stamp).
+async fn home_write(store: &LoomLiteStore, pid: u32, home: &str) {
+    store
+        .write_with_source(
+            pid,
+            &MemoryNamespace::Default,
+            &format!("agent-{pid}"),
+            MemoryValue::Text(format!("payload-{home}-{pid}")),
+            1_700_000_000_000_000_000 + pid as i64,
+            home,
+            "",
+        )
+        .await
+        .expect("home write must succeed");
+}
+
+/// AC1 / D1 (F2): Live 3-region ≥10-agent pilot — convergence holds across
+/// three sovereign regions (NFR-Scale-1). ≥10 distinct `spirit_pid` agents
+/// write concurrently across the three regions and propagate via mediated
+/// re-attestation; the oracle triple (canonical-hash SET + `kv_merkle_root` +
+/// `compute_kv_payload_oracle` + exact row-count) matches across ALL THREE leaf
+/// sets under independent per-region re-derivation on read-back (all-three-
+/// equal, NOT pairwise). The ≥10-agent count is DERIVED-AND-RECONCILED against
+/// the distinct-pid write-set (never a hardcoded literal — the 11.2a vacuous-
+/// count P1 lesson), and two topology-fraud negative controls a shared table
+/// cannot fake are asserted (distinct-datname + pre-replication physical-
+/// absence). Those negative controls ARE this leg's proven-red: collapse the
+/// topology to one shared table and both hard-fail.
+#[tokio::test]
+#[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
+async fn three_region_convergence_all_three_equal() {
+    let _g = guard();
+
+    // Three physically-distinct region databases.
+    let store_a = make_store_for('a', "region-a").await;
+    let store_b = make_store_for('b', "region-b").await;
+    let store_c = make_store_for('c', "region-c").await;
+    reset_collective_for('a').await;
+    reset_collective_for('b').await;
+    reset_collective_for('c').await;
+
+    // ── NEGATIVE CONTROL #1: distinct-datname witness (F2) ───────────────
+    // A shared-table stand-in cannot fake three distinct `current_database()`.
+    let datname_a = current_database_for('a').await;
+    let datname_b = current_database_for('b').await;
+    let datname_c = current_database_for('c').await;
+    assert_ne!(
+        datname_a, datname_b,
+        "region-a and region-b share a database — topology fraud (F2: three \
+         real Postgres required)"
+    );
+    assert_ne!(
+        datname_a, datname_c,
+        "region-a and region-c share a database — topology fraud (F2)"
+    );
+    assert_ne!(
+        datname_b, datname_c,
+        "region-b and region-c share a database — topology fraud (F2)"
+    );
+
+    let region_a = Region::canonicalize("region-a").unwrap();
+    let region_b = Region::canonicalize("region-b").unwrap();
+    let region_c = Region::canonicalize("region-c").unwrap();
+
+    // ≥10 distinct spirit_pid agents writing concurrently ACROSS the three
+    // regions (L8). Pids 1..=4 home in A, 5..=8 in B, 9..=12 in C = 12 agents.
+    let mut distinct_pids: std::collections::BTreeSet<u32> = std::collections::BTreeSet::new();
+    for pid in 1u32..=4 {
+        home_write(&store_a, pid, "region-a").await;
+        distinct_pids.insert(pid);
+    }
+    for pid in 5u32..=8 {
+        home_write(&store_b, pid, "region-b").await;
+        distinct_pids.insert(pid);
+    }
+    for pid in 9u32..=12 {
+        home_write(&store_c, pid, "region-c").await;
+        distinct_pids.insert(pid);
+    }
+    assert!(
+        distinct_pids.len() >= 10,
+        "pilot must use ≥10 distinct spirit_pids (NFR-Scale-1), got {}",
+        distinct_pids.len()
+    );
+
+    // Capture each region's pre-propagation leaves BEFORE any cross-region
+    // apply (full-mesh fan-out would otherwise contaminate the source sets).
+    let leaves_a_pre = read_all_leaves_for('a').await;
+    let leaves_b_pre = read_all_leaves_for('b').await;
+    let leaves_c_pre = read_all_leaves_for('c').await;
+    assert_eq!(leaves_a_pre.len(), 4, "region-a pre-propagation = 4 home rows");
+    assert_eq!(leaves_b_pre.len(), 4, "region-b pre-propagation = 4 home rows");
+    assert_eq!(leaves_c_pre.len(), 4, "region-c pre-propagation = 4 home rows");
+
+    // ── NEGATIVE CONTROL #2: pre-replication physical-absence (F2) ───────
+    // A key written to DB-A only is physically ABSENT in region-B before
+    // replication. A single-shared-table stand-in CANNOT express this (the
+    // row would live in B's own table and read back as present).
+    let absent = store_b
+        .read(1, &MemoryNamespace::Default, "agent-1")
+        .await
+        .expect("read region-b");
+    assert_eq!(
+        absent, None,
+        "region-B must have ZERO rows for pid=1 (lives only in DB-A) before \
+         replication — physical-absence negative control (F2)"
+    );
+
+    // Full-mesh mediated propagation: each region's pre-propagation leaves
+    // are signed by their home region and applied to the other two.
+    let bundle_a = build_replication_bundle(leaves_a_pre.clone(), &region_a, &BASE_SEED);
+    let bundle_b = build_replication_bundle(leaves_b_pre.clone(), &region_b, &BASE_SEED);
+    let bundle_c = build_replication_bundle(leaves_c_pre.clone(), &region_c, &BASE_SEED);
+    for b in [&bundle_a, &bundle_b, &bundle_c] {
+        verify_replication_bundle(b, &BASE_SEED).expect("bundle must verify");
+    }
+
+    let ab = apply_replication_bundle(&bundle_a, &store_b, "region-b")
+        .await
+        .expect("A->B apply");
+    let ac = apply_replication_bundle(&bundle_a, &store_c, "region-c")
+        .await
+        .expect("A->C apply");
+    let ba = apply_replication_bundle(&bundle_b, &store_a, "region-a")
+        .await
+        .expect("B->A apply");
+    let bc = apply_replication_bundle(&bundle_b, &store_c, "region-c")
+        .await
+        .expect("B->C apply");
+    let ca = apply_replication_bundle(&bundle_c, &store_a, "region-a")
+        .await
+        .expect("C->A apply");
+    let cb = apply_replication_bundle(&bundle_c, &store_b, "region-b")
+        .await
+        .expect("C->B apply");
+
+    // Derived applied_count reconciliation (L8 / 11.2a vacuous-count lesson):
+    // each source bundle carries exactly its pre-propagation leaf count;
+    // applied_count MUST reconcile to that DERIVED count, never a hardcoded
+    // literal. No leaf may be skipped in the pilot convergence (u32-valid pids).
+    let results = [ab, ac, ba, bc, ca, cb];
+    let total_skipped: usize = results.iter().map(|r| r.skipped_count).sum();
+    assert_eq!(
+        total_skipped, 0,
+        "no leaves may be skipped in the pilot convergence (u32-valid pids)"
+    );
+    for (applied, src_len, src) in [
+        (results[0].applied_count, leaves_a_pre.len(), "A"),
+        (results[1].applied_count, leaves_a_pre.len(), "A"),
+        (results[2].applied_count, leaves_b_pre.len(), "B"),
+        (results[3].applied_count, leaves_b_pre.len(), "B"),
+        (results[4].applied_count, leaves_c_pre.len(), "C"),
+        (results[5].applied_count, leaves_c_pre.len(), "C"),
+    ] {
+        assert_eq!(
+            applied, src_len,
+            "applied_count for {src}'s bundle ({applied}) must reconcile to its \
+             derived pre-propagation leaf count ({src_len}), not a hardcoded literal"
+        );
+    }
+
+    // ── All-three-equal oracle triple (independent per-region re-derivation) ──
+    let leaves_a = read_all_leaves_for('a').await;
+    let leaves_b = read_all_leaves_for('b').await;
+    let leaves_c = read_all_leaves_for('c').await;
+
+    // 1. Exact row count — all three equal AND reconciled to the distinct-pid
+    //    write-set (derived, never a hardcoded literal).
+    assert_eq!(
+        leaves_a.len(),
+        distinct_pids.len(),
+        "region-a row count ({}) must reconcile to the distinct-pid write-set ({})",
+        leaves_a.len(),
+        distinct_pids.len()
+    );
+    assert_eq!(
+        leaves_b.len(),
+        distinct_pids.len(),
+        "region-b row count ({}) must reconcile to the distinct-pid write-set",
+        leaves_b.len()
+    );
+    assert_eq!(
+        leaves_c.len(),
+        distinct_pids.len(),
+        "region-c row count ({}) must reconcile to the distinct-pid write-set",
+        leaves_c.len()
+    );
+
+    // 2. Canonical-hash SET equality (all-three, NOT pairwise).
+    let set_a: std::collections::BTreeSet<[u8; 32]> =
+        leaves_a.iter().map(|l| l.canonical_hash()).collect();
+    let set_b: std::collections::BTreeSet<[u8; 32]> =
+        leaves_b.iter().map(|l| l.canonical_hash()).collect();
+    let set_c: std::collections::BTreeSet<[u8; 32]> =
+        leaves_c.iter().map(|l| l.canonical_hash()).collect();
+    assert_eq!(set_a, set_b, "canonical-hash set: region-a != region-b");
+    assert_eq!(set_a, set_c, "canonical-hash set: region-a != region-c");
+    assert_eq!(set_b, set_c, "canonical-hash set: region-b != region-c");
+
+    // 3. Merkle root (all-three).
+    let root_a = kv_merkle_root(&leaves_a);
+    let root_b = kv_merkle_root(&leaves_b);
+    let root_c = kv_merkle_root(&leaves_c);
+    assert_eq!(root_a, root_b, "merkle root: region-a != region-b");
+    assert_eq!(root_a, root_c, "merkle root: region-a != region-c");
+    assert_eq!(root_b, root_c, "merkle root: region-b != region-c");
+
+    // 4. Payload oracle (all-three) — catches a planted single-byte divergence
+    //    the Merkle root (deduplicated over equal hashes) is blind to.
+    let payload_a = compute_kv_payload_oracle(&leaves_a);
+    let payload_b = compute_kv_payload_oracle(&leaves_b);
+    let payload_c = compute_kv_payload_oracle(&leaves_c);
+    assert_eq!(payload_a, payload_b, "payload oracle: region-a != region-b");
+    assert_eq!(payload_a, payload_c, "payload oracle: region-a != region-c");
+    assert_eq!(payload_b, payload_c, "payload oracle: region-b != region-c");
+}
+
+/// AC1: CRDT LWW total order `(source_ts, source_region)` yields identical
+/// converged state across THREE regions regardless of propagation order. The
+/// same conflicting write-set is applied to region-a in two different orders
+/// (after a reset between); the converged winner is byte-identical.
+#[tokio::test]
+#[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
+async fn three_region_reorder_independence() {
+    let _g = guard();
+    let store_a = make_store_for('a', "region-a").await;
+    let store_b = make_store_for('b', "region-b").await;
+    let store_c = make_store_for('c', "region-c").await;
+    reset_collective_for('a').await;
+    reset_collective_for('b').await;
+    reset_collective_for('c').await;
+
+    let region_a = Region::canonicalize("region-a").unwrap();
+    let region_b = Region::canonicalize("region-b").unwrap();
+    let region_c = Region::canonicalize("region-c").unwrap();
+
+    // Three regions each write the SAME key with DIFFERENT payloads + ts. The
+    // CRDT LWW total order picks a single winner deterministically (region-b,
+    // ts=3000, the highest).
+    store_a
+        .write_with_source(
+            1,
+            &MemoryNamespace::Default,
+            "shared",
+            MemoryValue::Text("from-a".to_string()),
+            1000,
+            "region-a",
+            "",
+        )
+        .await
+        .unwrap();
+    store_b
+        .write_with_source(
+            1,
+            &MemoryNamespace::Default,
+            "shared",
+            MemoryValue::Text("from-b".to_string()),
+            3000,
+            "region-b",
+            "",
+        )
+        .await
+        .unwrap();
+    store_c
+        .write_with_source(
+            1,
+            &MemoryNamespace::Default,
+            "shared",
+            MemoryValue::Text("from-c".to_string()),
+            2000,
+            "region-c",
+            "",
+        )
+        .await
+        .unwrap();
+
+    let bundle_a =
+        build_replication_bundle(read_all_leaves_for('a').await, &region_a, &BASE_SEED);
+    let bundle_b =
+        build_replication_bundle(read_all_leaves_for('b').await, &region_b, &BASE_SEED);
+    let bundle_c =
+        build_replication_bundle(read_all_leaves_for('c').await, &region_c, &BASE_SEED);
+
+    // Order [a, b, c] → region-a (which already holds its own region-a write).
+    apply_replication_bundle(&bundle_a, &store_a, "region-a")
+        .await
+        .unwrap();
+    apply_replication_bundle(&bundle_b, &store_a, "region-a")
+        .await
+        .unwrap();
+    apply_replication_bundle(&bundle_c, &store_a, "region-a")
+        .await
+        .unwrap();
+    let winner_abc = read_all_leaves_for('a').await;
+
+    // Reset region-a; apply the SAME three bundles in REVERSE order [c, b, a].
+    reset_collective_for('a').await;
+    apply_replication_bundle(&bundle_c, &store_a, "region-a")
+        .await
+        .unwrap();
+    apply_replication_bundle(&bundle_b, &store_a, "region-a")
+        .await
+        .unwrap();
+    apply_replication_bundle(&bundle_a, &store_a, "region-a")
+        .await
+        .unwrap();
+    let winner_cba = read_all_leaves_for('a').await;
+
+    assert_eq!(winner_abc.len(), 1, "converged set = 1 row (LWW winner)");
+    assert_eq!(winner_cba.len(), 1, "converged set = 1 row (LWW winner)");
+    assert_eq!(
+        winner_abc[0].canonical_hash(),
+        winner_cba[0].canonical_hash(),
+        "CRDT LWW must converge to identical state regardless of propagation order"
+    );
+    assert_eq!(
+        winner_abc[0].source_region, "region-b",
+        "winner = the write with the highest source_ts (region-b, ts=3000)"
+    );
+}
+
+/// AC1: Empty-set convergence across three regions is N/A, not a vacuous pass.
+/// Three empty regions converge trivially (zero root + empty oracle); the leg
+/// reports N/A, never a green-over-nothing.
+#[tokio::test]
+#[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
+async fn three_region_empty_set_is_na() {
+    let _g = guard();
+    // Ensure the schema exists (init_schema is idempotent) before resetting.
+    let _ = make_store_for('a', "region-a").await;
+    let _ = make_store_for('b', "region-b").await;
+    let _ = make_store_for('c', "region-c").await;
+    reset_collective_for('a').await;
+    reset_collective_for('b').await;
+    reset_collective_for('c').await;
+
+    let leaves_a = read_all_leaves_for('a').await;
+    let leaves_b = read_all_leaves_for('b').await;
+    let leaves_c = read_all_leaves_for('c').await;
+
+    // All three empty → trivially "converged". This is reported N/A, not a
+    // meaningful pass: an empty-set pilot proves nothing about cross-region
+    // convergence. The gate's vacuous-green guard treats ran==true &&
+    // passed>=1 as the signal; this test exists to be COUNTED, not to assert
+    // a vacuous green over zero rows.
+    assert!(leaves_a.is_empty() && leaves_b.is_empty() && leaves_c.is_empty());
+    assert_eq!(kv_merkle_root(&leaves_a), [0u8; 32], "empty-set root sentinel");
+    assert_eq!(kv_merkle_root(&leaves_b), [0u8; 32], "empty-set root sentinel");
+    assert_eq!(kv_merkle_root(&leaves_c), [0u8; 32], "empty-set root sentinel");
+}
+
+// ─── Story 11.2b — AC4 / F4: fail-closed region-identity on the LIVE read path ─
+//
+// These tests run on the 3-region SEPARATE-table rig (F2) — the read-path
+// enforcement is INEXPRESSIBLE on a shared table: a foreign row injected via
+// `write_with_source` (bypassing the mediator) lands with an empty
+// `source_log_ref`, and only on a separate table does a mediated apply land a
+// fresh non-empty `source_log_ref` the guard accepts.
+
+/// AC4 / F4 proven-red: a foreign-region row injected DIRECTLY into DB-A
+/// (`source_region="region-b"`, empty `source_log_ref`, via `write_with_source`
+/// — a raw-copy / compromised-replication simulation that bypassed the signed
+/// mediator) is REFUSED on the Spirit read path — `store_A.read` returns `None`
+/// (fail closed, GREEN). The independence control: `read_all_rows_from` STILL
+/// shows the row physically present in DB-A's table, proving the guard HIDES it
+/// (not that the row is absent). Without the guard, `read` would return `Some`
+/// (the transparent-replication leak NFR-Comp-4 forbids — RED).
+#[tokio::test]
+#[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
+async fn live_read_region_identity_foreign_refused() {
+    let _g = guard();
+    let store_a = make_store_for('a', "region-a").await;
+    reset_collective_for('a').await;
+
+    // Inject a foreign-region row directly into DB-A, bypassing the mediator
+    // (raw-copy / compromised-replication). Empty source_log_ref = no valid
+    // re-attestation provenance.
+    store_a
+        .write_with_source(
+            1,
+            &MemoryNamespace::Default,
+            "foreign-key",
+            MemoryValue::Text("leaked-payload".to_string()),
+            1_700_000_000_000_000_001,
+            "region-b", // foreign to store-a (home region-a)
+            "",         // empty source_log_ref — NOT validly re-attested
+        )
+        .await
+        .expect("raw-copy injection into DB-A");
+
+    // The Spirit read path MUST fail closed (refuse the foreign row).
+    let refused = store_a
+        .read(1, &MemoryNamespace::Default, "foreign-key")
+        .await
+        .expect("read must not error");
+    assert_eq!(
+        refused, None,
+        "an un-validated foreign-region row MUST be refused on the live read \
+         path (NFR-Comp-4 'no transparent replication', enforced on READ)"
+    );
+
+    // Independence control: the row IS physically present in DB-A's table
+    // (read_all_rows_from, the unguarded provenance path, sees it) — proving the
+    // guard HIDES it from the Spirit read, not that the row is absent. Without
+    // the guard, `read` would serve it (the leak).
+    let present = read_all_rows_for('a').await;
+    let foreign = present
+        .iter()
+        .find(|r| r.key == "foreign-key")
+        .expect("the foreign row must be physically present in DB-A (guard hides it, not absence)");
+    assert_eq!(
+        foreign.source_region, "region-b",
+        "the physically-present row is foreign (source_region=region-b) — exactly \
+         what the guard refuses to serve"
+    );
+    assert!(
+        foreign.source_log_ref.is_empty(),
+        "the refused row carries NO valid re-attestation provenance (empty \
+         source_log_ref) — the marker the mediator stamps is absent"
+    );
+}
+
+/// AC4 / F4 positive: a foreign-region row that WAS validly re-attested (applied
+/// via the signed mediator on a SEPARATE table, landing a fresh non-empty
+/// `source_log_ref`) is SERVED on the Spirit read path. This is the convergence-
+/// preserving case — region-B can read region-A's replicated data because the
+/// mediator's re-attestation marker is present.
+#[tokio::test]
+#[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
+async fn live_read_region_identity_reattested_served() {
+    let _g = guard();
+    let store_a = make_store_for('a', "region-a").await;
+    let store_b = make_store_for('b', "region-b").await;
+    reset_collective_for('a').await;
+    reset_collective_for('b').await;
+
+    let region_a = Region::canonicalize("region-a").unwrap();
+
+    // Region-A home write.
+    store_a
+        .write_with_source(
+            1,
+            &MemoryNamespace::Default,
+            "shared-key",
+            MemoryValue::Text("from-a".to_string()),
+            1_700_000_000_000_000_001,
+            "region-a",
+            "",
+        )
+        .await
+        .expect("home write to region-a");
+
+    // Mediated apply to region-B's SEPARATE table → lands a fresh non-empty
+    // source_log_ref (the re-attestation marker).
+    let bundle = build_replication_bundle(read_all_leaves_for('a').await, &region_a, &BASE_SEED);
+    verify_replication_bundle(&bundle, &BASE_SEED).expect("bundle verifies");
+    let result = apply_replication_bundle(&bundle, &store_b, "region-b")
+        .await
+        .expect("apply to region-b");
+    assert_eq!(result.applied_count, 1, "one row applied");
+
+    // The re-attested foreign row IS served on region-B's read path.
+    let served = store_b
+        .read(1, &MemoryNamespace::Default, "shared-key")
+        .await
+        .expect("read must not error");
+    assert_eq!(
+        served,
+        Some(MemoryValue::Text("from-a".to_string())),
+        "a validly-re-attested foreign row MUST be served (the re-attestation \
+         marker is present) — convergence is preserved"
+    );
+
+    // Provenance check: the served row's source_log_ref is non-empty (mediator stamp).
+    let rows_b = read_all_rows_for('b').await;
+    let row = rows_b
+        .iter()
+        .find(|r| r.key == "shared-key")
+        .expect("row present in region-b");
+    assert!(
+        !row.source_log_ref.is_empty(),
+        "the served foreign row carries the mediator's non-empty re-attestation \
+         provenance — the marker the guard accepts"
+    );
+}
+
+/// AC4 / F4: a HOME-origin row is always served (loopback self-read is home,
+/// NOT cross-region — the vacuous-tautology guard). A single-region self-read
+/// must not be miscounted as cross-region enforcement.
+#[tokio::test]
+#[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
+async fn live_read_region_identity_home_served() {
+    let _g = guard();
+    let store_a = make_store_for('a', "region-a").await;
+    reset_collective_for('a').await;
+
+    store_a
+        .write_with_source(
+            1,
+            &MemoryNamespace::Default,
+            "home-key",
+            MemoryValue::Text("home-val".to_string()),
+            1_700_000_000_000_000_001,
+            "region-a", // home-origin
+            "",
+        )
+        .await
+        .expect("home write");
+
+    let served = store_a
+        .read(1, &MemoryNamespace::Default, "home-key")
+        .await
+        .expect("read must not error");
+    assert_eq!(
+        served,
+        Some(MemoryValue::Text("home-val".to_string())),
+        "a home-origin row is always served (loopback self-read is home, not \
+         cross-region enforcement)"
+    );
+}
+
+// ─── Story 11.2b §A6 review patches ───────────────────────────────────────
+
+/// §A6 review P1: behavioral scan twin of `live_read_region_identity_foreign_refused`.
+/// Exercises the SCAN path (not just READ) — a foreign-region row injected
+/// directly into DB-A with an empty `source_log_ref` must be excluded from
+/// `store_A.scan(...)` results.  Without this test, a refactoring that drops
+/// the `continue` in `scan` (but keeps the `region_guard` call for the static
+/// chokepoint) would silently leak foreign rows on scan while the gate stays
+/// green.
+#[tokio::test]
+#[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
+async fn live_scan_region_identity_foreign_refused() {
+    let _g = guard();
+    let store_a = make_store_for('a', "region-a").await;
+    reset_collective_for('a').await;
+
+    // Inject a foreign-region row directly into DB-A (empty source_log_ref =
+    // raw-copy / compromised-replication, bypassing the signed mediator).
+    store_a
+        .write_with_source(
+            1,
+            &MemoryNamespace::Default,
+            "scan-foreign",
+            MemoryValue::Text("leaked-scan-payload".to_string()),
+            1_700_000_000_000_000_001,
+            "region-b", // foreign to store-a (home region-a)
+            "",         // empty source_log_ref — NOT validly re-attested
+        )
+        .await
+        .expect("raw-copy injection into DB-A");
+
+    // Also write a legitimate home-origin row so the scan is non-empty.
+    store_a
+        .write_with_source(
+            2,
+            &MemoryNamespace::Default,
+            "scan-home",
+            MemoryValue::Text("home-payload".to_string()),
+            1_700_000_000_000_000_002,
+            "region-a",
+            "",
+        )
+        .await
+        .expect("home write");
+
+    // scan MUST exclude the foreign row.
+    let scanned = store_a
+        .scan(1, &MemoryNamespace::Default, "scan-", 100)
+        .await
+        .expect("scan must not error");
+    assert!(
+        !scanned.iter().any(|e| e.key == "scan-foreign"),
+        "scan MUST exclude an un-validated foreign-region row (NFR-Comp-4 \
+         'no transparent replication', enforced on SCAN as well as read)"
+    );
+
+    // The home row IS returned.
+    let scanned_home = store_a
+        .scan(2, &MemoryNamespace::Default, "scan-", 100)
+        .await
+        .expect("scan must not error");
+    assert!(
+        scanned_home.iter().any(|e| e.key == "scan-home"),
+        "scan must return the home-origin row"
+    );
+
+    // Independence control: the foreign row IS physically present.
+    let present = read_all_rows_for('a').await;
+    assert!(
+        present.iter().any(|r| r.key == "scan-foreign"),
+        "the foreign row must be physically present (guard hides it on scan, \
+         not that the row is absent)"
+    );
+}
+
+/// §A6 review D1: forged-stamp boundary test — documents the residual threat
+/// that a foreign row with a FORGED non-empty `source_log_ref` IS SERVED.
+/// This is by design: the read-path guard checks provenance-PRESENCE, not
+/// cryptographic VALIDITY (the Ed25519 bundle signature is validated at
+/// apply-time, not re-checked on every read).  A forged stamp requires direct
+/// DB write access, which also lets the attacker INSERT a home-origin row
+/// (always served at line 412), so forged-stamp is not a net-new exposure.
+/// The successor that achieves per-row crypto is a trusted-applied-root
+/// registry (v2.x).
+#[tokio::test]
+#[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
+async fn live_read_region_identity_forged_stamp_served() {
+    let _g = guard();
+    let store_a = make_store_for('a', "region-a").await;
+    reset_collective_for('a').await;
+
+    // Inject a foreign-region row with a FORGED non-empty source_log_ref —
+    // simulating an attacker who can write directly to the DB and fabricates
+    // a plausible-looking stamp without going through the signed mediator.
+    store_a
+        .write_with_source(
+            1,
+            &MemoryNamespace::Default,
+            "forged-key",
+            MemoryValue::Text("forged-payload".to_string()),
+            1_700_000_000_000_000_001,
+            "region-b",
+            r#"{"source_region":"region-b","merkle_root":"forged-root"}"#,
+        )
+        .await
+        .expect("forged-stamp injection into DB-A");
+
+    // The guard checks provenance-PRESENCE (!is_empty), not VALIDITY —
+    // the forged stamp IS non-empty, so the row IS served.  This is the
+    // documented residual threat (trust-boundary doc in store.rs).
+    let served = store_a
+        .read(1, &MemoryNamespace::Default, "forged-key")
+        .await
+        .expect("read must not error");
+    assert_eq!(
+        served,
+        Some(MemoryValue::Text("forged-payload".to_string())),
+        "a foreign row with a forged non-empty source_log_ref IS served — \
+         the read-path guard checks provenance-PRESENCE, not cryptographic \
+         VALIDITY (documented residual threat, by design)"
     );
 }

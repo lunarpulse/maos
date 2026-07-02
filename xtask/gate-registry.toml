@@ -98,6 +98,10 @@ gates = [
     # Story 11.2a (AC5, D10) — cross-region convergent replication gate
     # (ADR-049). Advisory at v1.0/v1.5; blocking at v2.0.
     "check-cross-region-consensus",
+    # Story 11.2b (AC5, D5) — multi-region SLO gate (3-region pilot +
+    # cross-region round-trip SLO + halt-presence + fail-closed read path).
+    # Per-leg independence. Advisory at v1.0/v1.5; blocking at v2.0.
+    "check-multi-region-slo",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -244,6 +248,11 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
 [[ship_gate]]
 name = "check-cross-region-consensus"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+# Story 11.2b (AC5, D5) — multi-region SLO gate (3-region Cortex pilot).
+# Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+[[ship_gate]]
+name = "check-multi-region-slo"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 
 

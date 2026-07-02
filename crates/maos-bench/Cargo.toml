@@ -21,6 +21,18 @@ tempfile = "3"
 [dev-dependencies]
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 maos-audit = { path = "../maos-audit" }
+# Story 11.2b (F7): cross-region round-trip SLO probe lives in the maos-bench
+# test file; it pulls maos-loom-lite as a dev-dep (keeps loom-lite's manifest
+# free of a leak-risk toggle — the slo-fault-inject feature is HERE, not there).
+maos-loom-lite = { path = "../maos-loom-lite" }
+# Story 11.2b (AC3): per-region halt-receipt PRESENCE observability reuses the
+# termination corpus (NFR-Rel-11 ≥99.9% receipt presence, partitioned per region).
+maos-eval = { path = "../maos-eval" }
+# #[tokio::test] for the async round-trip probe (clean path, no feature).
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+# raw tokio_postgres::connect for the round-trip probe's leaf reads (the probe
+# mirrors cross_region_live.rs: raw NoTls connect, not the deadpool wrapper).
+tokio-postgres = "0.7"
 rusqlite = { version = "0.31", features = ["bundled"] }
 criterion = "0.5"
 smallvec = { version = "1", features = ["serde"] }
@@ -32,6 +44,13 @@ kernel_measurement = ["tokio"]
 # kernel_measurement so injection lands on the real path, not smoke. MUST NOT
 # appear in any release/GA feature set (compile_error! + CI cargo-tree check).
 bench-fault-inject = ["kernel_measurement"]
+# Story 11.2b AC2/F7: cross-region round-trip SLO fault injection (Arm-1,
+# latency ONLY). Injects a fixed 15ms delay INSIDE the measured A→B→A span so a
+# mutation test asserts p95 >= 14_000µs && !budget_met. Arm-1/latency only — it
+# does NOT imply kernel_measurement (the round-trip uses loom-lite, not the
+# kernel). MUST NOT appear in any release/GA feature set (compile_error! +
+# CI cargo-tree --release absence check — SHIP-BLOCKER).
+slo-fault-inject = []
 
 [dependencies.tokio]
 version = "1"

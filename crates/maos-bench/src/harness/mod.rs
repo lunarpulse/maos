@@ -6,6 +6,7 @@
 //! - Timer: `monotonic_now_ns()` via `std::time::Instant` + `OnceLock` base.
 //! - `BenchHarness`: owns run metadata + journey results.
 
+pub mod cross_region;
 pub mod j0;
 pub mod j1;
 pub mod j4;

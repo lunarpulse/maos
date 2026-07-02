@@ -266,6 +266,12 @@ impl LoomLiteStore {
     }
 
     /// Read a value from the collective store.
+    ///
+    /// Story 11.2b (AC4 / F4): enforces fail-closed region-identity on the LIVE
+    /// read path via [`region_guard`]. The store now SELECTs the row's
+    /// `source_region` + `source_log_ref` (store-internal provenance) but does
+    /// NOT return them — `CollectiveMemoryPort::read` stays byte-identical. An
+    /// un-validated foreign-region row is refused (returns `None`), never served.
     pub async fn read(
         &self,
         spirit_pid: u32,
@@ -278,7 +284,8 @@ impl LoomLiteStore {
 
         let rows = client
             .query(
-                "SELECT value_kind, value_data FROM collective_memory
+                "SELECT value_kind, value_data, source_region, source_log_ref
+                 FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2 AND namespace_detail = $3 AND key = $4",
                 &[&(spirit_pid as i64), &ns_kind, &ns_detail, &key],
             )
@@ -287,8 +294,15 @@ impl LoomLiteStore {
         if let Some(row) = rows.first() {
             let val_kind: &str = row.get(0);
             let val_data: Vec<u8> = row.get(1);
-            let value =
-                schema::parts_to_value(val_kind, &val_data).map_err(StoreError::Serialization)?;
+            let src_region: String = row.get(2);
+            let src_log_ref: String = row.get(3);
+            // AC4 (F4): fail-closed region-identity — refuse an un-validated
+            // foreign-region row (NFR-Comp-4 "no transparent replication").
+            if !self.region_guard(&src_region, &src_log_ref) {
+                return Ok(None);
+            }
+            let value = schema::parts_to_value(val_kind, &val_data)
+                .map_err(StoreError::Serialization)?;
             Ok(Some(value))
         } else {
             Ok(None)
@@ -298,7 +312,12 @@ impl LoomLiteStore {
     /// Scan entries matching a key prefix.
     ///
     /// An entry that fails validation is PROPAGATED as an error (AC1 review —
-    /// no silent truncation of results).
+    /// no silent truncation of results). Story 11.2b (AC4 / F4): enforces
+    /// fail-closed region-identity — an un-validated foreign-region row is
+    /// FILTERED OUT (never served), not errored; the SQL WHERE clause excludes
+    /// foreign rows lacking a mediator stamp BEFORE the LIMIT is applied (so
+    /// foreign rows do not consume LIMIT slots), and the Rust-side
+    /// `region_guard` check is kept as defense-in-depth.
     pub async fn scan(
         &self,
         spirit_pid: u32,
@@ -317,9 +336,10 @@ impl LoomLiteStore {
 
         let rows = client
             .query(
-                "SELECT namespace_kind, namespace_detail, key, value_kind, value_data, timestamp_ns
+                "SELECT namespace_kind, namespace_detail, key, value_kind, value_data, timestamp_ns, source_region, source_log_ref
                  FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2 AND namespace_detail = $3 AND key LIKE $4
+                   AND (source_region = $6 OR source_log_ref <> '')
                  ORDER BY key ASC
                  LIMIT $5",
                 &[
@@ -328,6 +348,7 @@ impl LoomLiteStore {
                     &ns_detail,
                     &like_pattern,
                     &(limit as i64),
+                    &self.config.home_region.as_str(),
                 ],
             )
             .await?;
@@ -340,6 +361,14 @@ impl LoomLiteStore {
             let row_val_kind: &str = row.get(3);
             let row_val_data: Vec<u8> = row.get(4);
             let row_ts: i64 = row.get(5);
+            let src_region: String = row.get(6);
+            let src_log_ref: String = row.get(7);
+
+            // AC4 (F4): fail-closed region-identity — filter out an un-validated
+            // foreign-region row (NFR-Comp-4 "no transparent replication").
+            if !self.region_guard(&src_region, &src_log_ref) {
+                continue;
+            }
 
             let ns = schema::parts_to_namespace(row_ns_kind, &row_ns_detail)
                 .map_err(StoreError::Serialization)?;
@@ -352,6 +381,58 @@ impl LoomLiteStore {
         }
 
         Ok(entries)
+    }
+
+    /// Story 11.2b (AC4 / F4): fail-closed region-identity guard for the
+    /// Spirit-facing READ path.
+    ///
+    /// Returns `true` (serve) iff the row is **home-origin** (`source_region`
+    /// == `self.config.home_region`) OR a **foreign row carrying a
+    /// provenance-presence marker** (a non-empty `source_log_ref` — the stamp
+    /// `apply_replication_bundle` writes after `verify_replication_bundle`
+    /// succeeds).
+    ///
+    /// # Trust boundary
+    ///
+    /// Cryptographic validation happens at **apply-time** (the Ed25519 bundle
+    /// signature in `verify_replication_bundle`), NOT on every read.  The
+    /// read-path guard checks **provenance-presence** (non-empty mediator
+    /// stamp), not cryptographic validity.  A row whose `source_log_ref` is
+    /// non-empty but *forged* (written via `write_with_source` or raw SQL
+    /// without going through the signed mediator) **will be served** — this is
+    /// a documented residual threat under the model where the attacker has
+    /// direct DB write access (but that attacker can also INSERT a home-origin
+    /// row the guard always serves, so forged-stamp is not a net-new
+    /// exposure).  The successor that achieves per-row cryptographic validity
+    /// is a **trusted-applied-root registry** (record verified roots at apply
+    /// time, check on read) — a schema + apply-path feature out of 11.2b
+    /// scope, tracked as a v2.x successor.
+    ///
+    /// Both operands are store-internal (the row's stored columns vs the
+    /// store's `home_region` config) → `CollectiveMemoryPort::read/scan` stays
+    /// byte-identical (ZERO kernel-Δ; the port gains no region parameter and
+    /// the store does NOT return `source_region`). This is distinct from — and
+    /// does NOT reuse — `DowngradeRouter::check_region_identity` (wrong home:
+    /// it carries the *router's* home, not the *store's*; reusing it would
+    /// couple the store to the router).
+    ///
+    /// NOTE on the F4 lean signature: the preflight prose named a 1-operand
+    /// `region_guard(&self, row_source_region)`. AC4's binding text ("home-origin
+    /// OR carry a validly-re-attested provenance") REQUIRES the `source_log_ref`
+    /// operand to distinguish a validly-re-attested foreign row (served) from a
+    /// raw-copy injection (refused). A 1-operand guard would either refuse ALL
+    /// foreign rows (breaking 11.2a convergence — region-B could never read
+    /// region-A's replicated data via `read`) or serve ALL foreign rows (no
+    /// enforcement). The 2-operand form is the honest encoding of the property.
+    fn region_guard(&self, row_source_region: &str, row_source_log_ref: &str) -> bool {
+        if row_source_region == self.config.home_region {
+            return true; // home-origin: always served
+        }
+        // Foreign row: serve ONLY with a provenance-presence marker — the
+        // non-empty source_log_ref stamped by apply_replication_bundle after
+        // the bundle signature was verified.  This is a PRESENCE check, not
+        // cryptographic re-validation on read (see trust-boundary doc above).
+        !row_source_log_ref.is_empty()
     }
 
     /// Read all collective-memory rows with source provenance for the
