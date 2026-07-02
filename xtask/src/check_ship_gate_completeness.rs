@@ -48,6 +48,8 @@ const EXPECTED_GATES: &[&str] = &[
     "check-j4-latency",
     // Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
     "check-skill-conformance",
+    // Story 11.2a (AC5, D10) — cross-region convergent replication gate (ADR-049).
+    "check-cross-region-consensus",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.
@@ -106,6 +108,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 | "check-mobile-push-on-halt"
                 | "check-j4-latency"
                 | "check-skill-conformance"
+                // Story 11.2a (AC5) — cross-region convergent replication gate.
+                | "check-cross-region-consensus"
         );
         if (is_story10_ship_gate || WEEKLY_ONLY_GATES.contains(gate))
             && !registry_names.contains(gate)

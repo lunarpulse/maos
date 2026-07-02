@@ -40,6 +40,7 @@ async fn make_broken_adapter() -> Arc<LoomLiteAdapter> {
         vector_dim: 1536,
         pool_size: 2,
         timeout_ms: 3000,
+        home_region: String::new(),
     };
 
     let store = Arc::new(

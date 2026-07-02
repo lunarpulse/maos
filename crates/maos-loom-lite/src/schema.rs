@@ -47,6 +47,14 @@ CREATE TABLE IF NOT EXISTS collective_memory (
     source_log_ref  TEXT NOT NULL DEFAULT '',
     distillation_depth INTEGER NOT NULL DEFAULT 0,
     timestamp_ns    BIGINT NOT NULL,
+    -- Story 11.2a (AC1, F3): CRDT LWW-register total-order tiebreak columns.
+    -- source_region: canonical ascii-v1 region tag of the originating write.
+    -- source_ts: the source write's nanosecond timestamp, preserved across
+    -- re-attestation apply (NOT re-minted on apply — re-minting destroys
+    -- convergence).  Backfill: home region + 0 sentinel for pre-11.2a rows.
+    -- These columns are NOT in the UNIQUE key (region-free convergence).
+    source_region   TEXT NOT NULL DEFAULT '',
+    source_ts       BIGINT NOT NULL DEFAULT 0,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (spirit_pid, namespace_kind, namespace_detail, key),
     -- I11 (enforced-by-construction at the store layer): a pattern record
@@ -58,6 +66,25 @@ CREATE TABLE IF NOT EXISTS collective_memory (
         kind <> 'pattern' OR (source_log_ref <> '' AND distillation_depth > 0)
     )
 );
+
+-- Story 11.2a: additive migration — add source_region and source_ts if absent.
+-- Idempotent (IF NOT EXISTS / DO NOTHING on re-run).
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'source_region'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN source_region TEXT NOT NULL DEFAULT '';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'source_ts'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN source_ts BIGINT NOT NULL DEFAULT 0;
+    END IF;
+END
+$$;
 
 -- HNSW index for filtered similarity queries (pgvector 0.8+).  Staged schema:
 -- v1.5 ships KV-only; the vector(N)/HNSW/pgvector surface is inert until a

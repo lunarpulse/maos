@@ -17,6 +17,21 @@
 
 use maos_domain::region::{Region, RegionError};
 
+/// Canonical reference to a cross-region replication bundle (Story 11.2a).
+///
+/// Content-free at the kernel layer — the kernel names provenance only;
+/// crypto verification lives in `maos-audit`, replication + merge in
+/// `maos-loom-lite`.  The type exists so the exhaustive match forces
+/// region enforcement on the re-admit path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceLogRef {
+    /// Source region tag (redundant with the variant field, but kept for
+    /// self-describing provenance).
+    pub source_region: String,
+    /// Hex-encoded Merkle root of the source replication bundle.
+    pub merkle_root: String,
+}
+
 /// Every store-write path is exactly one of these variants.
 ///
 /// **No wildcard match arm may ever be written against this enum** — that is the
@@ -41,6 +56,19 @@ pub enum WriteEntryPoint {
         /// The region the backup artifact was bound to (`None` = untagged).
         source_region: Option<Region>,
     },
+    /// Write applied from a cross-region collective-memory re-admission
+    /// (Story 11.2a, ADR-049).  Carries the source region's provenance and
+    /// the canonical `source_log_ref` naming the source bundle's Merkle root.
+    /// **No live path at v1.5** — reserved + guarded so a cross-region re-admit
+    /// path cannot land without region enforcement.
+    CrossRegionReadmit {
+        /// Originating region (mandatory — cross-region writes always have a
+        /// verified source region).
+        source_region: Region,
+        /// Canonical reference to the source replication bundle:
+        /// `{source_region, merkle_root}` content-addressed.
+        source_log_ref: SourceLogRef,
+    },
 }
 
 impl WriteEntryPoint {
@@ -54,6 +82,7 @@ impl WriteEntryPoint {
             WriteEntryPoint::DirectWrite => home,
             WriteEntryPoint::ReplayApply { source_region } => source_region.as_ref(),
             WriteEntryPoint::BackupRestore { source_region } => source_region.as_ref(),
+            WriteEntryPoint::CrossRegionReadmit { source_region, .. } => Some(source_region),
         }
     }
 }
@@ -179,6 +208,13 @@ mod tests {
             WriteEntryPoint::BackupRestore {
                 source_region: None,
             },
+            WriteEntryPoint::CrossRegionReadmit {
+                source_region: home.clone(),
+                source_log_ref: SourceLogRef {
+                    source_region: home.as_str().to_string(),
+                    merkle_root: "00".to_string(),
+                },
+            },
         ];
         for ep in &all {
             // Disabled pinning → every variant is permitted (legacy semantics).
@@ -196,5 +232,28 @@ mod tests {
             source_region: Some(foreign),
         };
         assert!(enforce_region(&ep, None).is_ok());
+    }
+
+    #[test]
+    fn r_rg_cross_region_readmit_enforced() {
+        let home = Region::canonicalize("us-east").unwrap();
+        let source = Region::canonicalize("eu-west").unwrap();
+        let entry = WriteEntryPoint::CrossRegionReadmit {
+            source_region: source.clone(),
+            source_log_ref: SourceLogRef {
+                source_region: "eu-west".to_string(),
+                merkle_root: "deadbeef".to_string(),
+            },
+        };
+        // Cross-region write to a different home → rejected
+        let result = enforce_region(&entry, Some(&home));
+        assert!(result.is_err(), "cross-region readmit to foreign home must be rejected");
+        // Same region → accepted
+        let same_home = Region::canonicalize("eu-west").unwrap();
+        let result = enforce_region(&entry, Some(&same_home));
+        assert!(result.is_ok(), "cross-region readmit to matching home must be accepted");
+        // No home (region pinning disabled) → accepted
+        let result = enforce_region(&entry, None);
+        assert!(result.is_ok(), "no home region → always accepted");
     }
 }

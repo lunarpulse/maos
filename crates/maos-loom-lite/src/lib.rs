@@ -24,4 +24,5 @@ pub mod adapter;
 pub mod canonical;
 pub mod migration;
 pub mod schema;
+pub mod replication;
 pub mod store;

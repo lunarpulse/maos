@@ -172,4 +172,14 @@
 #          tests/sandbox_enforcement_windows.rs (NOT counted — tests/, not src/).
 #          All additive; no public symbols removed. Windows compile/runtime still
 #          CI-only (windows-latest); not verifiable from this Linux host.
-src_lines = 22964
+#   23023  Story 11.2a — charter-amended kernel delta: bounded FLAG-Winston
+#          CrossRegionReadmit provenance arm (+59, incl. test LOC).
+#          FLAG-Winston: authorized 2026-07-02 (party-mode preflight, unanimous).
+#          Added WriteEntryPoint::CrossRegionReadmit { source_region, source_log_ref }
+#          variant + SourceLogRef struct + one source_region() match arm in
+#          write_entry_point.rs. enforce_region body = 0-LOC (generic over
+#          source_region()). r_rg_cross_region_readmit_enforced test +
+#          r_rg3 exhaustiveness array updated. Functional src delta ~10 LOC;
+#          remainder is doc comments + test code the line-count gate includes.
+#          All additive; no public symbols removed. ADR-049 ref.
+src_lines = 23023

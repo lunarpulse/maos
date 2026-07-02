@@ -14,7 +14,6 @@ use tokio_postgres::NoTls;
 use crate::schema;
 
 /// Configuration for the Loom-lite Postgres store.
-#[derive(Debug, Clone)]
 pub struct StoreConfig {
     /// Postgres connection string (e.g. "host=localhost dbname=loom_lite").
     pub connection_string: String,
@@ -24,6 +23,9 @@ pub struct StoreConfig {
     pub pool_size: usize,
     /// Operation timeout in milliseconds.
     pub timeout_ms: u64,
+    /// Home region (canonical ascii-v1) for CRDT source_region stamping.
+    /// Empty string = no region configured (pre-11.2a behavior / single-region).
+    pub home_region: String,
 }
 
 impl Default for StoreConfig {
@@ -33,6 +35,7 @@ impl Default for StoreConfig {
             vector_dim: schema::DEFAULT_VECTOR_DIM,
             pool_size: 16,
             timeout_ms: 5000,
+            home_region: String::new(),
         }
     }
 }
@@ -165,7 +168,12 @@ impl LoomLiteStore {
         Ok(())
     }
 
-    /// Write a value to the collective store (upsert).
+    /// Write a value to the collective store (upsert with CRDT LWW merge).
+    ///
+    /// Story 11.2a (AC1): local writes stamp `source_ts = now()` and
+    /// `source_region = config.home_region`.  The upsert is **conditional**:
+    /// overwrites ONLY when the incoming `(source_ts, source_region)` total
+    /// order strictly dominates the stored one (LWW-register property).
     pub async fn write(
         &self,
         spirit_pid: u32,
@@ -173,22 +181,72 @@ impl LoomLiteStore {
         key: &str,
         value: MemoryValue,
     ) -> Result<(), StoreError> {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as i64;
+        self.write_with_source(
+            spirit_pid,
+            namespace,
+            key,
+            value,
+            ts,
+            &self.config.home_region,
+            "",
+        )
+        .await
+    }
+
+    /// Write with explicit source provenance (cross-region replication path).
+    ///
+    /// Story 11.2a (AC1/D1): the CRDT LWW merge — conditional upsert that
+    /// overwrites ONLY when the incoming `(source_ts, source_region)` total
+    /// order strictly dominates the stored one.  Total order is lexicographic:
+    /// `source_ts` first (higher wins), then `source_region` (lexicographic
+    /// tiebreak on identical timestamps).  This is commutative + idempotent:
+    /// the converged value is identical regardless of arrival order.
+    ///
+    /// `source_ts` is the **source write's** nanosecond timestamp, preserved
+    /// across re-attestation apply — NOT re-minted on apply.
+    pub async fn write_with_source(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+        source_ts: i64,
+        source_region: &str,
+        source_log_ref: &str,
+    ) -> Result<(), StoreError> {
         let client = self.get_client_with_timeout().await?;
 
         let (ns_kind, ns_detail) = schema::namespace_to_parts(namespace);
         let (val_kind, val_data) =
             schema::value_to_parts(&value).map_err(StoreError::Serialization)?;
-        let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as i64;
 
+        // Story 11.2a (AC1): conditional LWW upsert.
+        // Total order: (source_ts, source_region) lexicographic.
+        // Overwrite ONLY when incoming strictly dominates stored:
+        //   incoming.source_ts > stored.source_ts
+        //   OR (incoming.source_ts == stored.source_ts AND incoming.source_region > stored.source_region)
+        // This replaces the unconditional DO UPDATE (store.rs:188-191).
         client
             .execute(
-                "INSERT INTO collective_memory (spirit_pid, namespace_kind, namespace_detail, key, value_kind, value_data, timestamp_ns)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                "INSERT INTO collective_memory
+                    (spirit_pid, namespace_kind, namespace_detail, key,
+                     value_kind, value_data, timestamp_ns, source_ts, source_region, source_log_ref)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                  ON CONFLICT (spirit_pid, namespace_kind, namespace_detail, key)
-                 DO UPDATE SET value_kind = $5, value_data = $6, timestamp_ns = $7",
+                 DO UPDATE SET
+                     value_kind = EXCLUDED.value_kind,
+                     value_data = EXCLUDED.value_data,
+                     timestamp_ns = EXCLUDED.timestamp_ns,
+                     source_ts = EXCLUDED.source_ts,
+                     source_region = EXCLUDED.source_region,
+                     source_log_ref = EXCLUDED.source_log_ref
+                 WHERE EXCLUDED.source_ts > collective_memory.source_ts
+                    OR (EXCLUDED.source_ts = collective_memory.source_ts
+                        AND EXCLUDED.source_region > collective_memory.source_region)",
                 &[
                     &(spirit_pid as i64),
                     &ns_kind,
@@ -196,7 +254,10 @@ impl LoomLiteStore {
                     &key,
                     &val_kind,
                     &val_data,
-                    &ts,
+                    &source_ts,
+                    &source_ts,
+                    &source_region,
+                    &source_log_ref,
                 ],
             )
             .await?;
@@ -293,6 +354,44 @@ impl LoomLiteStore {
         Ok(entries)
     }
 
+    /// Read all collective-memory rows with source provenance for the
+    /// convergence oracle (Story 11.2a AC3).
+    ///
+    /// Generic over `GenericClient` so it works with both `Client` and
+    /// `Transaction` (verify-before-commit pattern from `canonical.rs:281`).
+    pub async fn read_all_rows_from<C>(
+        client: &C,
+    ) -> Result<Vec<CollectiveRow>, StoreError>
+    where
+        C: tokio_postgres::GenericClient + Sync,
+    {
+        let rows = client
+            .query(
+                "SELECT spirit_pid, namespace_kind, namespace_detail, key,
+                        value_kind, value_data, source_region, source_ts, source_log_ref
+                 FROM collective_memory
+                 ORDER BY spirit_pid, namespace_kind, namespace_detail, key",
+                &[],
+            )
+            .await
+            .map_err(|e| StoreError::Query(e.to_string()))?;
+
+        Ok(rows
+            .iter()
+            .map(|row| CollectiveRow {
+                spirit_pid: row.get(0),
+                namespace_kind: row.get(1),
+                namespace_detail: row.get(2),
+                key: row.get(3),
+                value_kind: row.get(4),
+                value_data: row.get(5),
+                source_region: row.get(6),
+                source_ts: row.get(7),
+                source_log_ref: row.get(8),
+            })
+            .collect())
+    }
+
     /// Get a client with the configured timeout.
     async fn get_client_with_timeout(&self) -> Result<deadpool_postgres::Client, StoreError> {
         let timeout = Duration::from_millis(self.config.timeout_ms);
@@ -314,6 +413,24 @@ impl LoomLiteStore {
     pub fn config(&self) -> &StoreConfig {
         &self.config
     }
+}
+
+/// A raw collective-memory row for convergence oracle + replication.
+///
+/// Story 11.2a (AC3): the oracle triple needs the full row with source
+/// provenance fields.  This struct is the internal shape — NOT exported
+/// through the `CollectiveMemoryPort` trait.
+#[derive(Debug, Clone)]
+pub struct CollectiveRow {
+    pub spirit_pid: i64,
+    pub namespace_kind: String,
+    pub namespace_detail: String,
+    pub key: String,
+    pub value_kind: String,
+    pub value_data: Vec<u8>,
+    pub source_region: String,
+    pub source_ts: i64,
+    pub source_log_ref: String,
 }
 
 impl From<StoreError> for MemoryError {

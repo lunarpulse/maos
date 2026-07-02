@@ -2533,6 +2533,26 @@ jobs:
       - name: Verify equiv WASM fixture provenance (no stale .wasm drift)
         run: cargo run -p xtask -- check-equiv-fixture-provenance --json
 
+  # Story 11.2a (AC5, D10) — cross-region convergent replication gate.
+  # ONE gate / ONE disposition / FIVE independently-falsifiable legs:
+  # reattestation-mediated, convergence-oracle, region-identity, ap-degrade,
+  # kernel-abi-diff. Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner);
+  # blocking at v2.0 (absent/unmeasured → BLOCK).
+  check-cross-region-consensus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-cross-region-consensus-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-cross-region-consensus gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-cross-region-consensus --json 2>&1 | tee /tmp/cross-region-gate.json
+
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2566,6 +2586,7 @@ jobs:
       - check-skill-conformance
       - wasm-host-tests
       - check-wasm-form-equiv
+      - check-cross-region-consensus
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2593,6 +2614,7 @@ jobs:
           echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
           echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | cargo test -p maos-host -p maos-wasm-host |"
           echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
+          echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2616,6 +2638,7 @@ jobs:
           echo "  check-ko-coverage: ${{ needs.check-ko-coverage.result }}"
           echo "  wasm-host-tests: ${{ needs.wasm-host-tests.result }}"
           echo "  check-wasm-form-equiv: ${{ needs.check-wasm-form-equiv.result }}"
+          echo "  check-cross-region-consensus: ${{ needs.check-cross-region-consensus.result }}"
           exit 1
 
   aggregate:

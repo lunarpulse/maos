@@ -2347,7 +2347,9 @@ name = "maos-loom-lite"
 version = "0.1.0-alpha"
 dependencies = [
  "deadpool-postgres",
+ "ed25519-dalek",
  "hex",
+ "hkdf",
  "maos-audit",
  "maos-domain",
  "pgvector",

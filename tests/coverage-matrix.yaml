@@ -722,7 +722,7 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Comp-4:
-    gates: []
+    gates: [check-cross-region-consensus]
     enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
@@ -1125,7 +1125,7 @@ coverage:
       gate is cross-listed under NFR-Sec-13, which owns the chaos structure that
       produces the revocation events.
   NFR-Scale-1:
-    gates: []
+    gates: [check-cross-region-consensus]
     corpora: []
     phase: v2.0+
     valid_until: '2027-05-12'

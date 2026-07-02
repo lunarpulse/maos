@@ -1704,8 +1704,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let collective_port: Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>> =
         match std::env::var("MAOS_LOOM_POSTGRES") {
             Ok(conn_str) => {
+                let home_region_str = maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
+                    .home_region
+                    .as_ref()
+                    .map(|r| r.as_str().to_string())
+                    .unwrap_or_default();
                 let cfg = maos_loom_lite::store::StoreConfig {
                     connection_string: conn_str,
+                    home_region: home_region_str,
                     ..Default::default()
                 };
                 match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
