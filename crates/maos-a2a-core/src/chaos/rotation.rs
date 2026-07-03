@@ -153,7 +153,7 @@ impl RotationDrillReport {
     }
 }
 
-fn percentiles(samples: &[u64]) -> (u64, u64) {
+pub(crate) fn percentiles(samples: &[u64]) -> (u64, u64) {
     if samples.is_empty() {
         return (0, 0);
     }

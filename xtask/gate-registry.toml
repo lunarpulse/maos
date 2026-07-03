@@ -102,6 +102,9 @@ gates = [
     # cross-region round-trip SLO + halt-presence + fail-closed read path).
     # Per-leg independence. Advisory at v1.0/v1.5; blocking at v2.0.
     "check-multi-region-slo",
+    # Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate. Per-leg
+    # independence. Advisory at v1.0/v1.5; blocking at v2.0.
+    "check-scale-churn",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -253,6 +256,11 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
 [[ship_gate]]
 name = "check-multi-region-slo"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+# Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate.
+# Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+[[ship_gate]]
+name = "check-scale-churn"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 
 

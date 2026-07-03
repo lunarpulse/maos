@@ -30,6 +30,10 @@ mod check_cross_region_consensus;
 // Story 11.2b — multi-region SLO gate (3-region pilot + cross-region round-trip
 // SLO + halt-presence + fail-closed read path). Per-leg independence (ADR-049 ops).
 mod check_multi_region_slo;
+// Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate (per-leg
+// independence). MUST NOT append legs to check-rotation-real-timing or
+// check-multi-region-slo (F7).
+mod check_scale_churn;
 // Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
 mod check_wasm_form_equiv;
 // Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
@@ -749,6 +753,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 11.3 — scale-envelope 25/30-host churn gate (per-leg independence).
+    #[command(name = "check-scale-churn")]
+    CheckScaleChurn {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.1b (review finding #21) — WASM fixture provenance / drift
     /// guard. Verifies each committed equiv-*.wasm fixture's binary + source
     /// SHA-256 against the sidecar provenance manifest (stale-blob detection).
@@ -1155,6 +1165,7 @@ fn main() {
         Commands::CheckSkillConformance { json } => check_skill_conformance::run(json),
         Commands::CheckCrossRegionConsensus { json } => check_cross_region_consensus::run(json),
         Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
+        Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

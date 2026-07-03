@@ -15,13 +15,16 @@
 #![allow(dead_code)]
 
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
-use maos_a2a_core::{A2APeerConfig, A2AProfile, ConsentAllowlists};
+use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
+use maos_a2a_core::{A2AError, A2APeerConfig, A2AProfile, ConsentAllowlists};
 use maos_a2a_core::{HandshakeRetryPolicy, InMemoryTofuPinStore, TofuPinStore};
 use maos_a2a_tcp::{
     build_client_config, length_delimited_codec, PinnedFingerprint, TcpA2AConfig, TcpA2ATransport,
     TcpTimeouts, TrustPosture,
 };
+use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i8::A2AIntent;
+use maos_spirit_abi::identity::HostId;
 use rcgen::{BasicConstraints, CertificateParams, IsCa, KeyPair};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName, UnixTime};
 use std::net::SocketAddr;
@@ -413,4 +416,126 @@ pub fn make_frame(
         )),
         intent_lineage: IntentLineage::default(),
     }
+}
+
+// ─────────────── Story 11.3 — N-host mesh scale primitives ───────────────
+//
+// Extends the 10.4b 3-host template (`bind_node`/`build_mesh`/
+// `directed_dial_sweep`, defined LOCALLY in `t_10_4b_rotation_real_timing.rs`
+// — untouched, no shared-helper churn on an already-landed test) to a
+// parameterized host count for `t_11_3_scale_churn.rs`.
+
+/// Canonical per-index host name for an N-host mesh (`host_00`, `host_01`, …).
+pub fn host_name(i: usize) -> String {
+    format!("host_{i:02}")
+}
+
+/// A live N-host mTLS mesh node: the bound transport + its identity
+/// witnesses (cert fingerprint, bound `SocketAddr`) — the derive-and-
+/// reconcile raw material for the distinct-host-identity reflex (Story 11.3
+/// D7/L8).
+pub struct MeshNode {
+    pub name: String,
+    pub transport: TcpA2ATransport,
+    pub fingerprint: PeerCertFingerprint,
+    pub addr: SocketAddr,
+}
+
+/// Parameterized N-host analogue of the 10.4b `build_mesh` — every node pins
+/// every OTHER node's `expected[j]` leaf; its own served identity is
+/// `serving[i]`. Passing the SAME `&Leaf` at two different indices in
+/// `serving` models a CLONED identity (11.3 AC1 duplicate-identity negative
+/// control): the resulting nodes bind at DISTINCT `SocketAddr`s but report
+/// the SAME `PeerCertFingerprint` — `ChurnDrillReport::distinct_host_count`
+/// must catch it.
+pub async fn build_mesh_n(
+    clock: &Clock,
+    ca: &Ca,
+    names: &[String],
+    serving: &[&Leaf],
+    expected: &[&Leaf],
+    retry: HandshakeRetryPolicy,
+) -> Vec<MeshNode> {
+    let n = names.len();
+    assert_eq!(serving.len(), n, "serving leaves must match host count");
+    assert_eq!(expected.len(), n, "expected leaves must match host count");
+    let mut nodes = Vec::with_capacity(n);
+    for i in 0..n {
+        let peers: Vec<(usize, &Leaf)> = (0..n)
+            .filter(|j| *j != i)
+            .map(|j| (j, expected[j]))
+            .collect();
+        let peer_pins: Vec<_> = peers
+            .iter()
+            .map(|(j, leaf)| pin(&names[*j], &leaf.fingerprint, 1_000 + *j as u64))
+            .collect();
+        let peer_cfgs: Vec<_> = peers
+            .iter()
+            .map(|(j, leaf)| {
+                peer_cfg(
+                    &names[*j],
+                    "tls://127.0.0.1:0",
+                    &leaf.fingerprint,
+                    &["readonly"],
+                    &["readonly"],
+                )
+            })
+            .collect();
+        let transport = bind_endpoint(
+            serving[i],
+            Some(ca),
+            1_000 + i as u64,
+            peer_pins,
+            peer_cfgs,
+            clock,
+            TcpTimeouts::test_profile(),
+            retry.clone(),
+        )
+        .await;
+        let addr = transport.local_addr().expect("bound addr (H3/H4)");
+        nodes.push(MeshNode {
+            name: names[i].clone(),
+            transport,
+            fingerprint: serving[i].fingerprint.clone(),
+            addr,
+        });
+    }
+    // Wire real readback addresses (H3/H4) now that all listeners are bound.
+    for i in 0..n {
+        for j in 0..n {
+            if j != i {
+                nodes[i].transport.set_peer_endpoint(
+                    &HostId(names[j].clone()),
+                    format!("tls://{}", nodes[j].addr),
+                );
+            }
+        }
+    }
+    nodes
+}
+
+/// Concurrent directed-dial sweep over a caller-chosen SUBSET of `(i, j)`
+/// pairs — all in flight at once via `join_all` (real I/O-bound handshakes
+/// genuinely overlap under tokio's cooperative scheduler, so wall-clock stays
+/// low even though every dial is a real socket op). Story 11.3's disclosed
+/// CI-budget bound: at N=30 a full NxN sweep is 30×29=870 real mTLS
+/// handshakes PER ROUND; `t_11_3_scale_churn.rs` bounds each round to a
+/// hub-and-spoke topology (`2×(N−1)` dials) rather than full NxN — see that
+/// file's module docs for the exact bound and rationale (Task-0 disclosure).
+pub async fn concurrent_dial_pairs(
+    nodes: &[MeshNode],
+    pairs: &[(usize, usize)],
+    seq_base: u64,
+    intent: IntentClass,
+) -> Vec<(usize, usize, Result<(), A2AError>)> {
+    use futures_util::future::join_all;
+    let futs = pairs.iter().enumerate().map(|(k, &(i, j))| {
+        let frame = make_frame(&nodes[i].name, &nodes[j].name, intent, seq_base + k as u64);
+        let to = HostId(nodes[j].name.clone());
+        async move {
+            let res = nodes[i].transport.route_outbound(frame, &to).await;
+            (i, j, res)
+        }
+    });
+    join_all(futs).await
 }

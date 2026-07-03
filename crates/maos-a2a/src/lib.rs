@@ -31,10 +31,11 @@
 //! - **NFR-Rel-6 Spirit-restart TOFU re-pin** (`tofu::invalidate_for_restart`):
 //!   peer detects restart via `boot_nonce` roll, invalidates prior pin, refuses
 //!   re-establishment without explicit operator consent confirmation.
-//! - **NFR-Rel-7 churn-test scaffold** (`chaos::churn`): 3-host compressed
-//!   adversarial scaffold with calibration-phase reporting against the v2.0
-//!   binding floor (`detection ≤1h median / blast radius ≤5 peers / recovery
-//!   ≤24h`).
+//! - **NFR-Rel-7 / NFR-Scale-2 churn drill** (`chaos::churn`): real N-host
+//!   adversarial mesh drill (Story 11.3) — the v0.5 3-host canned scaffold was
+//!   deleted; `ChurnDrillReport` is now derived from real events against the
+//!   v2.0 binding floor (`detection ≤1h median / blast radius ≤5 peers /
+//!   recovery ≤24h`) plus a reported (non-binding) `rto_secs ≤4h` axis.
 
 pub mod adapter;
 
@@ -63,9 +64,10 @@ pub use maos_a2a_core::{
     A2ARouterCore,
     A2ATransport,
     AckBody,
+    AdversarialAttempt,
+    AdversarialDetection,
     AgentRotationTimestamps,
     ChurnDrillReport,
-    ChurnHarnessConfig,
     ConsentAllowlists,
     EIntentDenied,
     EPinMismatch,

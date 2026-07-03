@@ -46,3 +46,15 @@ tokio-util = { version = "0.7", features = ["codec"] }
 futures-util = { version = "0.3", features = ["sink"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+
+[features]
+# Story 11.3 (D6/F6) — per-class blind falsifier for the check-scale-churn
+# detection-latency leg. Blinds ONE adversary class at the HARNESS
+# observation/counting seam (t_11_3_scale_churn.rs) — NEVER feature-gates
+# `verifier.rs`/`router` (that would be subsystem-gating, the 11.2b P2 sin).
+# The real detector still fires; only the test's tally drops the sample.
+# MUST NOT appear in any release/GA feature set — guarded by a
+# `compile_error!` in the test file + the `check-scale-churn` gate's
+# `cargo tree --release` absence SHIP-BLOCKER. Mirrors `slo-fault-inject`
+# (`maos-bench/Cargo.toml`).
+churn-fault-inject = []

@@ -1544,9 +1544,6 @@ jobs:
         run: cargo test -p maos-a2a --test restart_invalidates_pin_nfr_rel_6 --locked
       - name: Run AC5 NFR-Sec-13 cert rotation chaos test
         run: cargo test -p maos-a2a --test cert_rotation_chaos_3_host --locked
-      - name: Run AC6 NFR-Rel-7 churn scaffold test
-        run: cargo test -p maos-a2a --test churn_3_host_scaffold --locked
-
   # Story 6.3 Task 6 — verify Story 6.2's lineage corpus loads the 20 NEW A2A scenarios.
   intent-lineage-a2a-extension-6-3:
     runs-on: ubuntu-latest
@@ -2584,6 +2581,37 @@ jobs:
             exit 1
           fi
           echo "OK: slo-fault-inject absent from the release feature graph"
+
+  # Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate. ONE gate /
+  # ONE disposition / FOUR independently-falsifiable legs with PER-LEG
+  # independence (mesh-identity-reconcile, detection-latency, blast-recovery-
+  # rto, kernel-abi-diff — each reads its OWN `cargo test` oracle). Advisory
+  # at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-scale-churn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-scale-churn-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-scale-churn gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-scale-churn --json 2>&1 | tee /tmp/scale-churn-gate.json
+      # Story 11.3 (D6/L7) SHIP-BLOCKER: churn-fault-inject MUST NOT leak into
+      # the release feature graph (mirrors the slo-fault-inject / bench-fault-
+      # inject cargo-tree absence idiom).
+      - name: churn-fault-inject absent from release feature graph
+        run: |
+          if cargo tree -p maos-a2a-tcp -e features --release 2>&1 | grep -q "churn-fault-inject"; then
+            echo "FAIL: churn-fault-inject leaked into the maos-a2a-tcp release feature graph (Story 11.3 ship-blocker)"
+            exit 1
+          fi
+          echo "OK: churn-fault-inject absent from the release feature graph"
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2619,6 +2647,7 @@ jobs:
       - check-wasm-form-equiv
       - check-cross-region-consensus
       - check-multi-region-slo
+      - check-scale-churn
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2648,6 +2677,7 @@ jobs:
           echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
           echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"
+          echo "| check-scale-churn | ${{ needs.check-scale-churn.result }} | cargo run -p xtask -- check-scale-churn |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2673,6 +2703,7 @@ jobs:
           echo "  check-wasm-form-equiv: ${{ needs.check-wasm-form-equiv.result }}"
           echo "  check-cross-region-consensus: ${{ needs.check-cross-region-consensus.result }}"
           echo "  check-multi-region-slo: ${{ needs.check-multi-region-slo.result }}"
+          echo "  check-scale-churn: ${{ needs.check-scale-churn.result }}"
           exit 1
 
   aggregate:

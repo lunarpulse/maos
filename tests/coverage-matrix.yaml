@@ -1096,10 +1096,21 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Rel-7:
-    gates: []
+    gates: [check-scale-churn]
     corpora: []
     phase: v2.0+
     valid_until: '2027-05-12'
+    notes: |
+      Story 11.3 — PRIMARY row (D10 traceability: this NFR's literal
+      detection ≤1h / blast ≤5 / recovery ≤24h floors). The `check-scale-churn`
+      gate (`xtask/src/check_scale_churn.rs`) derives these from a real N=30
+      (floor ≥25) host mTLS mesh drill (`maos-a2a-tcp/tests/t_11_3_scale_churn.rs`),
+      replacing the deleted `chaos::churn::run_scaffold` canned-constant
+      scaffold. Detection is two-surface (handshake `TcpTransportError` +
+      router NACK — F-new). `max_blast_radius`/`recovery_secs` are BINDING at
+      v2.0; the derived `rto_secs` axis is REPORTED/advisory only (F3-ledger),
+      cross-listed under NFR-Scale-2 (the scale/phase anchor — cite BOTH rows,
+      "and/or" traces to nothing).
   NFR-Rel-8:
     gates:
       - journal_append_p99_measurement
@@ -1130,10 +1141,17 @@ coverage:
     phase: v2.0+
     valid_until: '2027-05-12'
   NFR-Scale-2:
-    gates: []
+    gates: [check-scale-churn]
     corpora: []
     phase: v2.0+
     valid_until: '2027-05-12'
+    notes: |
+      Story 11.3 — scale/phase ANCHOR row (D10 traceability: 25-host @v2.0,
+      100→30 cost-compression target). `check-scale-churn` runs the real
+      drill at N=30 (floor ≥25 distinct-identity-reconciled hosts), a
+      compressed churn schedule (10-20% turnover/wk x 4wk, modeled as 12-24
+      real join/leave events on a co-located loopback mesh). PRIMARY
+      floor-tracing row is NFR-Rel-7 (cite BOTH rows).
   NFR-Scale-3:
     gates: []
     corpora: []
