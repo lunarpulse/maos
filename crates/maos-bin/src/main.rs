@@ -30,6 +30,8 @@
 
 mod cassette_replay;
 mod env_contract;
+#[cfg(feature = "network")]
+mod enterprise_pdp_runtime;
 
 use std::sync::Arc;
 use std::thread::available_parallelism;
@@ -1665,81 +1667,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Story 11.4a — enterprise Policy Decision Point (Cedar, out-of-kernel per
-    // ADR-050 / NFR-Sec-17). Optional: MAOS_PDP_POLICY carries the operator
-    // Cedar policy (inline text OR a path to a .cedar file — try-as-path-first).
-    // When set, the off-hot-path reconciler evaluates the policy and
-    // materializes org forbids into the bounded `per_capability_deny` (F2) via
-    // the public CoW `PolicyTable::update()` — the PDP is NEVER on the
-    // token-verify hot path (ADR-030). When absent, `per_capability_deny` stays
-    // empty and kernel behavior is byte-identical to pre-11.4a (AC1).
-    // Fail-closed (F4): a configured-but-broken PDP materializes ALL governed
-    // denies (refuses PDP-scoped grants), never relaxing to permissive.
-    let _pdp_port: Option<Arc<dyn maos_domain::ports::PolicyDecisionPort>> =
-        match std::env::var("MAOS_PDP_POLICY") {
-            Ok(raw) => {
+    // ADR-050 / NFR-Sec-17). Optional explicit sources:
+    // `MAOS_PDP_POLICY_FILE=/path/policy.cedar`, `MAOS_PDP_POLICY_INLINE=...`,
+    // or legacy `MAOS_PDP_POLICY=file:...|inline:...|<inline text>`.
+    // When configured, the off-hot-path runtime reconciler materializes org and
+    // subject forbids into the bounded deny layers via the public CoW
+    // `PolicyTable::update()`; the PDP is NEVER on the token-verify hot path
+    // (ADR-030). When absent, deny layers stay empty and kernel behavior is
+    // byte-identical to pre-11.4a (AC1).
+    let enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime> =
+        match enterprise_pdp_runtime::load_policy_text_from_env()? {
+            Some(policy_text) => {
                 use maos_domain::ports::PolicyDecisionPort;
-                let policy_text = {
-                    let path = std::path::Path::new(&raw);
-                    if path.is_file() {
-                        std::fs::read_to_string(path).map_err(|e| {
-                            format!("maos: MAOS_PDP_POLICY file '{}' is unreadable: {e}", raw)
-                        })?
-                    } else if raw.ends_with(".cedar") || raw.contains(std::path::MAIN_SEPARATOR) {
-                        return Err(format!(
-                            "maos: MAOS_PDP_POLICY points to a policy file that does not exist: {raw}"
-                        )
-                        .into());
-                    } else {
-                        raw
-                    }
-                };
+
                 let adapter = Arc::new(maos_pdp::CedarPolicyAdapter::new());
                 adapter
                     .load_policy(&policy_text)
                     .map_err(|e| format!("maos: PDP policy load error: {e}"))?;
-                let mut reconciler = maos_pdp::FailClosedReconciler::new(300_000_000_000);
-                let outcome = reconciler.reconcile_at(&*adapter, 0);
-                let known_spirits: Vec<u32> = policy
-                    .inner()
-                    .load_full()
-                    .manifest_scopes
-                    .keys()
-                    .copied()
-                    .collect();
-                let subject_denies = maos_pdp::reconcile_subject_denies(&*adapter, &known_spirits)
-                    .map_err(|e| format!("maos: PDP subject reconcile error: {e}"))?;
-                let mut inner = (*policy.inner().load_full()).clone();
-                inner.operator_policy.per_capability_deny =
-                    outcome.deny_keys.iter().cloned().collect();
-                inner.operator_policy.per_spirit_capability_deny = subject_denies.per_spirit;
-                policy.update(inner);
-                match outcome.posture {
-                    maos_pdp::FailClosedPosture::Fresh => {
-                        eprintln!(
-                            "maos: enterprise PDP (Cedar) initialized — {} org forbid(s), {} \
-                             subject-scoped Spirit set(s) materialized into policy",
-                            outcome.deny_keys.len(),
-                            known_spirits.len()
-                        );
-                        Some(adapter as Arc<dyn maos_domain::ports::PolicyDecisionPort>)
-                    }
-                    maos_pdp::FailClosedPosture::StartupClosed
-                    | maos_pdp::FailClosedPosture::RuntimeFreeze
-                    | maos_pdp::FailClosedPosture::TtlExpiredRevert => {
-                        eprintln!(
-                            "maos: warn: PDP fail-closed ({:?}) — denying all {} governed \
-                             capabilities (configured PDP unusable; refusing PDP-scoped grants, \
-                             NOT relaxing)",
-                            outcome.posture,
-                            outcome.deny_keys.len()
-                        );
-                        None
-                    }
-                }
-            }
-            Err(_) => {
+
+                let refresh_interval = enterprise_pdp_runtime::refresh_interval_from_env()?;
+                let staleness_ttl = enterprise_pdp_runtime::staleness_ttl_from_env()?;
+                let pdp_port: Arc<dyn maos_domain::ports::PolicyDecisionPort> = adapter;
+                let mut runtime = enterprise_pdp_runtime::EnterprisePdpRuntime::new(
+                    pdp_port,
+                    Arc::clone(&policy),
+                    refresh_interval,
+                    staleness_ttl,
+                )?;
+                let initial_posture = runtime.refresh_once();
                 eprintln!(
-                    "maos: enterprise PDP not configured — set MAOS_PDP_POLICY to enable (Cedar)"
+                    "maos: enterprise PDP (Cedar) configured — initial posture {:?}, refresh={}ms, ttl={}ms",
+                    initial_posture,
+                    refresh_interval.as_millis(),
+                    staleness_ttl.as_millis()
+                );
+                Some(runtime)
+            }
+            None => {
+                eprintln!(
+                    "maos: enterprise PDP not configured — set MAOS_PDP_POLICY_FILE or \
+                     MAOS_PDP_POLICY_INLINE to enable (Cedar)"
                 );
                 None
             }
@@ -6538,6 +6505,11 @@ description = "smoke test spirit successor"
     // ─────────────────────────────────────────────────────────────
 
     let cancel = CancellationToken::new();
+    let enterprise_pdp_runtime = enterprise_pdp_runtime.map(|runtime| {
+        let handle = runtime.spawn(cancel.child_token());
+        eprintln!("maos: EnterprisePdpRuntime spawned (Story 11.4a)");
+        handle
+    });
 
     // Story 5.1 — IdleWatchdog spawned alongside the audit writer.
     let idle_watchdog = Arc::new(maos_kernel_core::scheduler::IdleWatchdog::new(
@@ -6639,6 +6611,15 @@ description = "smoke test spirit successor"
             eprintln!("maos: SilentFailureDetector task returned error during drain: {e}")
         }
         Err(_) => eprintln!("maos: SilentFailureDetector drain timed out after 5s"),
+    }
+
+    if let Some(enterprise_pdp_runtime) = enterprise_pdp_runtime {
+        match tokio::time::timeout(std::time::Duration::from_secs(5), enterprise_pdp_runtime).await
+        {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => eprintln!("maos: EnterprisePdpRuntime task returned error: {e}"),
+            Err(_) => eprintln!("maos: EnterprisePdpRuntime drain timed out after 5s"),
+        }
     }
 
     let cap_audit_rows = match transparency_log.query_frames(FrameFilter {

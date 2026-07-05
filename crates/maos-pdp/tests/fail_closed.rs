@@ -8,10 +8,12 @@
 //! configured-down-loud / runtime-freeze / TTL-revert) are exercised at the
 //! composition-root + gate level.
 
+use maos_domain::invariants::i1::Scope;
 use maos_domain::ports::{
     PolicyDecisionError, PolicyDecisionPort, PolicyDecisionRequest, PolicyVerdict,
 };
-use maos_pdp::{CedarPolicyAdapter, FailClosedPosture, FailClosedReconciler};
+use maos_pdp::{scope_deny_key, CedarPolicyAdapter, FailClosedPosture, FailClosedReconciler};
+use std::collections::{HashMap, HashSet};
 
 #[test]
 fn no_policy_loaded_evaluate_is_unreachable() {
@@ -145,5 +147,103 @@ fn startup_unreachable_denies_all_governed_scopes() {
     assert_eq!(
         closed.deny_keys.len(),
         maos_pdp::all_governed_deny_keys().len()
+    );
+}
+
+// A port whose verdicts are keyed by (spirit_pid, capability_key). Distinct
+// from FlakyPort: it handles the subject-aware reconcile calls, where the org
+// leg submits N requests (spirit_pid 0) and the subject leg submits N * spirit
+// requests — a single canned verdict vector would trip the reconciler's
+// cardinality-mismatch guard on the subject leg.
+struct SubjectKeyedPort {
+    denies: HashMap<u32, HashSet<String>>,
+    available: bool,
+}
+
+impl PolicyDecisionPort for SubjectKeyedPort {
+    fn load_policy(&self, _policy_text: &str) -> Result<(), PolicyDecisionError> {
+        Ok(())
+    }
+    fn evaluate(
+        &self,
+        requests: &[PolicyDecisionRequest],
+    ) -> Result<Vec<PolicyVerdict>, PolicyDecisionError> {
+        if !self.available {
+            return Err(PolicyDecisionError::Unreachable {
+                reason: "injected PDP failure".into(),
+            });
+        }
+        Ok(requests
+            .iter()
+            .map(|r| {
+                if self
+                    .denies
+                    .get(&r.spirit_pid)
+                    .is_some_and(|denied| denied.contains(&r.capability_key))
+                {
+                    PolicyVerdict::Deny
+                } else {
+                    PolicyVerdict::Allow
+                }
+            })
+            .collect())
+    }
+    fn is_healthy(&self) -> bool {
+        self.available
+    }
+}
+
+#[test]
+fn reconcile_with_subjects_freezes_subject_denies_before_ttl() {
+    // Story 11.4a — reconcile_with_subjects_at must freeze the last-known-good
+    // SUBJECT denies (per_spirit) on a within-TTL runtime drop, not just the
+    // global deny_keys. The existing freeze test covers the global leg via
+    // reconcile_at (no subjects); this pins the subject leg directly.
+    //
+    // Two spirits with the deny on spirit 7 ONLY, so fs.read stays genuinely
+    // subject-scoped (denied for one of two spirits ⇒ it does NOT fold into
+    // MaterializedDenies.global) and the freeze can be observed on per_spirit
+    // without ambiguity.
+    let fs_read = scope_deny_key(&Scope::FsRead { subtree: String::new() });
+    let fresh = SubjectKeyedPort {
+        denies: HashMap::from([(7, HashSet::from([fs_read.clone()]))]),
+        available: true,
+    };
+    let down = SubjectKeyedPort {
+        denies: HashMap::new(),
+        available: false,
+    };
+    let mut reconciler = FailClosedReconciler::new(1000);
+
+    let first = reconciler.reconcile_with_subjects_at(&fresh, &[7, 8], 100);
+    assert_eq!(first.posture, FailClosedPosture::Fresh);
+    let spirit7 = first
+        .subject_denies
+        .per_spirit
+        .get(&7)
+        .expect("spirit 7 subject deny materialized on a fresh eval");
+    assert!(
+        spirit7.contains(&fs_read),
+        "fresh eval applies the subject-scoped deny for spirit 7"
+    );
+    assert!(
+        !first.subject_denies.global.contains(&fs_read),
+        "fs.read denied for one of two spirits stays subject-scoped (not global)"
+    );
+
+    // PDP drops within TTL — the subject denies must be frozen verbatim.
+    let frozen = reconciler.reconcile_with_subjects_at(&down, &[7, 8], 200);
+    assert_eq!(frozen.posture, FailClosedPosture::RuntimeFreeze);
+    assert_eq!(
+        frozen.subject_denies, first.subject_denies,
+        "subject denies are frozen verbatim on a within-TTL runtime drop"
+    );
+    assert!(
+        frozen
+            .subject_denies
+            .per_spirit
+            .get(&7)
+            .is_some_and(|d| d.contains(&fs_read)),
+        "the frozen subject deny for spirit 7 survives the drop"
     );
 }

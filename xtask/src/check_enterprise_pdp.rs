@@ -22,13 +22,15 @@
 //! 3. **issue-path-deny** (AC3 end-to-end) — `issue_path_deny.rs`: Cedar
 //!    `forbid` → materialize into `per_capability_deny` → `PolicyTable::evaluate`
 //!    → `Deny` even when the manifest grants (override proven).
-//! 4. **fail-closed** (AC4) — `fail_closed.rs`: no-policy → Unreachable;
-//!    malformed → stays unhealthy; no silent Allow on error.
+//! 4. **fail-closed** (AC4) — `fail_closed.rs` plus `maos-bin`
+//!    `enterprise_pdp_runtime` unit tests: no-policy/unhealthy adapter,
+//!    startup-closed, runtime freeze, TTL revert, recovery, subject refresh for
+//!    newly observed Spirits, and explicit file/inline policy config.
 //! 5. **ceiling-and-zero-config** (AC1) — `policy_per_capability_deny.rs`
 //!    (kernel-core): PDP deny cannot grant beyond the manifest (ceiling
 //!    preserved, I1) + empty `per_capability_deny` ⇒ no-op (byte-identical).
 //! 6. **kernel-abi-diff** (AC1/AC5) — `check-kernel-baseline` GREEN at the
-//!    **re-pinned** 23040 (the bounded F2 FLAG-Winston delta, NOT 23023).
+//!    **re-pinned** 23081 (the bounded F2 + §A6 follow-up delta, not 23023).
 //! 7. **release-graph-absence** (D8 ship-blocker) — `pdp-fault-inject` is
 //!    ABSENT from the release feature graph (`cargo tree --release`).
 //!
@@ -174,6 +176,53 @@ fn invoke_cargo_test(
     Ok((passed, failed, ran, green))
 }
 
+/// Invoke package/unit tests with a name filter. Used for composition-root
+/// runtime seam tests that live inside `maos-bin` rather than a `--test` target.
+fn invoke_cargo_package_test(
+    pkg: &str,
+    name_filter: &str,
+) -> Result<(u32, u32, bool, bool), String> {
+    let mut cmd = Command::new("cargo");
+    cmd.args([
+        "test",
+        "--locked",
+        "-p",
+        pkg,
+        name_filter,
+        "--",
+        "--nocapture",
+    ]);
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output = cmd
+        .output()
+        .map_err(|e| format!("cannot invoke `cargo test` ({pkg} {name_filter}): {e}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let combined = format!("{stdout}{stderr}");
+    let (passed, failed) = parse_test_summary(&combined);
+    let ran = combined
+        .lines()
+        .any(|l| l.trim().starts_with("test result:"));
+    let green = output.status.success() && ran && passed >= 1 && failed == 0;
+    if !green {
+        let tail: String = combined
+            .lines()
+            .rev()
+            .take(20)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join("\n");
+        eprintln!(
+            "{GATE_NAME}: {pkg} unit tests (filter={name_filter:?}) NOT green \
+             (passed={passed}, failed={failed}, ran={ran}, exit={}):\n{tail}",
+            output.status
+        );
+    }
+    Ok((passed, failed, ran, green))
+}
+
 /// Run several sub-invocations and fold them into ONE leg (AND semantics —
 /// every sub-invocation must be green for the leg to be green).
 fn run_leg(
@@ -248,12 +297,29 @@ fn run_issue_path_deny_leg() -> LegResult {
     )
 }
 
-/// Leg 4: fail-closed (AC4). No-policy → Unreachable; no silent Allow.
+/// Leg 4: fail-closed (AC4). Adapter-level failures plus the maos-bin runtime
+/// seam: startup fail-closed, runtime freeze, TTL revert, recovery, subject
+/// refresh for newly observed Spirits, and explicit file/inline config parsing.
 fn run_fail_closed_leg() -> LegResult {
-    run_leg(
+    let mut result = run_leg(
         "fail-closed",
         &[("maos-pdp", "fail_closed", "", None, false)],
-    )
+    );
+    match invoke_cargo_package_test("maos-bin", "enterprise_pdp_runtime") {
+        Ok((p, f, r, g)) => {
+            result.passed += p;
+            result.failed += f;
+            result.ran |= r;
+            result.green &= g;
+        }
+        Err(e) => {
+            eprintln!("{GATE_NAME}: fail-closed leg error (maos-bin unit): {e}");
+            result.failed += 1;
+            result.ran = true;
+            result.green = false;
+        }
+    }
+    result
 }
 
 /// Leg 5: ceiling-and-zero-config (AC1). Kernel-core F2 tests: PDP deny cannot
@@ -309,7 +375,14 @@ fn run_release_graph_absence_leg() -> LegResult {
             // GREEN = the release build FAILED with the compile_error citing
             // pdp-fault-inject (the ship-blocker guard fired).
             let fired = !o.status.success() && stderr.contains("pdp-fault-inject");
-            (fired, if fired { "compile_error fired (ship-blocker OK)" } else { "release build did NOT fail with the pdp-fault-inject compile_error — ship-blocker BROKEN" })
+            (
+                fired,
+                if fired {
+                    "compile_error fired (ship-blocker OK)"
+                } else {
+                    "release build did NOT fail with the pdp-fault-inject compile_error — ship-blocker BROKEN"
+                },
+            )
         }
         Err(_) => (false, "failed to invoke cargo build"),
     };
@@ -413,9 +486,7 @@ pub fn run(json: bool) -> Result<(), String> {
     //    own green, not a test count).
     let exempt = |label: &str| label == "kernel-abi-diff" || label == "release-graph-absence";
     for leg in &legs {
-        if !exempt(leg.label)
-            && leg.attempted
-            && (!leg.ran || (leg.passed == 0 && leg.failed == 0))
+        if !exempt(leg.label) && leg.attempted && (!leg.ran || (leg.passed == 0 && leg.failed == 0))
         {
             let msg = format!(
                 "{GATE_NAME}: FAIL — {} leg is vacuous (ran={}, passed={}, failed={}). \

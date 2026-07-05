@@ -2,18 +2,20 @@
 //! verdicts to the kernel's bounded `OperatorPolicyConfig.per_capability_deny`
 //! forbid layer (F2).
 //!
-//! The reconciler runs OFF-HOT-PATH at daemon startup (ADR-030: the PDP is
-//! NEVER called from the token-verify hot path). It submits the governed
-//! capability set to the engine, collects the `Deny` verdicts, and returns
-//! their stable action keys for the composition root to materialize into
-//! `per_capability_deny` via the public CoW `PolicyTable::update()`.
+//! The reconciler runs OFF-HOT-PATH at daemon startup and on the daemon
+//! refresh cadence (ADR-030: the PDP is NEVER called from the token-verify hot
+//! path). It submits the governed capability set to the engine, collects the
+//! `Deny` verdicts, and returns their stable action keys for the composition
+//! root to materialize into `per_capability_deny` via the public CoW
+//! `PolicyTable::update()`.
 //!
 //! # Fail-closed (F4)
 //!
-//! A configured-but-unreachable PDP MUST fail closed — the caller materializes
-//! [`all_governed_deny_keys`] (deny every governed capability) rather than
-//! relaxing to permissive defaults. The reconciler returns the typed
-//! `PolicyDecisionError`; the composition root decides the fail-closed shape.
+//! A configured-but-unreachable PDP MUST fail closed. At startup the caller
+//! materializes [`all_governed_deny_keys`]. After a fresh reconciliation, a
+//! runtime drop freezes the last-known-good global and subject-scoped denies
+//! until the TTL expires; after TTL expiry the reconciler returns all governed
+//! deny keys to close the stale-permit/revocation window.
 
 use std::collections::{HashMap, HashSet};
 
@@ -148,23 +150,30 @@ pub struct MaterializedDenies {
 
 /// Reconcile a Cedar policy for a concrete set of known Spirit subjects.
 ///
-/// Global policy is still represented by inserting a deny for every supplied
-/// subject; the kernel also keeps a global deny set for fail-closed and
-/// operator-wide ceilings. This function preserves principal-specific Cedar
-/// semantics instead of collapsing every verdict into one org-wide key.
+/// Returns an empty materialization without calling the adapter when
+/// `spirit_pids` is empty; that lets the composition root report "0 subjects"
+/// honestly without manufacturing a successful subject-policy evaluation.
+/// Global Cedar denies that apply to every supplied Spirit are also surfaced in
+/// [`MaterializedDenies::global`] so callers can intentionally fold them into
+/// the kernel's global deny set instead of carrying a dead field.
 pub fn reconcile_subject_denies(
     adapter: &dyn PolicyDecisionPort,
     spirit_pids: &[u32],
 ) -> Result<MaterializedDenies, PolicyDecisionError> {
+    if spirit_pids.is_empty() {
+        return Ok(MaterializedDenies::default());
+    }
+
     let scopes = representative_governed_scopes();
     let mut requests = Vec::with_capacity(scopes.len() * spirit_pids.len());
     let mut positions = Vec::with_capacity(scopes.len() * spirit_pids.len());
     for pid in spirit_pids {
         for scope in &scopes {
-            positions.push((*pid, scope_deny_key(scope)));
+            let key = scope_deny_key(scope);
+            positions.push((*pid, key.clone()));
             requests.push(PolicyDecisionRequest {
                 spirit_pid: *pid,
-                capability_key: scope_deny_key(scope),
+                capability_key: key,
                 principal_attributes: None,
             });
         }
@@ -183,6 +192,16 @@ pub fn reconcile_subject_denies(
             materialized.per_spirit.entry(pid).or_default().insert(key);
         }
     }
+    for key in all_governed_deny_keys() {
+        if spirit_pids.iter().all(|pid| {
+            materialized
+                .per_spirit
+                .get(pid)
+                .is_some_and(|denies| denies.contains(&key))
+        }) {
+            materialized.global.insert(key);
+        }
+    }
     Ok(materialized)
 }
 
@@ -197,6 +216,7 @@ pub enum FailClosedPosture {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FailClosedOutcome {
     pub deny_keys: Vec<String>,
+    pub subject_denies: MaterializedDenies,
     pub posture: FailClosedPosture,
 }
 
@@ -204,6 +224,7 @@ pub struct FailClosedOutcome {
 pub struct FailClosedReconciler {
     ttl_nanos: u64,
     last_good: Option<Vec<String>>,
+    last_good_subject_denies: Option<MaterializedDenies>,
     last_success_nanos: Option<u64>,
 }
 
@@ -212,6 +233,7 @@ impl FailClosedReconciler {
         Self {
             ttl_nanos,
             last_good: None,
+            last_good_subject_denies: None,
             last_success_nanos: None,
         }
     }
@@ -221,28 +243,50 @@ impl FailClosedReconciler {
         adapter: &dyn PolicyDecisionPort,
         now_nanos: u64,
     ) -> FailClosedOutcome {
-        match reconcile_org_denies(adapter) {
-            Ok(deny_keys) => {
+        self.reconcile_with_subjects_at(adapter, &[], now_nanos)
+    }
+
+    pub fn reconcile_with_subjects_at(
+        &mut self,
+        adapter: &dyn PolicyDecisionPort,
+        spirit_pids: &[u32],
+        now_nanos: u64,
+    ) -> FailClosedOutcome {
+        match reconcile_org_denies(adapter).and_then(|deny_keys| {
+            reconcile_subject_denies(adapter, spirit_pids).map(|s| (deny_keys, s))
+        }) {
+            Ok((deny_keys, subject_denies)) => {
                 self.last_good = Some(deny_keys.clone());
+                self.last_good_subject_denies = Some(subject_denies.clone());
                 self.last_success_nanos = Some(now_nanos);
                 FailClosedOutcome {
                     deny_keys,
+                    subject_denies,
                     posture: FailClosedPosture::Fresh,
                 }
             }
-            Err(_) => match (&self.last_good, self.last_success_nanos) {
-                (Some(keys), Some(last)) if now_nanos.saturating_sub(last) <= self.ttl_nanos => {
+            Err(_) => match (
+                &self.last_good,
+                &self.last_good_subject_denies,
+                self.last_success_nanos,
+            ) {
+                (Some(keys), Some(subject_denies), Some(last))
+                    if now_nanos.saturating_sub(last) <= self.ttl_nanos =>
+                {
                     FailClosedOutcome {
                         deny_keys: keys.clone(),
+                        subject_denies: subject_denies.clone(),
                         posture: FailClosedPosture::RuntimeFreeze,
                     }
                 }
-                (Some(_), Some(_)) => FailClosedOutcome {
+                (Some(_), _, Some(_)) => FailClosedOutcome {
                     deny_keys: all_governed_deny_keys(),
+                    subject_denies: MaterializedDenies::default(),
                     posture: FailClosedPosture::TtlExpiredRevert,
                 },
                 _ => FailClosedOutcome {
                     deny_keys: all_governed_deny_keys(),
+                    subject_denies: MaterializedDenies::default(),
                     posture: FailClosedPosture::StartupClosed,
                 },
             },
@@ -337,7 +381,12 @@ mod tests {
             }),
             "fs.read"
         );
-        assert_eq!(scope_deny_key(&Scope::ProcExec { binary: "sh".into() }), "proc.exec");
+        assert_eq!(
+            scope_deny_key(&Scope::ProcExec {
+                binary: "sh".into()
+            }),
+            "proc.exec"
+        );
         assert!(!scope_deny_key(&Scope::LoomScan).contains("Discriminant"));
     }
 
