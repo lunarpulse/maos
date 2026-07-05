@@ -54,6 +54,8 @@ const EXPECTED_GATES: &[&str] = &[
     "check-multi-region-slo",
     // Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate.
     "check-scale-churn",
+    // Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar).
+    "check-enterprise-pdp",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.
@@ -118,6 +120,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 | "check-multi-region-slo"
                 // Story 11.3 (AC5) — scale-envelope 25/30-host churn gate.
                 | "check-scale-churn"
+                // Story 11.4a (AC5) — enterprise PDP integration gate.
+                | "check-enterprise-pdp"
         );
         if (is_story10_ship_gate || WEEKLY_ONLY_GATES.contains(gate))
             && !registry_names.contains(gate)

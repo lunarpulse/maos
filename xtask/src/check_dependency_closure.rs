@@ -50,6 +50,15 @@ const FORBIDDEN_CRATES: &[&str] = &[
     "wasmtime",
     "wasmtime-wasi",
     "wit-bindgen",
+    // Story 11.4a — enterprise PDP engine. The Cedar reference adapter lives
+    // in `maos-pdp` (user-space, in-process); the engine MUST stay out of the
+    // kernel/domain closure so the kernel keeps mediating (ADR-006 / I1) and
+    // never learns/depends on a policy engine. `--edges all` means even a
+    // `#[cfg(test)]` import of cedar-policy into kernel-core/domain reds.
+    "cedar-policy",
+    "cedar-policy-core",
+    "cedar-policy-validator",
+    "cedar-policy-formatter",
 ];
 
 /// Trees whose transitive closure must exclude every FORBIDDEN_CRATES entry.

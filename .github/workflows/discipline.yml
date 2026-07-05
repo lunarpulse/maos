@@ -2612,6 +2612,26 @@ jobs:
             exit 1
           fi
           echo "OK: churn-fault-inject absent from the release feature graph"
+  # Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
+  # in-process; real per-commit tripwire — no advisory-skipped live leg). Per-
+  # leg independence (real-evaluation, deny-proven-red, issue-path-deny,
+  # fail-closed, ceiling-and-zero-config, kernel-abi-diff, release-graph-
+  # absence). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-enterprise-pdp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-enterprise-pdp-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-enterprise-pdp gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-enterprise-pdp --json 2>&1 | tee /tmp/enterprise-pdp-gate.json
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2648,6 +2668,7 @@ jobs:
       - check-cross-region-consensus
       - check-multi-region-slo
       - check-scale-churn
+      - check-enterprise-pdp
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2678,6 +2699,7 @@ jobs:
           echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"
           echo "| check-scale-churn | ${{ needs.check-scale-churn.result }} | cargo run -p xtask -- check-scale-churn |"
+          echo "| check-enterprise-pdp | ${{ needs.check-enterprise-pdp.result }} | cargo run -p xtask -- check-enterprise-pdp |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2704,6 +2726,7 @@ jobs:
           echo "  check-cross-region-consensus: ${{ needs.check-cross-region-consensus.result }}"
           echo "  check-multi-region-slo: ${{ needs.check-multi-region-slo.result }}"
           echo "  check-scale-churn: ${{ needs.check-scale-churn.result }}"
+          echo "  check-enterprise-pdp: ${{ needs.check-enterprise-pdp.result }}"
           exit 1
 
   aggregate:

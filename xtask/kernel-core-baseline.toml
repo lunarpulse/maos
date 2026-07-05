@@ -182,4 +182,24 @@
 #          r_rg3 exhaustiveness array updated. Functional src delta ~10 LOC;
 #          remainder is doc comments + test code the line-count gate includes.
 #          All additive; no public symbols removed. ADR-049 ref.
-src_lines = 23023
+#   23040  Story 11.4a (F2, FLAG-Winston) — bounded org-level deny layer
+#          (+17, AUTHORIZED kernel-core delta; party-mode preflight ratified
+#          2026-07-05, unanimous Winston·Murat·John·Amelia+Mary). Added
+#          OperatorPolicyConfig.per_capability_deny (HashSet<String>) + one
+#          deny-wins arm in PolicyTable::evaluate placed BEFORE the grant
+#          checks (Cedar forbid-beats-permit). The kernel keeps the ceiling
+#          (I1) — subtract-only; an out-of-kernel PolicyDecisionPort adapter
+#          (maos-pdp) populates the set at the composition root. The deny is
+#          observable via the existing Err(CapError::PolicyDenied) issue path
+#          (CATCH-B); rich forbid-rule attribution is 11.4c's SIEM slice.
+#          Confined to cap_policy/mod.rs (field + arm + doc). F2 unit tests
+#          live in tests/policy_per_capability_deny.rs (NOT counted — tests/,
+#          not src/). All additive; no public symbols removed. ADR-050 ref.
+#   23081  Story 11.4a code-review patches — bounded follow-up to the same
+#          FLAG-Winston surface. Added stable PDP action-key lookup (replacing
+#          Rust Discriminant Debug keying), subject-scoped
+#          OperatorPolicyConfig.per_spirit_capability_deny, and schedule
+#          watchdog denial logging for CATCH-B observability. Still confined to
+#          the policy/mediation observability surface; no PDP engine dependency
+#          enters kernel-core; all additive, no public symbols removed.
+src_lines = 23081

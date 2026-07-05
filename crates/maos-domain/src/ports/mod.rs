@@ -41,6 +41,7 @@ pub mod io_subsystem;
 pub mod log_recall; // NEW — Story 4.4 LogRecallPort per AC1
 pub mod mcp; // NEW — Story 5.5c McpClientPort + domain types
 pub mod memory;
+pub mod policy_decision; // NEW — Story 11.4a PolicyDecisionPort per ADR-050 / NFR-Sec-17
 pub mod registry; // NEW — Story 5.5d SpiritRegistryClient port + domain types
 pub mod scheduler;
 pub mod security;
@@ -64,6 +65,9 @@ pub use io_subsystem::IoSubsystemPort;
 pub use log_recall::LogRecallPort; // NEW — Story 4.4
 pub use mcp::{McpAttribution, McpClientPort, McpError, McpRequest, McpResponse, McpTransportId}; // NEW — Story 5.5c
 pub use memory::MemoryManagerPort;
+pub use policy_decision::{
+    scope_action_key, PolicyDecisionError, PolicyDecisionPort, PolicyDecisionRequest, PolicyVerdict,
+}; // NEW — Story 11.4a
 pub use registry::{
     PublishReceipt, RegistryError, SearchQuery, SearchResultItem, SearchResults, SignedArtifact,
     SignedManifest, SignedPackage, SpiritRegistryClient, YankEntry, YankList, YankReason,

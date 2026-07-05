@@ -36,6 +36,7 @@ maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-loom-lite = { path = "../maos-loom-lite" }
+maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY
 maos-host = { path = "../maos-host" }   # Story 11.1a — Spirit Host Port trait types (needed even without wasmtime; the host abstraction is engine-agnostic)
 maos-wasm-host = { path = "../maos-wasm-host", optional = true }   # Story 11.1a — wasmtime component adapter, behind `wasm-host` feature (export-control OFF-by-default, AC6)
 maos-mcp = { path = "../maos-mcp", optional = true }

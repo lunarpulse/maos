@@ -105,6 +105,10 @@ gates = [
     # Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate. Per-leg
     # independence. Advisory at v1.0/v1.5; blocking at v2.0.
     "check-scale-churn",
+    # Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
+    # in-process; real per-commit tripwire). Per-leg independence. Advisory at
+    # v1.0/v1.5; blocking at v2.0.
+    "check-enterprise-pdp",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -261,6 +265,11 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
 [[ship_gate]]
 name = "check-scale-churn"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+# Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
+# in-process). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+[[ship_gate]]
+name = "check-enterprise-pdp"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 
 

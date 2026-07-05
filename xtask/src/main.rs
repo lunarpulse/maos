@@ -34,6 +34,8 @@ mod check_multi_region_slo;
 // independence). MUST NOT append legs to check-rotation-real-timing or
 // check-multi-region-slo (F7).
 mod check_scale_churn;
+// Story 11.4a — enterprise PDP integration gate (per-leg independence, ADR-050).
+mod check_enterprise_pdp;
 // Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
 mod check_wasm_form_equiv;
 // Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
@@ -759,6 +761,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 11.4a — enterprise PDP integration gate (per-leg independence).
+    #[command(name = "check-enterprise-pdp")]
+    CheckEnterprisePdp {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.1b (review finding #21) — WASM fixture provenance / drift
     /// guard. Verifies each committed equiv-*.wasm fixture's binary + source
     /// SHA-256 against the sidecar provenance manifest (stale-blob detection).
@@ -1166,6 +1174,7 @@ fn main() {
         Commands::CheckCrossRegionConsensus { json } => check_cross_region_consensus::run(json),
         Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
         Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
+        Commands::CheckEnterprisePdp { json } => check_enterprise_pdp::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

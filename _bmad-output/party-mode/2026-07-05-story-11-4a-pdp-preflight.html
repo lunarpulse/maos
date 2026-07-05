@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Story 11.4a — Enterprise PDP Preflight · Round-Table Record</title>
+<style>
+  :root{
+    --bg:#0e1118; --bg2:#141a24; --card:#171e2a; --card2:#1c2432;
+    --ink:#e8edf5; --ink-dim:#9fb0c6; --line:#26303f; --line2:#33404f;
+    --accent:#5e9bff; --good:#37d39b; --warn:#ffb454; --bad:#ff6b6b;
+    --w:#7aa2ff;  /* Winston */
+    --m:#37d39b;  /* Murat */
+    --j:#ffb454;  /* John */
+    --a:#c191ff;  /* Amelia */
+    --y:#ff86b0;  /* Mary */
+    --g:#ff7a59;  /* Grumbal */
+    --shadow: 0 1px 0 rgba(255,255,255,.03), 0 8px 30px rgba(0,0,0,.45);
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f4f6fb; --bg2:#eef1f8; --card:#ffffff; --card2:#f7f9fd;
+      --ink:#151b26; --ink-dim:#57657a; --line:#e2e8f2; --line2:#d4dcea;
+      --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 26px rgba(30,50,90,.10);
+      --w:#3f63c9; --m:#0f9e73; --j:#c07d13; --a:#8b46d6; --y:#c94f81; --g:#d1502e;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(1100px 600px at 82% -8%, color-mix(in srgb,var(--accent) 12%,transparent), transparent 60%),
+      radial-gradient(900px 520px at -6% 8%, color-mix(in srgb,var(--m) 10%,transparent), transparent 55%),
+      var(--bg);
+    color:var(--ink); font-family:var(--sans);
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+    padding:clamp(14px,3vw,40px);
+  }
+  .wrap{max-width:1060px;margin:0 auto}
+  a{color:var(--accent)}
+  code,.mono{font-family:var(--mono);font-size:.88em}
+
+  /* ---- header ---- */
+  .seal{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .seal svg{flex:0 0 auto}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)}
+  h1{font-size:clamp(26px,4.4vw,44px);line-height:1.06;margin:.18em 0 .1em;letter-spacing:-.02em}
+  h1 .sub{display:block;font-size:.44em;font-weight:600;color:var(--ink-dim);letter-spacing:.02em;margin-top:.5em}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-family:var(--mono);font-size:12.5px;color:var(--ink-dim);margin-top:14px}
+  .meta b{color:var(--ink);font-weight:600}
+  .stamp{
+    display:inline-flex;align-items:center;gap:8px;margin-top:18px;padding:7px 14px;border-radius:999px;
+    border:1px solid color-mix(in srgb,var(--good) 45%,var(--line));
+    background:color-mix(in srgb,var(--good) 12%,transparent);
+    color:var(--good);font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.05em;
+  }
+  .stamp .dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent);animation:pulse 2.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 55%,transparent)}70%{box-shadow:0 0 0 9px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  @media (prefers-reduced-motion: reduce){.stamp .dot{animation:none}}
+
+  /* ---- cast ---- */
+  .cast{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:26px 0 8px}
+  .who{display:flex;gap:11px;align-items:center;padding:11px 12px;background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}
+  .av{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:20px;flex:0 0 auto;border:1px solid var(--line2)}
+  .who .nm{font-weight:700;font-size:14px;line-height:1.15}
+  .who .rl{font-size:11.5px;color:var(--ink-dim)}
+  .cW .av{background:color-mix(in srgb,var(--w) 20%,transparent);border-color:color-mix(in srgb,var(--w) 45%,transparent)} .cW .nm{color:var(--w)}
+  .cM .av{background:color-mix(in srgb,var(--m) 20%,transparent);border-color:color-mix(in srgb,var(--m) 45%,transparent)} .cM .nm{color:var(--m)}
+  .cJ .av{background:color-mix(in srgb,var(--j) 20%,transparent);border-color:color-mix(in srgb,var(--j) 45%,transparent)} .cJ .nm{color:var(--j)}
+  .cA .av{background:color-mix(in srgb,var(--a) 20%,transparent);border-color:color-mix(in srgb,var(--a) 45%,transparent)} .cA .nm{color:var(--a)}
+  .cY .av{background:color-mix(in srgb,var(--y) 20%,transparent);border-color:color-mix(in srgb,var(--y) 45%,transparent)} .cY .nm{color:var(--y)}
+  .cG .av{background:color-mix(in srgb,var(--g) 20%,transparent);border-color:color-mix(in srgb,var(--g) 45%,transparent)} .cG .nm{color:var(--g)}
+
+  section{margin:34px 0}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-dim);margin:0 0 12px;display:flex;align-items:center;gap:10px}
+  .eyebrow::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+  h2{font-size:clamp(19px,2.6vw,25px);margin:.1em 0 .5em;letter-spacing:-.01em}
+
+  /* ---- verdict banner ---- */
+  .verdict{
+    position:relative;overflow:hidden;border-radius:18px;padding:clamp(18px,3vw,28px);
+    background:linear-gradient(135deg,color-mix(in srgb,var(--bad) 13%,var(--card)),var(--card) 62%);
+    border:1px solid color-mix(in srgb,var(--bad) 32%,var(--line));box-shadow:var(--shadow);
+  }
+  .verdict h2{margin-top:0}
+  .verdict .big{font-size:clamp(17px,2.5vw,21px);font-weight:700;line-height:1.35}
+  .verdict .big em{color:var(--bad);font-style:normal}
+  .verdict p{color:var(--ink-dim);margin:.7em 0 0}
+  .killmark{position:absolute;right:-6px;top:-6px;opacity:.14;pointer-events:none}
+
+  /* ---- ledger ---- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+  .fk{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:16px 17px;box-shadow:var(--shadow);position:relative}
+  .fk::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:3px;background:var(--accent)}
+  .fk.k-over::before{background:var(--bad)} .fk.k-esc::before{background:var(--warn)} .fk.k-ok::before{background:var(--good)}
+  .fk .tag{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-dim);text-transform:uppercase}
+  .pill{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.05em;padding:2px 7px;border-radius:6px;text-transform:uppercase}
+  .pill.over{color:var(--bad);background:color-mix(in srgb,var(--bad) 15%,transparent)}
+  .pill.esc{color:var(--warn);background:color-mix(in srgb,var(--warn) 15%,transparent)}
+  .pill.ok{color:var(--good);background:color-mix(in srgb,var(--good) 15%,transparent)}
+  .fk h3{font-size:15.5px;margin:.5em 0 .35em}
+  .fk p{margin:.35em 0 0;font-size:13.5px;color:var(--ink-dim)}
+  .fk p b{color:var(--ink)}
+
+  /* ---- quotes ---- */
+  .quotes{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.quotes{grid-template-columns:1fr}}
+  .q{background:var(--card2);border:1px solid var(--line);border-left-width:3px;border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+  .q p{margin:0 0 9px;font-size:14.5px;line-height:1.5}
+  .q .by{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink-dim)}
+  .q .by b{font-weight:700}
+  .q .mini{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:14px}
+  .qW{border-left-color:var(--w)} .qW .by b{color:var(--w)} .qW .mini{background:color-mix(in srgb,var(--w) 20%,transparent)}
+  .qM{border-left-color:var(--m)} .qM .by b{color:var(--m)} .qM .mini{background:color-mix(in srgb,var(--m) 20%,transparent)}
+  .qJ{border-left-color:var(--j)} .qJ .by b{color:var(--j)} .qJ .mini{background:color-mix(in srgb,var(--j) 20%,transparent)}
+  .qA{border-left-color:var(--a)} .qA .by b{color:var(--a)} .qA .mini{background:color-mix(in srgb,var(--a) 20%,transparent)}
+  .qG{border-left-color:var(--g)} .qG .by b{color:var(--g)} .qG .mini{background:color-mix(in srgb,var(--g) 20%,transparent)}
+  .qY{border-left-color:var(--y)} .qY .by b{color:var(--y)} .qY .mini{background:color-mix(in srgb,var(--y) 20%,transparent)}
+
+  /* ---- build plan ---- */
+  .build{border:1px solid var(--line);border-radius:15px;overflow:hidden;box-shadow:var(--shadow);background:var(--card)}
+  .row{display:grid;grid-template-columns:210px 1fr;gap:0;border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  .row .k{padding:13px 16px;font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--card2);display:flex;align-items:center;gap:8px}
+  .row .v{padding:13px 16px;font-size:13.5px;color:var(--ink-dim)}
+  .row .v b{color:var(--ink)}
+  .badge{font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;letter-spacing:.04em}
+  .b-new{color:var(--good);background:color-mix(in srgb,var(--good) 15%,transparent)}
+  .b-kern{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
+  @media(max-width:600px){.row{grid-template-columns:1fr}.row .k{border-bottom:1px solid var(--line)}}
+
+  /* ---- prove 4 ---- */
+  .prove{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:13px}
+  .pv{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
+  .pv .n{font-family:var(--mono);font-size:26px;font-weight:800;color:var(--accent);line-height:1;opacity:.55}
+  .pv h4{margin:.35em 0 .3em;font-size:15px}
+  .pv p{margin:0;font-size:13px;color:var(--ink-dim)}
+
+  footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--line);color:var(--ink-dim);font-size:12.5px;font-family:var(--mono);display:flex;flex-wrap:wrap;gap:6px 18px;justify-content:space-between}
+  .hl{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== HEADER ===== -->
+  <header>
+    <div class="seal">
+      <svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">
+        <defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#5e9bff"/><stop offset="1" stop-color="#37d39b"/></linearGradient></defs>
+        <rect x="2" y="2" width="42" height="42" rx="12" fill="none" stroke="url(#g1)" stroke-width="2"/>
+        <path d="M12 24 l7 7 l15 -15" fill="none" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="23" cy="23" r="19" fill="none" stroke="url(#g1)" stroke-width=".6" stroke-dasharray="2 4" opacity=".5"/>
+      </svg>
+      <span class="kicker">MAOS · Epic 11 v2.0 · Preflight Record</span>
+    </div>
+    <h1>Story 11.4a — Enterprise PDP Integration
+      <span class="sub">Party-mode round-table · the day the room killed the author's ZERO-Δ lean</span>
+    </h1>
+    <div class="meta">
+      <span><b>Date</b> 2026-07-05</span>
+      <span><b>Mode</b> session</span>
+      <span><b>Kernel baseline</b> 23023 → bounded re-pin</span>
+      <span><b>Blocks</b> 11.4c</span>
+      <span><b>Depends</b> —</span>
+    </div>
+    <div class="stamp"><span class="dot"></span> RESOLVED · UNANIMOUS · 7 forks + 2 catches</div>
+  </header>
+
+  <!-- ===== CAST ===== -->
+  <div class="cast">
+    <div class="who cW"><div class="av">🏗️</div><div><div class="nm">Winston</div><div class="rl">Architect · ceiling conscience</div></div></div>
+    <div class="who cM"><div class="av">🧪</div><div><div class="nm">Murat</div><div class="rl">Test Architect · anti-theater</div></div></div>
+    <div class="who cJ"><div class="av">📋</div><div><div class="nm">John</div><div class="rl">PM · eviction & traceability</div></div></div>
+    <div class="who cA"><div class="av">💻</div><div><div class="nm">Amelia</div><div class="rl">Dev · ratifies by the compiler</div></div></div>
+    <div class="who cG"><div class="av">😤</div><div><div class="nm">Grumbal</div><div class="rl">Adversary · finds the 3am page</div></div></div>
+    <div class="who cY"><div class="av">📊</div><div><div class="nm">Mary</div><div class="rl">Analyst · walk-on, traceability</div></div></div>
+  </div>
+
+  <!-- ===== VERDICT ===== -->
+  <section>
+    <div class="eyebrow">The headline</div>
+    <div class="verdict">
+      <svg class="killmark" width="150" height="150" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="44" fill="none" stroke="var(--bad)" stroke-width="5"/>
+        <line x1="22" y1="22" x2="78" y2="78" stroke="var(--bad)" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+      <h2>The ZERO-Δ lean did not survive contact</h2>
+      <p class="big">The story shipped a clever plan: <em>materialize the PDP's decisions into the kernel's copy-on-write policy snapshot — zero kernel change.</em> Winston knifed his own author's lean — on <b style="color:var(--ink)">correctness, not taste</b>.</p>
+      <p>Expressing an organisation's <b>forbid</b> by quietly withholding a capability scope does three unforgivable things: it becomes a <b>latent authorization bypass</b> the day the approval prompt goes live; it hands the capability <b>ceiling</b> to out-of-kernel code (inverts invariant I1) and erases the audit distinction <span class="mono">manifest-gap vs org-forbid</span>; and subtraction can never express <span class="mono">forbid-beats-permit</span> override. The room authorized instead a <b>bounded, named kernel re-pin</b> — a real deny layer that the kernel owns and the PDP can only ever subtract from.</p>
+    </div>
+  </section>
+
+  <!-- ===== RATIFIED LEDGER ===== -->
+  <section>
+    <div class="eyebrow">Ratified ledger — 7 forks, 2 catches</div>
+    <h2>What the room decided</h2>
+    <div class="grid">
+
+      <div class="fk k-esc">
+        <span class="tag">F1 · Model tier <span class="pill esc">escalated</span></span>
+        <h3>opus-4-8 + full §A6</h3>
+        <p>Escalated from <code>opus-4-6</code>. <b>The canned-green story of the epic</b> — a stubbed PDP is indistinguishable from a real one until the policy swaps. §A6 must run the deny <b>live</b> and watch the falsifier red it. Third security-adjacent story running to escalate — now a standing trigger.</p>
+      </div>
+
+      <div class="fk k-over">
+        <span class="tag">F2 · Kernel seam <span class="pill over">lean overruled</span></span>
+        <h3>Bounded <code>per_capability_deny</code></h3>
+        <p><b>NOT zero-delta.</b> A new <code>OperatorPolicyConfig.per_capability_deny</code> field + one <b>deny-wins</b> arm in <code>evaluate</code> (~+15–25 LOC, FLAG-Winston, HISTORY-disclosed). Kernel keeps the ceiling; the PDP layer <b>only subtracts</b>.</p>
+      </div>
+
+      <div class="fk k-ok">
+        <span class="tag">F3 · Reference engine <span class="pill ok">resolved</span></span>
+        <h3>Cedar, in-process</h3>
+        <p>Engine-agnostic port + one <b>Cedar</b> (<code>cedar-policy</code>, pure-Rust) reference adapter. In-process → the deny tripwire is a <b>real per-commit gate</b>, not advisory-skipped. OPA / Vault are additive-per-port.</p>
+      </div>
+
+      <div class="fk k-ok">
+        <span class="tag">F4 · Fail-closed <span class="pill ok">resolved</span></span>
+        <h3>Freeze + staleness TTL</h3>
+        <p>Four distinct proven-reds: no-config→default · configured-down→closed <b>loud</b> · runtime-drop→frozen · <b>TTL-expiry→PDP-grants revert</b> (Grumbal's stale-permit hole).</p>
+      </div>
+
+      <div class="fk k-ok">
+        <span class="tag">F5 · CI provisioning <span class="pill ok">resolved</span></span>
+        <h3>No service block</h3>
+        <p>Folds into F3 — Cedar runs in-process, so the deny falsifier is a plain <code>cargo test</code>. If OPA/Vault land later, <b>they</b> carry the service container.</p>
+      </div>
+
+      <div class="fk k-ok">
+        <span class="tag">F6 · Docs <span class="pill ok">resolved</span></span>
+        <h3>ADR-050 + NFR-Sec-17</h3>
+        <p>Lead with ADR-050 (binding-v2.0, gated on AC1–AC4 green). NFR-Sec-17 as a security <b>floor</b>. Gate traces to primary + an enterprise-deployment anchor — <i>both cited, or it traces to nothing</i> (Mary).</p>
+      </div>
+
+      <div class="fk k-ok">
+        <span class="tag">F7 · Forward-compat <span class="pill ok">resolved</span></span>
+        <h3>Optional <code>principal_attributes</code></h3>
+        <p>One opaque field on the port request now — unused in 4a, populated by <b>11.4c</b>'s SSO principal. Don't model the SSO shape today.</p>
+      </div>
+
+      <div class="fk k-ok">
+        <span class="tag">Catch B · Auditable deny <span class="pill ok">constraint</span></span>
+        <h3>AC count holds at 5</h3>
+        <p>"A denial you can't audit is half a feature." Folded as a <b>constraint on AC3</b> (Task 0 traces it), not a 6th AC. Rich attribution defers to 11.4c's SIEM slice.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== QUOTES ===== -->
+  <section>
+    <div class="eyebrow">Beats worth keeping</div>
+    <h2>How they said it</h2>
+    <div class="quotes">
+      <div class="q qW">
+        <p>"An out-of-kernel adapter overwriting <code>manifest_scopes</code> makes user-space the ceiling authority. I1 says the kernel <em>mediates</em> capability — it doesn't delegate the ceiling. This re-pin is correct."</p>
+        <div class="by"><span class="mini">🏗️</span><b>Winston</b> — overruling his own author</div>
+      </div>
+      <div class="q qM">
+        <p>"It's the canned-green story of the epic. A stubbed PDP returning canned <code>Allow</code> looks identical to a real one until you swap the policy. Strong opinion, weakly held: opus-4-8. Nobody's going to make it overkill."</p>
+        <div class="by"><span class="mini">🧪</span><b>Murat</b> — on the model tier</div>
+      </div>
+      <div class="q qG">
+        <p>"Everybody says 'fail closed' and nobody handles the case where <em>closed</em> means keep serving the access you were supposed to revoke."</p>
+        <div class="by"><span class="mini">😤</span><b>Grumbal</b> — naming the stale-permit hole</div>
+      </div>
+      <div class="q qJ">
+        <p>"Careful — this is where 4a metastasizes into 4c. Auditability is a constraint on the deny path, not its own AC. The count holds at five."</p>
+        <div class="by"><span class="mini">📋</span><b>John</b> — holding the line</div>
+      </div>
+      <div class="q qA">
+        <p>"Twenty lines. Deny-wins arm before the grant checks. If the fault-inject can't move the number, the probe's a constant and the gate's a lie."</p>
+        <div class="by"><span class="mini">💻</span><b>Amelia</b> — ratifying by the compiler</div>
+      </div>
+      <div class="q qM">
+        <p>"The policy-swap must force <em>two distinct engine evaluations</em>. A memoizing cache passes a naive swap — that's the exact fake we're hunting."</p>
+        <div class="by"><span class="mini">🧪</span><b>Murat</b> — sharpening the anti-canned tooth</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== WHAT WE'LL BUILD ===== -->
+  <section>
+    <div class="eyebrow">The deliverable</div>
+    <h2>What this story ships</h2>
+    <div class="build">
+      <div class="row"><div class="k">🔌 <span>PolicyDecisionPort</span></div><div class="v"><span class="badge b-new">NEW</span> &nbsp;Out-of-kernel port trait in <code>maos-domain</code>, mirroring the <code>CollectiveMemoryPort</code> pattern. Carries an optional opaque <code>principal_attributes</code> for 11.4c.</div></div>
+      <div class="row"><div class="k">📦 <span>maos-pdp crate</span></div><div class="v"><span class="badge b-new">NEW</span> &nbsp;Adapter crate running a <b>real Cedar engine</b> in-process. Owns the heavy dep; kept out of the kernel/domain closure.</div></div>
+      <div class="row"><div class="k">🧱 <span>per_capability_deny</span></div><div class="v"><span class="badge b-kern">KERNEL Δ</span> &nbsp;The <b>only</b> authorized kernel edit: a deny-wins arm in <code>evaluate</code>. Kernel keeps the ceiling; PDP subtracts. Re-pinned + HISTORY-disclosed.</div></div>
+      <div class="row"><div class="k">🧩 <span>composition root</span></div><div class="v">Wire the adapter at <code>main.rs</code>; materialize decisions into the CoW snapshot <b>off the &lt;5µs hot path</b> (ADR-030 forbids a live PDP call there).</div></div>
+      <div class="row"><div class="k">🚦 <span>check-enterprise-pdp</span></div><div class="v"><span class="badge b-new">NEW</span> &nbsp;Per-leg gate: real-evaluation · deny-proven-red · fail-closed · provenance-blind · ceiling-preserved · kernel-abi-diff. <code>{v2.0 = blocking}</code>.</div></div>
+      <div class="row"><div class="k">📜 <span>ADR-050 · NFR-Sec-17</span></div><div class="v"><span class="badge b-new">NEW</span> &nbsp;Lead-with-it ADR (binding-v2.0) + a security-floor NFR. Both traced in the coverage matrix.</div></div>
+    </div>
+  </section>
+
+  <!-- ===== PROVE 4 ===== -->
+  <section>
+    <div class="eyebrow">The teeth</div>
+    <h2>Four behaviours the gate must prove</h2>
+    <div class="prove">
+      <div class="pv"><div class="n">01</div><h4>Real evaluation</h4><p>Swap the policy → the same request's verdict flips, via two <b>distinct</b> engine runs. A hardcoded map can't flip.</p></div>
+      <div class="pv"><div class="n">02</div><h4>Deny actually blocks</h4><p>An org <code>forbid</code> refuses the capability at issue — <b>even when the manifest grants it</b> (override proven).</p></div>
+      <div class="pv"><div class="n">03</div><h4>Fail-closed</h4><p>PDP down ⇒ freeze last-known-good; after the TTL, granted caps <b>revert to deny</b>. Never fail open.</p></div>
+      <div class="pv"><div class="n">04</div><h4>Observable</h4><p>Every denial is logged — a silent org-deny is not recoverable. Rich attribution rides 11.4c.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>🗂 <span class="hl">MAOS Epic 11 · Story 11.4a</span> · Enterprise PDP Integration</span>
+    <span>Party-mode keepsake · generated <span class="hl">2026-07-05</span> · record only — the canonical spec lives in the story file</span>
+  </footer>
+
+</div>
+</body>
+</html>

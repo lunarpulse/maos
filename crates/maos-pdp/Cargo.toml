@@ -1,0 +1,47 @@
+[package]
+name = "maos-pdp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS enterprise Policy Decision Point — out-of-kernel Cedar reference adapter (Story 11.4a, ADR-050 / NFR-Sec-17)"
+
+[dependencies]
+# Domain types (the sync PolicyDecisionPort trait + request/verdict types)
+maos-domain = { path = "../maos-domain" }
+
+# The REAL policy engine — in-process Cedar (F3: pure-Rust, Apache-2.0,
+# deny.toml-friendly, no external server → the deny tripwire is a real
+# per-commit gate, not advisory-skipped like an external OPA/Vault leg).
+# FORBIDDEN in maos-domain / maos-kernel-core (kept at the binary edge —
+# nothing depends on this crate except maos-bin; see check-dependency-closure).
+cedar-policy = "4"
+
+# Error handling
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+
+[dev-dependencies]
+# Story 11.4a AC3 — the issue-path end-to-end test materializes a Cedar `forbid`
+# into the kernel's `per_capability_deny` (F2) and asserts `PolicyTable::evaluate`
+# returns `Deny`. maos-kernel-core is a DEV-dep only (maos-pdp is a DEPENDENT of
+# kernel-core, not vice versa) — check-dependency-closure runs `cargo tree -p
+# maos-kernel-core` (forward closure), so this dev-edge does NOT pull cedar into
+# the kernel/domain closure.
+maos-kernel-core = { path = "../maos-kernel-core" }
+
+[features]
+default = []
+# Story 11.4a AC3 — dev/CI-ONLY fault-injection falsifier. When enabled, the
+# adapter's `evaluate` STUBS the real Cedar engine to a canned `Allow` (the
+# engine is never called). With it on, a real `forbid` rule → `Allow` (not
+# `Deny`) → the deny test goes RED, proving the deny is engine-derived, not a
+# constant (§A7.3 "feature-flag ≠ measurement" done right: the flag REMOVES
+# the real engine, and the verdict flips). MUST NOT ship in release builds —
+# the `compile_error!` in `src/lib.rs` hard-fails any release build with this
+# feature on, and the `check-enterprise-pdp` gate's `cargo tree --release`
+# absence leg is the belt-and-suspenders graph guard (SHIP-BLOCKER).
+pdp-fault-inject = []

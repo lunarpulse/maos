@@ -29,6 +29,19 @@ coverage:
     phase: v0.1-alpha
     valid_until: '2027-05-12'
     notes: 1a.2 wires maos-bin composition root with #[tokio::main(flavor=multi_thread)] + CancellationToken root + select! shutdown; per-Spirit Tokio task supervision deferred to Story 1b.1 (supervisor task spawns there)
+  ADR-050:
+    gates:
+    - check-enterprise-pdp
+    - check-dependency-closure
+    - check-kernel-baseline
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-05-12'
+    notes: |
+      Story 11.4a enterprise-deployment anchor. Out-of-kernel PolicyDecisionPort
+      (maos-domain) + in-process Cedar reference adapter (maos-pdp); bounded
+      OperatorPolicyConfig.per_capability_deny FLAG-Winston re-pin (23023→23040).
+      Primary NFR: NFR-Sec-17.
   I9:
     gates:
     - check-empty-kernel
@@ -1222,6 +1235,19 @@ coverage:
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+  NFR-Sec-17:
+    gates:
+    - check-enterprise-pdp
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-05-12'
+    notes: |
+      Story 11.4a — enterprise PDP integration. Capability-authorization
+      decisions sourced from a real external PDP behind an out-of-kernel
+      PolicyDecisionPort (maos-domain); Cedar in-process reference adapter
+      (maos-pdp). Real evaluation (policy-swap-flips-verdict), deny-falsifiable
+      (pdp-fault-inject), fail-closed on unavailability; absent→BLOCK@v2.0.
+      ADR-050 is the enterprise-deployment anchor for this NFR.
   NFR-Sec-2:
     gates: []
     corpora: []

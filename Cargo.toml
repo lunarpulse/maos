@@ -24,6 +24,7 @@ members = [
     "crates/maos-notify-push",
     "crates/maos-registry",
     "crates/maos-persistence",
+    "crates/maos-pdp",
     "crates/maos-providers",
     "crates/maos-secrets",
     "crates/maos-skill",
