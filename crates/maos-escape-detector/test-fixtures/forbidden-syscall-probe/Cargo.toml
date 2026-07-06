@@ -1,0 +1,11 @@
+[workspace]
+
+[package]
+name = "forbidden-syscall-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Test-only probe (Story 11.4b): issues a raw ptrace(2) syscall on the kernel T2 seccomp hostile-list to prove a real SIGSYS kill produces a real SandboxBlock TL row through the producer-wired seam. Own [workspace] table keeps it out of the main workspace; built ad hoc by the integration tests. NOT part of any shipped artifact."
+
+[dependencies]
+libc = "0.2"

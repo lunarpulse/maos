@@ -2426,6 +2426,7 @@ dependencies = [
  "maos-corpus-gen",
  "maos-director-surface",
  "maos-domain",
+ "maos-escape-detector",
  "maos-host",
  "maos-kernel-core",
  "maos-loom-lite",
@@ -2454,6 +2455,7 @@ dependencies = [
  "sha2 0.10.9",
  "smallvec",
  "tar",
+ "tempfile",
  "tokio",
  "tokio-util",
  "toml 0.8.23",
@@ -2564,6 +2566,21 @@ dependencies = [
  "serde_json",
  "smallvec",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "maos-escape-detector"
+version = "0.1.0-alpha"
+dependencies = [
+ "libc",
+ "maos-domain",
+ "maos-kernel-core",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]

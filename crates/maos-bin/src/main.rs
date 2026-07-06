@@ -32,6 +32,10 @@ mod cassette_replay;
 mod env_contract;
 #[cfg(feature = "network")]
 mod enterprise_pdp_runtime;
+// Story 11.4b — out-of-kernel sandbox-escape detector consumer (ADR-024).
+// Declared at the composition root, NOT in `api.rs` (it is not a kernel-core
+// adapter) so `check-composition-root-completeness` stays GREEN.
+mod escape_detector_consumer;
 
 use std::sync::Arc;
 use std::thread::available_parallelism;

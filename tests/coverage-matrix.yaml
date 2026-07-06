@@ -42,6 +42,21 @@ coverage:
       (maos-domain) + in-process Cedar reference adapter (maos-pdp); bounded
       OperatorPolicyConfig.per_capability_deny FLAG-Winston re-pin (23023→23040).
       Primary NFR: NFR-Sec-17.
+  ADR-024:
+    gates:
+    - check-escape-detector
+    - check-dependency-closure
+    - check-kernel-baseline
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-05-12'
+    notes: |
+      Story 11.4b sandbox-escape structural-detector anchor. Out-of-kernel
+      read-only Transparency-Log consumer (maos-escape-detector) correlates
+      kind=8 SandboxBlock frames against the Spirit manifest; the producer is
+      edge-wired at the composition root (ZERO kernel-core delta @ 23081 —
+      CATCH-0). Primary NFR: NFR-Sec-3 (signal 1 of 3 @v2.0 — seccomp
+      exit-classification-vs-manifest; fd-growth + outbound-IAC deferred).
   I9:
     gates:
     - check-empty-kernel

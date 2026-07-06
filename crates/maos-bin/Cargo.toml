@@ -37,6 +37,7 @@ maos-domain = { path = "../maos-domain" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-loom-lite = { path = "../maos-loom-lite" }
 maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY
+maos-escape-detector = { path = "../maos-escape-detector" }   # Story 11.4b — out-of-kernel sandbox-escape detector (ADR-024); read-only TL consumer wired at the composition root (NOT a kernel-core adapter; stays out of api.rs)
 maos-host = { path = "../maos-host" }   # Story 11.1a — Spirit Host Port trait types (needed even without wasmtime; the host abstraction is engine-agnostic)
 maos-wasm-host = { path = "../maos-wasm-host", optional = true }   # Story 11.1a — wasmtime component adapter, behind `wasm-host` feature (export-control OFF-by-default, AC6)
 maos-mcp = { path = "../maos-mcp", optional = true }
@@ -79,3 +80,6 @@ ring = "0.17"
 serde_cbor = "0.11"
 tar = { version = "0.4", default-features = false }
 smallvec = { version = "1", features = ["serde"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -56,6 +56,8 @@ const EXPECTED_GATES: &[&str] = &[
     "check-scale-churn",
     // Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar).
     "check-enterprise-pdp",
+    // Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate.
+    "check-escape-detector",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.

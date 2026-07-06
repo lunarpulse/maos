@@ -1,8 +1,8 @@
 ---
-Status: Accepted (architecture) — ratified 2026-06-29 (Epic 11 party-mode); binding-v2.0 deferred to Story 11.4b. Authored in the v1.5 hold-window per the Epic 11 ratification.
+Status: binding-v2.0 — ratified 2026-06-29 (Epic 11 party-mode); bound by Story 11.4b (AC1–AC4 implemented; the `check-escape-detector` gate is enrolled with the structural legs green at HEAD and the live-seccomp leg a real per-commit tripwire on seccomp-capable runners). Authored in the v1.5 hold-window per the Epic 11 ratification.
 Gate: Story 11.4b — out-of-kernel detector with TP-floor + FP-ceiling on a live-syscall proven-red (no mock); kernel emission carries no verdict field (structural-not-semantic test); detector crate has no `maos-kernel-core` dependency (`check-service-boundary` / Story-1a.4 decoupling rule).
 Decided: 2026-06-29
-Accepted-in-PR: <PR_NUMBER>
+Accepted-in-PR: epic-11 branch (Story 11.4b — PR pending merge; gated on the Epic-11 external v1.5 holds)
 Supersedes: none (resolves the `speculative-vNext` ADR-024 placeholder tracked in `architecture-maos-minimal-opus/12-architecture-decision-records.md`)
 Revisits: NFR-Sec-3; ADR-006 §I9; ADR-038 (kernel-core ceiling)
 ---
@@ -31,6 +31,20 @@ A prep survey of the live tree established the real seam — this ADR is grounde
 
 **This refines the ratified Epic 11 plan.** Story 11.4b's row hypothesized "FLAG-Winston bounded to an emission-seam ONLY if `SandboxViolation` lacks a subscribable sink (verify at prep; possibly ZERO)." The verification result is: **it lacks a subscribable sink, and the producer is unwired** → the kernel delta for 11.4b is **not zero**. It is bounded, and this ADR scopes exactly what it is.
 
+
+> **Story 11.4b correction (2026-07-06, ✅ PREFLIGHT CATCH-0).** The §4 premise
+> that the producer-wiring is a bounded in-kernel-core delta was **inverted** by
+> the Story 11.4b party-mode preflight: the reap the original survey named
+> (`cli_wrapper/runtime.rs:635`) reaps `spawn_and_bridge` — a plain **unsandboxed**
+> `Command` — and `spawn_sandboxed`/`classify_exit`/`emit_sandbox_block` have
+> **zero production callers** (tests only). The real producer-wiring site is the
+> **launcher/composition-root edge** (`maos-bin`) calling the *existing* public
+> kernel-core API → **ZERO kernel-core delta** (`check-kernel-baseline` holds @
+> 23081; FLAG-Winston re-pin = contingency only). The production CLI-wrapper-
+> unsandboxed gap is named **out of scope** (a separate hardening story); the
+> producer-wired proven-red runs on the real `spawn_sandboxed` T2 path (the 11.1a
+> WASM seam substrate). fd-growth + outbound-IAC remain deferred (NFR-Sec-3
+> annotated "signal 1 of 3 @v2.0").
 ## Decision
 
 ### 1. The detector is a user-space consumer; the kernel learns no patterns
