@@ -60,7 +60,7 @@ fn bridge_program_and_prefix(skill_name: &str) -> (String, Vec<String>, Vec<Stri
 
 fn execute_fixture_via_cli_wrapper(skill_name: &str) -> Result<(), String> {
     use maos_kernel_core::lifecycle::cli_wrapper::runtime::{
-        argv_prefix_hash, spawn_and_bridge, Backpressure, BridgeSpawnSpec,
+        Backpressure, BridgeSpawnSpec, argv_prefix_hash, spawn_and_bridge,
     };
     use maos_kernel_core::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
 

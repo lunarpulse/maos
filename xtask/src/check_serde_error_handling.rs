@@ -359,7 +359,9 @@ mod tests {
 
     #[test]
     fn ignores_explicit_allow_marker() {
-        let f = tmp_file("fn x() { let _ = serde_json::to_vec(&42).unwrap_or_default(); // xtask-serde-allow: doctest setup\n}");
+        let f = tmp_file(
+            "fn x() { let _ = serde_json::to_vec(&42).unwrap_or_default(); // xtask-serde-allow: doctest setup\n}",
+        );
         let v = scan_file(f.path());
         assert!(v.is_empty(), "explicit allow should suppress");
     }

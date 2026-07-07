@@ -19,8 +19,8 @@ use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::{A2AError, A2APeerConfig, A2AProfile, ConsentAllowlists};
 use maos_a2a_core::{HandshakeRetryPolicy, InMemoryTofuPinStore, TofuPinStore};
 use maos_a2a_tcp::{
-    build_client_config, length_delimited_codec, PinnedFingerprint, TcpA2AConfig, TcpA2ATransport,
-    TcpTimeouts, TrustPosture,
+    PinnedFingerprint, TcpA2AConfig, TcpA2ATransport, TcpTimeouts, TrustPosture,
+    build_client_config, length_delimited_codec,
 };
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i8::A2AIntent;
@@ -34,8 +34,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tempfile::TempDir;
 use time::OffsetDateTime;
 use tokio::net::TcpStream;
-use tokio_rustls::client::TlsStream;
 use tokio_rustls::TlsConnector;
+use tokio_rustls::client::TlsStream;
 use tokio_util::codec::Framed;
 
 /// H2 — a single pinned clock captured once per test.
@@ -369,8 +369,8 @@ pub fn make_frame(
     use maos_domain::frame::{
         ConsentEnvelope, FrameAddress, FramePayload, PosturePreferences, TaskAssignPayload,
     };
-    use maos_domain::invariants::i13::IntentLineage;
     use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i13::IntentLineage;
     use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId};
     use smallvec::smallvec;
 

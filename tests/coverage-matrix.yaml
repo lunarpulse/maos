@@ -1535,11 +1535,32 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Test-5:
-    gates: []
+    gates:
+    - check-fkcs
+    - check-kernel-baseline
     corpora: []
     phase: v2.0+
+    fkcs_split:
+      v2_0_infrastructure_delivered: true
+      v2_0_cohort: in-house-chinese-wall-proxy
+      v2_0_score: advisory-proof-of-mechanism
+      v2_0_negative_control_rejected_by: maos_registry::admission::admit_spirit
+      v2_5_populated_delivered: false
+      v2_5_genuine_external_spirits: 3
+      v2_5_n12_trial_owner: NFR-Test-8
     valid_until: '2027-05-12'
-    notes: FKCS-infrastructure at v2.0; FKCS-populated at v2.5
+    notes: |
+      FKCS-infrastructure delivered at v2.0 by ADR-052 / check-fkcs: annotated
+      frozen-kernel-v2.0 tag, pinned surface triple, derived diff oracle,
+      in-house Chinese-wall proxy cohort harness, and literal at-admission
+      rejection of the off-frozen-surface negative control by
+      maos_registry::admission::admit_spirit (AdmissionError::OffFrozenSurface,
+      journaled/falsifiable) — not only by an FKCS-internal gate. The proxy
+      score is proof-of-mechanism only; the genuine-external ≥27/30 per-Spirit
+      and ≥85/90 aggregate FKCS floor is NOT satisfied until FKCS-populated
+      runs on 3 externally-authored Spirits at v2.5 (the N=12 black-box trial
+      is owned separately by NFR-Test-8). Machine-readable phase split above in
+      fkcs_split.
   NFR-Test-6:
     gates: [lcas-corpus-tests]
     corpora: [lcas-v0.3]

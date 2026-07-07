@@ -167,8 +167,15 @@ fn invoke_cargo_test(
         .any(|l| l.trim().starts_with("test result:"));
     let green = output.status.success() && ran && passed >= 1 && failed == 0;
     if !green {
-        let tail: String = combined.lines().rev().take(20).collect::<Vec<_>>()
-            .into_iter().rev().collect::<Vec<_>>().join("\n");
+        let tail: String = combined
+            .lines()
+            .rev()
+            .take(20)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join("\n");
         eprintln!(
             "{GATE_NAME}: {pkg}/{test_file} (filter={name_filter:?}, features={features:?}, \
              ignored={ignored}) NOT green (passed={passed}, failed={failed}, ran={ran}, \
@@ -239,7 +246,14 @@ fn run_no_verdict_invariant_leg() -> LegResult {
         false,
     )
     .unwrap_or((0, 1, true, false));
-    LegResult { label: "no-verdict-invariant", passed: p, failed: f, ran: r, attempted: true, green: g }
+    LegResult {
+        label: "no-verdict-invariant",
+        passed: p,
+        failed: f,
+        ran: r,
+        attempted: true,
+        green: g,
+    }
 }
 
 /// Leg 2: out-of-kernel-boundary (AC1). The detector's NORMAL dependency
@@ -259,7 +273,9 @@ fn run_out_of_kernel_boundary_leg() -> LegResult {
         _ => false,
     };
     if !green {
-        eprintln!("{GATE_NAME}: out-of-kernel-boundary leg RED — maos-kernel-core present in the detector's normal closure");
+        eprintln!(
+            "{GATE_NAME}: out-of-kernel-boundary leg RED — maos-kernel-core present in the detector's normal closure"
+        );
     }
     LegResult {
         label: "out-of-kernel-boundary",
@@ -284,7 +300,14 @@ fn run_detection_quality_leg() -> LegResult {
         false,
     )
     .unwrap_or((0, 1, true, false));
-    LegResult { label: "detection-quality", passed: p, failed: f, ran: r, attempted: true, green: g }
+    LegResult {
+        label: "detection-quality",
+        passed: p,
+        failed: f,
+        ran: r,
+        attempted: true,
+        green: g,
+    }
 }
 
 /// Leg 4: detection-quality falsifier (AC4 anti-canned). The `escape-fault-inject`

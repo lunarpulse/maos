@@ -125,8 +125,26 @@ fn check_surface() -> Result<Report, String> {
         }
     };
 
-    // Capture the current surface. `cargo public-api` writes progress logging
-    // to stderr and the canonical sorted item list to stdout.
+    match capture_current_surface() {
+        Ok(current) => Ok(scan_surface_diff(&baseline, &current)),
+        Err(msg) => Ok(Report {
+            passed: false,
+            removed: Vec::new(),
+            added: Vec::new(),
+            baseline_file: BASELINE_FILE.to_string(),
+            unavailable: Some(msg),
+        }),
+    }
+}
+
+/// Capture the CURRENT public-API surface of `maos-host` via `cargo public-api`
+/// and return the canonical sorted item list (stdout). Exposed `pub` so sibling
+/// gates — notably `check-fkcs` — can measure the live host surface directly
+/// instead of trusting a hardcoded literal.
+///
+/// Writes progress logging to stderr; the canonical item list is the return
+/// value. A missing toolchain / nightly is a hard `Err` (never a silent pass).
+pub fn capture_current_surface() -> Result<String, String> {
     let output = Command::new("cargo")
         .args([
             "public-api",
@@ -135,40 +153,19 @@ fn check_surface() -> Result<Report, String> {
             "--all-features",
             "-sss",
         ])
-        .output();
-
-    let output = match output {
-        Ok(o) => o,
-        Err(e) => {
-            return Ok(Report {
-                passed: false,
-                removed: Vec::new(),
-                added: Vec::new(),
-                baseline_file: BASELINE_FILE.to_string(),
-                unavailable: Some(format!(
-                    "failed to invoke `cargo public-api`: {e} — install with `cargo install cargo-public-api`"
-                )),
-            });
-        }
-    };
+        .output()
+        .map_err(|e| format!("failed to invoke `cargo public-api`: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         // `cargo public-api` delegates to the nightly toolchain for rustdoc
         // JSON; a failure here usually means the tool / nightly is missing.
-        return Ok(Report {
-            passed: false,
-            removed: Vec::new(),
-            added: Vec::new(),
-            baseline_file: BASELINE_FILE.to_string(),
-            unavailable: Some(format!(
-                "`cargo public-api` exited non-zero — install `cargo-public-api` + nightly toolchain: {stderr}"
-            )),
-        });
+        return Err(format!(
+            "`cargo public-api` exited non-zero — install `cargo-public-api` + nightly toolchain: {stderr}"
+        ));
     }
 
-    let current = String::from_utf8_lossy(&output.stdout);
-    Ok(scan_surface_diff(&baseline, &current))
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 /// Diff a pinned baseline surface against a current surface and classify the
@@ -257,7 +254,9 @@ pub fn maos_host::SpiritHostPort::supported_forms(&self) -> &[maos_host::SpiritF
         let report = scan_surface_diff(FAKE_BASELINE, &current);
         assert!(!report.passed, "an added public item must RED");
         assert!(
-            report.added.contains(&"pub fn maos_host::SpiritHostPort::probe_runtime(&self) -> bool".to_string()),
+            report.added.contains(
+                &"pub fn maos_host::SpiritHostPort::probe_runtime(&self) -> bool".to_string()
+            ),
             "must flag the added method"
         );
     }

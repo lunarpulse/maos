@@ -60,6 +60,10 @@ const EXPECTED_GATES: &[&str] = &[
     "check-escape-detector",
     // Story 11.4c (AC6) — enterprise identity + at-rest + SIEM gate.
     "check-enterprise-identity",
+    // Story 11.5 (AC4/D7) — Frozen-Kernel Conformance Suite infrastructure gate.
+    "check-fkcs",
+    // Story 11.7 (AC4/D2) — v2.0 third-party trial attestation producer gate.
+    "check-trial-attestation",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.

@@ -53,6 +53,7 @@ members = [
     "crates/maos-host",
     "crates/maos-wasm-host",
     "crates/maos-escape-detector",
+    "crates/maos-fkcs",
 ]
 default-members = []
 exclude = ["templates", "templates/spirit-ts"]

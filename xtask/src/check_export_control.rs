@@ -306,7 +306,9 @@ pub fn scan_wasm_host_leak(stdout: &str) -> WasmHostLeakReport {
 /// failure is reported as non-passing so the gate never silently passes.
 pub fn check_wasm_host_absent_from_default() -> WasmHostLeakReport {
     let output = Command::new("cargo")
-        .args(["tree", "-p", "maos-bin", "--prefix", "none", "--edges", "all"])
+        .args([
+            "tree", "-p", "maos-bin", "--prefix", "none", "--edges", "all",
+        ])
         .output();
     let stdout = match output {
         Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
@@ -364,10 +366,11 @@ mod tests {
         write_stability(tmp.path(), NON_STUB_FENCE);
         let r = check_export_control(tmp.path());
         assert!(!r.passed);
-        assert!(r
-            .failures
-            .iter()
-            .any(|f| f.contains("eccn-classification.md not found")));
+        assert!(
+            r.failures
+                .iter()
+                .any(|f| f.contains("eccn-classification.md not found"))
+        );
     }
 
     #[test]
@@ -407,7 +410,10 @@ mod tests {
     fn fails_when_crypto_primitive_missing() {
         let tmp = TempDir::new().unwrap();
         // Drop "Ed25519" — enumeration incomplete.
-        write_eccn(tmp.path(), "HKDF-SHA256, AEAD, TLS 1.3, SHA-256, CBOR. Host crates: maos-iac, maos-kernel-core, maos-a2a-tcp, maos-compliance.");
+        write_eccn(
+            tmp.path(),
+            "HKDF-SHA256, AEAD, TLS 1.3, SHA-256, CBOR. Host crates: maos-iac, maos-kernel-core, maos-a2a-tcp, maos-compliance.",
+        );
         write_stability(tmp.path(), NON_STUB_FENCE);
         let r = check_export_control(tmp.path());
         assert!(!r.passed);

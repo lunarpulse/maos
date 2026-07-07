@@ -155,7 +155,15 @@ fn invoke_cargo_test_lib(
         .any(|line| line.trim().starts_with("test result:"));
     let green = output.status.success() && ran && passed >= 1 && failed == 0;
     if !green {
-        let tail = combined.lines().rev().take(20).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+        let tail = combined
+            .lines()
+            .rev()
+            .take(20)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join("\n");
         eprintln!(
             "{GATE_NAME}: {pkg} --lib (filter={name_filter:?}, features={features:?}) NOT green (passed={passed}, failed={failed}, ran={ran}, exit={}):\n{tail}",
             output.status
@@ -164,10 +172,7 @@ fn invoke_cargo_test_lib(
     Ok((passed, failed, ran, green))
 }
 
-fn run_leg(
-    label: &'static str,
-    invocations: &[(&str, &str, &str, Option<&str>)],
-) -> LegResult {
+fn run_leg(label: &'static str, invocations: &[(&str, &str, &str, Option<&str>)]) -> LegResult {
     let mut passed = 0u32;
     let mut failed = 0u32;
     let mut ran = false;
@@ -240,12 +245,7 @@ fn run_at_rest_seal_leg() -> LegResult {
         "at-rest-seal",
         &[
             ("maos-secrets", "at_rest_seal", "", None),
-            (
-                "maos-secrets",
-                "default_plaintext_preserved",
-                "",
-                None,
-            ),
+            ("maos-secrets", "default_plaintext_preserved", "", None),
         ],
     )
 }
@@ -300,7 +300,9 @@ fn run_fault_inject_leg() -> LegResult {
                 result.ran |= r;
                 result.green &= g;
                 if !g {
-                    eprintln!("{GATE_NAME}: {pkg}/{feature} fault test did NOT invert green (passed={p}, failed={f}, ran={r})");
+                    eprintln!(
+                        "{GATE_NAME}: {pkg}/{feature} fault test did NOT invert green (passed={p}, failed={f}, ran={r})"
+                    );
                 }
             }
             Err(e) => {
@@ -375,7 +377,15 @@ fn release_guard_fires(pkg: &str, feature: &str) -> bool {
 /// release composition) none of the fault features should appear.
 fn release_feature_graph_clean() -> bool {
     let output = Command::new("cargo")
-        .args(["tree", "-e", "features", "-p", "maos-bin", "--features", "network"])
+        .args([
+            "tree",
+            "-e",
+            "features",
+            "-p",
+            "maos-bin",
+            "--features",
+            "network",
+        ])
         .output();
     match output {
         Ok(o) => {
@@ -600,9 +610,7 @@ pub fn run(json: bool) -> Result<(), String> {
         return Err(msg);
     }
 
-    let banner = format!(
-        "## Enterprise Identity Gate: WOULD HAVE BLOCKED SHIP (v2.0)\n{detail}\n"
-    );
+    let banner = format!("## Enterprise Identity Gate: WOULD HAVE BLOCKED SHIP (v2.0)\n{detail}\n");
     emit_command(
         json,
         "warning",

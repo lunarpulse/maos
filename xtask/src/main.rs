@@ -38,12 +38,15 @@ mod check_scale_churn;
 mod check_enterprise_pdp;
 // Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence, ADR-051).
 mod check_enterprise_identity;
+// Story 11.5 — Frozen-Kernel Conformance Suite infrastructure gate (ADR-052).
+mod check_fkcs;
+// Story 11.7 — v2.0 third-party trial attestation producer gate (ADR-053).
+mod check_trial_attestation;
 // Story 11.4b — ADR-024 sandbox-escape structural detector gate (per-leg independence).
 mod check_escape_detector;
 // Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
 mod check_wasm_form_equiv;
 // Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
-mod check_equiv_fixture_provenance;
 mod check_deprecations_declared;
 mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
@@ -51,6 +54,7 @@ mod check_empty_kernel;
 mod check_env_contract;
 mod check_epic_6_bridge;
 mod check_epic_close_green;
+mod check_equiv_fixture_provenance;
 mod check_error_catalog;
 mod check_fr47;
 mod check_governance_categories;
@@ -731,6 +735,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 11.7 — v2.0 third-party trial attestation producer gate.
+    #[command(name = "check-trial-attestation")]
+    CheckTrialAttestation {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate
     /// (ADVISORY per ADR-040 rust-inproc deferral). Validates pre-committed
     /// Mann-Whitney U-test artifact.
@@ -774,6 +784,12 @@ enum Commands {
     /// Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence).
     #[command(name = "check-enterprise-identity")]
     CheckEnterpriseIdentity {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.5 — Frozen-Kernel Conformance Suite infrastructure gate.
+    #[command(name = "check-fkcs")]
+    CheckFkcs {
         #[arg(long)]
         json: bool,
     },
@@ -1176,9 +1192,7 @@ fn main() {
         Commands::CheckThirdPartyTrial { json } => check_third_party_trial::run(json),
         Commands::CheckCrossFormEquiv { json } => check_cross_form_equiv::run(json),
         Commands::CheckWasmFormEquiv { json } => check_wasm_form_equiv::run(json),
-        Commands::CheckEquivFixtureProvenance { json } => {
-            check_equiv_fixture_provenance::run(json)
-        }
+        Commands::CheckEquivFixtureProvenance { json } => check_equiv_fixture_provenance::run(json),
         Commands::CheckRedTeamGate { json } => check_red_team_gate::run(json),
         Commands::CheckExportControl { json } => check_export_control::run(json),
         Commands::CheckCnaRegistration { json } => check_cna_registration::run(json),
@@ -1192,6 +1206,8 @@ fn main() {
         Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
         Commands::CheckEnterprisePdp { json } => check_enterprise_pdp::run(json),
         Commands::CheckEnterpriseIdentity { json } => check_enterprise_identity::run(json),
+        Commands::CheckFkcs { json } => check_fkcs::run(json),
+        Commands::CheckTrialAttestation { json } => check_trial_attestation::run(json),
         Commands::CheckEscapeDetector { json } => check_escape_detector::run(json),
     };
     if let Err(e) = result {

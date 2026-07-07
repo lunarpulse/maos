@@ -2,12 +2,12 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use crate::corpus_types::{load_toml, round_ratio, CorpusManifest};
+use crate::corpus_types::{CorpusManifest, load_toml, round_ratio};
 
 /// Trait abstracting judge-LLM invocations.
 pub trait JudgeRunner {
     fn judge(&self, item: &serde_json::Value, expected: &serde_json::Value)
-        -> Result<bool, String>;
+    -> Result<bool, String>;
 }
 
 /// v0.1-alpha shim: compares item["expected_judgment"] == expected (trivially passes).
@@ -76,7 +76,10 @@ pub fn run(
     } else {
         for c in &report.per_corpus {
             if c.agreement_ratio < threshold {
-                eprintln!("NFR-Test-1 violation: corpus {} agreement ratio {:.4} below quarterly threshold 0.98 — open re-baseline review issue", c.corpus, c.agreement_ratio);
+                eprintln!(
+                    "NFR-Test-1 violation: corpus {} agreement ratio {:.4} below quarterly threshold 0.98 — open re-baseline review issue",
+                    c.corpus, c.agreement_ratio
+                );
             }
         }
     }
@@ -138,7 +141,10 @@ fn rebaseline_check(
             1.0
         };
         if corpus_errors > 0 {
-            eprintln!("rebaseline-check: corpus {} had {corpus_errors} judge errors counted as disagreements", name);
+            eprintln!(
+                "rebaseline-check: corpus {} had {corpus_errors} judge errors counted as disagreements",
+                name
+            );
         }
         per_corpus.push(CorpusAgreement {
             corpus: name.clone(),

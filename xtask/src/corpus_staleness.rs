@@ -4,7 +4,7 @@ use std::path::Path;
 
 use chrono::NaiveDate;
 
-use crate::corpus_types::{load_toml, CorpusManifest, CoverageMatrixFile};
+use crate::corpus_types::{CorpusManifest, CoverageMatrixFile, load_toml};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Violation {
@@ -172,7 +172,10 @@ fn push_date_result(
                 "NFR-Meta-2 violation: corpus"
             };
             let msg = if is_matrix {
-                format!("{}: {} corpus expired {} (current={}); either extend with assessor sign-off PR or rebuild", prefix, id, valid_until, today)
+                format!(
+                    "{}: {} corpus expired {} (current={}); either extend with assessor sign-off PR or rebuild",
+                    prefix, id, valid_until, today
+                )
             } else {
                 format!(
                     "{} {} expired {}; either extend with assessor sign-off PR or rebuild",

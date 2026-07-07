@@ -72,10 +72,7 @@ fn read_disposition() -> Result<HashMap<String, String>, String> {
 
 /// Resolve the disposition for `phase`, inheriting the nearest prior declared
 /// phase when `phase` itself is absent from the map.
-fn phase_disposition<'a>(
-    disposition: &'a HashMap<String, String>,
-    phase: &str,
-) -> Option<&'a str> {
+fn phase_disposition<'a>(disposition: &'a HashMap<String, String>, phase: &str) -> Option<&'a str> {
     let idx = PHASE_ORDER.iter().position(|p| *p == phase)?;
     for i in (0..=idx).rev() {
         if let Some(d) = disposition.get(PHASE_ORDER[i]) {
@@ -293,7 +290,10 @@ pub fn run(json: bool) -> Result<(), String> {
     let disposition = read_disposition()?;
     // The v2.0 binding promise MUST be present — its absence is a registry
     // defect (the gate would silently stay advisory forever).
-    if !matches!(disposition.get("v2_0").map(|s| s.as_str()), Some("blocking")) {
+    if !matches!(
+        disposition.get("v2_0").map(|s| s.as_str()),
+        Some("blocking")
+    ) {
         return Err(format!(
             "{GATE_NAME}: registry defect — v2_0 disposition must be \"blocking\" (got {:?})",
             disposition.get("v2_0")

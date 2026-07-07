@@ -12,7 +12,7 @@
 //! depends on: a regression that silently coerces an unknown field, or accepts
 //! a non-semver version, would be a CORRECTNESS bug, not a style nit.
 
-use maos_skill::{parse_skill, ESkillSchema};
+use maos_skill::{ESkillSchema, parse_skill};
 
 const VALID: &str = "---\nid = \"check.valid\"\nversion = \"1.2.3\"\nname = \"Valid\"\ndescription = \"d\"\n---\nBody present.\n";
 const UNKNOWN_FIELD: &str = "---\nid = \"check.unknown\"\nversion = \"1.0.0\"\nname = \"X\"\ndescription = \"d\"\nbogus = 1\n---\nbody\n";

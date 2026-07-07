@@ -53,7 +53,9 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     if hits.is_empty() {
-        eprintln!("check-deprecations-declared: PASS — 0 deprecation annotations at HEAD (v0.5 empty-present)");
+        eprintln!(
+            "check-deprecations-declared: PASS — 0 deprecation annotations at HEAD (v0.5 empty-present)"
+        );
         Ok(())
     } else {
         for hit in &hits {

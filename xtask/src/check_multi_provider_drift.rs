@@ -150,16 +150,14 @@ pub fn run(report: &Path, threshold: f64, strict: bool, json: bool) -> i32 {
             // GitHub Actions annotation for PR-visible drift markers
             // (story narrative line 511; original code skipped this).
             if let Some(fixture) = outlier.get("fixture_id").and_then(|v| v.as_str()) {
-                println!("::notice file=tests/reports/multi-provider.json::Drift outlier in fixture {fixture}");
+                println!(
+                    "::notice file=tests/reports/multi-provider.json::Drift outlier in fixture {fixture}"
+                );
             }
         }
     }
 
-    if strict && !outliers.is_empty() {
-        1
-    } else {
-        0
-    }
+    if strict && !outliers.is_empty() { 1 } else { 0 }
 }
 
 #[cfg(test)]

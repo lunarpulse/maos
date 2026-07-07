@@ -65,6 +65,22 @@ pub enum AdmissionError {
     /// (a policy reject) so the operator sees a config-fix signal.
     #[error("model-provenance section malformed: {0}")]
     ModelProvenanceMalformed(String),
+    /// Story 11.5 AC3 (literal) — the optional `[fkcs]` manifest section
+    /// declares off-frozen-surface / `pub(crate)`-style `internal_references`.
+    /// `admit_spirit` rejects any package that declares a non-empty set before
+    /// tier/signature resolution: such references are not part of the frozen
+    /// public ABI/host surface, so the package is non-conformant regardless of
+    /// trust tier. The rejection is typed and name-stable (`FKCS
+    /// off-frozen-surface`) so it is journaled/falsifiable; an absent or empty
+    /// `[fkcs]` section admits (backward compatible with pre-11.5 manifests).
+    #[error(
+        "FKCS off-frozen-surface rejection: manifest [fkcs].internal_references declares off-surface symbol(s): {symbols:?}"
+    )]
+    OffFrozenSurface {
+        /// The off-surface symbol paths the manifest declared (e.g.
+        /// `maos_kernel_core::scheduler::pick_next_spirit_from_slice`).
+        symbols: Vec<String>,
+    },
 }
 
 /// Configuration for the admission path.
@@ -90,6 +106,21 @@ pub fn admit_spirit(
     pkg: &SignedPackage,
     op_cfg: &AdmissionConfig,
 ) -> Result<AdmissionDecision, AdmissionError> {
+    // Story 11.5 AC3 (literal) — FKCS off-frozen-surface gate. A package whose
+    // manifest declares a non-empty `[fkcs].internal_references` array (off-
+    // surface / pub(crate)-style internals) is rejected HERE, before tier,
+    // signature, or ComplianceClaim resolution. Off-surface conformance is
+    // orthogonal to the trust-tier axis, so the real `admit_spirit` path
+    // journals the rejection via `AdmissionError::OffFrozenSurface`. An absent
+    // or empty declaration admits — backward compatible with pre-11.5 manifests,
+    // which carry no `[fkcs]` section.
+    let off_surface_refs = extract_fkcs_internal_references(&pkg.manifest_toml);
+    if !off_surface_refs.is_empty() {
+        return Err(AdmissionError::OffFrozenSurface {
+            symbols: off_surface_refs,
+        });
+    }
+
     // 1. Parse manifest to extract declared trust tier.
     let manifest_declared_tier = extract_manifest_tier(&pkg.manifest_toml);
 
@@ -409,6 +440,51 @@ pub fn extract_manifest_tier(manifest_toml: &[u8]) -> TrustTier {
     }
     // Default: Local
     TrustTier::Local
+}
+
+/// Parse the optional `[fkcs].internal_references` array from a manifest
+/// (Story 11.5 AC3 — the FKCS conformance declaration).
+///
+/// A conformant Spirit either omits the `[fkcs]` section or lists only symbols
+/// on the frozen public ABI/host surface; a negative-control / non-conformant
+/// package lists `pub(crate)`-style internals here. Returns the declared
+/// off-surface references in declaration order. Empty when the `[fkcs]` section
+/// or the `internal_references` key is absent (or the array is empty) —
+/// backward compatible with pre-11.5 manifests, which carry no `[fkcs]` section
+/// and therefore admit.
+fn extract_fkcs_internal_references(manifest_toml: &[u8]) -> Vec<String> {
+    let text = String::from_utf8_lossy(manifest_toml);
+    let mut in_fkcs_table = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        // A TOML table header toggles which section subsequent keys belong to.
+        if trimmed.starts_with('[') {
+            in_fkcs_table = trimmed == "[fkcs]";
+            continue;
+        }
+        if !in_fkcs_table {
+            continue;
+        }
+        if let Some(eq) = trimmed.find('=') {
+            if trimmed[..eq].trim() == "internal_references" {
+                return parse_manifest_string_array(trimmed[eq + 1..].trim());
+            }
+        }
+    }
+    Vec::new()
+}
+
+/// Parse a single-line TOML inline string array (`["a", "b"]`) into owned
+/// strings, tolerating surrounding whitespace and quotes. Mirrors the lenient
+/// line-based parsing used by [`extract_manifest_tier`].
+fn parse_manifest_string_array(s: &str) -> Vec<String> {
+    let s = s.trim();
+    let s = s.strip_prefix('[').unwrap_or(s);
+    let s = s.strip_suffix(']').unwrap_or(s);
+    s.split(',')
+        .map(|part| part.trim().trim_matches('"').to_string())
+        .filter(|part| !part.is_empty())
+        .collect()
 }
 
 /// Verify the publisher's Ed25519 signature over `sha256(manifest_len_u64 || manifest_toml || artifact_len_u64 || artifact_bytes)`.

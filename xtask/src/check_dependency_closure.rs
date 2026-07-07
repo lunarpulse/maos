@@ -87,6 +87,10 @@ pub fn run(json: bool) -> Result<(), String> {
     if json {
         let aggregate = AggregateReport {
             passed: overall_passed,
+            violations: reports
+                .iter()
+                .flat_map(|(_, r)| r.violations.clone())
+                .collect::<Vec<_>>(),
             trees: reports
                 .iter()
                 .map(|(name, r)| TreeReport {
@@ -132,6 +136,7 @@ pub fn run(json: bool) -> Result<(), String> {
 #[derive(Debug, serde::Serialize)]
 struct AggregateReport {
     passed: bool,
+    violations: Vec<String>,
     trees: Vec<TreeReport>,
 }
 

@@ -242,10 +242,11 @@ mod tests {
         // No SECURITY.md written.
         let r = check_cna_registration(tmp.path());
         assert!(!r.passed);
-        assert!(r
-            .failures
-            .iter()
-            .any(|f| f.contains("SECURITY.md not found")));
+        assert!(
+            r.failures
+                .iter()
+                .any(|f| f.contains("SECURITY.md not found"))
+        );
     }
     #[test]
     fn fails_when_version_only_as_substring() {

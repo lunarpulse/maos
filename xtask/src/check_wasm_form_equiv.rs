@@ -68,10 +68,7 @@ fn read_disposition() -> Result<HashMap<String, String>, String> {
 
 /// Resolve the disposition for `phase`, inheriting the nearest prior declared
 /// phase when `phase` itself is absent from the map.
-fn phase_disposition<'a>(
-    disposition: &'a HashMap<String, String>,
-    phase: &str,
-) -> Option<&'a str> {
+fn phase_disposition<'a>(disposition: &'a HashMap<String, String>, phase: &str) -> Option<&'a str> {
     let idx = PHASE_ORDER.iter().position(|p| *p == phase)?;
     for i in (0..=idx).rev() {
         if let Some(d) = disposition.get(PHASE_ORDER[i]) {
@@ -117,7 +114,14 @@ struct LegResult {
 /// optionally with `equiv-fault-inject`) and parse its `test result:` summary.
 fn run_oracle_leg(label: &'static str, features: &[&str]) -> Result<LegResult, String> {
     let mut cmd = Command::new("cargo");
-    cmd.args(["test", "--locked", "-p", "maos-wasm-host", "--test", "equiv_harness"]);
+    cmd.args([
+        "test",
+        "--locked",
+        "-p",
+        "maos-wasm-host",
+        "--test",
+        "equiv_harness",
+    ]);
     for f in features {
         cmd.args(["--features", f]);
     }
@@ -212,7 +216,10 @@ pub fn run(json: bool) -> Result<(), String> {
     let disposition = read_disposition()?;
     // The v2.0 binding promise MUST be present — its absence is a registry
     // defect (the gate would silently stay advisory forever).
-    if !matches!(disposition.get("v2_0").map(|s| s.as_str()), Some("blocking")) {
+    if !matches!(
+        disposition.get("v2_0").map(|s| s.as_str()),
+        Some("blocking")
+    ) {
         return Err(format!(
             "check-wasm-form-equiv: registry defect — v2_0 disposition must be \"blocking\" (got {:?})",
             disposition.get("v2_0")
@@ -281,7 +288,12 @@ pub fn run(json: bool) -> Result<(), String> {
     let detail = format!(
         "- base leg: {} passed, {} failed (green={})\n\
          - anti-canned leg: {} passed, {} failed (green={})\n",
-        base.passed, base.failed, base.green, fault_inject.passed, fault_inject.failed, fault_inject.green,
+        base.passed,
+        base.failed,
+        base.green,
+        fault_inject.passed,
+        fault_inject.failed,
+        fault_inject.green,
     );
     if blocking_now {
         // v2.0: BLOCK ship.
@@ -405,8 +417,17 @@ mod tests {
             .iter()
             .find(|e| e.name == "check-wasm-form-equiv")
             .expect("check-wasm-form-equiv [[ship_gate]] entry present");
-        assert_eq!(entry.disposition.get("v1_0").map(|s| s.as_str()), Some("advisory"));
-        assert_eq!(entry.disposition.get("v1_5").map(|s| s.as_str()), Some("advisory"));
-        assert_eq!(entry.disposition.get("v2_0").map(|s| s.as_str()), Some("blocking"));
+        assert_eq!(
+            entry.disposition.get("v1_0").map(|s| s.as_str()),
+            Some("advisory")
+        );
+        assert_eq!(
+            entry.disposition.get("v1_5").map(|s| s.as_str()),
+            Some("advisory")
+        );
+        assert_eq!(
+            entry.disposition.get("v2_0").map(|s| s.as_str()),
+            Some("blocking")
+        );
     }
 }

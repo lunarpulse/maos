@@ -2608,6 +2608,7 @@ dependencies = [
 name = "maos-eval"
 version = "0.1.0-alpha"
 dependencies = [
+ "maos-audit",
  "maos-domain",
  "maos-kernel-core",
  "maos-spirit-abi",
@@ -2618,6 +2619,20 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "walkdir",
+]
+
+[[package]]
+name = "maos-fkcs"
+version = "0.1.0-alpha"
+dependencies = [
+ "maos-domain",
+ "maos-registry",
+ "maos-skill",
+ "maos-spirit-abi",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml 0.8.23",
 ]
 
 [[package]]
@@ -6483,6 +6498,7 @@ dependencies = [
  "maos-audit",
  "maos-domain",
  "maos-eval",
+ "maos-fkcs",
  "maos-iac",
  "maos-kernel-core",
  "maos-loom-lite",

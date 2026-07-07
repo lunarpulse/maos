@@ -55,8 +55,7 @@ fn source_hash(paths: &[String]) -> Result<String, String> {
     sorted.sort();
     let mut combined: Vec<u8> = Vec::new();
     for p in &sorted {
-        let bytes = std::fs::read(p)
-            .map_err(|e| format!("cannot read source input {p}: {e}"))?;
+        let bytes = std::fs::read(p).map_err(|e| format!("cannot read source input {p}: {e}"))?;
         combined.extend_from_slice(&bytes);
     }
     Ok(sha256_hex(&combined))
@@ -71,8 +70,8 @@ pub fn run(json: bool) -> Result<(), String> {
     }
     let manifest_src = std::fs::read_to_string(manifest_path)
         .map_err(|e| format!("cannot read {MANIFEST_REL}: {e}"))?;
-    let manifest: Manifest = toml::from_str(&manifest_src)
-        .map_err(|e| format!("cannot parse {MANIFEST_REL}: {e}"))?;
+    let manifest: Manifest =
+        toml::from_str(&manifest_src).map_err(|e| format!("cannot parse {MANIFEST_REL}: {e}"))?;
 
     if manifest.fixture.is_empty() {
         return Err(format!(

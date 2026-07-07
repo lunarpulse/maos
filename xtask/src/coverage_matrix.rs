@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::corpus_types::{
-    load_toml, CorpusManifest, CoverageMatrixFile, GateRegistry, PhaseConfig,
+    CorpusManifest, CoverageMatrixFile, GateRegistry, PhaseConfig, load_toml,
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

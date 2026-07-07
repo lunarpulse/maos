@@ -32,7 +32,7 @@ use crate::check_workspace_count::count_cargo_toml_members;
 // the producer and `check_export_control` can never drift apart on what the
 // §Export fence is.
 use crate::check_export_control::{
-    extract_export_fence, EXPORT_FENCE_END, EXPORT_FENCE_START, STUB_MARKER,
+    EXPORT_FENCE_END, EXPORT_FENCE_START, STUB_MARKER, extract_export_fence,
 };
 
 const SPIRIT_ABI_LIB: &str = "crates/maos-spirit-abi/src/lib.rs";
@@ -73,10 +73,14 @@ pub fn run(workspace_root: &Path, check: bool, json: bool) -> Result<(), String>
             });
             println!("{payload}");
         } else if in_sync && deprecation_issues.is_empty() && export_issue.is_none() {
-            eprintln!("stability-matrix: PASS — STABILITY.md in sync with workspace state; 0 undocumented deprecations; §Export present (non-stub)");
+            eprintln!(
+                "stability-matrix: PASS — STABILITY.md in sync with workspace state; 0 undocumented deprecations; §Export present (non-stub)"
+            );
         } else {
             if !in_sync {
-                eprintln!("stability-matrix: FAIL — STABILITY.md drift (committed differs from workspace-derived matrix)");
+                eprintln!(
+                    "stability-matrix: FAIL — STABILITY.md drift (committed differs from workspace-derived matrix)"
+                );
             }
             for issue in &deprecation_issues {
                 eprintln!("stability-matrix: FAIL — {issue}");

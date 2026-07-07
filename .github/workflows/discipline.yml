@@ -2650,6 +2650,46 @@ jobs:
         run: |
           set -o pipefail
           cargo run -p xtask -- check-enterprise-identity --json 2>&1 | tee /tmp/enterprise-identity-gate.json
+
+  # Story 11.5 (AC4/D7) — Frozen-Kernel Conformance Suite infrastructure gate.
+  # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-fkcs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-fkcs-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-fkcs gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-fkcs --json 2>&1 | tee /tmp/fkcs-gate.json
+
+  # Story 11.7 (AC4/D2) — v2.0 third-party trial attestation producer gate.
+  # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-trial-attestation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-trial-attestation-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-trial-attestation gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-trial-attestation --json 2>&1 | tee /tmp/trial-attestation-gate.json
   # Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate
   # (out-of-kernel read-only TL consumer; per-leg independence). The live-seccomp
   # leg builds the forbidden-syscall-probe fixture first (real seccomp SIGSYS
@@ -2709,6 +2749,8 @@ jobs:
       - check-scale-churn
       - check-enterprise-pdp
       - check-enterprise-identity
+      - check-fkcs
+      - check-trial-attestation
       - check-escape-detector
     if: always()
     steps:
@@ -2742,6 +2784,8 @@ jobs:
           echo "| check-scale-churn | ${{ needs.check-scale-churn.result }} | cargo run -p xtask -- check-scale-churn |"
           echo "| check-enterprise-pdp | ${{ needs.check-enterprise-pdp.result }} | cargo run -p xtask -- check-enterprise-pdp |"
           echo "| check-enterprise-identity | ${{ needs.check-enterprise-identity.result }} | cargo run -p xtask -- check-enterprise-identity |"
+          echo "| check-fkcs | ${{ needs.check-fkcs.result }} | cargo run -p xtask -- check-fkcs |"
+          echo "| check-trial-attestation | ${{ needs.check-trial-attestation.result }} | cargo run -p xtask -- check-trial-attestation |"
           echo "| check-escape-detector | ${{ needs.check-escape-detector.result }} | cargo run -p xtask -- check-escape-detector |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
@@ -2771,6 +2815,8 @@ jobs:
           echo "  check-scale-churn: ${{ needs.check-scale-churn.result }}"
           echo "  check-enterprise-pdp: ${{ needs.check-enterprise-pdp.result }}"
           echo "  check-enterprise-identity: ${{ needs.check-enterprise-identity.result }}"
+          echo "  check-fkcs: ${{ needs.check-fkcs.result }}"
+          echo "  check-trial-attestation: ${{ needs.check-trial-attestation.result }}"
           exit 1
 
   aggregate:
@@ -2892,6 +2938,7 @@ jobs:
       - check-coverage-matrix-completeness
       - check-owasp-freeze-hash
       - check-third-party-trial
+      - check-trial-attestation
       - check-cross-form-equiv
       - check-red-team-gate
       - check-migration-merkle
@@ -3119,6 +3166,8 @@ jobs:
       - check-cross-form-equiv
       - check-third-party-trial
       - check-enterprise-identity
+      - check-fkcs
+      - check-trial-attestation
     if: always()
     steps:
       - name: v1.5 ship gate summary
@@ -3132,6 +3181,8 @@ jobs:
           echo "| check-cross-form-equiv | ${{ needs.check-cross-form-equiv.result }} | advisory |"
           echo "| check-third-party-trial | ${{ needs.check-third-party-trial.result }} | blocking-when-present |"
           echo "| check-enterprise-identity | ${{ needs.check-enterprise-identity.result }} | advisory |"
+          echo "| check-fkcs | ${{ needs.check-fkcs.result }} | advisory |"
+          echo "| check-trial-attestation | ${{ needs.check-trial-attestation.result }} | advisory |"
           echo ""
           echo "Phase disposition source: xtask/gate-registry.toml [[ship_gate]] entries."
       - name: Fail if any v1.5-blocking gate failed

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use syn::visit::Visit;
 
-use crate::corpus_types::{load_toml, JudgeConfig, JudgeDirectCallIdentifiers};
+use crate::corpus_types::{JudgeConfig, JudgeDirectCallIdentifiers, load_toml};
 use crate::fs_walk;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -23,19 +23,37 @@ impl std::fmt::Display for Violation {
                 .line
                 .map(|l| l.to_string())
                 .unwrap_or_else(|| "?".into());
-            return write!(f, "NFR-Test-1 violation: direct judge-LLM call at {file}:{line}: route via JudgeRunner trait + tests/judge-config.toml (epic-0 / Story 0.3 BDD2)");
+            return write!(
+                f,
+                "NFR-Test-1 violation: direct judge-LLM call at {file}:{line}: route via JudgeRunner trait + tests/judge-config.toml (epic-0 / Story 0.3 BDD2)"
+            );
         }
         let (field, req) = match self.kind.as_str() {
             "temperature" => ("temperature", "temperature=0.0"),
             "top_p" => ("top_p", "top_p=1.0"),
-            "seed" => return write!(f, "NFR-Test-1 violation: judge '{}' missing seed; pinned-judge contract requires seed: u64 (epic-0 / Story 0.3 BDD2)", self.judge),
+            "seed" => {
+                return write!(
+                    f,
+                    "NFR-Test-1 violation: judge '{}' missing seed; pinned-judge contract requires seed: u64 (epic-0 / Story 0.3 BDD2)",
+                    self.judge
+                );
+            }
             "retry_budget" => ("retry_budget", "retry_budget=1"),
             "prompt_version_hash" => ("prompt_version_hash", "64-hex SHA-256"),
             "model" => ("model", "provider:model_id@version format"),
-            _ => return write!(f, "NFR-Test-1 violation: {} — {}: {}", self.kind, self.judge, self.detail),
+            _ => {
+                return write!(
+                    f,
+                    "NFR-Test-1 violation: {} — {}: {}",
+                    self.kind, self.judge, self.detail
+                );
+            }
         };
-        write!(f, "NFR-Test-1 violation: judge '{}' has {}={}; pinned-judge contract requires {} (epic-0 / Story 0.3 BDD2)",
-            self.judge, field, self.detail, req)
+        write!(
+            f,
+            "NFR-Test-1 violation: judge '{}' has {}={}; pinned-judge contract requires {} (epic-0 / Story 0.3 BDD2)",
+            self.judge, field, self.detail, req
+        )
     }
 }
 
