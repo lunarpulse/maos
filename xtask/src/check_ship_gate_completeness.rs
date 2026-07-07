@@ -58,6 +58,8 @@ const EXPECTED_GATES: &[&str] = &[
     "check-enterprise-pdp",
     // Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate.
     "check-escape-detector",
+    // Story 11.4c (AC6) — enterprise identity + at-rest + SIEM gate.
+    "check-enterprise-identity",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.

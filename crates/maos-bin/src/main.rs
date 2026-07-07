@@ -47,17 +47,13 @@ use tokio_util::sync::CancellationToken;
 #[cfg(feature = "network")]
 use maos_director_surface::notification::{NotificationDispatcher, TerminalChannel};
 #[cfg(feature = "network")]
-use maos_domain::invariants::i1::IntentClass;
-#[cfg(feature = "network")]
-use maos_domain::invariants::i1::Scope;
+use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
 #[cfg(feature = "network")]
 use maos_domain::orchestrator::OrchestratorInstruction;
 #[cfg(feature = "network")]
 use maos_domain::orchestrator::OrchestratorInstructionId;
 #[cfg(feature = "network")]
-use maos_domain::ports::crypto::CryptoProvider;
-#[cfg(feature = "network")]
-use maos_domain::ports::CapabilityRegistryPort;
+use maos_domain::ports::{scope_action_key, CapabilityRegistryPort, CryptoProvider, PolicyVerdict};
 #[cfg(feature = "network")]
 use maos_kernel_core::api::{
     CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter, RingCryptoProvider,
@@ -80,6 +76,77 @@ use maos_providers::AnthropicProvider;
 
 fn worker_thread_count() -> usize {
     available_parallelism().map(usize::from).unwrap_or(1)
+}
+
+#[cfg(feature = "network")]
+fn principal_attributes_for_pdp(
+    principal: &maos_domain::ports::AuthenticatedPrincipal,
+) -> std::collections::HashMap<String, String> {
+    let mut attrs = principal.attributes.clone();
+    attrs
+        .entry("sub".to_string())
+        .or_insert_with(|| principal.subject.clone());
+    attrs
+        .entry("iss".to_string())
+        .or_insert_with(|| principal.issuer.clone());
+    attrs
+        .entry("aud".to_string())
+        .or_insert_with(|| principal.audience.clone());
+    attrs
+}
+
+#[cfg(feature = "network")]
+fn issue_enterprise_governed_capability(
+    capability: &CapabilityRegistryAdapter,
+    enterprise_runtime: Option<&maos_bin::enterprise_identity::EnterpriseRuntime>,
+    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    spirit_pid: u32,
+    scope: Scope,
+    ttl_secs: u32,
+    posture_hash: [u8; 32],
+    intent_class: IntentClass,
+) -> Result<CapabilityToken, String> {
+    let capability_key = scope_action_key(&scope).to_string();
+    let principal = match enterprise_runtime {
+        Some(runtime) if runtime.sso_configured() => {
+            let assertion = std::env::var("MAOS_SSO_ASSERTION").map_err(|_| {
+                format!(
+                    "enterprise SSO is configured but MAOS_SSO_ASSERTION is absent for {capability_key}"
+                )
+            })?;
+            runtime
+                .verify_principal_for_issuance(spirit_pid, &assertion)
+                .map_err(|e| e.to_string())?
+        }
+        _ => None,
+    };
+
+    if let Some(pdp) = enterprise_pdp_runtime {
+        let principal_attributes = principal.as_ref().map(principal_attributes_for_pdp);
+        match pdp
+            .evaluate_issuance(spirit_pid, &capability_key, principal_attributes)
+            .map_err(|e| format!("enterprise PDP issuance evaluation failed: {e}"))?
+        {
+            PolicyVerdict::Allow => {}
+            PolicyVerdict::Deny => {
+                return Err(format!(
+                    "enterprise PDP denied capability issuance for {capability_key}"
+                ));
+            }
+        }
+    }
+
+    let token = capability
+        .issue_with_mediation(spirit_pid, scope, ttl_secs, posture_hash, intent_class)
+        .map_err(|e| format!("kernel capability mediation failed: {e}"))?;
+
+    if let (Some(runtime), Some(principal)) = (enterprise_runtime, principal.as_ref()) {
+        runtime
+            .persist_identity_asserted(spirit_pid, principal, &capability_key)
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(token)
 }
 
 #[cfg(feature = "network")]
@@ -389,6 +456,8 @@ fn run_cli_wrapper_manifest(
     transparency_log: Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
     spirit_host: Option<Arc<dyn maos_host::SpiritHostPort>>,
+    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use maos_domain::host_grant::{HostGrant, StaticHostGrantAllowlist};
     use maos_domain::invariants::i9::SandboxTier;
@@ -492,8 +561,15 @@ fn run_cli_wrapper_manifest(
     //    audit note — never a silent bypass. The CapabilityInvocation exit row is
     //    journaled regardless. The full cap-token issue→bind→revoke lifecycle is
     //    proven in `maos-capability::cap_tokens::tests::cli_subprocess_exit_revoke`.
+    // Story 11.4c AC2 — SSO/PDP governance happens at the composition root,
+    // before the kernel's frozen `CapabilityToken` is minted. Enterprise SSO
+    // verifies `MAOS_SSO_ASSERTION`; Enterprise PDP receives the verified
+    // principal attributes; only then does the kernel issue the token.
     let aph = argv_prefix_hash(&config.argv_prefix);
-    let token_id = match capability.issue_with_mediation(
+    let token_id = match issue_enterprise_governed_capability(
+        capability.as_ref(),
+        enterprise_runtime.as_deref(),
+        enterprise_pdp_runtime,
         0,
         Scope::CliSubprocessSpawn {
             cli_binary_path: resolved.clone(),
@@ -644,6 +720,8 @@ struct LiveButlerMcpPort {
     posture_hash: [u8; 32],
     mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
     capability: Arc<CapabilityRegistryAdapter>,
+    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
 }
 #[cfg(feature = "network")]
 impl LiveButlerMcpPort {
@@ -652,12 +730,16 @@ impl LiveButlerMcpPort {
         posture_hash: [u8; 32],
         mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
         capability: Arc<CapabilityRegistryAdapter>,
+        enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+        enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
     ) -> Self {
         Self {
             spirit_pid: std::sync::atomic::AtomicU32::new(spirit_pid),
             posture_hash,
             mcp_client,
             capability,
+            enterprise_runtime,
+            enterprise_pdp_runtime,
         }
     }
     // Comment budget on Winston's request
@@ -731,17 +813,18 @@ impl LiveButlerMcpPort {
             server: server.into(),
             tool: tool.into(),
         };
-        let token = self
-            .capability
-            .issue_with_mediation(
-                self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst),
-                scope,
-                60,
-                // Pass [0u8; 32] because the kernel's McpClientAdapter is hardcoded to verify using [0u8; 32]
-                [0u8; 32],
-                IntentClass::Standard,
-            )
-            .map_err(|_| butler::ButlerMcpError::TokenIssuanceFailed)?;
+        let token = issue_enterprise_governed_capability(
+            self.capability.as_ref(),
+            self.enterprise_runtime.as_deref(),
+            self.enterprise_pdp_runtime.as_ref(),
+            self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst),
+            scope,
+            60,
+            // Pass [0u8; 32] because the kernel's McpClientAdapter is hardcoded to verify using [0u8; 32]
+            [0u8; 32],
+            IntentClass::Standard,
+        )
+        .map_err(|_| butler::ButlerMcpError::TokenIssuanceFailed)?;
         let response = self
             .mcp_client
             .call(&token, server, tool, args)
@@ -779,6 +862,8 @@ struct LiveResearcherMcpPort {
     posture_hash: [u8; 32],
     mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
     capability: Arc<CapabilityRegistryAdapter>,
+    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
     handle: tokio::runtime::Handle,
     sem: Arc<tokio::sync::Semaphore>,
 }
@@ -789,12 +874,16 @@ impl LiveResearcherMcpPort {
         posture_hash: [u8; 32],
         mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
         capability: Arc<CapabilityRegistryAdapter>,
+        enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+        enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
     ) -> Self {
         Self {
             spirit_pid: std::sync::atomic::AtomicU32::new(spirit_pid),
             posture_hash,
             mcp_client,
             capability,
+            enterprise_runtime,
+            enterprise_pdp_runtime,
             handle: tokio::runtime::Handle::current(),
             sem: Arc::new(tokio::sync::Semaphore::new(
                 researcher::RESEARCHER_PARALLELISM,
@@ -851,6 +940,8 @@ impl LiveResearcherMcpPort {
             let capability = Arc::clone(&self.capability);
             let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
             let posture_hash = self.posture_hash;
+            let enterprise_runtime = self.enterprise_runtime.clone();
+            let enterprise_pdp_runtime = self.enterprise_pdp_runtime.clone();
             set.spawn(async move {
                 let _permit = sem.acquire().await.map_err(|e| {
                     researcher::ResearcherMcpError::CallFailed {
@@ -864,17 +955,17 @@ impl LiveResearcherMcpPort {
                         server: server.into(),
                         tool: tool.into(),
                     };
-                    let token = capability
-                        .issue_with_mediation(
-                            spirit_pid,
-                            scope,
-                            60,
-                            posture_hash,
-                            IntentClass::Standard,
-                        )
-                        .map_err(|e| {
-                            researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
-                        })?;
+                    let token = issue_enterprise_governed_capability(
+                        capability.as_ref(),
+                        enterprise_runtime.as_deref(),
+                        enterprise_pdp_runtime.as_ref(),
+                        spirit_pid,
+                        scope,
+                        60,
+                        posture_hash,
+                        IntentClass::Standard,
+                    )
+                    .map_err(researcher::ResearcherMcpError::TokenIssuanceFailed)?;
                     let response = mcp_client.call(&token, server, tool, args).map_err(|e| {
                         researcher::ResearcherMcpError::CallFailed {
                             server: server.into(),
@@ -950,6 +1041,8 @@ impl LiveResearcherMcpPort {
             let capability = Arc::clone(&self.capability);
             let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
             let posture_hash = self.posture_hash;
+            let enterprise_runtime = self.enterprise_runtime.clone();
+            let enterprise_pdp_runtime = self.enterprise_pdp_runtime.clone();
             set.spawn(async move {
                 let _permit = sem.acquire().await.map_err(|e| {
                     researcher::ResearcherMcpError::CallFailed {
@@ -963,17 +1056,17 @@ impl LiveResearcherMcpPort {
                         server: fetch_server.into(),
                         tool: fetch_tool.into(),
                     };
-                    let token = capability
-                        .issue_with_mediation(
-                            spirit_pid,
-                            scope,
-                            60,
-                            posture_hash,
-                            IntentClass::Standard,
-                        )
-                        .map_err(|e| {
-                            researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
-                        })?;
+                    let token = issue_enterprise_governed_capability(
+                        capability.as_ref(),
+                        enterprise_runtime.as_deref(),
+                        enterprise_pdp_runtime.as_ref(),
+                        spirit_pid,
+                        scope,
+                        60,
+                        posture_hash,
+                        IntentClass::Standard,
+                    )
+                    .map_err(researcher::ResearcherMcpError::TokenIssuanceFailed)?;
                     let response = mcp_client
                         .call(&token, fetch_server, fetch_tool, args)
                         .map_err(|e| researcher::ResearcherMcpError::CallFailed {
@@ -1649,7 +1742,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
     let capability = Arc::new(CapabilityRegistryAdapter::new(
-        crypto,
+        Arc::clone(&crypto),
         signing_key,
         boot_nonce,
         Arc::clone(&policy),
@@ -1716,6 +1809,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
+    // Story 11.4c — enterprise identity / at-rest / SIEM composition root.
+    //
+    // REAL adapter wiring (OIDC verify / envelope AEAD seal / SIEM projection),
+    // environment-gated on MAOS_SSO_* / MAOS_KMS_* / MAOS_SIEM_*. Zero env →
+    // None → the v1.5 byte-identical posture. A configured-but-unhealthy
+    // subsystem is demoted to fail-closed per subsystem at construction. Held
+    // in an `Arc` so the at-rest seal hook (loom-lite) and the SIEM forwarder
+    // (spawned consumer) share one runtime. Stays OUT of `api.rs` — a
+    // composition-root concern, not a kernel-core adapter (L1 / F8).
+    let enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>> =
+        match maos_bin::enterprise_identity::EnterpriseRuntime::from_env(
+            Arc::clone(&crypto),
+            audit_db_path.clone(),
+            boot_nonce,
+        ) {
+            Ok(rt) if !rt.is_noop() => {
+                eprintln!(
+                    "maos: enterprise identity/at-rest/SIEM runtime configured (Story 11.4c): sso={}, kms={}, siem={}",
+                    rt.sso_configured(),
+                    rt.kms_configured(),
+                    rt.siem_configured()
+                );
+                Some(Arc::new(rt))
+            }
+            Ok(_) => {
+                eprintln!(
+                    "maos: enterprise identity/at-rest/SIEM NOT configured — set \
+                     MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)"
+                );
+                None
+            }
+            Err(e) => return Err(format!("maos: enterprise runtime construction failed: {e}").into()),
+        };
+
     // Story 4.2 — HaltRegistry + WorkingMemoryOrchestrator for scalar-write pipeline.
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
     let orchestrator = Arc::new(
@@ -1768,6 +1895,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
                     Ok(store) => {
+                        // Story 11.4c — inject the at-rest envelope seal when
+                        // org-KMS is configured (real AEAD ciphertext on the
+                        // collective store; None → byte-identical Option-A
+                        // plaintext, the v1.5 default preserved).
+                        let store = match enterprise_runtime
+                            .as_ref()
+                            .and_then(|rt| rt.at_rest_seal_hook())
+                        {
+                            Some(hook) => store.with_at_rest_seal(Some(hook)),
+                            None => store,
+                        };
                         let store = Arc::new(store);
                         if let Err(e) = store.init_schema().await {
                             eprintln!(
@@ -2857,6 +2995,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Arc::clone(&transparency_log),
                     Arc::clone(&capability),
                     spirit_host.clone(),
+                    enterprise_runtime.clone(),
+                    enterprise_pdp_runtime.as_ref(),
                 )?;
                 return Ok(());
             }
@@ -3189,6 +3329,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 posture_hash,
                                 adapter,
                                 Arc::clone(&capability),
+                                enterprise_runtime.clone(),
+                                enterprise_pdp_runtime.clone(),
                             ));
                             butler = butler.with_mcp_port(
                                 Arc::clone(&live_mcp) as Arc<dyn butler::ButlerMcpPort>
@@ -3358,6 +3500,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 posture_hash,
                                 adapter,
                                 Arc::clone(&capability),
+                                enterprise_runtime.clone(),
+                                enterprise_pdp_runtime.clone(),
                             ));
                             researcher = researcher
                                 .with_mcp_port(
@@ -3382,17 +3526,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 "maos run: --live requested but no inference provider is configured"
                             })?
                             .to_string();
-                        let token = capability
-                            .issue_with_mediation(
-                                // FIXME(Patch 4): spirit_pid is 0 because pid is not yet
-                                // allocated; requires pre-alloc or deferred binding.
-                                0,
-                                Scope::ProviderInfer { provider },
-                                60,
-                                [0u8; 32],
-                                IntentClass::Standard,
-                            )
-                            .map_err(|e| format!("maos run: token issue failed: {e}"))?;
+                        let token = issue_enterprise_governed_capability(
+                            capability.as_ref(),
+                            enterprise_runtime.as_deref(),
+                            enterprise_pdp_runtime.as_ref(),
+                            // FIXME(Patch 4): spirit_pid is 0 because pid is not yet
+                            // allocated; requires pre-alloc or deferred binding.
+                            0,
+                            Scope::ProviderInfer { provider },
+                            60,
+                            [0u8; 32],
+                            IntentClass::Standard,
+                        )
+                        .map_err(|e| format!("maos run: token issue failed: {e}"))?;
                         let researcher_inference = InferencePortAdapter::new(
                             Arc::clone(&router),
                             Arc::clone(&capability),
@@ -3427,18 +3573,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             strict,
                         )
                         .map_err(|e| format!("maos run: cassette replay init failed: {e}"))?;
-                        let token = capability
-                            .issue_with_mediation(
-                                // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
-                                0,
-                                Scope::ProviderInfer {
-                                    provider: "replay".into(),
-                                },
-                                60,
-                                [0u8; 32],
-                                IntentClass::Standard,
-                            )
-                            .map_err(|e| format!("maos run: token issue failed: {e}"))?;
+                        let token = issue_enterprise_governed_capability(
+                            capability.as_ref(),
+                            enterprise_runtime.as_deref(),
+                            enterprise_pdp_runtime.as_ref(),
+                            // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
+                            0,
+                            Scope::ProviderInfer {
+                                provider: "replay".into(),
+                            },
+                            60,
+                            [0u8; 32],
+                            IntentClass::Standard,
+                        )
+                        .map_err(|e| format!("maos run: token issue failed: {e}"))?;
                         let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
                             Arc::new(replay);
                         // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
@@ -6449,17 +6597,19 @@ description = "smoke test spirit successor"
 
         // Issue a valid capability token for the in-process hello-Spirit
         let token_provider_id = router.default_id().unwrap_or("anthropic").to_string();
-        let token = capability
-            .issue_with_mediation(
-                0,
-                Scope::ProviderInfer {
-                    provider: token_provider_id,
-                },
-                60,
-                [0u8; 32],
-                IntentClass::Standard,
-            )
-            .map_err(|e| format!("failed to issue capability token: {e}"))?;
+        let token = issue_enterprise_governed_capability(
+            capability.as_ref(),
+            enterprise_runtime.as_deref(),
+            enterprise_pdp_runtime.as_ref(),
+            0,
+            Scope::ProviderInfer {
+                provider: token_provider_id,
+            },
+            60,
+            [0u8; 32],
+            IntentClass::Standard,
+        )
+        .map_err(|e| format!("failed to issue capability token: {e}"))?;
 
         // Print token_id for downstream test observability (Story 3.4 AC4).
         let token_id_hex: String = token
@@ -6514,6 +6664,49 @@ description = "smoke test spirit successor"
         eprintln!("maos: EnterprisePdpRuntime spawned (Story 11.4a)");
         handle
     });
+
+    // Story 11.4c — SIEM export consumer. Periodically tails the (quiesced)
+    // Transparency Log read-only and forwards redacted records to the
+    // configured localhost sink (MAOS_SIEM_FILE) with a wall-clock watermark
+    // (since_ns) so each record is forwarded once. On sink-down the runtime
+    // surfaces a buffered + operator-visible error (never a silent drop).
+    // Network/HTTPS sinks are additive-deferred and MUST be TLS-only when
+    // introduced (ADR-051); a persistent max-ts watermark is the production
+    // follow-up (this v2.0 reference uses the per-tick wall clock).
+    let _siem_forward_handle = enterprise_runtime.as_ref().map(|rt| {
+        let rt = Arc::clone(rt);
+        let cancel = cancel.clone();
+        tokio::spawn(async move {
+            let mut last_forwarded_ns: Option<u64> = None;
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+            interval.tick().await; // skip the immediate first tick
+            loop {
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = interval.tick() => {
+                        let now_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
+                        let mut filter = maos_audit::AuditFilter::default();
+                        if let Some(since) = last_forwarded_ns {
+                            filter.since_ns = Some(since.saturating_add(1));
+                        }
+                        match rt.forward_audit_to_siem(filter) {
+                            Ok(n) if n > 0 => eprintln!(
+                                "maos: SIEM export forwarded {n} record(s) to the localhost sink (Story 11.4c)"
+                            ),
+                            Ok(_) => {}
+                            Err(e) => eprintln!(
+                                "maos: SIEM export forward failed — records buffered, operator action required: {e}"
+                            ),
+                        }
+                        last_forwarded_ns = Some(now_ns);
+                    }
+                }
+            }
+        })
+    });
+    if enterprise_runtime.is_some() {
+        eprintln!("maos: SIEM export consumer spawned (Story 11.4c)");
+    }
 
     // Story 5.1 — IdleWatchdog spawned alongside the audit writer.
     let idle_watchdog = Arc::new(maos_kernel_core::scheduler::IdleWatchdog::new(
@@ -9612,7 +9805,7 @@ mod tests {
                 Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::new(10)),
             ),
         );
-        let port = LiveButlerMcpPort::new(0, [0u8; 32], client, cap);
+        let port = LiveButlerMcpPort::new(0, [0u8; 32], client, cap, None, None);
         assert_eq!(port.spirit_pid.load(std::sync::atomic::Ordering::SeqCst), 0);
         assert_eq!(port.posture_hash, [0u8; 32]);
     }

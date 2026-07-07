@@ -12,6 +12,7 @@ use std::time::Duration;
 use tokio_postgres::NoTls;
 
 use crate::schema;
+use crate::seal::{AtRestSeal, AtRestSealer};
 
 /// Configuration for the Loom-lite Postgres store.
 pub struct StoreConfig {
@@ -44,8 +45,11 @@ impl Default for StoreConfig {
 pub struct LoomLiteStore {
     pool: Pool,
     config: StoreConfig,
+    /// Story 11.4c (AC3): optional at-rest seal hook applied to value
+    /// payload bytes at the write layer. `None` (default) = byte-identical
+    /// Option-A plaintext.
+    at_rest_sealer: AtRestSealer,
 }
-
 /// Store-level error type.
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -59,6 +63,11 @@ pub enum StoreError {
     Serialization(String),
     #[error("operation timeout after {timeout_ms}ms")]
     Timeout { timeout_ms: u64 },
+    /// Story 11.4c (AC3): the configured at-rest seal hook failed. The write
+    /// fails CLOSED — no plaintext is persisted under a configured seal
+    /// posture.
+    #[error("at-rest seal error: {0}")]
+    AtRestSeal(String),
 }
 
 impl From<tokio_postgres::Error> for StoreError {
@@ -147,7 +156,34 @@ impl LoomLiteStore {
             .create_pool(Some(Runtime::Tokio1), NoTls)
             .map_err(|e| StoreError::Pool(e.to_string()))?;
 
-        Ok(Self { pool, config })
+        Ok(Self {
+            pool,
+            config,
+            at_rest_sealer: AtRestSealer::default(),
+        })
+    }
+
+    /// Story 11.4c (AC3): install an optional at-rest seal hook.
+    ///
+    /// When `Some`, value payload bytes are sealed (ciphertext) at the write
+    /// layer before persistence; when `None`, writes are byte-identical
+    /// Option-A plaintext (the default). On hook error the write fails
+    /// CLOSED — never persist plaintext under a configured seal posture.
+    ///
+    /// The hook is a **closure boundary**: `maos-loom-lite` carries NO
+    /// dependency on `maos-secrets` (L7 closure hygiene). The daemon
+    /// composition root builds the closure from
+    /// `maos_secrets::seal_at_rest_opt` bound to the configured
+    /// `KeyManagementPort` + `CryptoProvider` and injects it here.
+    pub fn with_at_rest_seal(mut self, seal: Option<AtRestSeal>) -> Self {
+        self.at_rest_sealer = AtRestSealer::new(seal);
+        self
+    }
+
+    /// Story 11.4c (AC3): the configured at-rest sealer (introspectable so
+    /// the composition root / operators can confirm seal posture).
+    pub fn at_rest_sealer(&self) -> &AtRestSealer {
+        &self.at_rest_sealer
     }
 
     /// Initialize the schema (idempotent).
@@ -223,6 +259,14 @@ impl LoomLiteStore {
         let (ns_kind, ns_detail) = schema::namespace_to_parts(namespace);
         let (val_kind, val_data) =
             schema::value_to_parts(&value).map_err(StoreError::Serialization)?;
+
+        // Story 11.4c (AC3): seal the value payload at the write layer. With
+        // a configured hook, `val_data` is transformed into ciphertext BEFORE
+        // the INSERT (sealed-at-rest); without one (default) it is
+        // byte-identical Option-A plaintext. On hook error the write fails
+        // CLOSED here — the `?` returns before `execute`, so NO plaintext is
+        // persisted under a configured seal posture.
+        let val_data = self.at_rest_sealer.seal(&val_data)?;
 
         // Story 11.2a (AC1): conditional LWW upsert.
         // Total order: (source_ts, source_region) lexicographic.
@@ -517,5 +561,56 @@ pub struct CollectiveRow {
 impl From<StoreError> for MemoryError {
     fn from(e: StoreError) -> Self {
         MemoryError::Storage(e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::seal::AtRestSeal;
+    use std::sync::Arc;
+
+    /// Story 11.4c (AC3): the `.with_at_rest_seal` builder installs the seal
+    /// hook on the store, and the default (`new`) carries NO hook — the
+    /// byte-identical Option-A plaintext posture.
+    ///
+    /// `LoomLiteStore::new` succeeds against a dead host because the deadpool
+    /// is lazy (no connection at construction — see `transport_failure.rs`),
+    /// so the builder wiring is verifiable without a live Postgres. The seal
+    /// TRANSFORM itself (the bytes that hit disk) is exercised in
+    /// [`seal::tests`](crate::seal::tests).
+    #[tokio::test]
+    async fn with_at_rest_seal_builder_installs_hook_default_is_none() {
+        let store = LoomLiteStore::new(StoreConfig {
+            connection_string:
+                "host=127.0.0.1 port=1 dbname=none connect_timeout=1".to_string(),
+            timeout_ms: 500,
+            ..StoreConfig::default()
+        })
+        .await
+        .expect("lazy pool: store creation succeeds even with a dead host");
+
+        // Default posture: no seal hook (byte-identical Option-A plaintext).
+        assert!(
+            !store.at_rest_sealer().is_configured(),
+            "default store MUST have no seal hook (Option-A plaintext)"
+        );
+
+        // Install a deterministic XOR stand-in for AEAD (no maos-secrets dep).
+        let xor_seal: AtRestSeal =
+            Arc::new(|d: &[u8]| Ok(d.iter().map(|b| b ^ 0xA5).collect()));
+        let sealed_store = store.with_at_rest_seal(Some(xor_seal));
+
+        assert!(
+            sealed_store.at_rest_sealer().is_configured(),
+            ".with_at_rest_seal(Some) MUST install the hook"
+        );
+
+        // `.with_at_rest_seal(None)` is an explicit return to plaintext posture.
+        let plain_store = sealed_store.with_at_rest_seal(None);
+        assert!(
+            !plain_store.at_rest_sealer().is_configured(),
+            ".with_at_rest_seal(None) MUST clear the hook"
+        );
     }
 }

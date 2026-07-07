@@ -25,4 +25,5 @@ pub mod canonical;
 pub mod migration;
 pub mod schema;
 pub mod replication;
+pub mod seal;
 pub mod store;

@@ -17,7 +17,14 @@ maos-domain = { path = "../maos-domain" }
 ed25519-dalek = { version = "2", features = ["std"] }
 sha2 = "0.10"
 hex = "0.4"
-# Story 9.4b AC-5 (re-ratification R3) — region-bound TL signing-key derivation.
+# Story 11.4c — out-of-kernel `identity.asserted` write helper needs 16 random
+# bytes for the `frame_id` PK (128-bit collision space, same width the kernel
+# uses). Already in the workspace closure (transitive via ring); pulled in as a
+# direct dep here so the write path doesn't synthesize entropy. The `std`
+# feature enables `std::error::Error for Error` / `From<Error> for io::Error`,
+# which the helper needs to map an entropy failure onto `AuditError::Io`.
+getrandom = { version = "0.2", features = ["std"] }
+ # Story 9.4b AC-5 (re-ratification R3) — region-bound TL signing-key derivation.
 # RustCrypto `hkdf` (HKDF-SHA256 over the existing `sha2`, pulls `hmac`) —
 # consistent with Decision B (NOT ring) and the audited RustCrypto stack;
 # no hand-rolled KDF (Winston ruling).

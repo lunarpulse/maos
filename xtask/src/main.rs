@@ -36,6 +36,8 @@ mod check_multi_region_slo;
 mod check_scale_churn;
 // Story 11.4a — enterprise PDP integration gate (per-leg independence, ADR-050).
 mod check_enterprise_pdp;
+// Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence, ADR-051).
+mod check_enterprise_identity;
 // Story 11.4b — ADR-024 sandbox-escape structural detector gate (per-leg independence).
 mod check_escape_detector;
 // Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
@@ -769,6 +771,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence).
+    #[command(name = "check-enterprise-identity")]
+    CheckEnterpriseIdentity {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.4b — ADR-024 sandbox-escape structural detector gate (per-leg independence).
     #[command(name = "check-escape-detector")]
     CheckEscapeDetector {
@@ -1183,6 +1191,7 @@ fn main() {
         Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
         Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
         Commands::CheckEnterprisePdp { json } => check_enterprise_pdp::run(json),
+        Commands::CheckEnterpriseIdentity { json } => check_enterprise_identity::run(json),
         Commands::CheckEscapeDetector { json } => check_escape_detector::run(json),
     };
     if let Err(e) = result {

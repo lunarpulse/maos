@@ -36,7 +36,9 @@ pub mod distillation; // NEW — Story 4.4 DistillationPort per AC2
 pub mod epistemic_scalar; // NEW — Story 8.10 AC1 cognitive-Spirit scalar-write port
 pub mod hot_swap; // NEW — ADR-041 (Epic 6 retro §A3 2026-05-28) Phase-4 extraction prep
 pub mod iac_bus;
+pub mod identity_assertion; // NEW — Story 11.4c IdentityAssertionPort per ADR-051 / NFR-Sec-18
 pub mod inference;
+pub mod key_management; // NEW — Story 11.4c KeyManagementPort per ADR-051 / NFR-Sec-19
 pub mod io_subsystem;
 pub mod log_recall; // NEW — Story 4.4 LogRecallPort per AC1
 pub mod mcp; // NEW — Story 5.5c McpClientPort + domain types
@@ -45,6 +47,7 @@ pub mod policy_decision; // NEW — Story 11.4a PolicyDecisionPort per ADR-050 /
 pub mod registry; // NEW — Story 5.5d SpiritRegistryClient port + domain types
 pub mod scheduler;
 pub mod security;
+pub mod siem_projection; // NEW — Story 11.4c SiemProjectionPort per ADR-051 / NFR-Aud-11
 pub mod self_telemetry; // NEW — Story 4.3 SelfTelemetryPort per FR56
 pub mod task;
 pub mod telemetry; // NEW — Story 5.3 in-flight task assignment record
@@ -60,7 +63,9 @@ pub use distillation::DistillationPort; // NEW — Story 4.4
 pub use epistemic_scalar::{EpistemicScalarPort, ScalarPortError}; // NEW — Story 8.10 AC1
 pub use hot_swap::HotSwapPort; // NEW — ADR-041 Phase-4 extraction prep
 pub use iac_bus::IacBusPort;
+pub use identity_assertion::{AuthenticatedPrincipal, IdentityAssertionPort, IdentityError}; // NEW — Story 11.4c
 pub use inference::InferencePort;
+pub use key_management::{KeyManagementPort, KmsError}; // NEW — Story 11.4c
 pub use io_subsystem::IoSubsystemPort;
 pub use log_recall::LogRecallPort; // NEW — Story 4.4
 pub use mcp::{McpAttribution, McpClientPort, McpError, McpRequest, McpResponse, McpTransportId}; // NEW — Story 5.5c
@@ -75,6 +80,7 @@ pub use registry::{
 }; // NEW — Story 5.5d
 pub use scheduler::SpiritSchedulerPort;
 pub use security::SecurityManagerPort;
+pub use siem_projection::{SiemProjectionError, SiemProjectionPort}; // NEW — Story 11.4c
 pub use self_telemetry::SelfTelemetryPort; // NEW — Story 4.3
 pub use telemetry::TelemetryStreamPort; // NEW
 pub use trace_sink::{

@@ -1,9 +1,11 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use maos_domain::ports::PolicyDecisionPort;
+use maos_domain::ports::{
+    PolicyDecisionError, PolicyDecisionPort, PolicyDecisionRequest, PolicyVerdict,
+};
 use maos_kernel_core::capability::cap_policy::PolicyTable;
 use maos_pdp::{FailClosedOutcome, FailClosedPosture, FailClosedReconciler};
 use tokio_util::sync::CancellationToken;
@@ -152,6 +154,36 @@ impl EnterprisePdpRuntime {
         apply_fail_closed_outcome(&self.policy, &outcome);
         self.log_posture_transition(outcome.posture, known_spirits.len(), &outcome);
         outcome.posture
+    }
+
+    /// Evaluate ONE live capability issuance with optional SSO principal
+    /// attributes. This is the 11.4c composition-root seam: the kernel still
+    /// mints the token, but the out-of-kernel PDP can deny the request using the
+    /// authenticated principal before `CapabilityToken` exists.
+    pub fn evaluate_issuance(
+        &self,
+        spirit_pid: u32,
+        capability_key: &str,
+        principal_attributes: Option<HashMap<String, String>>,
+    ) -> Result<PolicyVerdict, PolicyDecisionError> {
+        if !self.adapter.is_healthy() {
+            return Err(PolicyDecisionError::Unreachable {
+                reason: "enterprise PDP configured but unhealthy at issuance".to_string(),
+            });
+        }
+        let request = PolicyDecisionRequest {
+            spirit_pid,
+            capability_key: capability_key.to_string(),
+            principal_attributes,
+        };
+        let mut verdicts = self.adapter.evaluate(&[request])?;
+        if verdicts.len() != 1 {
+            return Err(PolicyDecisionError::Transport(format!(
+                "enterprise PDP returned {} verdict(s) for one issuance request",
+                verdicts.len()
+            )));
+        }
+        Ok(verdicts.remove(0))
     }
 
     pub fn spawn(mut self, cancel: CancellationToken) -> tokio::task::JoinHandle<()> {
@@ -354,6 +386,7 @@ mod tests {
     struct ScriptedState {
         denies: HashMap<u32, HashSet<String>>,
         failing: bool,
+        last_requests: Vec<PolicyDecisionRequest>,
     }
 
     impl ScriptedPort {
@@ -362,11 +395,15 @@ mod tests {
                 state: Arc::new(Mutex::new(ScriptedState {
                     denies,
                     failing: false,
+                    last_requests: Vec::new(),
                 })),
             }
         }
         fn set_failing(&self, failing: bool) {
             self.state.lock().failing = failing;
+        }
+        fn last_requests(&self) -> Vec<PolicyDecisionRequest> {
+            self.state.lock().last_requests.clone()
         }
     }
 
@@ -378,12 +415,13 @@ mod tests {
             &self,
             requests: &[PolicyDecisionRequest],
         ) -> Result<Vec<PolicyVerdict>, PolicyDecisionError> {
-            let state = self.state.lock();
+            let mut state = self.state.lock();
             if state.failing {
                 return Err(PolicyDecisionError::Unreachable {
                     reason: "injected PDP failure".into(),
                 });
             }
+            state.last_requests = requests.to_vec();
             Ok(requests
                 .iter()
                 .map(|r| {
@@ -417,6 +455,28 @@ mod tests {
             Duration::from_nanos(TTL_NANOS),
         )
         .expect("refresh_interval < staleness_ttl is a valid pair")
+    }
+
+    #[test]
+    fn evaluate_issuance_forwards_principal_attributes() {
+        let port = Arc::new(ScriptedPort::new(HashMap::new()));
+        let policy = Arc::new(PolicyTable::new());
+        let runtime = build_runtime(Arc::clone(&port), Arc::clone(&policy));
+        let attrs = HashMap::from([
+            ("sub".to_string(), "alice".to_string()),
+            ("iss".to_string(), "https://issuer.example".to_string()),
+        ]);
+
+        let verdict = runtime
+            .evaluate_issuance(42, "provider.infer", Some(attrs.clone()))
+            .expect("healthy PDP should evaluate one issuance request");
+
+        assert_eq!(verdict, PolicyVerdict::Allow);
+        let requests = port.last_requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].spirit_pid, 42);
+        assert_eq!(requests[0].capability_key, "provider.infer");
+        assert_eq!(requests[0].principal_attributes.as_ref(), Some(&attrs));
     }
 
     fn insert_spirit(policy: &PolicyTable, pid: u32) {

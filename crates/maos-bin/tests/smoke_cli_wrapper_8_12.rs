@@ -20,6 +20,16 @@ fn workspace_root() -> &'static str {
     concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
 }
 
+fn path_with_target_debug() -> std::ffi::OsString {
+    let mut paths = Vec::new();
+    paths.push(std::path::PathBuf::from(workspace_root()).join("target/debug"));
+    paths.push(std::path::PathBuf::from(workspace_root()).join("target/debug/deps"));
+    if let Some(existing) = std::env::var_os("PATH") {
+        paths.extend(std::env::split_paths(&existing));
+    }
+    std::env::join_paths(paths).expect("target/debug PATH entries are valid")
+}
+
 struct IsolatedDataHome {
     path: std::path::PathBuf,
 }
@@ -46,6 +56,7 @@ fn maos_run_cli_wrapper_worker_spawns_real_subprocess() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/worker/manifest.toml", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
+        .env("PATH", path_with_target_debug())
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos-bin");

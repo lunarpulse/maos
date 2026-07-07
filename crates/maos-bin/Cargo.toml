@@ -21,6 +21,9 @@ network = [
     "dep:maos-notify-push",
     "dep:rcgen",
     "dep:maos-a2a",
+    "dep:maos-sso",
+    "dep:maos-secrets",
+    "dep:maos-siem",
 ]
 air-gap = []  # Compile-out all networking: reqwest, hyper client, tokio::net, DNS resolvers
 wasm-host = ["dep:maos-wasm-host"]  # Story 11.1a — OFF by default. Gates the vendored `wasmtime` engine + maos-wasm-host/maos-wasm-runner. OFF-by-default is the export-control precondition (5D002.c.1) — see docs/compliance/export-counsel-precondition.md.
@@ -38,6 +41,9 @@ maos-kernel-core = { path = "../maos-kernel-core" }
 maos-loom-lite = { path = "../maos-loom-lite" }
 maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY
 maos-escape-detector = { path = "../maos-escape-detector" }   # Story 11.4b — out-of-kernel sandbox-escape detector (ADR-024); read-only TL consumer wired at the composition root (NOT a kernel-core adapter; stays out of api.rs)
+maos-sso = { path = "../maos-sso", optional = true }   # Story 11.4c — OIDC verify adapter (network-gated; composed at the root)
+maos-secrets = { path = "../maos-secrets", optional = true }   # Story 11.4c — at-rest envelope AEAD (network-gated; composed at the root)
+maos-siem = { path = "../maos-siem", optional = true }   # Story 11.4c — read-only TL projection + localhost SIEM sink (network-gated; composed at the root, stays out of api.rs)
 maos-host = { path = "../maos-host" }   # Story 11.1a — Spirit Host Port trait types (needed even without wasmtime; the host abstraction is engine-agnostic)
 maos-wasm-host = { path = "../maos-wasm-host", optional = true }   # Story 11.1a — wasmtime component adapter, behind `wasm-host` feature (export-control OFF-by-default, AC6)
 maos-mcp = { path = "../maos-mcp", optional = true }
@@ -80,6 +86,8 @@ ring = "0.17"
 serde_cbor = "0.11"
 tar = { version = "0.4", default-features = false }
 smallvec = { version = "1", features = ["serde"] }
+thiserror = "2"
 
 [dev-dependencies]
 tempfile = "3"
+rusqlite = { version = "0.31", features = ["bundled"] }   # Story 11.4c — Available-arm wiring tests (TL schema fixture)

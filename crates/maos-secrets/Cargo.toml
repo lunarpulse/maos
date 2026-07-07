@@ -8,3 +8,13 @@ rust-version.workspace = true
 description = "MAOS secrets — OS keyring and secret-provider adapters (NFR-Sec-16)"
 
 [dependencies]
+maos-domain = { path = "../maos-domain" }
+getrandom = "0.3"
+ring = "0.17"
+
+[dev-dependencies]
+maos-kernel-core = { path = "../maos-kernel-core" }
+
+[features]
+default = []
+kms-fault-inject = []

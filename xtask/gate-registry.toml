@@ -114,6 +114,10 @@ gates = [
     # seccomp-capable runners). Per-leg independence. Advisory at v1.0/v1.5;
     # blocking at v2.0.
     "check-escape-detector",
+    # Story 11.4c (AC6) — enterprise identity + at-rest + SIEM gate
+    # (OIDC, identity provenance, KMS seal, SIEM redaction export, fail-closed).
+    # Per-leg independence. Advisory at v1.0/v1.5; blocking at v2.0.
+    "check-enterprise-identity",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -284,6 +288,12 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 [[ship_gate]]
 name = "check-escape-detector"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+# Story 11.4c (AC6) — enterprise identity + at-rest + SIEM. Advisory at
+# v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+[[ship_gate]]
+name = "check-enterprise-identity"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+
 
 
 owasp_freeze_hash = "2c4df8094d116903261320ad2999290671c3129beb71e740d690a43f56816f20"

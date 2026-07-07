@@ -42,6 +42,19 @@ coverage:
       (maos-domain) + in-process Cedar reference adapter (maos-pdp); bounded
       OperatorPolicyConfig.per_capability_deny FLAG-Winston re-pin (23023→23040).
       Primary NFR: NFR-Sec-17.
+  ADR-051:
+    gates:
+    - check-enterprise-identity
+    - check-dependency-closure
+    - check-kernel-baseline
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-07-06'
+    notes: |
+      Story 11.4c enterprise identity + at-rest + SIEM anchor. Out-of-kernel
+      IdentityAssertionPort / KeyManagementPort / SiemProjectionPort; OIDC
+      reference verifier, dev/CI local-master-key KMS, and SIEM TL projection
+      are additive leaves. Fault-inject features are blocked from release builds.
   ADR-024:
     gates:
     - check-escape-detector
@@ -637,11 +650,16 @@ coverage:
     valid_until: '2027-06-12'
     notes: Story 9.2 50/50 clean-removal + 0/100 leakage floor over separate probe; structural replay, no live judge
   NFR-Aud-11:
-    gates: []
+    gates:
+    - check-enterprise-identity
     enforcement: advisory-until-engagement
     corpora: []
-    phase: v1.0
-    valid_until: '2027-05-12'
+    phase: v2.0+
+    valid_until: '2027-07-06'
+    notes: |
+      Story 11.4c satisfies the SIEM half of NFR-Aud-11 with read-only TL
+      export through `query_with_redaction` before NDJSON/CEF/RFC5424 projection.
+      OTel/tracing export remains covered by its earlier slice.
   NFR-Aud-12:
     gates: []
     enforcement: advisory-until-engagement
@@ -1263,6 +1281,31 @@ coverage:
       (maos-pdp). Real evaluation (policy-swap-flips-verdict), deny-falsifiable
       (pdp-fault-inject), fail-closed on unavailability; absent→BLOCK@v2.0.
       ADR-050 is the enterprise-deployment anchor for this NFR.
+  NFR-Sec-18:
+    gates:
+    - check-enterprise-identity
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-07-06'
+    notes: |
+      Story 11.4c OIDC identity assertion: `IdentityAssertionPort` plus
+      `maos-sso` static-JWKS verifier, RS256/ES256 algorithm allowlist,
+      `alg:none` and HS256-confusion negatives, and principal-governed
+      authorization provenance.
+  NFR-Sec-19:
+    gates:
+    - check-enterprise-identity
+    - check-dependency-closure
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-07-06'
+    notes: |
+      Story 11.4c opt-in at-rest envelope encryption for loom-lite
+      Collective adapter rows plus out-of-kernel identity assertion writes:
+      `KeyManagementPort`, dev/CI local-master-key KMS, wrong-key failure,
+      default plaintext preserved when KMS is unconfigured. Generic
+      kernel-authored Transparency Log payload encryption and kernel-core
+      Private/Shared at-rest remain deferred and must not be overclaimed.
   NFR-Sec-2:
     gates: []
     corpora: []
