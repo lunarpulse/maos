@@ -5,12 +5,12 @@ performs for each participant Spirit after the trial: re-loading the binary on a
 clean VM, checking SBOM completeness against the lockfile, and verifying the
 signing chain against the trusted root.
 
-> **Scope (F6→C):** these checks are **operational verification, not automated
-> gate logic.** They are recorded per participant as `sbom_verified` and
-> `signing_chain_verified` in `trial-results.toml`, but
-> `check-third-party-trial` **does not assert** them as blocking. They surface
-> supply-chain health; the ship decision at N=12 is carried by the count floors
-> and per-participant success conjunction (see `README.md` §4–§5).
+> **v1.0/v1.5 scope (F6→C):** these checks are **operational
+> verification, not automated gate logic.** They are recorded per participant
+> as `sbom_verified` and `signing_chain_verified` in `trial-results.toml`, but
+> `check-third-party-trial` does not assert them as blocking before v2.0. They
+> surface supply-chain health; the v1.0/v1.5 ship decision is carried by the
+> count floors and per-participant success conjunction.
 
 ## 1. Re-load the signed Spirit binary on a clean VM
 
@@ -73,5 +73,32 @@ the SBOM/signing steps below.
 4. Record `signing_chain_verified = true`; a break in the chain records `false`
    and triggers the emergency-rotation steps in the release-signing runbook.
 
-> **Reminder:** steps 2 and 3 populate advisory booleans only. At N=12 the trust
-> boundary is PR review (F4→A), not cryptographic signing — see `README.md` §5.
+> **Reminder for v1.0/v1.5:** steps 2 and 3 populate advisory booleans only.
+> At those tiers the trust boundary is PR review (F4→A), not cryptographic
+> signing — see `README.md` §5. v2.0 changes this via ADR-053.
+
+## 4. v2.0: CI-bot-derived attestation is asserted, not advisory
+
+ADR-053 graduates this runbook from human-path evidence to a machine-derived
+attestation seam at v2.0:
+
+1. A fresh CI runner starts with no prior MAOS state.
+2. The producer gate re-loads the candidate and derives `binary_loads` and
+   `frames_run` from execution, not from the participant file.
+3. SBOM completeness is derived by reconciling the candidate-shipped
+   `Cargo.lock` against an independently recomputed `cargo tree --locked`
+   closure, plus the existing dependency-closure deny policy. CycloneDX/SPDX
+   emission remains deferred to v2.5; the v2.0 bill of materials is the
+   reconciled closure.
+4. Signing-chain truth is derived by `maos_audit::release_verify` against
+   `RELEASE_PUBKEY`.
+5. Halt recall is derived through `maos-eval` scoring over the
+   class-appropriate subset and records the corpus SHA/provisional stamp.
+6. The producer emits participant records with
+   `derivation_provenance = "maos-trial-attestation-v2"`.
+
+At `MAOS_SHIP_PHASE=v2_0`, `check-third-party-trial` default-denies any
+present participant record lacking that provenance stamp and folds
+`sbom_verified` + `signing_chain_verified` into the participant success
+conjunction. Hand-authored v2.0 TOML is therefore rejected; v1.0/v1.5 TOML stays
+valid for its original advisory SBOM/signing boundary.

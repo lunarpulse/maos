@@ -28,7 +28,8 @@ maos-kernel-core = { path = "../crates/maos-kernel-core" }
 maos-loom-lite = { path = "../crates/maos-loom-lite" }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time"] }
 maos-skill = { path = "../crates/maos-skill" }   # Story 7.4 — check-skill-schema round-trip gate
-maos-eval = { path = "../crates/maos-eval" }     # Story 7.5b — nfr-onb-1-gate (stratification + cohort evaluator + seam)
+maos-eval = { path = "../crates/maos-eval", features = ["trial-attestation"] } # Story 7.5b + Story 11.7 trial-attestation gate
+maos-fkcs = { path = "../crates/maos-fkcs" }      # Story 11.7 — Chinese-wall proxy cohort reuse for trial-attestation gate
 clap = { version = "4.5", features = ["derive"] }
 syn = { version = "2.0", features = ["full", "visit"] }
 quote = "1.0"

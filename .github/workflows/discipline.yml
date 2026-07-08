@@ -2072,6 +2072,12 @@ jobs:
   # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
   check-third-party-trial:
     runs-on: ubuntu-latest
+    env:
+      # P14: the v2.0 default-deny (require producer-signed attestations) only
+      # fires when MAOS_SHIP_PHASE=v2_0. Default to v1_5 (advisory) until the repo
+      # flips this variable to v2_0 at the v2.0 ship gate — the flip is a config
+      # change, not a code change, and the proven-red tests exercise the v2_0 path.
+      MAOS_SHIP_PHASE: ${{ vars.MAOS_SHIP_PHASE || 'v1_5' }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2686,10 +2692,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-trial-attestation-${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-trial-attestation gate
+      - name: Run check-trial-attestation gate (green path)
         run: |
           set -o pipefail
           cargo run -p xtask -- check-trial-attestation --json 2>&1 | tee /tmp/trial-attestation-gate.json
+      # P6/§A6: the proven-red vectors (the falsifier legs each watched RED-then-GREEN)
+      # and the real-harness tests (D2 — derive_reload_facts_from_local_runner over a
+      # real LocalRunner, derive_halt_recall_from_onboarding_score over the real
+      # scorer, recompute_cargo_tree_locked over the real workspace). CI must run
+      # these, not just the green gate JSON, or the §A6 "watch each leg red" guarantee
+      # is not delivered.
+      - name: Run trial-attestation proven-red + real-harness tests
+        run: |
+          cargo test -p maos-eval --features trial-attestation
+          cargo test -p xtask --test trial_attestation_proven_red -- --test-threads=1
+          cargo test -p xtask --test story_10_2_proven_red -- trial_gate --test-threads=1
   # Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate
   # (out-of-kernel read-only TL consumer; per-leg independence). The live-seccomp
   # leg builds the forbidden-syscall-probe fixture first (real seccomp SIGSYS

@@ -15,6 +15,8 @@ use std::path::Path;
 pub struct TrialResults {
     pub trial: TrialSection,
     pub participant: Vec<Participant>,
+    #[serde(default)]
+    pub derivation_provenance: Option<DerivationProvenance>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -32,6 +34,11 @@ pub struct TrialSection {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct DerivationProvenance {
+    pub stamp: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Participant {
     pub id: String,
     pub stratum: Vec<String>,
@@ -41,6 +48,8 @@ pub struct Participant {
     pub halt_recall: f64,
     pub sbom_verified: bool,
     pub signing_chain_verified: bool,
+    #[serde(default)]
+    pub derivation_provenance: Option<String>,
 }
 
 /// Reject negative counts — these indicate malformed input, not a failed assertion.
@@ -79,9 +88,82 @@ fn wilson_ci(successes: i64, n: i64) -> (f64, f64) {
 }
 
 const RESULTS_PATH: &str = "docs/third-party-trial/results/trial-results.toml";
+fn current_phase() -> String {
+    std::env::var("MAOS_SHIP_PHASE").unwrap_or_else(|_| "v1_5".to_string())
+}
+
+fn is_v2_blocking_phase(phase: &str) -> bool {
+    // P14: tolerate surrounding whitespace + the dotted `v2.0` spelling so a
+    // casing/typo in the CI env var does not silently downgrade v2.0 to advisory.
+    phase.trim().eq_ignore_ascii_case("v2_0") || phase.trim().eq_ignore_ascii_case("v2.0")
+}
+
+/// Resolve a repo-relative path against the workspace root (not the CWD), so the
+/// gate still finds `trial-results.toml` / `derived-attestations.json` when invoked
+/// from a subdirectory (P15). Walks up from CWD to the dir containing both a
+/// workspace `Cargo.toml` and an `xtask/` directory.
+fn resolve_workspace_path(relative: &str) -> Option<std::path::PathBuf> {
+    let cwd = std::env::current_dir().ok()?;
+    let mut dir: Option<&std::path::Path> = Some(&cwd);
+    while let Some(d) = dir {
+        if d.join("Cargo.toml").exists() && d.join("xtask").exists() {
+            return Some(d.join(relative));
+        }
+        dir = d.parent();
+    }
+    None
+}
+
+/// Load the producer-emitted, producer-signed per-participant derived attestations
+/// (D1). Each signature is verified against the producer pubkey; only validly-
+/// signed attestations are returned. Returns an empty map when the file is absent
+/// (v1.0/v1.5 path — provenance is not required there).
+fn load_signed_attestations(
+) -> std::collections::HashMap<String, maos_eval::trial_attestation::DerivedParticipantAttestation> {
+    let path = match resolve_workspace_path(maos_eval::trial_attestation::DERIVED_ATTESTATIONS_PATH) {
+        Some(p) => p,
+        None => std::path::PathBuf::from(maos_eval::trial_attestation::DERIVED_ATTESTATIONS_PATH),
+    };
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        // Absent file is the v1.0/v1.5 path (provenance not required) — silent.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return std::collections::HashMap::new(),
+        // Any OTHER read failure (permissions, truncated) is a real defect — surface
+        // it so an operator is not misled by 12× "missing producer-signed" messages.
+        Err(e) => {
+            eprintln!("check-third-party-trial: WARNING — derived-attestations.json unreadable: {e}");
+            return std::collections::HashMap::new();
+        }
+    };
+    let signed: Vec<maos_eval::trial_attestation::SignedAttestation> =
+        match serde_json::from_str(&content) {
+            Ok(v) => v,
+            // A malformed/truncated JSON is a producer bug, not an absent file — surface it.
+            Err(e) => {
+                eprintln!("check-third-party-trial: WARNING — derived-attestations.json malformed: {e}");
+                return std::collections::HashMap::new();
+            }
+        };
+    let pubkey = maos_eval::trial_attestation::producer_pubkey();
+    let mut map = std::collections::HashMap::new();
+    for att in signed
+        .into_iter()
+        .filter_map(|s| maos_eval::trial_attestation::verify_signed_attestation(&s, &pubkey).ok())
+    {
+        let id = att.participant_id.clone();
+        if map.insert(id.clone(), att).is_some() {
+            eprintln!(
+                "check-third-party-trial: WARNING — duplicate signed attestation for participant {id} (last wins)"
+            );
+        }
+    }
+    map
+}
+
 
 pub fn run(json: bool) -> Result<(), String> {
-    let path = Path::new(RESULTS_PATH);
+    let path = resolve_workspace_path(RESULTS_PATH)
+        .unwrap_or_else(|| Path::new(RESULTS_PATH).to_path_buf());
 
     if !path.exists() {
         // Advisory: trial-results.toml absent — third-party trial still pending.
@@ -132,6 +214,29 @@ pub fn run(json: bool) -> Result<(), String> {
     })?;
 
     let t = &results.trial;
+    let current_phase = current_phase();
+    let require_derivation_provenance = is_v2_blocking_phase(&current_phase);
+    // D1: at v2.0 provenance is a producer-SIGNED per-participant derived
+    // attestation (verified against the producer pubkey), never a pasteable
+    // bare-string stamp and never a file-level stamp that launders all
+    // participants. The producer (`check-trial-attestation`) emits these.
+    let signed_attestations = load_signed_attestations();
+    // R2-D2 guard: the dev producer keypair is PUBLIC (committed for local/test
+    // builds). At the v2.0 ship gate the consumer MUST NOT trust it — otherwise a
+    // coordinator with repo read could mint accepted attestations with the public
+    // dev seed. Production CI sets MAOS_TRIAL_PRODUCER_PUBKEY to a real key; if it
+    // is unset at v2.0, fail loud rather than silently trusting the forgeable dev key.
+    if require_derivation_provenance {
+        let trusted = maos_eval::trial_attestation::producer_pubkey();
+        let dev_pubkey =
+            maos_audit::sealed_export::derive_pubkey(&maos_eval::trial_attestation::producer_dev_seed());
+        if trusted == dev_pubkey {
+            return Err(format!(
+                "check-third-party-trial: FAIL — v2.0 requires MAOS_TRIAL_PRODUCER_PUBKEY set to a \
+                 production key (the committed dev key is not trusted at the v2.0 ship gate)"
+            ));
+        }
+    }
 
     // Reject negative counts up front (input validity, not assertion).
     let counts = [
@@ -157,7 +262,13 @@ pub fn run(json: bool) -> Result<(), String> {
         ));
     }
     // #1/#21: participant records must match the declared cohort exactly and be unique.
-    if results.participant.len() != t.participants_total as usize {
+    let participants_total = usize::try_from(t.participants_total).map_err(|_| {
+        format!(
+            "check-third-party-trial: FAIL — participants_total={} overflows usize",
+            t.participants_total
+        )
+    })?;
+    if results.participant.len() != participants_total {
         return Err(format!(
             "check-third-party-trial: FAIL — participant records={} != participants_total={} \
              (cohort must be fully enumerated; self-reported count is not trusted)",
@@ -191,41 +302,91 @@ pub fn run(json: bool) -> Result<(), String> {
     let mut failures: Vec<String> = Vec::new();
     let mut derived_successes: i64 = 0;
     for p in &results.participant {
-        // halt_recall must be a finite probability in [0,1] regardless of producer status.
-        if !p.halt_recall.is_finite() {
+        // D1: at v2.0 the EFFECTIVE fields come from the producer-SIGNED derived
+        // attestation (a coordinator cannot forge it without the producer private
+        // key). The self-reported TOML fields are probes the derived value
+        // overrides — this closes the "10.2 canned-trap" (a planted `sbom_verified
+        // = true` over a tampered artifact no longer turns the gate green).
+        let signed = signed_attestations.get(&p.id);
+        let (produced_binary, binary_loads, frames_run, halt_recall, sbom_verified, signing_chain_verified) =
+            if require_derivation_provenance {
+                match signed {
+                    Some(att) => (
+                        att.produced_binary,
+                        att.binary_loads,
+                        att.frames_run,
+                        att.halt_recall,
+                        att.sbom_verified,
+                        att.signing_chain_verified,
+                    ),
+                    None => {
+                        failures.push(format!(
+                            "participant {} missing producer-signed derived attestation (v2.0 default-deny)",
+                            p.id
+                        ));
+                        (p.produced_binary, false, 0_i64, 0.0_f64, false, false)
+                    }
+                }
+            } else {
+                (
+                    p.produced_binary,
+                    p.binary_loads,
+                    p.frames_run,
+                    p.halt_recall,
+                    p.sbom_verified,
+                    p.signing_chain_verified,
+                )
+            };
+
+        // halt_recall must be a finite probability in [0,1] (on the EFFECTIVE value).
+        if !halt_recall.is_finite() {
             failures.push(format!(
                 "participant {} halt_recall={:.3} (not finite)",
-                p.id, p.halt_recall
+                p.id, halt_recall
             ));
-        } else if !(0.0..=1.0).contains(&p.halt_recall) {
+        } else if !(0.0..=1.0).contains(&halt_recall) {
             failures.push(format!(
                 "participant {} halt_recall={:.3} (out of [0,1])",
-                p.id, p.halt_recall
+                p.id, halt_recall
             ));
         }
 
-        // Success conjunction (README §4): produced_binary && binary_loads && frames_run>=1000
-        // && halt_recall in [0.85, 1.0]. A participant failing ANY term is a non-success.
-        let is_success = p.produced_binary
-            && p.binary_loads
-            && p.frames_run >= 1000
-            && p.halt_recall.is_finite()
-            && p.halt_recall >= 0.85
-            && p.halt_recall <= 1.0;
+        // Success conjunction over the EFFECTIVE (derived at v2.0) fields.
+        let v2_attestation_ok = !require_derivation_provenance
+            || (signed.is_some() && sbom_verified && signing_chain_verified);
+        let is_success = produced_binary
+            && binary_loads
+            && frames_run >= 1000
+            && halt_recall.is_finite()
+            && halt_recall >= 0.85
+            && halt_recall <= 1.0
+            && v2_attestation_ok;
         if is_success {
             derived_successes += 1;
-        } else if p.produced_binary && p.binary_loads {
+        } else if produced_binary && binary_loads {
             // Producer that didn't clear the quality bar — flag the specific shortfall.
-            if p.frames_run < 1000 {
+            if frames_run < 1000 {
                 failures.push(format!(
                     "participant {} ran {} frames (< 1000)",
-                    p.id, p.frames_run
+                    p.id, frames_run
                 ));
             }
-            if p.halt_recall.is_finite() && p.halt_recall < 0.85 {
+            if halt_recall.is_finite() && halt_recall < 0.85 {
                 failures.push(format!(
                     "participant {} halt_recall={:.3} (< 0.85)",
-                    p.id, p.halt_recall
+                    p.id, halt_recall
+                ));
+            }
+            if require_derivation_provenance && !sbom_verified {
+                failures.push(format!(
+                    "participant {} derived sbom_verified=false (v2.0)",
+                    p.id
+                ));
+            }
+            if require_derivation_provenance && !signing_chain_verified {
+                failures.push(format!(
+                    "participant {} derived signing_chain_verified=false (v2.0)",
+                    p.id
                 ));
             }
         }
@@ -336,6 +497,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 "methodology_version": t.methodology_version,
                 "wilson_ci_lower": ci_lower,
                 "wilson_ci_upper": ci_upper,
+                "current_phase": current_phase,
+                "provenance_required": require_derivation_provenance,
                 "failures": failures,
             })
         );

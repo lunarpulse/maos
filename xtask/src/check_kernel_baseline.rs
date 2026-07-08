@@ -58,7 +58,7 @@ pub fn run(json: bool) -> Result<(), String> {
     Ok(())
 }
 
-fn check() -> Result<Report, String> {
+pub fn check() -> Result<Report, String> {
     let pinned_lines = read_pinned(Path::new(BASELINE_TOML))?;
     let actual_lines = count_rs_lines(Path::new(KERNEL_SRC))?;
     Ok(Report {

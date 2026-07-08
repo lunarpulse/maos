@@ -1613,11 +1613,23 @@ coverage:
   NFR-Test-8:
     gates:
     - check-third-party-trial
+    - check-trial-attestation
     enforcement: blocking-when-present
     corpora: []
-    phase: v1.0
+    phase: v2.0
     valid_until: '2027-05-12'
-    notes: Third-party trial N=12 gate. Wilson CI advisory, raw count + stratification
-      + per-participant conjunction BLOCKING when results are present (derive-from-detail, with
-      successes and strata reconciled against participant records). Absent = advisory
-      (trial pending). Distinct from NFR-Test-7/NFR-Sec-10 which are advisory at v1.0.
+    trial_split:
+      v2_0_infrastructure_delivered: true
+      v2_0_cohort: in-house-chinese-wall-proxy
+      v2_0_score: advisory-proof-of-mechanism
+      v2_0_sbom_signing: derived-and-asserted
+      v2_0_sbom_emit: deferred-v2_5
+      v2_5_external_n12_owner: Epic-14
+    notes: |
+      Third-party trial N=12 gate. Wilson CI advisory, raw count + stratification
+      + per-participant conjunction BLOCKING when results are present
+      (derive-from-detail, with successes and strata reconciled against
+      participant records). Absent = advisory in v1.0/v1.5; at v2.0
+      `check-third-party-trial` default-denies present non-provenanced records
+      and `check-trial-attestation` derives clean-reload/SBOM/signing/halt facts.
+      Genuine external N=12 execution remains v2.5/Epic-14.
