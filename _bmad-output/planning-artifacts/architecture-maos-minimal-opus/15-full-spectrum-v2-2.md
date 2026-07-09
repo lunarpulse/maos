@@ -1,6 +1,8 @@
 # 15. Full-Spectrum v2.2 Architecture (J3 Team Nexus + Reza Cortex)
 
-**Status:** `proposed-v2.2` — drafted 2026-07-06 (Step 2 of the full-PRD planning plan, operator-directed functionality-first); **pending party-mode ratification.** Fork choices carry `[ASSUMPTION]` tags; the ratification agenda is §15.10. Decision trail: `_bmad-output/planning-artifacts/architecture/architecture-maos-2026-07-06/.memlog.md`. **Reviewer gate applied 2026-07-06** (reality-check · adversarial · rubric/reconcile — 3× PASS-WITH-FIXES; all 14 adversarial rule-tightenings folded in below; full reviews in `…/architecture-maos-2026-07-06/reviews/`).
+**Status:** `RATIFIED-v2.2` — drafted 2026-07-06 (Step 2 of the full-PRD planning plan, operator-directed functionality-first); **party-mode ratified 2026-07-09 (Lunarpulse sign-off; all 8 §15.10 forks ratified as recommended, no overrides).** Ratification record: §15.11. Decision trail: `_bmad-output/planning-artifacts/architecture/architecture-maos-2026-07-06/.memlog.md`. **Reviewer gate applied 2026-07-06** (reality-check · adversarial · rubric/reconcile — 3× PASS-WITH-FIXES; all 14 adversarial rule-tightenings folded in below; full reviews in `…/architecture-maos-2026-07-06/reviews/`).
+
+> **⚠ ADR RENUMBERING (ratification hygiene, 2026-07-09):** the draft below numbered its new ADRs 052–055, but `docs/adr/` shows **ADR-052 (FKCS, Story 11.5) and ADR-053 (third-party trial attestation, Story 11.7) already landed** — the draft only caught the 051 collision. The v2.2 ADRs therefore shift **+2**: cohort mesh **052→054**, multi-tenant Loom **053→055**, FR37 vetting **054→056**, constitutional ceiling **055→057**. `ADV-05x-*` sub-decision tags inherit their parent ADR's new number. §15.8 and §15.11 carry the corrected numbers; inline draft numbers in §15.2–15.5 are as-drafted — the §15.11 record and §15.8 table are authoritative. The two §15.10 BLOCKER forks retain their agenda names: "ADR-053 cross-team keys" = **ADR-055 ADV-055-1**; "ADR-055 numbers" = **ADR-057**.
 
 This section extends the minimal architecture to the two remaining PRD journeys — **J3 Marcus Team Nexus** (§10.7.1, committed at v2.2) and **Reza single-org cross-team Cortex** (§10.7.2, committed at v2.2) — plus the FR37 vetting machinery and the post-v2.0 constitutional ceiling. Everything here is **additive**: the §0.6 foundational commitments and the §3.2 invariants I1–I14 are unchanged, exactly as §10.7.3 promised. Working posture inherited from Epics 9–11: **zero-kernel-Δ by default**; any kernel-core delta is a FLAG-Winston pinned re-pin, never a side effect.
 
@@ -18,7 +20,7 @@ This section extends the minimal architecture to the two remaining PRD journeys 
 
 **In flight (NOT yet built — v2.2 designs that lean on these carry the dependency explicitly):** 11.4c enterprise identity/at-rest/SIEM (`ready-for-dev`, preflight resolved 2026-07-06; **ADR-051 is a reservation, not a landed ADR**) — §15.3 org-KMS composition and the §15.6 Enterprise reference Spirit depend on it. 11.5 FKCS infrastructure and 11.7 trial infrastructure (`backlog`, sequence last). Epic 11 lives on branch `epic-11`, un-merged; the shippable line still holds on the two external v1.5 items (pen-test, export counsel).
 
-## 15.2 J3 cohort mesh — proposed ADR-052
+## 15.2 J3 cohort mesh — proposed ADR-054 (was draft-052; ratified 2026-07-09)
 
 **Decision.** The N-host topology (J3's 8-host team, Reza's cross-team links) is a **full pairwise mesh of the existing bilateral A2A channels, declared by a static, Ed25519-signed cohort manifest.** No peer discovery, no DHT, no gateway node.
 
@@ -42,7 +44,7 @@ This section extends the minimal architecture to the two remaining PRD journeys 
 
 **Gate (proposed): `check-cohort-mesh`** — manifest round-trip **with cross-issuer verification** (artifact produced by one code path, verified by an independently-derived verifier — the ADR-049 independence discipline); concurrent-re-issue negative control (`ECohortManifestFork` proven); stale-member leg (revoked member refused mesh-wide within T_stale); per-(peer,role) consent corpus incl. role-mismatch-on-allowed-peer, acting-role exact-match, and skew (`ECohortManifestSkew`) negatives; linear-chain validation error + `EMigrationPlanDrift` proven-red; receipt-presence per member under one induced member loss **plus one induced connectivity loss** (absence marker observed); surveillance-negative control. Live at N=8; anti-canned per §A7.
 
-## 15.3 Multi-tenant Loom — proposed ADR-053
+## 15.3 Multi-tenant Loom — proposed ADR-055 (was draft-053; ratified 2026-07-09, Fork-4 = per-team HKDF weld)
 
 **Decision.** Per-team residency in the Reza Cortex is **database-per-team** (distinct `datname` per team on operator-assigned Postgres instances) with a **store-internal `team_guard` chokepoint** below `CollectiveMemoryPort`, and **per-team Merkle convergence roots**.
 
@@ -67,7 +69,7 @@ This section extends the minimal architecture to the two remaining PRD journeys 
 
 **Gate (proposed): `check-multi-tenant-loom`** — physical-absence control (team-B rows unreachable from team-A connection, distinct-`datname` witness); guard proven-red on a live read (foreign-team row without valid re-attestation refused, never served) **with the verifier independently derived from the write codec**; per-team Merkle independence (mutating B's store does not move A's root); stale-map leg (`ETenantMapStale` proven within the staleness ceiling); dual-connection negative control (foreign-team read via a second connection refused + audited, `ETenantConnectionMismatch`); cross-team distillate provenance round-trip (flattened chain lands with the row; consented raw traceback works; unconsented refusal surfaced); NFR-Scale-5 capacity envelope derived from measured per-instance load.
 
-## 15.4 FR37 vetting machinery — proposed ADR-054
+## 15.4 FR37 vetting machinery — proposed ADR-056 (was draft-054; ratified 2026-07-09)
 
 **Decision.** The vetting flow is **out-of-kernel** (registry + `maos-compliance`). A `VettingAttestation` is an Ed25519-signed envelope binding (manifest hash — **exact-hash, by design**, from-tier, to-tier, vetter key id, expiry, `revocation_semantics`, optional `successor_policy`); issuance, verification, revocation, **and vetter-key lifecycle events** are journaled to the TL; revocation rides the CRL/yank path, FR59-distinguishable.
 
@@ -83,7 +85,7 @@ This section extends the minimal architecture to the two remaining PRD journeys 
 
 **Gate (proposed): `check-vetting-attestation`** — issue→install→promote→revoke round-trip on a clean host **with independently-derived verifier**; forged-signature, expired-attestation, **and forged-vetter-key (unenrolled key, valid signature)** negative controls; upgrade-flap control (new version without attestation refused at floor); running-Spirit lapse produces the journaled observation event; four-cause distinguishability in audit output.
 
-## 15.5 Post-v2.0 constitutional ceiling — proposed ADR-055 (constitutional; ADR-037 gate applies)
+## 15.5 Post-v2.0 constitutional ceiling — proposed ADR-057 (was draft-055; constitutional, ADR-037 gate applies; ratified 2026-07-09, Fork-5 = measured-honest ~11K, Fork-6 = accept ≤25K/23.5K set)
 
 **Reality, stated in both instruments (reality-check F2 — the two regimes are never compared to each other):**
 
@@ -131,18 +133,18 @@ NFR-Maint-1's text is amended at the next PRD delta touch: the excluding-tests l
 
 | ADR | Title | Status | Gate |
 |---|---|---|---|
-| 052 | Cohort mesh via signed static manifest over pairwise bilateral A2A (authority key, per-(peer,role) tuples, reserved intent classes, linear migration chains; amends ADR-003 revisit clause) | `proposed-v2.2` | `check-cohort-mesh` live at N=8 (legs per §15.2) |
-| 053 | Multi-tenant Loom — database-per-team + `team_guard` + per-team Merkle roots + cross-team provenance (key-weld fork per §15.3) | `proposed-v2.2` | `check-multi-tenant-loom` (legs per §15.3) |
-| 054 | FR37 vetting attestation machinery, out-of-kernel, internal-vetter-first, exact-hash + refuse-at-next-load | `proposed-v2.2` | `check-vetting-attestation` (legs per §15.4) |
-| 055 | Post-v2.0 constitutional ceiling — pin protocol + retro-residual discipline + `kernel-crate-set.toml` ≤25 KLOC (kloc units) | `proposed-v2.2` (constitutional; `invariant-lock` + party-mode) | `check-kernel-baseline` (tripwire) + NEW kernel-crate-set aggregate leg (advisory → binding at wave close) |
+| **054** | Cohort mesh via signed static manifest over pairwise bilateral A2A (authority key, per-(peer,role) tuples, reserved intent classes, linear migration chains; amends ADR-003 revisit clause) | `ratified-v2.2` (2026-07-09) | `check-cohort-mesh` live at N=8 (legs per §15.2) |
+| **055** | Multi-tenant Loom — database-per-team + `team_guard` + per-team Merkle roots + cross-team provenance (**per-team HKDF key-weld**, Fork-4 ratified) | `ratified-v2.2` (2026-07-09) | `check-multi-tenant-loom` (legs per §15.3) |
+| **056** | FR37 vetting attestation machinery, out-of-kernel, internal-vetter-first, exact-hash + refuse-at-next-load | `ratified-v2.2` (2026-07-09) | `check-vetting-attestation` (legs per §15.4) |
+| **057** | Post-v2.0 constitutional ceiling — pin protocol + retro-residual discipline + `kernel-crate-set.toml` ≤25 KLOC (kloc units), **measured-honest ~11K kernel-core residual target** (Fork-5/6 ratified) | `ratified-v2.2` (2026-07-09; constitutional; `invariant-lock` + party-mode DONE) | `check-kernel-baseline` (tripwire) + NEW kernel-crate-set aggregate leg (advisory → binding at wave close) |
 
-Numbering: 051 is reserved by Story 11.4c. The live registry `docs/adr/` is authoritative for landed ADRs — §12.0.1.
+Numbering (corrected 2026-07-09): **ADR-049 (11.2a), 050 (11.4a), 051 (11.4c), 052 (11.5 FKCS), 053 (11.7 trial) are all LANDED** in `docs/adr/`; the v2.2 ADRs take the next free block **054–057**. The draft's original 052–055 numbering is superseded (see the §15 header banner). The live registry `docs/adr/` is authoritative for landed ADRs — §12.0.1.
 
 ## 15.9 What v2.2 explicitly does not decide
 
 External-author FKCS population, external N=12 cohort, accredited vetters, cert bodies, consortium case study (v2.5, non-gating). App-D.4 federation tier (deferred, trigger named). Predicate stdlib (App-D.3 — deferred; fresh number when proposed). rust-inproc (App-D.2 — retired; §13.1 gate is the escape hatch). Tier-3 14-site/28-agent consortium proof (v3.0/thesis milestone — release-gate evidence, never stories).
 
-## 15.10 Party-mode ratification agenda (the named forks)
+## 15.10 Party-mode ratification agenda (the named forks) — ✅ RESOLVED 2026-07-09 (see §15.11)
 
 1. **ADR-052 topology:** full-pairwise-manifest (recommended) vs gateway-mediated vs peer-DHT.
 2. **ADR-052 authority:** single cohort-authority key vs k-of-n multisig (mechanism identical; choose the genesis default).
@@ -152,3 +154,26 @@ External-author FKCS population, external N=12 cohort, accredited vetters, cert 
 6. **ADR-055 numbers + set:** kernel-crate-set membership (recommended: Unit-B trusted-computing-base set ≈22.5K today) and the 25K/23.5K figures, kloc units.
 7. **D.5 chaining + linear-chain constraint** (recommended as written) — cheap to ratify with 052.
 8. **Formal-methods trigger** (§15.6): accept the ADR-052 consent-composition matrix as the named evaluation candidate, or drop formal methods outright.
+
+## 15.11 Ratification record — 2026-07-09 (party-mode, Lunarpulse sign-off)
+
+Participants: Winston (Architect, drafted), Vex (Security), Murat (Test Architect), John (PM), Amelia (Developer facilitating), Lunarpulse (Project Lead). **All 8 forks ratified as recommended — no overrides.** ADR numbers shown are the corrected post-collision numbers (see §15 header banner).
+
+| Fork | Ratified decision | ADR |
+|---|---|---|
+| 1 — topology | **full-pairwise-manifest** (N=8→28 pairs; 11.3 proved N=30 under churn) over gateway/DHT | ADR-054 |
+| 2 — authority | **single cohort-authority key** as genesis default (k-of-n multisig remains an explicit manifest-declared option; mechanism identical) | ADR-054 (ADV-054-1) |
+| 3 — tenant shape | **database-per-team** (distinct `datname`, 11.2b physical-absence precedent dispositive) over namespace-per-team | ADR-055 |
+| 4 — cross-team keys **(BLOCKER)** | **per-team HKDF key weld** — second HKDF stage over the region seed, `verify_bundle` derives pubkey from `(claimed_region, claimed_team)`, `source_team` enters `canonical_kv_leaf` v2 (v1 byte-compat). Same-region cross-team forgery impossible. Vex-led. `team_guard` upgrades to signature verification (not presence-only). | ADR-055 (ADV-055-1) |
+| 5 — residual target | **measured-honest ~11.2K** kernel-core residual under clause-2 retro-residual discipline; the 6,000 figure (Epic-5-era arithmetic) is retired — the pin protocol was always the control | ADR-057 |
+| 6 — ceiling numbers + set **(BLOCKER)** | **accept** `kernel-crate-set.toml` = {residual kernel-core + ADR-041 extracts + maos-iac + maos-manifest + maos-capability} ≈22.5K today; ceiling **≤25 KLOC, alarm 23.5K** (kloc/production units); advisory from ratification → **binds at v2.2-wave close**; membership change is FLAG-Winston | ADR-057 (ADV-057-1) |
+| 7 — migration chaining | **linear-chain constraint as written** (second outgoing migrator per source = manifest-validation error; `EMigratorMissing`/`EMigrationPlanDrift`; absorbs App-D.5) | ADR-054 (ADV-054-4) |
+| 8 — formal-methods trigger | **accept** the ADR-054 consent-composition matrix (per-(peer,role) × version-skew × in-flight drain) as the named first evaluation candidate; formal methods NOT dropped | §15.6 |
+
+**Ratification-hygiene actions (into Step 3):**
+1. Create ADR files `docs/adr/ADR-054..057-*.md` at Step-3 kickoff with the decisions above; update the §12.0 registry.
+2. Renumber the inline §15.2–15.5 draft ADR/ADV references (052–055 → 054–057) when the ADR files land (this record + §15.8 are authoritative meanwhile).
+3. Amend NFR-Maint-1 text at the next PRD-delta touch: retain the excluding-tests letter with the ADR-057 clause-4 `kernel-crate-set` aggregate as its post-v2.0 successor instrument.
+4. Author `loom-threat-model.md` **before** multi-tenant Loom ships (Fork-4 = weld → same-region insider-team forgery is now cryptographically closed, not an accepted risk; threat model still covers cohort-authority-key compromise + malicious cohort member + Sec-14a/14b extended to N-host).
+
+**Next:** Step 3 — `bmad-create-epics-and-stories` → Epic 12 (J3 Team Nexus / ADR-054) · Epic 13 (Reza Cortex + multi-tenant Loom + FR37 / ADR-055+056) · Epic 14 (ecosystem-proof infra + 100-host) · Epic 15 (v2.0 remainder sweep). Then Step 4 IR check → Epic 12 dev under the frontier-allowlist + §A6 discipline (E11 retro A1).

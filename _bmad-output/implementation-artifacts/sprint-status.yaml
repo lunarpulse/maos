@@ -1,4 +1,4 @@
-last_updated: '2026-07-07+story-11-7-v2-0-third-party-trial-infrastructure-review-patched'
+last_updated: '2026-07-09+epic-11-retrospective-complete'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -190,4 +190,31 @@ development_status:
   11-4c-enterprise-identity-at-rest-siem: done  # Wave-2. DONE 2026-07-07: post-review patch set applied. `EnterpriseRuntime` builds real env adapters; every direct `maos-bin` `issue_with_mediation` call routes through `issue_enterprise_governed_capability`; SSO verifies `MAOS_SSO_ASSERTION`, forwards principal attrs into Enterprise PDP, and persists `identity.asserted`; loom-lite gets KMS seal hook; SIEM forwards to localhost sink with buffer/error surfacing. `check-enterprise-identity` GREEN: 10/10 legs incl. fault-inject-falsifiers, available-arm-integration, issuance-bypass-absence, release-graph-absence, kernel-abi-diff. Kernel baseline unchanged @23081. Generic kernel-authored TL payload encryption deferred by L1 zero-kernel-delta scope.
   11-5-fkcs-infrastructure: done  # Wave-2 (sequence LAST). Implemented 2026-07-07. opus-4-8 whole-story + full §A6 ratified at preflight: THE falsifiability story. ZERO delta scoped to kernel-core/spirit-abi/host/admission path; xtask + maos-fkcs infrastructure edits expected. diff-oracle DERIVES zero-kernel-change from frozen surface snapshots (no self-reported flag); negative-control 4th Spirit fails the check-fkcs frozen-surface membership leg; counts derive-and-reconcile; absent→BLOCK@v2.0. INFRA-ONLY @v2.0: in-house Chinese-wall proxy cohort proves mechanism only; genuine external 3-Spirit FKCS floor deferred to v2.5. 5 ACs. Depends: 11.1a + frozen-kernel-vN.0 tag (created by this story). ADR-052 + NFR-Test-5 annotation landed; `cargo test --workspace` green (3086 passed); `check-fkcs --json` green 8/8 legs.
   11-7-v2-0-third-party-trial-infrastructure: done  # Wave-2. Story completed 2026-07-07; PREFLIGHT RESOLVED party-mode 2026-07-07 (Winston·John·Murat·Amelia + Vex·Grumbal·Mary·Dana·Yui·Paige; Lunarpulse steered F4/F3). De-cans the "10.2 canned-trap": existing check-third-party-trial validates a HAND-AUTHORED trial-results.toml; 11.7 builds the CI-bot harness that DERIVES binary_loads/frames_run/halt_recall/sbom_verified/signing_chain_verified from real re-load+SBOM-closure(cargo tree)+Ed25519-verify(release_verify/RELEASE_PUBKEY)+halt-measure(maos-eval) on a hermetic clean env, ignoring self-reports. Reuses maos-fkcs::ProxyCohort (Chinese-wall), maos-audit::release_verify, maos-eval halt scoring, LocalRunner (onb_1_self_trial). ZERO kernel-Δ @23081. INFRA…
-  epic-11-retrospective: optional
+  epic-11-retrospective: done  # 2026-07-09 (epic-11-retro-2026-07-09.md); §A6 review net caught a ship-blocker on all 11 stories (best follow-through ever). RATIFIED: model-tier opus-4-8 dev mandate RETIRED → frontier-allowlist {opus-4-8/gpt-5.5/glm-5.2/equiv} + §A6-net-as-binding-control (supersedes E9 §A2 / E10 §A5); live-DB gates SPLIT hermetic-blocking + live-substrate-advisory (no Postgres/no-GH-gate); external holds (pen-test NFR-Sec-7 + export NFR-Comp-1) DECOUPLED to GA ledger (founder functionality-first) → merge epic-11→main as v2.0 feature-complete line. epic_update_required: true — Epic 12 (v2.2 functional-completeness: J3+Reza+multi-tenant+FR37-machinery+100-host) start-gate = Step 2 §15.10 ratification → Step 3 epic generation.
+
+# Epic 11 retrospective action items (2026-07-09)
+action_items:
+  - epic: 11
+    action: "A1: Retire opus-4-8 dev mandate → frontier-class allowlist {opus-4-8,gpt-5.5,glm-5.2,equiv} + §A6 full-layer review net as binding control; supersede E9 §A2 / E10 §A5; add check-dev-model-tier gate (allowlist membership AND §A6 artifact attached)."
+    owner: "John + Winston"
+    status: open
+  - epic: 11
+    action: "A2: Split each live-DB gate into hermetic logic leg (SQLite, blocking) + live-substrate leg (Postgres+pgvector, advisory + marker-gated, ephemeral container; skip→advisory-RED never silent-green); gate-registry disposition {v2_0=advisory-substrate-gated} + WOULD-HAVE-BLOCKED banner + pre-release live-run runbook. Applies check-cross-region-consensus / check-multi-region-slo / 11.7 consumer leg."
+    owner: "Murat"
+    status: open
+  - epic: 11
+    action: "A3: Decouple external holds from dev — open RELEASE-HOLDS.md GA ledger (NFR-Sec-7 pen-test + NFR-Comp-1 export 5D002.c.1); merge epic-11→main as v2.0 feature-complete line; keep WASM external binary publication flag-gated until export counsel clears."
+    owner: "Lunarpulse + John"
+    status: open
+  - epic: 11
+    action: "A4: Complete Step 2 — ratify §15.10 full architecture (party-mode): 8 forks incl. BLOCKER ADR-053 cross-team keys + ADR-055 numbers; disposition 5 Appendix-D shapes; re-set post-v2.0 KLOC ceiling (NFR-Maint-1 expires @v2.0); reconcile ADR-053 numbering collision (11.7 trial-attestation vs cross-team keys)."
+    owner: "Winston"
+    status: open
+  - epic: 11
+    action: "A5: Step 3 — generate Epic 12+ (Epic 12 J3 Team Nexus, Epic 13 Reza Cortex + multi-tenant Loom + FR37 machinery, Epic 14 ecosystem-proof infra + 100-host churn, Epic 15 v2.0 remainder sweep); carry A1/A2 reflexes into every preflight."
+    owner: "John"
+    status: open
+  - epic: 11
+    action: "A6 (carry-forward): recalibrate preflight LOC-budget to count in-src #[cfg(test)] modules (11.2a +59 vs ratified +16 overshoot)."
+    owner: "Winston"
+    status: open
