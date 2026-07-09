@@ -11,7 +11,7 @@
 
 **Phasing is invariant-preserving:** every phase ships a working subset of invariants; no phase ships a relaxed version of any invariant. v0.1 ships I1–I10 enforced at the foundational kernel layer; v0.3 adds I11/I12/I13 enforcement (digest audit-chain, decision-context, intent provenance) without requiring multi-Spirit; v0.5 adds I14 (halt continuity); v0.8 introduces multi-Spirit invariant interactions at scale.
 
-**Phased delivery (founder-directed restructure of original input documents):** The original architecture §13 phasing had v0.1 = "Bootstrap" with one Architect Spirit driving a coding task. Per founder directive, **v0.1 has been re-purposed as foundational kernel + placeholder Spirit** — proving the kernel's big-picture readiness before committing to specific Spirit ambition. **Butler and Researcher journeys are inserted at v0.3 and v0.5 as simpler single-Spirit value demonstrations** that exercise the kernel's anticipatory and exploratory cognitive surfaces without requiring multi-Spirit IAC, A2A peer mesh, or the full distillation pattern. **The founder's-loop wedge demo (J1) is pushed to v0.8** where the substrate composes the foundational kernel + single-Spirit cognitive primitives + multi-Spirit Orchestrator+Worker coordination + cross-host A2A + full §9.5 distillation pattern in one demo. v1.0 then ships team-readiness; v1.5 ships the diagnostic-architect pair; v2.0 ships WASM Spirit form + Cortex precursor (technical); v2.5 ships ecosystem-adoption (parallelizable from v1.5, decoupled from technical phase).
+**Phased delivery (founder-directed restructure of original input documents):** The original architecture §13 phasing had v0.1 = "Bootstrap" with one Architect Spirit driving a coding task. Per founder directive, **v0.1 has been re-purposed as foundational kernel + placeholder Spirit** — proving the kernel's big-picture readiness before committing to specific Spirit ambition. **Butler and Researcher journeys are inserted at v0.3 and v0.5 as simpler single-Spirit value demonstrations** that exercise the kernel's anticipatory and exploratory cognitive surfaces without requiring multi-Spirit IAC, A2A peer mesh, or the full distillation pattern. **The founder's-loop wedge demo (J1) is pushed to v0.8** where the substrate composes the foundational kernel + single-Spirit cognitive primitives + multi-Spirit Orchestrator+Worker coordination + cross-host A2A + full §9.5 distillation pattern in one demo. v1.0 then ships team-readiness; v1.5 ships the diagnostic-architect pair; v2.0 ships WASM Spirit form + Cortex precursor (technical); **[DELTA-2026-07-06 per Lunarpulse (operator) + John] v2.2 ships full-spectrum functional completeness — every PRD journey runnable end-to-end (J3 Team Nexus + Reza Cortex) and every FR functionally demonstrable on engineering-owned infrastructure**; v2.5 ships ecosystem-adoption (parallelizable from v1.5, decoupled from technical phase, **non-gating by rule**).
 
 This restructure addresses three concerns from Step 8 party mode:
 - **John's "v0.1 timeline 2x optimistic" concern** — by reducing v0.1 scope to foundational kernel + placeholder Spirit, the v0.1 milestone becomes shippable in ~6–8 weeks (Murat's testable threshold), not the 10–12-week aspirational claim.
@@ -29,6 +29,7 @@ This restructure addresses three concerns from Step 8 party mode:
 | v1.0 (Team-ready) | ~30–32 weeks total | 3–4 implementers + ≥1 community contributor + DevRel | Spirit registry, Ed25519 signing, ACP server, vetting attestations, ComplianceClaim, HSIS/CCAC/manifest-fuzz/wire-fuzz gates, 30-min validation gate, typed error catalog, 8 doc artifacts |
 | v1.5 (Diagnostic-architect pair) | ~38–40 weeks total | 4–5 implementers + ≥3 community contributors | Postgres + pgvector for Loom-lite, MAOS-mediated provider proxies, mobile push, JetBrains plugin, asymmetric postures |
 | v2.0 (technical) | 18-month total | 5+ implementers + active community + ≥1 ecosystem partner | WASM Component Model, PDP integration, multi-region Loom coordination, FKCS protocol |
+| v2.2 (functional completeness) **[DELTA-2026-07-06]** | post-v2.0 engineering wave | v2.0 team continues | J3 Team Nexus journey, Reza Cortex journey, multi-tenant Loom, FR37 vetting machinery, 100-host churn, v2.0 remainder sweep |
 | v2.5 (ecosystem-adoption, parallelizable from v1.5) | 24–30 months | + DevRel + BD function | Certification body engagement, cohort interop, Cortex consortium recruitment |
 
 ## Phase v0.1 — Foundational Kernel + Placeholder Spirit (~6–8 weeks)
@@ -172,7 +173,7 @@ This restructure addresses three concerns from Step 8 party mode:
 
 ## Phase v1.0 — Team-Ready, Third-Party Spirits Ship (~30–32 weeks total)
 
-**Validation milestone:** J3 Team Nexus (8-Host team peer mesh) reproducible end-to-end on a real team in parallel with a 30-day synthetic-shadow run (zero substrate-invariant violations, zero unauthorized cross-Spirit data flow, halt-recall preserved within ±0.03 of v0.8 baseline). J6 Diego validated via black-box external-author trial (N=12 stratified authors, 14-day no-DM-support window, ≥ 10/12 succeed; per NFR-Test-8). First cohort interop demonstration (any of openclaw / ironclaw / hermes / paperclip / rustain / codex).
+**Validation milestone:** **[DELTA-2026-07-06: the J3 clause below was NOT delivered at v1.0 — the minimal architecture (§10.7.1) explicitly reduced the v1.0 J3 commitment to "bilateral 2-Host substrate readiness only" and Epics 1–11 never built the journey; J3 reproducibility is retagged v2.2. The Diego/cohort clauses stand as v1.0 history.]** J3 Team Nexus (8-Host team peer mesh) reproducible end-to-end on a real team in parallel with a 30-day synthetic-shadow run (zero substrate-invariant violations, zero unauthorized cross-Spirit data flow, halt-recall preserved within ±0.03 of v0.8 baseline). J6 Diego validated via black-box external-author trial (N=12 stratified authors, 14-day no-DM-support window, ≥ 10/12 succeed; per NFR-Test-8). First cohort interop demonstration (any of openclaw / ironclaw / hermes / paperclip / rustain / codex).
 
 **Adds to v0.8:**
 - **Architect (Nash-class) + Reviewer reference Spirits** added; **6 reference Spirits total** (Butler / Researcher / Architect / Worker / Reviewer / Observer)
@@ -207,7 +208,7 @@ This restructure addresses three concerns from Step 8 party mode:
   - Deployment topology guide
   - Three-door page at `docs.maos.dev`
   - WCAG AA compliance
-- **Localization**: Korean (shipped); Japanese + Chinese-simplified (v1.0 targets)
+- **Localization**: Korean (shipped); ~~Japanese + Chinese-simplified (v1.0 targets)~~ **[DELTA-2026-07-06: ja + zh-Hans deferred INDEFINITELY per Epic 11 §8 decision 2026-06-29 — fabricated-translation incident at Epic 10 §A2; en + ko are the supported locales (LOCALES.md); re-introduction requires real human translation + Unicode-script-identity gate + native-reviewer runbook]**
 - **Substrate Operations**: full lifecycle (`maosctl install/upgrade/yank/uninstall/revoke`); signed Revocation List (CRL) artifact; offline import path; auto-respawn-with-backoff for Spirits declaring `restart: on-failure`
 - **LTS commitment announced**: 2-year LTS on minor lines from v1.0; security-only patches after year 1; two LTS lines maintained concurrently
 - **`STABILITY.md`** with live (kernel, abi, manifest_schema) compatibility matrix and substrate-self compliance scope clause
@@ -236,7 +237,7 @@ This restructure addresses three concerns from Step 8 party mode:
 
 ## Phase v2.0 (technical) — WASM Spirits + Cortex Precursor (18-month total)
 
-**Validation milestone:** Cortex 3-region pilot at small scale (≥ 10 agents) with technical validation (NOT commercial-adoption gating); FKCS protocol passes (3 case-studied future Spirits implemented by external authors against published ABI documentation only; ≥ 27/30 success per Spirit, ≥ 85/90 aggregate; diff oracle confirms zero kernel changes).
+**Validation milestone:** Cortex 3-region pilot at small scale (≥ 10 agents) with technical validation (NOT commercial-adoption gating); **FKCS-infrastructure passes** (diff oracle + harness + `kernel-frozen-vN.0` commit-tagging operational; negative-control "fourth Spirit" proven to fail; exercised by Chinese-wall internal proxy authors). **[DELTA-2026-07-06: prior prose here required "3 case-studied future Spirits implemented by external authors" at v2.0 — that contradicted NFR-Test-5's phase split (infrastructure v2.0 / populated-by-external-authors v2.5) and is corrected to match the NFR (the long-open Q4 correction). External-author population (≥ 27/30 per Spirit, ≥ 85/90 aggregate) remains the v2.5 leg and never gates an engineering phase.]**
 
 **Adds to v1.5:**
 - **WASM-component Spirit form** — third-party ecosystem capability-isolated by construction; single portable artifact; WIT contract `maos:spirit@1.0`
@@ -246,10 +247,25 @@ This restructure addresses three concerns from Step 8 party mode:
 - **Sentinel-validated canary auto-rollback**; pre-deployment scanning against pattern library
 - **Native push notifications** (mobile)
 - **Optional skill registry** (separate from Spirit registry)
-- **Cortex churn test** passes: 100-host Cortex, 10% host turnover/week for 4 weeks, 3 planted adversarial hosts; detection latency ≤ 1h median, blast radius ≤ 5 peers, recovery ≤ 24h
+- **Cortex churn test** passes: ~~100-host Cortex~~ **25/30-host Cortex [DELTA-2026-07-06: corrected to match NFR-Scale-2's cost-compression split (25/30-host at v2.0, ratified by the Epic 11 plan and delivered by Story 11.3); full 100-host retagged v2.2]**, 10% host turnover/week for 4 weeks, 3 planted adversarial hosts; detection latency ≤ 1h median, blast radius ≤ 5 peers, recovery ≤ 24h
 - **Cross-form Semantic equivalence** (any-rust ↔ wasm-component) ≥ 75%
 - **ADR-024 sandbox-escape detection** (Winston's Risk 9 mitigation)
 - **`loom-threat-model.md`** drafted (deferred from Step 5)
+
+## Phase v2.2 (functional completeness) — Full-Spectrum PRD, engineering-owned **[DELTA-2026-07-06 per Lunarpulse (operator) + John]**
+
+**Operator directive (2026-07-06):** make the project complete in functionality as specified in this PRD before ceremonies and community-acceptance review. This phase exists so that no functional promise in the PRD is left waiting on an adoption metric.
+
+**Validation milestone:** J3 Marcus day-30 standup scene AND Reza cross-team negotiation scene each reproducible end-to-end on engineering-owned infrastructure; every FR (including FR37 machinery) functionally demonstrable; requirements-inventory v2 shows zero FRs without a functional home.
+
+**Adds to v2.0 (engineering only; gates on nothing external):**
+- **J3 Team Nexus journey closure**: cohort-topology operator UX; per-(peer,role) consent tuples; cohort hot-swap/migration choreography; cross-agent halt-on-conflict; narrative team digest across an 8-Host peer mesh
+- **Reza Cortex journey closure**: cross-team asymmetric consent envelopes; multi-hop distillation provenance (digest→raw across Cortex hops); Loom-tier pattern libraries; NFR-Scale-5 14-institution capacity envelope
+- **Multi-tenant Loom** with per-team data residency (NFR-Ops-11 / NFR-Tenancy-1 full implementation — retagged from v2.5: it is a Reza prerequisite, not an adoption artifact)
+- **FR37 vetting machinery**: attestation issuance/verification/revocation flow end-to-end with internal vetter keys (Diego's final promotion leg runnable; *accredited external vetters* remain v2.5)
+- **Scale closers**: 100-host churn (NFR-Scale-2 / NFR-Rel-7 second half — retagged from v2.5; engineering-ownable)
+- **v2.0 remainder sweep** (v2.0 phase-list items not absorbed by Epic 11; final disposition at full-architecture time): sentinel canary auto-rollback, native mobile push, optional skill registry, Vault/cloud-KMS secret backends, distro packages + one-line installer, Bedrock/Vertex/local providers, Enterprise reference Spirit as a class (Story 11.4a shipped the PDP port, not the Spirit), formal-methods disposition (TLA+/Alloy for I5/I6/I9), `loom-threat-model.md`
+- **Explicitly NOT in v2.2**: external-author FKCS population, external N=12 cohort, cert bodies, ≥ 20 external Spirits, consortium case study, RTL (no RTL locale targeted), ja/zh docs (deferred indefinitely) — all remain v2.5 adoption or indefinite
 
 ## Phase v2.5 (ecosystem-adoption) — Parallelizable from v1.5 (24–30 months)
 
@@ -359,7 +375,7 @@ This restructure addresses three concerns from Step 8 party mode:
 - **Pull-forwards are gone from v0.1.** Subprocess Spirit form, multi-Spirit IAC bus, A2A peer mesh, T2 sandbox, distillation pattern, hot-swap migration all deferred to their natural phases (v0.3 / v0.5 / v0.8). v0.1 timeline becomes ~6–8 weeks (Murat's testable threshold).
 - **Reference Spirit count grows progressively:** 1 placeholder at v0.1 → 2 (Butler) at v0.3 → 4 (+ Researcher + Observer) at v0.5 → 7 (+ Orchestrator + 2 Workers) at v0.8 → 9 (+ Architect + Reviewer) at v1.0 → 10 (+ Mira) at v1.5 → 11 (+ Enterprise) at v2.0. Third-party Spirits proliferate via the registry, not by being added to MAOS source.
 - **Skills are user-space; never kernel.** Filesystem-based v0.5; optional registry v2.0.
-- **v2.0 splits into v2.0 (technical) + v2.5 (ecosystem-adoption).** Technical phase cannot gate on third-party adoption (per John's rule).
+- **v2.0 splits into v2.0 (technical) + v2.5 (ecosystem-adoption).** Technical phase cannot gate on third-party adoption (per John's rule). **[DELTA-2026-07-06]** A third leg is added: **v2.2 (functional completeness)** — the engineering wave that closes every remaining PRD journey and FR on engineering-owned infrastructure. Functional completeness precedes ceremony: v2.5 adoption outcomes are measured, never scheduled, and never gate v2.2.
 - **Halt-recall preference is user-configurable** per Spirit per tag.
 - **Kernel-stays-small redefinition:** trusted core ≤ 20 KLOC through v2.0; integration adapters in separate crates with their own budgets; "small" = trusted core, not binary footprint.
 - **v0.3 split:** Governance Lock (positioning, license, consortium target, trust-anchor framing) + Architecture Lock (failure-semantics floor as ADR-022). Different review boards, different acceptance criteria.

@@ -1,5 +1,7 @@
 # Product Scope
 
+> **[SUPERSEDED PHASING — DELTA-2026-07-06]** This file carries the **pre-restructure phasing scheme** (v0.1 = Architect Spirit drives a real coding task; six default Spirits at v0.5; subprocess form at v1.0) and was never updated after the founder-directed restructure. **The operative phasing is `project-scoping-phased-development.md`** (v0.1 = foundational kernel + placeholder `hello-spirit`; Butler v0.3; Researcher v0.5; founder-loop wedge v0.8; …; v2.2 functional completeness; v2.5 ecosystem-adoption) — it is what the FR/NFR traceability tables, journey anchors, epics, and twelve shipped epics were actually built against. This file is retained as scope-content reference (in/out lists remain broadly informative) but **its version tags must not be planned against.**
+
 ## MVP — Minimum Viable Product (v0.1)
 
 **Validation milestone:** the Architect reference Spirit drives a real coding task on a local repository end-to-end with approval prompts.

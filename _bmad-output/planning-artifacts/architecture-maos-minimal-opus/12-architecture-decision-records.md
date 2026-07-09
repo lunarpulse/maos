@@ -55,7 +55,19 @@ Sorted by Status (binding-v0.1 first), then by ADR number. Reviewers triaging "w
 | 031 | Cross-Form Spirit Equivalence (`spirit-conformance`) | `speculative-vNext` | Resolves-by: ADR-002 measurement gate triggering inproc unlock; conformance suite ≥90% on 200-scenario class corpus |
 | 023 | Capability-token TTL + bind-to-PID | `binding-v0.1` | TTL ≤60s for high-privilege; tokens bound to (Spirit-PID + boot-nonce + expiry); TOCTOU re-validation at use |
 
-**Reserved:** ADR-039 — number reserved; not in scope for the substrate. The four universal-arithmetic predicates from ADR-022 cover the journeys this architecture ships. Future predicate-vocabulary extensions, if justified by a Spirit class, would land in a user-space stdlib without altering the kernel surface (see App-D.3).
+**Reserved:** ADR-039 — number reserved; not in scope for the substrate. The four universal-arithmetic predicates from ADR-022 cover the journeys this architecture ships. Future predicate-vocabulary extensions, if justified by a Spirit class, would land in a user-space stdlib without altering the kernel surface (see App-D.3). **[STALE as of 2026-07-06 — see §12.0.1: the live registry consumed ADR-039 for the per-module unsafe-code policy; a future predicate-stdlib proposal takes a fresh number.]**
+
+## 12.0.1 Registry consolidation note (2026-07-06, Step-2 full-spectrum pass)
+
+Two ADR registries now exist and this note fixes their relationship:
+
+1. **`docs/adr/` (the live registry, 001–050 at HEAD) is authoritative for every ADR that has landed in implementation.** Where the two disagree, the live registry wins. Known divergences from this planning document:
+   - **ADR-031** live = *WASM Component-Model Spirit form* (binding-v2.0, Stories 11.1a/11.1b; resolves and absorbs this document's speculative "Cross-Form Spirit Equivalence").
+   - **ADR-039** live = *per-module `#![forbid(unsafe_code)]` policy* (binding-v0.1). This document's "reserved for predicate stdlib" note is stale — see above.
+   - **ADR-040** live = *§13.1 rust-inproc measurement gate, v0.5 decision* (defer; superseded by ADR-031). This document's ADR-040 (*threat-model split Sec-14a/14b*) landed conceptually via NFR-Sec-14/ADR-040-planning but the **number** now belongs to the live entry; cite the threat-model split as "§8.1 / NFR-Sec-14," not by ADR number.
+   - Implementation-era ADRs **041–050** (kernel-core extraction, κ-floor, gate retirement, GDPR redaction, governance artifacts, cost attribution, trust-anchor framing, Docusaurus, cross-region replication, enterprise PDP) exist only in the live registry. **ADR-051** is reserved by Story 11.4c (enterprise identity/at-rest/SIEM).
+2. **This §12 remains the specification of record for planning ADRs that have not yet landed** (the live index's own footer says the same in the reverse direction). At each landing, the live entry supersedes the planning text.
+3. **New v2.2 ADRs number from 052** — see §15.7 (052 cohort mesh, 053 multi-tenant Loom, 054 vetting machinery, 055 constitutional ceiling; all `proposed-v2.2` pending party-mode ratification). On ratification they enter `docs/adr/` and its index, not this table.
 
 ## ADR-001 — Kernel language is Rust + Tokio
 

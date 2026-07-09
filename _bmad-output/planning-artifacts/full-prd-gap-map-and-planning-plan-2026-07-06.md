@@ -1,6 +1,6 @@
 # Full-PRD Planning — Gap Map and Planning Plan
 
-**Author:** John (PM) · **Date:** 2026-07-06 · **Status:** PROPOSED — awaiting party-mode ratification
+**Author:** John (PM) · **Date:** 2026-07-06 · **Status:** STEP 1 EXECUTED (operator-directed, functionality-first) — see `prd-delta-full-spectrum-2026-07-06.md`; Steps 2–4 pending. **Naming supersession:** the functional wave proposed below as "v2.5" was numbered **v2.2** at execution (v2.5 keeps its established adoption-only identity, now explicitly non-gating); read this plan's "v2.5 = J3+Reza" references as v2.2.
 **Trigger:** Epic 11 (v2.0 technical phase) is nearly closed (11.0–11.4a done, 11.4b in review, 11.4c/11.5/11.7 backlog). The minimal architecture (`architecture-maos-minimal-opus/`) declared v1.5/J4 its terminal milestone and its roadmap table stops there. The operator has directed: plan the **full PRD** — every user journey, full architecture, full epics and stories.
 
 **Sources (read in full for this plan):** `prd/` (all 13 files), `maos-product-brief.md`, `architecture-maos-minimal-opus/` (scope, traceability, roadmap, open questions, appendices C/D/E, ADR index, foundational commitments), `epics/` (12-epic structure, requirements-inventory, Epic 11, open-items, dependency docs), `sprint-status.yaml`.

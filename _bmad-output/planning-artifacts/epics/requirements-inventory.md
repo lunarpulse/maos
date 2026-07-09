@@ -120,7 +120,7 @@
 - **NFR-Rel-10:** Kernel cold-restart ≤ 30s with no data loss on graceful shutdown; ≤ 1 in-flight message loss on hard kill. v0.8.
 - **NFR-Rel-11:** Halt-receipt production rate ≥ 99.9%. Every Spirit termination, planned or unplanned, produces a halt receipt before process exit. Closes I14 directly (separate from HSIS aggregate). v0.8.
 
-### Security (16 NFRs)
+### Security (19 NFRs)
 
 - **NFR-Sec-1:** Sandbox tier enforced per Spirit; strictest-of-(manifest, trust-tier, operator-policy) floor. v0.1 (T0/T1/T2); v0.5 (T3); v2.0 (T4 WASM).
 - **NFR-Sec-2:** Capability-token TTL ≤ 60s for high-privilege operations; bound to Spirit-PID + boot-nonce; audit-logged at every use with origin-Spirit-ID. v1.5 (ADR-023). [Note: architecture marks ADR-023 as binding-v0.1.]
@@ -138,6 +138,9 @@
 - **NFR-Sec-14:** Cross-Spirit memory isolation corpus — 200-scenario adversarial corpus where Spirit-A actively attempts to enumerate, read, side-channel, or timing-attack Spirit-B's substrate state. Categories: namespace enumeration, working-memory read-across, decision-frame observation, halt-signal observation, transparency-log cross-read, working-memory-digest cross-read, capability-token forgery cross-Spirit, sandbox-escape lateral. Floor: 200/200 isolation maintained; any leak = P0 ship-block. Defends the v1.0 hermes-tenant positioning sentence. v0.8.
 - **NFR-Sec-15:** Crypto-module pluggability with FIPS 140-3-validated default option. Kernel-internal cryptographic operations (signature verification, sealed-export encryption, capability-token signing) route through a provider trait permitting substitution of FIPS-validated, hardware-backed, or post-quantum implementations without recompilation of Spirits. v1.0.
 - **NFR-Sec-16:** Manifest-evolution lint forcing binary `secret`/`non-secret` annotation on every new manifest field — no default. Mitigates structural-vs-semantic redaction tension by shifting cost from runtime detection (forbidden by §4.0.7) to authoring time. v0.5.
+- **NFR-Sec-17:** Enterprise PDP integration — capability-authorization decisions sourced from a real external Policy Decision Point behind out-of-kernel `PolicyDecisionPort` (maos-domain), evaluated by the PDP's real engine (Cedar in-process reference in `maos-pdp`); fail-closed on PDP unavailability; absent→BLOCK@v2.0. Anchor: ADR-050.
+- **NFR-Sec-18:** Enterprise identity assertion (OIDC) — out-of-kernel `IdentityAssertionPort` + `maos-sso` reference verifier; explicit algorithm allowlist; reject `alg:none` and HS256-confusion; enforce signature/issuer/audience/time claims; configured-but-down SSO denies issuance. Honesty: one reference OIDC path; SAML/social/discovery adapters deferred. Gate: `check-enterprise-identity`; anchor: ADR-051.
+- **NFR-Sec-19:** Opt-in adapter-store at-rest AEAD — out-of-kernel `KeyManagementPort` + `maos-secrets` envelope helper; ciphertext≠plaintext, right-key opens, wrong-key fails, KMS-down refuses sealed writes. Honesty: opt-in adapter-store scope only; Option-A plaintext remains default; kernel-core Private/Shared and production KMS adapters deferred. Gate: `check-enterprise-identity`; anchor: ADR-051.
 
 ### Auditability & Compliance (14 NFRs)
 
@@ -151,7 +154,7 @@
 - **NFR-Aud-8:** Two-tier corpus: N=100 calibration per-commit (CI width 0.124, fine for trend detection) + N=500 quarterly audit (CI width ≤0.05 at p=0.90 for digest-recall; tight statistical confidence). Plus 10⁵-case secret-leakage corpus + production canary system per NFR-Sec-4. v0.5 (per-commit), v1.0 (quarterly).
 - **NFR-Aud-9:** ComplianceClaim Adversarial Corpus (CCAC) v1.0 — N=600 (200 well-formed + 400 malformed). Per-class N=30, floor ≥ 27/30. 100 context-drift claims (100/100 rejected). Cross-validation across ≥3 reference Spirits, agreement within ±2%. v1.0 ship gate.
 - **NFR-Aud-10:** GDPR Article 17 right-to-be-forgotten — 50-scenario corpus with cross-Spirit cascade. Floor: 50/50 clean removal at queryable surface; 50/50 redaction-marker present in immutable log; 0 leakage in 100 follow-up subject-access queries. v1.0.
-- **NFR-Aud-11:** SIEM export at v2.0. OpenTelemetry adapter at v1.0.
+- **NFR-Aud-11:** SIEM export at v2.0; OpenTelemetry adapter at v1.0. Story 11.4c delivers the SIEM half via `maos-siem` read-only TL export through `query_with_redaction` before NDJSON+CEF/RFC5424 projection; empty TL reports N/A, not a green zero. Honesty: production network sinks are additive; HTTPS/network must be TLS-only and plaintext/file localhost-only. Gate: `check-enterprise-identity`; anchor: ADR-051.
 - **NFR-Aud-12:** Storage cascade erasure completeness + externally-verifiable uninstall receipt. Substrate-uninstall produces a portable, externally-verifiable erasure receipt (signed Merkle inclusion + signed Merkle exclusion proof, retained independent of the substrate). 100% of registered storage backends prove erasure within bounded window for any given principal. Closes the weakest leg of the hermes-tenant positioning sentence. v1.0.
 - **NFR-Aud-13:** Time-to-erasure SLA. Floor: 95% of right-to-be-forgotten requests complete within 30 days (configurable to 7 for enterprise tier); audit log entry within 24h of request acceptance. v1.0.
 - **NFR-Aud-14:** Intent-lineage propagation completeness — 100% of cross-Spirit IAC frames carry unbroken lineage chain back to originating principal intent. Closes ADR-018/I13 NFR coverage gap. v0.8.

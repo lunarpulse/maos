@@ -14,6 +14,8 @@ companion_artifacts:
 
 # Product Brief: MAOS — Modular Agentic Operating System
 
+> **[DELTA-2026-07-06]** This brief is the **vision document** (2026-05-05) and remains the canonical statement of ambition, differentiators, and the "out forever" list. Its journey numbering ("Journey 10/11/12"), 20-week v1.0 timeline, and phase tags are **superseded by the PRD** (`prd/user-journeys.md`, `prd/project-scoping-phased-development.md`) — plan against those, not this file.
+
 ## Executive Summary
 
 The AI agent landscape in 2026 is a fragmented archipelago. Claude Code, Codex, Gemini CLI, opencode, Cursor — each is a competent agent, each is a closed runtime. Teams that want multi-agent collaboration must accept one vendor's lock-in, cobble together brittle integrations, or build their own substrate from scratch. There is no portable, capability-isolated, vendor-neutral runtime for arbitrary AI agents — and emphatically nothing that lets a personal "Butler," a team's peer-mesh, a production diagnostic-architect pair, and a 28-agent enterprise nervous system all run on the same primitives.

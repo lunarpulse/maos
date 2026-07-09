@@ -134,9 +134,20 @@
     - [ADR-037 — Constitutional amendment process](./12-architecture-decision-records.md#adr-037-constitutional-amendment-process)
     - [ADR-038 — Per-service KLOC ceiling](./12-architecture-decision-records.md#adr-038-per-service-kloc-ceiling)
     - [ADR-040 — Threat-model split: same-Host vs A2A](./12-architecture-decision-records.md#adr-040-threat-model-split-same-host-vs-a2a)
-  - [13. Phased Roadmap](./13-phased-roadmap.md)
-    - [13.1 Spirit-form Measurement Gate (subprocess → inproc)](./13-phased-roadmap.md#131-spirit-form-measurement-gate-subprocess-inproc)
-  - [14. Open Questions](./14-open-questions.md)
+  - [13. Phased Roadmap](./13-phased-roadmap.md) *(extended 2026-07-06: v2.0 as-shipped / v2.2 functional completeness / v2.5 non-gating)*
+    - [13.1 Spirit-form Measurement Gate (subprocess → inproc)](./13-phased-roadmap.md#131-spirit-form-measurement-gate-subprocess-inproc) *(retired as roadmap item; retained as escape hatch)*
+  - [14. Open Questions](./14-open-questions.md) *(dispositioned 2026-07-06)*
+  - [15. Full-Spectrum v2.2 Architecture (J3 + Reza)](./15-full-spectrum-v2-2.md) *(proposed-v2.2, pending party-mode)*
+    - [15.1 What v2.2 stands on](./15-full-spectrum-v2-2.md#151-what-v22-stands-on-already-shipped-by-epic-11)
+    - [15.2 J3 cohort mesh — proposed ADR-052](./15-full-spectrum-v2-2.md#152-j3-cohort-mesh-proposed-adr-052)
+    - [15.3 Multi-tenant Loom — proposed ADR-053](./15-full-spectrum-v2-2.md#153-multi-tenant-loom-proposed-adr-053)
+    - [15.4 FR37 vetting machinery — proposed ADR-054](./15-full-spectrum-v2-2.md#154-fr37-vetting-machinery-proposed-adr-054)
+    - [15.5 Post-v2.0 constitutional ceiling — proposed ADR-055](./15-full-spectrum-v2-2.md#155-post-v20-constitutional-ceiling-proposed-adr-055-constitutional-adr-037-gate-applies)
+    - [15.6 v2.0 remainder sweep + scale closers — dispositions](./15-full-spectrum-v2-2.md#156-v20-remainder-sweep-scale-closers-dispositions)
+    - [15.7 Operational envelope](./15-full-spectrum-v2-2.md#157-operational-envelope-rubric-high-previously-silent)
+    - [15.8 New ADR stubs](./15-full-spectrum-v2-2.md#158-new-adr-stubs-enter-120-and-docsadr-at-ratification)
+    - [15.9 What v2.2 explicitly does not decide](./15-full-spectrum-v2-2.md#159-what-v22-explicitly-does-not-decide)
+    - [15.10 Party-mode ratification agenda](./15-full-spectrum-v2-2.md#1510-party-mode-ratification-agenda-the-named-forks)
   - [Appendix A — Cohort prior-art map](./appendix-a-cohort-prior-art-map.md)
   - [Appendix B — Glossary diff vs. the survey](./appendix-b-glossary-diff-vs-the-survey.md)
   - [Appendix C — What this document deliberately is NOT](./appendix-c-what-this-document-deliberately-is-not.md)
