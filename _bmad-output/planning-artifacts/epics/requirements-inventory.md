@@ -494,3 +494,38 @@ _N/A — this is a kernel/infrastructure project with no UX design document. Dir
 | FR65 | E9 | Proof-of-erasure on uninstall (externally-verifiable Merkle proof) |
 
 **Coverage:** All 65 FRs mapped to ≥1 epic. Per-NFR ownership is embedded in each epic section below; full corpus authoring schedule (~2,249 items via parameterized generators) lives in E0 + per-epic corpus stories.
+
+---
+
+## v2.2 Functional-Completeness Coverage Map (added 2026-07-10 — Step 3; ratified §15 architecture / ADR-054–057)
+
+The v2.2 phase (Epics 12–14) closes the residual PRD surface so **every FR has a functional home** and both remaining journeys (J3, Reza) are served. No new FRs; **FR37 is the only previously-unserved FR**. External-actor requirements stay v2.5, non-gating.
+
+### Journeys
+| Journey | Status before v2.2 | Served by |
+|---|---|---|
+| J3 Marcus Team Nexus (8-host peer mesh) | **UNSERVED** | **E12** (12.4 day-30 scene) |
+| Reza single-org cross-team Cortex | enablers-only | **E13** (13.6 Reza scene) |
+
+### Residual / re-homed requirements → v2.2 story
+| Requirement | Was | v2.2 home |
+|---|---|---|
+| FR37 vetting attestation (internal-vetter machinery) | deferred v1.0→v2.5 | **E13.4** (ADR-056); external accredited vetters → v2.5 |
+| NFR-Ops-11 multi-operator tenancy (full impl) | "v1.5+ implemented" (metric-false) | **E13.1** (multi-tenant Loom, physical wall) |
+| NFR-Tenancy-1 multi-tenant | single-tenant through v2.0 | **E13.1 + E13.2** (physical + crypto tenant wall) |
+| NFR-Scale-5 14-institution Cortex envelope | v2.5 → retagged v2.2 | **E13.6** (measured capacity envelope) |
+| NFR-Scale-2 100-host (second half) | v2.5 → retagged v2.2 | **E14.1** |
+| NFR-Rel-7 100-host churn | v2.5 → retagged v2.2 | **E14.1** |
+| NFR-Sec-13 10-host mTLS rotation chaos | v2.0 half | **E14.2** |
+| v2.0 remainder sweep (canary rollback, native push, KMS backends, Bedrock/Vertex, installers) | deferred at v2.0 | **E14.4 / E14.5** |
+| NFR-Maint-1 post-v2.0 ceiling instrument | ≤20 KLOC letter expires @v2.0 | **E14.6** (ADR-057 `kernel-crate-set` ≤25K) |
+
+### New ADRs (ratified §15.11, 2026-07-09)
+ADR-054 cohort mesh (E12) · ADR-055 multi-tenant Loom + per-team HKDF weld (E13) · ADR-056 FR37 vetting (E13) · ADR-057 constitutional ceiling (E14).
+
+### Release-gate artifacts (NOT stories) & v2.5-deferred (non-gating)
+- **Release-gate artifacts:** NFR-Scale-1 30-day soak, absolute geo-SLO — absent/unmeasured → BLOCK at the v2.2 ship gate.
+- **v2.5 (non-gating):** 3 genuine external-authored FKCS Spirits, external N=12 trial cohort, accredited external vetters (NFR-Comp-2), ≥20 registry Spirits, cert bodies, RTL/ja/zh docs. Infrastructure is reserved by **E14.3**.
+- **External holds (GA ledger, non-gating for v2.2 dev):** external pen-test (NFR-Sec-7), export counsel (NFR-Comp-1).
+
+**v2.2 coverage:** every residual FR/NFR is mapped to a story or explicitly re-deferred with a reason. **FR37 now has a functional home (E13.4) — zero FRs unserved.**
