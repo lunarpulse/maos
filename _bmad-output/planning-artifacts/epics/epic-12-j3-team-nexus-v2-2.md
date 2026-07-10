@@ -36,13 +36,15 @@ Full-pairwise mesh of existing bilateral A2A channels, declared by a static Ed25
 
 **Sequencing:** 12.1 → 12.2 → 12.3 → **12.4 (J3 journey closer — demonstrable here)** → 12.5 (hardening, after the journey). 5 large demo-anchored stories; hot-swap deliberately follows the showable journey (it is not on the day-30 *normalcy* critical path).
 
+**Demo-ability (smallest watchable multi-node demo):** two rungs — a **hermetic N=3 minimal-cohort smoke** (12.1·AC2; the smallest "three or more" mesh, runs anywhere with zero infra) and the full **N=8 J3 day-30 standup scene** (12.4). Both run on the 8.15 journey-acceptance harness (PTY/vt100 + ReplayInference) — you *watch* the mesh work end-to-end, not just read a gate number. The N=3 rung means the mechanism is observable before the journey-scale demo.
+
 ---
 
 ## Per-story AC sketch (finalize at preflight)
 
 **12.1 — Cohort manifest + full-pairwise mesh foundation**
 1. Cohort manifest schema v1: signed TOML — members (`host_id`, pinned cert fingerprint, declared roles), per-(peer,role) consent matrix, genesis cohort-authority key (or explicit k-of-n set); Ed25519-signed; strictly-monotonic integer version.
-2. Full-pairwise mesh: N=8 → 28 bilateral §7.2 channels declared by manifest; wire/mTLS+TOFU/logical-clock unchanged; membership changes = manifest re-issue, never runtime negotiation.
+2. Full-pairwise mesh, **smallest-watchable-first**: a **minimal N=3 cohort** (3 bilateral channels — the smallest ADR-003 "three or more" mesh) as a hermetic **watchable smoke** on the 8.15 journey harness, *then* N=8 → 28 bilateral §7.2 channels for the J3 journey; wire/mTLS+TOFU/logical-clock unchanged; membership changes = manifest re-issue, never runtime negotiation.
 3. Manifest authority (ADV-054-1): only genesis-declared authority signs re-issues; member refuses non-authority signature + version regressions → `ECohortManifestFork` (names both versions); re-issue journaled to authority TL; each member journals its own acceptance of v(n+1).
 4. Distribution + staleness (ADV-054-2): reserved always-allowlisted `cohort.manifest.reissue` (push + pull-on-connect fallback); `T_stale` (default §7.2 30s × 4) → degraded links + refuse consent-sensitive frames under stale matrix (fail-closed, Story-8.8 posture); revoked member refused mesh-wide within `T_stale`.
 5. `check-cohort-mesh` (core legs): manifest round-trip with **cross-issuer verification** (independently-derived verifier, ADR-049 discipline); concurrent-re-issue negative control (`ECohortManifestFork` proven-red); stale-member leg. Live at N=8; anti-canned §A7 (manifest-authority-identity reflex).

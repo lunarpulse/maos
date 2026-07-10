@@ -203,14 +203,14 @@ development_status:
   # IR CHECK 2026-07-10 (implementation-readiness-report-2026-07-10.md): 🟢 READY for per-story preflight + Epic 12 dev; 5 non-blocking preflight gaps G1–G5 (G1=verify the 3 FLAG-Winston seams; G2=E14.6 ADR-041 decomposition scope; G3=track loom-threat-model.md before 13.1; G4=create docs/adr/ADR-054..057 + reconcile ADR-053 collision; G5=keep external WASM publication flag-gated).
   # Critical path: Epic 12 → Epic 13 (13.x consumes the 12.1 org manifest); Epic 14 largely parallelizable (14.3 waits on 13.4). First dev target = 12.1.
   epic-12: backlog  # J3 Marcus Team Nexus — ADR-054 cohort mesh; 5 stories; 12.4 = J3 day-30 standup scene closer. Depends: Epic 11 (done, branch epic-11).
-  12-1-cohort-manifest-full-pairwise-mesh-foundation: backlog  # signed cohort manifest v1 + N=8 full-pairwise A2A mesh + check-cohort-mesh core legs. ZERO kernel-Δ. FIRST dev target.
+  12-1-cohort-manifest-full-pairwise-mesh-foundation: backlog  # signed cohort manifest v1 + N=8 full-pairwise A2A mesh + check-cohort-mesh core legs. Smallest watchable demo = hermetic N=3 minimal-cohort smoke (AC2). ZERO kernel-Δ. FIRST dev target.
   12-2-per-peer-role-consent-tuples: backlog  # two-seam send/accept allowlists, acting-role exact-match (ADR-012 extended). §A6 non-degradable (consent).
   12-3-cross-agent-halt-on-conflict-receipt-presence: backlog  # reserved cohort.halt.receipt intent + receipt-presence/absence observability (not arbitration).
   12-4-team-digest-no-surveillance-j3-day-30-scene: backlog  # J3 day-30 Marcus scene E2E + surveillance-negative control. §A6 non-degradable (journey). JOURNEY CLOSER.
   12-5-cohort-hot-swap-linear-chain-migration: backlog  # cohort-lifecycle hardening; FLAG-Winston verify-at-preflight (EMigrationPlanDrift/EMigratorMissing) — possibly ZERO.
   epic-12-retrospective: optional
   epic-13: backlog  # Reza single-org cross-team Cortex — ADR-055 multi-tenant Loom + ADR-056 FR37 vetting; 6 stories; 13.6 = Reza Cortex scene. Consumes Epic 12 (12.1 org manifest) + Epic 11 Loom/PDP/identity. PREREQ: author loom-threat-model.md before 13.1 (G3).
-  13-1-multi-tenant-loom-physical-tenant-wall: backlog  # database-per-team + store-internal team_guard chokepoint (ETenantMapStale/ETenantConnectionMismatch). §A6 non-degradable (tenant wall). ZERO expected.
+  13-1-multi-tenant-loom-physical-tenant-wall: backlog  # database-per-team + store-internal team_guard chokepoint (ETenantMapStale/ETenantConnectionMismatch). Smallest watchable demo = hermetic 2-team SQLite tenant-wall smoke (AC5, blocking). §A6 non-degradable (tenant wall). ZERO expected.
   13-2-multi-tenant-loom-cryptographic-tenant-boundary: backlog  # per-team HKDF weld + canonical_kv_leaf v2 + per-team Merkle (Fork-4; closes 11.2b D1). FLAG-Winston verify (cross-team CrossRegionReadmit reuse).
   13-3-cross-team-asymmetric-consent-multi-hop-distillation-provenance: backlog  # cross-team re-attested writes over cohort links + flattened I11 chain. FLAG-Winston verify (cross-team CrossRegionReadmit reuse).
   13-4-fr37-vetting-machinery: backlog  # ADR-056 VettingAttestation issue→install→promote→revoke, internal-vetter-first. Serves FR37 (the ONLY unserved PRD FR). ZERO kernel-Δ.
@@ -218,8 +218,8 @@ development_status:
   13-6-reza-cortex-journey-closer-nfr-scale-5: backlog  # 3 teams×regions on the 11.2b substrate; Reza cross-team Cortex scene E2E + NFR-Scale-5 14-institution envelope (gated, not printed). §A6 non-degradable (journey). JOURNEY CLOSER.
   epic-13-retrospective: optional
   epic-14: backlog  # v2.2 Hardening + Closers (Scale·Rotation·Ecosystem-readiness·v2.0 sweep) — absorbs the former Epic-15; 6 stories; all ZERO kernel-Δ. Largely parallelizable; 14.6 ceiling binds at v2.2-wave close.
-  14-1-100-host-churn-scale-envelope: backlog  # NFR-Scale-2/Rel-7; scale the real 11.3 mesh to N=100, floors unchanged, blind-one-detector proven-red. §A6 non-degradable (test-infra risk). Live leg advisory-substrate-gated.
-  14-2-10-host-mtls-rotation-chaos: backlog  # NFR-Sec-13; scale ratified rotation.rs floors to 10 hosts, zero conversation drops under rotation-during-load. §A6 non-degradable (test-infra risk).
+  14-1-100-host-churn-scale-envelope: backlog  # NFR-Scale-2/Rel-7; watchable N=5 churn scene first (AC1: eviction→detection→reconvergence), then scale the SAME real 11.3 mesh to N=100, floors unchanged, blind-one-detector proven-red. §A6 non-degradable (test-infra risk). N=100 live leg advisory-substrate-gated.
+  14-2-10-host-mtls-rotation-chaos: backlog  # NFR-Sec-13; watchable N=3 rotation scene first (AC2: certs roll under live traffic, zero drops), then scale ratified rotation.rs floors to 10 hosts under rotation-during-load. §A6 non-degradable (test-infra risk).
   14-3-ecosystem-readiness-verification-v2-5-graduation-ledger: backlog  # FKCS-infra (11.5) + trial-infra (11.7) proven green at the v2.2 gate via Chinese-wall proxy; v2.5 graduation ledger. Depends: 13.4.
   14-4-v2-0-sweep-operational-surfaces: backlog  # sentinel canary auto-rollback + native mobile push + distro installers (clean-host verified). Keep external WASM publication flag-gated (G5).
   14-5-v2-0-sweep-backends-multi-provider: backlog  # Vault/cloud-KMS secret backends + Bedrock/Vertex/local multi-provider (ADR-005) behind traits; no vendor SDK in kernel.

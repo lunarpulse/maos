@@ -42,12 +42,14 @@ Close everything left to make v2.2 **functionally complete** once the two journe
 
 **Sequencing:** 14.1 · 14.2 · 14.3 · 14.4 · 14.5 · 14.6 are largely **parallelizable** (independent surfaces); 14.3 needs 13.4 (FR37 internal machinery); **14.6's kernel-crate-set ceiling binds at the v2.2-wave close** (the last gate to flip). 6 large stories; absorbs the former Epic-15 v2.0 remainder sweep.
 
+**Demo-ability (watchable multi-node scene for the hardening epic):** unlike Epics 12–13, Epic 14 is otherwise gate-metric-driven (its value is scale/reliability envelopes, not a new journey). So it now carries a small **substrate-under-stress** scene you can *watch* at a scale that runs without big infra: an **N=5 churn scene** (14.1·AC1 — eviction → two-surface detection → reconvergence) plus an **N=3 rotation scene** (14.2·AC2 — certs roll under live traffic, zero drops). The **N=100 churn** and **10-host rotation** runs are the scale-out proofs layered on top (advisory-substrate-gated where CI can't host them); the small scenes are the observable demo of what the epic hardens.
+
 ---
 
 ## Per-story AC sketch (finalize at preflight)
 
 **14.1 — 100-host churn scale envelope** (NFR-Scale-2 / NFR-Rel-7 second half)
-1. Scale the **real** 11.3 mesh substrate to **N=100** (real kernel-process/container instances, mTLS mesh); the canned `churn.rs::run_scaffold` **stays deleted** (verify — the 11.3 deletion is the live 10.2-trap fix); every metric derived per-event from real timestamps.
+1. **Smallest-watchable-first**: stand up the **real** 11.3 mesh at a small **N=5** scale — a host eviction → two-surface detection → mesh reconvergence **observable as a scene** — *then* scale the **SAME** substrate to **N=100** (real kernel-process/container instances, mTLS mesh); the canned `churn.rs::run_scaffold` **stays deleted** (verify — the 11.3 deletion is the live 10.2-trap fix); every metric derived per-event from real timestamps.
 2. Two-surface detection at scale: handshake `TcpTransportError` (verifier layer) + router NACK (the 11.3 F-new pattern), at N=100.
 3. Floors **UNCHANGED** from 11.3, all **derived per-event** not asserted: detection ≤1h median, blast-radius ≤5 peers, recovery ≤24h, RTO 4h-breach. **The teeth are the falsifiers, not the clean pass** (11.3 L5).
 4. Real planted adversarial hosts (per-class: pin-spoof, cert-rotation-race, consent-bypass) at N=100; the 10–20% turnover/wk × 4wk churn profile driven from real evictions/re-dials.
@@ -56,7 +58,7 @@ Close everything left to make v2.2 **functionally complete** once the two journe
 
 **14.2 — 10-host mTLS rotation chaos** (NFR-Sec-13 v2.0 half)
 1. Scale the ratified `rotation.rs` floors (10.4b/10.5 3-host drill) to **10 hosts** with real timestamps — floors stay **as strict as the ratified `rotation.rs`**, never relaxed to looser story numbers (the 10.5 AC6 regression-trap lesson).
-2. Rotation-during-load: cert/key rotation across the 10-host mesh under active A2A conversation → **zero conversation drops** (the NFR-Sec-13 assertion), proven on real traffic.
+2. Rotation-during-load, **smallest-watchable-first**: a **watchable N=3 rotation scene** (certs/keys roll under active A2A traffic → **zero drops**, observable) *then* cert/key rotation across the **10-host** mesh under active A2A conversation → **zero conversation drops** (the NFR-Sec-13 assertion), proven on real traffic.
 3. Rotation p99 + **one-generation-overlap** (§7.2.1.a pre-staged-overlap idiom) proven at 10-host scale.
 4. Real-timestamp derivation (not canned): rotation timing derived per-event; blind mutations red the rotation floor.
 5. `check-rotation` gate scale-out (10-host leg): rotation-drop → RED, rotation-p99-breach → RED, floor-relaxation → RED; proven-red on real rotation events.

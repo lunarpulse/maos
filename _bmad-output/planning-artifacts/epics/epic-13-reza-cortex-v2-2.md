@@ -40,6 +40,8 @@ Serve **Reza's single-org cross-team Cortex** (§10.7.2, committed v2.2) — a 4
 
 **Sequencing:** 13.1 (physical wall) → 13.2 (crypto boundary) → 13.3 (cross-team consent) → **13.6 (Reza journey closer)**, with 13.4 (FR37) and 13.5 (Enterprise Spirit) parallelizable after their deps and joining the closer. 6 large demo-anchored stories; the tenant wall is unpacked into a physical-absence proof + a forge-resistance proof; the closer *composes*, never builds.
 
+**Demo-ability (smallest watchable multi-node demo):** two rungs — a **hermetic 2-team SQLite tenant-wall smoke** (13.1·AC5; blocking, no Postgres — the smallest observable wall, a team-B row refused to team-A) and the full **3-team × 3-region Reza Cortex scene** (13.6; real 3-Postgres = live-substrate-advisory per the A2 split). The small rung is the one you can watch anywhere; the journey-scale rung is gated where the multi-Postgres substrate exists — never silent-green when it doesn't.
+
 ---
 
 ## Per-story AC sketch (finalize at preflight)
@@ -49,7 +51,7 @@ Serve **Reza's single-org cross-team Cortex** (§10.7.2, committed v2.2) — a 4
 2. Mapping ownership (ADV-055-2): the team↔region↔datname mapping is a **signed section of the org manifest** (ADR-054 artifact); `team_guard` loads only from the manifest, verifies the signature at load, caches by version, and **refuses reads/writes when its cached version trails the announced current** (`ETenantMapStale`, fail-closed). Store-local config holds connection credentials **only** — never membership/placement.
 3. Team membership identity-keyed + single-valued (ADV-055-3): a Spirit belongs to exactly one team per the manifest; `team_guard` verifies `(spirit_pid → team)` **and** that the connection in use is the one assigned to that team (`ETenantConnectionMismatch`, never a silent allow); a Spirit needing both teams' data = **two Spirits with an ADR-012-consented channel**.
 4. Physical row-ownership: a re-attested copy in team B's database is **team B's row** for capacity + GDPR-erasure, with `source_team` provenance — the forget-cascade target (the 9.2 spine must know whom to cascade to). (Physical ownership here; the cryptographic re-attestation is 13.2/13.3.)
-5. `check-multi-tenant-loom` (physical legs): **physical-absence control** (team-B rows unreachable from team-A connection, distinct-`datname` witness a shared table cannot fake); `ETenantMapStale` + dual-connection `ETenantConnectionMismatch` negatives; chokepoint grep-proof (single `team_guard` enforcement path). **Real multi-Postgres** proven-red, no mock.
+5. `check-multi-tenant-loom` (physical legs): **physical-absence control** (team-B rows unreachable from team-A connection, distinct-`datname` witness a shared table cannot fake); `ETenantMapStale` + dual-connection `ETenantConnectionMismatch` negatives; chokepoint grep-proof (single `team_guard` enforcement path). **Smallest watchable demo = a hermetic 2-team SQLite tenant-wall smoke** (team-B row refused to team-A, observable) as the **blocking** leg per the E11 retro A2 split; **real multi-Postgres** proven-red as the live-substrate-advisory leg where CI has no Postgres — never mock, never silent-green.
 6. ZERO kernel-Δ expected (maos-loom-lite + store-internal guard, 11.2b precedent; verify vs 11.2a readmit).
 
 **13.2 — Multi-tenant Loom — cryptographic tenant boundary** (ADR-055, Fork-4)
