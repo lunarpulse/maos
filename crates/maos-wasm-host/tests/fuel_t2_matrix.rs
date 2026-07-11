@@ -59,10 +59,7 @@ fn spin_loop_exhausts_fuel_with_out_of_fuel_trap() {
     assert!(result.is_err(), "spin with limited fuel must trap");
     let err = result.unwrap_err();
     let trap = err.downcast_ref::<wasmtime::Trap>();
-    assert!(
-        trap.is_some(),
-        "error must be a Trap, got: {err}"
-    );
+    assert!(trap.is_some(), "error must be a Trap, got: {err}");
     // The trap must indicate fuel exhaustion specifically
     assert_eq!(
         *trap.unwrap(),
@@ -91,12 +88,18 @@ fn benign_guest_completes_with_fuel() {
         .unwrap();
 
     let result = run_fn.call(&mut store, ());
-    assert!(result.is_ok(), "benign guest must complete without trapping");
+    assert!(
+        result.is_ok(),
+        "benign guest must complete without trapping"
+    );
     assert_eq!(result.unwrap(), 0, "benign guest returns 0");
 
     // Verify fuel was consumed (not zero — that would mean metering is broken)
     let remaining = store.get_fuel().unwrap();
-    assert!(remaining < 1_000_000, "fuel must be consumed during execution");
+    assert!(
+        remaining < 1_000_000,
+        "fuel must be consumed during execution"
+    );
 }
 
 // ── Cell 3: Echo guest identity function works ─────────────────────────
@@ -120,7 +123,10 @@ fn echo_guest_returns_input_identity() {
     // Test various inputs
     for input in [0, 1, 42, -1, i32::MAX, i32::MIN] {
         let result = echo_fn.call(&mut store, input).unwrap();
-        assert_eq!(result, input, "echo must return input unchanged for {input}");
+        assert_eq!(
+            result, input,
+            "echo must return input unchanged for {input}"
+        );
     }
 }
 
@@ -273,7 +279,6 @@ fn fuel_ordering_fuel_bound_strictly_less_than_t2() {
     drop(ticker);
 }
 
-
 // ── Invalid component detection ────────────────────────────────────────
 
 #[test]
@@ -306,5 +311,8 @@ fn component_model_engine_configuration() {
     config.wasm_component_model(true);
 
     let engine = Engine::new(&config);
-    assert!(engine.is_ok(), "engine with component-model must initialize");
+    assert!(
+        engine.is_ok(),
+        "engine with component-model must initialize"
+    );
 }

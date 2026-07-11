@@ -570,12 +570,11 @@ pub fn append_identity_asserted(
         field: "boot_nonce",
         value: boot_nonce,
     })?;
-    let decision_time_ns_i = i64::try_from(decision_time_ns).map_err(|_| {
-        AuditError::ValueOverflow {
+    let decision_time_ns_i =
+        i64::try_from(decision_time_ns).map_err(|_| AuditError::ValueOverflow {
             field: "decision_time_ns",
             value: decision_time_ns,
-        }
-    })?;
+        })?;
 
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
@@ -594,14 +593,14 @@ pub fn append_identity_asserted(
           kind, intent, payload_redacted, origin) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         rusqlite::params![
-            &frame_id[..],                                      // frame_id
-            decision_time_ns_i,                                 // timestamp_ns
-            spirit_pid_i,                                       // spirit_pid
-            boot_nonce_i,                                       // boot_nonce
-            Option::<&[u8]>::None,                              // capability_token = NULL
-            30i64,                                              // kind — identity.asserted
-            "identity.asserted",                                // intent
-            payload_bytes,                                      // payload_redacted (compact JSON)
+            &frame_id[..],                                                  // frame_id
+            decision_time_ns_i,                                             // timestamp_ns
+            spirit_pid_i,                                                   // spirit_pid
+            boot_nonce_i,                                                   // boot_nonce
+            Option::<&[u8]>::None, // capability_token = NULL
+            30i64,                 // kind — identity.asserted
+            "identity.asserted",   // intent
+            payload_bytes,         // payload_redacted (compact JSON)
             maos_domain::invariants::i3::FrameOrigin::HumanAuthored as i64, // origin = 0 (non-kernel)
         ],
     )

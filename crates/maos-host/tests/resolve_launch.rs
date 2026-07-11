@@ -71,7 +71,10 @@ fn native_subprocess_is_identity() {
     let plan = host.resolve_launch(&request).unwrap();
 
     assert_eq!(plan.program, "/usr/bin/my-spirit");
-    assert!(plan.argv.is_empty(), "native form should have no extra argv");
+    assert!(
+        plan.argv.is_empty(),
+        "native form should have no extra argv"
+    );
     assert!(plan.env.is_empty());
     assert_eq!(plan.wire, WireShape::ContentLengthCbor);
 }

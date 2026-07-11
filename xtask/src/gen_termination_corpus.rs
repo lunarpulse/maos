@@ -11,7 +11,7 @@
 //! Each scenario file is deterministic (SHA-pinned generator output);
 //! re-running produces byte-identical files.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;

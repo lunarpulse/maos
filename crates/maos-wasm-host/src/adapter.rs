@@ -60,10 +60,7 @@ impl SpiritHostPort for WasmHostAdapter {
                 })?;
                 if !meta.is_file() {
                     return Err(SpiritHostError::InvalidComponent {
-                        reason: format!(
-                            "artifact '{}' is not a regular file",
-                            request.artifact
-                        ),
+                        reason: format!("artifact '{}' is not a regular file", request.artifact),
                     });
                 }
                 const MAX_COMPONENT_BYTES: u64 = 64 * 1024 * 1024;

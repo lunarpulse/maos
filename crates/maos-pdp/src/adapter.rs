@@ -74,9 +74,7 @@ impl CedarPolicyAdapter {
     ///   not resource-scoped, in 11.4a).
     /// - context: empty (the optional `principal_attributes`, F7, are for
     ///   11.4c's SSO layer and are not modeled into Cedar yet).
-    fn build_cedar_request(
-        req: &PolicyDecisionRequest,
-    ) -> Result<Request, PolicyDecisionError> {
+    fn build_cedar_request(req: &PolicyDecisionRequest) -> Result<Request, PolicyDecisionError> {
         let principal: EntityUid = format!("Spirit::\"{}\"", req.spirit_pid)
             .parse()
             .map_err(|e| PolicyDecisionError::Transport(format!("principal uid parse: {e}")))?;
@@ -99,11 +97,11 @@ impl CedarPolicyAdapter {
             .policy
             .read()
             .map_err(|e| PolicyDecisionError::Transport(format!("policy lock poisoned: {e}")))?;
-        let policies = guard.as_ref().ok_or_else(|| {
-            PolicyDecisionError::Unreachable {
+        let policies = guard
+            .as_ref()
+            .ok_or_else(|| PolicyDecisionError::Unreachable {
                 reason: "no operator policy loaded".into(),
-            }
-        })?;
+            })?;
         let entities = Entities::empty();
         let mut out = Vec::with_capacity(requests.len());
         for req in requests {
@@ -112,7 +110,9 @@ impl CedarPolicyAdapter {
             // entry point. Each iteration is a DISTINCT evaluation (AC2: the
             // policy swap forces a fresh load, so two calls under two policies
             // are two real evaluations, NOT a memoized cache).
-            let resp = self.authorizer.is_authorized(&cedar_req, policies, &entities);
+            let resp = self
+                .authorizer
+                .is_authorized(&cedar_req, policies, &entities);
             let verdict = match resp.decision() {
                 Decision::Allow => PolicyVerdict::Allow,
                 Decision::Deny => PolicyVerdict::Deny,

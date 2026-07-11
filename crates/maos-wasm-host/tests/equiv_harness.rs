@@ -236,10 +236,16 @@ impl EffectData {
     fn content_key(&self) -> String {
         match self {
             EffectData::FrameSequence(v) => format!("frames:{}:{:016x}", v.len(), content_hash(v)),
-            EffectData::HaltReceipt { halt_id, spirit_pid } => {
+            EffectData::HaltReceipt {
+                halt_id,
+                spirit_pid,
+            } => {
                 format!("halt:{halt_id}:{spirit_pid}")
             }
-            EffectData::CapabilityDenial { error_kind, spirit_pid } => {
+            EffectData::CapabilityDenial {
+                error_kind,
+                spirit_pid,
+            } => {
                 format!("cap:{error_kind}:{spirit_pid}")
             }
             EffectData::RegionViolation {
@@ -275,8 +281,7 @@ fn content_hash<T: std::fmt::Debug>(value: &T) -> u64 {
 ///
 /// Adding a field to this list requires editing this `const` AND keeping the
 /// mutation tests green; the set and the behavior are coupled by design.
-const F3_EXCLUDED_FIELDS: &[&str] =
-    &["intent", "consent_envelope", "intent_lineage", "scope"];
+const F3_EXCLUDED_FIELDS: &[&str] = &["intent", "consent_envelope", "intent_lineage", "scope"];
 
 /// The bridge-PRESERVED projection of an [`IacFrame`], with the per-run
 /// nondeterministic fields (`frame_id`, `timestamp_ns`) zeroed so two
@@ -436,8 +441,10 @@ pub fn compare_effects(native: &[CapturedEffect], wasm: &[CapturedEffect]) -> Ti
     // valid oracle. `unanimous_form` returns a placeholder for a mixed
     // stream; detect it explicitly so the note is honest.
     if !stream_form_is_unanimous(native) || !stream_form_is_unanimous(wasm) {
-        let mixed_side = match (!stream_form_is_unanimous(native), !stream_form_is_unanimous(wasm))
-        {
+        let mixed_side = match (
+            !stream_form_is_unanimous(native),
+            !stream_form_is_unanimous(wasm),
+        ) {
             (true, true) => "BOTH streams",
             (true, false) => "the NATIVE stream",
             (false, true) => "the WASM stream",
@@ -533,7 +540,10 @@ pub fn compare_effects(native: &[CapturedEffect], wasm: &[CapturedEffect]) -> Ti
                         a.invariant_class, a.scenario
                     )
                 } else {
-                    format!("match on {:?} for scenario {:?}", a.invariant_class, a.scenario)
+                    format!(
+                        "match on {:?} for scenario {:?}",
+                        a.invariant_class, a.scenario
+                    )
                 };
                 details.push(ComparisonDetail {
                     scenario: a.scenario.clone(),
@@ -590,7 +600,10 @@ fn stream_form_is_unanimous(effects: &[CapturedEffect]) -> bool {
 /// placeholder and let the mixed-form / absent-form gates above produce the
 /// honest verdict.
 fn unanimous_form(effects: &[CapturedEffect]) -> SpiritForm {
-    effects.first().map(|e| e.form).unwrap_or(SpiritForm::Native)
+    effects
+        .first()
+        .map(|e| e.form)
+        .unwrap_or(SpiritForm::Native)
 }
 
 /// True if any effect is an empty `FrameSequence` — a form that ran but
@@ -781,7 +794,9 @@ fn drive_subprocess(binary: &Path, args: &[&str], input_frames: &[IacFrame]) -> 
     }
 
     writer.join().expect("writer thread must not panic");
-    let stderr_output = stderr_handle.join().expect("stderr drain thread must not panic");
+    let stderr_output = stderr_handle
+        .join()
+        .expect("stderr drain thread must not panic");
 
     let status = child.wait().expect("wait for subprocess");
     assert!(
@@ -890,12 +905,20 @@ fn effect_frame_sequence(frames: Vec<IacFrame>) -> EffectData {
 
 /// Wrap a frame sequence emitted by the NATIVE form for `scenario`.
 fn capture_native_frame_sequence(scenario: &str, frames: Vec<IacFrame>) -> CapturedEffect {
-    capture_native(scenario, InvariantClass::FrameSequence, effect_frame_sequence(frames))
+    capture_native(
+        scenario,
+        InvariantClass::FrameSequence,
+        effect_frame_sequence(frames),
+    )
 }
 
 /// Wrap a frame sequence emitted by the WASM form for `scenario`.
 fn capture_wasm_frame_sequence(scenario: &str, frames: Vec<IacFrame>) -> CapturedEffect {
-    capture_wasm(scenario, InvariantClass::FrameSequence, effect_frame_sequence(frames))
+    capture_wasm(
+        scenario,
+        InvariantClass::FrameSequence,
+        effect_frame_sequence(frames),
+    )
 }
 
 /// Build a `HaltReceipt` effect from a REAL [`HaltReceipt`]. The invariant
@@ -943,7 +966,6 @@ fn effect_region_violation(attempted: &Region, home: &Region) -> EffectData {
         home_region: home.as_str().to_string(),
     }
 }
-
 
 /// Build an `AuditEntry` effect. `kind` is a real kernel audit kind string;
 /// `count` is the observed row count. Both are invariant.
@@ -1018,7 +1040,9 @@ fn inject_invariant_fault(effect: &mut CapturedEffect) {
         EffectData::CapabilityDenial { error_kind, .. } => {
             *error_kind = format!("{error_kind}<<fault>>");
         }
-        EffectData::RegionViolation { attempted_region, .. } => {
+        EffectData::RegionViolation {
+            attempted_region, ..
+        } => {
             *attempted_region = format!("{attempted_region}<<fault>>");
         }
         EffectData::AuditEntry { count, .. } => {
@@ -1171,7 +1195,10 @@ fn mixed_form_stream_rejected() {
         capture_native_frame_sequence("mix", vec![frame.clone()]),
         capture_wasm_frame_sequence("mix", vec![frame]),
     ];
-    let wasm = vec![capture_wasm_frame_sequence("mix", vec![sample_identity_frame()])];
+    let wasm = vec![capture_wasm_frame_sequence(
+        "mix",
+        vec![sample_identity_frame()],
+    )];
 
     let verdict = compare_effects(&mixed, &wasm);
     assert!(
@@ -1179,7 +1206,10 @@ fn mixed_form_stream_rejected() {
         "a mixed-form stream MUST fail loud, not pass vacuously: {verdict:?}"
     );
     assert!(
-        verdict.details.iter().any(|d| d.note.contains("MIXED FORM STREAM")),
+        verdict
+            .details
+            .iter()
+            .any(|d| d.note.contains("MIXED FORM STREAM")),
         "expected a MIXED FORM STREAM diagnosis: {verdict:?}"
     );
 }
@@ -1263,7 +1293,10 @@ fn effect_capability_decision(res: &Result<(), CapError>, spirit_pid: u32) -> Ef
         Ok(()) => "Allowed".to_string(),
         Err(e) => cap_error_kind(e).to_string(),
     };
-    EffectData::CapabilityDenial { error_kind, spirit_pid }
+    EffectData::CapabilityDenial {
+        error_kind,
+        spirit_pid,
+    }
 }
 
 mod kernel_oracle {
@@ -1276,8 +1309,8 @@ mod kernel_oracle {
     use maos_domain::frame::EpistemicHaltPayload;
     use maos_domain::invariants::i1::{IntentClass, Scope};
     use maos_domain::invariants::i9::SandboxTier;
-    use maos_domain::ports::CapabilityRegistryPort;
     use maos_domain::ports::capability::CapError;
+    use maos_domain::ports::CapabilityRegistryPort;
     use maos_domain::region::{Region, RegionError};
     use maos_kernel_core::api::RingCryptoProvider;
     use maos_kernel_core::capability::{
@@ -1310,7 +1343,9 @@ mod kernel_oracle {
             inner.manifest_scopes.insert(
                 POLICY_SPIRIT_PID,
                 cap_policy::ManifestCapabilityScope {
-                    scopes: vec![Scope::FsRead { subtree: "/tmp".into() }],
+                    scopes: vec![Scope::FsRead {
+                        subtree: "/tmp".into(),
+                    }],
                     declared_tier: SandboxTier(0),
                     trust_tier: cap_policy::decision::TrustTier::Verified,
                 },
@@ -1340,7 +1375,9 @@ mod kernel_oracle {
         let token = adapter
             .issue(
                 POLICY_SPIRIT_PID,
-                Scope::FsRead { subtree: "/tmp".into() },
+                Scope::FsRead {
+                    subtree: "/tmp".into(),
+                },
                 60,
                 POSTURE,
                 IntentClass::Standard,
@@ -1364,7 +1401,9 @@ mod kernel_oracle {
             let token = adapter
                 .issue(
                     POLICY_SPIRIT_PID,
-                    Scope::FsRead { subtree: "/tmp".into() },
+                    Scope::FsRead {
+                        subtree: "/tmp".into(),
+                    },
                     60,
                     POSTURE,
                     IntentClass::Standard,
@@ -1383,7 +1422,8 @@ mod kernel_oracle {
     /// journal entry + `HaltReceipt`) and return the receipt.
     pub fn halt_receipt(halt_suffix: &str) -> HaltReceipt {
         let tmp = tempfile::TempDir::new().expect("journal tmpdir");
-        let journal = JournalAdapter::open(&tmp.path().join("journal.ndjson")).expect("open journal");
+        let journal =
+            JournalAdapter::open(&tmp.path().join("journal.ndjson")).expect("open journal");
         let tl = TransparencyLogAdapter::open_in_memory(0);
         let registry = HaltRegistry::new();
         let payload = EpistemicHaltPayload::new(
@@ -1395,8 +1435,16 @@ mod kernel_oracle {
             "equiv-oracle".to_string(),
         )
         .expect("valid halt payload");
-        invoke_halt(&tl, &journal, &registry, payload, POLICY_SPIRIT_PID, "equiv-spirit", 0)
-            .expect("invoke_halt produces a receipt")
+        invoke_halt(
+            &tl,
+            &journal,
+            &registry,
+            payload,
+            POLICY_SPIRIT_PID,
+            "equiv-spirit",
+            0,
+        )
+        .expect("invoke_halt produces a receipt")
     }
 
     /// Observe a REAL region-pin decision at the write chokepoint and project
@@ -1407,7 +1455,9 @@ mod kernel_oracle {
         let home = Region::canonicalize(HOME_REGION_TAG).expect("home region");
         let entry = if foreign {
             WriteEntryPoint::ReplayApply {
-                source_region: Some(Region::canonicalize(FOREIGN_REGION_TAG).expect("foreign region")),
+                source_region: Some(
+                    Region::canonicalize(FOREIGN_REGION_TAG).expect("foreign region"),
+                ),
             }
         } else {
             WriteEntryPoint::DirectWrite
@@ -1417,12 +1467,12 @@ mod kernel_oracle {
                 attempted_region: home.as_str().to_string(),
                 home_region: home.as_str().to_string(),
             },
-            Err(RegionError::ERegionViolation { expected, found, .. }) => {
-                EffectData::RegionViolation {
-                    attempted_region: found,
-                    home_region: expected,
-                }
-            }
+            Err(RegionError::ERegionViolation {
+                expected, found, ..
+            }) => EffectData::RegionViolation {
+                attempted_region: found,
+                home_region: expected,
+            },
             Err(other) => panic!("unexpected region decision: {other:?}"),
         }
     }
@@ -1443,8 +1493,16 @@ fn kernel_audit_kinds_are_real() {
 #[test]
 fn halt_observed_via_in_process_kernel() {
     let receipt = kernel_oracle::halt_receipt("probe");
-    let native = vec![capture_native("halt-ker", InvariantClass::Halt, effect_halt(&receipt))];
-    let wasm = vec![capture_wasm("halt-ker", InvariantClass::Halt, effect_halt(&receipt))];
+    let native = vec![capture_native(
+        "halt-ker",
+        InvariantClass::Halt,
+        effect_halt(&receipt),
+    )];
+    let wasm = vec![capture_wasm(
+        "halt-ker",
+        InvariantClass::Halt,
+        effect_halt(&receipt),
+    )];
     let verdict = compare_effects(&native, &wasm);
     assert!(
         verdict.passed && verdict.invariant_match_pct == 100.0,
@@ -1454,7 +1512,11 @@ fn halt_observed_via_in_process_kernel() {
     // A DIFFERENT real halt (distinct halt_id from a fresh invoke_halt) → RED.
     let other = kernel_oracle::halt_receipt("divergent");
     assert_ne!(other.halt_id, receipt.halt_id, "sanity: distinct halts");
-    let wasm_div = vec![capture_wasm("halt-ker", InvariantClass::Halt, effect_halt(&other))];
+    let wasm_div = vec![capture_wasm(
+        "halt-ker",
+        InvariantClass::Halt,
+        effect_halt(&other),
+    )];
     let red = compare_effects(&native, &wasm_div);
     assert!(
         !red.passed && red.invariant_match_pct < 100.0,
@@ -1489,7 +1551,10 @@ fn capability_decision_observed_via_in_process_kernel() {
 
     // A REVOKED token → a different real kernel decision → RED.
     let revoked = kernel_oracle::capability_decision(&adapter, true);
-    assert!(revoked.is_err(), "sanity: revoked token denies: {revoked:?}");
+    assert!(
+        revoked.is_err(),
+        "sanity: revoked token denies: {revoked:?}"
+    );
     let wasm_div = vec![capture_wasm(
         "cap-ker",
         InvariantClass::CapabilityDenial,
@@ -1605,15 +1670,21 @@ fn forged_consent_is_non_invariant() {
     // Native twin: forge an in-band intent the WASM bridge cannot carry.
     let mut native_frame = sample_identity_frame();
     native_frame.intent = IntentClass::HighPrivilege; // forged in-band intent
-    // WASM form: the bridge defaults intent to Readonly and cannot carry the
-    // native's forged value — yet it MUST compare equal after normalization.
+                                                      // WASM form: the bridge defaults intent to Readonly and cannot carry the
+                                                      // native's forged value — yet it MUST compare equal after normalization.
     let mut wasm_frame = sample_identity_frame();
     wasm_frame.intent = IntentClass::Readonly;
 
     // Forged intent on native vs defaulted intent on wasm → identical
     // normalized frames (intent is F3-excluded) → identical invariant verdict.
-    let native = vec![capture_native_frame_sequence("forged-consent", vec![native_frame])];
-    let wasm = vec![capture_wasm_frame_sequence("forged-consent", vec![wasm_frame])];
+    let native = vec![capture_native_frame_sequence(
+        "forged-consent",
+        vec![native_frame],
+    )];
+    let wasm = vec![capture_wasm_frame_sequence(
+        "forged-consent",
+        vec![wasm_frame],
+    )];
 
     let verdict = compare_effects(&native, &wasm);
     assert!(
@@ -1678,7 +1749,11 @@ fn cosmetic_threshold_bites_through_invariant_green() {
             receipt.boot_nonce,
             receipt.frame_id,
         );
-        wasm.push(capture_wasm("cos", InvariantClass::Halt, effect_halt(&r_wasm)));
+        wasm.push(capture_wasm(
+            "cos",
+            InvariantClass::Halt,
+            effect_halt(&r_wasm),
+        ));
     }
 
     let verdict = compare_effects(&native, &wasm);
@@ -1724,15 +1799,13 @@ fn cosmetic_threshold_bites_through_invariant_green() {
 #[test]
 fn duplicate_key_pairing_is_robust() {
     let mk = |halt_id: &str| {
-        effect_halt(
-            &HaltReceipt::new(
-                HaltId::new(halt_id).unwrap(),
-                1,
-                7,
-                0,
-                [0; 16],
-            ),
-        )
+        effect_halt(&HaltReceipt::new(
+            HaltId::new(halt_id).unwrap(),
+            1,
+            7,
+            0,
+            [0; 16],
+        ))
     };
     // Native emits [a, b]; wasm emits the SAME multiset but in scrambled
     // order [b, a]. A sort by (scenario, class) alone leaves emission order
@@ -1799,8 +1872,9 @@ fn normalize_ignores_exactly_the_f3_excluded_fields() {
     // Excluded `scope` (TaskAssign sub-field): non-empty vs empty → same.
     let mut c = sample_identity_frame();
     if let FramePayload::TaskAssign(ta) = &mut c.payload {
-        ta.scope
-            .push(maos_domain::invariants::i1::Scope::FsRead { subtree: "/tmp".to_string() });
+        ta.scope.push(maos_domain::invariants::i1::Scope::FsRead {
+            subtree: "/tmp".to_string(),
+        });
     }
     let d = sample_identity_frame();
     assert_eq!(normalize(&c), normalize(&d), "scope is F3-excluded");
@@ -1906,7 +1980,10 @@ fn tier_demotion_causes_red() {
     let native_frame = sample_identity_frame();
     let mut wasm_frame = sample_identity_frame();
     wasm_frame.logical_clock = native_frame.logical_clock + 1;
-    let native = vec![capture_native_frame_sequence("demotion", vec![native_frame])];
+    let native = vec![capture_native_frame_sequence(
+        "demotion",
+        vec![native_frame],
+    )];
     let wasm = vec![capture_wasm_frame_sequence("demotion", vec![wasm_frame])];
     let verdict = compare_effects(&native, &wasm);
     assert!(
@@ -2012,10 +2089,7 @@ fn fault_injection_covers_every_invariant_class() {
 #[cfg(feature = "equiv-fault-inject")]
 fn assert_fault_moves_verdict(native: CapturedEffect, wasm: CapturedEffect, class: &str) {
     let clean = compare_effects(std::slice::from_ref(&native), std::slice::from_ref(&wasm));
-    assert!(
-        clean.passed,
-        "[{class}] baseline must be GREEN: {clean:?}"
-    );
+    assert!(clean.passed, "[{class}] baseline must be GREEN: {clean:?}");
     let mut faulted = native.clone();
     inject_invariant_fault(&mut faulted);
     let red = compare_effects(std::slice::from_ref(&faulted), std::slice::from_ref(&wasm));
@@ -2058,7 +2132,10 @@ fn fault_injection_boundary_moves_under_distinct_perturbation() {
     let mut at_max = sample_identity_frame();
     at_max.logical_clock = u64::MAX;
 
-    let native = vec![capture_native_frame_sequence("max-fault", vec![at_max.clone()])];
+    let native = vec![capture_native_frame_sequence(
+        "max-fault",
+        vec![at_max.clone()],
+    )];
     let wasm = vec![capture_wasm_frame_sequence("max-fault", vec![at_max])];
     let clean = compare_effects(&native, &wasm);
     assert!(clean.passed, "baseline at MAX must be GREEN: {clean:?}");
@@ -2070,7 +2147,8 @@ fn fault_injection_boundary_moves_under_distinct_perturbation() {
     // Sanity: the distinct injection actually changed the value away from MAX.
     if let EffectData::FrameSequence(frames) = &faulted[0].data {
         assert_ne!(
-            frames[0].logical_clock, u64::MAX,
+            frames[0].logical_clock,
+            u64::MAX,
             "distinct perturbation must move the value off the MAX ceiling"
         );
     } else {

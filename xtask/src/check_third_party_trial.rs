@@ -119,19 +119,25 @@ fn resolve_workspace_path(relative: &str) -> Option<std::path::PathBuf> {
 /// signed attestations are returned. Returns an empty map when the file is absent
 /// (v1.0/v1.5 path — provenance is not required there).
 fn load_signed_attestations(
-) -> std::collections::HashMap<String, maos_eval::trial_attestation::DerivedParticipantAttestation> {
-    let path = match resolve_workspace_path(maos_eval::trial_attestation::DERIVED_ATTESTATIONS_PATH) {
+) -> std::collections::HashMap<String, maos_eval::trial_attestation::DerivedParticipantAttestation>
+{
+    let path = match resolve_workspace_path(maos_eval::trial_attestation::DERIVED_ATTESTATIONS_PATH)
+    {
         Some(p) => p,
         None => std::path::PathBuf::from(maos_eval::trial_attestation::DERIVED_ATTESTATIONS_PATH),
     };
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
         // Absent file is the v1.0/v1.5 path (provenance not required) — silent.
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return std::collections::HashMap::new(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return std::collections::HashMap::new()
+        }
         // Any OTHER read failure (permissions, truncated) is a real defect — surface
         // it so an operator is not misled by 12× "missing producer-signed" messages.
         Err(e) => {
-            eprintln!("check-third-party-trial: WARNING — derived-attestations.json unreadable: {e}");
+            eprintln!(
+                "check-third-party-trial: WARNING — derived-attestations.json unreadable: {e}"
+            );
             return std::collections::HashMap::new();
         }
     };
@@ -140,7 +146,9 @@ fn load_signed_attestations(
             Ok(v) => v,
             // A malformed/truncated JSON is a producer bug, not an absent file — surface it.
             Err(e) => {
-                eprintln!("check-third-party-trial: WARNING — derived-attestations.json malformed: {e}");
+                eprintln!(
+                    "check-third-party-trial: WARNING — derived-attestations.json malformed: {e}"
+                );
                 return std::collections::HashMap::new();
             }
         };
@@ -159,7 +167,6 @@ fn load_signed_attestations(
     }
     map
 }
-
 
 pub fn run(json: bool) -> Result<(), String> {
     let path = resolve_workspace_path(RESULTS_PATH)
@@ -228,8 +235,9 @@ pub fn run(json: bool) -> Result<(), String> {
     // is unset at v2.0, fail loud rather than silently trusting the forgeable dev key.
     if require_derivation_provenance {
         let trusted = maos_eval::trial_attestation::producer_pubkey();
-        let dev_pubkey =
-            maos_audit::sealed_export::derive_pubkey(&maos_eval::trial_attestation::producer_dev_seed());
+        let dev_pubkey = maos_audit::sealed_export::derive_pubkey(
+            &maos_eval::trial_attestation::producer_dev_seed(),
+        );
         if trusted == dev_pubkey {
             return Err(format!(
                 "check-third-party-trial: FAIL — v2.0 requires MAOS_TRIAL_PRODUCER_PUBKEY set to a \
@@ -308,35 +316,41 @@ pub fn run(json: bool) -> Result<(), String> {
         // overrides — this closes the "10.2 canned-trap" (a planted `sbom_verified
         // = true` over a tampered artifact no longer turns the gate green).
         let signed = signed_attestations.get(&p.id);
-        let (produced_binary, binary_loads, frames_run, halt_recall, sbom_verified, signing_chain_verified) =
-            if require_derivation_provenance {
-                match signed {
-                    Some(att) => (
-                        att.produced_binary,
-                        att.binary_loads,
-                        att.frames_run,
-                        att.halt_recall,
-                        att.sbom_verified,
-                        att.signing_chain_verified,
-                    ),
-                    None => {
-                        failures.push(format!(
+        let (
+            produced_binary,
+            binary_loads,
+            frames_run,
+            halt_recall,
+            sbom_verified,
+            signing_chain_verified,
+        ) = if require_derivation_provenance {
+            match signed {
+                Some(att) => (
+                    att.produced_binary,
+                    att.binary_loads,
+                    att.frames_run,
+                    att.halt_recall,
+                    att.sbom_verified,
+                    att.signing_chain_verified,
+                ),
+                None => {
+                    failures.push(format!(
                             "participant {} missing producer-signed derived attestation (v2.0 default-deny)",
                             p.id
                         ));
-                        (p.produced_binary, false, 0_i64, 0.0_f64, false, false)
-                    }
+                    (p.produced_binary, false, 0_i64, 0.0_f64, false, false)
                 }
-            } else {
-                (
-                    p.produced_binary,
-                    p.binary_loads,
-                    p.frames_run,
-                    p.halt_recall,
-                    p.sbom_verified,
-                    p.signing_chain_verified,
-                )
-            };
+            }
+        } else {
+            (
+                p.produced_binary,
+                p.binary_loads,
+                p.frames_run,
+                p.halt_recall,
+                p.sbom_verified,
+                p.signing_chain_verified,
+            )
+        };
 
         // halt_recall must be a finite probability in [0,1] (on the EFFECTIVE value).
         if !halt_recall.is_finite() {

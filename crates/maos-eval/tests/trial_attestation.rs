@@ -20,8 +20,8 @@ use maos_eval::trial_attestation::{
     derive_halt_recall, derive_participant_attestation, derive_reload_facts,
     derive_sbom_from_sources, summarize_attestations, DerivationInputs,
     DerivedParticipantAttestation, HaltRecallCounts, HermeticEnvironment, HermeticityReport,
-    PackageId, ReloadExecutionReport, ReportedParticipantFacts, SigningDerivation, HALT_RECALL_FLOOR,
-    PROVENANCE_STAMP,
+    PackageId, ReloadExecutionReport, ReportedParticipantFacts, SigningDerivation,
+    HALT_RECALL_FLOOR, PROVENANCE_STAMP,
 };
 use std::path::PathBuf;
 
@@ -31,9 +31,7 @@ use std::path::PathBuf;
 fn lock_with(packages: &[(&str, &str)]) -> String {
     packages
         .iter()
-        .map(|(name, version)| {
-            format!("[[package]]\nname = \"{name}\"\nversion = \"{version}\"\n")
-        })
+        .map(|(name, version)| format!("[[package]]\nname = \"{name}\"\nversion = \"{version}\"\n"))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -58,7 +56,10 @@ fn attestation(signing_ok: bool) -> DerivedParticipantAttestation {
         load_accepted: true,
         frames_executed: 1_000,
     });
-    let sbom = derive_sbom_from_sources(&lock_with(&[("maos", "0.1.0")]), &tree_with(&[("maos", "0.1.0")]));
+    let sbom = derive_sbom_from_sources(
+        &lock_with(&[("maos", "0.1.0")]),
+        &tree_with(&[("maos", "0.1.0")]),
+    );
     let signing = SigningDerivation {
         signing_chain_verified: signing_ok,
         verified_manifest_entries: if signing_ok { 1 } else { 0 },
@@ -109,7 +110,10 @@ fn fail_to_load_derives_binary_loads_false_not_an_error() {
         !facts.meets_frame_floor,
         "a non-loading binary cannot satisfy the frame floor"
     );
-    assert_eq!(facts.frames_run, 1_000, "frames_run is still derived from the run report");
+    assert_eq!(
+        facts.frames_run, 1_000,
+        "frames_run is still derived from the run report"
+    );
 }
 
 /// AC1b: the ≥1000-frame floor is a real boundary — 1000 meets it, 999 does not.
@@ -124,7 +128,10 @@ fn frame_floor_1000_meets_and_999_derives_below_floor() {
         frames_executed: 999,
     });
     assert_eq!(at_floor.frames_run, 1_000);
-    assert!(at_floor.meets_frame_floor, "exactly 1000 frames must meet the floor");
+    assert!(
+        at_floor.meets_frame_floor,
+        "exactly 1000 frames must meet the floor"
+    );
     assert_eq!(below.frames_run, 999);
     assert!(
         !below.meets_frame_floor,
@@ -275,7 +282,10 @@ fn halt_recall_is_measured_not_hard_coded_to_one() {
         b"class-appropriate-corpus",
         true,
     );
-    assert_eq!(perfect.halt_recall, 1.0, "a perfect candidate legitimately hits 1.0");
+    assert_eq!(
+        perfect.halt_recall, 1.0,
+        "a perfect candidate legitimately hits 1.0"
+    );
     assert!(perfect.meets_floor);
 }
 
@@ -298,7 +308,10 @@ fn forged_self_report_is_ignored_and_derived_success_stays_false() {
         load_accepted: true,
         frames_executed: 1_000,
     });
-    let sbom = derive_sbom_from_sources(&lock_with(&[("maos", "0.1.0")]), &tree_with(&[("maos", "0.1.0")]));
+    let sbom = derive_sbom_from_sources(
+        &lock_with(&[("maos", "0.1.0")]),
+        &tree_with(&[("maos", "0.1.0")]),
+    );
     // The REAL signing-chain derivation failed (tampered artifact).
     let signing = SigningDerivation {
         signing_chain_verified: false,
@@ -358,7 +371,10 @@ fn halt_recall_self_report_contradiction_is_ignored() {
         load_accepted: true,
         frames_executed: 1_000,
     });
-    let sbom = derive_sbom_from_sources(&lock_with(&[("maos", "0.1.0")]), &tree_with(&[("maos", "0.1.0")]));
+    let sbom = derive_sbom_from_sources(
+        &lock_with(&[("maos", "0.1.0")]),
+        &tree_with(&[("maos", "0.1.0")]),
+    );
     let signing = SigningDerivation {
         signing_chain_verified: true,
         verified_manifest_entries: 1,
@@ -393,7 +409,10 @@ fn halt_recall_self_report_contradiction_is_ignored() {
         record.halt_recall < HALT_RECALL_FLOOR,
         "measured 0.4 must win over the 0.99 self-report"
     );
-    assert!(!record.success, "the measured shortfall must fail the conjunction");
+    assert!(
+        !record.success,
+        "the measured shortfall must fail the conjunction"
+    );
     assert!(record.ignored_self_report);
 }
 
@@ -411,7 +430,10 @@ fn dirty_environment_invalidates_the_full_success_conjunction() {
         load_accepted: true,
         frames_executed: 1_000,
     });
-    let sbom = derive_sbom_from_sources(&lock_with(&[("maos", "0.1.0")]), &tree_with(&[("maos", "0.1.0")]));
+    let sbom = derive_sbom_from_sources(
+        &lock_with(&[("maos", "0.1.0")]),
+        &tree_with(&[("maos", "0.1.0")]),
+    );
     let signing = SigningDerivation {
         signing_chain_verified: true,
         verified_manifest_entries: 1,

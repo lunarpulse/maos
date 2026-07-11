@@ -16,11 +16,11 @@
 
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
-use maos_a2a_core::{A2AError, A2APeerConfig, A2AProfile, ConsentAllowlists};
+use maos_a2a_core::{A2AError, A2APeerConfig, A2AProfile, CohortManifestGate, ConsentAllowlists};
 use maos_a2a_core::{HandshakeRetryPolicy, InMemoryTofuPinStore, TofuPinStore};
 use maos_a2a_tcp::{
-    PinnedFingerprint, TcpA2AConfig, TcpA2ATransport, TcpTimeouts, TrustPosture,
-    build_client_config, length_delimited_codec,
+    build_client_config, length_delimited_codec, PinnedFingerprint, TcpA2AConfig, TcpA2ATransport,
+    TcpTimeouts, TrustPosture,
 };
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i8::A2AIntent;
@@ -34,8 +34,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tempfile::TempDir;
 use time::OffsetDateTime;
 use tokio::net::TcpStream;
-use tokio_rustls::TlsConnector;
 use tokio_rustls::client::TlsStream;
+use tokio_rustls::TlsConnector;
 use tokio_util::codec::Framed;
 
 /// H2 — a single pinned clock captured once per test.
@@ -369,8 +369,8 @@ pub fn make_frame(
     use maos_domain::frame::{
         ConsentEnvelope, FrameAddress, FramePayload, PosturePreferences, TaskAssignPayload,
     };
-    use maos_domain::invariants::i3::FrameOrigin;
     use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
     use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId};
     use smallvec::smallvec;
 
@@ -456,9 +456,23 @@ pub async fn build_mesh_n(
     expected: &[&Leaf],
     retry: HandshakeRetryPolicy,
 ) -> Vec<MeshNode> {
+    let gates: Vec<Option<Arc<dyn CohortManifestGate>>> = vec![None; names.len()];
+    build_mesh_n_with_gates(clock, ca, names, serving, expected, retry, &gates).await
+}
+
+pub async fn build_mesh_n_with_gates(
+    clock: &Clock,
+    ca: &Ca,
+    names: &[String],
+    serving: &[&Leaf],
+    expected: &[&Leaf],
+    retry: HandshakeRetryPolicy,
+    gates: &[Option<Arc<dyn CohortManifestGate>>],
+) -> Vec<MeshNode> {
     let n = names.len();
     assert_eq!(serving.len(), n, "serving leaves must match host count");
     assert_eq!(expected.len(), n, "expected leaves must match host count");
+    assert_eq!(gates.len(), n, "cohort gates must match host count");
     let mut nodes = Vec::with_capacity(n);
     for i in 0..n {
         let peers: Vec<(usize, &Leaf)> = (0..n)
@@ -481,17 +495,20 @@ pub async fn build_mesh_n(
                 )
             })
             .collect();
-        let transport = bind_endpoint(
-            serving[i],
-            Some(ca),
-            1_000 + i as u64,
-            peer_pins,
+        let pems = write_pem(serving[i], Some(ca));
+        let tcp = tcp_config(&pems, peer_pins, Duration::from_secs(30));
+        let transport = TcpA2ATransport::bind_with_cohort_manifest_gate(
+            tcp,
             peer_cfgs,
-            clock,
+            1_000 + i as u64,
             TcpTimeouts::test_profile(),
             retry.clone(),
+            Some(clock.unix()),
+            None,
+            gates[i].clone(),
         )
-        .await;
+        .await
+        .expect("bind mesh endpoint");
         let addr = transport.local_addr().expect("bound addr (H3/H4)");
         nodes.push(MeshNode {
             name: names[i].clone(),

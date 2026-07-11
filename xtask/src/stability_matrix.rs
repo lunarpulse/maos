@@ -32,7 +32,7 @@ use crate::check_workspace_count::count_cargo_toml_members;
 // the producer and `check_export_control` can never drift apart on what the
 // §Export fence is.
 use crate::check_export_control::{
-    EXPORT_FENCE_END, EXPORT_FENCE_START, STUB_MARKER, extract_export_fence,
+    extract_export_fence, EXPORT_FENCE_END, EXPORT_FENCE_START, STUB_MARKER,
 };
 
 const SPIRIT_ABI_LIB: &str = "crates/maos-spirit-abi/src/lib.rs";

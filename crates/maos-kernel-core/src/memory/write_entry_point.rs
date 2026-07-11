@@ -247,11 +247,17 @@ mod tests {
         };
         // Cross-region write to a different home → rejected
         let result = enforce_region(&entry, Some(&home));
-        assert!(result.is_err(), "cross-region readmit to foreign home must be rejected");
+        assert!(
+            result.is_err(),
+            "cross-region readmit to foreign home must be rejected"
+        );
         // Same region → accepted
         let same_home = Region::canonicalize("eu-west").unwrap();
         let result = enforce_region(&entry, Some(&same_home));
-        assert!(result.is_ok(), "cross-region readmit to matching home must be accepted");
+        assert!(
+            result.is_ok(),
+            "cross-region readmit to matching home must be accepted"
+        );
         // No home (region pinning disabled) → accepted
         let result = enforce_region(&entry, None);
         assert!(result.is_ok(), "no home region → always accepted");

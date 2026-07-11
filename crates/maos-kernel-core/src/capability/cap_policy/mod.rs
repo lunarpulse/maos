@@ -120,9 +120,8 @@ impl PolicyTable {
             .get(&spirit_pid);
         if global_deny.contains(deny_scope_key)
             || global_deny.contains(deny_intent_key)
-            || spirit_deny.is_some_and(|deny| {
-                deny.contains(deny_scope_key) || deny.contains(deny_intent_key)
-            })
+            || spirit_deny
+                .is_some_and(|deny| deny.contains(deny_scope_key) || deny.contains(deny_intent_key))
         {
             return PolicyDecision::Deny;
         }
@@ -182,11 +181,7 @@ impl PolicyTable {
         // Approval-class lookup from operator policy (by stable scope key
         // and by stable intent key).
         let scope_key = maos_domain::ports::scope_action_key(&capability.scope);
-        if let Some(class) = inner
-            .operator_policy
-            .per_capability_approval
-            .get(scope_key)
-        {
+        if let Some(class) = inner.operator_policy.per_capability_approval.get(scope_key) {
             return PolicyDecision::RequireApproval { class: *class };
         }
         let intent_key = intent_action_key(intent);

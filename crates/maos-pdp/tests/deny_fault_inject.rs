@@ -27,8 +27,7 @@ fn req(pid: u32, key: &str) -> PolicyDecisionRequest {
     }
 }
 
-const POLICY_FORBID_FSREAD: &str =
-    r#"forbid(principal, action == Action::"FsRead", resource);"#;
+const POLICY_FORBID_FSREAD: &str = r#"forbid(principal, action == Action::"FsRead", resource);"#;
 
 #[test]
 fn deny_forbid_returns_deny_through_port() {

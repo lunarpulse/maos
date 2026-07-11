@@ -55,7 +55,10 @@ fn ciphertext_differs_from_plaintext() {
     // The plaintext must not appear verbatim anywhere in the sealed blob —
     // defends against a "prepend-the-plaintext" fake too.
     assert!(
-        !sealed.as_slice().windows(PAYLOAD.len()).any(|w| w == PAYLOAD),
+        !sealed
+            .as_slice()
+            .windows(PAYLOAD.len())
+            .any(|w| w == PAYLOAD),
         "the plaintext MUST NOT appear as a contiguous substring of the sealed blob"
     );
 }

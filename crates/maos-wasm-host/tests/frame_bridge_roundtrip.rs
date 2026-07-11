@@ -21,14 +21,15 @@
 #![cfg(test)]
 
 use maos_domain::frame::{
-    self, ConsentRequestPayload, ConsentRupturePayload, DecisionDispatchPayload, EpistemicHaltPayload,
-    FrameAddress, FramePayload, IacFrame, PosturePreferences, RateLimitedPayload, RetractPayload,
-    RuptureRejection, TaskAssignPayload, TaskCompletePayload, TelemetryEventPayload,
+    self, ConsentRequestPayload, ConsentRupturePayload, DecisionDispatchPayload,
+    EpistemicHaltPayload, FrameAddress, FramePayload, IacFrame, PosturePreferences,
+    RateLimitedPayload, RetractPayload, RuptureRejection, TaskAssignPayload, TaskCompletePayload,
+    TelemetryEventPayload,
 };
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i1::Scope;
-use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i13::IntentLineage;
+use maos_domain::invariants::i3::FrameOrigin;
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
 use smallvec::SmallVec;
 
@@ -73,15 +74,25 @@ fn envelope(kind: FrameKind, payload: FramePayload) -> IacFrame {
 /// lossy fields (`intent`, `consent_envelope`, `intent_lineage`) are checked in
 /// their own dedicated tests below — never silently folded into a pass here.
 fn assert_envelope_round_trips(original: &IacFrame, round: &IacFrame) {
-    assert_eq!(round.frame_id, original.frame_id, "frame_id must round-trip");
+    assert_eq!(
+        round.frame_id, original.frame_id,
+        "frame_id must round-trip"
+    );
     assert_eq!(round.timestamp_ns, original.timestamp_ns);
     assert_eq!(round.logical_clock, original.logical_clock);
     assert_eq!(round.kind, original.kind, "FrameKind must round-trip");
-    assert_eq!(round.auto_marker, original.auto_marker, "FrameOrigin must round-trip");
+    assert_eq!(
+        round.auto_marker, original.auto_marker,
+        "FrameOrigin must round-trip"
+    );
     assert_eq!(round.from.spirit_id, original.from.spirit_id);
     assert_eq!(round.from.host_id, original.from.host_id);
     assert_eq!(round.from.role, original.from.role);
-    assert_eq!(round.to.len(), original.to.len(), "recipient count must round-trip");
+    assert_eq!(
+        round.to.len(),
+        original.to.len(),
+        "recipient count must round-trip"
+    );
     for (got, want) in round.to.iter().zip(original.to.iter()) {
         assert_eq!(got.spirit_id, want.spirit_id);
         assert_eq!(got.host_id, want.host_id);
@@ -172,7 +183,9 @@ fn task_assign_scope_round_trips_lossy_debug_projection() {
     // a real Scope type, this assertion flips RED and forces the fix.
     let payload = TaskAssignPayload {
         scope: vec![
-            Scope::FsRead { subtree: "/tmp".into() },
+            Scope::FsRead {
+                subtree: "/tmp".into(),
+            },
             Scope::SelfTelemetryRead,
         ],
         ..task_assign_defaults()
@@ -211,7 +224,10 @@ fn decision_dispatch_payload_round_trips() {
         approved: true,
         working_memory_digest_refs: Default::default(),
     };
-    let frame = envelope(FrameKind::DecisionDispatch, FramePayload::DecisionDispatch(payload));
+    let frame = envelope(
+        FrameKind::DecisionDispatch,
+        FramePayload::DecisionDispatch(payload),
+    );
     let round = round_trip(&frame);
     assert_envelope_round_trips(&frame, &round);
     let FramePayload::DecisionDispatch(got) = &round.payload else {
@@ -231,7 +247,10 @@ fn epistemic_halt_payload_round_trips() {
         policy_id: "policy-7".into(),
         derived_from: "frame-9".into(),
     };
-    let frame = envelope(FrameKind::EpistemicHalt, FramePayload::EpistemicHalt(payload));
+    let frame = envelope(
+        FrameKind::EpistemicHalt,
+        FramePayload::EpistemicHalt(payload),
+    );
     let round = round_trip(&frame);
     assert_envelope_round_trips(&frame, &round);
     let FramePayload::EpistemicHalt(got) = &round.payload else {
@@ -239,8 +258,15 @@ fn epistemic_halt_payload_round_trips() {
     };
     assert_eq!(got.halt_id, "halt-1");
     assert_eq!(got.tag, "confidence");
-    assert!((got.value - 0.42_f32).abs() < 1e-6, "f32 value must round-trip");
-    assert_eq!(got.threshold, Some(0.9_f32), "Option<f32> threshold must round-trip");
+    assert!(
+        (got.value - 0.42_f32).abs() < 1e-6,
+        "f32 value must round-trip"
+    );
+    assert_eq!(
+        got.threshold,
+        Some(0.9_f32),
+        "Option<f32> threshold must round-trip"
+    );
     assert_eq!(got.policy_id, "policy-7");
     assert_eq!(got.derived_from, "frame-9");
 }
@@ -251,7 +277,10 @@ fn telemetry_event_payload_round_trips() {
         event_type: "latency".into(),
         data: r#"{"p99_ms":42}"#.into(),
     };
-    let frame = envelope(FrameKind::TelemetryEvent, FramePayload::TelemetryEvent(payload));
+    let frame = envelope(
+        FrameKind::TelemetryEvent,
+        FramePayload::TelemetryEvent(payload),
+    );
     let round = round_trip(&frame);
     assert_envelope_round_trips(&frame, &round);
     let FramePayload::TelemetryEvent(got) = &round.payload else {
@@ -266,7 +295,10 @@ fn consent_request_payload_round_trips() {
     let payload = ConsentRequestPayload {
         capability: "fs:read:/tmp".into(),
     };
-    let frame = envelope(FrameKind::ConsentRequest, FramePayload::ConsentRequest(payload));
+    let frame = envelope(
+        FrameKind::ConsentRequest,
+        FramePayload::ConsentRequest(payload),
+    );
     let round = round_trip(&frame);
     assert_envelope_round_trips(&frame, &round);
     let FramePayload::ConsentRequest(got) = &round.payload else {
@@ -306,7 +338,10 @@ fn consent_rupture_payload_round_trips() {
         }],
         ruptured_at_ns: 9_999,
     };
-    let frame = envelope(FrameKind::ConsentRupture, FramePayload::ConsentRupture(payload));
+    let frame = envelope(
+        FrameKind::ConsentRupture,
+        FramePayload::ConsentRupture(payload),
+    );
     let round = round_trip(&frame);
     assert_envelope_round_trips(&frame, &round);
     let FramePayload::ConsentRupture(got) = &round.payload else {
@@ -361,7 +396,10 @@ fn intent_field_round_trips_lossy_to_readonly() {
         IntentClass::Readonly,
         "intent is dropped on lower and defaulted to Readonly on lift (tracked gap)"
     );
-    assert_ne!(round.intent, frame.intent, "sanity: the original was NOT Readonly");
+    assert_ne!(
+        round.intent, frame.intent,
+        "sanity: the original was NOT Readonly"
+    );
 }
 
 #[test]

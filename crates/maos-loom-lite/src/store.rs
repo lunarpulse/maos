@@ -345,8 +345,8 @@ impl LoomLiteStore {
             if !self.region_guard(&src_region, &src_log_ref) {
                 return Ok(None);
             }
-            let value = schema::parts_to_value(val_kind, &val_data)
-                .map_err(StoreError::Serialization)?;
+            let value =
+                schema::parts_to_value(val_kind, &val_data).map_err(StoreError::Serialization)?;
             Ok(Some(value))
         } else {
             Ok(None)
@@ -484,9 +484,7 @@ impl LoomLiteStore {
     ///
     /// Generic over `GenericClient` so it works with both `Client` and
     /// `Transaction` (verify-before-commit pattern from `canonical.rs:281`).
-    pub async fn read_all_rows_from<C>(
-        client: &C,
-    ) -> Result<Vec<CollectiveRow>, StoreError>
+    pub async fn read_all_rows_from<C>(client: &C) -> Result<Vec<CollectiveRow>, StoreError>
     where
         C: tokio_postgres::GenericClient + Sync,
     {
@@ -582,8 +580,7 @@ mod tests {
     #[tokio::test]
     async fn with_at_rest_seal_builder_installs_hook_default_is_none() {
         let store = LoomLiteStore::new(StoreConfig {
-            connection_string:
-                "host=127.0.0.1 port=1 dbname=none connect_timeout=1".to_string(),
+            connection_string: "host=127.0.0.1 port=1 dbname=none connect_timeout=1".to_string(),
             timeout_ms: 500,
             ..StoreConfig::default()
         })
@@ -597,8 +594,7 @@ mod tests {
         );
 
         // Install a deterministic XOR stand-in for AEAD (no maos-secrets dep).
-        let xor_seal: AtRestSeal =
-            Arc::new(|d: &[u8]| Ok(d.iter().map(|b| b ^ 0xA5).collect()));
+        let xor_seal: AtRestSeal = Arc::new(|d: &[u8]| Ok(d.iter().map(|b| b ^ 0xA5).collect()));
         let sealed_store = store.with_at_rest_seal(Some(xor_seal));
 
         assert!(

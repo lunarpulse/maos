@@ -157,7 +157,11 @@ pub fn run(report: &Path, threshold: f64, strict: bool, json: bool) -> i32 {
         }
     }
 
-    if strict && !outliers.is_empty() { 1 } else { 0 }
+    if strict && !outliers.is_empty() {
+        1
+    } else {
+        0
+    }
 }
 
 #[cfg(test)]

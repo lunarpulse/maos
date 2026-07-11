@@ -1,4 +1,7 @@
-use xtask::check_fkcs::{FkcsBaseline, FkcsOracle, FkcsSurfaceSnapshot, ForgedSelfReport, is_blocking_at, parse_inline_disposition, phase_disposition, read_disposition, read_nonempty_lines};
+use xtask::check_fkcs::{
+    is_blocking_at, parse_inline_disposition, phase_disposition, read_disposition,
+    read_nonempty_lines, FkcsBaseline, FkcsOracle, FkcsSurfaceSnapshot, ForgedSelfReport,
+};
 
 #[test]
 fn frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift() {
@@ -53,7 +56,6 @@ fn diff_oracle_derives_kernel_unchanged_and_ignores_self_reported_flags() {
         "self-reported flags are not oracle inputs"
     );
 }
-
 
 #[test]
 fn diff_oracle_reports_kernel_unchanged_for_identical_surfaces() {
@@ -126,7 +128,10 @@ fn frozen_baseline_files_carry_real_public_surfaces_not_synthetic_tokens() {
         "the synthetic 'abi' placeholder token must not stand in for the real surface"
     );
     assert!(abi.len() > 1, "a real abi surface is multi-symbol");
-    assert!(!host.is_empty(), "host baseline must carry a non-empty real surface");
+    assert!(
+        !host.is_empty(),
+        "host baseline must carry a non-empty real surface"
+    );
 }
 
 #[test]
@@ -158,10 +163,7 @@ fn live_triple_reconciles_real_kernel_core_line_count_not_a_literal() {
 fn real_kernel_core_src_lines() -> usize {
     let cwd = std::env::current_dir().expect("current_dir is readable");
     for ancestor in cwd.ancestors() {
-        let src = ancestor
-            .join("crates")
-            .join("maos-kernel-core")
-            .join("src");
+        let src = ancestor.join("crates").join("maos-kernel-core").join("src");
         if src.is_dir() {
             return count_rs_lines_recursive(&src);
         }
@@ -174,8 +176,8 @@ fn real_kernel_core_src_lines() -> usize {
 
 fn count_rs_lines_recursive(dir: &std::path::Path) -> usize {
     let mut total = 0;
-    for entry in std::fs::read_dir(dir)
-        .unwrap_or_else(|e| panic!("read_dir {}: {e}", dir.display()))
+    for entry in
+        std::fs::read_dir(dir).unwrap_or_else(|e| panic!("read_dir {}: {e}", dir.display()))
     {
         let path = entry.expect("dir entry").path();
         if path.is_dir() {
@@ -189,7 +191,6 @@ fn count_rs_lines_recursive(dir: &std::path::Path) -> usize {
     }
     total
 }
-
 
 #[test]
 fn oracle_fault_injections_red_kernel_unchanged_around_a_stable_base() {

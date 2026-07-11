@@ -153,9 +153,7 @@ mod tests {
     fn test_memory_error_should_not_degrade() {
         // A forwarded memory-layer error is a data-layer fault, not a
         // recoverable outage: downgrading would mask corruption → fail closed.
-        let err = CollectivePortError::Memory(MemoryError::NamespaceViolation(
-            "boom".to_string(),
-        ));
+        let err = CollectivePortError::Memory(MemoryError::NamespaceViolation("boom".to_string()));
         assert!(
             !DowngradeRouter::should_degrade(&err),
             "Memory(...) must NOT degrade — it is a non-recoverable data fault"

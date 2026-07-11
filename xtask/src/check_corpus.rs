@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
-use crate::corpus_types::{CorpusManifest, load_toml};
+use crate::corpus_types::{load_toml, CorpusManifest};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Violation {

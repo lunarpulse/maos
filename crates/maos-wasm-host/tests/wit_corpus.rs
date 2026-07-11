@@ -26,8 +26,8 @@ mod wit_ast {
 
     fn resolve() -> Resolve {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../wit/spirit.wit");
-        let source = std::fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("failed to read {path}: {e}"));
+        let source =
+            std::fs::read_to_string(path).unwrap_or_else(|e| panic!("failed to read {path}: {e}"));
         let mut resolve = Resolve::new();
         resolve
             .push_source(path, &source)
@@ -200,7 +200,10 @@ fn k_encode_task_assign_is_canonical() {
     // Decode and re-encode: byte-identical
     let decoded: BTreeMap<String, serde_json::Value> = codec::decode_cbor(&encoded1).unwrap();
     let reencoded = codec::encode_cbor(&decoded).unwrap();
-    assert_eq!(encoded1, reencoded, "decode→re-encode must be byte-identical");
+    assert_eq!(
+        encoded1, reencoded,
+        "decode→re-encode must be byte-identical"
+    );
 }
 
 #[test]
@@ -236,7 +239,10 @@ fn k_encode_all_payload_variants_canonical() {
 
         let dec: BTreeMap<String, serde_json::Value> = codec::decode_cbor(&enc1).unwrap();
         let reenc = codec::encode_cbor(&dec).unwrap();
-        assert_eq!(enc1, reenc, "payload variant {i} decode→re-encode must be identical");
+        assert_eq!(
+            enc1, reenc,
+            "payload variant {i} decode→re-encode must be identical"
+        );
     }
 }
 
@@ -301,7 +307,10 @@ fn cbor_map_reorder_produces_different_bytes() {
     // BTreeMap sorts, so both produce identical CBOR (canonical)
     let enc_a = codec::encode_cbor(&map_a).unwrap();
     let enc_b = codec::encode_cbor(&map_b).unwrap();
-    assert_eq!(enc_a, enc_b, "BTreeMap insertion order should not affect canonical CBOR");
+    assert_eq!(
+        enc_a, enc_b,
+        "BTreeMap insertion order should not affect canonical CBOR"
+    );
 }
 
 /// A map wrapper serializing entries in EXACTLY the given order (unlike
@@ -357,7 +366,10 @@ fn cbor_non_pre_sorted_container_reveals_insertion_order_not_canonical() {
 fn mutator_flips_field_detected_red() {
     let original = build_task_assign_frame();
     let mut mutated = original.clone();
-    mutated.insert("goal".to_string(), serde_json::Value::String("MUTATED".to_string()));
+    mutated.insert(
+        "goal".to_string(),
+        serde_json::Value::String("MUTATED".to_string()),
+    );
 
     let enc_orig = codec::encode_cbor(&original).unwrap();
     let enc_mut = codec::encode_cbor(&mutated).unwrap();
@@ -371,11 +383,17 @@ fn mutator_flips_field_detected_red() {
 #[test]
 fn dropper_omits_optional_detected_red() {
     let mut with_opt = BTreeMap::new();
-    with_opt.insert("value".to_string(), serde_json::Value::String("test".to_string()));
+    with_opt.insert(
+        "value".to_string(),
+        serde_json::Value::String("test".to_string()),
+    );
     with_opt.insert("opt".to_string(), serde_json::Value::Number(42.into()));
 
     let mut without_opt = BTreeMap::new();
-    without_opt.insert("value".to_string(), serde_json::Value::String("test".to_string()));
+    without_opt.insert(
+        "value".to_string(),
+        serde_json::Value::String("test".to_string()),
+    );
     // "opt" key omitted entirely
 
     let enc_with = codec::encode_cbor(&with_opt).unwrap();
@@ -391,58 +409,100 @@ fn dropper_omits_optional_detected_red() {
 
 fn build_task_assign_frame() -> BTreeMap<String, serde_json::Value> {
     let mut m = BTreeMap::new();
-    m.insert("goal".to_string(), serde_json::Value::String("test goal".to_string()));
+    m.insert(
+        "goal".to_string(),
+        serde_json::Value::String("test goal".to_string()),
+    );
     m.insert("scope".to_string(), serde_json::json!(["scope1"]));
-    m.insert("success_criteria".to_string(), serde_json::Value::String("done".to_string()));
-    m.insert("posture_preferences".to_string(), serde_json::json!({
-        "preferred_posture": null,
-        "halt_policy_overrides": []
-    }));
+    m.insert(
+        "success_criteria".to_string(),
+        serde_json::Value::String("done".to_string()),
+    );
+    m.insert(
+        "posture_preferences".to_string(),
+        serde_json::json!({
+            "preferred_posture": null,
+            "halt_policy_overrides": []
+        }),
+    );
     m.insert("prior_distillate_ref".to_string(), serde_json::Value::Null);
     m
 }
 
 fn build_task_complete_frame() -> BTreeMap<String, serde_json::Value> {
     let mut m = BTreeMap::new();
-    m.insert("result".to_string(), serde_json::Value::String("completed".to_string()));
+    m.insert(
+        "result".to_string(),
+        serde_json::Value::String("completed".to_string()),
+    );
     m
 }
 
 fn build_decision_dispatch_frame() -> BTreeMap<String, serde_json::Value> {
     let mut m = BTreeMap::new();
-    m.insert("decision_id".to_string(), serde_json::Value::Number(1.into()));
+    m.insert(
+        "decision_id".to_string(),
+        serde_json::Value::Number(1.into()),
+    );
     m.insert("approved".to_string(), serde_json::Value::Bool(true));
     m
 }
 
 fn build_epistemic_halt_frame() -> BTreeMap<String, serde_json::Value> {
     let mut m = BTreeMap::new();
-    m.insert("halt_id".to_string(), serde_json::Value::String("halt-1".to_string()));
-    m.insert("tag".to_string(), serde_json::Value::String("claim.security".to_string()));
+    m.insert(
+        "halt_id".to_string(),
+        serde_json::Value::String("halt-1".to_string()),
+    );
+    m.insert(
+        "tag".to_string(),
+        serde_json::Value::String("claim.security".to_string()),
+    );
     m.insert("value".to_string(), serde_json::json!(0.5));
     m.insert("threshold".to_string(), serde_json::json!(0.7));
-    m.insert("policy_id".to_string(), serde_json::Value::String("pol-1".to_string()));
-    m.insert("derived_from".to_string(), serde_json::Value::String("source".to_string()));
+    m.insert(
+        "policy_id".to_string(),
+        serde_json::Value::String("pol-1".to_string()),
+    );
+    m.insert(
+        "derived_from".to_string(),
+        serde_json::Value::String("source".to_string()),
+    );
     m
 }
 
 fn build_telemetry_event_frame() -> BTreeMap<String, serde_json::Value> {
     let mut m = BTreeMap::new();
-    m.insert("event_type".to_string(), serde_json::Value::String("metric".to_string()));
-    m.insert("data".to_string(), serde_json::Value::String("{}".to_string()));
+    m.insert(
+        "event_type".to_string(),
+        serde_json::Value::String("metric".to_string()),
+    );
+    m.insert(
+        "data".to_string(),
+        serde_json::Value::String("{}".to_string()),
+    );
     m
 }
 
 fn build_consent_request_frame() -> BTreeMap<String, serde_json::Value> {
     let mut m = BTreeMap::new();
-    m.insert("capability".to_string(), serde_json::Value::String("fs.read".to_string()));
+    m.insert(
+        "capability".to_string(),
+        serde_json::Value::String("fs.read".to_string()),
+    );
     m
 }
 
 fn build_retract_frame() -> BTreeMap<String, serde_json::Value> {
     let mut m = BTreeMap::new();
-    m.insert("original_frame_id".to_string(), serde_json::json!(vec![0u8; 16]));
-    m.insert("reason".to_string(), serde_json::Value::String("withdrawn".to_string()));
+    m.insert(
+        "original_frame_id".to_string(),
+        serde_json::json!(vec![0u8; 16]),
+    );
+    m.insert(
+        "reason".to_string(),
+        serde_json::Value::String("withdrawn".to_string()),
+    );
     m.insert("original_kind".to_string(), serde_json::Value::Null);
     m
 }
@@ -450,22 +510,49 @@ fn build_retract_frame() -> BTreeMap<String, serde_json::Value> {
 fn build_consent_rupture_frame() -> BTreeMap<String, serde_json::Value> {
     let mut m = BTreeMap::new();
     m.insert("rupture_id".to_string(), serde_json::json!(vec![1u8; 16]));
-    m.insert("original_frame_id".to_string(), serde_json::json!(vec![2u8; 16]));
-    m.insert("original_kind".to_string(), serde_json::Value::Number(0.into()));
+    m.insert(
+        "original_frame_id".to_string(),
+        serde_json::json!(vec![2u8; 16]),
+    );
+    m.insert(
+        "original_kind".to_string(),
+        serde_json::Value::Number(0.into()),
+    );
     m.insert("accepted".to_string(), serde_json::json!([]));
     m.insert("rejected".to_string(), serde_json::json!([]));
-    m.insert("ruptured_at_ns".to_string(), serde_json::Value::Number(1000.into()));
+    m.insert(
+        "ruptured_at_ns".to_string(),
+        serde_json::Value::Number(1000.into()),
+    );
     m
 }
 
 fn build_rate_limited_frame() -> BTreeMap<String, serde_json::Value> {
     let mut m = BTreeMap::new();
-    m.insert("provider_id".to_string(), serde_json::Value::String("anthropic".to_string()));
-    m.insert("credential_fingerprint_prefix_hex".to_string(), serde_json::Value::String("abcd1234".to_string()));
-    m.insert("retry_after_ms".to_string(), serde_json::Value::Number(5000.into()));
-    m.insert("bucket_remaining".to_string(), serde_json::Value::Number(0.into()));
-    m.insert("bucket_capacity".to_string(), serde_json::Value::Number(100.into()));
-    m.insert("refill_per_sec".to_string(), serde_json::Value::Number(10.into()));
+    m.insert(
+        "provider_id".to_string(),
+        serde_json::Value::String("anthropic".to_string()),
+    );
+    m.insert(
+        "credential_fingerprint_prefix_hex".to_string(),
+        serde_json::Value::String("abcd1234".to_string()),
+    );
+    m.insert(
+        "retry_after_ms".to_string(),
+        serde_json::Value::Number(5000.into()),
+    );
+    m.insert(
+        "bucket_remaining".to_string(),
+        serde_json::Value::Number(0.into()),
+    );
+    m.insert(
+        "bucket_capacity".to_string(),
+        serde_json::Value::Number(100.into()),
+    );
+    m.insert(
+        "refill_per_sec".to_string(),
+        serde_json::Value::Number(10.into()),
+    );
     m.insert("schedule_id".to_string(), serde_json::Value::Null);
     m
 }

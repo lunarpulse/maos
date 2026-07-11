@@ -83,8 +83,7 @@ fn append_identity_asserted_writes_one_kind_30_row_round_tripping_payload() {
     assert_eq!(row.boot_nonce, BOOT_NONCE);
     assert_eq!(row.timestamp_ns, DECISION_TIME_NS);
     assert_eq!(
-        row.capability_token_hex,
-        None,
+        row.capability_token_hex, None,
         "identity.asserted carries NO capability token"
     );
 
@@ -106,8 +105,16 @@ fn append_identity_asserted_row_is_filterable_by_kind_string() {
     let tmp = tempfile::TempDir::new().unwrap();
     let db = fresh_db(&tmp, "identity-asserted-filter.sqlite");
 
-    append_identity_asserted(&db, SPIRIT_PID, BOOT_NONCE, SUBJECT, ISSUER, CAPABILITY_KEY, DECISION_TIME_NS)
-        .expect("append succeeds");
+    append_identity_asserted(
+        &db,
+        SPIRIT_PID,
+        BOOT_NONCE,
+        SUBJECT,
+        ISSUER,
+        CAPABILITY_KEY,
+        DECISION_TIME_NS,
+    )
+    .expect("append succeeds");
 
     let mut filter = AuditFilter::default();
     filter.kind = Some("identity.asserted".to_string());
@@ -118,7 +125,10 @@ fn append_identity_asserted_row_is_filterable_by_kind_string() {
     let mut other = AuditFilter::default();
     other.kind = Some("task.assign".to_string());
     let missed = query(&db, other).expect("other-kind query succeeds");
-    assert!(missed.is_empty(), "task.assign filter must not match identity.asserted");
+    assert!(
+        missed.is_empty(),
+        "task.assign filter must not match identity.asserted"
+    );
 }
 
 /// Fail-closed: a missing `transparency_log` table is an error, NOT a silent

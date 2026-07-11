@@ -128,12 +128,15 @@ fn build_probe() -> PathBuf {
 }
 
 /// Open a fresh on-disk Transparency Log in a temp dir (boot_nonce=1).
-pub fn fresh_temp_tl() -> (tempfile::TempDir, PathBuf, std::sync::Arc<TransparencyLogAdapter>) {
+pub fn fresh_temp_tl() -> (
+    tempfile::TempDir,
+    PathBuf,
+    std::sync::Arc<TransparencyLogAdapter>,
+) {
     let dir = tempfile::tempdir().expect("tempdir");
     let db_path = dir.path().join("escape_detector_tl.db");
-    let tl = std::sync::Arc::new(
-        TransparencyLogAdapter::open(&db_path, 1).expect("open on-disk TL"),
-    );
+    let tl =
+        std::sync::Arc::new(TransparencyLogAdapter::open(&db_path, 1).expect("open on-disk TL"));
     (dir, db_path, tl)
 }
 
@@ -159,7 +162,10 @@ pub fn skip_if_sandbox_unavailable<T>(result: Result<T, SpawnError>, test_name: 
                 std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::Unsupported
             ) =>
         {
-            eprintln!("SKIP {test_name}: sandbox spawn refused by host ({:?})", e.kind());
+            eprintln!(
+                "SKIP {test_name}: sandbox spawn refused by host ({:?})",
+                e.kind()
+            );
             None
         }
         Err(e) => panic!(

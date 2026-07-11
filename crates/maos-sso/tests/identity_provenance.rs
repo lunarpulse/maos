@@ -20,9 +20,7 @@
 #[path = "fixtures.rs"]
 mod fixtures;
 
-use maos_sso::{
-    reconcile_provenance, IdentityProvenanceRecord, OidcAlgorithm, OidcVerifier,
-};
+use maos_sso::{reconcile_provenance, IdentityProvenanceRecord, OidcAlgorithm, OidcVerifier};
 
 /// Build the reference verifier: static JWKS = {keyA}, allowlist = [RS256],
 /// trusted issuer = ISS_GOOD, expected audience = AUD_EXPECTED.

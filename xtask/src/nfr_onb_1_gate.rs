@@ -21,8 +21,8 @@
 use std::path::Path;
 
 use maos_eval::onboarding_gate_corpus::{
-    CandidateOutcome, CohortManifest, OnboardingCorpus, classify_prerequisites, evaluate_cohort,
-    validate_corpus_size, validate_stratification,
+    classify_prerequisites, evaluate_cohort, validate_corpus_size, validate_stratification,
+    CandidateOutcome, CohortManifest, OnboardingCorpus,
 };
 
 const EXAMPLE_COHORT: &str = "docs/research/examples/cohort.example.json";

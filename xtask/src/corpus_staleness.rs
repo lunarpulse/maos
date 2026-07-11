@@ -4,7 +4,7 @@ use std::path::Path;
 
 use chrono::NaiveDate;
 
-use crate::corpus_types::{CorpusManifest, CoverageMatrixFile, load_toml};
+use crate::corpus_types::{load_toml, CorpusManifest, CoverageMatrixFile};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Violation {

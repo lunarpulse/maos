@@ -45,9 +45,7 @@ fn verifier() -> OidcVerifier {
 fn govern_authorization_rejects_unverified_assertion_fail_closed() {
     let err = verifier()
         .govern_authorization(fixtures::TOKEN_WRONG_KEY, 4242, "fs.read")
-        .expect_err(
-            "an assertion signed by a key NOT in the JWKS MUST NOT govern authorization",
-        );
+        .expect_err("an assertion signed by a key NOT in the JWKS MUST NOT govern authorization");
     assert_eq!(
         err,
         IdentityError::SignatureInvalid,
@@ -74,7 +72,10 @@ fn governed_principal_attributes_populate_policy_decision_request() {
     // This is the JWT payload value, NOT a hardcoded literal — govern_authorization
     // re-derived it from the cryptographically verified claims.
     assert_eq!(
-        governed.principal_attributes.get("email").map(String::as_str),
+        governed
+            .principal_attributes
+            .get("email")
+            .map(String::as_str),
         Some(fixtures::EMAIL),
         "govern_authorization must surface the VERIFIED principal's email attribute"
     );

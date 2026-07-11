@@ -32,14 +32,14 @@
 //!
 //! Each test is tagged with `#[ignore]` so the gate controls execution.
 
-use std::sync::Mutex;
-use tokio_postgres::NoTls;
 use maos_domain::memory::{MemoryNamespace, MemoryValue};
 use maos_domain::region::Region;
+use std::sync::Mutex;
+use tokio_postgres::NoTls;
 
 use maos_loom_lite::replication::bundle::{
-    apply_replication_bundle, build_replication_bundle, build_reattestation_receipt,
-    verify_replication_bundle, verify_reattestation_receipt, BundleError,
+    apply_replication_bundle, build_reattestation_receipt, build_replication_bundle,
+    verify_reattestation_receipt, verify_replication_bundle, BundleError,
 };
 use maos_loom_lite::replication::leaf::{
     compute_kv_payload_oracle, kv_merkle_root, CollectiveKvLeaf,
@@ -232,8 +232,7 @@ async fn no_aead_sign_only_bundle() {
 
     // Leaves are plaintext — value_data matches what was written.
     assert_eq!(
-        bundle.leaves[0].value_data,
-        b"v",
+        bundle.leaves[0].value_data, b"v",
         "leaves carry plaintext value_data (no encryption)"
     );
 }
@@ -256,8 +255,20 @@ async fn crdt_reorder_independence_oracle_converges() {
     // must produce the same winner regardless of arrival order.
     let writes = [
         // (spirit_pid, key, value, ts, region)
-        (1, "shared-key", "early-value", 1_000_000_000_000_000_001i64, "region-a"),
-        (1, "shared-key", "late-value", 1_000_000_000_000_000_002i64, "region-b"),
+        (
+            1,
+            "shared-key",
+            "early-value",
+            1_000_000_000_000_000_001i64,
+            "region-a",
+        ),
+        (
+            1,
+            "shared-key",
+            "late-value",
+            1_000_000_000_000_000_002i64,
+            "region-b",
+        ),
     ];
 
     // Region A: apply in order [0, 1] (early first).
@@ -321,8 +332,7 @@ async fn crdt_reorder_independence_oracle_converges() {
 
     // Verify the WINNER is the later-timestamp write (LWW).
     assert_eq!(
-        leaves_a[0].value_data,
-        b"late-value",
+        leaves_a[0].value_data, b"late-value",
         "LWW winner must be the write with the higher source_ts"
     );
 }
@@ -667,7 +677,10 @@ async fn region_identity_forge_rejected_count_moves() {
         .await
         .expect("genuine apply succeeds");
     let genuine_count = genuine_result.applied_count;
-    assert!(genuine_count > 0, "genuine bundle must apply at least 1 row");
+    assert!(
+        genuine_count > 0,
+        "genuine bundle must apply at least 1 row"
+    );
 
     // Forged bundle: verification already failed above, so apply is unreachable.
     // The count is 0 because the gate would never reach apply_replication_bundle.
@@ -698,10 +711,7 @@ async fn loopback_not_cross_region() {
 
     // Empty source is also rejected.
     let err2 = router.check_region_identity("");
-    assert!(
-        err2.is_err(),
-        "empty source_region must be rejected"
-    );
+    assert!(err2.is_err(), "empty source_region must be rejected");
 }
 
 /// AC3: Cryptographic region-identity verification — derive_region_pubkey
@@ -736,8 +746,7 @@ async fn ap_degrade_real_partition() {
 
     // Create a store pointing at a dead endpoint (the 10.4a pattern).
     let broken_store = LoomLiteStore::new(StoreConfig {
-        connection_string: "host=127.0.0.1 port=1 dbname=nonexistent connect_timeout=1"
-            .to_string(),
+        connection_string: "host=127.0.0.1 port=1 dbname=nonexistent connect_timeout=1".to_string(),
         timeout_ms: 2000,
         home_region: "region-a".to_string(),
         ..StoreConfig::default()
@@ -858,8 +867,7 @@ async fn healing_remerge_converges() {
     let post_leaves = read_all_leaves(&store).await;
     assert_eq!(post_leaves.len(), 1, "still one row (same UNIQUE key)");
     assert_eq!(
-        post_leaves[0].value_data,
-        b"updated-during-partition",
+        post_leaves[0].value_data, b"updated-during-partition",
         "LWW winner must be the partition-era write with higher source_ts"
     );
     assert_eq!(post_leaves[0].source_region, "region-b");
@@ -907,11 +915,7 @@ async fn apply_result_surfaces_skipped() {
         value_data: b"invalid-value".to_vec(),
     };
 
-    let bundle = build_replication_bundle(
-        vec![valid_leaf, invalid_leaf],
-        &region_a,
-        &BASE_SEED,
-    );
+    let bundle = build_replication_bundle(vec![valid_leaf, invalid_leaf], &region_a, &BASE_SEED);
     verify_replication_bundle(&bundle, &BASE_SEED).expect("bundle verifies (leaves are hashed)");
 
     let result = apply_replication_bundle(&bundle, &store, "region-b")
@@ -937,8 +941,20 @@ async fn blind_overwrite_regression_detected() {
     // Both share the same Postgres — reset once is enough.
 
     let writes = [
-        (1u32, "regr-key", "old", 1_000_000_000_000_000_001i64, "region-a"),
-        (1u32, "regr-key", "new", 1_000_000_000_000_000_002i64, "region-b"),
+        (
+            1u32,
+            "regr-key",
+            "old",
+            1_000_000_000_000_000_001i64,
+            "region-a",
+        ),
+        (
+            1u32,
+            "regr-key",
+            "new",
+            1_000_000_000_000_000_002i64,
+            "region-b",
+        ),
     ];
 
     // Forward order.
@@ -964,7 +980,11 @@ async fn blind_overwrite_regression_detected() {
     // above would be refused on the Spirit read path; the merge winner is still
     // observable via the provenance path, which is the correct oracle here.)
     let leaves_fwd = read_all_leaves(&store_fwd).await;
-    assert_eq!(leaves_fwd.len(), 1, "one converged row after forward writes");
+    assert_eq!(
+        leaves_fwd.len(),
+        1,
+        "one converged row after forward writes"
+    );
     let val_fwd = maos_loom_lite::schema::parts_to_value(
         &leaves_fwd[0].value_kind,
         &leaves_fwd[0].value_data,
@@ -988,7 +1008,11 @@ async fn blind_overwrite_regression_detected() {
             .unwrap();
     }
     let leaves_rev = read_all_leaves(&store_rev).await;
-    assert_eq!(leaves_rev.len(), 1, "one converged row after reverse writes");
+    assert_eq!(
+        leaves_rev.len(),
+        1,
+        "one converged row after reverse writes"
+    );
     let val_rev = maos_loom_lite::schema::parts_to_value(
         &leaves_rev[0].value_kind,
         &leaves_rev[0].value_data,
@@ -1242,9 +1266,21 @@ async fn three_region_convergence_all_three_equal() {
     let leaves_a_pre = read_all_leaves_for('a').await;
     let leaves_b_pre = read_all_leaves_for('b').await;
     let leaves_c_pre = read_all_leaves_for('c').await;
-    assert_eq!(leaves_a_pre.len(), 4, "region-a pre-propagation = 4 home rows");
-    assert_eq!(leaves_b_pre.len(), 4, "region-b pre-propagation = 4 home rows");
-    assert_eq!(leaves_c_pre.len(), 4, "region-c pre-propagation = 4 home rows");
+    assert_eq!(
+        leaves_a_pre.len(),
+        4,
+        "region-a pre-propagation = 4 home rows"
+    );
+    assert_eq!(
+        leaves_b_pre.len(),
+        4,
+        "region-b pre-propagation = 4 home rows"
+    );
+    assert_eq!(
+        leaves_c_pre.len(),
+        4,
+        "region-c pre-propagation = 4 home rows"
+    );
 
     // ── NEGATIVE CONTROL #2: pre-replication physical-absence (F2) ───────
     // A key written to DB-A only is physically ABSENT in region-B before
@@ -1428,12 +1464,9 @@ async fn three_region_reorder_independence() {
         .await
         .unwrap();
 
-    let bundle_a =
-        build_replication_bundle(read_all_leaves_for('a').await, &region_a, &BASE_SEED);
-    let bundle_b =
-        build_replication_bundle(read_all_leaves_for('b').await, &region_b, &BASE_SEED);
-    let bundle_c =
-        build_replication_bundle(read_all_leaves_for('c').await, &region_c, &BASE_SEED);
+    let bundle_a = build_replication_bundle(read_all_leaves_for('a').await, &region_a, &BASE_SEED);
+    let bundle_b = build_replication_bundle(read_all_leaves_for('b').await, &region_b, &BASE_SEED);
+    let bundle_c = build_replication_bundle(read_all_leaves_for('c').await, &region_c, &BASE_SEED);
 
     // Order [a, b, c] → region-a (which already holds its own region-a write).
     apply_replication_bundle(&bundle_a, &store_a, "region-a")
@@ -1498,9 +1531,21 @@ async fn three_region_empty_set_is_na() {
     // passed>=1 as the signal; this test exists to be COUNTED, not to assert
     // a vacuous green over zero rows.
     assert!(leaves_a.is_empty() && leaves_b.is_empty() && leaves_c.is_empty());
-    assert_eq!(kv_merkle_root(&leaves_a), [0u8; 32], "empty-set root sentinel");
-    assert_eq!(kv_merkle_root(&leaves_b), [0u8; 32], "empty-set root sentinel");
-    assert_eq!(kv_merkle_root(&leaves_c), [0u8; 32], "empty-set root sentinel");
+    assert_eq!(
+        kv_merkle_root(&leaves_a),
+        [0u8; 32],
+        "empty-set root sentinel"
+    );
+    assert_eq!(
+        kv_merkle_root(&leaves_b),
+        [0u8; 32],
+        "empty-set root sentinel"
+    );
+    assert_eq!(
+        kv_merkle_root(&leaves_c),
+        [0u8; 32],
+        "empty-set root sentinel"
+    );
 }
 
 // ─── Story 11.2b — AC4 / F4: fail-closed region-identity on the LIVE read path ─

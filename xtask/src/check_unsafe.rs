@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::Path;
-use syn::Attribute;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
+use syn::Attribute;
 
 use crate::fs_walk;
 

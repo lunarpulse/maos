@@ -122,6 +122,115 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        // Story 12.2 consent legs — each hard-fails independently (loop below).
+        // §A7 role-identity reflex: the admitted acting role is the manifest-
+        // bound-to-peer AND frame-carried role; a relabel reds via the real NACK.
+        Leg {
+            name: "role-mismatch-on-allowed-peer",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_2_cohort_consent",
+                "t_12_2_role_mismatch_on_allowed_peer_live_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 role-identity reflex: positive + relabeled-negative prove no any-role OR.
+        Leg {
+            name: "acting-role-exact-match",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_2_cohort_consent",
+                "t_12_2_acting_role_exact_match_live_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 entitlement reflex (parse arm): the tightened per-peer validator
+        // rejects a role a different member declares.
+        Leg {
+            name: "entitlement-parse",
+            args: &[
+                "test",
+                "-p",
+                "maos-cohort",
+                "--lib",
+                "manifest::tests::reject_consent_role_declared_only_by_different_peer",
+                "--",
+                "--exact",
+            ],
+        },
+        // §A7 entitlement reflex (accept arm): an unheld acting role is refused
+        // distinctly from "no grant".
+        Leg {
+            name: "entitlement-accept",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_2_cohort_consent",
+                "t_12_2_entitlement_accept_live_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 skew-cause reflex: asserts ECohortManifestSkew specifically, paired
+        // with a |Δv| ≤ 1 admit.
+        Leg {
+            name: "manifest-skew-cause",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_2_cohort_consent",
+                "t_12_2_manifest_skew_cause_live_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 fail-closed reflex: None acting role AND None version each refused.
+        Leg {
+            name: "fail-closed-none",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_2_cohort_consent",
+                "t_12_2_fail_closed_none_live_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 placement reflex: a reserved-intent frame with no role/version still
+        // ACKs — the role gate sits after the reserved short-circuit (P4).
+        Leg {
+            name: "reserved-intent-passes",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_2_cohort_consent",
+                "t_12_2_reserved_intent_without_role_or_version_live_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
     ];
     for leg in &legs {
         run_leg(leg)?;

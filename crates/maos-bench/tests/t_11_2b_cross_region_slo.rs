@@ -220,8 +220,7 @@ async fn cross_region_roundtrip_live() {
         "cross-region round-trip p95={}µs must be <= the loopback regression \
          floor MULTI_REGION_SLO_P95_US={}µs (NOT a geo-SLO — CI Postgres is \
          co-located). If this regressed, the machinery/convergence slowed.",
-        result.p95_us,
-        MULTI_REGION_SLO_P95_US
+        result.p95_us, MULTI_REGION_SLO_P95_US
     );
 
     eprintln!(
@@ -273,8 +272,7 @@ async fn cross_region_roundtrip_mutation() {
         "mutation: budget_met must be FALSE with slo-fault-inject — p95={}µs \
          did not cross the {}µs floor. If the injection cannot move the number, \
          the probe has been re-stubbed to constants (F7 ship-blocker).",
-        result.p95_us,
-        MULTI_REGION_SLO_P95_US
+        result.p95_us, MULTI_REGION_SLO_P95_US
     );
     assert!(
         result.p95_us >= 14_000,

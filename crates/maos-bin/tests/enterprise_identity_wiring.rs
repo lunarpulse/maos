@@ -25,7 +25,9 @@
 
 #![cfg(feature = "network")]
 
-use maos_bin::enterprise_identity::{AuditFilter, EnterpriseConfig, EnterpriseFailure, EnterpriseRuntime};
+use maos_bin::enterprise_identity::{
+    AuditFilter, EnterpriseConfig, EnterpriseFailure, EnterpriseRuntime,
+};
 
 // ---------------------------------------------------------------------------
 // AC5 (a) — zero-config default: no subsystem, byte-identical no-op.
@@ -98,8 +100,9 @@ fn sso_configured_but_down_denies_issuance_and_never_falls_open() {
         "test vector must reflect SSO configured-but-down"
     );
 
-    let runtime = EnterpriseRuntime::from_config(&config)
-        .expect("a configured runtime MUST build (down-state is observed at use, not construction)");
+    let runtime = EnterpriseRuntime::from_config(&config).expect(
+        "a configured runtime MUST build (down-state is observed at use, not construction)",
+    );
 
     // IdP unreachable ⇒ the capability issuance governed by the SSO assertion
     // is DENIED. The composition root MUST NEVER fall open to a bare
@@ -125,8 +128,9 @@ fn kms_configured_but_down_refuses_sealed_write_and_never_writes_plaintext() {
         "test vector must reflect KMS configured-but-down"
     );
 
-    let runtime = EnterpriseRuntime::from_config(&config)
-        .expect("a configured runtime MUST build (down-state is observed at use, not construction)");
+    let runtime = EnterpriseRuntime::from_config(&config).expect(
+        "a configured runtime MUST build (down-state is observed at use, not construction)",
+    );
 
     let sensitive_row: &[u8] = b"collective-row-that-must-not-leak-as-plaintext";
 
@@ -161,8 +165,9 @@ fn siem_configured_but_down_surfaces_an_operator_error_and_never_drops() {
         "test vector must reflect SIEM configured-but-down"
     );
 
-    let runtime = EnterpriseRuntime::from_config(&config)
-        .expect("a configured runtime MUST build (down-state is observed at use, not construction)");
+    let runtime = EnterpriseRuntime::from_config(&config).expect(
+        "a configured runtime MUST build (down-state is observed at use, not construction)",
+    );
 
     // Sink unreachable ⇒ the forward surfaces a SiemSinkDown operator-visible
     // error. The composition root MUST NOT silently drop the audit trail under
@@ -177,8 +182,8 @@ fn siem_configured_but_down_surfaces_an_operator_error_and_never_drops() {
             "SIEM configured-but-down MUST surface an operator-visible SiemSinkDown error; \
              Ok({n}) is a silent drop of the audit trail"
         ),
-        other => panic!(
-            "SIEM configured-but-down MUST surface a distinct SiemSinkDown; got {other:?}"
-        ),
+        other => {
+            panic!("SIEM configured-but-down MUST surface a distinct SiemSinkDown; got {other:?}")
+        }
     }
 }

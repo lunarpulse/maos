@@ -87,7 +87,10 @@ impl PinnedAuthorityKeys {
 
     /// Hex encoding of the pinned keys (lowercase), for display / logging.
     pub fn hex(&self) -> Vec<String> {
-        self.keys.iter().map(|k| hex::encode(k.to_bytes())).collect()
+        self.keys
+            .iter()
+            .map(|k| hex::encode(k.to_bytes()))
+            .collect()
     }
 
     /// Iterate the underlying verifying keys.
@@ -113,9 +116,8 @@ impl PinnedAuthorityKeys {
 /// manifest-declared authority keys (a declared key that is not a valid
 /// 32-byte Ed25519 pubkey → `EInvalidAuthorityKey`).
 pub(crate) fn parse_verifying_key(hex_str: &str) -> Result<VerifyingKey, CohortError> {
-    let bytes = hex::decode(hex_str).map_err(|e| {
-        CohortError::EInvalidAuthorityKey(format!("bad hex ({e}): {hex_str}"))
-    })?;
+    let bytes = hex::decode(hex_str)
+        .map_err(|e| CohortError::EInvalidAuthorityKey(format!("bad hex ({e}): {hex_str}")))?;
     let arr: [u8; 32] = bytes.as_slice().try_into().map_err(|_| {
         CohortError::EInvalidAuthorityKey(format!(
             "expected 32 bytes (64 hex chars), got {} bytes: {hex_str}",

@@ -27,8 +27,8 @@
 //! the 5D002.c.1 classification question.
 
 pub mod adapter;
-pub mod config;
 pub mod codec;
+pub mod config;
 pub mod conformance;
 pub mod frame_bridge;
 pub mod host_state;

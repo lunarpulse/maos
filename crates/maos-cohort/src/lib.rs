@@ -33,10 +33,11 @@
 //! (Task 2), re-issue/fork discipline (Task 3), distribution + staleness
 //! (Task 4), and the `check-cohort-mesh` gate (Task 5) build on this foundation.
 
-pub mod error;
 pub mod audit;
+mod consent;
 pub mod control;
 pub mod distribution;
+pub mod error;
 pub mod manifest;
 pub mod pin;
 pub mod state;
@@ -44,13 +45,13 @@ pub mod state;
 pub use audit::{
     CohortAuditEvent, CohortAuditSink, CohortTransparencyLogSink, InMemoryCohortAuditSink,
 };
-pub use error::{CohortError, CohortManifestForkReason};
 pub use control::{CohortManifestControl, CONTROL_EVENT_TYPE};
 pub use distribution::CohortDistributor;
+pub use error::{CohortError, CohortManifestForkReason};
 pub use manifest::{
-    CohortAuthority, CohortManifest, CohortMember, ConsentMatrix, ConsentTuple,
-    ManifestSignature, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
-    SIG_DOMAIN, T_STALE_DEFAULT, T_STALE_MAX, T_STALE_MIN,
+    CohortAuthority, CohortManifest, CohortMember, ConsentMatrix, ConsentTuple, ManifestSignature,
+    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION, SIG_DOMAIN,
+    T_STALE_DEFAULT, T_STALE_MAX, T_STALE_MIN,
 };
 pub use pin::PinnedAuthorityKeys;
 pub use state::{CohortClock, CohortManifestState, ReissueOutcome};

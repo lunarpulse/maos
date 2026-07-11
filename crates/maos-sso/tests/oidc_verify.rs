@@ -78,5 +78,8 @@ fn wrong_key_token_is_rejected_fail_closed() {
 /// fail-closed leg depends on this signal).
 #[test]
 fn verifier_reports_healthy_with_jwks_loaded() {
-    assert!(verifier().is_healthy(), "a loaded static JWKS is a healthy verifier");
+    assert!(
+        verifier().is_healthy(),
+        "a loaded static JWKS is a healthy verifier"
+    );
 }

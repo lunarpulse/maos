@@ -76,6 +76,13 @@ pub struct A2AJsonRpcRequest {
     /// mismatch. Added in Story 6.3 §A1 P6 (Epic 6 retro 2026-05-28).
     #[serde(default)]
     pub boot_nonce: u64,
+    /// Sender-selected cohort role for this frame. Cohort gates require an
+    /// exact manifest-bound value; legacy bilateral peers leave it absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cohort_acting_role: Option<String>,
+    /// Sender's accepted cohort-manifest version at the frame decision point.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cohort_manifest_version: Option<u64>,
 }
 
 /// JSON-RPC 2.0 response. Untagged (field-based) deserialization
@@ -127,6 +134,8 @@ impl A2AJsonRpcRequest {
             params,
             id,
             boot_nonce: 0,
+            cohort_acting_role: None,
+            cohort_manifest_version: None,
         }
     }
 
@@ -137,6 +146,16 @@ impl A2AJsonRpcRequest {
     /// restart-detection check.
     pub fn with_boot_nonce(mut self, boot_nonce: u64) -> Self {
         self.boot_nonce = boot_nonce;
+        self
+    }
+
+    pub fn with_cohort_acting_role(mut self, acting_role: impl Into<String>) -> Self {
+        self.cohort_acting_role = Some(acting_role.into());
+        self
+    }
+
+    pub fn with_cohort_manifest_version(mut self, manifest_version: u64) -> Self {
+        self.cohort_manifest_version = Some(manifest_version);
         self
     }
 

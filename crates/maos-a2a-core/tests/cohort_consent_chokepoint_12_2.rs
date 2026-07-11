@@ -1,4 +1,4 @@
-//! Story 12.1 / Task 4 — guard atomic cohort-consent evaluation.
+//! Story 12.2 — pin the single role/version consent-evaluation chokepoint.
 
 fn strip_line_comments(source: &str) -> String {
     source
@@ -9,16 +9,18 @@ fn strip_line_comments(source: &str) -> String {
 }
 
 #[test]
-fn manifest_currentness_is_not_a_second_router_read() {
+fn cohort_consent_has_one_port_call_and_two_route_uses() {
     let router = strip_line_comments(include_str!("../src/router.rs"));
     assert_eq!(
-        router.matches(".is_current(").count(),
-        0,
-        "the router must not re-read cohort state after the consent verdict"
+        router
+            .matches("cohort_manifest_gate.consent_decision(")
+            .count(),
+        1,
+        "only cohort_consent_decision may call the gate directly"
     );
     assert_eq!(
         router.matches("cohort_consent_decision(").count(),
         3,
-        "one atomic gate call site plus outbound and inbound enforcement"
+        "one definition plus the outbound and inbound enforcement calls"
     );
 }

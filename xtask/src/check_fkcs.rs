@@ -6,12 +6,11 @@
 //! directly. `maos-fkcs` remains a dev-only fixture crate for cohort/admission
 //! tests and does not depend on xtask.
 
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use sha2::{Digest, Sha256};
-
 
 const GATE_NAME: &str = "check-fkcs";
 const CURRENT_PHASE: &str = "v1_5";
@@ -330,9 +329,7 @@ fn run_diff_oracle_derives_leg() -> LegResult {
                 }),
             );
             (
-                positive.kernel_unchanged
-                    && forged.kernel_unchanged
-                    && forged.ignored_self_report,
+                positive.kernel_unchanged && forged.kernel_unchanged && forged.ignored_self_report,
                 true,
             )
         }
@@ -379,8 +376,7 @@ fn run_fault_inject_falsifiers_leg() -> LegResult {
                 None => base.clone(),
             };
             let host_fault = base.with_extra_host_item("maos_host::UnauthorizedSurface");
-            let kernel_red =
-                !FkcsOracle::derive(&base, &kernel_fault, None).kernel_unchanged;
+            let kernel_red = !FkcsOracle::derive(&base, &kernel_fault, None).kernel_unchanged;
             let abi_red = !FkcsOracle::derive(&base, &abi_fault, None).kernel_unchanged;
             let host_red = !FkcsOracle::derive(&base, &host_fault, None).kernel_unchanged;
             (kernel_red && abi_red && host_red, true)
@@ -592,7 +588,10 @@ pub fn parse_inline_disposition(line: &str) -> Result<HashMap<String, String>, S
     Ok(out)
 }
 
-pub fn phase_disposition<'a>(disposition: &'a HashMap<String, String>, phase: &str) -> Option<&'a str> {
+pub fn phase_disposition<'a>(
+    disposition: &'a HashMap<String, String>,
+    phase: &str,
+) -> Option<&'a str> {
     let idx = PHASE_ORDER.iter().position(|p| *p == phase)?;
     for i in (0..=idx).rev() {
         if let Some(d) = disposition.get(PHASE_ORDER[i]) {
@@ -712,8 +711,8 @@ pub fn admission_content_hash(files: &[String]) -> Result<String, String> {
     let mut hasher = Sha256::new();
     for file in files {
         let path = resolve_workspace_path(Path::new(file))?;
-        let content = fs::read(&path)
-            .map_err(|e| format!("read admission file {}: {e}", path.display()))?;
+        let content =
+            fs::read(&path).map_err(|e| format!("read admission file {}: {e}", path.display()))?;
         hasher.update(file.as_bytes());
         hasher.update(b"\0");
         hasher.update(&(content.len() as u64).to_le_bytes());

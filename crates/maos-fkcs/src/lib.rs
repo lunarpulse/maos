@@ -9,7 +9,7 @@
 use std::collections::BTreeSet;
 
 use maos_domain::ports::registry::{SignedPackage, SpiritId, TrustTier};
-use maos_registry::admission::{AdmissionConfig, admit_spirit};
+use maos_registry::admission::{admit_spirit, AdmissionConfig};
 use maos_skill::admission::{SkillAdmissionQueue, SkillEntryPath};
 use maos_skill::schema::parse_skill;
 use maos_spirit_abi::compliance::{
@@ -523,12 +523,36 @@ fn build_checklist(
     use ChecklistCategory::*;
     vec![
         // ABI-symbol coverage (6): the Spirit references only the frozen surface.
-        ChecklistItem::new(AbiSymbolCoverage, "ComplianceClaimEnvelope on frozen ABI surface", symbols_on_surface),
-        ChecklistItem::new(AbiSymbolCoverage, "SpiritHostPort on frozen host surface", symbols_on_surface),
-        ChecklistItem::new(AbiSymbolCoverage, "no off-frozen-surface kernel-internal references", symbols_on_surface),
-        ChecklistItem::new(AbiSymbolCoverage, "declared symbol set non-empty and well-formed", symbols_on_surface),
-        ChecklistItem::new(AbiSymbolCoverage, "abi public-surface subset holds", symbols_on_surface),
-        ChecklistItem::new(AbiSymbolCoverage, "host closed-allowlist membership holds", symbols_on_surface),
+        ChecklistItem::new(
+            AbiSymbolCoverage,
+            "ComplianceClaimEnvelope on frozen ABI surface",
+            symbols_on_surface,
+        ),
+        ChecklistItem::new(
+            AbiSymbolCoverage,
+            "SpiritHostPort on frozen host surface",
+            symbols_on_surface,
+        ),
+        ChecklistItem::new(
+            AbiSymbolCoverage,
+            "no off-frozen-surface kernel-internal references",
+            symbols_on_surface,
+        ),
+        ChecklistItem::new(
+            AbiSymbolCoverage,
+            "declared symbol set non-empty and well-formed",
+            symbols_on_surface,
+        ),
+        ChecklistItem::new(
+            AbiSymbolCoverage,
+            "abi public-surface subset holds",
+            symbols_on_surface,
+        ),
+        ChecklistItem::new(
+            AbiSymbolCoverage,
+            "host closed-allowlist membership holds",
+            symbols_on_surface,
+        ),
         // Frame round-trip (6): the manifest loads and dispatches cleanly.
         ChecklistItem::new(FrameRoundTrip, "manifest parses and enqueues", admits),
         ChecklistItem::new(FrameRoundTrip, "frame entry-path accepted", admits),
@@ -539,7 +563,11 @@ fn build_checklist(
         // Halt invariant (3): exit reaches the kernel via the documented halt.
         ChecklistItem::new(HaltInvariant, "halt-on-exit signals the kernel", admits),
         ChecklistItem::new(HaltInvariant, "halt propagates to the kernel ctx", admits),
-        ChecklistItem::new(HaltInvariant, "halt is the sole documented exit path", conformance),
+        ChecklistItem::new(
+            HaltInvariant,
+            "halt is the sole documented exit path",
+            conformance,
+        ),
         // Capability invariant (3): capabilities are declared and enforced.
         ChecklistItem::new(CapInvariant, "capability manifest declared", admits),
         ChecklistItem::new(CapInvariant, "capability scope enforced", admits),
@@ -550,17 +578,37 @@ fn build_checklist(
         ChecklistItem::new(RegionInvariant, "region bound to manifest", conformance),
         // Audit invariant (3): the three freeze sub-derivations, itemized so
         // each can red independently (29/28/27 representable).
-        ChecklistItem::new(AuditInvariant, "kernel src_lines stable before/after", line_stable),
+        ChecklistItem::new(
+            AuditInvariant,
+            "kernel src_lines stable before/after",
+            line_stable,
+        ),
         ChecklistItem::new(AuditInvariant, "abi additive-only holds", abi_additive),
         ChecklistItem::new(AuditInvariant, "host closed-allowlist holds", host_holds),
         // Sandbox confinement (3): dispatch stays within the sandbox.
-        ChecklistItem::new(SandboxConfinement, "sandbox boundary entered on dispatch", admits),
+        ChecklistItem::new(
+            SandboxConfinement,
+            "sandbox boundary entered on dispatch",
+            admits,
+        ),
         ChecklistItem::new(SandboxConfinement, "no ambient reachability", conformance),
-        ChecklistItem::new(SandboxConfinement, "confinement proven by isolation", conformance),
+        ChecklistItem::new(
+            SandboxConfinement,
+            "confinement proven by isolation",
+            conformance,
+        ),
         // ComplianceClaim verify (3): the claim envelope is present and verified.
-        ChecklistItem::new(ComplianceClaimVerify, "ComplianceClaimEnvelope present and parsed", admits),
+        ChecklistItem::new(
+            ComplianceClaimVerify,
+            "ComplianceClaimEnvelope present and parsed",
+            admits,
+        ),
         ChecklistItem::new(ComplianceClaimVerify, "claim signature verified", journaled),
-        ChecklistItem::new(ComplianceClaimVerify, "claim matches manifest identity", conformance),
+        ChecklistItem::new(
+            ComplianceClaimVerify,
+            "claim matches manifest identity",
+            conformance,
+        ),
     ]
 }
 

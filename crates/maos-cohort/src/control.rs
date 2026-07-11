@@ -12,8 +12,13 @@ pub const CONTROL_EVENT_TYPE: &str = "maos.cohort-manifest.v1";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CohortManifestControl {
-    Push { manifest_toml: String },
-    Pull { known_version: u64, known_hash: String },
+    Push {
+        manifest_toml: String,
+    },
+    Pull {
+        known_version: u64,
+        known_hash: String,
+    },
 }
 
 impl CohortManifestControl {
@@ -32,7 +37,8 @@ impl CohortManifestControl {
         if payload.event_type != CONTROL_EVENT_TYPE {
             return Err(CohortError::EControlEnvelopeInvalid);
         }
-        serde_json::from_str(&payload.data).map_err(|error| CohortError::EControlEnvelopeDecode(error.to_string()))
+        serde_json::from_str(&payload.data)
+            .map_err(|error| CohortError::EControlEnvelopeDecode(error.to_string()))
     }
 
     pub fn telemetry_payload(&self) -> Result<TelemetryEventPayload, CohortError> {

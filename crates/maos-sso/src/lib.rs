@@ -156,7 +156,10 @@ impl OidcVerifier {
         Ok(Self {
             keys,
             allowed_algorithms: allowed_algorithms.iter().copied().collect(),
-            trusted_issuers: trusted_issuers.iter().map(|issuer| (*issuer).to_string()).collect(),
+            trusted_issuers: trusted_issuers
+                .iter()
+                .map(|issuer| (*issuer).to_string())
+                .collect(),
             expected_audience: expected_audience.to_string(),
         })
     }
@@ -218,8 +221,8 @@ impl OidcVerifier {
         );
         validation.validate_nbf = true;
 
-        let data = decode::<Claims>(assertion, &decoding_key, &validation)
-            .map_err(map_jwt_error)?;
+        let data =
+            decode::<Claims>(assertion, &decoding_key, &validation).map_err(map_jwt_error)?;
         let claims = data.claims;
         if !self.trusted_issuers.contains(&claims.iss) {
             return Err(IdentityError::IssuerUntrusted);
@@ -247,7 +250,9 @@ impl IdentityAssertionPort for OidcVerifier {
     }
 
     fn is_healthy(&self) -> bool {
-        !self.keys.is_empty() && !self.allowed_algorithms.is_empty() && !self.trusted_issuers.is_empty()
+        !self.keys.is_empty()
+            && !self.allowed_algorithms.is_empty()
+            && !self.trusted_issuers.is_empty()
     }
 }
 
@@ -350,7 +355,9 @@ where
                 _ => Err(serde::de::Error::custom("aud array contains non-string")),
             })
             .collect(),
-        _ => Err(serde::de::Error::custom("aud must be string or string array")),
+        _ => Err(serde::de::Error::custom(
+            "aud must be string or string array",
+        )),
     }
 }
 

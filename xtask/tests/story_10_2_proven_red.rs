@@ -314,7 +314,9 @@ fn trial_gate_rejects_missing_producer_signed_attestation_at_v2_0() {
     // NOTE: deliberately NO derived-attestations.json — the honor-system stamp
     // ([derivation_provenance] stamp=...) is no longer accepted at v2.0.
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["check-third-party-trial", "--json"]).env("MAOS_SHIP_PHASE", "v2_0").env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
+        .args(["check-third-party-trial", "--json"])
+        .env("MAOS_SHIP_PHASE", "v2_0")
+        .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
         .current_dir(dir.path())
         .output()
         .expect("failed to run xtask");
@@ -346,7 +348,9 @@ fn trial_gate_accepts_valid_record_with_producer_signed_attestation_at_v2_0() {
         &cohort_signed_attestations_json(None, &TEST_PRODUCER_SEED),
     );
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["check-third-party-trial", "--json"]).env("MAOS_SHIP_PHASE", "v2_0").env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
+        .args(["check-third-party-trial", "--json"])
+        .env("MAOS_SHIP_PHASE", "v2_0")
+        .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
         .current_dir(dir.path())
         .output()
         .expect("failed to run xtask");
@@ -378,7 +382,9 @@ fn trial_gate_rejects_when_signed_sbom_false_overrides_self_reported_true_at_v2_
         &cohort_signed_attestations_json(Some("P005"), &TEST_PRODUCER_SEED),
     );
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["check-third-party-trial", "--json"]).env("MAOS_SHIP_PHASE", "v2_0").env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
+        .args(["check-third-party-trial", "--json"])
+        .env("MAOS_SHIP_PHASE", "v2_0")
+        .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
         .current_dir(dir.path())
         .output()
         .expect("failed to run xtask");
@@ -414,9 +420,15 @@ fn trial_gate_rejects_tampered_producer_signature_at_v2_0() {
         bytes[sig_start] = if bytes[sig_start] == b'0' { b'1' } else { b'0' };
     }
     let json = String::from_utf8(bytes).expect("toggling a hex nibble keeps valid UTF-8");
-    write_file(dir.path(), "docs/third-party-trial/results/derived-attestations.json", &json);
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/derived-attestations.json",
+        &json,
+    );
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["check-third-party-trial", "--json"]).env("MAOS_SHIP_PHASE", "v2_0").env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
+        .args(["check-third-party-trial", "--json"])
+        .env("MAOS_SHIP_PHASE", "v2_0")
+        .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
         .current_dir(dir.path())
         .output()
         .expect("failed to run xtask");
@@ -465,8 +477,12 @@ fn producer_emit_writes_file_the_consumer_accepts_round_trip() {
     let emit_path = dir
         .path()
         .join("docs/third-party-trial/results/derived-attestations.json");
-    maos_eval::trial_attestation::emit_signed_attestations(&cohort, &TEST_PRODUCER_SEED, &emit_path)
-        .expect("producer emit must succeed");
+    maos_eval::trial_attestation::emit_signed_attestations(
+        &cohort,
+        &TEST_PRODUCER_SEED,
+        &emit_path,
+    )
+    .expect("producer emit must succeed");
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(["check-third-party-trial", "--json"])
         .env("MAOS_SHIP_PHASE", "v2_0")

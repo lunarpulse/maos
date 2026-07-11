@@ -29,12 +29,16 @@ fn policy_swap_flips_verdict_allow_to_deny() {
     let adapter = CedarPolicyAdapter::new();
     let request = req(42, "FsRead");
 
-    adapter.load_policy(POLICY_A_PERMIT).expect("policy A parses");
+    adapter
+        .load_policy(POLICY_A_PERMIT)
+        .expect("policy A parses");
     let under_a = adapter.evaluate(&[request.clone()]).expect("eval A");
     assert_eq!(under_a, vec![PolicyVerdict::Allow]);
 
     // SWAP to the forbid policy — same request, opposite verdict.
-    adapter.load_policy(POLICY_B_FORBID).expect("policy B parses");
+    adapter
+        .load_policy(POLICY_B_FORBID)
+        .expect("policy B parses");
     let under_b = adapter.evaluate(&[request.clone()]).expect("eval B");
     assert_eq!(
         under_b,
@@ -83,7 +87,9 @@ fn canned_map_negative_control_empty_policy_denies() {
     // silently return a hardcoded `Allow`. (Contrast: a `HashMap` literal
     // stand-in would return its baked verdict regardless of the policy.)
     let adapter = CedarPolicyAdapter::new();
-    adapter.load_policy("").expect("empty policy parses to an empty PolicySet");
+    adapter
+        .load_policy("")
+        .expect("empty policy parses to an empty PolicySet");
     let requests = [req(1, "FsRead"), req(2, "ProcExec"), req(3, "NetHttps")];
     let verdicts = adapter.evaluate(&requests).expect("eval on empty policy");
     assert!(
@@ -116,11 +122,20 @@ fn derive_and_reconcile_count_vs_request_cardinality() {
     // Reconcile: one verdict per request (cardinality match — derive-and-
     // reconcile, not a committed count).
     assert_eq!(verdicts.len(), requests.len(), "one verdict per request");
-    let allow_count = verdicts.iter().filter(|v| **v == PolicyVerdict::Allow).count();
-    let deny_count = verdicts.iter().filter(|v| **v == PolicyVerdict::Deny).count();
+    let allow_count = verdicts
+        .iter()
+        .filter(|v| **v == PolicyVerdict::Allow)
+        .count();
+    let deny_count = verdicts
+        .iter()
+        .filter(|v| **v == PolicyVerdict::Deny)
+        .count();
     // Derived from the real engine output: FsRead×2 + NetHttps×1 = 3 Allow;
     // ProcExec×1 = 1 Deny. Empty-policy N/A does NOT appear here (non-vacuous).
-    assert_eq!(allow_count, 3, "derived allow count from real engine output");
+    assert_eq!(
+        allow_count, 3,
+        "derived allow count from real engine output"
+    );
     assert_eq!(deny_count, 1, "derived deny count from real engine output");
     assert_eq!(allow_count + deny_count, requests.len());
 }

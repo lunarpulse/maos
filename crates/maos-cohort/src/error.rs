@@ -139,6 +139,37 @@ pub enum CohortError {
     #[error("consent.{direction} tuple references undeclared role {role}")]
     EConsentRoleUndeclared { direction: String, role: String },
 
+    #[error("cohort frame is missing its acting role")]
+    EConsentActingRoleAbsent,
+
+    #[error("cohort frame is missing its sender manifest version")]
+    EConsentManifestVersionAbsent,
+
+    #[error("peer {peer} is not entitled to acting role {role}")]
+    EConsentRoleNotEntitled { peer: String, role: String },
+
+    #[error(
+        "consent.{direction} has no exact grant for peer={peer}, role={role:?}, intent={intent}"
+    )]
+    EConsentTupleDenied {
+        direction: String,
+        peer: String,
+        role: Option<String>,
+        intent: String,
+    },
+
+    #[error("multiple acting roles are granted for peer={peer}, intent={intent}")]
+    EConsentActingRoleAmbiguous { peer: String, intent: String },
+
+    #[error(
+        "cohort manifest skew: sender_version={sender_version}, receiver_version={receiver_version}, delta={delta}"
+    )]
+    ECohortManifestSkew {
+        sender_version: u64,
+        receiver_version: u64,
+        delta: u64,
+    },
+
     /// An intent (in a consent tuple or the reserved set) is not in canonical
     /// fine-grained form — it could never match a frame's consent key
     /// (`A2AIntent::is_canonical`), so it is rejected fail-closed at parse.

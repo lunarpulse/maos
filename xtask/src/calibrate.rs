@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use crate::corpus_types::{CorpusManifest, load_toml};
+use crate::corpus_types::{load_toml, CorpusManifest};
 use crate::rebaseline_check::{JudgeRunner, OfflineMode};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

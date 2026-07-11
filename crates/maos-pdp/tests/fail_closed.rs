@@ -204,7 +204,9 @@ fn reconcile_with_subjects_freezes_subject_denies_before_ttl() {
     // subject-scoped (denied for one of two spirits ⇒ it does NOT fold into
     // MaterializedDenies.global) and the freeze can be observed on per_spirit
     // without ambiguity.
-    let fs_read = scope_deny_key(&Scope::FsRead { subtree: String::new() });
+    let fs_read = scope_deny_key(&Scope::FsRead {
+        subtree: String::new(),
+    });
     let fresh = SubjectKeyedPort {
         denies: HashMap::from([(7, HashSet::from([fs_read.clone()]))]),
         available: true,

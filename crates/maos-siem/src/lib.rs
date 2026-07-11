@@ -66,9 +66,8 @@ impl SiemProjectionPort for SiemExporter {
         &self,
         redacted_entry_json: &str,
     ) -> Result<String, SiemProjectionError> {
-        let entry: AuditEntry = serde_json::from_str(redacted_entry_json).map_err(|e| {
-            SiemProjectionError::Projection(format!("decode redacted entry: {e}"))
-        })?;
+        let entry: AuditEntry = serde_json::from_str(redacted_entry_json)
+            .map_err(|e| SiemProjectionError::Projection(format!("decode redacted entry: {e}")))?;
         let record = project_one(&entry)
             .map_err(|e| SiemProjectionError::Projection(format!("project entry: {e}")))?;
         // The RFC5424-framed CEF line is the syslog transport frame.
@@ -202,8 +201,17 @@ fn siem_hostname() -> String {
 /// signal; the authoritative disposition still lives in the audit record.
 fn derive_cef_severity(kind: &str) -> u8 {
     const HIGH: &[&str] = &[
-        "block", "deny", "denied", "revoke", "revok", "violation", "breach", "evict", "kill",
-        "crash", "oom",
+        "block",
+        "deny",
+        "denied",
+        "revoke",
+        "revok",
+        "violation",
+        "breach",
+        "evict",
+        "kill",
+        "crash",
+        "oom",
     ];
     const MEDIUM: &[&str] = &["error", "fail", "abort", "halt", "panic", "fatal"];
     let k = kind.to_ascii_lowercase();
@@ -413,7 +421,10 @@ mod tests {
                 .chars()
                 .next()
                 .expect("RFC5424 record must be non-empty");
-            assert_eq!(first, '<', "RFC5424 frame must open with '<' (start of PRI)");
+            assert_eq!(
+                first, '<',
+                "RFC5424 frame must open with '<' (start of PRI)"
+            );
 
             let close = rec
                 .rfc5424
@@ -501,16 +512,15 @@ mod tests {
             "2023-01-01T00:00:00.000000000Z",
         );
         // 1 ns past the epoch carries the full 9-digit fractional second.
-        assert_eq!(
-            rfc3339_from_nanos(1),
-            "1970-01-01T00:00:00.000000001Z",
-        );
+        assert_eq!(rfc3339_from_nanos(1), "1970-01-01T00:00:00.000000001Z",);
     }
 
     #[test]
     fn rfc5424_frame_carries_real_timestamp_and_hostname_not_nil() {
         let entry = sample_entry("task.assign", 42, 1_672_531_200_000_000_000, "{}");
-        let frame = project(&[entry]).expect("projection succeeds")[0].rfc5424.clone();
+        let frame = project(&[entry]).expect("projection succeeds")[0]
+            .rfc5424
+            .clone();
 
         // <PRI>VERSION SP TIMESTAMP SP HOSTNAME SP APP-NAME ...
         let rest = frame.strip_prefix("<134>1 ").expect("PRI+VERSION prefix");
@@ -532,14 +542,22 @@ mod tests {
             // Severity is the 7th pipe-delimited CEF field (index 6 after CEF:V).
             cef.split('|').nth(6).unwrap()
         }
-        let blocked =
-            project(&[sample_entry("sandbox.block", 1, 1, "{}")]).unwrap()[0].cef.clone();
-        let revoked =
-            project(&[sample_entry("capability.revoke", 2, 1, "{}")]).unwrap()[0].cef.clone();
-        let benign = project(&[sample_entry("task.assign", 3, 1, "{}")]).unwrap()[0].cef.clone();
+        let blocked = project(&[sample_entry("sandbox.block", 1, 1, "{}")]).unwrap()[0]
+            .cef
+            .clone();
+        let revoked = project(&[sample_entry("capability.revoke", 2, 1, "{}")]).unwrap()[0]
+            .cef
+            .clone();
+        let benign = project(&[sample_entry("task.assign", 3, 1, "{}")]).unwrap()[0]
+            .cef
+            .clone();
 
         assert_eq!(severity_of(&blocked), "8", "sandbox.block → high severity");
-        assert_eq!(severity_of(&revoked), "8", "capability.revoke → high severity");
+        assert_eq!(
+            severity_of(&revoked),
+            "8",
+            "capability.revoke → high severity"
+        );
         assert_eq!(severity_of(&benign), "3", "task.assign → low severity");
         assert_ne!(
             severity_of(&benign),

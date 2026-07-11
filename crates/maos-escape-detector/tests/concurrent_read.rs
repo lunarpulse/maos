@@ -83,7 +83,9 @@ fn read_only_reader_isolates_uncommitted_writer_transaction() {
     let uncommitted_id: [u8; 16] = [0xF0; 16];
     let payload: &[u8] = b"tier=2";
     let writer = rusqlite::Connection::open(&db_path).expect("open second writer");
-    writer.execute_batch("BEGIN IMMEDIATE;").expect("begin immediate");
+    writer
+        .execute_batch("BEGIN IMMEDIATE;")
+        .expect("begin immediate");
     writer
         .execute(
             "INSERT INTO transparency_log \
@@ -94,11 +96,11 @@ fn read_only_reader_isolates_uncommitted_writer_transaction() {
                 &uncommitted_id[..],
                 0_i64,
                 9000_i64,
-                1_i64,  // boot_nonce
-                8_i64,  // kind = FrameKind::SandboxBlock
+                1_i64, // boot_nonce
+                8_i64, // kind = FrameKind::SandboxBlock
                 "sandbox.block.unknown",
                 payload,
-                3_i64,  // origin = FrameOrigin::Kernel
+                3_i64, // origin = FrameOrigin::Kernel
             ],
         )
         .expect("insert uncommitted row");

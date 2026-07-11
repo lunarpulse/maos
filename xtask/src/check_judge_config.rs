@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use syn::visit::Visit;
 
-use crate::corpus_types::{JudgeConfig, JudgeDirectCallIdentifiers, load_toml};
+use crate::corpus_types::{load_toml, JudgeConfig, JudgeDirectCallIdentifiers};
 use crate::fs_walk;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

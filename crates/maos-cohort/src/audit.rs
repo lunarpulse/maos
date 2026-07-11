@@ -44,7 +44,10 @@ pub struct InMemoryCohortAuditSink {
 
 impl InMemoryCohortAuditSink {
     pub fn events(&self) -> Vec<CohortAuditEvent> {
-        self.events.lock().expect("cohort audit lock poisoned").clone()
+        self.events
+            .lock()
+            .expect("cohort audit lock poisoned")
+            .clone()
     }
 }
 

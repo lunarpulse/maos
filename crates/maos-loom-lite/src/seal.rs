@@ -92,9 +92,8 @@ mod tests {
     /// `maos-secrets` dependency to this crate.
     #[test]
     fn at_rest_seal_with_hook_transforms_bytes_and_succeeds() {
-        let xor_seal: AtRestSeal = Arc::new(|data: &[u8]| {
-            Ok(data.iter().map(|b| b ^ 0xA5).collect())
-        });
+        let xor_seal: AtRestSeal =
+            Arc::new(|data: &[u8]| Ok(data.iter().map(|b| b ^ 0xA5).collect()));
         let sealer = AtRestSealer::new(Some(xor_seal));
 
         let plaintext: Vec<u8> = b"collective-memory-payload".to_vec();

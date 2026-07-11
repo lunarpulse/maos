@@ -160,13 +160,14 @@ fn per_capability_deny_cannot_grant_beyond_manifest() {
     assert_eq!(decision, PolicyDecision::Allow);
 }
 
-
 #[test]
 fn per_spirit_capability_deny_only_targets_one_spirit() {
     let target = table_with_manifest_grant(42);
     {
         let mut inner = (*target.inner().load_full()).clone();
-        inner.manifest_scopes.insert(7, inner.manifest_scopes[&42].clone());
+        inner
+            .manifest_scopes
+            .insert(7, inner.manifest_scopes[&42].clone());
         inner
             .operator_policy
             .per_spirit_capability_deny

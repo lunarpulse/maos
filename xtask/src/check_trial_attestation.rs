@@ -186,7 +186,9 @@ fn sbom_completeness_derived_leg() -> LegResult {
     let mismatch = derive_sbom_from_sources(&lock_with(&[("maos", "0.1.0")]), tree);
     LegResult::from_bool(
         "sbom-completeness-derived",
-        good.sbom_verified && !mismatch.sbom_verified && !mismatch.missing_from_declaration.is_empty(),
+        good.sbom_verified
+            && !mismatch.sbom_verified
+            && !mismatch.missing_from_declaration.is_empty(),
     )
 }
 
@@ -198,7 +200,11 @@ fn signing_chain_verified_leg() -> LegResult {
     let good = derive_signing_chain(sha256sums.as_bytes(), &sig, &[("candidate.bin", artifact)]);
     let mut tampered_sig = sig;
     tampered_sig[0] ^= 0xA5;
-    let bad = derive_signing_chain(sha256sums.as_bytes(), &tampered_sig, &[("candidate.bin", artifact)]);
+    let bad = derive_signing_chain(
+        sha256sums.as_bytes(),
+        &tampered_sig,
+        &[("candidate.bin", artifact)],
+    );
     LegResult::from_bool(
         "signing-chain-verified",
         good.signing_chain_verified && !bad.signing_chain_verified,
@@ -288,7 +294,10 @@ fn negative_control_record_with_reported(
         load_accepted: true,
         frames_executed: 999,
     });
-    let sbom = derive_sbom_from_sources(&lock_with(&[("maos", "0.1.0")]), "maos v0.1.0\n└── serde v1.0.0\n");
+    let sbom = derive_sbom_from_sources(
+        &lock_with(&[("maos", "0.1.0")]),
+        "maos v0.1.0\n└── serde v1.0.0\n",
+    );
     let signing = maos_eval::trial_attestation::SigningDerivation {
         signing_chain_verified: false,
         verified_manifest_entries: 0,
@@ -337,7 +346,10 @@ fn blind_harness_negative_control_leg() -> LegResult {
     let blind_summary = summarize_attestations(&[blind.clone()]);
     LegResult::from_bool(
         "blind-harness-negative-control",
-        blind.ignored_self_report && !blind.success && !real.success && blind_summary.derived_successes == 0,
+        blind.ignored_self_report
+            && !blind.success
+            && !real.success
+            && blind_summary.derived_successes == 0,
     )
 }
 
@@ -367,9 +379,7 @@ fn release_graph_absence_leg() -> LegResult {
             let tree = String::from_utf8_lossy(&out.stdout);
             // P12: line-based match so a cargo-tree feature-edge label format
             // change cannot silently hide a trial-attestation (or maos-fkcs) leak.
-            let trial_feature_leaked = tree
-                .lines()
-                .any(|line| line.contains("trial-attestation"));
+            let trial_feature_leaked = tree.lines().any(|line| line.contains("trial-attestation"));
             let fkcs_crate_leaked = tree.lines().any(|line| {
                 let stripped =
                     line.trim_start_matches(|c: char| c.is_whitespace() || "│├└─".contains(c));

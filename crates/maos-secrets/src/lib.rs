@@ -123,16 +123,18 @@ pub fn seal_at_rest_opt(
 /// `seal_for_export` uses exactly ring `AES_256_GCM` — so this open path is its
 /// matching inverse. A future FIPS/HSM provider substitution would need a
 /// matching additive open path (deferred, tracked by ADR-051).
-pub fn open_at_rest(
-    kms: &dyn KeyManagementPort,
-    sealed: &[u8],
-) -> Result<Vec<u8>, KmsError> {
+pub fn open_at_rest(kms: &dyn KeyManagementPort, sealed: &[u8]) -> Result<Vec<u8>, KmsError> {
     if !kms.is_healthy() {
         return Err(KmsError::Unavailable("KMS is unhealthy".to_string()));
     }
     let parsed = ParsedSealedPayload::parse(sealed)?;
     let data_key = kms.unwrap_data_key(parsed.wrapped_data_key)?;
-    open_aead(&data_key, parsed.row_nonce, b"maos.at-rest.v1", parsed.ciphertext)
+    open_aead(
+        &data_key,
+        parsed.row_nonce,
+        b"maos.at-rest.v1",
+        parsed.ciphertext,
+    )
 }
 
 struct ParsedSealedPayload<'a> {

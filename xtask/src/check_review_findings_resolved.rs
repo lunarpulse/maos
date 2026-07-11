@@ -336,14 +336,12 @@ mod tests {
         );
         let sprint = dir.path().join("sprint.yaml");
         fs::write(&sprint, "development_status:\n  5-1-foo: done\n").unwrap();
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.to_str().unwrap(),
-                false,
-            )
-            .is_ok()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.to_str().unwrap(),
+            false,
+        )
+        .is_ok());
     }
 
     #[test]
@@ -356,14 +354,12 @@ mod tests {
         );
         let sprint = dir.path().join("sprint.yaml");
         fs::write(&sprint, "development_status:\n  5-2-bad: done\n").unwrap();
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.to_str().unwrap(),
-                false,
-            )
-            .is_err()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.to_str().unwrap(),
+            false,
+        )
+        .is_err());
     }
 
     #[test]
@@ -376,14 +372,12 @@ mod tests {
         );
         let sprint = dir.path().join("sprint.yaml");
         fs::write(&sprint, "development_status:\n  5-3-wip: in-review\n").unwrap();
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.to_str().unwrap(),
-                false,
-            )
-            .is_ok()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.to_str().unwrap(),
+            false,
+        )
+        .is_ok());
     }
 
     #[test]
@@ -396,14 +390,12 @@ mod tests {
         );
         let sprint = dir.path().join("sprint.yaml");
         fs::write(&sprint, "development_status:\n  5-4-scope: done\n").unwrap();
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.to_str().unwrap(),
-                false,
-            )
-            .is_err()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.to_str().unwrap(),
+            false,
+        )
+        .is_err());
     }
 
     #[test]
@@ -416,14 +408,12 @@ mod tests {
         );
         let sprint = dir.path().join("sprint.yaml");
         fs::write(&sprint, "development_status:\n  5-5-marker: done\n").unwrap();
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.to_str().unwrap(),
-                false,
-            )
-            .is_ok()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.to_str().unwrap(),
+            false,
+        )
+        .is_ok());
     }
 
     #[test]
@@ -436,13 +426,11 @@ mod tests {
         );
         let sprint = dir.path().join("sprint.yaml");
         fs::write(&sprint, "development_status:\n  0-1-bootstrap: done\n").unwrap();
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.to_str().unwrap(),
-                false,
-            )
-            .is_ok()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.to_str().unwrap(),
+            false,
+        )
+        .is_ok());
     }
 }

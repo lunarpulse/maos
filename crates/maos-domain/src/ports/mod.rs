@@ -38,8 +38,8 @@ pub mod hot_swap; // NEW — ADR-041 (Epic 6 retro §A3 2026-05-28) Phase-4 extr
 pub mod iac_bus;
 pub mod identity_assertion; // NEW — Story 11.4c IdentityAssertionPort per ADR-051 / NFR-Sec-18
 pub mod inference;
-pub mod key_management; // NEW — Story 11.4c KeyManagementPort per ADR-051 / NFR-Sec-19
 pub mod io_subsystem;
+pub mod key_management; // NEW — Story 11.4c KeyManagementPort per ADR-051 / NFR-Sec-19
 pub mod log_recall; // NEW — Story 4.4 LogRecallPort per AC1
 pub mod mcp; // NEW — Story 5.5c McpClientPort + domain types
 pub mod memory;
@@ -47,8 +47,8 @@ pub mod policy_decision; // NEW — Story 11.4a PolicyDecisionPort per ADR-050 /
 pub mod registry; // NEW — Story 5.5d SpiritRegistryClient port + domain types
 pub mod scheduler;
 pub mod security;
-pub mod siem_projection; // NEW — Story 11.4c SiemProjectionPort per ADR-051 / NFR-Aud-11
 pub mod self_telemetry; // NEW — Story 4.3 SelfTelemetryPort per FR56
+pub mod siem_projection; // NEW — Story 11.4c SiemProjectionPort per ADR-051 / NFR-Aud-11
 pub mod task;
 pub mod telemetry; // NEW — Story 5.3 in-flight task assignment record
 pub mod trace_sink; // NEW — Story 9.5b TraceSink port per NFR-Obs-2 / R2-2
@@ -65,8 +65,8 @@ pub use hot_swap::HotSwapPort; // NEW — ADR-041 Phase-4 extraction prep
 pub use iac_bus::IacBusPort;
 pub use identity_assertion::{AuthenticatedPrincipal, IdentityAssertionPort, IdentityError}; // NEW — Story 11.4c
 pub use inference::InferencePort;
-pub use key_management::{KeyManagementPort, KmsError}; // NEW — Story 11.4c
 pub use io_subsystem::IoSubsystemPort;
+pub use key_management::{KeyManagementPort, KmsError}; // NEW — Story 11.4c
 pub use log_recall::LogRecallPort; // NEW — Story 4.4
 pub use mcp::{McpAttribution, McpClientPort, McpError, McpRequest, McpResponse, McpTransportId}; // NEW — Story 5.5c
 pub use memory::MemoryManagerPort;
@@ -80,8 +80,8 @@ pub use registry::{
 }; // NEW — Story 5.5d
 pub use scheduler::SpiritSchedulerPort;
 pub use security::SecurityManagerPort;
-pub use siem_projection::{SiemProjectionError, SiemProjectionPort}; // NEW — Story 11.4c
 pub use self_telemetry::SelfTelemetryPort; // NEW — Story 4.3
+pub use siem_projection::{SiemProjectionError, SiemProjectionPort}; // NEW — Story 11.4c
 pub use telemetry::TelemetryStreamPort; // NEW
 pub use trace_sink::{
     CapabilitySpanAttrs, HaltSpanAttrs, IacFrameSpanAttrs, SpanContext, SpanGuard, TraceSink,

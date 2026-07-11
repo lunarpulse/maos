@@ -154,8 +154,11 @@ pub fn build_replication_bundle(
     base_seed: &[u8; 32],
 ) -> CrossRegionReplicationBundle {
     let root = kv_merkle_root(&leaves);
-    let sign_payload =
-        build_sign_payload(BUNDLE_SCHEMA_VERSION, source_region.as_str().as_bytes(), &root);
+    let sign_payload = build_sign_payload(
+        BUNDLE_SCHEMA_VERSION,
+        source_region.as_str().as_bytes(),
+        &root,
+    );
 
     let region_seed = derive_region_signing_seed(base_seed, source_region);
     let signing_key = SigningKey::from_bytes(&region_seed);
@@ -183,23 +186,22 @@ pub fn verify_replication_bundle(
     let region = Region::canonicalize(&bundle.source_region)
         .map_err(|e| BundleError::InvalidRegion(e.to_string()))?;
 
-    let sign_payload =
-        build_sign_payload(bundle.schema_version, region.as_str().as_bytes(), &bundle.root);
+    let sign_payload = build_sign_payload(
+        bundle.schema_version,
+        region.as_str().as_bytes(),
+        &bundle.root,
+    );
 
     let pubkey_bytes = derive_region_pubkey(base_seed, &region);
     let verifying_key = VerifyingKey::from_bytes(&pubkey_bytes)
         .map_err(|e| BundleError::SignatureVerificationFailed(format!("invalid pubkey: {e}")))?;
 
-    let sig_bytes: [u8; 64] = bundle
-        .region_sig
-        .as_slice()
-        .try_into()
-        .map_err(|_| {
-            BundleError::SignatureVerificationFailed(format!(
-                "signature must be 64 bytes, got {}",
-                bundle.region_sig.len()
-            ))
-        })?;
+    let sig_bytes: [u8; 64] = bundle.region_sig.as_slice().try_into().map_err(|_| {
+        BundleError::SignatureVerificationFailed(format!(
+            "signature must be 64 bytes, got {}",
+            bundle.region_sig.len()
+        ))
+    })?;
     let signature = Signature::from_bytes(&sig_bytes);
 
     verifying_key
@@ -383,16 +385,12 @@ pub fn verify_reattestation_receipt(
     let verifying_key = VerifyingKey::from_bytes(home_pubkey)
         .map_err(|e| BundleError::SignatureVerificationFailed(format!("invalid pubkey: {e}")))?;
 
-    let sig_bytes: [u8; 64] = receipt
-        .signature
-        .as_slice()
-        .try_into()
-        .map_err(|_| {
-            BundleError::SignatureVerificationFailed(format!(
-                "signature must be 64 bytes, got {}",
-                receipt.signature.len()
-            ))
-        })?;
+    let sig_bytes: [u8; 64] = receipt.signature.as_slice().try_into().map_err(|_| {
+        BundleError::SignatureVerificationFailed(format!(
+            "signature must be 64 bytes, got {}",
+            receipt.signature.len()
+        ))
+    })?;
     let signature = Signature::from_bytes(&sig_bytes);
 
     verifying_key

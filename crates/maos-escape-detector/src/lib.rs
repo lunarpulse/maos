@@ -149,10 +149,7 @@ pub enum CorrelationOutcome {
 /// This is the **detection decision** — measured by the detection-quality leg,
 /// NOT the deterministic `classify_exit` map. An anomaly is raised iff the kill
 /// frame is real (kernel-origin) AND the manifest did not anticipate it.
-pub fn correlate(
-    frame: &SandboxBlockFrame,
-    manifest: &ManifestDeclaration,
-) -> CorrelationOutcome {
+pub fn correlate(frame: &SandboxBlockFrame, manifest: &ManifestDeclaration) -> CorrelationOutcome {
     // AC3/AC4 FALSIFIER — `escape-fault-inject` stubs the correlation to a
     // canned anomaly regardless of the manifest declaration. With it ON, the
     // FP set (anticipated kills / benign completions) anomalizes → the
@@ -165,8 +162,7 @@ pub fn correlate(
         return CorrelationOutcome::Anomaly(AnomalyReport {
             frame_id_hex: frame.frame_id_hex.clone(),
             spirit_pid: frame.spirit_pid,
-            rationale: "escape-fault-inject canned-TP (real correlation bypassed)"
-                .to_string(),
+            rationale: "escape-fault-inject canned-TP (real correlation bypassed)".to_string(),
             attempted_syscall: frame.attempted_syscall().to_string(),
             observed_tier: frame.observed_tier().unwrap_or(2),
             declared_tier: 0,

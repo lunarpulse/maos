@@ -2,12 +2,12 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use crate::corpus_types::{CorpusManifest, load_toml, round_ratio};
+use crate::corpus_types::{load_toml, round_ratio, CorpusManifest};
 
 /// Trait abstracting judge-LLM invocations.
 pub trait JudgeRunner {
     fn judge(&self, item: &serde_json::Value, expected: &serde_json::Value)
-    -> Result<bool, String>;
+        -> Result<bool, String>;
 }
 
 /// v0.1-alpha shim: compares item["expected_judgment"] == expected (trivially passes).

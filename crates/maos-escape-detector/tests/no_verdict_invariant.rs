@@ -30,9 +30,18 @@ fn sandbox_block_carries_no_verdict_field() {
     // RUNTIME BELT-AND-SUSPENDERS — the Debug rendering carries the three
     // structural field names and NONE of the forbidden verdict axes.
     let dbg = format!("{event:?}");
-    assert!(dbg.contains("spirit_pid"), "structural field present: {dbg}");
-    assert!(dbg.contains("attempted_syscall"), "structural field present: {dbg}");
-    assert!(dbg.contains("sandbox_tier"), "structural field present: {dbg}");
+    assert!(
+        dbg.contains("spirit_pid"),
+        "structural field present: {dbg}"
+    );
+    assert!(
+        dbg.contains("attempted_syscall"),
+        "structural field present: {dbg}"
+    );
+    assert!(
+        dbg.contains("sandbox_tier"),
+        "structural field present: {dbg}"
+    );
     for forbidden in ["malice", "verdict", "severity", "intent"] {
         assert!(
             !dbg.contains(forbidden),

@@ -40,7 +40,11 @@ fn insert_block(
 }
 
 fn manifest_for(pid: u32) -> ManifestDeclaration {
-    ManifestDeclaration { spirit_pid: pid as i64, declared_tier: 2, anticipated_kill: false }
+    ManifestDeclaration {
+        spirit_pid: pid as i64,
+        declared_tier: 2,
+        anticipated_kill: false,
+    }
 }
 
 /// D8 (identity): each detected anomaly traces to a REAL kernel-emitted frame.
@@ -82,7 +86,11 @@ fn blind_one_source_moves_the_count() {
     let with = Detector::detect(&db_path_with, &manifests).expect("detect with");
     let without = Detector::detect(&db_path_without, &manifests).expect("detect without");
     assert_eq!(with.len(), 1, "the real frame yields one anomaly");
-    assert_eq!(without.len(), 0, "blinding the one real source moves the count to zero");
+    assert_eq!(
+        without.len(),
+        0,
+        "blinding the one real source moves the count to zero"
+    );
 }
 
 /// D8 (replay-dedup): a replayed read MUST NOT inflate the count. The TL
@@ -104,7 +112,11 @@ fn replayed_read_does_not_inflate_count() {
 
     let first = Detector::detect(&db_path, &manifests).expect("first detect");
     let replayed = Detector::detect(&db_path, &manifests).expect("replayed detect");
-    assert_eq!(first.len(), pids.len(), "baseline: one anomaly per real kernel row");
+    assert_eq!(
+        first.len(),
+        pids.len(),
+        "baseline: one anomaly per real kernel row"
+    );
     assert_eq!(
         first.len(),
         replayed.len(),
@@ -116,7 +128,10 @@ fn replayed_read_does_not_inflate_count() {
     let raw = Detector::read_kernel_sandbox_blocks(&db_path).expect("read");
     let mut seen = std::collections::HashSet::new();
     for f in &raw {
-        assert!(seen.insert(&f.frame_id_hex), "within-read dedup collapsed a duplicate");
+        assert!(
+            seen.insert(&f.frame_id_hex),
+            "within-read dedup collapsed a duplicate"
+        );
     }
 }
 
@@ -130,16 +145,19 @@ fn read_path_returns_all_kind8_rows_detect_filters_to_kernel() {
     insert_block(&tl, [0x33; 16], 7102, FrameOrigin::HumanAuthored);
     let read = Detector::read_kernel_sandbox_blocks(&db_path).expect("read");
     assert_eq!(read.len(), 3, "read returns all kind=8 rows pre-filter");
-    let kernel = read.iter().filter(|f| f.origin == FRAME_ORIGIN_KERNEL).count();
+    let kernel = read
+        .iter()
+        .filter(|f| f.origin == FRAME_ORIGIN_KERNEL)
+        .count();
     assert_eq!(kernel, 1, "exactly one kernel-origin frame");
     // detect() counts only the kernel-origin frame.
-    let manifests = vec![
-        manifest_for(7100),
-        manifest_for(7101),
-        manifest_for(7102),
-    ];
+    let manifests = vec![manifest_for(7100), manifest_for(7101), manifest_for(7102)];
     let anomalies = Detector::detect(&db_path, &manifests).expect("detect");
-    assert_eq!(anomalies.len(), 1, "detect counts only the real kernel-origin frame");
+    assert_eq!(
+        anomalies.len(),
+        1,
+        "detect counts only the real kernel-origin frame"
+    );
 }
 
 fn hex(bytes: &[u8]) -> String {

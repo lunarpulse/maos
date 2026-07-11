@@ -36,7 +36,7 @@ use ed25519_dalek::SigningKey;
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_cohort::{
     CohortAuthority, CohortClock, CohortDistributor, CohortManifest, CohortManifestState,
-    CohortMember, ConsentMatrix, InMemoryCohortAuditSink, ManifestSignature,
+    CohortMember, ConsentMatrix, ConsentTuple, InMemoryCohortAuditSink, ManifestSignature,
     PinnedAuthorityKeys, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
 };
 use maos_domain::frame::FrameAddress;
@@ -48,7 +48,11 @@ const HOST_COUNT: usize = 8;
 
 fn all_directed_pairs(n: usize) -> Vec<(usize, usize)> {
     (0..n)
-        .flat_map(|from| (0..n).filter(move |&to| to != from).map(move |to| (from, to)))
+        .flat_map(|from| {
+            (0..n)
+                .filter(move |&to| to != from)
+                .map(move |to| (from, to))
+        })
         .collect()
 }
 
@@ -58,9 +62,7 @@ async fn t_12_1_n8_full_pairwise_mesh_measurement() {
     let clock = Clock::capture();
     let ca = mk_ca(&clock, "ca-12-1-full-pairwise");
     let names: Vec<String> = (0..HOST_COUNT).map(host_name).collect();
-    let leaves: Vec<Leaf> = (0..HOST_COUNT)
-        .map(|_| valid_leaf(&ca, &clock))
-        .collect();
+    let leaves: Vec<Leaf> = (0..HOST_COUNT).map(|_| valid_leaf(&ca, &clock)).collect();
     let refs: Vec<&Leaf> = leaves.iter().collect();
     let mesh = build_mesh_n(&clock, &ca, &names, &refs, &refs, no_retry()).await;
     let pairs = all_directed_pairs(mesh.len());
@@ -71,9 +73,15 @@ async fn t_12_1_n8_full_pairwise_mesh_measurement() {
     let started = Instant::now();
     let results = concurrent_dial_pairs(&mesh, &pairs, 12_100, IntentClass::Readonly).await;
     let elapsed = started.elapsed();
-    let failures: Vec<_> = results.iter().filter(|(_, _, result)| result.is_err()).collect();
+    let failures: Vec<_> = results
+        .iter()
+        .filter(|(_, _, result)| result.is_err())
+        .collect();
 
-    assert!(failures.is_empty(), "full-pairwise sweep failures: {failures:?}");
+    assert!(
+        failures.is_empty(),
+        "full-pairwise sweep failures: {failures:?}"
+    );
     assert_eq!(results.len(), mesh.len() * (mesh.len() - 1));
     eprintln!(
         "Story 12.1 Task 0: N={} channels={} directed_dials={} wall_clock_ms={}",
@@ -100,8 +108,15 @@ fn t_12_1_pair_counts_derived_from_n() {
         let bilateral = directed / 2;
         assert_eq!(pairs.len(), directed, "N={n}: directed dial count");
         // No self-dial ever appears in an all-`i != j` mesh.
-        assert!(pairs.iter().all(|&(from, to)| from != to), "N={n}: no self-dials");
-        assert_eq!(bilateral * 2, directed, "N={n}: channels are half the directed dials");
+        assert!(
+            pairs.iter().all(|&(from, to)| from != to),
+            "N={n}: no self-dials"
+        );
+        assert_eq!(
+            bilateral * 2,
+            directed,
+            "N={n}: channels are half the directed dials"
+        );
     }
 
     // The Task-2 fleet size: the derivation reproduces 56 dials / 28 channels.
@@ -279,7 +294,32 @@ fn signed_cohort_manifest(
                 roles: vec!["worker".into()],
             },
         ],
-        consent: ConsentMatrix::default(),
+        consent: ConsentMatrix {
+            send: vec![
+                ConsentTuple {
+                    peer: "host_a".into(),
+                    role: "worker".into(),
+                    intent: "readonly".into(),
+                },
+                ConsentTuple {
+                    peer: "host_b".into(),
+                    role: "worker".into(),
+                    intent: "readonly".into(),
+                },
+            ],
+            accept: vec![
+                ConsentTuple {
+                    peer: "host_a".into(),
+                    role: "worker".into(),
+                    intent: "readonly".into(),
+                },
+                ConsentTuple {
+                    peer: "host_b".into(),
+                    role: "worker".into(),
+                    intent: "readonly".into(),
+                },
+            ],
+        },
         reserved_intents: vec![
             RESERVED_INTENT_REISSUE.into(),
             RESERVED_INTENT_HALT_RECEIPT.into(),
@@ -304,8 +344,10 @@ async fn t_12_1_stale_pull_push_resubmit_real_tcp() {
     let authority = SigningKey::from_bytes(&[42u8; 32]);
     let pins =
         PinnedAuthorityKeys::from_keys(vec![authority.verifying_key()]).expect("authority pins");
-    let manifest_v1 = signed_cohort_manifest(1, &authority, &leaf_a.fingerprint, &leaf_b.fingerprint);
-    let manifest_v2 = signed_cohort_manifest(2, &authority, &leaf_a.fingerprint, &leaf_b.fingerprint);
+    let manifest_v1 =
+        signed_cohort_manifest(1, &authority, &leaf_a.fingerprint, &leaf_b.fingerprint);
+    let manifest_v2 =
+        signed_cohort_manifest(2, &authority, &leaf_a.fingerprint, &leaf_b.fingerprint);
     let clock_a = Arc::new(TestCohortClock::new(0));
     let clock_b = Arc::new(TestCohortClock::new(0));
     let state_a = Arc::new(
@@ -424,7 +466,10 @@ async fn t_12_1_stale_pull_push_resubmit_real_tcp() {
         },
     );
     assert_eq!(
-        distributor_a.service_pending_pulls().await.expect("signed push"),
+        distributor_a
+            .service_pending_pulls()
+            .await
+            .expect("signed push"),
         1,
         "one verified pull must produce one signed push"
     );

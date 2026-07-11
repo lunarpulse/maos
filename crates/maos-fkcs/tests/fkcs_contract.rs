@@ -9,8 +9,8 @@
 //! AC3 mechanism.
 
 use maos_fkcs::{
-    AdmissionHarness, ChecklistCategory, FKCS_AGGREGATE_FLOOR, FKCS_PER_SPIRIT_FLOOR,
-    KernelFreezeProvenance, ProxyCohort, ProxySpirit, SpiritChecklistReport,
+    AdmissionHarness, ChecklistCategory, KernelFreezeProvenance, ProxyCohort, ProxySpirit,
+    SpiritChecklistReport, FKCS_AGGREGATE_FLOOR, FKCS_PER_SPIRIT_FLOOR,
 };
 
 /// The off-frozen-surface `pub(crate)`-style internal the negative control
@@ -159,7 +159,10 @@ fn cohort_checklist_is_itemized_across_categories_not_a_flat_bucket() {
     assert!(has_category(ChecklistCategory::AuditInvariant));
     assert!(has_category(ChecklistCategory::ComplianceClaimVerify));
     assert!(
-        spirit.items.iter().any(|item| item.category != spirit.items[0].category),
+        spirit
+            .items
+            .iter()
+            .any(|item| item.category != spirit.items[0].category),
         "an itemized checklist must span multiple categories, not a flat bucket"
     );
     assert!(
@@ -192,7 +195,10 @@ fn cohort_one_freeze_axis_red_drops_reconciled_count_while_admission_holds() {
     ]);
     // Lines drift 23081 -> 23082; abi additive + host allowlist still hold.
     let one_axis_red = KernelFreezeProvenance::from_measure(23_081, 23_082, true, true);
-    assert!(!one_axis_red.frozen(), "fixture: a line drift makes the freeze RED");
+    assert!(
+        !one_axis_red.frozen(),
+        "fixture: a line drift makes the freeze RED"
+    );
     assert!(!one_axis_red.line_stable());
 
     let report = cohort.evaluate(&harness, &one_axis_red);
@@ -269,7 +275,10 @@ fn cohort_with_negative_control_scores_below_floor_and_fails_aggregate() {
 
     let report = cohort.evaluate(&harness, &stable);
 
-    assert_eq!(report.admitted_count, 1, "only the conformance proxy admits");
+    assert_eq!(
+        report.admitted_count, 1,
+        "only the conformance proxy admits"
+    );
     assert_eq!(
         report.reconciled_count, 1,
         "only the conformance proxy reconciles"

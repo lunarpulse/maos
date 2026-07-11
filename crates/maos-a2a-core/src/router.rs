@@ -13,11 +13,11 @@
 //! `LoopbackA2ARouter` itself stays in `maos-a2a` (the only `impl A2ATransport`
 //! that crate retains); it is now a thin wrapper around [`A2ARouterCore`].
 
-use crate::config::A2APeerConfig;
 use crate::cohort::{
-    CohortManifestGate, LegacyCohortManifestGate, RESERVED_INTENT_HALT_RECEIPT,
-    RESERVED_INTENT_REISSUE,
+    CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
+    LegacyCohortManifestGate, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
+use crate::config::A2APeerConfig;
 use crate::consent::{AllowlistDirection, ConsentAllowlists, EIntentDenied};
 use crate::error::{A2AError, IntentDirection, UnclassifiedReason};
 use crate::identity::PeerId;
@@ -490,13 +490,39 @@ impl A2ARouterCore {
             || intent.eq_ignore_ascii_case(RESERVED_INTENT_HALT_RECEIPT)
     }
 
-    /// The sole router call to the manifest-currentness port. Reserved control
-    /// intents stay admissible so a stale/revoked member can receive the signed
-    /// reissue that explains its change; every other cross-host frame fails
-    /// closed when either roster member is absent or the cache lease is stale.
-    fn cohort_manifest_is_current(&self, frame: &IacFrame, peer: &HostId) -> bool {
-        Self::is_reserved_cohort_intent(&Self::consent_match_key(frame))
-            || self.cohort_manifest_gate.is_current(peer)
+    /// The sole router call to the role/version consent port. Both route seams
+    /// use this synchronous chokepoint; no verdict can straddle an await.
+    fn cohort_consent_decision(
+        &self,
+        seam: CohortConsentSeam,
+        counterparty: &HostId,
+        acting_role: Option<&str>,
+        intent: &str,
+        sender_manifest_version: Option<u64>,
+    ) -> CohortConsentVerdict {
+        self.cohort_manifest_gate.consent_decision(
+            seam,
+            counterparty,
+            acting_role,
+            intent,
+            sender_manifest_version,
+        )
+    }
+
+    fn cohort_denial_data(reason: &CohortConsentDenial) -> serde_json::Value {
+        match reason {
+            CohortConsentDenial::ManifestSkew {
+                sender_version,
+                receiver_version,
+                delta,
+            } => serde_json::json!({
+                "reason": reason.reason(),
+                "sender_version": sender_version,
+                "receiver_version": receiver_version,
+                "delta": delta,
+            }),
+            _ => serde_json::json!({ "reason": reason.reason() }),
+        }
     }
 
     /// Send-allowlist enforcement. The peer's `send_allowlist` enumerates
@@ -571,13 +597,6 @@ impl A2ARouterCore {
             });
         }
 
-        if !self.cohort_manifest_is_current(&frame, peer) {
-            return Err(A2AError::ConfigInvalid(format!(
-                "cohort manifest is not current for peer {}",
-                peer.as_str()
-            )));
-        }
-
         // (1) ADR-012 send-allowlist check (defense-in-depth — sender side).
         if !self.send_admits(&peer_cfg.allowlists, &frame, peer_cfg.peer_id.as_str()) {
             return Err(A2AError::IntentDenied {
@@ -591,6 +610,32 @@ impl A2ARouterCore {
                 },
             });
         }
+
+        let intent = Self::consent_match_key(&frame);
+        let cohort_context = if Self::is_reserved_cohort_intent(&intent) {
+            None
+        } else {
+            match self.cohort_consent_decision(CohortConsentSeam::Send, peer, None, &intent, None) {
+                CohortConsentVerdict::Defer => None,
+                CohortConsentVerdict::AdmitOutbound {
+                    acting_role,
+                    manifest_version,
+                } => Some((acting_role, manifest_version)),
+                CohortConsentVerdict::Admit => None,
+                CohortConsentVerdict::NotCurrent => {
+                    return Err(A2AError::ConfigInvalid(format!(
+                        "cohort manifest is not current for peer {}",
+                        peer.as_str()
+                    )));
+                }
+                CohortConsentVerdict::Deny(reason) => {
+                    return Err(A2AError::CohortConsentDenied {
+                        direction: IntentDirection::Send,
+                        reason,
+                    });
+                }
+            }
+        };
 
         // (2) TOFU pin verify — ensure the peer's cert fingerprint matches the
         //     pinned record before writing to wire.
@@ -624,7 +669,13 @@ impl A2ARouterCore {
         // (4) Build JSON-RPC request.
         let id = self.alloc_id();
         let frame_id = frame.frame_id;
-        let request = A2AJsonRpcRequest::new("iac.deliver", frame, id).with_boot_nonce(boot_nonce);
+        let mut request =
+            A2AJsonRpcRequest::new("iac.deliver", frame, id).with_boot_nonce(boot_nonce);
+        if let Some((acting_role, manifest_version)) = cohort_context {
+            request = request
+                .with_cohort_acting_role(acting_role)
+                .with_cohort_manifest_version(manifest_version);
+        }
         Ok((request, peer_cfg, frame_id))
     }
 
@@ -906,17 +957,6 @@ impl A2ARouterCore {
             );
         }
 
-        if !self.cohort_manifest_is_current(frame, &HostId(peer_cfg.peer_id.as_str().to_string())) {
-            return A2AJsonRpcResponse::nack(
-                request.id,
-                CODE_INTERNAL,
-                format!(
-                    "cohort manifest is not current for peer {}",
-                    peer_cfg.peer_id.as_str()
-                ),
-            );
-        }
-
         // (3) ADR-012 accept-allowlist check.
         if !self.accept_admits(&peer_cfg.allowlists, frame, peer_cfg.peer_id.as_str()) {
             // Story 8.13.1 / AC3 — EARN the rupture: emit a genuine typed
@@ -940,9 +980,47 @@ impl A2ARouterCore {
         }
 
         let cohort_intent = Self::consent_match_key(frame);
+        if !Self::is_reserved_cohort_intent(&cohort_intent) {
+            match self.cohort_consent_decision(
+                CohortConsentSeam::Accept,
+                &peer_host,
+                request.cohort_acting_role.as_deref(),
+                &cohort_intent,
+                request.cohort_manifest_version,
+            ) {
+                CohortConsentVerdict::Defer => {}
+                CohortConsentVerdict::Admit | CohortConsentVerdict::AdmitOutbound { .. } => {}
+                CohortConsentVerdict::NotCurrent => {
+                    return A2AJsonRpcResponse::nack(
+                        request.id,
+                        CODE_INTERNAL,
+                        format!(
+                            "cohort manifest is not current for peer {}",
+                            peer_cfg.peer_id.as_str()
+                        ),
+                    );
+                }
+                CohortConsentVerdict::Deny(reason) => {
+                    let data = Self::cohort_denial_data(&reason);
+                    self.emit_consent_rupture(frame).await;
+                    return A2AJsonRpcResponse::nack_with_data(
+                        request.id,
+                        CODE_INTENT_DENIED,
+                        format!(
+                            "cohort consent denied for peer {}: {reason}",
+                            peer_cfg.peer_id.as_str()
+                        ),
+                        data,
+                    );
+                }
+            }
+        }
         if cohort_intent.eq_ignore_ascii_case(RESERVED_INTENT_REISSUE) {
             let verified_peer = HostId(peer_cfg.peer_id.as_str().to_string());
-            return match self.cohort_manifest_gate.apply_reissue(&verified_peer, frame) {
+            return match self
+                .cohort_manifest_gate
+                .apply_reissue(&verified_peer, frame)
+            {
                 Ok(_) => A2AJsonRpcResponse::ack(
                     request.id,
                     AckBody {
@@ -1122,6 +1200,11 @@ pub fn map_a2a_error_to_iac_bus(err: A2AError, peer: &str) -> IacBusError {
         A2AError::ConsentGranterMismatch { granter, frame_from } => {
             IacBusError::CrossHostRouteFailure(format!(
                 "consent granter mismatch: envelope granter {granter}, frame from {frame_from}"
+            ))
+        }
+        A2AError::CohortConsentDenied { direction, reason } => {
+            IacBusError::CrossHostRouteFailure(format!(
+                "cohort consent denied ({direction:?}) for peer {peer}: {reason}"
             ))
         }
         // Story 8.8 — fail-closed unclassified-consent denials map to the generic

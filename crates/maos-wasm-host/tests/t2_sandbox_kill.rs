@@ -25,7 +25,9 @@ use std::io;
 use std::process::Command;
 
 use maos_domain::invariants::i9::SandboxTier;
-use maos_kernel_core::security::sandbox::{classify_exit, spawn_sandboxed, SandboxSpec, SpawnError};
+use maos_kernel_core::security::sandbox::{
+    classify_exit, spawn_sandboxed, SandboxSpec, SpawnError,
+};
 
 fn skip_if_perm_denied<T>(result: Result<T, SpawnError>, test_name: &str) -> Option<T> {
     match result {
@@ -154,17 +156,17 @@ fn granted_fs_capability_works_ungranted_is_refused() {
     let granted_spec = SandboxSpec {
         tier: SandboxTier::T2,
         resolved_caps: Default::default(),
-        declared_scopes: vec![maos_domain::invariants::i1::Scope::FsRead { subtree: subtree.clone() }],
+        declared_scopes: vec![maos_domain::invariants::i1::Scope::FsRead {
+            subtree: subtree.clone(),
+        }],
         spirit_id: "test-spirit-t2-fs-granted".to_string(),
         output_shape_predicate: None,
     };
-    let mut granted_child = match skip_if_perm_denied(
-        spawn_sandboxed(&granted_spec, &mut cat_cmd()),
-        "fs_granted",
-    ) {
-        Some(c) => c,
-        None => return,
-    };
+    let mut granted_child =
+        match skip_if_perm_denied(spawn_sandboxed(&granted_spec, &mut cat_cmd()), "fs_granted") {
+            Some(c) => c,
+            None => return,
+        };
     let granted_status = granted_child.wait().unwrap();
     assert!(
         granted_status.success(),

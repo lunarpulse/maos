@@ -284,11 +284,10 @@ mod tests {
         fs::remove_file(seed).unwrap();
         let r = check_fuzz_targets(tmp.path());
         assert!(!r.passed);
-        assert!(
-            r.failures
-                .iter()
-                .any(|f| f.contains("frame_deser") && f.contains("seed"))
-        );
+        assert!(r
+            .failures
+            .iter()
+            .any(|f| f.contains("frame_deser") && f.contains("seed")));
     }
 
     #[test]
@@ -349,11 +348,10 @@ mod tests {
             !r.passed,
             "a .gitkeep-only corpus must NOT satisfy the seed requirement"
         );
-        assert!(
-            r.failures
-                .iter()
-                .any(|f| f.contains("frame_deser") && f.contains("seed"))
-        );
+        assert!(r
+            .failures
+            .iter()
+            .any(|f| f.contains("frame_deser") && f.contains("seed")));
     }
 
     #[test]
@@ -367,10 +365,9 @@ mod tests {
         .unwrap();
         let r = check_fuzz_targets(tmp.path());
         assert!(!r.passed);
-        assert!(
-            r.failures
-                .iter()
-                .any(|f| f.contains("parse") && f.contains("maos-manifest"))
-        );
+        assert!(r
+            .failures
+            .iter()
+            .any(|f| f.contains("parse") && f.contains("maos-manifest")));
     }
 }

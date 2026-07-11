@@ -131,15 +131,13 @@ pub fn write_frame(writer: &mut impl Write, cbor_data: &[u8]) -> io::Result<()> 
 /// Encode a serde-serializable value to canonical CBOR bytes.
 pub fn encode_cbor<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, String> {
     let mut buf = Vec::new();
-    ciborium::into_writer(value, &mut buf)
-        .map_err(|e| format!("CBOR encode error: {e}"))?;
+    ciborium::into_writer(value, &mut buf).map_err(|e| format!("CBOR encode error: {e}"))?;
     Ok(buf)
 }
 
 /// Decode canonical CBOR bytes to a serde-deserializable value.
 pub fn decode_cbor<T: serde::de::DeserializeOwned>(data: &[u8]) -> Result<T, String> {
-    ciborium::from_reader(data)
-        .map_err(|e| format!("CBOR decode error: {e}"))
+    ciborium::from_reader(data).map_err(|e| format!("CBOR decode error: {e}"))
 }
 
 #[cfg(test)]

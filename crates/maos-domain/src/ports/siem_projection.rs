@@ -18,7 +18,10 @@ pub trait SiemProjectionPort: Send + Sync {
     /// Project one already-redacted audit entry representation into a SIEM-ready
     /// transport frame. Implementations must not perform authorization or mutate
     /// kernel state.
-    fn project_redacted_entry(&self, redacted_entry_json: &str) -> Result<String, SiemProjectionError>;
+    fn project_redacted_entry(
+        &self,
+        redacted_entry_json: &str,
+    ) -> Result<String, SiemProjectionError>;
 
     /// Class: supervision
     ///

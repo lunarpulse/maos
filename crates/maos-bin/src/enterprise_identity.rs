@@ -336,14 +336,16 @@ impl EnterpriseRuntime {
     /// (redaction applied before projection). On sink I/O error or
     /// `ConfiguredDown` → `SiemSinkDown` (buffered count surfaced to the
     /// operator); records are never silently dropped.
-    pub fn forward_audit_to_siem(
-        &self,
-        filter: AuditFilter,
-    ) -> Result<usize, EnterpriseFailure> {
+    pub fn forward_audit_to_siem(&self, filter: AuditFilter) -> Result<usize, EnterpriseFailure> {
         match self.config.siem {
             SubsystemState::Disabled => Ok(0),
             SubsystemState::Available => {
-                if self.siem_port.as_ref().map(|p| p.is_healthy()).unwrap_or(false) {
+                if self
+                    .siem_port
+                    .as_ref()
+                    .map(|p| p.is_healthy())
+                    .unwrap_or(false)
+                {
                     let (db, sink) = match (&self.audit_db_path, &self.siem_sink_path) {
                         (Some(d), Some(s)) => (d, s),
                         _ => return Err(EnterpriseFailure::SiemSinkDown { buffered: 0 }),
@@ -406,7 +408,8 @@ fn any_env_with_prefix(prefix: &str) -> bool {
 /// Decode the hex-encoded 32-byte org master key from `MAOS_KMS_MASTER_KEY`.
 fn build_local_kms() -> Result<LocalMasterKeyKms, String> {
     let raw = std::env::var("MAOS_KMS_MASTER_KEY").map_err(|_| "MAOS_KMS_MASTER_KEY absent")?;
-    let bytes = hex::decode(raw.trim()).map_err(|e| format!("master key hex decode failed: {e}"))?;
+    let bytes =
+        hex::decode(raw.trim()).map_err(|e| format!("master key hex decode failed: {e}"))?;
     LocalMasterKeyKms::from_master_key(&bytes).map_err(|e| e.to_string())
 }
 
@@ -415,8 +418,7 @@ fn build_local_kms() -> Result<LocalMasterKeyKms, String> {
 /// `MAOS_SSO_ALGS` (optional, default RS256+ES256).
 fn build_sso_verifier() -> Result<OidcVerifier, String> {
     let jwks = std::env::var("MAOS_SSO_JWKS").map_err(|_| "MAOS_SSO_JWKS absent")?;
-    let issuers_raw =
-        std::env::var("MAOS_SSO_ISSUERS").map_err(|_| "MAOS_SSO_ISSUERS absent")?;
+    let issuers_raw = std::env::var("MAOS_SSO_ISSUERS").map_err(|_| "MAOS_SSO_ISSUERS absent")?;
     let audience = std::env::var("MAOS_SSO_AUDIENCE").map_err(|_| "MAOS_SSO_AUDIENCE absent")?;
     let algs_raw = std::env::var("MAOS_SSO_ALGS").unwrap_or_else(|_| "RS256,ES256".to_string());
     let algs: Vec<OidcAlgorithm> = algs_raw
@@ -430,7 +432,11 @@ fn build_sso_verifier() -> Result<OidcVerifier, String> {
     if algs.is_empty() {
         return Err("MAOS_SSO_ALGS resolved to no supported algorithms".to_string());
     }
-    let issuers: Vec<&str> = issuers_raw.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    let issuers: Vec<&str> = issuers_raw
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
     OidcVerifier::from_static_jwks(&jwks, &algs, &issuers, &audience).map_err(|e| e.to_string())
 }
 
@@ -516,8 +522,13 @@ mod available_arm_tests {
     fn verifier() -> Arc<dyn IdentityAssertionPort> {
         let jwks = fixture("JWKS_KEY_A");
         Arc::new(
-            OidcVerifier::from_static_jwks(&jwks, &[OidcAlgorithm::Rs256], &[ISS_GOOD], AUD_EXPECTED)
-                .expect("verifier from fixture JWKS"),
+            OidcVerifier::from_static_jwks(
+                &jwks,
+                &[OidcAlgorithm::Rs256],
+                &[ISS_GOOD],
+                AUD_EXPECTED,
+            )
+            .expect("verifier from fixture JWKS"),
         )
     }
 
@@ -618,8 +629,10 @@ mod available_arm_tests {
         rt.issue_under_principal(42, &good, "cap-test")
             .expect("a validly-signed, in-claim-window assertion MUST verify + issue");
         let rows = query(&tl, AuditFilter::default()).expect("read TL");
-        let asserted: Vec<&AuditEntry> =
-            rows.iter().filter(|r| r.kind == "identity.asserted").collect();
+        let asserted: Vec<&AuditEntry> = rows
+            .iter()
+            .filter(|r| r.kind == "identity.asserted")
+            .collect();
         assert_eq!(
             asserted.len(),
             1,

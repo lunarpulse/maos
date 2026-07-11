@@ -88,7 +88,10 @@ fn real_seccomp_kill_produces_real_tl_row_and_detector_anomaly() {
     );
     // Sally's observability constraint: the signal is an operator-observable line.
     let line = format_anomaly_line(anomaly);
-    assert!(line.starts_with("escape-anomaly:"), "operator-observable line: {line}");
+    assert!(
+        line.starts_with("escape-anomaly:"),
+        "operator-observable line: {line}"
+    );
 
     // Derive-and-reconcile (§A7.1): the count is derived from the real TL, not a
     // committed literal. Re-reading the TL yields the same single row.
@@ -127,7 +130,7 @@ fn fault_inject_severs_producer_wiring_to_no_row() {
         reap_and_emit_violation(&spec, &mut cmd, &tx, &security, spirit_pid),
         "producer_fault_inject",
     ) {
-        Some(v) => v, // v: Option<SandboxViolation> — the classified real kill
+        Some(v) => v,   // v: Option<SandboxViolation> — the classified real kill
         None => return, // sandbox unavailable — advisory skip, emits NO marker
     };
     drop(tx);

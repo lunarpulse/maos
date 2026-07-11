@@ -332,15 +332,13 @@ mod tests {
             "---\ndev_model_used: claude-opus-4-7\n---\n### Agent Model Used\nclaude\n### Completion Notes List\n- task 1 done\n### File List\n- crates/foo/bar.rs\n",
         );
         let sprint = sprint_with("5-1-foo", "done");
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.path().to_str().unwrap(),
-                false,
-                false,
-            )
-            .is_ok()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.path().to_str().unwrap(),
+            false,
+            false,
+        )
+        .is_ok());
     }
 
     #[test]
@@ -352,15 +350,13 @@ mod tests {
             "---\ndev_model_used: TBD (recommend claude-opus-4-7)\n---\n### Agent Model Used\nclaude\n### Completion Notes List\n- task 1\n### File List\n- crates/x.rs\n",
         );
         let sprint = sprint_with("5-2-tbd", "done");
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.path().to_str().unwrap(),
-                false,
-                false,
-            )
-            .is_err()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.path().to_str().unwrap(),
+            false,
+            false,
+        )
+        .is_err());
     }
 
     #[test]
@@ -372,15 +368,13 @@ mod tests {
             "---\ndev_model_used: glm-5.1\n---\n### Agent Model Used\nglm-5.1\n### Completion Notes List\n\n### File List\n- crates/y.rs\n",
         );
         let sprint = sprint_with("5-3-empty", "done");
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.path().to_str().unwrap(),
-                false,
-                false,
-            )
-            .is_err()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.path().to_str().unwrap(),
+            false,
+            false,
+        )
+        .is_err());
     }
 
     #[test]
@@ -392,15 +386,13 @@ mod tests {
             "---\ndev_model_used: claude\n---\n### Agent Model Used\nclaude\n### Completion Notes List\n- done\n### File List\n\n",
         );
         let sprint = sprint_with("5-4-nofiles", "done");
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.path().to_str().unwrap(),
-                false,
-                false,
-            )
-            .is_err()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.path().to_str().unwrap(),
+            false,
+            false,
+        )
+        .is_err());
     }
 
     #[test]
@@ -412,14 +404,12 @@ mod tests {
             "---\ndev_model_used: TBD\n---\n### Agent Model Used\n\n### Completion Notes List\n\n### File List\n\n",
         );
         let sprint = sprint_with("5-5-wip", "in-progress");
-        assert!(
-            run(
-                dir.path().to_str().unwrap(),
-                sprint.path().to_str().unwrap(),
-                false,
-                false,
-            )
-            .is_ok()
-        );
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.path().to_str().unwrap(),
+            false,
+            false,
+        )
+        .is_ok());
     }
 }

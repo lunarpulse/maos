@@ -244,9 +244,7 @@ fn payload_to_wit(p: &domain::FramePayload) -> wit::FramePayload {
         Retract(b) => wit::FramePayload::Retract(wit::RetractBody {
             original_frame_id: b.original_frame_id.to_vec(),
             reason: b.reason.clone(),
-            original_kind: b.original_kind.map(|k| {
-                frame_kind_to_wit(k)
-            }),
+            original_kind: b.original_kind.map(|k| frame_kind_to_wit(k)),
         }),
         ConsentRupture(b) => wit::FramePayload::ConsentRupture(wit::ConsentRuptureBody {
             rupture_id: b.rupture_id.to_vec(),
@@ -292,13 +290,16 @@ fn payload_from_wit(p: wit::FramePayload) -> Result<domain::FramePayload, Bridge
                 .collect(),
             success_criteria: b.success_criteria,
             posture_preferences: posture_prefs_from_wit(b.posture_preferences),
-            prior_distillate_ref: b.prior_distillate_ref.map(|r| {
-                Ok::<_, BridgeError>(domain::PriorDistillateRef {
-                    digest_frame_id: frame_id_from_vec(r.digest_frame_id)?,
-                    distillation_depth: r.distillation_depth,
-                    intent_lineage: Default::default(),
+            prior_distillate_ref: b
+                .prior_distillate_ref
+                .map(|r| {
+                    Ok::<_, BridgeError>(domain::PriorDistillateRef {
+                        digest_frame_id: frame_id_from_vec(r.digest_frame_id)?,
+                        distillation_depth: r.distillation_depth,
+                        intent_lineage: Default::default(),
+                    })
                 })
-            }).transpose()?,
+                .transpose()?,
         }),
         wit::FramePayload::TaskComplete(b) => D::TaskComplete(domain::TaskCompletePayload {
             result: b.result_text,
@@ -318,12 +319,10 @@ fn payload_from_wit(p: wit::FramePayload) -> Result<domain::FramePayload, Bridge
             policy_id: b.policy_id,
             derived_from: b.derived_from,
         }),
-        wit::FramePayload::TelemetryEvent(b) => {
-            D::TelemetryEvent(domain::TelemetryEventPayload {
-                event_type: b.event_type,
-                data: b.data,
-            })
-        }
+        wit::FramePayload::TelemetryEvent(b) => D::TelemetryEvent(domain::TelemetryEventPayload {
+            event_type: b.event_type,
+            data: b.data,
+        }),
         wit::FramePayload::ConsentRequest(b) => D::ConsentRequest(domain::ConsentRequestPayload {
             capability: b.capability,
         }),

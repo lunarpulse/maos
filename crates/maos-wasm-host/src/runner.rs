@@ -141,7 +141,10 @@ const COMPILE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 fn run(args: RunnerArgs) -> Result<(), RunError> {
     let wasm_bytes = std::fs::read(&args.component_path).map_err(|e| {
-        RunError::InvalidComponent(format!("cannot read component '{}': {e}", args.component_path))
+        RunError::InvalidComponent(format!(
+            "cannot read component '{}': {e}",
+            args.component_path
+        ))
     })?;
 
     let mut engine_config = Config::new();
@@ -240,8 +243,9 @@ fn pump_frames<T>(
             Err(e) => return Err(RunError::Other(format!("stdin read error: {e}"))),
         };
 
-        let domain_frame: maos_domain::frame::IacFrame = maos_wasm_host::codec::decode_cbor(&frame_bytes)
-            .map_err(|e| RunError::Other(format!("inbound frame decode error: {e}")))?;
+        let domain_frame: maos_domain::frame::IacFrame =
+            maos_wasm_host::codec::decode_cbor(&frame_bytes)
+                .map_err(|e| RunError::Other(format!("inbound frame decode error: {e}")))?;
 
         let wit_frame = maos_wasm_host::frame_bridge::lower(&domain_frame);
 

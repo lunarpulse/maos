@@ -11,7 +11,7 @@
 //! All crypto delegated to `maos_audit::release_verify`.
 
 use maos_audit::release_verify::{
-    RELEASE_PUBKEY, parse_sha256sums, sign_sha256sums, verify_release,
+    parse_sha256sums, sign_sha256sums, verify_release, RELEASE_PUBKEY,
 };
 use maos_domain::audit_key::parse_seed_bytes;
 use std::path::Path;

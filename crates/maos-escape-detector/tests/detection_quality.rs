@@ -84,12 +84,16 @@ fn detection_quality_meets_floor_and_ceiling_on_real_seccomp() {
     {
         let spec = t2_spec("test-spirit-fp-benign");
         let mut cmd = Command::new("/bin/true");
-        if let Some(mut child) =
-            skip_if_sandbox_unavailable(spawn_sandboxed(&spec, &mut cmd), "detection_quality_benign")
-        {
+        if let Some(mut child) = skip_if_sandbox_unavailable(
+            spawn_sandboxed(&spec, &mut cmd),
+            "detection_quality_benign",
+        ) {
             let status = child.wait().expect("wait benign");
             assert!(status.success(), "benign /bin/true must complete under T2");
-            assert!(classify_exit(status).is_none(), "clean exit is not a violation");
+            assert!(
+                classify_exit(status).is_none(),
+                "clean exit is not a violation"
+            );
             benign_observed = true;
         }
     }
@@ -108,10 +112,22 @@ fn detection_quality_meets_floor_and_ceiling_on_real_seccomp() {
     }
 
     let manifests = vec![
-        ManifestDeclaration { spirit_pid: 5001, declared_tier: 2, anticipated_kill: false },
-        ManifestDeclaration { spirit_pid: 5002, declared_tier: 2, anticipated_kill: false },
+        ManifestDeclaration {
+            spirit_pid: 5001,
+            declared_tier: 2,
+            anticipated_kill: false,
+        },
+        ManifestDeclaration {
+            spirit_pid: 5002,
+            declared_tier: 2,
+            anticipated_kill: false,
+        },
         // The anticipated kill: the manifest declared this kill was expected.
-        ManifestDeclaration { spirit_pid: 6001, declared_tier: 2, anticipated_kill: true },
+        ManifestDeclaration {
+            spirit_pid: 6001,
+            declared_tier: 2,
+            anticipated_kill: true,
+        },
     ];
     let anomalies = Detector::detect(&db_path, &manifests).expect("detect over real-seccomp TL");
 
@@ -128,8 +144,14 @@ fn detection_quality_meets_floor_and_ceiling_on_real_seccomp() {
         .count() as f64;
     let fp_rate = fp_anomalies / fp_cases;
 
-    assert!(tp_rate >= TP_FLOOR, "TP-rate {tp_rate:.3} below floor {TP_FLOOR}");
-    assert!(fp_rate <= FP_CEILING, "FP-rate {fp_rate:.3} above ceiling {FP_CEILING}");
+    assert!(
+        tp_rate >= TP_FLOOR,
+        "TP-rate {tp_rate:.3} below floor {TP_FLOOR}"
+    );
+    assert!(
+        fp_rate <= FP_CEILING,
+        "FP-rate {fp_rate:.3} above ceiling {FP_CEILING}"
+    );
 
     // Measurement marker — the gate's detection-quality leg requires this string
     // to consider the leg GREEN (a silent seccomp-unavailable skip emits none).
@@ -238,11 +260,31 @@ fn correlation_quality_on_structural_rows() {
     );
 
     let manifests = vec![
-        ManifestDeclaration { spirit_pid: 8001, declared_tier: 2, anticipated_kill: false },
-        ManifestDeclaration { spirit_pid: 8002, declared_tier: 2, anticipated_kill: false },
-        ManifestDeclaration { spirit_pid: 8003, declared_tier: 2, anticipated_kill: false },
-        ManifestDeclaration { spirit_pid: 8004, declared_tier: 2, anticipated_kill: true },
-        ManifestDeclaration { spirit_pid: 8005, declared_tier: 2, anticipated_kill: false },
+        ManifestDeclaration {
+            spirit_pid: 8001,
+            declared_tier: 2,
+            anticipated_kill: false,
+        },
+        ManifestDeclaration {
+            spirit_pid: 8002,
+            declared_tier: 2,
+            anticipated_kill: false,
+        },
+        ManifestDeclaration {
+            spirit_pid: 8003,
+            declared_tier: 2,
+            anticipated_kill: false,
+        },
+        ManifestDeclaration {
+            spirit_pid: 8004,
+            declared_tier: 2,
+            anticipated_kill: true,
+        },
+        ManifestDeclaration {
+            spirit_pid: 8005,
+            declared_tier: 2,
+            anticipated_kill: false,
+        },
     ];
     let anomalies = Detector::detect(&db_path, &manifests).expect("detect over structural rows");
 
@@ -261,8 +303,14 @@ fn correlation_quality_on_structural_rows() {
     let fp_anomalies = anomalies.iter().filter(|a| !is_tp(a.spirit_pid)).count() as f64;
     let fp_rate = fp_anomalies / fp_cases;
 
-    assert!(tp_rate >= TP_FLOOR, "TP-rate {tp_rate:.3} below floor {TP_FLOOR}");
-    assert!(fp_rate <= FP_CEILING, "FP-rate {fp_rate:.3} above ceiling {FP_CEILING}");
+    assert!(
+        tp_rate >= TP_FLOOR,
+        "TP-rate {tp_rate:.3} below floor {TP_FLOOR}"
+    );
+    assert!(
+        fp_rate <= FP_CEILING,
+        "FP-rate {fp_rate:.3} above ceiling {FP_CEILING}"
+    );
 
     // Measurement marker (AFTER the asserts — only a genuine pass emits it). The
     // gate's detection-quality leg requires this string to consider the leg GREEN.

@@ -126,7 +126,10 @@ fn cbor_boundary_values() {
     let enc_24 = codec::encode_cbor(&val_24).unwrap();
 
     // 23 fits in one-byte CBOR; 24 requires two bytes
-    assert!(enc_23.len() < enc_24.len(), "CBOR 23 should be shorter than 24");
+    assert!(
+        enc_23.len() < enc_24.len(),
+        "CBOR 23 should be shorter than 24"
+    );
 
     let dec_23: u64 = codec::decode_cbor(&enc_23).unwrap();
     let dec_24: u64 = codec::decode_cbor(&enc_24).unwrap();
@@ -143,7 +146,10 @@ fn cbor_boundary_255_256() {
     let enc_255 = codec::encode_cbor(&val_255).unwrap();
     let enc_256 = codec::encode_cbor(&val_256).unwrap();
 
-    assert!(enc_255.len() < enc_256.len(), "CBOR 255 should be shorter than 256");
+    assert!(
+        enc_255.len() < enc_256.len(),
+        "CBOR 255 should be shorter than 256"
+    );
 
     let dec_255: u64 = codec::decode_cbor(&enc_255).unwrap();
     let dec_256: u64 = codec::decode_cbor(&enc_256).unwrap();

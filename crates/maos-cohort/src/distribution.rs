@@ -92,7 +92,12 @@ impl CohortDistributor {
     ) -> Result<IacFrame, CohortError> {
         let payload = control.telemetry_payload()?;
         let mut frame_id = [0u8; 16];
-        frame_id[8..].copy_from_slice(&self.next_frame_id.fetch_add(1, Ordering::Relaxed).to_be_bytes());
+        frame_id[8..].copy_from_slice(
+            &self
+                .next_frame_id
+                .fetch_add(1, Ordering::Relaxed)
+                .to_be_bytes(),
+        );
         let recipient = FrameAddress {
             spirit_id: self.from.spirit_id.clone(),
             host_id: Some(peer.clone()),

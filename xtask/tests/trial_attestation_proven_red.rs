@@ -14,18 +14,16 @@
 use maos_audit::release_verify::{generate_sha256sums, sign_sha256sums};
 use maos_eval::trial_attestation::{
     derive_halt_recall, derive_participant_attestation, derive_reload_facts,
-    derive_sbom_from_sources, derive_signing_chain, recompute_cargo_tree_locked,
-    sha256_hex, DerivationInputs, HaltRecallCounts, HermeticityReport,
-    PROXY_COHORT_LABEL, ReloadExecutionReport, ReportedParticipantFacts,
+    derive_sbom_from_sources, derive_signing_chain, recompute_cargo_tree_locked, sha256_hex,
+    DerivationInputs, HaltRecallCounts, HermeticityReport, ReloadExecutionReport,
+    ReportedParticipantFacts, PROXY_COHORT_LABEL,
 };
 use maos_fkcs::{AdmissionHarness, KernelFreezeProvenance, ProxyCohort, ProxySpirit};
 
 fn lock_with(packages: &[(&str, &str)]) -> String {
     packages
         .iter()
-        .map(|(name, version)| {
-            format!("[[package]]\nname = \"{name}\"\nversion = \"{version}\"\n")
-        })
+        .map(|(name, version)| format!("[[package]]\nname = \"{name}\"\nversion = \"{version}\"\n"))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -81,7 +79,8 @@ fn valid_signature_derives_signing_chain_verified_true_at_real_ed25519_path() {
     let sha256sums = generate_sha256sums(&[("candidate.bin".to_string(), hash)]);
     let sig = sign_sha256sums(sha256sums.as_bytes(), &dev_seed());
 
-    let derivation = derive_signing_chain(sha256sums.as_bytes(), &sig, &[("candidate.bin", artifact)]);
+    let derivation =
+        derive_signing_chain(sha256sums.as_bytes(), &sig, &[("candidate.bin", artifact)]);
 
     assert!(
         derivation.signing_chain_verified,
@@ -116,10 +115,8 @@ fn tampered_and_wrong_key_signatures_derive_false_at_real_verify_path() {
     );
 
     // (b) valid signature over tampered SHA256SUMS content (hash changed).
-    let tampered_sums = generate_sha256sums(&[(
-        "candidate.bin".to_string(),
-        sha256_hex(b"different bytes"),
-    )]);
+    let tampered_sums =
+        generate_sha256sums(&[("candidate.bin".to_string(), sha256_hex(b"different bytes"))]);
     let content_tampered = derive_signing_chain(
         tampered_sums.as_bytes(),
         &sig,
@@ -158,7 +155,10 @@ fn empty_chinese_wall_proxy_cohort_is_na_not_a_vacuous_pass() {
         &AdmissionHarness::default(),
         &KernelFreezeProvenance::stable_at(KERNEL_BASELINE_LINES),
     );
-    assert!(empty.is_na, "an empty cohort must be is_na (never a vacuous pass)");
+    assert!(
+        empty.is_na,
+        "an empty cohort must be is_na (never a vacuous pass)"
+    );
     assert_eq!(empty.cohort_label, PROXY_COHORT_LABEL);
 
     let cohort = ProxyCohort::new(vec![ProxySpirit::conformance("proxy-1")]).evaluate(
@@ -189,8 +189,8 @@ fn producer_gate_json_reports_non_vacuous_legs_and_v2_0_blocking_disposition() {
         "check-trial-attestation should pass; stderr: {}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let json: serde_json::Value =
-        serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).expect("gate emits one JSON object");
+    let json: serde_json::Value = serde_json::from_str(&String::from_utf8_lossy(&out.stdout))
+        .expect("gate emits one JSON object");
 
     assert_eq!(json["gate"], "check-trial-attestation");
     assert_eq!(
@@ -201,7 +201,10 @@ fn producer_gate_json_reports_non_vacuous_legs_and_v2_0_blocking_disposition() {
     let legs = json["legs"]
         .as_array()
         .expect("legs is a JSON array of falsifier results");
-    assert!(!legs.is_empty(), "the gate must carry minimum falsifier legs");
+    assert!(
+        !legs.is_empty(),
+        "the gate must carry minimum falsifier legs"
+    );
     for leg in legs {
         let label = leg["label"].as_str().unwrap_or("<unnamed>");
         let ran = leg["ran"].as_bool().unwrap_or(false);
@@ -389,5 +392,8 @@ fn self_report_ignored_when_real_signing_derivation_contradicts_forged_self_repo
         "derived signing_chain_verified=false must win over the forged self-report"
     );
     assert!(!record.success);
-    assert!(record.ignored_self_report, "the forged self-report must be flagged ignored");
+    assert!(
+        record.ignored_self_report,
+        "the forged self-report must be flagged ignored"
+    );
 }

@@ -366,11 +366,10 @@ mod tests {
         write_stability(tmp.path(), NON_STUB_FENCE);
         let r = check_export_control(tmp.path());
         assert!(!r.passed);
-        assert!(
-            r.failures
-                .iter()
-                .any(|f| f.contains("eccn-classification.md not found"))
-        );
+        assert!(r
+            .failures
+            .iter()
+            .any(|f| f.contains("eccn-classification.md not found")));
     }
 
     #[test]

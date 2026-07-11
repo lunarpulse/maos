@@ -304,12 +304,10 @@ mod tests {
             ],
             Language::Rust,
         );
-        assert!(
-            rendered
-                .get("lib.rs")
-                .unwrap()
-                .contains("pub struct ExampleSpirit;")
-        );
+        assert!(rendered
+            .get("lib.rs")
+            .unwrap()
+            .contains("pub struct ExampleSpirit;"));
     }
 
     #[test]

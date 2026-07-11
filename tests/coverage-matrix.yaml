@@ -260,7 +260,12 @@ coverage:
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
-    notes: J3 §10.7.1 cohort-mesh primary; traced with FR21-26 and FR52-54.
+    notes: |
+      J3 §10.7.1 cohort-mesh primary; traced with FR21-26 and FR52-54.
+      Story 12.2 adds ADR-012 confused-deputy per-(peer,role) consent legs
+      (role-mismatch-on-allowed-peer, acting-role-exact-match, entitlement-parse,
+      entitlement-accept, manifest-skew-cause, fail-closed-none,
+      reserved-intent-passes) to check-cohort-mesh.
   FR22:
     gates: []
     corpora: []
@@ -502,21 +507,30 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   FR52:
-    gates: []
+    gates: [check-cohort-mesh]
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: |
+      J3 §10.7.1 + ADR-012 confused-deputy anchor. Story 12.2 per-(peer,role)
+      consent evaluated at both A2A seams; accept seam is the binding control.
   FR53:
-    gates: []
+    gates: [check-cohort-mesh]
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: |
+      J3 §10.7.1 + ADR-012/ADR-054 anchor. Story 12.2 acting-role exact match
+      (never any-role OR) + explicit entitlement refusal.
   FR54:
-    gates: []
+    gates: [check-cohort-mesh]
     enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: |
+      J3 §10.7.1 + ADR-054 anchor. Story 12.2 version-skew fail-closed
+      (ECohortManifestSkew, |Δv|>1) and fail-closed-on-absent role/version.
   FR55:
     gates:
     - check-service-boundary

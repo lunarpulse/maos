@@ -1,11 +1,15 @@
 #![forbid(unsafe_code)]
 
-use maos_a2a_core::{CohortManifestGate, CohortReissueDisposition, CohortReissueRejection};
+use maos_a2a_core::{
+    CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
+    CohortReissueDisposition, CohortReissueRejection,
+};
 use maos_spirit_abi::identity::HostId;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::audit::{CohortAuditEvent, CohortAuditSink};
+use crate::consent::{accept_admits, send_context, OutboundConsentContext};
 use crate::control::CohortManifestControl;
 use crate::error::{CohortError, CohortManifestForkReason};
 use crate::manifest::CohortManifest;
@@ -115,6 +119,43 @@ impl CohortManifestState {
             .map_err(|_| CohortError::EStatePoisoned)?
             .manifest
             .version)
+    }
+
+    pub(crate) fn accept_consent(
+        &self,
+        sender_peer: &str,
+        acting_role: Option<&str>,
+        intent: &str,
+        sender_version: Option<u64>,
+    ) -> Result<(), CohortError> {
+        let cached = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        accept_admits(
+            &cached.manifest,
+            sender_peer,
+            acting_role,
+            intent,
+            sender_version,
+        )
+    }
+
+    pub(crate) fn outbound_consent_context(
+        &self,
+        receiver_peer: &str,
+        intent: &str,
+    ) -> Result<OutboundConsentContext, CohortError> {
+        let cached = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        send_context(
+            &cached.manifest,
+            self.local_host.as_str(),
+            receiver_peer,
+            intent,
+        )
     }
 
     pub fn canonical_hash(&self) -> Result<[u8; 32], CohortError> {
@@ -352,24 +393,92 @@ pub enum ReissueOutcome {
 }
 
 impl CohortManifestGate for CohortManifestState {
-    fn is_current(&self, peer: &HostId) -> bool {
-        let Ok(cached) = self.cached.lock() else {
-            return false;
+    fn consent_decision(
+        &self,
+        seam: CohortConsentSeam,
+        counterparty: &HostId,
+        acting_role: Option<&str>,
+        intent: &str,
+        sender_manifest_version: Option<u64>,
+    ) -> CohortConsentVerdict {
+        let cached = match self.cached.lock() {
+            Ok(cached) => cached,
+            Err(_) => return CohortConsentVerdict::Deny(CohortConsentDenial::StateUnavailable),
         };
-        self.clock
+        let manifest = &cached.manifest;
+
+        // A peer outside the roster is a mixed-deployment bilateral path, not a
+        // cohort denial. This preserves the legacy defer behavior.
+        if !manifest
+            .members
+            .iter()
+            .any(|member| member.host_id == counterparty.as_str())
+        {
+            return CohortConsentVerdict::Defer;
+        }
+        let current = self
+            .clock
             .now_secs()
             .saturating_sub(cached.confirmed_at_secs)
-            <= cached.manifest.t_stale_secs
-            && cached
-                .manifest
+            <= manifest.t_stale_secs
+            && manifest
                 .members
                 .iter()
-                .any(|member| member.host_id == self.local_host.as_str())
-            && cached
-                .manifest
-                .members
-                .iter()
-                .any(|member| member.host_id == peer.as_str())
+                .any(|member| member.host_id == self.local_host.as_str());
+        if !current {
+            return CohortConsentVerdict::NotCurrent;
+        }
+
+        let decision = match seam {
+            CohortConsentSeam::Send => send_context(
+                manifest,
+                self.local_host.as_str(),
+                counterparty.as_str(),
+                intent,
+            )
+            .map(|context| CohortConsentVerdict::AdmitOutbound {
+                acting_role: context.acting_role,
+                manifest_version: context.manifest_version,
+            }),
+            CohortConsentSeam::Accept => accept_admits(
+                manifest,
+                counterparty.as_str(),
+                acting_role,
+                intent,
+                sender_manifest_version,
+            )
+            .map(|()| CohortConsentVerdict::Admit),
+        };
+        match decision {
+            Ok(verdict) => verdict,
+            Err(CohortError::EConsentPeerNotMember { ref peer, .. })
+                if peer == counterparty.as_str() =>
+            {
+                CohortConsentVerdict::Defer
+            }
+            Err(CohortError::EConsentActingRoleAbsent) => {
+                CohortConsentVerdict::Deny(CohortConsentDenial::ActingRoleAbsent)
+            }
+            Err(CohortError::EConsentManifestVersionAbsent) => {
+                CohortConsentVerdict::Deny(CohortConsentDenial::ManifestVersionAbsent)
+            }
+            Err(CohortError::EConsentRoleNotEntitled { .. }) => {
+                CohortConsentVerdict::Deny(CohortConsentDenial::RoleNotEntitled)
+            }
+            Err(CohortError::EConsentTupleDenied { .. }) => {
+                CohortConsentVerdict::Deny(CohortConsentDenial::NoGrant)
+            }
+            Err(CohortError::ECohortManifestSkew {
+                sender_version,
+                receiver_version,
+                delta,
+            }) => CohortConsentVerdict::Deny(CohortConsentDenial::ManifestSkew {
+                sender_version,
+                receiver_version,
+                delta,
+            }),
+            Err(_) => CohortConsentVerdict::Deny(CohortConsentDenial::StateUnavailable),
+        }
     }
 
     fn apply_reissue(
@@ -418,7 +527,7 @@ mod tests {
     use super::*;
     use crate::audit::InMemoryCohortAuditSink;
     use crate::manifest::{
-        CohortAuthority, CohortMember, ConsentMatrix, ManifestSignature,
+        CohortAuthority, CohortMember, ConsentMatrix, ConsentTuple, ManifestSignature,
         RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
     };
 
@@ -489,6 +598,77 @@ mod tests {
         .unwrap()
     }
 
+    fn consent_state(version: u64, signer: &SigningKey) -> CohortManifestState {
+        let manifest = CohortManifest {
+            schema_version: SCHEMA_VERSION,
+            cohort_id: "consent-state".into(),
+            version,
+            authority: CohortAuthority {
+                threshold: 1,
+                keys: vec![hex::encode(signer.verifying_key().to_bytes())],
+            },
+            members: vec![
+                CohortMember {
+                    host_id: "host-a".into(),
+                    fingerprint: format!("sha256:{}", "aa".repeat(32)),
+                    roles: vec!["architect".into()],
+                },
+                CohortMember {
+                    host_id: "host-b".into(),
+                    fingerprint: format!("sha256:{}", "bb".repeat(32)),
+                    roles: vec!["receiver".into()],
+                },
+            ],
+            consent: ConsentMatrix {
+                send: vec![ConsentTuple {
+                    peer: "host-b".into(),
+                    role: "receiver".into(),
+                    intent: "cohort-work:write".into(),
+                }],
+                accept: vec![ConsentTuple {
+                    peer: "host-a".into(),
+                    role: "architect".into(),
+                    intent: "cohort-work:write".into(),
+                }],
+            },
+            reserved_intents: vec![
+                RESERVED_INTENT_REISSUE.into(),
+                RESERVED_INTENT_HALT_RECEIPT.into(),
+            ],
+            t_stale_secs: 120,
+            signature: ManifestSignature { sig: String::new() },
+        }
+        .signed_with(signer);
+        let pins = PinnedAuthorityKeys::from_keys(vec![signer.verifying_key()]).unwrap();
+        CohortManifestState::load(
+            HostId("host-b".into()),
+            &toml::to_string(&manifest).unwrap(),
+            pins,
+            Arc::new(InMemoryCohortAuditSink::default()),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn consent_reads_the_live_manifest_version_for_each_frame() {
+        let signer = signing_key(14);
+        let state = consent_state(4, &signer);
+        state
+            .accept_consent("host-a", Some("architect"), "cohort-work:write", Some(4))
+            .expect("same-version frame admits");
+
+        let replacement = consent_state(6, &signer).signed_toml().unwrap();
+        state.apply_reissue(&replacement).unwrap();
+        assert!(matches!(
+            state.accept_consent("host-a", Some("architect"), "cohort-work:write", Some(4),),
+            Err(CohortError::ECohortManifestSkew {
+                sender_version: 4,
+                receiver_version: 6,
+                delta: 2,
+            })
+        ));
+    }
+
     #[test]
     fn applies_higher_verified_reissue_after_auditing() {
         let signer = signing_key(7);
@@ -509,12 +689,20 @@ mod tests {
     }
 
     #[test]
-    fn peer_absent_from_current_manifest_is_revoked_mesh_wide() {
+    fn peer_absent_from_current_manifest_defers_to_bilateral_path() {
         let signer = signing_key(13);
         let state = state(1, &signer, Arc::new(InMemoryCohortAuditSink::default()));
-        assert!(
-            !CohortManifestGate::is_current(&state, &HostId("host-b".into())),
-            "a peer absent from the accepted roster must be denied while the manifest is fresh"
+        assert_eq!(
+            CohortManifestGate::consent_decision(
+                &state,
+                CohortConsentSeam::Send,
+                &HostId("host-b".into()),
+                None,
+                "cohort-work:write",
+                None,
+            ),
+            CohortConsentVerdict::Defer,
+            "an unknown peer remains eligible for the legacy bilateral path"
         );
     }
 

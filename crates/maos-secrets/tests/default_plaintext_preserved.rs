@@ -48,7 +48,8 @@ const MASTER_KEY_A: [u8; 32] = [0xA1; 32];
 
 /// A row-like plaintext payload — mirrors a loom-lite Collective / audit TL row
 /// that, under Option-A, is stored byte-for-byte on disk.
-const PAYLOAD: &[u8] = b"{\"region\":\"default\",\"spirit_pid\":7,\"row\":\"option-a-plaintext-default\"}";
+const PAYLOAD: &[u8] =
+    b"{\"region\":\"default\",\"spirit_pid\":7,\"row\":\"option-a-plaintext-default\"}";
 
 fn crypto() -> RingCryptoProvider {
     RingCryptoProvider

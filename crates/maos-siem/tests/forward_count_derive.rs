@@ -117,13 +117,11 @@ fn empty_tl_reports_forwarded_count_none_not_a_green_zero() {
     // regression behind a green zero. `None` forces an explicit unmeasured
     // disposition; returning `Some(_)` for an empty TL reddens this assertion.
     assert_eq!(
-        report.forwarded_count,
-        None,
+        report.forwarded_count, None,
         "an empty TL must report forwarded_count == None (N/A), NOT Some(0) — a \
          green zero hides a silent-no-op export regression: {report:?}"
     );
 }
-
 
 #[test]
 fn non_empty_tl_with_zero_filter_matches_reports_some_zero_not_none() {

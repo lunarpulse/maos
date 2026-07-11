@@ -27,7 +27,8 @@ pub const HALT_RECALL_FLOOR: f64 = 0.85;
 /// Relative path to the producer-emitted, producer-signed per-participant derived
 /// attestations consumed by `check-third-party-trial` at v2.0. The producer
 /// (`check-trial-attestation`) writes this; the consumer verifies each signature.
-pub const DERIVED_ATTESTATIONS_PATH: &str = "docs/third-party-trial/results/derived-attestations.json";
+pub const DERIVED_ATTESTATIONS_PATH: &str =
+    "docs/third-party-trial/results/derived-attestations.json";
 
 // ─── Producer signing keypair (D1 — binds the seam; mirrors release_verify's
 //     dev_seed/RELEASE_PUBKEY split) ──────────────────────────────────────────
@@ -207,7 +208,10 @@ impl PackageId {
     }
 }
 
-pub fn derive_sbom_from_sources(declared_cargo_lock: &str, recomputed_cargo_tree: &str) -> SbomDerivation {
+pub fn derive_sbom_from_sources(
+    declared_cargo_lock: &str,
+    recomputed_cargo_tree: &str,
+) -> SbomDerivation {
     derive_sbom_with_policy(
         declared_cargo_lock,
         recomputed_cargo_tree,
@@ -232,7 +236,11 @@ pub fn derive_sbom_with_policy(
         .collect::<BTreeSet<_>>();
     let forbidden_in_closure = recomputed_packages
         .iter()
-        .filter(|pkg| forbidden_crates.iter().any(|forbidden| *forbidden == pkg.name))
+        .filter(|pkg| {
+            forbidden_crates
+                .iter()
+                .any(|forbidden| *forbidden == pkg.name)
+        })
         .map(|pkg| pkg.name.clone())
         .collect::<BTreeSet<_>>();
     let closure_policy_passed = forbidden_in_closure.is_empty();
@@ -342,9 +350,7 @@ fn parse_cargo_tree_line(line: &str) -> Option<PackageId> {
     // The version is the first `vX.Y.Z`-shaped token; strip a trailing `(*)`
     // marker and ignore build metadata for reconciliation (name+version only).
     let version_token = tokens.find(|token| {
-        token.starts_with('v')
-            && token.len() > 1
-            && token.as_bytes()[1].is_ascii_digit()
+        token.starts_with('v') && token.len() > 1 && token.as_bytes()[1].is_ascii_digit()
     })?;
     let version = version_token
         .trim_start_matches('v')
@@ -434,12 +440,8 @@ pub fn derive_halt_recall_from_onboarding_score(
     input: &crate::onboarding_gate_corpus::CandidateInput,
     observations: Option<&BTreeMap<String, bool>>,
 ) -> HaltRecallDerivation {
-    let outcome = crate::onboarding_gate_corpus::score_candidate(
-        corpus,
-        resolved,
-        input,
-        observations,
-    );
+    let outcome =
+        crate::onboarding_gate_corpus::score_candidate(corpus, resolved, input, observations);
     // If the class-appropriate corpus subset has zero expected-halt scenarios,
     // there is nothing to measure: score_candidate's ratio-or-one would yield a
     // vacuous 1.0 (the L5 trap). Treat that as not-measured (below floor), not a
@@ -509,7 +511,9 @@ pub struct DerivationInputs<'a> {
     pub reported: Option<ReportedParticipantFacts>,
 }
 
-pub fn derive_participant_attestation(inputs: DerivationInputs<'_>) -> DerivedParticipantAttestation {
+pub fn derive_participant_attestation(
+    inputs: DerivationInputs<'_>,
+) -> DerivedParticipantAttestation {
     let halt_ok = inputs.halt.measured
         && inputs.halt.halt_recall.is_finite()
         && inputs.halt.halt_recall >= HALT_RECALL_FLOOR
@@ -615,7 +619,9 @@ pub struct TrialAttestationSummary {
     pub provenance_stamp: String,
 }
 
-pub fn summarize_attestations(records: &[DerivedParticipantAttestation]) -> TrialAttestationSummary {
+pub fn summarize_attestations(
+    records: &[DerivedParticipantAttestation],
+) -> TrialAttestationSummary {
     TrialAttestationSummary {
         participants_total: records.len(),
         derived_successes: records.iter().filter(|record| record.success).count(),
@@ -676,10 +682,14 @@ fn parse_signature_hex(hex: &str) -> Option<[u8; 64]> {
     Some(out)
 }
 
-pub fn sign_attestation(attestation: &DerivedParticipantAttestation, seed: &[u8; 32]) -> SignedAttestation {
+pub fn sign_attestation(
+    attestation: &DerivedParticipantAttestation,
+    seed: &[u8; 32],
+) -> SignedAttestation {
     // Serialization of a DerivedParticipantAttestation is infallible in practice
     // (all fields are finite JSON types); surface the error rather than panic.
-    let bytes = canonical_attestation_bytes(attestation).expect("infallible canonical serialization");
+    let bytes =
+        canonical_attestation_bytes(attestation).expect("infallible canonical serialization");
     let sig = sign_sha256sums(&bytes, seed);
     SignedAttestation {
         attestation: attestation.clone(),
@@ -713,18 +723,15 @@ pub fn emit_signed_attestations(
     seed: &[u8; 32],
     path: &Path,
 ) -> Result<(), String> {
-    let signed: Vec<SignedAttestation> = records
-        .iter()
-        .map(|r| sign_attestation(r, &seed))
-        .collect();
+    let signed: Vec<SignedAttestation> =
+        records.iter().map(|r| sign_attestation(r, &seed)).collect();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
     }
     let json = serde_json::to_vec_pretty(&signed)
         .map_err(|e| format!("cannot serialize signed attestations: {e}"))?;
-    std::fs::write(path, &json)
-        .map_err(|e| format!("cannot write {}: {e}", path.display()))
+    std::fs::write(path, &json).map_err(|e| format!("cannot write {}: {e}", path.display()))
 }
 
 #[cfg(test)]
@@ -735,7 +742,9 @@ mod tests {
     fn lock_with(packages: &[(&str, &str)]) -> String {
         packages
             .iter()
-            .map(|(name, version)| format!("[[package]]\nname = \"{name}\"\nversion = \"{version}\"\n"))
+            .map(|(name, version)| {
+                format!("[[package]]\nname = \"{name}\"\nversion = \"{version}\"\n")
+            })
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -744,7 +753,12 @@ mod tests {
 
     #[maos_spirit_sdk::spirit]
     impl TrialReloadSpirit {
-        fn on_frame(&self, _ctx: &mut maos_spirit_sdk::Ctx, _payload: &maos_spirit_sdk::FramePayload<'_>) {}
+        fn on_frame(
+            &self,
+            _ctx: &mut maos_spirit_sdk::Ctx,
+            _payload: &maos_spirit_sdk::FramePayload<'_>,
+        ) {
+        }
     }
 
     fn frame_fixture(frames: usize) -> maos_spirit_sdk::local_runner::LocalRunnerFixture {
@@ -823,24 +837,39 @@ mod tests {
             "candidate.bin".to_string(),
             sha256_hex(artifact),
         )]);
-        let good_sig = maos_audit::release_verify::sign_sha256sums(manifest.as_bytes(), &dev_seed());
-        let good = derive_signing_chain(manifest.as_bytes(), &good_sig, &[("candidate.bin", artifact)]);
+        let good_sig =
+            maos_audit::release_verify::sign_sha256sums(manifest.as_bytes(), &dev_seed());
+        let good = derive_signing_chain(
+            manifest.as_bytes(),
+            &good_sig,
+            &[("candidate.bin", artifact)],
+        );
         assert!(good.signing_chain_verified);
         assert_eq!(good.verified_manifest_entries, 1);
 
         let wrong_seed = [7u8; 32];
         let wrong_key_sig =
             maos_audit::release_verify::sign_sha256sums(manifest.as_bytes(), &wrong_seed);
-        let wrong = derive_signing_chain(manifest.as_bytes(), &wrong_key_sig, &[("candidate.bin", artifact)]);
+        let wrong = derive_signing_chain(
+            manifest.as_bytes(),
+            &wrong_key_sig,
+            &[("candidate.bin", artifact)],
+        );
         assert!(!wrong.signing_chain_verified);
 
         let mut tampered = good_sig;
         tampered[0] ^= 0x55;
-        let bad = derive_signing_chain(manifest.as_bytes(), &tampered, &[("candidate.bin", artifact)]);
+        let bad = derive_signing_chain(
+            manifest.as_bytes(),
+            &tampered,
+            &[("candidate.bin", artifact)],
+        );
         assert!(!bad.signing_chain_verified);
     }
 
-    fn class_appropriate_corpus(expected_halts: usize) -> crate::onboarding_gate_corpus::OnboardingCorpus {
+    fn class_appropriate_corpus(
+        expected_halts: usize,
+    ) -> crate::onboarding_gate_corpus::OnboardingCorpus {
         crate::onboarding_gate_corpus::OnboardingCorpus {
             meta: None,
             scenarios: (0..expected_halts)
@@ -874,18 +903,10 @@ mod tests {
         let low_obs = (0..20)
             .map(|idx| (format!("cc-{idx}"), idx < 16))
             .collect::<BTreeMap<_, _>>();
-        let green = derive_halt_recall_from_onboarding_score(
-            &corpus,
-            &resolved,
-            &input,
-            Some(&green_obs),
-        );
-        let low = derive_halt_recall_from_onboarding_score(
-            &corpus,
-            &resolved,
-            &input,
-            Some(&low_obs),
-        );
+        let green =
+            derive_halt_recall_from_onboarding_score(&corpus, &resolved, &input, Some(&green_obs));
+        let low =
+            derive_halt_recall_from_onboarding_score(&corpus, &resolved, &input, Some(&low_obs));
         assert_eq!(green.halt_recall, 0.85);
         assert!(green.meets_floor);
         assert_eq!(green.corpus_sha256, "corpus-sha");
@@ -947,10 +968,16 @@ mod tests {
         assert!(reconciliation.ignored_self_report);
         assert_eq!(
             reconciliation.field_mismatches,
-            vec!["halt_recall".to_string(), "signing_chain_verified".to_string()]
+            vec![
+                "halt_recall".to_string(),
+                "signing_chain_verified".to_string()
+            ]
         );
         assert!(reconcile_reported_successes(&[record.clone()], 1).is_err());
-        assert_eq!(reconcile_reported_successes(&[record.clone()], 0).unwrap(), 0);
+        assert_eq!(
+            reconcile_reported_successes(&[record.clone()], 0).unwrap(),
+            0
+        );
         assert!(record.ignored_self_report);
         assert!(!record.signing_chain_verified);
         assert!(!record.success);
@@ -962,8 +989,12 @@ mod tests {
         // not from hand-setting `load_accepted: false` on the report.
         let spirit = TrialReloadSpirit;
         let vtable = __maos_spirit_vtable_TrialReloadSpirit();
-        let zero_frames = derive_reload_facts_from_local_runner(&spirit, &vtable, &frame_fixture(0));
-        assert!(!zero_frames.binary_loads, "zero hook fires must derive binary_loads=false");
+        let zero_frames =
+            derive_reload_facts_from_local_runner(&spirit, &vtable, &frame_fixture(0));
+        assert!(
+            !zero_frames.binary_loads,
+            "zero hook fires must derive binary_loads=false"
+        );
         assert_eq!(zero_frames.frames_run, 0);
         assert!(!zero_frames.meets_frame_floor);
         // And a real 1000-frame load still derives green — the machinery is wired.
@@ -977,14 +1008,20 @@ mod tests {
         // constant string copied from an input field.
         let corpus = b"class-appropriate-corpus";
         let derived = derive_halt_recall(
-            HaltRecallCounts { true_positives: 17, false_negatives: 3 },
+            HaltRecallCounts {
+                true_positives: 17,
+                false_negatives: 3,
+            },
             corpus,
             true,
         );
         assert_eq!(derived.corpus_sha256, sha256_hex(corpus));
         // A different corpus yields a different SHA (not a fixed constant).
         let other = derive_halt_recall(
-            HaltRecallCounts { true_positives: 17, false_negatives: 3 },
+            HaltRecallCounts {
+                true_positives: 17,
+                false_negatives: 3,
+            },
             b"different-corpus",
             true,
         );
@@ -995,7 +1032,10 @@ mod tests {
     fn halt_recall_zero_denominator_is_not_measured_and_never_a_clean_pass() {
         // P10: zero denominator = "not measured" (measured=false, below floor), never a vacuous pass.
         let unmeasured = derive_halt_recall(
-            HaltRecallCounts { true_positives: 0, false_negatives: 0 },
+            HaltRecallCounts {
+                true_positives: 0,
+                false_negatives: 0,
+            },
             b"corpus",
             true,
         );
@@ -1014,7 +1054,10 @@ mod tests {
             candidate_cache: temp.path().join("missing-cache-1"),
         };
         let report = env_zero.assert_clean();
-        assert!(!report.clean, "zero-byte stale artifact must red hermeticity");
+        assert!(
+            !report.clean,
+            "zero-byte stale artifact must red hermeticity"
+        );
 
         let dangling = temp.path().join("dangling-link");
         #[cfg(unix)]
@@ -1037,7 +1080,10 @@ mod tests {
         );
         let tree = "maos v0.1.0 (/tmp/maos)\n|-- serde v1.0.0\n`-- tokio v1.0.0 (*)\n";
         let derived = derive_sbom_from_sources(&lock, tree);
-        assert!(derived.sbom_verified, "ASCII tree + BOM lock must reconcile cleanly");
+        assert!(
+            derived.sbom_verified,
+            "ASCII tree + BOM lock must reconcile cleanly"
+        );
     }
 
     #[test]
@@ -1054,10 +1100,24 @@ mod tests {
             produced_binary: true,
             artifact_bytes: b"candidate",
             hermeticity: &hermeticity,
-            reload: derive_reload_facts(ReloadExecutionReport { load_accepted: true, frames_executed: 1_000 }),
+            reload: derive_reload_facts(ReloadExecutionReport {
+                load_accepted: true,
+                frames_executed: 1_000,
+            }),
             sbom: &derive_sbom_from_sources(&lock_with(&[("maos", "0.1.0")]), "maos v0.1.0\n"),
-            signing: &SigningDerivation { signing_chain_verified: true, verified_manifest_entries: 1, error: None },
-            halt: &derive_halt_recall(HaltRecallCounts { true_positives: 17, false_negatives: 3 }, b"corpus", true),
+            signing: &SigningDerivation {
+                signing_chain_verified: true,
+                verified_manifest_entries: 1,
+                error: None,
+            },
+            halt: &derive_halt_recall(
+                HaltRecallCounts {
+                    true_positives: 17,
+                    false_negatives: 3,
+                },
+                b"corpus",
+                true,
+            ),
             reported: None,
         });
         let signed = sign_attestation(&record, &producer_signing_seed());

@@ -181,8 +181,12 @@ impl CohortManifest {
 
         // Authority keys: set semantics — sort the lowercased hex so key
         // declaration order never perturbs the signature.
-        let mut keys_sorted: Vec<String> =
-            self.authority.keys.iter().map(|k| k.to_lowercase()).collect();
+        let mut keys_sorted: Vec<String> = self
+            .authority
+            .keys
+            .iter()
+            .map(|k| k.to_lowercase())
+            .collect();
         keys_sorted.sort_unstable();
         buf.extend_from_slice(&(keys_sorted.len() as u32).to_be_bytes());
         for k in &keys_sorted {
@@ -251,7 +255,11 @@ impl CohortManifest {
         }
 
         // No duplicate host_id.
-        let mut seen_hosts: Vec<&str> = manifest.members.iter().map(|m| m.host_id.as_str()).collect();
+        let mut seen_hosts: Vec<&str> = manifest
+            .members
+            .iter()
+            .map(|m| m.host_id.as_str())
+            .collect();
         seen_hosts.sort_unstable();
         for w in seen_hosts.windows(2) {
             if w[0] == w[1] {
@@ -328,19 +336,11 @@ impl CohortManifest {
             }
         }
 
-        // Consent referential integrity (RR-min): peer ∈ members, role ∈
-        // declared roles, intent canonical. Apply to BOTH send and accept.
-        let member_host_ids: Vec<&str> =
-            manifest.members.iter().map(|m| m.host_id.as_str()).collect();
-        let declared_roles: Vec<&str> =
-            manifest.members.iter().flat_map(|m| m.roles.iter()).map(|r| r.as_str()).collect();
-        validate_consent_table("send", &manifest.consent.send, &member_host_ids, &declared_roles)?;
-        validate_consent_table(
-            "accept",
-            &manifest.consent.accept,
-            &member_host_ids,
-            &declared_roles,
-        )?;
+        // Every consent tuple binds the named peer to one of that same peer's
+        // declared roles. A cohort-wide role union would let one member borrow
+        // another member's authority.
+        validate_consent_table("send", &manifest.consent.send, &manifest.members)?;
+        validate_consent_table("accept", &manifest.consent.accept, &manifest.members)?;
 
         Ok(manifest)
     }
@@ -353,9 +353,8 @@ impl CohortManifest {
     /// NEVER a key carried in the manifest body, NEVER re-derived from the
     /// manifest's own declaration.
     pub fn verify_signature(&self, pinned: &PinnedAuthorityKeys) -> Result<(), CohortError> {
-        let sig_bytes = hex::decode(&self.signature.sig).map_err(|e| {
-            CohortError::EInvalidSignature(format!("bad hex ({e})"))
-        })?;
+        let sig_bytes = hex::decode(&self.signature.sig)
+            .map_err(|e| CohortError::EInvalidSignature(format!("bad hex ({e})")))?;
         let sig_arr: [u8; 64] = sig_bytes.as_slice().try_into().map_err(|_| {
             CohortError::EInvalidSignature(format!(
                 "expected 64 bytes (128 hex chars), got {} bytes",
@@ -398,10 +397,7 @@ impl CohortManifest {
     /// Determinism: edges are emitted in member declaration order; allowlist
     /// intents in declaration order. `self_host` MUST name a declared member,
     /// else [`CohortError::EHostNotMember`].
-    pub fn peer_configs_for(
-        &self,
-        self_host: &str,
-    ) -> Result<Vec<A2APeerConfig>, CohortError> {
+    pub fn peer_configs_for(&self, self_host: &str) -> Result<Vec<A2APeerConfig>, CohortError> {
         // The mesh is full-pairwise over DECLARED members only — `self_host`
         // must name one, else there is no position from which to project edges.
         if !self.members.iter().any(|m| m.host_id == self_host) {
@@ -488,31 +484,30 @@ fn canonicalize_consent_table(buf: &mut Vec<u8>, table: &[ConsentTuple]) {
     }
 }
 
-/// Referential-integrity + canonicality validation for one consent table
-/// (RR-min): each peer must be a member host_id, each role must be declared by
-/// some member, and each intent must be canonical.
+/// Referential-integrity + canonicality validation for one consent table:
+/// each peer must be a member, its role must be declared by that same member,
+/// and its intent must be canonical.
 fn validate_consent_table(
     direction: &str,
     table: &[ConsentTuple],
-    member_host_ids: &[&str],
-    declared_roles: &[&str],
+    members: &[CohortMember],
 ) -> Result<(), CohortError> {
-    for t in table {
-        if !member_host_ids.contains(&t.peer.as_str()) {
+    for tuple in table {
+        let Some(member) = members.iter().find(|member| member.host_id == tuple.peer) else {
             return Err(CohortError::EConsentPeerNotMember {
                 direction: direction.to_string(),
-                peer: t.peer.clone(),
+                peer: tuple.peer.clone(),
             });
-        }
-        if !declared_roles.contains(&t.role.as_str()) {
+        };
+        if !member.roles.iter().any(|role| role == &tuple.role) {
             return Err(CohortError::EConsentRoleUndeclared {
                 direction: direction.to_string(),
-                role: t.role.clone(),
+                role: tuple.role.clone(),
             });
         }
-        if !A2AIntent::new(&t.intent).is_canonical() {
+        if !A2AIntent::new(&tuple.intent).is_canonical() {
             return Err(CohortError::EIntentNotCanonical {
-                intent: t.intent.clone(),
+                intent: tuple.intent.clone(),
             });
         }
     }
@@ -570,12 +565,12 @@ mod tests {
             consent: ConsentMatrix {
                 send: vec![ConsentTuple {
                     peer: "host-b".to_string(),
-                    role: "coordinator".to_string(),
+                    role: "worker".to_string(),
                     intent: "diagnosis-handoff:read-only-evidence".to_string(),
                 }],
                 accept: vec![ConsentTuple {
                     peer: "host-a".to_string(),
-                    role: "worker".to_string(),
+                    role: "coordinator".to_string(),
                     intent: "code-mutation-directive".to_string(),
                 }],
             },
@@ -611,7 +606,9 @@ mod tests {
         // body canonicalization is identical regardless of the signature value.
         let mut m = signed_sample();
         let body_a = m.to_canonical_bytes();
-        m.signature = ManifestSignature { sig: "00".repeat(64) };
+        m.signature = ManifestSignature {
+            sig: "00".repeat(64),
+        };
         let body_b = m.to_canonical_bytes();
         assert_eq!(
             body_a, body_b,
@@ -719,7 +716,10 @@ mod tests {
         let err = CohortManifest::parse_and_validate(&toml_str, &pinned).unwrap_err();
         assert!(matches!(
             err,
-            CohortError::EUnsupportedSchemaVersion { got: 2, expected: 1 }
+            CohortError::EUnsupportedSchemaVersion {
+                got: 2,
+                expected: 1
+            }
         ));
     }
 
@@ -730,7 +730,10 @@ mod tests {
         let toml_str = toml::to_string(&m).unwrap();
         let pinned = pinned_authority();
         let err = CohortManifest::parse_and_validate(&toml_str, &pinned).unwrap_err();
-        assert!(matches!(err, CohortError::EVersionNotPositive { version: 0 }));
+        assert!(matches!(
+            err,
+            CohortError::EVersionNotPositive { version: 0 }
+        ));
     }
 
     #[test]
@@ -740,7 +743,9 @@ mod tests {
         let toml_str = toml::to_string(&m).unwrap();
         let pinned = pinned_authority();
         let err = CohortManifest::parse_and_validate(&toml_str, &pinned).unwrap_err();
-        assert!(matches!(err, CohortError::EDuplicateHostId { ref host_id } if host_id == "host-a"));
+        assert!(
+            matches!(err, CohortError::EDuplicateHostId { ref host_id } if host_id == "host-a")
+        );
     }
 
     #[test]
@@ -785,15 +790,18 @@ mod tests {
         // R1/RR5: declared authority key is absent from the pinned set.
         let mut m = signed_sample();
         m.authority.keys = vec![pubkey_hex(99)]; // not pinned
-        // Re-sign so the manifest is otherwise well-formed (signature will be
-        // irrelevant — parse rejects on the unpinned authority BEFORE verify).
+                                                 // Re-sign so the manifest is otherwise well-formed (signature will be
+                                                 // irrelevant — parse rejects on the unpinned authority BEFORE verify).
         let signed = m.signed_with(&signing_key(99));
         let toml_str = toml::to_string(&signed).unwrap();
         let pinned = pinned_authority();
         let err = CohortManifest::parse_and_validate(&toml_str, &pinned).unwrap_err();
         assert!(matches!(
             err,
-            CohortError::ECohortAuthorityUnpinned { unpinned_count: 1, .. }
+            CohortError::ECohortAuthorityUnpinned {
+                unpinned_count: 1,
+                ..
+            }
         ));
     }
 
@@ -804,8 +812,7 @@ mod tests {
         m.authority.keys = vec![pubkey_hex(1)]; // current
         let signed = m.signed_with(&signing_key(1));
         let toml_str = toml::to_string(&signed).unwrap();
-        let pinned =
-            PinnedAuthorityKeys::from_hex(&[pubkey_hex(1), pubkey_hex(2)]).unwrap(); // {current, next}
+        let pinned = PinnedAuthorityKeys::from_hex(&[pubkey_hex(1), pubkey_hex(2)]).unwrap(); // {current, next}
         let parsed = CohortManifest::parse_and_validate(&toml_str, &pinned).unwrap();
         parsed.verify_signature(&pinned).unwrap(); // signed by current → verifies
     }
@@ -831,7 +838,10 @@ mod tests {
         let toml_str = toml::to_string(&m).unwrap();
         let pinned = pinned_authority();
         let err = CohortManifest::parse_and_validate(&toml_str, &pinned).unwrap_err();
-        assert!(matches!(err, CohortError::ECohortStaleBoundViolation { .. }));
+        assert!(matches!(
+            err,
+            CohortError::ECohortStaleBoundViolation { .. }
+        ));
     }
 
     #[test]
@@ -894,6 +904,27 @@ mod tests {
     }
 
     #[test]
+    fn reject_consent_role_declared_only_by_different_peer() {
+        let mut manifest = signed_sample();
+        manifest.consent.send[0] = ConsentTuple {
+            peer: "host-b".to_string(),
+            role: "reviewer".to_string(),
+            intent: "diagnosis-handoff:read-only-evidence".to_string(),
+        };
+        let signed = manifest.signed_with(&signing_key(1));
+        let manifest_toml = toml::to_string(&signed).unwrap();
+        let error =
+            CohortManifest::parse_and_validate(&manifest_toml, &pinned_authority()).unwrap_err();
+        assert!(matches!(
+            error,
+            CohortError::EConsentRoleUndeclared {
+                ref direction,
+                ref role,
+            } if direction == "send" && role == "reviewer"
+        ));
+    }
+
+    #[test]
     fn reject_consent_intent_not_canonical() {
         let mut m = signed_sample();
         m.consent.send[0].intent = "Bad Intent".to_string(); // uppercase + space
@@ -932,7 +963,9 @@ mod tests {
     #[test]
     fn bad_signature_hex_rejected() {
         let mut m = signed_sample();
-        m.signature = ManifestSignature { sig: "nothex".to_string() };
+        m.signature = ManifestSignature {
+            sig: "nothex".to_string(),
+        };
         let pinned = pinned_authority();
         let err = m.verify_signature(&pinned).unwrap_err();
         assert!(matches!(err, CohortError::EInvalidSignature(_)));
@@ -941,7 +974,9 @@ mod tests {
     #[test]
     fn bad_signature_length_rejected() {
         let mut m = signed_sample();
-        m.signature = ManifestSignature { sig: "ff".to_string() }; // 1 byte, not 64
+        m.signature = ManifestSignature {
+            sig: "ff".to_string(),
+        }; // 1 byte, not 64
         let pinned = pinned_authority();
         let err = m.verify_signature(&pinned).unwrap_err();
         assert!(matches!(err, CohortError::EInvalidSignature(_)));
@@ -1077,7 +1112,10 @@ mod tests {
                 c.peer_id
             );
         }
-        let got: Vec<String> = cfgs.iter().map(|c| c.peer_id.as_str().to_string()).collect();
+        let got: Vec<String> = cfgs
+            .iter()
+            .map(|c| c.peer_id.as_str().to_string())
+            .collect();
         let want: Vec<String> = (1..n).map(|i| format!("host-{i}")).collect();
         assert_eq!(got, want, "peer edges in declaration order, self excluded");
     }
@@ -1144,7 +1182,10 @@ mod tests {
         assert_eq!(cfgs0.len(), 1);
         let edge0 = &cfgs0[0];
         assert_eq!(edge0.peer_id.as_str(), "host-1");
-        assert_eq!(edge0.allowlists.send_allowlist, vec![A2AIntent::new("readonly")]);
+        assert_eq!(
+            edge0.allowlists.send_allowlist,
+            vec![A2AIntent::new("readonly")]
+        );
         assert_eq!(
             edge0.allowlists.accept_allowlist,
             vec![A2AIntent::new("rca-summary")]
