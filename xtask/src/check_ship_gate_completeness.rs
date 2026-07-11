@@ -54,6 +54,8 @@ const EXPECTED_GATES: &[&str] = &[
     "check-multi-region-slo",
     // Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate.
     "check-scale-churn",
+    // Story 12.1 — cohort manifest + N=3/N=8 full-pairwise mesh.
+    "check-cohort-mesh",
     // Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar).
     "check-enterprise-pdp",
     // Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate.
@@ -128,6 +130,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 | "check-multi-region-slo"
                 // Story 11.3 (AC5) — scale-envelope 25/30-host churn gate.
                 | "check-scale-churn"
+                // Story 12.1 (AC5) — cohort manifest + full-pairwise mesh.
+                | "check-cohort-mesh"
                 // Story 11.4a (AC5) — enterprise PDP integration gate.
                 | "check-enterprise-pdp"
         );

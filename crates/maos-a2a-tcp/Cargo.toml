@@ -35,11 +35,15 @@ tracing = "0.1"
 maos-a2a-core = { path = "../maos-a2a-core" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-domain = { path = "../maos-domain" }
+maos-cohort = { path = "../maos-cohort" }
 serde_json = "1.0"
 sha2 = "0.10"
 smallvec = "1"
 rcgen = "0.13"
 time = "0.3"
+ed25519-dalek = { version = "2", features = ["std"] }
+hex = "0.4"
+toml = "0.8"
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util", "time", "net", "io-util"] }
 tokio-util = { version = "0.7", features = ["codec"] }

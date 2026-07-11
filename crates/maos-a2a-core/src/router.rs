@@ -14,6 +14,10 @@
 //! that crate retains); it is now a thin wrapper around [`A2ARouterCore`].
 
 use crate::config::A2APeerConfig;
+use crate::cohort::{
+    CohortManifestGate, LegacyCohortManifestGate, RESERVED_INTENT_HALT_RECEIPT,
+    RESERVED_INTENT_REISSUE,
+};
 use crate::consent::{AllowlistDirection, ConsentAllowlists, EIntentDenied};
 use crate::error::{A2AError, IntentDirection, UnclassifiedReason};
 use crate::identity::PeerId;
@@ -127,6 +131,10 @@ pub struct A2ARouterCore {
     peers: Arc<DashMap<String, A2APeerConfig>>,
     tofu: Arc<dyn TofuPinStore>,
     clock: Arc<LamportClock>,
+    /// Out-of-kernel cohort manifest currentness port. The legacy default keeps
+    /// non-cohort deployments byte-for-byte compatible; cohort composition
+    /// injects a verified cache before any transport is started.
+    cohort_manifest_gate: Arc<dyn CohortManifestGate>,
     /// Optional intake sink for tests — when set, accepted frames are
     /// pushed here so test code can observe them.
     intake_sink: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<IacFrame>>>>,
@@ -182,6 +190,7 @@ impl A2ARouterCore {
             rupture_sink: Arc::new(tokio::sync::Mutex::new(None)),
             next_id: Arc::new(std::sync::atomic::AtomicU64::new(1)),
             consent_now_ns: None,
+            cohort_manifest_gate: Arc::new(LegacyCohortManifestGate),
             warned_entries: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
         })
     }
@@ -196,6 +205,13 @@ impl A2ARouterCore {
     /// and uses the real wall clock ([`wall_now_ns`]).
     pub fn with_pinned_consent_clock(mut self, now_ns: u64) -> Self {
         self.consent_now_ns = Some(now_ns);
+        self
+    }
+
+    /// Inject the single verified cohort-manifest currentness authority.
+    /// This is a builder so existing constructors/callers remain compatible.
+    pub fn with_cohort_manifest_gate(mut self, gate: Arc<dyn CohortManifestGate>) -> Self {
+        self.cohort_manifest_gate = gate;
         self
     }
 
@@ -469,10 +485,27 @@ impl A2ARouterCore {
         }
     }
 
+    fn is_reserved_cohort_intent(intent: &str) -> bool {
+        intent.eq_ignore_ascii_case(RESERVED_INTENT_REISSUE)
+            || intent.eq_ignore_ascii_case(RESERVED_INTENT_HALT_RECEIPT)
+    }
+
+    /// The sole router call to the manifest-currentness port. Reserved control
+    /// intents stay admissible so a stale/revoked member can receive the signed
+    /// reissue that explains its change; every other cross-host frame fails
+    /// closed when either roster member is absent or the cache lease is stale.
+    fn cohort_manifest_is_current(&self, frame: &IacFrame, peer: &HostId) -> bool {
+        Self::is_reserved_cohort_intent(&Self::consent_match_key(frame))
+            || self.cohort_manifest_gate.is_current(peer)
+    }
+
     /// Send-allowlist enforcement. The peer's `send_allowlist` enumerates
     /// `A2AIntent` strings the operator wills THIS Host to SEND to that peer.
     fn send_admits(&self, allow: &ConsentAllowlists, frame: &IacFrame, peer_id: &str) -> bool {
         let s = Self::consent_match_key(frame);
+        if Self::is_reserved_cohort_intent(&s) {
+            return true;
+        }
         let admitted = allow
             .send_allowlist
             .iter()
@@ -485,6 +518,9 @@ impl A2ARouterCore {
 
     fn accept_admits(&self, allow: &ConsentAllowlists, frame: &IacFrame, peer_id: &str) -> bool {
         let s = Self::consent_match_key(frame);
+        if Self::is_reserved_cohort_intent(&s) {
+            return true;
+        }
         let admitted = allow
             .accept_allowlist
             .iter()
@@ -533,6 +569,13 @@ impl A2ARouterCore {
                 direction: IntentDirection::Send,
                 reason,
             });
+        }
+
+        if !self.cohort_manifest_is_current(&frame, peer) {
+            return Err(A2AError::ConfigInvalid(format!(
+                "cohort manifest is not current for peer {}",
+                peer.as_str()
+            )));
         }
 
         // (1) ADR-012 send-allowlist check (defense-in-depth — sender side).
@@ -863,6 +906,17 @@ impl A2ARouterCore {
             );
         }
 
+        if !self.cohort_manifest_is_current(frame, &HostId(peer_cfg.peer_id.as_str().to_string())) {
+            return A2AJsonRpcResponse::nack(
+                request.id,
+                CODE_INTERNAL,
+                format!(
+                    "cohort manifest is not current for peer {}",
+                    peer_cfg.peer_id.as_str()
+                ),
+            );
+        }
+
         // (3) ADR-012 accept-allowlist check.
         if !self.accept_admits(&peer_cfg.allowlists, frame, peer_cfg.peer_id.as_str()) {
             // Story 8.13.1 / AC3 — EARN the rupture: emit a genuine typed
@@ -882,6 +936,38 @@ impl A2ARouterCore {
                     Self::consent_match_key(frame),
                     peer_cfg.peer_id.as_str()
                 ),
+            );
+        }
+
+        let cohort_intent = Self::consent_match_key(frame);
+        if cohort_intent.eq_ignore_ascii_case(RESERVED_INTENT_REISSUE) {
+            let verified_peer = HostId(peer_cfg.peer_id.as_str().to_string());
+            return match self.cohort_manifest_gate.apply_reissue(&verified_peer, frame) {
+                Ok(_) => A2AJsonRpcResponse::ack(
+                    request.id,
+                    AckBody {
+                        delivered: true,
+                        receiver_logical_clock: self.clock.recv_advance(frame.logical_clock),
+                    },
+                ),
+                Err(rejection) => A2AJsonRpcResponse::nack_with_data(
+                    request.id,
+                    CODE_INTERNAL,
+                    rejection.reason,
+                    serde_json::json!({
+                        "seen_version": rejection.seen_version,
+                        "rejected_version": rejection.rejected_version,
+                    }),
+                ),
+            };
+        }
+        if cohort_intent.eq_ignore_ascii_case(RESERVED_INTENT_HALT_RECEIPT) {
+            return A2AJsonRpcResponse::ack(
+                request.id,
+                AckBody {
+                    delivered: true,
+                    receiver_logical_clock: self.clock.recv_advance(frame.logical_clock),
+                },
             );
         }
 

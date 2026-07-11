@@ -124,6 +124,7 @@ async fn idle_watchdog_fires_on_idle_after_quiescence() {
 
 #[tokio::test]
 async fn idle_watchdog_skips_paused_spirit() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let scb = make_scb(vec!["on_idle".into()], 100);
     scb.state
         .store(ScbLifecycleState::Paused as u8, Ordering::Release);

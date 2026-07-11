@@ -18,6 +18,7 @@ network = [
     "dep:maos-providers",
     "dep:maos-mcp",
     "dep:maos-a2a-tcp",
+    "dep:maos-cohort",
     "dep:maos-notify-push",
     "dep:rcgen",
     "dep:maos-a2a",
@@ -56,8 +57,10 @@ maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-spirit-hello = { path = "../maos-spirit-hello" }
 maos-spirit-sdk = { path = "../maos-spirit-sdk" }
 maos-a2a = { path = "../maos-a2a", optional = true }  # Story 6.3 — composition-root A2A router wiring + smoke arm
+maos-iac = { path = "../maos-iac" }              # Story 12.1 — daemon-owned Transparency Log for cohort audit
 maos-a2a-core = { path = "../maos-a2a-core" }  # Story 8.6 — protocol substrate (config/pin types for the daemon binding)
 maos-a2a-tcp = { path = "../maos-a2a-tcp", optional = true }    # Story 8.6 — live cross-Host TCP/mTLS transport + smoke-a2a-tcp-8-6
+maos-cohort = { path = "../maos-cohort", optional = true }      # Story 12.1 — signed cohort manifest state + distribution
 rcgen = { version = "0.13", optional = true }  # Story 8.6 — runtime self-signed cert gen for the smoke-a2a-tcp-8-6 demo
 maos-compliance = { path = "../maos-compliance" }   # Story 7.3 — v0.9-binding evaluator (smoke-compliance-7-3)
 maos-spirit-cli = { path = "../maos-spirit-cli" }   # Story 7.3 — REAL producer round-trip in the smoke arm

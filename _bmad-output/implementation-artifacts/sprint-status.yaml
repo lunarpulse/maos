@@ -1,4 +1,4 @@
-last_updated: '2026-07-10+v2.2-epics-12-13-14-sprint-planned'
+last_updated: '2026-07-11+story-12-1-review-remediated'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -202,8 +202,8 @@ development_status:
   # Discipline carry (E11 retro A1/A2): frontier-class dev allowlist {opus-4-8,gpt-5.5,glm-5.2,equiv} + §A6 full-layer review net (Blind+Edge+Acceptance+Test-Infra+runtime) = binding control (non-degradable on consent/security/journey stories 12.2/12.4/13.1/13.2/13.3 + test-infra-risk 14.1/14.2); derive-and-reconcile + real-subsystem proven-red + region/team/identity source-reflex gates; live-DB legs hermetic-blocking + live-substrate-advisory (no Postgres/no-GH-gate); absent-result → BLOCK at the v2.2 ship gate.
   # IR CHECK 2026-07-10 (implementation-readiness-report-2026-07-10.md): 🟢 READY for per-story preflight + Epic 12 dev; 5 non-blocking preflight gaps G1–G5 (G1=verify the 3 FLAG-Winston seams; G2=E14.6 ADR-041 decomposition scope; G3=track loom-threat-model.md before 13.1; G4=create docs/adr/ADR-054..057 + reconcile ADR-053 collision; G5=keep external WASM publication flag-gated).
   # Critical path: Epic 12 → Epic 13 (13.x consumes the 12.1 org manifest); Epic 14 largely parallelizable (14.3 waits on 13.4). First dev target = 12.1.
-  epic-12: backlog  # J3 Marcus Team Nexus — ADR-054 cohort mesh; 5 stories; 12.4 = J3 day-30 standup scene closer. Depends: Epic 11 (done, branch epic-11).
-  12-1-cohort-manifest-full-pairwise-mesh-foundation: backlog  # signed cohort manifest v1 + N=8 full-pairwise A2A mesh + check-cohort-mesh core legs. Smallest watchable demo = hermetic N=3 minimal-cohort smoke (AC2). ZERO kernel-Δ. FIRST dev target.
+  epic-12: in-progress  # J3 Marcus Team Nexus — ADR-054 cohort mesh; 5 stories; 12.4 = J3 day-30 standup scene closer. Depends: Epic 11 (done, branch epic-11). Started 2026-07-10 (12.1 created).
+  12-1-cohort-manifest-full-pairwise-mesh-foundation: done  # DONE 2026-07-11: signed cohort manifest v1, pinned Ed25519 authority/fork discipline, deterministic full-pairwise mesh, fail-closed stale/revoked-member gate, real TCP stale→pull→signed-push→explicit-resubmit recovery, and seven-leg check-cohort-mesh enrollment. ZERO kernel-core/src delta @23081. cargo test --workspace: 3187 passed, 0 failed, 58 ignored.
   12-2-per-peer-role-consent-tuples: backlog  # two-seam send/accept allowlists, acting-role exact-match (ADR-012 extended). §A6 non-degradable (consent).
   12-3-cross-agent-halt-on-conflict-receipt-presence: backlog  # reserved cohort.halt.receipt intent + receipt-presence/absence observability (not arbitration).
   12-4-team-digest-no-surveillance-j3-day-30-scene: backlog  # J3 day-30 Marcus scene E2E + surveillance-negative control. §A6 non-degradable (journey). JOURNEY CLOSER.

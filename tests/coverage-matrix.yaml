@@ -256,10 +256,11 @@ coverage:
     phase: v0.8
     valid_until: '2027-05-12'
   FR21:
-    gates: []
+    gates: [check-cohort-mesh]
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: J3 §10.7.1 cohort-mesh primary; traced with FR21-26 and FR52-54.
   FR22:
     gates: []
     corpora: []
@@ -278,7 +279,7 @@ coverage:
     valid_until: '2027-05-12'
     notes: v0.8 loopback A2A; v1.0 full mesh at FR23b
   FR23b:
-    gates: []
+    gates: [check-cohort-mesh]
     enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0

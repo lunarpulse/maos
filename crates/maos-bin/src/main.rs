@@ -29,9 +29,9 @@
 //! to run the reference Spirit once and print JSON to stdout.
 
 mod cassette_replay;
-mod env_contract;
 #[cfg(feature = "network")]
 mod enterprise_pdp_runtime;
+mod env_contract;
 // Story 11.4b — out-of-kernel sandbox-escape detector consumer (ADR-024).
 // Declared at the composition root, NOT in `api.rs` (it is not a kernel-core
 // adapter) so `check-composition-root-completeness` stays GREEN.
@@ -537,14 +537,15 @@ fn run_cli_wrapper_manifest(
     // port (native-only default build), `resolved` is used directly —
     // byte-identical to pre-11.1a behavior.
     let resolved = match &spirit_host {
-        Some(host) => host
-            .resolve_launch(&maos_host::SpiritLaunchRequest {
+        Some(host) => {
+            host.resolve_launch(&maos_host::SpiritLaunchRequest {
                 form: maos_host::SpiritForm::NativeSubprocess,
                 artifact: resolved,
                 form_config: vec![],
             })
             .map_err(|e| format!("maos run: spirit host resolve_launch: {e}"))?
-            .program,
+            .program
+        }
         None => resolved,
     };
 
@@ -1840,7 +1841,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
                 None
             }
-            Err(e) => return Err(format!("maos: enterprise runtime construction failed: {e}").into()),
+            Err(e) => {
+                return Err(format!("maos: enterprise runtime construction failed: {e}").into())
+            }
         };
 
     // Story 4.2 — HaltRegistry + WorkingMemoryOrchestrator for scalar-write pipeline.
@@ -7375,6 +7378,128 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
         "smoke-orchestrator-fanout-6-2: ✅ wedge demo complete; founder-loop substrate verified"
     );
     Ok(())
+}
+
+#[cfg(feature = "network")]
+struct CohortDaemonConfig {
+    manifest_toml: String,
+    pinned_authority_keys: maos_cohort::PinnedAuthorityKeys,
+    local_host: maos_spirit_abi::identity::HostId,
+    control_spirit: maos_spirit_abi::identity::SpiritId,
+    transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+}
+
+#[cfg(feature = "network")]
+struct CohortDaemonRuntime {
+    state: std::sync::Arc<maos_cohort::CohortManifestState>,
+    transport: std::sync::Arc<maos_a2a_tcp::TcpA2ATransport>,
+    cancel: tokio_util::sync::CancellationToken,
+    service: tokio::task::JoinHandle<Result<(), maos_cohort::CohortError>>,
+}
+
+#[cfg(feature = "network")]
+impl CohortDaemonRuntime {
+    async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
+        self.cancel.cancel();
+        self.service
+            .await
+            .map_err(|error| format!("cohort distributor task join failed: {error}"))??;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "network")]
+async fn build_cohort_a2a_daemon_runtime(
+    cohort: CohortDaemonConfig,
+    tcp_config: maos_a2a_tcp::TcpA2AConfig,
+    peer_configs: Vec<maos_a2a_core::A2APeerConfig>,
+    own_boot_nonce: u64,
+) -> Result<CohortDaemonRuntime, Box<dyn std::error::Error>> {
+    let pull_peers: Vec<maos_spirit_abi::identity::HostId> = peer_configs
+        .iter()
+        .map(|peer| maos_spirit_abi::identity::HostId(peer.peer_id.as_str().to_string()))
+        .collect();
+    let audit = std::sync::Arc::new(maos_cohort::CohortTransparencyLogSink::new(
+        cohort.transparency_log,
+    ));
+    let state = std::sync::Arc::new(maos_cohort::CohortManifestState::load(
+        cohort.local_host.clone(),
+        &cohort.manifest_toml,
+        cohort.pinned_authority_keys,
+        audit,
+    )?);
+    let gate: std::sync::Arc<dyn maos_a2a_core::CohortManifestGate> = state.clone();
+    let transport = std::sync::Arc::new(
+        maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_manifest_gate(
+            tcp_config,
+            peer_configs,
+            own_boot_nonce,
+            maos_a2a_tcp::TcpTimeouts::production(std::time::Duration::from_secs(30)),
+            maos_a2a_core::HandshakeRetryPolicy::default(),
+            None,
+            None,
+            Some(gate),
+        )
+        .await
+        .map_err(|error| format!("cohort a2a-tcp daemon bind failed: {error}"))?,
+    );
+    let router: std::sync::Arc<dyn maos_a2a_core::router::A2APeerRouter> = transport.clone();
+    let distributor = std::sync::Arc::new(maos_cohort::CohortDistributor::new(
+        state.clone(),
+        router,
+        maos_domain::frame::FrameAddress {
+            spirit_id: cohort.control_spirit,
+            host_id: Some(cohort.local_host),
+            role: None,
+        },
+    ));
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let service_cancel = cancel.child_token();
+    let refresh_state = state.clone();
+    let service = tokio::spawn(async move {
+        // Pull-on-connect fallback: each configured bilateral peer is contacted
+        // through the reserved control path once the local listener is live.
+        // Failed pulls remain observable and retry before the signed stale lease
+        // expires; ordinary traffic still fails closed if confirmation never
+        // arrives.
+        for peer in &pull_peers {
+            if let Err(error) = distributor.pull_from(peer).await {
+                eprintln!(
+                    "cohort manifest initial pull from {} failed: {error}",
+                    peer.as_str()
+                );
+            }
+        }
+        let mut tick = tokio::time::interval(std::time::Duration::from_millis(10));
+        let mut next_confirmation =
+            tokio::time::Instant::now() + refresh_state.confirmation_interval()?;
+        loop {
+            tokio::select! {
+                _ = service_cancel.cancelled() => return Ok(()),
+                _ = tick.tick() => {
+                    distributor.service_pending_pulls().await?;
+                }
+                _ = tokio::time::sleep_until(next_confirmation) => {
+                    for peer in &pull_peers {
+                        if let Err(error) = distributor.pull_from(peer).await {
+                            eprintln!(
+                                "cohort manifest renewal pull from {} failed: {error}",
+                                peer.as_str()
+                            );
+                        }
+                    }
+                    next_confirmation =
+                        tokio::time::Instant::now() + refresh_state.confirmation_interval()?;
+                }
+            }
+        }
+    });
+    Ok(CohortDaemonRuntime {
+        state,
+        transport,
+        cancel,
+        service,
+    })
 }
 
 #[cfg(feature = "network")]

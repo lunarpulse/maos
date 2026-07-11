@@ -17,7 +17,8 @@ use maos_a2a_core::router::{map_a2a_error_to_iac_bus, A2ARouterCore};
 // retained). The import also brings the traits into scope for the impls below.
 pub use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::{
-    A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, LamportClock, TofuPinStore,
+    A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, CohortManifestGate,
+    LamportClock, TofuPinStore,
 };
 use maos_domain::frame::IacFrame;
 use maos_domain::iac_bus_types::IacBusError;
@@ -47,6 +48,13 @@ impl LoopbackA2ARouter {
         Self {
             core: A2ARouterCore::new(peer_configs, tofu),
         }
+    }
+
+    /// Cohort-enabled construction path sharing the core's single manifest
+    /// currentness gate with live TCP transport.
+    pub fn with_cohort_manifest_gate(mut self, gate: Arc<dyn CohortManifestGate>) -> Self {
+        self.core = self.core.with_cohort_manifest_gate(gate);
+        self
     }
 
     /// Install an intake sink — test-only hook. Accepted frames are forwarded

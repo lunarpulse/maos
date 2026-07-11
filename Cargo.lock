@@ -2338,8 +2338,11 @@ name = "maos-a2a-tcp"
 version = "0.1.0-alpha"
 dependencies = [
  "async-trait",
+ "ed25519-dalek",
  "futures-util",
+ "hex",
  "maos-a2a-core",
+ "maos-cohort",
  "maos-domain",
  "maos-spirit-abi",
  "rcgen",
@@ -2355,6 +2358,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util",
+ "toml 0.8.23",
  "tracing",
 ]
 
@@ -2438,12 +2442,14 @@ dependencies = [
  "maos-audit",
  "maos-bench",
  "maos-cli",
+ "maos-cohort",
  "maos-compliance",
  "maos-corpus-gen",
  "maos-director-surface",
  "maos-domain",
  "maos-escape-detector",
  "maos-host",
+ "maos-iac",
  "maos-kernel-core",
  "maos-loom-lite",
  "maos-mcp",
@@ -2519,6 +2525,24 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-postgres",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "maos-cohort"
+version = "0.1.0-alpha"
+dependencies = [
+ "ed25519-dalek",
+ "hex",
+ "maos-a2a-core",
+ "maos-domain",
+ "maos-iac",
+ "maos-spirit-abi",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "smallvec",
+ "thiserror 2.0.18",
  "toml 0.8.23",
 ]
 

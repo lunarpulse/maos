@@ -74,8 +74,16 @@ mod tests {
         );
 
         let manifests = vec![
-            ManifestDeclaration { spirit_pid: 4242, declared_tier: 2, anticipated_kill: false },
-            ManifestDeclaration { spirit_pid: 4243, declared_tier: 2, anticipated_kill: true },
+            ManifestDeclaration {
+                spirit_pid: 4242,
+                declared_tier: 2,
+                anticipated_kill: false,
+            },
+            ManifestDeclaration {
+                spirit_pid: 4243,
+                declared_tier: 2,
+                anticipated_kill: true,
+            },
         ];
         let count = report_escape_anomalies(&db, &manifests).expect("read-only TL scan ok");
         assert_eq!(

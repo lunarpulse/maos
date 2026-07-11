@@ -34,6 +34,8 @@ mod check_multi_region_slo;
 // independence). MUST NOT append legs to check-rotation-real-timing or
 // check-multi-region-slo (F7).
 mod check_scale_churn;
+// Story 12.1 — signed cohort manifest and full-pairwise mesh gate.
+mod check_cohort_mesh;
 // Story 11.4a — enterprise PDP integration gate (per-leg independence, ADR-050).
 mod check_enterprise_pdp;
 // Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence, ADR-051).
@@ -775,6 +777,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 12.1 — signed cohort manifest + N=3/N=8 full-pairwise mesh gate.
+    #[command(name = "check-cohort-mesh")]
+    CheckCohortMesh {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.4a — enterprise PDP integration gate (per-leg independence).
     #[command(name = "check-enterprise-pdp")]
     CheckEnterprisePdp {
@@ -1204,6 +1212,7 @@ fn main() {
         Commands::CheckCrossRegionConsensus { json } => check_cross_region_consensus::run(json),
         Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
         Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
+        Commands::CheckCohortMesh { json } => check_cohort_mesh::run(json),
         Commands::CheckEnterprisePdp { json } => check_enterprise_pdp::run(json),
         Commands::CheckEnterpriseIdentity { json } => check_enterprise_identity::run(json),
         Commands::CheckFkcs { json } => check_fkcs::run(json),

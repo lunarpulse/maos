@@ -29,6 +29,7 @@
 pub mod chaos;
 pub mod config;
 pub mod consent;
+pub mod cohort;
 pub mod corpus;
 pub mod error;
 pub mod identity;
@@ -43,6 +44,10 @@ pub mod transport;
 pub use chaos::churn::{AdversarialAttempt, AdversarialDetection, ChurnDrillReport};
 pub use chaos::rotation::{compute_t_grace, AgentRotationTimestamps, RotationDrillReport};
 pub use config::{A2AConfig, A2APeerConfig, A2AProfile};
+pub use cohort::{
+    CohortManifestGate, CohortReissueDisposition, CohortReissueRejection,
+    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+};
 // Story 8.7 / AC2b — `A2AConsentEnvelope` was deleted (dead fail-open footgun).
 pub use consent::{ConsentAllowlists, EIntentDenied};
 pub use error::{A2AError, A2AResult};

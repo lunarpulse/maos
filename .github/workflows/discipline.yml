@@ -2589,6 +2589,20 @@ jobs:
           echo "OK: slo-fault-inject absent from the release feature graph"
 
   # Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate. ONE gate /
+  # Story 12.1 — signed cohort manifest and real N=3/N=8 pairwise mesh.
+  check-cohort-mesh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-cohort-mesh-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-cohort-mesh gate
+        run: cargo run -p xtask -- check-cohort-mesh --json
   # ONE disposition / FOUR independently-falsifiable legs with PER-LEG
   # independence (mesh-identity-reconcile, detection-latency, blast-recovery-
   # rto, kernel-abi-diff — each reads its OWN `cargo test` oracle). Advisory
@@ -2764,6 +2778,7 @@ jobs:
       - check-cross-region-consensus
       - check-multi-region-slo
       - check-scale-churn
+      - check-cohort-mesh
       - check-enterprise-pdp
       - check-enterprise-identity
       - check-fkcs
@@ -2799,6 +2814,7 @@ jobs:
           echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"
           echo "| check-scale-churn | ${{ needs.check-scale-churn.result }} | cargo run -p xtask -- check-scale-churn |"
+          echo "| check-cohort-mesh | ${{ needs.check-cohort-mesh.result }} | cargo run -p xtask -- check-cohort-mesh |"
           echo "| check-enterprise-pdp | ${{ needs.check-enterprise-pdp.result }} | cargo run -p xtask -- check-enterprise-pdp |"
           echo "| check-enterprise-identity | ${{ needs.check-enterprise-identity.result }} | cargo run -p xtask -- check-enterprise-identity |"
           echo "| check-fkcs | ${{ needs.check-fkcs.result }} | cargo run -p xtask -- check-fkcs |"
@@ -2830,6 +2846,7 @@ jobs:
           echo "  check-cross-region-consensus: ${{ needs.check-cross-region-consensus.result }}"
           echo "  check-multi-region-slo: ${{ needs.check-multi-region-slo.result }}"
           echo "  check-scale-churn: ${{ needs.check-scale-churn.result }}"
+          echo "  check-cohort-mesh: ${{ needs.check-cohort-mesh.result }}"
           echo "  check-enterprise-pdp: ${{ needs.check-enterprise-pdp.result }}"
           echo "  check-enterprise-identity: ${{ needs.check-enterprise-identity.result }}"
           echo "  check-fkcs: ${{ needs.check-fkcs.result }}"

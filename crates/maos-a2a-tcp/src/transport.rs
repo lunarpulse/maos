@@ -20,8 +20,8 @@ use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::router::{A2APeerRouter, A2ARouterCore, A2ATransport};
 use maos_a2a_core::transport::json_rpc::{CODE_FRAME_TOO_LARGE, CODE_TIMEOUT};
 use maos_a2a_core::{
-    A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, HandshakeRetryPolicy,
-    InMemoryTofuPinStore, TofuPinStore,
+    A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, CohortManifestGate,
+    HandshakeRetryPolicy, InMemoryTofuPinStore, TofuPinStore,
 };
 use maos_domain::frame::IacFrame;
 use maos_spirit_abi::identity::HostId;
@@ -142,11 +142,33 @@ impl TcpA2ATransport {
         timeouts: TcpTimeouts,
         retry_policy: HandshakeRetryPolicy,
         validation_time: Option<UnixTime>,
-        // Story 8.9 / AC3 — optional pinned consent-expiry clock (ns since epoch)
-        // for deterministic on-wire expiry tests. `None` in production (real wall
-        // clock). Threaded into the shared `A2ARouterCore` so both the sender's
-        // `prepare_outbound` stamp and the receiver's expiry check use it.
         consent_now_ns: Option<u64>,
+    ) -> Result<Self, TcpTransportError> {
+        Self::bind_with_cohort_manifest_gate(
+            tcp_config,
+            peer_configs,
+            own_boot_nonce,
+            timeouts,
+            retry_policy,
+            validation_time,
+            consent_now_ns,
+            None,
+        )
+        .await
+    }
+
+    /// Cohort-enabled construction path. The gate is installed before the core
+    /// is wrapped and the accept loop is spawned, so no inbound connection can
+    /// observe a legacy policy window.
+    pub async fn bind_with_cohort_manifest_gate(
+        tcp_config: TcpA2AConfig,
+        peer_configs: Vec<A2APeerConfig>,
+        own_boot_nonce: u64,
+        timeouts: TcpTimeouts,
+        retry_policy: HandshakeRetryPolicy,
+        validation_time: Option<UnixTime>,
+        consent_now_ns: Option<u64>,
+        cohort_manifest_gate: Option<Arc<dyn CohortManifestGate>>,
     ) -> Result<Self, TcpTransportError> {
         let pins = tcp_config.build_pin_store().await?;
         let posture = tcp_config.trust_posture()?;
@@ -167,6 +189,9 @@ impl TcpA2ATransport {
         // frames are denied with CODE_CONSENT_UNCLASSIFIED (-32009).
         if let Some(t) = consent_now_ns {
             core_inner = core_inner.with_pinned_consent_clock(t);
+        }
+        if let Some(gate) = cohort_manifest_gate {
+            core_inner = core_inner.with_cohort_manifest_gate(gate);
         }
         let core = Arc::new(core_inner);
 

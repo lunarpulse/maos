@@ -1,0 +1,32 @@
+[package]
+name = "maos-cohort"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS cohort manifest + full-pairwise A2A mesh foundation (Epic 12 / Story 12.1) — out-of-kernel signed manifest schema v1"
+
+[dependencies]
+# A2A substrate — the §7.2 pin form (PeerCertFingerprint) + peer identity.
+maos-a2a-core = { path = "../maos-a2a-core" }
+# Domain model — the canonical A2A-intent grammar (I8) consumed unchanged.
+maos-domain = { path = "../maos-domain" }
+# Out-of-kernel I2 Transparency Log writer for manifest issue/accept/reject events.
+maos-iac = { path = "../maos-iac" }
+# Peer-aware router gate signature uses the frozen HostId type directly.
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+# Ed25519 sign/verify-at-load (sign-only — mirrors maos-loom-lite bundle.rs;
+# NEVER the kernel CryptoProvider). Decision B audited RustCrypto stack.
+ed25519-dalek = { version = "2", features = ["std"] }
+# Serialization — strict schema v1 TOML (deny_unknown_fields).
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+serde_json = "1.0"
+smallvec = "1"
+# Canonical signing bytes — SHA-256 of the pinned pre-image (leaf.rs idiom).
+sha2 = "0.10"
+# Typed public errors (the repo standard — bundle.rs / maos-manifest).
+thiserror = "2.0"
+# Authority-key / fingerprint hex encode+decode.
+hex = "0.4"
