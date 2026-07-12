@@ -228,6 +228,12 @@ pub enum CohortError {
     #[error("cohort manifest state lock poisoned")]
     EStatePoisoned,
 
+    #[error("invalid cohort digest-read request: {0}")]
+    EInvalidDigestRequest(String),
+
+    #[error("cohort digest-read capacity exceeded: {0}")]
+    EDigestCapacityExceeded(String),
+
     #[error("cohort manifest control envelope has an invalid intent, frame kind, or event type")]
     EControlEnvelopeInvalid,
 

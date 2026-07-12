@@ -16,14 +16,19 @@
 
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
-use maos_a2a_core::{A2AError, A2APeerConfig, A2AProfile, CohortManifestGate, ConsentAllowlists};
+use maos_a2a_core::{
+    A2AError, A2APeerConfig, A2AProfile, CohortManifestGate, ConsentAllowlists, DigestReadPort,
+    HaltReceiptObserver,
+};
 use maos_a2a_core::{HandshakeRetryPolicy, InMemoryTofuPinStore, TofuPinStore};
 use maos_a2a_tcp::{
     build_client_config, length_delimited_codec, PinnedFingerprint, TcpA2AConfig, TcpA2ATransport,
     TcpTimeouts, TrustPosture,
 };
+use maos_cohort::CohortRuptureLogSink;
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i8::A2AIntent;
+use maos_iac::TransparencyLogAdapter;
 use maos_spirit_abi::identity::HostId;
 use rcgen::{BasicConstraints, CertificateParams, IsCa, KeyPair};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName, UnixTime};
@@ -518,6 +523,104 @@ pub async fn build_mesh_n_with_gates(
         });
     }
     // Wire real readback addresses (H3/H4) now that all listeners are bound.
+    for i in 0..n {
+        for j in 0..n {
+            if j != i {
+                nodes[i].transport.set_peer_endpoint(
+                    &HostId(names[j].clone()),
+                    format!("tls://{}", nodes[j].addr),
+                );
+            }
+        }
+    }
+    nodes
+}
+
+/// Story 12.4a — a live mesh node whose transport is shareable as
+/// `Arc<dyn A2APeerRouter>` for the `CohortDigestDistributor` couriers.
+pub struct DigestMeshNode {
+    pub name: String,
+    pub transport: Arc<TcpA2ATransport>,
+    pub fingerprint: PeerCertFingerprint,
+    pub addr: SocketAddr,
+    pub rupture_log: Arc<TransparencyLogAdapter>,
+}
+
+/// Story 12.4a — N-host mesh wiring the manifest gate, halt-receipt observer,
+/// AND the digest-read correlation port per node (all the SAME
+/// `CohortManifestState` in the caller, P7b), with caller-chosen transport
+/// allowlists so the non-reserved `cohort:digest-read` intent clears the coarse
+/// ADR-012 send/accept check and the signed manifest is the fine-grained
+/// authority. Additive sibling of [`build_mesh_n_with_gates`] (no caller churn).
+#[allow(clippy::too_many_arguments)]
+pub async fn build_mesh_n_with_digest(
+    clock: &Clock,
+    ca: &Ca,
+    names: &[String],
+    serving: &[&Leaf],
+    expected: &[&Leaf],
+    retry: HandshakeRetryPolicy,
+    gates: &[Option<Arc<dyn CohortManifestGate>>],
+    observers: &[Option<Arc<dyn HaltReceiptObserver>>],
+    digest_ports: &[Option<Arc<dyn DigestReadPort>>],
+    allowlist: &[&str],
+) -> Vec<DigestMeshNode> {
+    let n = names.len();
+    assert_eq!(serving.len(), n, "serving leaves must match host count");
+    assert_eq!(expected.len(), n, "expected leaves must match host count");
+    assert_eq!(gates.len(), n, "cohort gates must match host count");
+    assert_eq!(observers.len(), n, "observers must match host count");
+    assert_eq!(digest_ports.len(), n, "digest ports must match host count");
+    let mut nodes = Vec::with_capacity(n);
+    for i in 0..n {
+        let peers: Vec<(usize, &Leaf)> = (0..n)
+            .filter(|j| *j != i)
+            .map(|j| (j, expected[j]))
+            .collect();
+        let peer_pins: Vec<_> = peers
+            .iter()
+            .map(|(j, leaf)| pin(&names[*j], &leaf.fingerprint, 1_000 + *j as u64))
+            .collect();
+        let peer_cfgs: Vec<_> = peers
+            .iter()
+            .map(|(j, leaf)| {
+                peer_cfg(
+                    &names[*j],
+                    "tls://127.0.0.1:0",
+                    &leaf.fingerprint,
+                    allowlist,
+                    allowlist,
+                )
+            })
+            .collect();
+        let pems = write_pem(serving[i], Some(ca));
+        let tcp = tcp_config(&pems, peer_pins, Duration::from_secs(30));
+        let rupture_log = Arc::new(TransparencyLogAdapter::open_in_memory(1_000 + i as u64));
+        let rupture_sink = Arc::new(CohortRuptureLogSink::new(rupture_log.clone()));
+        let transport = TcpA2ATransport::bind_with_cohort_wiring_and_digest(
+            tcp,
+            peer_cfgs,
+            1_000 + i as u64,
+            TcpTimeouts::test_profile(),
+            retry.clone(),
+            Some(clock.unix()),
+            None,
+            gates[i].clone(),
+            observers[i].clone(),
+            digest_ports[i].clone(),
+            Some(rupture_sink),
+        )
+        .await
+        .expect("bind mesh endpoint");
+        let addr = transport.local_addr().expect("bound addr (H3/H4)");
+        nodes.push(DigestMeshNode {
+            name: names[i].clone(),
+            transport: Arc::new(transport),
+            fingerprint: serving[i].fingerprint.clone(),
+            addr,
+            rupture_log,
+        });
+    }
     for i in 0..n {
         for j in 0..n {
             if j != i {

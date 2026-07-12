@@ -36,6 +36,7 @@
 pub mod audit;
 mod consent;
 pub mod control;
+pub mod digest;
 pub mod distribution;
 pub mod error;
 pub mod halt_receipt;
@@ -47,6 +48,10 @@ pub use audit::{
     CohortAuditEvent, CohortAuditSink, CohortTransparencyLogSink, InMemoryCohortAuditSink,
 };
 pub use control::{CohortManifestControl, CONTROL_EVENT_TYPE};
+pub use digest::{
+    journal_rupture_frame, CohortDigestDistributor, CohortRuptureLogSink, DigestReadControl,
+    DigestSummary, DIGEST_DAILY_SCOPE, DIGEST_READ_EVENT_TYPE,
+};
 pub use distribution::CohortDistributor;
 pub use error::{CohortError, CohortManifestForkReason};
 pub use halt_receipt::{

@@ -6396,6 +6396,10 @@ description = "smoke test spirit successor"
             return smoke_orchestrator_fanout_6_2().await;
         }
 
+        #[cfg(feature = "network")]
+        if mode == "cohort-a2a-daemon" {
+            return run_cohort_a2a_daemon_from_env().await;
+        }
         // Story 8.6 AC-T13/AC-A7 — `smoke-a2a-tcp-8-6`: live cross-Host
         // Mira(host_a) → Nash(host_b) advisory over a REAL TCP/mTLS socket
         // (two independent `TcpA2ATransport` endpoints, genuine handshake + wire).
@@ -7381,17 +7385,83 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
 }
 
 #[cfg(feature = "network")]
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CohortDaemonFileConfig {
+    tcp: maos_a2a_tcp::TcpA2AConfig,
+    peers: Vec<maos_a2a_core::A2APeerConfig>,
+    own_boot_nonce: u64,
+    manifest_path: std::path::PathBuf,
+    authority_keys: Vec<String>,
+    local_host: String,
+    control_spirit: String,
+    transparency_log_path: std::path::PathBuf,
+    digest_summary: maos_cohort::DigestSummary,
+}
+
+#[cfg(feature = "network")]
+async fn run_cohort_a2a_daemon_from_env() -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a_core::router::A2ATransport as _;
+    let config_path = std::env::var("MAOS_COHORT_DAEMON_CONFIG")
+        .map_err(|_| "MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
+    let config_text = std::fs::read_to_string(&config_path)
+        .map_err(|error| format!("read cohort daemon config {config_path}: {error}"))?;
+    let file: CohortDaemonFileConfig = toml::from_str(&config_text)
+        .map_err(|error| format!("parse cohort daemon config {config_path}: {error}"))?;
+    let manifest_toml = std::fs::read_to_string(&file.manifest_path).map_err(|error| {
+        format!(
+            "read cohort manifest {}: {error}",
+            file.manifest_path.display()
+        )
+    })?;
+    let transparency_log = std::sync::Arc::new(
+        maos_iac::TransparencyLogAdapter::open(&file.transparency_log_path, file.own_boot_nonce)
+            .map_err(|error| {
+                format!(
+                    "open cohort transparency log {}: {error}",
+                    file.transparency_log_path.display()
+                )
+            })?,
+    );
+    let runtime = build_cohort_a2a_daemon_runtime(
+        CohortDaemonConfig {
+            manifest_toml,
+            pinned_authority_keys: maos_cohort::PinnedAuthorityKeys::from_hex(
+                &file.authority_keys,
+            )?,
+            local_host: maos_spirit_abi::identity::HostId(file.local_host),
+            control_spirit: maos_spirit_abi::identity::SpiritId::from(file.control_spirit),
+            transparency_log,
+            digest_summary: file.digest_summary,
+        },
+        file.tcp,
+        file.peers,
+        file.own_boot_nonce,
+    )
+    .await?;
+    eprintln!(
+        "cohort-a2a-daemon listening on {}",
+        runtime
+            .transport
+            .local_addr()
+            .ok_or("cohort daemon transport did not expose a listener")?
+    );
+    tokio::signal::ctrl_c().await?;
+    runtime.shutdown().await
+}
+
+#[cfg(feature = "network")]
 struct CohortDaemonConfig {
     manifest_toml: String,
     pinned_authority_keys: maos_cohort::PinnedAuthorityKeys,
     local_host: maos_spirit_abi::identity::HostId,
     control_spirit: maos_spirit_abi::identity::SpiritId,
     transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+    digest_summary: maos_cohort::DigestSummary,
 }
 
 #[cfg(feature = "network")]
 struct CohortDaemonRuntime {
-    state: std::sync::Arc<maos_cohort::CohortManifestState>,
     transport: std::sync::Arc<maos_a2a_tcp::TcpA2ATransport>,
     cancel: tokio_util::sync::CancellationToken,
     service: tokio::task::JoinHandle<Result<(), maos_cohort::CohortError>>,
@@ -7419,6 +7489,9 @@ async fn build_cohort_a2a_daemon_runtime(
         .iter()
         .map(|peer| maos_spirit_abi::identity::HostId(peer.peer_id.as_str().to_string()))
         .collect();
+    // Story 12.4a / AC4 — retain the TL handle before it is moved into the
+    // manifest-audit sink, so the rupture-journal drain can write to it too.
+    let transparency_log = cohort.transparency_log.clone();
     let audit = std::sync::Arc::new(maos_cohort::CohortTransparencyLogSink::new(
         cohort.transparency_log,
     ));
@@ -7434,8 +7507,14 @@ async fn build_cohort_a2a_daemon_runtime(
     // smoke exists to prove it here).
     let gate: std::sync::Arc<dyn maos_a2a_core::CohortManifestGate> = state.clone();
     let observer: std::sync::Arc<dyn maos_a2a_core::HaltReceiptObserver> = state.clone();
+    // Story 12.4a — wire the digest-read correlation port as the SAME state
+    // (P7b single-object wiring), so the correlated-reply send/accept exemptions
+    // are authorized on the live wire.
+    let digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort> = state.clone();
+    let rupture_sink: std::sync::Arc<dyn maos_a2a_core::ConsentRuptureSink> =
+        std::sync::Arc::new(maos_cohort::CohortRuptureLogSink::new(transparency_log));
     let transport = std::sync::Arc::new(
-        maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring(
+        maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring_and_digest(
             tcp_config,
             peer_configs,
             own_boot_nonce,
@@ -7445,20 +7524,29 @@ async fn build_cohort_a2a_daemon_runtime(
             None,
             Some(gate),
             Some(observer),
+            Some(digest_port),
+            Some(rupture_sink),
         )
         .await
         .map_err(|error| format!("cohort a2a-tcp daemon bind failed: {error}"))?,
     );
     let router: std::sync::Arc<dyn maos_a2a_core::router::A2APeerRouter> = transport.clone();
+    let from = maos_domain::frame::FrameAddress {
+        spirit_id: cohort.control_spirit,
+        host_id: Some(cohort.local_host),
+        role: None,
+    };
     let distributor = std::sync::Arc::new(maos_cohort::CohortDistributor::new(
         state.clone(),
-        router,
-        maos_domain::frame::FrameAddress {
-            spirit_id: cohort.control_spirit,
-            host_id: Some(cohort.local_host),
-            role: None,
-        },
+        router.clone(),
+        from.clone(),
     ));
+    let digest_distributor = std::sync::Arc::new(maos_cohort::CohortDigestDistributor::new(
+        state.clone(),
+        router,
+        from,
+    ));
+    let digest_summary = cohort.digest_summary;
     let cancel = tokio_util::sync::CancellationToken::new();
     let service_cancel = cancel.child_token();
     let refresh_state = state.clone();
@@ -7484,6 +7572,7 @@ async fn build_cohort_a2a_daemon_runtime(
                 _ = service_cancel.cancelled() => return Ok(()),
                 _ = tick.tick() => {
                     distributor.service_pending_pulls().await?;
+                    digest_distributor.service_pending_replies(&digest_summary).await?;
                 }
                 _ = tokio::time::sleep_until(next_confirmation) => {
                     for peer in &pull_peers {
@@ -7501,7 +7590,6 @@ async fn build_cohort_a2a_daemon_runtime(
         }
     });
     Ok(CohortDaemonRuntime {
-        state,
         transport,
         cancel,
         service,

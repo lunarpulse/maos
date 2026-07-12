@@ -2,7 +2,8 @@
 
 use maos_a2a_core::{
     CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
-    CohortReissueDisposition, CohortReissueRejection, HaltReceiptObserver,
+    CohortReissueDisposition, CohortReissueRejection, DigestFrameClass, DigestReadPort,
+    DigestReplyObservation, HaltReceiptObserver, COHORT_INTENT_DIGEST_READ,
 };
 use maos_domain::frame::IacFrame;
 use maos_spirit_abi::identity::HostId;
@@ -13,6 +14,7 @@ use std::time::{Duration, Instant};
 use crate::audit::{CohortAuditEvent, CohortAuditSink};
 use crate::consent::{accept_admits, send_context, OutboundConsentContext};
 use crate::control::CohortManifestControl;
+use crate::digest::{DigestReadControl, DigestSummary, DIGEST_DAILY_SCOPE};
 use crate::error::{CohortError, CohortManifestForkReason};
 use crate::halt_receipt::{AbsenceKind, HaltReceiptControl};
 use crate::manifest::CohortManifest;
@@ -49,6 +51,14 @@ struct CachedManifest {
     confirmed_at_secs: u64,
 }
 
+#[derive(Debug, Clone)]
+struct DigestGrant {
+    scope: String,
+    manifest_version: u64,
+}
+
+const MAX_PENDING_DIGEST_READS: usize = 256;
+
 /// The verified, local authority for a cohort manifest cache.
 ///
 /// All state transitions verify a candidate under the operator-pinned genesis
@@ -69,6 +79,16 @@ pub struct CohortManifestState {
     /// Story 12.3 — per-member explicit transport-level absence marker recorded
     /// after a classified probe (P2a/P3). Observability only.
     halt_absence: Mutex<HashMap<String, AbsenceKind>>,
+    /// Story 12.4a — reader-side live capabilities keyed by authenticated peer
+    /// and globally unique request id. Each capability is bound to the admitted
+    /// scope and manifest version, then consumed by the first accepted reply.
+    outstanding_digest_reads: Mutex<HashMap<(String, String), DigestGrant>>,
+    /// Target-side reply capabilities with the same immutable binding.
+    admitted_digest_reads: Mutex<HashMap<(String, String), DigestGrant>>,
+    /// Target-side bounded reply obligations.
+    pending_digest_replies: Mutex<Vec<(String, String, String)>>,
+    /// Reader-side immutable summaries keyed by `(member, request_id)`.
+    received_digest_summaries: Mutex<HashMap<(String, String), DigestSummary>>,
 }
 
 impl CohortManifestState {
@@ -112,6 +132,10 @@ impl CohortManifestState {
             pull_requests: Mutex::new(Vec::new()),
             halt_presence: Mutex::new(HashMap::new()),
             halt_absence: Mutex::new(HashMap::new()),
+            outstanding_digest_reads: Mutex::new(HashMap::new()),
+            admitted_digest_reads: Mutex::new(HashMap::new()),
+            pending_digest_replies: Mutex::new(Vec::new()),
+            received_digest_summaries: Mutex::new(HashMap::new()),
             clock,
         })
     }
@@ -284,6 +308,21 @@ impl CohortManifestState {
             signed_toml: manifest_toml.to_string(),
             confirmed_at_secs: self.clock.now_secs(),
         };
+        // Correlation capabilities are grants under one signed manifest
+        // snapshot. A reissue invalidates every in-flight exemption; callers
+        // must mint a fresh request under the new matrix.
+        self.outstanding_digest_reads
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?
+            .clear();
+        self.admitted_digest_reads
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?
+            .clear();
+        self.pending_digest_replies
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?
+            .clear();
         Ok(ReissueOutcome::Applied { version })
     }
 
@@ -594,6 +633,279 @@ impl HaltReceiptObserver for CohortManifestState {
     }
 }
 
+impl CohortManifestState {
+    pub fn note_digest_request_sent(
+        &self,
+        peer: &HostId,
+        request_id: &str,
+        scope: &str,
+    ) -> Result<(), CohortError> {
+        let version = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?
+            .manifest
+            .version;
+        let mut outstanding = self
+            .outstanding_digest_reads
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        let received = self
+            .received_digest_summaries
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        if outstanding.keys().any(|(_, id)| id == request_id)
+            || received.keys().any(|(_, id)| id == request_id)
+        {
+            return Err(CohortError::EInvalidDigestRequest(
+                "request_id must be globally unique for this reader".into(),
+            ));
+        }
+        if outstanding.len() >= MAX_PENDING_DIGEST_READS {
+            return Err(CohortError::EDigestCapacityExceeded(
+                "reader has too many outstanding requests".into(),
+            ));
+        }
+        outstanding.insert(
+            (peer.as_str().to_string(), request_id.to_string()),
+            DigestGrant {
+                scope: scope.to_string(),
+                manifest_version: version,
+            },
+        );
+        Ok(())
+    }
+
+    pub fn cancel_digest_request(
+        &self,
+        peer: &HostId,
+        request_id: &str,
+    ) -> Result<(), CohortError> {
+        self.outstanding_digest_reads
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?
+            .remove(&(peer.as_str().to_string(), request_id.to_string()));
+        Ok(())
+    }
+
+    pub fn complete_admitted_digest_reply(
+        &self,
+        peer: &HostId,
+        request_id: &str,
+    ) -> Result<(), CohortError> {
+        self.admitted_digest_reads
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?
+            .remove(&(peer.as_str().to_string(), request_id.to_string()));
+        Ok(())
+    }
+
+    pub fn drain_pending_digest_replies(
+        &self,
+    ) -> Result<Vec<(String, String, String)>, CohortError> {
+        Ok(std::mem::take(
+            &mut *self
+                .pending_digest_replies
+                .lock()
+                .map_err(|_| CohortError::EStatePoisoned)?,
+        ))
+    }
+
+    pub fn requeue_pending_digest_reply(
+        &self,
+        requester: String,
+        request_id: String,
+        scope: String,
+    ) -> Result<(), CohortError> {
+        let mut queue = self
+            .pending_digest_replies
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        if queue.len() >= MAX_PENDING_DIGEST_READS {
+            return Err(CohortError::EDigestCapacityExceeded(
+                "target has too many pending replies".into(),
+            ));
+        }
+        if !queue
+            .iter()
+            .any(|(peer, id, _)| peer == &requester && id == &request_id)
+        {
+            queue.push((requester, request_id, scope));
+        }
+        Ok(())
+    }
+
+    pub fn digest_summary(&self, peer: &HostId, request_id: &str) -> Option<DigestSummary> {
+        self.received_digest_summaries.lock().ok().and_then(|map| {
+            map.get(&(peer.as_str().to_string(), request_id.to_string()))
+                .cloned()
+        })
+    }
+
+    pub fn digest_summary_count(&self) -> usize {
+        self.received_digest_summaries
+            .lock()
+            .map(|map| map.len())
+            .unwrap_or(0)
+    }
+}
+
+impl DigestReadPort for CohortManifestState {
+    /// Parse a `cohort:digest-read` frame into its request/reply class. A frame
+    /// that is not a well-formed digest-read envelope is `NotDigest` (the router
+    /// then treats it as an ordinary consent-gated frame).
+    fn classify(&self, frame: &IacFrame) -> DigestFrameClass {
+        match DigestReadControl::from_frame(frame) {
+            Ok(DigestReadControl::Request { request_id, .. }) => {
+                DigestFrameClass::Request { request_id }
+            }
+            Ok(DigestReadControl::Reply { request_id, .. }) => {
+                DigestFrameClass::Reply { request_id }
+            }
+            Err(_)
+                if frame
+                    .consent_envelope
+                    .as_ref()
+                    .and_then(|envelope| envelope.intent_class.as_ref())
+                    .is_some_and(|intent| {
+                        intent
+                            .as_str()
+                            .eq_ignore_ascii_case(COHORT_INTENT_DIGEST_READ)
+                    }) =>
+            {
+                DigestFrameClass::Invalid
+            }
+            Err(_) => DigestFrameClass::NotDigest,
+        }
+    }
+
+    fn note_admitted_request(
+        &self,
+        requester: &HostId,
+        request_id: &str,
+        frame: &IacFrame,
+    ) -> Result<(), String> {
+        let DigestReadControl::Request {
+            request_id: parsed_id,
+            scope,
+        } = DigestReadControl::from_frame(frame).map_err(|error| error.to_string())?
+        else {
+            return Err("admitted digest frame is not a request".into());
+        };
+        if parsed_id != request_id {
+            return Err("classified request id changed before admission".into());
+        }
+        let version = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned.to_string())?
+            .manifest
+            .version;
+        let key = (requester.as_str().to_string(), request_id.to_string());
+        let mut admitted = self
+            .admitted_digest_reads
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned.to_string())?;
+        if admitted.contains_key(&key) {
+            return Ok(());
+        }
+        let mut queue = self
+            .pending_digest_replies
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned.to_string())?;
+        if admitted.len() >= MAX_PENDING_DIGEST_READS || queue.len() >= MAX_PENDING_DIGEST_READS {
+            return Err(CohortError::EDigestCapacityExceeded(
+                "target has too many admitted digest reads".into(),
+            )
+            .to_string());
+        }
+        self.audit
+            .append(&CohortAuditEvent::DigestReadRequested {
+                requester: requester.as_str().to_string(),
+                request_id: request_id.to_string(),
+                scope: scope.clone(),
+            })
+            .map_err(|error| error.to_string())?;
+        admitted.insert(
+            key.clone(),
+            DigestGrant {
+                scope: scope.clone(),
+                manifest_version: version,
+            },
+        );
+        queue.push((key.0, key.1, scope));
+        Ok(())
+    }
+
+    fn authorize_reply_send(&self, peer: &HostId, request_id: &str) -> bool {
+        let Ok(cached) = self.cached.lock() else {
+            return false;
+        };
+        self.admitted_digest_reads
+            .lock()
+            .map(|grants| {
+                grants
+                    .get(&(peer.as_str().to_string(), request_id.to_string()))
+                    .is_some_and(|grant| {
+                        grant.manifest_version == cached.manifest.version
+                            && grant.scope == DIGEST_DAILY_SCOPE
+                    })
+            })
+            .unwrap_or(false)
+    }
+
+    fn observe_reply(
+        &self,
+        peer: &HostId,
+        frame: &IacFrame,
+    ) -> Result<DigestReplyObservation, String> {
+        let DigestReadControl::Reply {
+            request_id,
+            summary,
+        } = DigestReadControl::from_frame(frame).map_err(|error| error.to_string())?
+        else {
+            return Ok(DigestReplyObservation::Unauthorized);
+        };
+        let version = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned.to_string())?
+            .manifest
+            .version;
+        let key = (peer.as_str().to_string(), request_id.clone());
+        let mut outstanding = self
+            .outstanding_digest_reads
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned.to_string())?;
+        let mut received = self
+            .received_digest_summaries
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned.to_string())?;
+        if let Some(existing) = received.get(&key) {
+            return if existing == &summary {
+                Ok(DigestReplyObservation::Duplicate)
+            } else {
+                Err("conflicting replay attempted to replace a recorded digest summary".into())
+            };
+        }
+        let Some(grant) = outstanding.get(&key) else {
+            return Ok(DigestReplyObservation::Unauthorized);
+        };
+        if grant.manifest_version != version || grant.scope != DIGEST_DAILY_SCOPE {
+            return Ok(DigestReplyObservation::Unauthorized);
+        }
+        self.audit
+            .append(&CohortAuditEvent::DigestReplyReceived {
+                member: peer.as_str().to_string(),
+                request_id: request_id.clone(),
+            })
+            .map_err(|error| error.to_string())?;
+        outstanding.remove(&key);
+        received.insert(key, summary);
+        Ok(DigestReplyObservation::Accepted)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -606,6 +918,13 @@ mod tests {
         CohortAuthority, CohortMember, ConsentMatrix, ConsentTuple, ManifestSignature,
         RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
     };
+    use maos_domain::frame::{ConsentEnvelope, FrameAddress, FramePayload, TelemetryEventPayload};
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_spirit_abi::identity::{FrameKind, SpiritId, SpiritRole};
+    use smallvec::smallvec;
 
     fn signing_key(seed: u8) -> SigningKey {
         SigningKey::from_bytes(&[seed; 32])
@@ -640,6 +959,36 @@ mod tests {
         }
         .signed_with(signer);
         toml::to_string(&manifest).expect("serializable test manifest")
+    }
+
+    fn digest_frame(from: &str, to: &str, control: DigestReadControl) -> IacFrame {
+        let from_address = FrameAddress {
+            spirit_id: SpiritId::from("digest"),
+            host_id: Some(HostId(from.into())),
+            role: Some(SpiritRole::Worker),
+        };
+        IacFrame {
+            frame_id: [7; 16],
+            timestamp_ns: 0,
+            logical_clock: 1,
+            from: from_address.clone(),
+            to: smallvec![FrameAddress {
+                spirit_id: SpiritId::from("digest"),
+                host_id: Some(HostId(to.into())),
+                role: None,
+            }],
+            kind: FrameKind::TelemetryEvent,
+            intent: IntentClass::Readonly,
+            payload: FramePayload::TelemetryEvent(
+                control.telemetry_payload().expect("valid digest control"),
+            ),
+            auto_marker: FrameOrigin::SpiritAuto,
+            consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(
+                from_address,
+                A2AIntent::new(COHORT_INTENT_DIGEST_READ),
+            )),
+            intent_lineage: IntentLineage::default(),
+        }
     }
 
     fn signed_toml_with_stale_secs(
@@ -935,5 +1284,99 @@ mod tests {
             Err(CohortError::EAuditAppendFailed(_))
         ));
         assert_eq!(state.version().unwrap(), 1);
+    }
+
+    #[test]
+    fn digest_audit_failure_publishes_no_reply_capability() {
+        let signer = signing_key(13);
+        let state = state(1, &signer, Arc::new(RejectingAudit));
+        let request = digest_frame(
+            "host-b",
+            "host-a",
+            DigestReadControl::Request {
+                request_id: "host-b:0001".into(),
+                scope: DIGEST_DAILY_SCOPE.into(),
+            },
+        );
+
+        assert!(DigestReadPort::note_admitted_request(
+            &state,
+            &HostId("host-b".into()),
+            "host-b:0001",
+            &request,
+        )
+        .is_err());
+        assert!(!DigestReadPort::authorize_reply_send(
+            &state,
+            &HostId("host-b".into()),
+            "host-b:0001",
+        ));
+        assert!(state
+            .drain_pending_digest_replies()
+            .expect("queue remains readable")
+            .is_empty());
+    }
+
+    #[test]
+    fn digest_reply_is_immutable_and_manifest_scoped() {
+        let signer = signing_key(14);
+        let state = state(1, &signer, Arc::new(InMemoryCohortAuditSink::default()));
+        let peer = HostId("host-b".into());
+        state
+            .note_digest_request_sent(&peer, "host-a:0001", DIGEST_DAILY_SCOPE)
+            .unwrap();
+        let first = DigestSummary {
+            frames: 1,
+            halts: 2,
+            conflicts: 3,
+        };
+        let reply = digest_frame(
+            "host-b",
+            "host-a",
+            DigestReadControl::Reply {
+                request_id: "host-a:0001".into(),
+                summary: first.clone(),
+            },
+        );
+        assert_eq!(
+            DigestReadPort::observe_reply(&state, &peer, &reply).unwrap(),
+            DigestReplyObservation::Accepted
+        );
+        assert_eq!(
+            DigestReadPort::observe_reply(&state, &peer, &reply).unwrap(),
+            DigestReplyObservation::Duplicate
+        );
+        let conflicting = digest_frame(
+            "host-b",
+            "host-a",
+            DigestReadControl::Reply {
+                request_id: "host-a:0001".into(),
+                summary: DigestSummary {
+                    frames: 99,
+                    ..first.clone()
+                },
+            },
+        );
+        assert!(DigestReadPort::observe_reply(&state, &peer, &conflicting).is_err());
+        assert_eq!(state.digest_summary(&peer, "host-a:0001"), Some(first));
+
+        state
+            .note_digest_request_sent(&peer, "host-a:0002", DIGEST_DAILY_SCOPE)
+            .unwrap();
+        state
+            .apply_reissue(&signed_toml(2, &signer, &signer))
+            .unwrap();
+        let revoked = digest_frame(
+            "host-b",
+            "host-a",
+            DigestReadControl::Reply {
+                request_id: "host-a:0002".into(),
+                summary: DigestSummary::default(),
+            },
+        );
+        assert_eq!(
+            DigestReadPort::observe_reply(&state, &peer, &revoked).unwrap(),
+            DigestReplyObservation::Unauthorized
+        );
     }
 }

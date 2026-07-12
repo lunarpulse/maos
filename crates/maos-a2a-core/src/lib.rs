@@ -45,7 +45,8 @@ pub use chaos::churn::{AdversarialAttempt, AdversarialDetection, ChurnDrillRepor
 pub use chaos::rotation::{compute_t_grace, AgentRotationTimestamps, RotationDrillReport};
 pub use cohort::{
     CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
-    CohortReissueDisposition, CohortReissueRejection, HaltReceiptObserver,
+    CohortReissueDisposition, CohortReissueRejection, ConsentRuptureSink, DigestFrameClass,
+    DigestReadPort, DigestReplyObservation, HaltReceiptObserver, COHORT_INTENT_DIGEST_READ,
     RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 pub use config::{A2AConfig, A2APeerConfig, A2AProfile};

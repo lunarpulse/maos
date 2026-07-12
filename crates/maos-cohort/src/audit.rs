@@ -33,6 +33,17 @@ pub enum CohortAuditEvent {
         rejected_version: u64,
         reason: String,
     },
+    /// Story 12.4a — a consent-gated `cohort:digest-read` request was ADMITTED
+    /// by this host's accept-gate (the single consent decision). Journaled to
+    /// the I2 TL so the cross-member read is auditable (AC2).
+    DigestReadRequested {
+        requester: String,
+        request_id: String,
+        scope: String,
+    },
+    /// Story 12.4a — a correlated digest-read reply was received + recorded
+    /// (idempotent per `request_id`). Journaled once per distinct reply (AC2).
+    DigestReplyReceived { member: String, request_id: String },
 }
 
 /// Deterministic in-memory implementation for focused state tests. Production
@@ -76,37 +87,62 @@ impl CohortTransparencyLogSink {
 
 impl CohortAuditSink for CohortTransparencyLogSink {
     fn append(&self, event: &CohortAuditEvent) -> Result<(), CohortError> {
-        let payload = match event {
+        let (intent, payload) = match event {
             CohortAuditEvent::AuthorityReissueIssued {
                 cohort_id,
                 version,
                 canonical_hash,
-            } => format!(
-                "{{\"event\":\"authority_reissue_issued\",\"cohort_id\":{cohort_id:?},\"version\":{version},\"canonical_hash\":\"{}\"}}",
-                hex::encode(canonical_hash)
+            } => (
+                "cohort:manifest-audit",
+                format!(
+                    "{{\"event\":\"authority_reissue_issued\",\"cohort_id\":{cohort_id:?},\"version\":{version},\"canonical_hash\":\"{}\"}}",
+                    hex::encode(canonical_hash)
+                ),
             ),
             CohortAuditEvent::MemberReissueAccepted {
                 cohort_id,
                 version,
                 canonical_hash,
-            } => format!(
-                "{{\"event\":\"member_reissue_accepted\",\"cohort_id\":{cohort_id:?},\"version\":{version},\"canonical_hash\":\"{}\"}}",
-                hex::encode(canonical_hash)
+            } => (
+                "cohort:manifest-audit",
+                format!(
+                    "{{\"event\":\"member_reissue_accepted\",\"cohort_id\":{cohort_id:?},\"version\":{version},\"canonical_hash\":\"{}\"}}",
+                    hex::encode(canonical_hash)
+                ),
             ),
             CohortAuditEvent::ReissueRejected {
                 cohort_id,
                 seen_version,
                 rejected_version,
                 reason,
-            } => format!(
-                "{{\"event\":\"reissue_rejected\",\"cohort_id\":{cohort_id:?},\"seen_version\":{seen_version},\"rejected_version\":{rejected_version},\"reason\":{reason:?}}}"
+            } => (
+                "cohort:manifest-audit",
+                format!(
+                    "{{\"event\":\"reissue_rejected\",\"cohort_id\":{cohort_id:?},\"seen_version\":{seen_version},\"rejected_version\":{rejected_version},\"reason\":{reason:?}}}"
+                ),
+            ),
+            CohortAuditEvent::DigestReadRequested {
+                requester,
+                request_id,
+                scope,
+            } => (
+                "cohort:digest-audit",
+                format!(
+                    "{{\"event\":\"digest_read_requested\",\"requester\":{requester:?},\"request_id\":{request_id:?},\"scope\":{scope:?}}}"
+                ),
+            ),
+            CohortAuditEvent::DigestReplyReceived { member, request_id } => (
+                "cohort:digest-audit",
+                format!(
+                    "{{\"event\":\"digest_reply_received\",\"member\":{member:?},\"request_id\":{request_id:?}}}"
+                ),
             ),
         };
         self.log.insert_frame_event(
             FrameKind::TelemetryEvent,
             0,
             None,
-            "cohort:manifest-audit",
+            intent,
             payload.as_bytes(),
             FrameOrigin::Kernel,
         );

@@ -15,8 +15,9 @@
 
 use crate::cohort::{
     CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
-    HaltReceiptObserver, LegacyCohortManifestGate, LegacyHaltReceiptObserver,
-    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+    ConsentRuptureSink, DigestFrameClass, DigestReadPort, DigestReplyObservation,
+    HaltReceiptObserver, LegacyCohortManifestGate, LegacyDigestReadPort, LegacyHaltReceiptObserver,
+    COHORT_INTENT_DIGEST_READ, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use crate::config::A2APeerConfig;
 use crate::consent::{AllowlistDirection, ConsentAllowlists, EIntentDenied};
@@ -142,19 +143,20 @@ pub struct A2ARouterCore {
     /// gate (P7b — single-object wiring, no transposition footgun). Observed on
     /// the TLS-verified intake path only (P5r).
     halt_receipt_observer: Arc<dyn HaltReceiptObserver>,
+    /// Story 12.4a — out-of-kernel cohort digest-read correlation port. The
+    /// legacy no-op default keeps non-cohort deployments byte-for-byte
+    /// compatible; cohort composition injects the same `CohortManifestState`
+    /// used for the gate/observer (P7b — single-object wiring). Authorizes the
+    /// correlated-reply send/accept exemptions WITHOUT touching the unchanged
+    /// `send_admits`/`accept_admits` seam bodies (AC2).
+    digest_read_port: Arc<dyn DigestReadPort>,
     /// Optional intake sink for tests — when set, accepted frames are
     /// pushed here so test code can observe them.
     intake_sink: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<IacFrame>>>>,
-    /// Story 8.13.1 / AC3 — optional rupture sink. When set, a typed
-    /// `FramePayload::ConsentRupture` frame is pushed here on the cross-Host
-    /// classified-but-policy-denied (`-32001 CODE_INTENT_DENIED`) leg, BEFORE
-    /// the NACK is returned. This is the production emission that earns the
-    /// transparency-log `ConsentRupture` record — mirroring the same-host 6.4
-    /// `iac_bus` pattern where the routing infrastructure (NOT the test)
-    /// produces the typed rupture frame. The observer (smoke / daemon) drains
-    /// this channel; the rupture is genuine because only the deny path can
-    /// populate `RuptureReason::IntentAllowlistMismatch` + the verified peer.
-    rupture_sink: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::Sender<IacFrame>>>>,
+    /// Fail-closed persistence seam for consent ruptures. The sink appends
+    /// synchronously before the deny response is returned, so queue pressure,
+    /// shutdown, or a detached drain task cannot silently erase evidence.
+    rupture_sink: Arc<tokio::sync::Mutex<Option<Arc<dyn ConsentRuptureSink>>>>,
     /// Atomic counter for outbound request ids.
     next_id: Arc<std::sync::atomic::AtomicU64>,
     /// Pinned consent-expiry clock (ns since Unix epoch). `None` ⇒ real wall
@@ -199,6 +201,7 @@ impl A2ARouterCore {
             consent_now_ns: None,
             cohort_manifest_gate: Arc::new(LegacyCohortManifestGate),
             halt_receipt_observer: Arc::new(LegacyHaltReceiptObserver),
+            digest_read_port: Arc::new(LegacyDigestReadPort),
             warned_entries: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
         })
     }
@@ -234,6 +237,14 @@ impl A2ARouterCore {
         self
     }
 
+    /// Story 12.4a — inject the out-of-kernel cohort digest-read correlation
+    /// port. A builder (mirrors [`Self::with_halt_receipt_observer`]) so the
+    /// daemon wires the SAME `CohortManifestState` used for the gate/observer.
+    pub fn with_digest_read_port(mut self, port: Arc<dyn DigestReadPort>) -> Self {
+        self.digest_read_port = port;
+        self
+    }
+
     /// The "now" used for consent-envelope expiry: the pinned test clock if set,
     /// else the real wall clock.
     fn consent_now_ns(&self) -> u64 {
@@ -247,42 +258,27 @@ impl A2ARouterCore {
         *guard = Some(sink);
     }
 
-    /// Story 8.13.1 / AC3 — install a rupture sink. On the cross-Host
-    /// classified-but-policy-denied (`-32001`) intake leg, the router pushes a
-    /// typed `FramePayload::ConsentRupture` frame here BEFORE returning the
-    /// NACK. The receiver daemon (or the smoke acting as integration driver)
-    /// drains it and journals the genuine, production-produced rupture — the
-    /// transparency log never hand-writes the row. Mirrors `install_intake_sink`.
-    pub async fn install_rupture_sink(&self, sink: tokio::sync::mpsc::Sender<IacFrame>) {
+    /// Install the fail-closed rupture persistence seam. Live transports install
+    /// this before exposing their listener; tests may replace it explicitly.
+    pub async fn install_rupture_sink(&self, sink: Arc<dyn ConsentRuptureSink>) {
         let mut guard = self.rupture_sink.lock().await;
         *guard = Some(sink);
     }
 
-    /// Story 8.13.1 / AC3 — emit a genuine typed `ConsentRupture` frame on the
-    /// classified-but-policy-denied (`-32001 CODE_INTENT_DENIED`) intake leg.
-    /// Pushed to `rupture_sink` (when installed) BEFORE the NACK is returned, so
-    /// the transparency-log row is EARNED by this production deny path rather
-    /// than hand-inserted by a smoke — closing the 8.13 P5 systemic gap and
-    /// matching the same-host 6.4 `iac_bus` rupture-frame precedent.
-    ///
-    /// The frame binds the **verified peer** (the sender, `frame.from`) — proven
-    /// equal to the TLS-verified peer by [`Self::handle_intake_verified`] before
-    /// delegation on the wire path, so a forged `from` is rejected with
-    /// `-32007` and can NEVER reach this branch (Winston's confused-deputy
-    /// guard, G8) — and the **denied intent class**. `RuptureReason::
-    /// IntentAllowlistMismatch` is the policy fact only this deny decision
-    /// possesses, so the record cannot be re-synthesised from the bare error
-    /// code (Murat's information-content bar). A closed sink (observer dropped)
-    /// is best-effort and never fails the deny.
-    async fn emit_consent_rupture(&self, frame: &IacFrame) {
-        // Story 8.13.1-review / P2 — clone the sender and drop the lock BEFORE
-        // building the frame so concurrent install_rupture_sink is not blocked.
+    /// Emit and durably persist a genuine typed `ConsentRupture` before the
+    /// denial response is returned. Digest-read denials require a sink; missing
+    /// or failed persistence is surfaced as an internal fail-closed NACK rather
+    /// than masquerading as a normal, visible refusal.
+    async fn emit_consent_rupture(&self, frame: &IacFrame) -> Result<(), String> {
         let sink = {
             let guard = self.rupture_sink.lock().await;
             guard.as_ref().cloned()
         };
         let Some(sink) = sink else {
-            return;
+            if Self::consent_match_key(frame).eq_ignore_ascii_case(COHORT_INTENT_DIGEST_READ) {
+                return Err("digest-read rupture sink is not installed".into());
+            }
+            return Ok(());
         };
         let now_ns = self.consent_now_ns();
         // Story 8.13.1-review / P4 — unique-per-denial correlation id: the first
@@ -299,7 +295,7 @@ impl A2ARouterCore {
         // rather than fall back to the sender identity, which would be semantically
         // wrong (the rupture would appear to come from the denied party).
         let Some(denier) = frame.to.first().cloned() else {
-            return;
+            return Err("denied frame has no recipient to attribute rupture".into());
         };
         let payload = maos_domain::frame::ConsentRupturePayload {
             rupture_id,
@@ -322,13 +318,12 @@ impl A2ARouterCore {
             intent: frame.intent,
             payload: maos_domain::frame::FramePayload::ConsentRupture(payload),
             auto_marker: maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
-            consent_envelope: None,
+            // Preserve the denied fine-grained intent for truthful audit
+            // attribution; the rupture itself is never routed through consent.
+            consent_envelope: frame.consent_envelope.clone(),
             intent_lineage: frame.intent_lineage.clone(),
         };
-        // Story 8.13.1-review / P3 — bounded channel with best-effort drop on full.
-        if let Err(e) = sink.try_send(rupture) {
-            tracing::warn!(error = %e, "ConsentRupture dropped — rupture_sink full");
-        }
+        sink.append(&rupture)
     }
 
     pub fn clock(&self) -> Arc<LamportClock> {
@@ -615,43 +610,81 @@ impl A2ARouterCore {
                 reason,
             });
         }
-
-        // (1) ADR-012 send-allowlist check (defense-in-depth — sender side).
-        if !self.send_admits(&peer_cfg.allowlists, &frame, peer_cfg.peer_id.as_str()) {
-            return Err(A2AError::IntentDenied {
-                direction: IntentDirection::Send,
-                inner: EIntentDenied {
-                    peer: peer.as_str().to_string(),
-                    // Story 8.7 — report the SAME key `send_admits` tested
-                    // (fine-grained when present), never a band token.
-                    intent: Self::consent_match_key(&frame),
-                    direction: AllowlistDirection::Send,
-                },
-            });
+        if Self::consent_match_key(&frame).eq_ignore_ascii_case(COHORT_INTENT_DIGEST_READ)
+            && matches!(
+                self.digest_read_port.classify(&frame),
+                DigestFrameClass::Invalid
+            )
+        {
+            return Err(A2AError::ConfigInvalid(
+                "malformed or out-of-bounds cohort:digest-read control".into(),
+            ));
         }
 
-        let intent = Self::consent_match_key(&frame);
-        let cohort_context = if Self::is_reserved_cohort_intent(&intent) {
+        // Story 12.4a — correlated digest-read reply send-exemption (AC2). A
+        // reply the target OWES for a request it ADMITTED is authorized by that
+        // admit, NOT re-gated by a second send-allowlist check — this closes the
+        // split story's dead-air (admit-the-ask / deny-the-answer) and the
+        // topic-exists-but-withheld side-channel. Scoped narrowly: ONLY a
+        // `cohort:digest-read` Reply whose `request_id` the port authorizes for
+        // THIS peer bypasses the send seam + Send cohort overlay. Requests,
+        // unsolicited "replies", and every other intent take the unchanged seam
+        // path below (an unauthorized reply is denied, never silently exempted).
+        // The `send_admits`/`cohort_consent_decision` bodies are untouched.
+        let digest_reply_send_exempt = Self::consent_match_key(&frame)
+            .eq_ignore_ascii_case(COHORT_INTENT_DIGEST_READ)
+            && matches!(
+                self.digest_read_port.classify(&frame),
+                DigestFrameClass::Reply { request_id }
+                    if self.digest_read_port.authorize_reply_send(peer, &request_id)
+            );
+
+        let cohort_context = if digest_reply_send_exempt {
             None
         } else {
-            match self.cohort_consent_decision(CohortConsentSeam::Send, peer, None, &intent, None) {
-                CohortConsentVerdict::Defer => None,
-                CohortConsentVerdict::AdmitOutbound {
-                    acting_role,
-                    manifest_version,
-                } => Some((acting_role, manifest_version)),
-                CohortConsentVerdict::Admit => None,
-                CohortConsentVerdict::NotCurrent => {
-                    return Err(A2AError::ConfigInvalid(format!(
-                        "cohort manifest is not current for peer {}",
-                        peer.as_str()
-                    )));
-                }
-                CohortConsentVerdict::Deny(reason) => {
-                    return Err(A2AError::CohortConsentDenied {
-                        direction: IntentDirection::Send,
-                        reason,
-                    });
+            // (1) ADR-012 send-allowlist check (defense-in-depth — sender side).
+            if !self.send_admits(&peer_cfg.allowlists, &frame, peer_cfg.peer_id.as_str()) {
+                return Err(A2AError::IntentDenied {
+                    direction: IntentDirection::Send,
+                    inner: EIntentDenied {
+                        peer: peer.as_str().to_string(),
+                        // Story 8.7 — report the SAME key `send_admits` tested
+                        // (fine-grained when present), never a band token.
+                        intent: Self::consent_match_key(&frame),
+                        direction: AllowlistDirection::Send,
+                    },
+                });
+            }
+
+            let intent = Self::consent_match_key(&frame);
+            if Self::is_reserved_cohort_intent(&intent) {
+                None
+            } else {
+                match self.cohort_consent_decision(
+                    CohortConsentSeam::Send,
+                    peer,
+                    None,
+                    &intent,
+                    None,
+                ) {
+                    CohortConsentVerdict::Defer => None,
+                    CohortConsentVerdict::AdmitOutbound {
+                        acting_role,
+                        manifest_version,
+                    } => Some((acting_role, manifest_version)),
+                    CohortConsentVerdict::Admit => None,
+                    CohortConsentVerdict::NotCurrent => {
+                        return Err(A2AError::ConfigInvalid(format!(
+                            "cohort manifest is not current for peer {}",
+                            peer.as_str()
+                        )));
+                    }
+                    CohortConsentVerdict::Deny(reason) => {
+                        return Err(A2AError::CohortConsentDenied {
+                            direction: IntentDirection::Send,
+                            reason,
+                        });
+                    }
                 }
             }
         };
@@ -975,6 +1008,72 @@ impl A2ARouterCore {
                 data,
             );
         }
+        if Self::consent_match_key(frame).eq_ignore_ascii_case(COHORT_INTENT_DIGEST_READ)
+            && matches!(
+                self.digest_read_port.classify(frame),
+                DigestFrameClass::Invalid
+            )
+        {
+            return A2AJsonRpcResponse::nack(
+                request.id,
+                CODE_CONSENT_UNCLASSIFIED,
+                "malformed or out-of-bounds cohort:digest-read control",
+            );
+        }
+
+        // Story 12.4a — correlated digest-read reply accept-exemption (AC2). A
+        // reply THIS host is awaiting (it sent the matching request to this peer)
+        // is accepted without a fresh consent decision: the target's admit was
+        // the SINGLE decision, and a reader re-gating its OWN solicited reply is
+        // the dead-air the split story forbade. Scoped narrowly: ONLY a
+        // `cohort:digest-read` Reply whose `request_id` the port confirms this
+        // host is awaiting FROM THIS peer is exempt (identity is TLS-bound by
+        // `handle_intake_verified` before delegation). An unsolicited "reply"
+        // fails this gate and falls through to the unchanged accept seam below —
+        // where it is denied and ruptured, exactly as an out-of-matrix read
+        // should be. Dedup is idempotent per `request_id` (AC2b), NEVER the
+        // resetting envelope `frame_id`.
+        if Self::consent_match_key(frame).eq_ignore_ascii_case(COHORT_INTENT_DIGEST_READ)
+            && matches!(
+                self.digest_read_port.classify(frame),
+                DigestFrameClass::Reply { .. }
+            )
+        {
+            match self.digest_read_port.observe_reply(&peer_host, frame) {
+                Ok(DigestReplyObservation::Accepted) => {
+                    let new_clock = self.clock.recv_advance(frame.logical_clock);
+                    let sink_guard = self.intake_sink.lock().await;
+                    if let Some(sink) = sink_guard.as_ref() {
+                        let _ = sink.send(frame.clone());
+                    }
+                    drop(sink_guard);
+                    return A2AJsonRpcResponse::ack(
+                        request.id,
+                        AckBody {
+                            delivered: true,
+                            receiver_logical_clock: new_clock,
+                        },
+                    );
+                }
+                Ok(DigestReplyObservation::Duplicate) => {
+                    return A2AJsonRpcResponse::ack(
+                        request.id,
+                        AckBody {
+                            delivered: true,
+                            receiver_logical_clock: self.clock.recv_advance(frame.logical_clock),
+                        },
+                    );
+                }
+                Ok(DigestReplyObservation::Unauthorized) => {}
+                Err(error) => {
+                    return A2AJsonRpcResponse::nack(
+                        request.id,
+                        CODE_INTERNAL,
+                        format!("digest reply audit/state transition failed: {error}"),
+                    );
+                }
+            }
+        }
 
         // (3) ADR-012 accept-allowlist check.
         if !self.accept_admits(&peer_cfg.allowlists, frame, peer_cfg.peer_id.as_str()) {
@@ -985,7 +1084,13 @@ impl A2ARouterCore {
             // semantics. Emitted BEFORE the NACK so an observer that drains the
             // rupture sink sees the record bound to the verified peer + denied
             // intent. The wire NACK below is byte-for-byte unchanged.
-            self.emit_consent_rupture(frame).await;
+            if let Err(error) = self.emit_consent_rupture(frame).await {
+                return A2AJsonRpcResponse::nack(
+                    request.id,
+                    CODE_INTERNAL,
+                    format!("consent denied but rupture persistence failed: {error}"),
+                );
+            }
             return A2AJsonRpcResponse::nack(
                 request.id,
                 CODE_INTENT_DENIED,
@@ -1021,7 +1126,15 @@ impl A2ARouterCore {
                 }
                 CohortConsentVerdict::Deny(reason) => {
                     let data = Self::cohort_denial_data(&reason);
-                    self.emit_consent_rupture(frame).await;
+                    if let Err(error) = self.emit_consent_rupture(frame).await {
+                        return A2AJsonRpcResponse::nack(
+                            request.id,
+                            CODE_INTERNAL,
+                            format!(
+                                "cohort consent denied but rupture persistence failed: {error}"
+                            ),
+                        );
+                    }
                     return A2AJsonRpcResponse::nack_with_data(
                         request.id,
                         CODE_INTENT_DENIED,
@@ -1147,10 +1260,39 @@ impl A2ARouterCore {
                     request.params.clone(),
                 )
             });
-        let response = self.handle_intake(request).await;
+        // Story 12.4a — retain an admitted digest-read REQUEST so, after the
+        // accept-gate ACKs it (the single consent decision), the port records the
+        // reply obligation + authorizes the future correlated reply. Identity is
+        // TLS-bound here (P5r); a malformed/denied request never reaches the
+        // ACK arm, so no unauthorized reply can be minted.
+        let digest_request_to_admit = Self::consent_match_key(&request.params)
+            .eq_ignore_ascii_case(COHORT_INTENT_DIGEST_READ)
+            .then(|| self.digest_read_port.classify(&request.params))
+            .and_then(|class| match class {
+                DigestFrameClass::Request { request_id } => Some((
+                    HostId(verified_peer.as_str().to_string()),
+                    request_id,
+                    request.params.clone(),
+                )),
+                _ => None,
+            });
+        let response_id = request.id;
+        let mut response = self.handle_intake(request).await;
         if matches!(&response, A2AJsonRpcResponse::Ack(_)) {
             if let Some((member, frame)) = receipt_to_observe {
                 self.halt_receipt_observer.observe_receipt(&member, &frame);
+            }
+            if let Some((requester, request_id, frame)) = digest_request_to_admit {
+                if let Err(error) =
+                    self.digest_read_port
+                        .note_admitted_request(&requester, &request_id, &frame)
+                {
+                    response = A2AJsonRpcResponse::nack(
+                        response_id,
+                        CODE_INTERNAL,
+                        format!("digest request audit/state transition failed: {error}"),
+                    );
+                }
             }
         }
         (response, true)
@@ -1278,6 +1420,21 @@ mod tests {
     use maos_domain::invariants::i8::A2AIntent;
     use maos_spirit_abi::identity::{FrameKind, SpiritId};
     use smallvec::smallvec;
+
+    #[derive(Default)]
+    struct RecordingRuptureSink {
+        frames: std::sync::Mutex<Vec<IacFrame>>,
+    }
+
+    impl ConsentRuptureSink for RecordingRuptureSink {
+        fn append(&self, frame: &IacFrame) -> Result<(), String> {
+            self.frames
+                .lock()
+                .map_err(|_| "recording rupture sink lock poisoned".to_string())?
+                .push(frame.clone());
+            Ok(())
+        }
+    }
 
     fn make_peer_cfg(allowlists: ConsentAllowlists) -> A2APeerConfig {
         A2APeerConfig {
@@ -1432,8 +1589,8 @@ mod tests {
             accept_allowlist: vec![], // denies the classified "standard" intent
         };
         let core = pinned_core(allow).await;
-        let (tx, mut rx) = tokio::sync::mpsc::channel(16);
-        core.install_rupture_sink(tx).await;
+        let sink = Arc::new(RecordingRuptureSink::default());
+        core.install_rupture_sink(sink.clone()).await;
         let frame = make_frame(Some("loopback"));
         let original_id = frame.frame_id;
         let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1);
@@ -1447,8 +1604,12 @@ mod tests {
         // the record the smokes used to hand-insert. Information only the deny
         // decision possesses (the reason) is carried, so it cannot be re-faked
         // from the bare error code (Murat's information-content bar).
-        let rupture = rx
-            .try_recv()
+        let rupture = sink
+            .frames
+            .lock()
+            .expect("recording rupture sink lock")
+            .first()
+            .cloned()
             .expect("classified-policy-deny path must emit a ConsentRupture frame");
         assert_eq!(rupture.kind, FrameKind::ConsentRupture);
         // Bound to the verified peer (sender A) + the denied intent class.
@@ -1478,14 +1639,17 @@ mod tests {
             accept_allowlist: vec![A2AIntent::new("standard")],
         };
         let core = pinned_core(allow).await;
-        let (tx, mut rx) = tokio::sync::mpsc::channel(16);
-        core.install_rupture_sink(tx).await;
+        let sink = Arc::new(RecordingRuptureSink::default());
+        core.install_rupture_sink(sink.clone()).await;
         let frame = make_frame(Some("loopback"));
         let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1);
         let resp = core.handle_intake(req).await;
         assert!(matches!(resp, A2AJsonRpcResponse::Ack(_)));
         assert!(
-            rx.try_recv().is_err(),
+            sink.frames
+                .lock()
+                .expect("recording rupture sink lock")
+                .is_empty(),
             "ACCEPT path must not emit a ConsentRupture"
         );
     }

@@ -272,6 +272,16 @@ coverage:
       observer-no-arbitration-chokepoint) to check-cohort-mesh — the kernel
       remains the single halt owner (invoke_halt/I2 unchanged); 12.3 ships +
       observes the receipt out-of-kernel (observability, not arbitration).
+      Story 12.4a adds the ADR-054 §8 no-surveillance MECHANISM legs
+      (digest-read-consented-admitted, digest-read-surveillance-negative,
+      digest-read-rupture-sink-wired, digest-read-anti-canned-resign,
+      digest-read-replay-dedup) to check-cohort-mesh: a NEW non-reserved
+      cohort:digest-read consent-gated read (J3 §10.7.1 "reads only consented
+      topics") whose out-of-matrix query is refused at the cohort accept-overlay
+      (ADR-012 confused-deputy, acting-role exact-match) AND made visible to the
+      target as a journaled, queryable ConsentRupture (the F4 production
+      rupture-sink fix) — reads-with-consent + visible-refusal, never a claim
+      standing in for the control.
   FR22:
     gates: []
     corpora: []

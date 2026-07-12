@@ -9,6 +9,22 @@ use maos_spirit_abi::identity::HostId;
 pub const RESERVED_INTENT_REISSUE: &str = "cohort:manifest-reissue";
 pub const RESERVED_INTENT_HALT_RECEIPT: &str = "cohort:halt-receipt";
 
+/// Story 12.4a — the NON-reserved cohort digest-read intent. Deliberately
+/// absent from [`crate::router::A2ARouterCore::is_reserved_cohort_intent`], so
+/// it is fully evaluated by both consent seams and the cohort role/version
+/// overlay (AC1: a reserved read would be an *ungated* read). Colon-kebab per
+/// the `A2AIntent::is_canonical` grammar (`maos-domain` i8).
+pub const COHORT_INTENT_DIGEST_READ: &str = "cohort:digest-read";
+
+/// Synchronous, fail-closed persistence seam for consent ruptures.
+///
+/// Implementations return only after the denial evidence is durable. Keeping
+/// this port in `maos-a2a-core` preserves dependency inversion while avoiding
+/// a lossy asynchronous queue between the deny decision and its audit row.
+pub trait ConsentRuptureSink: Send + Sync {
+    fn append(&self, frame: &IacFrame) -> Result<(), String>;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CohortConsentSeam {
     Send,
@@ -167,4 +183,116 @@ pub(crate) struct LegacyHaltReceiptObserver;
 
 impl HaltReceiptObserver for LegacyHaltReceiptObserver {
     fn observe_receipt(&self, _member: &HostId, _frame: &IacFrame) {}
+}
+
+/// Story 12.4a — the request/reply classification of a `cohort:digest-read`
+/// frame, returned by [`DigestReadPort::classify`]. The router never parses the
+/// `maos-cohort` payload itself; it asks the port and acts on this primitive
+/// so no cohort type leaks into `maos-a2a-core` (mirrors the `&IacFrame`-only
+/// [`HaltReceiptObserver`] seam).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DigestFrameClass {
+    /// A digest-read REQUEST carrying its stable correlation id (`request_id`).
+    Request {
+        request_id: String,
+    },
+    /// A digest-read REPLY answering the request with the same `request_id`.
+    Reply {
+        request_id: String,
+    },
+    /// Not a well-formed digest-read frame — the router treats it as ordinary
+    /// (falls through to the unchanged consent seams).
+    /// The frame claims the digest-read intent but its typed envelope is
+    /// malformed or violates request-id/scope bounds. Routers deny it rather
+    /// than treating it as an ordinary consented payload.
+    Invalid,
+    NotDigest,
+}
+
+/// Atomic result of validating and recording a correlated digest reply.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DigestReplyObservation {
+    /// The reply consumed a live `(peer, request_id)` capability and was
+    /// durably recorded.
+    Accepted,
+    /// The exact capability was already consumed. The replay is acknowledged
+    /// idempotently but cannot mutate or re-deliver the first summary.
+    Duplicate,
+    /// No live request from this peer authorizes the reply.
+    Unauthorized,
+}
+
+/// Story 12.4a — dependency-inverted **cohort digest-read** correlation port.
+///
+/// A cross-member "read" is ONE consent decision (the target's accept-gate) plus
+/// an intrinsic **correlated reply** (AC2). The reply is authorized by the
+/// ADMIT, NOT re-gated by a second consent check — so the router needs a
+/// correlation oracle to (a) authorize the target's send of a reply it owes and
+/// (b) authorize the reader's accept of a reply it is awaiting, WITHOUT touching
+/// the unchanged `send_admits`/`accept_admits` seam bodies. All correlation
+/// state + payload parsing lives in the `maos-cohort` impl; this seam speaks
+/// only primitives / `&IacFrame` / `&HostId`.
+///
+/// The correlation is capability-scoped: a reply is send-exempt only for a
+/// request THIS host admitted from that peer, and accept-exempt only for a
+/// request THIS host actually sent to that peer — never a free-standing
+/// unsolicited push (AC2). Identity is already TLS-bound by
+/// [`crate::router::A2ARouterCore::handle_intake_verified`] before any accept
+/// authorization is asked.
+pub trait DigestReadPort: Send + Sync {
+    /// Classify a `cohort:digest-read` frame into request / reply / neither.
+    fn classify(&self, frame: &IacFrame) -> DigestFrameClass;
+
+    /// Target side — this host just admitted a digest-read request from
+    /// `requester`. The implementation MUST durably audit before publishing
+    /// the reply capability or obligation. A failure converts the pending ACK
+    /// into a fail-closed NACK.
+    fn note_admitted_request(
+        &self,
+        requester: &HostId,
+        request_id: &str,
+        frame: &IacFrame,
+    ) -> Result<(), String>;
+
+    /// Target side — may this host send a correlated reply tagged `request_id`
+    /// to `peer`? True iff a matching request from `peer` was admitted.
+    fn authorize_reply_send(&self, peer: &HostId, request_id: &str) -> bool;
+
+    /// Reader side — atomically validate, durably audit, consume, and record a
+    /// correlated reply. Combining authorization with observation prevents two
+    /// concurrent replays from both passing a check-then-act window.
+    fn observe_reply(
+        &self,
+        peer: &HostId,
+        frame: &IacFrame,
+    ) -> Result<DigestReplyObservation, String>;
+}
+
+/// No-op default so non-cohort deployments are byte-for-byte unaffected
+/// (mirrors [`LegacyHaltReceiptObserver`]): every frame classifies as
+/// `NotDigest` and no reply is ever authorized.
+pub(crate) struct LegacyDigestReadPort;
+
+impl DigestReadPort for LegacyDigestReadPort {
+    fn classify(&self, _frame: &IacFrame) -> DigestFrameClass {
+        DigestFrameClass::NotDigest
+    }
+    fn note_admitted_request(
+        &self,
+        _requester: &HostId,
+        _request_id: &str,
+        _frame: &IacFrame,
+    ) -> Result<(), String> {
+        Err("digest-read correlation port is not installed".into())
+    }
+    fn authorize_reply_send(&self, _peer: &HostId, _request_id: &str) -> bool {
+        false
+    }
+    fn observe_reply(
+        &self,
+        _peer: &HostId,
+        _frame: &IacFrame,
+    ) -> Result<DigestReplyObservation, String> {
+        Ok(DigestReplyObservation::Unauthorized)
+    }
 }

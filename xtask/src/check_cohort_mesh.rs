@@ -334,6 +334,95 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        // ── Story 12.4a — no-surveillance MECHANISM legs (live N=8 TCP) ──────
+        // §A7 no-surveillance reflex: a consent-matrix cohort:digest-read is
+        // admitted through the target's accept-gate and the correlated reply
+        // lands, tagged with the request's request_id (a data-return without
+        // an admit, or a lost reply, reds).
+        Leg {
+            name: "digest-read-consented-admitted",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_4a_digest_read",
+                "t_12_4a_consented_read_admitted_reply",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 no-surveillance reflex: an out-of-matrix read is refused at the
+        // COHORT accept-overlay (a real Deny, not the coarse allowlist), no data
+        // returned, and the refusal is a genuine ConsentRupture bound to the
+        // denier=target (an invisible refusal or a data-return reds).
+        Leg {
+            name: "digest-read-surveillance-negative",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_4a_digest_read",
+                "t_12_4a_surveillance_negative_denied_and_visible",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 sink-is-live reflex (P7c, anti-silent-green): the F4 fix — a
+        // refusal's rupture lands in a RECORDING target journal AND is returned
+        // by a --frame-kind ConsentRupture query; a stubbed/no-op sink journals
+        // nothing and reds it ("wired" ≠ "the member can query the row").
+        Leg {
+            name: "digest-read-rupture-sink-wired",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_4a_digest_read",
+                "t_12_4a_rupture_sink_wired_live_journal",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 anti-canned reflex: a re-signed manifest with the digest-read
+        // accept grant REMOVED flips admit→deny through the gate's own
+        // comparator (a static verdict reds).
+        Leg {
+            name: "digest-read-anti-canned-resign",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_4a_digest_read",
+                "t_12_4a_anti_canned_resign_flips_verdict",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 replay-dedup reflex: the SAME request_id reply shipped twice is
+        // counted once (a distinct request_id counts again); dedup on the
+        // resetting envelope frame_id is the 12.3 P4 silent no-op and reds.
+        Leg {
+            name: "digest-read-replay-dedup",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_4a_digest_read",
+                "t_12_4a_replay_dedup_reply_idempotent",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
     ];
     for leg in &legs {
         run_leg(leg)?;
