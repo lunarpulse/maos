@@ -2,7 +2,7 @@
 # The annotated git tag is the auditable freeze; this file is the oracle input.
 frozen_tag = "frozen-kernel-v2.0"
 frozen_commit = "1f5d57295f4f8fbe58a4d1bbf16cf99f5cfdcdd8"
-src_lines = 23081
+src_lines = 23082
 abi_baseline = "abi-baseline/v1-pre-bump.txt"
 host_baseline = "abi-baseline/maos-host-v1.txt"
 frozen_at = "2026-07-07"

@@ -291,6 +291,7 @@ enum LoadedSpiritKind {
     Reviewer,
     Mira,
     Nash,
+    Digest,
 }
 
 #[cfg(feature = "network")]
@@ -303,8 +304,71 @@ fn classify_spirit(class_name: &str) -> Option<LoadedSpiritKind> {
         "reviewer" => Some(LoadedSpiritKind::Reviewer),
         "mira" => Some(LoadedSpiritKind::Mira),
         "nash" => Some(LoadedSpiritKind::Nash),
+        "digest" => Some(LoadedSpiritKind::Digest),
         _ => None,
     }
+}
+
+#[cfg(feature = "network")]
+fn render_j3_digest_scene(
+    transparency_log: &Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
+    distillate_writer: &dyn maos_domain::ports::DistillationPort,
+    spirit_pid: u32,
+    fixture_path: &std::path::Path,
+) -> Result<maos_digest::TeamDigest, String> {
+    let bytes = std::fs::read(fixture_path).map_err(|error| {
+        format!(
+            "read J3 captured raw inputs {}: {error}",
+            fixture_path.display()
+        )
+    })?;
+    let mut raw: maos_digest::RawDigestInputs = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("decode J3 captured raw inputs: {error}"))?;
+
+    for evidence in &mut raw.summaries {
+        let payload = serde_json::to_vec(evidence)
+            .map_err(|error| format!("encode J3 summary ingestion: {error}"))?;
+        transparency_log.insert_frame_event(
+            FrameKind::TelemetryEvent,
+            spirit_pid,
+            None,
+            "cohort:digest-ingestion",
+            &payload,
+            maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+        );
+        evidence.source_log_ref = hex::encode(transparency_log.last_frame_id());
+    }
+    for evidence in &mut raw.receipt_presence {
+        let payload = serde_json::to_vec(evidence)
+            .map_err(|error| format!("encode J3 receipt ingestion: {error}"))?;
+        transparency_log.insert_frame_event(
+            FrameKind::TelemetryEvent,
+            spirit_pid,
+            None,
+            "cohort:digest-ingestion",
+            &payload,
+            maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+        );
+        evidence.source_log_ref = hex::encode(transparency_log.last_frame_id());
+    }
+    for evidence in &mut raw.consent_journal {
+        let payload = serde_json::to_vec(evidence)
+            .map_err(|error| format!("encode J3 consent-journal ingestion: {error}"))?;
+        transparency_log.insert_frame_event(
+            FrameKind::TelemetryEvent,
+            spirit_pid,
+            None,
+            "cohort:digest-ingestion",
+            &payload,
+            maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+        );
+        evidence.source_log_ref = hex::encode(transparency_log.last_frame_id());
+    }
+
+    let digest = maos_digest::derive_team_digest(&raw).map_err(|error| error.to_string())?;
+    maos_digest::persist_team_digest(distillate_writer, spirit_pid, &digest)
+        .map_err(|error| error.to_string())?;
+    Ok(digest)
 }
 
 #[cfg(feature = "network")]
@@ -2834,6 +2898,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map_err(|e| {
                             format!("maos run: scheduler.load failed for {spirit_id}: {e}")
                         })?,
+                    LoadedSpiritKind::Digest => scheduler
+                        .load(
+                            &spirit_id,
+                            bundle,
+                            maos_digest::DigestSpirit::default(),
+                            boot_nonce,
+                        )
+                        .await
+                        .map_err(|e| {
+                            format!("maos run: scheduler.load failed for {spirit_id}: {e}")
+                        })?,
                     LoadedSpiritKind::Butler | LoadedSpiritKind::Researcher => {
                         return Err(format!(
                             "maos run: topology manifests currently accept deterministic class Spirits only; got {spirit_id}"
@@ -3009,7 +3084,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let kind = classify_spirit(&class_section.name).ok_or_else(|| {
                 format!(
                     "maos run: unknown Spirit class '{}' (known: butler, researcher, \
-                 orchestrator, architect, reviewer, mira, nash)",
+                 orchestrator, architect, reviewer, mira, nash, digest)",
                     class_section.name
                 )
             })?;
@@ -3689,6 +3764,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     )
                     .await
                     .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
+                LoadedSpiritKind::Digest => scheduler
+                    .load(
+                        &spirit_id,
+                        bundle,
+                        maos_digest::DigestSpirit::default(),
+                        boot_nonce,
+                    )
+                    .await
+                    .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
             };
             pid_by_spirit_id
                 .write()
@@ -3728,6 +3812,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "{}",
                     serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
                 );
+                if kind == LoadedSpiritKind::Digest {
+                    let home = std::env::var_os("MAOS_HOME")
+                        .map(std::path::PathBuf::from)
+                        .ok_or("maos run digest: MAOS_HOME is required")?;
+                    let digest = render_j3_digest_scene(
+                        &transparency_log,
+                        distillate_writer.as_ref(),
+                        pid,
+                        &home.join("j3-digest-inputs.json"),
+                    )?;
+                    let output_json = serde_json::to_value(&digest)
+                        .map_err(|error| format!("maos run digest: encode output: {error}"))?;
+                    let predicate =
+                        maos_kernel_core::security::OutputShapePredicate::from(&output_shape);
+                    predicate.check(&output_json).map_err(|error| {
+                        format!("maos run digest: output_shape violation: {error}")
+                    })?;
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "event": "team_digest",
+                            "render": digest.narrative,
+                            "digest": output_json,
+                        })
+                    );
+                }
                 // JB-5 — output_shape enforcement: validate the Spirit's notification
                 // output against the manifest's OutputShapePredicate. The Spirit writes
                 // to the shared output channel during on_idle; the daemon validates here.

@@ -2447,6 +2447,7 @@ dependencies = [
  "maos-cohort",
  "maos-compliance",
  "maos-corpus-gen",
+ "maos-digest",
  "maos-director-surface",
  "maos-domain",
  "maos-escape-detector",
@@ -2589,6 +2590,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "maos-digest"
+version = "0.1.0"
+dependencies = [
+ "maos-cohort",
+ "maos-domain",
+ "maos-iac",
+ "maos-spirit-abi",
+ "maos-spirit-sdk",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 0.8.23",
+]
+
+[[package]]
 name = "maos-director-surface"
 version = "0.1.0-alpha"
 dependencies = [
@@ -2700,6 +2716,7 @@ dependencies = [
  "butler",
  "maos-audit",
  "maos-bin",
+ "maos-digest",
  "maos-domain",
  "maos-kernel-core",
  "maos-mcp",

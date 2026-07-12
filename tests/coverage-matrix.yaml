@@ -282,6 +282,10 @@ coverage:
       target as a journaled, queryable ConsentRupture (the F4 production
       rupture-sink fix) — reads-with-consent + visible-refusal, never a claim
       standing in for the control.
+      Story 12.4b closes J3 §10.7.1 with the day-30-scene and
+      anti-canned-raw-byte legs: the Grade-A PTY daemon render persists a §9.5
+      I11 distillate whose clause map cites Digest-owned consented evidence, and
+      a blinded one-byte captured input moves the rendered vt100 line.
   FR22:
     gates: []
     corpora: []

@@ -35,6 +35,21 @@ fn run_leg(leg: &Leg) -> Result<(), String> {
     Ok(())
 }
 
+fn build_journey_daemon() -> Result<(), String> {
+    let output = Command::new("cargo")
+        .args(["build", "-p", "maos-bin"])
+        .output()
+        .map_err(|error| format!("{GATE_NAME}: could not build J3 daemon: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "{GATE_NAME}: J3 daemon build RED\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    ))
+}
+
 pub fn run(json: bool) -> Result<(), String> {
     assert_eq!(
         CURRENT_PHASE, "v1_5",
@@ -43,6 +58,7 @@ pub fn run(json: bool) -> Result<(), String> {
     assert!(PHASE_ORDER.contains(&"v2_2"));
     // Every designated leg is phase-independent and hard-fails here, before
     // any ship-phase disposition can classify the aggregate as advisory.
+    build_journey_daemon()?;
     let legs = [
         Leg {
             name: "unpinned-authority",
@@ -420,6 +436,39 @@ pub fn run(json: bool) -> Result<(), String> {
                 "t_12_4a_replay_dedup_reply_idempotent",
                 "--",
                 "--ignored",
+                "--exact",
+            ],
+        },
+        // Story 12.4b §A7 day-30 journey reflex: the production daemon loads
+        // the captured raw dataset, journals Digest-owned ingestion frames,
+        // derives and persists the I11 distillate, and moves the real vt100
+        // screen. A missing render/persist seam reds this exact Grade-A test.
+        Leg {
+            name: "j3-day-30-scene",
+            args: &[
+                "test",
+                "-p",
+                "maos-journey-test",
+                "--test",
+                "journey_j3",
+                "j3_day_30_digest_renders_and_persists_via_real_daemon",
+                "--",
+                "--exact",
+            ],
+        },
+        // Story 12.4b §A7 anti-canned reflex: blind exactly one byte in a
+        // captured summary count, derive through the one shared function, and
+        // require the vt100 line to move. Static prose or stale pre-render reds.
+        Leg {
+            name: "j3-anti-canned-raw-byte",
+            args: &[
+                "test",
+                "-p",
+                "maos-journey-test",
+                "--test",
+                "journey_j3",
+                "j3_anti_canned_blinded_raw_input_moves_rendered_line",
+                "--",
                 "--exact",
             ],
         },

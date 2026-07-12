@@ -36,13 +36,14 @@ use maos_a2a_core::{
 };
 use maos_cohort::{
     CohortAuthority, CohortDigestDistributor, CohortManifest, CohortManifestState, CohortMember,
-    ConsentMatrix, ConsentTuple, DigestReadControl, DigestSummary, InMemoryCohortAuditSink,
-    ManifestSignature, PinnedAuthorityKeys, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
-    SCHEMA_VERSION,
+    ConsentMatrix, ConsentTuple, DigestReadControl, DigestSummary, HaltReceiptDistributor,
+    InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys, RESERVED_INTENT_HALT_RECEIPT,
+    RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
 };
 use maos_domain::frame::{
     ConsentEnvelope, FrameAddress, FramePayload, IacFrame, TelemetryEventPayload,
 };
+use maos_domain::halt::{HaltId, HaltReceipt};
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
@@ -101,20 +102,18 @@ fn digest_manifest(
         },
         members,
         consent: ConsentMatrix {
-            // host_00 may SEND digest-read to host_01 / host_02 (targets declare
-            // "member"); the acting_role it claims derives from the accept grant.
-            send: vec![
-                ConsentTuple {
-                    peer: names[1].clone(),
+            // host_00 may send digest-read to every cohort member. Existing
+            // 12.4a legs exercise hosts 01/02; Story 12.4b's capture utility
+            // exercises all seven remote peers on the same real N=8 mesh.
+            send: names
+                .iter()
+                .skip(1)
+                .map(|peer| ConsentTuple {
+                    peer: peer.clone(),
                     role: "member".into(),
                     intent: COHORT_INTENT_DIGEST_READ.into(),
-                },
-                ConsentTuple {
-                    peer: names[2].clone(),
-                    role: "member".into(),
-                    intent: COHORT_INTENT_DIGEST_READ.into(),
-                },
-            ],
+                })
+                .collect(),
             accept,
         },
         reserved_intents: vec![
@@ -579,4 +578,162 @@ async fn t_12_4a_replay_dedup_reply_idempotent() {
         2,
         "a distinct request_id records a second summary"
     );
+}
+
+/// Story 12.4b capture utility. This ignored, explicitly-invoked test is the
+/// only producer of the committed J3 raw-input fixture: every remote summary is
+/// obtained over the real N=8 mTLS digest-read path, receipt presence is shipped
+/// over the real 12.3 reserved path, and the refusal is read from the target's
+/// production-wired rupture journal. It emits raw evidence only; it never calls
+/// the Digest Spirit's narrative derivation.
+#[tokio::test]
+#[ignore = "Story 12.4b fixture capture — set MAOS_CAPTURE_J3_FIXTURE to an output path"]
+async fn t_12_4b_capture_j3_raw_inputs() {
+    let output = std::env::var("MAOS_CAPTURE_J3_FIXTURE")
+        .expect("MAOS_CAPTURE_J3_FIXTURE output path is required");
+    let authority = SigningKey::from_bytes(&[0x4f; 32]);
+    let fleet = build_fleet("ca-12-4b-capture", &authority, &[true; HOST_COUNT]).await;
+    let mesh = build_mesh(&fleet).await;
+
+    let frame_counts = [5_u64, 6, 7, 5, 8, 4, 9, 3];
+    let reader_router: Arc<dyn A2APeerRouter> = mesh[0].transport.clone();
+    let reader_courier =
+        CohortDigestDistributor::new(fleet.states[0].clone(), reader_router, from_addr(READER));
+    let mut summaries = vec![serde_json::json!({
+        "member": READER,
+        "request_id": "local:self-report",
+        "summary": {"frames": frame_counts[0], "halts": 0, "conflicts": 0},
+        "source_log_ref": "local:self-report"
+    })];
+    let mut admitted_request_ids = Vec::new();
+    for target_index in 1..HOST_COUNT {
+        let target = HostId(fleet.names[target_index].clone());
+        let request_id = reader_courier
+            .request_read(&target, maos_cohort::DIGEST_DAILY_SCOPE)
+            .await
+            .expect("consent-gated digest-read request ships");
+        let target_router: Arc<dyn A2APeerRouter> = mesh[target_index].transport.clone();
+        let target_courier = CohortDigestDistributor::new(
+            fleet.states[target_index].clone(),
+            target_router,
+            from_addr(&fleet.names[target_index]),
+        );
+        let summary = DigestSummary {
+            frames: frame_counts[target_index],
+            halts: u64::from(target_index <= 3),
+            conflicts: u64::from(target_index == 1),
+        };
+        assert_eq!(
+            target_courier
+                .service_pending_replies(&summary)
+                .await
+                .expect("target services admitted reply"),
+            1
+        );
+        assert_eq!(
+            fleet.states[0].digest_summary(&target, &request_id),
+            Some(summary.clone()),
+            "reader records the real correlated reply"
+        );
+        summaries.push(serde_json::json!({
+            "member": target.as_str(),
+            "request_id": request_id,
+            "summary": summary,
+            "source_log_ref": request_id
+        }));
+        admitted_request_ids.push(request_id);
+    }
+    assert_eq!(fleet.states[0].digest_summary_count(), 7);
+
+    let mut receipt_presence = Vec::new();
+    for member_index in 1..=3 {
+        let halt_id = format!("j3-conflict-halt-{member_index}");
+        let receipt = HaltReceipt::new(
+            HaltId::new(&halt_id).expect("valid halt id"),
+            100 + member_index as u64,
+            member_index as u32,
+            7,
+            [member_index as u8; 16],
+        );
+        let router: Arc<dyn A2APeerRouter> = mesh[member_index].transport.clone();
+        let distributor = HaltReceiptDistributor::new(
+            fleet.states[member_index].clone(),
+            router,
+            from_addr(&fleet.names[member_index]),
+        );
+        distributor
+            .push_receipt_to(&HostId(READER.into()), &receipt)
+            .await
+            .expect("halt receipt ships to Digest reader");
+        assert!(fleet.states[0]
+            .is_receipt_present(&HostId(fleet.names[member_index].clone()), &halt_id));
+        receipt_presence.push(serde_json::json!({
+            "member": fleet.names[member_index],
+            "halt_id": halt_id,
+            "architectural_conflict": member_index == 1,
+            "source_log_ref": halt_id
+        }));
+    }
+
+    let denied_target = HOST_COUNT - 1;
+    let mut framed = raw_client_connect(
+        mesh[denied_target].addr,
+        &fleet.leaves[0],
+        &fleet.leaves[denied_target].fingerprint,
+        Some(&fleet.ca),
+        &fleet.clock,
+    )
+    .await;
+    let response = send_recv(
+        &mut framed,
+        &raw_digest_request(
+            denied_target,
+            "j3-refused-consultation",
+            RELABELED_ROLE,
+            0x4b,
+        ),
+    )
+    .await;
+    assert!(
+        matches!(response, A2AJsonRpcResponse::Nack(_)),
+        "out-of-role consultation must be refused"
+    );
+    let rupture_rows = mesh[denied_target]
+        .rupture_log
+        .query_frames(FrameFilter {
+            kind: Some(TlFrameKind::ConsentRupture),
+            ..Default::default()
+        })
+        .expect("query real rupture journal");
+    assert_eq!(rupture_rows.len(), 1);
+    let rupture_ref = hex::encode(rupture_rows[0].frame_id);
+
+    let consent_journal = vec![
+        serde_json::json!({
+            "consultation_id": admitted_request_ids[0],
+            "outcome": "resolved",
+            "source_log_ref": admitted_request_ids[0]
+        }),
+        serde_json::json!({
+            "consultation_id": admitted_request_ids[1],
+            "outcome": "resolved",
+            "source_log_ref": admitted_request_ids[1]
+        }),
+        serde_json::json!({
+            "consultation_id": "j3-refused-consultation",
+            "outcome": "refused",
+            "source_log_ref": rupture_ref
+        }),
+    ];
+    let captured = serde_json::json!({
+        "summaries": summaries,
+        "receipt_presence": receipt_presence,
+        "consent_journal": consent_journal
+    });
+    let path = std::path::Path::new(&output);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).expect("create fixture directory");
+    }
+    std::fs::write(path, serde_json::to_vec_pretty(&captured).unwrap())
+        .expect("write captured J3 raw inputs");
 }

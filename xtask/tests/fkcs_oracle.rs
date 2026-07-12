@@ -8,7 +8,7 @@ fn frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift() {
     let baseline =
         FkcsBaseline::load_from_file("xtask/fkcs-baseline.toml").expect("baseline loads");
 
-    assert_eq!(baseline.src_lines, 23_081);
+    assert_eq!(baseline.src_lines, 23_082);
     assert_eq!(baseline.abi_baseline, "abi-baseline/v1-pre-bump.txt");
     assert_eq!(baseline.host_baseline, "abi-baseline/maos-host-v1.txt");
     baseline
@@ -16,9 +16,9 @@ fn frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift() {
         .expect("surface files exist");
 
     let mut drifted = baseline.clone();
-    drifted.src_lines = 23_082;
+    drifted.src_lines = 23_083;
     let err = drifted
-        .reconcile_src_lines(23_081)
+        .reconcile_src_lines(23_082)
         .expect_err("src_lines drift must red the frozen-tag-consistency leg");
     assert!(err.contains("src_lines"));
 }

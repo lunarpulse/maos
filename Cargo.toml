@@ -55,6 +55,7 @@ members = [
     "crates/maos-escape-detector",
     "crates/maos-fkcs",
     "crates/maos-cohort",
+    "spirits/digest",
 ]
 default-members = []
 exclude = ["templates", "templates/spirit-ts"]
