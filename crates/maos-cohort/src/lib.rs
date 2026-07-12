@@ -38,6 +38,7 @@ mod consent;
 pub mod control;
 pub mod distribution;
 pub mod error;
+pub mod halt_receipt;
 pub mod manifest;
 pub mod pin;
 pub mod state;
@@ -48,6 +49,10 @@ pub use audit::{
 pub use control::{CohortManifestControl, CONTROL_EVENT_TYPE};
 pub use distribution::CohortDistributor;
 pub use error::{CohortError, CohortManifestForkReason};
+pub use halt_receipt::{
+    classify_probe_result, AbsenceKind, HaltPresence, HaltReceiptControl, HaltReceiptDistributor,
+    HALT_RECEIPT_EVENT_TYPE,
+};
 pub use manifest::{
     CohortAuthority, CohortManifest, CohortMember, ConsentMatrix, ConsentTuple, ManifestSignature,
     RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION, SIG_DOMAIN,

@@ -45,8 +45,8 @@ pub use chaos::churn::{AdversarialAttempt, AdversarialDetection, ChurnDrillRepor
 pub use chaos::rotation::{compute_t_grace, AgentRotationTimestamps, RotationDrillReport};
 pub use cohort::{
     CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
-    CohortReissueDisposition, CohortReissueRejection, RESERVED_INTENT_HALT_RECEIPT,
-    RESERVED_INTENT_REISSUE,
+    CohortReissueDisposition, CohortReissueRejection, HaltReceiptObserver,
+    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 pub use config::{A2AConfig, A2APeerConfig, A2AProfile};
 // Story 8.7 / AC2b — `A2AConsentEnvelope` was deleted (dead fail-open footgun).

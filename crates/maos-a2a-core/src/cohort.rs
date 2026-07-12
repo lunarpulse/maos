@@ -133,3 +133,38 @@ impl CohortManifestGate for LegacyCohortManifestGate {
         })
     }
 }
+
+/// Story 12.3 — dependency-inverted **halt-receipt presence** port.
+///
+/// The receiving verified-intake path routes a reserved `cohort:halt-receipt`
+/// frame here so an out-of-kernel observer can surface, per member, that a
+/// locally-owned `HaltReceipt` arrived (feeding the 12.4 team digest). Like
+/// [`CohortManifestGate`], the seam speaks only primitives / `&IacFrame` /
+/// `&HostId` so no `maos-cohort` type leaks into `maos-a2a-core`.
+///
+/// **Observability, NOT arbitration (AC3):** an observer receives receipts and
+/// records presence; it has NO method to resolve, resume, terminate, or
+/// override a halt. The load-bearing guarantee is the dependency graph — the
+/// production impl lives in `maos-cohort`, which does NOT depend on
+/// `maos-kernel-core`, so the arbitration sink (`HaltRegistry::resolve` /
+/// `KernelHaltResolver`) is graph-unreachable and any receipt held here is
+/// inert.
+pub trait HaltReceiptObserver: Send + Sync {
+    /// Record receipt-presence for `member` — the TLS-verified emitting host,
+    /// proven equal to `frame.from.host_id` by
+    /// [`crate::router::A2ARouterCore::handle_intake_verified`] BEFORE this
+    /// call (P5r: the receipt payload carries NO host identity, so the
+    /// authenticated peer is the only trustworthy emitter). The `frame` carries
+    /// the serialized `HaltReceipt` behind the reserved `cohort:halt-receipt`
+    /// intent; the impl parses it and records presence idempotently by the
+    /// receipt's stable identity.
+    fn observe_receipt(&self, member: &HostId, frame: &IacFrame);
+}
+
+/// No-op default so non-cohort deployments are byte-for-byte unaffected
+/// (mirrors [`LegacyCohortManifestGate`]).
+pub(crate) struct LegacyHaltReceiptObserver;
+
+impl HaltReceiptObserver for LegacyHaltReceiptObserver {
+    fn observe_receipt(&self, _member: &HostId, _frame: &IacFrame) {}
+}

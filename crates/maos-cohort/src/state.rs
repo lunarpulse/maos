@@ -2,9 +2,11 @@
 
 use maos_a2a_core::{
     CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
-    CohortReissueDisposition, CohortReissueRejection,
+    CohortReissueDisposition, CohortReissueRejection, HaltReceiptObserver,
 };
+use maos_domain::frame::IacFrame;
 use maos_spirit_abi::identity::HostId;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -12,6 +14,7 @@ use crate::audit::{CohortAuditEvent, CohortAuditSink};
 use crate::consent::{accept_admits, send_context, OutboundConsentContext};
 use crate::control::CohortManifestControl;
 use crate::error::{CohortError, CohortManifestForkReason};
+use crate::halt_receipt::{AbsenceKind, HaltReceiptControl};
 use crate::manifest::CohortManifest;
 use crate::pin::PinnedAuthorityKeys;
 
@@ -58,6 +61,14 @@ pub struct CohortManifestState {
     pull_requests: Mutex<Vec<HostId>>,
     clock: Arc<dyn CohortClock>,
     local_host: HostId,
+    /// Story 12.3 — per-member received-receipt presence table: member
+    /// `host_id` → the set of distinct `HaltReceipt.halt_id`s observed from
+    /// that authenticated member. Dedup is by `halt_id` (P4), so a re-shipped
+    /// receipt never inflates the count. Interior-mutable like `pull_requests`.
+    halt_presence: Mutex<HashMap<String, HashSet<String>>>,
+    /// Story 12.3 — per-member explicit transport-level absence marker recorded
+    /// after a classified probe (P2a/P3). Observability only.
+    halt_absence: Mutex<HashMap<String, AbsenceKind>>,
 }
 
 impl CohortManifestState {
@@ -99,6 +110,8 @@ impl CohortManifestState {
                 confirmed_at_secs: clock.now_secs(),
             }),
             pull_requests: Mutex::new(Vec::new()),
+            halt_presence: Mutex::new(HashMap::new()),
+            halt_absence: Mutex::new(HashMap::new()),
             clock,
         })
     }
@@ -376,6 +389,45 @@ impl CohortManifestState {
             rejected_version,
         }
     }
+
+    /// Story 12.3 — record an explicit transport-level absence marker for a
+    /// probed member (P2a/P3). Observability only; the caller classifies the
+    /// probe result (`HaltReceiptDistributor::classify_presence`) and records
+    /// the induced-loss outcome here. Poisoned lock is a best-effort drop —
+    /// absence is never a trust decision.
+    pub fn record_absence(&self, member: &HostId, kind: AbsenceKind) {
+        if let Ok(mut table) = self.halt_absence.lock() {
+            table.insert(member.as_str().to_string(), kind);
+        }
+    }
+
+    /// Story 12.3 — the count of DISTINCT halt receipts observed from `member`
+    /// (dedup by `halt_id`, P4). Feeds the 12.4 digest. A poisoned lock reads 0.
+    pub fn present_receipt_count(&self, member: &HostId) -> usize {
+        self.halt_presence
+            .lock()
+            .ok()
+            .and_then(|table| table.get(member.as_str()).map(HashSet::len))
+            .unwrap_or(0)
+    }
+
+    /// Story 12.3 — whether a specific receipt (by `halt_id`) is present for a
+    /// member.
+    pub fn is_receipt_present(&self, member: &HostId, halt_id: &str) -> bool {
+        self.halt_presence
+            .lock()
+            .ok()
+            .and_then(|table| table.get(member.as_str()).map(|ids| ids.contains(halt_id)))
+            .unwrap_or(false)
+    }
+
+    /// Story 12.3 — the recorded absence marker for a member, if any.
+    pub fn absence_of(&self, member: &HostId) -> Option<AbsenceKind> {
+        self.halt_absence
+            .lock()
+            .ok()
+            .and_then(|table| table.get(member.as_str()).copied())
+    }
 }
 
 fn reissue_version(manifest_toml: &str) -> Option<u64> {
@@ -514,6 +566,30 @@ impl CohortManifestGate for CohortManifestState {
                 seen_version: self.version().ok(),
                 rejected_version: None,
             }),
+        }
+    }
+}
+
+impl HaltReceiptObserver for CohortManifestState {
+    /// Record receipt-presence for the authenticated `member` (P5r — the caller
+    /// [`crate::A2ARouterCore::handle_intake_verified`] has proven
+    /// `frame.from.host_id == verified_peer`, and the receipt payload carries no
+    /// host identity, so `member` is the sole trustworthy emitter). Dedup is by
+    /// the receipt's stable `halt_id` (P4). A frame that is not a well-formed
+    /// halt-receipt control envelope is silently ignored (it never reaches this
+    /// arm on the production path). Observability ONLY — this type has no method
+    /// that resolves, resumes, or overrides a halt, and `maos-cohort` does not
+    /// depend on `maos-kernel-core`, so the arbitration sink is unreachable (AC3).
+    fn observe_receipt(&self, member: &HostId, frame: &IacFrame) {
+        let Ok(control) = HaltReceiptControl::from_frame(frame) else {
+            return;
+        };
+        let halt_id = control.halt_id().to_string();
+        if let Ok(mut table) = self.halt_presence.lock() {
+            table
+                .entry(member.as_str().to_string())
+                .or_default()
+                .insert(halt_id);
         }
     }
 }

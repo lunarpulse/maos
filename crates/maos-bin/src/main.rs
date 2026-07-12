@@ -7428,9 +7428,14 @@ async fn build_cohort_a2a_daemon_runtime(
         cohort.pinned_authority_keys,
         audit,
     )?);
+    // Story 12.3 — wire the gate AND the halt-receipt observer as the SAME
+    // CohortManifestState (P7b single-object wiring). The transport-level
+    // Fact-3 test proves this injection is load-bearing (P7c — no cohort daemon
+    // smoke exists to prove it here).
     let gate: std::sync::Arc<dyn maos_a2a_core::CohortManifestGate> = state.clone();
+    let observer: std::sync::Arc<dyn maos_a2a_core::HaltReceiptObserver> = state.clone();
     let transport = std::sync::Arc::new(
-        maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_manifest_gate(
+        maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring(
             tcp_config,
             peer_configs,
             own_boot_nonce,
@@ -7439,6 +7444,7 @@ async fn build_cohort_a2a_daemon_runtime(
             None,
             None,
             Some(gate),
+            Some(observer),
         )
         .await
         .map_err(|error| format!("cohort a2a-tcp daemon bind failed: {error}"))?,

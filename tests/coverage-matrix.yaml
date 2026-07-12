@@ -266,6 +266,12 @@ coverage:
       (role-mismatch-on-allowed-peer, acting-role-exact-match, entitlement-parse,
       entitlement-accept, manifest-skew-cause, fail-closed-none,
       reserved-intent-passes) to check-cohort-mesh.
+      Story 12.3 adds ADR-054 §7 (ADV-054-5) receipt-presence + I2 halt-substrate
+      legs (halt-receipt-absence-member-loss, halt-receipt-absence-connectivity-loss,
+      halt-receipt-replay-dedup, halt-source-identity, halt-receipt-observer-wired,
+      observer-no-arbitration-chokepoint) to check-cohort-mesh — the kernel
+      remains the single halt owner (invoke_halt/I2 unchanged); 12.3 ships +
+      observes the receipt out-of-kernel (observability, not arbitration).
   FR22:
     gates: []
     corpora: []
@@ -531,6 +537,10 @@ coverage:
     notes: |
       J3 §10.7.1 + ADR-054 anchor. Story 12.2 version-skew fail-closed
       (ECohortManifestSkew, |Δv|>1) and fail-closed-on-absent role/version.
+      Story 12.3: ADR-054 §7 ADV-054-5 receipt-presence per member (received
+      receipt OR explicit transport-level absence marker within §7.2's window),
+      anchored on the I2 halt substrate — observability, arbitration stays the
+      Director's.
   FR55:
     gates:
     - check-service-boundary

@@ -202,4 +202,21 @@
 #          watchdog denial logging for CATCH-B observability. Still confined to
 #          the policy/mediation observability surface; no PDP engine dependency
 #          enters kernel-core; all additive, no public symbols removed.
-src_lines = 23081
+#   23082  Story 12.3 review-closure reconciliation — carry-forward of a
+#          pre-existing, behavior-preserving `cargo fmt` reflow committed by the
+#          Story 12.2 commit (0c733d33) that was never re-pinned, leaving `main`
+#          RED on check-kernel-baseline at Story 12.3's baseline. Net +1 line,
+#          reflow ONLY, ZERO functional / ABI change (Story 12.3 itself adds ZERO
+#          kernel-core delta — the receipt courier + observer are entirely
+#          out-of-kernel in maos-cohort / maos-a2a-core). Affected files
+#          (`crates/maos-kernel-core/src/`), reflow only:
+#            capability/cap_policy/mod.rs — closure + method-chain line-wrap
+#              (`is_some_and` closure collapsed; `per_capability_approval.get`
+#              collapsed), net -4;
+#            memory/write_entry_point.rs — two `assert!(cond, "msg")` test lines
+#              split across four lines each by rustfmt, net +6.
+#          Same class as the Story 10.5 R3 disclosure above (silent fmt budget
+#          draw, no `cargo fmt --check` gate). FLAG-Winston: authorized by
+#          Lunarpulse 2026-07-11 as a behavior-preserving reconciliation so the
+#          green-at-HEAD prerequisite holds; no public symbols removed.
+src_lines = 23082

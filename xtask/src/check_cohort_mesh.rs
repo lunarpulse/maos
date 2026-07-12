@@ -231,6 +231,109 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        // Story 12.3 halt-receipt legs — each hard-fails independently (loop below).
+        // §A7 absence-first-class reflex (P2a/P3): a dropped member probes to Io →
+        // ABSENT(MemberLoss), paired with a PRESENT positive so up/down is proven
+        // distinguished — NOT PartitionTimeout (dead on the wire).
+        Leg {
+            name: "halt-receipt-absence-member-loss",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_3_cohort_halt_receipt",
+                "t_12_3_absence_member_loss_over_live_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 absence-first-class reflex (P2a/P3): a partitioned member times out →
+        // ABSENT(ConnectivityLoss), a DISTINCT variant, paired with a PRESENT
+        // positive — NOT a bare TransportFailed (an up peer's unknown NACK).
+        Leg {
+            name: "halt-receipt-absence-connectivity-loss",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_3_cohort_halt_receipt",
+                "t_12_3_absence_connectivity_loss_over_live_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 replay-dedup reflex (P4): the SAME receipt shipped twice keeps the
+        // presence count at 1 — keyed on HaltReceipt.halt_id, NOT the per-ship
+        // envelope frame_id; a distinct receipt raises it (non-vacuous).
+        Leg {
+            name: "halt-receipt-replay-dedup",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_3_cohort_halt_receipt",
+                "t_12_3_replay_dedup_over_live_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 source-identity reflex (P5r): a receipt via the unverified
+        // handle_intake / loopback path, or from ≠ TLS peer, is NOT counted —
+        // only the TLS-anchored, matching-`from` receipt increments presence.
+        Leg {
+            name: "halt-source-identity",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_3_cohort_halt_receipt",
+                "t_12_3_source_identity_over_core",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 wiring reflex (P7c, anti-silent-green): an injected RECORDING
+        // observer records a shipped cohort:halt-receipt through the real
+        // bind → handle_intake_verified → observer path; a mis-wired/inert
+        // observer reds it.
+        Leg {
+            name: "halt-receipt-observer-wired",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_3_cohort_halt_receipt",
+                "t_12_3_observer_wired_over_live_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 observability-not-arbitration reflex (P6/P5r): the AC3 static
+        // chokepoint — a single observer call site, no arbitration sink named
+        // (graph-guaranteed by cohort ↛ kernel-core).
+        Leg {
+            name: "observer-no-arbitration-chokepoint",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-core",
+                "--test",
+                "cohort_halt_receipt_chokepoint_12_3",
+                "halt_receipt_observed_at_one_site_with_no_arbitration_sink",
+                "--",
+                "--exact",
+            ],
+        },
     ];
     for leg in &legs {
         run_leg(leg)?;

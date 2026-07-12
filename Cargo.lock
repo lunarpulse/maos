@@ -2433,6 +2433,7 @@ dependencies = [
  "async-trait",
  "butler",
  "crossbeam-channel",
+ "ed25519-dalek",
  "getrandom 0.3.4",
  "hex",
  "maos-a2a",

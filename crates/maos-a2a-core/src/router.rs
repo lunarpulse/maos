@@ -15,7 +15,8 @@
 
 use crate::cohort::{
     CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
-    LegacyCohortManifestGate, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+    HaltReceiptObserver, LegacyCohortManifestGate, LegacyHaltReceiptObserver,
+    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use crate::config::A2APeerConfig;
 use crate::consent::{AllowlistDirection, ConsentAllowlists, EIntentDenied};
@@ -135,6 +136,12 @@ pub struct A2ARouterCore {
     /// non-cohort deployments byte-for-byte compatible; cohort composition
     /// injects a verified cache before any transport is started.
     cohort_manifest_gate: Arc<dyn CohortManifestGate>,
+    /// Story 12.3 — out-of-kernel halt-receipt presence observer. The legacy
+    /// no-op default keeps non-cohort deployments byte-for-byte compatible;
+    /// cohort composition injects the same `CohortManifestState` used for the
+    /// gate (P7b — single-object wiring, no transposition footgun). Observed on
+    /// the TLS-verified intake path only (P5r).
+    halt_receipt_observer: Arc<dyn HaltReceiptObserver>,
     /// Optional intake sink for tests — when set, accepted frames are
     /// pushed here so test code can observe them.
     intake_sink: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<IacFrame>>>>,
@@ -191,6 +198,7 @@ impl A2ARouterCore {
             next_id: Arc::new(std::sync::atomic::AtomicU64::new(1)),
             consent_now_ns: None,
             cohort_manifest_gate: Arc::new(LegacyCohortManifestGate),
+            halt_receipt_observer: Arc::new(LegacyHaltReceiptObserver),
             warned_entries: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
         })
     }
@@ -212,6 +220,17 @@ impl A2ARouterCore {
     /// This is a builder so existing constructors/callers remain compatible.
     pub fn with_cohort_manifest_gate(mut self, gate: Arc<dyn CohortManifestGate>) -> Self {
         self.cohort_manifest_gate = gate;
+        self
+    }
+
+    /// Story 12.3 — inject the out-of-kernel halt-receipt presence observer.
+    /// A builder (mirrors [`Self::with_cohort_manifest_gate`]) so the daemon
+    /// wires it in one step with the SAME `CohortManifestState` used for the
+    /// gate (`.with_cohort_manifest_gate(state.clone()).with_halt_receipt_observer(state.clone())`)
+    /// — the two named builders eliminate the adjacent-`Arc` transposition
+    /// footgun a positional `bind` param would carry (P7b).
+    pub fn with_halt_receipt_observer(mut self, observer: Arc<dyn HaltReceiptObserver>) -> Self {
+        self.halt_receipt_observer = observer;
         self
     }
 
@@ -1115,7 +1134,26 @@ impl A2ARouterCore {
             return (resp, false);
         }
 
-        (self.handle_intake(request).await, true)
+        // Story 12.3 (P5r/P8) — retain the TLS-bound member and the receipt
+        // frame while the shared body applies framing and consent validation.
+        // Presence becomes observable only after the reserved intent is ACKed:
+        // a TLS-authenticated but malformed, expired, or wrong-granter frame is
+        // rejected rather than being counted as a received halt receipt.
+        let receipt_to_observe = Self::consent_match_key(&request.params)
+            .eq_ignore_ascii_case(RESERVED_INTENT_HALT_RECEIPT)
+            .then(|| {
+                (
+                    HostId(verified_peer.as_str().to_string()),
+                    request.params.clone(),
+                )
+            });
+        let response = self.handle_intake(request).await;
+        if matches!(&response, A2AJsonRpcResponse::Ack(_)) {
+            if let Some((member, frame)) = receipt_to_observe {
+                self.halt_receipt_observer.observe_receipt(&member, &frame);
+            }
+        }
+        (response, true)
     }
 }
 

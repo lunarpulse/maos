@@ -21,7 +21,7 @@ use maos_a2a_core::router::{A2APeerRouter, A2ARouterCore, A2ATransport};
 use maos_a2a_core::transport::json_rpc::{CODE_FRAME_TOO_LARGE, CODE_TIMEOUT};
 use maos_a2a_core::{
     A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, CohortManifestGate,
-    HandshakeRetryPolicy, InMemoryTofuPinStore, TofuPinStore,
+    HaltReceiptObserver, HandshakeRetryPolicy, InMemoryTofuPinStore, TofuPinStore,
 };
 use maos_domain::frame::IacFrame;
 use maos_spirit_abi::identity::HostId;
@@ -157,9 +157,11 @@ impl TcpA2ATransport {
         .await
     }
 
-    /// Cohort-enabled construction path. The gate is installed before the core
-    /// is wrapped and the accept loop is spawned, so no inbound connection can
-    /// observe a legacy policy window.
+    /// Cohort-enabled construction path (gate only). Delegates to
+    /// [`Self::bind_with_cohort_wiring`] with no halt-receipt observer — the
+    /// existing callers stay byte-for-byte unchanged (Story 12.3 avoids the
+    /// 6-caller `bind` churn P7a flagged by adding a NEW wiring fn instead).
+    #[allow(clippy::too_many_arguments)]
     pub async fn bind_with_cohort_manifest_gate(
         tcp_config: TcpA2AConfig,
         peer_configs: Vec<A2APeerConfig>,
@@ -169,6 +171,38 @@ impl TcpA2ATransport {
         validation_time: Option<UnixTime>,
         consent_now_ns: Option<u64>,
         cohort_manifest_gate: Option<Arc<dyn CohortManifestGate>>,
+    ) -> Result<Self, TcpTransportError> {
+        Self::bind_with_cohort_wiring(
+            tcp_config,
+            peer_configs,
+            own_boot_nonce,
+            timeouts,
+            retry_policy,
+            validation_time,
+            consent_now_ns,
+            cohort_manifest_gate,
+            None,
+        )
+        .await
+    }
+
+    /// Story 12.3 — cohort-enabled construction path wiring BOTH the manifest
+    /// gate and the halt-receipt presence observer. Both are installed via the
+    /// named `A2ARouterCore` builders (no adjacent-`Arc` positional transposition
+    /// footgun, P7b) BEFORE the core is wrapped and the accept loop spawns, so
+    /// no inbound connection observes a legacy policy/observation window (P7c).
+    /// In production both are the SAME `CohortManifestState` (`state.clone()`).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn bind_with_cohort_wiring(
+        tcp_config: TcpA2AConfig,
+        peer_configs: Vec<A2APeerConfig>,
+        own_boot_nonce: u64,
+        timeouts: TcpTimeouts,
+        retry_policy: HandshakeRetryPolicy,
+        validation_time: Option<UnixTime>,
+        consent_now_ns: Option<u64>,
+        cohort_manifest_gate: Option<Arc<dyn CohortManifestGate>>,
+        halt_receipt_observer: Option<Arc<dyn HaltReceiptObserver>>,
     ) -> Result<Self, TcpTransportError> {
         let pins = tcp_config.build_pin_store().await?;
         let posture = tcp_config.trust_posture()?;
@@ -192,6 +226,9 @@ impl TcpA2ATransport {
         }
         if let Some(gate) = cohort_manifest_gate {
             core_inner = core_inner.with_cohort_manifest_gate(gate);
+        }
+        if let Some(observer) = halt_receipt_observer {
+            core_inner = core_inner.with_halt_receipt_observer(observer);
         }
         let core = Arc::new(core_inner);
 
