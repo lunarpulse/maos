@@ -1,4 +1,4 @@
-last_updated: '2026-07-13+story-12-6-code-review-complete'
+last_updated: '2026-07-13+epic-12-retrospective-complete'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -210,7 +210,7 @@ development_status:
   12-4b-team-digest-j3-day-30-scene: done  # SPLIT from 12.4 at party-mode preflight 2026-07-12. J3 day-30 JOURNEY scene (Epic-12 journey CLOSER): new spirits/digest Spirit + narrative I11-distillate render (existing write_distillate seam) + day-30 scene on the 8.15 PTY harness, driven by a dataset CAPTURED from a real 12.4a N=8 mesh run (harness has NO mesh — F1). §A6 JOURNEY net non-degradable. ZERO kernel-Δ @23082; bump check-workspace-count 54→55. DEPENDS ON 12-4a. REVIEW 2026-07-12 (bmad-code-review §A6 3-layer Blind+Edge+Acceptance; dev_model openai-codex → no Test-Infra layer): 3 patch findings applied+verified — (1) per-member aggregation collapse in derive_team_digest (latent multi-request_id double-count of acted_invisibly/frames, dead self_reported_halts removed) + 2 regression tests; (2) anti-canned leg now also exercises the real daemon render (47→48) via render_digest_screen; (3) count-aware narrative pluralization. 8/8 digest tests, 2/2 journey_j3, 27/27 cohort-mesh legs, fmt clean, kernel=23082, workspace=55 all green.
   12-5-cohort-hot-swap-linear-chain-migration: done  # created 2026-07-12; PREFLIGHT RESOLVED 2026-07-13 (party-mode, 3 scouts, Lunarpulse-ratified, 6 fixes R1-R6, still 6 ACs). Epic-12 CLOSER. REUSE: single-hop swap engine (coordinator.rs:120), run_migrator/EMigratorMissing (already names the hop), I14 validate_swap_halt_continuity (halt/mod.rs:430). NEW (all OUT-OF-KERNEL): linear-chain resolver over an operator CANDIDATE SET + chain-hash + EMigrationPlanDrift + a distinct fork/diamond error (both FR63-registered). R1 SHOW-STOPPER: NO version catalog exists (SpiritArchive test-only/unwired, registry not consulted) -> chain is DECLARED not discovered. R2 --plan EXTENDS upgrade/hot-swap-precheck (no new verb). R3 ZERO-Δ @23082 FORCED by layering (kernel never holds a chain; drift guard wraps the UpgradeOrchestrator::upgrade handle @main.rs:5306+5478/5497). R5 AC1 SPLIT (ratified): in-place hot-swap PRESERVES boot_nonce + PostSwapMonitor auto-reverts a roll -> NO re-pin (that's AC1a/I14/AC6). HARD-ROUND R2 (2 more scouts, ratified): R7 AC1(b) RESHAPED — the manifest gate does NOT enforce fingerprints (TOFU/rustls does), so re-pin = transport rebuild w/ new peer_pins (10.4b precedent) + manifest re-issue for roster COHERENCE; dropped 'via gate'/'NFR-Rel-6' (authority-adoption != consent). R8 AC2/AC3 authenticity boundary (candidate manifests UNSIGNED/parse-and-trusted; --plan+hash proves structure+integrity NOT authenticity; vetting=Epic-13 ADR-056). R9 AC6 reframed: gate DRAINS not carries -> zero-DROPPED over >=2 hops w/ >=1 real-pending non-vacuous, read from TL receipts, PostSwapMonitor HaltSetLoss landmine flagged. THIRD-ROUND R3 (2 more scouts, no user fork - code dictated): R10 AC3 plan_hash carriage - a retyped hash is CIRCULAR -> persist plan to MAOS_HOME file (Story-9.7 atomic-write idiom), guard reads file; threat model = accidental/third-party drift of a trusted set NOT a malicious operator. R11 AC2 linearity = CONCRETE-overlap (wildcard-fork ["1.0"]+["1.x"]) + acyclicity (2-cycle passes fork rule) TWO checks; fan-in LEGAL; taxonomy ECohortMigrationChainNotLinear{reason}+ECohortNoMigrationPath+reuse EMigratorMissing; cohort errors need ZERO catalog rows (corrects R2 FR63 claim). Baseline 23082 (NOT epic's stale 23081); still 6 ACs, ZERO-Δ. Three preflight rounds done. REVIEW-REMEDIATION 2026-07-13: bmad-code-review §A6 4-layer (Blind+Edge+Acceptance+Test-Infra); 3 decisions resolved by team consensus + 9/10 patches applied & verified (check-cohort-mesh PASSED 35 legs, N=8 re-pin green, ZERO-Δ @23082); 1 FLAG-Winston kernel landmine ESCALATED (PostSwapMonitor auto-reverts a drained-with-pending hot-swap: coordinator.rs:149/176/394 + post_swap_monitor.rs:108-131) -> blocks done; 1 pre-existing env-contract defer (11 Epic-11 vars).
   12-6-env-contract-registry-remediation: done  # Tech-debt remediation, RESHAPED by party-mode preflight 2026-07-13 (Lunarpulse ratified opt-1 split). Draft's 'register 11 -> 0 violations' was VACUOUS-GREEN: check-env-contract walks only maos-bin/src AND is blind to helper-indirected reads (enterprise_pdp_runtime.rs:86,90 MAOS_PDP_REFRESH_INTERVAL_MS/STALENESS_TTL_MS via duration_ms_from_env). AC1 register 13 not 11; AC2 HARDEN the detector (catch var(name)/vars_os forms + proven-red) so the green is honest in-crate; AC3 enroll BLOCKING via 3 files (EXPECTED_GATES+is_story10 match; gates[]+[[ship_gate]]; discipline.yml job+needs -- currently only nested in invariant-lock, not in ship aggregate) SCOPED/named to maos-bin so the badge doesn't overclaim; AC4 zero regression, formatting-only kernel baseline reconciliation @23147 (Lunarpulse-authorized). Workspace-wide contract (~30 vars/15 crates incl provider API keys) SPLIT to 12.7. REVIEW COMPLETE 2026-07-13: 1 decision → patch, 5 patches applied (AST detector hardening + regression coverage, prefix boundary, FKCS oracle assertion), 2 pre-existing defers, 2 dismissed; focused tests/gate + fmt green.
-  epic-12-retrospective: optional
+  epic-12-retrospective: done  # 2026-07-13 (epic-12-retro-2026-07-13.md); 7/7 done, J3 served. Ratified: B1 Option-C leg-level gate binding class (decouple blocking-disposition from CURRENT_PHASE; subsumes E11-A2, absorbs E11-A1 gate; CRITICAL-PATH before Epic 13 tenant-wall) + B2 execute E11-A3 (merge feature-complete line→main, open RELEASE-HOLDS.md) + B3 check-dev-model-tier as Blocking leg + B4 cargo-fmt-check Blocking leg + B5 env-contract debt single-home + B6 claim-vs-control reflex non-degradable on 13.1-13.3. epic_update_required: false
   epic-13: backlog  # Reza single-org cross-team Cortex — ADR-055 multi-tenant Loom + ADR-056 FR37 vetting; 6 stories; 13.6 = Reza Cortex scene. Consumes Epic 12 (12.1 org manifest) + Epic 11 Loom/PDP/identity. PREREQ: author loom-threat-model.md before 13.1 (G3).
   13-1-multi-tenant-loom-physical-tenant-wall: backlog  # database-per-team + store-internal team_guard chokepoint (ETenantMapStale/ETenantConnectionMismatch). Smallest watchable demo = hermetic 2-team SQLite tenant-wall smoke (AC5, blocking). §A6 non-degradable (tenant wall). ZERO expected.
   13-2-multi-tenant-loom-cryptographic-tenant-boundary: backlog  # per-team HKDF weld + canonical_kv_leaf v2 + per-team Merkle (Fork-4; closes 11.2b D1). FLAG-Winston verify (cross-team CrossRegionReadmit reuse).
@@ -236,24 +236,50 @@ action_items:
   - epic: 11
     action: "A1: Retire opus-4-8 dev mandate → frontier-class allowlist {opus-4-8,gpt-5.5,glm-5.2,equiv} + §A6 full-layer review net as binding control; supersede E9 §A2 / E10 §A5; add check-dev-model-tier gate (allowlist membership AND §A6 artifact attached)."
     owner: "John + Winston"
-    status: open
+    status: in-progress  # E12 follow-through: allowlist policy + §A6 net FOLLOWED on all 7 stories; check-dev-model-tier gate NEVER BUILT → superseded by E12-B3 (build as Blocking leg inside Option-C infra)
   - epic: 11
     action: "A2: Split each live-DB gate into hermetic logic leg (SQLite, blocking) + live-substrate leg (Postgres+pgvector, advisory + marker-gated, ephemeral container; skip→advisory-RED never silent-green); gate-registry disposition {v2_0=advisory-substrate-gated} + WOULD-HAVE-BLOCKED banner + pre-release live-run runbook. Applies check-cross-region-consensus / check-multi-region-slo / 11.7 consumer leg."
     owner: "Murat"
-    status: open
+    status: in-progress  # E12 follow-through: pattern APPLIED to new check-cohort-mesh (N=3 blocking / N=8 advisory); E11-gate retrofit NOT done → subsumed by E12-B1 (Option-C AdvisorySubstrate binding class)
   - epic: 11
     action: "A3: Decouple external holds from dev — open RELEASE-HOLDS.md GA ledger (NFR-Sec-7 pen-test + NFR-Comp-1 export 5D002.c.1); merge epic-11→main as v2.0 feature-complete line; keep WASM external binary publication flag-gated until export counsel clears."
     owner: "Lunarpulse + John"
-    status: open
+    status: open  # E12 follow-through: NOT addressed (main still at Epic 10 PR#3; no RELEASE-HOLDS.md; 27 commits stacked on epic-12) — ROOT CAUSE of CURRENT_PHASE gate-binding decay → re-ratified this retro as E12-B2 (merge Epic-12 feature-complete line, not epic-11)
   - epic: 11
     action: "A4: Complete Step 2 — ratify §15.10 full architecture (party-mode): 8 forks incl. BLOCKER ADR-053 cross-team keys + ADR-055 numbers; disposition 5 Appendix-D shapes; re-set post-v2.0 KLOC ceiling (NFR-Maint-1 expires @v2.0); reconcile ADR-053 numbering collision (11.7 trial-attestation vs cross-team keys)."
     owner: "Winston"
-    status: open
+    status: done  # E12 follow-through: DONE — ADRs 054-057 ratified 2026-07-09/10; Epic 12 built on ADR-054, Epic 13 on ADR-055/056
   - epic: 11
     action: "A5: Step 3 — generate Epic 12+ (Epic 12 J3 Team Nexus, Epic 13 Reza Cortex + multi-tenant Loom + FR37 machinery, Epic 14 ecosystem-proof infra + 100-host churn, Epic 15 v2.0 remainder sweep); carry A1/A2 reflexes into every preflight."
     owner: "John"
-    status: open
+    status: done  # E12 follow-through: DONE — Epics 12/13/14 drafted (17 stories; Epic 15 folded into Epic 14)
   - epic: 11
     action: "A6 (carry-forward): recalibrate preflight LOC-budget to count in-src #[cfg(test)] modules (11.2a +59 vs ratified +16 overshoot)."
     owner: "Winston"
+    status: in-progress  # E12 follow-through: baseline discipline held; checklist item not yet formalized — carry-forward
+
+# Epic 12 retrospective action items (2026-07-13)
+  - epic: 12
+    action: "B1: Option C — leg-level gate binding class. New shared xtask infra (BindingClass {Blocking, AdvisorySubstrate}) decoupling a leg's blocking-disposition from CURRENT_PHASE. Promote 12.1's carve-out; migrate the ~7 v2.0 gates (check_enterprise_identity/check_wasm_form_equiv/check_scale_churn/check_escape_detector/...) so each leg declares its class. SUBSUMES E11-A2 (hermetic=Blocking / live-substrate=AdvisorySubstrate) and ABSORBS E11-A1 gate (B3). CRITICAL PATH: land before Epic 13 tenant-wall gates."
+    owner: "Winston + Murat"
+    status: in-progress  # IMPLEMENTED 2026-07-13 on epic-12 (uncommitted->committing): gate_common BindingClass + dev_enforced_red_blocks + centralized CURRENT_PHASE/is_blocking_at; 6 hermetic gates flipped to Blocking (scale_churn/wasm_form_equiv/enterprise_pdp/enterprise_identity/fkcs/trial_attestation); escape-detector RECLASSIFIED hermetic-7->AdvisorySubstrate (seccomp capability-gated, measured); proven-red exit1. Pending B2 merge + full-aggregate CI green.
+  - epic: 12
+    action: "B2: Execute E11-A3. Merge Epic-12 feature-complete line → main as the v2.0/v2.2 feature-complete line (internal gates only). Open RELEASE-HOLDS.md GA ledger (NFR-Sec-7 pen-test + NFR-Comp-1 export 5D002.c.1). Keep WASM external binary publication flag-gated until export counsel clears. Stops the 27-commit branch depth."
+    owner: "Lunarpulse + John"
+    status: open
+  - epic: 12
+    action: "B3: Build check-dev-model-tier as a Blocking leg inside the Option C infra: dev_model_used in frontier allowlist AND a §A6 review artifact attached, else RED. Closes the E11-A1 mechanical gap."
+    owner: "Winston + Murat"
+    status: in-progress  # IMPLEMENTED 2026-07-13: NEW xtask/check_dev_model_tier.rs (Blocking, wired to discipline.yml aggregate) — epic>=12 frontier-allowlist + §A6 marker, fail-closed, 5 proven-red tests green. ALSO fixed pre-existing red: check-dev-model-used-populated was RED on 17 E11/E12 stories (model in body '### Agent Model Used', gate parsed frontmatter only) -> made body-aware, green. Pending B2 merge.
+  - epic: 12
+    action: "B4: Add cargo fmt --check as a Blocking leg (Option C class) so a formatting reflow reds the kernel baseline at its ORIGIN story, not the next one's lap (12.2 fmt drift 23081->23082 shipped un-caught into 12.3)."
+    owner: "Murat"
+    status: in-progress  # IMPLEMENTED 2026-07-13: check-fmt job (cargo fmt --all -- --check) added to discipline.yml + aggregate needs (Blocking). kernel-core-baseline.toml had explicitly asked for this gate. Pending B2 merge.
+  - epic: 12
+    action: "B5: Nail down the SINGLE home for the deferred workspace-wide env-contract debt (sprint-status says 12.7; 12.6 body says Epic 14 14.7-14.9 — resolve the double-booking; Epic 14 14.7-14.9 keys ARE staged) and ensure provider API-key secrets (MAOS_ANTHROPIC_API_KEY, MAOS_OPENAI_API_KEY) are named + classified so it cannot rot the way this debt did."
+    owner: "John"
+    status: open
+  - epic: 12
+    action: "B6: Carry the 'a claim standing in for a control' reflex into every Epic 13 preflight — multi-round scout-first code-verification + §A6 net NON-DEGRADABLE on 13.1/13.2/13.3 (tenant wall = adversarial boundary; a claimed-not-enforced wall = cross-team leak)."
+    owner: "Amelia + Murat"
     status: open
