@@ -651,6 +651,17 @@ pub enum SpiritOp {
         /// Path to the successor manifest TOML.
         #[arg(long)]
         to: String,
+        /// Predecessor version for a persisted multi-hop migration plan.
+        #[arg(long)]
+        from: Option<String>,
+        /// Comma-delimited candidate Spirit manifest paths. Required with
+        /// `--plan`; the resolver validates this operator-declared set.
+        #[arg(long, value_delimiter = ',')]
+        candidates: Vec<String>,
+        /// Resolve, validate, hash, and persist a multi-hop migration plan
+        /// without starting a swap.
+        #[arg(long)]
+        plan: bool,
         /// Upgrade policy. Default: hot-swap.
         #[arg(long, value_enum, default_value_t = UpgradePolicyArg::HotSwap)]
         policy: UpgradePolicyArg,

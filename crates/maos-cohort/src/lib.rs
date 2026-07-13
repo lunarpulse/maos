@@ -41,6 +41,7 @@ pub mod distribution;
 pub mod error;
 pub mod halt_receipt;
 pub mod manifest;
+pub mod migration;
 pub mod pin;
 pub mod state;
 
@@ -53,7 +54,7 @@ pub use digest::{
     DigestSummary, DIGEST_DAILY_SCOPE, DIGEST_READ_EVENT_TYPE,
 };
 pub use distribution::CohortDistributor;
-pub use error::{CohortError, CohortManifestForkReason};
+pub use error::{CohortError, CohortManifestForkReason, MigrationChainNotLinearReason};
 pub use halt_receipt::{
     classify_probe_result, AbsenceKind, HaltPresence, HaltReceiptControl, HaltReceiptDistributor,
     HALT_RECEIPT_EVENT_TYPE,
@@ -62,6 +63,9 @@ pub use manifest::{
     CohortAuthority, CohortManifest, CohortMember, ConsentMatrix, ConsentTuple, ManifestSignature,
     RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION, SIG_DOMAIN,
     T_STALE_DEFAULT, T_STALE_MAX, T_STALE_MIN,
+};
+pub use migration::{
+    resolve_migration_chain, MigrationCandidate, MigrationChain, MigrationHop, MigrationPlan,
 };
 pub use pin::PinnedAuthorityKeys;
 pub use state::{CohortClock, CohortManifestState, ReissueOutcome};

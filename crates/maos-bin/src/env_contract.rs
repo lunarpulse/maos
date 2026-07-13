@@ -147,6 +147,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_UPGRADE_PLAN",
+        purpose: "When set, --plan resolves+hashes+persists the migration chain instead of executing",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_UPGRADE_FROM_VERSION",
+        purpose: "Source version for a --plan migration chain resolution",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_UPGRADE_CANDIDATES",
+        purpose: "JSON array of candidate manifest paths for a --plan migration chain",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_REVOKE_TOKEN_ID",
         purpose: "Token ID for revocation verb",
         stability: EnvStability::UserFacing,

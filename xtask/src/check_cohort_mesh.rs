@@ -472,6 +472,131 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        // ── Story 12.5 — cohort hot-swap + linear-chain migration legs ──
+        // §A7 wildcard-fork reflex: declared-string uniqueness is insufficient;
+        // exact 1.0 plus wildcard 1.x must reject concrete source 1.0.
+        Leg {
+            name: "migration-chain-wildcard-fork",
+            args: &[
+                "test",
+                "-p",
+                "maos-cohort",
+                "--test",
+                "migration_chain",
+                "rejects_wildcard_overlap_as_a_fork_at_the_concrete_source",
+                "--",
+                "--exact",
+            ],
+        },
+        // §A7 cycle reflex: one outgoing candidate per source is still invalid
+        // when the chain cannot terminate.
+        Leg {
+            name: "migration-chain-cycle",
+            args: &[
+                "test",
+                "-p",
+                "maos-cohort",
+                "--test",
+                "migration_chain",
+                "rejects_a_two_cycle_even_when_every_source_has_one_outgoing_candidate",
+                "--",
+                "--exact",
+            ],
+        },
+        // §A7 self-loop reflex: the length-one cycle has its own precise error.
+        Leg {
+            name: "migration-chain-self-loop",
+            args: &[
+                "test",
+                "-p",
+                "maos-cohort",
+                "--test",
+                "migration_chain",
+                "rejects_a_self_loop_before_attempting_a_walk",
+                "--",
+                "--exact",
+            ],
+        },
+        // §A7 fan-in negative control: multiple predecessor patterns on one
+        // successor stay legal; only a disconnected requested target is no-path.
+        Leg {
+            name: "migration-chain-fanin-no-path",
+            args: &[
+                "test",
+                "-p",
+                "maos-cohort",
+                "--test",
+                "migration_chain",
+                "permits_fan_in_and_reports_no_path_only_for_a_well_formed_set",
+                "--",
+                "--exact",
+            ],
+        },
+        // §A7 missing-hop reflex: distinct from the plan-time no-path miss, the
+        // kernel refuses a RESOLVED hop whose migrator is absent at run time,
+        // naming the specific predecessor -> successor hop (AC4(b)).
+        Leg {
+            name: "migration-chain-missing-hop-at-runtime",
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "hot_swap_cross_major_migration",
+                "run_migrator_names_the_specific_absent_hop_at_run_time",
+                "--",
+                "--exact",
+            ],
+        },
+        // §A7 plan-drift reflex: the refusal comes from a REAL hash comparison of
+        // the persisted plan FILE vs the chain re-derived from the live candidate
+        // manifests on disk (not an in-memory-only comparison) — a candidate
+        // mutated after --plan reds EMigrationPlanDrift.
+        Leg {
+            name: "migration-plan-drift",
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--bin",
+                "maos",
+                "migration_plan::tests::persisted_plan_file_drift_is_refused_after_a_candidate_mutates_on_disk",
+                "--",
+                "--exact",
+            ],
+        },
+        // §A7 cert-rotation reflex: the rebuilt N=8 transport rejects an old
+        // credential, admits the new one through TOFU plus the cohort gate, and
+        // reconciles the signed reissue fingerprint with the active pin.
+        Leg {
+            name: "n8-cert-rotation-repin-coherence",
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-tcp",
+                "--test",
+                "t_12_5_cohort_hot_swap",
+                "t_12_5_n8_rotation_refuses_old_cert_and_admits_reissued_new_cert",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // §A7 halt-continuity reflex: blinding a durable receipt changes the
+        // derived surviving count; the drained pending registry is not used.
+        Leg {
+            name: "halt-receipt-derived-continuity",
+            args: &[
+                "test",
+                "-p",
+                "maos-journey-test",
+                "--test",
+                "journey_j3",
+                "j3_blinded_halt_receipt_moves_persistent_agents_halted_count",
+                "--",
+                "--exact",
+            ],
+        },
     ];
     for leg in &legs {
         run_leg(leg)?;

@@ -286,6 +286,17 @@ coverage:
       anti-canned-raw-byte legs: the Grade-A PTY daemon render persists a §9.5
       I11 distillate whose clause map cites Digest-owned consented evidence, and
       a blinded one-byte captured input moves the rendered vt100 line.
+      Story 12.5 adds ADR-054 ADV-054-4 / ADR-036 chain-plan legs: concrete
+      wildcard-fork, cycle, self-loop, legal-fan-in/no-path, a runtime
+      EMigratorMissing hop-naming refusal (kernel run_migrator, distinct from
+      the plan-time no-path miss), and persisted-FILE plan-hash drift (re-derived
+      from the live candidate manifests on disk) all hard-fail in
+      check-cohort-mesh. The same gate now
+      proves the AC1b transport-rebuild cert path on a real N=8 mesh (old
+      credential refused; new TOFU pin plus cohort gate admitted; signed
+      reissue fingerprint equals the peer's actually-pinned fp) and I14's AC6 receipt-derived
+      count reflex. NFR-Rel-6 remains the distinct restart-consent path; it is
+      not used by this authority-signed cert reissue.
   FR22:
     gates: []
     corpora: []

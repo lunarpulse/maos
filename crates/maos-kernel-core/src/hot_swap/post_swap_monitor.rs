@@ -120,12 +120,12 @@ impl PostSwapMonitor {
                     .iter()
                     .map(|h| h.as_str().to_string())
                     .collect();
-                for halt_id in &snapshot.pre_swap_halt_ids {
-                    if !current_halt_ids.contains(halt_id) {
-                        return Some(PostSwapInvariantViolation::HaltSetLoss {
-                            lost_halt_ids: vec![halt_id.clone()],
-                        });
-                    }
+                if let Some(lost) =
+                    detect_halt_set_loss(&snapshot.pre_swap_halt_ids, &current_halt_ids)
+                {
+                    return Some(PostSwapInvariantViolation::HaltSetLoss {
+                        lost_halt_ids: lost,
+                    });
                 }
             }
         }
@@ -153,6 +153,25 @@ impl PostSwapMonitor {
 
         None
     }
+}
+
+/// Pure halt-set-delta check: which snapshot halts are no longer pending?
+///
+/// The snapshot MUST hold only the halts expected to SURVIVE the swap — the
+/// post-drain pending set captured at commit. Halts the I14 gate drained-
+/// resolved are legitimately gone and must NOT appear here; otherwise this
+/// reports a false `HaltSetLoss` and the monitor auto-reverts a valid
+/// drained-with-pending swap (Story 12.5 review fix).
+fn detect_halt_set_loss(
+    snapshot_halt_ids: &[String],
+    current_pending: &std::collections::BTreeSet<String>,
+) -> Option<Vec<String>> {
+    let lost: Vec<String> = snapshot_halt_ids
+        .iter()
+        .filter(|id| !current_pending.contains(*id))
+        .cloned()
+        .collect();
+    (!lost.is_empty()).then_some(lost)
 }
 
 #[cfg(test)]
@@ -192,5 +211,49 @@ mod tests {
         };
         assert_eq!(snapshot.pid, 100);
         assert_eq!(snapshot.pre_swap_halt_ids.len(), 2);
+    }
+
+    #[test]
+    fn survivor_snapshot_without_the_drained_halt_is_not_a_loss() {
+        // Story 12.5 review fix (GREEN): a drained-with-pending swap resolves the
+        // pending halt at the I14 gate, so the commit-time SURVIVOR snapshot is
+        // empty. The monitor must NOT flag the drained halt as loss.
+        let survivor_snapshot: Vec<String> = vec![];
+        let current_pending = std::collections::BTreeSet::new();
+        assert_eq!(detect_halt_set_loss(&survivor_snapshot, &current_pending), None);
+    }
+
+    #[test]
+    fn a_pre_drain_snapshot_would_falsely_flag_the_drained_halt() {
+        // Story 12.5 review (RED shape): the pre-fix code snapshotted the
+        // PRE-drain set, so a drained halt — absent from live pending — was a
+        // FALSE HaltSetLoss that auto-reverted valid swaps. Guards the regression.
+        let pre_drain_snapshot = vec!["drained-halt".to_string()];
+        let current_pending = std::collections::BTreeSet::new();
+        assert_eq!(
+            detect_halt_set_loss(&pre_drain_snapshot, &current_pending),
+            Some(vec!["drained-halt".to_string()]),
+            "a pre-drain snapshot falsely flags the drained halt — the exact bug the survivor snapshot fixes"
+        );
+    }
+
+    #[test]
+    fn a_genuinely_lost_survivor_is_still_flagged() {
+        // The monitor must STILL catch a real loss: a halt that survived the
+        // gate (in the survivor snapshot) but then vanished during the window.
+        let survivor_snapshot = vec!["carried-halt".to_string()];
+        let current_pending = std::collections::BTreeSet::new();
+        assert_eq!(
+            detect_halt_set_loss(&survivor_snapshot, &current_pending),
+            Some(vec!["carried-halt".to_string()])
+        );
+    }
+
+    #[test]
+    fn a_surviving_halt_still_pending_is_clean() {
+        let survivor_snapshot = vec!["carried-halt".to_string()];
+        let current_pending: std::collections::BTreeSet<String> =
+            ["carried-halt".to_string()].into_iter().collect();
+        assert_eq!(detect_halt_set_loss(&survivor_snapshot, &current_pending), None);
     }
 }

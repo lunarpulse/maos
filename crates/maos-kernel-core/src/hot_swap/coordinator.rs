@@ -141,18 +141,6 @@ impl HotSwapCoordinator {
         let mut saga = HotSwapSaga::new().with_pre_swap_snapshot(Arc::clone(&predecessor_scb));
         saga.advance_to(SagaPhase::NotStarted);
 
-        // Story 5.2 review backfill: capture the pre-swap halt-id baseline
-        // BEFORE step 3 (validate_swap_halt_continuity) runs, since the
-        // wrapper may drain halts as a side effect. Without this, the
-        // PostSwapMonitor's halt-set-delta invariant compares against a
-        // post-drain baseline and can never detect halt-set loss.
-        let pre_swap_halt_ids_baseline: Vec<String> = self
-            .halt_registry
-            .pending_halt_ids()
-            .iter()
-            .map(|h| h.as_str().to_string())
-            .collect();
-
         let predecessor_version = predecessor_scb
             .manifest
             .class
@@ -388,10 +376,18 @@ impl HotSwapCoordinator {
         // Step 11: Spawn PostSwapMonitor (30s window).
         saga.advance_to(SagaPhase::Committed);
 
-        // Story 5.2 review backfill: use the baseline captured BEFORE step 3
-        // (validate_swap_halt_continuity), not after — see comment near the
-        // declaration of pre_swap_halt_ids_baseline.
-        let pre_swap_halt_ids: Vec<String> = pre_swap_halt_ids_baseline;
+        // Story 12.5 review fix: snapshot the halts that must SURVIVE the swap
+        // — the CURRENT (post-drain) pending set. Step 3's I14 gate legitimately
+        // drained the predecessor's halts (resolution), so listing those
+        // pre-drain ids made the PostSwapMonitor flag every drained-with-pending
+        // swap as HaltSetLoss and auto-revert a valid swap. Only halts still
+        // pending after the gate must persist through the post-swap window.
+        let pre_swap_halt_ids: Vec<String> = self
+            .halt_registry
+            .pending_halt_ids()
+            .iter()
+            .map(|h| h.as_str().to_string())
+            .collect();
 
         // Collect sample frame shapes from journal (placeholder — up to 5 recent).
         let pre_swap_frame_shapes: Vec<String> = vec![]; // TODO: sample from journal

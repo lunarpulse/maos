@@ -48,6 +48,26 @@ impl std::fmt::Display for CohortManifestForkReason {
     }
 }
 
+/// The precise structural reason an operator-declared migration candidate set
+/// cannot be walked as a linear chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MigrationChainNotLinearReason {
+    ForkAtSource,
+    Cycle,
+    SelfLoop,
+}
+
+impl std::fmt::Display for MigrationChainNotLinearReason {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Self::ForkAtSource => "fork_at_source",
+            Self::Cycle => "cycle",
+            Self::SelfLoop => "self_loop",
+        };
+        formatter.write_str(value)
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum CohortError {
     /// TOML failed to deserialize, or an unknown field appeared
@@ -240,6 +260,29 @@ pub enum CohortError {
     #[error("cohort manifest control envelope could not decode: {0}")]
     EControlEnvelopeDecode(String),
 
+    /// The operator-supplied candidate set has more than one outgoing
+    /// migration, a cycle, or a self-loop for the named concrete source.
+    #[error(
+        "migration candidate chain is not linear ({reason}) at source version {source_version}"
+    )]
+    ECohortMigrationChainNotLinear {
+        reason: MigrationChainNotLinearReason,
+        source_version: String,
+    },
+
+    /// The candidate set is structurally valid but contains no route from the
+    /// requested predecessor version to the requested successor version.
+    #[error("no migration path from version {from} to version {to}")]
+    ECohortNoMigrationPath { from: String, to: String },
+
+    /// A persisted approved plan does not match the chain re-derived from the
+    /// current candidate manifests. This guards trusted operator input against
+    /// accidental or third-party drift; it is not an attestation mechanism.
+    #[error("migration plan drift: approved hash {expected_plan_hash}, live chain hash {actual_chain_hash}")]
+    EMigrationPlanDrift {
+        expected_plan_hash: String,
+        actual_chain_hash: String,
+    },
     #[error("cohort manifest distribution failed: {0}")]
     EDistributionFailed(String),
 }

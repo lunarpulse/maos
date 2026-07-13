@@ -219,4 +219,20 @@
 #          draw, no `cargo fmt --check` gate). FLAG-Winston: authorized by
 #          Lunarpulse 2026-07-11 as a behavior-preserving reconciliation so the
 #          green-at-HEAD prerequisite holds; no public symbols removed.
-src_lines = 23082
+#   23141  Story 12.5 code-review FLAG-Winston — PostSwapMonitor halt-set-delta
+#          fix + proven-red tests. The review found a latent kernel defect the
+#          12.5 drain-per-hop migration mechanism activates: initiate_swap
+#          snapshotted the PRE-drain pending halt-ids, so after step-3's I14 gate
+#          drained a pending halt the PostSwapMonitor saw it "missing" and
+#          auto-reverted the (valid) swap ~1s later — a silent safety-guarantee
+#          falsifier on the Epic-12 closer. Fix (hot_swap/coordinator.rs):
+#          snapshot the post-drain SURVIVOR set (only halts that must persist).
+#          Extracted the pure `detect_halt_set_loss` helper (post_swap_monitor.rs)
+#          + 4 in-src #[cfg(test)] proven-red tests (RED: a pre-drain snapshot
+#          false-flags a drained halt; GREEN: a survivor snapshot does not;
+#          genuine loss still caught). Net +59 = fix logic (~+8 src) + the in-src
+#          proven-red tests (the private helper cannot be reached from tests/).
+#          No public symbols removed; no new kernel dependency. FLAG-Winston:
+#          authorized by the Story-12.5 review team consensus
+#          (Winston/Murat/Vex/John/Amelia, per-spec + long-term correctness) 2026-07-13.
+src_lines = 23141

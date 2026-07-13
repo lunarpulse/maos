@@ -36,6 +36,8 @@ mod env_contract;
 // Declared at the composition root, NOT in `api.rs` (it is not a kernel-core
 // adapter) so `check-composition-root-completeness` stays GREEN.
 mod escape_detector_consumer;
+#[cfg(feature = "network")]
+mod migration_plan;
 
 use std::sync::Arc;
 use std::thread::available_parallelism;
@@ -5303,12 +5305,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .parse::<maos_kernel_core::lifecycle::UpgradePolicy>()
                 .map_err(|e| format!("invalid upgrade policy: {e}"))?;
 
-            let report = upgrade_orchestrator
-                .upgrade(&spirit_id, std::path::Path::new(&manifest_path), policy)
-                .await
-                .map_err(|e| format!("upgrade failed: {e}"))?;
+            if std::env::var_os("MAOS_UPGRADE_PLAN").is_some() {
+                let from_version = std::env::var("MAOS_UPGRADE_FROM_VERSION")
+                    .map_err(|_| "MAOS_UPGRADE_FROM_VERSION is required with --plan")?;
+                let candidates = std::env::var("MAOS_UPGRADE_CANDIDATES")
+                    .map_err(|_| "MAOS_UPGRADE_CANDIDATES is required with --plan")?;
+                let candidates: Vec<String> = serde_json::from_str(&candidates)
+                    .map_err(|error| format!("invalid MAOS_UPGRADE_CANDIDATES: {error}"))?;
+                let (plan_path, plan) = migration_plan::create_plan(
+                    &spirit_id,
+                    &from_version,
+                    std::path::Path::new(&manifest_path),
+                    &candidates,
+                )?;
+                println!(
+                    "{}",
+                    serde_json::to_string(&plan)
+                        .map_err(|error| format!("serialize migration plan: {error}"))?
+                );
+                eprintln!(
+                    "maos: migration plan persisted at {}; execute the same upgrade command without --plan",
+                    plan_path.display()
+                );
+                drop(audit_tx);
+                drop(inference);
+                drop(capability);
+                match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
+                    .await
+                {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
+                    Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
+                }
+                return Ok(());
+            }
 
-            println!("{}", serde_json::to_string(&report).unwrap_or_default()); // xtask-serde-allow: best-effort report print; unwrap_or_default already swallows gracefully to ""
+            let reports = migration_plan::upgrade_with_plan_guard(
+                &upgrade_orchestrator,
+                &spirit_id,
+                std::path::Path::new(&manifest_path),
+                policy,
+            )
+            .await
+            .map_err(|error| format!("upgrade failed: {error}"))?;
+
+            let rendered = if reports.len() == 1 {
+                serde_json::to_string(&reports[0])
+            } else {
+                serde_json::to_string(&reports)
+            }
+            .map_err(|error| format!("serialize upgrade report: {error}"))?;
+            println!("{rendered}");
             drop(audit_tx);
             drop(inference);
             drop(capability);
@@ -5475,15 +5522,18 @@ description = "smoke test spirit successor"
             )
             .map_err(|e| format!("smoke: failed to write dummy successor manifest: {e}"))?;
 
-            let hot_swap_outcome = match upgrade_orchestrator
-                .upgrade(
-                    "smoke-spirit",
-                    &dummy_manifest_path,
-                    maos_kernel_core::lifecycle::UpgradePolicy::HotSwap,
-                )
-                .await
+            let hot_swap_outcome = match migration_plan::upgrade_with_plan_guard(
+                &upgrade_orchestrator,
+                "smoke-spirit",
+                &dummy_manifest_path,
+                maos_kernel_core::lifecycle::UpgradePolicy::HotSwap,
+            )
+            .await
             {
-                Ok(report) => report.outcome.as_str().to_string(),
+                Ok(reports) => reports
+                    .last()
+                    .map(|report| report.outcome.as_str().to_string())
+                    .unwrap_or_else(|| "completed-no-hops".into()),
                 Err(e) => {
                     // Hot-swap requires Story 5.2 coordinator wiring that may not be
                     // fully composed in the smoke arm's minimal composition root;
@@ -5494,14 +5544,17 @@ description = "smoke test spirit successor"
             println!("{{\"step\":1,\"surface\":\"upgrade_orchestrator\",\"policy\":\"hot-swap\",\"outcome\":\"{}\"}}", hot_swap_outcome);
 
             // Step 3: Cold-swap upgrade (orchestrator handles unload + reload)
-            let cold_report = upgrade_orchestrator
-                .upgrade(
-                    "smoke-spirit",
-                    &dummy_manifest_path,
-                    maos_kernel_core::lifecycle::UpgradePolicy::ColdSwap,
-                )
-                .await
-                .map_err(|e| format!("smoke: cold-swap upgrade failed: {e}"))?;
+            let cold_reports = migration_plan::upgrade_with_plan_guard(
+                &upgrade_orchestrator,
+                "smoke-spirit",
+                &dummy_manifest_path,
+                maos_kernel_core::lifecycle::UpgradePolicy::ColdSwap,
+            )
+            .await
+            .map_err(|error| format!("smoke: cold-swap upgrade failed: {error}"))?;
+            let cold_report = cold_reports
+                .last()
+                .ok_or("smoke: cold-swap upgrade completed without a report")?;
             println!("{{\"step\":2,\"surface\":\"upgrade_orchestrator\",\"policy\":\"cold-swap\",\"outcome\":\"{}\",\"halt_receipts_produced\":{}}}",
                 cold_report.outcome.as_str(), cold_report.halt_receipts_produced);
 

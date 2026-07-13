@@ -155,3 +155,36 @@ fn j3_anti_canned_blinded_raw_input_moves_rendered_line() {
         "one blinded byte must move the real daemon's vt100 render — a static digest reds"
     );
 }
+
+/// Story 12.5 AC6: the survivor count is derived from durable halt receipts,
+/// not the live pending registry that I14 intentionally drains. Blinding one
+/// receipt must therefore move the rendered count through the shared digest
+/// derivation rather than leave a canned narrative unchanged.
+#[test]
+fn j3_blinded_halt_receipt_moves_persistent_agents_halted_count() {
+    let captured_path =
+        workspace_root().join("crates/maos-journey-test/fixtures/j3/day-30-raw.json");
+    let captured = std::fs::read(captured_path).expect("captured J3 fixture");
+    let raw: maos_digest::RawDigestInputs =
+        serde_json::from_slice(&captured).expect("captured fixture decodes");
+    let original = maos_digest::derive_team_digest(&raw).expect("original receipt stream derives");
+    assert!(
+        !raw.receipt_presence.is_empty(),
+        "the durable J3 fixture must contain a halt receipt for this reflex"
+    );
+
+    let mut blinded = raw;
+    blinded.receipt_presence.remove(0);
+    let changed =
+        maos_digest::derive_team_digest(&blinded).expect("blinded receipt stream derives");
+
+    assert_eq!(
+        original.agents_halted,
+        changed.agents_halted + 1,
+        "one durable receipt maps to exactly one surviving halted-agent count"
+    );
+    assert_ne!(
+        original.narrative, changed.narrative,
+        "the persistent receipt blind must move the derived narrative"
+    );
+}
