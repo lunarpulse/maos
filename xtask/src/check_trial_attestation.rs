@@ -67,6 +67,15 @@ pub fn run(json: bool) -> Result<(), String> {
         ));
     }
     let blocking_now = is_blocking_at(&disposition, CURRENT_PHASE);
+    // Option C (Epic 12 retro B1): hermetic gate — the Blocking binding class
+    // hard-fails a RED oracle at HEAD regardless of CURRENT_PHASE. Dev-time
+    // enforcement is decoupled from the GA ship-phase ladder (`blocking_now` is
+    // retained for JSON reporting). See gate_common::BindingClass.
+    let dev_blocks = blocking_now
+        || crate::gate_common::dev_enforced_red_blocks(
+            crate::gate_common::BindingClass::Blocking,
+            true,
+        );
     let legs = vec![
         reload_derives_load_and_frames_leg(),
         hermetic_environment_enforced_leg(),
@@ -83,7 +92,7 @@ pub fn run(json: bool) -> Result<(), String> {
         .iter()
         .find(|leg| leg.attempted && (!leg.ran || (leg.passed == 0 && leg.failed == 0)));
     let oracle_green = legs.iter().all(|leg| leg.green);
-    let gate_passed = vacuous.is_none() && (oracle_green || !blocking_now);
+    let gate_passed = vacuous.is_none() && (oracle_green || !dev_blocks);
 
     if json {
         println!(

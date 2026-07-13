@@ -226,6 +226,15 @@ pub fn run(json: bool) -> Result<(), String> {
         ));
     }
     let blocking_now = is_blocking_at(&disposition, CURRENT_PHASE);
+    // Option C (Epic 12 retro B1): hermetic gate — the Blocking binding class
+    // hard-fails a RED oracle at HEAD regardless of CURRENT_PHASE. Dev-time
+    // enforcement is decoupled from the GA ship-phase ladder (`blocking_now` is
+    // retained for JSON reporting). See gate_common::BindingClass.
+    let dev_blocks = blocking_now
+        || crate::gate_common::dev_enforced_red_blocks(
+            crate::gate_common::BindingClass::Blocking,
+            true,
+        );
 
     // 2. Invoke the live oracle (both legs). This is the real evidence — the
     //    verdict is derived from actually-captured effects, not a constant.
@@ -277,7 +286,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 base.failed,
                 fault_inject.passed,
                 fault_inject.failed,
-                if blocking_now { "BLOCKING" } else { "advisory" },
+                if dev_blocks { "BLOCKING" } else { "advisory" },
                 CURRENT_PHASE,
             );
         }
@@ -295,7 +304,7 @@ pub fn run(json: bool) -> Result<(), String> {
         fault_inject.failed,
         fault_inject.green,
     );
-    if blocking_now {
+    if dev_blocks {
         // v2.0: BLOCK ship.
         let msg = format!(
             "check-wasm-form-equiv: BLOCKING — live oracle RED at {CURRENT_PHASE} (binding):\n{detail}"

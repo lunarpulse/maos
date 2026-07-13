@@ -50,6 +50,7 @@ mod check_escape_detector;
 mod check_wasm_form_equiv;
 // Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
 mod check_deprecations_declared;
+mod check_dev_model_tier;
 mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
 mod check_empty_kernel;
@@ -509,6 +510,13 @@ enum Commands {
     /// Story 7.1.5 — assert every story file has a populated `dev_model_used:` frontmatter field.
     #[command(name = "check-dev-model-used-populated")]
     CheckDevModelUsedPopulated {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Epic 12 retro B3 — frontier-era (epic >= 12) stories must record an
+    /// allowlisted dev model + a §A6 review artifact (Blocking; closes E11-A1).
+    #[command(name = "check-dev-model-tier")]
+    CheckDevModelTier {
         #[arg(long)]
         json: bool,
     },
@@ -1112,6 +1120,7 @@ fn main() {
         Commands::CheckBareReviewFindings { json } => check_bare_review_findings::run(json),
         Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
+        Commands::CheckDevModelTier { json } => check_dev_model_tier::run(json),
         Commands::CheckKernelBaseline { json } => check_kernel_baseline::run(json),
         Commands::CheckDependencyClosure { json } => check_dependency_closure::run(json),
         Commands::CheckHostSurface { json } => check_host_surface::run(json),

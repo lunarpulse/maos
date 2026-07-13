@@ -133,6 +133,24 @@ jobs:
       - name: Run check-unsafe
         run: cargo run -p xtask -- check-unsafe --json
 
+  # Epic 12 retro B4 (Option C Blocking, hermetic) — a `cargo fmt` reflow must
+  # red at its ORIGIN commit, not drift silently into a later story's kernel
+  # baseline. Story 12.2's fmt reflow moved the baseline 23081->23082 and shipped
+  # un-caught into 12.3 precisely because there was no fmt gate. Blocking.
+  check-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run cargo fmt --check
+        run: cargo fmt --all -- --check
+
   kloc-check:
     runs-on: ubuntu-latest
     # ADVISORY gate (2026-06-11). `xtask/kloc.toml` deliberately forbids raising
@@ -1745,6 +1763,22 @@ jobs:
       - name: Run check-dev-model-used-populated
         run: cargo run -p xtask -- check-dev-model-used-populated --json
 
+  # Epic 12 retro B3 (Option C Blocking; closes E11 retro A1) — frontier-era
+  # (epic >= 12) stories must record an allowlisted dev model + a §A6 review
+  # artifact. Makes the frontier-allowlist policy mechanical, not just cultural.
+  check-dev-model-tier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-dev-model-tier
+        run: cargo run -p xtask -- check-dev-model-tier --json
+
   # Story 8.16 §A4 — kernel-core line-count single source of truth.
   check-kernel-baseline:
     runs-on: ubuntu-latest
@@ -2871,6 +2905,7 @@ jobs:
     needs:
       - reproducible-build
       - check-unsafe
+      - check-fmt
       - kloc-check
       - abi-diff
       - gen-abi-docs
@@ -2963,6 +2998,7 @@ jobs:
       - check-dev-record-completeness
       - check-bare-review-findings
       - check-dev-model-used-populated
+      - check-dev-model-tier
       - check-kernel-baseline
       - check-epic-close-green
       - journey-hermetic-tier-1
