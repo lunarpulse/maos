@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use ed25519_dalek::SigningKey;
 use maos_a2a_core::cohort::CohortManifestGate;
+use maos_a2a_core::identity::PeerId;
 use maos_cohort::{
     CohortAuthority, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
     ConsentTuple, InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys,
@@ -18,7 +19,6 @@ use maos_cohort::{
 };
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
-use maos_a2a_core::identity::PeerId;
 use support::*;
 
 const HOST_COUNT: usize = 8;

@@ -235,4 +235,11 @@
 #          No public symbols removed; no new kernel dependency. FLAG-Winston:
 #          authorized by the Story-12.5 review team consensus
 #          (Winston/Murat/Vex/John/Amelia, per-spec + long-term correctness) 2026-07-13.
-src_lines = 23141
+#   23147  Story 12.6 user-authorized formatter reconciliation — `cargo fmt`
+#          normalized pre-existing layout drift in
+#          hot_swap/post_swap_monitor.rs and
+#          tests/hot_swap_halt_continuity_corpus_integration.rs, net +6 physical
+#          source lines. No behavior, public API, or dependency change.
+#          FLAG-Winston: Lunarpulse authorized the formatter run and this
+#          baseline reconciliation on 2026-07-13.
+src_lines = 23147

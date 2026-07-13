@@ -322,6 +322,20 @@ jobs:
       - name: Run check-service-boundary
         run: cargo run -p xtask -- check-service-boundary --json
 
+  # Story 12.6 — blocking registry coverage for maos-bin/src only; Story 12.7 widens this workspace-wide.
+  check-env-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-env-contract
+        run: cargo run -p xtask -- check-env-contract --json
+
   # Per-push invariant-lock validation. Journal persistence is a separate
   # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
   # job validates the tri-requirement (diff + corpus-delta + phase-commitment)
@@ -366,8 +380,6 @@ jobs:
         # crates/maos-journey-test/cassettes; passing the path positionally is a clap
         # `unexpected argument` error. Rely on the default (or use --cassette-dir).
         run: cargo run -p xtask -- cassette-age-gate --json
-      - name: check-env-contract
-        run: cargo run -p xtask -- check-env-contract
 
   check-corpus:
     runs-on: ubuntu-latest
@@ -2784,6 +2796,7 @@ jobs:
       - check-fkcs
       - check-trial-attestation
       - check-escape-detector
+      - check-env-contract
     if: always()
     steps:
       - name: Ship gate results summary

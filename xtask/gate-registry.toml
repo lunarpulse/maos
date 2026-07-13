@@ -126,6 +126,8 @@ gates = [
     # Story 11.7 (AC4/D2) — v2.0 third-party trial attestation producer gate.
     # Advisory at v1.0/v1.5; blocking at v2.0.
     "check-trial-attestation",
+    # Story 12.6 — maos-bin/src environment-contract registry; workspace coverage is Story 12.7.
+    "check-env-contract",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -316,6 +318,11 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 [[ship_gate]]
 name = "check-trial-attestation"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+
+# Story 12.6 — blocking only for maos-bin/src; Story 12.7 expands the contract workspace-wide.
+[[ship_gate]]
+name = "check-env-contract"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 
 
 

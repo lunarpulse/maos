@@ -59,6 +59,24 @@ impl FkcsBaseline {
         Ok(())
     }
 
+    pub fn validate_frozen_tag_src_lines(&self) -> Result<(), String> {
+        let paths = git([
+            "ls-tree",
+            "-r",
+            "--name-only",
+            &self.frozen_tag,
+            "--",
+            "crates/maos-kernel-core/src",
+        ])?;
+        let mut total = 0;
+        for path in paths.lines().filter(|path| path.ends_with(".rs")) {
+            let object = format!("{}:{path}", self.frozen_tag);
+            let source = git(["show", object.as_str()])?;
+            total += source.lines().count();
+        }
+        self.reconcile_src_lines(total)
+    }
+
     pub fn reconcile_src_lines(&self, actual: usize) -> Result<(), String> {
         if self.src_lines != actual {
             return Err(format!(
@@ -69,6 +87,10 @@ impl FkcsBaseline {
         Ok(())
     }
 
+    /// Validate the current workspace independently of the historical frozen
+    /// snapshot. The current kernel line count is governed by
+    /// `kernel-core-baseline.toml`; `validate_frozen_tag_src_lines` separately
+    /// verifies the snapshot against its frozen revision.
     pub fn validate_live_triple(&self) -> Result<(), String> {
         self.validate_files_exist()?;
         // Use `check()` (no stdout) instead of `run(false)` so `--json` stdout
@@ -77,11 +99,10 @@ impl FkcsBaseline {
         if !report.passed {
             return Err(format!(
                 "kernel-core line count drifted from the pinned baseline ({} pins {}, \
-                 live {}); authorize the delta or re-pin src_lines",
+                 live {}); authorize the delta or re-pin the current kernel baseline",
                 report.baseline_file, report.pinned_lines, report.actual_lines
             ));
         }
-        self.reconcile_src_lines(report.actual_lines)?;
         Ok(())
     }
 }
@@ -108,11 +129,9 @@ impl FkcsSurfaceSnapshot {
         }
     }
 
-    /// Capture the REAL current surfaces: live kernel-core line count + the
-    /// live `cargo public-api` ABI surface + the live `cargo public-api` host
-    /// surface. Anchored/validated by the frozen baseline triple
-    /// (`validate_live_triple` pins the kernel line count to the baseline and
-    /// confirms the ABI/host baseline files are present and non-empty).
+    /// surface. `validate_live_triple` verifies the current workspace against
+    /// its current kernel baseline, while `validate_frozen_tag_src_lines`
+    /// verifies the immutable snapshot against its annotated frozen revision.
     ///
     /// GREEN-path measurement used by the diff-oracle leg — it must NOT be a
     /// hardcoded literal. The fault-inject leg takes this real capture and
@@ -533,11 +552,13 @@ fn frozen_tag_consistency() -> Result<(), String> {
             tag_commit.trim()
         ));
     }
+    baseline.validate_frozen_tag_src_lines()?;
     Ok(())
 }
 
 fn git<const N: usize>(args: [&str; N]) -> Result<String, String> {
     let out = Command::new("git")
+        .current_dir(workspace_root()?)
         .args(args)
         .output()
         .map_err(|e| format!("git invocation failed: {e}"))?;
@@ -638,6 +659,14 @@ fn count_rs_lines(dir: impl AsRef<Path>) -> Result<usize, String> {
     let mut total = 0;
     walk(dir.as_ref(), &mut total)?;
     Ok(total)
+}
+
+fn workspace_root() -> Result<PathBuf, String> {
+    let cwd = std::env::current_dir().map_err(|e| format!("current_dir: {e}"))?;
+    cwd.ancestors()
+        .find(|ancestor| ancestor.join("crates/maos-kernel-core/src").is_dir())
+        .map(Path::to_path_buf)
+        .ok_or_else(|| format!("failed to find workspace root from {}", cwd.display()))
 }
 
 fn resolve_workspace_path(path: &Path) -> Result<PathBuf, String> {

@@ -220,7 +220,10 @@ mod tests {
         // empty. The monitor must NOT flag the drained halt as loss.
         let survivor_snapshot: Vec<String> = vec![];
         let current_pending = std::collections::BTreeSet::new();
-        assert_eq!(detect_halt_set_loss(&survivor_snapshot, &current_pending), None);
+        assert_eq!(
+            detect_halt_set_loss(&survivor_snapshot, &current_pending),
+            None
+        );
     }
 
     #[test]
@@ -254,6 +257,9 @@ mod tests {
         let survivor_snapshot = vec!["carried-halt".to_string()];
         let current_pending: std::collections::BTreeSet<String> =
             ["carried-halt".to_string()].into_iter().collect();
-        assert_eq!(detect_halt_set_loss(&survivor_snapshot, &current_pending), None);
+        assert_eq!(
+            detect_halt_set_loss(&survivor_snapshot, &current_pending),
+            None
+        );
     }
 }

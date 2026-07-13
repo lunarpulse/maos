@@ -8,17 +8,20 @@ fn frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift() {
     let baseline =
         FkcsBaseline::load_from_file("xtask/fkcs-baseline.toml").expect("baseline loads");
 
-    assert_eq!(baseline.src_lines, 23_082);
+    assert_eq!(baseline.src_lines, 23_081);
     assert_eq!(baseline.abi_baseline, "abi-baseline/v1-pre-bump.txt");
     assert_eq!(baseline.host_baseline, "abi-baseline/maos-host-v1.txt");
     baseline
         .validate_files_exist()
         .expect("surface files exist");
+    baseline
+        .validate_frozen_tag_src_lines()
+        .expect("frozen snapshot line count must match its annotated tag");
 
     let mut drifted = baseline.clone();
-    drifted.src_lines = 23_083;
+    drifted.src_lines = 23_082;
     let err = drifted
-        .reconcile_src_lines(23_082)
+        .reconcile_src_lines(23_081)
         .expect_err("src_lines drift must red the frozen-tag-consistency leg");
     assert!(err.contains("src_lines"));
 }
@@ -135,25 +138,36 @@ fn frozen_baseline_files_carry_real_public_surfaces_not_synthetic_tokens() {
 }
 
 #[test]
-fn live_triple_reconciles_real_kernel_core_line_count_not_a_literal() {
-    // AC1: the frozen baseline src_lines is reconciled against the REAL
-    // crates/maos-kernel-core/src tree — an independent line count of the live
-    // sources, NOT the reconcile_src_lines(23_081) literal. A frozen-kernel
-    // source change reds this. (The production `FkcsBaseline::validate_live_triple`
-    // performs this same count and is exercised by the gate's frozen-tag leg from
-    // the workspace root; this test re-counts independently so it is robust to the
-    // cargo-test CWD and directly proves the baseline is grounded in reality.)
+fn frozen_snapshot_and_current_kernel_baselines_are_independently_valid() {
     let baseline =
         FkcsBaseline::load_from_file("xtask/fkcs-baseline.toml").expect("baseline loads");
-    let real = real_kernel_core_src_lines();
 
     baseline
-        .reconcile_src_lines(real)
-        .expect("the frozen baseline src_lines must match the real kernel-core src count");
+        .validate_frozen_tag_src_lines()
+        .expect("the frozen snapshot must satisfy its annotated tag");
+
+    let current = real_kernel_core_src_lines();
     assert_eq!(
-        real, baseline.src_lines,
-        "the baseline is grounded in the real kernel-core src line count"
+        current,
+        current_kernel_baseline_src_lines(),
+        "the current kernel source count must satisfy its current baseline"
     );
+}
+
+fn current_kernel_baseline_src_lines() -> usize {
+    let cwd = std::env::current_dir().expect("current_dir is readable");
+    let path = cwd
+        .ancestors()
+        .map(|ancestor| ancestor.join("xtask/kernel-core-baseline.toml"))
+        .find(|candidate| candidate.is_file())
+        .expect("workspace kernel baseline exists");
+    std::fs::read_to_string(path)
+        .expect("kernel baseline reads")
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("src_lines = "))
+        .expect("kernel baseline has src_lines")
+        .parse()
+        .expect("kernel baseline src_lines parses")
 }
 
 /// Independently count every `.rs` line under `crates/maos-kernel-core/src`,

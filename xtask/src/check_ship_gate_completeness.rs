@@ -66,6 +66,8 @@ const EXPECTED_GATES: &[&str] = &[
     "check-fkcs",
     // Story 11.7 (AC4/D2) — v2.0 third-party trial attestation producer gate.
     "check-trial-attestation",
+    // Story 12.6 — maos-bin-scoped environment-contract registry gate.
+    "check-env-contract",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.
@@ -134,6 +136,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 | "check-cohort-mesh"
                 // Story 11.4a (AC5) — enterprise PDP integration gate.
                 | "check-enterprise-pdp"
+                // Story 12.6 — maos-bin-scoped environment-contract registry gate.
+                | "check-env-contract"
         );
         if (is_story10_ship_gate || WEEKLY_ONLY_GATES.contains(gate))
             && !registry_names.contains(gate)

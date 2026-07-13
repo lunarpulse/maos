@@ -185,7 +185,10 @@ fn chain_walk_drains_a_real_pending_halt_at_every_hop_with_zero_dropped() {
     let before_hop_2 = registry.pending_halt_ids().len();
     let hop_2 =
         validate_swap_halt_continuity(&registry, PID, 1, Some(&[1])).expect("hop-2 I14 verdict");
-    assert_eq!(before_hop_2, 1, "hop two must ALSO carry a real pending halt");
+    assert_eq!(
+        before_hop_2, 1,
+        "hop two must ALSO carry a real pending halt"
+    );
     assert_eq!(
         hop_2,
         SwapVerdict::SafeDrained {
