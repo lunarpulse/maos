@@ -152,5 +152,6 @@ fn store_error_to_port_error(e: StoreError) -> CollectivePortError {
         StoreError::Query(msg) => CollectivePortError::Transport(msg),
         StoreError::Schema(msg) => CollectivePortError::Transport(msg),
         StoreError::Serialization(msg) => CollectivePortError::Transport(msg),
+        StoreError::AtRestSeal(msg) => CollectivePortError::Transport(msg),
     }
 }

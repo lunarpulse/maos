@@ -98,7 +98,20 @@ pub fn build_tree(leaves: &[NodeHash]) -> MerkleTree {
 /// Build a tree directly from raw frame_ids.
 pub fn build_tree_from_frame_ids(frame_ids: &[[u8; 16]]) -> MerkleTree {
     let leaves: Vec<NodeHash> = frame_ids.iter().map(hash_leaf).collect();
-    build_tree(&leaves)
+    build_tree_from_leaves(&leaves)
+}
+
+/// Build a tree from pre-hashed leaves (e.g. KV-row canonical hashes).
+///
+/// Story 11.2a (AC3): generalized from `build_tree_from_frame_ids` which
+/// becomes a 2-line wrapper. The input leaves are ALREADY SHA-256 hashes
+/// (e.g. from `CollectiveKvLeaf::canonical_hash`), so no re-hashing is
+/// needed — they are passed directly as sorted leaf nodes.
+///
+/// Preserves 9.x `AuditBundle` byte-identity: `build_tree_from_frame_ids`
+/// remains a wrapper that hashes raw 16-byte frame_ids into leaves first.
+pub fn build_tree_from_leaves(leaf_hashes: &[NodeHash]) -> MerkleTree {
+    build_tree(leaf_hashes)
 }
 
 /// Prove that `leaf` is included in the tree.  Returns `None` if the leaf is

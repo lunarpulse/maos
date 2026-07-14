@@ -367,9 +367,28 @@ fn manifest_corpus_sha256() -> String {
 /// order, non-ASCII written as raw UTF-8). The content address of the
 /// deterministic corpus — pinned in tests/fixtures/MANIFEST.toml.
 fn corpus_sha256(corpus: &[serde_json::Value]) -> String {
-    let bytes = serde_json::to_vec(corpus).expect("serialize corpus");
+    let canonical: Vec<serde_json::Value> = corpus.iter().map(canonical_json).collect();
+    let bytes = serde_json::to_vec(&canonical).expect("serialize corpus");
     let digest = Sha256::digest(&bytes);
     digest.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn canonical_json(value: &serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.iter().map(canonical_json).collect())
+        }
+        serde_json::Value::Object(map) => {
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort_unstable();
+            let mut sorted = serde_json::Map::new();
+            for key in keys {
+                sorted.insert(key.clone(), canonical_json(&map[key]));
+            }
+            serde_json::Value::Object(sorted)
+        }
+        other => other.clone(),
+    }
 }
 
 // ───────────────────────────────────────────────────────────────────────────

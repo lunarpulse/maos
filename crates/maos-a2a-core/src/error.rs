@@ -5,6 +5,7 @@
 //! `error.code` field (see `transport::json_rpc::NackError` for the wire
 //! mapping).
 
+use crate::cohort::CohortConsentDenial;
 use crate::consent::EIntentDenied;
 use crate::tofu::EPinMismatch;
 
@@ -71,6 +72,12 @@ pub enum A2AError {
     IntentDenied {
         direction: IntentDirection,
         inner: EIntentDenied,
+    },
+
+    #[error("cohort consent denied ({direction:?}): {reason}")]
+    CohortConsentDenied {
+        direction: IntentDirection,
+        reason: CohortConsentDenial,
     },
 
     /// Receiver returned a JSON-RPC NACK with `-32001 EIntentDenied`.

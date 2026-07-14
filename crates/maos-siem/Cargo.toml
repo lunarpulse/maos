@@ -1,0 +1,26 @@
+[package]
+name = "maos-siem"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS SIEM export — read-only Transparency Log projection (NDJSON/CEF/RFC5424) per NFR-Aud-11"
+
+[dependencies]
+maos-audit = { path = "../maos-audit" }
+maos-domain = { path = "../maos-domain" }
+serde_json = "1"
+thiserror = "2"
+
+[dev-dependencies]
+serde_json = "1"
+tempfile = "3"
+# Story 11.4c Task 4 (AC4) — redaction-before-forward integration tests seed a
+# real Transparency Log via the kernel adapter (mirrors maos-audit's dev-deps).
+# dev-only: does NOT enter the library dependency graph / closure checks.
+maos-kernel-core = { path = "../maos-kernel-core" }
+
+[features]
+default = []
+siem-fault-inject = []

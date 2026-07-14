@@ -1461,7 +1461,14 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
 
             exec_and_forward(&mut cmd, &bin)
         }
-        SpiritOp::Upgrade { spirit, to, policy } => {
+        SpiritOp::Upgrade {
+            spirit,
+            to,
+            from,
+            candidates,
+            plan,
+            policy,
+        } => {
             if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
                 eprintln!("maosctl: spirit upgrade — {diag}");
                 return ExitCode::from(1);
@@ -1470,6 +1477,16 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
             if !manifest_path.exists() {
                 eprintln!("maosctl: spirit upgrade — manifest file not found: {to}");
                 return ExitCode::from(1);
+            }
+            if *plan && (from.as_deref().is_none_or(str::is_empty) || candidates.is_empty()) {
+                eprintln!(
+                    "maosctl: spirit upgrade --plan requires non-empty --from and --candidates"
+                );
+                return ExitCode::from(2);
+            }
+            if !*plan && (from.is_some() || !candidates.is_empty()) {
+                eprintln!("maosctl: spirit upgrade --from/--candidates require --plan");
+                return ExitCode::from(2);
             }
 
             let bin = maos_bin_path();
@@ -1485,6 +1502,21 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
                     UpgradePolicyArg::Migrator => "migrator",
                 },
             );
+            if *plan {
+                cmd.env("MAOS_UPGRADE_PLAN", "1");
+                cmd.env(
+                    "MAOS_UPGRADE_FROM_VERSION",
+                    from.as_deref().expect("validated --plan --from"),
+                );
+                let candidates_json = match serde_json::to_string(candidates) {
+                    Ok(json) => json,
+                    Err(err) => {
+                        eprintln!("maos: failed to serialize upgrade candidates: {err}");
+                        return ExitCode::FAILURE;
+                    }
+                };
+                cmd.env("MAOS_UPGRADE_CANDIDATES", candidates_json);
+            }
 
             if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
                 cmd.env("NO_COLOR", "1");

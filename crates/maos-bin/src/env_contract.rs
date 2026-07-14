@@ -147,6 +147,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_UPGRADE_PLAN",
+        purpose: "When set, --plan resolves+hashes+persists the migration chain instead of executing",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_UPGRADE_FROM_VERSION",
+        purpose: "Source version for a --plan migration chain resolution",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_UPGRADE_CANDIDATES",
+        purpose: "JSON array of candidate manifest paths for a --plan migration chain",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_REVOKE_TOKEN_ID",
         purpose: "Token ID for revocation verb",
         stability: EnvStability::UserFacing,
@@ -264,6 +279,71 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     EnvVar {
         name: "MAOS_LOOM_POSTGRES",
         purpose: "Collective-tier (Loom-lite) Postgres connection string; absent disables the collective tier (Story 10.4a)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SIEM_FILE",
+        purpose: "Path to the local SIEM file sink; when set and non-empty, enables enterprise SIEM export (Story 11.4c)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_KMS_MASTER_KEY",
+        purpose: "Hex-encoded 32-byte org master key for the LocalMasterKeyKms at-rest AEAD envelope; absent keeps byte-identical Option-A plaintext (Story 11.4c)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SSO_JWKS",
+        purpose: "Static JWKS document for the OIDC assertion verifier (Story 11.4c)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SSO_ISSUERS",
+        purpose: "Comma-separated allowlist of accepted OIDC issuers (Story 11.4c)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SSO_AUDIENCE",
+        purpose: "Required OIDC audience claim for SSO assertion verification (Story 11.4c)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SSO_ALGS",
+        purpose: "Optional comma-separated allowed JWS algorithms (default RS256,ES256) (Story 11.4c)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SSO_ASSERTION",
+        purpose: "OIDC assertion (JWT) presented at enterprise-governed capability issuance when SSO is configured (Story 11.4c)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_PDP_POLICY_FILE",
+        purpose: "Explicit path to a Cedar (.cedar) PDP policy file (Story 11.4a)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_PDP_POLICY_INLINE",
+        purpose: "Explicit inline Cedar PDP policy text (Story 11.4a)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_PDP_POLICY",
+        purpose: "Legacy PDP policy source: inline Cedar text or file path via file:/inline: prefix (Story 11.4a)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_PDP_REFRESH_INTERVAL_MS",
+        purpose: "PDP policy refresh interval (ms) for the enterprise PDP runtime reconciler (Story 11.4a; read via duration_ms_from_env at enterprise_pdp_runtime.rs:86)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_PDP_STALENESS_TTL_MS",
+        purpose: "PDP staleness TTL (ms); after expiry PDP-granted caps revert to deny (Story 11.4a; enterprise_pdp_runtime.rs:90)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_COHORT_DAEMON_CONFIG",
+        purpose: "Path to the cohort A2A daemon TOML config (manifest path + digest summary) (Story 12.1)",
         stability: EnvStability::UserFacing,
     },
 ];

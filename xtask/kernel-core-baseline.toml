@@ -172,4 +172,74 @@
 #          tests/sandbox_enforcement_windows.rs (NOT counted — tests/, not src/).
 #          All additive; no public symbols removed. Windows compile/runtime still
 #          CI-only (windows-latest); not verifiable from this Linux host.
-src_lines = 22964
+#   23023  Story 11.2a — charter-amended kernel delta: bounded FLAG-Winston
+#          CrossRegionReadmit provenance arm (+59, incl. test LOC).
+#          FLAG-Winston: authorized 2026-07-02 (party-mode preflight, unanimous).
+#          Added WriteEntryPoint::CrossRegionReadmit { source_region, source_log_ref }
+#          variant + SourceLogRef struct + one source_region() match arm in
+#          write_entry_point.rs. enforce_region body = 0-LOC (generic over
+#          source_region()). r_rg_cross_region_readmit_enforced test +
+#          r_rg3 exhaustiveness array updated. Functional src delta ~10 LOC;
+#          remainder is doc comments + test code the line-count gate includes.
+#          All additive; no public symbols removed. ADR-049 ref.
+#   23040  Story 11.4a (F2, FLAG-Winston) — bounded org-level deny layer
+#          (+17, AUTHORIZED kernel-core delta; party-mode preflight ratified
+#          2026-07-05, unanimous Winston·Murat·John·Amelia+Mary). Added
+#          OperatorPolicyConfig.per_capability_deny (HashSet<String>) + one
+#          deny-wins arm in PolicyTable::evaluate placed BEFORE the grant
+#          checks (Cedar forbid-beats-permit). The kernel keeps the ceiling
+#          (I1) — subtract-only; an out-of-kernel PolicyDecisionPort adapter
+#          (maos-pdp) populates the set at the composition root. The deny is
+#          observable via the existing Err(CapError::PolicyDenied) issue path
+#          (CATCH-B); rich forbid-rule attribution is 11.4c's SIEM slice.
+#          Confined to cap_policy/mod.rs (field + arm + doc). F2 unit tests
+#          live in tests/policy_per_capability_deny.rs (NOT counted — tests/,
+#          not src/). All additive; no public symbols removed. ADR-050 ref.
+#   23081  Story 11.4a code-review patches — bounded follow-up to the same
+#          FLAG-Winston surface. Added stable PDP action-key lookup (replacing
+#          Rust Discriminant Debug keying), subject-scoped
+#          OperatorPolicyConfig.per_spirit_capability_deny, and schedule
+#          watchdog denial logging for CATCH-B observability. Still confined to
+#          the policy/mediation observability surface; no PDP engine dependency
+#          enters kernel-core; all additive, no public symbols removed.
+#   23082  Story 12.3 review-closure reconciliation — carry-forward of a
+#          pre-existing, behavior-preserving `cargo fmt` reflow committed by the
+#          Story 12.2 commit (0c733d33) that was never re-pinned, leaving `main`
+#          RED on check-kernel-baseline at Story 12.3's baseline. Net +1 line,
+#          reflow ONLY, ZERO functional / ABI change (Story 12.3 itself adds ZERO
+#          kernel-core delta — the receipt courier + observer are entirely
+#          out-of-kernel in maos-cohort / maos-a2a-core). Affected files
+#          (`crates/maos-kernel-core/src/`), reflow only:
+#            capability/cap_policy/mod.rs — closure + method-chain line-wrap
+#              (`is_some_and` closure collapsed; `per_capability_approval.get`
+#              collapsed), net -4;
+#            memory/write_entry_point.rs — two `assert!(cond, "msg")` test lines
+#              split across four lines each by rustfmt, net +6.
+#          Same class as the Story 10.5 R3 disclosure above (silent fmt budget
+#          draw, no `cargo fmt --check` gate). FLAG-Winston: authorized by
+#          Lunarpulse 2026-07-11 as a behavior-preserving reconciliation so the
+#          green-at-HEAD prerequisite holds; no public symbols removed.
+#   23141  Story 12.5 code-review FLAG-Winston — PostSwapMonitor halt-set-delta
+#          fix + proven-red tests. The review found a latent kernel defect the
+#          12.5 drain-per-hop migration mechanism activates: initiate_swap
+#          snapshotted the PRE-drain pending halt-ids, so after step-3's I14 gate
+#          drained a pending halt the PostSwapMonitor saw it "missing" and
+#          auto-reverted the (valid) swap ~1s later — a silent safety-guarantee
+#          falsifier on the Epic-12 closer. Fix (hot_swap/coordinator.rs):
+#          snapshot the post-drain SURVIVOR set (only halts that must persist).
+#          Extracted the pure `detect_halt_set_loss` helper (post_swap_monitor.rs)
+#          + 4 in-src #[cfg(test)] proven-red tests (RED: a pre-drain snapshot
+#          false-flags a drained halt; GREEN: a survivor snapshot does not;
+#          genuine loss still caught). Net +59 = fix logic (~+8 src) + the in-src
+#          proven-red tests (the private helper cannot be reached from tests/).
+#          No public symbols removed; no new kernel dependency. FLAG-Winston:
+#          authorized by the Story-12.5 review team consensus
+#          (Winston/Murat/Vex/John/Amelia, per-spec + long-term correctness) 2026-07-13.
+#   23147  Story 12.6 user-authorized formatter reconciliation — `cargo fmt`
+#          normalized pre-existing layout drift in
+#          hot_swap/post_swap_monitor.rs and
+#          tests/hot_swap_halt_continuity_corpus_integration.rs, net +6 physical
+#          source lines. No behavior, public API, or dependency change.
+#          FLAG-Winston: Lunarpulse authorized the formatter run and this
+#          baseline reconciliation on 2026-07-13.
+src_lines = 23147

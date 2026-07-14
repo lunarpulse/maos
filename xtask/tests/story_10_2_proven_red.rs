@@ -60,6 +60,78 @@ offline_only = {}
     )
 }
 
+use maos_audit::sealed_export::derive_pubkey;
+use maos_eval::trial_attestation::{
+    sign_attestation, DerivedParticipantAttestation, PROVENANCE_STAMP,
+};
+
+/// A FOREIGN producer keypair for the v2.0 tests (R2-D2): the consumer refuses
+/// the public dev key at v2.0, so the tests sign with this test seed and set its
+/// pubkey via MAOS_TRIAL_PRODUCER_PUBKEY on the consumer subprocess — modeling the
+/// production config (CI sets a real, non-dev keypair) without env-mutating races.
+const TEST_PRODUCER_SEED: [u8; 32] = [0x42; 32];
+fn test_producer_pubkey_hex() -> String {
+    let pk = derive_pubkey(&TEST_PRODUCER_SEED);
+    pk.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The 12-participant cohort declared in `VALID_PARTICIPANTS` (10 green + 2
+/// non-producers P011/P012 → `successes=10`).
+const COHORT_IDS: &[&str] = &[
+    "P001", "P002", "P003", "P004", "P005", "P006", "P007", "P008", "P009", "P010", "P011", "P012",
+];
+
+fn green_attestation(participant_id: &str) -> DerivedParticipantAttestation {
+    DerivedParticipantAttestation {
+        participant_id: participant_id.to_string(),
+        produced_binary: true,
+        binary_loads: true,
+        frames_run: 1500,
+        halt_recall: 0.92,
+        sbom_verified: true,
+        signing_chain_verified: true,
+        provenance_stamp: PROVENANCE_STAMP.to_string(),
+        environment_clean: true,
+        corpus_sha256: "class-appropriate-corpus-sha".to_string(),
+        artifact_sha256: "candidate-artifact-sha".to_string(),
+        ignored_self_report: false,
+        success: true,
+    }
+}
+
+/// Build producer-SIGNED per-participant derived attestations for the cohort,
+/// matching `successes=10` (10 green + P011/P012 non-producers). When
+/// `red_sbom_id` is set, that participant's derived `sbom_verified=false`
+/// (a SBOM the producer genuinely failed to reconcile) — the P5 negative
+/// control: a coordinator's self-reported `sbom_verified=true` for that
+/// participant in the TOML must be IGNORED (the signed derivation wins).
+fn cohort_signed_attestations_json(red_sbom_id: Option<&str>, seed: &[u8; 32]) -> String {
+    let signed: Vec<_> = COHORT_IDS
+        .iter()
+        .map(|id| {
+            let mut att = if *id == "P011" || *id == "P012" {
+                let mut a = green_attestation(id);
+                a.produced_binary = false;
+                a.binary_loads = false;
+                a.frames_run = 0;
+                a.halt_recall = 0.0;
+                a.sbom_verified = false;
+                a.signing_chain_verified = false;
+                a.success = false;
+                a
+            } else {
+                green_attestation(id)
+            };
+            if Some(*id) == red_sbom_id {
+                att.sbom_verified = false;
+                att.success = false;
+            }
+            sign_attestation(&att, &seed)
+        })
+        .collect();
+    serde_json::to_string(&signed).unwrap()
+}
+
 const VALID_PARTICIPANTS: &str = r#"
 [[participant]]
 id = "P001"
@@ -228,6 +300,233 @@ fn trial_gate_passes_on_valid_results() {
     );
 }
 
+/// Story 11.7 consumer graduation (D1): a perfect hand-authored file with NO
+/// producer-signed derived attestations is rejected at v2.0 — a coordinator
+/// cannot `vim` their way to green (the bare provenance stamp no longer suffices).
+#[test]
+fn trial_gate_rejects_missing_producer_signed_attestation_at_v2_0() {
+    let dir = tempfile::tempdir().unwrap();
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/trial-results.toml",
+        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+    );
+    // NOTE: deliberately NO derived-attestations.json — the honor-system stamp
+    // ([derivation_provenance] stamp=...) is no longer accepted at v2.0.
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .args(["check-third-party-trial", "--json"])
+        .env("MAOS_SHIP_PHASE", "v2_0")
+        .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run xtask");
+    assert!(
+        !out.status.success(),
+        "v2.0 consumer must reject records lacking producer-signed attestations"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("missing producer-signed derived attestation"),
+        "stderr should name the producer-signature provenance failure: {stderr}"
+    );
+}
+/// Story 11.7 consumer graduation (D1, green-half): the cohort carries
+/// producer-SIGNED per-participant derived attestations (10 green + 2
+/// non-producers, matching `successes=10`) → the consumer verifies every
+/// signature against the producer pubkey and ACCEPTS at v2.0.
+#[test]
+fn trial_gate_accepts_valid_record_with_producer_signed_attestation_at_v2_0() {
+    let dir = tempfile::tempdir().unwrap();
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/trial-results.toml",
+        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+    );
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/derived-attestations.json",
+        &cohort_signed_attestations_json(None, &TEST_PRODUCER_SEED),
+    );
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .args(["check-third-party-trial", "--json"])
+        .env("MAOS_SHIP_PHASE", "v2_0")
+        .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run xtask");
+    assert!(
+        out.status.success(),
+        "a producer-signed valid cohort must pass at v2.0: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// P5 / D7-fold negative control: a participant (P005) ships a producer-signed
+/// attestation whose derived `sbom_verified=false`, while the hand-authored TOML
+/// self-reports `sbom_verified=true` for that same participant. The consumer
+/// must IGNORE the self-report, count P005 a non-success (derived_successes=9 ≠
+/// reported 10), and FAIL. This proves the D7 fold actually gates and the
+/// canned-trap stays closed: the self-reported boolean cannot override the
+/// signed derivation.
+#[test]
+fn trial_gate_rejects_when_signed_sbom_false_overrides_self_reported_true_at_v2_0() {
+    let dir = tempfile::tempdir().unwrap();
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/trial-results.toml",
+        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+    );
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/derived-attestations.json",
+        &cohort_signed_attestations_json(Some("P005"), &TEST_PRODUCER_SEED),
+    );
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .args(["check-third-party-trial", "--json"])
+        .env("MAOS_SHIP_PHASE", "v2_0")
+        .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run xtask");
+    assert!(
+        !out.status.success(),
+        "v2.0 must reject when the signed sbom_verified=false overrides the self-reported true"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("sbom_verified=false") || stderr.contains("does not match"),
+        "stderr should name the derived-SBOM failure or the count mismatch: {stderr}"
+    );
+}
+
+/// D1 tamper control: a derived-attestations.json whose signature does NOT verify
+/// against the producer pubkey (tampered after signing) is rejected as if unsigned.
+#[test]
+fn trial_gate_rejects_tampered_producer_signature_at_v2_0() {
+    let dir = tempfile::tempdir().unwrap();
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/trial-results.toml",
+        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+    );
+    // Tamper one signature nibble after serialization (safe byte round-trip).
+    let json = cohort_signed_attestations_json(None, &TEST_PRODUCER_SEED);
+    let sig_marker = "\"producer_signature_hex\":\"";
+    let mut bytes = json.into_bytes();
+    if let Some(pos) = (0..bytes.len().saturating_sub(sig_marker.len()))
+        .find(|&i| &bytes[i..i + sig_marker.len()] == sig_marker.as_bytes())
+    {
+        let sig_start = pos + sig_marker.len();
+        bytes[sig_start] = if bytes[sig_start] == b'0' { b'1' } else { b'0' };
+    }
+    let json = String::from_utf8(bytes).expect("toggling a hex nibble keeps valid UTF-8");
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/derived-attestations.json",
+        &json,
+    );
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .args(["check-third-party-trial", "--json"])
+        .env("MAOS_SHIP_PHASE", "v2_0")
+        .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run xtask");
+    assert!(
+        !out.status.success(),
+        "v2.0 must reject a tampered producer signature (P001 unverified → count mismatch)"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("P001"),
+        "the dropped participant should be P001 (its signature was tampered): {stderr}"
+    );
+}
+
+/// R2-D1: `emit_signed_attestations` is NOT dead — the producer WRITES the file
+/// the consumer reads, and the consumer accepts the producer-signed cohort. This
+/// proves the producer→consumer handoff is wired (the producer half of the seam,
+/// not just the consumer half the other tests exercise).
+#[test]
+fn producer_emit_writes_file_the_consumer_accepts_round_trip() {
+    let dir = tempfile::tempdir().unwrap();
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/trial-results.toml",
+        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+    );
+    // Producer emit: derive the cohort records + sign + write derived-attestations.json.
+    let cohort: Vec<DerivedParticipantAttestation> = COHORT_IDS
+        .iter()
+        .map(|id| {
+            if *id == "P011" || *id == "P012" {
+                let mut a = green_attestation(id);
+                a.produced_binary = false;
+                a.binary_loads = false;
+                a.frames_run = 0;
+                a.halt_recall = 0.0;
+                a.sbom_verified = false;
+                a.signing_chain_verified = false;
+                a.success = false;
+                a
+            } else {
+                green_attestation(id)
+            }
+        })
+        .collect();
+    let emit_path = dir
+        .path()
+        .join("docs/third-party-trial/results/derived-attestations.json");
+    maos_eval::trial_attestation::emit_signed_attestations(
+        &cohort,
+        &TEST_PRODUCER_SEED,
+        &emit_path,
+    )
+    .expect("producer emit must succeed");
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .args(["check-third-party-trial", "--json"])
+        .env("MAOS_SHIP_PHASE", "v2_0")
+        .env("MAOS_TRIAL_PRODUCER_PUBKEY", test_producer_pubkey_hex())
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run xtask");
+    assert!(
+        out.status.success(),
+        "the producer-emitted signed cohort must pass the consumer at v2.0: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// R2-D2 guard: at v2.0 the consumer MUST refuse the public dev producer key —
+/// otherwise a coordinator with repo read could forge attestations. Only an
+/// explicitly-set production key (MAOS_TRIAL_PRODUCER_PUBKEY) is trusted.
+#[test]
+fn trial_gate_refuses_public_dev_producer_key_at_v2_0() {
+    let dir = tempfile::tempdir().unwrap();
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/trial-results.toml",
+        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+    );
+    // Deliberately do NOT set MAOS_TRIAL_PRODUCER_PUBKEY → consumer would trust
+    // the public dev key. It must refuse instead.
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .args(["check-third-party-trial", "--json"])
+        .env("MAOS_SHIP_PHASE", "v2_0")
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run xtask");
+    assert!(
+        !out.status.success(),
+        "v2.0 must refuse the public dev producer key (forgeable)"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("MAOS_TRIAL_PRODUCER_PUBKEY"),
+        "stderr should demand a production producer pubkey: {stderr}"
+    );
+}
+
 /// Vector (d): absent → pass with advisory.
 #[test]
 fn trial_gate_passes_advisory_when_absent() {
@@ -258,6 +557,12 @@ fn trial_gate_fails_on_malformed_toml() {
 // ═══════════════════════════════════════════════════════════════════
 
 fn make_cross_form(p_value: f64) -> String {
+    // Per-run hashes are MANDATORY (§A7 derive-and-reconcile; review finding
+    // #6 default-deny): 30+30 interleaved values — cli={0,2,..58},
+    // sub={1,3,..59} → U1=465 (see `cross_form_recompute_path_with_hashes`).
+    // The reported u_statistic matches the recomputed value.
+    let hashes_cli: Vec<String> = (0..30).map(|i| format!("{:064x}", i * 2)).collect();
+    let hashes_sub: Vec<String> = (0..30).map(|i| format!("{:064x}", i * 2 + 1)).collect();
     format!(
         r#"{{
   "test_metadata": {{
@@ -269,10 +574,12 @@ fn make_cross_form(p_value: f64) -> String {
     "subprocess_runs": 30
   }},
   "results": {{
-    "u_statistic": 450.0,
+    "u_statistic": 465.0,
     "p_value": {p_value},
     "sample_size_cli": 30,
-    "sample_size_sub": 30
+    "sample_size_sub": 30,
+    "per_run_hashes_cli": {hashes_cli:?},
+    "per_run_hashes_sub": {hashes_sub:?}
   }}
 }}"#
     )
@@ -321,6 +628,42 @@ fn cross_form_gate_passes_advisory_when_absent() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(json["advisory"], true, "should be advisory");
+}
+
+/// Review finding #6 / D15b default-deny: a PRESENT artifact WITHOUT per-run
+/// hashes is an unrecognized measurement — it cannot be derive-and-reconciled,
+/// and a deterministic fixture routed here must not slip through the advisory
+/// path. Must hard-ERROR (never advisory-green).
+#[test]
+fn cross_form_gate_errors_when_hashes_absent() {
+    let artifact = r#"{
+  "test_metadata": {
+    "spirit_name": "hello", "spirit_version": "0.1.0",
+    "run_date": "2026-06-01", "environment": "test",
+    "cli_wrapper_runs": 30, "subprocess_runs": 30
+  },
+  "results": {
+    "u_statistic": 450.0, "p_value": 0.95,
+    "sample_size_cli": 30, "sample_size_sub": 30
+  }
+}"#;
+    let out = run_in_tempdir("check-cross-form-equiv", |root| {
+        write_adr_040_fixture(root);
+        write_file(
+            root,
+            "docs/cross-form/results/cross-form-results.json",
+            artifact,
+        );
+    });
+    assert!(
+        !out.status.success(),
+        "a present hashless artifact must default-deny ERROR, not advisory-pass"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("per-run hashes") || stderr.contains("default-deny"),
+        "error should cite the missing per-run hashes / default-deny: {stderr}"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════

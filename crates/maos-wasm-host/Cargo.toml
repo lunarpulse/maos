@@ -1,0 +1,68 @@
+[package]
+name = "maos-wasm-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS WASM Host — wasmtime component adapter + runner (Story 11.1a, ADR-031/041)"
+
+[[bin]]
+name = "maos-wasm-runner"
+path = "src/runner.rs"
+
+[features]
+# Story 11.1b — anti-canned tripwire for the cross-form equivalence gate.
+# When active, `tests/equiv_harness.rs` perturbs a captured invariant-tier
+# effect AFTER capture but BEFORE comparison, proving the comparator actually
+# responds to its inputs rather than rubber-stamping a canned GREEN.
+# Off by default (dev-only; never shipped).
+equiv-fault-inject = []
+
+[dependencies]
+# Host port trait + plan types (daemon-side, Story 11.1a D1)
+maos-host = { path = "../maos-host" }
+
+# Domain frame types — the real `IacFrame`/`FramePayload` this host bridges
+# between the ADR-032 wire and the `maos:spirit@1.0` WIT world (AC2/AC3).
+# Allowed direction: maos-wasm-host -> maos-domain. Forbidden direction
+# (asserted by xtask check-dependency-closure) is wasmtime leaking INTO
+# maos-domain/maos-kernel-core, which this does not do.
+maos-domain = { path = "../maos-domain" }
+maos-spirit-abi = { path = "../maos-spirit-abi" }
+
+# Wasmtime component model (AC3: real wasmtime, NOT mock). The host side
+# uses `wasmtime::component::bindgen!` (src/wit_guest.rs) against the SAME
+# wit/spirit.wit the guest compiles against — no separate `wit-bindgen`
+# host-side dependency is needed (that crate is for GUEST code generation;
+# guests live in guests/echo-spirit, a standalone `[workspace]`, and pull
+# their own `wit-bindgen` dependency there).
+wasmtime = { version = "46", features = ["component-model"] }
+wasmtime-wasi = "46"
+
+# ADR-032 wire protocol: Content-Length + CBOR
+ciborium = "0.2"
+ciborium-io = "0.2"
+
+# Error handling
+thiserror = "2.0"
+
+# Serialization (canonical CBOR profile, RFC 8949 §4.2.1)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }
+tempfile = "3"
+smallvec = "1"
+# AC4 T2 integration test only — reuses the kernel's real spawn_sandboxed/
+# classify_exit on the forbidden-syscall probe fixture. Dev-dependency only:
+# does not ship and does not add wasmtime to kernel-core's own closure.
+maos-kernel-core = { path = "../maos-kernel-core" }
+libc = "0.2"
+# WIT AST parsing for the corpus completeness denominator (D5: "enumerated
+# mechanically from the .wit AST", not a hand-maintained const array).
+wit-parser = "0.251"

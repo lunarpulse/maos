@@ -29,6 +29,47 @@ coverage:
     phase: v0.1-alpha
     valid_until: '2027-05-12'
     notes: 1a.2 wires maos-bin composition root with #[tokio::main(flavor=multi_thread)] + CancellationToken root + select! shutdown; per-Spirit Tokio task supervision deferred to Story 1b.1 (supervisor task spawns there)
+  ADR-050:
+    gates:
+    - check-enterprise-pdp
+    - check-dependency-closure
+    - check-kernel-baseline
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-05-12'
+    notes: |
+      Story 11.4a enterprise-deployment anchor. Out-of-kernel PolicyDecisionPort
+      (maos-domain) + in-process Cedar reference adapter (maos-pdp); bounded
+      OperatorPolicyConfig.per_capability_deny FLAG-Winston re-pin (23023→23040).
+      Primary NFR: NFR-Sec-17.
+  ADR-051:
+    gates:
+    - check-enterprise-identity
+    - check-dependency-closure
+    - check-kernel-baseline
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-07-06'
+    notes: |
+      Story 11.4c enterprise identity + at-rest + SIEM anchor. Out-of-kernel
+      IdentityAssertionPort / KeyManagementPort / SiemProjectionPort; OIDC
+      reference verifier, dev/CI local-master-key KMS, and SIEM TL projection
+      are additive leaves. Fault-inject features are blocked from release builds.
+  ADR-024:
+    gates:
+    - check-escape-detector
+    - check-dependency-closure
+    - check-kernel-baseline
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-05-12'
+    notes: |
+      Story 11.4b sandbox-escape structural-detector anchor. Out-of-kernel
+      read-only Transparency-Log consumer (maos-escape-detector) correlates
+      kind=8 SandboxBlock frames against the Spirit manifest; the producer is
+      edge-wired at the composition root (ZERO kernel-core delta @ 23081 —
+      CATCH-0). Primary NFR: NFR-Sec-3 (signal 1 of 3 @v2.0 — seccomp
+      exit-classification-vs-manifest; fd-growth + outbound-IAC deferred).
   I9:
     gates:
     - check-empty-kernel
@@ -215,10 +256,47 @@ coverage:
     phase: v0.8
     valid_until: '2027-05-12'
   FR21:
-    gates: []
+    gates: [check-cohort-mesh]
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: |
+      J3 §10.7.1 cohort-mesh primary; traced with FR21-26 and FR52-54.
+      Story 12.2 adds ADR-012 confused-deputy per-(peer,role) consent legs
+      (role-mismatch-on-allowed-peer, acting-role-exact-match, entitlement-parse,
+      entitlement-accept, manifest-skew-cause, fail-closed-none,
+      reserved-intent-passes) to check-cohort-mesh.
+      Story 12.3 adds ADR-054 §7 (ADV-054-5) receipt-presence + I2 halt-substrate
+      legs (halt-receipt-absence-member-loss, halt-receipt-absence-connectivity-loss,
+      halt-receipt-replay-dedup, halt-source-identity, halt-receipt-observer-wired,
+      observer-no-arbitration-chokepoint) to check-cohort-mesh — the kernel
+      remains the single halt owner (invoke_halt/I2 unchanged); 12.3 ships +
+      observes the receipt out-of-kernel (observability, not arbitration).
+      Story 12.4a adds the ADR-054 §8 no-surveillance MECHANISM legs
+      (digest-read-consented-admitted, digest-read-surveillance-negative,
+      digest-read-rupture-sink-wired, digest-read-anti-canned-resign,
+      digest-read-replay-dedup) to check-cohort-mesh: a NEW non-reserved
+      cohort:digest-read consent-gated read (J3 §10.7.1 "reads only consented
+      topics") whose out-of-matrix query is refused at the cohort accept-overlay
+      (ADR-012 confused-deputy, acting-role exact-match) AND made visible to the
+      target as a journaled, queryable ConsentRupture (the F4 production
+      rupture-sink fix) — reads-with-consent + visible-refusal, never a claim
+      standing in for the control.
+      Story 12.4b closes J3 §10.7.1 with the day-30-scene and
+      anti-canned-raw-byte legs: the Grade-A PTY daemon render persists a §9.5
+      I11 distillate whose clause map cites Digest-owned consented evidence, and
+      a blinded one-byte captured input moves the rendered vt100 line.
+      Story 12.5 adds ADR-054 ADV-054-4 / ADR-036 chain-plan legs: concrete
+      wildcard-fork, cycle, self-loop, legal-fan-in/no-path, a runtime
+      EMigratorMissing hop-naming refusal (kernel run_migrator, distinct from
+      the plan-time no-path miss), and persisted-FILE plan-hash drift (re-derived
+      from the live candidate manifests on disk) all hard-fail in
+      check-cohort-mesh. The same gate now
+      proves the AC1b transport-rebuild cert path on a real N=8 mesh (old
+      credential refused; new TOFU pin plus cohort gate admitted; signed
+      reissue fingerprint equals the peer's actually-pinned fp) and I14's AC6 receipt-derived
+      count reflex. NFR-Rel-6 remains the distinct restart-consent path; it is
+      not used by this authority-signed cert reissue.
   FR22:
     gates: []
     corpora: []
@@ -237,7 +315,7 @@ coverage:
     valid_until: '2027-05-12'
     notes: v0.8 loopback A2A; v1.0 full mesh at FR23b
   FR23b:
-    gates: []
+    gates: [check-cohort-mesh]
     enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
@@ -460,21 +538,34 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   FR52:
-    gates: []
+    gates: [check-cohort-mesh]
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: |
+      J3 §10.7.1 + ADR-012 confused-deputy anchor. Story 12.2 per-(peer,role)
+      consent evaluated at both A2A seams; accept seam is the binding control.
   FR53:
-    gates: []
+    gates: [check-cohort-mesh]
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: |
+      J3 §10.7.1 + ADR-012/ADR-054 anchor. Story 12.2 acting-role exact match
+      (never any-role OR) + explicit entitlement refusal.
   FR54:
-    gates: []
+    gates: [check-cohort-mesh]
     enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: |
+      J3 §10.7.1 + ADR-054 anchor. Story 12.2 version-skew fail-closed
+      (ECohortManifestSkew, |Δv|>1) and fail-closed-on-absent role/version.
+      Story 12.3: ADR-054 §7 ADV-054-5 receipt-presence per member (received
+      receipt OR explicit transport-level absence marker within §7.2's window),
+      anchored on the I2 halt substrate — observability, arbitration stays the
+      Director's.
   FR55:
     gates:
     - check-service-boundary
@@ -609,11 +700,16 @@ coverage:
     valid_until: '2027-06-12'
     notes: Story 9.2 50/50 clean-removal + 0/100 leakage floor over separate probe; structural replay, no live judge
   NFR-Aud-11:
-    gates: []
+    gates:
+    - check-enterprise-identity
     enforcement: advisory-until-engagement
     corpora: []
-    phase: v1.0
-    valid_until: '2027-05-12'
+    phase: v2.0+
+    valid_until: '2027-07-06'
+    notes: |
+      Story 11.4c satisfies the SIEM half of NFR-Aud-11 with read-only TL
+      export through `query_with_redaction` before NDJSON/CEF/RFC5424 projection.
+      OTel/tracing export remains covered by its earlier slice.
   NFR-Aud-12:
     gates: []
     enforcement: advisory-until-engagement
@@ -722,7 +818,7 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Comp-4:
-    gates: []
+    gates: [check-cross-region-consensus]
     enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
@@ -771,13 +867,11 @@ coverage:
   NFR-Doc-6:
     gates:
     - check-ko-coverage
-    - check-ja-coverage
-    - check-zh-coverage
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
-    notes: Story 10.3 ships Korean; Story 10.5 AC5 ships Japanese + zh-Hans.
-      KO/JA/ZHHANS_COVERAGE_MIN=100 wired into docs-site CI gates.
+    notes: Story 10.3 ships Korean. Japanese and zh-Hans gates are intentionally
+      not tracked indefinitely; KO_COVERAGE_MIN=100 remains the active docs-site coverage gate.
   NFR-Doc-7:
     gates: []
     enforcement: advisory-until-engagement
@@ -1098,10 +1192,21 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Rel-7:
-    gates: []
+    gates: [check-scale-churn]
     corpora: []
     phase: v2.0+
     valid_until: '2027-05-12'
+    notes: |
+      Story 11.3 — PRIMARY row (D10 traceability: this NFR's literal
+      detection ≤1h / blast ≤5 / recovery ≤24h floors). The `check-scale-churn`
+      gate (`xtask/src/check_scale_churn.rs`) derives these from a real N=30
+      (floor ≥25) host mTLS mesh drill (`maos-a2a-tcp/tests/t_11_3_scale_churn.rs`),
+      replacing the deleted `chaos::churn::run_scaffold` canned-constant
+      scaffold. Detection is two-surface (handshake `TcpTransportError` +
+      router NACK — F-new). `max_blast_radius`/`recovery_secs` are BINDING at
+      v2.0; the derived `rto_secs` axis is REPORTED/advisory only (F3-ledger),
+      cross-listed under NFR-Scale-2 (the scale/phase anchor — cite BOTH rows,
+      "and/or" traces to nothing).
   NFR-Rel-8:
     gates:
       - journal_append_p99_measurement
@@ -1127,15 +1232,22 @@ coverage:
       gate is cross-listed under NFR-Sec-13, which owns the chaos structure that
       produces the revocation events.
   NFR-Scale-1:
-    gates: []
+    gates: [check-cross-region-consensus, check-multi-region-slo]
     corpora: []
     phase: v2.0+
     valid_until: '2027-05-12'
   NFR-Scale-2:
-    gates: []
+    gates: [check-scale-churn]
     corpora: []
     phase: v2.0+
     valid_until: '2027-05-12'
+    notes: |
+      Story 11.3 — scale/phase ANCHOR row (D10 traceability: 25-host @v2.0,
+      100→30 cost-compression target). `check-scale-churn` runs the real
+      drill at N=30 (floor ≥25 distinct-identity-reconciled hosts), a
+      compressed churn schedule (10-20% turnover/wk x 4wk, modeled as 12-24
+      real join/leave events on a co-located loopback mesh). PRIMARY
+      floor-tracing row is NFR-Rel-7 (cite BOTH rows).
   NFR-Scale-3:
     gates: []
     corpora: []
@@ -1206,6 +1318,44 @@ coverage:
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+  NFR-Sec-17:
+    gates:
+    - check-enterprise-pdp
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-05-12'
+    notes: |
+      Story 11.4a — enterprise PDP integration. Capability-authorization
+      decisions sourced from a real external PDP behind an out-of-kernel
+      PolicyDecisionPort (maos-domain); Cedar in-process reference adapter
+      (maos-pdp). Real evaluation (policy-swap-flips-verdict), deny-falsifiable
+      (pdp-fault-inject), fail-closed on unavailability; absent→BLOCK@v2.0.
+      ADR-050 is the enterprise-deployment anchor for this NFR.
+  NFR-Sec-18:
+    gates:
+    - check-enterprise-identity
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-07-06'
+    notes: |
+      Story 11.4c OIDC identity assertion: `IdentityAssertionPort` plus
+      `maos-sso` static-JWKS verifier, RS256/ES256 algorithm allowlist,
+      `alg:none` and HS256-confusion negatives, and principal-governed
+      authorization provenance.
+  NFR-Sec-19:
+    gates:
+    - check-enterprise-identity
+    - check-dependency-closure
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-07-06'
+    notes: |
+      Story 11.4c opt-in at-rest envelope encryption for loom-lite
+      Collective adapter rows plus out-of-kernel identity assertion writes:
+      `KeyManagementPort`, dev/CI local-master-key KMS, wrong-key failure,
+      default plaintext preserved when KMS is unconfigured. Generic
+      kernel-authored Transparency Log payload encryption and kernel-core
+      Private/Shared at-rest remain deferred and must not be overclaimed.
   NFR-Sec-2:
     gates: []
     corpora: []
@@ -1435,11 +1585,32 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Test-5:
-    gates: []
+    gates:
+    - check-fkcs
+    - check-kernel-baseline
     corpora: []
     phase: v2.0+
+    fkcs_split:
+      v2_0_infrastructure_delivered: true
+      v2_0_cohort: in-house-chinese-wall-proxy
+      v2_0_score: advisory-proof-of-mechanism
+      v2_0_negative_control_rejected_by: maos_registry::admission::admit_spirit
+      v2_5_populated_delivered: false
+      v2_5_genuine_external_spirits: 3
+      v2_5_n12_trial_owner: NFR-Test-8
     valid_until: '2027-05-12'
-    notes: FKCS-infrastructure at v2.0; FKCS-populated at v2.5
+    notes: |
+      FKCS-infrastructure delivered at v2.0 by ADR-052 / check-fkcs: annotated
+      frozen-kernel-v2.0 tag, pinned surface triple, derived diff oracle,
+      in-house Chinese-wall proxy cohort harness, and literal at-admission
+      rejection of the off-frozen-surface negative control by
+      maos_registry::admission::admit_spirit (AdmissionError::OffFrozenSurface,
+      journaled/falsifiable) — not only by an FKCS-internal gate. The proxy
+      score is proof-of-mechanism only; the genuine-external ≥27/30 per-Spirit
+      and ≥85/90 aggregate FKCS floor is NOT satisfied until FKCS-populated
+      runs on 3 externally-authored Spirits at v2.5 (the N=12 black-box trial
+      is owned separately by NFR-Test-8). Machine-readable phase split above in
+      fkcs_split.
   NFR-Test-6:
     gates: [lcas-corpus-tests]
     corpora: [lcas-v0.3]
@@ -1458,6 +1629,10 @@ coverage:
       the three 70-item buckets). Gate-verified by structural assertion
       (gold_label match + per-bucket count); judge-LLM agreement layer is a
       later story.
+  # NFR-Test-7 is split into its two legs so each carries machine-readable
+  # phase + gate metadata (review finding #19): the v1.5 advisory CLI-wrapper
+  # distributional leg and the v2.0+ blocking any-rust↔wasm-component binding
+  # leg are distinct rows, not one conflated entry hiding the binding in prose.
   NFR-Test-7:
     gates:
     - check-cross-form-equiv
@@ -1465,16 +1640,46 @@ coverage:
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
-    notes: CLI-wrapper-only cross-form distributional equivalence per ADR-040
-      (rust-inproc deferred to v2.0+). Advisory gate.
+    notes: |
+      CLI-wrapper distributional leg (Story 10.2, advisory per ADR-040).
+      Mann-Whitney U-test over 30+30 per-run hashes (derive-and-reconcile);
+      advisory at v1.0/v1.5. NOT the equivalence-binding gate — the binding
+      leg is NFR-Test-7-binding (check-wasm-form-equiv).
+  NFR-Test-7-binding:
+    gates:
+    - check-wasm-form-equiv
+    enforcement: blocking
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-05-12'
+    notes: |
+      v2.0 any-rust ↔ wasm-component BINDING leg (Story 11.1b, ADR-031).
+      Tiered behavioral-oracle deterministic equivalence (100% invariant /
+      ≥75% cosmetic), live cargo test (base + equiv-fault-inject legs).
+      Machine-readable phase graduation: advisory at v1.0/v1.5 (emits a
+      §A7.5 WOULD-HAVE-BLOCKED banner, does not fail the aggregate), BLOCKING
+      at v2.0 — gate-registry.toml disposition
+      {v1_0="advisory", v1_5="advisory", v2_0="blocking"}.
   NFR-Test-8:
     gates:
     - check-third-party-trial
+    - check-trial-attestation
     enforcement: blocking-when-present
     corpora: []
-    phase: v1.0
+    phase: v2.0
     valid_until: '2027-05-12'
-    notes: Third-party trial N=12 gate. Wilson CI advisory, raw count + stratification
-      + per-participant conjunction BLOCKING when results are present (derive-from-detail, with
-      successes and strata reconciled against participant records). Absent = advisory
-      (trial pending). Distinct from NFR-Test-7/NFR-Sec-10 which are advisory at v1.0.
+    trial_split:
+      v2_0_infrastructure_delivered: true
+      v2_0_cohort: in-house-chinese-wall-proxy
+      v2_0_score: advisory-proof-of-mechanism
+      v2_0_sbom_signing: derived-and-asserted
+      v2_0_sbom_emit: deferred-v2_5
+      v2_5_external_n12_owner: Epic-14
+    notes: |
+      Third-party trial N=12 gate. Wilson CI advisory, raw count + stratification
+      + per-participant conjunction BLOCKING when results are present
+      (derive-from-detail, with successes and strata reconciled against
+      participant records). Absent = advisory in v1.0/v1.5; at v2.0
+      `check-third-party-trial` default-denies present non-provenanced records
+      and `check-trial-attestation` derives clean-reload/SBOM/signing/halt facts.
+      Genuine external N=12 execution remains v2.5/Epic-14.

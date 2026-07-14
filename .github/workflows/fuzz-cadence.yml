@@ -6,9 +6,15 @@
 # a timer; fuzz accrual is non-blocking and must not entangle the merge gate.
 #
 # Design (party-mode consensus, Winston·Murat·John·Amelia, 2026-06-22):
-#  1. Nightly is the floor-accrual driver — one run ≈ 0.67 CPU-hr
+#  1. The cadence run is the floor-accrual driver — one run ≈ 0.67 CPU-hr
 #     (600 s × 4 workers); the ≥72 CPU-hr/target/90-day floor needs ~108
 #     runs/target/quarter, so on-merge alone cannot reach it.
+#     CADENCE CHANGE (Epic-12 retro 2026-07-14): downgraded daily → WEEKLY to cut
+#     scheduled-run noise/cost. CONSEQUENCE: at weekly (~13 runs/quarter) the
+#     0.67 CPU-hr/run soak accrues only ~8.7 CPU-hr/target/90-day — ~8× under the
+#     72 CPU-hr floor. The floor gate is advisory until the ledger spans ≥90 days;
+#     BEFORE that auto-promotion the floor must be re-derived for weekly (lengthen
+#     `-max_total_time` per run, or re-ratify a lower CPU-hr floor). FLAG-Murat.
 #  2. Ledger write-back is DECOUPLED from main — the run uploads a record
 #     artifact; a collector job appends to fuzz-ledger.json on a dedicated
 #     `fuzz-ledger` branch. No per-merge commit to main (serializes appends,
@@ -26,10 +32,12 @@ name: fuzz-cadence
 
 on:
   schedule:
-    # 03:00 UTC daily — off-peak for contributor merge activity.
-    - cron: '0 3 * * *'
+    # 03:00 UTC every Sunday — WEEKLY cadence (Epic-12 retro 2026-07-14,
+    # downgraded from daily). Off-peak for contributor merge activity.
+    # See the floor-accrual CONSEQUENCE note in the header before re-promoting.
+    - cron: '0 3 * * 0'
   workflow_dispatch:
-    # Manual trigger (release-time T3 close-out, or to backfill a missed night).
+    # Manual trigger (release-time T3 close-out, or to backfill a missed week).
 
 permissions:
   contents: write # collector commits to the fuzz-ledger branch
@@ -98,6 +106,13 @@ jobs:
     needs: fuzz-run-t1
     if: always()
     steps:
+      # Checkout is REQUIRED before the git append below — without a working
+      # tree the branch-fetch/create logic dies with "fatal: not a git
+      # repository" (Epic-12 retro fix 2026-07-14). fetch-depth: 0 so the
+      # `origin/main` fallback that seeds the ledger branch resolves.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Download all record artifacts from this run
         uses: actions/download-artifact@v4
         with:
@@ -151,9 +166,23 @@ jobs:
     needs: fuzz-ledger-collect
     if: always()
     steps:
+      # Check out main (always present), then try to switch to the fuzz-ledger
+      # branch the collector seeds. If it is not present yet (first run before
+      # the collector's initial push, or a skipped push), skip the gate with a
+      # warning instead of hard-failing on a missing ref — the floor is advisory
+      # until the ledger spans ≥90 days anyway (Epic-12 retro fix 2026-07-14).
       - uses: actions/checkout@v5
         with:
-          ref: fuzz-ledger
+          fetch-depth: 0
+      - name: Switch to fuzz-ledger branch (skip gate if not yet seeded)
+        id: ledger
+        run: |
+          if git fetch origin fuzz-ledger 2>/dev/null && git checkout fuzz-ledger 2>/dev/null; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::fuzz-ledger branch not present yet — floor gate skipped (advisory; the collector seeds it on the first successful cadence run)"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -161,4 +190,5 @@ jobs:
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Fuzz CPU-hour floor gate
+        if: steps.ledger.outputs.present == 'true'
         run: cargo run -p xtask -- check-fuzz-floor --json

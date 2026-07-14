@@ -28,6 +28,18 @@ pub struct OperatorPolicyConfig {
     pub per_capability_approval: HashMap<String, decision::ApprovalClass>,
     /// Resource cap floor from operator policy (Story 1b.3).
     pub resource_cap_floor: Option<crate::security::manifest::ResourceCaps>,
+    /// Story 11.4a (F2, FLAG-Winston) — org-level deny (forbid) set, keyed
+    /// by stable enterprise-PDP action keys (for example `fs.read`), not Rust
+    /// discriminant debug output. An absolute deny: the `evaluate` deny-wins
+    /// arm returns `Deny` before any grant (Cedar `forbid`-beats-`permit`).
+    /// Populated out-of-kernel by the `PolicyDecisionPort` Cedar adapter at
+    /// the composition root; the kernel keeps the ceiling (I1) — subtract-only.
+    /// Empty (default) ⇒ no-op (AC1).
+    pub per_capability_deny: std::collections::HashSet<String>,
+    /// Subject-scoped org forbids keyed by `spirit_pid` then stable action key.
+    /// This preserves Cedar's principal-specific policy semantics without
+    /// letting PDP permits raise the manifest ceiling.
+    pub per_spirit_capability_deny: HashMap<u32, std::collections::HashSet<String>>,
 }
 
 /// Manifest capability scope per Spirit.
@@ -96,6 +108,24 @@ impl PolicyTable {
 
         let inner = self.inner.load_full();
 
+        // Story 11.4a (F2, FLAG-Winston) — org forbid beats every grant
+        // (Cedar forbid-beats-permit). Populated out-of-kernel by the PDP
+        // adapter at the composition root; subtract-only (I1, kernel ceiling).
+        let deny_scope_key = maos_domain::ports::scope_action_key(&capability.scope);
+        let deny_intent_key = intent_action_key(intent);
+        let global_deny = &inner.operator_policy.per_capability_deny;
+        let spirit_deny = inner
+            .operator_policy
+            .per_spirit_capability_deny
+            .get(&spirit_pid);
+        if global_deny.contains(deny_scope_key)
+            || global_deny.contains(deny_intent_key)
+            || spirit_deny
+                .is_some_and(|deny| deny.contains(deny_scope_key) || deny.contains(deny_intent_key))
+        {
+            return PolicyDecision::Deny;
+        }
+
         // Fail-closed: unknown Spirits are denied.
         let manifest = match inner.manifest_scopes.get(&spirit_pid) {
             Some(m) => m,
@@ -148,21 +178,17 @@ impl PolicyTable {
             _ => {}
         }
 
-        // Approval-class lookup from operator policy (by scope discriminant
-        // and by intent discriminant).
-        let scope_key = format!("{:?}", std::mem::discriminant(&capability.scope));
-        if let Some(class) = inner
-            .operator_policy
-            .per_capability_approval
-            .get(&scope_key)
-        {
+        // Approval-class lookup from operator policy (by stable scope key
+        // and by stable intent key).
+        let scope_key = maos_domain::ports::scope_action_key(&capability.scope);
+        if let Some(class) = inner.operator_policy.per_capability_approval.get(scope_key) {
             return PolicyDecision::RequireApproval { class: *class };
         }
-        let intent_key = format!("{:?}", std::mem::discriminant(intent));
+        let intent_key = intent_action_key(intent);
         if let Some(class) = inner
             .operator_policy
             .per_capability_approval
-            .get(&intent_key)
+            .get(intent_key)
         {
             return PolicyDecision::RequireApproval { class: *class };
         }
@@ -320,6 +346,28 @@ fn domain_class_to_decision(
         maos_domain::notification::ApprovalClass::Interactive => {
             decision::ApprovalClass::Interactive
         }
+    }
+}
+
+fn intent_action_key(intent: &Intent) -> &'static str {
+    match intent {
+        Intent::FsRead { .. } => "fs.read",
+        Intent::FsWrite { .. } => "fs.write",
+        Intent::NetHttps { .. } => "net.https",
+        Intent::ProcExec { .. } => "proc.exec",
+        Intent::SubSpiritSpawn { .. } => "subspirit.spawn",
+        Intent::ProviderInfer { .. } => "provider.infer",
+        Intent::IacSend { .. } => "iac.send",
+        Intent::MemRead { .. } => "mem.read",
+        Intent::MemWrite { .. } => "mem.write",
+        Intent::SelfTelemetryRead => "self.telemetry.read",
+        Intent::LogRecall => "log.recall",
+        Intent::LogFetch => "log.fetch",
+        Intent::DistillateWrite => "distillate.write",
+        Intent::McpCall { .. } => "mcp.call",
+        Intent::LoomRead => "loom.read",
+        Intent::LoomWrite => "loom.write",
+        Intent::LoomScan => "loom.scan",
     }
 }
 

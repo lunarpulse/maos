@@ -1,0 +1,121 @@
+{
+  "consent_journal": [
+    {
+      "consultation_id": "host_00:000000000000000018c18bdf3ab99eeb:0000000000000001",
+      "outcome": "resolved",
+      "source_log_ref": "host_00:000000000000000018c18bdf3ab99eeb:0000000000000001"
+    },
+    {
+      "consultation_id": "host_00:000000000000000018c18bdf3af7d1a4:0000000000000002",
+      "outcome": "resolved",
+      "source_log_ref": "host_00:000000000000000018c18bdf3af7d1a4:0000000000000002"
+    },
+    {
+      "consultation_id": "j3-refused-consultation",
+      "outcome": "refused",
+      "source_log_ref": "000000000000004b0200000000000000"
+    }
+  ],
+  "receipt_presence": [
+    {
+      "architectural_conflict": true,
+      "halt_id": "j3-conflict-halt-1",
+      "member": "host_01",
+      "source_log_ref": "j3-conflict-halt-1"
+    },
+    {
+      "architectural_conflict": false,
+      "halt_id": "j3-conflict-halt-2",
+      "member": "host_02",
+      "source_log_ref": "j3-conflict-halt-2"
+    },
+    {
+      "architectural_conflict": false,
+      "halt_id": "j3-conflict-halt-3",
+      "member": "host_03",
+      "source_log_ref": "j3-conflict-halt-3"
+    }
+  ],
+  "summaries": [
+    {
+      "member": "host_00",
+      "request_id": "local:self-report",
+      "source_log_ref": "local:self-report",
+      "summary": {
+        "conflicts": 0,
+        "frames": 5,
+        "halts": 0
+      }
+    },
+    {
+      "member": "host_01",
+      "request_id": "host_00:000000000000000018c18bdf3ab99eeb:0000000000000001",
+      "source_log_ref": "host_00:000000000000000018c18bdf3ab99eeb:0000000000000001",
+      "summary": {
+        "conflicts": 1,
+        "frames": 6,
+        "halts": 1
+      }
+    },
+    {
+      "member": "host_02",
+      "request_id": "host_00:000000000000000018c18bdf3af7d1a4:0000000000000002",
+      "source_log_ref": "host_00:000000000000000018c18bdf3af7d1a4:0000000000000002",
+      "summary": {
+        "conflicts": 0,
+        "frames": 7,
+        "halts": 1
+      }
+    },
+    {
+      "member": "host_03",
+      "request_id": "host_00:000000000000000018c18bdf3b2e5b36:0000000000000003",
+      "source_log_ref": "host_00:000000000000000018c18bdf3b2e5b36:0000000000000003",
+      "summary": {
+        "conflicts": 0,
+        "frames": 5,
+        "halts": 1
+      }
+    },
+    {
+      "member": "host_04",
+      "request_id": "host_00:000000000000000018c18bdf3b64cb9d:0000000000000004",
+      "source_log_ref": "host_00:000000000000000018c18bdf3b64cb9d:0000000000000004",
+      "summary": {
+        "conflicts": 0,
+        "frames": 8,
+        "halts": 0
+      }
+    },
+    {
+      "member": "host_05",
+      "request_id": "host_00:000000000000000018c18bdf3b9be9c7:0000000000000005",
+      "source_log_ref": "host_00:000000000000000018c18bdf3b9be9c7:0000000000000005",
+      "summary": {
+        "conflicts": 0,
+        "frames": 4,
+        "halts": 0
+      }
+    },
+    {
+      "member": "host_06",
+      "request_id": "host_00:000000000000000018c18bdf3bd2db36:0000000000000006",
+      "source_log_ref": "host_00:000000000000000018c18bdf3bd2db36:0000000000000006",
+      "summary": {
+        "conflicts": 0,
+        "frames": 9,
+        "halts": 0
+      }
+    },
+    {
+      "member": "host_07",
+      "request_id": "host_00:000000000000000018c18bdf3c08fd44:0000000000000007",
+      "source_log_ref": "host_00:000000000000000018c18bdf3c08fd44:0000000000000007",
+      "summary": {
+        "conflicts": 0,
+        "frames": 3,
+        "halts": 0
+      }
+    }
+  ]
+}

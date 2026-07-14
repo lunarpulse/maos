@@ -676,6 +676,7 @@ fn kind_to_string(kind: i64) -> String {
         22 => "consent.rupture",
         28 => "governance.event",
         29 => "cost.attribution",
+        30 => "identity.asserted",
         _ => "unknown",
     }
     .to_string()
@@ -702,6 +703,7 @@ fn kind_from_string(s: &str) -> Option<i64> {
         "consent.rupture" | "ConsentRupture" => Some(22),
         "governance.event" | "GovernanceEvent" => Some(28),
         "cost.attribution" | "CostAttribution" => Some(29),
+        "identity.asserted" | "IdentityAsserted" => Some(30),
         _ => None,
     }
 }

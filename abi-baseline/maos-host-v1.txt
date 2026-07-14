@@ -1,0 +1,25 @@
+pub mod maos_host
+pub enum maos_host::SpiritForm
+pub maos_host::SpiritForm::NativeSubprocess
+pub maos_host::SpiritForm::WasmComponent
+pub enum maos_host::SpiritHostError
+pub maos_host::SpiritHostError::InvalidComponent
+pub maos_host::SpiritHostError::InvalidComponent::reason: alloc::string::String
+pub maos_host::SpiritHostError::Timeout
+pub maos_host::SpiritHostError::Timeout::timeout_ms: u64
+pub maos_host::SpiritHostError::Unreachable
+pub maos_host::SpiritHostError::Unreachable::reason: alloc::string::String
+pub enum maos_host::WireShape
+pub maos_host::WireShape::ContentLengthCbor
+pub struct maos_host::SpiritLaunchPlan
+pub maos_host::SpiritLaunchPlan::argv: alloc::vec::Vec<alloc::string::String>
+pub maos_host::SpiritLaunchPlan::env: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub maos_host::SpiritLaunchPlan::program: alloc::string::String
+pub maos_host::SpiritLaunchPlan::wire: maos_host::WireShape
+pub struct maos_host::SpiritLaunchRequest
+pub maos_host::SpiritLaunchRequest::artifact: alloc::string::String
+pub maos_host::SpiritLaunchRequest::form: maos_host::SpiritForm
+pub maos_host::SpiritLaunchRequest::form_config: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub trait maos_host::SpiritHostPort: core::marker::Send + core::marker::Sync
+pub fn maos_host::SpiritHostPort::resolve_launch(&self, request: &maos_host::SpiritLaunchRequest) -> core::result::Result<maos_host::SpiritLaunchPlan, maos_host::SpiritHostError>
+pub fn maos_host::SpiritHostPort::supported_forms(&self) -> &[maos_host::SpiritForm]

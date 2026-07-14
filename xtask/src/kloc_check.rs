@@ -61,7 +61,10 @@ pub fn run(config: &str, json: bool) -> Result<(), String> {
                 let status = if *loc > budget { "❌ OVER" } else { "✅ ok" };
                 table.push_str(&format!("| {crate_name} | {loc} | {budget} | {status} |\n"));
             }
-            eprintln!("NFR-Maint-1 violation: 20 KLOC ceiling breached: current={}, per-crate breakdown:\n{table}", report.aggregate);
+            eprintln!(
+                "NFR-Maint-1 violation: 20 KLOC ceiling breached: current={}, per-crate breakdown:\n{table}",
+                report.aggregate
+            );
         } else {
             println!("kloc-check: PASSED (aggregate={} LOC)", report.aggregate);
         }

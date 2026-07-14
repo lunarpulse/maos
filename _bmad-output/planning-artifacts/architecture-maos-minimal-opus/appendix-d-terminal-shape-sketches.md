@@ -2,7 +2,17 @@
 
 This appendix describes terminal shapes — directions the architecture is biased toward but has not committed to. **Nothing in this appendix is binding.** Sections in the main body (§0–§14) reference appendix entries by ID (e.g., D.3) when a v0.1-or-later decision deliberately leaves room for one of these shapes.
 
-The convention is simple: **if a behavior is in §0–§14, it is binding for its declared phase. If a behavior is in App-D / E / F, it is non-binding by construction.** A reader in the main body never has to ask "is this real?" — if it is in §0–§14, it is real.
+The convention is simple: **if a behavior is in §0–§15, it is binding for its declared phase. If a behavior is in App-D / E / F, it is non-binding by construction.** A reader in the main body never has to ask "is this real?" — if it is in §0–§15, it is real.
+
+> **Disposition ledger (2026-07-06, Step-2 full-spectrum pass — pending party-mode ratification; designs in §15):**
+>
+> | Shape | Disposition | Where |
+> |---|---|---|
+> | D.1 N-host topology | **COMMIT at v2.2** — signed static cohort manifest over pairwise bilateral A2A | §15.2 / proposed ADR-052 |
+> | D.2 rust-inproc | **RETIRED as a roadmap item** — ADR-031 (WASM) filled the second-form slot; §13.1 gate survives as escape hatch | §13.1 note |
+> | D.3 predicate stdlib | **DEFERRED** — no committed journey needs it; revisit trigger = FKCS Negotiator/Tutor population (v2.5). NOTE: the reserved "ADR-039" number was consumed by the live registry (`docs/adr/ADR-039` = per-module unsafe policy); a future proposal takes a fresh number | §15.8 |
+> | D.4 federation tier | **DEFERRED (structure-reserved, unchanged)** — FR37's `public-vetted` is not this slot; revisit trigger = first partner-org deployment request | §15.4 |
+> | D.5 multi-step migration | **COMMIT at v2.2** — chained single-step ADR-020 migrators, `EMigratorMissing` names the missing hop, `maosctl swap --plan` | §15.2 |
 
 ## D.1 — Multi-host topologies beyond bilateral
 

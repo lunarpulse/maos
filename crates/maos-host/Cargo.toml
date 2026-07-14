@@ -1,0 +1,14 @@
+[package]
+name = "maos-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS Spirit Host Port — daemon-side form→launch-plan resolver (Story 11.1a, ADR-031)"
+
+[dependencies]
+# Error handling (mirrors CollectivePortError pattern in maos-domain)
+thiserror = "2.0"
+
+[dev-dependencies]

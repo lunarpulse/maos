@@ -1,0 +1,13 @@
+[workspace]
+
+[package]
+name = "equiv-fixture-logic"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Shared fixture-Spirit logic for the Story 11.1b cross-form equivalence gate"
+
+# Pure logic crate — crypto-free (D9) and dependency-free (D11). The WASM
+# guests (`wasm-guest` / `divergent-guest` / `cosmetic-guest`) and the native
+# `equiv-native-twin` subprocess both compile against this SAME source so the
+# behavioral spec is literally one binary, not two hand-kept copies.

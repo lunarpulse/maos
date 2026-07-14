@@ -74,43 +74,46 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
             Err(_) => continue,
         };
 
-        let (dmu_value, has_frontmatter) = parse_dev_model_used(&content);
+        // Presence source (Epic 12 retro B3, body-aware fix): the model may be
+        // recorded in YAML frontmatter (`dev_model_used:`, older stories) OR in
+        // the `### Agent Model Used` body section (Epic 8+ story template). Take
+        // the frontmatter value first; fall back to the body-section model.
+        let (fm_value, _has_frontmatter) = parse_dev_model_used(&content);
+        let effective = fm_value
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+            .or_else(|| agent_model_section_model(&content));
 
-        if !has_frontmatter {
-            violations.push(DmuViolation {
+        match effective {
+            None => violations.push(DmuViolation {
                 file: name,
                 kind: ViolationKind::Missing,
                 value: None,
-            });
-        } else if let Some(value) = dmu_value {
-            let trimmed = value.trim();
-            if trimmed.is_empty() {
-                violations.push(DmuViolation {
-                    file: name,
-                    kind: ViolationKind::Empty,
-                    value: Some(value),
-                });
-            } else if trimmed == "TBD-set-at-story-start"
-                || trimmed == "<set by dev at story start>"
-            {
-                violations.push(DmuViolation {
-                    file: name,
-                    kind: ViolationKind::TbdPlaceholder,
-                    value: Some(value),
-                });
-            } else if !known_set.contains(trimmed) {
-                violations.push(DmuViolation {
-                    file: name,
-                    kind: ViolationKind::UnknownModel,
-                    value: Some(value),
-                });
+            }),
+            Some(value) => {
+                let trimmed = value.trim();
+                if trimmed.is_empty() {
+                    violations.push(DmuViolation {
+                        file: name,
+                        kind: ViolationKind::Empty,
+                        value: Some(value.clone()),
+                    });
+                } else if trimmed == "TBD-set-at-story-start"
+                    || trimmed == "<set by dev at story start>"
+                {
+                    violations.push(DmuViolation {
+                        file: name,
+                        kind: ViolationKind::TbdPlaceholder,
+                        value: Some(value.clone()),
+                    });
+                } else if !known_set.contains(trimmed) {
+                    violations.push(DmuViolation {
+                        file: name,
+                        kind: ViolationKind::UnknownModel,
+                        value: Some(value.clone()),
+                    });
+                }
             }
-        } else {
-            violations.push(DmuViolation {
-                file: name,
-                kind: ViolationKind::Missing,
-                value: None,
-            });
         }
     }
 
@@ -212,6 +215,80 @@ fn parse_dev_model_used(content: &str) -> (Option<String>, bool) {
     }
 
     (None, true)
+}
+
+/// Model recorded outside YAML frontmatter — the story template varies:
+///   1. a `### Agent Model Used` body section (Epic 12 template), or
+///   2. a `**Model:** <model>` / `Model: <model>` preamble line (Epic 11).
+/// The boilerplate reminder line "(frontier-class allowlist {…})" is stripped so
+/// the models it *lists* are not mistaken for the model *used* (a vacuous-match
+/// trap). Returns the first model-shaped token (vendor/family). Shared with
+/// `check-dev-model-tier` (Epic 12 retro B3).
+pub fn agent_model_section_model(content: &str) -> Option<String> {
+    let is_boilerplate = |t: &str| t.contains("allowlist {");
+    let tokenize = |t: &str| -> Vec<String> {
+        t.split(|c: char| c.is_whitespace() || matches!(c, '(' | ')' | ',' | '`' | ';'))
+            .map(|w| {
+                w.trim_matches(|c: char| c == '.' || c == '*' || c == ':')
+                    .to_string()
+            })
+            .filter(|w| !w.is_empty())
+            .collect()
+    };
+
+    // Source 1: the `### Agent Model Used` section.
+    let mut in_section = false;
+    let mut section_words: Vec<String> = Vec::new();
+    for line in content.lines() {
+        let t = line.trim();
+        if !in_section {
+            if t == "### Agent Model Used" {
+                in_section = true;
+            }
+            continue;
+        }
+        if t.starts_with("## ") || t.starts_with("### ") {
+            break;
+        }
+        if is_boilerplate(t) {
+            continue;
+        }
+        section_words.extend(tokenize(t));
+    }
+    if let Some(m) = section_words.iter().find(|w| looks_like_model(w)) {
+        return Some(m.clone());
+    }
+
+    // Source 2: a `**Model:**` / `Model:` preamble line anywhere in the doc.
+    for line in content.lines() {
+        let t = line.trim().trim_start_matches('*').trim();
+        if (t.starts_with("Model:") || t.starts_with("Model ")) && !is_boilerplate(t) {
+            if let Some(m) = tokenize(t).iter().find(|w| looks_like_model(w)) {
+                return Some(m.clone());
+            }
+        }
+    }
+
+    // Presence fallback: the first meaningful word of the section (if any).
+    section_words.into_iter().next()
+}
+
+/// A token shaped like a concrete model id (vendor/family or bare family).
+pub fn looks_like_model(tok: &str) -> bool {
+    let t = tok.to_ascii_lowercase();
+    (t.contains('/')
+        && (t.contains("gpt-")
+            || t.contains("opus")
+            || t.contains("glm")
+            || t.contains("claude")
+            || t.contains("kimi")
+            || t.contains("deepseek")))
+        || t.starts_with("claude-opus-")
+        || t.starts_with("opus-4-")
+        || t.starts_with("gpt-5")
+        || t.starts_with("glm-5")
+        || t.starts_with("deepseek-")
+        || t.starts_with("k2p")
 }
 
 #[cfg(test)]

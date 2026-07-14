@@ -31,8 +31,7 @@ const SELF_TRIAL_OUTCOME: &str = "docs/research/examples/self-trial-outcome.exam
 const THREE_DOOR_INDEX: &str = "docs/maos.dev/index.md";
 const THREE_DOOR_WRITE: &str = "docs/maos.dev/write-a-spirit.md";
 const SPIRIT_TEMPLATE_DIR: &str = "templates/spirit-rust";
-const CARGO_GENERATE_CMD: &str =
-    "cargo generate --git https://github.com/lunarpulse/maos templates/spirit-rust --name my-spirit";
+const CARGO_GENERATE_CMD: &str = "cargo generate --git https://github.com/lunarpulse/maos templates/spirit-rust --name my-spirit";
 
 pub fn run(workspace_root: &Path, _check: bool, json: bool) -> Result<(), String> {
     let mut issues: Vec<String> = Vec::new();

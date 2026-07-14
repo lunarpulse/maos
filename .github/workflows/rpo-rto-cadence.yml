@@ -69,6 +69,11 @@ jobs:
         env:
           MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_rto
         run: |
+          # `out/` must exist before the `--evidence-output` write and the
+          # `> out/rto-drill-report.json` redirect — otherwise the redirect fails
+          # with "No such file or directory" and the drill never runs (Epic-12
+          # retro fix 2026-07-14).
+          mkdir -p out
           cargo run -p xtask -- rto-drill \
             --frames 10000 \
             --evidence-output out/rto-evidence-entry.toml \
@@ -91,6 +96,13 @@ jobs:
     needs: rto-drill-t1
     if: always()
     steps:
+      # Checkout is REQUIRED before the git append below — without a working
+      # tree the branch-fetch/create logic dies with "fatal: not a git
+      # repository" (Epic-12 retro fix 2026-07-14). fetch-depth: 0 so the
+      # `origin/main` fallback that seeds the ledger branch resolves.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Download evidence artifact from this run
         uses: actions/download-artifact@v4
         with:
@@ -129,9 +141,24 @@ jobs:
     needs: rto-ledger-collect
     if: always()
     steps:
+      # Check out main (always present), then try to switch to the rto-ledger
+      # branch the collector seeds. If it is not present yet (first run before
+      # the collector's initial push, or a skipped push), skip the gate with a
+      # warning instead of hard-failing on a missing ref — the gate is advisory
+      # until the first weekly drill produces evidence (Epic-12 retro fix
+      # 2026-07-14).
       - uses: actions/checkout@v5
         with:
-          ref: rto-ledger
+          fetch-depth: 0
+      - name: Switch to rto-ledger branch (skip gate if not yet seeded)
+        id: ledger
+        run: |
+          if git fetch origin rto-ledger 2>/dev/null && git checkout rto-ledger 2>/dev/null; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::rto-ledger branch not present yet — RTO gate skipped (advisory until the first weekly drill seeds evidence)"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -139,4 +166,5 @@ jobs:
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: RTO ≤ 4h gate (evidence-based)
+        if: steps.ledger.outputs.present == 'true'
         run: cargo run -p xtask -- check-rto-gate --evidence rto-evidence.toml --json

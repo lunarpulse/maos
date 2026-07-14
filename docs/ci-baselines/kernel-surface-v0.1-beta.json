@@ -150,7 +150,12 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::memory::write_entry_point::WriteEntryPoint",
-      "signature_hash": "45d7dc52d0b3a10f8879f21b8f6fa572eea5410489a06f8ab25bb41626c78942"
+      "signature_hash": "3adcae382fdba5f6724a650fc36eeeb6f9662dcd660bff786bff091b23e50674"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::memory::write_entry_point::SourceLogRef",
+      "signature_hash": "62e0e6d6838c3481451cfd738007cba142a231f6fca9ed293b71ea85d13995d4"
     },
     {
       "kind": "enum",
@@ -505,7 +510,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::capability::cap_policy::OperatorPolicyConfig",
-      "signature_hash": "eb5b433fdc4112e72cb755ed21372b495e1393b404952d485c3575dcff527f9a"
+      "signature_hash": "33ec9d436661cf232c09669c18a2d9e2f9818b724e335e4d8e75be6cd0581a76"
     },
     {
       "kind": "struct",

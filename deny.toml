@@ -45,6 +45,9 @@ allow = [
     "MPL-2.0",
     "OpenSSL",  # Story 1a.3 — ring 0.17 (Rust crypto primitives; de-facto standard)
     "CDLA-Permissive-2.0",  # Story 1b.4 — webpki-roots via ureq (root CA certificates bundle)
+    "Zlib",  # foldhash (Zlib-only; transitive via hashbrown/ahash) — OSI-approved
+             # permissive license, functionally equivalent to MIT/BSD. Surfaced by
+             # the first full-branch CI run over the Epic 11+12 line.
 ]
 confidence-threshold = 0.8
 
@@ -94,6 +97,30 @@ skip = [
     { name = "rand" },
     { name = "rand_core" },
     { name = "fallible-iterator" },
+    # Story 11.4a enterprise PDP — the Cedar reference engine (cedar-policy,
+    # in `maos-pdp`, user-space only; quarantined from kernel/domain by
+    # check-dependency-closure) brings a parser/graph/serde cluster that
+    # coexists with the workspace's established versions. Provenance (verified
+    # via `cargo deny check bans`): cedar-policy-core → miette → {winnow,
+    # toml, toml_datetime, serde_spanned, unicode-width, phf_shared} +
+    # cedar-policy-core/build → {fixedbitset, petgraph, wasm-encoder, wast,
+    # object} + arrayvec. None is a vulnerability — `advisories`, `licenses`,
+    # `sources` all pass; this trips only the `multiple-versions` hygiene rule.
+    # Unifying would mean upgrading workspace parser/serde stacks to match
+    # cedar's: a dedicated migration, not a CI-green patch. FLAG-Winston/John:
+    # ratify; drop each entry as the upstreams converge.
+    { name = "arrayvec" },
+    { name = "fixedbitset" },
+    { name = "object" },
+    { name = "petgraph" },
+    { name = "phf_shared" },
+    { name = "serde_spanned" },
+    { name = "toml" },
+    { name = "toml_datetime" },
+    { name = "unicode-width" },
+    { name = "wasm-encoder" },
+    { name = "wast" },
+    { name = "winnow" },
 ]
 skip-tree = []
 

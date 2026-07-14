@@ -1,0 +1,88 @@
+SPIKE — Story 11.0 (NO-MERGE). Wiring sketch for crates/maos-bin/src/main.rs.
+Shows the TWO touch points, both in maos-bin (the composition root) — ZERO lines
+in maos-kernel-core. This is the whole "launcher seam."
+
+================================================================================
+(A) INJECTION — next to the Loom-lite CollectiveMemoryPort, at main.rs:1683-1719
+================================================================================
+
+The existing Loom-lite injection (main.rs:1683) is the template:
+
+    let collective_port: Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>> =
+        match std::env::var("MAOS_LOOM_POSTGRES") { ... };
+
+The SpiritHostPort plugs in identically, gated on operator config:
+
+    // 11.1a: construct the WASM host adapter at the composition root, holding
+    // the runtime handle owned here (same as LoomLiteAdapter::new).
+    let spirit_host: Option<Arc<dyn maos_domain::ports::SpiritHostPort>> =
+        match std::env::var("MAOS_WASM_RUNNER") {
+            Ok(runner) if !runner.is_empty() => {
+                let cfg = Arc::new(maos_wasm_host::WasmHostConfig {
+                    runner_program: runner,
+                    default_fuel: 1_000_000_000,
+                });
+                let adapter = Arc::new(maos_wasm_host::WasmHostAdapter::new(
+                    cfg,
+                    tokio::runtime::Handle::current(),
+                    std::time::Duration::from_secs(5),
+                ));
+                Some(adapter as Arc<dyn maos_domain::ports::SpiritHostPort>)
+            }
+            _ => None, // native-only: the kernel default, unchanged
+        };
+
+================================================================================
+(B) USE — in the `maos run` spawn path, at main.rs:492-505
+================================================================================
+
+Today (form-agnostic already): the program is resolved from the manifest's
+config.command at main.rs:467-468, then handed to the kernel launcher verbatim:
+
+    let spec = BridgeSpawnSpec { program: resolved, /* argv, env, shape */ ... };  // :492
+    let mut bridge = spawn_and_bridge(spec)?;                                       // :505
+
+11.1a inserts ONE resolver call BEFORE building the spec — still entirely in
+maos-bin, the kernel launcher (`spawn_and_bridge`) is untouched:
+
+    // Resolve the manifest's declared form into a concrete launch plan.
+    // Native form → identity (program = resolved). WASM form → program =
+    // the component runner, argv = [--component <wasm> --fuel <n>].
+    let plan = match (&spirit_host, manifest.form) {
+        (Some(host), SpiritForm::WasmComponent) => host.resolve_launch(&SpiritLaunchRequest {
+            form: SpiritForm::WasmComponent,
+            artifact: resolved,
+            form_config: manifest.form_config.clone(),
+        })?,
+        _ => SpiritLaunchPlan {                  // native default (no host needed)
+            program: resolved, argv: vec![], env: vec![],
+            wire: WireShape::ContentLengthCbor,
+        },
+    };
+
+    let spec = BridgeSpawnSpec {
+        program: plan.program,                   // <-- runner path for WASM, binary for native
+        // argv: plan.argv, env: plan.env, shape: JsonRpcOverStdio (ADR-032), ...
+        ..
+    };
+    let mut bridge = spawn_and_bridge(spec)?;    // kernel launcher UNCHANGED
+
+================================================================================
+WHY THE KERNEL DELTA IS ~0
+================================================================================
+
+  * spawn_and_bridge takes program: String and runs Command::new(&program)
+    (runtime.rs:461). It does not know or care whether `program` is a binary or
+    a wasmtime runner. No kernel change to launch a WASM Spirit.
+  * SandboxSpec (sandbox/mod.rs:32-41) has no program/form field — the T2 path
+    wraps the runner subprocess exactly as any other. No kernel change.
+  * The ADR-032 reader (read_content_length, runtime.rs:345) + ciborium are
+    already in the kernel. The runner emits ADR-032 frames the bridge already
+    consumes. No kernel change to receive the bytes.
+
+The ONLY way the kernel would gain lines is an OPTIONAL design choice at 11.1a
+to thread a form discriminator THROUGH a kernel spawn-spec constructor instead
+of resolving program entirely at the composition root. That is not required for
+the ratified "WASM-in-subprocess" option, which is why the ≤+150 LOC ceiling is
+HEADROOM (and plausibly the delta is exactly 0). 11.1a commits the final number
+with an abi-diff proven-red against kernel-core-baseline.toml (22964).

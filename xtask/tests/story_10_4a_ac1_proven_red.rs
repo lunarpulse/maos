@@ -562,6 +562,7 @@ fn story_10_4a_ac1_loom_down_typed_timeout() {
                 vector_dim: 1536,
                 pool_size: 2,
                 timeout_ms: 800,
+                home_region: String::new(),
             })
             .await
         })

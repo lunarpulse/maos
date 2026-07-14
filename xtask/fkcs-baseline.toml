@@ -1,0 +1,22 @@
+# Story 11.5 — Frozen-Kernel Conformance Suite baseline triple.
+# The annotated git tag is the auditable freeze; this file is the oracle input.
+frozen_tag = "frozen-kernel-v2.0"
+frozen_commit = "1f5d57295f4f8fbe58a4d1bbf16cf99f5cfdcdd8"
+src_lines = 23081
+abi_baseline = "abi-baseline/v1-pre-bump.txt"
+host_baseline = "abi-baseline/maos-host-v1.txt"
+frozen_at = "2026-07-07"
+ratifier = "Lunarpulse"
+
+# Story 11.5 literal AC3 — frozen admission-path baseline. The registry
+# admission path gains the OffFrozenSurface rejection arm; this SHA-256 pins
+# the post-AC3 content over the declared admission source files. The
+# `admission-path-unmodified` leg compares the working-tree content hash to
+# this value (content semantics, not file existence). Re-pin after any
+# deliberate admission-path change.
+[admission_baseline]
+files = [
+    "crates/maos-registry/src/admission.rs",
+    "crates/maos-skill/src/admission.rs",
+]
+sha256 = "dfbbf748707d8891edbbfcbdeacb5a55cf4ed83391cb614febe0f9012d2c6eb2"

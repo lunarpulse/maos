@@ -12,6 +12,7 @@ publish = false
 # The SHARED render-string / scalar-tag constants JB-3 binds to (AC5 f) — drift
 # between production and harness is a COMPILE error, not a silent body edit.
 butler = { path = "../../spirits/butler" }
+maos-digest = { path = "../../spirits/digest" }
 portable-pty = "0.9"
 vt100 = "0.16"
 tempfile = "3"

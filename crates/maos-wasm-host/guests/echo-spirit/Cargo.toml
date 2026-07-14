@@ -1,0 +1,18 @@
+[workspace]
+
+[package]
+name = "echo-spirit"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+wit-bindgen = "0.44"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = "s"
+panic = "abort"
+strip = true

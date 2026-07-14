@@ -327,11 +327,16 @@ impl ScheduleWatchdog {
                         first_id = Some(token.token_id);
                     }
                 }
-                Err(_) => {
+                Err(e) => {
                     // Token issue failure: not a hard error at v0.5 — the
                     // firing proceeds with empty side-effect token (the
                     // hook will fail the in-Spirit capability check, which
-                    // is the correct posture). Story 7.3 may upgrade this.
+                    // is the correct posture). Keep the denial observable:
+                    // Story 11.4a CATCH-B forbids silent org-policy denies.
+                    eprintln!(
+                        "schedule-watchdog: capability token issue denied for spirit {}: {e}",
+                        scb.pid
+                    );
                     continue;
                 }
             }

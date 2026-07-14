@@ -20,12 +20,34 @@ pub struct Violation {
 impl std::fmt::Display for Violation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.kind.as_str() {
-            "integrity" => write!(f, "NFR-Test-1 violation: corpus integrity broken — {} at {}: manifest expected {}, computed {}",
-                self.corpus, self.path, self.expected_hash.as_deref().unwrap_or("?"), self.computed_hash.as_deref().unwrap_or("?")),
-            "missing" => write!(f, "NFR-Test-1 violation: corpus missing — {} at {}: file does not exist", self.corpus, self.path),
-            "unregistered" => write!(f, "NFR-Test-1 violation: corpus unregistered — {} has no manifest entry (use 'cargo xtask check-corpus --register <name>' to compute its SHA-256)", self.path),
-            "malformed" => write!(f, "NFR-Test-1 violation: corpus malformed — {} at {}: {}", self.corpus, self.path, self.detail),
-            _ => write!(f, "NFR-Test-1 violation: {} — {} at {}: {}", self.kind, self.corpus, self.path, self.detail),
+            "integrity" => write!(
+                f,
+                "NFR-Test-1 violation: corpus integrity broken — {} at {}: manifest expected {}, computed {}",
+                self.corpus,
+                self.path,
+                self.expected_hash.as_deref().unwrap_or("?"),
+                self.computed_hash.as_deref().unwrap_or("?")
+            ),
+            "missing" => write!(
+                f,
+                "NFR-Test-1 violation: corpus missing — {} at {}: file does not exist",
+                self.corpus, self.path
+            ),
+            "unregistered" => write!(
+                f,
+                "NFR-Test-1 violation: corpus unregistered — {} has no manifest entry (use 'cargo xtask check-corpus --register <name>' to compute its SHA-256)",
+                self.path
+            ),
+            "malformed" => write!(
+                f,
+                "NFR-Test-1 violation: corpus malformed — {} at {}: {}",
+                self.corpus, self.path, self.detail
+            ),
+            _ => write!(
+                f,
+                "NFR-Test-1 violation: {} — {} at {}: {}",
+                self.kind, self.corpus, self.path, self.detail
+            ),
         }
     }
 }

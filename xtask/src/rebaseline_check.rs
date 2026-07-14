@@ -76,7 +76,10 @@ pub fn run(
     } else {
         for c in &report.per_corpus {
             if c.agreement_ratio < threshold {
-                eprintln!("NFR-Test-1 violation: corpus {} agreement ratio {:.4} below quarterly threshold 0.98 — open re-baseline review issue", c.corpus, c.agreement_ratio);
+                eprintln!(
+                    "NFR-Test-1 violation: corpus {} agreement ratio {:.4} below quarterly threshold 0.98 — open re-baseline review issue",
+                    c.corpus, c.agreement_ratio
+                );
             }
         }
     }
@@ -138,7 +141,10 @@ fn rebaseline_check(
             1.0
         };
         if corpus_errors > 0 {
-            eprintln!("rebaseline-check: corpus {} had {corpus_errors} judge errors counted as disagreements", name);
+            eprintln!(
+                "rebaseline-check: corpus {} had {corpus_errors} judge errors counted as disagreements",
+                name
+            );
         }
         per_corpus.push(CorpusAgreement {
             corpus: name.clone(),

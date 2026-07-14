@@ -1,0 +1,33 @@
+# MAOS J3 team Digest reference Spirit — read-only cohort narrative composer.
+
+[class]
+name = "digest"
+version = "0.1.0"
+abi = "1.0"
+manifest_schema_version = 2
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "Read-only J3 team Digest Spirit: composes consented per-member summaries, halt-receipt presence, and consent-rupture evidence into an I11 narrative distillate."
+
+[posture]
+default = "cautious"
+allowed_max = "cautious"
+
+[output_shape]
+required_fields = ["agents_ran", "frames_exchanged", "agents_halted", "acted_invisibly", "consultations_resolved", "architectural_conflicts", "narrative", "clause_sources"]
+
+[budget]
+context_window_size = 4096
+time_cap_seconds = 10
+
+[resources]
+cpu_max_pct = 10
+memory_max_mb = 64
+
+[sandbox]
+tier = "T2"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"

@@ -12,9 +12,9 @@ use std::time::Duration;
 use tokio_postgres::NoTls;
 
 use crate::schema;
+use crate::seal::{AtRestSeal, AtRestSealer};
 
 /// Configuration for the Loom-lite Postgres store.
-#[derive(Debug, Clone)]
 pub struct StoreConfig {
     /// Postgres connection string (e.g. "host=localhost dbname=loom_lite").
     pub connection_string: String,
@@ -24,6 +24,9 @@ pub struct StoreConfig {
     pub pool_size: usize,
     /// Operation timeout in milliseconds.
     pub timeout_ms: u64,
+    /// Home region (canonical ascii-v1) for CRDT source_region stamping.
+    /// Empty string = no region configured (pre-11.2a behavior / single-region).
+    pub home_region: String,
 }
 
 impl Default for StoreConfig {
@@ -33,6 +36,7 @@ impl Default for StoreConfig {
             vector_dim: schema::DEFAULT_VECTOR_DIM,
             pool_size: 16,
             timeout_ms: 5000,
+            home_region: String::new(),
         }
     }
 }
@@ -41,8 +45,11 @@ impl Default for StoreConfig {
 pub struct LoomLiteStore {
     pool: Pool,
     config: StoreConfig,
+    /// Story 11.4c (AC3): optional at-rest seal hook applied to value
+    /// payload bytes at the write layer. `None` (default) = byte-identical
+    /// Option-A plaintext.
+    at_rest_sealer: AtRestSealer,
 }
-
 /// Store-level error type.
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -56,6 +63,11 @@ pub enum StoreError {
     Serialization(String),
     #[error("operation timeout after {timeout_ms}ms")]
     Timeout { timeout_ms: u64 },
+    /// Story 11.4c (AC3): the configured at-rest seal hook failed. The write
+    /// fails CLOSED — no plaintext is persisted under a configured seal
+    /// posture.
+    #[error("at-rest seal error: {0}")]
+    AtRestSeal(String),
 }
 
 impl From<tokio_postgres::Error> for StoreError {
@@ -144,7 +156,34 @@ impl LoomLiteStore {
             .create_pool(Some(Runtime::Tokio1), NoTls)
             .map_err(|e| StoreError::Pool(e.to_string()))?;
 
-        Ok(Self { pool, config })
+        Ok(Self {
+            pool,
+            config,
+            at_rest_sealer: AtRestSealer::default(),
+        })
+    }
+
+    /// Story 11.4c (AC3): install an optional at-rest seal hook.
+    ///
+    /// When `Some`, value payload bytes are sealed (ciphertext) at the write
+    /// layer before persistence; when `None`, writes are byte-identical
+    /// Option-A plaintext (the default). On hook error the write fails
+    /// CLOSED — never persist plaintext under a configured seal posture.
+    ///
+    /// The hook is a **closure boundary**: `maos-loom-lite` carries NO
+    /// dependency on `maos-secrets` (L7 closure hygiene). The daemon
+    /// composition root builds the closure from
+    /// `maos_secrets::seal_at_rest_opt` bound to the configured
+    /// `KeyManagementPort` + `CryptoProvider` and injects it here.
+    pub fn with_at_rest_seal(mut self, seal: Option<AtRestSeal>) -> Self {
+        self.at_rest_sealer = AtRestSealer::new(seal);
+        self
+    }
+
+    /// Story 11.4c (AC3): the configured at-rest sealer (introspectable so
+    /// the composition root / operators can confirm seal posture).
+    pub fn at_rest_sealer(&self) -> &AtRestSealer {
+        &self.at_rest_sealer
     }
 
     /// Initialize the schema (idempotent).
@@ -165,7 +204,12 @@ impl LoomLiteStore {
         Ok(())
     }
 
-    /// Write a value to the collective store (upsert).
+    /// Write a value to the collective store (upsert with CRDT LWW merge).
+    ///
+    /// Story 11.2a (AC1): local writes stamp `source_ts = now()` and
+    /// `source_region = config.home_region`.  The upsert is **conditional**:
+    /// overwrites ONLY when the incoming `(source_ts, source_region)` total
+    /// order strictly dominates the stored one (LWW-register property).
     pub async fn write(
         &self,
         spirit_pid: u32,
@@ -173,22 +217,80 @@ impl LoomLiteStore {
         key: &str,
         value: MemoryValue,
     ) -> Result<(), StoreError> {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as i64;
+        self.write_with_source(
+            spirit_pid,
+            namespace,
+            key,
+            value,
+            ts,
+            &self.config.home_region,
+            "",
+        )
+        .await
+    }
+
+    /// Write with explicit source provenance (cross-region replication path).
+    ///
+    /// Story 11.2a (AC1/D1): the CRDT LWW merge — conditional upsert that
+    /// overwrites ONLY when the incoming `(source_ts, source_region)` total
+    /// order strictly dominates the stored one.  Total order is lexicographic:
+    /// `source_ts` first (higher wins), then `source_region` (lexicographic
+    /// tiebreak on identical timestamps).  This is commutative + idempotent:
+    /// the converged value is identical regardless of arrival order.
+    ///
+    /// `source_ts` is the **source write's** nanosecond timestamp, preserved
+    /// across re-attestation apply — NOT re-minted on apply.
+    pub async fn write_with_source(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+        source_ts: i64,
+        source_region: &str,
+        source_log_ref: &str,
+    ) -> Result<(), StoreError> {
         let client = self.get_client_with_timeout().await?;
 
         let (ns_kind, ns_detail) = schema::namespace_to_parts(namespace);
         let (val_kind, val_data) =
             schema::value_to_parts(&value).map_err(StoreError::Serialization)?;
-        let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as i64;
 
+        // Story 11.4c (AC3): seal the value payload at the write layer. With
+        // a configured hook, `val_data` is transformed into ciphertext BEFORE
+        // the INSERT (sealed-at-rest); without one (default) it is
+        // byte-identical Option-A plaintext. On hook error the write fails
+        // CLOSED here — the `?` returns before `execute`, so NO plaintext is
+        // persisted under a configured seal posture.
+        let val_data = self.at_rest_sealer.seal(&val_data)?;
+
+        // Story 11.2a (AC1): conditional LWW upsert.
+        // Total order: (source_ts, source_region) lexicographic.
+        // Overwrite ONLY when incoming strictly dominates stored:
+        //   incoming.source_ts > stored.source_ts
+        //   OR (incoming.source_ts == stored.source_ts AND incoming.source_region > stored.source_region)
+        // This replaces the unconditional DO UPDATE (store.rs:188-191).
         client
             .execute(
-                "INSERT INTO collective_memory (spirit_pid, namespace_kind, namespace_detail, key, value_kind, value_data, timestamp_ns)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                "INSERT INTO collective_memory
+                    (spirit_pid, namespace_kind, namespace_detail, key,
+                     value_kind, value_data, timestamp_ns, source_ts, source_region, source_log_ref)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                  ON CONFLICT (spirit_pid, namespace_kind, namespace_detail, key)
-                 DO UPDATE SET value_kind = $5, value_data = $6, timestamp_ns = $7",
+                 DO UPDATE SET
+                     value_kind = EXCLUDED.value_kind,
+                     value_data = EXCLUDED.value_data,
+                     timestamp_ns = EXCLUDED.timestamp_ns,
+                     source_ts = EXCLUDED.source_ts,
+                     source_region = EXCLUDED.source_region,
+                     source_log_ref = EXCLUDED.source_log_ref
+                 WHERE EXCLUDED.source_ts > collective_memory.source_ts
+                    OR (EXCLUDED.source_ts = collective_memory.source_ts
+                        AND EXCLUDED.source_region > collective_memory.source_region)",
                 &[
                     &(spirit_pid as i64),
                     &ns_kind,
@@ -196,7 +298,10 @@ impl LoomLiteStore {
                     &key,
                     &val_kind,
                     &val_data,
-                    &ts,
+                    &source_ts,
+                    &source_ts,
+                    &source_region,
+                    &source_log_ref,
                 ],
             )
             .await?;
@@ -205,6 +310,12 @@ impl LoomLiteStore {
     }
 
     /// Read a value from the collective store.
+    ///
+    /// Story 11.2b (AC4 / F4): enforces fail-closed region-identity on the LIVE
+    /// read path via [`region_guard`]. The store now SELECTs the row's
+    /// `source_region` + `source_log_ref` (store-internal provenance) but does
+    /// NOT return them — `CollectiveMemoryPort::read` stays byte-identical. An
+    /// un-validated foreign-region row is refused (returns `None`), never served.
     pub async fn read(
         &self,
         spirit_pid: u32,
@@ -217,7 +328,8 @@ impl LoomLiteStore {
 
         let rows = client
             .query(
-                "SELECT value_kind, value_data FROM collective_memory
+                "SELECT value_kind, value_data, source_region, source_log_ref
+                 FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2 AND namespace_detail = $3 AND key = $4",
                 &[&(spirit_pid as i64), &ns_kind, &ns_detail, &key],
             )
@@ -226,6 +338,13 @@ impl LoomLiteStore {
         if let Some(row) = rows.first() {
             let val_kind: &str = row.get(0);
             let val_data: Vec<u8> = row.get(1);
+            let src_region: String = row.get(2);
+            let src_log_ref: String = row.get(3);
+            // AC4 (F4): fail-closed region-identity — refuse an un-validated
+            // foreign-region row (NFR-Comp-4 "no transparent replication").
+            if !self.region_guard(&src_region, &src_log_ref) {
+                return Ok(None);
+            }
             let value =
                 schema::parts_to_value(val_kind, &val_data).map_err(StoreError::Serialization)?;
             Ok(Some(value))
@@ -237,7 +356,12 @@ impl LoomLiteStore {
     /// Scan entries matching a key prefix.
     ///
     /// An entry that fails validation is PROPAGATED as an error (AC1 review —
-    /// no silent truncation of results).
+    /// no silent truncation of results). Story 11.2b (AC4 / F4): enforces
+    /// fail-closed region-identity — an un-validated foreign-region row is
+    /// FILTERED OUT (never served), not errored; the SQL WHERE clause excludes
+    /// foreign rows lacking a mediator stamp BEFORE the LIMIT is applied (so
+    /// foreign rows do not consume LIMIT slots), and the Rust-side
+    /// `region_guard` check is kept as defense-in-depth.
     pub async fn scan(
         &self,
         spirit_pid: u32,
@@ -256,9 +380,10 @@ impl LoomLiteStore {
 
         let rows = client
             .query(
-                "SELECT namespace_kind, namespace_detail, key, value_kind, value_data, timestamp_ns
+                "SELECT namespace_kind, namespace_detail, key, value_kind, value_data, timestamp_ns, source_region, source_log_ref
                  FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2 AND namespace_detail = $3 AND key LIKE $4
+                   AND (source_region = $6 OR source_log_ref <> '')
                  ORDER BY key ASC
                  LIMIT $5",
                 &[
@@ -267,6 +392,7 @@ impl LoomLiteStore {
                     &ns_detail,
                     &like_pattern,
                     &(limit as i64),
+                    &self.config.home_region.as_str(),
                 ],
             )
             .await?;
@@ -279,6 +405,14 @@ impl LoomLiteStore {
             let row_val_kind: &str = row.get(3);
             let row_val_data: Vec<u8> = row.get(4);
             let row_ts: i64 = row.get(5);
+            let src_region: String = row.get(6);
+            let src_log_ref: String = row.get(7);
+
+            // AC4 (F4): fail-closed region-identity — filter out an un-validated
+            // foreign-region row (NFR-Comp-4 "no transparent replication").
+            if !self.region_guard(&src_region, &src_log_ref) {
+                continue;
+            }
 
             let ns = schema::parts_to_namespace(row_ns_kind, &row_ns_detail)
                 .map_err(StoreError::Serialization)?;
@@ -291,6 +425,94 @@ impl LoomLiteStore {
         }
 
         Ok(entries)
+    }
+
+    /// Story 11.2b (AC4 / F4): fail-closed region-identity guard for the
+    /// Spirit-facing READ path.
+    ///
+    /// Returns `true` (serve) iff the row is **home-origin** (`source_region`
+    /// == `self.config.home_region`) OR a **foreign row carrying a
+    /// provenance-presence marker** (a non-empty `source_log_ref` — the stamp
+    /// `apply_replication_bundle` writes after `verify_replication_bundle`
+    /// succeeds).
+    ///
+    /// # Trust boundary
+    ///
+    /// Cryptographic validation happens at **apply-time** (the Ed25519 bundle
+    /// signature in `verify_replication_bundle`), NOT on every read.  The
+    /// read-path guard checks **provenance-presence** (non-empty mediator
+    /// stamp), not cryptographic validity.  A row whose `source_log_ref` is
+    /// non-empty but *forged* (written via `write_with_source` or raw SQL
+    /// without going through the signed mediator) **will be served** — this is
+    /// a documented residual threat under the model where the attacker has
+    /// direct DB write access (but that attacker can also INSERT a home-origin
+    /// row the guard always serves, so forged-stamp is not a net-new
+    /// exposure).  The successor that achieves per-row cryptographic validity
+    /// is a **trusted-applied-root registry** (record verified roots at apply
+    /// time, check on read) — a schema + apply-path feature out of 11.2b
+    /// scope, tracked as a v2.x successor.
+    ///
+    /// Both operands are store-internal (the row's stored columns vs the
+    /// store's `home_region` config) → `CollectiveMemoryPort::read/scan` stays
+    /// byte-identical (ZERO kernel-Δ; the port gains no region parameter and
+    /// the store does NOT return `source_region`). This is distinct from — and
+    /// does NOT reuse — `DowngradeRouter::check_region_identity` (wrong home:
+    /// it carries the *router's* home, not the *store's*; reusing it would
+    /// couple the store to the router).
+    ///
+    /// NOTE on the F4 lean signature: the preflight prose named a 1-operand
+    /// `region_guard(&self, row_source_region)`. AC4's binding text ("home-origin
+    /// OR carry a validly-re-attested provenance") REQUIRES the `source_log_ref`
+    /// operand to distinguish a validly-re-attested foreign row (served) from a
+    /// raw-copy injection (refused). A 1-operand guard would either refuse ALL
+    /// foreign rows (breaking 11.2a convergence — region-B could never read
+    /// region-A's replicated data via `read`) or serve ALL foreign rows (no
+    /// enforcement). The 2-operand form is the honest encoding of the property.
+    fn region_guard(&self, row_source_region: &str, row_source_log_ref: &str) -> bool {
+        if row_source_region == self.config.home_region {
+            return true; // home-origin: always served
+        }
+        // Foreign row: serve ONLY with a provenance-presence marker — the
+        // non-empty source_log_ref stamped by apply_replication_bundle after
+        // the bundle signature was verified.  This is a PRESENCE check, not
+        // cryptographic re-validation on read (see trust-boundary doc above).
+        !row_source_log_ref.is_empty()
+    }
+
+    /// Read all collective-memory rows with source provenance for the
+    /// convergence oracle (Story 11.2a AC3).
+    ///
+    /// Generic over `GenericClient` so it works with both `Client` and
+    /// `Transaction` (verify-before-commit pattern from `canonical.rs:281`).
+    pub async fn read_all_rows_from<C>(client: &C) -> Result<Vec<CollectiveRow>, StoreError>
+    where
+        C: tokio_postgres::GenericClient + Sync,
+    {
+        let rows = client
+            .query(
+                "SELECT spirit_pid, namespace_kind, namespace_detail, key,
+                        value_kind, value_data, source_region, source_ts, source_log_ref
+                 FROM collective_memory
+                 ORDER BY spirit_pid, namespace_kind, namespace_detail, key",
+                &[],
+            )
+            .await
+            .map_err(|e| StoreError::Query(e.to_string()))?;
+
+        Ok(rows
+            .iter()
+            .map(|row| CollectiveRow {
+                spirit_pid: row.get(0),
+                namespace_kind: row.get(1),
+                namespace_detail: row.get(2),
+                key: row.get(3),
+                value_kind: row.get(4),
+                value_data: row.get(5),
+                source_region: row.get(6),
+                source_ts: row.get(7),
+                source_log_ref: row.get(8),
+            })
+            .collect())
     }
 
     /// Get a client with the configured timeout.
@@ -316,8 +538,75 @@ impl LoomLiteStore {
     }
 }
 
+/// A raw collective-memory row for convergence oracle + replication.
+///
+/// Story 11.2a (AC3): the oracle triple needs the full row with source
+/// provenance fields.  This struct is the internal shape — NOT exported
+/// through the `CollectiveMemoryPort` trait.
+#[derive(Debug, Clone)]
+pub struct CollectiveRow {
+    pub spirit_pid: i64,
+    pub namespace_kind: String,
+    pub namespace_detail: String,
+    pub key: String,
+    pub value_kind: String,
+    pub value_data: Vec<u8>,
+    pub source_region: String,
+    pub source_ts: i64,
+    pub source_log_ref: String,
+}
+
 impl From<StoreError> for MemoryError {
     fn from(e: StoreError) -> Self {
         MemoryError::Storage(e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::seal::AtRestSeal;
+    use std::sync::Arc;
+
+    /// Story 11.4c (AC3): the `.with_at_rest_seal` builder installs the seal
+    /// hook on the store, and the default (`new`) carries NO hook — the
+    /// byte-identical Option-A plaintext posture.
+    ///
+    /// `LoomLiteStore::new` succeeds against a dead host because the deadpool
+    /// is lazy (no connection at construction — see `transport_failure.rs`),
+    /// so the builder wiring is verifiable without a live Postgres. The seal
+    /// TRANSFORM itself (the bytes that hit disk) is exercised in
+    /// [`seal::tests`](crate::seal::tests).
+    #[tokio::test]
+    async fn with_at_rest_seal_builder_installs_hook_default_is_none() {
+        let store = LoomLiteStore::new(StoreConfig {
+            connection_string: "host=127.0.0.1 port=1 dbname=none connect_timeout=1".to_string(),
+            timeout_ms: 500,
+            ..StoreConfig::default()
+        })
+        .await
+        .expect("lazy pool: store creation succeeds even with a dead host");
+
+        // Default posture: no seal hook (byte-identical Option-A plaintext).
+        assert!(
+            !store.at_rest_sealer().is_configured(),
+            "default store MUST have no seal hook (Option-A plaintext)"
+        );
+
+        // Install a deterministic XOR stand-in for AEAD (no maos-secrets dep).
+        let xor_seal: AtRestSeal = Arc::new(|d: &[u8]| Ok(d.iter().map(|b| b ^ 0xA5).collect()));
+        let sealed_store = store.with_at_rest_seal(Some(xor_seal));
+
+        assert!(
+            sealed_store.at_rest_sealer().is_configured(),
+            ".with_at_rest_seal(Some) MUST install the hook"
+        );
+
+        // `.with_at_rest_seal(None)` is an explicit return to plaintext posture.
+        let plain_store = sealed_store.with_at_rest_seal(None);
+        assert!(
+            !plain_store.at_rest_sealer().is_configured(),
+            ".with_at_rest_seal(None) MUST clear the hook"
+        );
     }
 }

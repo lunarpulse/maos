@@ -1,3 +1,218 @@
-// Stub: WIT interface definition for the Spirit ABI.
-// WIT bindings ship at v1.0+ if WASM-component form ever exits the
-// speculative-vNext zone of ADR-007. See ADR-002 for the Spirit-form decision.
+// `maos:spirit@1.0` — typed WIT projection of the ADR-032 frame set.
+//
+// Story 11.1a, ADR-031 §3: this WIT is the typed face a WASM Spirit author
+// binds against (via wit-bindgen). The host serializes/deserializes these
+// records to the SAME CBOR the native subprocess form uses. The bytes on the
+// wire stay Content-Length + CBOR (ADR-032). The byte-equal golden corpus
+// (ADR-032's gate) is EXTENDED with this projection — it does not replace it.
+//
+// Frame set sources:
+//   FrameKind discriminants — crates/maos-spirit-abi/src/identity.rs:30-79
+//   FramePayload / IacFrame  — crates/maos-domain/src/frame.rs:26-75
+//
+// Decision D5 (11.1a preflight): WIT byte-equal oracle = two independent
+// paths (kernel K-encode vs WIT lower→real-component→lift), canonical CBOR
+// (RFC 8949 §4.2.1) enforced on BOTH sides; completeness denominator = every
+// type-constructor in the `.wit` AST.
+
+package maos:spirit@1.0.0;
+
+interface frames {
+    // ── FrameKind (identity.rs:30-79) ──────────────────────────────────
+    // WIT enum order encodes the discriminant; the comment is the on-wire
+    // CBOR discriminant value.
+    enum frame-kind {
+        task-assign,            // 0
+        task-complete,          // 1
+        decision-dispatch,      // 2
+        epistemic-halt,         // 3
+        telemetry-event,        // 4
+        consent-request,        // 5
+        retract,                // 6
+        capability-invocation,  // 7
+        sandbox-block,          // 8
+        inference-call,         // 9
+        cli-subprocess-output,  // 21
+        consent-rupture,        // 22
+        rate-limited,           // 23
+        gateway-inbound,        // 24
+        gateway-outbound,       // 25
+    }
+
+    // ── FrameOrigin (i3) ───────────────────────────────────────────────
+    enum frame-origin {
+        human-authored,
+        spirit-auto,
+        spirit-drafted-human-approved,
+        kernel,
+    }
+
+    // ── FrameAddress (frame.rs:54-59) ──────────────────────────────────
+    record frame-address {
+        spirit-id: string,
+        host-id: option<string>,
+        role: option<string>,
+    }
+
+    // ── PostureHint (frame.rs:166-171) ─────────────────────────────────
+    enum posture-hint {
+        autonomous-with-halt,
+        assistive,
+        cautious,
+    }
+
+    // ── HaltPolicyOverride (frame.rs:142-147) ──────────────────────────
+    record halt-policy-override {
+        tag: string,
+        recall-vs-precision: f32,
+    }
+
+    // ── PosturePreferences (frame.rs:118-130) ──────────────────────────
+    record posture-preferences {
+        preferred-posture: option<posture-hint>,
+        halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    // ── PriorDistillateRef (frame.rs:100-110) ──────────────────────────
+    record prior-distillate-ref {
+        digest-frame-id: list<u8>,      // [u8; 16]
+        distillation-depth: u32,
+    }
+
+    // ── TaskAssignPayload (frame.rs:79-92) ─────────────────────────────
+    record task-assign-body {
+        goal: string,
+        scope: list<string>,           // Vec<Scope> serialized as strings
+        success-criteria: string,
+        posture-preferences: posture-preferences,
+        prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    // ── TaskCompletePayload (frame.rs:175-177) ─────────────────────────
+    record task-complete-body {
+        result-text: string,
+    }
+
+    // ── DecisionDispatchPayload (frame.rs:181-190) ─────────────────────
+    record decision-dispatch-body {
+        decision-id: u64,
+        approved: bool,
+    }
+
+    // ── EpistemicHaltPayload (frame.rs:198-230) ────────────────────────
+    record epistemic-halt-body {
+        halt-id: string,
+        tag: string,
+        value: f32,
+        threshold: option<f32>,
+        policy-id: string,
+        derived-from: string,
+    }
+
+    // ── TelemetryEventPayload (frame.rs:278-281) ───────────────────────
+    record telemetry-event-body {
+        event-type: string,
+        data: string,
+    }
+
+    // ── ConsentRequestPayload (frame.rs:285-287) ───────────────────────
+    record consent-request-body {
+        capability: string,
+    }
+
+    // ── RetractPayload (frame.rs:296-308) ──────────────────────────────
+    record retract-body {
+        original-frame-id: list<u8>,    // [u8; 16]
+        reason: string,
+        original-kind: option<frame-kind>,
+    }
+
+    // ── RuptureReason (frame.rs:370-382) ───────────────────────────────
+    enum rupture-reason {
+        intent-allowlist-mismatch,
+        posture-shifted-during-transmission,
+        token-revoked,
+        principal-revoked,
+        recipient-unloaded,
+    }
+
+    // ── RuptureRejection (frame.rs:360-363) ────────────────────────────
+    record rupture-rejection {
+        address: frame-address,
+        reason: rupture-reason,
+    }
+
+    // ── ConsentRupturePayload (frame.rs:345-356) ───────────────────────
+    record consent-rupture-body {
+        rupture-id: list<u8>,           // [u8; 16]
+        original-frame-id: list<u8>,    // [u8; 16]
+        original-kind: frame-kind,
+        accepted: list<frame-address>,
+        rejected: list<rupture-rejection>,
+        ruptured-at-ns: u64,
+    }
+
+    // ── RateLimitedPayload (frame.rs:386-400) ──────────────────────────
+    record rate-limited-body {
+        provider-id: string,
+        credential-fingerprint-prefix-hex: string,
+        retry-after-ms: u64,
+        bucket-remaining: u32,
+        bucket-capacity: u32,
+        refill-per-sec: u32,
+        schedule-id: option<string>,
+    }
+
+    // ── FramePayload (frame.rs:63-75) ──────────────────────────────────
+    // Discriminated union — one variant per routed FrameKind.
+    variant frame-payload {
+        task-assign(task-assign-body),
+        task-complete(task-complete-body),
+        decision-dispatch(decision-dispatch-body),
+        epistemic-halt(epistemic-halt-body),
+        telemetry-event(telemetry-event-body),
+        consent-request(consent-request-body),
+        retract(retract-body),
+        consent-rupture(consent-rupture-body),
+        rate-limited(rate-limited-body),
+    }
+
+    // ── IacFrame envelope (frame.rs:26-51) ─────────────────────────────
+    record iac-frame {
+        frame-id: list<u8>,             // [u8; 16]
+        timestamp-ns: u64,
+        logical-clock: u64,
+        frame-from: frame-address,
+        to: list<frame-address>,
+        kind: frame-kind,
+        payload: frame-payload,
+        auto-marker: frame-origin,
+    }
+
+    // ── Halt signal ────────────────────────────────────────────────────
+    // Returned by the guest (ADR-032: EOF after clean frame =
+    // Halt::Voluntary; mid-frame EOF = Halt::Fault(Truncated)).
+    variant halt {
+        voluntary,
+        fault(string),
+    }
+}
+
+// The Spirit world a WASM-component author implements. The host
+// (maos-wasm-host) drives it: feeds inbound frames decoded from the
+// ADR-032 stdio stream, and writes the guest's emitted frames back to
+// the same stream. The runner process is sandboxed by the existing T2
+// path (ADR-004) — the WIT capability surface is defense-in-depth ON
+// TOP of the OS process boundary (ADR-031 §1).
+world spirit {
+    use frames.{iac-frame, halt};
+
+    // host → guest: deliver one inbound frame, get zero-or-more emitted
+    // frames. A returned `halt` ends the session (maps to the ADR-032
+    // EOF semantics).
+    export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+
+    // host → guest: lifecycle hooks (mirror the native form's boot/shutdown).
+    export on-start: func() -> result<_, halt>;
+    export on-shutdown: func();
+}

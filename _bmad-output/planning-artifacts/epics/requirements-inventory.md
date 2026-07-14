@@ -120,7 +120,7 @@
 - **NFR-Rel-10:** Kernel cold-restart ≤ 30s with no data loss on graceful shutdown; ≤ 1 in-flight message loss on hard kill. v0.8.
 - **NFR-Rel-11:** Halt-receipt production rate ≥ 99.9%. Every Spirit termination, planned or unplanned, produces a halt receipt before process exit. Closes I14 directly (separate from HSIS aggregate). v0.8.
 
-### Security (16 NFRs)
+### Security (19 NFRs)
 
 - **NFR-Sec-1:** Sandbox tier enforced per Spirit; strictest-of-(manifest, trust-tier, operator-policy) floor. v0.1 (T0/T1/T2); v0.5 (T3); v2.0 (T4 WASM).
 - **NFR-Sec-2:** Capability-token TTL ≤ 60s for high-privilege operations; bound to Spirit-PID + boot-nonce; audit-logged at every use with origin-Spirit-ID. v1.5 (ADR-023). [Note: architecture marks ADR-023 as binding-v0.1.]
@@ -138,6 +138,9 @@
 - **NFR-Sec-14:** Cross-Spirit memory isolation corpus — 200-scenario adversarial corpus where Spirit-A actively attempts to enumerate, read, side-channel, or timing-attack Spirit-B's substrate state. Categories: namespace enumeration, working-memory read-across, decision-frame observation, halt-signal observation, transparency-log cross-read, working-memory-digest cross-read, capability-token forgery cross-Spirit, sandbox-escape lateral. Floor: 200/200 isolation maintained; any leak = P0 ship-block. Defends the v1.0 hermes-tenant positioning sentence. v0.8.
 - **NFR-Sec-15:** Crypto-module pluggability with FIPS 140-3-validated default option. Kernel-internal cryptographic operations (signature verification, sealed-export encryption, capability-token signing) route through a provider trait permitting substitution of FIPS-validated, hardware-backed, or post-quantum implementations without recompilation of Spirits. v1.0.
 - **NFR-Sec-16:** Manifest-evolution lint forcing binary `secret`/`non-secret` annotation on every new manifest field — no default. Mitigates structural-vs-semantic redaction tension by shifting cost from runtime detection (forbidden by §4.0.7) to authoring time. v0.5.
+- **NFR-Sec-17:** Enterprise PDP integration — capability-authorization decisions sourced from a real external Policy Decision Point behind out-of-kernel `PolicyDecisionPort` (maos-domain), evaluated by the PDP's real engine (Cedar in-process reference in `maos-pdp`); fail-closed on PDP unavailability; absent→BLOCK@v2.0. Anchor: ADR-050.
+- **NFR-Sec-18:** Enterprise identity assertion (OIDC) — out-of-kernel `IdentityAssertionPort` + `maos-sso` reference verifier; explicit algorithm allowlist; reject `alg:none` and HS256-confusion; enforce signature/issuer/audience/time claims; configured-but-down SSO denies issuance. Honesty: one reference OIDC path; SAML/social/discovery adapters deferred. Gate: `check-enterprise-identity`; anchor: ADR-051.
+- **NFR-Sec-19:** Opt-in adapter-store at-rest AEAD — out-of-kernel `KeyManagementPort` + `maos-secrets` envelope helper; ciphertext≠plaintext, right-key opens, wrong-key fails, KMS-down refuses sealed writes. Honesty: opt-in adapter-store scope only; Option-A plaintext remains default; kernel-core Private/Shared and production KMS adapters deferred. Gate: `check-enterprise-identity`; anchor: ADR-051.
 
 ### Auditability & Compliance (14 NFRs)
 
@@ -151,7 +154,7 @@
 - **NFR-Aud-8:** Two-tier corpus: N=100 calibration per-commit (CI width 0.124, fine for trend detection) + N=500 quarterly audit (CI width ≤0.05 at p=0.90 for digest-recall; tight statistical confidence). Plus 10⁵-case secret-leakage corpus + production canary system per NFR-Sec-4. v0.5 (per-commit), v1.0 (quarterly).
 - **NFR-Aud-9:** ComplianceClaim Adversarial Corpus (CCAC) v1.0 — N=600 (200 well-formed + 400 malformed). Per-class N=30, floor ≥ 27/30. 100 context-drift claims (100/100 rejected). Cross-validation across ≥3 reference Spirits, agreement within ±2%. v1.0 ship gate.
 - **NFR-Aud-10:** GDPR Article 17 right-to-be-forgotten — 50-scenario corpus with cross-Spirit cascade. Floor: 50/50 clean removal at queryable surface; 50/50 redaction-marker present in immutable log; 0 leakage in 100 follow-up subject-access queries. v1.0.
-- **NFR-Aud-11:** SIEM export at v2.0. OpenTelemetry adapter at v1.0.
+- **NFR-Aud-11:** SIEM export at v2.0; OpenTelemetry adapter at v1.0. Story 11.4c delivers the SIEM half via `maos-siem` read-only TL export through `query_with_redaction` before NDJSON+CEF/RFC5424 projection; empty TL reports N/A, not a green zero. Honesty: production network sinks are additive; HTTPS/network must be TLS-only and plaintext/file localhost-only. Gate: `check-enterprise-identity`; anchor: ADR-051.
 - **NFR-Aud-12:** Storage cascade erasure completeness + externally-verifiable uninstall receipt. Substrate-uninstall produces a portable, externally-verifiable erasure receipt (signed Merkle inclusion + signed Merkle exclusion proof, retained independent of the substrate). 100% of registered storage backends prove erasure within bounded window for any given principal. Closes the weakest leg of the hermes-tenant positioning sentence. v1.0.
 - **NFR-Aud-13:** Time-to-erasure SLA. Floor: 95% of right-to-be-forgotten requests complete within 30 days (configurable to 7 for enterprise tier); audit log entry within 24h of request acceptance. v1.0.
 - **NFR-Aud-14:** Intent-lineage propagation completeness — 100% of cross-Spirit IAC frames carry unbroken lineage chain back to originating principal intent. Closes ADR-018/I13 NFR coverage gap. v0.8.
@@ -162,10 +165,10 @@
 - **NFR-Test-2:** Kernel-API surface invariant test (per-commit gate). Build-time reflection enumerates every kernel API exported to Spirits via `kernel::api::*`; classifies each function by computational class (universal-arithmetic / data-movement / supervision / **other**); floor: 0 functions in class "other"; new function entering class "other" is build-break. Static analyzer on Rust `syn` walking allowlist-based predicate definitions; decidable for permitted subset (no theorem prover). Kernel-utility crate (`kernel::util::*`) has separate looser invariant: no I/O except via injected trait, no global state. v0.1 build gate (surface-diff only); v0.5 adds static analyzer for predicates.
 - **NFR-Test-3:** spirit-test SDK harness coverage ≥ 80% of Spirit author's manifest-declared capabilities reachable via fixtures; validated by external-author trial in 5+ third-party Spirits. v1.0.
 - **NFR-Test-4:** Halt-recall ≥ 0.7 / halt-precision ≥ 0.85 per Spirit class on `bmad-eval` standard corpus. v0.5.
-- **NFR-Test-5:** FKCS (Frozen-Kernel Conformance Suite). FKCS-infrastructure (diff oracle, test harness, kernel-frozen-vN.0 commit-tagging) at v2.0; FKCS-populated (3 future Spirits implemented by external authors) at v2.5. Floor: ≥27/30 per Spirit, ≥85/90 aggregate; diff oracle confirms zero kernel changes; negative-control "fourth Spirit" deliberately uses undocumented kernel internal and MUST fail.
+- **NFR-Test-5** [PHASE-SPLIT per John]: FKCS (Frozen-Kernel Conformance Suite). FKCS-infrastructure (diff oracle, test harness, kernel-frozen-vN.0 commit-tagging) DELIVERED at v2.0 (ADR-052 / Story 11.5; the v2.0 cohort is in-house Chinese-wall proxy authors, NOT genuine externals); FKCS-populated — 3 genuine externally-authored Spirits — REMAINS v2.5. The N=12 stratified black-box third-party trial is owned separately by **NFR-Test-8** and was never part of FKCS-populated scope (it was silently dropped from earlier FKCS-populated wording; restored here as an explicit cross-reference). Floor: ≥27/30 per Spirit, ≥85/90 aggregate; the v2.0 in-house Chinese-wall proxy cohort demonstrates the scoring mechanism only and does **not** satisfy the genuine-external FKCS floor. Diff oracle DERIVES zero frozen-surface changes (never a self-reported flag); negative-control "fourth Spirit" declares an off-frozen-surface / `pub(crate)`-style kernel internal and is **rejected at admission by `maos_registry::admission::admit_spirit`** (a journaled, falsifiable `AdmissionError::OffFrozenSurface`), not only by an FKCS-internal gate. **[ADR-052 · Story 11.5; scope source: PRD NFR-Test-5 + Epic-11 Decision 7]**
 - **NFR-Test-6:** LCAS (Long-context Ambiguity Stress) corpus — N=210 scenarios in 3 buckets (clearly-decidable n=70 / genuinely-ambiguous n=70 / adversarially-misleading n=70). Adversarial trajectories contain a planted load-bearing claim contradicting a louder repeated claim. v0.5 ship gate.
 - **NFR-Test-7:** Cross-form Semantic equivalence (rust-inproc ↔ subprocess) ≥ 90%; (any-rust ↔ wasm-component) ≥ 75%. CLI-wrapper requires distributional behavioral equivalence (Mann-Whitney U-test p > 0.05 over 30 runs). v1.5 (rust↔subprocess; cohort interop at v1.0 is rust-rust); v2.0 (any-rust↔wasm).
-- **NFR-Test-8:** Black-box third-party trial v1.0 — N=12 stratified (≥4 with no prior MAOS contribution; ≥3 who've never written Rust Spirit; ≥2 who've never written Rust at all; ≥2 non-English-native; ≥1 working offline-only). 14-day no-DM-support window. Floor: ≥10/12 produce working signed Spirit binary that loads on fresh Host VM, runs ≥1000 frames, halt-recall ≥0.85. Wilson CI [0.552, 0.962] meaningful at N=12; meaningless at N=5. Auditable via SBOM + signing chain re-loaded on clean VM by CI bot. Run only at major releases (v1.0, v2.0); minor releases use NFR-Onb-1 (12-author onboarding) as proxy.
+- **NFR-Test-8:** Black-box third-party trial v1.0 — N=12 stratified (≥4 with no prior MAOS contribution; ≥3 who've never written Rust Spirit; ≥2 who've never written Rust at all; ≥2 non-English-native; ≥1 working offline-only). 14-day no-DM-support window. Floor: ≥10/12 produce working signed Spirit binary that loads on fresh Host VM, runs ≥1000 frames, halt-recall ≥0.85 on the class-appropriate subset. Wilson CI [0.552, 0.962] meaningful at N=12; meaningless at N=5. Auditable via SBOM + signing chain re-loaded on clean VM by CI bot. Phase split per Story 11.7 / ADR-053: v2.0 infrastructure delivered by `check-trial-attestation` with in-house Chinese-wall proxy advisory proof-of-mechanism and SBOM/signing derived-and-asserted; CycloneDX/SBOM emission and genuine external N=12 execution are deferred to v2.5/Epic-14. Minor releases use NFR-Onb-1 (12-author onboarding) as proxy.
 - **NFR-Test-9:** Loom-not-in-kernel structural test. `grep` of kernel crate for orchestration/planning symbols returns ∅. Per-commit gate. Covers ADR-006's negative commitment (Loom is user-space). v0.5.
 - **NFR-Test-10:** Skill-format conformance — at least one third-party skill format (Anthropic Skills format OR equivalent) executes via Spirit-form adapter without kernel modification. Covers ADR-027's external-standard interop assertion empirically. v1.5.
 - **NFR-Test-11:** Namespace grammar lock test. Grammar `.lark` (or equivalent) hash pinned in CI; any change requires architecture-lock review process, not regular PR. v0.5.
@@ -491,3 +494,38 @@ _N/A — this is a kernel/infrastructure project with no UX design document. Dir
 | FR65 | E9 | Proof-of-erasure on uninstall (externally-verifiable Merkle proof) |
 
 **Coverage:** All 65 FRs mapped to ≥1 epic. Per-NFR ownership is embedded in each epic section below; full corpus authoring schedule (~2,249 items via parameterized generators) lives in E0 + per-epic corpus stories.
+
+---
+
+## v2.2 Functional-Completeness Coverage Map (added 2026-07-10 — Step 3; ratified §15 architecture / ADR-054–057)
+
+The v2.2 phase (Epics 12–14) closes the residual PRD surface so **every FR has a functional home** and both remaining journeys (J3, Reza) are served. No new FRs; **FR37 is the only previously-unserved FR**. External-actor requirements stay v2.5, non-gating.
+
+### Journeys
+| Journey | Status before v2.2 | Served by |
+|---|---|---|
+| J3 Marcus Team Nexus (8-host peer mesh) | **UNSERVED** | **E12** (12.4 day-30 scene) |
+| Reza single-org cross-team Cortex | enablers-only | **E13** (13.6 Reza scene) |
+
+### Residual / re-homed requirements → v2.2 story
+| Requirement | Was | v2.2 home |
+|---|---|---|
+| FR37 vetting attestation (internal-vetter machinery) | deferred v1.0→v2.5 | **E13.4** (ADR-056); external accredited vetters → v2.5 |
+| NFR-Ops-11 multi-operator tenancy (full impl) | "v1.5+ implemented" (metric-false) | **E13.1** (multi-tenant Loom, physical wall) |
+| NFR-Tenancy-1 multi-tenant | single-tenant through v2.0 | **E13.1 + E13.2** (physical + crypto tenant wall) |
+| NFR-Scale-5 14-institution Cortex envelope | v2.5 → retagged v2.2 | **E13.6** (measured capacity envelope) |
+| NFR-Scale-2 100-host (second half) | v2.5 → retagged v2.2 | **E14.1** |
+| NFR-Rel-7 100-host churn | v2.5 → retagged v2.2 | **E14.1** |
+| NFR-Sec-13 10-host mTLS rotation chaos | v2.0 half | **E14.2** |
+| v2.0 remainder sweep (canary rollback, native push, KMS backends, Bedrock/Vertex, installers) | deferred at v2.0 | **E14.4 / E14.5** |
+| NFR-Maint-1 post-v2.0 ceiling instrument | ≤20 KLOC letter expires @v2.0 | **E14.6** (ADR-057 `kernel-crate-set` ≤25K) |
+
+### New ADRs (ratified §15.11, 2026-07-09)
+ADR-054 cohort mesh (E12) · ADR-055 multi-tenant Loom + per-team HKDF weld (E13) · ADR-056 FR37 vetting (E13) · ADR-057 constitutional ceiling (E14).
+
+### Release-gate artifacts (NOT stories) & v2.5-deferred (non-gating)
+- **Release-gate artifacts:** NFR-Scale-1 30-day soak, absolute geo-SLO — absent/unmeasured → BLOCK at the v2.2 ship gate.
+- **v2.5 (non-gating):** 3 genuine external-authored FKCS Spirits, external N=12 trial cohort, accredited external vetters (NFR-Comp-2), ≥20 registry Spirits, cert bodies, RTL/ja/zh docs. Infrastructure is reserved by **E14.3**.
+- **External holds (GA ledger, non-gating for v2.2 dev):** external pen-test (NFR-Sec-7), export counsel (NFR-Comp-1).
+
+**v2.2 coverage:** every residual FR/NFR is mapped to a story or explicitly re-deferred with a reason. **FR37 now has a functional home (E13.4) — zero FRs unserved.**

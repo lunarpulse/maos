@@ -553,6 +553,7 @@
 "maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk" = "supervision"
 # Memory region-enforcement entry points: data-movement (memory tier I/O chokepoints)
 "maos_kernel_core::memory::write_entry_point::WriteEntryPoint"           = "data-movement"
+"maos_kernel_core::memory::write_entry_point::SourceLogRef"              = "data-movement"
 "maos_kernel_core::memory::write_entry_point::WriteEntryPoint::new"      = "data-movement"
 "maos_kernel_core::memory::write_entry_point::WriteEntryPoint::write"    = "data-movement"
 "maos_kernel_core::memory::write_entry_point::enforce_region"            = "data-movement"

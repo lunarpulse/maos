@@ -1,0 +1,40 @@
+[package]
+name = "maos-escape-detector"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS out-of-kernel sandbox-escape structural anomaly detector (ADR-024 / NFR-Sec-3, signal 1 of 3 @v2.0)"
+
+[dependencies]
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+# Downward-only dependency (the maos-audit read-only-consumer template). The
+# detector reuses the kernel's shared domain model (SandboxTier, FrameOrigin
+# discriminants) but NEVER depends on maos-kernel-core at the library level —
+# enforced by check-service-boundary / check-dependency-closure (L3).
+maos-domain = { path = "../maos-domain" }
+
+[dev-dependencies]
+tempfile = "3"
+# Dev/CI-only: the live-syscall proven-red (AC3/AC4) drives the REAL kernel
+# producer (`spawn_sandboxed`/`classify_exit`/`emit_sandbox_block`/`CapAuditWriter`)
+# over a real seccomp-enforced child. Library graph stays kernel-core-free; the
+# dev-dependency does not ship (mirrors the maos-audit template).
+maos-kernel-core = { path = "../maos-kernel-core" }
+libc = "0.2"
+# Drives the real async `CapAuditWriter` task (the writer half of the cap-audit
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
+
+# `escape-fault-inject` (AC3/AC4 falsifier — dev/CI only). Stubs the detector's
+# correlation to canned-TP and severs the producer-wired emit path, so the gate
+# can prove the detection-quality + producer-wired legs are derived from the REAL
+# correlation/wiring (the flag REMOVES the real logic and the verdict flips —
+# §A7.3). MUST NOT ship in release builds — the `compile_error!` in `src/lib.rs`
+# hard-fails any release build with this feature on, and the `check-escape-detector`
+# gate's release-graph-absence leg is the belt-and-suspenders graph guard.
+[features]
+escape-fault-inject = []

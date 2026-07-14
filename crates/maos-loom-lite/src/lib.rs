@@ -23,5 +23,7 @@
 pub mod adapter;
 pub mod canonical;
 pub mod migration;
+pub mod replication;
 pub mod schema;
+pub mod seal;
 pub mod store;

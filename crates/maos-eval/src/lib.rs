@@ -26,6 +26,8 @@ pub mod revocation_corpus; // NEW — Story 5.4 revocation corpus (AC5)
 pub mod safety_critical_corpus; // NEW — Story 8.5 safety-critical corpus + Cohen's κ (AC5)
 pub mod t3_escape_corpus; // NEW — Story 5.5a T3 escape corpus (AC4)
 pub mod termination_corpus; // NEW — Story 5.2 HSIS 300-corpus (AC5)
+#[cfg(feature = "trial-attestation")]
+pub mod trial_attestation; // NEW — Story 11.7 v2.0 third-party trial machine-derived attestation
 pub mod upgrade_policy_corpus; // NEW — Story 5.4 upgrade-policy corpus (AC1)
 
 pub use distillate_corpus::{DistillateCorpus, DistillateScenario, IaaAttestation};

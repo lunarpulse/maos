@@ -20,7 +20,8 @@ use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::router::{A2APeerRouter, A2ARouterCore, A2ATransport};
 use maos_a2a_core::transport::json_rpc::{CODE_FRAME_TOO_LARGE, CODE_TIMEOUT};
 use maos_a2a_core::{
-    A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, HandshakeRetryPolicy,
+    A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, CohortManifestGate,
+    ConsentRuptureSink, DigestReadPort, HaltReceiptObserver, HandshakeRetryPolicy,
     InMemoryTofuPinStore, TofuPinStore,
 };
 use maos_domain::frame::IacFrame;
@@ -142,11 +143,103 @@ impl TcpA2ATransport {
         timeouts: TcpTimeouts,
         retry_policy: HandshakeRetryPolicy,
         validation_time: Option<UnixTime>,
-        // Story 8.9 / AC3 — optional pinned consent-expiry clock (ns since epoch)
-        // for deterministic on-wire expiry tests. `None` in production (real wall
-        // clock). Threaded into the shared `A2ARouterCore` so both the sender's
-        // `prepare_outbound` stamp and the receiver's expiry check use it.
         consent_now_ns: Option<u64>,
+    ) -> Result<Self, TcpTransportError> {
+        Self::bind_with_cohort_manifest_gate(
+            tcp_config,
+            peer_configs,
+            own_boot_nonce,
+            timeouts,
+            retry_policy,
+            validation_time,
+            consent_now_ns,
+            None,
+        )
+        .await
+    }
+
+    /// Cohort-enabled construction path (gate only). Delegates to
+    /// [`Self::bind_with_cohort_wiring`] with no halt-receipt observer — the
+    /// existing callers stay byte-for-byte unchanged (Story 12.3 avoids the
+    /// 6-caller `bind` churn P7a flagged by adding a NEW wiring fn instead).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn bind_with_cohort_manifest_gate(
+        tcp_config: TcpA2AConfig,
+        peer_configs: Vec<A2APeerConfig>,
+        own_boot_nonce: u64,
+        timeouts: TcpTimeouts,
+        retry_policy: HandshakeRetryPolicy,
+        validation_time: Option<UnixTime>,
+        consent_now_ns: Option<u64>,
+        cohort_manifest_gate: Option<Arc<dyn CohortManifestGate>>,
+    ) -> Result<Self, TcpTransportError> {
+        Self::bind_with_cohort_wiring(
+            tcp_config,
+            peer_configs,
+            own_boot_nonce,
+            timeouts,
+            retry_policy,
+            validation_time,
+            consent_now_ns,
+            cohort_manifest_gate,
+            None,
+        )
+        .await
+    }
+
+    /// Story 12.3 — cohort-enabled construction path wiring BOTH the manifest
+    /// gate and the halt-receipt presence observer. Delegates to
+    /// [`Self::bind_with_cohort_wiring_and_digest`] with no digest-read port —
+    /// existing callers stay byte-for-byte unchanged (Story 12.4a avoids caller
+    /// churn by adding a NEW wiring fn, mirroring 12.3's P7a discipline).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn bind_with_cohort_wiring(
+        tcp_config: TcpA2AConfig,
+        peer_configs: Vec<A2APeerConfig>,
+        own_boot_nonce: u64,
+        timeouts: TcpTimeouts,
+        retry_policy: HandshakeRetryPolicy,
+        validation_time: Option<UnixTime>,
+        consent_now_ns: Option<u64>,
+        cohort_manifest_gate: Option<Arc<dyn CohortManifestGate>>,
+        halt_receipt_observer: Option<Arc<dyn HaltReceiptObserver>>,
+    ) -> Result<Self, TcpTransportError> {
+        Self::bind_with_cohort_wiring_and_digest(
+            tcp_config,
+            peer_configs,
+            own_boot_nonce,
+            timeouts,
+            retry_policy,
+            validation_time,
+            consent_now_ns,
+            cohort_manifest_gate,
+            halt_receipt_observer,
+            None,
+            None,
+        )
+        .await
+    }
+
+    /// Story 12.4a — cohort-enabled construction path wiring the manifest gate,
+    /// the halt-receipt observer, AND the digest-read correlation port. All are
+    /// installed via the named `A2ARouterCore` builders (no adjacent-`Arc`
+    /// positional transposition footgun, P7b) BEFORE the core is wrapped and the
+    /// accept loop spawns, so no inbound connection observes a legacy
+    /// policy/observation/correlation window (P7c). In production all three are
+    /// the SAME `CohortManifestState` (`state.clone()`).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn bind_with_cohort_wiring_and_digest(
+        tcp_config: TcpA2AConfig,
+        peer_configs: Vec<A2APeerConfig>,
+        own_boot_nonce: u64,
+        timeouts: TcpTimeouts,
+        retry_policy: HandshakeRetryPolicy,
+        validation_time: Option<UnixTime>,
+        consent_now_ns: Option<u64>,
+        cohort_manifest_gate: Option<Arc<dyn CohortManifestGate>>,
+        halt_receipt_observer: Option<Arc<dyn HaltReceiptObserver>>,
+        digest_read_port: Option<Arc<dyn DigestReadPort>>,
+        rupture_sink: Option<Arc<dyn ConsentRuptureSink>>,
     ) -> Result<Self, TcpTransportError> {
         let pins = tcp_config.build_pin_store().await?;
         let posture = tcp_config.trust_posture()?;
@@ -168,7 +261,19 @@ impl TcpA2ATransport {
         if let Some(t) = consent_now_ns {
             core_inner = core_inner.with_pinned_consent_clock(t);
         }
+        if let Some(gate) = cohort_manifest_gate {
+            core_inner = core_inner.with_cohort_manifest_gate(gate);
+        }
+        if let Some(observer) = halt_receipt_observer {
+            core_inner = core_inner.with_halt_receipt_observer(observer);
+        }
+        if let Some(port) = digest_read_port {
+            core_inner = core_inner.with_digest_read_port(port);
+        }
         let core = Arc::new(core_inner);
+        if let Some(sink) = rupture_sink {
+            core.install_rupture_sink(sink).await;
+        }
 
         let server_config = Arc::new(build_server_config(
             &own_chain,

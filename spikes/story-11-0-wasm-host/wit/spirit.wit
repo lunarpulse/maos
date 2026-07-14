@@ -1,0 +1,119 @@
+// SPIKE — Story 11.0 (NO-MERGE). Illustrative WIT, not built.
+// At 11.1a this would live at `crates/maos-wasm-host/wit/spirit.wit`.
+//
+// `maos:spirit@1.0` is a TYPED PROJECTION of the ADR-032 frame set — NOT a new
+// protocol (ADR-031 §3). The bytes on the wire stay Content-Length + CBOR
+// (ADR-032). This WIT is the typed face a WASM Spirit author binds against
+// (via wit-bindgen); the host serializes/deserializes these records to the
+// same CBOR the native subprocess form uses. The byte-equal golden corpus
+// (ADR-032's gate) is EXTENDED with this projection at 11.1a — it does not
+// replace it.
+//
+// Frame set sources:
+//   FrameKind discriminants — crates/maos-spirit-abi/src/identity.rs:30-79
+//   FramePayload / IacFrame  — crates/maos-domain/src/frame.rs:26-75
+
+package maos:spirit@1.0.0;
+
+interface frames {
+    // Mirrors `FrameKind` (identity.rs:30-79). WIT enum order encodes the
+    // discriminant; the comment is the on-wire value the CBOR carries.
+    enum frame-kind {
+        task-assign,            // 0
+        task-complete,          // 1
+        decision-dispatch,      // 2
+        epistemic-halt,         // 3
+        telemetry-event,        // 4
+        consent-request,        // 5
+        retract,                // 6
+        capability-invocation,  // 7
+        sandbox-block,          // 8
+        inference-call,         // 9
+        cli-subprocess-output,  // 21
+        consent-rupture,        // 22
+        rate-limited,           // 23
+        gateway-inbound,        // 24
+        gateway-outbound,       // 25
+    }
+
+    // Mirrors `FrameOrigin` (i3) — kernel vs spirit provenance marker.
+    enum frame-origin {
+        kernel,
+        spirit,
+    }
+
+    // Mirrors `FrameAddress` (frame.rs:54-59). `host-id` / `role` optional.
+    record frame-address {
+        spirit-id: string,
+        host-id: option<string>,
+        role: option<string>,
+    }
+
+    // Mirrors the routed `FramePayload` variants (frame.rs:63-75). Bodies are
+    // projected as records in the full 11.1a corpus; sketched here as the
+    // discriminated shape so the WIT world type-checks against the kind set.
+    variant frame-payload {
+        task-assign(task-assign-body),
+        task-complete(task-complete-body),
+        decision-dispatch(list<u8>),
+        epistemic-halt(epistemic-halt-body),
+        telemetry-event(list<u8>),
+        consent-request(list<u8>),
+        retract(list<u8>),
+        consent-rupture(list<u8>),
+        rate-limited(list<u8>),
+    }
+
+    record task-assign-body {
+        goal: string,
+    }
+
+    record task-complete-body {
+        summary: string,
+        ok: bool,
+    }
+
+    // The halt is the load-bearing invariant-bearing effect (ADR-031 §5 / 11.1b
+    // tier-1 equivalence): a WASM Spirit MUST halt with the same shape as the
+    // native form. `voluntary` = clean EOF after a frame; `fault` = mid-frame.
+    record epistemic-halt-body {
+        reason: string,
+        voluntary: bool,
+    }
+
+    // Mirrors the `IacFrame` envelope (frame.rs:26-51). frame-id is 16 bytes.
+    record iac-frame {
+        frame-id: list<u8>,         // [u8; 16]
+        timestamp-ns: u64,
+        logical-clock: u64,
+        from: frame-address,
+        to: list<frame-address>,
+        kind: frame-kind,
+        payload: frame-payload,
+        auto-marker: frame-origin,
+    }
+
+    // Halt signal returned by the guest (ADR-032: EOF after clean frame =
+    // Halt::Voluntary; mid-frame EOF = Halt::Fault(Truncated)).
+    variant halt {
+        voluntary,
+        fault(string),
+    }
+}
+
+// The Spirit world a WASM-component author implements. The host (maos-wasm-host)
+// drives it: feeds inbound frames decoded from the ADR-032 stdio stream, and
+// writes the guest's emitted frames back to the same stream. The runner process
+// is sandboxed by the existing T2 path (ADR-004) — the WIT capability surface is
+// defense-in-depth ON TOP of the OS process boundary (ADR-031 §1).
+world spirit {
+    use frames.{iac-frame, halt};
+
+    // host → guest: deliver one inbound frame, get zero-or-more emitted frames.
+    // A returned `halt` ends the session (maps to the ADR-032 EOF semantics).
+    export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+
+    // host → guest: lifecycle hooks (mirror the native form's boot/shutdown).
+    export on-start: func() -> result<_, halt>;
+    export on-shutdown: func();
+}

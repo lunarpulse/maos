@@ -104,7 +104,7 @@ fn diff_git(base: &str, json: bool) -> Result<(), String> {
     }
 }
 
-fn capture_public_api() -> Result<String, String> {
+pub fn capture_public_api() -> Result<String, String> {
     let out = Command::new("cargo")
         .args(["public-api", "--manifest-path", MANIFEST, "-sss"])
         .output()

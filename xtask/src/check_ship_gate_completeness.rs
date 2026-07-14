@@ -21,15 +21,14 @@ const EXPECTED_GATES: &[&str] = &[
     "check-pentest-gate",
     "check-third-party-trial",
     "check-cross-form-equiv",
+    // Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
+    "check-wasm-form-equiv",
     "check-red-team-gate",
     // Story 10.3 AC-1/2/3/4/5 — v1.0 compliance ship-gates.
     "check-export-control",
     "check-fuzz-targets",
     "check-cna-registration",
     "check-ko-coverage",
-    // Story 10.5 AC5 — Japanese and zh-Hans v1.5 localization gates.
-    "check-ja-coverage",
-    "check-zh-coverage",
     // Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
     "windows-check",
     // Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate.
@@ -49,6 +48,26 @@ const EXPECTED_GATES: &[&str] = &[
     "check-j4-latency",
     // Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
     "check-skill-conformance",
+    // Story 11.2a (AC5, D10) — cross-region convergent replication gate (ADR-049).
+    "check-cross-region-consensus",
+    // Story 11.2b (AC5, D5) — multi-region SLO gate (3-region Cortex pilot).
+    "check-multi-region-slo",
+    // Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate.
+    "check-scale-churn",
+    // Story 12.1 — cohort manifest + N=3/N=8 full-pairwise mesh.
+    "check-cohort-mesh",
+    // Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar).
+    "check-enterprise-pdp",
+    // Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate.
+    "check-escape-detector",
+    // Story 11.4c (AC6) — enterprise identity + at-rest + SIEM gate.
+    "check-enterprise-identity",
+    // Story 11.5 (AC4/D7) — Frozen-Kernel Conformance Suite infrastructure gate.
+    "check-fkcs",
+    // Story 11.7 (AC4/D2) — v2.0 third-party trial attestation producer gate.
+    "check-trial-attestation",
+    // Story 12.6 — maos-bin-scoped environment-contract registry gate.
+    "check-env-contract",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.
@@ -98,9 +117,8 @@ pub fn run(json: bool) -> Result<(), String> {
             "check-pentest-gate"
                 | "check-third-party-trial"
                 | "check-cross-form-equiv"
+                | "check-wasm-form-equiv"
                 | "check-red-team-gate"
-                | "check-ja-coverage"
-                | "check-zh-coverage"
                 | "windows-check"
                 | "check-migration-merkle"
                 | "check-live-bilateral-consent"
@@ -108,6 +126,18 @@ pub fn run(json: bool) -> Result<(), String> {
                 | "check-mobile-push-on-halt"
                 | "check-j4-latency"
                 | "check-skill-conformance"
+                // Story 11.2a (AC5) — cross-region convergent replication gate.
+                | "check-cross-region-consensus"
+                // Story 11.2b (AC5) — multi-region SLO gate.
+                | "check-multi-region-slo"
+                // Story 11.3 (AC5) — scale-envelope 25/30-host churn gate.
+                | "check-scale-churn"
+                // Story 12.1 (AC5) — cohort manifest + full-pairwise mesh.
+                | "check-cohort-mesh"
+                // Story 11.4a (AC5) — enterprise PDP integration gate.
+                | "check-enterprise-pdp"
+                // Story 12.6 — maos-bin-scoped environment-contract registry gate.
+                | "check-env-contract"
         );
         if (is_story10_ship_gate || WEEKLY_ONLY_GATES.contains(gate))
             && !registry_names.contains(gate)

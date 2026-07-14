@@ -139,6 +139,14 @@
     - [Story 10.3: Close v1.0 Compliance Gates — Export-Control, Fuzz Hardening, Korean Docs, CNA Registration](./epic-10-v10-ship-gate-v15-collective-tier-v10-v15.md#story-103-close-v10-compliance-gates-export-control-fuzz-hardening-korean-docs-cna-registration)
     - [Story 10.4: Ship the v1.5 Collective Tier with Postgres+pgvector and SQLite→Postgres Migration](./epic-10-v10-ship-gate-v15-collective-tier-v10-v15.md#story-104-ship-the-v15-collective-tier-with-postgrespgvector-and-sqlitepostgres-migration)
     - [Story 10.5: Mature v1.5 — Skill-Format Conformance, JetBrains, Windows, 2-Year LTS, Japanese/CN-S i18n](./epic-10-v10-ship-gate-v15-collective-tier-v10-v15.md#story-105-mature-v15-skill-format-conformance-jetbrains-windows-2-year-lts-japanesecn-s-i18n)
+  - [Epic 11: v2.0 Technical Phase — WASM Form, Cross-Region Loom, Enterprise PDP/Identity, Sandbox-Escape Detector, FKCS/Trial Infra (v1.5 → v2.0)](./epic-11-v20-technical-phase.md) — 11 stories, `done` (branch `epic-11`)
+  - **—— v2.2 Functional-Completeness Phase (ratified 2026-07-09; architecture §15 / ADR-054–057; 3 epics, 17 stories) ——**
+  - [Epic 12: J3 Marcus Team Nexus — Cohort Mesh (ADR-054), Consent Tuples, Halt-on-Conflict, Team Digest, Day-30 Scene](./epic-12-j3-team-nexus-v2-2.md) — 5 stories, `draft`
+    - Stories: 12.1 cohort manifest + mesh · 12.2 per-(peer,role) consent · 12.3 halt-on-conflict (receipt-presence) · 12.4 team digest + no-surveillance (**J3 day-30 scene**) · 12.5 cohort hot-swap
+  - [Epic 13: Reza Single-Org Cross-Team Cortex — Multi-Tenant Loom (ADR-055), FR37 Vetting (ADR-056), Enterprise Spirit, Reza Scene](./epic-13-reza-cortex-v2-2.md) — 6 stories, `draft`
+    - Stories: 13.1 physical tenant wall · 13.2 crypto tenant boundary · 13.3 cross-team consent + provenance · 13.4 FR37 vetting machinery · 13.5 Enterprise reference Spirit · 13.6 **Reza Cortex scene** + NFR-Scale-5
+  - [Epic 14: v2.2 Hardening + Closers — 100-Host Churn, 10-Host Rotation, Ecosystem-Readiness, v2.0 Sweep, ADR-057 Ceiling](./epic-14-scale-closers-ecosystem-readiness-v2-2.md) — 6 stories, `draft`
+    - Stories: 14.1 100-host churn · 14.2 10-host rotation chaos · 14.3 ecosystem-readiness + v2.5 ledger · 14.4 sweep: operational · 14.5 sweep: backends/multi-provider · 14.6 ADR-057 ceiling + formal-methods
   - [Dependency Verification (12-Epic Ordering)](./dependency-verification-12-epic-ordering.md)
   - [Open Items for Story Creation (Step 3)](./open-items-for-story-creation-step-3.md)
   - [Open Items Carried Forward to Implementation](./open-items-carried-forward-to-implementation.md)

@@ -1,0 +1,38 @@
+[package]
+name = "maos-sso"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "MAOS enterprise identity - out-of-kernel OIDC assertion verifier (Story 11.4c, ADR-051 / NFR-Sec-18)"
+
+[dependencies]
+# Domain types (the sync IdentityAssertionPort trait + principal/error types).
+# FORBIDDEN in maos-kernel-core (kept at the binary edge - only maos-bin depends
+# on this crate; see check-dependency-closure).
+maos-domain = { path = "../maos-domain" }
+base64 = "0.22"
+jsonwebtoken = "9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+
+# NOTE: the real OIDC/JWT verification dependency (e.g. `jsonwebtoken`) is added
+# by the implementer; these tests pin the contract with OFFLINE static-JWKS +
+# real RS256 fixtures (tests/fixtures.rs), so the crate builds with NO crypto
+# dev-dependency and no network access (L5: the tripwire is a real per-commit
+# gate, not advisory-skipped like a live-IdP leg).
+
+[features]
+default = []
+# Story 11.4c AC1 - dev/CI-ONLY fault-injection falsifier. When enabled, the
+# verifier STUBS verification to accept-all (the JWKS signature check is never
+# performed). With it on, a forged/alg-none/confusion token -> Ok -> the
+# reject tests go RED, proving the reject is signature-derived, not a constant
+# (Section A7.3 "feature-flag != measurement" done right: the flag REMOVES the
+# real verification, and the verdict flips). MUST NOT ship in release builds -
+# the `compile_error!` guard in `src/lib.rs` hard-fails any release build with
+# this feature on, and the `check-enterprise-identity` gate's release-graph-
+# absence leg is the belt-and-suspenders graph guard (SHIP-BLOCKER).
+sso-fault-inject = []

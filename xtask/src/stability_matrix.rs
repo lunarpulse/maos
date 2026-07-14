@@ -73,10 +73,14 @@ pub fn run(workspace_root: &Path, check: bool, json: bool) -> Result<(), String>
             });
             println!("{payload}");
         } else if in_sync && deprecation_issues.is_empty() && export_issue.is_none() {
-            eprintln!("stability-matrix: PASS — STABILITY.md in sync with workspace state; 0 undocumented deprecations; §Export present (non-stub)");
+            eprintln!(
+                "stability-matrix: PASS — STABILITY.md in sync with workspace state; 0 undocumented deprecations; §Export present (non-stub)"
+            );
         } else {
             if !in_sync {
-                eprintln!("stability-matrix: FAIL — STABILITY.md drift (committed differs from workspace-derived matrix)");
+                eprintln!(
+                    "stability-matrix: FAIL — STABILITY.md drift (committed differs from workspace-derived matrix)"
+                );
             }
             for issue in &deprecation_issues {
                 eprintln!("stability-matrix: FAIL — {issue}");

@@ -47,7 +47,9 @@ pub fn run(
         if report.passed {
             println!("invariant-lock: PASSED");
         } else {
-            eprintln!("ADR-037 violation: invariant-lock requires (diff | corpus-delta | phase-commitment) update");
+            eprintln!(
+                "ADR-037 violation: invariant-lock requires (diff | corpus-delta | phase-commitment) update"
+            );
             if report.missing_corpus_delta {
                 eprintln!("  missing: corpus delta (tests/coverage-matrix.yaml not touched)");
             }

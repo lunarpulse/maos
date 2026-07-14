@@ -14,6 +14,8 @@ mod check_bare_review_findings;
 mod gate_common;
 // Story 10.4a — dependency-closure gate (kernel-core artifact hygiene)
 mod check_dependency_closure;
+// Story 11.1a — maos-host public-API baseline gate (ADR-031 Spirit Host Port).
+mod check_host_surface;
 mod check_rto_gate;
 // Story 10.4a — RTO drill (performs cold-restore + timing, writes evidence for check-rto-gate).
 mod check_rto;
@@ -23,13 +25,39 @@ mod check_composition_root_completeness;
 mod check_corpus;
 mod check_coverage_matrix_completeness;
 mod check_cross_form_equiv;
+// Story 11.2a — cross-region convergent replication gate (ADR-049).
+mod check_cross_region_consensus;
+// Story 11.2b — multi-region SLO gate (3-region pilot + cross-region round-trip
+// SLO + halt-presence + fail-closed read path). Per-leg independence (ADR-049 ops).
+mod check_multi_region_slo;
+// Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate (per-leg
+// independence). MUST NOT append legs to check-rotation-real-timing or
+// check-multi-region-slo (F7).
+mod check_scale_churn;
+// Story 12.1 — signed cohort manifest and full-pairwise mesh gate.
+mod check_cohort_mesh;
+// Story 11.4a — enterprise PDP integration gate (per-leg independence, ADR-050).
+mod check_enterprise_pdp;
+// Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence, ADR-051).
+mod check_enterprise_identity;
+// Story 11.5 — Frozen-Kernel Conformance Suite infrastructure gate (ADR-052).
+mod check_fkcs;
+// Story 11.7 — v2.0 third-party trial attestation producer gate (ADR-053).
+mod check_trial_attestation;
+// Story 11.4b — ADR-024 sandbox-escape structural detector gate (per-leg independence).
+mod check_escape_detector;
+// Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
+mod check_wasm_form_equiv;
+// Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
 mod check_deprecations_declared;
+mod check_dev_model_tier;
 mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
 mod check_empty_kernel;
 mod check_env_contract;
 mod check_epic_6_bridge;
 mod check_epic_close_green;
+mod check_equiv_fixture_provenance;
 mod check_error_catalog;
 mod check_fr47;
 mod check_governance_categories;
@@ -485,6 +513,13 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Epic 12 retro B3 — frontier-era (epic >= 12) stories must record an
+    /// allowlisted dev model + a §A6 review artifact (Blocking; closes E11-A1).
+    #[command(name = "check-dev-model-tier")]
+    CheckDevModelTier {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 7.5a — generate (or `--check`) repo-root STABILITY.md from live
     /// workspace state (ABI Stability Triple + LTS + compliance/export STUBs).
     #[command(name = "stability-matrix")]
@@ -503,6 +538,13 @@ enum Commands {
     /// Story 10.4a — dependency-closure gate (kernel-core artifact excludes Postgres/pgvector).
     #[command(name = "check-dependency-closure")]
     CheckDependencyClosure {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.1a — maos-host public-API baseline gate (ADR-031 Spirit Host
+    /// Port); removed items RED, added items reported but GREEN.
+    #[command(name = "check-host-surface")]
+    CheckHostSurface {
         #[arg(long)]
         json: bool,
     },
@@ -703,11 +745,81 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 11.7 — v2.0 third-party trial attestation producer gate.
+    #[command(name = "check-trial-attestation")]
+    CheckTrialAttestation {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate
     /// (ADVISORY per ADR-040 rust-inproc deferral). Validates pre-committed
     /// Mann-Whitney U-test artifact.
     #[command(name = "check-cross-form-equiv")]
     CheckCrossFormEquiv {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.1b AC3 — authoritative tiered behavioral-oracle cross-form
+    /// equivalence gate (binding). Reads the live `cargo test` tiered oracle
+    /// results and enforces the ADR-031 equivalence-binding disposition.
+    #[command(name = "check-wasm-form-equiv")]
+    CheckWasmFormEquiv {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.2a — cross-region convergent replication gate.
+    #[command(name = "check-cross-region-consensus")]
+    CheckCrossRegionConsensus {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.2b — multi-region SLO gate (per-leg independence).
+    #[command(name = "check-multi-region-slo")]
+    CheckMultiRegionSlo {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.3 — scale-envelope 25/30-host churn gate (per-leg independence).
+    #[command(name = "check-scale-churn")]
+    CheckScaleChurn {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 12.1 — signed cohort manifest + N=3/N=8 full-pairwise mesh gate.
+    #[command(name = "check-cohort-mesh")]
+    CheckCohortMesh {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.4a — enterprise PDP integration gate (per-leg independence).
+    #[command(name = "check-enterprise-pdp")]
+    CheckEnterprisePdp {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence).
+    #[command(name = "check-enterprise-identity")]
+    CheckEnterpriseIdentity {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.5 — Frozen-Kernel Conformance Suite infrastructure gate.
+    #[command(name = "check-fkcs")]
+    CheckFkcs {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.4b — ADR-024 sandbox-escape structural detector gate (per-leg independence).
+    #[command(name = "check-escape-detector")]
+    CheckEscapeDetector {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 11.1b (review finding #21) — WASM fixture provenance / drift
+    /// guard. Verifies each committed equiv-*.wasm fixture's binary + source
+    /// SHA-256 against the sidecar provenance manifest (stale-blob detection).
+    #[command(name = "check-equiv-fixture-provenance")]
+    CheckEquivFixtureProvenance {
         #[arg(long)]
         json: bool,
     },
@@ -1008,8 +1120,10 @@ fn main() {
         Commands::CheckBareReviewFindings { json } => check_bare_review_findings::run(json),
         Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
+        Commands::CheckDevModelTier { json } => check_dev_model_tier::run(json),
         Commands::CheckKernelBaseline { json } => check_kernel_baseline::run(json),
         Commands::CheckDependencyClosure { json } => check_dependency_closure::run(json),
+        Commands::CheckHostSurface { json } => check_host_surface::run(json),
         Commands::CheckRtoGate { evidence, json } => check_rto_gate::run(&evidence, json),
         Commands::RtoDrill {
             source,
@@ -1094,6 +1208,8 @@ fn main() {
         }
         Commands::CheckThirdPartyTrial { json } => check_third_party_trial::run(json),
         Commands::CheckCrossFormEquiv { json } => check_cross_form_equiv::run(json),
+        Commands::CheckWasmFormEquiv { json } => check_wasm_form_equiv::run(json),
+        Commands::CheckEquivFixtureProvenance { json } => check_equiv_fixture_provenance::run(json),
         Commands::CheckRedTeamGate { json } => check_red_team_gate::run(json),
         Commands::CheckExportControl { json } => check_export_control::run(json),
         Commands::CheckCnaRegistration { json } => check_cna_registration::run(json),
@@ -1102,6 +1218,15 @@ fn main() {
         Commands::CheckMigrationMerkle { json } => check_migration_merkle::run(json),
         Commands::CheckFfJ6 { json } => check_ff_j6::run(json),
         Commands::CheckSkillConformance { json } => check_skill_conformance::run(json),
+        Commands::CheckCrossRegionConsensus { json } => check_cross_region_consensus::run(json),
+        Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
+        Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
+        Commands::CheckCohortMesh { json } => check_cohort_mesh::run(json),
+        Commands::CheckEnterprisePdp { json } => check_enterprise_pdp::run(json),
+        Commands::CheckEnterpriseIdentity { json } => check_enterprise_identity::run(json),
+        Commands::CheckFkcs { json } => check_fkcs::run(json),
+        Commands::CheckTrialAttestation { json } => check_trial_attestation::run(json),
+        Commands::CheckEscapeDetector { json } => check_escape_detector::run(json),
     };
     if let Err(e) = result {
         eprintln!("{e}");

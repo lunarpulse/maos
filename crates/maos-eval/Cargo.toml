@@ -10,6 +10,8 @@ description = "MAOS evaluation harness — corpora + measurement gates (halt-rec
 [dependencies]
 maos-domain = { path = "../maos-domain" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
+maos-audit = { path = "../maos-audit", optional = true }
+maos-spirit-sdk = { path = "../maos-spirit-sdk", features = ["local_runner"], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
@@ -17,6 +19,9 @@ walkdir = "2"
 # Story 7.5b — SHA-256 pinning of the Butler-class fixture corpus (the resolver
 # logs which corpus + digest it scored against; mirrors xtask's sha2 usage).
 sha2 = "0.10"
+
+[features]
+trial-attestation = ["maos-audit", "maos-spirit-sdk"]
 
 [dev-dependencies]
 maos-kernel-core = { path = "../maos-kernel-core" }

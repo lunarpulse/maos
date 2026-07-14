@@ -62,8 +62,18 @@ pub fn run(
             report.corpus, report.n, report.ci_width, report.malformed_items
         );
     } else {
-        eprintln!("NFR-Aud-8 violation: corpus {} {} CI-width {:.4} exceeds {} at p={:.2} — increase N or accept wider window with assessor sign-off",
-            report.corpus, if report.n >= 500 { "quarterly" } else { "per-commit" }, report.ci_width, report.threshold.unwrap_or(0.0), p);
+        eprintln!(
+            "NFR-Aud-8 violation: corpus {} {} CI-width {:.4} exceeds {} at p={:.2} — increase N or accept wider window with assessor sign-off",
+            report.corpus,
+            if report.n >= 500 {
+                "quarterly"
+            } else {
+                "per-commit"
+            },
+            report.ci_width,
+            report.threshold.unwrap_or(0.0),
+            p
+        );
     }
     if !report.passed {
         return Err("calibrate failed".into());

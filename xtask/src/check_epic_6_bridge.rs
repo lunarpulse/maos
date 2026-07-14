@@ -1003,9 +1003,14 @@ fn check_6_3_a3_a5_a6_shipped() -> CheckResult {
         passed: blocking_pass,
         message: format!(
             "blocking_6_3: §A3 xtask={} job={} §A5 xtask={} job={}({}) §A6 xtask={} job={}({}) — §A5/§A6 discipline.yml carry-forward",
-            a3_xtask, a3_job,
-            a5_xtask, a5_job, if a5_job { "shipped" } else { "carry-forward" },
-            a6_xtask, a6_job, if a6_job { "shipped" } else { "carry-forward" },
+            a3_xtask,
+            a3_job,
+            a5_xtask,
+            a5_job,
+            if a5_job { "shipped" } else { "carry-forward" },
+            a6_xtask,
+            a6_job,
+            if a6_job { "shipped" } else { "carry-forward" },
         ),
     }
 }
@@ -1179,7 +1184,11 @@ fn check_6_3_smoke_iac_bus_chain() -> CheckResult {
         message: format!(
             "verify-only: smoke-iac-bus-6 arm present={} — smoke-a2a-loopback-6-3 {} (does NOT block 6.3)",
             smoke_iac_bus_6_present,
-            if smoke_iac_bus_6_present { "chains" } else { "stands alone" }
+            if smoke_iac_bus_6_present {
+                "chains"
+            } else {
+                "stands alone"
+            }
         ),
     }
 }
@@ -1232,9 +1241,17 @@ fn check_6_4_a3_a5_a6_shipped() -> CheckResult {
         passed: a3_pass && a5_pass && a6_pass,
         message: format!(
             "verify: §A3 xtask={} job={} run={} §A5 xtask={} job={}({}) run={} §A6 xtask={} job={}({}) run={}",
-            a3_xtask, a3_job, a3_pass,
-            a5_xtask, a5_job, if a5_job { "shipped" } else { "carry-forward" }, a5_pass,
-            a6_xtask, a6_job, if a6_job { "shipped" } else { "carry-forward" }, a6_pass,
+            a3_xtask,
+            a3_job,
+            a3_pass,
+            a5_xtask,
+            a5_job,
+            if a5_job { "shipped" } else { "carry-forward" },
+            a5_pass,
+            a6_xtask,
+            a6_job,
+            if a6_job { "shipped" } else { "carry-forward" },
+            a6_pass,
         ),
     }
 }
@@ -1561,7 +1578,10 @@ fn check_6_5_6_4_review_findings() -> Result<CheckResult, std::io::Error> {
             Ok(CheckResult {
                 id,
                 passed: true,
-                message: format!("verify-only: Story 6.4 has {} open Critical/High findings (does NOT block 6.5)", open_critical_high),
+                message: format!(
+                    "verify-only: Story 6.4 has {} open Critical/High findings (does NOT block 6.5)",
+                    open_critical_high
+                ),
             })
         }
     }
@@ -1716,7 +1736,10 @@ fn check_6_5_iac_baseline() -> Result<CheckResult, std::io::Error> {
     Ok(CheckResult {
         id,
         passed,
-        message: format!("blocking_6_5: maos-iac exists={} (must be true) all_13_extracted={} total_loc={} → passed={}", maos_iac_exists, all_extracted, total_loc, passed),
+        message: format!(
+            "blocking_6_5: maos-iac exists={} (must be true) all_13_extracted={} total_loc={} → passed={}",
+            maos_iac_exists, all_extracted, total_loc, passed
+        ),
     })
 }
 
@@ -1742,7 +1765,10 @@ fn check_6_5_manifest_baseline() -> Result<CheckResult, std::io::Error> {
     Ok(CheckResult {
         id,
         passed,
-        message: format!("blocking_6_5: maos-manifest exists={} (must be true) new_manifest.rs exists={} new_loc={} old_shim_loc={} → passed={}", maos_manifest_exists, new_manifest_exists, new_loc, old_loc, passed),
+        message: format!(
+            "blocking_6_5: maos-manifest exists={} (must be true) new_manifest.rs exists={} new_loc={} old_shim_loc={} → passed={}",
+            maos_manifest_exists, new_manifest_exists, new_loc, old_loc, passed
+        ),
     })
 }
 
@@ -1786,7 +1812,14 @@ fn check_6_5_gateway_baseline() -> Result<CheckResult, std::io::Error> {
         passed,
         message: format!(
             "blocking_6_5: gateway.rs={} dispatcher.rs={} schema.json={} GatewayInbound={} GatewayOutbound={} d24_present={} d25_present={} → passed={}",
-            gateway_rs, dispatcher_rs, schema_json, has_gateway_inbound, has_gateway_outbound, d24_present, d25_present, passed
+            gateway_rs,
+            dispatcher_rs,
+            schema_json,
+            has_gateway_inbound,
+            has_gateway_outbound,
+            d24_present,
+            d25_present,
+            passed
         ),
     })
 }
@@ -1863,7 +1896,10 @@ fn check_6_5_review_findings_status() -> Result<CheckResult, std::io::Error> {
             Ok(CheckResult {
                 id,
                 passed: true,
-                message: format!("verify-only: Story 6.5 Review Findings section={} open Critical/High={} (checked at done transition)", has_review_section, open_critical_high),
+                message: format!(
+                    "verify-only: Story 6.5 Review Findings section={} open Critical/High={} (checked at done transition)",
+                    has_review_section, open_critical_high
+                ),
             })
         }
     }
@@ -1896,7 +1932,10 @@ fn check_7_1_a1_p1_p5() -> Result<CheckResult, std::io::Error> {
             Ok(CheckResult {
                 id,
                 passed: true, // verify-only — does NOT block 7.1
-                message: format!("verify-only: Story 6.3 P1-P5 closed markers={}/5 — Story 7.1 is INDEPENDENT per Epic 6 retro line 252", p_closed),
+                message: format!(
+                    "verify-only: Story 6.3 P1-P5 closed markers={}/5 — Story 7.1 is INDEPENDENT per Epic 6 retro line 252",
+                    p_closed
+                ),
             })
         }
     }
@@ -1909,7 +1948,10 @@ fn check_7_1_a2_step1() -> CheckResult {
     CheckResult {
         id,
         passed: true, // verify-only — does NOT block 7.1
-        message: format!("verify: check-review-findings-resolved={} check-dev-record-completeness={} — continue-on-error may be true during backfill", job1, job2),
+        message: format!(
+            "verify: check-review-findings-resolved={} check-dev-record-completeness={} — continue-on-error may be true during backfill",
+            job1, job2
+        ),
     }
 }
 
@@ -1948,7 +1990,10 @@ fn check_7_1_a3() -> CheckResult {
     CheckResult {
         id,
         passed: true, // verify-only — does NOT block 7.1
-        message: format!("verify: Phase 3 architecture decision documented={} — Story 7.1 is independent per Epic 6 retro line 257", adr_exists),
+        message: format!(
+            "verify: Phase 3 architecture decision documented={} — Story 7.1 is independent per Epic 6 retro line 257",
+            adr_exists
+        ),
     }
 }
 
@@ -1974,7 +2019,10 @@ fn check_7_1_a4() -> CheckResult {
     CheckResult {
         id,
         passed: true, // verify-only — does NOT block 7.1
-        message: format!("verify: manifest_schema_version≥2={} check-manifest-schema-version={} manifest-n-minus-1-test={}", manifest_version_ok, job1, job2),
+        message: format!(
+            "verify: manifest_schema_version≥2={} check-manifest-schema-version={} manifest-n-minus-1-test={}",
+            manifest_version_ok, job1, job2
+        ),
     }
 }
 
@@ -2158,7 +2206,14 @@ fn check_7_1_rust_template_baseline() -> CheckResult {
     CheckResult {
         id,
         passed,
-        message: format!("blocking_7_1: cargo-generate.toml={} lib.rs={} class_name_placeholder={} example-spirit/Cargo.toml={} → {}", cargo_generate, lib_rs, has_class_name, example_cargo, if passed { "PASS" } else { "FAIL" }),
+        message: format!(
+            "blocking_7_1: cargo-generate.toml={} lib.rs={} class_name_placeholder={} example-spirit/Cargo.toml={} → {}",
+            cargo_generate,
+            lib_rs,
+            has_class_name,
+            example_cargo,
+            if passed { "PASS" } else { "FAIL" }
+        ),
     }
 }
 
@@ -2174,7 +2229,13 @@ fn check_7_1_ts_template_baseline() -> CheckResult {
     CheckResult {
         id,
         passed,
-        message: format!("blocking_7_1 (regression): templates/spirit-ts exists={} examples/example-spirit-ts exists={} sdks/spirit-ts exists={} → {}", ts_template, ts_example, ts_sdk, if passed { "PASS" } else { "FAIL" }),
+        message: format!(
+            "blocking_7_1 (regression): templates/spirit-ts exists={} examples/example-spirit-ts exists={} sdks/spirit-ts exists={} → {}",
+            ts_template,
+            ts_example,
+            ts_sdk,
+            if passed { "PASS" } else { "FAIL" }
+        ),
     }
 }
 
@@ -2232,7 +2293,12 @@ fn check_7_1_ctx_deprecation_baseline() -> CheckResult {
     CheckResult {
         id,
         passed,
-        message: format!("blocking_7_1 (regression): deprecation_warnings in ctx.rs={} DeprecationWarning in lib.rs={} → {}", has_deprecation_in_ctx, has_deprecation_warning_struct, if passed { "PASS" } else { "FAIL" }),
+        message: format!(
+            "blocking_7_1 (regression): deprecation_warnings in ctx.rs={} DeprecationWarning in lib.rs={} → {}",
+            has_deprecation_in_ctx,
+            has_deprecation_warning_struct,
+            if passed { "PASS" } else { "FAIL" }
+        ),
     }
 }
 
@@ -2307,7 +2373,10 @@ fn check_7_1_rf_status() -> Result<CheckResult, std::io::Error> {
             Ok(CheckResult {
                 id,
                 passed: true, // verify-only
-                message: format!("verify-only: Story 7.1 Review Findings section={} open Critical/High={} (checked at done transition)", has_review_section, open_critical_high),
+                message: format!(
+                    "verify-only: Story 7.1 Review Findings section={} open Critical/High={} (checked at done transition)",
+                    has_review_section, open_critical_high
+                ),
             })
         }
     }
@@ -2380,7 +2449,10 @@ fn check_7_1_5_a2_step1() -> CheckResult {
     CheckResult {
         id,
         passed: true, // verify-only
-        message: format!("verify: check-review-findings-resolved job={} check-dev-record-completeness job={} (both wired)", has_check_rf, has_check_dev),
+        message: format!(
+            "verify: check-review-findings-resolved job={} check-dev-record-completeness job={} (both wired)",
+            has_check_rf, has_check_dev
+        ),
     }
 }
 
@@ -2609,8 +2681,13 @@ fn check_7_1_5_a2_continue_on_error() -> CheckResult {
         passed,
         message: format!(
             "blocking_7_1_5: split-flip state — existing gates soft-fail={} new gates hard-fail={} → {}",
-            existing_gates_soft_fail, new_gates_hard_fail,
-            if passed { "PASS (correct split-flip state)" } else { "FAIL — gate soft/hard-fail state incorrect" }
+            existing_gates_soft_fail,
+            new_gates_hard_fail,
+            if passed {
+                "PASS (correct split-flip state)"
+            } else {
+                "FAIL — gate soft/hard-fail state incorrect"
+            }
         ),
     }
 }
@@ -2841,7 +2918,9 @@ fn check_7_2_a2_step3_hard_fail() -> CheckResult {
         passed: true, // verify-only — does NOT block 7.2
         message: format!(
             "verify: §A2 step 3 hard-fail flip — core_gates_hard_fail={} bare-rf job present={} dev-model-used job present={} → {}",
-            hard_fail_correct, bare_rf_present, dmu_present,
+            hard_fail_correct,
+            bare_rf_present,
+            dmu_present,
             if passed { "CLOSED" } else { "DEGRADED" }
         ),
     }
@@ -3363,7 +3442,9 @@ fn check_7_3_a2_a5_hard_fail() -> CheckResult {
         passed: true, // verify-only — does NOT block 7.3
         message: format!(
             "verify: §A2/§A5 hard-fail — core gates hard_fail={} bare-rf job={} dev-model-used job={} → {} (7.2 RF#8 claimed DEGRADED; re-verified here)",
-            core_hard_fail, bare_rf_present, dmu_present,
+            core_hard_fail,
+            bare_rf_present,
+            dmu_present,
             if closed { "CLOSED" } else { "DEGRADED" }
         ),
     }
@@ -3406,7 +3487,11 @@ fn check_7_3_7_2_rf_inventory() -> Result<CheckResult, std::io::Error> {
                 passed: true, // verify-only — does NOT block 7.3 (substrate-adjacency reported)
                 message: format!(
                     "verify→classify: Story 7.2 RF table — open={} deferred-to-7.2-remediation={} open-Critical/High={}; substrate-adjacency: admission.rs={} compliance_verify.rs={} (dev confirms `cargo test -p maos-registry` PASS out-of-band before AC3 rewires PublicUntrusted branch)",
-                    open_rows, deferred_rows, open_critical_high, admission_present, compliance_verify_present
+                    open_rows,
+                    deferred_rows,
+                    open_critical_high,
+                    admission_present,
+                    compliance_verify_present
                 ),
             })
         }
@@ -3498,8 +3583,17 @@ fn check_7_3_ccac_module_absent() -> CheckResult {
         passed: consistent,
         message: format!(
             "blocking_7_3: CCAC canvas — ccac/mod.rs={} seeds={} MANIFEST block={} jsonl={} → {} (consistent={})",
-            mod_present, seeds_present, manifest_has_block, jsonl_present,
-            if all_absent { "PRE-AC4 clean" } else if all_present { "POST-AC4 shipped" } else { "PARTIAL" },
+            mod_present,
+            seeds_present,
+            manifest_has_block,
+            jsonl_present,
+            if all_absent {
+                "PRE-AC4 clean"
+            } else if all_present {
+                "POST-AC4 shipped"
+            } else {
+                "PARTIAL"
+            },
             consistent
         ),
     }
@@ -3538,7 +3632,10 @@ fn check_7_3_abi_frozen() -> Result<CheckResult, std::io::Error> {
         passed,
         message: format!(
             "blocking_7_3: ABI frozen — {} of {} frozen markers present (missing={:?}); ABI_VERSION=1={} (dev runs `abi-diff` out-of-band; expect no change to compliance.rs)",
-            markers.len() - missing.len(), markers.len(), missing, abi_version_1
+            markers.len() - missing.len(),
+            markers.len(),
+            missing,
+            abi_version_1
         ),
     })
 }
@@ -3881,8 +3978,13 @@ fn check_7_4_a2_a5_hard_fail() -> CheckResult {
         message: format!(
             "verify: §A2 split-flip — resolved+completeness soft-fail(continue-on-error)={} → {}; §A5 hard-fail: bare-review-findings={} dev-model-used-populated={} (7.4 does NOT flip §A2; 7.4's own dev record satisfies the two hard-fail gates)",
             core_soft_fail,
-            if degraded { "STILL DEGRADED (matches 7.3 RF#4)" } else { "CLOSED" },
-            bare_rf_hard_fail, dmu_hard_fail
+            if degraded {
+                "STILL DEGRADED (matches 7.3 RF#4)"
+            } else {
+                "CLOSED"
+            },
+            bare_rf_hard_fail,
+            dmu_hard_fail
         ),
     }
 }
@@ -3951,8 +4053,17 @@ fn check_7_4_maos_skill_baseline() -> CheckResult {
         passed: consistent,
         message: format!(
             "blocking_7_4: maos-skill canvas — dir={} Cargo.toml={} lib.rs={} workspace-member={} → {} (consistent={})",
-            crate_dir, cargo, lib, is_member,
-            if all_absent { "PRE-AC2 clean" } else if all_present { "POST-AC2 shipped" } else { "PARTIAL — surface" },
+            crate_dir,
+            cargo,
+            lib,
+            is_member,
+            if all_absent {
+                "PRE-AC2 clean"
+            } else if all_present {
+                "POST-AC2 shipped"
+            } else {
+                "PARTIAL — surface"
+            },
             consistent
         ),
     }
@@ -3986,8 +4097,15 @@ fn check_7_4_skill_scope_baseline() -> Result<CheckResult, std::io::Error> {
         passed: consistent,
         message: format!(
             "blocking_7_4: Scope::SkillAuthorSelf canvas — variant in i1.rs={} cap_policy wired={} → {} (consistent={})",
-            scope_variant_present, policy_wired,
-            if all_absent { "PRE-AC2 clean" } else if all_present { "POST-AC2 shipped" } else { "PARTIAL — surface" },
+            scope_variant_present,
+            policy_wired,
+            if all_absent {
+                "PRE-AC2 clean"
+            } else if all_present {
+                "POST-AC2 shipped"
+            } else {
+                "PARTIAL — surface"
+            },
             consistent
         ),
     })
@@ -4015,8 +4133,13 @@ fn check_7_4_cli_wrapper_baseline() -> Result<CheckResult, std::io::Error> {
         passed,
         message: format!(
             "blocking_7_4: CliWrapper baseline — EOutputShapeAdapterMismatch={} probe_and_verify_shape={} (dev runs `cargo test -p maos-kernel-core cli_wrapper` out-of-band; expect PASS) → {}",
-            err_present, probe_present,
-            if passed { "PASS — extend, not rebuild" } else { "FAIL — baseline missing" }
+            err_present,
+            probe_present,
+            if passed {
+                "PASS — extend, not rebuild"
+            } else {
+                "FAIL — baseline missing"
+            }
         ),
     })
 }
@@ -4041,8 +4164,13 @@ fn check_7_4_self_telemetry_baseline() -> Result<CheckResult, std::io::Error> {
         passed,
         message: format!(
             "blocking_7_4: self-telemetry baseline — SelfTelemetryReport={} SelfTelemetryPort={} (dev runs `cargo test -p maos-domain self_telemetry` out-of-band; expect PASS) → {}",
-            report_present, port_present,
-            if passed { "PASS — consume FR56" } else { "FAIL — baseline missing" }
+            report_present,
+            port_present,
+            if passed {
+                "PASS — consume FR56"
+            } else {
+                "FAIL — baseline missing"
+            }
         ),
     })
 }
@@ -4074,8 +4202,15 @@ fn check_7_4_lcas_baseline() -> Result<CheckResult, std::io::Error> {
         passed: consistent,
         message: format!(
             "blocking_7_4: LCAS baseline — jsonl lines={} MANIFEST item_count={} → {} (consistent={}; dev runs `cargo run -p xtask -- check-corpus` out-of-band, expect PASS)",
-            line_count, manifest_count,
-            if pre { "PRE-AC5 (70)" } else if post { "POST-AC5 (210)" } else { "PARTIAL — surface" },
+            line_count,
+            manifest_count,
+            if pre {
+                "PRE-AC5 (70)"
+            } else if post {
+                "POST-AC5 (210)"
+            } else {
+                "PARTIAL — surface"
+            },
             consistent
         ),
     })
@@ -4115,7 +4250,10 @@ fn check_7_4_abi_frozen() -> Result<CheckResult, std::io::Error> {
         passed,
         message: format!(
             "blocking_7_4: ABI frozen — {} of {} frozen markers present (missing={:?}); ABI_VERSION=1={} (dev runs `abi-diff` out-of-band; new Scope/FrameKind variants must be Added-only)",
-            markers.len() - missing.len(), markers.len(), missing, abi_version_1
+            markers.len() - missing.len(),
+            markers.len(),
+            missing,
+            abi_version_1
         ),
     })
 }
@@ -4252,7 +4390,11 @@ fn check_7_5a_a2_a5_hard_fail() -> CheckResult {
         passed: true, // verify-only — never gates 7.5a
         message: format!(
             "verify: §A2 split-flip resolved+completeness soft-fail={core_soft_fail} → {}; §A5 hard-fail bare-review-findings={bare_rf_hard_fail} dev-model-used-populated={dmu_hard_fail} (7.5a does NOT flip §A2; the ~42-violation backlog stays Story-7.2-remediation)",
-            if core_soft_fail { "STILL DEGRADED (matches 7.3/7.4)" } else { "CLOSED" }
+            if core_soft_fail {
+                "STILL DEGRADED (matches 7.3/7.4)"
+            } else {
+                "CLOSED"
+            }
         ),
     }
 }
@@ -4314,7 +4456,13 @@ fn check_7_5a_enforcement_baseline() -> CheckResult {
         passed: consistent,
         message: format!(
             "blocking_7_5a: typed errors — ESubstrateTooOld={substrate_too_old} EAbiTooOld={abi_too_old} EAbiTooNew={abi_too_new} → {} (consistent={consistent})",
-            if all_present { "POST-AC2 enforced" } else if all_absent { "PRE-AC2 clean" } else { "PARTIAL — surface" }
+            if all_present {
+                "POST-AC2 enforced"
+            } else if all_absent {
+                "PRE-AC2 clean"
+            } else {
+                "PARTIAL — surface"
+            }
         ),
     }
 }
@@ -4335,7 +4483,13 @@ fn check_7_5a_stability_breaking_baseline() -> CheckResult {
         passed: consistent,
         message: format!(
             "blocking_7_5a: STABILITY.md={stability} BREAKING.md={breaking} stability_matrix.rs={matrix_gate} check_breaking_md.rs={breaking_gate} → {} (consistent={consistent})",
-            if all_present { "POST-AC3 published" } else if all_absent { "PRE-AC3 clean" } else { "PARTIAL — surface" }
+            if all_present {
+                "POST-AC3 published"
+            } else if all_absent {
+                "PRE-AC3 clean"
+            } else {
+                "PARTIAL — surface"
+            }
         ),
     }
 }
@@ -4426,7 +4580,8 @@ fn check_7_5a_abi_frozen() -> Result<CheckResult, std::io::Error> {
         passed,
         message: format!(
             "blocking_7_5a: ABI frozen — {}/{} markers (missing={missing:?}); ABI_VERSION=1={abi_version_1} (new SecurityError variants are kernel-internal, NOT ABI surface; dev runs abi-diff out-of-band → Added-only)",
-            markers.len() - missing.len(), markers.len()
+            markers.len() - missing.len(),
+            markers.len()
         ),
     })
 }

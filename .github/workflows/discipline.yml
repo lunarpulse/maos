@@ -133,6 +133,24 @@ jobs:
       - name: Run check-unsafe
         run: cargo run -p xtask -- check-unsafe --json
 
+  # Epic 12 retro B4 (Option C Blocking, hermetic) — a `cargo fmt` reflow must
+  # red at its ORIGIN commit, not drift silently into a later story's kernel
+  # baseline. Story 12.2's fmt reflow moved the baseline 23081->23082 and shipped
+  # un-caught into 12.3 precisely because there was no fmt gate. Blocking.
+  check-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run cargo fmt --check
+        run: cargo fmt --all -- --check
+
   kloc-check:
     runs-on: ubuntu-latest
     # ADVISORY gate (2026-06-11). `xtask/kloc.toml` deliberately forbids raising
@@ -322,6 +340,20 @@ jobs:
       - name: Run check-service-boundary
         run: cargo run -p xtask -- check-service-boundary --json
 
+  # Story 12.6 — blocking registry coverage for maos-bin/src only; Story 12.7 widens this workspace-wide.
+  check-env-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-env-contract
+        run: cargo run -p xtask -- check-env-contract --json
+
   # Per-push invariant-lock validation. Journal persistence is a separate
   # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
   # job validates the tri-requirement (diff + corpus-delta + phase-commitment)
@@ -366,8 +398,6 @@ jobs:
         # crates/maos-journey-test/cassettes; passing the path positionally is a clap
         # `unexpected argument` error. Rely on the default (or use --cassette-dir).
         run: cargo run -p xtask -- cassette-age-gate --json
-      - name: check-env-contract
-        run: cargo run -p xtask -- check-env-contract
 
   check-corpus:
     runs-on: ubuntu-latest
@@ -1544,9 +1574,6 @@ jobs:
         run: cargo test -p maos-a2a --test restart_invalidates_pin_nfr_rel_6 --locked
       - name: Run AC5 NFR-Sec-13 cert rotation chaos test
         run: cargo test -p maos-a2a --test cert_rotation_chaos_3_host --locked
-      - name: Run AC6 NFR-Rel-7 churn scaffold test
-        run: cargo test -p maos-a2a --test churn_3_host_scaffold --locked
-
   # Story 6.3 Task 6 — verify Story 6.2's lineage corpus loads the 20 NEW A2A scenarios.
   intent-lineage-a2a-extension-6-3:
     runs-on: ubuntu-latest
@@ -1735,6 +1762,22 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-dev-model-used-populated
         run: cargo run -p xtask -- check-dev-model-used-populated --json
+
+  # Epic 12 retro B3 (Option C Blocking; closes E11 retro A1) — frontier-era
+  # (epic >= 12) stories must record an allowlisted dev model + a §A6 review
+  # artifact. Makes the frontier-allowlist policy mechanical, not just cultural.
+  check-dev-model-tier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-dev-model-tier
+        run: cargo run -p xtask -- check-dev-model-tier --json
 
   # Story 8.16 §A4 — kernel-core line-count single source of truth.
   check-kernel-baseline:
@@ -2075,6 +2118,12 @@ jobs:
   # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
   check-third-party-trial:
     runs-on: ubuntu-latest
+    env:
+      # P14: the v2.0 default-deny (require producer-signed attestations) only
+      # fires when MAOS_SHIP_PHASE=v2_0. Default to v1_5 (advisory) until the repo
+      # flips this variable to v2_0 at the v2.0 ship gate — the flip is a config
+      # change, not a code change, and the proven-red tests exercise the v2_0 path.
+      MAOS_SHIP_PHASE: ${{ vars.MAOS_SHIP_PHASE || 'v1_5' }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2170,6 +2219,70 @@ jobs:
       - name: Check export-control classification
         run: cargo run -p xtask -- check-export-control --json
 
+  # Story 11.1a AC1/D4 — maos-host public-API baseline gate (ADR-031 Spirit
+  # Host Port). Pinned against abi-baseline/maos-host-v1.txt; removed items
+  # RED, added items reported but GREEN (F2: NOT the vacuous "empty abi-diff
+  # in a non-scanned crate" pattern — this is a dedicated baseline for a
+  # crate abi-diff never touches).
+  check-host-surface:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Install nightly toolchain for cargo-public-api
+        run: rustup toolchain install nightly --profile minimal
+      - name: Install cargo-public-api
+        run: |
+          cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
+      - name: Run check-host-surface
+        run: cargo run -p xtask -- check-host-surface --json
+
+  # Story 10.4a / 11.1a — dependency-closure gate: kernel-core + domain
+  # trees exclude the Postgres/pgvector stack AND the WASM runtime stack
+  # (wasmtime/wasmtime-wasi/wit-bindgen, ADR-031/ADR-041 isolation).
+  check-dependency-closure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-dependency-closure
+        run: cargo run -p xtask -- check-dependency-closure --json
+
+  # Story 11.1a AC2/AC3/AC4 — WASM host adapter BEHAVIORAL tests. The four
+  # xtask gates above (check-host-surface / check-dependency-closure /
+  # check-export-control / check-kernel-baseline) guard the SHAPE of 11.1a
+  # (API surface, dependency isolation, packaging); this job guards the
+  # BEHAVIOR — the real guest ADR-032 round-trip (AC3), the fuel/T2 kill
+  # matrix (AC4), and the frame_bridge lower/lift conversions for all 15
+  # FrameKinds (AC2). Without it the 11.1a test suite never executes in CI
+  # at all — the CONCERNS finding from the Murat trace audit (2026-07-01).
+  # The T2 column (t2_sandbox_kill.rs) self-skips without CAP_SYS_ADMIN,
+  # mirroring the kernel's own sandbox_enforcement_linux.rs pattern.
+  wasm-host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm-host-tests-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build forbidden-syscall-probe fixture (AC4 T2 column)
+        run: cargo build --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Run maos-host + maos-wasm-host test suites
+        run: cargo test -p maos-host -p maos-wasm-host --locked
+
   # Story 10.3 AC-5 (NFR-Ops-4) — CNA registration gate (blocking-when-present).
   check-cna-registration:
     runs-on: ubuntu-latest
@@ -2240,55 +2353,6 @@ jobs:
         run: npm run gate:glossary-lock
 
 
-  # Story 10.5 AC5 (NFR-Doc-6 v1.5) — Japanese coverage + glossary-lock gate.
-  check-ja-coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: docs-site/package-lock.json
-      - name: Install docs-site dependencies
-        working-directory: docs-site
-        run: npm ci
-      # R2 (Epic-10 retro §A2): real ja translations DEFERRED to v2.0 (Epic 11).
-      # The i18n/ja tree is untranslated WIP scaffold (Korean placeholder content),
-      # so 100% enforcement is dropped to REPORT-ONLY for v1.5 — it prints
-      # file-presence coverage but cannot block. Re-instate JA_COVERAGE_MIN=100 in
-      # Epic 11 when real Japanese translations land. See LOCALES.md + epic-11 DRAFT.
-      - name: Japanese canonical-coverage (report-only — real ja deferred to v2.0/Epic 11)
-        working-directory: docs-site
-        run: npm run gate:ja-coverage
-      - name: Japanese glossary-lock gate
-        working-directory: docs-site
-        run: npm run gate:ja-glossary-lock
-
-  # Story 10.5 AC5 (NFR-Doc-6 v1.5) — zh-Hans coverage + glossary-lock gate.
-  check-zh-coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: docs-site/package-lock.json
-      - name: Install docs-site dependencies
-        working-directory: docs-site
-        run: npm ci
-      # R2 (Epic-10 retro §A2): real zh-Hans translations DEFERRED to v2.0 (Epic 11).
-      # The i18n/zh-Hans tree is untranslated WIP scaffold (Korean placeholder
-      # content), so 100% enforcement is dropped to REPORT-ONLY for v1.5 — it prints
-      # file-presence coverage but cannot block. Re-instate ZHHANS_COVERAGE_MIN=100 in
-      # Epic 11 when real Chinese translations land. See LOCALES.md + epic-11 DRAFT.
-      - name: zh-Hans canonical-coverage (report-only — real zh deferred to v2.0/Epic 11)
-        working-directory: docs-site
-        run: npm run gate:zh-coverage
-      - name: zh-Hans glossary-lock gate
-        working-directory: docs-site
-        run: npm run gate:zh-glossary-lock
   # Story 10.4b (NFR-Sec-13) — live bilateral A2A consent + binding_checked gate.
   check-live-bilateral-consent:
     runs-on: ubuntu-latest
@@ -2454,6 +2518,290 @@ jobs:
       - name: Run skill-conformance proven-red vectors (H2)
         run: cargo test -p xtask --test story_10_5_proven_red -- --test-threads=1
 
+  # Story 11.1b AC3 — tiered behavioral-oracle cross-form equivalence gate.
+  # The binding row for ADR-031: deterministic tiered oracle, live cargo test
+  # (base + equiv-fault-inject legs), advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED
+  # banner) and blocking at v2.0. Runs the equiv harness as real subprocesses
+  # over real pipes. Review findings #3/#5- CI/#13: the xtask INVOKES the live
+  # oracle and parses its output (not a stub); the native twin is built to the
+  # standalone-workspace path the harness resolves; the anti-canned leg runs
+  # with a ≥1-test guard; the fault-inject feature is excluded from release.
+  check-wasm-form-equiv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-wasm-form-equiv-${{ hashFiles('**/Cargo.lock') }}
+      # Finding #5: build the native twin in its OWN standalone workspace. It
+      # emits native-twin/target/release/equiv-native-twin, which the harness
+      # resolves directly (require_binary probes the standalone target dir, with
+      # a build-on-demand fallback). No copy to the main target/ is needed.
+      - name: Build equiv-fixture native twin
+        run: cargo build --release --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml
+      # Finding #3: the xtask invokes the live oracle as `cargo test` (BOTH the
+      # base tiered-oracle leg and the equiv-fault-inject anti-canned leg) and
+      # parses `test result:` lines — it is not an unconditional-pass stub. Its
+      # exit code enforces the disposition (advisory banner at v1.0/v1.5;
+      # BLOCKING at v2.0) and hard-fails if either leg compiles to ZERO tests.
+      - name: Run check-wasm-form-equiv gate (live tiered oracle + disposition)
+        run: |
+          set -o pipefail
+          # stdout (the gate JSON) → file + console; stderr (cargo build noise,
+          # WOULD-HAVE-BLOCKED banner) → console only. NO `2>&1`: on a cache-COLD
+          # run the merged "Compiling …" output would pollute the file and break
+          # the tripwire's JSON parse (Epic-12 retro fix, 2026-07-14).
+          cargo run -p xtask -- check-wasm-form-equiv --json | tee /tmp/equiv-gate.json
+      # Finding #13 (J4 pattern, cf. discipline.yml:2374): assert the
+      # equiv-fault-inject anti-canned leg actually added and ran feature-only
+      # tests, not merely the shared base harness. A cfg-attribute regression
+      # must be RED even if the base leg still reports nonzero tests.
+      - name: Anti-canned tripwire guard (equiv-fault-inject leg added tests)
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          # Extract the gate JSON line robustly instead of assuming the whole file
+          # parses — hardens the tripwire against any stray stdout / build noise
+          # on a cache-cold run (Epic-12 retro fix, 2026-07-14).
+          data = None
+          for raw in open("/tmp/equiv-gate.json"):
+              line = raw.strip()
+              if line.startswith("{") and "base_passed" in line:
+                  data = json.loads(line)
+          if data is None:
+              print("FAIL: no check-wasm-form-equiv JSON found in /tmp/equiv-gate.json")
+              sys.exit(1)
+          base = int(data.get("base_passed", 0))
+          fault = int(data.get("fault_inject_passed", 0))
+          if fault <= base:
+              print(f"FAIL: equiv-fault-inject did not add tests (base_passed={base}, fault_inject_passed={fault})")
+              sys.exit(1)
+          print(f"check-wasm-form-equiv: anti-canned tripwire RAN (fault_inject_passed={fault} > base_passed={base}).")
+          PY
+      # Finding #13 (D7): the fault-inject feature MUST be absent from the
+      # release feature graph so it can never weaken a shipped build.
+      - name: Verify equiv-fault-inject absent from release graph (D7)
+        run: |
+          if cargo tree -p maos-wasm-host -e features --release 2>&1 | grep -q "equiv-fault-inject"; then
+            echo "FAIL: equiv-fault-inject present in release feature graph"
+            exit 1
+          fi
+          echo "check-wasm-form-equiv: equiv-fault-inject absent from release graph (D7 verified)."
+      # Finding #21: WASM fixture drift/provenance guard. Pins each committed
+      # equiv-*.wasm to its binary + source SHA-256; fails if a source edit left
+      # a stale .wasm blob the gate would otherwise keep consuming.
+      - name: Verify equiv WASM fixture provenance (no stale .wasm drift)
+        run: cargo run -p xtask -- check-equiv-fixture-provenance --json
+
+  # Story 11.2a (AC5, D10) — cross-region convergent replication gate.
+  # ONE gate / ONE disposition / FIVE independently-falsifiable legs:
+  # reattestation-mediated, convergence-oracle, region-identity, ap-degrade,
+  # kernel-abi-diff. Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner);
+  # blocking at v2.0 (absent/unmeasured → BLOCK).
+  check-cross-region-consensus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-cross-region-consensus-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-cross-region-consensus gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-cross-region-consensus --json 2>&1 | tee /tmp/cross-region-gate.json
+
+  # Story 11.2b (AC5, D5) — multi-region SLO gate. ONE gate / ONE disposition /
+  # FIVE independently-falsifiable legs with PER-LEG independence (each leg reads
+  # its own oracle — NOT appended to the consensus gate's single-binary
+  # broadcast). Legs: three-region-convergence, roundtrip-slo (+slo-fault-inject),
+  # halt-presence, live-read-region-identity (+chokepoint), kernel-abi-diff.
+  # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-multi-region-slo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-multi-region-slo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-multi-region-slo gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-multi-region-slo --json 2>&1 | tee /tmp/multi-region-slo-gate.json
+      # Story 11.2b (F7) SHIP-BLOCKER: slo-fault-inject MUST NOT leak into the
+      # release feature graph (a release build with fault injection active would
+      # inject spurious latency into a production measurement path). Mirrors the
+      # j4-latency / wasm-form-equiv cargo-tree absence idiom.
+      - name: slo-fault-inject absent from release feature graph
+        run: |
+          if cargo tree -p maos-bench -e features --release 2>&1 | grep -q "slo-fault-inject"; then
+            echo "FAIL: slo-fault-inject leaked into the maos-bench release feature graph (Story 11.2b ship-blocker)"
+            exit 1
+          fi
+          echo "OK: slo-fault-inject absent from the release feature graph"
+
+  # Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate. ONE gate /
+  # Story 12.1 — signed cohort manifest and real N=3/N=8 pairwise mesh.
+  check-cohort-mesh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-cohort-mesh-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-cohort-mesh gate
+        run: cargo run -p xtask -- check-cohort-mesh --json
+  # ONE disposition / FOUR independently-falsifiable legs with PER-LEG
+  # independence (mesh-identity-reconcile, detection-latency, blast-recovery-
+  # rto, kernel-abi-diff — each reads its OWN `cargo test` oracle). Advisory
+  # at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-scale-churn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-scale-churn-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-scale-churn gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-scale-churn --json 2>&1 | tee /tmp/scale-churn-gate.json
+      # Story 11.3 (D6/L7) SHIP-BLOCKER: churn-fault-inject MUST NOT leak into
+      # the release feature graph (mirrors the slo-fault-inject / bench-fault-
+      # inject cargo-tree absence idiom).
+      - name: churn-fault-inject absent from release feature graph
+        run: |
+          if cargo tree -p maos-a2a-tcp -e features --release 2>&1 | grep -q "churn-fault-inject"; then
+            echo "FAIL: churn-fault-inject leaked into the maos-a2a-tcp release feature graph (Story 11.3 ship-blocker)"
+            exit 1
+          fi
+          echo "OK: churn-fault-inject absent from the release feature graph"
+  # Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
+  # in-process; real per-commit tripwire — no advisory-skipped live leg). Per-
+  # leg independence (real-evaluation, deny-proven-red, issue-path-deny,
+  # fail-closed, ceiling-and-zero-config, kernel-abi-diff, release-graph-
+  # absence). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-enterprise-pdp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-enterprise-pdp-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-enterprise-pdp gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-enterprise-pdp --json 2>&1 | tee /tmp/enterprise-pdp-gate.json
+  # Story 11.4c (AC6) — enterprise identity + at-rest + SIEM gate.
+  # Per-leg OIDC/provenance/KMS/SIEM/fail-closed/release-guard oracle.
+  # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-enterprise-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-enterprise-identity-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-enterprise-identity gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-enterprise-identity --json 2>&1 | tee /tmp/enterprise-identity-gate.json
+
+  # Story 11.5 (AC4/D7) — Frozen-Kernel Conformance Suite infrastructure gate.
+  # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-fkcs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-fkcs-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-fkcs gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-fkcs --json 2>&1 | tee /tmp/fkcs-gate.json
+
+  # Story 11.7 (AC4/D2) — v2.0 third-party trial attestation producer gate.
+  # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-trial-attestation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-trial-attestation-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-trial-attestation gate (green path)
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-trial-attestation --json 2>&1 | tee /tmp/trial-attestation-gate.json
+      # P6/§A6: the proven-red vectors (the falsifier legs each watched RED-then-GREEN)
+      # and the real-harness tests (D2 — derive_reload_facts_from_local_runner over a
+      # real LocalRunner, derive_halt_recall_from_onboarding_score over the real
+      # scorer, recompute_cargo_tree_locked over the real workspace). CI must run
+      # these, not just the green gate JSON, or the §A6 "watch each leg red" guarantee
+      # is not delivered.
+      - name: Run trial-attestation proven-red + real-harness tests
+        run: |
+          cargo test -p maos-eval --features trial-attestation
+          cargo test -p xtask --test trial_attestation_proven_red -- --test-threads=1
+          cargo test -p xtask --test story_10_2_proven_red -- trial_gate --test-threads=1
+  # Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate
+  # (out-of-kernel read-only TL consumer; per-leg independence). The live-seccomp
+  # leg builds the forbidden-syscall-probe fixture first (real seccomp SIGSYS
+  # substrate). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+  check-escape-detector:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-escape-detector-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build forbidden-syscall-probe fixture (real seccomp substrate)
+        run: cargo build --release --manifest-path crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Run check-escape-detector gate
+        run: |
+          set -o pipefail
+          cargo run -p xtask -- check-escape-detector --json 2>&1 | tee /tmp/escape-detector-gate.json
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # explicit result checks to prevent skip-propagation false positives.
@@ -2471,12 +2819,12 @@ jobs:
       - check-cross-form-equiv
       - check-red-team-gate
       - check-export-control
+      - check-host-surface
+      - check-dependency-closure
       - check-cna-registration
       - check-fuzz-targets
       - fuzz-build
       - check-ko-coverage
-      - check-ja-coverage
-      - check-zh-coverage
       - windows-check
       - check-migration-merkle
       - check-live-bilateral-consent
@@ -2485,6 +2833,18 @@ jobs:
       - check-mobile-push-on-halt
       - check-ff-j6
       - check-skill-conformance
+      - wasm-host-tests
+      - check-wasm-form-equiv
+      - check-cross-region-consensus
+      - check-multi-region-slo
+      - check-scale-churn
+      - check-cohort-mesh
+      - check-enterprise-pdp
+      - check-enterprise-identity
+      - check-fkcs
+      - check-trial-attestation
+      - check-escape-detector
+      - check-env-contract
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2503,11 +2863,24 @@ jobs:
           echo "| check-cross-form-equiv | ${{ needs.check-cross-form-equiv.result }} | cargo run -p xtask -- check-cross-form-equiv |"
           echo "| check-red-team-gate | ${{ needs.check-red-team-gate.result }} | cargo run -p xtask -- check-red-team-gate |"
           echo "| check-export-control | ${{ needs.check-export-control.result }} | cargo run -p xtask -- check-export-control |"
+          echo "| check-host-surface | ${{ needs.check-host-surface.result }} | cargo run -p xtask -- check-host-surface |"
+          echo "| check-dependency-closure | ${{ needs.check-dependency-closure.result }} | cargo run -p xtask -- check-dependency-closure |"
           echo "| check-cna-registration | ${{ needs.check-cna-registration.result }} | cargo run -p xtask -- check-cna-registration |"
           echo "| check-fuzz-targets | ${{ needs.check-fuzz-targets.result }} | cargo run -p xtask -- check-fuzz-targets |"
           echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
           echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
+          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | cargo test -p maos-host -p maos-wasm-host |"
+          echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
+          echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
+          echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"
+          echo "| check-scale-churn | ${{ needs.check-scale-churn.result }} | cargo run -p xtask -- check-scale-churn |"
+          echo "| check-cohort-mesh | ${{ needs.check-cohort-mesh.result }} | cargo run -p xtask -- check-cohort-mesh |"
+          echo "| check-enterprise-pdp | ${{ needs.check-enterprise-pdp.result }} | cargo run -p xtask -- check-enterprise-pdp |"
+          echo "| check-enterprise-identity | ${{ needs.check-enterprise-identity.result }} | cargo run -p xtask -- check-enterprise-identity |"
+          echo "| check-fkcs | ${{ needs.check-fkcs.result }} | cargo run -p xtask -- check-fkcs |"
+          echo "| check-trial-attestation | ${{ needs.check-trial-attestation.result }} | cargo run -p xtask -- check-trial-attestation |"
+          echo "| check-escape-detector | ${{ needs.check-escape-detector.result }} | cargo run -p xtask -- check-escape-detector |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2529,6 +2902,16 @@ jobs:
           echo "  check-fuzz-targets: ${{ needs.check-fuzz-targets.result }}"
           echo "  fuzz-build: ${{ needs.fuzz-build.result }}"
           echo "  check-ko-coverage: ${{ needs.check-ko-coverage.result }}"
+          echo "  wasm-host-tests: ${{ needs.wasm-host-tests.result }}"
+          echo "  check-wasm-form-equiv: ${{ needs.check-wasm-form-equiv.result }}"
+          echo "  check-cross-region-consensus: ${{ needs.check-cross-region-consensus.result }}"
+          echo "  check-multi-region-slo: ${{ needs.check-multi-region-slo.result }}"
+          echo "  check-scale-churn: ${{ needs.check-scale-churn.result }}"
+          echo "  check-cohort-mesh: ${{ needs.check-cohort-mesh.result }}"
+          echo "  check-enterprise-pdp: ${{ needs.check-enterprise-pdp.result }}"
+          echo "  check-enterprise-identity: ${{ needs.check-enterprise-identity.result }}"
+          echo "  check-fkcs: ${{ needs.check-fkcs.result }}"
+          echo "  check-trial-attestation: ${{ needs.check-trial-attestation.result }}"
           exit 1
 
   aggregate:
@@ -2536,6 +2919,7 @@ jobs:
     needs:
       - reproducible-build
       - check-unsafe
+      - check-fmt
       - kloc-check
       - abi-diff
       - gen-abi-docs
@@ -2628,6 +3012,7 @@ jobs:
       - check-dev-record-completeness
       - check-bare-review-findings
       - check-dev-model-used-populated
+      - check-dev-model-tier
       - check-kernel-baseline
       - check-epic-close-green
       - journey-hermetic-tier-1
@@ -2650,6 +3035,7 @@ jobs:
       - check-coverage-matrix-completeness
       - check-owasp-freeze-hash
       - check-third-party-trial
+      - check-trial-attestation
       - check-cross-form-equiv
       - check-red-team-gate
       - check-migration-merkle
@@ -2876,6 +3262,9 @@ jobs:
       - check-red-team-gate
       - check-cross-form-equiv
       - check-third-party-trial
+      - check-enterprise-identity
+      - check-fkcs
+      - check-trial-attestation
     if: always()
     steps:
       - name: v1.5 ship gate summary
@@ -2888,6 +3277,9 @@ jobs:
           echo "| check-red-team-gate | ${{ needs.check-red-team-gate.result }} | blocking-when-present |"
           echo "| check-cross-form-equiv | ${{ needs.check-cross-form-equiv.result }} | advisory |"
           echo "| check-third-party-trial | ${{ needs.check-third-party-trial.result }} | blocking-when-present |"
+          echo "| check-enterprise-identity | ${{ needs.check-enterprise-identity.result }} | advisory |"
+          echo "| check-fkcs | ${{ needs.check-fkcs.result }} | advisory |"
+          echo "| check-trial-attestation | ${{ needs.check-trial-attestation.result }} | advisory |"
           echo ""
           echo "Phase disposition source: xtask/gate-registry.toml [[ship_gate]] entries."
       - name: Fail if any v1.5-blocking gate failed

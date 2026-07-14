@@ -27,6 +27,7 @@
 //! verifier-driven mTLS config types in [`mtls`].
 
 pub mod chaos;
+pub mod cohort;
 pub mod config;
 pub mod consent;
 pub mod corpus;
@@ -40,8 +41,14 @@ pub mod transport;
 // Root re-exports — preserve the exact symbol set `maos-a2a` published so its
 // `pub use maos_a2a_core::…` re-exports keep every downstream import path
 // (`maos-bin`, `spirits/mira`, `spirits/nash`, tests) compiling unchanged.
-pub use chaos::churn::{ChurnDrillReport, ChurnHarnessConfig};
+pub use chaos::churn::{AdversarialAttempt, AdversarialDetection, ChurnDrillReport};
 pub use chaos::rotation::{compute_t_grace, AgentRotationTimestamps, RotationDrillReport};
+pub use cohort::{
+    CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
+    CohortReissueDisposition, CohortReissueRejection, ConsentRuptureSink, DigestFrameClass,
+    DigestReadPort, DigestReplyObservation, HaltReceiptObserver, COHORT_INTENT_DIGEST_READ,
+    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+};
 pub use config::{A2AConfig, A2APeerConfig, A2AProfile};
 // Story 8.7 / AC2b — `A2AConsentEnvelope` was deleted (dead fail-open footgun).
 pub use consent::{ConsentAllowlists, EIntentDenied};

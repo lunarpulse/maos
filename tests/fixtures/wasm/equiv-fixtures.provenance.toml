@@ -1,0 +1,49 @@
+# Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
+#
+# Each committed equiv-*.wasm fixture is pinned to BOTH its binary hash and the
+# hash of the source inputs that produced it. `cargo run -p xtask --
+# check-equiv-fixture-provenance` recomputes both from the live tree and FAILS
+# on any mismatch:
+#   - wasm_sha256 mismatch   → the .wasm blob was swapped without updating this
+#                              manifest (binary/manifest desync);
+#   - source_sha256 mismatch → a guest/logic source file drifted since the .wasm
+#                              was built — a stale blob the gate would otherwise
+#                              keep consuming until the scoped-nightly regen.
+#
+# The residual gap (regen-from-changed-source + updating both hashes together)
+# is a legitimate regen and is closed by the scoped-nightly byte-rebuild job
+# (the 11.1a D9 idiom); this manifest is the per-commit source↔binary↔manifest
+# sync guard that runs in the check-wasm-form-equiv CI job.
+
+[[fixture]]
+component = "equiv_identity_spirit_component.wasm"
+wasm_sha256 = "4f6789a0860a07d1833026b1a497b40ae68b115678d03ffd2b5340f7d34741fa"
+source_sha256 = "ade9e0093ca6ddd4f7e9695768f734690ec66de7a5b0617ee3a7352722d62af4"
+source = [
+    "crates/maos-wasm-host/guests/equiv-fixture/logic/Cargo.toml",
+    "crates/maos-wasm-host/guests/equiv-fixture/logic/src/lib.rs",
+    "crates/maos-wasm-host/guests/equiv-fixture/wasm-guest/Cargo.toml",
+    "crates/maos-wasm-host/guests/equiv-fixture/wasm-guest/src/lib.rs",
+]
+
+[[fixture]]
+component = "equiv_divergent_spirit_component.wasm"
+wasm_sha256 = "659ed858f321675ccce8dd4c0e2fb614e7281b2836046d2a6461505c4d3703fc"
+source_sha256 = "0622d463446ca0e6a777af4b4beba11e496a6fead0eb10e32bf875cb41d85fd4"
+source = [
+    "crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/Cargo.toml",
+    "crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/src/lib.rs",
+    "crates/maos-wasm-host/guests/equiv-fixture/logic/Cargo.toml",
+    "crates/maos-wasm-host/guests/equiv-fixture/logic/src/lib.rs",
+]
+
+[[fixture]]
+component = "equiv_cosmetic_spirit_component.wasm"
+wasm_sha256 = "405463de3a1fe17e6f0cf78f41cd1ee3d5ef7449a099cac605ae9267dd98da11"
+source_sha256 = "6ca8eee478850c7d6fe81e45bf84ec1168a2e04d75661ca88e7ee6615662d099"
+source = [
+    "crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/Cargo.toml",
+    "crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/src/lib.rs",
+    "crates/maos-wasm-host/guests/equiv-fixture/logic/Cargo.toml",
+    "crates/maos-wasm-host/guests/equiv-fixture/logic/src/lib.rs",
+]

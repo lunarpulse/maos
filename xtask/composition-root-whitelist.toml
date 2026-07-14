@@ -52,4 +52,14 @@ whitelist = [
     # calendar/slack/linear/figma servers; Researcher wraps web/arXiv/github/
     # citation). These are per-Spirit MCP clients, never a shared instance.
     "McpClientAdapter",
+
+    # TransparencyLogAdapter — one instance in the main production boot path
+    # (`fn main`, opens `audit_db_path` shared across services), plus one in the
+    # `network`-gated cohort A2A daemon entrypoint
+    # (`run_cohort_a2a_daemon_from_env`, opens the daemon config's own
+    # `transparency_log_path` with its own boot nonce). These are mutually
+    # exclusive process run-modes (main daemon vs cohort-A2A daemon), each with
+    # its own DB path — NOT a duplicate shared-state instance. (Story 12.x cohort
+    # mesh; surfaced by the first full-branch CI run over the Epic 11+12 line.)
+    "TransparencyLogAdapter",
 ]

@@ -24,8 +24,11 @@ members = [
     "crates/maos-notify-push",
     "crates/maos-registry",
     "crates/maos-persistence",
+    "crates/maos-pdp",
     "crates/maos-providers",
     "crates/maos-secrets",
+    "crates/maos-siem",
+    "crates/maos-sso",
     "crates/maos-skill",
     "crates/maos-spirit-abi",
     "crates/maos-spirit-hello",
@@ -47,6 +50,12 @@ members = [
     "spirits/nash",
     "crates/maos-shell",
     "crates/maos-telemetry",
+    "crates/maos-host",
+    "crates/maos-wasm-host",
+    "crates/maos-escape-detector",
+    "crates/maos-fkcs",
+    "crates/maos-cohort",
+    "spirits/digest",
 ]
 default-members = []
 exclude = ["templates", "templates/spirit-ts"]

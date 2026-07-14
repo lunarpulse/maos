@@ -230,7 +230,9 @@ impl<'a> Visit<'_> for LoomVisitor<'a> {
         let names = collect_use_names(&node.tree, &mut |glob_path| {
             eprintln!(
                 "NFR-Test-9 warning: glob import '{}' at {}:{} — cannot verify blocklisted symbols; review manually",
-                glob_path, self.file, node.use_token.span.start().line
+                glob_path,
+                self.file,
+                node.use_token.span.start().line
             );
         });
         for name in names {

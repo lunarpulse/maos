@@ -1,0 +1,23 @@
+[package]
+name = "maos-digest"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "MAOS J3 team Digest reference Spirit — consented cohort summaries, halt-receipt presence, and I11 narrative distillation"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+maos-cohort = { path = "../../crates/maos-cohort" }
+maos-domain = { path = "../../crates/maos-domain" }
+maos-spirit-abi = { path = "../../crates/maos-spirit-abi" }
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner", "mock", "spirit_test"] }
+maos-iac = { path = "../../crates/maos-iac" }
+tokio = { version = "1", features = ["macros", "rt", "sync"] }
+toml = "0.8"

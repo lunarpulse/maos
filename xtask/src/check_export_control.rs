@@ -13,6 +13,7 @@
 //! Absence is a v1.0 ship-block (disposition `v1_0 = "blocking"`).
 
 use std::path::Path;
+use std::process::Command;
 
 use crate::gate_common::emit_command;
 
@@ -181,17 +182,30 @@ pub fn run(json: bool) -> Result<(), String> {
     let workspace_root = std::env::current_dir().expect("failed to get current dir");
     let report = check_export_control(&workspace_root);
 
+    // Story 11.1a AC6 — the WASM-host absence gate is a REAL part of this
+    // command's exit status, not a `#[cfg(test)]`-only vector. This is what
+    // makes AC6's negative AC mechanical rather than a note: enabling
+    // `wasm-host` on `maos-bin` without also proving it's excluded from the
+    // default artifact now fails CI (the existing `check-export-control`
+    // job in `.github/workflows/discipline.yml`), not just a unit test.
+    let wasm_leak = check_wasm_host_absent_from_default();
+    let overall_passed = report.passed && wasm_leak.passed;
+
     if json {
         println!(
             "{}",
             serde_json::json!({
-                "passed": report.passed,
+                "passed": overall_passed,
                 "failures": report.failures,
+                "wasm_host_leak": {
+                    "passed": wasm_leak.passed,
+                    "violations": wasm_leak.violations,
+                },
             })
         );
-    } else if report.passed {
+    } else if overall_passed {
         eprintln!(
-            "check-export-control: PASS (ECCN doc + STABILITY §Export non-stub + {} primitives + {} host crates)",
+            "check-export-control: PASS (ECCN doc + STABILITY §Export non-stub + {} primitives + {} host crates + wasm-host absent from default)",
             REQUIRED_CRYPTO_PRIMITIVES.len(),
             REQUIRED_CRYPTO_CRATES.len()
         );
@@ -199,20 +213,120 @@ pub fn run(json: bool) -> Result<(), String> {
         for f in &report.failures {
             emit_command(json, "error", &format!("check-export-control: {f}"));
         }
+        if !wasm_leak.passed {
+            for v in &wasm_leak.violations {
+                emit_command(
+                    json,
+                    "error",
+                    &format!("check-export-control: wasm-host leak into default build: {v}"),
+                );
+            }
+        }
         eprintln!(
             "check-export-control: FAIL — {} issue(s)",
-            report.failures.len()
+            report.failures.len() + wasm_leak.violations.len()
         );
     }
 
-    if report.passed {
+    if overall_passed {
         Ok(())
     } else {
         Err(format!(
             "check-export-control: {} issue(s) — see annotations",
-            report.failures.len()
+            report.failures.len() + wasm_leak.violations.len()
         ))
     }
+}
+
+// ─── Story 11.1a — WASM-host leak gate (negative AC) ──────────────────────
+//
+// The `wasm-host` feature (OFF by default in `crates/maos-bin/Cargo.toml`)
+// will eventually pull in the vendored `wasmtime` engine plus the
+// `maos-wasm-host` / `maos-wasm-runner` host crates. `wasmtime` is the
+// 5D002.c.1 classification trigger currently under counsel review (see
+// `docs/compliance/export-counsel-precondition.md`). Until counsel clears that
+// question, NONE of those crates may appear in the DEFAULT `maos` build
+// artifact. This gate runs `cargo tree -p maos-bin` with NO feature flags and
+// asserts the closure is clean — it goes RED the moment `wasm-host` leaks into
+// the default build.
+
+/// Crates that MUST NOT appear in `maos-bin`'s DEFAULT closure (compiled with
+/// NO `--features wasm-host`). `wasmtime` is the vendored WASM engine — the
+// 5D002.c.1 classification trigger under counsel review; `maos-wasm-host` and
+/// `maos-wasm-runner` are the host crates that gate it behind the `wasm-host`
+/// feature.
+const WASM_HOST_LEAK_INDICATORS: &[&str] = &[
+    "wasmtime",
+    "wasmtime-wasi",
+    "maos-wasm-host",
+    "maos-wasm-runner",
+];
+
+/// Report from the WASM-host leak check.
+#[derive(Debug, Default, serde::Serialize)]
+pub struct WasmHostLeakReport {
+    pub passed: bool,
+    /// Leak indicators found in the default-build closure (empty if passed).
+    pub violations: Vec<String>,
+}
+
+/// Scan a `cargo tree -p maos-bin --prefix none` output (the DEFAULT build —
+/// no `--features wasm-host`) for WASM-host leak indicators. Extracted as a
+/// pure function so a RED vector can feed fake cargo-tree output and prove the
+/// gate DETECTS a leak without running cargo (mirrors
+/// `check_dependency_closure::scan_tree_output`).
+pub fn scan_wasm_host_leak(stdout: &str) -> WasmHostLeakReport {
+    let mut violations = Vec::new();
+    for line in stdout.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let crate_name = trimmed.split_whitespace().next().unwrap_or("");
+        let base_name = crate_name.split('+').next().unwrap_or(crate_name);
+        if WASM_HOST_LEAK_INDICATORS.contains(&base_name)
+            && !violations.contains(&base_name.to_string())
+        {
+            violations.push(base_name.to_string());
+        }
+    }
+    violations.sort();
+    let passed = violations.is_empty();
+    WasmHostLeakReport { passed, violations }
+}
+
+/// Assert the DEFAULT `maos-bin` build (compiled with NO `--features
+/// wasm-host`) pulls in NONE of the WASM-host leak indicators. Negative AC for
+/// Story 11.1a: the `wasm-host` feature is OFF by default, so `wasmtime` and
+/// the `maos-wasm-host` / `maos-wasm-runner` crates must NOT appear in the
+/// dependency closure of the default artifact.
+///
+/// Runs `cargo tree -p maos-bin` with NO feature flags (default build only —
+/// the `default = ["network"]` set never enables `wasm-host`). Any cargo-tree
+/// failure is reported as non-passing so the gate never silently passes.
+pub fn check_wasm_host_absent_from_default() -> WasmHostLeakReport {
+    let output = Command::new("cargo")
+        .args([
+            "tree", "-p", "maos-bin", "--prefix", "none", "--edges", "all",
+        ])
+        .output();
+    let stdout = match output {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            return WasmHostLeakReport {
+                passed: false,
+                violations: vec![format!("`cargo tree -p maos-bin` failed: {stderr}")],
+            };
+        }
+        Err(e) => {
+            return WasmHostLeakReport {
+                passed: false,
+                violations: vec![format!("failed to run `cargo tree`: {e}")],
+            };
+        }
+    };
+    scan_wasm_host_leak(&stdout)
 }
 
 #[cfg(test)]
@@ -295,7 +409,10 @@ mod tests {
     fn fails_when_crypto_primitive_missing() {
         let tmp = TempDir::new().unwrap();
         // Drop "Ed25519" — enumeration incomplete.
-        write_eccn(tmp.path(), "HKDF-SHA256, AEAD, TLS 1.3, SHA-256, CBOR. Host crates: maos-iac, maos-kernel-core, maos-a2a-tcp, maos-compliance.");
+        write_eccn(
+            tmp.path(),
+            "HKDF-SHA256, AEAD, TLS 1.3, SHA-256, CBOR. Host crates: maos-iac, maos-kernel-core, maos-a2a-tcp, maos-compliance.",
+        );
         write_stability(tmp.path(), NON_STUB_FENCE);
         let r = check_export_control(tmp.path());
         assert!(!r.passed);
@@ -350,5 +467,87 @@ mod tests {
         let body = "intro <!-- PRESERVED:export --> prose\n\
             <!-- PRESERVED:export -->\nreal content\n<!-- END PRESERVED:export -->\n";
         assert_eq!(extract_export_fence(body), Some("real content"));
+    }
+    // ─── Story 11.1a — WASM-host leak gate tests ───────────────────────────
+
+    #[test]
+    fn wasm_host_leak_indicators_listed() {
+        assert!(!WASM_HOST_LEAK_INDICATORS.is_empty());
+        assert!(WASM_HOST_LEAK_INDICATORS.contains(&"wasmtime"));
+        assert!(WASM_HOST_LEAK_INDICATORS.contains(&"maos-wasm-host"));
+        assert!(WASM_HOST_LEAK_INDICATORS.contains(&"maos-wasm-runner"));
+    }
+
+    #[test]
+    fn scan_wasm_host_leak_detects_wasmtime_red() {
+        // Fake cargo-tree output for a DEFAULT build that has LEAKED wasmtime.
+        // The gate must go RED — this is the named negative AC for Story 11.1a.
+        let fake = "\
+maos-bin v0.5.0\n\
+maos-host v0.5.0\n\
+wasmtime v25.0.0\n\
+maos-domain v0.5.0\n";
+        let report = scan_wasm_host_leak(fake);
+        assert!(
+            !report.passed,
+            "must RED when wasmtime leaks into the default build"
+        );
+        assert!(
+            report.violations.contains(&"wasmtime".to_string()),
+            "wasmtime must be in violations: {:?}",
+            report.violations
+        );
+    }
+
+    #[test]
+    fn scan_wasm_host_leak_detects_wasm_host_crates_red() {
+        // The maos-wasm-host / maos-wasm-runner host crates themselves are also
+        // leak indicators — they gate wasmtime behind the `wasm-host` feature.
+        let fake = "\
+maos-bin v0.5.0\n\
+maos-wasm-host v0.5.0\n\
+maos-wasm-runner v0.5.0\n";
+        let report = scan_wasm_host_leak(fake);
+        assert!(!report.passed, "must RED");
+        assert!(report.violations.contains(&"maos-wasm-host".to_string()));
+        assert!(report.violations.contains(&"maos-wasm-runner".to_string()));
+    }
+
+    #[test]
+    fn scan_wasm_host_leak_clean_closure_green() {
+        // A clean DEFAULT build: the non-wasmtime `maos-host` abstraction is
+        // present (engine-agnostic trait types), but NO wasmtime and NO
+        // wasm-host / wasm-runner crates.
+        let fake = "\
+maos-bin v0.5.0\n\
+maos-host v0.5.0\n\
+maos-domain v0.5.0\n\
+maos-kernel-core v0.5.0\n";
+        let report = scan_wasm_host_leak(fake);
+        assert!(
+            report.passed,
+            "clean closure must GREEN: {:?}",
+            report.violations
+        );
+        assert!(report.violations.is_empty());
+    }
+
+    #[test]
+    fn scan_wasm_host_leak_dedupes_repeated_wasmtime() {
+        // wasmtime appears many times transitively; the violation list must
+        // dedupe to a single entry per indicator.
+        let fake = "\
+maos-bin v0.5.0\n\
+maos-wasm-host v0.5.0\n\
+wasmtime v25.0.0\n\
+wasmtime v25.0.0\n";
+        let report = scan_wasm_host_leak(fake);
+        assert!(!report.passed);
+        let wasmtime_count = report
+            .violations
+            .iter()
+            .filter(|v| v.as_str() == "wasmtime")
+            .count();
+        assert_eq!(wasmtime_count, 1, "wasmtime must be deduped");
     }
 }

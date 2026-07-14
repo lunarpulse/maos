@@ -1,5 +1,6 @@
 ---
 Status: accepted
+Superseded-by: ADR-031 (defer lifted; in-process embedding remains FORBIDDEN; §13.1 measurement gate stays untripped)
 Phase: binding-v0.5
 Gate: v0.5 release-block (xtask check-adr-040-accepted); ADR-031 status-resolution
 Decided: 2025-05-25 (real-mode measurement completed)
@@ -62,14 +63,14 @@ A superseding ADR shall be authored (re-running the §13.1 measurement) when:
 
 3. **A sustained 24h breach of arch §13.1 trip-thresholds in production** (the Prometheus `IacRtP95Breach` alert fires with `for: 24h`). Production telemetry from v0.7+ deployments provides the empirical evidence that subprocess-form is insufficient.
 
-4. **ADR-031 transitions to `binding-v1.5`** — if the cross-form equivalence requirement becomes binding, rust-inproc measurement becomes mandatory regardless of subprocess-form budget status.
+4. **ADR-031 transitions to `binding-v2.0`** — if the cross-form equivalence requirement becomes binding, rust-inproc measurement becomes mandatory regardless of subprocess-form budget status. **[Reconciled 2026-07-01: ADR-031 was accepted as the WASM-*component* form (WASM-in-subprocess), which is NOT rust-inproc and keeps the process boundary — so this criterion did NOT fire. rust-inproc measurement stays deferred; in-process embedding remains FORBIDDEN. See ADR-031 §4.]**
 
 ## Status Reconciliation with ADR-031
 
 Since the binding decision is `defer-rust-inproc-to-v2.0+`:
 
-- ADR-031 (`Cross-Form Spirit Equivalence`) **remains** `speculative-vNext`.
-- Story 10.2's NFR-Test-7 cross-form equivalence test plan is **REMOVED** from v1.5 scope.
+- ADR-031 (`Cross-Form Spirit Equivalence`) **remains** `speculative-vNext`. **[Superseded 2026-07-01: ADR-031 is now **Accepted** as the WASM-component Spirit form (host-as-adapter; binding-v2.0 at Story 11.1b). It lifts this defer *only* for the WASM-component form — which is WASM-in-subprocess, keeping the process boundary — while rust-inproc (in-process) stays deferred and in-kernel/in-process embedding remains FORBIDDEN and §13.1-gated. See ADR-031 §4.]**
+- Story 10.2's NFR-Test-7 cross-form equivalence test plan was **REMOVED** from v1.5 scope (historical; cross-form equivalence returns at Story 11.1b under ADR-031's tiered behavioral-oracle gate).
 - CLI-wrapper-only behavioral equivalence runs instead (the v0.9 substrate behavioral floor per ADR-021).
 
 ## Forward-shape Dependencies

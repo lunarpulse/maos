@@ -1,0 +1,35 @@
+[workspace]
+
+[package]
+name = "equiv-native-twin"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Story 11.1b cross-form equivalence gate — native twin subprocess (mirrors the WASM fixtures over the same ADR-032 codec)"
+
+[[bin]]
+name = "equiv-native-twin"
+path = "src/main.rs"
+
+[dependencies]
+# Domain frame types — the real `IacFrame` this twin deserializes directly
+# (no WIT bridge on the native path; the codec round-trips the SAME CBOR the
+# WASM runner speaks).
+maos-domain = { path = "../../../../maos-domain" }
+# ADR-032 wire protocol codec: Content-Length + CBOR. The SAME `read_frame` /
+# `write_frame` / `encode_cbor` / `decode_cbor` the `maos-wasm-runner` uses, so
+# both Spirit forms speak byte-identical wire bytes.
+maos-wasm-host = { path = "../../../" }
+# FrameKind / IntentClass (re-exported by maos-domain; pinned here so the twin
+# can name them if a future mode needs to inspect/construct kinds).
+maos-spirit-abi = { path = "../../../../maos-spirit-abi" }
+# Shared fixture-Spirit logic — the SINGLE source of behavior compiled into the
+# WASM guests too. The native twin selects its mode at runtime via `--mode`.
+equiv-fixture-logic = { path = "../logic" }
+# Serialization profile matching the codec (canonical CBOR, RFC 8949 §4.2.1).
+serde = { version = "1.0", features = ["derive"] }
+ciborium = "0.2"
+
+[dev-dependencies]
+# SmallVec construction for test frames (`IacFrame.to` is `SmallVec<[FrameAddress;1]>`).
+smallvec = "1"
