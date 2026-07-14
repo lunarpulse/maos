@@ -83,8 +83,46 @@
 # FLAG-Winston: ratify the kernel-core 17000→17750 bump in the Epic-10 retro
 # (authorized AC3 delta) — the others are tooling/CLI/domain growth.
 # -----------------------------------------------------------------------------
+# Epic 12 retrospective ceiling review (2026-07-14) — first full-branch CI run
+# -----------------------------------------------------------------------------
+# `origin/epic-12` was pushed for the first time (~29 commits, the whole Epic
+# 11+12 line), so this is the FIRST time the blocking `kloc-check` aggregate ran
+# over the v2.0 + v2.2 surface together. Five crates + the aggregate breached the
+# Epic-10 ceilings. Per the established process (tight measured residual, NOT
+# round headroom — cf. the Epic-10 block above), ratified re-baseline (Epic-12
+# retro Q2, Lunarpulse 2026-07-14):
+#
+#   crate            prev     measured  new ceiling  driver
+#   maos-kernel-core 17750    17832     17900        Story 12.5 PostSwapMonitor
+#                                                     survivor-set fix (+59 — the
+#                                                     ONLY real kernel code delta
+#                                                     this line; kernel-baseline
+#                                                     gate green @23147). Phase-4
+#                                                     decomposition debt REMAINS.
+#   maos-bin         9000     11003     11100        v2.0/v2.2 composition root:
+#                                                     enterprise SSO/KMS/SIEM
+#                                                     runtime + cohort A2A daemon
+#                                                     + the identity.asserted
+#                                                     write helper moved HERE from
+#                                                     maos-audit (read-only fix).
+#   maos-domain      8100     8231      8300         v2.2 cohort/tenant ports.
+#   maos-a2a-core    3200     3999      4050         cohort mesh transport + halt
+#                                                     receipt-presence (Epic 12).
+#   xtask            22500    28791     29000        +6,291 LOC v2.0/v2.2 gate
+#                                                     infra (scale-churn, wasm-
+#                                                     form-equiv, enterprise-pdp/
+#                                                     -identity, fkcs, trial-attest,
+#                                                     cohort-mesh) + Option-C leg
+#                                                     binding + dev-model-tier gate
+#                                                     + proven-red suites. Tooling,
+#                                                     not shipped kernel.
+#   _aggregate       103000   121198    122000       sum of the above.
+#
+# FLAG-Winston/John: ratify the maos-kernel-core 17750→17900 bump (authorized
+# 12.5 delta) in the Epic-12 retro — the rest is composition-root/tooling growth.
+# -----------------------------------------------------------------------------
 
-maos-kernel-core = 17750
+maos-kernel-core = 17900   # Epic-12 retro 2026-07-14: 17750→17900 (Story 12.5 PostSwapMonitor +59; measured 17,832)
 maos-capability = 2000
 maos-cap-registry = 3000
 maos-corpus-gen = 3000
@@ -92,13 +130,13 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 22500          # Epic-10 retro 2026-06-26: +7,873 LOC v1.0/v1.5 gate infra (tooling, not kernel)
+xtask = 29000          # Epic-12 retro 2026-07-14: 22500→29000 (+6,291 LOC v2.0/v2.2 gate infra + Option-C binding + dev-model-tier; measured 28,791; tooling, not kernel)
 # Story 6.5 — Phase 1 extraction
 maos-iac = 5800        # Epic-10 retro 2026-06-26: 5500→5800 (TL + bus growth; measured 5,736)
 maos-manifest = 4050   # Epic-10 retro 2026-06-26: 4000→4050 (schema-version surface; measured 4,012)
 
 # Story 1a.1 — 13 new crate stubs
-maos-domain = 8100     # Epic-10 retro 2026-06-26: 7000→8100 (collective-tier ports + i9; measured 8,045)
+maos-domain = 8300     # Epic-12 retro 2026-07-14: 8100→8300 (v2.2 cohort/tenant ports; measured 8,231)
 maos-spirit-hello = 1000
 maos-providers = 2000
 maos-mcp = 1100
@@ -132,7 +170,7 @@ maos-a2a = 1500
 # over a per-crate ceiling, that is a scope signal — surface it, do not bump
 # silently"). Per the 8.8 precedent: set to the tight measured residual (3144),
 # NOT round headroom. FLAG-Winston: ratify this surfaced bump in 8.13.1 review.
-maos-a2a-core = 3200
+maos-a2a-core = 4050   # Epic-12 retro 2026-07-14: 3200→4050 (cohort mesh transport + halt receipt-presence; measured 3,999)
 # Story 8.6 — maos-a2a-tcp: live cross-Host TCP/mTLS transport (the second
 # A2ATransport impl). Socket + rustls + codec wiring + verifier.
 maos-a2a-tcp = 1500
@@ -144,11 +182,11 @@ maos-secrets = 1000
 maos-compliance = 2000
 maos-control = 1500
 maos-cli = 3750        # Epic-10 retro 2026-06-26: 2000→3750 (skill-queue + audit subcommands; measured 3,689)
-maos-bin = 9000
+maos-bin = 11100       # Epic-12 retro 2026-07-14: 9000→11100 (enterprise SSO/KMS/SIEM + cohort A2A daemon + identity.asserted write moved from maos-audit; measured 11,003)
 maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
 
 _aggregate_alarm = 16000
-_aggregate_hardfail = 103000  # Epic-10 retro 2026-06-26: 90000→103000 (measured aggregate 102,171)
+_aggregate_hardfail = 122000  # Epic-12 retro 2026-07-14: 103000→122000 (measured aggregate 121,198)
 
 # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
 # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a

@@ -92,8 +92,14 @@ serde_cbor = "0.11"
 tar = { version = "0.4", default-features = false }
 smallvec = { version = "1", features = ["serde"] }
 thiserror = "2"
+# Story 11.4c — the out-of-kernel `identity.asserted` (kind 30) write helper
+# (`enterprise_identity::append_identity_asserted`) opens the Transparency Log
+# read-write from the composition root. Moved here from `maos-audit` (Epic-12
+# retro 2026-07-14) to keep that crate read-only per Story 9.2 Decision A.2 /
+# the `maos-audit-read-only` gate. Already in maos-bin's link closure transitively
+# via the kernel-core TL adapter — a direct dep just exposes the API.
+rusqlite = { version = "0.31", features = ["bundled"] }
 
 [dev-dependencies]
 tempfile = "3"
-rusqlite = { version = "0.31", features = ["bundled"] }   # Story 11.4c — Available-arm wiring tests (TL schema fixture)
 ed25519-dalek = { version = "2", features = ["std"] }   # Story 12.3 — sign a cohort manifest fixture for the Fact-2 provenance test

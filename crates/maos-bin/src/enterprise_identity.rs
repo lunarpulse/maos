@@ -22,13 +22,16 @@
 //! composition-root concern, not a kernel-core adapter (keeps
 //! `check-composition-root-completeness` green). It touches no kernel-core
 //! surface (L1): the principal never welds into the frozen `CapabilityToken`,
-//! and `identity.asserted` is written through the maos-audit raw-kind helper,
-//! not a kernel `FrameKind` variant.
+//! and `identity.asserted` is written through the composition-root
+//! [`append_identity_asserted`] helper below — a raw kind-30 row, not a kernel
+//! `FrameKind` variant. The helper lives HERE (the writer side), not in the
+//! read-only `maos-audit` crate (Story 9.2 Decision A.2 / `maos-audit-read-only`
+//! gate).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use maos_audit::append_identity_asserted;
+use maos_audit::AuditError;
 pub use maos_audit::AuditFilter;
 use maos_domain::ports::{
     AuthenticatedPrincipal, CryptoProvider, IdentityAssertionPort, KeyManagementPort,
@@ -38,6 +41,7 @@ use maos_loom_lite::seal::AtRestSeal;
 use maos_secrets::{seal_at_rest_opt, LocalMasterKeyKms};
 use maos_siem::{export_report_from_tl, forward_to_file, SiemExporter};
 use maos_sso::{OidcAlgorithm, OidcVerifier};
+use rusqlite::OpenFlags;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SubsystemState {
@@ -446,6 +450,107 @@ fn now_ns() -> Result<u64, std::time::SystemTimeError> {
         .map(|d| d.as_nanos().min(u128::from(u64::MAX)) as u64)
 }
 
+/// Append ONE out-of-kernel `identity.asserted` (kind = 30) row to the
+/// Transparency Log (Story 11.4c AC2).
+///
+/// This write helper lives in `maos-bin` — the composition root / writer side —
+/// NOT in `maos-audit`, which is read-only by design (Story 9.2 Decision A.2,
+/// enforced by the `maos-audit-read-only` gate). Every OTHER Transparency-Log
+/// row is written by the kernel's `TransparencyLogAdapter::insert_frame_event`,
+/// which takes the kernel-core `FrameKind` enum; `IdentityAsserted` is
+/// deliberately NOT a kernel-core `FrameKind` (adding it would be an L1
+/// kernel-core delta — FORBIDDEN), so the `maos-sso` verified-principal flow
+/// persists this provenance row directly from the composition root.
+///
+/// # Row shape
+///
+/// - `frame_id`         — 16 cryptographically-random bytes (`getrandom`); a PK
+///                        collision (vanishing at 128 bits) surfaces as
+///                        `AuditError::Query`, NEVER swallowed.
+/// - `timestamp_ns`     — `decision_time_ns` (the IdP's assertion instant).
+/// - `spirit_pid` /
+///   `boot_nonce`       — the kernel context the assertion is bound to.
+/// - `capability_token` — `NULL` (no capability mediates an identity assertion).
+/// - `kind`             — `30` (renders as `"identity.asserted"` on read).
+/// - `intent`           — `"identity.asserted"`.
+/// - `payload_redacted` — compact JSON
+///   `{"subject","issuer","capability_key","decision_time_ns"}`.
+/// - `origin`           — `FrameOrigin::HumanAuthored = 0`: a NON-kernel origin.
+///                        Reuses the domain enum so the discriminator cannot
+///                        drift from `i3`.
+///
+/// Fail-closed: any SQLite, serialization, or entropy error returns
+/// `AuditError` — no silent `INSERT OR IGNORE`. The `transparency_log` table is
+/// created by the kernel; this helper does NOT create it and returns an error
+/// if it is absent (single-sourced schema, no drift).
+pub fn append_identity_asserted(
+    db_path: &Path,
+    spirit_pid: u32,
+    boot_nonce: u64,
+    subject: &str,
+    issuer: &str,
+    capability_key: &str,
+    decision_time_ns: u64,
+) -> Result<(), AuditError> {
+    let mut frame_id = [0u8; 16];
+    getrandom::fill(&mut frame_id)
+        .map_err(|e| AuditError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+    let payload = serde_json::json!({
+        "subject": subject,
+        "issuer": issuer,
+        "capability_key": capability_key,
+        "decision_time_ns": decision_time_ns,
+    });
+    let payload_bytes = serde_json::to_vec(&payload)?;
+
+    let spirit_pid_i = i64::try_from(spirit_pid).map_err(|_| AuditError::ValueOverflow {
+        field: "spirit_pid",
+        value: spirit_pid.into(),
+    })?;
+    let boot_nonce_i = i64::try_from(boot_nonce).map_err(|_| AuditError::ValueOverflow {
+        field: "boot_nonce",
+        value: boot_nonce,
+    })?;
+    let decision_time_ns_i =
+        i64::try_from(decision_time_ns).map_err(|_| AuditError::ValueOverflow {
+            field: "decision_time_ns",
+            value: decision_time_ns,
+        })?;
+
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_CREATE
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(AuditError::Open)?;
+
+    // Plain INSERT (NOT `INSERT OR IGNORE`): a frame_id PK collision surfaces as
+    // SQLITE_CONSTRAINT_PRIMARYKEY → AuditError::Query rather than being silently
+    // swallowed (Story 11.4c "fail closed" requirement).
+    conn.execute(
+        "INSERT INTO transparency_log \
+         (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, \
+          kind, intent, payload_redacted, origin) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        rusqlite::params![
+            &frame_id[..],                                                  // frame_id
+            decision_time_ns_i,                                             // timestamp_ns
+            spirit_pid_i,                                                   // spirit_pid
+            boot_nonce_i,                                                   // boot_nonce
+            Option::<&[u8]>::None, // capability_token = NULL
+            30i64,                 // kind — identity.asserted
+            "identity.asserted",   // intent
+            payload_bytes,         // payload_redacted (compact JSON)
+            maos_domain::invariants::i3::FrameOrigin::HumanAuthored as i64, // origin = 0 (non-kernel)
+        ],
+    )
+    .map_err(AuditError::Query)?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod available_arm_tests {
     //! Prove the `Available` arms route through the REAL adapters (not the stub).
@@ -457,7 +562,7 @@ mod available_arm_tests {
     //! `crates/maos-sso/tests/fixtures.rs` via `include_str!` + a tiny extractor,
     //! so this test can never drift from the trusted token material.
     use super::*;
-    use maos_audit::{append_identity_asserted, query, AuditEntry};
+    use maos_audit::{query, AuditEntry};
     use maos_kernel_core::security::RingCryptoProvider;
     use maos_secrets::LocalMasterKeyKms;
     use maos_siem::SiemExporter;

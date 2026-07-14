@@ -45,6 +45,9 @@ allow = [
     "MPL-2.0",
     "OpenSSL",  # Story 1a.3 — ring 0.17 (Rust crypto primitives; de-facto standard)
     "CDLA-Permissive-2.0",  # Story 1b.4 — webpki-roots via ureq (root CA certificates bundle)
+    "Zlib",  # foldhash (Zlib-only; transitive via hashbrown/ahash) — OSI-approved
+             # permissive license, functionally equivalent to MIT/BSD. Surfaced by
+             # the first full-branch CI run over the Epic 11+12 line.
 ]
 confidence-threshold = 0.8
 

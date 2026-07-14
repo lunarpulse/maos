@@ -1,14 +1,19 @@
 #![forbid(unsafe_code)]
+#![cfg(feature = "network")]
 
-//! Story 11.4c — production write helper for the out-of-kernel
+//! Story 11.4c — composition-root write helper for the out-of-kernel
 //! `identity.asserted` audit row (kind = 30).
 //!
-//! `append_identity_asserted` is the ONLY sanctioned production write path in
-//! `maos-audit` (every OTHER Transparency-Log row is written by the kernel's
-//! `TransparencyLogAdapter::insert_frame_event`, which cannot express kind 30
-//! without an L1 kernel-core delta). This file pins its public contract:
+//! `maos_bin::enterprise_identity::append_identity_asserted` is the sanctioned
+//! production write path for this one non-kernel provenance row. It lives in
+//! `maos-bin` (the writer / composition-root side), NOT in `maos-audit`, which
+//! is read-only by design (Story 9.2 Decision A.2, enforced by the
+//! `maos-audit-read-only` gate). Every OTHER Transparency-Log row is written by
+//! the kernel's `TransparencyLogAdapter::insert_frame_event`, which cannot
+//! express kind 30 without an L1 kernel-core delta. This file pins the helper's
+//! public contract:
 //!
-//! 1. It inserts exactly one row that surfaces via `query` with
+//! 1. It inserts exactly one row that surfaces via `maos_audit::query` with
 //!    `kind == "identity.asserted"`.
 //! 2. The four payload fields (`subject`, `issuer`, `capability_key`,
 //!    `decision_time_ns`) round-trip through `payload_redacted`.
@@ -18,7 +23,8 @@
 //!    absent — it does NOT create the schema.
 //! 5. Two writes produce two distinct `frame_id`s (random, no hard-coded PK).
 
-use maos_audit::{append_identity_asserted, query, AuditFilter};
+use maos_audit::{query, AuditFilter};
+use maos_bin::enterprise_identity::append_identity_asserted;
 use rusqlite::Connection;
 
 /// Exact `transparency_log` DDL — mirrors the schema-creation helper in the

@@ -2550,7 +2550,11 @@ jobs:
       - name: Run check-wasm-form-equiv gate (live tiered oracle + disposition)
         run: |
           set -o pipefail
-          cargo run -p xtask -- check-wasm-form-equiv --json 2>&1 | tee /tmp/equiv-gate.json
+          # stdout (the gate JSON) → file + console; stderr (cargo build noise,
+          # WOULD-HAVE-BLOCKED banner) → console only. NO `2>&1`: on a cache-COLD
+          # run the merged "Compiling …" output would pollute the file and break
+          # the tripwire's JSON parse (Epic-12 retro fix, 2026-07-14).
+          cargo run -p xtask -- check-wasm-form-equiv --json | tee /tmp/equiv-gate.json
       # Finding #13 (J4 pattern, cf. discipline.yml:2374): assert the
       # equiv-fault-inject anti-canned leg actually added and ran feature-only
       # tests, not merely the shared base harness. A cfg-attribute regression
@@ -2559,7 +2563,17 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, sys
-          data = json.load(open("/tmp/equiv-gate.json"))
+          # Extract the gate JSON line robustly instead of assuming the whole file
+          # parses — hardens the tripwire against any stray stdout / build noise
+          # on a cache-cold run (Epic-12 retro fix, 2026-07-14).
+          data = None
+          for raw in open("/tmp/equiv-gate.json"):
+              line = raw.strip()
+              if line.startswith("{") and "base_passed" in line:
+                  data = json.loads(line)
+          if data is None:
+              print("FAIL: no check-wasm-form-equiv JSON found in /tmp/equiv-gate.json")
+              sys.exit(1)
           base = int(data.get("base_passed", 0))
           fault = int(data.get("fault_inject_passed", 0))
           if fault <= base:

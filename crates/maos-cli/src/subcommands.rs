@@ -1508,11 +1508,14 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
                     "MAOS_UPGRADE_FROM_VERSION",
                     from.as_deref().expect("validated --plan --from"),
                 );
-                cmd.env(
-                    "MAOS_UPGRADE_CANDIDATES",
-                    serde_json::to_string(candidates)
-                        .expect("Vec<String> serialization is infallible"),
-                );
+                let candidates_json = match serde_json::to_string(candidates) {
+                    Ok(json) => json,
+                    Err(err) => {
+                        eprintln!("maos: failed to serialize upgrade candidates: {err}");
+                        return ExitCode::FAILURE;
+                    }
+                };
+                cmd.env("MAOS_UPGRADE_CANDIDATES", candidates_json);
             }
 
             if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
