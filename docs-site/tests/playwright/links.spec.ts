@@ -2,8 +2,6 @@ import { expect, test } from "@playwright/test";
 import {
   buildPageRoutes,
   koPath,
-  jaPath,
-  zhPath,
   loadManifest,
   manifestRoutePaths,
   type RouteManifest,
@@ -13,20 +11,21 @@ function normalizeRoute(route: string): string {
   return route.replace(/\/$/, "") || "/";
 }
 
+// Supported locales are en + ko only. ja + zh-Hans were deferred indefinitely
+// (Epic 11 hold-window decision 2026-06-29; see docusaurus.config.ts i18n +
+// LOCALES.md "Deferral Policy") — the placeholder scaffold was removed, so the
+// build never emits /ja/* or /zh-Hans/* pages. Expecting them here made the
+// behavioral gate assert fabricated routes (Epic-12 retro fix, 2026-07-14).
 function expectedPageRoutes(manifest: RouteManifest): Set<string> {
   const enRoutes = manifestRoutePaths(manifest);
   const expected = new Set<string>();
   for (const route of enRoutes) {
     expected.add(normalizeRoute(route));
     expected.add(normalizeRoute(koPath(route)));
-    expected.add(normalizeRoute(jaPath(route)));
-    expected.add(normalizeRoute(zhPath(route)));
   }
   for (const redirect of manifest.redirects ?? []) {
     expected.add(normalizeRoute(redirect.from));
     expected.add(normalizeRoute(koPath(redirect.from)));
-    expected.add(normalizeRoute(jaPath(redirect.from)));
-    expected.add(normalizeRoute(zhPath(redirect.from)));
   }
   return expected;
 }
