@@ -836,9 +836,42 @@ fn run_cli_wrapper_manifest(
     // injected host-side on the live path, never in this argv/env shaping code.
     let worker_env = worker_cli.nonsecret_env();
 
-    // 6. Journaled admission (Story 7.4 path: probe + shape assert + T3 floor).
-    admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
-        .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+    // 6. Admission — adapter-aware. The hermetic fixture speaks the kernel's
+    //    Story 7.4 `--maos-bridge-probe` output-shape handshake, so it uses the
+    //    journaled kernel path (probe + shape assert + T3 floor). A real
+    //    adapter-backed CLI (codex/claude) does NOT implement that handshake —
+    //    it exits non-zero on the probe flag, which is why the fixture was the
+    //    only worker that ever admitted. For real CLIs the WorkerCli adapter's
+    //    `parse_completion` IS the output-shape contract (verified at COMPLETION),
+    //    so admission runs a liveness probe and re-asserts the T3 floor here.
+    match worker_cli.probe_strategy() {
+        worker_cli::ProbeStrategy::BridgeHandshake => {
+            admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
+                .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+        }
+        worker_cli::ProbeStrategy::Liveness { argv } => {
+            // AC6 floor — a CliWrapperSpirit requires T3 (the kernel probe asserts
+            // this; preserve it on the real-CLI path).
+            if !matches!(granted_tier, maos_domain::invariants::i9::SandboxTier::T3) {
+                return Err(format!(
+                    "maos run: cli_wrapper admission failed: {} requires SandboxTier::T3, \
+                     host-granted {granted_tier:?}",
+                    worker_cli.name()
+                )
+                .into());
+            }
+            worker_cli::run_liveness_probe(&resolved, &argv, std::time::Duration::from_secs(10))
+                .map_err(|e| {
+                    format!("maos run: cli_wrapper admission failed: liveness probe: {e}")
+                })?;
+            eprintln!(
+                "maos run: cli_wrapper '{}' admitted via liveness probe (real adapter-backed CLI; \
+                 output shape is verified at completion by the {} adapter, not a bridge handshake)",
+                resolved,
+                worker_cli.name()
+            );
+        }
+    }
 
     // 7. Issue the Scope::CliSubprocessSpawn cap-token (binds argv_prefix_hash).
     //    Mediation requires the operator policy to grant `proc.exec` for the CLI

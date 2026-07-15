@@ -115,6 +115,73 @@ pub trait WorkerCli: Send + Sync {
     fn ambient_auth_path(&self, _home: &std::path::Path) -> Option<std::path::PathBuf> {
         None
     }
+
+    /// How admission verifies this CLI at load time.
+    ///
+    /// The kernel's Story 6.2 output-shape probe spawns the CLI with a
+    /// `--maos-bridge-probe` flag and expects it to emit its `output_shape_version`
+    /// — a MAOS-specific handshake that ONLY the hermetic fixture implements. A
+    /// real agent CLI (codex, claude) does not speak it and exits non-zero, so the
+    /// kernel probe can never admit a real worker. For those, the WorkerCli
+    /// adapter's [`parse_completion`](Self::parse_completion) IS the output-shape
+    /// contract (verified at COMPLETION time), so admission only needs a liveness
+    /// check that the binary is present and invokable. Default = a `--version`
+    /// liveness probe; the fixture overrides to the bridge handshake.
+    fn probe_strategy(&self) -> ProbeStrategy {
+        ProbeStrategy::Liveness {
+            argv: vec!["--version".to_string()],
+        }
+    }
+}
+
+/// How admission verifies a worker CLI (see [`WorkerCli::probe_strategy`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProbeStrategy {
+    /// The kernel's Story 6.2 `--maos-bridge-probe` output-shape handshake.
+    /// Fixture-only — the only CLI that answers the MAOS probe protocol.
+    BridgeHandshake,
+    /// A liveness probe for a real adapter-backed CLI: run it with `argv` and
+    /// require a clean exit. The adapter (not a handshake) is the output-shape
+    /// contract, verified at completion.
+    Liveness { argv: Vec<String> },
+}
+
+/// Run a liveness probe: spawn `program argv`, require a clean exit within
+/// `timeout`. Fail-closed on spawn error, non-zero exit, or timeout. Output is
+/// discarded — a liveness probe checks invokability, NOT output shape (that is
+/// the adapter's completion oracle). Mirrors the kernel probe's poll+timeout
+/// shape so the real-CLI admission path has the same fail-loud guarantees.
+pub fn run_liveness_probe(
+    program: &str,
+    argv: &[String],
+    timeout: std::time::Duration,
+) -> Result<(), String> {
+    use std::process::{Command, Stdio};
+    let mut child = Command::new(program)
+        .args(argv)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("spawn failed for {program}: {e}"))?;
+    let start = std::time::Instant::now();
+    loop {
+        match child
+            .try_wait()
+            .map_err(|e| format!("try_wait failed for {program}: {e}"))?
+        {
+            Some(status) if status.success() => return Ok(()),
+            Some(status) => return Err(format!("non-zero exit ({status}) for {program}")),
+            None => {
+                if start.elapsed() >= timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!("timed out after {timeout:?} for {program}"));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
+    }
 }
 
 /// The clean-home invariant (spec "Never"): on the live path, refuse if the CLI's
@@ -203,6 +270,13 @@ impl WorkerCli for FixtureCli {
             },
             _ => WorkerCompletion::NotCompleted(WorkerNonCompletion::NoCompletionMarker),
         }
+    }
+
+    /// The hermetic fixture is the ONE CLI that implements the kernel's
+    /// `--maos-bridge-probe` output-shape handshake, so it uses it (hermetic
+    /// Tier-1 keeps proving the kernel probe path).
+    fn probe_strategy(&self) -> ProbeStrategy {
+        ProbeStrategy::BridgeHandshake
     }
 }
 
@@ -419,6 +493,53 @@ mod tests {
         // The fixture is never shadowed by an ambient codex token.
         assert!(refuse_ambient_auth(&FixtureCli, &tmp).is_ok());
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    // ── admission probe strategy — fixture handshake vs real-CLI liveness ────
+
+    #[test]
+    fn only_the_fixture_speaks_the_bridge_handshake() {
+        // The gap this closes: the kernel `--maos-bridge-probe` handshake is
+        // fixture-only, so real CLIs must NOT be routed through it (they exit
+        // non-zero and never admit). The fixture keeps it; codex/claude get a
+        // `--version` liveness probe.
+        assert_eq!(FixtureCli.probe_strategy(), ProbeStrategy::BridgeHandshake);
+        assert_eq!(
+            CodexCli.probe_strategy(),
+            ProbeStrategy::Liveness {
+                argv: s(&["--version"])
+            }
+        );
+        assert_eq!(
+            ClaudeCli.probe_strategy(),
+            ProbeStrategy::Liveness {
+                argv: s(&["--version"])
+            }
+        );
+    }
+
+    #[test]
+    fn liveness_probe_passes_on_clean_exit_and_fails_closed_otherwise() {
+        use std::time::Duration;
+        let t = Duration::from_secs(5);
+        // A binary that exits 0 → admitted.
+        assert!(run_liveness_probe("true", &[], t).is_ok());
+        // A binary that exits non-zero → fail-closed (this is the codex-exit-2
+        // admission failure the operator hit, now a clean typed refusal).
+        let err = run_liveness_probe("false", &[], t).unwrap_err();
+        assert!(err.contains("non-zero exit"), "got: {err}");
+        // A missing binary → fail-closed on spawn.
+        let err = run_liveness_probe("maos-no-such-binary-xyz", &[], t).unwrap_err();
+        assert!(err.contains("spawn failed"), "got: {err}");
+    }
+
+    #[test]
+    fn liveness_probe_times_out_and_fails_closed_on_a_hang() {
+        use std::time::Duration;
+        // `sleep 5` under a 200ms budget → killed + refused (a hanging CLI must
+        // not block admission), mirroring the kernel probe's 2s timeout guard.
+        let err = run_liveness_probe("sleep", &s(&["5"]), Duration::from_millis(200)).unwrap_err();
+        assert!(err.contains("timed out"), "got: {err}");
     }
 
     // ── the completion oracle — a raw exit is NEVER completion ──────────────

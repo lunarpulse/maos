@@ -69,17 +69,41 @@ DEMO=$(mktemp -d /tmp/maos-j1-demo.XXXXXX)   # outside the repo tree on purpose
 - [ ] Confirm **no ambient `~/.codex/auth.json`** in the sandbox home — a live ChatGPT session shadows the injected `OPENAI_API_KEY` and leaves an un-scrubbable token. The run must **refuse or wipe** it, never inherit. `[T5 negative test proves it]`
 - [ ] `codex --version` present and pinned; record it (it becomes the "live-agent identity" in the capture).
 
+**1.4 — codex sandbox prerequisite (bubblewrap / user namespaces):** `[found 2026-07-15]`
+
+- [ ] codex's OWN sandbox (`--sandbox workspace-write`) uses **bubblewrap**, which needs **unprivileged user namespaces**. On a hardened host / default Docker you'll see `bwrap: No permissions to create a new namespace` and **every codex write fails**. Enable it at the *container/host* (e.g. `sudo sysctl -w kernel.unprivileged_userns_clone=1`, or run the container `--privileged` / with userns allowed), then re-test **1.5**. This is an environment prerequisite, **not** a MAOS setting.
+- [ ] **Do NOT** "fix" it with codex `--sandbox danger-full-access` for the *signed* run — that removes codex's FS jail, and MAOS's T3 FS-scope is *declared-not-enforced* at v0.1, so the c2 demo-dir bound would be enforced by **nothing**. The signed run requires codex's workspace-write jail to actually work.
+
+**1.5 — Pin the exact codex invocation that WRITES to `$DEMO`, standalone:** `[found 2026-07-15]`
+
+```
+cd "$DEMO" && git init -q .
+RUST_LOG=error codex exec --sandbox workspace-write "write hello to ./hello.txt"
+#   PASS = hello.txt exists, exit 0, a final message on stdout.
+#   If it fails on bwrap → fix 1.4 first. Then transcribe the EXACT flags into
+#   spirits/worker/manifest-codex.toml `argv_prefix` (it is TOCTOU-hashed).
+```
+
+> **MAOS admission note (fixed 2026-07-15):** real CLIs do NOT implement MAOS's
+> `--maos-bridge-probe` output-shape handshake (only the fixture does), so the
+> codex worker is admitted by a **liveness probe** (`codex --version` exits 0) +
+> the T3 floor; the output shape is verified at *completion* by the codex
+> adapter. Your `manifest-codex.toml` needs no probe handler.
+
 ---
 
-## Phase 2 — Dry run (optional, UNSIGNED — subscription is fine here)
+## Phase 2 — Dry run (fixture mechanics OR a direct codex sanity check)
 
-Watch it work before you spend a signed dollar. Subscription/ChatGPT-login is acceptable **only here** — nothing gets signed, so the un-held token doesn't matter.
+**Important:** a *subscription* codex run **through the bridge is refused** — `MAOS_LIVE_AGENT=1` + codex triggers the clean-home refusal whenever `~/.codex/auth.json` exists, and it's the API-key path that Tier-2 requires. So the free dry run is one of:
 
-```
-MAOS_LIVE_AGENT=1 maos run spirits/topologies/j1-founder-loop.toml --live   # [--live exists; MAOS_LIVE_AGENT + topology Worker = T1/T2/T5]
-```
+- **Fixture mechanics (no codex, no cost):** run the hermetic worker to watch the topology/bridge/serving-loop. Needs `worker-cli-fixture` on PATH — easiest is to run the freshly-built binary so it's a daemon-sibling:
+  ```
+  cargo build --workspace
+  ./target/debug/maos run spirits/topologies/j1-founder-loop.toml --once
+  ```
+- **Direct codex sanity check (subscription OK):** just `codex exec …` outside `maos` (Phase 1.5) — confirms codex itself works; nothing signed.
 
-- [ ] You see: Orchestrator loads Architect + Reviewer + **codex Developer-Worker**; a typed `task.assign` routes to codex; codex works in `$DEMO`; `task.complete`; a digest citing the Worker's TL ref. Ideally a halt → you answer → resume cites the exact pre-halt ref.
+- [ ] Fixture path: Orchestrator loads Architect + Reviewer + the worker; a typed task routes; the worker subprocess is real (`child_pid`); `worker_completion completed=true`; clean drain.
 
 ---
 
