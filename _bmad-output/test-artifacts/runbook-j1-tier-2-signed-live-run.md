@@ -90,6 +90,16 @@ RUST_LOG=error codex exec --sandbox workspace-write "write hello to ./hello.txt"
 > the T3 floor; the output shape is verified at *completion* by the codex
 > adapter. Your `manifest-codex.toml` needs no probe handler.
 
+> **MAOS stdin note (fixed 2026-07-15, kernel):** `codex exec` reads its prompt
+> from argv **and** keeps reading **stdin-until-EOF**. The bridge used to hold
+> the worker's stdin open, so codex hung at `Reading additional input from
+> stdin…` (`ps`: `Sl+`, 0 % CPU) while the bridge waited for output — a deadlock.
+> The kernel now **closes the worker's stdin** for a `Signals`-driven worker
+> (the codex/fixture path) so codex gets EOF and runs on its argv prompt. **No
+> `< /dev/null` shim needed** on a `maos` built from `epic-13` at `0a03468f` or
+> later. If you see the hang, your `maos` binary predates the fix — rebuild
+> (`cargo build --workspace`).
+
 ---
 
 ## Phase 2 — Dry run (fixture mechanics OR a direct codex sanity check)
