@@ -32,7 +32,7 @@
 
 | Secret | Role | Where it lives |
 |---|---|---|
-| `OPENAI_API_KEY` | codex **Worker** spends it | injected host-side into sandbox env; denylisted; scrubbed |
+| `CODEX_API_KEY` | codex **Worker** spends it | inherited host-side into sandbox env; denylisted; scrubbed. **NOT `OPENAI_API_KEY`** — `codex exec` ignores that var and reads `CODEX_API_KEY` (codex-rs `login/src/auth/manager.rs:1226` + `exec/src/lib.rs:571`). Set `CODEX_API_KEY="$OPENAI_API_KEY"`. |
 | Orchestrator provider key (e.g. `ANTHROPIC_API_KEY`) | the class Spirits' **reasoning** under `--live` | MAOS provider port; host-side |
 | Operator **audit key** (Ed25519) | **you sign** with it | host-only; **never enters the sandbox** |
 
@@ -122,7 +122,8 @@ RUST_LOG=error codex exec --sandbox workspace-write "write hello to ./hello.txt"
 **Two "live" axes — set both:** `--live` = real provider for the Spirits' *reasoning*; `MAOS_LIVE_AGENT=1` = real *codex subprocess* instead of the fixture.
 
 ```
-export OPENAI_API_KEY=…            # codex worker — metered, capped, revocable (the child INHERITS this; MAOS never reads/holds it)
+export CODEX_API_KEY="$OPENAI_API_KEY"   # codex worker — metered, capped, revocable (the child INHERITS this; MAOS never reads/holds it).
+                                         # MUST be CODEX_API_KEY: `codex exec` IGNORES OPENAI_API_KEY for auth (→ 401 Missing bearer).
 export ANTHROPIC_API_KEY=…         # (or your configured provider) — Orchestrator reasoning
 export MAOS_LIVE_AGENT=1           # [lands] permit the real agent subprocess (CI never sets this → CI cannot spawn a paid agent)
 export MAOS_HOST_GRANTS=~/.maos/host-grants.toml   # [lands] operator grant for codex (see below) — without it, codex fails closed
@@ -136,19 +137,24 @@ export MAOS_HOST_GRANTS=~/.maos/host-grants.toml   # [lands] operator grant for 
 #   AND a codex worker manifest (command="codex", argv_prefix=["exec","--sandbox","workspace-write"])
 #   referenced by the topology (swap the fixture worker entry).
 
-#   Clean-home invariant: MAOS REFUSES the live run if ~/.codex/auth.json exists
-#   (it shadows OPENAI_API_KEY with a token MAOS can't attest). Wipe it first.
+#   Clean-home invariant: MAOS REFUSES the live run if ~/.codex/auth.json exists.
+#   (CODEX_API_KEY actually takes precedence OVER auth.json in codex, so this is
+#   not about shadowing — it is to keep an un-attestable subscription token out of
+#   the signed run's sandbox entirely.) Wipe it first.
+#   Run maos FROM $DEMO so codex inherits cwd=$DEMO (workspace-write binds writes
+#   to cwd) — otherwise codex writes into the launch dir, breaking the c2 bound.
 
-maos run spirits/topologies/j1-founder-loop.toml --live   # [--live exists; live Worker = adapter + host-grant + gate]
+cd "$DEMO" && maos run <abs>/spirits/topologies/j1-founder-loop-codex.toml --live   # codex topology, NOT the fixture one
 #   continuous service; use safe shutdown (Ctrl-C, not --once). NOTE: the full
 #   halt/resume digest-citation is a DEFERRED seam (FOLLOWUP-J1-RESUME-SEAM) — not
 #   a gate for this run; continuous service + safe shutdown ARE verified.
+#   PROVEN 2026-07-15: worker_completion completed=true, exit 0, completion_tl_ref set.
 ```
 
 - [ ] Delegation → codex executes the c2 task in `$DEMO` → completion **parsed by the adapter** (codex: final line on stdout), never inferred from exit code.
 - [ ] Digest cites the Worker-produced Transparency Log reference through the distillate chain.
 - [ ] (Ideal) a halt/resume: post-resume digest contains the exact pre-halt typed ref; no in-flight delegation preempted.
-- [ ] Revoke `OPENAI_API_KEY` when done.
+- [ ] Revoke the OpenAI API key (`CODEX_API_KEY` / `OPENAI_API_KEY`) when done.
 
 ---
 
@@ -160,7 +166,7 @@ Write the capture doc as a **JSON file** (e.g. `./j1-tier2-capture.json`). Phase
 {
   "signer": "<your name> (named human signer)",
   "live_agent_identity": "codex <version>",
-  "command_metadata": "codex exec <task>; OPENAI_API_KEY injected host-side (value redacted)",
+  "command_metadata": "codex exec <task>; CODEX_API_KEY injected host-side (value redacted)",
   "host_grant_disposition": "exact-match grant admitted (codex @ OpenAI, T3); a mismatch would have refused",
   "audit_refs": ["<audit TL ref>", "<digest TL ref the digest cited>"],
   "egress": "declared-not-enforced",
@@ -256,10 +262,10 @@ Edit `_bmad-output/test-artifacts/release-gate-8-12-tier-2-cli-wrapper.md`:
 
 **T6 = 사람(당신)만 닫을 수 있는 게이트.** 테스트 초록불로는 안 닫힘. 순서:
 
-- **0단계 (지금 가능):** c2 작업 문장 + 지출 상한 확정 → 세 개의 비밀 분리(`OPENAI_API_KEY`=codex worker / provider key=Orchestrator 추론 / **audit key**=서명, 샌드박스 진입 금지) → `maosctl audit keygen`으로 서명 키 생성 + 지문 공개.
+- **0단계 (지금 가능):** c2 작업 문장 + 지출 상한 확정 → 세 개의 비밀 분리(`CODEX_API_KEY`=codex worker / provider key=Orchestrator 추론 / **audit key**=서명, 샌드박스 진입 금지) → `maosctl audit keygen`으로 서명 키 생성 + 지문 공개. (**codex worker는 `CODEX_API_KEY`를 읽음 — `OPENAI_API_KEY`가 아님**; `codex exec`는 후자를 무시 → 401.)
 - **1단계:** `main`에서 브릿지 브랜치 worktree(더러운 epic-12 트리 보존) → 일회용 `$DEMO` 디렉터리(repo 밖) → 샌드박스 홈에 `~/.codex/auth.json` 없음 확인 → `codex --version` 기록.
 - **2단계 (선택, 무서명):** 구독으로 한 번 구경 — 서명 안 하니 토큰 상관없음.
-- **3단계 (서명 실행):** `OPENAI_API_KEY`+provider key+`MAOS_LIVE_AGENT=1` → `maos run …j1-founder-loop.toml --live`(연속, `--once` 아님 → halt/resume 확인). codex가 `$DEMO`에서 작업 → 완료는 **어댑터가 파싱**(종료코드 아님) → 다이제스트가 Worker TL ref 인용. 끝나면 키 폐기.
+- **3단계 (서명 실행):** `CODEX_API_KEY="$OPENAI_API_KEY"`+provider key+`MAOS_LIVE_AGENT=1` → `cd "$DEMO" && maos run …j1-founder-loop-codex.toml --live`(codex 토폴로지, 연속, `--once` 아님 → halt/resume 확인; `$DEMO`에서 실행해야 codex cwd=$DEMO). codex가 `$DEMO`에서 작업 → 완료는 **어댑터가 파싱**(종료코드 아님) → 다이제스트가 Worker TL ref 인용. 끝나면 키 폐기. (**2026-07-15 실증: `worker_completion completed=true`, exit 0, `completion_tl_ref` 발급.**)
 - **4단계:** 캡처 문서를 **JSON 파일**로 작성(비밀 제외): `signer`, `live_agent_identity`, `command_metadata`(redacted argv), `host_grant_disposition`, `audit_refs`, `egress`=`declared-not-enforced`+`egress_followup`, `redaction_result`=`verified`, `outcome`. (필수 필드 미달·비밀 포함·과잉주장 시 5a에서 거부됨.)
 - **5단계 (저널링 후 서명):** **5a** `maosctl audit record-capture --capture <file.json> --spirit <orch>` → 캡처를 `run.capture` audit row로 저널링(서명이 파일이 아니라 audit **행**을 서명하므로 필수) → **5b** `maosctl audit sealed-export --spirit <orch> --audit-key <signer.key> --output …` → **하나의 서명된 JSON 번들**(embedded Ed25519 서명) → **직접 검증**(지문 대조) 통과해야 함. (`SHA256SUMS`+`.sig`가 아님 — 그건 오프라인 임포트 경로. journal-capture 배선은 2026-07-15 착륙.)
 - **6단계:** release-gate에 서명자=Myoungki Jung/날짜/번들 경로 기록, 관찰된 증거로만 체크 → 커밋 → 스프린트 라인 done → `13-1` 앞에서 머지.

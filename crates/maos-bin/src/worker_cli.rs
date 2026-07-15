@@ -300,8 +300,12 @@ impl WorkerCli for CodexCli {
     }
 
     fn nonsecret_env(&self) -> Vec<(String, String)> {
-        // Non-interactive; keeps codex from prompting for a TTY. The credential
-        // (`OPENAI_API_KEY`) is injected host-side, NOT here.
+        // Non-interactive; keeps codex from prompting for a TTY. The credential is
+        // `CODEX_API_KEY` — NOT `OPENAI_API_KEY`. `codex exec` ignores
+        // OPENAI_API_KEY for auth; it reads CODEX_API_KEY via load_auth's
+        // enable_codex_api_key_env path (codex-rs login/src/auth/manager.rs:1226,
+        // enabled for exec at exec/src/lib.rs:571). It is inherited host-side from
+        // the maos process env, NEVER set here (so MAOS never holds the value).
         vec![("CODEX_NON_INTERACTIVE".to_string(), "1".to_string())]
     }
 
@@ -315,8 +319,12 @@ impl WorkerCli for CodexCli {
     }
 
     fn ambient_auth_path(&self, home: &std::path::Path) -> Option<std::path::PathBuf> {
-        // ChatGPT-login writes a plaintext token here; on the live path its
-        // presence is a hard refusal (it shadows the injected `OPENAI_API_KEY`).
+        // ChatGPT-login writes a plaintext subscription token here. Note
+        // `CODEX_API_KEY` actually takes PRECEDENCE over auth.json (manager.rs:1226
+        // is checked before the file store), so this is NOT about shadowing — it is
+        // a hard refusal on the live path because an un-attestable subscription
+        // credential must not exist in the signed run's sandbox home at all
+        // (MAOS cannot prove it scrubbed a token it never held). Refuse-or-wipe.
         Some(home.join(".codex").join("auth.json"))
     }
 }
