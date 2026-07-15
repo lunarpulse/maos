@@ -473,7 +473,20 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
         .map_err(|e| BridgeError::Spawn(format!("{}: {e}", spec.program)))?;
 
     let child_pid = child.id();
-    let stdin = child.stdin.take();
+    // Close the child's stdin unless stdin IS the control channel. A worker
+    // driven by `Signals` (or the fixture) is not fed via stdin, and a real CLI
+    // that reads stdin-until-EOF (e.g. `codex exec`) would otherwise DEADLOCK on
+    // the bridge's held-open pipe: it blocks reading stdin while the bridge blocks
+    // reading its output. Dropping the `ChildStdin` sends EOF so the child
+    // proceeds on its argv prompt. `StdinCommands` (and the J1 bench's
+    // `write_stdin_line`) keep stdin open — that path drives the worker through it.
+    let stdin = match spec.control_channel {
+        CliWrapperControlChannel::Signals => {
+            let _ = child.stdin.take(); // drop the ChildStdin → EOF to the child
+            None
+        }
+        _ => child.stdin.take(),
+    };
     let stdout = child
         .stdout
         .take()
@@ -1115,6 +1128,48 @@ mod tests {
             start.elapsed() < Duration::from_secs(5),
             "Drop without pump took {:?} — likely deadlocked",
             start.elapsed()
+        );
+    }
+
+    /// Regression (J1 live codex): a worker driven by `Signals` is NOT fed via
+    /// stdin, so the bridge must close the child's stdin. Otherwise a CLI that
+    /// reads stdin-until-EOF (`codex exec`) deadlocks — it blocks reading stdin
+    /// while the bridge blocks reading its output. The hermetic fixture never
+    /// read stdin, so this stayed invisible through T1–T5. Here a REAL `cat`
+    /// blocks on stdin then echoes: it can only reach the echo if the bridge sent
+    /// EOF by closing stdin. (`StdinCommands` keeps stdin — the J1 bench drives it
+    /// via `write_stdin_line`; not closed here.)
+    #[test]
+    fn signals_control_closes_worker_stdin_so_a_stdin_reader_proceeds() {
+        let argv_prefix = vec!["-c".to_string(), "cat >/dev/null; echo done".to_string()];
+        let spec = BridgeSpawnSpec {
+            program: "/bin/sh".to_string(),
+            expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
+            argv_prefix,
+            task_args: vec![],
+            from_spirit_id: "worker".to_string(),
+            stdio_shape: CliWrapperStdioShape::NdjsonOverStdio,
+            control_channel: CliWrapperControlChannel::Signals,
+            shutdown_signal: None,
+            channel_capacity: 8,
+            backpressure: Backpressure::Block,
+            env: vec![],
+        };
+        let mut bridge = spawn_and_bridge(spec).expect("spawn /bin/sh");
+
+        // The bridge closed the worker's stdin (Signals) → it is gone.
+        assert!(
+            bridge.write_stdin_line(b"x").is_err(),
+            "a Signals worker's stdin must be closed so a stdin-reading CLI gets EOF"
+        );
+
+        // And `cat` actually reached `echo done` — proof it received EOF and did
+        // not deadlock. Before the fix, stdin stayed open, `cat` blocked forever,
+        // and `done` never arrived.
+        let line = bridge.recv_line();
+        assert!(
+            matches!(&line, Some((SubStream::Stdout, b)) if b == b"done"),
+            "expected 'done' after EOF-driven completion, got {line:?}"
         );
     }
 }
