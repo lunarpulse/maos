@@ -136,3 +136,71 @@ fn founder_loop_journey_runs_with_real_worker_subprocess() {
         "the founder-loop topology must terminate through the production drain seam; stdout:\n{stdout}"
     );
 }
+
+/// T5 — the CI/local split control, proven at the `maos run` level (not just the
+/// unit gate): a HOST-GRANTED real agent CLI is still refused when
+/// `MAOS_LIVE_AGENT` is unset — so CI (which never sets it) physically cannot
+/// spawn a paid agent. Removing the gate call from the run path reds THIS test.
+/// Linux-only: the T3 grant fails closed on non-Linux before the gate is reached.
+#[cfg(target_os = "linux")]
+#[test]
+fn ci_local_split_refuses_a_granted_real_agent_without_the_live_flag() {
+    let home = isolated_data_home("split");
+
+    // A fake `codex` on PATH so binary resolution succeeds — the gate refuses
+    // BEFORE the process is ever run, so the fake never has to do anything.
+    let bindir = home.path.join("bin");
+    std::fs::create_dir_all(&bindir).unwrap();
+    let fake = bindir.join("codex");
+    std::fs::write(&fake, "#!/bin/sh\nexit 0\n").unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    // Host-grant codex at T3 so we isolate the LIVE-flag gate (not the grant).
+    let grants = home.path.join("host-grants.toml");
+    std::fs::write(
+        &grants,
+        "[[grant]]\nattested_image = \"codex\"\nsigning_key_id = \"OpenAI\"\n\
+         permitted_tier = \"T3\"\npermitted_egress_destinations = [\"api.openai.com\"]\n",
+    )
+    .unwrap();
+
+    // A [cli_wrapper] worker manifest wrapping codex.
+    let manifest = home.path.join("codex-worker.toml");
+    std::fs::write(
+        &manifest,
+        "[cli_wrapper]\ncommand = \"codex\"\nargv_prefix = [\"exec\"]\n\
+         output_shape_version = \"1.0.0\"\nrecovery_policy = \"respawn_fresh\"\n\
+         [cli_wrapper.posture]\nstdio_shape = \"ndjson_over_stdio\"\n\
+         control_channel = \"signals\"\nshutdown_signal = \"SIGTERM\"\n\
+         [sandbox]\ntier = \"T3\"\n[author]\nname = \"OpenAI\"\n",
+    )
+    .unwrap();
+
+    let mut path = std::ffi::OsString::from(&bindir);
+    path.push(":");
+    path.push(std::env::var_os("PATH").unwrap_or_default());
+
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
+        .args(["run", manifest.to_str().unwrap(), "--once"])
+        .env("XDG_DATA_HOME", home.path.clone())
+        .env("MAOS_HOME", home.path.clone())
+        .env("MAOS_HOST_GRANTS", &grants)
+        .env("PATH", path)
+        .env_remove("MAOS_LIVE_AGENT")
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to execute maos-bin");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "a granted real agent CLI must be refused without MAOS_LIVE_AGENT; stderr:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("MAOS_LIVE_AGENT"),
+        "the refusal must name the local opt-in (CI runs the fixture only, never a paid agent); stderr:\n{stderr}"
+    );
+}

@@ -1,0 +1,134 @@
+---
+title: 'Make the Founder’s Loop a verifiable Tier-2 live-agent journey'
+type: 'feature'
+created: '2026-07-12'
+updated: '2026-07-14'
+status: 'in-progress'
+baseline_commit: '79a880eccea92e01278f072b754de066674de79d'  # main HEAD; bridge branch j1-tier2-live-agent-signed-bridge off main
+review_loop_iteration: 1
+context:
+  - '_bmad-output/planning-artifacts/prd/user-journeys.md'
+  - '_bmad-output/planning-artifacts/architecture-maos-minimal-opus/6-reference-spirits.md'
+  - '_bmad-output/test-artifacts/release-gate-8-12-tier-2-cli-wrapper.md'
+ratified: '2026-07-14 party-mode (Winston·Murat·Amelia·John·Vex·Grumbal·Dana·Boundary); Lunarpulse ratified c1–c4 + execution model + worker CLI'
+slot: 'pre-Epic-13 bridge (8.16 precedent); dedicated branch off main; merge before 13-1; alongside B1 (Option-C leg-binding) + G3 (loom-threat-model)'
+---
+
+<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates. Renegotiated + re-frozen 2026-07-14 (c1–c4 ratified).">
+
+## Intent
+
+**Problem:** J1 cannot yet prove its PRD promise: an Orchestrator delegates a real coding task to a Developer-Worker while the founder is away. Its topology contains only Orchestrator, Architect, and Reviewer; topology loading rejects `[cli_wrapper]` members; bridge invocation receives no task; continuous topology execution fails; the Tier-2 signed live-agent gate remains open.
+
+**Approach:** Make J1 run one host-authorized real Developer-Worker alongside its class Spirits, route a typed `task.assign` into that Worker, retain audit/digest/halt lineage, and capture one controlled real **agent-CLI** execution from a clean worktree. The Worker CLI is a **swappable adapter** (the ratified first CLI is **`codex exec`**; `claude -p` and others are the same seam, not a fork). Sign evidence only after every required fact is observed.
+
+## Boundaries & Constraints
+
+**Always:** Use `maos run` and production IAC, admission, Transparency Log, and digest paths—never a bespoke harness, hand-inserted rows, or fixture substituted for the live run. The Worker launches only after a host-managed exact-match grant approves its executable identity, tier, and egress; replace the current manifest-derived self-grant. Use a dedicated clean worktree, preserving the dirty `epic-12` tree. **Inject every LLM credential only host-side as an API key — the codex Worker key (`OPENAI_API_KEY`) AND the class-Spirit reasoning-provider key that `--live` consumes (e.g. `ANTHROPIC_API_KEY`) — so MAOS holds each value, denylists it, and can prove it scrubbed it**; redact both before persistence and exclude them from evidence. (Two live axes: `--live` = real provider for Spirit reasoning; `MAOS_LIVE_AGENT=1` = real codex subprocess.) Keep `--once` for hermetic tests; the signed path needs continuous operation and explicit safe shutdown. **The signed run is operator-LOCAL and observed by a human — never a GitHub CI job.** The signing key (operator Ed25519 audit key) is a third secret, distinct from both LLM credentials, and never enters the sandbox.
+
+**Ask First — RATIFIED 2026-07-14 (c1–c4):**
+- **c1 — model + spend ceiling:** **codex** worker; **API-key-in-env** for the signed run (subscription/ChatGPT-login is acceptable only for an *unsigned* dry-run — it cannot back the signature, see Never). Metered key, small usage, operator sets the exact ceiling at run time.
+- **c2 — task + tool scope:** one real, non-destructive-to-the-repo, story-sized task in a **freshly-created disposable demo directory**, with full **create/read/update/delete** *inside that directory only*; no auto-stage/commit; no `--dangerously-skip-permissions`.
+- **c3 — host-grant / egress:** exact-match grant (identity + tier + egress allowlist); egress is recorded **`declared-not-enforced`** with a follow-up ID for run one (enforced packet-level egress is a named Epic-14 v2.0 hardening follow-up). Acceptable *because* c1 (scoped/revocable/capped key) + c2 (disposable dir) bound the blast radius.
+- **c4 — signer:** the accountable **human** (Lunarpulse) signs via `maosctl audit sealed-export` (FR44, Ed25519 audit key); the review room is the §A6 seal underneath (author ≠ sealer ≠ signer).
+
+**Never:** Do not run a real agent in the dirty worktree; automatically stage/commit its edits; log credential values; bypass CLI permissions; use `--dangerously-skip-permissions`; accept a raw process exit as task completion; or close Tier-2 from fixture output. **Do not use subscription / ChatGPT-login / `~/.codex/auth.json` auth for the signed run** (MAOS never holds that token, so redaction is unattestable → a failed Tier-2). **Do not run the live/paid path in CI.** Do not let the audit signing key enter the sandbox.
+
+## I/O & Edge-Case Matrix
+
+| Scenario | Input / State | Expected behavior | Error handling |
+|---|---|---|---|
+| Authorized delegation | J1 topology, signed host grant, bounded `task.assign`, real codex (API-key-in-env) | Worker executes the task; output, completion, digest refs, and audit lineage persist | N/A |
+| No exact grant | CLI wrapper has no matching host grant | Refuse before probe/spawn with typed authorization failure | No subprocess or capture |
+| Halt/resume | Ambiguous task or controlled restart | Record halt; resume cites the exact pre-halt typed reference | No silent fallback or context loss |
+| Secret-shaped output | Either LLM credential (codex Worker key or the orchestrator's `--live` provider key) appears in output | Persistent output and evidence are redacted (both values MAOS injected + denylisted) | Demonstration fails if a secret persists |
+| Subscription-only auth | Signed run attempted with ChatGPT-login / `~/.codex/auth.json`, no API key in env | Signed capture refuses to claim `redaction: verified`; Tier-2 stays open | Un-attestable secret; not a valid signature |
+| Ambient auth token in sandbox home | `~/.codex/auth.json` present in sandbox home | Refuse or wipe — never inherit (it shadows the injected key + leaves an un-scrubbable token) | Fail-closed before spawn |
+| CRUD outside demo dir | Worker attempts create/delete outside the disposable demo directory | Capability scope refuses, fail-closed, journaled | No escape to repo / epic-12 tree / $HOME |
+| Agent failure | CLI crashes or capability expires mid-task | Typed lifecycle result and unsigned failed capture; a raw exit is NOT completion | Tier-2 remains open |
+
+</frozen-after-approval>
+
+## Code Map
+
+- `spirits/topologies/j1-founder-loop.toml` — canonical J1 composition; currently omits Worker.
+- `spirits/worker/manifest.toml` — fixture baseline; preserve it for hermetic tests, not the live profile.
+- `crates/maos-bin/src/main.rs` — topology loader, CLI wrapper runner, grants, lifecycle, and events. Home of the new **`WorkerCli` adapter** (CLI selection + `argv(task)` + `parse_completion(stdout,stderr,exit)`), kept in maos-bin so kernel-core stays generic.
+- `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs` — subprocess framing, journal, recovery. Stays **CLI-agnostic**: runs argv, returns raw stdout/stderr/exit; the adapter (maos-bin) interprets completion. (ZERO-Δ target; Task-0 confirms.)
+- `crates/maos-domain/src/host_grant.rs` — grant seam; composition root currently self-populates it.
+- `crates/maos-domain/src/audit_key.rs` — operator Ed25519 audit key (generate/load); the **signer** key. Reused, not rebuilt.
+- `crates/maos-cli/src/subcommands.rs` — `maosctl audit sealed-export` (FR44, `audit_sealed_export`): builds a bundle from the **audit entries** (`build_bundle`) and signs it with the operator Ed25519 audit key (`sign_bundle` → Ed25519 over `sha256(canonical)`), writing **one self-contained signed JSON bundle** to `--output` (a file; signature embedded). **This is the signature mechanism.** CORRECTION (dev 2026-07-14): it is NOT a `SHA256SUMS` + separate `.sig` file set — so the capture doc joins by being **journaled as an audit entry** (in the covered window), NOT added to a hashed file list.
+- `crates/maos-journey-test/tests/journey_j1.rs` — J1 contract; currently tests only class load/drain.
+- `crates/maos-bin/tests/smoke_cli_wrapper_8_12.rs` — separate fixture-worker and topology tests.
+- `_bmad-output/test-artifacts/release-gate-8-12-tier-2-cli-wrapper.md` — authoritative gate record.
+- **Secret-var trace:** three governed secrets — `MAOS_OPENAI_API_KEY` (codex Worker), `MAOS_ANTHROPIC_API_KEY` (Orchestrator `--live` reasoning provider), `MAOS_AUDIT_KEY` (signer) — **all already named in Story 14-9**; the bridge’s handling must align with that classification (registry stores name+purpose, never value; never logged/echoed/serialized). The two live axes (`--live` reasoning provider + `MAOS_LIVE_AGENT` codex subprocess) are why there are two LLM keys, not one.
+
+## Tasks & Acceptance
+
+**Execution:**
+
+- [x] **T1 — admit the CLI-wrapper topology member** (`crates/maos-bin/src/main.rs` + focused tests): flip the `[cli_wrapper]` rejection (~`main.rs:2734`) to admit-through the standalone grant and output-shape gates; route the typed task assignment/completion instead of the empty argument vector (`main.rs:665` `task_args: vec![]`); retain class-only behavior; fail closed on duplicates, unsupported wrappers, or absent grants.
+- [x] **T2 — `WorkerCli` adapter** (`crates/maos-bin/src/main.rs` + tests): one trait — `argv(task)` and `parse_completion(stdout, stderr, exit)` — with `codex` and `claude` impls; **the hermetic fixture goes through the same trait** (real subprocess, deterministic output), the live run swaps only binary + argv. Per-CLI completion oracle lives in the adapter (codex: final message on stdout, progress on stderr; claude `-p`: result on stdout). A raw exit code is never completion.
+- [x] **T3 — host-managed grant** (`crates/maos-domain/src/host_grant.rs`, composition-root config, tests): replace self-grants with a host-managed exact-match grant/egress source; prove no/mismatched grants cannot spawn. Records egress `declared` and (for run one) `enforced=false` with a follow-up ID.
+- [~] **T4 — continuous service + halt/resume** (`crates/maos-bin/src/main.rs` + lifecycle tests): **continuous J1 service + safe shutdown DONE + verified** (fall-through to the shared serving loop; SIGINT/SIGTERM → clean drain). **Halt/resume referential-identity DEFERRED** — the "post-resume digest cites pre-halt ref" seam is a production seam Story 9.6 never implemented (`journey_j1.rs:208`); needs its own story (`FOLLOWUP-J1-RESUME-SEAM`). Not faked.
+- [x] **T5 — the test net + CI/local split** (`crates/maos-journey-test/tests/journey_j1.rs`, `crates/maos-bin/tests/smoke_cli_wrapper_8_12.rs`): prove topology-integrated local test-CLI delegation, lineage, resume identity, redaction, no-grant rejection, **CRUD-outside-demo-dir refusal, and ambient-`auth.json`-refusal** — each with a blind that reds it. **Split the `--features network` surface** into network-*shape* fixture (CI-safe, blocking) vs real-agent-*live* (gated behind `MAOS_LIVE_AGENT=1`, local-only, CI physically cannot trip it).
+- [ ] **T6 — the signed live run** (`_bmad-output/test-artifacts/release-gate-8-12-tier-2-cli-wrapper.md` + signed capture; NOT code beyond wiring the capture doc into the sealed-export file set): after automated gates and the §A6 seal, run the bounded codex task **locally** from the clean worktree into the disposable demo dir; capture non-secret command metadata, live-agent (codex) identity, grant disposition, audit/digest refs, `egress: declared-not-enforced`, redaction result, signer, date, and outcome; **sign via `maosctl audit sealed-export`** (the capture doc must be **journaled as an audit entry** in the covered window so the single signed JSON bundle covers it — see corrected Design Notes; the "hashed file set" wording was wrong). Check off Tier-2 only on observed evidence. **Dev-portion still open:** a small "journal-capture" wiring so the capture becomes a covered audit entry.
+
+**Acceptance Criteria:**
+- Given approved live J1 configuration, when `maos run <j1-topology> --live` starts (locally, `MAOS_LIVE_AGENT=1`, `OPENAI_API_KEY` in env), then it loads each declared class Spirit and the codex Developer-Worker, accepts a typed delegated task, and starts no unauthenticated subprocess.
+- Given Worker completion, when the Orchestrator emits a digest, then every completion claim cites the Worker-produced Transparency Log reference through a persisted distillate chain; completion is parsed by the adapter, never inferred from exit code.
+- Given halt and resume, when the topology resumes, then the digest contains the exact pre-halt typed reference and no in-flight delegation is preempted. **(DEFERRED — `FOLLOWUP-J1-RESUME-SEAM`: the production resume→digest-citation seam was never implemented by Story 9.6, per `journey_j1.rs:208`. The "no in-flight delegation preempted" half holds today: the worker completes its delegated task during load, before continuous serving. The referential-identity half needs the deferred seam.)**
+- Given denial, crash, malformed output, secret-shaped output, subscription-only auth, ambient `auth.json`, or CRUD-outside-the-demo-dir, when processing ends, then the typed result is recorded, no secret persists, no escape occurs, and Tier-2 stays unsigned.
+- Given a successful approved codex run, when the sealed-export capture is reviewed, then it has a named human signer, live-agent (codex) identity, host-grant disposition, audit/digest refs, `egress: declared-not-enforced` + follow-up ID, and redaction proof, and verifies against the operator pubkey; otherwise the gate remains open.
+- CI runs Tier-1 (fixture worker through the real bridge) only, blocking; the live/paid path never runs in CI.
+
+## Spec Change Log
+
+- **2026-07-14 (dev, bmad-quick-dev step-03 — bridge branch `j1-tier2-live-agent-signed-bridge` off main@79a880ec, ZERO-Δ @23147):**
+  - **T2 DONE** — `crates/maos-bin/src/worker_cli.rs`: `WorkerCli` trait (`argv` + `parse_completion`) with `codex`/`claude`/fixture impls + `select_worker_cli`; completion oracle over captured output (a raw exit is never completion); 12 unit tests. Wired into `run_cli_wrapper_manifest`: routes the typed task (kills `task_args: vec![]` at main.rs:665) and derives completion from the **journaled** `CliSubprocessOutput` rows read back via `query_frames` (emits a `worker_completion` event with the completion TL ref). No 8.12 smoke regression.
+  - **T3 DONE** — self-grant killed. `load_host_grant_allowlist()` (built-in fixture grant + operator `MAOS_HOST_GRANTS` TOML file) replaces the manifest-derived self-grant; a manifest matching no host grant fails CLOSED (`ECliWrapperTierNotGranted`). Emits a `host_grant_disposition` event: egress `declared-not-enforced` + `egress_followup` ID. 4 unit tests (incl. the trust-direction "cannot self-grant an unlisted image" proof).
+  - New env vars registered: `MAOS_WORKER_TASK`, `MAOS_LIVE_AGENT`, `MAOS_HOST_GRANTS`.
+  - **T1 DONE** — flipped the topology `[cli_wrapper]` rejection (main.rs:2734): a worker is admitted as a topology member through the same host-grant + adapter + bridge path, routes its typed task, and continues loading the class Spirits. Added the worker to `spirits/topologies/j1-founder-loop.toml`; the fixture now **echoes the routed task** (task-gated, replaces line 1 → SHA-pin + 3-line shape preserved). **Routing PROVEN** by observed control: a `CliSubprocessOutput` row (`from=worker`, kind=21) carries the operator's `MAOS_WORKER_TASK` token in its journaled payload. All worker + journey_j1 + 8.12 tests green.
+  - **T4 PARTIAL** — **continuous topology service + safe shutdown DONE + verified**: replaced the "continuous mode not supported" error with a fall-through to the shared serving loop (IdleWatchdog drives `on_idle` for every topology Spirit; `ctrl_c`/SIGTERM → drain). Observed: `maos run <topology>` (no `--once`) → "entering continuous serving loop" → SIGINT → clean shutdown, exit 0, rows drained. The worker runs its delegated task to completion during load, so no in-flight delegation is preempted.
+    - **KNOWN GAP (honest, pre-existing): the full halt/resume referential-identity oracle is DEFERRED.** The AC "post-resume digest cites the exact pre-halt typed ref" depends on a production resume seam (halt → persist `TrajectoryRef` → resume → `digest.cited_refs ∋ pre_halt_ref`) that **Story 9.6 explicitly deferred and never implemented** — documented in `crates/maos-journey-test/tests/journey_j1.rs:208`. The topology now inherits the halt-registry machinery via the serving loop, but proving referential identity needs that seam built as its own story (a kernel/digest-touching feature out of this bridge's ZERO-Δ scope). NOT faked. `j1_resume_continuity_ref_identity_oracle` continues to prove the tractable part (cold-start negative control: distinct runtime-dependent output, not static). **Follow-up: `FOLLOWUP-J1-RESUME-SEAM` — build the halt→persist→resume→cite seam (own story).**
+    - Minor: topology-continuous shutdown drains cleanly (exit 0, rows persisted) but the audit-writer join hits the serving loop's designed 10s timeout guard — a shared-serving-loop drain-ordering behavior (SCB `audit_tx` clones released at end-of-scope, not before the writer await); inherited, not introduced. Follow-up: `FOLLOWUP-SERVING-DRAIN-ORDER`.
+  - **T5 DONE (tractable scope)** — the CI/local split is enforced as a **positive fixture-allowlist gated on `MAOS_LIVE_AGENT`** (`worker_cli::live_agent_gate`), wired at the spawn site in `run_cli_wrapper_manifest` and covered by a **`maos run`-level integration blind** (`ci_local_split_refuses_a_granted_real_agent_without_the_live_flag`): a host-granted `codex` is refused without the flag, so CI physically cannot spawn a paid agent. Stronger than (and supersedes) the kernel's unwired `ci_default_guard` denylist. Ambient-`auth.json` refusal (`refuse_ambient_auth`, wired on the live path) enforces API-key-not-subscription — since the bridge does NOT clear the child env, the child inherits `OPENAI_API_KEY` (MAOS never holds it) but the clean-home refusal blocks the token footgun. **Redaction VERIFIED end-to-end** (observed): a credential-shaped `MAOS_WORKER_TASK` echoed by the worker is scrubbed to `<REDACTED:type=api_key_anthropic…>` in the TL — raw secret absent. No-grant fail-closed proven (T3). +7 unit tests (gate ×3, ambient-auth ×1, in worker_cli) + 1 integration blind. **CRUD-outside-demo-dir = T3-container-enforced** (the sandbox tier isolates the FS; the hermetic fixture does no CRUD, so it is proven at the live run / by the container, not hermetically). **Resume-identity = DEFERRED** (T4 `FOLLOWUP-J1-RESUME-SEAM`).
+  - **sealed-export mechanism CORRECTED (honesty fix)** — `maosctl audit sealed-export` signs a **canonical JSON bundle of audit entries** (Ed25519 over `sha256(canonical)`), writing ONE self-contained signed JSON file to `--output`. It is NOT a `SHA256SUMS`+`.sig` file set (that is the offline-import verify path). So the T6 capture doc joins by being **journaled as an audit entry** in the covered window — a small dev wiring T6 still needs, NOT "add a file to a hashed list." Spec Code Map + Design Notes + runbook corrected.
+  - **T6 remains human-gated** (Lunarpulse runs the paid local codex run + signs); the ONE dev sub-task left is the "journal-capture" wiring above. Everything T6 depends on (adapter, host grant, live gate, ambient-auth refusal, continuous service, redaction, sealed-export) is landed + verified.
+- **2026-07-14 (iteration 1, party-mode + Lunarpulse ratification):**
+  - **Worker CLI = swappable adapter; codex first.** Corrected the false premise that `claude -p` is deprecated (it is current) — the real fix is the CLI-agnostic adapter the J1 thesis already implies. Ratified **codex** as the first live worker.
+  - **c1 auth split (Vex catch).** codex subscription = plaintext `~/.codex/auth.json` the subprocess reads → MAOS never holds the token → redaction unattestable. Signed run pinned to **API-key-in-env**; subscription only for an unsigned dry-run.
+  - **c2** full CRUD **bounded to a disposable demo dir**, with a fail-closed outside-dir negative.
+  - **c3** egress **`declared-not-enforced`** + follow-up ID (enforced egress → Epic-14 v2.0 hardening); blast radius bounded by c1+c2.
+  - **c4** signer = accountable human via **`maosctl audit sealed-export`** (FR44, existing) — no new signing mechanism; room = §A6 seal (author ≠ sealer ≠ signer).
+  - **Execution model (Lunarpulse):** signed run is **operator-local, not CI**; `--features network` split into CI-safe fixture vs `MAOS_LIVE_AGENT=1`-gated live.
+  - Frozen block renegotiated + re-frozen: Intent Approach, Boundaries (Always/Ask-First/Never), I/O matrix (+4 rows).
+  - **Three-secret refinement (runbook feedback, same day):** two live axes (`--live` provider reasoning + `MAOS_LIVE_AGENT` codex subprocess) ⇒ redaction/denylist must cover BOTH LLM creds (worker `OPENAI_API_KEY` + Orchestrator provider `ANTHROPIC_API_KEY`) plus the audit key; all three ∈ Story 14-9 secret set. Folded into Boundaries/Always, the secret-shaped-output I/O row, Code Map trace, Design Notes, and the local Verification command.
+
+## Design Notes
+
+Topology loading currently rejects `[cli_wrapper]` at `main.rs:2734-2740`; `run_cli_wrapper_manifest()` is standalone/synchronous and supplies `task_args: vec![]`. Keep dispatch and lineage in IAC: the bridge executes an authorized typed task; it does not invent orchestration policy. The live configuration must stay operator-local.
+
+**Worker-CLI adapter (codex specifics).** `codex exec "<task>"` runs non-interactively; `CODEX_NON_INTERACTIVE=1`; sandbox via `--sandbox workspace-write`; **progress → stderr, final message → stdout** (cleaner completion oracle than claude). Known footgun: a live ChatGPT session shadows `OPENAI_API_KEY` — hence the clean-sandbox-home invariant. Keep the adapter in maos-bin so `runtime.rs` stays generic and kernel-core stays ZERO-Δ.
+
+**Signing = sealed-export.** No new signing mechanism: `maosctl audit sealed-export` (FR44) builds a bundle from the covered-window **audit entries** and signs it with the operator Ed25519 audit key (`audit_key.rs`) — Ed25519 over `sha256(canonical_bundle_json)` — emitting **one self-contained signed JSON bundle** (signature embedded; `--output` is a file). **CORRECTION (dev):** it does NOT hash an arbitrary file set to `SHA256SUMS`+`.sig` (that shape is the *offline-import* verify path, not sealed-export). Therefore the capture doc is covered by the signature only if it is **journaled as an audit entry** inside the exported window — a small dev wiring T6 needs (a "journal-capture" step), NOT "add a file to a hashed list." This is a factual correction to the pre-dev spec. The three secrets — worker key (`OPENAI_API_KEY`), Orchestrator provider key (`ANTHROPIC_API_KEY`), and audit key (signer) — have three separate lives; the audit key never enters the sandbox and is never mixed with the LLM keys.
+
+**Kernel-Δ.** Expected **ZERO @23147** (HEAD baseline after 12.6). Task-0: compile and let `check-kernel-baseline` rule. If routing a real task through the existing bridge forces a line into `runtime.rs`, it is a bounded FLAG-Winston re-pin **with a written reason**, not a silent drift.
+
+**§A6 seal (before the human signs).** Murat runs the live drill and watches a planted non-completion (codex crash) red the completion leg; Winston seals kernel-baseline + word-matches-reality; Amelia seals by compiler + measurement; Vex seals redaction-verified + egress-declared. Human signs on top.
+
+## Verification
+
+**Commands (CI — hermetic, blocking):**
+- `cargo test -p maos-bin --test smoke_cli_wrapper_8_12` — topology-integrated fixture Worker (through the shared `WorkerCli` adapter), no-grant, redaction, CRUD-boundary, ambient-auth-refusal, lifecycle tests pass.
+- `cargo test -p maos-journey-test journey_j1 -- --nocapture` — real J1 path proves delegation and typed halt/resume continuity (fixture worker).
+- `cargo test -p maos-kernel-core cli_wrapper -- --nocapture` — framing, recovery, shape, and redaction contracts pass.
+- `cargo run -p xtask -- check-service-boundary && cargo run -p xtask -- check-empty-kernel && cargo run -p xtask -- check-kernel-baseline` — discipline gates pass (baseline 23147).
+- `cargo test --workspace --locked` — workspace green before the live invocation.
+
+**Commands (LOCAL — live, operator-run, NOT CI):**
+- `MAOS_LIVE_AGENT=1 OPENAI_API_KEY=… ANTHROPIC_API_KEY=… maos run spirits/topologies/j1-founder-loop.toml --live` — real codex Worker (`OPENAI_API_KEY`) + real Orchestrator provider (`ANTHROPIC_API_KEY`) into the disposable demo dir; observe delegation → digest → halt/resume.
+- `maosctl audit sealed-export …` over the run's TL slice + capture doc — produces the signed bundle; verify it against the operator pubkey.
+
+**Manual checks:**
+- In the separate clean worktree, inspect the signed sealed-export bundle and referenced audit rows; confirm real codex identity, host-managed grant, `egress: declared-not-enforced` + follow-up ID, no secret persisted, resolving digest citations, named human signer, and a passing signature verification.

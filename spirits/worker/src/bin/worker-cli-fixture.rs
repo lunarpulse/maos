@@ -28,7 +28,18 @@ fn main() {
         return;
     }
 
-    for line in worker::CANNED_OUTPUT_LINES {
-        println!("{line}");
+    // Non-probe: the FIRST line acknowledges the routed task. When the bridge
+    // routes a task (a trailing non-flag argv after the `--maos-worker` prefix),
+    // echo it — this is what makes task routing PROVABLE hermetically (the task
+    // text lands in the Transparency Log). With no task arg the line falls back
+    // to the canned acknowledgement, so the SHA-pinned 3-line shape and the
+    // `CANNED_OUTPUT_LINES` constant are preserved unchanged. The terminal line
+    // stays `worker: task complete` (the completion oracle's marker).
+    let routed_task = args.iter().skip(1).find(|a| !a.starts_with("--"));
+    match routed_task {
+        Some(task) => println!("worker: received task assignment: {task}"),
+        None => println!("{}", worker::CANNED_OUTPUT_LINES[0]),
     }
+    println!("{}", worker::CANNED_OUTPUT_LINES[1]);
+    println!("{}", worker::CANNED_OUTPUT_LINES[2]);
 }
