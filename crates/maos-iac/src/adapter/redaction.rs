@@ -209,6 +209,23 @@ fn contains_prefix(haystack: &[u8], needle: &[u8]) -> bool {
     haystack.windows(needle.len()).any(|w| w == needle)
 }
 
+/// Scan for a CREDENTIAL-shaped value (API key, private key, cloud credential)
+/// by the same prefix [`RULES`] the redaction filter uses, returning the class
+/// of the first match.
+///
+/// Unlike [`RedactionPolicy::redact`], this deliberately does NOT flag the
+/// 32+-hex token heuristic: Transparency-Log references (frame IDs, digest refs)
+/// are legitimately hex and are NOT secrets. This is the pre-write TRIPWIRE for
+/// human-authored artifacts — e.g. a J1 Tier-2 signed-run capture — that must
+/// carry NO credential yet DO carry hex TL references. `redact()` (which scrubs
+/// tokens too) remains the boundary filter for machine-generated frames.
+pub fn detect_credential(bytes: &[u8]) -> Option<&'static str> {
+    RULES
+        .iter()
+        .find(|rule| contains_prefix(bytes, rule.prefix))
+        .map(|rule| rule.class)
+}
+
 /// Check if `haystack` contains a hex-encoded token of sufficient length.
 fn contains_hex_token(haystack: &[u8]) -> bool {
     let mut run = 0;
@@ -276,6 +293,27 @@ mod tests {
             matches!(result, Cow::Borrowed(_)),
             "clean payload triggered allocation"
         );
+    }
+
+    #[test]
+    fn detect_credential_flags_prefix_secrets_but_not_hex_refs() {
+        // Prefix-shaped credentials are flagged with their class...
+        assert_eq!(
+            detect_credential(b"OPENAI_API_KEY=sk-proj-abcdef0123456789"),
+            Some("api_key_openai")
+        );
+        assert_eq!(
+            detect_credential(b"token: ghp_ABCDEFGHIJKLMNOPqrstuvwx"),
+            Some("api_key_github")
+        );
+        // ...but a 32-hex Transparency-Log reference is NOT a secret: `redact`
+        // would scrub it as a token, yet `detect_credential` (prefix-only) lets
+        // it through, which is exactly what a signed-run capture needs.
+        assert_eq!(
+            detect_credential(b"audit_ref: aabbccddeeff00112233445566778899"),
+            None
+        );
+        assert_eq!(detect_credential(b"plain non-secret metadata"), None);
     }
 
     #[test]

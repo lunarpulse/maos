@@ -120,19 +120,47 @@ maos run spirits/topologies/j1-founder-loop.toml --live   # [--live exists; live
 
 ## Phase 4 — Capture the evidence (non-secret only)
 
-Write the capture doc — it becomes one of the files the signature covers `[T6 wires it into the sealed-export set]`:
+Write the capture doc as a **JSON file** (e.g. `./j1-tier2-capture.json`). Phase 5 journals it as a `run.capture` audit row (`maosctl audit record-capture`), so the sealed-export signature covers it. `record-capture` **validates these fields fail-closed** and **refuses any capture carrying a credential-shaped value** — so use the exact keys below (non-secret only):
 
-- [ ] codex identity + version (live-agent identity)
-- [ ] non-secret command metadata (argv **with the key redacted**)
-- [ ] host-grant disposition (exact-match grant admitted; no/mismatched grant would have refused)
-- [ ] audit + digest Transparency Log refs (the ones the digest cited)
-- [ ] `egress: declared-not-enforced` + **follow-up ID** (enforced egress = Epic-14 v2.0 hardening)
-- [ ] redaction result: **verified** (the injected key's value is absent from the TL — MAOS held it, so it can prove this)
-- [ ] outcome + timestamp
+```json
+{
+  "signer": "<your name> (named human signer)",
+  "live_agent_identity": "codex <version>",
+  "command_metadata": "codex exec <task>; OPENAI_API_KEY injected host-side (value redacted)",
+  "host_grant_disposition": "exact-match grant admitted (codex @ OpenAI, T3); a mismatch would have refused",
+  "audit_refs": ["<audit TL ref>", "<digest TL ref the digest cited>"],
+  "egress": "declared-not-enforced",
+  "egress_followup": "FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT",
+  "redaction_result": "verified",
+  "outcome": "<worker completed; no secret persisted; digest cites the worker ref>"
+}
+```
+
+- [ ] codex identity + version → `live_agent_identity`
+- [ ] non-secret command metadata (argv **with the key redacted**) → `command_metadata` *(a pasted `sk-…`/`ghp_…` value is refused, so redact it)*
+- [ ] host-grant disposition (exact-match grant admitted) → `host_grant_disposition`
+- [ ] audit + digest Transparency Log refs → `audit_refs` (≥1 required)
+- [ ] `egress` **must be exactly** `declared-not-enforced` + `egress_followup` ID (enforced egress = Epic-14 v2.0 hardening; claiming "enforced" is refused)
+- [ ] `redaction_result` **must be exactly** `verified` (the injected key's value is absent from the TL — MAOS held it, so it can prove this)
+- [ ] `outcome` (+ the row's timestamp is stamped automatically). Extra fields you add are preserved verbatim.
 
 ---
 
-## Phase 5 — Sign (sealed-export = the signature)
+## Phase 5 — Journal the capture, then sign (sealed-export = the signature)
+
+**5a — journal the capture as an audit row** so the signature covers it `[record-capture — LANDED dev 2026-07-15]`:
+
+```
+maosctl audit record-capture \                      # [exists — J1 Tier-2]
+  --capture ./j1-tier2-capture.json \
+  --spirit <orchestrator-spirit-name>
+#   (--boot <n> to disambiguate multiple boots; omit --spirit for a host-level
+#    attestation, then cover it with `sealed-export --range <window>` instead.)
+```
+
+This validates the Phase-4 fields, **refuses** a capture that carries a credential or overclaims a control (egress "enforced", redaction not "verified"), and writes a `run.capture` row stamped with the orchestrator's `(boot_nonce, pid)` — so the next command's `--spirit` includes it. It prints the row's `frame_id`.
+
+**5b — sign the covered window:**
 
 ```
 maosctl audit sealed-export \                       # [exists — FR44]
@@ -143,17 +171,17 @@ maosctl audit sealed-export \                       # [exists — FR44]
 #    run `maosctl audit sealed-export --help` to confirm exact flag spellings)
 ```
 
-> **CORRECTION (dev 2026-07-14):** `sealed-export` writes **ONE self-contained signed
-> JSON bundle** (`--output` is a FILE) — a canonical bundle of the covered **audit
-> entries** signed with Ed25519 over `sha256(canonical)`, signature embedded. It is
-> **NOT** a `SHA256SUMS` + separate `.sig` file set (that shape is the *offline-import*
-> verify path). Therefore the Phase-4 capture doc is covered by the signature only if
-> its content is **journaled as an audit entry** inside the exported window — a small
-> "journal-capture" dev wiring that is still **OPEN** (the one remaining T6 code sub-task).
-> Until it lands, capture the run in the bundle by exporting the window that already
-> contains the worker's `CliSubprocessOutput` + `host_grant_disposition` + `worker_completion`
-> audit rows, and keep the human-readable capture doc alongside (not yet signature-covered).
+> **How the capture is covered (dev 2026-07-15 — journal-capture LANDED):** `sealed-export`
+> writes **ONE self-contained signed JSON bundle** (`--output` is a FILE) — a canonical bundle
+> of the covered **audit entries** signed with Ed25519 over `sha256(canonical)`, signature
+> embedded. It is **NOT** a `SHA256SUMS` + separate `.sig` file set (that shape is the
+> *offline-import* verify path). Because it signs audit **rows**, the capture is covered by
+> running **5a first**: `record-capture` journals the capture as a `run.capture` row in the
+> same `--spirit` window, so `sealed-export` signs it alongside the worker's
+> `CliSubprocessOutput` + `host_grant_disposition` + `worker_completion` rows. (Earlier drafts
+> said this wiring was OPEN — it landed 2026-07-15.)
 
+- [ ] `record-capture` accepted the capture and printed a `run.capture` frame_id (a refusal here means the capture overclaims or carries a secret — fix it; the gate stays open).
 - [ ] Signed bundle produced: one JSON file with an embedded Ed25519 signature over the audit entries.
 - [ ] **Verify it yourself** before recording — the verify path must pass against `<FPR>`. If it doesn't verify, the gate stays open.
 
@@ -198,8 +226,8 @@ Edit `_bmad-output/test-artifacts/release-gate-8-12-tier-2-cli-wrapper.md`:
 - **1단계:** `main`에서 브릿지 브랜치 worktree(더러운 epic-12 트리 보존) → 일회용 `$DEMO` 디렉터리(repo 밖) → 샌드박스 홈에 `~/.codex/auth.json` 없음 확인 → `codex --version` 기록.
 - **2단계 (선택, 무서명):** 구독으로 한 번 구경 — 서명 안 하니 토큰 상관없음.
 - **3단계 (서명 실행):** `OPENAI_API_KEY`+provider key+`MAOS_LIVE_AGENT=1` → `maos run …j1-founder-loop.toml --live`(연속, `--once` 아님 → halt/resume 확인). codex가 `$DEMO`에서 작업 → 완료는 **어댑터가 파싱**(종료코드 아님) → 다이제스트가 Worker TL ref 인용. 끝나면 키 폐기.
-- **4단계:** 캡처 문서(비밀 제외): codex 신원, redacted argv, grant 처분, audit/digest refs, `egress: declared-not-enforced`+후속ID, 리댁션=verified, 결과.
-- **5단계 (서명):** `maosctl audit sealed-export --spirit <orch> --audit-key <signer.key> --output …` (캡처 문서 포함) → `SHA256SUMS`+`.sig` → **직접 검증**(지문 대조) 통과해야 함.
+- **4단계:** 캡처 문서를 **JSON 파일**로 작성(비밀 제외): `signer`, `live_agent_identity`, `command_metadata`(redacted argv), `host_grant_disposition`, `audit_refs`, `egress`=`declared-not-enforced`+`egress_followup`, `redaction_result`=`verified`, `outcome`. (필수 필드 미달·비밀 포함·과잉주장 시 5a에서 거부됨.)
+- **5단계 (저널링 후 서명):** **5a** `maosctl audit record-capture --capture <file.json> --spirit <orch>` → 캡처를 `run.capture` audit row로 저널링(서명이 파일이 아니라 audit **행**을 서명하므로 필수) → **5b** `maosctl audit sealed-export --spirit <orch> --audit-key <signer.key> --output …` → **하나의 서명된 JSON 번들**(embedded Ed25519 서명) → **직접 검증**(지문 대조) 통과해야 함. (`SHA256SUMS`+`.sig`가 아님 — 그건 오프라인 임포트 경로. journal-capture 배선은 2026-07-15 착륙.)
 - **6단계:** release-gate에 서명자=Myoungki Jung/날짜/번들 경로 기록, 관찰된 증거로만 체크 → 커밋 → 스프린트 라인 done → `13-1` 앞에서 머지.
 
 **중단 조건(하나라도 → 서명 금지, Tier-2 OPEN 유지):** 비밀 잔존 / `$DEMO` 밖 CRUD / 서명 실행에 구독·auth.json 사용 / auth.json 상속 / 종료코드=완료 오인 / 서명 검증 실패.

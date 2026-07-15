@@ -677,6 +677,12 @@ fn kind_to_string(kind: i64) -> String {
         28 => "governance.event",
         29 => "cost.attribution",
         30 => "identity.asserted",
+        // J1 Tier-2 — a human-authored signed-run capture attestation, written
+        // at the bin/CLI boundary as a raw kind int (like `identity.asserted`
+        // above) so it renders here on read WITHOUT a kernel `FrameKind` variant
+        // (ZERO kernel delta). Journaled by `maosctl audit record-capture` so a
+        // subsequent `sealed-export` signature covers the capture as an audit row.
+        31 => "run.capture",
         _ => "unknown",
     }
     .to_string()
@@ -704,6 +710,7 @@ fn kind_from_string(s: &str) -> Option<i64> {
         "governance.event" | "GovernanceEvent" => Some(28),
         "cost.attribution" | "CostAttribution" => Some(29),
         "identity.asserted" | "IdentityAsserted" => Some(30),
+        "run.capture" | "RunCapture" => Some(31),
         _ => None,
     }
 }
@@ -1524,6 +1531,20 @@ fn resolve_isolation_corpus_root_from_env_internal(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn run_capture_kind_round_trips() {
+        // J1 Tier-2 — the human-authored `run.capture` attestation is written at
+        // the bin/CLI boundary as a raw kind int (31) so no kernel `FrameKind`
+        // variant is needed (ZERO kernel delta). It must render on read and be
+        // resolvable by name, exactly like `identity.asserted` (30).
+        assert_eq!(kind_to_string(31), "run.capture");
+        assert_eq!(kind_from_string("run.capture"), Some(31));
+        assert_eq!(kind_from_string("RunCapture"), Some(31));
+        // Kind ints are NOT part of the kernel FrameKind enum surface here; an
+        // unmapped int must still degrade gracefully, never panic.
+        assert_eq!(kind_to_string(9999), "unknown");
+    }
 
     #[test]
     fn query_empty_db_returns_empty() {
