@@ -395,6 +395,28 @@ pub enum AuditQuery {
         #[arg(long)]
         output: Option<std::path::PathBuf>,
     },
+    /// J1 Tier-2 — journal a signed-run **capture doc** as an audit entry so a
+    /// subsequent `sealed-export` signature covers it.
+    ///
+    /// `sealed-export` signs the covered-window audit ROWS (not an arbitrary
+    /// file set), so a human-readable capture is only under the signature if it
+    /// is first written to the Transparency Log. This records the capture as a
+    /// `run.capture` row (kind 31, `HumanAuthored` origin) after validating the
+    /// required non-secret fields and refusing any capture that carries a
+    /// secret-shaped value. Run this BEFORE `sealed-export --spirit <same>`.
+    RecordCapture {
+        /// Path to the capture-doc JSON file (non-secret run metadata).
+        #[arg(long)]
+        capture: std::path::PathBuf,
+        /// Spirit the capture attests. Its `(boot_nonce, pid)` stamp the row so
+        /// `sealed-export --spirit <same>` includes it. Omit to stamp a
+        /// host-level attestation (pid/boot = 0), covered by `--range` export.
+        #[arg(long)]
+        spirit: Option<String>,
+        /// Disambiguate when the spirit name resolves to multiple boots.
+        #[arg(long)]
+        boot: Option<u64>,
+    },
     /// Verify a sealed-export bundle.
     VerifyBundle {
         /// Path to bundle JSON file.

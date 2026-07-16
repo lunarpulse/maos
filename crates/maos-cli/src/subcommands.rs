@@ -1653,6 +1653,11 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
             color,
         ),
         Some(AuditQuery::Keygen { output }) => audit_keygen(output),
+        Some(AuditQuery::RecordCapture {
+            capture,
+            spirit,
+            boot,
+        }) => audit_record_capture(capture, spirit.as_deref(), *boot),
         Some(AuditQuery::VerifyBundle { bundle, pubkey }) => audit_verify_bundle(bundle, pubkey),
         Some(AuditQuery::SubjectAccess { principal, format }) => {
             audit_subject_access(principal, *format, color)
@@ -2073,6 +2078,279 @@ fn audit_keygen(output: &Option<PathBuf>) -> ExitCode {
             ExitCode::from(2)
         }
     }
+}
+
+// ─── J1 Tier-2 — journal-capture (record a signed-run capture as an audit row) ───
+
+/// Egress posture the capture MUST declare (enforced egress is Epic-14 v2.0
+/// hardening; a capture claiming "enforced" states a control that does not
+/// exist and is refused).
+const CAPTURE_EGRESS_DECLARED_NOT_ENFORCED: &str = "declared-not-enforced";
+/// Redaction result the capture MUST assert.
+const CAPTURE_REDACTION_VERIFIED: &str = "verified";
+
+/// The capture-doc schema `maosctl audit record-capture` validates before
+/// journaling. Fields mirror the runbook Phase-4 capture template. Extra fields
+/// are permitted (the operator may add notes) and are preserved verbatim in the
+/// journaled row; only the fields below are REQUIRED, and two are
+/// value-constrained so a capture that overclaims a control cannot be signed.
+#[derive(Debug, serde::Deserialize)]
+struct CaptureDoc {
+    /// Named human signer (the accountable operator).
+    #[serde(default)]
+    signer: String,
+    /// Live-agent identity + version (e.g. "codex 0.x.y").
+    #[serde(default)]
+    live_agent_identity: String,
+    /// Non-secret command metadata — argv WITH the key redacted.
+    #[serde(default)]
+    command_metadata: String,
+    /// Host-grant disposition (exact-match grant admitted; a mismatch refuses).
+    #[serde(default)]
+    host_grant_disposition: String,
+    /// Audit + digest Transparency Log refs the run/digest cited.
+    #[serde(default)]
+    audit_refs: Vec<String>,
+    /// Egress posture — MUST equal `declared-not-enforced`.
+    #[serde(default)]
+    egress: String,
+    /// The egress-enforcement follow-up ID (Epic-14 v2.0).
+    #[serde(default)]
+    egress_followup: String,
+    /// Redaction result — MUST equal `verified`.
+    #[serde(default)]
+    redaction_result: String,
+    /// Run outcome (e.g. "worker completed; no secret persisted").
+    #[serde(default)]
+    outcome: String,
+}
+
+impl CaptureDoc {
+    /// Fail-closed field validation. Every required field must be non-empty; the
+    /// two control-statement fields are value-constrained so a dishonest capture
+    /// (egress "enforced", redaction not "verified") cannot be journaled and then
+    /// signed. Returns the first violation as an operator-facing message.
+    fn validate(&self) -> Result<(), String> {
+        let required = [
+            ("signer", self.signer.trim()),
+            ("live_agent_identity", self.live_agent_identity.trim()),
+            ("command_metadata", self.command_metadata.trim()),
+            ("host_grant_disposition", self.host_grant_disposition.trim()),
+            ("egress_followup", self.egress_followup.trim()),
+            ("outcome", self.outcome.trim()),
+        ];
+        for (name, val) in required {
+            if val.is_empty() {
+                return Err(format!(
+                    "capture field `{name}` is required and must be non-empty"
+                ));
+            }
+        }
+        if self.audit_refs.iter().all(|r| r.trim().is_empty()) {
+            return Err(
+                "capture field `audit_refs` must list at least one Transparency Log ref \
+                 (the audit/digest refs the run produced)"
+                    .to_string(),
+            );
+        }
+        if self.egress.trim() != CAPTURE_EGRESS_DECLARED_NOT_ENFORCED {
+            return Err(format!(
+                "capture field `egress` must be exactly \"{CAPTURE_EGRESS_DECLARED_NOT_ENFORCED}\" \
+                 (this run DECLARES egress, it does not enforce it — enforced egress is Epic-14 \
+                 v2.0 hardening); got \"{}\"",
+                self.egress.trim()
+            ));
+        }
+        if self.redaction_result.trim() != CAPTURE_REDACTION_VERIFIED {
+            return Err(format!(
+                "capture field `redaction_result` must be exactly \"{CAPTURE_REDACTION_VERIFIED}\" \
+                 (the injected key's value must be proven absent from the TL); got \"{}\"",
+                self.redaction_result.trim()
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Parse, validate, canonicalize, and secret-screen a capture doc — the PURE
+/// core of `record-capture` (no IO, no env), so the hard logic is unit-testable.
+///
+/// Returns the canonical (compact, key-ordered) capture bytes to journal, or an
+/// operator-facing error. The SAME redaction filter used at every TL write is
+/// applied here as a TRIPWIRE: a capture is non-secret by construction, so a
+/// secret-shaped value is refused (never scrubbed-and-journaled, never echoed).
+fn parse_and_validate_capture(raw: &str) -> Result<Vec<u8>, String> {
+    let doc: CaptureDoc =
+        serde_json::from_str(raw).map_err(|e| format!("capture is not valid JSON: {e}"))?;
+    let value: serde_json::Value =
+        serde_json::from_str(raw).map_err(|e| format!("capture is not valid JSON: {e}"))?;
+
+    doc.validate()?;
+
+    let canonical =
+        serde_json::to_vec(&value).map_err(|e| format!("canonicalization error: {e}"))?;
+
+    // Credential tripwire: the SAME prefix rules as the TL redaction filter, but
+    // NOT the hex-token heuristic — a capture legitimately cites 32-hex frame /
+    // digest refs, yet must carry no API key / private key / cloud credential. A
+    // credential present is an operator error: REFUSE (never echo it, never
+    // journal it), naming only the class.
+    if let Some(class) = maos_iac::adapter::redaction::detect_credential(&canonical) {
+        return Err(format!(
+            "REFUSED: the capture contains a secret-shaped value (class: {class}). A capture must \
+             carry NON-SECRET metadata only (redact the key from argv before capturing). \
+             Nothing was journaled."
+        ));
+    }
+    Ok(canonical)
+}
+
+/// Write a validated, secret-free capture as a `run.capture` (kind 31) audit row.
+///
+/// Raw INSERT with a literal kind int + `HumanAuthored` origin, exactly like
+/// `identity.asserted`=30 — a bin/CLI-boundary audit kind with ZERO kernel delta
+/// (no `FrameKind` variant). Opened READ_WRITE (NOT CREATE): the kernel owns the
+/// schema, so an absent TL fails closed. Returns the 16-byte frame_id.
+fn journal_run_capture_row(
+    db_path: &std::path::Path,
+    spirit_pid: u32,
+    boot_nonce: u64,
+    payload: &[u8],
+) -> Result<[u8; 16], String> {
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|e| {
+        format!(
+            "no Transparency Log at {} ({e}). Run the spirit first to seed it.",
+            db_path.display()
+        )
+    })?;
+
+    let now_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+
+    // frame_id: 16 random bytes via SQLite (no extra RNG dep in maos-cli).
+    let frame_vec: Vec<u8> = conn
+        .query_row("SELECT randomblob(16)", [], |r| r.get(0))
+        .map_err(|e| format!("frame-id generation failed: {e}"))?;
+
+    conn.execute(
+        "INSERT INTO transparency_log \
+         (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, \
+          kind, intent, payload_redacted, origin) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        rusqlite::params![
+            &frame_vec[..],
+            now_ns as i64,
+            spirit_pid as i64,
+            boot_nonce as i64,
+            Option::<&[u8]>::None, // capability_token = NULL
+            31i64,                 // kind — run.capture
+            "run.capture",         // intent
+            payload,               // validated, secret-free
+            maos_domain::invariants::i3::FrameOrigin::HumanAuthored as i64, // origin = 0 (non-kernel)
+        ],
+    )
+    .map_err(|e| format!("journal write failed: {e}"))?;
+
+    let mut frame_id = [0u8; 16];
+    if frame_vec.len() != 16 {
+        return Err(format!(
+            "frame-id generation returned {} bytes, expected 16",
+            frame_vec.len()
+        ));
+    }
+    frame_id.copy_from_slice(&frame_vec);
+    Ok(frame_id)
+}
+
+/// J1 Tier-2 — journal a signed-run capture doc as a `run.capture` audit row so
+/// a subsequent `sealed-export` signature covers it.
+///
+/// `sealed-export` signs the covered-window audit ROWS (not an arbitrary file
+/// set), so a capture is only under the signature once it is in the TL.
+fn audit_record_capture(
+    capture: &std::path::Path,
+    spirit: Option<&str>,
+    boot: Option<u64>,
+) -> ExitCode {
+    // 1-4. Read, validate, canonicalize, secret-screen (pure core).
+    let raw = match std::fs::read_to_string(capture) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!(
+                "maosctl: audit record-capture — cannot read {}: {e}",
+                capture.display()
+            );
+            return ExitCode::from(2);
+        }
+    };
+    let canonical = match parse_and_validate_capture(&raw) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            eprintln!("maosctl: audit record-capture — {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    // 5. Resolve the spirit stamp so `sealed-export --spirit <same>` covers the
+    // row. Omitting --spirit stamps a host-level attestation (pid/boot = 0),
+    // covered by a `sealed-export --range <window>` export instead.
+    let db_path = default_transparency_log_path();
+    let (spirit_pid, boot_nonce): (u32, u64) = match spirit {
+        Some(name) => {
+            let all_boots = boot.is_some();
+            match resolve_spirit_pid(name, &db_path, all_boots) {
+                Ok(pairs) => {
+                    let chosen = match boot {
+                        Some(b) => pairs.iter().find(|(bn, _)| *bn == b).copied(),
+                        None => pairs.first().copied(),
+                    };
+                    match chosen {
+                        Some((bn, pid)) => (pid, bn),
+                        None => {
+                            eprintln!(
+                                "maosctl: audit record-capture — spirit '{name}' has no matching boot {} in the TL",
+                                boot.map(|b| b.to_string())
+                                    .unwrap_or_else(|| "(latest)".to_string())
+                            );
+                            return ExitCode::from(2);
+                        }
+                    }
+                }
+                Err(diag) => {
+                    eprintln!("maosctl: audit record-capture — {diag}");
+                    return ExitCode::from(2);
+                }
+            }
+        }
+        None => (0, 0),
+    };
+
+    // 6. Journal the row.
+    let frame_id = match journal_run_capture_row(&db_path, spirit_pid, boot_nonce, &canonical) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("maosctl: audit record-capture — {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let frame_hex = hex::encode(frame_id);
+    eprintln!("maosctl: audit record-capture — journaled run.capture {frame_hex}");
+    match spirit {
+        Some(name) => eprintln!(
+            "  now sign the covered window: maosctl audit sealed-export --spirit {name} --audit-key <signer.key> --output <bundle.json>"
+        ),
+        None => eprintln!(
+            "  host-level attestation (pid/boot = 0); cover it with: maosctl audit sealed-export --range <window> --audit-key <signer.key> --output <bundle.json>"
+        ),
+    }
+    ExitCode::SUCCESS
 }
 
 /// FR44 — verify a sealed-export bundle.
@@ -3325,6 +3603,216 @@ mod tests {
         assert!(
             err.contains("unknown spirit 'orchestrator'"),
             "diagnostic must name the unknown spirit: got {err}"
+        );
+    }
+
+    // ── J1 Tier-2: record-capture (journal-capture wiring) ───────────────
+
+    /// A complete, non-secret capture doc. `audit_refs` are real 32-hex frame
+    /// IDs — legitimately hex, and the tripwire must NOT flag them.
+    fn valid_capture_json() -> String {
+        serde_json::json!({
+            "signer": "Myoungki Jung (Lunarpulse)",
+            "live_agent_identity": "codex 0.5.0",
+            "command_metadata": "codex exec <task>; OPENAI_API_KEY injected host-side (value redacted)",
+            "host_grant_disposition": "exact-match grant admitted (codex @ OpenAI, T3)",
+            "audit_refs": ["aabbccddeeff00112233445566778899", "99887766554433221100ffeeddccbbaa"],
+            "egress": "declared-not-enforced",
+            "egress_followup": "FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT",
+            "redaction_result": "verified",
+            "outcome": "worker completed; no secret persisted",
+            "note": "operator may add extra fields — preserved verbatim"
+        })
+        .to_string()
+    }
+
+    fn create_tl_schema(db_path: &std::path::Path) {
+        let conn = rusqlite::Connection::open(db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn record_capture_parses_flags() {
+        use crate::cli::{AuditQuery, Subcommand};
+        let cli = Cli::try_parse_from([
+            "maosctl",
+            "audit",
+            "record-capture",
+            "--capture",
+            "/tmp/cap.json",
+            "--spirit",
+            "orchestrator",
+            "--boot",
+            "7",
+        ])
+        .unwrap();
+        match &cli.command {
+            Subcommand::Audit(args) => match &args.query {
+                Some(AuditQuery::RecordCapture {
+                    capture,
+                    spirit,
+                    boot,
+                }) => {
+                    assert_eq!(capture.to_str(), Some("/tmp/cap.json"));
+                    assert_eq!(spirit.as_deref(), Some("orchestrator"));
+                    assert_eq!(*boot, Some(7));
+                }
+                _ => panic!("expected RecordCapture subcommand"),
+            },
+            _ => panic!("expected Audit subcommand"),
+        }
+    }
+
+    #[test]
+    fn capture_validation_accepts_complete_nonsecret_doc() {
+        // The happy path: a complete capture with hex TL refs round-trips to
+        // canonical bytes that still contain every required field.
+        let bytes = parse_and_validate_capture(&valid_capture_json())
+            .expect("a complete non-secret capture must validate");
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v["signer"], "Myoungki Jung (Lunarpulse)");
+        assert_eq!(v["egress"], "declared-not-enforced");
+        assert_eq!(v["redaction_result"], "verified");
+        assert_eq!(
+            v["note"],
+            "operator may add extra fields — preserved verbatim"
+        );
+    }
+
+    #[test]
+    fn capture_validation_rejects_missing_signer() {
+        let mut v: serde_json::Value = serde_json::from_str(&valid_capture_json()).unwrap();
+        v["signer"] = serde_json::json!("   "); // whitespace only
+        let err = parse_and_validate_capture(&v.to_string()).unwrap_err();
+        assert!(err.contains("signer"), "must name the missing field: {err}");
+    }
+
+    #[test]
+    fn capture_validation_refuses_egress_enforced_overclaim() {
+        // The honesty control: a capture may not CLAIM enforced egress (which
+        // does not exist until Epic-14). This must be refused, not journaled.
+        let mut v: serde_json::Value = serde_json::from_str(&valid_capture_json()).unwrap();
+        v["egress"] = serde_json::json!("enforced");
+        let err = parse_and_validate_capture(&v.to_string()).unwrap_err();
+        assert!(
+            err.contains("egress") && err.contains("declared-not-enforced"),
+            "must refuse the egress overclaim and state the required value: {err}"
+        );
+    }
+
+    #[test]
+    fn capture_validation_requires_verified_redaction() {
+        let mut v: serde_json::Value = serde_json::from_str(&valid_capture_json()).unwrap();
+        v["redaction_result"] = serde_json::json!("unverified");
+        let err = parse_and_validate_capture(&v.to_string()).unwrap_err();
+        assert!(
+            err.contains("redaction_result") && err.contains("verified"),
+            "must require a verified redaction result: {err}"
+        );
+    }
+
+    #[test]
+    fn capture_validation_requires_at_least_one_audit_ref() {
+        let mut v: serde_json::Value = serde_json::from_str(&valid_capture_json()).unwrap();
+        v["audit_refs"] = serde_json::json!([]);
+        let err = parse_and_validate_capture(&v.to_string()).unwrap_err();
+        assert!(
+            err.contains("audit_refs"),
+            "must require an audit ref: {err}"
+        );
+    }
+
+    #[test]
+    fn capture_tripwire_refuses_a_pasted_api_key() {
+        // The core secret-hygiene control: a real key accidentally pasted into
+        // the argv metadata is REFUSED and never journaled — and the error
+        // names only the class, never the value.
+        let mut v: serde_json::Value = serde_json::from_str(&valid_capture_json()).unwrap();
+        let secret = "sk-proj-AAAABBBBCCCCDDDDEEEEFFFF0000";
+        v["command_metadata"] = serde_json::json!(format!("codex exec; OPENAI_API_KEY={secret}"));
+        let err = parse_and_validate_capture(&v.to_string()).unwrap_err();
+        assert!(err.contains("REFUSED"), "must refuse a pasted key: {err}");
+        assert!(
+            !err.contains(secret),
+            "the error must NOT echo the secret value: {err}"
+        );
+    }
+
+    #[test]
+    fn capture_tripwire_allows_hex_tl_refs() {
+        // The false-positive guard: 32-hex frame refs must NOT be mistaken for a
+        // capability token — the whole reason the tripwire is prefix-only.
+        let bytes = parse_and_validate_capture(&valid_capture_json())
+            .expect("hex TL refs must not trip the credential tripwire");
+        let text = String::from_utf8(bytes).unwrap();
+        assert!(
+            text.contains("aabbccddeeff00112233445566778899"),
+            "the hex refs must survive verbatim, not be redacted: {text}"
+        );
+    }
+
+    #[test]
+    fn record_capture_row_round_trips_through_audit_query() {
+        // End-to-end at the DB seam: a journaled run.capture row is what
+        // sealed-export's `maos_audit::query` reads back — same kind string,
+        // same spirit stamp, payload intact, secret-free.
+        let tmpdir = tempfile::TempDir::new().unwrap();
+        let db_path = tmpdir.path().join("transparency.sqlite");
+        create_tl_schema(&db_path);
+
+        let canonical = parse_and_validate_capture(&valid_capture_json()).unwrap();
+        let frame_id =
+            journal_run_capture_row(&db_path, 4321, 9, &canonical).expect("row must write");
+
+        // Query it back exactly as sealed-export does (filter by spirit stamp).
+        let mut filter = maos_audit::AuditFilter::default();
+        filter.spirit_pid = Some(4321);
+        filter.boot_nonce = Some(9);
+        let entries = maos_audit::query(&db_path, filter).unwrap();
+        let cap = entries
+            .iter()
+            .find(|e| e.kind == "run.capture")
+            .expect("the run.capture row must be queryable");
+
+        assert_eq!(cap.frame_id_hex, hex::encode(frame_id));
+        assert_eq!(cap.spirit_pid, 4321);
+        assert_eq!(cap.boot_nonce, 9);
+        assert!(cap.timestamp_ns > 0, "row must carry a real timestamp");
+        assert!(
+            cap.payload.contains("declared-not-enforced") && cap.payload.contains("Lunarpulse"),
+            "the capture payload must be journaled intact: {}",
+            cap.payload
+        );
+        assert!(
+            !cap.payload.contains("sk-proj-") && !cap.payload.contains("sk-ant-"),
+            "no secret may appear in the journaled capture: {}",
+            cap.payload
+        );
+    }
+
+    #[test]
+    fn journal_run_capture_row_fails_closed_without_a_tl() {
+        // No schema created: opening READ_WRITE on an absent TL must fail closed.
+        let tmpdir = tempfile::TempDir::new().unwrap();
+        let db_path = tmpdir.path().join("does-not-exist.sqlite");
+        let canonical = parse_and_validate_capture(&valid_capture_json()).unwrap();
+        let err = journal_run_capture_row(&db_path, 0, 0, &canonical).unwrap_err();
+        assert!(
+            err.contains("Transparency Log"),
+            "absent TL must fail closed with a clear message: {err}"
         );
     }
 

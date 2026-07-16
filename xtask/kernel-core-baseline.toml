@@ -242,4 +242,23 @@
 #          source lines. No behavior, public API, or dependency change.
 #          FLAG-Winston: Lunarpulse authorized the formatter run and this
 #          baseline reconciliation on 2026-07-13.
-src_lines = 23147
+#   23202  J1 Tier-2 live-agent bridge — real-CLI stdin deadlock fix (+55,
+#          AUTHORIZED kernel-core delta). FLAG-Winston: Lunarpulse authorized
+#          2026-07-15 ("approving proper fix"). The J1 Tier-2 signed-live-run
+#          bridge spawns a REAL worker CLI (`codex exec`) that reads
+#          stdin-until-EOF for its prompt; `spawn_and_bridge` held the child's
+#          stdin open as a control channel, so the worker BLOCKED reading stdin
+#          while the bridge BLOCKED reading the worker's output — a mutual
+#          deadlock. The hermetic fixture never read stdin, so this stayed
+#          invisible through T1–T5 (the "PROVEN" runs were fixture-only). Fix
+#          (lifecycle/cli_wrapper/runtime.rs, spawn_and_bridge): when
+#          `control_channel` is `Signals` (worker is NOT driven via stdin), drop
+#          the `ChildStdin` right after spawn so the child receives EOF and
+#          proceeds on its argv prompt. `StdinCommands` (the J1 bench's
+#          `write_stdin_line` path) keeps stdin open — unaffected. Net +55 = ~9
+#          functional (the match arm) + ~46 the in-src #[cfg(test)] regression
+#          (signals_control_closes_worker_stdin_so_a_stdin_reader_proceeds — a
+#          real `cat`-then-`echo` that can only complete if it received EOF; the
+#          private spawn path cannot be exercised from tests/). All additive; no
+#          public symbols removed.
+src_lines = 23202

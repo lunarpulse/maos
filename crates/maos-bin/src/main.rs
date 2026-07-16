@@ -38,6 +38,11 @@ mod env_contract;
 mod escape_detector_consumer;
 #[cfg(feature = "network")]
 mod migration_plan;
+// J1 Tier-2 bridge (T2) — the swappable Worker-CLI adapter (codex/claude/fixture
+// share one trait). Composition-root only; runtime.rs stays CLI-agnostic (ZERO
+// kernel-Δ). Declared here, NOT in api.rs (not a kernel-core adapter).
+#[cfg(feature = "network")]
+mod worker_cli;
 
 use std::sync::Arc;
 use std::thread::available_parallelism;
@@ -515,6 +520,173 @@ fn resolve_cli_binary(command: &str) -> Result<String, String> {
 /// `FrameKind::CliSubprocessOutput=21` row, and on exit revokes the cap-token
 /// with `RevokeReason::CliSubprocessExit`. Composition-root only — the kernel
 /// receives a constructed handle and decides no topology.
+/// Follow-up ID for the deferred packet-level egress enforcement. Run one records
+/// egress `declared-not-enforced`; enforced egress is an Epic-14 v2.0 hardening.
+#[cfg(feature = "network")]
+const EGRESS_ENFORCEMENT_FOLLOWUP: &str = "FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT";
+
+/// The built-in HOST grant for the hermetic fixture Worker. Host-side and
+/// image-keyed — the host independently grants THIS known image; it never echoes
+/// the manifest's self-declared fields (the AC5 trust-direction inversion).
+#[cfg(feature = "network")]
+fn builtin_fixture_grant() -> maos_domain::host_grant::HostGrant {
+    maos_domain::host_grant::HostGrant {
+        attested_image: "worker-cli-fixture".to_string(),
+        signing_key_id: "MAOS Project".to_string(),
+        permitted_tier: maos_domain::invariants::i9::SandboxTier::T3,
+        permitted_egress_destinations: vec![], // hermetic: no egress
+    }
+}
+
+/// Parse an operator `MAOS_HOST_GRANTS` TOML file into host grants. Schema:
+/// ```toml
+/// [[grant]]
+/// attested_image = "codex"
+/// signing_key_id = "OpenAI"
+/// permitted_tier = "T3"
+/// permitted_egress_destinations = ["api.openai.com"]
+/// ```
+/// A grant missing a required field is an ERROR — never a silent admit.
+#[cfg(feature = "network")]
+fn parse_host_grants_toml(text: &str) -> Result<Vec<maos_domain::host_grant::HostGrant>, String> {
+    let root: toml::Value = toml::from_str(text).map_err(|e| format!("toml parse: {e}"))?;
+    let Some(arr) = root.get("grant").and_then(|g| g.as_array()) else {
+        return Ok(Vec::new());
+    };
+    let mut out = Vec::with_capacity(arr.len());
+    for (i, g) in arr.iter().enumerate() {
+        let attested_image = g
+            .get("attested_image")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| format!("grant[{i}]: missing attested_image"))?
+            .to_string();
+        let signing_key_id = g
+            .get("signing_key_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| format!("grant[{i}]: missing signing_key_id"))?
+            .to_string();
+        let permitted_tier = match g.get("permitted_tier").and_then(|v| v.as_str()) {
+            Some(s) => parse_sandbox_tier(s)?,
+            None => maos_domain::invariants::i9::SandboxTier::T3,
+        };
+        let permitted_egress_destinations = g
+            .get("permitted_egress_destinations")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| x.as_str().map(String::from))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        out.push(maos_domain::host_grant::HostGrant {
+            attested_image,
+            signing_key_id,
+            permitted_tier,
+            permitted_egress_destinations,
+        });
+    }
+    Ok(out)
+}
+
+/// Load the HOST-MANAGED grant allowlist (replaces the v0.9 self-grant). The
+/// built-in fixture grant keeps the hermetic path green; the operator adds real
+/// agent-CLI grants (codex/claude + egress) via a `MAOS_HOST_GRANTS` TOML file.
+/// A manifest whose (image, author) matches no grant fails CLOSED at
+/// `resolve_cli_wrapper_tier` — never self-granted.
+#[cfg(feature = "network")]
+fn load_host_grant_allowlist() -> maos_domain::host_grant::StaticHostGrantAllowlist {
+    let mut grants = vec![builtin_fixture_grant()];
+    if let Some(path) = std::env::var_os("MAOS_HOST_GRANTS") {
+        let display = std::path::Path::new(&path).display().to_string();
+        match std::fs::read_to_string(&path) {
+            Ok(text) => match parse_host_grants_toml(&text) {
+                Ok(mut extra) => grants.append(&mut extra),
+                Err(e) => eprintln!(
+                    "maos run: MAOS_HOST_GRANTS parse error ({display}): {e}; \
+                     using built-in grants only (real agent CLIs will fail closed)"
+                ),
+            },
+            Err(e) => eprintln!(
+                "maos run: MAOS_HOST_GRANTS unreadable ({display}): {e}; \
+                 using built-in grants only (real agent CLIs will fail closed)"
+            ),
+        }
+    }
+    maos_domain::host_grant::StaticHostGrantAllowlist::new(grants)
+}
+
+#[cfg(all(test, feature = "network"))]
+mod host_grant_tests {
+    use super::*;
+    use maos_domain::host_grant::{HostGrantAllowlist, StaticHostGrantAllowlist};
+    use maos_domain::invariants::i9::SandboxTier;
+    use maos_kernel_core::lifecycle::cli_wrapper::resolve_cli_wrapper_tier;
+
+    #[test]
+    fn builtin_allowlist_grants_the_fixture_only() {
+        // No MAOS_HOST_GRANTS in the test env → built-in fixture grant only.
+        let al = load_host_grant_allowlist();
+        assert!(
+            al.lookup("worker-cli-fixture", "MAOS Project").is_some(),
+            "the built-in host grant must cover the hermetic fixture"
+        );
+        assert!(
+            al.lookup("codex", "OpenAI").is_none(),
+            "codex must NOT be granted without an operator MAOS_HOST_GRANTS entry"
+        );
+    }
+
+    #[test]
+    fn a_manifest_cannot_self_grant_an_unlisted_image() {
+        // Trust-direction proof: a manifest claiming to be `codex` is NOT granted
+        // by the host allowlist → fail closed. Under the old self-grant it would
+        // have auto-granted itself.
+        let al = StaticHostGrantAllowlist::new(vec![builtin_fixture_grant()]);
+        assert!(
+            resolve_cli_wrapper_tier(SandboxTier::T3, "codex", "anyone", &al).is_err(),
+            "an unlisted image must fail closed, not self-grant"
+        );
+        assert!(matches!(
+            resolve_cli_wrapper_tier(SandboxTier::T3, "worker-cli-fixture", "MAOS Project", &al),
+            Ok(t) if t == SandboxTier::T3
+        ));
+    }
+
+    #[test]
+    fn operator_grants_file_parses_real_cli_with_egress() {
+        let toml = r#"
+[[grant]]
+attested_image = "codex"
+signing_key_id = "OpenAI"
+permitted_tier = "T3"
+permitted_egress_destinations = ["api.openai.com"]
+"#;
+        let grants = parse_host_grants_toml(toml).expect("valid grants file parses");
+        assert_eq!(grants.len(), 1);
+        assert_eq!(grants[0].attested_image, "codex");
+        assert_eq!(
+            grants[0].permitted_egress_destinations,
+            vec!["api.openai.com".to_string()]
+        );
+        assert_eq!(grants[0].permitted_tier, SandboxTier::T3);
+    }
+
+    #[test]
+    fn malformed_grants_file_errors_never_silently_admits() {
+        assert!(
+            parse_host_grants_toml("[[grant]]\nsigning_key_id = \"x\"\n").is_err(),
+            "a grant missing attested_image must error, never silently admit"
+        );
+    }
+}
+
+/// The default Worker task when the operator sets no `MAOS_WORKER_TASK`. Kept
+/// deterministic so the hermetic fixture path stays bit-stable in CI (the
+/// fixture ignores the task text; the live run overrides it via the env var).
+#[cfg(feature = "network")]
+const DEFAULT_WORKER_TASK: &str =
+    "founder-loop: acknowledge the delegated assignment and report completion";
+
 #[cfg(feature = "network")]
 fn run_cli_wrapper_manifest(
     manifest_root: &toml::Value,
@@ -525,7 +697,7 @@ fn run_cli_wrapper_manifest(
     enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use maos_domain::host_grant::{HostGrant, StaticHostGrantAllowlist};
+    use maos_domain::host_grant::HostGrantAllowlist;
     use maos_domain::invariants::i9::SandboxTier;
     use maos_kernel_core::lifecycle::cli_wrapper::{
         admit_cli_wrapper_journaled, argv_prefix_hash, reject_respawn_with_context,
@@ -556,19 +728,13 @@ fn run_cli_wrapper_manifest(
     // 3. AC1 FORK C — fail loud at load on the deferred respawn_with_context.
     reject_respawn_with_context(&config).map_err(|e| format!("maos run: {e}"))?;
 
-    // 4. AC5 FORK A — host-grant tier gate. The allowlist is operator config
-    //    (host-side), keyed on attested-image + signing-key — NOT in the
-    //    artifact.
-    //
-    //    ⚠ SEAM: the allowlist below is SELF-GRANTING — populated from the
-    //    manifest's own `command` and `author.name`, so every manifest
-    //    auto-grants itself. The architecture (HostGrant / HostGrantAllowlist
-    //    trait / resolve_tier_grant) is generalized for 8.14b/c reuse; only
-    //    the POPULATION SOURCE is v0.9-only. Epic 9 MUST replace this with an
-    //    operator-managed grant source (host-grants.toml or equivalent).
-    //    Until then, AC5 FORK A's trust-direction gate is structurally correct
-    //    but NOT enforced: the artifact effectively decides its own tier.
-    //    See: host_grant.rs module doc, Cross-Impact #2.
+    // 4. AC5 FORK A — host-grant tier gate (T3: self-grant KILLED). The manifest
+    //    supplies only the REQUEST (its claimed image + author); the allowlist is
+    //    HOST-MANAGED (built-in fixture grant + operator `MAOS_HOST_GRANTS` file),
+    //    never populated from the manifest's own fields. A (image, author) that
+    //    matches no host grant fails CLOSED at `resolve_cli_wrapper_tier`
+    //    (ECliWrapperTierNotGranted) — the artifact can no longer decide its own
+    //    tier. See host_grant.rs module doc + `load_host_grant_allowlist`.
     let attested_image = config.command.clone();
     let signing_key_id = manifest_root
         .get("author")
@@ -576,19 +742,32 @@ fn run_cli_wrapper_manifest(
         .and_then(|n| n.as_str())
         .unwrap_or("unknown")
         .to_string();
-    let allowlist = StaticHostGrantAllowlist::new(vec![HostGrant {
-        attested_image: attested_image.clone(),
-        signing_key_id: signing_key_id.clone(),
-        permitted_tier: SandboxTier::T3,
-        // Enforced egress allowlisting is recorded as a follow-up (Cross-Impact
-        // #3): 8.12 lands the grant seam + fail-closed error; the live-CLI path
-        // uses the T3 network-permitted variant. No silent gap — see Completion
-        // Notes for enforced-vs-declared.
-        permitted_egress_destinations: vec![],
-    }]);
+    let allowlist = load_host_grant_allowlist();
     let granted_tier =
         resolve_cli_wrapper_tier(requested_tier, &attested_image, &signing_key_id, &allowlist)
             .map_err(|e| format!("maos run: {e}"))?;
+
+    // Egress disposition (spec c3): run one records egress `declared-not-enforced`
+    // with a follow-up ID; enforced packet-level egress is an Epic-14 v2.0
+    // hardening. The permitted destinations come from the HOST grant, not the
+    // manifest.
+    let permitted_egress = allowlist
+        .lookup(&attested_image, &signing_key_id)
+        .map(|g| g.permitted_egress_destinations.clone())
+        .unwrap_or_default();
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "host_grant_disposition",
+            "attested_image": attested_image,
+            "signing_key_id": signing_key_id,
+            "granted_tier": format!("{granted_tier:?}"),
+            "egress": "declared-not-enforced",
+            "egress_enforced": false,
+            "permitted_egress": permitted_egress,
+            "egress_followup": EGRESS_ENFORCEMENT_FOLLOWUP,
+        })
+    );
 
     // 5. Resolve the CLI binary path; pin it into the config for the probe.
     let resolved = resolve_cli_binary(&config.command)?;
@@ -615,9 +794,84 @@ fn run_cli_wrapper_manifest(
         None => resolved,
     };
 
-    // 6. Journaled admission (Story 7.4 path: probe + shape assert + T3 floor).
-    admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
-        .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+    // T2/T1 — select the swappable Worker-CLI adapter by resolved binary and
+    // route the typed task into its argv. An unsupported wrapper fails CLOSED
+    // here, before the admission probe or any spawn (spec: "refuse before
+    // probe/spawn"; "fail closed on ... unsupported wrappers").
+    let worker_cli = worker_cli::select_worker_cli(&resolved).ok_or_else(|| {
+        format!(
+            "maos run: unsupported cli_wrapper command '{resolved}'; supported worker CLIs: {:?}",
+            worker_cli::SUPPORTED_WORKER_CLIS
+        )
+    })?;
+    // T5 — CI/local split: a real agent CLI needs MAOS_LIVE_AGENT (local opt-in);
+    // the fixture always runs. CI never sets the flag, so CI cannot spawn a paid
+    // agent — the paid path is physically local-only. Fails closed before spawn.
+    let live_agent = std::env::var_os("MAOS_LIVE_AGENT").is_some_and(|v| !v.is_empty());
+    worker_cli::live_agent_gate(worker_cli.name(), live_agent)
+        .map_err(|e| format!("maos run: {e}"))?;
+    // T5 — clean-home invariant on the live path: refuse an ambient auth file
+    // (codex's ~/.codex/auth.json) that would shadow the injected API key with a
+    // token MAOS never holds (redaction unattestable). The child inherits HOME
+    // (the bridge does not clear the env), so this is a real footgun.
+    if live_agent {
+        if let Some(home) = std::env::var_os("HOME") {
+            if let Err(p) =
+                worker_cli::refuse_ambient_auth(worker_cli.as_ref(), std::path::Path::new(&home))
+            {
+                return Err(format!(
+                    "maos run: ambient auth file {} present in the sandbox home — refusing the \
+                     live run. It shadows the injected API key with a token MAOS never holds, so \
+                     redaction is unattestable (a failed Tier-2). Wipe it or use a clean sandbox home.",
+                    p.display()
+                )
+                .into());
+            }
+        }
+    }
+    let worker_task =
+        std::env::var("MAOS_WORKER_TASK").unwrap_or_else(|_| DEFAULT_WORKER_TASK.to_string());
+    let task_args = worker_cli.argv(&worker_task);
+    // Non-secret CLI env only (e.g. codex CODEX_NON_INTERACTIVE). Credentials are
+    // injected host-side on the live path, never in this argv/env shaping code.
+    let worker_env = worker_cli.nonsecret_env();
+
+    // 6. Admission — adapter-aware. The hermetic fixture speaks the kernel's
+    //    Story 7.4 `--maos-bridge-probe` output-shape handshake, so it uses the
+    //    journaled kernel path (probe + shape assert + T3 floor). A real
+    //    adapter-backed CLI (codex/claude) does NOT implement that handshake —
+    //    it exits non-zero on the probe flag, which is why the fixture was the
+    //    only worker that ever admitted. For real CLIs the WorkerCli adapter's
+    //    `parse_completion` IS the output-shape contract (verified at COMPLETION),
+    //    so admission runs a liveness probe and re-asserts the T3 floor here.
+    match worker_cli.probe_strategy() {
+        worker_cli::ProbeStrategy::BridgeHandshake => {
+            admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
+                .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+        }
+        worker_cli::ProbeStrategy::Liveness { argv } => {
+            // AC6 floor — a CliWrapperSpirit requires T3 (the kernel probe asserts
+            // this; preserve it on the real-CLI path).
+            if !matches!(granted_tier, maos_domain::invariants::i9::SandboxTier::T3) {
+                return Err(format!(
+                    "maos run: cli_wrapper admission failed: {} requires SandboxTier::T3, \
+                     host-granted {granted_tier:?}",
+                    worker_cli.name()
+                )
+                .into());
+            }
+            worker_cli::run_liveness_probe(&resolved, &argv, std::time::Duration::from_secs(10))
+                .map_err(|e| {
+                    format!("maos run: cli_wrapper admission failed: liveness probe: {e}")
+                })?;
+            eprintln!(
+                "maos run: cli_wrapper '{}' admitted via liveness probe (real adapter-backed CLI; \
+                 output shape is verified at completion by the {} adapter, not a bridge handshake)",
+                resolved,
+                worker_cli.name()
+            );
+        }
+    }
 
     // 7. Issue the Scope::CliSubprocessSpawn cap-token (binds argv_prefix_hash).
     //    Mediation requires the operator policy to grant `proc.exec` for the CLI
@@ -658,11 +912,12 @@ fn run_cli_wrapper_manifest(
         }
     };
 
-    // 8. Spawn the REAL bridge (no probe flag → the worker runs its task).
+    // 8. Spawn the REAL bridge. The typed task is routed as the trailing argv
+    //    (after the hashed argv_prefix); no probe flag → the worker runs its task.
     let spec = BridgeSpawnSpec {
         program: resolved,
         argv_prefix: config.argv_prefix.clone(),
-        task_args: vec![],
+        task_args,
         expected_argv_prefix_hash: aph,
         from_spirit_id: "worker".to_string(),
         stdio_shape: config.posture.stdio_shape,
@@ -670,8 +925,14 @@ fn run_cli_wrapper_manifest(
         shutdown_signal: config.posture.shutdown_signal.clone(),
         channel_capacity: 256,
         backpressure: Backpressure::Block,
-        env: vec![],
+        env: worker_env,
     };
+    // Bound the completion read-back to THIS run's journaled CliSubprocessOutput
+    // rows (the adapter's oracle reads the persisted evidence, not the raw exit).
+    let worker_run_since_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0);
     let mut bridge = spawn_and_bridge(spec).map_err(|e| format!("maos run: bridge spawn: {e}"))?;
     let child_pid = bridge.child_pid();
     println!(
@@ -717,6 +978,67 @@ fn run_cli_wrapper_manifest(
         exit.cause,
         pump.stdout_lines + pump.stderr_lines
     );
+
+    // T2/T1 — completion is decided by the adapter over the JOURNALED Worker
+    // output (redacted at insert), never by the raw exit code. Reconstruct the
+    // Worker's stdout/stderr from the CliSubprocessOutput rows this run wrote,
+    // then let the adapter's per-CLI oracle rule. The last stdout frame is the
+    // Worker-produced Transparency Log reference a digest would cite.
+    let worker_exit = match exit.cause.exit_code() {
+        Some(code) => worker_cli::WorkerExit::Exited(code),
+        None => worker_cli::WorkerExit::Crashed,
+    };
+    let mut wc_stdout: Vec<String> = Vec::new();
+    let mut wc_stderr: Vec<String> = Vec::new();
+    let mut completion_tl_ref: Option<[u8; 16]> = None;
+    match transparency_log.query_frames(FrameFilter {
+        kind: Some(FrameKind::CliSubprocessOutput),
+        since_ns: Some(worker_run_since_ns),
+        ..Default::default()
+    }) {
+        Ok(rows) => {
+            for row in &rows {
+                if row.from_spirit_id != "worker" {
+                    continue;
+                }
+                let Ok(v) = serde_json::from_slice::<serde_json::Value>(&row.payload_redacted)
+                else {
+                    continue;
+                };
+                let line = v
+                    .get("line")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                match v.get("stream").and_then(|s| s.as_str()) {
+                    Some("stdout") => {
+                        completion_tl_ref = Some(row.frame_id);
+                        wc_stdout.push(line);
+                    }
+                    Some("stderr") => wc_stderr.push(line),
+                    _ => {}
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("maos run: could not read worker output rows for completion: {e}")
+        }
+    }
+    let completion = worker_cli.parse_completion(&wc_stdout, &wc_stderr, worker_exit);
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "worker_completion",
+            "worker_cli": worker_cli.name(),
+            "completion": completion.label(),
+            "completed": completion.is_completed(),
+            // Non-secret: the last stdout CliSubprocessOutput frame_id (hex) — the
+            // Worker-produced TL reference a digest cites. `null` if none captured.
+            "completion_tl_ref":
+                completion_tl_ref.map(|id| id.iter().map(|b| format!("{b:02x}")).collect::<String>()),
+        })
+    );
+
     Ok(())
 }
 
@@ -2710,6 +3032,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .parent()
                 .unwrap_or_else(|| std::path::Path::new("."));
             let mut loaded_pids: Vec<(String, u32)> = Vec::with_capacity(topology_entries.len());
+            // T1 — host-authorized CliWrapper Developer-Workers admitted as
+            // topology members (not scheduler class Spirits). Tracked separately
+            // for the drain event.
+            let mut loaded_workers: Vec<String> = Vec::new();
             for entry in topology_entries {
                 let child_path = {
                     let p = std::path::PathBuf::from(&entry);
@@ -2731,12 +3057,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         child_path.display()
                     )
                 })?;
+                // T1 — a [cli_wrapper] topology member is a host-authorized
+                // Developer-Worker (NOT a scheduler class Spirit). Admit it
+                // through the SAME host-grant + adapter + bridge path as the
+                // standalone run (T2/T3), routing + running its delegated task,
+                // then continue loading the class Spirits. (Continuous/halt-resume
+                // of a long-running worker is T4; --once runs it to completion.)
                 if child_root.get("cli_wrapper").is_some() {
-                    return Err(format!(
-                        "maos run: topology entry {} is [cli_wrapper]; class Spirits only in topology manifests",
-                        child_path.display()
-                    )
-                    .into());
+                    if child_root.get("class").is_some() {
+                        return Err(format!(
+                            "maos run: topology entry {} declares both [cli_wrapper] and [class] — \
+                             mutually exclusive (architecture §6.7, EManifestSchemaConflict)",
+                            child_path.display()
+                        )
+                        .into());
+                    }
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "event": "topology_worker_admit",
+                            "manifest": child_path.display().to_string(),
+                            "topology": true,
+                        })
+                    );
+                    run_cli_wrapper_manifest(
+                        &child_root,
+                        &run,
+                        Arc::clone(&transparency_log),
+                        Arc::clone(&capability),
+                        spirit_host.clone(),
+                        enterprise_runtime.clone(),
+                        enterprise_pdp_runtime.as_ref(),
+                    )?;
+                    loaded_workers.push(child_path.display().to_string());
+                    continue;
                 }
                 let child_extract = |section: &str| -> Result<String, Box<dyn std::error::Error>> {
                     let v = child_root.get(section).ok_or_else(|| {
@@ -3024,7 +3378,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     serde_json::json!({
                         "event": "drain",
                         "topology": true,
-                        "spirits": loaded_pids.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>()
+                        "spirits": loaded_pids.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>(),
+                        "workers": loaded_workers,
                     })
                 );
                 yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -3046,11 +3401,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("maos run: topology --once complete — exiting cleanly");
                 return Ok(());
             }
-            // Patch 6 — topology continuous mode is not yet implemented.
-            // Fail explicitly rather than silently falling through to the
-            // single-Spirit serving loop (which is guarded by topology().is_none()).
-            return Err(
-                "maos run: topology continuous mode is not yet supported; use --once".into(),
+            // T4 — topology CONTINUOUS service. Fall through to the shared serving
+            // loop below: the IdleWatchdog drives `on_idle` for every loaded
+            // topology Spirit against real time, `ctrl_c`/SIGTERM trigger the safe
+            // drain, and the halt registry + resume machinery are already wired
+            // (same infrastructure the single-Spirit non-`--once` path uses). The
+            // Developer-Worker ran its delegated task to completion during load
+            // (above), so no in-flight delegation can be preempted by a shutdown
+            // or halt. `MAOS_ONE_SHOT` is unset on the `maos run` path, so the
+            // lifecycle-verb block below is skipped.
+            eprintln!(
+                "maos run: topology '{}' loaded ({} class Spirit(s) + {} worker(s)) — \
+                 entering continuous serving loop (ctrl_c/SIGTERM for safe shutdown)",
+                run.manifest_path,
+                loaded_pids.len(),
+                loaded_workers.len()
             );
         }
 

@@ -12,3 +12,13 @@ priority_weight = 2
 [[topology.spirits]]
 manifest = "../reviewer/manifest.toml"
 priority_weight = 1
+
+# The host-authorized Developer-Worker (a [cli_wrapper] member, NOT a class
+# Spirit). Last so it "executes" after the Orchestrator has loaded. Admitted
+# through the host-managed grant + WorkerCli adapter + live bridge; runs the
+# delegated task (MAOS_WORKER_TASK), journaling its output to the Transparency
+# Log. The hermetic profile wraps `worker-cli-fixture`; the live signed run
+# swaps it (+ MAOS_HOST_GRANTS) for `codex` — binary + argv only.
+[[topology.spirits]]
+manifest = "../worker/manifest.toml"
+priority_weight = 1

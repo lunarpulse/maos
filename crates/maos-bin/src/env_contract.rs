@@ -346,6 +346,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         purpose: "Path to the cohort A2A daemon TOML config (manifest path + digest summary) (Story 12.1)",
         stability: EnvStability::UserFacing,
     },
+    EnvVar {
+        name: "MAOS_WORKER_TASK",
+        purpose: "The bounded task text routed to the CliWrapper Worker's argv (trailing arg after the hashed argv_prefix); operator-supplied for the J1 Tier-2 live run (j1-tier2-live-agent-signed-bridge)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_LIVE_AGENT",
+        purpose: "Opt in to spawning a REAL agent-CLI Worker subprocess (codex/claude) instead of the hermetic fixture; local-only, never CI. Distinct from --live (which selects the real reasoning provider for class Spirits) (j1-tier2-live-agent-signed-bridge)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_HOST_GRANTS",
+        purpose: "Path to an operator TOML file of host-managed CliWrapper grants ([[grant]] attested_image/signing_key_id/permitted_tier/permitted_egress_destinations); replaces the v0.9 self-grant. Absent → built-in fixture grant only, real agent CLIs fail closed (j1-tier2-live-agent-signed-bridge)",
+        stability: EnvStability::UserFacing,
+    },
 ];
 
 pub fn lookup(name: &str) -> Option<&'static EnvVar> {

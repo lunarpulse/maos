@@ -1,0 +1,11 @@
+{
+  "signer": "Myoungki Jung (Lunarpulse) — named human signer",
+  "live_agent_identity": "OpenAI Codex v0.144.4 (model gpt-5.6-sol, provider openai)",
+  "command_metadata": "codex exec --sandbox workspace-write \"<c2 task>\"; CODEX_API_KEY injected host-side (value redacted)",
+  "host_grant_disposition": "exact-match host grant admitted (attested_image=codex, signing_key_id=OpenAI, tier T3); a mismatch would have refused",
+  "audit_refs": ["019f67ef8d8f548f32e4a0cb94308968"],
+  "egress": "declared-not-enforced",
+  "egress_followup": "FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT",
+  "redaction_result": "verified",
+  "outcome": "codex worker completed the delegated task (exit 0, adapter-parsed completion); main.rs + NOTES.md written to $DEMO; no secret persisted to the TL"
+}
