@@ -46,7 +46,7 @@
       Redaction VERIFIED on the live wire: `SELECT count(*) … LIKE '%sk-proj-%'`
       over the TL = **0** — no token landed in the Transparency Log.
 
-**Signed bundle:** `j1-tier2-bundle.json` — sealed-export `--range 1d`, **247 entries**
+**Signed bundle:** `j1-tier2-evidence/j1-tier2-bundle.json` (capture doc archived alongside as `j1-tier2-evidence/j1-tier2-capture.json`) — sealed-export `--range 1d`, **247 entries**
 (incl. `run.capture d301a233…` + worker completion `019f67ef…`), pubkey `61f4f495…`.
 `verify-bundle` = **OK (247 entries, seq 1784161270937636202)** against the operator pubkey.
 
@@ -60,5 +60,5 @@ not this Epic-8-debt bridge. The worker task was operator-set (`MAOS_WORKER_TASK
 routed to the Worker, not Orchestrator-decomposed.
 
 **Named owner:** Myoungki Jung (Lunarpulse) — named human signer
-**Signed artifact path:** `j1-tier2-bundle.json` (pubkey/FPR `61f4f495dba703e74aff7d42b4286a1a914a89b592a98bf76ed3656c81107766`)
+**Signed artifact path:** `_bmad-output/test-artifacts/j1-tier2-evidence/j1-tier2-bundle.json` (pubkey/FPR `61f4f495dba703e74aff7d42b4286a1a914a89b592a98bf76ed3656c81107766`; re-verify: `maosctl audit verify-bundle <path> --pubkey <FPR>`)
 **Date:** 2026-07-16
