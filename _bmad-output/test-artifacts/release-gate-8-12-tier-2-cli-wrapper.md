@@ -59,6 +59,16 @@ loopback-only, `user-journeys.md:326`) and which is a separate A2A-peer-mesh sto
 not this Epic-8-debt bridge. The worker task was operator-set (`MAOS_WORKER_TASK`)
 routed to the Worker, not Orchestrator-decomposed.
 
+**Remainder now SCHEDULED (2026-07-16):** the cross-host leg is the **post-Epic-13
+J1 cross-host bridge** — `j1-crosshost-1-loopback-developer-remote-delegation` (v0.8
+loopback rung) → `j1-crosshost-2-cross-host-signed-run` (v1.0 two-real-host signed
+rung), on the 8.16 / j1-tier2 bridge precedent. See
+`_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-16.md` (scope
+Moderate, ZERO kernel-Δ @23202) and the grounding brief
+`_bmad-output/planning-artifacts/analysis-j1-cross-host-developer-remote-2026-07-16.md`.
+The PRD's v1.0 milestone now carries the matching `[DELTA-2026-07-16]` honesty note.
+This gate stays **CLOSED** — the bridge closes a *different* (cross-host) rung.
+
 **Named owner:** Myoungki Jung (Lunarpulse) — named human signer
 **Signed artifact path:** `_bmad-output/test-artifacts/j1-tier2-evidence/j1-tier2-bundle.json` (pubkey/FPR `61f4f495dba703e74aff7d42b4286a1a914a89b592a98bf76ed3656c81107766`; re-verify: `maosctl audit verify-bundle <path> --pubkey <FPR>`)
 **Date:** 2026-07-16

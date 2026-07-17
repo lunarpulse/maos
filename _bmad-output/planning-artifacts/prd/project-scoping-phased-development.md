@@ -177,7 +177,7 @@ This restructure addresses three concerns from Step 8 party mode:
 
 **Adds to v0.8:**
 - **Architect (Nash-class) + Reviewer reference Spirits** added; **6 reference Spirits total** (Butler / Researcher / Architect / Worker / Reviewer / Observer)
-- **Cross-host A2A peer mesh** with full mTLS + TOFU + ADR-012 typed-intent consent (lifted from loopback-only)
+- **Cross-host A2A peer mesh** with full mTLS + TOFU + ADR-012 typed-intent consent (lifted from loopback-only). **[DELTA-2026-07-16: for J1 this clause was NOT delivered at v1.0.** The A2A mechanism shipped and is proven in isolation (`smoke-a2a-loopback-6-3` / `smoke-a2a-tcp-8-6` real mTLS wire / `-consent-vocab-8-7` / `-fail-closed-8-8`; the cohort A2A daemon), but **no epic wired it into the founder-loop `maos run` path at any tier** — the T6 signed run (2026-07-16) closed J1's **v0.8 local composition only** (`release-gate-8-12-tier-2-cli-wrapper.md:53-60`; the worker task was operator-set via `MAOS_WORKER_TASK`, not Orchestrator-decomposed). J1's cross-host `developer-remote` leg is retagged to the **post-Epic-13 J1 cross-host bridge** (`j1-crosshost-1` → `j1-crosshost-2`; sprint-change-proposal-2026-07-16.md), on the 8.16 / j1-tier2 bridge precedent. Same correction shape as the J3 `[DELTA-2026-07-06]` note above. **Zero new FRs** — FR23a/FR23b already scope the peer mesh. The J3/J4/Reza cross-host clauses stand as v1.0 history.**]**
 - **Spirit registry v1.0 (full)**: `registry.search` / `manifest` / `artifact` / `publish` / `deprecate`; four trust tiers operational; strictest-of-(manifest, tier) enforcement
 - **Sandbox tier T4 WASM (tools, not Spirits yet)**
 - **ComplianceClaim envelope** + admission-time verification (first-class kernel object)
