@@ -37,3 +37,4 @@ pub mod revocation; // NEW — Story 5.4 CRL types + RegistryClient trait
 pub mod sandbox; // NEW — Story 5.5a T3 container isolation domain types
 pub mod self_telemetry; // NEW — Story 4.3 self-telemetry types
 pub mod supervision; // NEW — Story 5.3 crash / hang / silent-failure detection
+pub mod team; // Story 13.1 — shared canonical tenant identity (ADR-055)

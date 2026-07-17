@@ -282,6 +282,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_LOOM_HOME_TEAM",
+        purpose: "Canonical tenant team id for the Loom-lite store; requires a refreshable verified schema-v2 cohort source (Story 13.1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_SIEM_FILE",
         purpose: "Path to the local SIEM file sink; when set and non-empty, enables enterprise SIEM export (Story 11.4c)",
         stability: EnvStability::UserFacing,

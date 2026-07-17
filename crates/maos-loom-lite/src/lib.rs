@@ -27,3 +27,4 @@ pub mod replication;
 pub mod schema;
 pub mod seal;
 pub mod store;
+pub mod tenant;

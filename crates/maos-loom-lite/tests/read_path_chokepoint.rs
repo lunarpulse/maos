@@ -44,6 +44,30 @@ fn count_code_occurrences(src: &str, needle: &str) -> usize {
         .count()
 }
 
+fn function_body<'a>(src: &'a str, signature: &str) -> &'a str {
+    let start = src
+        .find(signature)
+        .unwrap_or_else(|| panic!("missing function signature: {signature}"));
+    let open = src[start..]
+        .find('{')
+        .map(|offset| start + offset)
+        .unwrap_or_else(|| panic!("missing function body: {signature}"));
+    let mut depth = 0usize;
+    for (offset, byte) in src.as_bytes()[open..].iter().enumerate() {
+        match byte {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return &src[open..=open + offset];
+                }
+            }
+            _ => {}
+        }
+    }
+    panic!("unterminated function body: {signature}");
+}
+
 #[test]
 fn region_guard_wired_into_both_spirit_reads() {
     // The guard is invoked in BOTH read and scan. Two real call sites
@@ -55,6 +79,37 @@ fn region_guard_wired_into_both_spirit_reads() {
          (read + scan); found {guard_calls}. A missing guard on either read, or \
          a third unguarded Spirit read, is a fail-closed bypass (AC4)."
     );
+}
+
+#[test]
+fn team_guard_is_exactly_the_three_spirit_entry_points() {
+    for signature in [
+        "pub async fn write(",
+        "pub async fn read(",
+        "pub async fn scan(",
+    ] {
+        let body = function_body(STORE_SRC, signature);
+        assert_eq!(
+            count_code_occurrences(body, "self.team_guard("),
+            1,
+            "{signature} must invoke team_guard exactly once before querying"
+        );
+    }
+
+    assert_eq!(
+        count_code_occurrences(STORE_SRC, "self.team_guard("),
+        3,
+        "team_guard must have exactly three call sites: write, read, and scan"
+    );
+
+    for signature in ["pub async fn write_with_source(", "pub fn pool("] {
+        let body = function_body(STORE_SRC, signature);
+        assert_eq!(
+            count_code_occurrences(body, "self.team_guard("),
+            0,
+            "{signature} is deliberately unguarded"
+        );
+    }
 }
 
 #[test]

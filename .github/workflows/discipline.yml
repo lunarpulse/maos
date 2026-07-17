@@ -2663,6 +2663,43 @@ jobs:
           key: check-cohort-mesh-${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-cohort-mesh gate
         run: cargo run -p xtask -- check-cohort-mesh --json
+
+  # Story 13.1 — ADR-055 physical tenant wall. The live legs use two
+  # databases on one serialized Postgres 16 instance.
+  check-multi-tenant-loom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maos_team_a
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d maos_team_a"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-multi-tenant-loom-${{ hashFiles('**/Cargo.lock') }}
+      - name: Create team B database
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d maos_team_a -c 'CREATE DATABASE maos_team_b;'
+      - name: Run check-multi-tenant-loom gate
+        env:
+          MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
+          MAOS_TEST_POSTGRES_TEAM_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+        run: cargo run -p xtask -- check-multi-tenant-loom --json
   # ONE disposition / FOUR independently-falsifiable legs with PER-LEG
   # independence (mesh-identity-reconcile, detection-latency, blast-recovery-
   # rto, kernel-abi-diff — each reads its OWN `cargo test` oracle). Advisory
@@ -2839,6 +2876,7 @@ jobs:
       - check-multi-region-slo
       - check-scale-churn
       - check-cohort-mesh
+      - check-multi-tenant-loom
       - check-enterprise-pdp
       - check-enterprise-identity
       - check-fkcs
@@ -2876,6 +2914,7 @@ jobs:
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"
           echo "| check-scale-churn | ${{ needs.check-scale-churn.result }} | cargo run -p xtask -- check-scale-churn |"
           echo "| check-cohort-mesh | ${{ needs.check-cohort-mesh.result }} | cargo run -p xtask -- check-cohort-mesh |"
+          echo "| check-multi-tenant-loom | ${{ needs.check-multi-tenant-loom.result }} | cargo run -p xtask -- check-multi-tenant-loom |"
           echo "| check-enterprise-pdp | ${{ needs.check-enterprise-pdp.result }} | cargo run -p xtask -- check-enterprise-pdp |"
           echo "| check-enterprise-identity | ${{ needs.check-enterprise-identity.result }} | cargo run -p xtask -- check-enterprise-identity |"
           echo "| check-fkcs | ${{ needs.check-fkcs.result }} | cargo run -p xtask -- check-fkcs |"
@@ -2908,6 +2947,7 @@ jobs:
           echo "  check-multi-region-slo: ${{ needs.check-multi-region-slo.result }}"
           echo "  check-scale-churn: ${{ needs.check-scale-churn.result }}"
           echo "  check-cohort-mesh: ${{ needs.check-cohort-mesh.result }}"
+          echo "  check-multi-tenant-loom: ${{ needs.check-multi-tenant-loom.result }}"
           echo "  check-enterprise-pdp: ${{ needs.check-enterprise-pdp.result }}"
           echo "  check-enterprise-identity: ${{ needs.check-enterprise-identity.result }}"
           echo "  check-fkcs: ${{ needs.check-fkcs.result }}"

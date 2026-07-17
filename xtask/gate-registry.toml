@@ -107,6 +107,9 @@ gates = [
     "check-scale-churn",
     # Story 12.1 — signed cohort manifest and blocking N=3/N=8 pairwise mesh.
     "check-cohort-mesh",
+    # Story 13.1 — ADR-055 physical tenant wall; hermetic legs bind at HEAD,
+    # live two-datname legs are advisory-substrate-gated.
+    "check-multi-tenant-loom",
     # Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
     # in-process; real per-commit tripwire). Per-leg independence. Advisory at
     # v1.0/v1.5; blocking at v2.0.
@@ -289,6 +292,12 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 # disposition controls the v2.2 ship-gate ladder without advancing global phase.
 [[ship_gate]]
 name = "check-cohort-mesh"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
+# Story 13.1 — physical tenant wall. Hermetic legs hard-fail at HEAD; live
+# two-datname legs block when the Postgres substrate is present and emit a
+# WOULD-HAVE-BLOCKED advisory when absent.
+[[ship_gate]]
+name = "check-multi-tenant-loom"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
 # Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
 # in-process). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.

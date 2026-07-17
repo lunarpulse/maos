@@ -1,15 +1,15 @@
 # Epic 13 — Reza Single-Org Cross-Team Cortex (v2.2)
 
-**Status:** `draft-ready-for-preflight` — created 2026-07-09 (Step 3 of the full-PRD planning plan). Built on the **RATIFIED** full architecture §15 (party-mode 2026-07-09, §15.11 record) + the ratified PRD delta. Second epic of the **v2.2 functional-completeness** phase; consumes Epic 12 (cohort mesh) and Epic 11 (multi-region Loom, PDP, identity).
+**Status:** `in-progress — plan-hardened 2026-07-17` — Story 13.1 is `ready-for-dev`: Lunarpulse ratified F4 Option A+ with dual-read v1/v2 compatibility, exact schema↔teams invariants, distinct signature domains, tenant-required-v2 boot, and downgrade refusal. The Epic-13 plan includes two evidence-discovered prerequisites before the Reza closer: collective-tier erasure/legal-hold and a real Spirit/daemon collective path with tenant audit isolation.
 
 **Dev-gate:** external holds (pen-test NFR-Sec-7 + export counsel NFR-Comp-1) = **GA ledger only, non-gating for v2.2 dev** (E11 retro A3).
 
-**Model/review discipline (E11 retro A1):** frontier-class dev allowlist + **§A6 full-layer review net is the binding control**. The tenant wall (13.1), cross-team consent/provenance (13.2), and vetting-tier promotion (13.3) are **adversarial boundaries** → the full §A6 net (incl. Test-Infra + runtime) is **non-degradable** on those stories.
+**Model/review discipline (E11 retro A1):** frontier-class dev allowlist + **§A6 full-layer review net is the binding control**. The physical and cryptographic tenant walls (13.1/13.2), cross-team consent/provenance (13.3), vetting promotion (13.4), collective erasure/hold (13.5b), production tenant-audit path (13.5c), and Reza journey (13.6) are adversarial boundaries → the full §A6 net (incl. Test-Infra + runtime) is **non-degradable**.
 
 ---
 
 ## Objective
-Serve **Reza's single-org cross-team Cortex** (§10.7.2, committed v2.2) — a 400-person fintech running multiple teams as one governed Cortex on shared MAOS infrastructure. Epic 11 shipped the **enablers** (WASM form, multi-region Loom, PDP, identity/at-rest/SIEM); the journey itself is **unbuilt**. Epic 13 delivers the **tenant wall** (multi-tenant Loom, database-per-team, cryptographic per-team boundary), **cross-team asymmetric sharing with multi-hop distillation provenance**, the **FR37 vetting machinery** (the only unserved PRD FR — internal-vetter-first), the **Enterprise reference Spirit class**, and the **Reza Cortex scene E2E** on the 3-region substrate. **Zero new PRD FRs beyond FR37**; multi-tenancy arrives **outside the kernel** (the tenant wall is proven at the store gate, not in kernel-core).
+Serve **Reza's single-org cross-team Cortex** (§10.7.2, committed v2.2) — a 400-person fintech running multiple teams as one governed Cortex on shared MAOS infrastructure. Epic 11 shipped the **enablers** (WASM form, multi-region Loom, PDP, identity/at-rest/SIEM); the journey itself is **unbuilt**. Epic 13 delivers the **tenant wall** (multi-tenant Loom, database-per-team, cryptographic per-team boundary), **cross-team asymmetric sharing with multi-hop distillation provenance**, the **FR37 vetting machinery** (the only unserved PRD FR — internal-vetter-first), the **Enterprise reference Spirit class**, collective-tier erasure/legal-hold closure, a real Spirit/daemon collective path with tenant audit isolation, and the **Reza Cortex scene E2E** on the 3-region substrate. The closer composes proven controls and refuses to translate absent or indeterminate evidence into a product claim.
 
 ## What Epic 13 stands on
 | Substrate | From | Epic 13 use |
@@ -35,24 +35,26 @@ Serve **Reza's single-org cross-team Cortex** (§10.7.2, committed v2.2) — a 4
 | **13.2** | Multi-tenant Loom — **cryptographic tenant boundary** (ADR-055, Fork-4) | Per-team HKDF key-weld + `canonical_kv_leaf` v2 (`source_team` in pre-image, v1 byte-compat); `team_guard` upgrades to signature-verify (closes 11.2b D1); per-team Merkle independence; forged-team-stamp negative; team-identity source-reflex. | 6 | frontier + **full §A6** (crypto boundary) | ZERO expected (HKDF + crypto in maos-loom-lite; verify) | 13.1 |
 | **13.3** | Cross-team asymmetric consent + multi-hop distillation provenance | Cross-team re-attested writes over cohort links; asymmetric consent envelopes (team axis); flattened I11 chain in the crossing bundle; consented cross-wall `log.recall`; refusal first-class. | 6 | frontier + **full §A6** (cross-team consent) | ZERO expected (reuses 11.2a re-attestation; team dimension in maos-loom-lite; verify) | 13.2, Epic 12 (12.2) |
 | **13.4** | FR37 vetting machinery (ADR-056) | `VettingAttestation` issue→install→promote→revoke, internal vetter keys; exact-hash + refuse-at-next-load; vetter-key lifecycle at the operator audit key; four-cause distinguishability; `check-vetting-attestation`. | 6 | frontier + **full §A6** (trust-tier) | ZERO (out-of-kernel registry + maos-compliance) | Epic 7 registry, §7.3 audit key |
-| **13.5** | Enterprise reference Spirit class | The 11th reference Spirit, Spirit-side: PDP (11.4a) + identity/at-rest/SIEM (11.4c) composed into a reusable enterprise-governed Spirit; proven wired at the daemon seam (not just constructed). | 6 | frontier + §A6 | ZERO (Spirit-side) | 11.4a, 11.4c (both done) |
-| **13.6** | Reza Cortex journey closer + NFR-Scale-5 envelope | 3 teams × regions on the 11.2b substrate composing 13.1–13.5; **Reza cross-team Cortex scene E2E**; NFR-Scale-5 14-institution capacity envelope (measured, gated not printed); no-leak under the live journey. | 6 | frontier + **full §A6** (journey) | ZERO | 13.1–13.5, 11.2b |
+| **13.5a** | Enterprise reference Spirit class | The 11th reference Spirit, Spirit-side: PDP (11.4a) + identity/at-rest/SIEM (11.4c) composed into a reusable enterprise-governed Spirit; proven wired at the daemon seam (not just constructed). | 6 | frontier + §A6 | ZERO expected (Spirit-side) | 11.4a, 11.4c (both done) |
+| **13.5b** | Collective-tier erasure + legal-hold cascade | Extend the shipped Epic-9 forget/hold spine to collective rows and cross-team destination copies using 13.2 `source_team`; reconcile success, hold, and partial-failure outcomes. | 6 | frontier + **full §A6** (lifecycle boundary) | **FLAG-Winston expected** — current `CollectiveMemoryPort` has no erase operation and kernel `forget*` never reaches `MemoryTier::Collective`; do not preserve a ZERO claim by routing around the owner | 13.2, Epic 9 |
+| **13.5c** | Reza production collective path + tenant audit isolation | Make mediated Spirit/daemon collective read/write real; bind per-team/per-operator TL isolation and cross-team correlation so 13.6 exercises production code, not a wall around an unused door. | 6 | frontier + **full §A6** (runtime/audit boundary) | **FLAG-Winston verify** — `SpiritMemoryView` exposes no collective path at the 13.1 preflight baseline; no ZERO assumption before preflight | 13.1, 13.3, 13.5a |
+| **13.6** | Reza Cortex journey closer + NFR-Scale-5 envelope | 3 teams × 3 regions composing 13.1–13.5c; allowed collaboration, explainable refusal/recovery, minimum-disclosure provenance, collective erase/hold reconciliation, live production wiring, and the measured—not executed—14-institution envelope. | 6 | frontier + **full §A6** (journey) | No blanket ZERO claim; verify the final baseline after 13.5b/13.5c | 13.1–13.5c, 11.2b |
 
-**Sequencing:** 13.1 (physical wall) → 13.2 (crypto boundary) → 13.3 (cross-team consent) → **13.6 (Reza journey closer)**, with 13.4 (FR37) and 13.5 (Enterprise Spirit) parallelizable after their deps and joining the closer. 6 large demo-anchored stories; the tenant wall is unpacked into a physical-absence proof + a forge-resistance proof; the closer *composes*, never builds.
+**Sequencing:** 13.1 (physical wall; F4 Option A+ ratified/dev-ready) → 13.2 (crypto boundary) → 13.3 (cross-team consent). 13.4 (FR37) and 13.5a (Enterprise Spirit) remain parallelizable; 13.5b closes collective lifecycle after `source_team`, and 13.5c makes the tenant wall reachable through the real Spirit/daemon path. **13.6 is last and only judges; it never invents a missing mechanism inside the journey harness.** Eight stories total.
 
-**Demo-ability (smallest watchable multi-node demo):** two rungs — a **hermetic 2-team SQLite tenant-wall smoke** (13.1·AC5; blocking, no Postgres — the smallest observable wall, a team-B row refused to team-A) and the full **3-team × 3-region Reza Cortex scene** (13.6; real 3-Postgres = live-substrate-advisory per the A2 split). The small rung is the one you can watch anywhere; the journey-scale rung is gated where the multi-Postgres substrate exists — never silent-green when it doesn't.
+**Demo-ability:** the smallest real wall is a **CI-provisioned Postgres service with two distinct `datname`s** (13.1·AC5). Loom-lite has no SQLite collective store; a SQLite twin would prove code that does not ship. The full rung is the **3-team × 3-region Reza scene** (13.6). Absence of its live-substrate evidence may leave development lanes advisory, but it blocks the Reza/v2.2 product claim.
 
 ---
 
 ## Per-story AC sketch (finalize at preflight)
 
 **13.1 — Multi-tenant Loom — physical tenant wall** (ADR-055)
-1. Database-per-team: distinct `datname` per team on operator-assigned Postgres; store-internal `team_guard` chokepoint **below** `CollectiveMemoryPort` (same layer as 11.2b `region_guard`); a team's rows live in a database the other team's connection cannot name. **BLOCKING chokepoint grep-proof** (single enforcement path).
-2. Mapping ownership (ADV-055-2): the team↔region↔datname mapping is a **signed section of the org manifest** (ADR-054 artifact); `team_guard` loads only from the manifest, verifies the signature at load, caches by version, and **refuses reads/writes when its cached version trails the announced current** (`ETenantMapStale`, fail-closed). Store-local config holds connection credentials **only** — never membership/placement.
-3. Team membership identity-keyed + single-valued (ADV-055-3): a Spirit belongs to exactly one team per the manifest; `team_guard` verifies `(spirit_pid → team)` **and** that the connection in use is the one assigned to that team (`ETenantConnectionMismatch`, never a silent allow); a Spirit needing both teams' data = **two Spirits with an ADR-012-consented channel**.
-4. Physical row-ownership: a re-attested copy in team B's database is **team B's row** for capacity + GDPR-erasure, with `source_team` provenance — the forget-cascade target (the 9.2 spine must know whom to cascade to). (Physical ownership here; the cryptographic re-attestation is 13.2/13.3.)
-5. `check-multi-tenant-loom` (physical legs): **physical-absence control** (team-B rows unreachable from team-A connection, distinct-`datname` witness a shared table cannot fake); `ETenantMapStale` + dual-connection `ETenantConnectionMismatch` negatives; chokepoint grep-proof (single `team_guard` enforcement path). **Smallest watchable demo = a hermetic 2-team SQLite tenant-wall smoke** (team-B row refused to team-A, observable) as the **blocking** leg per the E11 retro A2 split; **real multi-Postgres** proven-red as the live-substrate-advisory leg where CI has no Postgres — never mock, never silent-green.
-6. ZERO kernel-Δ expected (maos-loom-lite + store-internal guard, 11.2b precedent; verify vs 11.2a readmit).
+1. Database-per-team: distinct `datname` per team on operator-assigned Postgres; private store-internal `team_guard` below `CollectiveMemoryPort`, invoked once at each Spirit-facing `read`/`scan`/`write` entry point. The static chokepoint leg proves each site and its unguarded negative twin.
+2. Mapping ownership: schema-v2 `[[teams]]` is part of the operator-signed cohort manifest; a `TenantMapPort` implementation lives in a leaf `maos-tenant-map` crate and is injected at the composition root. Staleness uses the shipped `t_stale_secs` time lease—there is no announced-version channel. **F4 schema-v2 canonical-signature compatibility must be ratified before development starts.**
+3. Membership is signed by stable `SpiritId`, then registered to runtime-local `spirit_pid` at composition. `team_guard` compares the manifest team with `StoreConfig.home_team`; connection construction verifies manifest `datname == current_database()`. Refusal is typed at `StoreError` and consciously lossy at the frozen collective port.
+4. Physical row ownership only: the owning team is the database containing the row, proven by an unguarded physical-absence witness. **13.1 does not claim `source_team`, collective forget, or forge resistance**; 13.2 adds source/key identity and 13.5b closes erasure/hold.
+5. `check-multi-tenant-loom`: hermetic Blocking chokepoint/tenant-map legs plus a CI-provisioned real-Postgres two-`datname` physical leg. A forged team stamp is deliberately documented as served at 13.1; crypto/provenance/lifecycle/runtime/journey legs emit **ABSENT**, never disappear or silently green.
+6. ZERO kernel-Δ @23202 for this story only; ADR-055 and `docs/loom-threat-model.md` are AC deliverables. Any pressure to change kernel-core stops for FLAG-Winston rather than being absorbed.
 
 **13.2 — Multi-tenant Loom — cryptographic tenant boundary** (ADR-055, Fork-4)
 1. Per-team HKDF key-weld (Fork-4): second HKDF stage over the region seed with a **frozen versioned `TEAM_INFO_PREFIX`** grammar (mirrors 9.4b exactly); `verify_bundle` for cross-team bundles derives the pubkey from `(claimed_region, claimed_team)`, **never from bundle contents**.
@@ -78,7 +80,7 @@ Serve **Reza's single-org cross-team Cortex** (§10.7.2, committed v2.2) — a 4
 5. Vetter-key lifecycle (ADV-056-3): enrollment/rotation/revocation are Ed25519-signed events **signed by the operator audit key** (§7.3 root), journaled; `verify` walks attestation → vetter-key enrollment → operator root, refusing attestations whose vetter key lacks a journaled enrollment predating issuance.
 6. `check-vetting-attestation`: issue→install→promote→revoke round-trip (independently-derived verifier); forged-signature, expired-attestation, **and forged-vetter-key (unenrolled key, valid signature)** negatives; upgrade-flap control (new version without attestation refused at the floor); running-Spirit lapse produces the journaled observation; four-cause distinguishability. ZERO kernel-Δ.
 
-**13.5 — Enterprise reference Spirit class**
+**13.5a — Enterprise reference Spirit class**
 1. The 11th reference Spirit, composed **Spirit-side** (zero kernel): PDP (11.4a) + identity/at-rest/SIEM (11.4c) into a reusable enterprise-governed Spirit **class**.
 2. Enterprise governance E2E through the Spirit lifecycle: SSO/OIDC principal → Enterprise PDP decision → at-rest AEAD → SIEM export — **reusing** the 11.4a/c subsystems, not re-implementing them.
 3. Composition proven at the **daemon seam** (E11 retro lesson — real subsystems passed isolated tripwires while dead-wired in 11.4c): an **available-arm integration leg** proves the Spirit is actually wired end-to-end, not merely constructed.
@@ -86,34 +88,55 @@ Serve **Reza's single-org cross-team Cortex** (§10.7.2, committed v2.2) — a 4
 5. Gate (enterprise-reference-spirit leg, folds into `check-multi-tenant-loom` or a sibling): real SSO→PDP→at-rest→SIEM round-trip **through the Spirit**; issuance-bypass-absence; **dead-wire negative control** (a constructed-but-unwired Spirit reds).
 6. ZERO kernel-Δ (Spirit-side). Depends 11.4a + 11.4c (both `done`).
 
+**13.5b — Collective-tier erasure + legal-hold cascade**
+1. Add an explicit collective erase contract to `CollectiveMemoryPort`; kernel `forget`/`forget_with_reason` reaches the collective tier rather than stopping at local memory.
+2. Resolve every destination-team copy from 13.2's cryptographically-bound `source_team` provenance; never infer ownership from a mutable label or audit text.
+3. A valid erase reconciles the source row and every authorized cross-team copy with independently-derived row and audit evidence.
+4. A destination copy under legal hold is not deleted; the source and destination audit surfaces distinguish `held` from `erased`, `not-found`, and `failed`.
+5. Partial failure cannot report success: remaining copies, responsible team, retry safety, and correlation IDs are explicit; a planted one-sided erase reds the gate.
+6. Preflight owns the port/kernel design and baseline budget. A kernel arm is currently required by evidence; any repin is named and FLAG-Winston-reviewed rather than hidden behind an out-of-kernel shim.
+
+**13.5c — Reza production collective path + tenant audit isolation**
+1. An Enterprise reference Spirit performs collective read/write through a mediated production Spirit/daemon path; direct test-only store calls do not satisfy this AC.
+2. A constructed-but-unwired collective adapter is a proven-red control; the path must reach the same real store guards proven by 13.1/13.2.
+3. Implement the still-unserved NFR-Ops-11 tenant audit axis: per-team/per-operator TL isolation with stable task/team correlation and no cross-tenant raw-log visibility.
+4. Cross-team actions reconcile requester team, destination team, consent decision, store row, and both audit references under one correlation ID.
+5. Another team's raw TL is available only through consented `log.recall`; direct read, missing consent, or label-only team identity reds the gate.
+6. Preflight verifies whether exposing the production collective path touches kernel-core. No ZERO-Δ claim exists until that route is grounded and counted.
+
 **13.6 — Reza Cortex journey closer + NFR-Scale-5 envelope**
-1. Reza single-org cross-team Cortex journey **E2E**: 3 teams × regions on the 11.2b 3-region substrate, per-team Postgres, PDP + identity stack, cross-team asymmetric consent + multi-hop distillation (13.1–13.5 **composed**).
-2. The Reza scene reproducible E2E on the journey-acceptance harness — the "14 prior cross-team schema decisions cited in one consolidated proposal" (multi-hop distillation provenance surfaced across the wall, consented).
-3. **NFR-Scale-5** 14-institution capacity envelope: **derived from measured per-instance load** (not asserted); capacity floor **gated, not printed**.
-4. No cross-team leak under the full live journey: physical-absence + team-identity source-reflex hold across the scene (leak-negative control that a shared table cannot fake).
-5. Gate (`check-multi-tenant-loom` journey legs + NFR-Scale-5 envelope): the Reza scene runs green on the 3-region substrate; **anti-canned** — the scene derives from real multi-team activity, never scripted output; derive-and-reconcile on the capacity envelope.
-6. ZERO kernel-Δ; release-gate artifacts (30-day soak NFR-Scale-1, absolute geo-SLO) tracked separately, **not closable ACs**.
+1. **Real composition:** one 3-team × 3-region run composes per-team Postgres, PDP/identity, physical+crypto tenant walls, asymmetric consent, vetting, the Enterprise Spirit, collective lifecycle, and the production collective/audit path from 13.1–13.5c. Constructed-but-unwired controls fail.
+2. **Allowed collaboration + minimum disclosure:** Reza obtains the consolidated proposal through an allowed A→B asymmetric share. The crossing bundle contains only policy-allowed provenance; raw payload, secret-bearing fields, and unconsented TL references are negative controls.
+3. **Explainable refusal and recovery:** reverse B→A share, stale tenant map, and vetting lapse/hold produce distinguishable operator outcomes naming the responsible authority and safe next action. Retry succeeds only after a valid manifest/consent/vetting repair.
+4. **Lifecycle reconciliation:** source-team erase or legal hold exercises 13.5b against destination copies. Both audit sides reconcile `erased`/`held`/`failed`; a one-sided result or an unauthorized hold bypass is RED.
+5. **Evidence-grade gate:** the Reza scene derives from real multi-team activity on the 3-region Postgres substrate. The 14-institution result remains a measured capacity envelope—never an assertion that 14 institutions executed. Each leg emits evidence state + artifact reference.
+6. **Boundary preservation:** physical absence, team-key source-reflex, provenance minimum-disclosure, tenant TL isolation, duplicate/correlation reconciliation, and the post-13.5 baseline all hold. Any **ABSENT** or **INDETERMINATE** required leg blocks the Reza/v2.2 product claim.
 
 ---
 
 ## Gate discipline (§A7 reflexes named per gate — E11 retro carry-forward)
-- **`check-multi-tenant-loom`** — derive-and-reconcile counts; **real multi-Postgres** proven-red (no mock/loopback for the tenant wall — the E11 §A6 real-subsystem rule); independently-derived verifier from the write codec (ADR-049); **NEW team-identity source-reflex** (every cross-team read verifies source-team identity from the **derived team key**, not a label — the region/language-identity reflex analogue, §15.9 open-question 5); physical-absence control a shared table cannot fake; absent-result → **BLOCK at the v2.2 ship gate**.
-- **`check-vetting-attestation`** — forged-vetter-key negative (the trust-root walk must red an unenrolled valid signature); exact-hash upgrade-flap control; four-cause distinguishability derived, not asserted.
-- Live-substrate legs (real 3-team Postgres): E11 retro A2 split — hermetic logic leg (SQLite) **blocking**, live-multi-Postgres leg **advisory-substrate-gated** with the WOULD-HAVE-BLOCKED banner where no CI Postgres, **never silent-green**.
+- **`check-multi-tenant-loom`** — derive-and-reconcile counts; a CI-provisioned real-Postgres two-`datname` physical leg; independently-derived verifier from the write codec; team-identity source-reflex after 13.2; physical-absence control a shared table cannot fake; explicit ABSENT declarations for unbuilt crypto/provenance/lifecycle/runtime/journey legs.
+- **`check-collective-erasure`** — source→destination copy resolution from cryptographically-bound `source_team`; legal-hold negative; one-sided/partial-failure proven-red; independently reconciled store and TL evidence.
+- **`check-reza-production-path`** — real Spirit/daemon→collective-store call path, dead-wire negative, tenant TL isolation, consented `log.recall`, and cross-team correlation.
+- **`check-vetting-attestation`** — forged-vetter-key negative; exact-hash upgrade-flap control; four-cause distinguishability derived, not asserted.
+
+### Evidence state is separate from enforcement class
+Every journey-relevant leg emits exactly one evidence state: **`PROVEN_BLOCKING`**, **`PROVEN_LIVE_SIGNED`**, **`ABSENT`**, or **`INDETERMINATE`**, plus its artifact reference when proven. This is orthogonal to `BindingClass::{Blocking, AdvisorySubstrate}`: an unavailable live substrate can remain advisory for a development lane while its evidence state is `ABSENT`, which prohibits the Reza completion claim. `ABSENT` never becomes green; `INDETERMINATE` is neither failure nor completion and requires reconciliation.
 
 ## Kernel-delta budget
-Baseline **23081** — **[STALE 2026-07-16: repin to 23202 at preflight.** The j1-tier2 live-agent bridge spent one authorized delta (23147→**23202**, +55, `spawn_and_bridge` closes worker stdin under `Signals` control; FLAG-Winston Lunarpulse 2026-07-15). `xtask/kernel-core-baseline.toml` is the single source of truth. The ZERO-Δ claims below are **unaffected** — only the pin number is stale.**]** **ZERO expected across all 6** (multi-tenant Loom in `maos-loom-lite`; `team_guard` store-internal below the port; FR37 out-of-kernel in registry + `maos-compliance`; Enterprise Spirit Spirit-side). **Watch 13.2/13.3:** cross-team re-attestation (crypto boundary + cross-team writes) reuses the 11.2a `CrossRegionReadmit` write path — a **bounded FLAG-Winston seam** is possible only if the readmit path needs a distinct kernel variant for the team dimension (verify at preflight; recall 11.2a landed +59 because in-`src` `#[cfg(test)]` modules count — E11 retro A6). Every re-pin names its surface in HISTORY; churn outside the named surface is RED.
+Baseline **23202** at the 13.1 preflight. Stories 13.1–13.5a retain their per-story ZERO/verify posture; **there is no Epic-wide ZERO claim.** 13.5b currently requires a collective port operation plus a kernel forget arm, and 13.5c may require a kernel-visible Spirit collective route. Both are FLAG-Winston seams: preflight must name the minimal surface, count it, update HISTORY, and prove no unrelated churn. Preserving the old ZERO claim by building a parallel out-of-kernel lifecycle owner is forbidden.
 
 ## Cut / deferred (not Epic 13)
 - 100-host churn scale-out, 10-host rotation chaos → **Epic 14**.
 - Accredited external vetters (NFR-Comp-2), external FKCS authors, external N=12 → **v2.5** (non-gating).
 - App-D.4 partner-org federation tier (deferred, trigger = first partner-org request).
 - 30-day soak (NFR-Scale-1) + absolute geo-SLO → **release-gate artifacts**, not closable ACs.
-- SAML, Vault/cloud-KMS backends → additive-per-port, **v2.2 sweep (Epic 15)** or deferred.
+- SAML, Vault/cloud-KMS backends → additive-per-port, **Epic 14 sweep** or deferred.
 
 ## Pre-dev checklist (per story, at preflight)
-1. Name each gate's §A7 source (derive-and-reconcile numerator, real-multi-Postgres proven-red, team-identity source-reflex, forged-vetter-key negative).
-2. Confirm/bound the 13.2/13.3 FLAG-Winston seam vs cross-team `CrossRegionReadmit` reuse (or prove ZERO); count in-`src` test modules (A6).
-3. Record the §A5 model tier (frontier-allowlist) + pre-book the §A6 multi-layer net (incl. Test-Infra + runtime) — **non-degradable** for 13.1/13.2/13.3/13.4/13.6 (physical + crypto tenant wall, cross-team consent, vetting-tier, journey).
-4. Decompose to ≤6 ACs; confirm demo/journey-anchored (13.6 = the Reza Cortex scene).
-5. **Hygiene:** author `docs/adr/ADR-055-multi-tenant-loom.md` + `docs/adr/ADR-056-fr37-vetting-attestation.md` from the §15.11 decisions; author `loom-threat-model.md` **before** 13.1 ships (Fork-4 weld closes same-region insider-team forgery; threat model still covers org-authority-key compromise + malicious team member).
+1. Ratify F4 before 13.1 development: schema-v2 `[[teams]]`, accepted versions `{1,2}`, canonical signature compatibility, and `teams.is_some() ⇒ v2`. Until then 13.1 remains `draft`.
+2. Name each gate's §A7 source and evidence state: derive-and-reconcile numerator, real-Postgres proven-red, team-identity source-reflex, erasure/hold reconciliation, dead-wire negative, forged-vetter-key negative.
+3. Confirm/bound the 13.2/13.3 `CrossRegionReadmit` seam and the 13.5b/13.5c lifecycle/runtime seams; count in-`src` test modules. ZERO is a per-story result, not an Epic premise.
+4. Record the frontier model + pre-book the complete §A6 net (incl. Test-Infra + runtime) for every adversarial boundary through 13.6.
+5. Keep each story at ≤6 ACs. If 13.5b/13.5c grounding reveals another independently shippable mechanism, split it rather than hiding implementation in 13.6.
+6. Author ADR-055/ADR-056 and `docs/loom-threat-model.md` at their owning stories; the threat model includes same-region forgery, authority compromise, malicious member, prompt-injection disclosure, erase/hold partial failure, and tenant-audit leakage.

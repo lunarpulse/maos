@@ -2,3 +2,5 @@
 
 #[cfg(feature = "network")]
 pub mod enterprise_identity;
+#[cfg(feature = "network")]
+pub mod tenant_map;

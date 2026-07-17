@@ -153,5 +153,10 @@ fn store_error_to_port_error(e: StoreError) -> CollectivePortError {
         StoreError::Schema(msg) => CollectivePortError::Transport(msg),
         StoreError::Serialization(msg) => CollectivePortError::Transport(msg),
         StoreError::AtRestSeal(msg) => CollectivePortError::Transport(msg),
+        StoreError::TenantMapStale(reason) => CollectivePortError::Transport(reason),
+        StoreError::TenantConnectionMismatch(reason) => CollectivePortError::Transport(reason),
+        StoreError::TenantSpiritUnmapped(spirit_pid) => CollectivePortError::Transport(format!(
+            "tenant spirit pid {spirit_pid} is not registered"
+        )),
     }
 }

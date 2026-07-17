@@ -12,7 +12,7 @@ use maos_a2a_core::{A2AJsonRpcResponse, CohortManifestGate};
 use maos_cohort::{
     CohortAuthority, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
     ConsentTuple, InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys,
-    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
+    COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
@@ -30,7 +30,7 @@ fn consent_manifest(
     receiver_fingerprint: &maos_a2a_core::PeerCertFingerprint,
 ) -> CohortManifest {
     CohortManifest {
-        schema_version: SCHEMA_VERSION,
+        schema_version: COHORT_SCHEMA_V1,
         cohort_id: "story-12-2-live-consent".into(),
         version: RECEIVER_VERSION,
         authority: CohortAuthority {
@@ -73,6 +73,7 @@ fn consent_manifest(
             RESERVED_INTENT_HALT_RECEIPT.into(),
         ],
         t_stale_secs: 120,
+        teams: None,
         signature: ManifestSignature { sig: String::new() },
     }
     .signed_with(authority)

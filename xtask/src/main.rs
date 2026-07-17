@@ -36,6 +36,8 @@ mod check_multi_region_slo;
 mod check_scale_churn;
 // Story 12.1 — signed cohort manifest and full-pairwise mesh gate.
 mod check_cohort_mesh;
+// Story 13.1 — physical multi-tenant Loom wall (ADR-055).
+mod check_multi_tenant_loom;
 // Story 11.4a — enterprise PDP integration gate (per-leg independence, ADR-050).
 mod check_enterprise_pdp;
 // Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence, ADR-051).
@@ -791,6 +793,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 13.1 — physical multi-tenant Loom wall (ADR-055).
+    #[command(name = "check-multi-tenant-loom")]
+    CheckMultiTenantLoom {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.4a — enterprise PDP integration gate (per-leg independence).
     #[command(name = "check-enterprise-pdp")]
     CheckEnterprisePdp {
@@ -1222,6 +1230,7 @@ fn main() {
         Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
         Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
         Commands::CheckCohortMesh { json } => check_cohort_mesh::run(json),
+        Commands::CheckMultiTenantLoom { json } => check_multi_tenant_loom::run(json),
         Commands::CheckEnterprisePdp { json } => check_enterprise_pdp::run(json),
         Commands::CheckEnterpriseIdentity { json } => check_enterprise_identity::run(json),
         Commands::CheckFkcs { json } => check_fkcs::run(json),

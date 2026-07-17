@@ -511,9 +511,9 @@ The v2.2 phase (Epics 12–14) closes the residual PRD surface so **every FR has
 | Requirement | Was | v2.2 home |
 |---|---|---|
 | FR37 vetting attestation (internal-vetter machinery) | deferred v1.0→v2.5 | **E13.4** (ADR-056); external accredited vetters → v2.5 |
-| NFR-Ops-11 multi-operator tenancy (full impl) | "v1.5+ implemented" (metric-false) | **E13.1** (multi-tenant Loom, physical wall) |
-| NFR-Tenancy-1 multi-tenant | single-tenant through v2.0 | **E13.1 + E13.2** (physical + crypto tenant wall) |
-| NFR-Scale-5 14-institution Cortex envelope | v2.5 → retagged v2.2 | **E13.6** (measured capacity envelope) |
+| NFR-Ops-11 multi-operator tenancy (full impl) | "v1.5+ implemented" (metric-false) | **E13.1 + E13.5b + E13.5c** — physical store ownership, collective erasure/hold scope, production path, per-team/per-operator TL isolation |
+| NFR-Tenancy-1 multi-tenant | single-tenant through v2.0 | **E13.1 + E13.2 + E13.5b + E13.5c** — physical + crypto wall, lifecycle ownership, reachable tenant/audit path |
+| NFR-Scale-5 14-institution Cortex envelope | v2.5 → retagged v2.2 | **E13.6** — measured capacity envelope only; not a claim that 14 institutions executed |
 | NFR-Scale-2 100-host (second half) | v2.5 → retagged v2.2 | **E14.1** |
 | NFR-Rel-7 100-host churn | v2.5 → retagged v2.2 | **E14.1** |
 | NFR-Sec-13 10-host mTLS rotation chaos | v2.0 half | **E14.2** |

@@ -563,6 +563,7 @@ fn story_10_4a_ac1_loom_down_typed_timeout() {
                 pool_size: 2,
                 timeout_ms: 800,
                 home_region: String::new(),
+                home_team: String::new(),
             })
             .await
         })

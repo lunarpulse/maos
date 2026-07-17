@@ -30,11 +30,11 @@
 
 ## Section 2 — Impact Analysis
 
-### 2.1 Epic impact — **no epic changes; this is BRIDGE work**
+### 2.1 Epic impact — **no J1 scope is absorbed into an epic; independent Epic-13 hardening affects schedule**
 
 | Epic | Impact | Why |
 |---|---|---|
-| **Epic 13** (Reza Cortex v2.2, `backlog`, 6 stories) | **None** | Remit = tenant wall + cross-team sharing + FR37 + Reza scene. J1 is not Reza scope. Epic 13 completes as planned; it stays the critical path. |
+| **Epic 13** (Reza Cortex v2.2, `in-progress`, 8 stories after 2026-07-17 hardening) | **No J1 scope** | J1 remains bridge work. Separate evidence review added 13.5b/13.5c before Reza's closer, so “after Epic 13” now means after the hardened eight-story critical path. |
 | **Epic 14** (v2.2 Hardening + Closers, `backlog`, 9 stories) | **None — and it must NOT absorb this** | See 2.2. |
 | **Epics 1–12** | **None** | Done/merged. J1's lineage (Epic 8 story 8.12; A2A mesh Epic 6; task-assignment Epic 3) is historical. |
 | **New epic** | **Not needed** | The BRIDGE precedent covers it (2.3). |
@@ -61,12 +61,12 @@ MAOS has a **two-instance precedent** for epic-external bridges that close journ
 
 ### 2.4 Story impact
 
-**Two new standalone bridge stories** (Option A, operator-ratified), sequenced **after Epic 13 closes**, parallelizable with Epic 14:
+**Two standalone bridge stories** remain the planned path, sequenced after the hardened Epic 13 and parallelizable with Epic 14:
 
 - `j1-crosshost-1-loopback-developer-remote-delegation`
 - `j1-crosshost-2-cross-host-signed-run`
 
-No existing story changes scope. `j1-tier2-live-agent-signed-bridge` stays `done`.
+Rung 2 is hardened: it requires a heterogeneous real adapter/provider, duplicate-safe assignment lifecycle, explicit halt/indeterminate semantics, structural credential absence, and evidence-state truth. If the existing non-Codex adapter is not viable live at preflight, insert a focused adapter-enablement story rather than downgrade to Codex↔Codex while claiming provider independence. `j1-tier2-live-agent-signed-bridge` stays `done`.
 
 ### 2.5 Artifact conflicts
 
@@ -74,8 +74,8 @@ No existing story changes scope. `j1-tier2-live-agent-signed-bridge` stays `done
 |---|---|---|
 | **PRD** | **[!]** The v1.0 milestone (`project-scoping-phased-development.md:180`) implies J1 cross-host shipped. It did not. | Add a **`[DELTA-2026-07-16]`** honesty note mirroring the J3 `[DELTA-2026-07-06]` shape. **Zero new FRs** (FR23a/FR23b already scope the A2A peer mesh, `user-journeys.md:355`). **MVP unaffected** — the v0.8 wedge demo is presentable today. |
 | **Architecture** | None requiring a new ADR | ADR-014's four-protocol ceiling is honored (A2A is an existing protocol; **no fifth**). ADR-012 (typed-intent consent) + ADR-013 (two-level `task.assign`) are reused. One interaction to record: the founder-loop run path gains a transport-selected delegation route **through the existing `A2ARouter` port**. |
-| **UI/UX** | N/A | No UX artifacts in this project. |
-| **Epic 13 / Epic 14 docs** | **[!] NEW FINDING — stale baseline pins** | Epic 13 pins **23081**; Epic 14 pins **23141**. The actual pin is **23202** (post-J1-bridge, `xtask/kernel-core-baseline.toml`). Both need a repin note at their next preflight. *(Surfaced by this analysis; not caused by it.)* |
+| **CLI/operator UX** | **[!]** | Rung 2 must distinguish `completed`, `halted`, and `indeterminate`, name the responsible host/authority, and prevent unsafe auto-retry after lost completion. |
+| **Epic 13 / Epic 14 docs** | **[!]** | Epic 13 was re-pinned to **23202** at the 13.1 preflight and independently hardened to 8 stories. Epic 14 still carries **23141** and must repin at its next preflight. |
 | **CI/CD** | **[!]** | The live/paid cross-host run **never enters CI** (inherits the T6 rule). A hermetic Tier-1 loopback leg with the fixture worker **can** gate (blocking). |
 | **Release gate** | **[!]** | `release-gate-8-12-tier-2-cli-wrapper.md`'s SCOPE clause (53-60) already names this remainder — add a forward pointer to the new bridge so the gate doc stays the single truth. |
 | **Docs/testing** | **[!]** | A two-host runbook (mirroring `runbook-j1-tier-2-signed-live-run.md`) + the two-host signed-bundle artifact. |
@@ -91,10 +91,10 @@ No existing story changes scope. `j1-tier2-live-agent-signed-bridge` stays `done
 ## Section 3 — Recommended Approach
 
 **Option 1 — Direct Adjustment. SELECTED.**
-Add two standalone BRIDGE stories on the established precedent; no epic edits; no new epic.
-- **Effort: Medium.** ~10/12 components already exist and are individually proven; the work is composition at the composition root + topology + a two-host audit artifact.
-- **Risk: Low–Medium.** ZERO-kernel-Δ is settled. Residual risk is concentrated in rung 2 (mTLS/TOFU provisioning, two-host audit reconciliation) — which is precisely why Option A splits it out.
-- **Rationale:** the bridge precedent (8.16 · j1-tier2) fits exactly — Epic-8/J1 debt, epic-external, dedicated branch, run between epics. Epic 13 (tenant-wall, critical path) is untouched; Epic 14's remit is not violated.
+Add two standalone BRIDGE stories on the established precedent; no **J1-driven** epic edits and no new epic. Epic 13's separate 2026-07-17 evidence hardening changes only the bridge's earliest start.
+- **Effort: Medium–High.** The transport pieces exist, but provider heterogeneity, correlation/idempotency, partition/halt semantics, structural secret absence, and a two-host signed artifact must compose through the real path.
+- **Risk: Medium.** ZERO-kernel-Δ remains the expected transport posture, not a settled lifecycle result. Rung 2 must preflight the assignment/reconciliation seams and insert adapter enablement if no real non-Codex worker is viable.
+- **Rationale:** the bridge precedent (8.16 · j1-tier2) still fits — Epic-8/J1 debt, epic-external, dedicated branch. The stricter contract prevents transport success from standing in for heterogeneous, duplicate-safe remote delegation.
 
 **Option 2 — Rollback. NOT VIABLE / N/A.** Nothing to revert. T6's local leg is correct, signed, and stays.
 
@@ -102,7 +102,7 @@ Add two standalone BRIDGE stories on the established precedent; no epic edits; n
 
 **Why two rungs, not one** (operator-ratified Option A): rung 1 proves the *wire* with no network and admits a hermetic CI gate; rung 2 adds network/mTLS/two-host audit. Collapsing them bundles wiring risk + network risk + audit risk into one review — the exact shape that let **four fixture-masked gaps** survive undetected into T6 (admission · userns · stdin-EOF · `CODEX_API_KEY`). The through-line from that bridge stands: **a live-agent gate is only proven by a live agent.**
 
-**Timeline impact:** none to Epic 13. The bridge runs after Epic 13 closes, parallelizable with Epic 14.
+**Timeline impact:** no J1 work enters Epic 13, but the bridge still waits for Epic 13's close; the independently hardened eight-story Epic therefore lengthens its earliest start. A conditional adapter-enablement story may add another rung before the signed run.
 
 ---
 
@@ -130,25 +130,25 @@ Add two standalone BRIDGE stories on the established precedent; no epic edits; n
 
 ### 4.2 — New bridge story 2
 
-**`j1-crosshost-2-cross-host-signed-run`** — *v1.0 rung: two real hosts, mTLS, signed — the operator's model*
+**`j1-crosshost-2-cross-host-signed-run`** — *v1.0 rung: heterogeneous two-host delegation, mTLS, retry/halt truth, signed*
 
 | Field | Value |
 |---|---|
-| Scope | Swap the loopback router for `TcpA2ATransport` + mTLS/TOFU across **two real hosts**; the remote daemon runs its **own** local `codex` with its **own** host-side credential; **two-host signed bundle** reconciling both Transparency Logs; human-signed release-gate artifact. |
+| Scope | Replace loopback with `TcpA2ATransport` + mTLS/TOFU across **two real hosts**; the remote daemon uses a **different real `WorkerCli` adapter/provider** from the T6 local Codex baseline; assignment/completion/halt state is correlated and duplicate-safe; credentials remain host-local; one human-signed bundle reconciles both Transparency Logs. |
 | ACs | 6 |
-| Model | frontier + **full §A6** (cross-host security + audit surface, non-degradable) |
-| Kernel-Δ risk | **ZERO @23202** (transport + sealed-export are out-of-kernel) |
-| Depends | **`j1-crosshost-1`** |
+| Model | frontier + **full §A6** (cross-host security, state-transition, and audit surfaces; non-degradable) |
+| Kernel-Δ risk | **ZERO expected @23202**, but only after preflight proves assignment lifecycle + audit reconciliation remain in `maos-iac`/`maos-bin`/`maos-audit` |
+| Depends | **`j1-crosshost-1`**; a viable real non-Codex adapter. `WorkerCli` currently has `CodexCli` and `ClaudeCli`; `FixtureCli` never satisfies provider heterogeneity. |
 
 **AC sketch (finalize at preflight):**
-1. Two real `maos` daemons on **two hosts**: the laptop Orchestrator's `task.assign` crosses `TcpA2ATransport` under **mTLS** to a **TOFU-pinned** peer; the **remote** daemon runs its **own local `codex`** through the T6-proven bridge and completes. This realizes `user-journeys.md:122` — *"Different host, different CLI, different provider, same protocol."*
-2. **Credential isolation (negative):** the remote host injects its **own** `CODEX_API_KEY` **host-side**; the `task.assign` frame carries **no credential**. Proven by a negative over **both** TLs **and** the captured wire: `LIKE '%sk-%'` = **0**.
-3. **TOFU:** a pin-mismatch peer is **REFUSED** and logged (the ratified v0.8 A2A floor: pin-mismatch 100/100 detected/rejected/logged); the run **fails closed**.
-4. **Two-host signed bundle:** ONE verifiable artifact reconciling **BOTH** Transparency Logs (local Orchestrator + remote Worker), citing the **remote** worker's completion TL ref; `verify-bundle` **OK** against the operator pubkey; signed by the named human (Lunarpulse). **A single-host log presented as the whole run is a FAIL** (the explicit anti-over-claim control; cf. the deferred `FOLLOWUP-J1-RESUME-SEAM`).
-5. Gate: the live cross-host leg is a **human-signed release-gate artifact, NEVER in CI**; rung 1's hermetic Tier-1 gate remains the CI blocker. Egress recorded **`declared-not-enforced`** + `FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT` — never "enforced." The operator audit/signing key **never enters any sandbox** and stays distinct from the per-host LLM keys.
-6. **ZERO kernel-Δ @23202**; FLAG-Winston only if two-host audit reconciliation surfaces a kernel seam (verify at preflight; expected NONE — `sealed-export` lives in `maos-cli`/`maos-audit`).
+1. **Heterogeneous real worker:** two real `maos` daemons on two hosts; the laptop Orchestrator's `task.assign` crosses `TcpA2ATransport` under mTLS to a TOFU-pinned peer, where a real non-Codex `WorkerCli` adapter/provider (currently `ClaudeCli` is the second implemented adapter) completes through the same protocol. Remote Codex or `FixtureCli` proves transport only and **does not** satisfy *"Different host, different CLI, different provider, same protocol."* If no live non-Codex adapter is viable at preflight, insert an enablement story and leave this story blocked—never downgrade the claim.
+2. **Assignment lifecycle + duplicate safety:** one `task_id`/correlation ID is identical across Orchestrator, wire, remote worker, both TLs, and completion. Fault-inject disconnects before execution, during execution, and after completion-before-ACK; reconnect or duplicate delivery never executes the coding task twice and returns either the existing idempotent result or an explicit duplicate refusal.
+3. **Halt and uncertainty semantics:** local halt, remote halt, network partition, and lost completion resolve to `completed`, `halted`, or `indeterminate` with journaled reason and safe next action. `indeterminate` is never displayed as completion and is never auto-retried until two-host audit reconciliation establishes whether the remote mutation occurred.
+4. **Structural credential isolation:** `TaskAssign` and completion wire schemas contain no credential-bearing field. Each host injects its own provider credential host-side; no credential, auth file, bearer token, or serialized secret crosses A2A. Both TLs and the captured wire run provider-aware secret detection as secondary evidence; `LIKE '%sk-%' = 0` alone is insufficient.
+5. **mTLS/TOFU + two-host signed truth:** pin mismatch is refused and journaled. One human-signed bundle reconciles both TLs under the same correlation ID and cites the remote completion; `verify-bundle` is OK. A single-host log, mismatched IDs, or missing remote artifact is a FAIL. The operator signing key never enters either sandbox.
+6. **Evidence-state gate + boundary:** rung 1 remains `PROVEN_BLOCKING` in CI; the real paid run must be `PROVEN_LIVE_SIGNED`. An unperformed run is `ABSENT`; a lost/unreconciled completion is `INDETERMINATE`; neither can close J1. Egress stays `declared-not-enforced`. Verify ZERO kernel-Δ @23202; any required kernel seam triggers FLAG-Winston rather than an implicit re-pin.
 
-**Sequencing:** `j1-crosshost-1` → `j1-crosshost-2`. Both depend on the closed `j1-tier2-live-agent-signed-bridge`. The bridge runs **after Epic 13 closes**, on a dedicated branch, parallelizable with Epic 14.
+**Sequencing:** `j1-crosshost-1` → optional real-adapter enablement only if preflight cannot run the existing non-Codex adapter → `j1-crosshost-2`. The bridge still starts after the now-hardened eight-story Epic 13 closes and remains parallelizable with Epic 14. The added adapter/lifecycle requirements raise rung-2 risk from Low–Medium to **Medium**; they do not change the protocol ceiling or Epic placement.
 
 ### 4.3 — PRD edit (honesty delta-note; zero new FRs)
 
@@ -209,17 +209,17 @@ Epic 13 pins **23081**; Epic 14 pins **23141**; the actual pin is **23202** (`xt
 
 **Scope: Moderate → Product Owner / Developer.**
 
-- **Applied on approval (this proposal):** sprint-status bridge entries (4.4) · PRD delta-note (4.3) · release-gate pointer (4.5) · stale-baseline notes flagged for the epic preflights (4.6).
-- **Next (create-story / preflight, when Epic 13 closes):** context-engineer `j1-crosshost-1` first, then `j1-crosshost-2`; each ≤6 ACs; both **frontier + full §A6** (delegation/consent + cross-host security/audit are non-degradable review surfaces per the E12-B6 reflex discipline).
-- **Dependency gates:** `j1-crosshost-1` requires `j1-tier2-live-agent-signed-bridge` (**met** — done 2026-07-16). `j1-crosshost-2` requires `j1-crosshost-1`. The bridge itself waits on Epic 13's close (priority: tenant wall).
+- **Applied:** sprint-status bridge entries · PRD honesty delta · release-gate pointer · baseline repin note · 2026-07-17 evidence hardening for heterogeneous provider, task lifecycle, halt/uncertainty, structural credential isolation, and evidence states.
+- **Next (create-story / preflight, when hardened Epic 13 closes):** context-engineer `j1-crosshost-1`, then verify a live non-Codex adapter and insert enablement only if required, then `j1-crosshost-2`; each story remains ≤6 ACs and frontier + full §A6.
+- **Dependency gates:** `j1-crosshost-1` requires `j1-tier2-live-agent-signed-bridge` (**met**). `j1-crosshost-2` requires rung 1 plus a viable real non-Codex adapter. The bridge waits on the hardened Epic 13 close.
 - **Not in scope:** no new protocol (ADR-014 ceiling); no change to the T6-proven local worker bridge (reused as-is on each host); no enforced egress (Epic-14 v2.0); no cohort/N-host mesh (that is J3/Reza) — this is a **bilateral** Orchestrator↔remote-Worker delegation.
 - **Success criteria:**
-  1. The Orchestrator delegates a real story-granularity `task.assign` to a `developer-remote` worker over A2A — **loopback (rung 1)**, then **cross-host mTLS on two real hosts (rung 2)**.
-  2. The remote worker runs its **own local `codex`** and completes, kernel-mediated + host-granted.
-  3. **No credential crosses the wire**; redaction = 0 over both TLs.
-  4. A **two-host signed bundle** reconciles both Transparency Logs and `verify-bundle` = OK, human-signed.
-  5. **ZERO kernel-Δ** — `check-kernel-baseline` PASS @23202.
-  6. The PRD no longer implies J1 cross-host shipped.
+  1. The Orchestrator delegates one correlated story-granularity `task.assign` over loopback, then mTLS/TOFU across two real hosts.
+  2. The remote host uses a different real `WorkerCli` adapter/provider from the local Codex baseline; fixture or Codex↔Codex cannot close the provider-independence claim.
+  3. Duplicate delivery, completion-ACK loss, reconnect, and halt never cause a second execution or a false completion; unresolved work is explicitly `INDETERMINATE`.
+  4. Wire schemas carry no credential field; each host injects its own secret locally, and provider-aware scans over both TLs + wire find no credential material.
+  5. One human-signed bundle reconciles both TLs, the shared correlation ID, and the remote completion; only `PROVEN_LIVE_SIGNED` closes rung 2.
+  6. `check-kernel-baseline` passes @23202 or a named FLAG-Winston seam reopens preflight; the PRD never implies the cross-host value shipped before this evidence exists.
 
 ---
 

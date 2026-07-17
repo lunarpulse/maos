@@ -8,11 +8,14 @@
 
 use deadpool_postgres::{Config, ManagerConfig, Pool, PoolConfig, RecyclingMethod, Runtime};
 use maos_domain::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio_postgres::NoTls;
 
 use crate::schema;
 use crate::seal::{AtRestSeal, AtRestSealer};
+use crate::tenant::{TenantMapError, TenantMapPort};
+use maos_domain::team::TeamId;
 
 /// Configuration for the Loom-lite Postgres store.
 pub struct StoreConfig {
@@ -27,6 +30,9 @@ pub struct StoreConfig {
     /// Home region (canonical ascii-v1) for CRDT source_region stamping.
     /// Empty string = no region configured (pre-11.2a behavior / single-region).
     pub home_region: String,
+    /// Home team for physical tenant isolation.
+    /// Empty string = tenancy disabled.
+    pub home_team: String,
 }
 
 impl Default for StoreConfig {
@@ -37,6 +43,7 @@ impl Default for StoreConfig {
             pool_size: 16,
             timeout_ms: 5000,
             home_region: String::new(),
+            home_team: String::new(),
         }
     }
 }
@@ -49,6 +56,7 @@ pub struct LoomLiteStore {
     /// payload bytes at the write layer. `None` (default) = byte-identical
     /// Option-A plaintext.
     at_rest_sealer: AtRestSealer,
+    tenant_map: Option<Arc<dyn TenantMapPort>>,
 }
 /// Store-level error type.
 #[derive(Debug, thiserror::Error)]
@@ -68,6 +76,12 @@ pub enum StoreError {
     /// posture.
     #[error("at-rest seal error: {0}")]
     AtRestSeal(String),
+    #[error("tenant map stale: {0}")]
+    TenantMapStale(String),
+    #[error("tenant connection mismatch: {0}")]
+    TenantConnectionMismatch(String),
+    #[error("tenant spirit pid {0} is not registered")]
+    TenantSpiritUnmapped(u32),
 }
 
 impl From<tokio_postgres::Error> for StoreError {
@@ -160,6 +174,7 @@ impl LoomLiteStore {
             pool,
             config,
             at_rest_sealer: AtRestSealer::default(),
+            tenant_map: None,
         })
     }
 
@@ -180,6 +195,12 @@ impl LoomLiteStore {
         self
     }
 
+    /// Install the verified tenant-map lookup owned by the composition root.
+    pub fn with_tenant_map(mut self, tenant_map: Arc<dyn TenantMapPort>) -> Self {
+        self.tenant_map = Some(tenant_map);
+        self
+    }
+
     /// Story 11.4c (AC3): the configured at-rest sealer (introspectable so
     /// the composition root / operators can confirm seal posture).
     pub fn at_rest_sealer(&self) -> &AtRestSealer {
@@ -189,6 +210,14 @@ impl LoomLiteStore {
     /// Initialize the schema (idempotent).
     pub async fn init_schema(&self) -> Result<(), StoreError> {
         let client = self.pool.get().await?;
+        if !self.config.home_team.is_empty() {
+            let row = client
+                .query_one("SELECT current_database()", &[])
+                .await
+                .map_err(|error| StoreError::Query(error.to_string()))?;
+            let current_database: String = row.get(0);
+            self.connection_assignment_guard(&current_database)?;
+        }
         let sql = schema::create_schema_sql(self.config.vector_dim);
         client
             .batch_execute(&sql)
@@ -217,6 +246,7 @@ impl LoomLiteStore {
         key: &str,
         value: MemoryValue,
     ) -> Result<(), StoreError> {
+        self.team_guard(spirit_pid)?;
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -244,6 +274,10 @@ impl LoomLiteStore {
     ///
     /// `source_ts` is the **source write's** nanosecond timestamp, preserved
     /// across re-attestation apply — NOT re-minted on apply.
+    ///
+    /// Deliberately unguarded: this is the verified replication apply path,
+    /// not a Spirit-facing entry point, and this store can name only its own
+    /// configured Postgres database.
     pub async fn write_with_source(
         &self,
         spirit_pid: u32,
@@ -322,6 +356,7 @@ impl LoomLiteStore {
         namespace: &MemoryNamespace,
         key: &str,
     ) -> Result<Option<MemoryValue>, StoreError> {
+        self.team_guard(spirit_pid)?;
         let client = self.get_client_with_timeout().await?;
 
         let (ns_kind, ns_detail) = schema::namespace_to_parts(namespace);
@@ -369,6 +404,7 @@ impl LoomLiteStore {
         prefix: &str,
         limit: usize,
     ) -> Result<Vec<MemoryEntry>, StoreError> {
+        self.team_guard(spirit_pid)?;
         let client = self.get_client_with_timeout().await?;
 
         let (ns_kind, ns_detail) = schema::namespace_to_parts(namespace);
@@ -425,6 +461,74 @@ impl LoomLiteStore {
         }
 
         Ok(entries)
+    }
+
+    /// Construction-time physical assignment check.
+    ///
+    /// Row ownership is physical: a row belongs to the team whose configured
+    /// database contains it. No source-team column or row-level team predicate
+    /// exists in Story 13.1. `init_schema` invokes this exactly once before
+    /// schema work; Spirit reads never repeat the database-name query.
+    fn connection_assignment_guard(&self, current_database: &str) -> Result<(), StoreError> {
+        if self.config.home_team.is_empty() {
+            return Ok(());
+        }
+        let home_team = TeamId::new(&self.config.home_team)
+            .map_err(|error| StoreError::TenantMapStale(error.to_string()))?;
+        let tenant_map = self.tenant_map.as_ref().ok_or_else(|| {
+            StoreError::TenantMapStale("tenant map is not configured".to_string())
+        })?;
+        let expected_database = tenant_map
+            .datname_for(&home_team)
+            .map_err(|error| StoreError::TenantMapStale(error.to_string()))?;
+        if expected_database != current_database {
+            return Err(StoreError::TenantConnectionMismatch(format!(
+                "team {home_team} expects database {expected_database}, connected to {current_database}"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Story 13.1 (AC1): fail-closed physical-tenant guard for every
+    /// Spirit-facing read, scan, and write.
+    ///
+    /// The guard runs once per call, before any query. Tenancy disabled
+    /// (`home_team` empty) preserves the existing single-tenant behavior.
+    ///
+    /// # Trust boundary
+    ///
+    /// This stage proves manifest-membership presence only. It does not prove
+    /// the per-team cryptographic key boundary owned by Story 13.2; a forged
+    /// same-region team stamp remains a documented D1 exposure. Both operands
+    /// remain store-internal (manifest-resolved caller team versus
+    /// `config.home_team`), so `CollectiveMemoryPort` stays byte-identical.
+    fn team_guard(&self, spirit_pid: u32) -> Result<(), StoreError> {
+        if self.config.home_team.is_empty() {
+            return Ok(());
+        }
+        let tenant_map = self.tenant_map.as_ref().ok_or_else(|| {
+            StoreError::TenantMapStale("tenant map is not configured".to_string())
+        })?;
+        let caller_team = tenant_map
+            .team_of(spirit_pid)
+            .map_err(|error| match error {
+                TenantMapError::Stale { reason } | TenantMapError::StateUnavailable { reason } => {
+                    StoreError::TenantMapStale(reason)
+                }
+                TenantMapError::SpiritUnmapped { spirit_pid } => {
+                    StoreError::TenantSpiritUnmapped(spirit_pid)
+                }
+                TenantMapError::TeamUnknown { team_id } => StoreError::TenantMapStale(format!(
+                    "team {team_id} is absent from the verified tenant map"
+                )),
+            })?;
+        if caller_team.as_str() != self.config.home_team {
+            return Err(StoreError::TenantConnectionMismatch(format!(
+                "store team {}, caller team {}",
+                self.config.home_team, caller_team
+            )));
+        }
+        Ok(())
     }
 
     /// Story 11.2b (AC4 / F4): fail-closed region-identity guard for the
@@ -528,6 +632,9 @@ impl LoomLiteStore {
     }
 
     /// Access the pool for migration and other low-level ops.
+    ///
+    /// Deliberately unguarded: callers use this for schema, migration, and
+    /// physical-absence verification against this store's single database.
     pub fn pool(&self) -> &Pool {
         &self.pool
     }
@@ -566,7 +673,130 @@ impl From<StoreError> for MemoryError {
 mod tests {
     use super::*;
     use crate::seal::AtRestSeal;
+    use maos_domain::ports::registry::SpiritId;
+    use maos_domain::team::TeamId;
     use std::sync::Arc;
+
+    struct StaticTenantMap;
+
+    impl TenantMapPort for StaticTenantMap {
+        fn team_of(&self, _spirit_pid: u32) -> Result<TeamId, TenantMapError> {
+            TeamId::new("team-a").map_err(|error| TenantMapError::StateUnavailable {
+                reason: error.to_string(),
+            })
+        }
+
+        fn datname_for(&self, team: &TeamId) -> Result<String, TenantMapError> {
+            // Patch 3: branch on the team so a wrong-team operand (e.g. passing
+            // home_region instead of home_team) is detectable, not masked by a
+            // constant return.
+            match team.as_str() {
+                "team-a" => Ok("maos_team_a".to_string()),
+                "team-b" => Ok("maos_team_b".to_string()),
+                _ => Err(TenantMapError::TeamUnknown {
+                    team_id: team.clone(),
+                }),
+            }
+        }
+
+        fn register_spirit(&self, _spirit_pid: u32, _spirit_id: SpiritId) {}
+    }
+
+    /// Stale-map stub: every lookup reports the lease expired.
+    struct StaleTenantMap;
+
+    impl TenantMapPort for StaleTenantMap {
+        fn team_of(&self, _spirit_pid: u32) -> Result<TeamId, TenantMapError> {
+            Err(TenantMapError::Stale {
+                reason: "test: lease expired".to_string(),
+            })
+        }
+
+        fn datname_for(&self, team: &TeamId) -> Result<String, TenantMapError> {
+            Err(TenantMapError::TeamUnknown {
+                team_id: team.clone(),
+            })
+        }
+
+        fn register_spirit(&self, _spirit_pid: u32, _spirit_id: SpiritId) {}
+    }
+
+    /// Unmapped-spirit stub: no spirit is bound to a team.
+    struct UnmappedTenantMap;
+
+    impl TenantMapPort for UnmappedTenantMap {
+        fn team_of(&self, spirit_pid: u32) -> Result<TeamId, TenantMapError> {
+            Err(TenantMapError::SpiritUnmapped { spirit_pid })
+        }
+
+        fn datname_for(&self, team: &TeamId) -> Result<String, TenantMapError> {
+            Err(TenantMapError::TeamUnknown {
+                team_id: team.clone(),
+            })
+        }
+
+        fn register_spirit(&self, _spirit_pid: u32, _spirit_id: SpiritId) {}
+    }
+
+    /// Patch 1 (F18): the store-level typed refusals for a STALE map and an
+    /// UNMAPPED spirit MUST be produced by `team_guard` AT THE STORE — the
+    /// mapping arms (store.rs match on `TenantMapError`) were previously proven
+    /// only at the adapter/port layer, leaving `team_guard`'s translation
+    /// behaviorally unverified. `team_guard` runs pre-query (before any pool
+    /// access), so `read`/`write`/`scan` refuse without a live database.
+    #[tokio::test]
+    async fn team_guard_maps_stale_and_unmapped_refusals_at_the_store() {
+        let dead = || StoreConfig {
+            connection_string: "host=127.0.0.1 port=1 dbname=none connect_timeout=1".to_string(),
+            timeout_ms: 500,
+            home_team: "team-a".to_string(),
+            ..StoreConfig::default()
+        };
+
+        let stale = LoomLiteStore::new(dead())
+            .await
+            .unwrap()
+            .with_tenant_map(Arc::new(StaleTenantMap));
+        assert!(matches!(
+            stale.read(7, &MemoryNamespace::Default, "k").await,
+            Err(StoreError::TenantMapStale(_))
+        ));
+        assert!(matches!(
+            stale
+                .write(
+                    7,
+                    &MemoryNamespace::Default,
+                    "k",
+                    MemoryValue::Text("v".to_string()),
+                )
+                .await,
+            Err(StoreError::TenantMapStale(_))
+        ));
+        assert!(matches!(
+            stale.scan(7, &MemoryNamespace::Default, "k", 8).await,
+            Err(StoreError::TenantMapStale(_))
+        ));
+
+        let unmapped = LoomLiteStore::new(dead())
+            .await
+            .unwrap()
+            .with_tenant_map(Arc::new(UnmappedTenantMap));
+        assert!(matches!(
+            unmapped.read(9, &MemoryNamespace::Default, "k").await,
+            Err(StoreError::TenantSpiritUnmapped(9))
+        ));
+        assert!(matches!(
+            unmapped
+                .write(
+                    9,
+                    &MemoryNamespace::Default,
+                    "k",
+                    MemoryValue::Text("v".to_string()),
+                )
+                .await,
+            Err(StoreError::TenantSpiritUnmapped(9))
+        ));
+    }
 
     /// Story 11.4c (AC3): the `.with_at_rest_seal` builder installs the seal
     /// hook on the store, and the default (`new`) carries NO hook — the
@@ -608,5 +838,24 @@ mod tests {
             !plain_store.at_rest_sealer().is_configured(),
             ".with_at_rest_seal(None) MUST clear the hook"
         );
+    }
+
+    #[tokio::test]
+    async fn connection_assignment_guard_matches_manifest_datname() {
+        let store = LoomLiteStore::new(StoreConfig {
+            connection_string: "host=127.0.0.1 port=1 dbname=none connect_timeout=1".to_string(),
+            timeout_ms: 500,
+            home_team: "team-a".to_string(),
+            ..StoreConfig::default()
+        })
+        .await
+        .unwrap()
+        .with_tenant_map(Arc::new(StaticTenantMap));
+
+        store.connection_assignment_guard("maos_team_a").unwrap();
+        assert!(matches!(
+            store.connection_assignment_guard("maos_team_b"),
+            Err(StoreError::TenantConnectionMismatch(_))
+        ));
     }
 }

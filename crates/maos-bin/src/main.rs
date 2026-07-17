@@ -2279,9 +2279,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .as_ref()
                     .map(|r| r.as_str().to_string())
                     .unwrap_or_default();
+                let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").unwrap_or_default();
+                // Story 13.1: the primary daemon has no refreshable cohort-state
+                // source yet (13.5c owns that wiring). Tenant mode therefore
+                // refuses at boot rather than serving until the lease bricks.
+                let tenant_map = maos_bin::tenant_map::tenant_map_for_store(&home_team, None)
+                    .map_err(|error| format!("maos: tenant map construction failed: {error}"))?;
                 let cfg = maos_loom_lite::store::StoreConfig {
                     connection_string: conn_str,
                     home_region: home_region_str,
+                    home_team,
                     ..Default::default()
                 };
                 match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
@@ -2297,12 +2304,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Some(hook) => store.with_at_rest_seal(Some(hook)),
                             None => store,
                         };
+                        let store = match tenant_map.as_ref() {
+                            Some(map) => store.with_tenant_map(Arc::clone(map)),
+                            None => store,
+                        };
                         let store = Arc::new(store);
                         if let Err(e) = store.init_schema().await {
-                            eprintln!(
-                                "maos: warn: loom-lite schema init failed (collective tier disabled): {e}"
-                            );
-                            None
+                            return Err(format!("maos: loom-lite schema init failed: {e}").into());
                         } else {
                             let adapter = Arc::new(maos_loom_lite::adapter::LoomLiteAdapter::new(
                                 store,
@@ -2314,10 +2322,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     Err(e) => {
-                        eprintln!(
-                            "maos: warn: loom-lite store init failed (collective tier disabled): {e}"
-                        );
-                        None
+                        return Err(format!("maos: loom-lite store init failed: {e}").into());
                     }
                 }
             }

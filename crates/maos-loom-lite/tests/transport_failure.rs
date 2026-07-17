@@ -41,6 +41,7 @@ async fn make_broken_adapter() -> Arc<LoomLiteAdapter> {
         pool_size: 2,
         timeout_ms: 3000,
         home_region: String::new(),
+        home_team: String::new(),
     };
 
     let store = Arc::new(

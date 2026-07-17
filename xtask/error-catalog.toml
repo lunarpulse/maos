@@ -555,6 +555,17 @@ owner = "maos-domain"
 kernel_or_spirit = "kernel"
 since_version = "1.0.0"
 
+[[error]]
+code = "ETeamIdInvalid"
+rust_path = "TeamIdError::ETeamIdInvalid"
+source_file = "crates/maos-domain/src/team.rs"
+description = "Operator-supplied team id failed the frozen lowercase ASCII tenant-identity grammar (ADR-055)"
+severity = "policy"
+recovery_class = "fix_config"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "2.2.0"
+
 # ---------------------------------------------------------------------------
 # ProvenanceError — crates/maos-domain/src/provenance.rs
 # Story 9.4b AC-6 model-provenance admission (NFR-Comp-5 / SB-1047)

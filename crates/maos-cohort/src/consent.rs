@@ -120,14 +120,14 @@ mod tests {
     use super::*;
     use crate::manifest::{
         CohortAuthority, CohortMember, ConsentMatrix, ConsentTuple, ManifestSignature,
-        RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION, T_STALE_DEFAULT,
+        COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, T_STALE_DEFAULT,
     };
 
     const INTENT: &str = "cohort-work:write";
 
     fn manifest() -> CohortManifest {
         CohortManifest {
-            schema_version: SCHEMA_VERSION,
+            schema_version: COHORT_SCHEMA_V1,
             cohort_id: "consent-test".into(),
             version: 4,
             authority: CohortAuthority {
@@ -163,6 +163,7 @@ mod tests {
                 RESERVED_INTENT_HALT_RECEIPT.into(),
             ],
             t_stale_secs: T_STALE_DEFAULT,
+            teams: None,
             signature: ManifestSignature { sig: String::new() },
         }
     }

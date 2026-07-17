@@ -26,8 +26,8 @@ use maos_a2a_tcp::{TcpA2ATransport, TcpTimeouts};
 use maos_cohort::{
     AbsenceKind, CohortAuthority, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
     ConsentTuple, HaltPresence, HaltReceiptControl, HaltReceiptDistributor,
-    InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys, RESERVED_INTENT_HALT_RECEIPT,
-    RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
+    InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys, COHORT_SCHEMA_V1,
+    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use maos_domain::frame::{FrameAddress, IacFrame};
 use maos_domain::halt::{HaltId, HaltReceipt};
@@ -131,7 +131,7 @@ fn signed_manifest(
     fp_b: &PeerCertFingerprint,
 ) -> String {
     let manifest = CohortManifest {
-        schema_version: SCHEMA_VERSION,
+        schema_version: COHORT_SCHEMA_V1,
         cohort_id: "story-12-3-halt-receipt".into(),
         version: 1,
         authority: CohortAuthority {
@@ -167,6 +167,7 @@ fn signed_manifest(
             RESERVED_INTENT_HALT_RECEIPT.into(),
         ],
         t_stale_secs: 120,
+        teams: None,
         signature: ManifestSignature { sig: String::new() },
     }
     .signed_with(authority);

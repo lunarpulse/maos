@@ -56,6 +56,8 @@ const EXPECTED_GATES: &[&str] = &[
     "check-scale-churn",
     // Story 12.1 — cohort manifest + N=3/N=8 full-pairwise mesh.
     "check-cohort-mesh",
+    // Story 13.1 — ADR-055 physical tenant wall.
+    "check-multi-tenant-loom",
     // Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar).
     "check-enterprise-pdp",
     // Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate.

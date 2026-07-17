@@ -55,6 +55,21 @@ coverage:
       IdentityAssertionPort / KeyManagementPort / SiemProjectionPort; OIDC
       reference verifier, dev/CI local-master-key KMS, and SIEM TL projection
       are additive leaves. Fault-inject features are blocked from release builds.
+  ADR-055:
+    gates:
+    - check-multi-tenant-loom
+    - check-dependency-closure
+    - check-kernel-baseline
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-07-17'
+    notes: |
+      Story 13.1 physical tenant-wall anchor. Database-per-team,
+      manifest-authoritative team placement, the three-site pre-query guard,
+      construction-time datname self-check, physical-absence witness, and the
+      staged D1 forged-stamp-served boundary are enforced by the mixed-binding
+      check-multi-tenant-loom gate. Stories 13.2/13.3/13.5b/13.5c/13.6 remain
+      explicitly absent successor surfaces.
   ADR-024:
     gates:
     - check-escape-detector

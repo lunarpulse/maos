@@ -17,7 +17,7 @@ use crate::control::CohortManifestControl;
 use crate::digest::{DigestReadControl, DigestSummary, DIGEST_DAILY_SCOPE};
 use crate::error::{CohortError, CohortManifestForkReason};
 use crate::halt_receipt::{AbsenceKind, HaltReceiptControl};
-use crate::manifest::CohortManifest;
+use crate::manifest::{CohortManifest, COHORT_SCHEMA_V1, COHORT_SCHEMA_V2};
 use crate::pin::PinnedAuthorityKeys;
 
 pub trait CohortClock: Send + Sync {
@@ -203,6 +203,11 @@ impl CohortManifestState {
             .canonical_hash)
     }
 
+    /// Host identity bound when this verified state was loaded.
+    pub fn local_host(&self) -> &HostId {
+        &self.local_host
+    }
+
     /// The exact verified, signed manifest artifact suitable for a push.
     pub fn signed_toml(&self) -> Result<String, CohortError> {
         Ok(self
@@ -265,7 +270,11 @@ impl CohortManifestState {
             return Err(error);
         }
 
-        let rejection = if candidate.version < seen_version {
+        let rejection = if cached.manifest.schema_version == COHORT_SCHEMA_V2
+            && candidate.schema_version == COHORT_SCHEMA_V1
+        {
+            Some(CohortManifestForkReason::SchemaDowngrade)
+        } else if candidate.version < seen_version {
             Some(CohortManifestForkReason::VersionRegression)
         } else if candidate.version == seen_version && candidate_hash != cached.canonical_hash {
             Some(CohortManifestForkReason::ConcurrentFork)
@@ -916,7 +925,7 @@ mod tests {
     use crate::audit::InMemoryCohortAuditSink;
     use crate::manifest::{
         CohortAuthority, CohortMember, ConsentMatrix, ConsentTuple, ManifestSignature,
-        RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
+        COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
     };
     use maos_domain::frame::{ConsentEnvelope, FrameAddress, FramePayload, TelemetryEventPayload};
     use maos_domain::invariants::i1::IntentClass;
@@ -937,7 +946,7 @@ mod tests {
         cohort_id: &str,
     ) -> String {
         let manifest = CohortManifest {
-            schema_version: SCHEMA_VERSION,
+            schema_version: COHORT_SCHEMA_V1,
             cohort_id: cohort_id.to_string(),
             version,
             authority: CohortAuthority {
@@ -955,6 +964,7 @@ mod tests {
                 RESERVED_INTENT_HALT_RECEIPT.into(),
             ],
             t_stale_secs: 120,
+            teams: None,
             signature: ManifestSignature { sig: String::new() },
         }
         .signed_with(signer);
@@ -1025,7 +1035,7 @@ mod tests {
 
     fn consent_state(version: u64, signer: &SigningKey) -> CohortManifestState {
         let manifest = CohortManifest {
-            schema_version: SCHEMA_VERSION,
+            schema_version: COHORT_SCHEMA_V1,
             cohort_id: "consent-state".into(),
             version,
             authority: CohortAuthority {
@@ -1061,6 +1071,7 @@ mod tests {
                 RESERVED_INTENT_HALT_RECEIPT.into(),
             ],
             t_stale_secs: 120,
+            teams: None,
             signature: ManifestSignature { sig: String::new() },
         }
         .signed_with(signer);
