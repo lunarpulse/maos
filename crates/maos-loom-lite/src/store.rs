@@ -595,7 +595,8 @@ impl LoomLiteStore {
         let rows = client
             .query(
                 "SELECT spirit_pid, namespace_kind, namespace_detail, key,
-                        value_kind, value_data, source_region, source_ts, source_log_ref
+                        value_kind, value_data, source_region, source_ts, source_log_ref,
+                        source_team
                  FROM collective_memory
                  ORDER BY spirit_pid, namespace_kind, namespace_detail, key",
                 &[],
@@ -603,9 +604,19 @@ impl LoomLiteStore {
             .await
             .map_err(|e| StoreError::Query(e.to_string()))?;
 
-        Ok(rows
-            .iter()
-            .map(|row| CollectiveRow {
+        let mut out = Vec::with_capacity(rows.len());
+        for row in &rows {
+            // Story 13.2 (AC2): source_team is a nullable column. NULL → v1 leaf
+            // (first-party local row); a value must be canonical (TeamId rejects
+            // non-canonical) — a malformed stored tag is a data-integrity fault.
+            let source_team_raw: Option<String> = row.get(9);
+            let source_team = match source_team_raw {
+                Some(raw) => Some(TeamId::new(&raw).map_err(|e| {
+                    StoreError::Query(format!("invalid source_team column value: {e}"))
+                })?),
+                None => None,
+            };
+            out.push(CollectiveRow {
                 spirit_pid: row.get(0),
                 namespace_kind: row.get(1),
                 namespace_detail: row.get(2),
@@ -615,8 +626,10 @@ impl LoomLiteStore {
                 source_region: row.get(6),
                 source_ts: row.get(7),
                 source_log_ref: row.get(8),
-            })
-            .collect())
+                source_team,
+            });
+        }
+        Ok(out)
     }
 
     /// Get a client with the configured timeout.
@@ -661,6 +674,10 @@ pub struct CollectiveRow {
     pub source_region: String,
     pub source_ts: i64,
     pub source_log_ref: String,
+    /// Story 13.2 (AC2): source-team provenance. `None` (NULL column) for
+    /// first-party local rows; `Some` only for re-attested cross-team copies
+    /// (written by 13.3 — at 13.2 local writes leave this NULL).
+    pub source_team: Option<TeamId>,
 }
 
 impl From<StoreError> for MemoryError {

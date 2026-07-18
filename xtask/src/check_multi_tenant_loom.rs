@@ -14,7 +14,9 @@ use crate::gate_common::{dev_enforced_red_blocks, emit_command, read_disposition
 
 const GATE_NAME: &str = "check-multi-tenant-loom";
 const ABSENT_SUCCESSORS: &[&str] = &[
-    "13.2 per-team cryptographic key boundary",
+    // Story 13.2 closed the per-team cryptographic key boundary at ENTRY
+    // (removed from this list). The region `source_log_ref` presence residual
+    // (D1, region axis) remains OPEN with NO named successor (G7 / Round-2).
     "13.3 widened caller-facing tenant error taxonomy",
     "13.5b collective GDPR erase/legal-hold cascade",
     "13.5c production Spirit routing, refresh wiring, refusal audit, and TL isolation",
@@ -192,6 +194,60 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--test",
                 "tenant_wall_live",
                 "tenant_wall_d1_forged_stamp_is_still_served_boundary",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "forged-team-stamp-refused-at-verify",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--lib",
+                "replication::bundle::tests::test_forged_team_stamp_refused_at_verify_same_region",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "apply-refuses-forged-bundle",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--lib",
+                "replication::bundle::tests::test_apply_refuses_forged_bundle_writes_zero_rows",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "team-identity-source-reflex",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--lib",
+                "replication::bundle::tests::test_team_identity_source_reflex",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "per-team-merkle-independence",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "tenant_wall_live",
+                "tenant_wall_per_team_merkle_independence_mixed_v1_v2",
                 "--",
                 "--ignored",
                 "--exact",

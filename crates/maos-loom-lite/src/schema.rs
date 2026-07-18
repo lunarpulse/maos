@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS collective_memory (
     -- These columns are NOT in the UNIQUE key (region-free convergence).
     source_region   TEXT NOT NULL DEFAULT '',
     source_ts       BIGINT NOT NULL DEFAULT 0,
+    -- Story 13.2 (AC2): nullable source-team provenance. NULL = v1 first-party
+    -- local row (byte-identical leaf); a value = re-attested cross-team copy.
+    -- NOT in the UNIQUE key. Additive/nullable = the 9.2b idiom.
+    source_team     TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (spirit_pid, namespace_kind, namespace_detail, key),
     -- I11 (enforced-by-construction at the store layer): a pattern record
@@ -82,6 +86,12 @@ BEGIN
         WHERE table_name = 'collective_memory' AND column_name = 'source_ts'
     ) THEN
         ALTER TABLE collective_memory ADD COLUMN source_ts BIGINT NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'source_team'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN source_team TEXT;
     END IF;
 END
 $$;

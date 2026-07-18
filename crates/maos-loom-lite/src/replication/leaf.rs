@@ -11,8 +11,7 @@
 //!
 //! Each collective-memory KV row reduces to this byte layout:
 //!
-//! ```text
-//! domain               27 bytes (b"maos.collective-kv-leaf.v1", verbatim)
+//! domain               26 bytes (b"maos.collective-kv-leaf.v1", verbatim)
 //! source_region_len    4 bytes (big-endian u32) + <len> UTF-8 bytes
 //! source_ts            8 bytes (big-endian i64)
 //! spirit_pid           8 bytes (big-endian i64)
@@ -21,6 +20,9 @@
 //! key_len              4 bytes (big-endian u32) + <len> UTF-8 bytes
 //! value_kind_len       4 bytes (big-endian u32) + <len> UTF-8 bytes
 //! value_data_len       4 bytes (big-endian u32) + <len> raw bytes
+//! source_team_len      v2 ONLY: 4 bytes (big-endian u32) + <len> UTF-8 bytes
+//!                      (v1 / None-team leaves omit this field ENTIRELY and use
+//!                       the v1 domain tag, so their bytes are unchanged)
 //! ```
 //!
 //! ## Encoding rules (pinned)
@@ -35,11 +37,19 @@
 //!   load-bearing: it makes a boundary shift such as `region="ab",key="c"`
 //!   vs `region="a",key="bc"` canonically distinct.
 
+use maos_domain::team::TeamId;
 use sha2::{Digest, Sha256};
 
 /// Domain separator namespaceing the collective-KV leaf canonical form from
 /// every other canonical byte layout (notably the TL `CanonicalFrame`).
 const KV_LEAF_DOMAIN: &[u8] = b"maos.collective-kv-leaf.v1";
+/// Story 13.2 (AC2): v2 domain tag for a leaf carrying `source_team`. The v2
+/// body is the v1 field order followed by a length-prefixed `source_team`. A
+/// `None`-team leaf stays under [`KV_LEAF_DOMAIN`] (byte-identical to pre-13.2);
+/// only a `Some`-team leaf uses this tag. The domain-tag axis and the
+/// bundle `schema_version` axis are INDEPENDENT version axes (Yui) — bumping one
+/// never implies the other.
+const KV_LEAF_DOMAIN_V2: &[u8] = b"maos.collective-kv-leaf.v2";
 
 /// A single collective-memory KV row reduced to the engine-independent
 /// canonical form used by the cross-region convergence oracle and replication.
@@ -58,6 +68,13 @@ pub struct CollectiveKvLeaf {
     pub key: String,
     pub value_kind: String,
     pub value_data: Vec<u8>,
+    /// Story 13.2 (AC2): source-team provenance. `None` for first-party local
+    /// rows (byte-identical v1 leaves — the 9.2b additive idiom); `Some` only
+    /// for re-attested cross-team copies (built by 13.3 / synthesized in tests).
+    /// `serde(default)` keeps a v1 bundle (no `source_team` in the wire) able to
+    /// deserialize; `skip_serializing_if` keeps the v1 wire byte-clean.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_team: Option<TeamId>,
 }
 
 impl CollectiveKvLeaf {
@@ -72,13 +89,23 @@ impl CollectiveKvLeaf {
             key: row.key.clone(),
             value_kind: row.value_kind.clone(),
             value_data: row.value_data.clone(),
+            source_team: row.source_team.clone(),
         }
     }
 
     /// Serialize this KV row into the pinned canonical byte form.
     pub fn to_canonical_bytes(&self) -> Vec<u8> {
+        // Dispatch on source_team (AC2). `None` → the EXACT pre-13.2 v1 layout
+        // under KV_LEAF_DOMAIN, byte-for-byte identical (11.2a cross-region
+        // convergence for existing rows depends on this). `Some` → KV_LEAF_DOMAIN_V2,
+        // the identical v1 field order, then a length-prefixed source_team appended
+        // at the tail. The length prefix keeps source_team boundary-shift-safe.
+        let (domain, team_bytes): (&[u8], Option<&[u8]>) = match &self.source_team {
+            None => (KV_LEAF_DOMAIN, None),
+            Some(team) => (KV_LEAF_DOMAIN_V2, Some(team.as_str().as_bytes())),
+        };
         let mut buf = Vec::with_capacity(
-            KV_LEAF_DOMAIN.len()
+            domain.len()
                 + 4 + self.source_region.len()
                 + 8 // source_ts
                 + 8 // spirit_pid
@@ -86,9 +113,10 @@ impl CollectiveKvLeaf {
                 + 4 + self.namespace_detail.len()
                 + 4 + self.key.len()
                 + 4 + self.value_kind.len()
-                + 4 + self.value_data.len(),
+                + 4 + self.value_data.len()
+                + team_bytes.map_or(0, |t| 4 + t.len()),
         );
-        buf.extend_from_slice(KV_LEAF_DOMAIN);
+        buf.extend_from_slice(domain);
         write_lp_bytes(&mut buf, self.source_region.as_bytes());
         buf.extend_from_slice(&self.source_ts.to_be_bytes());
         buf.extend_from_slice(&self.spirit_pid.to_be_bytes());
@@ -97,6 +125,9 @@ impl CollectiveKvLeaf {
         write_lp_bytes(&mut buf, self.key.as_bytes());
         write_lp_bytes(&mut buf, self.value_kind.as_bytes());
         write_lp_bytes(&mut buf, &self.value_data);
+        if let Some(team) = team_bytes {
+            write_lp_bytes(&mut buf, team);
+        }
         buf
     }
 
@@ -159,6 +190,7 @@ mod tests {
             key: "memory-key".to_string(),
             value_kind: "text/plain".to_string(),
             value_data: b"hello-world".to_vec(),
+            source_team: None,
         }
     }
 
@@ -317,6 +349,7 @@ mod tests {
             source_region: "eu-central-1".to_string(),
             source_ts: 123,
             source_log_ref: "log-ref-not-hashed".to_string(),
+            source_team: None,
         };
         let leaf = CollectiveKvLeaf::from_row(&row);
         assert_eq!(leaf.source_region, "eu-central-1");
@@ -342,6 +375,7 @@ mod tests {
             key: String::new(),
             value_kind: String::new(),
             value_data: Vec::new(),
+            source_team: None,
         };
         let h = empty.canonical_hash();
         assert_ne!(h, [0u8; 32], "empty leaf must NOT produce all-zero hash");
@@ -364,6 +398,7 @@ mod tests {
             key: "k".to_string(),
             value_kind: "v".to_string(),
             value_data: vec![0xff; 1024],
+            source_team: None,
         };
         let h = leaf.canonical_hash();
         assert_ne!(h, [0u8; 32], "max-value leaf must not produce zero hash");
@@ -410,6 +445,7 @@ mod tests {
             source_region: "r".to_string(),
             source_ts: 100,
             source_log_ref: "ref-A".to_string(),
+            source_team: None,
         };
         let row2 = crate::store::CollectiveRow {
             source_log_ref: "ref-B".to_string(),
@@ -421,6 +457,156 @@ mod tests {
             leaf1.canonical_hash(),
             leaf2.canonical_hash(),
             "source_log_ref must NOT affect the canonical hash"
+        );
+    }
+
+    // ─── Story 13.2 AC2 — leaf v2 (source_team) ──────────────────────────────
+
+    /// The write codec's oracle triple over a leaf set.
+    fn triple(leaves: &[CollectiveKvLeaf]) -> ([u8; 32], [u8; 32], usize) {
+        (
+            kv_merkle_root(leaves),
+            compute_kv_payload_oracle(leaves),
+            leaves.len(),
+        )
+    }
+
+    #[test]
+    fn test_v1_canonical_hash_golden() {
+        // FROZEN GOLDEN (AC2): a None-team (v1) leaf MUST reproduce the exact
+        // pre-13.2 canonical hash byte-for-byte. If this reds, leaf v2 changed
+        // v1 bytes → 11.2a cross-region convergence for every existing row
+        // breaks. Pinned at 13.2; changing it is an ADR-gated re-key.
+        assert_eq!(
+            hex::encode(sample_leaf().canonical_hash()),
+            "22fe823721e83979508088bfc4e5dac4acfabe264e98c4e97abb25a8a13c2a00",
+            "v1 (None-team) canonical hash drifted — v1 leaves are NOT byte-identical"
+        );
+    }
+
+    #[test]
+    fn test_source_team_v2_differs_from_v1() {
+        // A Some-team leaf uses the v2 domain tag + appended source_team, so its
+        // hash MUST differ from the byte-identical None-team v1 leaf.
+        let v1 = sample_leaf();
+        let mut v2 = sample_leaf();
+        v2.source_team = Some(TeamId::new("team-a").unwrap());
+        assert_ne!(
+            v1.canonical_hash(),
+            v2.canonical_hash(),
+            "a source_team-bearing v2 leaf must not collide with its v1 form"
+        );
+        // Distinct teams → distinct hashes (source_team is in the pre-image).
+        let mut v2b = sample_leaf();
+        v2b.source_team = Some(TeamId::new("team-b").unwrap());
+        assert_ne!(
+            v2.canonical_hash(),
+            v2b.canonical_hash(),
+            "distinct source_team must change the canonical hash"
+        );
+    }
+
+    #[test]
+    fn test_source_team_boundary_shift_no_collision() {
+        // The v2 length prefix on source_team is load-bearing: team="ab",key="c"
+        // must not collide with team="a",key="bc" (a boundary shift).
+        let mut a = sample_leaf();
+        a.source_team = Some(TeamId::new("ab").unwrap());
+        a.key = "c".to_string();
+        let mut b = sample_leaf();
+        b.source_team = Some(TeamId::new("a-").unwrap());
+        b.key = "bc".to_string();
+        assert_ne!(
+            a.canonical_hash(),
+            b.canonical_hash(),
+            "source_team/key boundary shift MUST NOT collide (length prefix load-bearing)"
+        );
+    }
+
+    #[test]
+    fn test_mixed_v1_v2_independence_and_convergence() {
+        // AC4 / Round-2 (Murat): a team store holds its own v1 rows (source_team
+        // = None) mixed with re-attested v2 copies (source_team = Some). Prove
+        // per-team independence and cross-region convergence hold across the mix,
+        // and that the payload oracle (not the dedup-blind SET-root) catches a
+        // within-team single-byte mutation.
+        let team_c = TeamId::new("team-c").unwrap();
+        let mut a1 = sample_leaf();
+        a1.key = "a-own-1".to_string();
+        let mut a2 = sample_leaf();
+        a2.key = "a-own-2".to_string();
+        let mut a_copy = sample_leaf();
+        a_copy.key = "c-copy".to_string();
+        a_copy.source_team = Some(team_c.clone());
+        let team_a = vec![a1.clone(), a2.clone(), a_copy.clone()];
+
+        let mut b1 = sample_leaf();
+        b1.key = "b-own-1".to_string();
+        let team_b = vec![b1];
+
+        let a_before = triple(&team_a);
+
+        // Mutate + grow team-B; its root MUST move, team-A's triple MUST NOT.
+        let mut b_mut = team_b.clone();
+        b_mut[0].value_data = b"mutated".to_vec();
+        let mut b_extra = sample_leaf();
+        b_extra.key = "b-own-2".to_string();
+        b_mut.push(b_extra);
+        assert_ne!(
+            triple(&team_b).0,
+            triple(&b_mut).0,
+            "team-B mutation must move team-B's root"
+        );
+        assert_eq!(
+            a_before,
+            triple(&team_a),
+            "team-A's triple must be independent of any team-B mutation"
+        );
+
+        // Convergence: two regions' converged copies are the SAME SET regardless
+        // of arrival order → identical root AND oracle.
+        let reordered = vec![a_copy, a1, a2];
+        assert_eq!(
+            a_before.0,
+            triple(&reordered).0,
+            "mixed-set root order-independent"
+        );
+        assert_eq!(
+            a_before.1,
+            triple(&reordered).1,
+            "mixed-set oracle order-independent"
+        );
+
+        // The payload oracle catches a single-byte value mutation on any leaf.
+        // (This mutation also moves the root, since the leaf-hash SET changes —
+        // it is NOT the root-blind case; it just confirms the oracle is live.)
+        let mut a_tampered = team_a.clone();
+        a_tampered[2].value_data = b"hello-worlD".to_vec();
+        assert_ne!(
+            a_before.1,
+            triple(&a_tampered).1,
+            "payload oracle must catch a within-team byte mutation of the v2 copy"
+        );
+
+        // The 11.2a L3 discipline (payload_byte_flip_changes_oracle_not_root):
+        // the SET-root DEDUPS leaf hashes, so it is BLIND to duplicate-COUNT
+        // drift — adding a second copy of an existing leaf leaves the root
+        // UNCHANGED while the payload oracle AND the row-count both move. A
+        // triple that checked only the root would miss this; prove all three.
+        let mut a_dup = team_a.clone();
+        a_dup.push(team_a[2].clone()); // duplicate of an existing leaf
+        let dup_triple = triple(&a_dup);
+        assert_eq!(
+            a_before.0, dup_triple.0,
+            "SET-root is dedup-blind: a duplicate leaf must NOT move the root"
+        );
+        assert_ne!(
+            a_before.1, dup_triple.1,
+            "payload oracle MUST catch the duplicate-count drift the root misses"
+        );
+        assert_ne!(
+            a_before.2, dup_triple.2,
+            "row-count MUST catch the duplicate-count drift the root misses"
         );
     }
 }

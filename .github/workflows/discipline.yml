@@ -2664,8 +2664,10 @@ jobs:
       - name: Run check-cohort-mesh gate
         run: cargo run -p xtask -- check-cohort-mesh --json
 
-  # Story 13.1 — ADR-055 physical tenant wall. The live legs use two
-  # databases on one serialized Postgres 16 instance.
+  # Story 13.1 + 13.2 — ADR-055 physical tenant wall + cryptographic tenant
+  # boundary. Hermetic crypto legs (forged-team-stamp-refused-at-verify,
+  # apply-refuses-forged-bundle, team-identity-source-reflex) are Blocking; the
+  # live legs use two databases on one serialized Postgres 16 instance.
   check-multi-tenant-loom:
     runs-on: ubuntu-latest
     timeout-minutes: 15

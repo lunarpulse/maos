@@ -64,12 +64,22 @@ coverage:
     phase: v2.0+
     valid_until: '2027-07-17'
     notes: |
-      Story 13.1 physical tenant-wall anchor. Database-per-team,
-      manifest-authoritative team placement, the three-site pre-query guard,
-      construction-time datname self-check, physical-absence witness, and the
-      staged D1 forged-stamp-served boundary are enforced by the mixed-binding
-      check-multi-tenant-loom gate. Stories 13.2/13.3/13.5b/13.5c/13.6 remain
-      explicitly absent successor surfaces.
+      Story 13.1 physical tenant-wall anchor + Story 13.2 cryptographic tenant
+      boundary (Fork-4 / ADV-055-1). 13.1: database-per-team, manifest-authoritative
+      team placement, the three-site pre-query guard, construction-time datname
+      self-check, physical-absence witness, and the staged D1 forged-stamp-served
+      boundary. 13.2 (Option A, closed at ENTRY): per-team HKDF signing-key weld
+      (2nd stage over the region seed), canonical_kv_leaf v2 (source_team in the
+      pre-image, v1 leaves byte-identical), and verify_replication_bundle deriving
+      the pubkey from the CLAIMED (region, team) so a forged same-region cross-team
+      bundle is refused at verify and never lands (apply-only-after-verify). Proven
+      by the check-multi-tenant-loom crypto legs: forged-team-stamp-refused-at-verify,
+      apply-refuses-forged-bundle, team-identity-source-reflex (hermetic Blocking) +
+      per-team-merkle-independence incl. mixed v1/v2 (advisory-substrate). team_guard
+      stays presence-only (read-path guard unchanged). D1 closed on the TEAM axis at
+      entry only; the region source_log_ref presence residual remains OPEN with no
+      named successor. Read-time attestation persistence + production seed/apply
+      wiring defer to 13.3. Stories 13.3/13.5b/13.5c/13.6 remain absent successors.
   ADR-024:
     gates:
     - check-escape-detector

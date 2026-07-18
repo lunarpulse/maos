@@ -157,7 +157,7 @@ async fn reattest_copy_fails_then_reattest_succeeds() {
         .expect("bundle verified under region-a key must succeed");
 
     // Apply to region B's store.
-    let result = apply_replication_bundle(&bundle, &store_b, "region-b").await;
+    let result = apply_replication_bundle(&bundle, &store_b, "region-b", &BASE_SEED).await;
     let apply = result.expect("apply to region-b must succeed");
     assert_eq!(apply.applied_count, 1, "one row applied");
     assert_eq!(apply.skipped_count, 0, "no rows skipped");
@@ -527,7 +527,7 @@ async fn full_convergence_across_regions() {
     let bundle = build_replication_bundle(leaves_a_pre.clone(), &region_a, &BASE_SEED);
     verify_replication_bundle(&bundle, &BASE_SEED).expect("bundle verifies");
 
-    let result = apply_replication_bundle(&bundle, &store_b, "region-b")
+    let result = apply_replication_bundle(&bundle, &store_b, "region-b", &BASE_SEED)
         .await
         .expect("apply succeeds");
     assert_eq!(result.applied_count, 5);
@@ -673,7 +673,7 @@ async fn region_identity_forge_rejected_count_moves() {
     // Genuine bundle: apply to a separate store → applied_count > 0.
     let store_dest = make_store("region-b").await;
     reset_collective(&store_dest).await;
-    let genuine_result = apply_replication_bundle(&bundle, &store_dest, "region-b")
+    let genuine_result = apply_replication_bundle(&bundle, &store_dest, "region-b", &BASE_SEED)
         .await
         .expect("genuine apply succeeds");
     let genuine_count = genuine_result.applied_count;
@@ -850,12 +850,13 @@ async fn healing_remerge_converges() {
         key: "heal-key".to_string(),
         value_kind: "text".to_string(),
         value_data: b"updated-during-partition".to_vec(),
+        source_team: None,
     };
     let bundle_b = build_replication_bundle(vec![partition_leaf], &region_b, &BASE_SEED);
     verify_replication_bundle(&bundle_b, &BASE_SEED).unwrap();
 
     // Phase 3: heal — apply B's bundle to region A's store.
-    let heal_result = apply_replication_bundle(&bundle_b, &store, "region-a")
+    let heal_result = apply_replication_bundle(&bundle_b, &store, "region-a", &BASE_SEED)
         .await
         .unwrap();
     assert_eq!(
@@ -903,6 +904,7 @@ async fn apply_result_surfaces_skipped() {
         key: "valid-key".to_string(),
         value_kind: "text".to_string(),
         value_data: b"valid-value".to_vec(),
+        source_team: None,
     };
     let invalid_leaf = CollectiveKvLeaf {
         source_region: "region-a".to_string(),
@@ -913,12 +915,13 @@ async fn apply_result_surfaces_skipped() {
         key: "invalid-key".to_string(),
         value_kind: "text".to_string(),
         value_data: b"invalid-value".to_vec(),
+        source_team: None,
     };
 
     let bundle = build_replication_bundle(vec![valid_leaf, invalid_leaf], &region_a, &BASE_SEED);
     verify_replication_bundle(&bundle, &BASE_SEED).expect("bundle verifies (leaves are hashed)");
 
-    let result = apply_replication_bundle(&bundle, &store, "region-b")
+    let result = apply_replication_bundle(&bundle, &store, "region-b", &BASE_SEED)
         .await
         .expect("apply succeeds overall");
 
@@ -1063,7 +1066,7 @@ async fn source_ts_preserved_across_reattestation() {
     let leaves = read_all_leaves(&store_a).await;
     let bundle = build_replication_bundle(leaves, &region_a, &BASE_SEED);
     verify_replication_bundle(&bundle, &BASE_SEED).unwrap();
-    apply_replication_bundle(&bundle, &store_b, "region-b")
+    apply_replication_bundle(&bundle, &store_b, "region-b", &BASE_SEED)
         .await
         .unwrap();
 
@@ -1305,22 +1308,22 @@ async fn three_region_convergence_all_three_equal() {
         verify_replication_bundle(b, &BASE_SEED).expect("bundle must verify");
     }
 
-    let ab = apply_replication_bundle(&bundle_a, &store_b, "region-b")
+    let ab = apply_replication_bundle(&bundle_a, &store_b, "region-b", &BASE_SEED)
         .await
         .expect("A->B apply");
-    let ac = apply_replication_bundle(&bundle_a, &store_c, "region-c")
+    let ac = apply_replication_bundle(&bundle_a, &store_c, "region-c", &BASE_SEED)
         .await
         .expect("A->C apply");
-    let ba = apply_replication_bundle(&bundle_b, &store_a, "region-a")
+    let ba = apply_replication_bundle(&bundle_b, &store_a, "region-a", &BASE_SEED)
         .await
         .expect("B->A apply");
-    let bc = apply_replication_bundle(&bundle_b, &store_c, "region-c")
+    let bc = apply_replication_bundle(&bundle_b, &store_c, "region-c", &BASE_SEED)
         .await
         .expect("B->C apply");
-    let ca = apply_replication_bundle(&bundle_c, &store_a, "region-a")
+    let ca = apply_replication_bundle(&bundle_c, &store_a, "region-a", &BASE_SEED)
         .await
         .expect("C->A apply");
-    let cb = apply_replication_bundle(&bundle_c, &store_b, "region-b")
+    let cb = apply_replication_bundle(&bundle_c, &store_b, "region-b", &BASE_SEED)
         .await
         .expect("C->B apply");
 
@@ -1469,26 +1472,26 @@ async fn three_region_reorder_independence() {
     let bundle_c = build_replication_bundle(read_all_leaves_for('c').await, &region_c, &BASE_SEED);
 
     // Order [a, b, c] → region-a (which already holds its own region-a write).
-    apply_replication_bundle(&bundle_a, &store_a, "region-a")
+    apply_replication_bundle(&bundle_a, &store_a, "region-a", &BASE_SEED)
         .await
         .unwrap();
-    apply_replication_bundle(&bundle_b, &store_a, "region-a")
+    apply_replication_bundle(&bundle_b, &store_a, "region-a", &BASE_SEED)
         .await
         .unwrap();
-    apply_replication_bundle(&bundle_c, &store_a, "region-a")
+    apply_replication_bundle(&bundle_c, &store_a, "region-a", &BASE_SEED)
         .await
         .unwrap();
     let winner_abc = read_all_leaves_for('a').await;
 
     // Reset region-a; apply the SAME three bundles in REVERSE order [c, b, a].
     reset_collective_for('a').await;
-    apply_replication_bundle(&bundle_c, &store_a, "region-a")
+    apply_replication_bundle(&bundle_c, &store_a, "region-a", &BASE_SEED)
         .await
         .unwrap();
-    apply_replication_bundle(&bundle_b, &store_a, "region-a")
+    apply_replication_bundle(&bundle_b, &store_a, "region-a", &BASE_SEED)
         .await
         .unwrap();
-    apply_replication_bundle(&bundle_a, &store_a, "region-a")
+    apply_replication_bundle(&bundle_a, &store_a, "region-a", &BASE_SEED)
         .await
         .unwrap();
     let winner_cba = read_all_leaves_for('a').await;
@@ -1653,7 +1656,7 @@ async fn live_read_region_identity_reattested_served() {
     // source_log_ref (the re-attestation marker).
     let bundle = build_replication_bundle(read_all_leaves_for('a').await, &region_a, &BASE_SEED);
     verify_replication_bundle(&bundle, &BASE_SEED).expect("bundle verifies");
-    let result = apply_replication_bundle(&bundle, &store_b, "region-b")
+    let result = apply_replication_bundle(&bundle, &store_b, "region-b", &BASE_SEED)
         .await
         .expect("apply to region-b");
     assert_eq!(result.applied_count, 1, "one row applied");

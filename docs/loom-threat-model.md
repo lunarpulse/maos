@@ -1,6 +1,6 @@
 # Loom multi-tenant threat model
 
-**Status:** binding for ADR-055 / Story 13.1; staged cryptographic closure remains Story 13.2.
+**Status:** binding for ADR-055 / Story 13.1 (physical wall) + Story 13.2 (cryptographic team boundary, closed at entry). Read-time closure and production cross-team wiring remain Story 13.3.
 
 ## Scope and security claim
 
@@ -22,11 +22,15 @@ The row-ownership rule is physical: a row belongs to the team whose database con
 
 ## Threats, posture, and evidence
 
-### T1 — Same-region insider-team provenance forgery: LIVE until Story 13.2
+### T1 — Same-region insider-team provenance forgery: CLOSED on the team axis at ENTRY (Story 13.2)
 
-A member of team B in the same region can currently forge a non-empty provenance-presence stamp accepted by the Story 11.2b `region_guard`. Story 13.1 verifies manifest membership and physical placement, not a per-team signing key. The `d1-forged-stamp-served-boundary` gate leg therefore requires the forged stamp to be **served** through a valid same-team read. Rejection would be a false security claim or an accidental absorption of Story 13.2.
+At Story 13.1 a member of team B in the same region could forge a non-empty provenance-presence stamp accepted by the 11.2b `region_guard`, because 13.1 verifies manifest membership and physical placement, not a per-team signing key. The `d1-forged-stamp-served-boundary` leg documents that residual by requiring the forged stamp to be **served** through a valid same-team read.
 
-Story 13.2 closes this threat atomically by adding `source_team`, canonical leaf v2, and per-team key derivation. Until all three land together, Story 13.1 must not claim forge resistance or valid cross-team re-attestation.
+**Story 13.2 (Fork-4 / ADV-055-1) closes this on the team axis at ENTRY (Option A).** A per-team Ed25519 key is derived by a second HKDF-SHA256 stage over the region seed; `source_team` enters the `canonical_kv_leaf` v2 pre-image (v1 leaves byte-identical); and `verify_replication_bundle` derives the verifying key from the **claimed** `(region, team)`. A team-B member who stamps `source_team = A` in the **same region** cannot sign under team-A's derived key, so the cross-team bundle is refused at `verify` (`BundleError::SignatureVerificationFailed`) and never applied — same-region cross-team forgery is cryptographically infeasible. This is proven by the `forged-team-stamp-refused-at-verify` gate leg (same-region, independently-derived verifier + positive control — not a cross-region tautology).
+
+**Blast radius (Vex, non-negotiable):** welding the team key over the region signing seed means **region-seed compromise is team-wide** — an attacker who recovers a region's signing seed can derive every team key in that region. This is acceptable — region-seed compromise is already region-wide — but it is written down here, not discovered later. It is the deliberate cost of one crypto home and the second-stage weld.
+
+**Not a blanket close.** 13.2 closes D1 on the **team axis at entry** only. The **read-time** D1 residual (both axes) is NOT closed — `collective_memory` persists no per-row signature/root/attestation a read could verify — and defers to Story 13.3, which builds the real cross-team write plus per-row attestation (`source_team` + `merkle_root` + `region_sig` + Merkle inclusion path) and the read-path verify-with-inclusion. The **region** `source_log_ref` presence residual (a different axis) remains **OPEN with no named successor**: the trusted-applied-root registry that was its successor was cut in preflight. `team_guard`'s read path stays presence-only (13.1); no read-path row-level guard is introduced at 13.2.
 
 ### T2 — Cohort authority-key compromise
 
@@ -67,7 +71,7 @@ The tenant wall creates a new tool-output boundary: collective rows may originat
 4. quarantine or require explicit consent for cross-team tool instructions, credential requests, policy overrides, and requests to suppress Transparency Log evidence;
 5. preserve the original bytes and rule decision in the tenant-scoped audit projection without leaking another team's row content.
 
-Story 13.1 has no cross-team read path, so these rules define the required successor boundary rather than pretending a non-existent path is protected.
+Story 13.1 has no cross-team read path, and Story 13.2 closes the forgery at bundle-*entry* (not at read) — so these rules still define the required successor boundary for the mediated cross-team **read** path that Story 13.3 will build, rather than pretending a non-existent read path is protected. 13.2 does add the crypto foundation (declared source-team + derived-key verification) those rules' "declared source team" labelling will consume.
 
 ## Carried security debt
 

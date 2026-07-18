@@ -8,6 +8,9 @@ use std::sync::{Arc, Mutex};
 use maos_domain::memory::{MemoryNamespace, MemoryValue};
 use maos_domain::ports::registry::SpiritId;
 use maos_domain::team::TeamId;
+use maos_loom_lite::replication::leaf::{
+    compute_kv_payload_oracle, kv_merkle_root, CollectiveKvLeaf,
+};
 use maos_loom_lite::store::{LoomLiteStore, StoreConfig, StoreError};
 use maos_loom_lite::tenant::{TenantMapError, TenantMapPort};
 use tokio_postgres::NoTls;
@@ -68,6 +71,7 @@ async fn init_fixture_schema(client: &tokio_postgres::Client) {
                 timestamp_ns BIGINT NOT NULL,
                 source_region TEXT NOT NULL DEFAULT '',
                 source_ts BIGINT NOT NULL DEFAULT 0,
+                source_team TEXT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 UNIQUE (spirit_pid, namespace_kind, namespace_detail, key),
                 CONSTRAINT collective_memory_i11_provenance CHECK (
@@ -297,5 +301,143 @@ async fn tenant_wall_d1_forged_stamp_is_still_served_boundary() {
     assert_eq!(
         served,
         MemoryValue::Text("presence-only boundary".to_string())
+    );
+}
+
+/// Story 13.2 (AC4 / AC5c): per-team Merkle independence over two physical
+/// datnames, including the MIXED v1/v2 case. Team-A's store holds its own v1
+/// rows (source_team NULL) plus a re-attested v2 copy (source_team = 'team-c');
+/// team-B's store is disjoint. The `{root, payload-oracle, row-count}` triple of
+/// team-A must be UNCHANGED by any mutation of team-B (physical database-per-team
+/// makes this true by construction — AC4 proves it with the discriminating
+/// triple, not the dedup-blind SET-root alone).
+#[tokio::test]
+#[ignore = "requires two live Postgres databases"]
+async fn tenant_wall_per_team_merkle_independence_mixed_v1_v2() {
+    let _guard = guard();
+    let raw_a = raw_connect(&team_a_conn()).await;
+    let raw_b = raw_connect(&team_b_conn()).await;
+    init_fixture_schema(&raw_a).await;
+    init_fixture_schema(&raw_b).await;
+    let map = Arc::new(LiveTenantMap::new(
+        current_database(&raw_a).await,
+        current_database(&raw_b).await,
+    ));
+    map.register_spirit(7, SpiritId::from("spirit-a"));
+    map.register_spirit(8, SpiritId::from("spirit-b"));
+    let store_a = make_store(team_a_conn(), "team-a", "region-a", map.clone()).await;
+    let store_b = make_store(team_b_conn(), "team-b", "region-b", map).await;
+    raw_a
+        .execute("DELETE FROM collective_memory", &[])
+        .await
+        .unwrap();
+    raw_b
+        .execute("DELETE FROM collective_memory", &[])
+        .await
+        .unwrap();
+
+    // team-A: two first-party v1 rows (source_team stays NULL).
+    for key in ["a-own-1", "a-own-2"] {
+        store_a
+            .write(
+                7,
+                &MemoryNamespace::Default,
+                key,
+                MemoryValue::Text(format!("v-{key}")),
+            )
+            .await
+            .expect("team-a v1 write");
+    }
+    // team-A: a re-attested v2 cross-team COPY (source_team = 'team-c'), inserted
+    // via raw SQL — 13.2 has no production path that writes source_team (that is
+    // 13.3); this synthesizes the mixed store a read would see.
+    raw_a
+        .execute(
+            "INSERT INTO collective_memory
+                (spirit_pid, namespace_kind, namespace_detail, key, value_kind, value_data,
+                 timestamp_ns, source_ts, source_region, source_log_ref, source_team)
+             VALUES (9, 'default', '', 'c-copy', 'text', $1, 0, 5, 'region-c', 'stamp', 'team-c')",
+            &[&b"cross-team-copy".to_vec()],
+        )
+        .await
+        .expect("v2 cross-team copy insert");
+
+    // team-B: a disjoint first-party row.
+    store_b
+        .write(
+            8,
+            &MemoryNamespace::Default,
+            "b-own-1",
+            MemoryValue::Text("v-b".to_string()),
+        )
+        .await
+        .expect("team-b v1 write");
+
+    let triple = |leaves: &[CollectiveKvLeaf]| {
+        (
+            kv_merkle_root(leaves),
+            compute_kv_payload_oracle(leaves),
+            leaves.len(),
+        )
+    };
+    let leaves_a = |rows: &[maos_loom_lite::store::CollectiveRow]| {
+        rows.iter()
+            .map(CollectiveKvLeaf::from_row)
+            .collect::<Vec<_>>()
+    };
+
+    let rows_a_before = LoomLiteStore::read_all_rows_from(&raw_a).await.unwrap();
+    let leaves_before = leaves_a(&rows_a_before);
+    assert_eq!(leaves_before.len(), 3, "team-A holds 2 v1 + 1 v2 row");
+    assert!(
+        leaves_before
+            .iter()
+            .any(|l| l.source_team.as_ref().map(|t| t.as_str()) == Some("team-c")),
+        "the mixed store must include the v2 cross-team copy"
+    );
+    assert_eq!(
+        leaves_before
+            .iter()
+            .filter(|l| l.source_team.is_none())
+            .count(),
+        2,
+        "the two first-party rows stay v1 (source_team NULL)"
+    );
+    let triple_a_before = triple(&leaves_before);
+
+    // Mutate team-B: overwrite its row + add another. Its own triple must move.
+    let rows_b_before = LoomLiteStore::read_all_rows_from(&raw_b).await.unwrap();
+    let triple_b_before = triple(&leaves_a(&rows_b_before));
+    store_b
+        .write(
+            8,
+            &MemoryNamespace::Default,
+            "b-own-1",
+            MemoryValue::Text("v-b-CHANGED".to_string()),
+        )
+        .await
+        .expect("team-b mutation");
+    store_b
+        .write(
+            8,
+            &MemoryNamespace::Default,
+            "b-own-2",
+            MemoryValue::Text("v-b-2".to_string()),
+        )
+        .await
+        .expect("team-b growth");
+    let rows_b_after = LoomLiteStore::read_all_rows_from(&raw_b).await.unwrap();
+    assert_ne!(
+        triple_b_before,
+        triple(&leaves_a(&rows_b_after)),
+        "team-B mutation must move team-B's own triple"
+    );
+
+    // team-A's triple is UNCHANGED by the team-B mutation (physical isolation).
+    let rows_a_after = LoomLiteStore::read_all_rows_from(&raw_a).await.unwrap();
+    assert_eq!(
+        triple_a_before,
+        triple(&leaves_a(&rows_a_after)),
+        "team-A's {{root, payload-oracle, row-count}} triple must be independent of team-B"
     );
 }
