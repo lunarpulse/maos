@@ -1,0 +1,12 @@
+[[evidence]]
+drill_date = "1970-01-01"
+rto_seconds = 0
+drill_success = false
+notes = "seed entry — no drill run yet"
+
+
+[[evidence]]
+drill_date = "2026-07-19"
+rto_seconds = 3
+drill_success = true
+notes = "integrity=true,rpo=true,frames=10000"
