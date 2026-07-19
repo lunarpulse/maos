@@ -13,7 +13,7 @@ Reuses: ADR-049 (independent-verifier and source-identity discipline), ADR-012 (
 
 ADR-054 owns the signed cohort roster and explicitly hands the team↔region↔database mapping to this decision. Reza is one governed cohort with stable Spirit identities partitioned into teams. A shared table with a team predicate is insufficient: one omitted `WHERE` clause would cross the boundary.
 
-The production collective store is Postgres-only. The kernel exposes one `CollectiveMemoryPort`, not a per-team router, and no production Spirit→collective route exists yet. Story 13.1 therefore ships and proves the storage mechanism per store. Story 13.5c owns production multi-store selection, Spirit mediation, refresh wiring, and tenant-refusal audit isolation.
+The production collective store is Postgres-only. The kernel exposes one `CollectiveMemoryPort`, not a per-team router, and no production Spirit→collective route exists yet. Story 13.1 therefore ships and proves the storage mechanism per store. **Story 13.5c makes the cohort daemon a single composition root so the verified manifest reaches the tenant map and `MAOS_LOOM_HOME_TEAM` boots — it owns refresh wiring only.** Production multi-store selection and Spirit mediation are **Story 13.5d**; per-operator tenant-refusal audit isolation is **Story 13.5e**.
 
 ## Decision
 
@@ -62,7 +62,7 @@ The key is **derived from the claimed identity, never looked up** — there is n
 
 Tenant map lookups require both lease freshness and local-host membership in the current verified roster. A peerless/N=1 source is not refreshable under the shipped authority model and is refused at boot. In the primary daemon, configured tenant mode without a refreshable source fails immediately; non-tenant configuration remains quietly disabled. Hot-path heartbeats and a new announcement protocol are rejected.
 
-The current cohort daemon owns the only refresh loop but is a parallel composition root with separate state and audit wiring. Joining that source to production team-store routing is explicitly Story 13.5c.
+The cohort daemon is **not** a parallel composition root. `run_cohort_a2a_daemon` is dispatched from *inside* `async fn main`, so a `cohort-a2a-daemon` process already runs the entire primary root — Transparency Log, boot nonce, store, memory manager — before reaching the dispatch, then discarded it and rebuilt a second set. **Story 13.5c closes this by parameter-passing, not by joining two roots:** it loads the verified `CohortManifestState` above the store, constructs the `TenantMapAdapter` from it (13.1's physical wall and 13.2's cryptographic wall go LIVE for the first time — `TenantMapAdapter`'s first production construction), and hands the same `Arc` plus the primary Transparency Log and boot nonce to the daemon function, deleting the daemon's second Transparency Log. Two consequences a future reader must not mistake for regressions: (a) the daemon's A2A boot nonce becomes **per-boot random and single-sourced** where it was an operator-static `own_boot_nonce` — a deliberate behavior change repairing the NFR-Rel-6 restart detector (`router.rs:897` `invalidate_if_boot_nonce_differs`), scoped to *per-boot random, single-sourced* (no test drives restart detection through a live transport, so peer-side detection is not claimed); (b) tenant mode now **BOOTS but does not SERVE** — `register_spirit` has no production caller until Story 13.5d, so every collective read/write/scan fails closed with `TenantSpiritUnmapped`. Refresh wiring closes here; production Spirit→collective routing is **Story 13.5d**.
 
 ## Consequences and carried gaps
 
@@ -72,8 +72,9 @@ The current cohort daemon owns the only refresh loop but is a parallel compositi
 - Story 13.2 adds per-team key derivation (`maos-audit::sealed_export`), `canonical_kv_leaf` v2, and bundle v2 verify-from-claimed-`(region,team)`, all out-of-kernel; the baseline stays 23202, `WriteEntryPoint` is untouched, and the crypto refusal reuses `BundleError::SignatureVerificationFailed` (no new `maos-domain` `E*`).
 - Story 13.2 closes the same-region cross-team forgery at ENTRY (D1, team axis). The **read-time** D1 residual (both axes) and per-row attestation persistence defer to Story 13.3. The **region** `source_log_ref` presence residual remains OPEN with **no named successor** (its intended trusted-applied-root registry was cut in preflight).
 - Collective GDPR erase/legal-hold reach does not exist. Story 13.5b owns the port and kernel cascade.
-- Tenant refusal auditing and per-operator Transparency Log isolation do not exist below the store port. Story 13.5c owns them. An unaudited refusal is a named intermediate gap, not ADR-055 completion.
-- Production multi-store routing and a Spirit-facing collective path remain Story 13.5c.
+- Tenant refusal auditing and per-operator Transparency Log isolation do not exist below the store port. **Story 13.5e** owns them. An unaudited refusal is a named intermediate gap, not ADR-055 completion.
+- Production multi-store routing and a Spirit-facing collective path remain **Story 13.5d**.
+- **Story 13.5c closed refresh wiring** — single composition root, one Transparency Log, one per-boot nonce, and the first production construction of `TenantMapAdapter` (13.1/13.2's walls go live). It changed the A2A boot nonce to per-boot random/single-sourced (NFR-Rel-6, §5). Tenant mode BOOTS but does not SERVE until 13.5d wires `register_spirit`. Baseline stays 23202; ~180 LOC `maos-bin` + ~300 LOC test, no new gate, crate, or dependency.
 
 ## Rejected alternatives
 

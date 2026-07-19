@@ -2266,6 +2266,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         audit_db_path.display()
     );
 
+    // Story 13.5c — single composition root.  A `cohort-a2a-daemon` process
+    // already ran this entire root; it must NOT open a second Transparency Log
+    // or reload the manifest (D1/D2).  When MAOS_COHORT_DAEMON_CONFIG is set,
+    // read the daemon config and load the verified cohort manifest state HERE —
+    // above the collective store — so (a) the tenant map is built from it and
+    // 13.1's wall goes live, and (b) the SAME Arc reaches the daemon dispatch
+    // below.  A malformed config is a hard error ONLY in cohort-a2a-daemon mode
+    // (K1 guard): a stale daemon TOML must not fail unrelated modes' boots.
+    let cohort_daemon = cohort_daemon_bootstrap(&transparency_log)?;
+
     // Story 10.4a — construct the collective-tier port (Loom-lite, user-space)
     // + inject the capability registry for I1/I2 mediation.  Configured from
     // MAOS_LOOM_POSTGRES; when absent the collective tier is disabled (ops
@@ -2280,11 +2290,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map(|r| r.as_str().to_string())
                     .unwrap_or_default();
                 let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").unwrap_or_default();
-                // Story 13.1: the primary daemon has no refreshable cohort-state
-                // source yet (13.5c owns that wiring). Tenant mode therefore
-                // refuses at boot rather than serving until the lease bricks.
-                let tenant_map = maos_bin::tenant_map::tenant_map_for_store(&home_team, None)
-                    .map_err(|error| format!("maos: tenant map construction failed: {error}"))?;
+                // Story 13.5c — the daemon's verified cohort state (loaded
+                // above) is the tenant-map source.  `refreshable_source` is true
+                // ONLY in cohort-a2a-daemon mode — the one arm that starts the
+                // refresh loop (D8/K3: a non-daemon process passing `true` would
+                // brick the lease after t_stale_secs).  `MAOS_ONE_SHOT` is read
+                // directly here because `mode` is bound ~2 030 lines below (D15).
+                // Kept inside the MAOS_LOOM_POSTGRES arm (K9): tenant mode must
+                // not refuse on hosts with no collective tier.
+                let tenant_source: Option<Arc<dyn maos_loom_lite::tenant::TenantMapPort>> =
+                    match cohort_daemon.as_ref() {
+                        Some(bootstrap) => {
+                            let refreshable = std::env::var("MAOS_ONE_SHOT").as_deref()
+                                == Ok("cohort-a2a-daemon");
+                            let adapter = maos_bin::tenant_map::TenantMapAdapter::new(
+                                Arc::clone(&bootstrap.state),
+                                bootstrap.local_host.as_str(),
+                                refreshable,
+                            )
+                            .map_err(|error| {
+                                format!("maos: tenant map construction failed: {error}")
+                            })?;
+                            Some(Arc::new(adapter) as Arc<dyn maos_loom_lite::tenant::TenantMapPort>)
+                        }
+                        None => None,
+                    };
+                let tenant_map =
+                    maos_bin::tenant_map::tenant_map_for_store(&home_team, tenant_source).map_err(
+                        |error| format!("maos: tenant map construction failed: {error}"),
+                    )?;
                 let cfg = maos_loom_lite::store::StoreConfig {
                     connection_string: conn_str,
                     home_region: home_region_str,
@@ -6931,7 +6965,8 @@ description = "smoke test spirit successor"
 
         #[cfg(feature = "network")]
         if mode == "cohort-a2a-daemon" {
-            return run_cohort_a2a_daemon_from_env().await;
+            return run_cohort_a2a_daemon(Arc::clone(&transparency_log), boot_nonce, cohort_daemon)
+                .await;
         }
         // Story 8.6 AC-T13/AC-A7 — `smoke-a2a-tcp-8-6`: live cross-Host
         // Mira(host_a) → Nash(host_b) advisory over a REAL TCP/mTLS socket
@@ -7923,21 +7958,63 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
 struct CohortDaemonFileConfig {
     tcp: maos_a2a_tcp::TcpA2AConfig,
     peers: Vec<maos_a2a_core::A2APeerConfig>,
-    own_boot_nonce: u64,
     manifest_path: std::path::PathBuf,
     authority_keys: Vec<String>,
     local_host: String,
     control_spirit: String,
-    transparency_log_path: std::path::PathBuf,
     digest_summary: maos_cohort::DigestSummary,
 }
 
+// Story 13.5c — everything the cohort-a2a-daemon needs from its config file,
+// plus the verified manifest state loaded from it.  Constructed at the
+// composition root (~main.rs:2268) so the tenant map is built from the SAME
+// `Arc<CohortManifestState>` the daemon later refreshes.  The daemon no longer
+// owns a Transparency Log or a boot nonce — it receives the primary root's
+// (D1/D2/D3).
 #[cfg(feature = "network")]
-async fn run_cohort_a2a_daemon_from_env() -> Result<(), Box<dyn std::error::Error>> {
-    use maos_a2a_core::router::A2ATransport as _;
-    let config_path = std::env::var("MAOS_COHORT_DAEMON_CONFIG")
-        .map_err(|_| "MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
-    let config_text = std::fs::read_to_string(&config_path)
+struct CohortDaemonBootstrap {
+    state: std::sync::Arc<maos_cohort::CohortManifestState>,
+    tcp: maos_a2a_tcp::TcpA2AConfig,
+    peers: Vec<maos_a2a_core::A2APeerConfig>,
+    local_host: maos_spirit_abi::identity::HostId,
+    control_spirit: maos_spirit_abi::identity::SpiritId,
+    digest_summary: maos_cohort::DigestSummary,
+}
+
+// Story 13.5c — read MAOS_COHORT_DAEMON_CONFIG (if set) and load the verified
+// cohort state under the PRIMARY Transparency Log.  Returns `None` when the env
+// var is unset.  A malformed/unverifiable config is a hard boot error ONLY in
+// cohort-a2a-daemon mode; other modes log and continue with `None` (tenant mode
+// then refuses via SourceUnavailable at the store) so a stale TOML never bricks
+// an unrelated boot (K1 guard).
+#[cfg(feature = "network")]
+fn cohort_daemon_bootstrap(
+    transparency_log: &std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+) -> Result<Option<CohortDaemonBootstrap>, Box<dyn std::error::Error>> {
+    let config_path = match std::env::var("MAOS_COHORT_DAEMON_CONFIG") {
+        Ok(path) => path,
+        Err(_) => return Ok(None),
+    };
+    let in_daemon_mode = std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("cohort-a2a-daemon");
+    match load_cohort_daemon_bootstrap(&config_path, std::sync::Arc::clone(transparency_log)) {
+        Ok(bootstrap) => Ok(Some(bootstrap)),
+        Err(error) if in_daemon_mode => Err(error),
+        Err(error) => {
+            eprintln!(
+                "maos: cohort daemon config present but not loadable ({error}); tenant mode \
+                 will refuse until a valid config runs in cohort-a2a-daemon mode"
+            );
+            Ok(None)
+        }
+    }
+}
+
+#[cfg(feature = "network")]
+fn load_cohort_daemon_bootstrap(
+    config_path: &str,
+    transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+) -> Result<CohortDaemonBootstrap, Box<dyn std::error::Error>> {
+    let config_text = std::fs::read_to_string(config_path)
         .map_err(|error| format!("read cohort daemon config {config_path}: {error}"))?;
     let file: CohortDaemonFileConfig = toml::from_str(&config_text)
         .map_err(|error| format!("parse cohort daemon config {config_path}: {error}"))?;
@@ -7947,50 +8024,61 @@ async fn run_cohort_a2a_daemon_from_env() -> Result<(), Box<dyn std::error::Erro
             file.manifest_path.display()
         )
     })?;
-    let transparency_log = std::sync::Arc::new(
-        maos_iac::TransparencyLogAdapter::open(&file.transparency_log_path, file.own_boot_nonce)
-            .map_err(|error| {
-                format!(
-                    "open cohort transparency log {}: {error}",
-                    file.transparency_log_path.display()
-                )
-            })?,
-    );
-    let runtime = build_cohort_a2a_daemon_runtime(
-        CohortDaemonConfig {
-            manifest_toml,
-            pinned_authority_keys: maos_cohort::PinnedAuthorityKeys::from_hex(
-                &file.authority_keys,
-            )?,
-            local_host: maos_spirit_abi::identity::HostId(file.local_host),
-            control_spirit: maos_spirit_abi::identity::SpiritId::from(file.control_spirit),
-            transparency_log,
-            digest_summary: file.digest_summary,
-        },
-        file.tcp,
-        file.peers,
-        file.own_boot_nonce,
-    )
-    .await?;
-    eprintln!(
-        "cohort-a2a-daemon listening on {}",
-        runtime
-            .transport
-            .local_addr()
-            .ok_or("cohort daemon transport did not expose a listener")?
-    );
-    tokio::signal::ctrl_c().await?;
-    runtime.shutdown().await
+    let local_host = maos_spirit_abi::identity::HostId(file.local_host);
+    // The manifest-audit sink writes to the PRIMARY Transparency Log (opened at
+    // main.rs:2254), so the daemon and the rest of the root share one log and
+    // one boot nonce (AC1/D2).
+    let audit = std::sync::Arc::new(maos_cohort::CohortTransparencyLogSink::new(
+        transparency_log,
+    ));
+    let state = std::sync::Arc::new(maos_cohort::CohortManifestState::load(
+        local_host.clone(),
+        &manifest_toml,
+        maos_cohort::PinnedAuthorityKeys::from_hex(&file.authority_keys)?,
+        audit,
+    )?);
+    Ok(CohortDaemonBootstrap {
+        state,
+        tcp: file.tcp,
+        peers: file.peers,
+        local_host,
+        control_spirit: maos_spirit_abi::identity::SpiritId::from(file.control_spirit),
+        digest_summary: file.digest_summary,
+    })
 }
 
 #[cfg(feature = "network")]
-struct CohortDaemonConfig {
-    manifest_toml: String,
-    pinned_authority_keys: maos_cohort::PinnedAuthorityKeys,
-    local_host: maos_spirit_abi::identity::HostId,
-    control_spirit: maos_spirit_abi::identity::SpiritId,
+async fn run_cohort_a2a_daemon(
     transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
-    digest_summary: maos_cohort::DigestSummary,
+    boot_nonce: u64,
+    bootstrap: Option<CohortDaemonBootstrap>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a_core::router::A2ATransport as _;
+    // The state is loaded at the composition root when the config is present;
+    // its absence here means MAOS_COHORT_DAEMON_CONFIG was unset — the pre-13.5c
+    // typed error, preserved.
+    let bootstrap = bootstrap.ok_or("MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
+    let runtime =
+        build_cohort_a2a_daemon_runtime(Arc::clone(&transparency_log), boot_nonce, bootstrap)
+            .await?;
+    let listen_addr = runtime
+        .transport
+        .local_addr()
+        .ok_or("cohort daemon transport did not expose a listener")?;
+    // Persist one bounded lifecycle record per real daemon boot. Besides giving
+    // operators an auditable restart trail, the row is stamped by the primary
+    // Transparency Log with the same per-boot nonce threaded into the transport.
+    let _logged = transparency_log.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+        0,
+        None,
+        "cohort:daemon-started",
+        br#"{"event":"daemon_started"}"#,
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
+    eprintln!("cohort-a2a-daemon listening on {listen_addr}");
+    tokio::signal::ctrl_c().await?;
+    runtime.shutdown().await
 }
 
 #[cfg(feature = "network")]
@@ -8013,44 +8101,37 @@ impl CohortDaemonRuntime {
 
 #[cfg(feature = "network")]
 async fn build_cohort_a2a_daemon_runtime(
-    cohort: CohortDaemonConfig,
-    tcp_config: maos_a2a_tcp::TcpA2AConfig,
-    peer_configs: Vec<maos_a2a_core::A2APeerConfig>,
-    own_boot_nonce: u64,
+    transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+    boot_nonce: u64,
+    bootstrap: CohortDaemonBootstrap,
 ) -> Result<CohortDaemonRuntime, Box<dyn std::error::Error>> {
+    let CohortDaemonBootstrap {
+        state,
+        tcp: tcp_config,
+        peers: peer_configs,
+        local_host,
+        control_spirit,
+        digest_summary,
+    } = bootstrap;
     let pull_peers: Vec<maos_spirit_abi::identity::HostId> = peer_configs
         .iter()
         .map(|peer| maos_spirit_abi::identity::HostId(peer.peer_id.as_str().to_string()))
         .collect();
-    // Story 12.4a / AC4 — retain the TL handle before it is moved into the
-    // manifest-audit sink, so the rupture-journal drain can write to it too.
-    let transparency_log = cohort.transparency_log.clone();
-    let audit = std::sync::Arc::new(maos_cohort::CohortTransparencyLogSink::new(
-        cohort.transparency_log,
-    ));
-    let state = std::sync::Arc::new(maos_cohort::CohortManifestState::load(
-        cohort.local_host.clone(),
-        &cohort.manifest_toml,
-        cohort.pinned_authority_keys,
-        audit,
-    )?);
     // Story 12.3 — wire the gate AND the halt-receipt observer as the SAME
-    // CohortManifestState (P7b single-object wiring). The transport-level
-    // Fact-3 test proves this injection is load-bearing (P7c — no cohort daemon
-    // smoke exists to prove it here).
+    // CohortManifestState (P7b single-object wiring) the tenant map also holds.
     let gate: std::sync::Arc<dyn maos_a2a_core::CohortManifestGate> = state.clone();
     let observer: std::sync::Arc<dyn maos_a2a_core::HaltReceiptObserver> = state.clone();
-    // Story 12.4a — wire the digest-read correlation port as the SAME state
-    // (P7b single-object wiring), so the correlated-reply send/accept exemptions
-    // are authorized on the live wire.
+    // Story 12.4a — digest-read correlation port, same state.
     let digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort> = state.clone();
+    // Story 13.5c — the rupture journal writes to the PRIMARY Transparency Log
+    // (the daemon no longer opens its own).
     let rupture_sink: std::sync::Arc<dyn maos_a2a_core::ConsentRuptureSink> =
         std::sync::Arc::new(maos_cohort::CohortRuptureLogSink::new(transparency_log));
     let transport = std::sync::Arc::new(
         maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring_and_digest(
             tcp_config,
             peer_configs,
-            own_boot_nonce,
+            boot_nonce,
             maos_a2a_tcp::TcpTimeouts::production(std::time::Duration::from_secs(30)),
             maos_a2a_core::HandshakeRetryPolicy::default(),
             None,
@@ -8065,8 +8146,8 @@ async fn build_cohort_a2a_daemon_runtime(
     );
     let router: std::sync::Arc<dyn maos_a2a_core::router::A2APeerRouter> = transport.clone();
     let from = maos_domain::frame::FrameAddress {
-        spirit_id: cohort.control_spirit,
-        host_id: Some(cohort.local_host),
+        spirit_id: control_spirit,
+        host_id: Some(local_host),
         role: None,
     };
     let distributor = std::sync::Arc::new(maos_cohort::CohortDistributor::new(
@@ -8079,16 +8160,12 @@ async fn build_cohort_a2a_daemon_runtime(
         router,
         from,
     ));
-    let digest_summary = cohort.digest_summary;
     let cancel = tokio_util::sync::CancellationToken::new();
     let service_cancel = cancel.child_token();
     let refresh_state = state.clone();
     let service = tokio::spawn(async move {
         // Pull-on-connect fallback: each configured bilateral peer is contacted
         // through the reserved control path once the local listener is live.
-        // Failed pulls remain observable and retry before the signed stale lease
-        // expires; ordinary traffic still fails closed if confirmation never
-        // arrives.
         for peer in &pull_peers {
             if let Err(error) = distributor.pull_from(peer).await {
                 eprintln!(

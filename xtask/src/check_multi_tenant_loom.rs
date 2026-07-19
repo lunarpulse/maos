@@ -19,7 +19,12 @@ const ABSENT_SUCCESSORS: &[&str] = &[
     // (D1, region axis) remains OPEN with NO named successor (G7 / Round-2).
     "13.3 widened caller-facing tenant error taxonomy",
     "13.5b collective GDPR erase/legal-hold cascade",
-    "13.5c production Spirit routing, refresh wiring, refusal audit, and TL isolation",
+    // Story 13.5c CLOSED refresh wiring (single composition root + bootable
+    // tenant mode). Its other former clauses are re-homed to their real owners:
+    // production Spirit routing → 13.5d; tenant refusal audit + per-operator
+    // Transparency Log isolation → 13.5e.
+    "13.5d production Spirit routing",
+    "13.5e tenant refusal audit and per-operator TL isolation",
     "13.6 three-team product journey",
 ];
 
@@ -248,6 +253,64 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--test",
                 "tenant_wall_live",
                 "tenant_wall_per_team_merkle_independence_mixed_v1_v2",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // ── Story 13.5c — single composition root + bootable tenant mode.
+        TestLeg {
+            name: "cohort-daemon-boots-and-serves",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cohort_daemon_smoke_13_5c",
+                "cohort_daemon_boots_and_serves",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cohort-daemon-per-boot-nonce-single-sourced",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cohort_daemon_smoke_13_5c",
+                "daemon_boot_rows_prove_per_boot_nonce_variance",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "non-daemon-does-not-enable-tenant-map",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cohort_daemon_smoke_13_5c",
+                "non_daemon_process_with_config_refuses_unrefreshable",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tenant-mode-boots-live",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cohort_daemon_smoke_13_5c",
+                "tenant_mode_boots_on_live_substrate",
                 "--",
                 "--ignored",
                 "--exact",

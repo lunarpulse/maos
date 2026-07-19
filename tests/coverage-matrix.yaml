@@ -62,7 +62,7 @@ coverage:
     - check-kernel-baseline
     corpora: []
     phase: v2.0+
-    valid_until: '2027-07-17'
+    valid_until: '2027-07-19'
     notes: |
       Story 13.1 physical tenant-wall anchor + Story 13.2 cryptographic tenant
       boundary (Fork-4 / ADV-055-1). 13.1: database-per-team, manifest-authoritative
@@ -79,7 +79,15 @@ coverage:
       stays presence-only (read-path guard unchanged). D1 closed on the TEAM axis at
       entry only; the region source_log_ref presence residual remains OPEN with no
       named successor. Read-time attestation persistence + production seed/apply
-      wiring defer to 13.3. Stories 13.3/13.5b/13.5c/13.6 remain absent successors.
+      wiring defer to 13.3. Story 13.5c (single composition root + bootable tenant
+      mode) closed refresh wiring: one Transparency Log, one per-boot nonce
+      (single-sourced, NFR-Rel-6), and TenantMapAdapter's first production
+      construction so MAOS_LOOM_HOME_TEAM boots (BOOTS, not SERVES — register_spirit
+      lands in 13.5d). Legs: cohort-daemon-boots-and-serves,
+      cohort-daemon-per-boot-nonce-single-sourced, non-daemon-does-not-enable-tenant-map
+      (hermetic Blocking) + tenant-mode-boots-live (advisory-substrate). Absent
+      successors: 13.5d production Spirit routing, 13.5e refusal audit + TL isolation,
+      13.5b collective erase, 13.6 three-team journey.
   ADR-024:
     gates:
     - check-escape-detector
