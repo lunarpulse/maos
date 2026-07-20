@@ -8,7 +8,7 @@
 - [lifecycle Module](./lifecycle) — distinct from the 14-hook `Spirit` trait
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 Gateway Submodule trait contract — ADR-029 binding-v1.0.
 

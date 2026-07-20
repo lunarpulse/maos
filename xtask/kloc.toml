@@ -133,7 +133,7 @@ maos-spirit-sdk = 3000
 xtask = 29000          # Epic-12 retro 2026-07-14: 22500→29000 (+6,291 LOC v2.0/v2.2 gate infra + Option-C binding + dev-model-tier; measured 28,791; tooling, not kernel)
 # Story 6.5 — Phase 1 extraction
 maos-iac = 5800        # Epic-10 retro 2026-06-26: 5500→5800 (TL + bus growth; measured 5,736)
-maos-manifest = 4050   # Epic-10 retro 2026-06-26: 4000→4050 (schema-version surface; measured 4,012)
+maos-manifest = 4150   # Story 13.5d: v4 Loom declaration surface; preserves measured headroom.
 
 # Story 1a.1 — 13 new crate stubs
 maos-domain = 8300     # Epic-12 retro 2026-07-14: 8100→8300 (v2.2 cohort/tenant ports; measured 8,231)

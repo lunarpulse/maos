@@ -58,6 +58,7 @@ coverage:
   ADR-055:
     gates:
     - check-multi-tenant-loom
+    - check-reza-production-path
     - check-dependency-closure
     - check-kernel-baseline
     corpora: []
@@ -82,12 +83,22 @@ coverage:
       wiring defer to 13.3. Story 13.5c (single composition root + bootable tenant
       mode) closed refresh wiring: one Transparency Log, one per-boot nonce
       (single-sourced, NFR-Rel-6), and TenantMapAdapter's first production
-      construction so MAOS_LOOM_HOME_TEAM boots (BOOTS, not SERVES — register_spirit
-      lands in 13.5d). Legs: cohort-daemon-boots-and-serves,
-      cohort-daemon-per-boot-nonce-single-sourced, non-daemon-does-not-enable-tenant-map
-      (hermetic Blocking) + tenant-mode-boots-live (advisory-substrate). Absent
-      successors: 13.5d production Spirit routing, 13.5e refusal audit + TL isolation,
-      13.5b collective erase, 13.6 three-team journey.
+      construction so MAOS_LOOM_HOME_TEAM boots. Story 13.5d makes the route
+      serve: manifest-v4 loom scopes reach admission policy, Researcher exposes
+      a fail-closed synchronous collective port, one AtomicU32 single-sources
+      token issuance, kernel calls, and tenant registration, and the live
+      two-datname witness proves a registered pid writes only its mapped team
+      while an unregistered pid writes nowhere. 13.5c legs:
+      cohort-daemon-boots-and-serves, cohort-daemon-per-boot-nonce-single-sourced,
+      non-daemon-does-not-enable-tenant-map (hermetic Blocking) +
+      tenant-mode-boots-live (advisory-substrate). `check-reza-production-path`
+      owns the 13.5d route legs: loom-scope-reaches-policy-table,
+      route-not-spirit-reachable, production-collective-single-source,
+      composition-root-does-not-seed-manifest-scopes, and
+      mediated-operation-correlation (hermetic Blocking) +
+      spirit-collective-route-live (advisory-substrate).
+      Absent successors: 13.5e refusal audit + TL isolation, 13.5b collective
+      erase, and the 13.6 three-team journey.
   ADR-024:
     gates:
     - check-escape-detector

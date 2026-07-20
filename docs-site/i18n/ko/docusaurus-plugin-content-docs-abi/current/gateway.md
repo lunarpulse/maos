@@ -12,7 +12,7 @@ review_status: machine
 - [lifecycle Module](./lifecycle) — 14-훅 `Spirit` 트레이트와 구별
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 Gateway Submodule 트레이트 계약 — ADR-029 binding-v1.0.
 

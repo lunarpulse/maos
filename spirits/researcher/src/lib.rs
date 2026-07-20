@@ -22,14 +22,12 @@
 //!    kernel-computed `intent_lineage`, [`DistillationError::AuditChainMissing`])
 //!    is never bypassed Spirit-side.
 //!
-//! ## Zero kernel KLOC (Story 0.2 invariant)
+//! ## Spirit-side boundary
 //! This crate depends only on the Spirit SDK/ABI and the PURE `maos-domain`
-//! ports/types ([`LogRecallPort`], [`DistillationPort`], the i7 scalar.tap
-//! types). It NEVER reaches into `maos-kernel-core`/`maos-iac`. The scoped
-//! recall, the I11 chain, and the scalar.tap subscription are PROVEN against the
-//! real kernel adapters in `tests/`, which carry kernel crates as
-//! dev-dependencies only (dev-deps do not enter the kernel-API surface the
-//! boundary gate guards — Butler's resolved pattern).
+//! ports/types. Kernel adapters remain at the composition root; the only
+//! kernel source delta for Story 13.5d is the bounded caller/token pid guard.
+//! Integration proofs use kernel crates as dev-dependencies, which do not enter
+//! the Spirit's production dependency surface.
 //!
 //! ## Compressor determinism
 //! The "LLM compression" is a deterministic seeded survey ([`Researcher::survey`])
@@ -37,6 +35,7 @@
 //! class is declared in the manifest (`provider.complete`, ≥Sonnet-tier).
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -46,6 +45,7 @@ use maos_domain::distillation::{
 use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::invariants::i7::ScalarTapEvent;
 use maos_domain::log_recall::{FrameKindLabel, LogRecallEntry, LogRecallError, LogRecallFilter};
+use maos_domain::memory::{MemoryEntry, MemoryNamespace, MemoryValue};
 use maos_domain::ports::inference::{InferenceError, InferenceOptions, InferenceRequest};
 use maos_domain::ports::{DistillationPort, InferencePort, LogRecallPort};
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
@@ -124,6 +124,36 @@ pub trait ResearcherMcpPort: Send + Sync {
     /// Fan out (≤ [`RESEARCHER_PARALLELISM`] concurrent) over the four declared
     /// servers for `query`, and return the parsed claims with their source keys.
     fn survey_literature(&self, query: &str) -> Result<Vec<FetchedClaim>, ResearcherMcpError>;
+}
+
+/// Story 13.5d — synchronous, mediated collective-memory boundary owned by
+/// Researcher. Kernel and runtime types remain at the composition root.
+#[derive(Debug, thiserror::Error)]
+pub enum ResearcherCollectiveError {
+    #[error("collective port is not wired")]
+    Unavailable,
+    #[error("collective operation denied or unavailable: {0}")]
+    Denied(String),
+}
+
+pub trait ResearcherCollectivePort: Send + Sync {
+    fn collective_write(
+        &self,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+    ) -> Result<(), ResearcherCollectiveError>;
+    fn collective_read(
+        &self,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<Option<MemoryValue>, ResearcherCollectiveError>;
+    fn collective_scan(
+        &self,
+        namespace: &MemoryNamespace,
+        prefix: &str,
+        limit: usize,
+    ) -> Result<Vec<MemoryEntry>, ResearcherCollectiveError>;
 }
 
 /// Story 8.14c — test double for `ResearcherMcpPort`.
@@ -352,6 +382,14 @@ pub struct Researcher {
     /// participant-scoped `walk()` and token issuance so McpInvocation frames
     /// journal under the same pid the walker queries.
     spirit_pid: u32,
+    /// Story 13.5d — mediated collective tier, wired by the composition root.
+    collective_port: Option<Arc<dyn ResearcherCollectivePort>>,
+    /// Set only after the production `on_idle` hook writes and reads back the
+    /// mediated collective readiness row.
+    collective_probe_completed: Arc<AtomicBool>,
+    /// Set when the latest collective readiness round-trip fails so a one-shot
+    /// driver can return a non-zero status without changing the hook ABI.
+    collective_probe_failed: Arc<AtomicBool>,
 }
 
 impl std::fmt::Debug for Researcher {
@@ -363,6 +401,7 @@ impl std::fmt::Debug for Researcher {
             .field("inference", &self.inference)
             .field("mcp_port", &self.mcp_port.is_some())
             .field("log_recall_port", &self.log_recall_port.is_some())
+            .field("collective_port", &self.collective_port.is_some())
             .field("spirit_pid", &self.spirit_pid)
             .finish()
     }
@@ -375,6 +414,13 @@ impl Researcher {
     fn on_idle(&self, ctx: &mut Ctx) {
         if ctx.cancellation().is_cancelled() {
             return;
+        }
+        match self.ensure_collective_route() {
+            Ok(()) => self.collective_probe_failed.store(false, Ordering::Release),
+            Err(error) => {
+                self.collective_probe_failed.store(true, Ordering::Release);
+                eprintln!("researcher: collective readiness round-trip failed: {error}");
+            }
         }
         if let Some(mcp_port) = &self.mcp_port {
             // Story 8.14c — MCP fan-out → scoped walk → join → survey.
@@ -435,6 +481,9 @@ impl Default for Researcher {
             mcp_port: None,
             log_recall_port: None,
             spirit_pid: 0,
+            collective_port: None,
+            collective_probe_completed: Arc::new(AtomicBool::new(false)),
+            collective_probe_failed: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -480,6 +529,96 @@ impl Researcher {
     pub fn with_mcp_port(mut self, port: Arc<dyn ResearcherMcpPort>) -> Self {
         self.mcp_port = Some(port);
         self
+    }
+
+    /// Story 13.5d — wire the mediated collective port. The port issues its
+    /// capability token at each operation, after scheduler PID backfill.
+    pub fn with_collective_port(mut self, port: Arc<dyn ResearcherCollectivePort>) -> Self {
+        self.collective_port = Some(port);
+        self
+    }
+
+    /// A shared status flag for one-shot drivers to observe readiness failures.
+    pub fn collective_route_failure_flag(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.collective_probe_failed)
+    }
+
+    fn ensure_collective_route(&self) -> Result<(), ResearcherCollectiveError> {
+        if self.collective_port.is_none() || self.collective_probe_completed.load(Ordering::Acquire)
+        {
+            return Ok(());
+        }
+        if self
+            .collective_probe_completed
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return Ok(());
+        }
+
+        let expected = MemoryValue::Text("researcher collective route ready".into());
+        let result = (|| {
+            self.collective_write(
+                &MemoryNamespace::Default,
+                "researcher/collective-route-ready",
+                expected.clone(),
+            )?;
+            match self.collective_read(
+                &MemoryNamespace::Default,
+                "researcher/collective-route-ready",
+            )? {
+                Some(actual) if actual == expected => Ok(()),
+                other => Err(ResearcherCollectiveError::Denied(format!(
+                    "collective readiness read-back mismatch: {other:?}"
+                ))),
+            }
+        })();
+        if result.is_err() {
+            self.collective_probe_completed
+                .store(false, Ordering::Release);
+        }
+        result
+    }
+
+    /// Write through the mediated collective boundary.
+    ///
+    /// A constructed but unwired Researcher fails closed; the composition root
+    /// must install the port after the tenant store exists.
+    pub fn collective_write(
+        &self,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+    ) -> Result<(), ResearcherCollectiveError> {
+        self.collective_port
+            .as_ref()
+            .ok_or(ResearcherCollectiveError::Unavailable)?
+            .collective_write(namespace, key, value)
+    }
+
+    /// Read through the mediated collective boundary.
+    pub fn collective_read(
+        &self,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<Option<MemoryValue>, ResearcherCollectiveError> {
+        self.collective_port
+            .as_ref()
+            .ok_or(ResearcherCollectiveError::Unavailable)?
+            .collective_read(namespace, key)
+    }
+
+    /// Scan through the mediated collective boundary.
+    pub fn collective_scan(
+        &self,
+        namespace: &MemoryNamespace,
+        prefix: &str,
+        limit: usize,
+    ) -> Result<Vec<MemoryEntry>, ResearcherCollectiveError> {
+        self.collective_port
+            .as_ref()
+            .ok_or(ResearcherCollectiveError::Unavailable)?
+            .collective_scan(namespace, prefix, limit)
     }
     /// Story 8.14c — wire the participant-scoped `LogRecallPort` used to recall
     /// McpInvocation frames after the MCP fan-out. Required when `mcp_port` is
@@ -1363,5 +1502,88 @@ mod unit_tests {
                 .copied()
                 .unwrap_or(0.0)
         );
+    }
+    #[derive(Default)]
+    struct RecordingCollectivePort {
+        writes: std::sync::atomic::AtomicUsize,
+        fail_writes: std::sync::atomic::AtomicBool,
+        reads: std::sync::atomic::AtomicUsize,
+        value: Mutex<Option<MemoryValue>>,
+    }
+
+    impl ResearcherCollectivePort for RecordingCollectivePort {
+        fn collective_write(
+            &self,
+            _namespace: &MemoryNamespace,
+            _key: &str,
+            value: MemoryValue,
+        ) -> Result<(), ResearcherCollectiveError> {
+            if self.fail_writes.load(std::sync::atomic::Ordering::SeqCst) {
+                return Err(ResearcherCollectiveError::Denied("write failed".into()));
+            }
+            self.writes
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            *self.value.lock().unwrap() = Some(value);
+            Ok(())
+        }
+
+        fn collective_read(
+            &self,
+            _namespace: &MemoryNamespace,
+            _key: &str,
+        ) -> Result<Option<MemoryValue>, ResearcherCollectiveError> {
+            self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(self.value.lock().unwrap().clone())
+        }
+
+        fn collective_scan(
+            &self,
+            _namespace: &MemoryNamespace,
+            _prefix: &str,
+            _limit: usize,
+        ) -> Result<Vec<MemoryEntry>, ResearcherCollectiveError> {
+            Ok(Vec::new())
+        }
+    }
+
+    #[test]
+    fn collective_route_is_fail_closed_until_wired_then_reaches_port() {
+        let unwired = Researcher::new();
+        assert!(matches!(
+            unwired.collective_write(
+                &MemoryNamespace::Default,
+                "dead-wire",
+                MemoryValue::Text("must not land".into()),
+            ),
+            Err(ResearcherCollectiveError::Unavailable)
+        ));
+
+        let port = Arc::new(RecordingCollectivePort::default());
+        let wired = Researcher::new().with_collective_port(port.clone());
+        let mut ctx = Ctx::mock();
+        wired.on_idle(&mut ctx);
+        wired.on_idle(&mut ctx);
+        assert_eq!(
+            port.writes.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "the production hook must make one falsifiable backing-port write"
+        );
+        assert_eq!(
+            port.reads.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "the production hook must read its backing row once and remain idempotent"
+        );
+    }
+
+    #[test]
+    fn collective_readiness_failure_is_observable() {
+        let port = Arc::new(RecordingCollectivePort::default());
+        port.fail_writes
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let researcher = Researcher::new().with_collective_port(port);
+        let failure = researcher.collective_route_failure_flag();
+        let mut ctx = Ctx::mock();
+        researcher.on_idle(&mut ctx);
+        assert!(failure.load(std::sync::atomic::Ordering::Acquire));
     }
 }

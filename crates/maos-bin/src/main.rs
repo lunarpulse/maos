@@ -400,6 +400,7 @@ fn caps_required_or_empty(
         mcp: maos_kernel_core::security::McpCapabilities {
             servers: Vec::new(),
         },
+        loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
     })
 }
 
@@ -1513,6 +1514,143 @@ impl LiveResearcherMcpPort {
     }
 }
 
+#[cfg(feature = "network")]
+/// Story 13.5d — Researcher's synchronous collective port. One atomic binding
+/// supplies the registered, token-issued, and kernel-call pid.
+struct LiveResearcherCollectivePort {
+    spirit_pid: std::sync::atomic::AtomicU32,
+    memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
+    capability: Arc<CapabilityRegistryAdapter>,
+    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+}
+
+#[cfg(feature = "network")]
+impl LiveResearcherCollectivePort {
+    fn new(
+        memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
+        capability: Arc<CapabilityRegistryAdapter>,
+        enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+        enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    ) -> Self {
+        Self {
+            spirit_pid: std::sync::atomic::AtomicU32::new(0),
+            memory,
+            capability,
+            enterprise_runtime,
+            enterprise_pdp_runtime,
+        }
+    }
+
+    fn issue(
+        &self,
+        spirit_pid: u32,
+        scope: Scope,
+        intent_class: IntentClass,
+    ) -> Result<CapabilityToken, researcher::ResearcherCollectiveError> {
+        issue_enterprise_governed_capability(
+            self.capability.as_ref(),
+            self.enterprise_runtime.as_deref(),
+            self.enterprise_pdp_runtime.as_ref(),
+            spirit_pid,
+            scope,
+            60,
+            [0u8; 32],
+            intent_class,
+        )
+        .map_err(researcher::ResearcherCollectiveError::Denied)
+    }
+}
+
+#[cfg(feature = "network")]
+impl researcher::ResearcherCollectivePort for LiveResearcherCollectivePort {
+    fn collective_write(
+        &self,
+        namespace: &maos_domain::memory::MemoryNamespace,
+        key: &str,
+        value: maos_domain::memory::MemoryValue,
+    ) -> Result<(), researcher::ResearcherCollectiveError> {
+        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+        let token = self.issue(spirit_pid, Scope::LoomWrite, IntentClass::HighPrivilege)?;
+        let payload = serde_json::json!({"namespace": namespace, "key": key}).to_string();
+        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
+            self.capability.as_ref(),
+            &token,
+            "collective.write".to_owned(),
+            payload.as_bytes(),
+        )
+        .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))?;
+        self.memory
+            .collective_write(
+                spirit_pid,
+                namespace,
+                key,
+                value,
+                &token,
+                [0u8; 32],
+                maos_domain::invariants::i9::SandboxTier(0),
+            )
+            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
+    }
+
+    fn collective_read(
+        &self,
+        namespace: &maos_domain::memory::MemoryNamespace,
+        key: &str,
+    ) -> Result<Option<maos_domain::memory::MemoryValue>, researcher::ResearcherCollectiveError>
+    {
+        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+        let token = self.issue(spirit_pid, Scope::LoomRead, IntentClass::Readonly)?;
+        let payload = serde_json::json!({"namespace": namespace, "key": key}).to_string();
+        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
+            self.capability.as_ref(),
+            &token,
+            "collective.read".to_owned(),
+            payload.as_bytes(),
+        )
+        .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))?;
+        self.memory
+            .collective_read(
+                spirit_pid,
+                namespace,
+                key,
+                &token,
+                [0u8; 32],
+                maos_domain::invariants::i9::SandboxTier(0),
+            )
+            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
+    }
+
+    fn collective_scan(
+        &self,
+        namespace: &maos_domain::memory::MemoryNamespace,
+        prefix: &str,
+        limit: usize,
+    ) -> Result<Vec<maos_domain::memory::MemoryEntry>, researcher::ResearcherCollectiveError> {
+        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+        let token = self.issue(spirit_pid, Scope::LoomScan, IntentClass::Readonly)?;
+        let payload = serde_json::json!({"namespace": namespace, "key": prefix}).to_string();
+        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
+            self.capability.as_ref(),
+            &token,
+            "collective.scan".to_owned(),
+            payload.as_bytes(),
+        )
+        .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))?;
+        self.memory
+            .collective_scan(
+                spirit_pid,
+                namespace,
+                prefix,
+                limit,
+                &token,
+                [0u8; 32],
+                maos_domain::invariants::i9::SandboxTier(0),
+            )
+            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
+    }
+}
+
 /// Emit a `FrameKind::GovernanceEvent` with a `VetterKeyPayload` to the
 /// Transparency Log. Consolidates the formerly copy-pasted emission blocks
 /// (Story 9.3b review — VetterKey emission coverage).
@@ -2281,92 +2419,107 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // MAOS_LOOM_POSTGRES; when absent the collective tier is disabled (ops
     // return CollectiveNotYetAvailable).  The port goes LIVE here so the
     // de-stub is not inert in production (AC1 review Decision A).
-    let collective_port: Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>> =
-        match std::env::var("MAOS_LOOM_POSTGRES") {
-            Ok(conn_str) => {
-                let home_region_str = maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
+    let (collective_port, tenant_spirit_map): (
+        Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>>,
+        Option<Arc<maos_bin::tenant_map::TenantMapAdapter>>,
+    ) = match std::env::var("MAOS_LOOM_POSTGRES") {
+        Ok(conn_str) => {
+            let home_region_str = maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
                     .home_region
                     .as_ref()
                     .map(|r| r.as_str().to_string())
                     .unwrap_or_default();
-                let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").unwrap_or_default();
-                // Story 13.5c — the daemon's verified cohort state (loaded
-                // above) is the tenant-map source.  `refreshable_source` is true
-                // ONLY in cohort-a2a-daemon mode — the one arm that starts the
-                // refresh loop (D8/K3: a non-daemon process passing `true` would
-                // brick the lease after t_stale_secs).  `MAOS_ONE_SHOT` is read
-                // directly here because `mode` is bound ~2 030 lines below (D15).
-                // Kept inside the MAOS_LOOM_POSTGRES arm (K9): tenant mode must
-                // not refuse on hosts with no collective tier.
-                let tenant_source: Option<Arc<dyn maos_loom_lite::tenant::TenantMapPort>> =
-                    match cohort_daemon.as_ref() {
-                        Some(bootstrap) => {
-                            let refreshable = std::env::var("MAOS_ONE_SHOT").as_deref()
-                                == Ok("cohort-a2a-daemon");
-                            let adapter = maos_bin::tenant_map::TenantMapAdapter::new(
-                                Arc::clone(&bootstrap.state),
-                                bootstrap.local_host.as_str(),
-                                refreshable,
-                            )
-                            .map_err(|error| {
-                                format!("maos: tenant map construction failed: {error}")
-                            })?;
-                            Some(Arc::new(adapter) as Arc<dyn maos_loom_lite::tenant::TenantMapPort>)
-                        }
-                        None => None,
+            let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").map_err(|_| {
+                "maos: MAOS_LOOM_HOME_TEAM is required when MAOS_LOOM_POSTGRES is set"
+            })?;
+            if home_team.trim().is_empty() {
+                return Err(
+                    "maos: MAOS_LOOM_HOME_TEAM must not be empty when MAOS_LOOM_POSTGRES is set"
+                        .into(),
+                );
+            }
+            // The verified cohort state is safe as a tenant-map source in two
+            // bounded cases: the daemon refreshes it continuously, while
+            // `maos run --once` exits before the signed snapshot can age past
+            // its lease. Continuous non-daemon runs remain fail-closed because
+            // they do not own the cohort refresh service.
+            // Kept inside the MAOS_LOOM_POSTGRES arm: hosts without a
+            // collective tier must not acquire a tenant-map dependency.
+            let tenant_spirit_map = match cohort_daemon.as_ref() {
+                Some(bootstrap) => {
+                    let daemon_mode =
+                        std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("cohort-a2a-daemon");
+                    let bounded_once = run_args.as_ref().is_some_and(|run| run.once);
+                    let refreshable = daemon_mode || bounded_once;
+                    Some(Arc::new(
+                        maos_bin::tenant_map::TenantMapAdapter::new(
+                            Arc::clone(&bootstrap.state),
+                            bootstrap.local_host.as_str(),
+                            refreshable,
+                        )
+                        .map_err(|error| {
+                            format!("maos: tenant map construction failed: {error}")
+                        })?,
+                    ))
+                }
+                None => None,
+            };
+            let tenant_source = tenant_spirit_map
+                .as_ref()
+                .map(|map| Arc::clone(map) as Arc<dyn maos_loom_lite::tenant::TenantMapPort>);
+            let tenant_map = maos_bin::tenant_map::tenant_map_for_store(&home_team, tenant_source)
+                .map_err(|error| format!("maos: tenant map construction failed: {error}"))?;
+            let cfg = maos_loom_lite::store::StoreConfig {
+                connection_string: conn_str,
+                home_region: home_region_str,
+                home_team,
+                ..Default::default()
+            };
+            match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
+                Ok(store) => {
+                    // Story 11.4c — inject the at-rest envelope seal when
+                    // org-KMS is configured (real AEAD ciphertext on the
+                    // collective store; None → byte-identical Option-A
+                    // plaintext, the v1.5 default preserved).
+                    let store = match enterprise_runtime
+                        .as_ref()
+                        .and_then(|rt| rt.at_rest_seal_hook())
+                    {
+                        Some(hook) => store.with_at_rest_seal(Some(hook)),
+                        None => store,
                     };
-                let tenant_map =
-                    maos_bin::tenant_map::tenant_map_for_store(&home_team, tenant_source).map_err(
-                        |error| format!("maos: tenant map construction failed: {error}"),
-                    )?;
-                let cfg = maos_loom_lite::store::StoreConfig {
-                    connection_string: conn_str,
-                    home_region: home_region_str,
-                    home_team,
-                    ..Default::default()
-                };
-                match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
-                    Ok(store) => {
-                        // Story 11.4c — inject the at-rest envelope seal when
-                        // org-KMS is configured (real AEAD ciphertext on the
-                        // collective store; None → byte-identical Option-A
-                        // plaintext, the v1.5 default preserved).
-                        let store = match enterprise_runtime
-                            .as_ref()
-                            .and_then(|rt| rt.at_rest_seal_hook())
-                        {
-                            Some(hook) => store.with_at_rest_seal(Some(hook)),
-                            None => store,
-                        };
-                        let store = match tenant_map.as_ref() {
-                            Some(map) => store.with_tenant_map(Arc::clone(map)),
-                            None => store,
-                        };
-                        let store = Arc::new(store);
-                        if let Err(e) = store.init_schema().await {
-                            return Err(format!("maos: loom-lite schema init failed: {e}").into());
-                        } else {
-                            let adapter = Arc::new(maos_loom_lite::adapter::LoomLiteAdapter::new(
-                                store,
-                                tokio::runtime::Handle::current(),
-                                std::time::Duration::from_secs(5),
-                            ));
-                            eprintln!("maos: collective tier (Loom-lite) initialized");
-                            Some(adapter as Arc<dyn maos_domain::ports::CollectiveMemoryPort>)
-                        }
-                    }
-                    Err(e) => {
-                        return Err(format!("maos: loom-lite store init failed: {e}").into());
+                    let store = match tenant_map.as_ref() {
+                        Some(map) => store.with_tenant_map(Arc::clone(map)),
+                        None => store,
+                    };
+                    let store = Arc::new(store);
+                    if let Err(e) = store.init_schema().await {
+                        return Err(format!("maos: loom-lite schema init failed: {e}").into());
+                    } else {
+                        let adapter = Arc::new(maos_loom_lite::adapter::LoomLiteAdapter::new(
+                            store,
+                            tokio::runtime::Handle::current(),
+                            std::time::Duration::from_secs(5),
+                        ));
+                        eprintln!("maos: collective tier (Loom-lite) initialized");
+                        (
+                            Some(adapter as Arc<dyn maos_domain::ports::CollectiveMemoryPort>),
+                            tenant_spirit_map,
+                        )
                     }
                 }
+                Err(e) => {
+                    return Err(format!("maos: loom-lite store init failed: {e}").into());
+                }
             }
-            Err(_) => {
-                eprintln!(
+        }
+        Err(_) => {
+            eprintln!(
                     "maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable"
                 );
-                None
-            }
-        };
+            (None, None)
+        }
+    };
 
     // Story 11.1a — construct the SpiritHostPort (ADR-031). `None` when the
     // `wasm-host` feature is off (the export-control default, AC6) or when
@@ -2433,7 +2586,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // write to Principal namespaces.
         .with_principal_write_enforcement()
         // Story 10.4a — collective tier (Loom-lite) + I1/I2 mediation.
-        .with_collective_port(collective_port)
+        .with_collective_port(collective_port.clone())
         .with_capabilities(Some(Arc::clone(&capability))),
     );
 
@@ -2857,7 +3010,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let manifest_root: toml::Value = manifest_toml
                 .parse()
                 .map_err(|e| format!("shell: cannot parse hello-spirit manifest: {e}"))?;
-
             let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
                 &toml::to_string(&manifest_root["sandbox"]).unwrap_or_default(),
             )?;
@@ -2879,6 +3031,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
                 &toml::to_string(&manifest_root["class"]).unwrap_or_default(),
             )?;
+            let caps_required =
+                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
             let posture_section =
                 maos_kernel_core::security::manifest::PostureSection::from_toml_str(
                     &toml::to_string(&manifest_root["posture"]).unwrap_or_default(),
@@ -3161,7 +3315,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
                     &child_extract("resources")?,
                 )?;
-                let caps_required = caps_required_or_empty(&child_root)?;
+                let caps_required = caps_required_or_empty(&child_root)?
+                    .degrade_for_schema_version(class_section.manifest_schema_version);
                 let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
                     &child_extract("output_shape")?,
                 )?;
@@ -3498,7 +3653,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 maos_kernel_core::security::SandboxConfig::from_toml_str(&extract("sandbox")?)?;
             let resource_caps =
                 maos_kernel_core::security::ResourceCaps::from_toml_str(&extract("resources")?)?;
-            let caps_required = caps_required_or_empty(&manifest_root)?;
+            let caps_required = caps_required_or_empty(&manifest_root)?
+                .degrade_for_schema_version(class_section.manifest_schema_version);
             let output_shape =
                 maos_kernel_core::security::OutputShape::from_toml_str(&extract("output_shape")?)?;
             let posture_section = PostureSection::from_toml_str(&extract("posture")?)
@@ -3610,6 +3766,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut halt_receipt_handle: Option<
                 Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>,
             > = None;
+            let mut researcher_collective_failure: Option<Arc<std::sync::atomic::AtomicBool>> =
+                None;
 
             // JB-5 — shared output channel for output_shape validation (only
             // populated for Butler-class Spirits).
@@ -3848,6 +4006,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     let mut researcher = researcher::Researcher::new();
                     let mut researcher_mcp_ref: Option<Arc<LiveResearcherMcpPort>> = None;
+                    let researcher_collective_ref = collective_port.as_ref().map(|_| {
+                        Arc::new(LiveResearcherCollectivePort::new(
+                            Arc::clone(&memory),
+                            Arc::clone(&capability),
+                            enterprise_runtime.clone(),
+                            enterprise_pdp_runtime.clone(),
+                        ))
+                    });
+                    if let Some(port) = researcher_collective_ref.as_ref() {
+                        researcher =
+                            researcher
+                                .with_collective_port(Arc::clone(port)
+                                    as Arc<dyn researcher::ResearcherCollectivePort>);
+                        researcher_collective_failure =
+                            Some(researcher.collective_route_failure_flag());
+                    }
                     if run.live {
                         // Story 8.14c — wire LiveResearcherMcpPort + LogRecallPort when --live.
                         use maos_domain::ports::mcp::McpTransportId;
@@ -4094,6 +4268,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         mcp.spirit_pid
                             .store(pid, std::sync::atomic::Ordering::SeqCst);
                     }
+                    if let Some(port) = researcher_collective_ref.as_ref() {
+                        port.spirit_pid
+                            .store(pid, std::sync::atomic::Ordering::SeqCst);
+                        if let Some(map) = tenant_spirit_map.as_ref() {
+                            let bound_pid =
+                                port.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+                            maos_loom_lite::tenant::TenantMapPort::register_spirit(
+                                map.as_ref(),
+                                bound_pid,
+                                maos_domain::ports::registry::SpiritId::from(spirit_id.as_str()),
+                            );
+                        }
+                    }
                     pid
                 }
                 LoadedSpiritKind::Orchestrator => scheduler
@@ -4218,6 +4405,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "{}",
                     serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
                 );
+                if kind == LoadedSpiritKind::Researcher
+                    && researcher_collective_failure.is_some_and(|flag| {
+                        flag.load(std::sync::atomic::Ordering::Acquire)
+                    })
+                {
+                    return Err(
+                        "maos run: researcher collective readiness round-trip failed".into(),
+                    );
+                }
                 if kind == LoadedSpiritKind::Digest {
                     let home = std::env::var_os("MAOS_HOME")
                         .map(std::path::PathBuf::from)
@@ -4563,6 +4759,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
                 &extract_section(&manifest_root, "class")?,
             )?;
+            let caps_required =
+                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
 
             // Reuse the single composition-root SecurityManagerAdapter (line ~1102).
             let _spec = security
@@ -7118,6 +7316,8 @@ description = "smoke test spirit successor"
             let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
                 &extract_section(&manifest_root, "class")?,
             )?;
+            let caps_required =
+                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
 
             // Open the Lifecycle Journal for admission (the Load event).
             let journal_path = maos_audit::default_journal_path();
@@ -10247,6 +10447,7 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
     let empty_caps = CapabilitiesRequired {
         provider: ProviderCapabilities { complete: vec![] },
         mcp: maos_kernel_core::security::manifest::McpCapabilities { servers: vec![] },
+        loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
     };
     let posture =
         PostureSection::from_toml_str("default = \"assistive\"\nallowed_max = \"assistive\"")?;

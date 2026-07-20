@@ -1,15 +1,16 @@
 ---
-baseline_commit: 652347b8
+baseline_commit: 8197317c
 ---
 
 # Story 13.5d: Production Spirit→collective route
 
-Status: **ready-for-dev — adversarial preflight closed 2026-07-19, all three blockers cleared the same day.** ✅ **L10 FLAG-WINSTON AUTHORIZED by the operator** (see `### FLAG-Winston authorization (L10)` — the grant is **bounded**; read the fence before touching kernel-core). ✅ **NEW AC7 written** (`register_spirit` — "routes ≠ serves"). ✅ **Six AC1 evidence corrections folded in** (D17–D22), including removing `abi-diff` as a named live control now that D18 proves it blind. **This story is NOT kernel-core ZERO and NOT zero-delta — say both sentences.** **L4 is REVERSED — 13.5a is a SOFT dependency; host on `spirits/researcher`.** ⚠ **Ratified 7-AC exception: this story carries 7 ACs against the epic's ≤6 rule** (pre-dev checklist item 5) — see `### Seven ACs: the exception and why it is not a hidden split` below. **Historical record of the blockers, retained deliberately:** (1) ~~**L10**~~ **CLEARED — (a) AND (b); the kernel-core re-pin is authorized and bounded**; (2) **NEW AC7** — `register_spirit`, which 13.5c explicitly handed to this story, appears **zero times** in this file, so the route as specced reaches a store that returns `TenantSpiritUnmapped` on every call; (3) **six evidence corrections** in AC1 (D17–D22), including a **null control** the story currently names as its live blocking gate (D18). **L4 is REVERSED — 13.5a is a SOFT dependency; host on `spirits/researcher`.** Nothing is externally blocked.
+Status: done
+**done — corrective implementation, adversarial review, live substrate, and independent oracle complete 2026-07-19 at baseline `8197317c`.** The bounded L10 FLAG-Winston grant remains limited to the landed `spirit_pid` ↔ `token.spirit_pid` check. The story is **not kernel-core ZERO** and **not zero-delta**.
 
 <!-- Epic 13 — Reza Single-Org Cross-Team Cortex (v2.2). Created 2026-07-18 by the 13.5c scoping pass (sprint-change-proposal-2026-07-18.md §3), which split the old seven-concern 13.5c into 13.5c / 13.5d / 13.5e. This story owns EXACTLY ONE of those seven: making the collective tier reachable by a Spirit through the mediated path. -->
 <!-- Depends: 13.5c (bootable tenant mode — without it the store has no tenant map and the walls stay inert), 13.5a (a live Spirit to hang the port on — see L4; sequencing 13.5a FIRST roughly HALVES this story's wiring cost, per sprint-change-proposal:117), 13.3 (source_team on the write path). Does NOT depend on 13.3b. -->
 <!-- Model/review: frontier-class dev allowlist {opus-4-8, gpt-5.5, glm-5.2, equiv} (E11 retro A1 / E12-B3). §A6 full-layer net (Blind + Edge + Acceptance + Test-Infra + runtime) NON-DEGRADABLE per E12-B6 — this is a RUNTIME BOUNDARY story that grants a Spirit its first-ever write path into a cryptographically walled multi-tenant store. -->
-<!-- Kernel baseline 23202 at HEAD 652347b8 — pin == actual VERIFIED (`find crates/maos-kernel-core/src -name '*.rs' -exec cat {} + | wc -l` = 23202; `xtask/kernel-core-baseline.toml:264` src_lines = 23202). ZERO-Δ is a per-story RESULT to re-verify at CATCH-0, not an epic premise. -->
+<!-- Kernel baseline at corrective-pass baseline 8197317c was pin == actual == 23202. FLAG-Winston authorized only the pid/token equality guard; final measured pin == actual == 23228 (+26). -->
 <!-- Grounded by 4 code-verification scouts + direct verification (2026-07-18): (1) the manifest→scope declaration path, (2) the collective read/write route + Spirit surface, (3) the LiveResearcherMcpPort copy-template + the PolicyTable bypass question, (4) the proven-red harness + gate/ABI/docs surfaces. Every premise below was checked against code at HEAD before being kept; sixteen findings are recorded in "What the scouts disproved". -->
 
 ## What this story is, in one paragraph
@@ -266,41 +267,58 @@ The directive was to try to **disprove** this story's own claims by reading the 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — CATCH-0 verify-or-prove-zero (do FIRST, before any code).** (AC: 6)
-  - [ ] Re-confirm at dev HEAD: `capabilities_required_to_scopes` still emits only two constructors (`manifest.rs:512-540`); `security/mod.rs:310`/`:324` still the sole feed/write; `cap_policy/mod.rs:129-143` unchanged; `collective_*` still have **zero** production callers (D8); `SpiritMemoryView` still has zero callers (D7); `MANIFEST_SCHEMA_VERSION` still **3** (`maos-spirit-abi/src/lib.rs:114`); no Spirit crate touches memory (D9). If any changed, re-scope.
-  - [ ] `cargo run -p xtask -- check-kernel-baseline` reads **23202** and equals actual. Record in Dev Agent Record.
-  - [ ] **⚠ INVERT 13.3's Task-0 ABI SENTENCE (D3).** 13.3 called the ABI gates a null control because they hardcode `maos-spirit-abi`. **This story's change is in that crate.** Run `abi-diff` against the planned constant change **before** writing code and record the result.
-  - [ ] **Run `check-abi-ratification` manually (D4)** — it has no CI job and no registry entry. Record the result; file the wiring gap as a retro item, do not fix it here.
-  - [ ] **Determine how `kloc-check` counts** and whether `maos-manifest` is already over its 4050 budget (`kloc.toml:136`; `manifest.rs` = 4812 physical).
-  - [ ] **Read 13.5c's RESOLVED K5** — it decides whether `check-reza-production-path` exists yet (L8).
-  - [ ] **Confirm L7 was settled across 13.3 / 13.5c / 13.5d.** If leg (f) still carries clause (iii), STOP — 13.5c will red a leg it claims to leave green (D15).
-- [ ] **Task 1 — the manifest surface and the v4 bump, IN THIS ORDER.** (AC: 1)
-  - [ ] **1a — resolve L2 first.** `provider.complete` is mandatory and non-empty (`manifest.rs:443-450`, `:473-480`); seven of eleven Spirits omit `[capabilities.required]` entirely. **A collective-only Spirit cannot declare a Loom capability today.** Land the relaxation with its own negative (a wholly empty `[capabilities.required]` still rejected) **before** adding the loom block.
-  - [ ] **1b — parser.** `RawLoomCapabilities`/`LoomCapabilities` on the Raw-then-validate idiom, `#[serde(deny_unknown_fields)]`, three booleans (L1). Extend `capabilities_required_to_scopes` with three unit-variant pushes.
-  - [ ] **1c — the bump, 3 → 4 (D1).** `maos-spirit-abi/src/lib.rs:114` + ledger row `:33`; **update the hardcoded tripwire at `manifest_n_minus_1_test.rs:89`** (it will hard-fail otherwise, by design); add the section to `POST_V1_SCHEMA_SECTIONS` (`manifest.rs:211-212`) — **the gate will not remind you (D11)**; new `[[ratification]]` in `xtask/abi-ratifications.toml`; regenerate STABILITY.md via `stability-matrix`.
-  - [ ] **1d — gate fixtures + docs.** ≥3 `manifest-field-coverage` fixtures per new `(section, field)` tuple, no orphans (`manifest_field_coverage.rs:31`, `discipline.yml:571`). `docs-site/docs/manifest/v4.md` + `migrate/v3-to-v4.md` + **Korean i18n at `KO_COVERAGE_MIN=100`** (`discipline.yml:2350`) — **translate, do not fabricate** (E10 retro).
-  - [ ] **1e — prove the grant flows.** A manifest declaring `loom.write` produces `Scope::LoomWrite` in `manifest_scopes` and `issue_with_mediation` **succeeds where it previously denied**. Drive the real `admit_spirit` chain, not a seeded fixture.
-- [ ] **Task 2 — the Spirit-side port + composition-root impl.** (AC: 2, 3)
-  - [ ] Sync trait + domain error in the host Spirit's crate (L4 — **13.5a's Enterprise Spirit recommended**); impl at the composition root; **no tokio and no kernel type in the Spirit crate** (`spirits/researcher/src/lib.rs:117-127` + `main.rs:1240-1294`).
-  - [ ] **Token issued AT CALL TIME** through `issue_enterprise_governed_capability` (`main.rs:105-156`), `IntentClass::HighPrivilege` for `LoomWrite` (**D14 — the 60 s cap keys on IntentClass, not Scope**). Copy the MCP shape (`:1343-1356`), **not** the inference shape (`:3979-3991`, minted once against pid 0).
-  - [ ] **`AtomicU32` pid + post-`load` backfill** (`main.rs:3948-3968`, `:4053-4063`). A plain `u32` binds the port to pid 0 forever (`:4014`, `:4042` are the cautionary examples).
-  - [ ] Call `collective_write`/`collective_read` (`memory/mod.rs:204-270`, `:272-313`). **Never `SpiritMemoryView`, never the `MemoryManagerPort` trait path, and do NOT touch `main.rs:2403`.**
-  - [ ] **D13 — prove the pid handed to `collective_write` is the pid the token was issued for**, by construction. No binding exists in the kernel (`memory/mod.rs:268`; `cap_tokens/mod.rs:246`).
-- [ ] **Task 3 — dead-wire negative + harness extension + gate legs.** (AC: 4)
-  - [ ] Extend `xtask/tests/story_10_4a_ac1_proven_red.rs` reusing `adapter_with_caps` (`:835-853`). **Do NOT extend `make_capability` (`:806-833`) into production — it is the bypass (D6).** Drive manifest→admission for real grants.
-  - [ ] `route-not-spirit-reachable` on the 11.4c falsifiable-side-effect template (`enterprise_identity.rs:554-562`, `:696-717`) — a constructed-but-unwired port **reds**.
-  - [ ] `composition-root-does-not-seed-manifest-scopes` (L3): zero `manifest_scopes` in `crates/maos-bin/src/**`; no `PolicyTable::update` except `apply_fail_closed_outcome`.
-  - [ ] Live `spirit-collective-route-live` leg, `AdvisorySubstrate`, `#[ignore]` + panic-if-env-unset + `PG_LOCK` (`tenant_wall_live.rs:18-32` idiom).
-  - [ ] Gate home per L8 / 13.5c's K5. **Do not claim leg (f) inverted (D15).**
-- [ ] **Task 4 — correlation, scoped.** (AC: 5)
-  - [ ] Derive the join from the journaled `CapabilityInvocation` frame (`memory/mod.rs:234`), the `token_id`, and the store row — **without widening the port** (L6(b)). Reconcile; do not assert a total.
-  - [ ] **Coordinate with 13.5b** if the port must widen at all — once, not twice (D16).
-- [ ] **Task 5 — docs + honesty ledger.** (AC: 1, 6)
-  - [ ] ADR note: the loom capability class, the v4 bump rationale, **D12's unsigned-local-manifest scoping**, and the rejected bypass with its three reasons.
-  - [ ] `coverage-matrix.yaml` notes + `valid_until`; `discipline.yml` job/legs per L8.
-  - [ ] **File as Epic-13 retro items, do not fix:** `SpiritMemoryView`'s false doc comment (D7), `check-abi-ratification` unwired (D4), `check-manifest-schema-version` absent from the registry (D5), `POST_V1_SCHEMA_SECTIONS`'s one-directional check (D11), the `spirit_pid`↔token gap (D13) if not closed in AC3.
+- [x] **Task 0 — CATCH-0 baseline and control audit.** (AC: 6)
+  - [x] Re-confirmed the actual `8197317c` baseline. The attachment's claim that the parser, v4 bump, and pid check were already landed was false; all three were absent.
+  - [x] Measured kernel pin/actual `23202` before the bounded change and `23228` after it.
+  - [x] Ran `check-abi-ratification` manually; it passed the base case and remains value-blind for the schema constant.
+  - [x] Confirmed the `maos-manifest` KLOC row is within its raised 4150 ceiling; the repository-wide advisory KLOC gate remains red on unrelated/global ceilings.
+- [x] **Task 1 — manifest surface and schema v4.** (AC: 1)
+  - [x] Added Raw-then-validate Loom read/write/scan booleans with unknown-field rejection and scope mapping.
+  - [x] Bumped schema 3 → 4, updated the ledger/tripwire/doctests, ratification, ABI docs, and STABILITY.md.
+  - [x] Added all three manifest-field tuples and the existing three-fixture sets; planted an omitted-tuple lie and observed the orphan-fixture RED.
+  - [x] Added English and Korean `manifest/v4` and `migrate/v3-to-v4`; `KO_COVERAGE_MIN=100` passes.
+  - [x] Drove the real manifest → `admit_spirit` → policy table → `issue_with_mediation` chain.
+- [x] **Task 2 — Spirit-side port and composition-root implementation.** (AC: 2, 3)
+  - [x] Added the synchronous Researcher collective port and fail-closed unwired error without leaking tokio or kernel types.
+  - [x] Added call-time enterprise-governed token issuance; writes use `IntentClass::HighPrivilege`.
+  - [x] One `AtomicU32` supplies registration pid, issued-token pid, and collective-call pid after load.
+  - [x] Production calls use the cap-gated `MemoryManagerAdapter::collective_*` path; `SpiritMemoryView` remains untouched.
+  - [x] Added the bounded kernel pid/token equality check and the forged-pid proven-RED control before tenant registration.
+- [x] **Task 3 — dead-wire, static, live, and gate proofs.** (AC: 4, 7)
+  - [x] Added the manifest-admission proven-red harness and matching-pid non-vacuity control.
+  - [x] Added a Researcher dead-wire refusal and a green backing-port write.
+  - [x] Added blocking single-source and composition-root no-seeding controls.
+  - [x] Added and enrolled `spirit-collective-route-live`, including registered-only-one-team and unregistered-write-nowhere assertions.
+  - [x] Executed every live gate leg against two Postgres datnames. The independent row oracle observed `maos_team_a|1` and `maos_team_b|0` for `story-13-5d-route`; `pg_stat_database` counters advanced in both datnames.
+- [x] **Task 4 — scoped mediated-operation correlation.** (AC: 5)
+  - [x] Reconciled requester pid, routed backing-row identity, and capability-audit `token_id` without widening the port.
+- [x] **Task 5 — generated docs, gates, and honesty ledger.** (AC: 1, 4, 6)
+  - [x] Regenerated and checked ABI docs and STABILITY.md; updated coverage-matrix and multi-tenant gate enrollment.
+  - [x] Repaired the vacuous `POST_V1_SCHEMA_SECTIONS` check with an independent ratified inventory; a phantom entry now REDs and the restored entry passes.
+  - [x] Removed 13.5d from `ABSENT_SUCCESSORS`; retained only genuine successors.
 
 ---
+
+### Review Findings
+
+Adversarial code review 2026-07-19 (bmad-code-review, 4 layers: Blind Hunter + Edge Case Hunter + Acceptance Auditor + Test Infrastructure Auditor, per the story's non-degradable §A6 net; dev_model_used `openai-codex/gpt-5.6-sol`). Raw 21 findings → 16 unique after dedup, each verified against the working tree by read-only scouts → 15 kept, 1 dismissed (fixed readiness-key collision claim — refuted: dedicated marker key, unique per pid, no other Researcher collective writes).
+
+- [x] [Review][Patch] RESOLVED D1 (party-mode consensus 2026-07-19: Winston·Murat·Amelia·John·Vex·Grumbal, per spec + long-term correctness) — Kernel pid-check runs before token verification: reorder `reject_spirit_pid` AFTER `verify_and_audit` in all three collective methods [crates/maos-kernel-core/src/memory/mod.rs:256-257,320-321,365-366]. Ruled WITHIN the FLAG-Winston grant (item 3: the authorization is for the pid-binding check, whatever it measures; reorder is net-zero lines, pin stays 23228). An unauthenticated caller can currently inject `SpiritIdMismatch` audits attributed to ANY pid — an audit-poisoning primitive. REQUIRED companion negative: forged token + mismatched pid → verification-class refusal, zero `SpiritIdMismatch` events (Murat's falsifier).
+- [x] [Review][Patch] RESOLVED D2 (same consensus) — Write commits before its correlation audit, and audit loss returns Ok: (a) reorder to audit-first in `LiveResearcherCollectivePort::collective_write` [crates/maos-bin/src/main.rs:1566-1593] so a crash never yields a row without its correlation intent; (b) the `mediated-operation-correlation` gate leg asserts the `cap_audit` drop counter is unchanged across the run (nonzero delta = leg reds); (c) may/may-not table gains an honesty line: AC5's durable join holds provided the audit channel is not saturated. The kernel half (fallible `record_invocation`) is DEFERRED — see below.
+- [x] [Review][Defer] Fallible `record_invocation` — `CapabilityRegistryAdapter::record_invocation` swallows a full-channel `try_send` into `Ok(())` [crates/maos-kernel-core/src/capability/mod.rs:332-351]; the only real fix is a fallible invocation path, which is kernel-core work the L10 grant does not cover — deferred, needs FLAG-Winston re-escalation (owner: next kernel-touching story). Reason: grant fence item 2 forbids spending the grant beyond the pid check.
+- [x] [Review][Patch] RESOLVED D3 (same consensus) — Readiness route failure invisible to lifecycle health: fail-hard in `--once` (exit non-zero on a failed readiness round-trip), keep best-effort-with-eprint in continuous mode [spirits/researcher/src/lib.rs:411-419; crates/maos-bin/src/main.rs:4371-4515]. An unmeasured `--once` is the same shape as a skipped live leg: UNMEASURED, not green.
+- [x] [Review][Patch] RESOLVED D4 (same consensus) — `check-reza-production-path` was mandated but never created: create the gate per L8/AC4 (13.6 is the third consumer; pay the five registration surfaces ONCE here), move the four route legs out of `check-multi-tenant-loom` (route controls mislabeled inside the wall gate), and verify the hand-enrollment with a planted lie (delete a registry line, watch something red, restore — D30 meta-hole, re-logged for the Epic-13 retro).
+- [x] [Review][Patch] v3 manifest can declare loom grants and receive v4 scopes [crates/maos-manifest/src/manifest.rs:568-575; crates/maos-kernel-core/src/security/mod.rs:309-330] — schema version is never checked against the loom section; `manifest_schema_version = 3` + `[capabilities.required.loom] write = true` parses, admits, and lands `Scope::LoomWrite` in `manifest_scopes`. Apply the repo's N-1 degradation idiom: old schema + new section must degrade (warn-and-skip), not grant.
+- [x] [Review][Patch] Empty `MAOS_LOOM_HOME_TEAM` silently disables the tenant wall on the new route [crates/maos-bin/src/main.rs:2416; crates/maos-bin/src/tenant_map.rs:148-160; crates/maos-loom-lite/src/store.rs:505-508] — `unwrap_or_default()` → `tenant_map_for_store` returns `None` → `team_guard` is a no-op, while the collective port is still wired. An env typo converts the wall into open access. Fail closed.
+- [x] [Review][Patch] Correlation gate test reimplements the audit instead of observing the production port [xtask/tests/story_10_4a_ac1_proven_red.rs:1131-1208] — the blocking `mediated-operation-correlation` leg calls `adapter.collective_write` on a mock then invokes `record_invocation` directly in the test; removing the composition-root audit (`main.rs:1586-1593`) leaves the leg green.
+- [x] [Review][Patch] `scan = true` granted but unused [spirits/researcher/manifest.toml:48-52] — the readiness route only writes and reads; no production scan caller exists. The story's own migrate docs say grant only what the Spirit needs.
+- [x] [Review][Patch] `collective_read`/`collective_scan` emit no invocation audit [crates/maos-bin/src/main.rs:1596-1633] — only write calls `record_invocation`; read is exercised by the production readiness round-trip with no route-level invocation record.
+- [x] [Review][Patch] `spirit-collective-route-live` leg is mislabeled [xtask/src/check_multi_tenant_loom.rs:387-399; crates/maos-loom-lite/tests/tenant_wall_live.rs:270-313] — it hand-builds `LiveTenantMap`+`LoomLiteStore` and calls `store.write` directly: no manifest, no governed token, no kernel adapter, no Spirit. The REAL end-to-end route IS gated separately (`tenant-mode-boots-live` → `tenant_mode_boots_on_live_substrate`), so this is a naming/honesty fix, not a coverage hole.
+- [x] [Review][Patch] Composition-root static negative covers only `main.rs` and skips the prohibited-API check [crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs:805-812] — `crates/maos-bin/src/**` has 10 files; pre-existing legitimate `manifest_scopes` READS live in `enterprise_pdp_runtime.rs:230-238`. Extend the negative to all files with a reader whitelist and assert no seeding writes.
+- [x] [Review][Patch] `init_schema` DDL has no advisory lock or transaction [crates/maos-loom-lite/src/schema.rs:72-109; crates/maos-loom-lite/src/store.rs:207-229] — daemon and `--once` are separate processes that can run the multi-statement migration concurrently; `IF NOT EXISTS` does not serialize the batch.
+- [x] [Review][Patch] Korean ABI pages still declare `MANIFEST_SCHEMA_VERSION = 3` [docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/constants.md:15,77-82 + all ko ABI pages] — English `docs-site/abi/v1/*` regenerated to 4; `gen-abi-docs --check` never traverses the ko tree, so CI cannot catch this. AC1's blast radius includes the ko mirrors.
+- [x] [Review][Patch] Forged-pid negative covers write only [xtask/tests/story_10_4a_ac1_proven_red.rs:1055-1101] — the kernel guard exists in all three methods, but deleting the read or scan guard keeps every test green. Add read/scan mismatch negatives.
+- [x] [Review][Patch] Loom fixtures are inert and the parser test is all-true only [crates/maos-kernel-core/tests/manifest_field_coverage.rs:40-43,89-209; crates/maos-manifest/src/manifest.rs:2546-2585] — the 9 fixtures are counted, never deserialized; no explicit-false or malformed-value parser test exists. A read↔write scope swap or a `false`-still-grants bug ships green.
 
 ## Dev Notes
 
@@ -397,23 +415,43 @@ Hermetic legs are plain `cargo test`; the live Spirit→store leg is `#[ignore]`
 
 ### Agent Model Used
 
-_(frontier-class allowlist per E11 retro A1 / E12-B3 — record the exact model at dev start)_
+`openai-codex/gpt-5.6-sol`
 
 ### Debug Log References
 
-_(record CATCH-0 results here: baseline pin/actual, the D-premise re-confirmations, the `abi-diff` result against the planned constant change, the manual `check-abi-ratification` result, the `kloc-check` counting determination, and 13.5c's resolved K5)_
+- Baseline discrepancy: at `8197317c`, direct source inspection found no `RawLoomCapabilities`, `MANIFEST_SCHEMA_VERSION` was `3`, and no collective pid/token equality check. The attachment's "already landed" claim was false at the supplied baseline; this pass implemented all three.
+- Kernel measurement: pin/actual `23202` before; pin/actual `23228` after the authorized pid check, exactly +26. Compile-forced Loom-field updates touched `scheduler_loop.rs` and kernel integration tests; `scheduler_loop.rs` is net-zero. The attachment's claim that `src/tests.rs` was the net-zero file was also false for this checkout.
+- P0 mutation: `story_13_5d_forged_pid_is_denied_before_collective_write` passed. Removing the pid check made it RED with `pid 9 MUST NOT spend a token issued for pid 7`; restoring the check passed. The final negative asserts outer `CapabilityDenied`, `SpiritIdMismatch`, zero writes, matching-pid success, and a `SpiritIdMismatch` audit event under the token owner's pid.
+- Manifest grant and correlation: `cargo test -p xtask --test story_10_4a_ac1_proven_red story_13_5d -- --nocapture` → 3 passed. The operation proof persists a `CapabilityInvocation` carrying token id, requester pid, `collective.write`, namespace, and store-row key.
+- Daemon/static controls: nine hermetic tests pass and `tenant_mode_boots_on_live_substrate` passes live. The live test boots the cohort daemon, runs the real `maos run researcher --once` production hook, asserts its backing row in team A only, reads the durable audit row from the Transparency Log, and plants a wrong-database refusal asserting `TenantConnectionMismatch` plus `expects database`.
+- Planted lies: deleting `("capabilities","loom_write")` made `test_nfr_test_13_three_cases_per_field` RED on three orphan fixtures; replacing the POST-v1 Loom entry with `loom_typo` made `check-manifest-schema-version` RED on one missing and one phantom entry. Both lies were restored; both controls pass.
+- Adversarial review found and this pass fixed: the previously uninvoked Researcher port, direct-store-only live witness, missing mismatch audit, non-durable operation join, check-then-alter schema race, spawn-blocking bridge false refusal, and disconnected-child reap leak.
+- Multi-tenant gate: all 20 legs attempted and passed, including five live Postgres legs and all new blocking route controls. Final JSON reported `advisory:false`, `oracle_green:true`, and `passed:true`.
+- Live oracle: reset both databases to `xact_commit=1`, `blks_hit=16`, and zero tuple mutations. After the final complete gate: A `xact_commit=78`, `xact_rollback=0`, `blks_read=0`, `blks_hit=9361`, `tup_inserted=7`, `tup_updated=0`, `tup_deleted=8`; B `xact_commit=48`, `xact_rollback=0`, `blks_read=0`, `blks_hit=2333`, `tup_inserted=2`, `tup_updated=1`, `tup_deleted=2`. Direct SQL found `story-13-5d-route` once in `maos_team_a` and zero times in `maos_team_b`; the daemon live test independently proved the real Researcher readiness row and audit before its fixture cleanup.
+- The first live run exposed an order-dependent schema bug: reduced tenant-wall fixtures created `collective_memory` without `embedding`. `create_schema_sql` now uses race-safe `ADD COLUMN IF NOT EXISTS embedding vector(N)` before indexing; its unit control, transport bridge suite, real one-shot route, and complete gate rerun pass.
+- Generated/governance checks passed: `gen-abi-docs --check`, `stability-matrix --check`, `check-manifest-schema-version`, `check-kernel-baseline` (`23228`), manual `check-abi-ratification` (base case), and Korean canonical coverage `38/38 = 100%`.
+- `cargo build --workspace` passed. `kloc-check` remains repository-wide advisory RED at 124434 lines with multiple pre-existing zero/low budgets; the changed `maos-manifest` row itself passes at 4087/4150.
 
 ### Completion Notes List
+- Manifest v4 now produces real Loom policy scopes. Researcher's production `on_idle` hook performs one idempotent write/read round-trip when the route is wired, using per-call governed tokens and cap-gated kernel methods.
+- The composition root single-sources pid registration, issuance, and calls. The kernel independently rejects and audits a mismatched token pid before any port side effect.
+- The live witness uses the actual `maos run researcher --once` route, persists a token/key correlation in `CapabilityInvocation`, writes one physical row in team A, leaves team B empty for that key, and preserves unregistered-pid fail-closed behavior.
+- No new crate or production dependency edge was added. `SpiritMemoryView`, the collective port method set, `ABI_VERSION`, and the manifest support floor remain unchanged.
 
 ### File List
+- Kernel and admission: `crates/maos-kernel-core/src/memory/mod.rs`, `crates/maos-kernel-core/src/scheduler/scheduler_loop.rs`, affected kernel integration tests, `xtask/kernel-core-baseline.toml`.
+- Manifest/schema: `crates/maos-manifest/src/{lib.rs,manifest.rs}`, `crates/maos-spirit-abi/src/lib.rs`, `crates/maos-spirit-abi/tests/manifest_n_minus_1_test.rs`, `xtask/abi-ratifications.toml`, `crates/maos-kernel-core/tests/manifest_field_coverage.rs`.
+- Route and proofs: `spirits/researcher/src/lib.rs`, `spirits/researcher/manifest.toml`, `crates/maos-bin/src/main.rs`, `crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs`, `crates/maos-loom-lite/src/{adapter.rs,schema.rs}`, `crates/maos-loom-lite/tests/tenant_wall_live.rs`, `xtask/tests/story_10_4a_ac1_proven_red.rs`.
+- Gates: `xtask/src/check_multi_tenant_loom.rs`, `xtask/src/check_manifest_schema_version.rs`, `tests/coverage-matrix.yaml`, `xtask/kloc.toml`.
+- Generated/docs: `STABILITY.md`, `docs-site/abi/v1/*`, `docs-site/docs/manifest/v4.md`, `docs-site/docs/migrate/v3-to-v4.md`, and both Korean mirrors.
 
 ### Change Log
 
 | Date | Change |
 |---|---|
-| 2026-07-18 | Story 13.5d created (create-story analysis, 4 code-verification scouts + direct verification @652347b8). The epic's headline premise — **Loom scopes are not manifest-declarable** — is **CONFIRMED verbatim** (`manifest.rs:512-540` emits only `ProviderInfer`+`McpCall`; `security/mod.rs:310`/`:324` is the sole feed/write; `cap_policy/mod.rs:129-143` is fail-closed on discriminant match). **Sixteen further findings, of which four are disproofs of load-bearing artifact claims:** (**D1**) the bump is **3→4, not v3** — v3 was spent on `[model_provenance]` at 9.4b, and researcher's promised "v3 bump" for parallelism was never honoured; (**D2**) the `≈75 LOC` estimate covers the parser and **none** of the seven surfaces the bump drags — the constant lives in `maos-spirit-abi`, `manifest_n_minus_1_test.rs:89` is a **hardcoded tripwire that hard-fails on any bump**, plus `POST_V1_SCHEMA_SECTIONS`, `abi-ratifications.toml`, `stability-matrix`, ≥3 `manifest-field-coverage` fixtures per tuple, and **blocking 100%-Korean docs**; (**D3**) 13.3's *"the ABI gates are a NULL CONTROL"* is **inverted here** — this story's change is *in* the crate both gates hardcode; (**D15**) the epic's claim that **13.5d inverts 13.3's leg (f) is FALSE** — this story's route is `DirectWrite` and never touches `apply_replication_bundle`, while **13.5c's AC2 already reds leg (f) clause (iii) despite claiming to leave it green**. **Five hazards no artifact had noticed:** (**D6**) the `PolicyTable` bypass is fully public and already written down as a fixture (`story_10_4a_ac1_proven_red.rs:806-833`) — rejected, with the three reasons proven; (**D10**) `provider.complete` is mandatory and non-empty, so a **collective-only Spirit cannot declare a Loom capability at all** (7 of 11 Spirits omit the block); (**D12**) **local Spirit manifests are UNSIGNED** — filesystem write access is capability-scope authorship, so the grant may never be called cryptographically bound; (**D13**) `collective_write` has **no `spirit_pid`↔`token.spirit_pid` binding** — a pid-7 token can write as pid 9 into another team's walled store, and this story's port is its first production caller; (**D14**) the 60 s LoomWrite cap keys on `IntentClass`, not on `Scope`. **Also found:** (**D7**) `SpiritMemoryView` is not merely a trap but **dead code with a false doc comment** claiming a nonexistent wire-protocol handler; (**D8**) the cap-gated route has **zero production callers**; (**D9**) **no reference Spirit touches memory at all** and the Spirit ABI/SDK expose no memory surface — the hard evidence that 13.5a must land first; (**D4/D5**) `check-abi-ratification` has **no CI job and no registry entry**, and `check-manifest-schema-version` is a required job **absent from the canonical registry**; (**D11**) `POST_V1_SCHEMA_SECTIONS`'s check is one-directional; (**D16**) the `cost.rs` correlation collision binds the **cost frame only** — the real constraint is 13.5b's concurrent port widening. 6 ACs, **kernel-core ZERO @23202 (pin == actual verified) AND `maos-manifest` ≈75 LOC + a 3→4 schema bump — both sentences**. Forks **L1–L8** open for preflight; **L2** (mandatory-provider) blocks AC1 and **L7** (leg-(f) inversion) spans three stories and must be settled before any of them develops. |
-
-| 2026-07-19 | **Adversarial preflight (scout-first, 3 code scouts + direct verification @`652347b8`). Status → needs-rework.** Kernel baseline **re-verified by the preflight: pin == actual == 23202**. Headline premise re-confirmed verbatim. **Fifteen new findings D17–D31; three forks opened (L9/L10/L11); one fork REVERSED (L4); two closed with no action (L7, L8).** **L4 REVERSED (D26): 13.5a is a SOFT dependency** — D9 is true and its conclusion is a non-sequitur (13.5a's own AC sketch never mentions memory, so it has no memory surface either); the decisive test is which Spirit is *constructed* at the composition root, and researcher is (`main.rs:3815`) while 13.5a's is constructed nowhere at `backlog`. Researcher additionally **discharges L2 outright** (it carries `provider.complete`). **The epic's DAG edge `13.5a → 13.5d = HARD` (`dependency-dag.md:150`) is wrong.** **NULL CONTROL FOUND (D18): `abi-diff` is blind to this change** — `cargo public-api` emits const signatures value-erased (`abi-baseline/v1-pre-bump.txt:148`), the baseline lacks `MANIFEST_SCHEMA_VERSION` entirely, and `abi_diff.rs:48` fails only on removed lines; **D3's inversion is itself disproved.** **LOAD-BEARING OMISSION (D23): `register_spirit` appears ZERO times in this story** despite 13.5c assigning it here five times — **NEW AC7**; "routes ≠ serves." **SHIP-BLOCKER ESCALATED (D24/L10):** the `spirit_pid`↔token hole is unreachable today only because `collective_*` has zero callers **and** `spirit_bindings` is empty — **this story removes both in the same commit**; the only fix that holds for future callers is kernel-core (~+9 lines, re-pin →~23211), so **L10 needs FLAG-Winston**. **Six AC1 evidence corrections:** D17 the Spirit count is **inverted** (4 omit, not 7; the list gave 8 names for "seven"); D19 the tripwire is at `:103` not `:89` and there are **two undiscovered doctests** (`lib.rs:112`, `:159` — the latter fails because `is_version_supported(4)` flips true); **D20 an EIGHTH surface, `gen-abi-docs`, a correctly-wired blocking anti-rot gate across 19 files**; D21 the migrate path is `docs-site/docs/migrate/`, not `manifest/migrate/`; D22 `maos-manifest` is **under** kloc budget (4012/4050, tokei *code* lines) on an **advisory** gate — the "already red physical counter" is false. **Also: D28** `POST_V1_SCHEMA_SECTIONS`'s check is **vacuous**, not one-directional (it greps the same source it parsed); **D29** `manifest-field-coverage` is blind parser→listed and **v3 already fell through it**; **D30** `check_ship_gate_completeness` never validates CI→registry — the meta-cause of D4/D5; **D31** there are **five** production readers of `manifest_scopes`, not one; **D25** L7 was already resolved upstream and **13.5c is the stale artifact**, and the route is a port write *below* the region chokepoint, not `DirectWrite`; **D27** three obligations were re-homed here by 13.5c and appear in none of the ACs. **Five premises of the preflight brief disproved**, including its most confident one (abi-diff). **ACs: 6 held (all reshaped) + 1 new = 7.** Discipline 8 applies to **four** ACs, not one — 13.5c's D18 puts AC2/AC3/AC5/AC7 all behind the `MAOS_LOOM_POSTGRES` arm. |
+| 2026-07-18 | Story 13.5d created and preflighted at `652347b8`. |
+| 2026-07-19 | Corrective implementation and adversarial-review fixes: manifest v4 Loom grant path, bounded and audited kernel pid binding, real Researcher production hook route, single-source tenant registration, durable token→row correlation, causal negatives, race-safe schema migration, gate/docs/ratification updates, generated artifacts, and complete live Postgres oracle. |
+| 2026-07-19 | bmad-code-review (4-layer §A6 net, party-mode consensus on 4 decision-needed items): 15 patches applied — kernel pid-check reordered after token verification (within FLAG-Winston grant, net-zero lines), v3 manifests degraded from v4 loom grants with a static anti-drift guard, empty `MAOS_LOOM_HOME_TEAM` fails closed, audit-first write ordering + read/scan invocation parity + drop-counter falsifier, `--once` fails hard on readiness failure, `scan = false` least privilege, `check-reza-production-path` gate created and enrolled across five surfaces (planted-lie verified), static negatives extended to all `maos-bin/src/**` and to read/scan forged pids, init_schema advisory-locked, per-field loom parser tests + live fixture sweep, Korean ABI docs to v4. 1 defer (fallible `record_invocation` — needs second grant). Kernel pin/actual 23228 holds. |
 
 ## Seven ACs: the exception and why it is not a hidden split
 
@@ -443,24 +481,57 @@ The epic's pre-dev checklist item 5 caps a story at **≤6 ACs**, and that rule 
 
 ## Status
 
-**needs-rework** (adversarial preflight closed 2026-07-19 — 3 code scouts + direct verification at HEAD `652347b8`).
+**done — implementation, adversarial review, live substrate, and independent oracle complete.**
 
-**The headline survives; the evidence base does not.** `capabilities_required_to_scopes` (`manifest.rs:512-540`) still emits only `ProviderInfer` + `McpCall`, `security/mod.rs:310` is still the sole feed, `cap_policy/mod.rs:129-143` is still fail-closed, and **kernel baseline pin == actual == 23202, re-verified**. Eleven forks (L1–L8 as drafted, plus L9/L10/L11 opened by this preflight) are settled except one, and **fifteen new disproof entries D17–D31** are recorded.
+The stale `ready-for-dev`, `needs-rework`, and pre-grant kernel-zero narratives are superseded. Actual baseline `8197317c` did not contain the claimed parser/schema/pid groundwork; this pass implemented it and measured kernel pin/actual `23228` (+26 authorized lines).
 
-**The three things that block `ready-for-dev`:**
+All hermetic and live route controls pass. The complete multi-tenant gate attempted all 20 legs and returned `oracle_green:true`; direct SQL independently confirmed the Story 13.5d row exists once in team A and zero times in team B.
 
-**1. L10 — the pid-binding hole, and it needs an operator decision (FLAG-Winston).** D24 confirms `collective_write`/`read`/`scan` never compare the caller-supplied `spirit_pid` to `token.spirit_pid` (used exactly once per method: declared `memory/mod.rs:212/276/319`, forwarded `:268/311/355`); `verify()` takes no pid argument and `SpiritIdMismatch` compares two token-side operands (`cap_tokens/mod.rs:246-248`); the forged pid selects the tenant at `store.rs:517` while the audit records the **token's** pid (`capability/mod.rs:248`). It is unreachable today for two accidental reasons — zero production callers, and an empty `spirit_bindings` — and **this story removes both, in the same commit.** The story's AC3 offers *"either a negative … or the gap is named with an owner"*; an either/or is not a disposition. The only fix that holds for the next caller is in kernel-core (~+9 lines, re-pin 23202 → ~23211).
+## Suggested Review Order
 
-**2. AC7 is missing — `register_spirit` appears zero times in this file (D23).** 13.5c's preflight closed one day after this story was drafted and assigned it here in five places; the epic repeats it at `:9`. Without it the route reaches a store that returns `TenantSpiritUnmapped` on every call. **13.5c's finding was "boots ≠ serves"; this story's is "routes ≠ serves."**
+**Production route**
 
-**3. AC1's evidence carries six corrections (D17–D22), one of which is a null control.** **`abi-diff` is blind to this change** (D18) — `cargo public-api` emits const signatures value-erased (`abi-baseline/v1-pre-bump.txt:148`), the baseline does not contain `MANIFEST_SCHEMA_VERSION` at all, and `abi_diff.rs:48` fails only on *removed* lines. The story names it as its live blocking control; that is instance #20 of *a claim standing in for a control*, in the story that spends four paragraphs warning about them. Also: the Spirit count is **inverted** (4 omit, not 7 — D17); the tripwire is at `:103` not `:89` and there are **two doctests nobody had found** (`lib.rs:112`, `:159` — D19); **`gen-abi-docs` is an eighth surface and 19 files** (D20); the migrate docs path is `docs-site/docs/migrate/`, not `manifest/migrate/` (D21); and `maos-manifest` is **under** kloc budget at 4012/4050 on an **advisory** gate (D22).
+- Start with the composition adapter: pid binding, governed tokens, kernel calls, and audit correlation.
+  [`main.rs:1520`](../../crates/maos-bin/src/main.rs#L1520)
 
-**Two forks resolved in the story's favour, and one reversal that changes the epic.** **L7 closes with no action** — 13.3's leg (f) was already re-cut into `(f-i)`/`(f-ii)` on 2026-07-18, exactly as L7 proposed; the stale artifact is **13.5c**, not this story (D25). **L8 resolves** — 13.5c's K5 closed to (b) and explicitly invited 13.5d to create `check-reza-production-path` (D27). And **L4 is REVERSED (D26): 13.5a is a SOFT dependency.** D9 is true and its conclusion is a non-sequitur — 13.5a's own AC sketch never mentions memory, so it has no memory surface either; the decisive test is which Spirit is *constructed* at the composition root, and researcher is (`main.rs:3815`) while 13.5a's is constructed nowhere and sits at `backlog`. Researcher also supplies the trait shape to copy, the enterprise runtimes, and a `provider.complete` block that **discharges L2 outright**. Sequencing 13.5a first does not halve this story; it adds an unscouted 6-AC story to the critical path.
+- Registration and every caller consume one post-load atomic pid binding.
+  [`main.rs:4246`](../../crates/maos-bin/src/main.rs#L4246)
 
-**The framing to say plainly, every time:** **kernel-core Δ is ZERO — conditionally on L10 — and this is not a zero-delta story.** The mediation has been complete since 10.4a and has never had a production caller. What is missing is a *declaration path* and a *tenant registration*, and closing both costs a manifest schema bump that lands in `maos-spirit-abi`, hard-fails **four** surfaces on day one (a tripwire, two doctests, and the stability matrix), regenerates ~19 ABI doc files through a blocking anti-rot gate, and pulls a 100%-Korean documentation gate behind it.
+- Bounded one-shot execution admits a verified cohort snapshot without weakening continuous-run freshness.
+  [`main.rs:2428`](../../crates/maos-bin/src/main.rs#L2428)
 
-**The risk to say plainly:** this story hands a Spirit its first write path into a cryptographically walled multi-tenant store **and registers that Spirit's tenant binding in the same commit**. Four of the controls a reader would assume guard that path do not do what their names suggest — `SpiritMemoryView` is dead code behind a doc comment describing a handler that does not exist, the manifest carrying the grant is **unsigned** on the local load path, `abi-diff` is a green light with no sensor for the change it is cited to guard, and the kernel **never binds the caller's `spirit_pid` to the token it presents**. The first three are inherited. **The fourth becomes exploitable because of this story**, and that is L10.
+**Spirit and security boundaries**
 
-**The framing to say plainly, every time:** **kernel-core Δ is ZERO and this is not a zero-delta story.** The kernel mediation for the collective tier has been complete since 10.4a and has never had a production caller. What is missing is a *declaration path* — and closing it costs a manifest schema bump that lands in `maos-spirit-abi`, hard-fails a deliberate test tripwire, and pulls seven further surfaces including a blocking 100 %-Korean documentation gate. The ≈75 LOC in `maos-manifest` is the cheapest part of this story.
+- The Spirit owns only synchronous domain types; kernel adapters stay outside.
+  [`lib.rs:139`](../../spirits/researcher/src/lib.rs#L139)
 
-**The risk to say plainly:** this story hands a Spirit its first write path into a cryptographically walled multi-tenant store, and three of the controls a reader would assume are guarding that path do not do what their names suggest — `SpiritMemoryView` is dead code behind a doc comment describing a handler that does not exist, the manifest that carries the grant is **unsigned** on the local load path, and the kernel **never binds the caller's `spirit_pid` to the token it presents**. None of those is this story's fault; all three are on its route.
+- Production `on_idle` performs one idempotent mediated write/read round-trip.
+  [`lib.rs:533`](../../spirits/researcher/src/lib.rs#L533)
+
+- Caller/token mismatches audit under the token owner before any port side effect.
+  [`mod.rs:210`](../../crates/maos-kernel-core/src/memory/mod.rs#L210)
+
+- Successful writes persist token, requester, intent, namespace, and row-key correlation.
+  [`main.rs:1587`](../../crates/maos-bin/src/main.rs#L1587)
+
+**Manifest and tenant substrate**
+
+- Strict Raw-then-validate parsing adds three deny-unknown Loom capability booleans.
+  [`manifest.rs:481`](../../crates/maos-manifest/src/manifest.rs#L481)
+
+- Schema v4 ratifies the first manifest-level Loom grant surface.
+  [`lib.rs:114`](../../crates/maos-spirit-abi/src/lib.rs#L114)
+
+- Race-safe additive migration repairs reduced fixtures before vector indexing.
+  [`schema.rs:76`](../../crates/maos-loom-lite/src/schema.rs#L76)
+
+**Causal and live proofs**
+
+- Forged pid refusal proves exact reason, zero writes, correct audit pid, and matching success.
+  [`story_10_4a_ac1_proven_red.rs:1056`](../../xtask/tests/story_10_4a_ac1_proven_red.rs#L1056)
+
+- Live daemon test runs the real Researcher route, physical row oracle, and durable audit.
+  [`cohort_daemon_smoke_13_5c.rs:656`](../../crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs#L656)
+
+- Gate orchestration distinguishes blocking controls from attempted live substrate legs.
+  [`check_multi_tenant_loom.rs:120`](../../xtask/src/check_multi_tenant_loom.rs#L120)

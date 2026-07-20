@@ -1,9 +1,9 @@
 #![forbid(unsafe_code)]
 
-//! Story 13.1 — physical multi-tenant Loom wall gate.
+//! Story 13.5d — Reza's mediated production collective route gate.
 //!
-//! Hermetic legs are [`BindingClass::Blocking`] at development HEAD. Live
-//! Postgres legs are [`BindingClass::AdvisorySubstrate`]: absence emits a
+//! Hermetic route legs are [`BindingClass::Blocking`] at development HEAD.
+//! Live Postgres legs are [`BindingClass::AdvisorySubstrate`]: absence emits a
 //! WOULD-HAVE-BLOCKED banner; presence makes any RED result blocking.
 
 use std::fs::OpenOptions;
@@ -12,12 +12,11 @@ use std::process::Command;
 
 use crate::gate_common::{dev_enforced_red_blocks, emit_command, read_disposition, BindingClass};
 
-const GATE_NAME: &str = "check-multi-tenant-loom";
+const GATE_NAME: &str = "check-reza-production-path";
 const ABSENT_SUCCESSORS: &[&str] = &[
-    // Story 13.2 closed the per-team cryptographic key boundary at ENTRY
-    // (removed from this list). The region `source_log_ref` presence residual
-    // (D1, region axis) remains OPEN with NO named successor (G7 / Round-2).
-    "13.3 widened caller-facing tenant error taxonomy",
+    "13.5b collective GDPR erase/legal-hold cascade",
+    "13.5e tenant refusal audit and per-operator TL isolation",
+    "13.6 three-team product journey",
 ];
 
 struct TestLeg {
@@ -126,133 +125,34 @@ pub fn run(json: bool) -> Result<(), String> {
     let live_present = live_substrate_present();
     let specs = [
         TestLeg {
-            name: "three-site-chokepoint",
+            name: "loom-scope-reaches-policy-table",
             class: BindingClass::Blocking,
             args: &[
                 "test",
                 "-p",
-                "maos-loom-lite",
+                "xtask",
                 "--test",
-                "read_path_chokepoint",
-                "team_guard_is_exactly_the_three_spirit_entry_points",
+                "story_10_4a_ac1_proven_red",
+                "story_13_5d_loom_scope_reaches_policy_table",
                 "--",
                 "--exact",
             ],
         },
         TestLeg {
-            name: "tenant-map-hermetic-matrix",
+            name: "route-not-spirit-reachable",
             class: BindingClass::Blocking,
             args: &[
                 "test",
                 "-p",
-                "maos-bin",
-                "--test",
-                "tenant_map_13_1",
-                "tenant_map_13_1_gate_matrix",
-                "--",
-                "--exact",
-            ],
-        },
-        TestLeg {
-            name: "manifest-option-a-plus-matrix",
-            class: BindingClass::Blocking,
-            args: &[
-                "test",
-                "-p",
-                "maos-cohort",
+                "researcher",
                 "--lib",
-                "manifest::tests::tenant_manifest_option_a_plus_gate_matrix",
+                "unit_tests::collective_route_is_fail_closed_until_wired_then_reaches_port",
                 "--",
                 "--exact",
             ],
         },
         TestLeg {
-            name: "two-datname-physical-absence",
-            class: BindingClass::AdvisorySubstrate,
-            args: &[
-                "test",
-                "-p",
-                "maos-loom-lite",
-                "--test",
-                "tenant_wall_live",
-                "tenant_wall_two_datname_physical_absence_and_assignment_matrix",
-                "--",
-                "--ignored",
-                "--exact",
-            ],
-        },
-        TestLeg {
-            name: "d1-forged-stamp-served-boundary",
-            class: BindingClass::AdvisorySubstrate,
-            args: &[
-                "test",
-                "-p",
-                "maos-loom-lite",
-                "--test",
-                "tenant_wall_live",
-                "tenant_wall_d1_forged_stamp_is_still_served_boundary",
-                "--",
-                "--ignored",
-                "--exact",
-            ],
-        },
-        TestLeg {
-            name: "forged-team-stamp-refused-at-verify",
-            class: BindingClass::Blocking,
-            args: &[
-                "test",
-                "-p",
-                "maos-loom-lite",
-                "--lib",
-                "replication::bundle::tests::test_forged_team_stamp_refused_at_verify_same_region",
-                "--",
-                "--exact",
-            ],
-        },
-        TestLeg {
-            name: "apply-refuses-forged-bundle",
-            class: BindingClass::Blocking,
-            args: &[
-                "test",
-                "-p",
-                "maos-loom-lite",
-                "--lib",
-                "replication::bundle::tests::test_apply_refuses_forged_bundle_writes_zero_rows",
-                "--",
-                "--exact",
-            ],
-        },
-        TestLeg {
-            name: "team-identity-source-reflex",
-            class: BindingClass::Blocking,
-            args: &[
-                "test",
-                "-p",
-                "maos-loom-lite",
-                "--lib",
-                "replication::bundle::tests::test_team_identity_source_reflex",
-                "--",
-                "--exact",
-            ],
-        },
-        TestLeg {
-            name: "per-team-merkle-independence",
-            class: BindingClass::AdvisorySubstrate,
-            args: &[
-                "test",
-                "-p",
-                "maos-loom-lite",
-                "--test",
-                "tenant_wall_live",
-                "tenant_wall_per_team_merkle_independence_mixed_v1_v2",
-                "--",
-                "--ignored",
-                "--exact",
-            ],
-        },
-        // ── Story 13.5c — single composition root + bootable tenant mode.
-        TestLeg {
-            name: "cohort-daemon-boots-and-serves",
+            name: "production-collective-single-source",
             class: BindingClass::Blocking,
             args: &[
                 "test",
@@ -260,13 +160,13 @@ pub fn run(json: bool) -> Result<(), String> {
                 "maos-bin",
                 "--test",
                 "cohort_daemon_smoke_13_5c",
-                "cohort_daemon_boots_and_serves",
+                "production_collective_calls_share_one_atomic_pid_binding",
                 "--",
                 "--exact",
             ],
         },
         TestLeg {
-            name: "cohort-daemon-per-boot-nonce-single-sourced",
+            name: "composition-root-does-not-seed-manifest-scopes",
             class: BindingClass::Blocking,
             args: &[
                 "test",
@@ -274,27 +174,27 @@ pub fn run(json: bool) -> Result<(), String> {
                 "maos-bin",
                 "--test",
                 "cohort_daemon_smoke_13_5c",
-                "daemon_boot_rows_prove_per_boot_nonce_variance",
+                "composition_root_does_not_seed_manifest_scopes",
                 "--",
                 "--exact",
             ],
         },
         TestLeg {
-            name: "non-daemon-does-not-enable-tenant-map",
+            name: "mediated-operation-correlation",
             class: BindingClass::Blocking,
             args: &[
                 "test",
                 "-p",
-                "maos-bin",
+                "xtask",
                 "--test",
-                "cohort_daemon_smoke_13_5c",
-                "non_daemon_process_with_config_refuses_unrefreshable",
+                "story_10_4a_ac1_proven_red",
+                "story_13_5d_request_route_row_audit_correlation",
                 "--",
                 "--exact",
             ],
         },
         TestLeg {
-            name: "tenant-mode-boots-live",
+            name: "spirit-collective-route-live",
             class: BindingClass::AdvisorySubstrate,
             args: &[
                 "test",
@@ -308,46 +208,14 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
-        TestLeg {
-            name: "collective-store-tenant-wall-live",
-            class: BindingClass::AdvisorySubstrate,
-            args: &[
-                "test",
-                "-p",
-                "maos-loom-lite",
-                "--test",
-                "tenant_wall_live",
-                "spirit_collective_route_registered_pid_serves_only_own_team",
-                "--",
-                "--ignored",
-                "--exact",
-            ],
-        },
     ];
-    let mut legs: Vec<(BindingClass, LegResult)> = specs
+    let legs: Vec<(BindingClass, LegResult)> = specs
         .iter()
         .map(|spec| {
             let substrate = spec.class == BindingClass::Blocking || live_present;
             (spec.class, run_test_leg(spec, substrate))
         })
         .collect();
-
-    let kernel_green = crate::check_kernel_baseline::check()?.passed;
-    legs.push((
-        BindingClass::Blocking,
-        LegResult {
-            name: "kernel-baseline-pinned",
-            binding: class_name(BindingClass::Blocking),
-            attempted: true,
-            substrate_present: true,
-            green: kernel_green,
-            detail: if kernel_green {
-                "kernel baseline actual=pinned=23228 (Story 13.5d authorized +26)".to_string()
-            } else {
-                "kernel baseline mismatch".to_string()
-            },
-        },
-    ));
 
     let blockers: Vec<&LegResult> = legs
         .iter()
@@ -362,7 +230,7 @@ pub fn run(json: bool) -> Result<(), String> {
 
     if !skipped_live.is_empty() {
         let banner = format!(
-            "## ⚠️ Multi-Tenant Loom Gate: WOULD HAVE BLOCKED SHIP (v2.2)\n\
+            "## ⚠️ Reza Production Path Gate: WOULD HAVE BLOCKED SHIP (v2.2)\n\
              Live two-datname Postgres substrate was absent; skipped: {}.\n\
              Hermetic legs still bind at HEAD. ABSENT successors: {}.",
             skipped_live
@@ -383,7 +251,7 @@ pub fn run(json: bool) -> Result<(), String> {
             .collect::<Vec<_>>()
             .join("\n");
         emit_command(json, "error", &format!("{GATE_NAME} RED: {detail}"));
-        write_step_summary(&format!("## ❌ Multi-Tenant Loom Gate: RED\n{detail}"));
+        write_step_summary(&format!("## ❌ Reza Production Path Gate: RED\n{detail}"));
     }
 
     if json {

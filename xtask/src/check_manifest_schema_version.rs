@@ -34,6 +34,13 @@ use std::path::Path;
 
 const SPIRIT_ABI_LIB: &str = "crates/maos-spirit-abi/src/lib.rs";
 const MANIFEST_VALIDATION: &str = "crates/maos-manifest/src/manifest.rs";
+const RATIFIED_POST_V1_SCHEMA_SECTIONS: &[&str] = &[
+    "cli_wrapper",
+    "schedule",
+    "gateway",
+    "model_provenance",
+    "capabilities.required.loom",
+];
 
 /// Parse `pub const NAME: u32 = N;` (or an alias to another such const) from a
 /// Rust source string. Reused by `stability_matrix` (Story 7.5a) to source the
@@ -180,10 +187,9 @@ pub fn run(json: bool) -> Result<(), String> {
         ));
     }
 
-    // Step 5 — POST_V1_SCHEMA_SECTIONS constant in manifest.rs stays in sync.
-    // When MANIFEST_SCHEMA_VERSION is bumped, this constant must be updated to
-    // include the new post-v1 sections. Each entry must appear as a parseable
-    // section key in the manifest parser.
+    // Step 5 — POST_V1_SCHEMA_SECTIONS must exactly match the independently
+    // ratified post-v1 inventory. Merely searching manifest.rs is vacuous:
+    // every entry necessarily appears in the constant being checked.
     if current >= 2 {
         let manifest_src = fs::read_to_string(MANIFEST_VALIDATION)
             .map_err(|e| format!("read {MANIFEST_VALIDATION}: {e}"))?;
@@ -202,12 +208,18 @@ pub fn run(json: bool) -> Result<(), String> {
                 ));
             }
             Some(entries) => {
+                for required in RATIFIED_POST_V1_SCHEMA_SECTIONS {
+                    if !entries.iter().any(|entry| entry == required) {
+                        violations.push(format!(
+                            "{MANIFEST_VALIDATION}: POST_V1_SCHEMA_SECTIONS is missing ratified entry '{required}'"
+                        ));
+                    }
+                }
                 for section in &entries {
-                    let section_key = format!("\"{section}\"");
-                    if !manifest_src.contains(&section_key) {
+                    if !RATIFIED_POST_V1_SCHEMA_SECTIONS.contains(&section.as_str()) {
                         violations.push(format!(
                             "{MANIFEST_VALIDATION}: POST_V1_SCHEMA_SECTIONS entry '{section}' \
-                             not found as a string literal in manifest.rs — stale or phantom entry"
+                             is stale or phantom (not in ratified inventory)"
                         ));
                     }
                 }

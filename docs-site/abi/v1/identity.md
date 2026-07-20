@@ -8,7 +8,7 @@
 - [architecture §7.1](https://github.com/lunarpulse/maos/blob/main/_bmad-output/planning-artifacts/architecture-maos-minimal-opus/7-inter-agent-communication.md#71-same-host-the-mailbox) — IAC frame-kind taxonomy
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 Spirit + Host identity types + FrameKind discriminator — wire-stable since v0.1-β.
 

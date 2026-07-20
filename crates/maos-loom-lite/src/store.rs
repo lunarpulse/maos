@@ -17,6 +17,10 @@ use crate::seal::{AtRestSeal, AtRestSealer};
 use crate::tenant::{TenantMapError, TenantMapPort};
 use maos_domain::team::TeamId;
 
+/// FNV-1a 64 of `b"maos-loom-lite-init-schema"`, represented as a PostgreSQL
+/// signed `bigint` advisory-lock key.
+const SCHEMA_INIT_ADVISORY_LOCK_KEY: i64 = -7_268_255_128_678_003_653;
+
 /// Configuration for the Loom-lite Postgres store.
 pub struct StoreConfig {
     /// Postgres connection string (e.g. "host=localhost dbname=loom_lite").
@@ -220,9 +224,30 @@ impl LoomLiteStore {
         }
         let sql = schema::create_schema_sql(self.config.vector_dim);
         client
-            .batch_execute(&sql)
+            .query_one(
+                "SELECT pg_advisory_lock($1)",
+                &[&SCHEMA_INIT_ADVISORY_LOCK_KEY],
+            )
             .await
-            .map_err(|e| StoreError::Schema(e.to_string()))?;
+            .map_err(|error| StoreError::Schema(error.to_string()))?;
+        let schema_result = client.batch_execute(&sql).await;
+        let unlock_result = client
+            .query_one(
+                "SELECT pg_advisory_unlock($1)",
+                &[&SCHEMA_INIT_ADVISORY_LOCK_KEY],
+            )
+            .await
+            .map(|row| row.get::<_, bool>(0));
+        match (schema_result, unlock_result) {
+            (Err(error), _) => return Err(StoreError::Schema(error.to_string())),
+            (Ok(()), Ok(true)) => {}
+            (Ok(()), Ok(false)) => {
+                return Err(StoreError::Schema(
+                    "schema initialization advisory lock was not held".to_string(),
+                ));
+            }
+            (Ok(()), Err(error)) => return Err(StoreError::Schema(error.to_string())),
+        }
 
         // Set HNSW session params on this pooled connection.
         client

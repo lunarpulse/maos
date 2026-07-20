@@ -96,11 +96,12 @@ fn manifest_schema_version_pinned_at_epic_6_addition_count() {
     //          (covered_model_id, training_data_lineage [reverse-DNS, not
     //          free-text], last_eval_timestamp). Recorded as a ratified
     //          [[ratification]] in xtask/abi-ratifications.toml (ADR-045 §8).
+    //   3 → 4  Story 13.5d: [capabilities.required.loom] declaration surface.
     //
     // When the next bump lands, update this assertion in the same PR as the new
     // STABILITY.md / ratification entry.
     assert_eq!(
-        MANIFEST_SCHEMA_VERSION, 3,
+        MANIFEST_SCHEMA_VERSION, 4,
         "MANIFEST_SCHEMA_VERSION was changed without updating this guard — \
          add the bump to the ledger above + the governing ratification/retro entry",
     );

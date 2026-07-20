@@ -110,6 +110,9 @@ gates = [
     # Story 13.1 — ADR-055 physical tenant wall; hermetic legs bind at HEAD,
     # live two-datname legs are advisory-substrate-gated.
     "check-multi-tenant-loom",
+    # Story 13.5d — Reza's mediated production collective route; hermetic legs
+    # bind at HEAD and the live route is advisory-substrate-gated.
+    "check-reza-production-path",
     # Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
     # in-process; real per-commit tripwire). Per-leg independence. Advisory at
     # v1.0/v1.5; blocking at v2.0.
@@ -298,6 +301,12 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = 
 # WOULD-HAVE-BLOCKED advisory when absent.
 [[ship_gate]]
 name = "check-multi-tenant-loom"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
+# Story 13.5d — Reza's mediated production collective route. Hermetic legs
+# hard-fail at HEAD; the live route blocks when Postgres is present and emits a
+# WOULD-HAVE-BLOCKED advisory when absent.
+[[ship_gate]]
+name = "check-reza-production-path"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
 # Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
 # in-process). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.

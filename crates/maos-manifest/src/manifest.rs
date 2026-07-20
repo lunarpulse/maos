@@ -209,7 +209,7 @@ impl ClassSection {
 /// gate reports the constant as missing. Keep the declaration on one physical
 /// line and out of doc comments above it.
 #[rustfmt::skip]
-const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance"];
+const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom"];
 
 /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
 /// newer-than-declared schema section that an N-1 manifest omits (and thus
@@ -404,6 +404,7 @@ impl RawClassSection {
 pub struct CapabilitiesRequired {
     pub provider: ProviderCapabilities,
     pub mcp: McpCapabilities,
+    pub loom: LoomCapabilities,
 }
 
 #[maos_attrs::i9_exempt(
@@ -412,6 +413,16 @@ pub struct CapabilitiesRequired {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderCapabilities {
     pub complete: Vec<String>,
+}
+
+/// Story 13.5d — declared collective capabilities. Scopes are unit variants,
+/// so this is intentionally three explicit booleans rather than a false
+/// namespace-qualified promise.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct LoomCapabilities {
+    pub read: bool,
+    pub write: bool,
+    pub scan: bool,
 }
 
 /// Story 5.5c — MCP server/tool capability declarations.
@@ -436,6 +447,17 @@ impl CapabilitiesRequired {
             toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         raw.validate()
     }
+    /// Drops capability declarations introduced after the manifest's schema.
+    ///
+    /// Schema v4 introduced `[capabilities.required.loom]`; older manifests
+    /// degrade it rather than gaining a capability their declared schema cannot
+    /// express.
+    pub fn degrade_for_schema_version(mut self, declared_schema: u32) -> Self {
+        if declared_schema < 4 {
+            self.loom = LoomCapabilities::default();
+        }
+        self
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -444,6 +466,8 @@ struct RawCapabilitiesRequired {
     provider: RawProviderCapabilities,
     #[serde(default)]
     mcp: RawMcpCapabilities,
+    #[serde(default)]
+    loom: RawLoomCapabilities,
 }
 
 #[maos_attrs::i9_exempt(
@@ -461,6 +485,17 @@ struct RawProviderCapabilities {
 struct RawMcpCapabilities {
     #[serde(default)]
     servers: Vec<RawMcpCapabilityServerEntry>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawLoomCapabilities {
+    #[serde(default)]
+    read: bool,
+    #[serde(default)]
+    write: bool,
+    #[serde(default)]
+    scan: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -501,6 +536,11 @@ impl RawCapabilitiesRequired {
                     })
                     .collect(),
             },
+            loom: LoomCapabilities {
+                read: self.loom.read,
+                write: self.loom.write,
+                scan: self.loom.scan,
+            },
         })
     }
 }
@@ -535,6 +575,15 @@ pub fn capabilities_required_to_scopes(
                 tool: tool.clone(),
             });
         }
+    }
+    if caps.loom.read {
+        scopes.push(maos_domain::invariants::i1::Scope::LoomRead);
+    }
+    if caps.loom.write {
+        scopes.push(maos_domain::invariants::i1::Scope::LoomWrite);
+    }
+    if caps.loom.scan {
+        scopes.push(maos_domain::invariants::i1::Scope::LoomScan);
     }
     scopes
 }
@@ -2464,9 +2513,9 @@ description = "MAOS reference Spirit"
     fn class_section_rejects_above_max_schema_version() {
         // Anything beyond MAX_SUPPORTED is hard-rejected — the kernel does not
         // gamble on future schemas it has not been compiled against.
-        // (Story 9.4b bumped MAX_SUPPORTED 2→3, so the above-max probe is now 4.)
+        // (Story 13.5d bumped MAX_SUPPORTED 3→4, so the above-max probe is 5.)
         let s =
-            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 4");
+            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 5");
         let err = ClassSection::from_toml_str(&s).unwrap_err();
         assert!(
             matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.manifest_schema_version"))
@@ -2502,6 +2551,82 @@ description = "MAOS reference Spirit"
         let s = r#"provider.complete = ["anthropic.claude-3-haiku-20240307"]"#;
         let c = CapabilitiesRequired::from_toml_str(s).unwrap();
         assert_eq!(c.provider.complete.len(), 1);
+    }
+
+
+    #[test]
+    fn capabilities_required_loom_defaults_false_and_rejects_unknown_fields() {
+        let defaults =
+            CapabilitiesRequired::from_toml_str(r#"provider.complete = ["anthropic.default"]"#)
+                .unwrap();
+        assert_eq!(
+            defaults.loom,
+            LoomCapabilities {
+                read: false,
+                write: false,
+                scan: false,
+            }
+        );
+        let error = CapabilitiesRequired::from_toml_str(
+            r#"provider.complete = ["anthropic.default"]
+loom.wirte = true"#,
+        )
+        .unwrap_err();
+        assert!(matches!(error, ManifestError::Toml(_)));
+    }
+
+    fn loom_scopes(caps: &CapabilitiesRequired) -> Vec<maos_domain::invariants::i1::Scope> {
+        capabilities_required_to_scopes(caps)
+            .into_iter()
+            .filter(|scope| matches!(scope, maos_domain::invariants::i1::Scope::LoomRead | maos_domain::invariants::i1::Scope::LoomWrite | maos_domain::invariants::i1::Scope::LoomScan))
+            .collect()
+    }
+
+    #[test]
+    fn capabilities_required_loom_degrades_before_schema_v4() {
+        let caps = CapabilitiesRequired::from_toml_str(
+            "provider.complete = [\"anthropic.default\"]\nloom.write = true",
+        )
+        .unwrap();
+        let v3 = ClassSection::from_toml_str(
+            &class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 3"),
+        ).unwrap();
+        let v4 = ClassSection::from_toml_str(
+            &class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 4"),
+        ).unwrap();
+        assert_eq!(loom_scopes(&caps.clone().degrade_for_schema_version(v3.manifest_schema_version)), Vec::new());
+        assert_eq!(
+            loom_scopes(&caps.degrade_for_schema_version(v4.manifest_schema_version)),
+            vec![maos_domain::invariants::i1::Scope::LoomWrite]
+        );
+    }
+
+    #[test]
+    fn capabilities_required_loom_maps_each_field_exactly() {
+        use maos_domain::invariants::i1::Scope;
+        for (declaration, expected) in [
+            ("loom.read = true", vec![Scope::LoomRead]),
+            ("loom.write = true", vec![Scope::LoomWrite]),
+            ("loom.scan = true", vec![Scope::LoomScan]),
+        ] {
+            let caps = CapabilitiesRequired::from_toml_str(&format!("provider.complete = [\"anthropic.default\"]\n{declaration}")).unwrap();
+            assert_eq!(loom_scopes(&caps), expected);
+        }
+    }
+
+    #[test]
+    fn capabilities_required_loom_false_fields_emit_no_loom_scopes() {
+        for declaration in ["loom.read = false", "loom.write = false", "loom.scan = false", "loom.read = false\nloom.write = false\nloom.scan = false"] {
+            let caps = CapabilitiesRequired::from_toml_str(&format!("provider.complete = [\"anthropic.default\"]\n{declaration}")).unwrap();
+            assert_eq!(loom_scopes(&caps), Vec::new());
+        }
+    }
+
+    #[test]
+    fn capabilities_required_loom_rejects_malformed_fields() {
+        for declaration in ["loom.read = \"yes\"", "loom.write = \"yes\"", "loom.scan = \"yes\""] {
+            assert!(CapabilitiesRequired::from_toml_str(&format!("provider.complete = [\"anthropic.default\"]\n{declaration}")).is_err());
+        }
     }
 
     #[test]

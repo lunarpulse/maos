@@ -52,9 +52,12 @@ use maos_spirit_sdk::spirit_test::{AttemptResult, IsolationHookPoint, Observatio
 #[cfg(feature = "spirit_test")]
 use parking_lot::Mutex;
 
+use crate::capability::cap_audit::VerifyOutcome;
+use crate::capability::CapabilityRegistryAdapter;
 use crate::iac::transparency_log::TransparencyLogAdapter;
 use maos_domain::cost::{CostAttributionPayload, PrincipalRef};
 use maos_domain::governance::GovernanceEventPayload;
+use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::memory::{
     CollectiveErrorKind, ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord,
     MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue, PrincipalIndexRow,
@@ -201,6 +204,25 @@ impl MemoryManagerAdapter {
         }
     }
 
+    /// Refuse and audit a caller/token pid mismatch before the port.
+    /// The refusal is audited under the token owner's pid and reaches no port.
+    /// This guard must precede tenant registration's first production caller.
+    fn reject_spirit_pid(
+        caps: &CapabilityRegistryAdapter,
+        spirit_pid: u32,
+        token: &CapabilityToken,
+    ) -> Result<(), MemoryError> {
+        let token_pid = token.spirit_pid;
+        if spirit_pid == token_pid {
+            return Ok(());
+        }
+        caps.record_verification(token, VerifyOutcome::SpiritIdMismatch);
+        Err(MemoryError::Collective {
+            kind: CollectiveErrorKind::CapabilityDenied,
+            reason: format!("SpiritIdMismatch: caller={spirit_pid} token={token_pid}"),
+        })
+    }
+
     /// Story 10.4a — Spirit-facing collective-tier WRITE, I1/I2 mediated.
     ///
     /// I1: `verify_and_audit` checks the token (and I2: journals the
@@ -236,6 +258,7 @@ impl MemoryManagerAdapter {
                 kind: CollectiveErrorKind::CapabilityDenied,
                 reason: format!("capability denied: {e}"),
             })?;
+        Self::reject_spirit_pid(caps, spirit_pid, token)?;
         match caps.get_token_scope(&token.token_id) {
             Some(maos_domain::invariants::i1::Scope::LoomWrite) => {}
             other => {
@@ -299,6 +322,7 @@ impl MemoryManagerAdapter {
                 kind: CollectiveErrorKind::CapabilityDenied,
                 reason: format!("capability denied: {e}"),
             })?;
+        Self::reject_spirit_pid(caps, spirit_pid, token)?;
         match caps.get_token_scope(&token.token_id) {
             Some(maos_domain::invariants::i1::Scope::LoomRead) => {}
             other => {
@@ -343,6 +367,7 @@ impl MemoryManagerAdapter {
                 kind: CollectiveErrorKind::CapabilityDenied,
                 reason: format!("capability denied: {e}"),
             })?;
+        Self::reject_spirit_pid(caps, spirit_pid, token)?;
         match caps.get_token_scope(&token.token_id) {
             Some(maos_domain::invariants::i1::Scope::LoomScan) => {}
             other => {

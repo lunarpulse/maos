@@ -71,8 +71,10 @@ CREATE TABLE IF NOT EXISTS collective_memory (
     )
 );
 
--- Story 11.2a: additive migration — add source_region and source_ts if absent.
+-- Additive migrations for a table created by an older or reduced fixture.
 -- Idempotent (IF NOT EXISTS / DO NOTHING on re-run).
+ALTER TABLE collective_memory
+    ADD COLUMN IF NOT EXISTS embedding vector({vector_dim});
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -257,6 +259,7 @@ mod tests {
         let sql = create_schema_sql(1536);
         assert!(sql.contains("CREATE EXTENSION IF NOT EXISTS vector"));
         assert!(sql.contains("vector(1536)"));
+        assert!(sql.contains("ADD COLUMN IF NOT EXISTS embedding vector(1536)"));
         assert!(sql.contains("hnsw"));
     }
 }

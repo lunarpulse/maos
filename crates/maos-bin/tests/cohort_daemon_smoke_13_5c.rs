@@ -102,7 +102,7 @@ fn signed_manifest(key: &SigningKey, version: u64) -> String {
             team_id: TeamId::new("team-a").unwrap(),
             region: Region::canonicalize("region-a").unwrap(),
             datname: "maos_team_a".to_string(),
-            members: vec![SpiritId::from("spirit-a")],
+            members: vec![SpiritId::from("spirit-a"), SpiritId::from("researcher")],
         },
         TeamEntry {
             team_id: TeamId::new("team-b").unwrap(),
@@ -289,7 +289,37 @@ fn boot_until_listening(mut cmd: Command) -> Result<(Child, u16, String), String
                     ));
                 }
             }
-            Err(RecvTimeoutError::Disconnected) => break,
+            Err(RecvTimeoutError::Disconnected) => {
+                let status = match child.try_wait() {
+                    Ok(Some(status)) => status,
+                    Ok(None) => {
+                        let _ = child.kill();
+                        let status = child
+                            .wait()
+                            .map_err(|e| format!("failed to reap daemon: {e}"))?;
+                        drop(rx);
+                        let full = reader.join().unwrap_or_default();
+                        return Err(format!(
+                            "daemon stderr disconnected before listening while the process was still running; \
+                             terminated with status {status}.\nstderr:\n{full}"
+                        ));
+                    }
+                    Err(error) => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        drop(rx);
+                        let full = reader.join().unwrap_or_default();
+                        return Err(format!(
+                            "failed to inspect daemon after stderr disconnected: {error}\nstderr:\n{full}"
+                        ));
+                    }
+                };
+                drop(rx);
+                let full = reader.join().unwrap_or_default();
+                return Err(format!(
+                    "daemon exited early (status {status}) before printing the listening line.\nstderr:\n{full}"
+                ));
+            }
         }
     }
 
@@ -327,6 +357,18 @@ fn tl_distinct_boot_nonces(db: &Path) -> Vec<i64> {
         .map(|r| r.expect("boot_nonce row"))
         .collect();
     rows
+}
+
+fn tl_collective_invocation(db: &Path) -> (i64, Vec<u8>, Vec<u8>) {
+    let conn = rusqlite::Connection::open(db).expect("open transparency log");
+    conn.query_row(
+        "SELECT spirit_pid, capability_token, payload_redacted \
+         FROM transparency_log WHERE intent = 'collective.write' \
+         ORDER BY timestamp_ns DESC LIMIT 1",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )
+    .expect("persisted collective.write invocation")
 }
 
 /// Number of distinct on-disk Transparency Log files the run produced under the
@@ -585,14 +627,29 @@ fn daemon_config_rejects_removed_own_boot_nonce() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Live leg (`AdvisorySubstrate`, #[ignore]) — tenant-mode-boots.
-// The first production construction of `TenantMapAdapter` (D10) is reachable
-// ONLY with a real Postgres (D18). Asserts BOOT success only — NOT serving
-// (register_spirit has zero production callers until 13.5d; boots ≠ serves,
-// D17/K8). Serialized behind PG_LOCK; panics if the substrate env is unset.
+// Live leg (`AdvisorySubstrate`, #[ignore]) — tenant route boots and serves.
+// The daemon must drive Researcher's production `on_idle` hook through the
+// mediated collective port and leave the readiness row in team A only.
+// Serialized behind PG_LOCK; panics if either substrate env is unset.
 // ─────────────────────────────────────────────────────────────────────────
 
 static PG_LOCK: Mutex<()> = Mutex::new(());
+
+fn psql_scalar(conn: &str, sql: &str) -> Result<String, String> {
+    let output = Command::new("psql")
+        .arg(conn)
+        .args(["-Atc", sql])
+        .output()
+        .map_err(|error| format!("spawn psql: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "psql failed ({}): {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+}
 
 #[test]
 #[ignore = "AdvisorySubstrate: requires MAOS_TEST_POSTGRES_TEAM_A (live Postgres, datname maos_team_a)"]
@@ -600,21 +657,197 @@ fn tenant_mode_boots_on_live_substrate() {
     let _guard = PG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let conn = std::env::var("MAOS_TEST_POSTGRES_TEAM_A")
         .expect("MAOS_TEST_POSTGRES_TEAM_A must be set for the live tenant-boot leg");
+    let wrong_conn = std::env::var("MAOS_TEST_POSTGRES_TEAM_B")
+        .expect("MAOS_TEST_POSTGRES_TEAM_B must be set for the live refusal control");
+    let clear_probe = "DO $$ BEGIN IF to_regclass('public.collective_memory') IS NOT NULL THEN DELETE FROM collective_memory WHERE key = 'researcher/collective-route-ready'; END IF; END $$;";
+    psql_scalar(&conn, clear_probe).expect("clear team A readiness row");
+    psql_scalar(&wrong_conn, clear_probe).expect("clear team B readiness row");
 
     let fixture = fixture("live");
     let mut cmd = maos_command(&fixture);
     cmd.env("MAOS_ONE_SHOT", "cohort-a2a-daemon")
         .env("MAOS_COHORT_DAEMON_CONFIG", &fixture.config_path)
-        // The headline: MAOS_LOOM_HOME_TEAM boots where it previously hard-failed.
-        // datname of `conn` MUST equal the manifest's teams[team-a].datname
-        // (maos_team_a) or init_schema's connection_assignment_guard rejects it.
-        .env("MAOS_LOOM_POSTGRES", conn)
+        .env("MAOS_LOOM_POSTGRES", &conn)
         .env("MAOS_LOOM_HOME_TEAM", "team-a");
     let (child, port, stderr) =
         boot_until_listening(cmd).unwrap_or_else(|e| panic!("live tenant boot failed: {e}"));
     assert!(
         port > 0,
-        "tenant-mode daemon bound a listener (BOOT success, not serving); stderr:\n{stderr}"
+        "tenant-mode daemon bound no listener; stderr:\n{stderr}"
     );
     reap(child);
+
+    let mut route_cmd = maos_command(&fixture);
+    route_cmd
+        .args(["run", "spirits/researcher/manifest.toml", "--once"])
+        .env("MAOS_COHORT_DAEMON_CONFIG", &fixture.config_path)
+        .env("MAOS_LOOM_POSTGRES", &conn)
+        .env("MAOS_LOOM_HOME_TEAM", "team-a");
+    let (route_ok, route_stderr) = run_to_completion(route_cmd);
+    assert!(
+        route_ok,
+        "real Researcher --once route failed:\n{route_stderr}"
+    );
+    let (audit_pid, audit_token, audit_payload) = tl_collective_invocation(&fixture.audit_db);
+    assert_eq!(
+        audit_token.len(),
+        32,
+        "audit reference is the capability token id"
+    );
+    assert!(
+        String::from_utf8_lossy(&audit_payload).contains("researcher/collective-route-ready"),
+        "audit payload must carry the physical store-row key"
+    );
+    let team_a_count = psql_scalar(
+        &conn,
+        "SELECT count(*) FROM collective_memory WHERE key = 'researcher/collective-route-ready'",
+    )
+    .expect("query team A readiness row")
+    .parse::<i64>()
+    .expect("team A count");
+    let team_b_count = psql_scalar(
+        &wrong_conn,
+        "SELECT count(*) FROM collective_memory WHERE key = 'researcher/collective-route-ready'",
+    )
+    .expect("query team B readiness row")
+    .parse::<i64>()
+    .expect("team B count");
+    assert_eq!(
+        team_a_count, 1,
+        "Researcher on_idle never served team A; stderr:\n{route_stderr}"
+    );
+    assert_eq!(team_b_count, 0, "team A readiness row leaked into team B");
+    assert_eq!(
+        audit_pid, 0,
+        "audit requester must be the loaded Researcher pid"
+    );
+
+    // The same signed manifest declares team-a -> maos_team_a. Pointing the
+    // daemon at team B must fail at the tenant connection-assignment guard.
+    let mut wrong_cmd = maos_command(&fixture);
+    wrong_cmd
+        .env("MAOS_ONE_SHOT", "cohort-a2a-daemon")
+        .env("MAOS_COHORT_DAEMON_CONFIG", &fixture.config_path)
+        .env("MAOS_LOOM_POSTGRES", wrong_conn)
+        .env("MAOS_LOOM_HOME_TEAM", "team-a");
+    let refusal = match boot_until_listening(wrong_cmd) {
+        Ok((child, _, stderr)) => {
+            reap(child);
+            panic!("wrong tenant database unexpectedly booted; stderr:\n{stderr}");
+        }
+        Err(error) => error,
+    };
+    assert!(
+        (refusal.contains("TenantConnectionMismatch")
+            || refusal.contains("tenant connection mismatch"))
+            && refusal.contains("expects database"),
+        "wrong-database refusal must identify the tenant boundary; error:\n{refusal}"
+    );
+}
+
+#[test]
+fn production_collective_calls_share_one_atomic_pid_binding() {
+    const MAIN: &str = include_str!("../src/main.rs");
+    for method in ["write", "read", "scan"] {
+        let signature = format!("fn collective_{method}(");
+        let start = MAIN
+            .find(&signature)
+            .unwrap_or_else(|| panic!("missing production {signature}"));
+        let tail = &MAIN[start..];
+        let end = tail
+            .find("\n    }\n")
+            .unwrap_or_else(|| panic!("unterminated production {signature}"));
+        let body = &tail[..end];
+        assert_eq!(
+            MAIN.matches(&format!(".collective_{method}(")).count(),
+            1,
+            "collective_{method} must have exactly one production kernel call site"
+        );
+        assert_eq!(
+            body.matches("let spirit_pid = self.spirit_pid.load(")
+                .count(),
+            1,
+            "collective_{method} must load the shared AtomicU32 exactly once"
+        );
+        assert!(
+            body.contains("self.issue(spirit_pid,"),
+            "collective_{method} token issuance must use the loaded binding"
+        );
+        assert!(
+            body.contains(&format!(
+                ".collective_{method}(\n                spirit_pid,"
+            )),
+            "collective_{method} kernel call must use the same loaded binding"
+        );
+        assert_eq!(
+            body.matches("CapabilityRegistryPort::record_invocation").count(),
+            1,
+            "collective_{method} must persist exactly one correlation audit"
+        );
+        assert!(
+            body.contains(&format!("\"collective.{method}\""))
+                && body.contains("payload.as_bytes()"),
+            "collective_{method} correlation audit must bind its own intent to the row-identity payload"
+        );
+    }
+
+    let registration = MAIN
+        .split_once("TenantMapPort::register_spirit(")
+        .expect("production tenant registration call")
+        .1;
+    assert!(
+        registration.contains("bound_pid,"),
+        "registration must use the pid reloaded from the shared AtomicU32"
+    );
+    assert_eq!(
+        MAIN.matches("CapabilityRegistryPort::record_invocation")
+            .count(),
+        3,
+        "production collective write, read, and scan must each persist one correlation audit"
+    );
+}
+
+#[test]
+fn composition_root_does_not_seed_manifest_scopes() {
+    const SCANNED_SOURCE_FILES: [(&str, &str); 10] = [
+        ("main.rs", include_str!("../src/main.rs")),
+        ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
+        ("env_contract.rs", include_str!("../src/env_contract.rs")),
+        ("lib.rs", include_str!("../src/lib.rs")),
+        ("worker_cli.rs", include_str!("../src/worker_cli.rs")),
+        ("migration_plan.rs", include_str!("../src/migration_plan.rs")),
+        (
+            "escape_detector_consumer.rs",
+            include_str!("../src/escape_detector_consumer.rs"),
+        ),
+        ("enterprise_identity.rs", include_str!("../src/enterprise_identity.rs")),
+        (
+            "enterprise_pdp_runtime.rs",
+            include_str!("../src/enterprise_pdp_runtime.rs"),
+        ),
+        ("cassette_replay.rs", include_str!("../src/cassette_replay.rs")),
+    ];
+    let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let source_file_count = std::fs::read_dir(&source_dir)
+        .expect("maos-bin source directory")
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().extension().is_some_and(|extension| extension == "rs"))
+        .count();
+    assert_eq!(
+        SCANNED_SOURCE_FILES.len(),
+        source_file_count,
+        "every maos-bin src/*.rs file must be listed so new files cannot evade this negative"
+    );
+
+    for (file_name, source) in SCANNED_SOURCE_FILES {
+        if file_name == "enterprise_pdp_runtime.rs" {
+            // Whitelisted: read-only roster derivation in `known_spirit_pids` plus test helpers.
+            continue;
+        }
+        assert_eq!(
+            source.matches("manifest_scopes").count(),
+            0,
+            "{file_name} must never seed or consume the manifest-derived policy table"
+        );
+    }
 }

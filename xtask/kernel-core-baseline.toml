@@ -261,4 +261,4 @@
 #          real `cat`-then-`echo` that can only complete if it received EOF; the
 #          private spawn path cannot be exercised from tests/). All additive; no
 #          public symbols removed.
-src_lines = 23202
+src_lines = 23228

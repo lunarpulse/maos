@@ -30,7 +30,7 @@
 //! | `compliance` | Story 1b.4 | Frozen schema, ABI_VERSION bump trigger |
 //! | `gateway` | Story 6.5 | ADR-029 binding-v1.0 |
 //! | `deprecation` | Story 7.1 | Empty-present deprecation channel |
-//! | `MANIFEST_SCHEMA_VERSION = 3` | Story 9.4b | `[model_provenance]` section |
+//! | `MANIFEST_SCHEMA_VERSION = 4` | Story 13.5d | `[capabilities.required.loom]` section |
 //!
 //! ## Modules
 //! | Module | Description | Introduced |
@@ -109,9 +109,9 @@ pub const ABI_VERSION: u32 = 1;
 /// ```rust
 /// use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 ///
-/// assert_eq!(MANIFEST_SCHEMA_VERSION, 3);
+/// assert_eq!(MANIFEST_SCHEMA_VERSION, 4);
 /// ```
-pub const MANIFEST_SCHEMA_VERSION: u32 = 3;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 4;
 
 /// Lowest manifest schema version this kernel accepts at admission.
 ///
@@ -156,7 +156,7 @@ pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1;
 /// assert!(is_version_supported(1));  // N-1 — supported
 /// assert!(is_version_supported(2));  // N-1 — supported
 /// assert!(is_version_supported(3));  // Current — supported
-/// assert!(!is_version_supported(4)); // Future — EAbiTooNew
+/// assert!(is_version_supported(4)); // Current — supported
 /// assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 /// ```
 pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;

@@ -17,6 +17,8 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use maos_domain::invariants::i1::Scope;
+use maos_kernel_core::security::{capabilities_required_to_scopes, CapabilitiesRequired};
 
 /// Single source of truth: every manifest `(section, field)` tuple that
 /// must have ≥3 fixture cases. Section-name maps 1:1 to the directory
@@ -38,6 +40,9 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
     ("class", "trust_tier"),
     ("class", "description"),
     ("capabilities", "provider_complete"),
+    ("capabilities", "loom_read"),
+    ("capabilities", "loom_write"),
+    ("capabilities", "loom_scan"),
     ("posture", "default"),
     ("posture", "allowed_max"),
     ("output_shape", "required_fields"),
@@ -169,6 +174,67 @@ fn find_orphan_fixtures(root: &Path) -> Vec<PathBuf> {
         }
     }
     orphans
+}
+
+fn capability_fixture_paths(root: &Path, category: &str) -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = fs::read_dir(root.join("capabilities").join(category))
+        .expect("capabilities fixture category must be readable")
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|extension| extension.to_str()) == Some("toml"))
+        .collect();
+    paths.sort();
+    paths
+}
+
+#[test]
+fn capabilities_fixtures_deserialize_to_their_declared_outcomes() {
+    let root = fixture_root();
+    let mut fixture_count = 0;
+    for category in CATEGORIES {
+        for path in capability_fixture_paths(&root, category) {
+            fixture_count += 1;
+            let fixture = fs::read_to_string(&path)
+                .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+            let manifest_fragment = if fixture.contains("provider.complete") {
+                fixture
+            } else {
+                format!("provider.complete = [\"anthropic.default\"]\n{fixture}")
+            };
+            let parsed = CapabilitiesRequired::from_toml_str(&manifest_fragment);
+            if *category == "malformed-rejected" {
+                assert!(parsed.is_err(), "{} must be rejected", path.display());
+                continue;
+            }
+            let caps = parsed.unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+            if *category == "edge-case" {
+                match path.file_stem().and_then(|stem| stem.to_str()) {
+                    Some("loom_read") => assert!(!capabilities_required_to_scopes(&caps).contains(&Scope::LoomRead)),
+                    Some("loom_write") => assert!(!capabilities_required_to_scopes(&caps).contains(&Scope::LoomWrite)),
+                    Some("loom_scan") => assert!(!capabilities_required_to_scopes(&caps).contains(&Scope::LoomScan)),
+                    _ => {}
+                }
+            }
+        }
+    }
+    assert_eq!(fixture_count, 12, "every capabilities fixture must be exercised");
+}
+
+#[test]
+fn production_capability_parsers_are_all_schema_degraded() {
+    let main_rs = include_str!("../../maos-bin/src/main.rs");
+    assert_eq!(
+        main_rs.matches("CapabilitiesRequired::from_toml_str").count(),
+        4,
+        "a new production capability parser must add schema degradation coverage"
+    );
+    assert_eq!(
+        main_rs
+            .matches(".degrade_for_schema_version(class_section.manifest_schema_version)")
+            .count(),
+        5,
+        "every direct parser and both caps_required_or_empty admission paths must degrade loom"
+    );
 }
 
 #[test]

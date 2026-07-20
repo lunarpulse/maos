@@ -12,11 +12,12 @@
 //! Topology: MCP streamable-http (async) → spawn_blocking → sync kernel-core
 //!   → this adapter (sync trait) → block_on(async store op) on the injected handle.
 //!
-//! The `block_on` is GUARDED so it can never panic into the kernel: a call
-//! from within a runtime worker context (which would panic) and a shut-down
-//! runtime both map to a typed `CollectivePortError::Unreachable` (AC1 §6 —
-//! typed, halt-safe, no panic, no hang).
+//! The `block_on` is guarded with `catch_unwind`: calls from an async worker
+//! (nested-runtime panic) and calls through a shut-down handle both map to a
+//! typed `CollectivePortError::Unreachable`. A Tokio `spawn_blocking` thread is
+//! allowed even though `Handle::try_current()` is available there.
 
+use std::future::Future;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use std::time::Duration;
@@ -53,32 +54,24 @@ impl LoomLiteAdapter {
     }
 }
 
-/// Run `fut` on the injected handle, mapping any panic-prone condition to a
-/// typed `Unreachable` error (no panic into the kernel).
+/// Run `fut` on the injected handle, mapping a nested-runtime or shut-down
+/// panic to typed `Unreachable` instead of unwinding into the kernel.
 ///
-/// - If a runtime context is already active on this thread, `block_on` would
-///   panic ("cannot start a runtime from within a runtime") → map to
-///   `Unreachable` (the adapter must run on a `spawn_blocking` thread).
-/// - If the runtime has been shut down, `block_on` panics → `catch_unwind`
-///   maps it to `Unreachable`.
+/// Do not preflight with `Handle::try_current()`: Tokio makes the current
+/// handle available inside `spawn_blocking`, which is precisely the supported
+/// bridge topology and can safely call `Handle::block_on`.
 fn block_on_or_typed<F, T>(
     handle: &tokio::runtime::Handle,
     fut: F,
 ) -> Result<T, CollectivePortError>
 where
-    F: std::future::Future<Output = T>,
+    F: Future<Output = T>,
 {
-    if tokio::runtime::Handle::try_current().is_ok() {
-        return Err(CollectivePortError::Unreachable {
-            reason: "collective adapter invoked from within a tokio runtime worker context — \
-                     it must run on a spawn_blocking thread (nested-runtime panic prevented)"
-                .into(),
-        });
-    }
     match catch_unwind(AssertUnwindSafe(|| handle.block_on(fut))) {
         Ok(v) => Ok(v),
         Err(_) => Err(CollectivePortError::Unreachable {
-            reason: "collective-tier runtime handle unavailable (runtime shut down?)".into(),
+            reason: "collective-tier runtime bridge unavailable (nested runtime or shutdown)"
+                .into(),
         }),
     }
 }

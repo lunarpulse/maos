@@ -22,16 +22,16 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 |---|---|
 | `kernel_version` | `0.1.0-alpha` |
 | `abi_version` | `1` |
-| `manifest_schema_version` (current) | `3` |
-| supported schema window | `1..=3` |
+| `manifest_schema_version` (current) | `4` |
+| supported schema window | `1..=4` |
 | workspace crates | `55` |
 
 | Manifest schema | Kernel behavior |
 |---|---|
-| `manifest_schema_version = 3` (current) | ✅ strict load (`deny_unknown_fields`) |
-| `manifest_schema_version = 2` (N-1) | ✅ supported (loads with WARN-level degradation notes) |
+| `manifest_schema_version = 4` (current) | ✅ strict load (`deny_unknown_fields`) |
+| `manifest_schema_version = 3` (N-1) | ✅ supported (loads with WARN-level degradation notes) |
 | `manifest_schema_version < 1` (N-2) | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |
-| `manifest_schema_version > 3` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
+| `manifest_schema_version > 4` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
 | `min_substrate_version` > running `kernel_version` | ⛔ hard refusal — typed `SecurityError::ESubstrateTooOld` (FR8) |
 
 The version gate is **fail-closed in both directions**: an out-of-window

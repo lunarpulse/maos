@@ -12,7 +12,7 @@ review_status: machine
 - [architecture §7.1](https://github.com/lunarpulse/maos/blob/main/_bmad-output/planning-artifacts/architecture-maos-minimal-opus/7-inter-agent-communication.md#71-same-host-the-mailbox) — IAC 프레임 종류 분류
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 Spirit + Host 신원 타입 + FrameKind 판별자 — v0.1-β 이후 와이어 안정.
 

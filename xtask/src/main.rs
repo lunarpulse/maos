@@ -38,6 +38,8 @@ mod check_scale_churn;
 mod check_cohort_mesh;
 // Story 13.1 — physical multi-tenant Loom wall (ADR-055).
 mod check_multi_tenant_loom;
+// Story 13.5d — Reza's mediated production collective route.
+mod check_reza_production_path;
 // Story 11.4a — enterprise PDP integration gate (per-leg independence, ADR-050).
 mod check_enterprise_pdp;
 // Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence, ADR-051).
@@ -799,6 +801,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 13.5d — Reza's mediated production collective route gate.
+    #[command(name = "check-reza-production-path")]
+    CheckRezaProductionPath {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.4a — enterprise PDP integration gate (per-leg independence).
     #[command(name = "check-enterprise-pdp")]
     CheckEnterprisePdp {
@@ -1231,6 +1239,7 @@ fn main() {
         Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
         Commands::CheckCohortMesh { json } => check_cohort_mesh::run(json),
         Commands::CheckMultiTenantLoom { json } => check_multi_tenant_loom::run(json),
+        Commands::CheckRezaProductionPath { json } => check_reza_production_path::run(json),
         Commands::CheckEnterprisePdp { json } => check_enterprise_pdp::run(json),
         Commands::CheckEnterpriseIdentity { json } => check_enterprise_identity::run(json),
         Commands::CheckFkcs { json } => check_fkcs::run(json),

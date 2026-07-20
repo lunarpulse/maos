@@ -1,0 +1,3 @@
+# expect: TOML type error
+[loom]
+write = 1

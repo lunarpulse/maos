@@ -151,6 +151,101 @@ async fn make_store(
     .expect("lazy store construction")
     .with_tenant_map(map)
 }
+#[test]
+fn schema_initialization_wraps_ddl_in_advisory_lock() {
+    let source = include_str!("../src/store.rs");
+    let init_schema = source
+        .split_once("pub async fn init_schema(&self) -> Result<(), StoreError> {")
+        .expect("init_schema exists")
+        .1
+        .split_once("\n    /// Write a value")
+        .expect("init_schema body ends before write")
+        .0;
+    let lock = init_schema
+        .find("SELECT pg_advisory_lock($1)")
+        .expect("schema initialization takes an advisory lock");
+    let ddl = init_schema
+        .find("let schema_result = client.batch_execute(&sql).await;")
+        .expect("schema initialization executes the DDL batch");
+    let unlock = init_schema
+        .find("SELECT pg_advisory_unlock($1)")
+        .expect("schema initialization releases the advisory lock");
+
+    assert!(
+        lock < ddl && ddl < unlock,
+        "schema DDL must execute while its advisory lock is held"
+    );
+}
+
+/// P8: independently pooled callers must serialize the additive DDL batch.
+#[tokio::test]
+#[ignore = "requires MAOS_TEST_POSTGRES_TEAM_A with pgvector"]
+async fn schema_initialization_is_serialized_across_pool_connections() {
+    let _guard = guard();
+    let raw = raw_connect(&team_a_conn()).await;
+    init_fixture_schema(&raw).await;
+    raw.batch_execute(
+        r#"
+        CREATE EXTENSION IF NOT EXISTS vector;
+        DROP INDEX IF EXISTS idx_collective_memory_embedding;
+        DROP INDEX IF EXISTS idx_collective_memory_spirit_key;
+        ALTER TABLE collective_memory DROP COLUMN IF EXISTS embedding;
+        "#,
+    )
+    .await
+    .expect("reset schema-init migration surface");
+
+    let store = Arc::new(
+        LoomLiteStore::new(StoreConfig {
+            connection_string: team_a_conn(),
+            pool_size: 4,
+            ..StoreConfig::default()
+        })
+        .await
+        .expect("lazy store construction"),
+    );
+    let mut calls = Vec::new();
+    for _ in 0..4 {
+        let store = Arc::clone(&store);
+        calls.push(tokio::spawn(async move { store.init_schema().await }));
+    }
+    for call in calls {
+        call.await
+            .expect("schema initialization task did not panic")
+            .expect("concurrent schema initialization succeeds");
+    }
+
+    let embedding_exists: bool = raw
+        .query_one(
+            "SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                    AND table_name = 'collective_memory'
+                    AND column_name = 'embedding'
+            )",
+            &[],
+        )
+        .await
+        .expect("embedding-column query")
+        .get(0);
+    let index_exists: bool = raw
+        .query_one(
+            "SELECT EXISTS (
+                SELECT 1 FROM pg_indexes
+                WHERE schemaname = current_schema()
+                    AND tablename = 'collective_memory'
+                    AND indexname = 'idx_collective_memory_embedding'
+            )",
+            &[],
+        )
+        .await
+        .expect("embedding-index query")
+        .get(0);
+
+    assert!(embedding_exists, "concurrent initialization adds embedding");
+    assert!(index_exists, "concurrent initialization creates HNSW index");
+}
+
 
 #[tokio::test]
 #[ignore = "requires two live Postgres databases"]
@@ -259,6 +354,77 @@ async fn tenant_wall_two_datname_physical_absence_and_assignment_matrix() {
         mismatch_b.init_schema().await,
         Err(StoreError::TenantConnectionMismatch(_))
     ));
+}
+
+/// Story 13.5d AC7 — registration makes the route serve exactly one team.
+///
+/// The positive row must exist in team A and be physically absent from team B.
+/// A second, unregistered pid remains fail-closed.
+#[tokio::test]
+#[ignore = "requires two live Postgres databases"]
+async fn spirit_collective_route_registered_pid_serves_only_own_team() {
+    let _guard = guard();
+    let raw_a = raw_connect(&team_a_conn()).await;
+    let raw_b = raw_connect(&team_b_conn()).await;
+    init_fixture_schema(&raw_a).await;
+    init_fixture_schema(&raw_b).await;
+    let map = Arc::new(LiveTenantMap::new(
+        current_database(&raw_a).await,
+        current_database(&raw_b).await,
+    ));
+    map.register_spirit(7, SpiritId::from("spirit-a"));
+    map.register_spirit(8, SpiritId::from("spirit-b"));
+    let store_a = make_store(team_a_conn(), "team-a", "region-a", map.clone()).await;
+
+    raw_a
+        .execute("DELETE FROM collective_memory", &[])
+        .await
+        .unwrap();
+    raw_b
+        .execute("DELETE FROM collective_memory", &[])
+        .await
+        .unwrap();
+
+    store_a
+        .write(
+            7,
+            &MemoryNamespace::Default,
+            "story-13-5d-route",
+            MemoryValue::Text("registered route served".to_string()),
+        )
+        .await
+        .expect("registered pid writes to its mapped team");
+    assert!(matches!(
+        store_a
+            .write(
+                9,
+                &MemoryNamespace::Default,
+                "story-13-5d-unregistered",
+                MemoryValue::Text("must not land".to_string()),
+            )
+            .await,
+        Err(StoreError::TenantSpiritUnmapped(9))
+    ));
+
+    let rows_a = LoomLiteStore::read_all_rows_from(&raw_a).await.unwrap();
+    let rows_b = LoomLiteStore::read_all_rows_from(&raw_b).await.unwrap();
+    assert!(
+        rows_a.iter().any(|row| row.key == "story-13-5d-route"),
+        "registered route must persist one row in team A"
+    );
+    assert!(
+        rows_b.iter().all(|row| row.key != "story-13-5d-route"),
+        "team A route row must be physically absent from team B"
+    );
+    assert!(
+        rows_a
+            .iter()
+            .all(|row| row.key != "story-13-5d-unregistered")
+            && rows_b
+                .iter()
+                .all(|row| row.key != "story-13-5d-unregistered"),
+        "unregistered pid must write zero rows in either tenant"
+    );
 }
 
 #[tokio::test]

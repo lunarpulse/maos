@@ -28,7 +28,7 @@
 name = "researcher"
 version = "0.5.0"
 abi = "1.0"
-manifest_schema_version = 2
+manifest_schema_version = 4
 min_substrate_version = "0.1.0-alpha"
 forms = ["rust-inproc"]
 trust_tier = "local"
@@ -45,6 +45,11 @@ description = "MAOS Researcher v0.5 reference Spirit — survey-mode distillatio
 # temp ≤0.3. At v0.5 the compressor is seeded/mocked in CI (no live LLM); the
 # declared provider class is the production target.
 provider.complete = ["anthropic.claude-3-5-sonnet-20241022"]
+
+[capabilities.required.loom]
+read = true
+write = true
+scan = false
 
 # Decision B — declare the McpCall { server, tool } capability scopes Researcher
 # WOULD exercise against real web/arXiv/GitHub/citation-graph drivers. At v0.5
