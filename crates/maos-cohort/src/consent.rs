@@ -165,6 +165,7 @@ mod tests {
             t_stale_secs: T_STALE_DEFAULT,
             teams: None,
             signature: ManifestSignature { sig: String::new() },
+            cross_team_consent: Vec::new(),
         }
     }
 

@@ -15,10 +15,10 @@
 //! renaming the allowlist entry in the same diff, which is the discipline
 //! the story wants: diff-reviewable contract changes.
 
-use std::fs;
-use std::path::{Path, PathBuf};
 use maos_domain::invariants::i1::Scope;
 use maos_kernel_core::security::{capabilities_required_to_scopes, CapabilitiesRequired};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Single source of truth: every manifest `(section, field)` tuple that
 /// must have ≥3 fixture cases. Section-name maps 1:1 to the directory
@@ -209,22 +209,33 @@ fn capabilities_fixtures_deserialize_to_their_declared_outcomes() {
             let caps = parsed.unwrap_or_else(|error| panic!("{}: {error}", path.display()));
             if *category == "edge-case" {
                 match path.file_stem().and_then(|stem| stem.to_str()) {
-                    Some("loom_read") => assert!(!capabilities_required_to_scopes(&caps).contains(&Scope::LoomRead)),
-                    Some("loom_write") => assert!(!capabilities_required_to_scopes(&caps).contains(&Scope::LoomWrite)),
-                    Some("loom_scan") => assert!(!capabilities_required_to_scopes(&caps).contains(&Scope::LoomScan)),
+                    Some("loom_read") => {
+                        assert!(!capabilities_required_to_scopes(&caps).contains(&Scope::LoomRead))
+                    }
+                    Some("loom_write") => {
+                        assert!(!capabilities_required_to_scopes(&caps).contains(&Scope::LoomWrite))
+                    }
+                    Some("loom_scan") => {
+                        assert!(!capabilities_required_to_scopes(&caps).contains(&Scope::LoomScan))
+                    }
                     _ => {}
                 }
             }
         }
     }
-    assert_eq!(fixture_count, 12, "every capabilities fixture must be exercised");
+    assert_eq!(
+        fixture_count, 12,
+        "every capabilities fixture must be exercised"
+    );
 }
 
 #[test]
 fn production_capability_parsers_are_all_schema_degraded() {
     let main_rs = include_str!("../../maos-bin/src/main.rs");
     assert_eq!(
-        main_rs.matches("CapabilitiesRequired::from_toml_str").count(),
+        main_rs
+            .matches("CapabilitiesRequired::from_toml_str")
+            .count(),
         4,
         "a new production capability parser must add schema degradation coverage"
     );

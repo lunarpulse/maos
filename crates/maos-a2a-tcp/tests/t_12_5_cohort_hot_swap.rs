@@ -75,6 +75,7 @@ fn reissued_manifest(names: &[String], leaves: &[Leaf], authority: &SigningKey) 
         t_stale_secs: 30,
         teams: None,
         signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: Vec::new(),
     }
     .signed_with(authority)
 }

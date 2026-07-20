@@ -22,6 +22,7 @@
 
 pub mod adapter;
 pub mod canonical;
+pub mod cross_team_consent;
 pub mod migration;
 pub mod replication;
 pub mod schema;

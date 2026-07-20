@@ -26,6 +26,7 @@
 use std::future::Future;
 
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use maos_audit::erasure::merkle::{build_tree, prove_inclusion};
 use maos_audit::sealed_export::{
     derive_region_pubkey, derive_region_signing_seed, derive_team_pubkey, derive_team_signing_seed,
 };
@@ -34,7 +35,7 @@ use maos_domain::team::TeamId;
 
 use super::leaf::{kv_merkle_root, CollectiveKvLeaf};
 use crate::schema;
-use crate::store::LoomLiteStore;
+use crate::store::{LoomLiteStore, RowAttestation};
 
 /// Frozen schema version for the replication-bundle wire shape.
 ///
@@ -86,6 +87,18 @@ pub struct ApplyResult {
     pub skipped_count: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct CrossTeamApplyContext<'a> {
+    pub to_team: &'a TeamId,
+    pub intent: &'a str,
+}
+
+impl<'a> CrossTeamApplyContext<'a> {
+    pub fn new(to_team: &'a TeamId, intent: &'a str) -> Self {
+        Self { to_team, intent }
+    }
+}
+
 /// Receipt attesting that a source region's bundle landed at a destination
 /// region. Signed by the home / control-plane seed over a canonical payload.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -118,6 +131,42 @@ pub enum BundleError {
     StoreError(String),
     #[error("deserialization error: {0}")]
     DeserializationError(String),
+    #[error("cross-team bundle requires an explicit destination team and intent")]
+    CrossTeamContextRequired,
+    #[error("region-only bundle must not carry cross-team apply context")]
+    UnexpectedCrossTeamContext,
+    #[error("destination store home team is invalid: {reason}")]
+    DestinationTeamInvalid { reason: String },
+    #[error("source team {team} equals destination home team")]
+    SelfCrossing { team: TeamId },
+    #[error("destination team mismatch: store={configured}, requested={requested}")]
+    DestinationTeamMismatch {
+        configured: TeamId,
+        requested: TeamId,
+    },
+    #[error("destination region mismatch: store={configured}, requested={requested}")]
+    DestinationRegionMismatch {
+        configured: String,
+        requested: String,
+    },
+    #[error(
+        "destination store has no configured home region for a cross-team apply (requested {requested})"
+    )]
+    DestinationRegionUnconfigured { requested: String },
+    #[error("cross-team leaf identity mismatch at key {key}: {reason}")]
+    LeafIdentityMismatch { key: String, reason: String },
+    #[error("no verifying key configured for the claimed (region {region}, team {team})")]
+    TeamVerifyingKeyUnavailable { region: String, team: TeamId },
+    #[error("cross-team consent denied: {from_team}->{to_team}, intent={intent}")]
+    ConsentDenied {
+        from_team: TeamId,
+        to_team: TeamId,
+        intent: String,
+    },
+    #[error("cross-team consent state stale: {reason}")]
+    ConsentStateStale { reason: String },
+    #[error("cross-team consent state unavailable: {reason}")]
+    ConsentStateUnavailable { reason: String },
 }
 
 // ─── Sign payload construction (pinned — build/verify MUST be symmetric) ────
@@ -157,6 +206,33 @@ fn build_team_sign_payload(
     payload.extend_from_slice(source_team);
     payload.extend_from_slice(root);
     payload
+}
+
+pub(crate) fn verify_team_root_signature(
+    schema_version: u16,
+    source_region: &Region,
+    source_team: &TeamId,
+    root: &[u8; 32],
+    region_sig: &[u8],
+    public_key: &[u8; 32],
+) -> bool {
+    if schema_version != BUNDLE_SCHEMA_VERSION_V2 {
+        return false;
+    }
+    let Ok(verifying_key) = VerifyingKey::from_bytes(public_key) else {
+        return false;
+    };
+    let Ok(signature_bytes) = <[u8; 64]>::try_from(region_sig) else {
+        return false;
+    };
+    let signature = Signature::from_bytes(&signature_bytes);
+    let payload = build_team_sign_payload(
+        schema_version,
+        source_region.as_str().as_bytes(),
+        source_team.as_str().as_bytes(),
+        root,
+    );
+    verifying_key.verify(&payload, &signature).is_ok()
 }
 
 /// Build the canonical byte payload covered by a re-attestation receipt
@@ -223,11 +299,21 @@ pub fn build_replication_bundle(
 /// *claims* a team it cannot sign for — cannot verify (ADV-055-1, the Fork-4
 /// payoff). Build/verify are symmetric on [`build_team_sign_payload`].
 pub fn build_replication_bundle_v2(
-    leaves: Vec<CollectiveKvLeaf>,
+    mut leaves: Vec<CollectiveKvLeaf>,
     source_region: &Region,
     source_team: &TeamId,
     base_seed: &[u8; 32],
 ) -> CrossRegionReplicationBundle {
+    // Stamp the envelope identity onto every leaf BEFORE hashing. The v2
+    // canonical leaf carries `source_region`/`source_team`, and the
+    // destination read path reconstructs each leaf with the envelope team —
+    // an unstamped (first-party) leaf would hash differently at read than at
+    // apply, landing a permanently unreadable row (13.3 review). Stamping is
+    // idempotent for leaves already carrying this exact identity.
+    for leaf in &mut leaves {
+        leaf.source_region = source_region.as_str().to_string();
+        leaf.source_team = Some(source_team.clone());
+    }
     let root = kv_merkle_root(&leaves);
     let sign_payload = build_team_sign_payload(
         BUNDLE_SCHEMA_VERSION_V2,
@@ -376,6 +462,14 @@ fn apply_verified_replication_bundle<'a>(
 
         let mut applied_count = 0usize;
         let mut skipped_count = 0usize;
+        let merkle_tree = bundle.source_team.as_ref().map(|_| {
+            let leaf_hashes: Vec<[u8; 32]> = bundle
+                .leaves
+                .iter()
+                .map(CollectiveKvLeaf::canonical_hash)
+                .collect();
+            build_tree(&leaf_hashes)
+        });
 
         for leaf in &bundle.leaves {
             let namespace =
@@ -406,6 +500,46 @@ fn apply_verified_replication_bundle<'a>(
                 }
             };
 
+            // The persisted bytes must equal the signed bytes: the write path
+            // re-serializes through `value_to_parts`/`namespace_to_parts`, so
+            // a leaf whose bytes do not round-trip (e.g. non-canonical JSON)
+            // would land a row whose read-path reconstructed hash never
+            // matches the persisted one (13.3 review).
+            match schema::value_to_parts(&value) {
+                Ok((kind, data)) if kind == leaf.value_kind && data == leaf.value_data => {}
+                Ok(_) => {
+                    tracing::warn!(
+                        source_region = %leaf.source_region,
+                        key = %leaf.key,
+                        "skipping leaf: value bytes do not round-trip through the store codec"
+                    );
+                    skipped_count += 1;
+                    continue;
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        source_region = %leaf.source_region,
+                        key = %leaf.key,
+                        error = %e,
+                        "skipping leaf: value re-serialization failed"
+                    );
+                    skipped_count += 1;
+                    continue;
+                }
+            }
+            {
+                let (ns_kind, ns_detail) = schema::namespace_to_parts(&namespace);
+                if ns_kind != leaf.namespace_kind.as_str() || ns_detail != leaf.namespace_detail {
+                    tracing::warn!(
+                        source_region = %leaf.source_region,
+                        key = %leaf.key,
+                        "skipping leaf: namespace does not round-trip through the store codec"
+                    );
+                    skipped_count += 1;
+                    continue;
+                }
+            }
+
             // Validate spirit_pid fits in u32 — the schema stores BIGINT (i64)
             // but the CollectiveMemoryPort trait expects u32.  A negative or
             // >u32::MAX value in a bundle is a data-integrity violation; skip it
@@ -424,15 +558,33 @@ fn apply_verified_replication_bundle<'a>(
                 }
             };
 
+            let attestation_parts = merkle_tree.as_ref().and_then(|tree| {
+                let leaf_hash = leaf.canonical_hash();
+                prove_inclusion(tree, leaf_hash).map(|proof| (leaf_hash, proof))
+            });
+            let attestation = attestation_parts
+                .as_ref()
+                .map(|(leaf_hash, inclusion_proof)| RowAttestation {
+                    leaf_canonical_hash: leaf_hash,
+                    merkle_root: &bundle.root,
+                    region_sig: &bundle.region_sig,
+                    bundle_schema_version: bundle.schema_version,
+                    inclusion_proof,
+                });
+
             store
-                .write_with_source(
+                .write_with_source_attested(
                     pid,
                     &namespace,
                     &leaf.key,
                     value,
-                    leaf.source_ts,
-                    &leaf.source_region,
-                    &source_log_ref,
+                    crate::store::WriteSource {
+                        ts: leaf.source_ts,
+                        region: &leaf.source_region,
+                        log_ref: &source_log_ref,
+                        team: bundle.source_team.as_ref(),
+                    },
+                    attestation.as_ref(),
                 )
                 .await
                 .map_err(|e| BundleError::StoreError(e.to_string()))?;
@@ -457,10 +609,105 @@ pub async fn apply_replication_bundle(
     bundle: &CrossRegionReplicationBundle,
     store: &LoomLiteStore,
     dest_region: &str,
+    cross_team: Option<CrossTeamApplyContext<'_>>,
     base_seed: &[u8; 32],
 ) -> Result<ApplyResult, BundleError> {
     verify_replication_bundle(bundle, base_seed)?;
-    apply_verified_replication_bundle(bundle, store, dest_region).await
+    let dest = Region::canonicalize(dest_region)
+        .map_err(|error| BundleError::InvalidRegion(error.to_string()))?;
+    // Region binding: v1 (region-only) bundles keep the legacy leniency — an
+    // unconfigured destination accepts any region. A cross-team bundle binds
+    // to a CONFIGURED destination region: empty is a typed refusal, not a
+    // skipped check (13.3 review).
+    if store.config().home_region.is_empty() {
+        if bundle.source_team.is_some() {
+            return Err(BundleError::DestinationRegionUnconfigured {
+                requested: dest.as_str().to_string(),
+            });
+        }
+    } else if store.config().home_region != dest.as_str() {
+        return Err(BundleError::DestinationRegionMismatch {
+            configured: store.config().home_region.clone(),
+            requested: dest.as_str().to_string(),
+        });
+    }
+    match (bundle.source_team.as_ref(), cross_team) {
+        (None, None) => {}
+        (None, Some(_)) => return Err(BundleError::UnexpectedCrossTeamContext),
+        (Some(_), None) => return Err(BundleError::CrossTeamContextRequired),
+        (Some(from_team), Some(context)) => {
+            let home_team = TeamId::new(&store.config().home_team).map_err(|error| {
+                BundleError::DestinationTeamInvalid {
+                    reason: error.to_string(),
+                }
+            })?;
+            if from_team == &home_team {
+                return Err(BundleError::SelfCrossing { team: home_team });
+            }
+            if context.to_team != &home_team {
+                return Err(BundleError::DestinationTeamMismatch {
+                    configured: home_team,
+                    requested: context.to_team.clone(),
+                });
+            }
+            // Leaf/envelope identity: every leaf must carry the verified
+            // envelope's (region, team). Apply persists the envelope team
+            // alongside a hash of the leaf itself; a mismatch lands rows
+            // that permanently fail the read-path hash check (13.3 review).
+            for leaf in &bundle.leaves {
+                if leaf.source_team.as_ref() != Some(from_team)
+                    || leaf.source_region != bundle.source_region
+                {
+                    return Err(BundleError::LeafIdentityMismatch {
+                        key: leaf.key.clone(),
+                        reason: "leaf (source_region, source_team) differs from the signed \
+                                 bundle envelope"
+                            .to_string(),
+                    });
+                }
+            }
+            let consent =
+                store
+                    .cross_team_consent()
+                    .ok_or_else(|| BundleError::ConsentStateUnavailable {
+                        reason: "no cross-team consent port is configured".to_string(),
+                    })?;
+            let granted = consent
+                .is_granted(from_team, context.to_team, context.intent)
+                .map_err(|error| match error {
+                    crate::cross_team_consent::CrossTeamConsentError::Stale { reason } => {
+                        BundleError::ConsentStateStale { reason }
+                    }
+                    crate::cross_team_consent::CrossTeamConsentError::StateUnavailable {
+                        reason,
+                    } => BundleError::ConsentStateUnavailable { reason },
+                })?;
+            if !granted {
+                return Err(BundleError::ConsentDenied {
+                    from_team: from_team.clone(),
+                    to_team: context.to_team.clone(),
+                    intent: context.intent.to_string(),
+                });
+            }
+            // Write/read coherence: the destination must hold the verifying
+            // key for the claimed (region, team) — the same manifest-declared
+            // pair set the read path enforces. A crossing the destination
+            // could never serve is refused here instead of landing rows that
+            // read back as AttestationInvalid (13.3 review, party-mode D1).
+            let claimed_region = Region::canonicalize(&bundle.source_region)
+                .map_err(|error| BundleError::InvalidRegion(error.to_string()))?;
+            if store
+                .team_verifying_key(&claimed_region, from_team)
+                .is_none()
+            {
+                return Err(BundleError::TeamVerifyingKeyUnavailable {
+                    region: claimed_region.as_str().to_string(),
+                    team: from_team.clone(),
+                });
+            }
+        }
+    }
+    apply_verified_replication_bundle(bundle, store, dest.as_str()).await
 }
 
 // ─── Re-attestation receipt ────────────────────────────────────────────────
@@ -833,8 +1080,17 @@ mod tests {
             &base_seed,
         );
         let genuine_sig_arr: [u8; 64] = genuine.region_sig.as_slice().try_into().unwrap();
+        // The genuine bundle's leaves are stamped with team-A's identity at
+        // build (13.3 review), so its root differs from the forged bundle's —
+        // the positive control signs the GENUINE root.
+        let genuine_payload = build_team_sign_payload(
+            BUNDLE_SCHEMA_VERSION_V2,
+            region.as_str().as_bytes(),
+            team_a.as_str().as_bytes(),
+            &genuine.root,
+        );
         assert!(
-            pk_a.verify(&payload, &Signature::from_bytes(&genuine_sig_arr))
+            pk_a.verify(&genuine_payload, &Signature::from_bytes(&genuine_sig_arr))
                 .is_ok(),
             "genuine team-A signature MUST verify under the independently-derived team-A key \
              (proves verify is not a reject-everything stub)"
@@ -894,12 +1150,73 @@ mod tests {
         .await
         .expect("lazy store construction must not connect");
 
-        let err = apply_replication_bundle(&forged, &store, "us-east-1", &base_seed)
+        let err = apply_replication_bundle(&forged, &store, "us-east-1", None, &base_seed)
             .await
             .unwrap_err();
         assert!(
             matches!(err, BundleError::SignatureVerificationFailed(_)),
             "forged bundle must be refused at verify before any store write, got {err:?}"
+        );
+    }
+
+    /// 13.3 review: a verify-passing bundle whose leaves disagree with the
+    /// signed envelope (region, team) must be refused at apply — before
+    /// consent and before any store access — or apply would persist the
+    /// envelope team alongside a hash of the foreign leaf, landing rows that
+    /// permanently fail the read-path hash check.
+    #[tokio::test]
+    async fn apply_refuses_leaf_identity_mismatch() {
+        let base_seed = [0x42u8; 32];
+        let region = Region::canonicalize("us-east-1").unwrap();
+        let team_a = team("security");
+        let team_b = team("support");
+
+        // Forge: leaves stamped for team-B, envelope claims team-A, signed
+        // with team-A's derived key — verify passes, identity does not.
+        let mut forged_leaves = vec![sample_leaf("us-east-1")];
+        forged_leaves[0].source_team = Some(team_b.clone());
+        let root = kv_merkle_root(&forged_leaves);
+        let payload = build_team_sign_payload(
+            BUNDLE_SCHEMA_VERSION_V2,
+            region.as_str().as_bytes(),
+            team_a.as_str().as_bytes(),
+            &root,
+        );
+        let signing_key =
+            SigningKey::from_bytes(&derive_team_signing_seed(&base_seed, &region, &team_a));
+        let forged = CrossRegionReplicationBundle {
+            schema_version: BUNDLE_SCHEMA_VERSION_V2,
+            source_region: region.as_str().to_string(),
+            root,
+            leaves: forged_leaves,
+            source_team: Some(team_a.clone()),
+            region_sig: signing_key.sign(&payload).to_bytes().to_vec(),
+        };
+        verify_replication_bundle(&forged, &base_seed)
+            .expect("control: the forged envelope verifies under team-A's key");
+
+        let store = LoomLiteStore::new(crate::store::StoreConfig {
+            connection_string: "host=127.0.0.1 port=1 user=maos dbname=maos sslmode=disable"
+                .to_string(),
+            home_region: "us-east-1".to_string(),
+            home_team: "support".to_string(),
+            ..crate::store::StoreConfig::default()
+        })
+        .await
+        .expect("lazy store construction must not connect");
+
+        let err = apply_replication_bundle(
+            &forged,
+            &store,
+            "us-east-1",
+            Some(CrossTeamApplyContext::new(&team_b, "collective:share")),
+            &base_seed,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, BundleError::LeafIdentityMismatch { .. }),
+            "leaf/envelope identity mismatch must refuse at apply, got {err:?}"
         );
     }
 }

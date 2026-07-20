@@ -131,9 +131,12 @@ async fn roundtrip_samples(
                 &MemoryNamespace::Default,
                 "rtt-probe",
                 MemoryValue::Text(format!("v{i}")),
-                ts,
-                "region-a",
-                "",
+                maos_loom_lite::store::WriteSource {
+                    ts: ts,
+                    region: "region-a",
+                    log_ref: "",
+                    team: None,
+                },
             )
             .await
             .expect("write probe to A");
@@ -141,14 +144,14 @@ async fn roundtrip_samples(
         let leaves_a = read_all_leaves(client_a).await;
         let bundle_ab = build_replication_bundle(leaves_a, &region_a, &BASE_SEED);
         verify_replication_bundle(&bundle_ab, &BASE_SEED).expect("verify A->B bundle");
-        apply_replication_bundle(&bundle_ab, store_b, "region-b", &BASE_SEED)
+        apply_replication_bundle(&bundle_ab, store_b, "region-b", None, &BASE_SEED)
             .await
             .expect("apply A->B");
         // build@B → apply(dest=A) — the return leg.
         let leaves_b = read_all_leaves(client_b).await;
         let bundle_ba = build_replication_bundle(leaves_b, &region_b, &BASE_SEED);
         verify_replication_bundle(&bundle_ba, &BASE_SEED).expect("verify B->A bundle");
-        apply_replication_bundle(&bundle_ba, store_a, "region-a", &BASE_SEED)
+        apply_replication_bundle(&bundle_ba, store_a, "region-a", None, &BASE_SEED)
             .await
             .expect("apply B->A");
         // F7 fault-inject: inject INSIDE the measured span (no-op without the

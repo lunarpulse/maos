@@ -117,6 +117,7 @@ fn shipping_state(authority: &SigningKey) -> Arc<CohortManifestState> {
         t_stale_secs: 120,
         teams: None,
         signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: Vec::new(),
     }
     .signed_with(authority);
     let toml = toml::to_string(&manifest).expect("signed manifest serializes");

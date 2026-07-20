@@ -95,6 +95,36 @@ BEGIN
     ) THEN
         ALTER TABLE collective_memory ADD COLUMN source_team TEXT;
     END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'leaf_canonical_hash'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN leaf_canonical_hash BYTEA;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'merkle_root'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN merkle_root BYTEA;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'region_sig'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN region_sig BYTEA;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'bundle_schema_version'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN bundle_schema_version SMALLINT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'inclusion_path'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN inclusion_path BYTEA;
+    END IF;
 END
 $$;
 

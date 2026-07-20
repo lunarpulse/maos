@@ -128,6 +128,7 @@ fn signed_manifest(key: &SigningKey, version: u64) -> String {
         t_stale_secs: 120,
         teams,
         signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: Vec::new(),
     }
     .signed_with(key);
     toml::to_string(&manifest).unwrap()
@@ -740,7 +741,7 @@ fn tenant_mode_boots_on_live_substrate() {
     assert!(
         (refusal.contains("TenantConnectionMismatch")
             || refusal.contains("tenant connection mismatch"))
-            && refusal.contains("expects database"),
+            && refusal.contains("expected database"),
         "wrong-database refusal must identify the tenant boundary; error:\n{refusal}"
     );
 }
@@ -780,7 +781,8 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
             "collective_{method} kernel call must use the same loaded binding"
         );
         assert_eq!(
-            body.matches("CapabilityRegistryPort::record_invocation").count(),
+            body.matches("CapabilityRegistryPort::record_invocation")
+                .count(),
             1,
             "collective_{method} must persist exactly one correlation audit"
         );
@@ -809,29 +811,47 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
 
 #[test]
 fn composition_root_does_not_seed_manifest_scopes() {
-    const SCANNED_SOURCE_FILES: [(&str, &str); 10] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 11] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
+        (
+            "cross_team_consent.rs",
+            include_str!("../src/cross_team_consent.rs"),
+        ),
         ("env_contract.rs", include_str!("../src/env_contract.rs")),
         ("lib.rs", include_str!("../src/lib.rs")),
         ("worker_cli.rs", include_str!("../src/worker_cli.rs")),
-        ("migration_plan.rs", include_str!("../src/migration_plan.rs")),
+        (
+            "migration_plan.rs",
+            include_str!("../src/migration_plan.rs"),
+        ),
         (
             "escape_detector_consumer.rs",
             include_str!("../src/escape_detector_consumer.rs"),
         ),
-        ("enterprise_identity.rs", include_str!("../src/enterprise_identity.rs")),
+        (
+            "enterprise_identity.rs",
+            include_str!("../src/enterprise_identity.rs"),
+        ),
         (
             "enterprise_pdp_runtime.rs",
             include_str!("../src/enterprise_pdp_runtime.rs"),
         ),
-        ("cassette_replay.rs", include_str!("../src/cassette_replay.rs")),
+        (
+            "cassette_replay.rs",
+            include_str!("../src/cassette_replay.rs"),
+        ),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)
         .expect("maos-bin source directory")
         .filter_map(Result::ok)
-        .filter(|entry| entry.path().extension().is_some_and(|extension| extension == "rs"))
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .is_some_and(|extension| extension == "rs")
+        })
         .count();
     assert_eq!(
         SCANNED_SOURCE_FILES.len(),

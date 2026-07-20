@@ -6,12 +6,19 @@
 //! `CollectiveMemoryPort` adapter in `adapter.rs` crosses the boundary
 //! via `spawn_blocking` + an injected runtime handle.
 
-use deadpool_postgres::{Config, ManagerConfig, Pool, PoolConfig, RecyclingMethod, Runtime};
-use maos_domain::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+
+use deadpool_postgres::{Config, ManagerConfig, Pool, PoolConfig, RecyclingMethod, Runtime};
+use maos_audit::erasure::merkle::{verify_proof, MerkleProof};
+use maos_domain::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue};
+use maos_domain::region::Region;
 use tokio_postgres::NoTls;
 
+use crate::cross_team_consent::CrossTeamConsentPort;
+use crate::replication::bundle::verify_team_root_signature;
+use crate::replication::leaf::CollectiveKvLeaf;
 use crate::schema;
 use crate::seal::{AtRestSeal, AtRestSealer};
 use crate::tenant::{TenantMapError, TenantMapPort};
@@ -52,6 +59,55 @@ impl Default for StoreConfig {
     }
 }
 
+/// Explicit source provenance for verified replication writes.
+#[derive(Debug, Clone, Copy)]
+pub struct WriteSource<'a> {
+    pub ts: i64,
+    pub region: &'a str,
+    pub log_ref: &'a str,
+    pub team: Option<&'a TeamId>,
+}
+
+pub(crate) struct RowAttestation<'a> {
+    pub leaf_canonical_hash: &'a [u8; 32],
+    pub merkle_root: &'a [u8; 32],
+    pub region_sig: &'a [u8],
+    pub bundle_schema_version: u16,
+    pub inclusion_proof: &'a MerkleProof,
+}
+
+fn cross_team_namespace_detail(source_team: &TeamId, original_detail: &str) -> String {
+    format!(
+        "xteam:{}:{}",
+        source_team.as_str(),
+        hex::encode(original_detail.as_bytes())
+    )
+}
+
+fn original_cross_team_namespace_detail(
+    source_team: &TeamId,
+    stored_detail: &str,
+) -> Option<String> {
+    let prefix = format!("xteam:{}:", source_team.as_str());
+    let encoded = stored_detail.strip_prefix(&prefix)?;
+    let bytes = hex::decode(encoded).ok()?;
+    String::from_utf8(bytes).ok()
+}
+
+/// Parse the `xteam:<team>:<hex(detail)>` marker written by
+/// [`cross_team_namespace_detail`], returning the claimed team and the
+/// original detail only when the shape is well-formed. The `xteam:` prefix is
+/// effectively reserved: a well-formed marker with a NULL `source_team` is a
+/// consistency violation (13.3 review) and the read path refuses it.
+fn parse_cross_team_marker(stored_detail: &str) -> Option<(TeamId, String)> {
+    let rest = stored_detail.strip_prefix("xteam:")?;
+    let (team, encoded) = rest.split_once(':')?;
+    let team = TeamId::new(team).ok()?;
+    let bytes = hex::decode(encoded).ok()?;
+    let detail = String::from_utf8(bytes).ok()?;
+    Some((team, detail))
+}
+
 /// Async Postgres+pgvector backing store.
 pub struct LoomLiteStore {
     pool: Pool,
@@ -61,6 +117,8 @@ pub struct LoomLiteStore {
     /// Option-A plaintext.
     at_rest_sealer: AtRestSealer,
     tenant_map: Option<Arc<dyn TenantMapPort>>,
+    cross_team_consent: Option<Arc<dyn CrossTeamConsentPort>>,
+    team_verifying_keys: HashMap<(Region, TeamId), [u8; 32]>,
 }
 /// Store-level error type.
 #[derive(Debug, thiserror::Error)]
@@ -80,12 +138,29 @@ pub enum StoreError {
     /// posture.
     #[error("at-rest seal error: {0}")]
     AtRestSeal(String),
-    #[error("tenant map stale: {0}")]
-    TenantMapStale(String),
-    #[error("tenant connection mismatch: {0}")]
-    TenantConnectionMismatch(String),
-    #[error("tenant spirit pid {0} is not registered")]
-    TenantSpiritUnmapped(u32),
+    #[error("tenant map stale: {reason}")]
+    TenantMapStale {
+        team_id: Option<TeamId>,
+        reason: String,
+    },
+    #[error("tenant connection mismatch for store {configured_team}: {reason}")]
+    TenantConnectionMismatch {
+        configured_team: TeamId,
+        caller_team: Option<TeamId>,
+        reason: String,
+    },
+    #[error("tenant spirit pid {spirit_pid} is not registered")]
+    TenantSpiritUnmapped { spirit_pid: u32 },
+    #[error("cross-team consent denied: {from_team}->{to_team}, intent={intent}")]
+    ConsentDenied {
+        from_team: TeamId,
+        to_team: TeamId,
+        intent: String,
+    },
+    #[error("cross-team consent state stale: {reason}")]
+    ConsentStateStale { reason: String },
+    #[error("cross-team attestation invalid for {team_id}: {reason}")]
+    AttestationInvalid { team_id: TeamId, reason: String },
 }
 
 impl From<tokio_postgres::Error> for StoreError {
@@ -179,6 +254,8 @@ impl LoomLiteStore {
             config,
             at_rest_sealer: AtRestSealer::default(),
             tenant_map: None,
+            cross_team_consent: None,
+            team_verifying_keys: HashMap::new(),
         })
     }
 
@@ -202,6 +279,40 @@ impl LoomLiteStore {
     /// Install the verified tenant-map lookup owned by the composition root.
     pub fn with_tenant_map(mut self, tenant_map: Arc<dyn TenantMapPort>) -> Self {
         self.tenant_map = Some(tenant_map);
+        self
+    }
+
+    /// Install the verified directional consent decision owned by the
+    /// composition root.
+    pub fn with_cross_team_consent(
+        mut self,
+        cross_team_consent: Arc<dyn CrossTeamConsentPort>,
+    ) -> Self {
+        self.cross_team_consent = Some(cross_team_consent);
+        self
+    }
+
+    pub(crate) fn cross_team_consent(&self) -> Option<&Arc<dyn CrossTeamConsentPort>> {
+        self.cross_team_consent.as_ref()
+    }
+
+    /// Look up the composition-injected verifying key for a manifest-declared
+    /// `(region, team)` pair. The apply path requires the claimed pair to be
+    /// present (fail-closed) so a crossing never lands rows the read path
+    /// could never verify (13.3 review, party-mode D1).
+    pub(crate) fn team_verifying_key(&self, region: &Region, team: &TeamId) -> Option<&[u8; 32]> {
+        self.team_verifying_keys
+            .iter()
+            .find_map(|((r, t), key)| (r == region && t == team).then_some(key))
+    }
+
+    /// Install public team keys derived at the composition root. The store
+    /// never receives the root seed or any signing key.
+    pub fn with_team_verifying_keys(
+        mut self,
+        team_verifying_keys: HashMap<(Region, TeamId), [u8; 32]>,
+    ) -> Self {
+        self.team_verifying_keys = team_verifying_keys;
         self
     }
 
@@ -281,9 +392,12 @@ impl LoomLiteStore {
             namespace,
             key,
             value,
-            ts,
-            &self.config.home_region,
-            "",
+            WriteSource {
+                ts,
+                region: &self.config.home_region,
+                log_ref: "",
+                team: None,
+            },
         )
         .await
     }
@@ -309,36 +423,52 @@ impl LoomLiteStore {
         namespace: &MemoryNamespace,
         key: &str,
         value: MemoryValue,
-        source_ts: i64,
-        source_region: &str,
-        source_log_ref: &str,
+        source: WriteSource<'_>,
+    ) -> Result<(), StoreError> {
+        self.write_with_source_attested(spirit_pid, namespace, key, value, source, None)
+            .await
+    }
+
+    pub(crate) async fn write_with_source_attested(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+        source: WriteSource<'_>,
+        attestation: Option<&RowAttestation<'_>>,
     ) -> Result<(), StoreError> {
         let client = self.get_client_with_timeout().await?;
 
-        let (ns_kind, ns_detail) = schema::namespace_to_parts(namespace);
+        let (ns_kind, mut ns_detail) = schema::namespace_to_parts(namespace);
+        if let Some(source_team) = source.team {
+            ns_detail = cross_team_namespace_detail(source_team, &ns_detail);
+        }
         let (val_kind, val_data) =
             schema::value_to_parts(&value).map_err(StoreError::Serialization)?;
-
-        // Story 11.4c (AC3): seal the value payload at the write layer. With
-        // a configured hook, `val_data` is transformed into ciphertext BEFORE
-        // the INSERT (sealed-at-rest); without one (default) it is
-        // byte-identical Option-A plaintext. On hook error the write fails
-        // CLOSED here — the `?` returns before `execute`, so NO plaintext is
-        // persisted under a configured seal posture.
         let val_data = self.at_rest_sealer.seal(&val_data)?;
 
-        // Story 11.2a (AC1): conditional LWW upsert.
-        // Total order: (source_ts, source_region) lexicographic.
-        // Overwrite ONLY when incoming strictly dominates stored:
-        //   incoming.source_ts > stored.source_ts
-        //   OR (incoming.source_ts == stored.source_ts AND incoming.source_region > stored.source_region)
-        // This replaces the unconditional DO UPDATE (store.rs:188-191).
+        let leaf_canonical_hash: Option<&[u8]> =
+            attestation.map(|value| value.leaf_canonical_hash.as_slice());
+        let merkle_root: Option<&[u8]> = attestation.map(|value| value.merkle_root.as_slice());
+        let region_sig: Option<&[u8]> = attestation.map(|value| value.region_sig);
+        let bundle_schema_version =
+            attestation.map(|value| i16::try_from(value.bundle_schema_version).unwrap());
+        let inclusion_path = attestation
+            .map(|value| {
+                serde_json::to_vec(value.inclusion_proof)
+                    .map_err(|error| StoreError::Serialization(error.to_string()))
+            })
+            .transpose()?;
+
         client
             .execute(
                 "INSERT INTO collective_memory
                     (spirit_pid, namespace_kind, namespace_detail, key,
-                     value_kind, value_data, timestamp_ns, source_ts, source_region, source_log_ref)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                     value_kind, value_data, timestamp_ns, source_ts, source_region,
+                     source_log_ref, source_team, leaf_canonical_hash, merkle_root,
+                     region_sig, bundle_schema_version, inclusion_path)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                  ON CONFLICT (spirit_pid, namespace_kind, namespace_detail, key)
                  DO UPDATE SET
                      value_kind = EXCLUDED.value_kind,
@@ -346,10 +476,19 @@ impl LoomLiteStore {
                      timestamp_ns = EXCLUDED.timestamp_ns,
                      source_ts = EXCLUDED.source_ts,
                      source_region = EXCLUDED.source_region,
-                     source_log_ref = EXCLUDED.source_log_ref
-                 WHERE EXCLUDED.source_ts > collective_memory.source_ts
-                    OR (EXCLUDED.source_ts = collective_memory.source_ts
-                        AND EXCLUDED.source_region > collective_memory.source_region)",
+                     source_log_ref = EXCLUDED.source_log_ref,
+                     source_team = EXCLUDED.source_team,
+                     leaf_canonical_hash = EXCLUDED.leaf_canonical_hash,
+                     merkle_root = EXCLUDED.merkle_root,
+                     region_sig = EXCLUDED.region_sig,
+                     bundle_schema_version = EXCLUDED.bundle_schema_version,
+                     inclusion_path = EXCLUDED.inclusion_path
+                 WHERE collective_memory.source_team IS NOT DISTINCT FROM EXCLUDED.source_team
+                   AND (
+                       EXCLUDED.source_ts > collective_memory.source_ts
+                       OR (EXCLUDED.source_ts = collective_memory.source_ts
+                           AND EXCLUDED.source_region > collective_memory.source_region)
+                   )",
                 &[
                     &(spirit_pid as i64),
                     &ns_kind,
@@ -357,10 +496,16 @@ impl LoomLiteStore {
                     &key,
                     &val_kind,
                     &val_data,
-                    &source_ts,
-                    &source_ts,
-                    &source_region,
-                    &source_log_ref,
+                    &source.ts,
+                    &source.ts,
+                    &source.region,
+                    &source.log_ref,
+                    &source.team.map(TeamId::as_str),
+                    &leaf_canonical_hash,
+                    &merkle_root,
+                    &region_sig,
+                    &bundle_schema_version,
+                    &inclusion_path,
                 ],
             )
             .await?;
@@ -385,32 +530,90 @@ impl LoomLiteStore {
         let client = self.get_client_with_timeout().await?;
 
         let (ns_kind, ns_detail) = schema::namespace_to_parts(namespace);
-
+        let cross_team_detail_pattern = format!("xteam:%:{}", hex::encode(ns_detail.as_bytes()));
         let rows = client
             .query(
-                "SELECT value_kind, value_data, source_region, source_log_ref
+                "SELECT value_kind, value_data, source_region, source_log_ref,
+                        source_ts, source_team, leaf_canonical_hash, merkle_root,
+                        region_sig, bundle_schema_version, inclusion_path,
+                        namespace_kind, namespace_detail
                  FROM collective_memory
-                 WHERE spirit_pid = $1 AND namespace_kind = $2 AND namespace_detail = $3 AND key = $4",
-                &[&(spirit_pid as i64), &ns_kind, &ns_detail, &key],
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND (namespace_detail = $3 OR namespace_detail LIKE $5)
+                   AND key = $4
+                 ORDER BY (namespace_detail = $3) DESC, source_ts DESC, source_region DESC
+                 LIMIT 1",
+                &[
+                    &(spirit_pid as i64),
+                    &ns_kind,
+                    &ns_detail,
+                    &key,
+                    &cross_team_detail_pattern,
+                ],
             )
             .await?;
 
-        if let Some(row) = rows.first() {
-            let val_kind: &str = row.get(0);
-            let val_data: Vec<u8> = row.get(1);
-            let src_region: String = row.get(2);
-            let src_log_ref: String = row.get(3);
-            // AC4 (F4): fail-closed region-identity — refuse an un-validated
-            // foreign-region row (NFR-Comp-4 "no transparent replication").
-            if !self.region_guard(&src_region, &src_log_ref) {
-                return Ok(None);
-            }
-            let value =
-                schema::parts_to_value(val_kind, &val_data).map_err(StoreError::Serialization)?;
-            Ok(Some(value))
-        } else {
-            Ok(None)
+        let Some(row) = rows.first() else {
+            return Ok(None);
+        };
+        let val_kind: &str = row.get(0);
+        let val_data: Vec<u8> = row.get(1);
+        let src_region: String = row.get(2);
+        let src_log_ref: String = row.get(3);
+        let source_ts: i64 = row.get(4);
+        let source_team_raw: Option<String> = row.get(5);
+        let source_team = source_team_raw
+            .as_deref()
+            .map(TeamId::new)
+            .transpose()
+            .map_err(|error| StoreError::Query(error.to_string()))?;
+        let persisted_leaf_hash: Option<Vec<u8>> = row.get(6);
+        let persisted_root: Option<Vec<u8>> = row.get(7);
+        let persisted_region_sig: Option<Vec<u8>> = row.get(8);
+        let persisted_schema_version: Option<i16> = row.get(9);
+        let persisted_proof: Option<Vec<u8>> = row.get(10);
+        let row_ns_kind: String = row.get(11);
+        let row_ns_detail: String = row.get(12);
+        if !self.region_guard(&src_region, &src_log_ref) {
+            return Ok(None);
         }
+        // Marker ⟺ provenance consistency: a well-formed cross-team marker
+        // with NULL source_team bypasses every attestation check and must be
+        // refused, never served (13.3 review).
+        if source_team.is_none() {
+            if let Some((claimed_team, _)) = parse_cross_team_marker(&row_ns_detail) {
+                return Err(StoreError::AttestationInvalid {
+                    team_id: claimed_team,
+                    reason: "cross-team namespace marker with NULL source_team".to_string(),
+                });
+            }
+        }
+        let logical_ns_detail = source_team
+            .as_ref()
+            .and_then(|team| original_cross_team_namespace_detail(team, &row_ns_detail))
+            .unwrap_or(row_ns_detail);
+        let leaf = CollectiveKvLeaf {
+            source_region: src_region,
+            source_ts,
+            spirit_pid: spirit_pid as i64,
+            namespace_kind: row_ns_kind,
+            namespace_detail: logical_ns_detail,
+            key: key.to_string(),
+            value_kind: val_kind.to_string(),
+            value_data: val_data.clone(),
+            source_team,
+        };
+        self.attestation_guard(
+            &leaf,
+            persisted_leaf_hash.as_deref(),
+            persisted_root.as_deref(),
+            persisted_region_sig.as_deref(),
+            persisted_schema_version,
+            persisted_proof.as_deref(),
+        )?;
+        let value =
+            schema::parts_to_value(val_kind, &val_data).map_err(StoreError::Serialization)?;
+        Ok(Some(value))
     }
 
     /// Scan entries matching a key prefix.
@@ -422,6 +625,12 @@ impl LoomLiteStore {
     /// foreign rows lacking a mediator stamp BEFORE the LIMIT is applied (so
     /// foreign rows do not consume LIMIT slots), and the Rust-side
     /// `region_guard` check is kept as defense-in-depth.
+    ///
+    /// Story 13.3 (review): one physical winner per logical key —
+    /// `DISTINCT ON (key)` with first-party-then-LWW ordering (the same
+    /// winner rule `read` applies via `LIMIT 1`), so a first-party row plus
+    /// cross-team copies of one key never surface as duplicate
+    /// [`MemoryEntry`] identities and duplicates never consume LIMIT slots.
     pub async fn scan(
         &self,
         spirit_pid: u32,
@@ -433,6 +642,7 @@ impl LoomLiteStore {
         let client = self.get_client_with_timeout().await?;
 
         let (ns_kind, ns_detail) = schema::namespace_to_parts(namespace);
+        let cross_team_detail_pattern = format!("xteam:%:{}", hex::encode(ns_detail.as_bytes()));
         let escaped_prefix = prefix
             .replace('\\', "\\\\")
             .replace('%', "\\%")
@@ -441,11 +651,17 @@ impl LoomLiteStore {
 
         let rows = client
             .query(
-                "SELECT namespace_kind, namespace_detail, key, value_kind, value_data, timestamp_ns, source_region, source_log_ref
+                "SELECT DISTINCT ON (key) namespace_kind, namespace_detail, key, value_kind,
+                        value_data, timestamp_ns, source_region, source_log_ref,
+                        source_ts, source_team, leaf_canonical_hash, merkle_root,
+                        region_sig, bundle_schema_version, inclusion_path
                  FROM collective_memory
-                 WHERE spirit_pid = $1 AND namespace_kind = $2 AND namespace_detail = $3 AND key LIKE $4
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND (namespace_detail = $3 OR namespace_detail LIKE $7)
+                   AND key LIKE $4
                    AND (source_region = $6 OR source_log_ref <> '')
-                 ORDER BY key ASC
+                 ORDER BY key ASC, (namespace_detail = $3) DESC,
+                        source_ts DESC, source_region DESC
                  LIMIT $5",
                 &[
                     &(spirit_pid as i64),
@@ -454,34 +670,76 @@ impl LoomLiteStore {
                     &like_pattern,
                     &(limit as i64),
                     &self.config.home_region.as_str(),
+                    &cross_team_detail_pattern,
                 ],
             )
             .await?;
 
         let mut entries = Vec::with_capacity(rows.len());
         for row in &rows {
-            let row_ns_kind: &str = row.get(0);
+            let row_ns_kind: String = row.get(0);
             let row_ns_detail: String = row.get(1);
             let row_key: String = row.get(2);
-            let row_val_kind: &str = row.get(3);
+            let row_val_kind: String = row.get(3);
             let row_val_data: Vec<u8> = row.get(4);
             let row_ts: i64 = row.get(5);
             let src_region: String = row.get(6);
             let src_log_ref: String = row.get(7);
+            let source_ts: i64 = row.get(8);
+            let source_team_raw: Option<String> = row.get(9);
+            let source_team = source_team_raw
+                .as_deref()
+                .map(TeamId::new)
+                .transpose()
+                .map_err(|error| StoreError::Query(error.to_string()))?;
+            let persisted_leaf_hash: Option<Vec<u8>> = row.get(10);
+            let persisted_root: Option<Vec<u8>> = row.get(11);
+            let persisted_region_sig: Option<Vec<u8>> = row.get(12);
+            let persisted_schema_version: Option<i16> = row.get(13);
+            let persisted_proof: Option<Vec<u8>> = row.get(14);
 
-            // AC4 (F4): fail-closed region-identity — filter out an un-validated
-            // foreign-region row (NFR-Comp-4 "no transparent replication").
             if !self.region_guard(&src_region, &src_log_ref) {
                 continue;
             }
+            // Same marker ⟺ provenance consistency refusal as `read`.
+            if source_team.is_none() {
+                if let Some((claimed_team, _)) = parse_cross_team_marker(&row_ns_detail) {
+                    return Err(StoreError::AttestationInvalid {
+                        team_id: claimed_team,
+                        reason: "cross-team namespace marker with NULL source_team".to_string(),
+                    });
+                }
+            }
+            let logical_ns_detail = source_team
+                .as_ref()
+                .and_then(|team| original_cross_team_namespace_detail(team, &row_ns_detail))
+                .unwrap_or(row_ns_detail);
+            let leaf = CollectiveKvLeaf {
+                source_region: src_region,
+                source_ts,
+                spirit_pid: spirit_pid as i64,
+                namespace_kind: row_ns_kind.clone(),
+                namespace_detail: logical_ns_detail.clone(),
+                key: row_key.clone(),
+                value_kind: row_val_kind.clone(),
+                value_data: row_val_data.clone(),
+                source_team,
+            };
+            self.attestation_guard(
+                &leaf,
+                persisted_leaf_hash.as_deref(),
+                persisted_root.as_deref(),
+                persisted_region_sig.as_deref(),
+                persisted_schema_version,
+                persisted_proof.as_deref(),
+            )?;
 
-            let ns = schema::parts_to_namespace(row_ns_kind, &row_ns_detail)
+            let ns = schema::parts_to_namespace(&row_ns_kind, &logical_ns_detail)
                 .map_err(StoreError::Serialization)?;
-            let val = schema::parts_to_value(row_val_kind, &row_val_data)
+            let val = schema::parts_to_value(&row_val_kind, &row_val_data)
                 .map_err(StoreError::Serialization)?;
-
             let entry = MemoryEntry::new(ns, row_key, val, row_ts as u64)
-                .map_err(|e| StoreError::Serialization(format!("invalid entry: {e}")))?;
+                .map_err(|error| StoreError::Serialization(format!("invalid entry: {error}")))?;
             entries.push(entry);
         }
 
@@ -498,18 +756,33 @@ impl LoomLiteStore {
         if self.config.home_team.is_empty() {
             return Ok(());
         }
-        let home_team = TeamId::new(&self.config.home_team)
-            .map_err(|error| StoreError::TenantMapStale(error.to_string()))?;
-        let tenant_map = self.tenant_map.as_ref().ok_or_else(|| {
-            StoreError::TenantMapStale("tenant map is not configured".to_string())
-        })?;
-        let expected_database = tenant_map
-            .datname_for(&home_team)
-            .map_err(|error| StoreError::TenantMapStale(error.to_string()))?;
+        let home_team =
+            TeamId::new(&self.config.home_team).map_err(|error| StoreError::TenantMapStale {
+                team_id: None,
+                reason: error.to_string(),
+            })?;
+        let tenant_map = self
+            .tenant_map
+            .as_ref()
+            .ok_or_else(|| StoreError::TenantMapStale {
+                team_id: Some(home_team.clone()),
+                reason: "tenant map is not configured".to_string(),
+            })?;
+        let expected_database =
+            tenant_map
+                .datname_for(&home_team)
+                .map_err(|error| StoreError::TenantMapStale {
+                    team_id: Some(home_team.clone()),
+                    reason: error.to_string(),
+                })?;
         if expected_database != current_database {
-            return Err(StoreError::TenantConnectionMismatch(format!(
-                "team {home_team} expects database {expected_database}, connected to {current_database}"
-            )));
+            return Err(StoreError::TenantConnectionMismatch {
+                configured_team: home_team,
+                caller_team: None,
+                reason: format!(
+                    "expected database {expected_database}, connected to {current_database}"
+                ),
+            });
         }
         Ok(())
     }
@@ -531,27 +804,120 @@ impl LoomLiteStore {
         if self.config.home_team.is_empty() {
             return Ok(());
         }
-        let tenant_map = self.tenant_map.as_ref().ok_or_else(|| {
-            StoreError::TenantMapStale("tenant map is not configured".to_string())
-        })?;
+        let configured_team =
+            TeamId::new(&self.config.home_team).map_err(|error| StoreError::TenantMapStale {
+                team_id: None,
+                reason: error.to_string(),
+            })?;
+        let tenant_map = self
+            .tenant_map
+            .as_ref()
+            .ok_or_else(|| StoreError::TenantMapStale {
+                team_id: Some(configured_team.clone()),
+                reason: "tenant map is not configured".to_string(),
+            })?;
         let caller_team = tenant_map
             .team_of(spirit_pid)
             .map_err(|error| match error {
                 TenantMapError::Stale { reason } | TenantMapError::StateUnavailable { reason } => {
-                    StoreError::TenantMapStale(reason)
+                    StoreError::TenantMapStale {
+                        team_id: Some(configured_team.clone()),
+                        reason,
+                    }
                 }
                 TenantMapError::SpiritUnmapped { spirit_pid } => {
-                    StoreError::TenantSpiritUnmapped(spirit_pid)
+                    StoreError::TenantSpiritUnmapped { spirit_pid }
                 }
-                TenantMapError::TeamUnknown { team_id } => StoreError::TenantMapStale(format!(
-                    "team {team_id} is absent from the verified tenant map"
-                )),
+                TenantMapError::TeamUnknown { team_id } => StoreError::TenantMapStale {
+                    reason: format!("team {team_id} is absent from the verified tenant map"),
+                    team_id: Some(team_id),
+                },
             })?;
-        if caller_team.as_str() != self.config.home_team {
-            return Err(StoreError::TenantConnectionMismatch(format!(
-                "store team {}, caller team {}",
-                self.config.home_team, caller_team
-            )));
+        if caller_team != configured_team {
+            return Err(StoreError::TenantConnectionMismatch {
+                configured_team,
+                caller_team: Some(caller_team),
+                reason: "caller team differs from the store home team".to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Verify the team-axis row attestation after query and before serving.
+    ///
+    /// The selected plaintext posture intentionally recomputes the canonical
+    /// leaf hash from the exact persisted row. When an at-rest seal is
+    /// configured, cross-team reads fail closed until Story 13.5a supplies the
+    /// missing unseal path; first-party rows remain unaffected.
+    #[allow(clippy::too_many_arguments)]
+    fn attestation_guard(
+        &self,
+        leaf: &CollectiveKvLeaf,
+        persisted_leaf_hash: Option<&[u8]>,
+        persisted_root: Option<&[u8]>,
+        persisted_region_sig: Option<&[u8]>,
+        persisted_schema_version: Option<i16>,
+        persisted_proof: Option<&[u8]>,
+    ) -> Result<(), StoreError> {
+        let Some(source_team) = leaf.source_team.as_ref() else {
+            return Ok(());
+        };
+        let invalid = |reason: &str| StoreError::AttestationInvalid {
+            team_id: source_team.clone(),
+            reason: reason.to_string(),
+        };
+        if self.at_rest_sealer.is_configured() {
+            return Err(invalid("configured seal has no paired unseal path"));
+        }
+        let (
+            Some(persisted_leaf_hash),
+            Some(persisted_root),
+            Some(persisted_region_sig),
+            Some(persisted_schema_version),
+            Some(persisted_proof),
+        ) = (
+            persisted_leaf_hash,
+            persisted_root,
+            persisted_region_sig,
+            persisted_schema_version,
+            persisted_proof,
+        )
+        else {
+            return Err(invalid("required attestation column is NULL"));
+        };
+        let leaf_hash = <[u8; 32]>::try_from(persisted_leaf_hash)
+            .map_err(|_| invalid("leaf hash is not 32 bytes"))?;
+        let root = <[u8; 32]>::try_from(persisted_root)
+            .map_err(|_| invalid("Merkle root is not 32 bytes"))?;
+        let schema_version = u16::try_from(persisted_schema_version)
+            .map_err(|_| invalid("bundle schema version is negative"))?;
+        let proof = serde_json::from_slice::<MerkleProof>(persisted_proof)
+            .map_err(|_| invalid("inclusion proof is malformed"))?;
+        if proof.adjacent_leaf.is_some()
+            || proof.leaf != leaf_hash
+            || leaf.canonical_hash() != leaf_hash
+            || !verify_proof(root, leaf_hash, &proof)
+        {
+            return Err(invalid("row binding or Merkle inclusion failed"));
+        }
+        let source_region = Region::canonicalize(&leaf.source_region)
+            .map_err(|_| invalid("source region is not canonical"))?;
+        let public_key = self
+            .team_verifying_keys
+            .iter()
+            .find_map(|((region, team), key)| {
+                (region == &source_region && team == source_team).then_some(key)
+            })
+            .ok_or_else(|| invalid("no public key for the claimed region and team"))?;
+        if !verify_team_root_signature(
+            schema_version,
+            &source_region,
+            source_team,
+            &root,
+            persisted_region_sig,
+            public_key,
+        ) {
+            return Err(invalid("root signature verification failed"));
         }
         Ok(())
     }
@@ -780,6 +1146,18 @@ mod tests {
         fn register_spirit(&self, _spirit_pid: u32, _spirit_id: SpiritId) {}
     }
 
+    #[test]
+    fn cross_team_namespace_details_are_distinct_and_stable() {
+        let team_a = TeamId::new("team-a").unwrap();
+        let team_b = TeamId::new("team-b").unwrap();
+        let first_party = String::new();
+        let a = cross_team_namespace_detail(&team_a, &first_party);
+        let b = cross_team_namespace_detail(&team_b, &first_party);
+        assert_ne!(a, first_party);
+        assert_ne!(a, b);
+        assert_eq!(a, cross_team_namespace_detail(&team_a, &first_party));
+    }
+
     /// Patch 1 (F18): the store-level typed refusals for a STALE map and an
     /// UNMAPPED spirit MUST be produced by `team_guard` AT THE STORE — the
     /// mapping arms (store.rs match on `TenantMapError`) were previously proven
@@ -801,7 +1179,7 @@ mod tests {
             .with_tenant_map(Arc::new(StaleTenantMap));
         assert!(matches!(
             stale.read(7, &MemoryNamespace::Default, "k").await,
-            Err(StoreError::TenantMapStale(_))
+            Err(StoreError::TenantMapStale { .. })
         ));
         assert!(matches!(
             stale
@@ -812,11 +1190,11 @@ mod tests {
                     MemoryValue::Text("v".to_string()),
                 )
                 .await,
-            Err(StoreError::TenantMapStale(_))
+            Err(StoreError::TenantMapStale { .. })
         ));
         assert!(matches!(
             stale.scan(7, &MemoryNamespace::Default, "k", 8).await,
-            Err(StoreError::TenantMapStale(_))
+            Err(StoreError::TenantMapStale { .. })
         ));
 
         let unmapped = LoomLiteStore::new(dead())
@@ -825,7 +1203,7 @@ mod tests {
             .with_tenant_map(Arc::new(UnmappedTenantMap));
         assert!(matches!(
             unmapped.read(9, &MemoryNamespace::Default, "k").await,
-            Err(StoreError::TenantSpiritUnmapped(9))
+            Err(StoreError::TenantSpiritUnmapped { spirit_pid: 9 })
         ));
         assert!(matches!(
             unmapped
@@ -836,7 +1214,7 @@ mod tests {
                     MemoryValue::Text("v".to_string()),
                 )
                 .await,
-            Err(StoreError::TenantSpiritUnmapped(9))
+            Err(StoreError::TenantSpiritUnmapped { spirit_pid: 9 })
         ));
     }
 
@@ -897,7 +1275,7 @@ mod tests {
         store.connection_assignment_guard("maos_team_a").unwrap();
         assert!(matches!(
             store.connection_assignment_guard("maos_team_b"),
-            Err(StoreError::TenantConnectionMismatch(_))
+            Err(StoreError::TenantConnectionMismatch { .. })
         ));
     }
 }

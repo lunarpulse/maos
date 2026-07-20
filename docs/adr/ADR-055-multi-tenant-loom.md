@@ -1,8 +1,8 @@
 ---
 Status: ratified-v2.2
-Gate: Story 13.1 — `check-multi-tenant-loom`, blocking at v2.2
-Decided: 2026-07-17
-Accepted-in-PR: Story-13.1
+Gate: Stories 13.1–13.3 — `check-multi-tenant-loom`, blocking at v2.2
+Decided: 2026-07-17; amended 2026-07-20
+Accepted-in-PR: Stories 13.1, 13.2, 13.3
 Extends: ADR-054 (team placement hand-off at §1)
 Reuses: ADR-049 (independent-verifier and source-identity discipline), ADR-012 (typed-intent consent)
 ---
@@ -13,18 +13,19 @@ Reuses: ADR-049 (independent-verifier and source-identity discipline), ADR-012 (
 
 ADR-054 owns the signed cohort roster and explicitly hands the team↔region↔database mapping to this decision. Reza is one governed cohort with stable Spirit identities partitioned into teams. A shared table with a team predicate is insufficient: one omitted `WHERE` clause would cross the boundary.
 
-The production collective store is Postgres-only. The kernel exposes one `CollectiveMemoryPort`, not a per-team router, and no production Spirit→collective route exists yet. Story 13.1 therefore ships and proves the storage mechanism per store. **Story 13.5c makes the cohort daemon a single composition root so the verified manifest reaches the tenant map and `MAOS_LOOM_HOME_TEAM` boots — it owns refresh wiring only.** Production multi-store selection and Spirit mediation are **Story 13.5d**; per-operator tenant-refusal audit isolation is **Story 13.5e**.
+The production collective store is Postgres-only. The kernel exposes one `CollectiveMemoryPort`, not a per-team router. Story 13.5c made the cohort daemon a single composition root so the verified manifest reaches the tenant map and tenant mode boots. Story 13.5d added the mediated first-party Spirit route and registration. Story 13.3 adds the verified cross-team apply seam described below, but **no production replication initiator calls it yet**; refusal audit isolation remains Story 13.5e.
 
 ## Decision
 
-### 1. One signed artifact, two explicit schemas
+### 1. One signed artifact, three explicit schemas
 
-The cohort reader accepts exactly `COHORT_SCHEMA_V1 = 1` and `COHORT_SCHEMA_V2 = 2`.
+The cohort reader accepts exactly `COHORT_SCHEMA_V1 = 1`, `COHORT_SCHEMA_V2 = 2`, and `COHORT_SCHEMA_V3 = 3`.
 
 - v1 iff `teams` is absent. Its canonical body and `SIG_DOMAIN_V1 = b"maos.cohort-manifest.v1"` remain byte-for-byte frozen.
-- v2 iff `teams` is present and non-empty. It signs under `SIG_DOMAIN_V2 = b"maos.cohort-manifest.v2"` and appends canonical teams after the unchanged common fields.
-- An unknown schema is rejected before strict full deserialization. A schema/team-shape mismatch is a distinct typed refusal.
-- Tenant-enabled composition requires a fresh, locally verified v2 manifest containing the local host. There is no v1 tenant fallback.
+- v2 and v3 require a present, non-empty `teams` map. V2 signs under the frozen `SIG_DOMAIN_V2 = b"maos.cohort-manifest.v2"`.
+- v3 signs under distinct `SIG_DOMAIN_V3 = b"maos.cohort-manifest.v3"` and appends canonical directional `(from_team, to_team, intent)` grants after teams. Grants require declared unequal endpoints, canonical intent, and no duplicate ordered triples. `(A,B,intent)` never implies `(B,A,intent)`.
+- Unknown schemas are rejected before strict full deserialization. Schema/team/cross-team-shape mismatches and each invalid grant condition are distinct typed refusals.
+- Tenant-enabled composition requires a fresh, locally verified schema-v2-or-newer manifest containing the local host. There is no v1 tenant fallback.
 
 Team entries are sorted by canonical `TeamId` and member references by stable `SpiritId` only for canonical encoding; parsed declaration order is not mutated. `TeamId` is the shared pure `maos-domain` identity with frozen grammar `^[a-z0-9-]{2,32}$`. Each team declares one canonical `Region`, one unique canonical Postgres `datname`, and a non-empty disjoint Spirit member set.
 
@@ -32,13 +33,13 @@ Team entries are sorted by canonical `TeamId` and member references by stable `S
 
 Rollout order is binding:
 
-1. deploy the `{v1,v2}` reader to every cohort host while the authority continues issuing v1;
+1. deploy the `{v1,v2,v3}` reader to every cohort host before the authority issues a higher schema;
 2. confirm every host is upgraded;
-3. issue a signed v2 reissue;
+3. issue a signed higher-schema reissue;
 4. each member verifies and locally journals `MemberReissueAccepted`;
 5. only then enable tenant stores.
 
-An old v1 reader fails closed on v2; premature issuance is an availability split, not successful compatibility. After a node has accepted v2, any v1 reissue is rejected and locally audited as `SchemaDowngrade`, even when its manifest revision is higher. Recovery is a higher v2 revision. Restarted tenant mode also refuses v1.
+An old reader fails closed on an unknown schema; premature issuance is an availability split, not successful compatibility. After a node accepts schema $N$, any lower-schema reissue is rejected and locally audited as `SchemaDowngrade`, even when its manifest revision is higher. Recovery is a higher revision at schema $N$ or newer. Restarted tenant mode likewise enforces schema v2 as a floor.
 
 ### 3. Physical boundary and single guard
 
@@ -46,7 +47,7 @@ A team owns the rows physically present in its database. Every `LoomLiteStore` h
 
 `write_with_source`, `read_all_rows_from`, and `pool()` remain deliberately unguarded infrastructure paths. They operate only on the store's one configured database and are used for verified replication, convergence, schema work, and the physical-absence witness. The Spirit-facing `CollectiveMemoryPort` stays unchanged.
 
-At construction, the manifest assignment for `home_team` must equal `SELECT current_database()`. A mismatch is `StoreError::TenantConnectionMismatch`. Stale state and unmapped live pids are separate typed store refusals. The current port error vocabulary is consciously lossy and carries these as `Transport(reason)`; Story 13.3 may widen the caller-facing taxonomy if cross-team mediation requires it.
+At construction, the manifest assignment for `home_team` must equal `SELECT current_database()`. A mismatch is structured `StoreError::TenantConnectionMismatch`; stale state, unmapped live pids, consent denial, and invalid row attestation remain separate structured store refusals. Story 13.3 preserves the existing `CollectivePortError::Transport(_)` outer shape for kernel compatibility but replaces its lossy string with `TransportCause`, making `consent-denied`, `map-stale`, `attestation-invalid`, `unmapped-spirit`, and `connection-mismatch` distinguishable without string parsing. These refusals are caller-visible but remain unaudited; Story 13.5e owns refusal auditing and per-operator Transparency Log isolation.
 
 ### 4. Staged trust semantics and the D1 team-axis closure (Story 13.2)
 
@@ -54,9 +55,24 @@ Story 13.1 verifies manifest authority, team presence, stable identity membershi
 
 **Story 13.2 (Fork-4 / ADV-055-1) closes the forgery at ENTRY (Option A).** It adds three pieces atomically: (a) a per-team Ed25519 signing key derived by a **second HKDF-SHA256 stage** whose IKM is the region signing seed (`derive_team_signing_seed`/`derive_team_pubkey` in `maos-audit::sealed_export`, welded over `derive_region_signing_seed`); (b) `canonical_kv_leaf` **v2** — `source_team` enters the leaf pre-image under the `maos.collective-kv-leaf.v2` domain tag, while a `None`-team (v1) leaf stays byte-identical so 11.2a cross-region convergence for existing rows is unchanged; (c) `verify_replication_bundle` derives the verifying key from the bundle's **claimed** `(region, team)` — never a key the bundle carries (R-RG1). A team-B member who stamps `source_team = A` (same region) cannot sign under team-A's derived key, so the bundle is refused at `verify` with `BundleError::SignatureVerificationFailed`; because the public `apply_replication_bundle` verifies before invoking its private row-apply helper, the forged row **never lands**. The team verifying key is **derived, not stored**: the manifest remains the authority for *placement*, the operator seed the root for *keys*, and the two trust roots stay separate (no cross-wiring the pinned cohort-authority key at `maos-cohort/src/pin.rs`).
 
-The key is **derived from the claimed identity, never looked up** — there is no team-pubkey field on any port and the store holds neither `base_seed` nor any verifying key. `team_guard` is **unchanged** (still presence-only, three sites); the read-path row-level guard is NOT introduced here.
+Story 13.3 keeps `team_guard` presence-only at its three Spirit-facing sites and adds a distinct two-site post-query `attestation_guard`. The store receives only public `(Region, TeamId)` verification keys derived at composition; neither `base_seed` nor a signing key crosses the port.
 
-**Scope of the 13.2 closure and the 13.3 hand-off.** 13.2 closes D1 on the **team axis at entry only**. It does **not** close: the read-time D1 residual on either axis (nothing is persisted per row for a read to verify — `collective_memory` carries no signature/root/attestation column); the region `source_log_ref` presence residual, which stays **OPEN with no named successor** (the trusted-applied-root registry that was its successor was cut in preflight). Per-row attestation persistence (`source_team` + `merkle_root` + `region_sig` + Merkle inclusion path), the read-path verify-with-inclusion, and production seed→store + cross-team apply wiring all land with **Story 13.3**, which builds the real cross-team write that gives a read guard something to verify. 13.2 supplies the `source_team` provenance and the entry-verify those depend on.
+**Cross-team crossing semantics.** `apply_replication_bundle` verifies the v2 team signature first, then requires an explicit destination team and intent, rejects self/destination mismatch, and consults fresh directional consent in the same function that lands the row. The write persists the verified `source_team`, uses a distinct cross-team namespace detail, and adds a source-team equality condition to its LWW upsert so a destination first-party row cannot be clobbered. Per-row attestation columns bind the landed row to the verified bundle as described below.
+
+**Kernel-mediated writes clarification.** This does not add a `WriteEntryPoint` or a new kernel-mediated cross-team operation. The apply seam is an infrastructure ingress whose signature, destination, and consent checks are colocated and fail closed. Story 13.5d's production Spirit route remains first-party; `build_replication_bundle*` and `apply_replication_bundle` still have no production initiator. The gate carries that dead-wire negative. The region `source_log_ref` presence residual remains OPEN with no named successor.
+
+#### Story 13.3 per-row attestation: claims and posture
+
+For a row carrying `source_team`, the destination persists the source leaf's canonical hash, Merkle root, region/team signature, bundle schema version, and inclusion proof. The post-query `attestation_guard` verifies inclusion and the root signature against composition-injected public `(Region, TeamId)` keys. The root seed remains above the store boundary.
+
+The read verifier is scoped to the default **plaintext-at-rest posture**. To bind the served database row to the signed leaf rather than merely trusting adjacent persisted hash columns, it reconstructs and hashes the complete canonical plaintext row before verifying inclusion. When an at-rest seal hook is configured, cross-team reads fail closed: the missing composition-root unseal path is owned by **Story 13.5a**. First-party rows keep nullable attestation columns and remain unaffected.
+
+| May not claim | Binding limit |
+|---|---|
+| Authorization provenance | The bundle and per-row attestation establish origin integrity only. Consent is a separate apply-time decision. |
+| Merkle multiplicity or ordering | `build_tree` sorts and deduplicates leaf hashes; inclusion proves set membership only. |
+| Seal-independent cross-team reads | Configured sealing refuses cross-team reads until Story 13.5a provides unseal. |
+| Region-axis closure | The existing `source_log_ref` presence residual remains open and the forged-stamp live leg remains served. |
 
 ### 5. Freshness and boot posture
 
@@ -67,14 +83,15 @@ The cohort daemon is **not** a parallel composition root. `run_cohort_a2a_daemon
 ## Consequences and carried gaps
 
 - Database-per-team makes cross-team leakage impossible to express through a second table predicate; the gate witnesses distinct `current_database()` values and physical absence through the unguarded provenance reader.
-- `maos-loom-lite` and `maos-cohort` gain no dependency edge. The adapter lives in `maos-bin`; no crate is added.
-- No `maos-kernel-core/src` line moves; the baseline remains 23202.
-- Story 13.2 adds per-team key derivation (`maos-audit::sealed_export`), `canonical_kv_leaf` v2, and bundle v2 verify-from-claimed-`(region,team)`, all out-of-kernel; the baseline stays 23202, `WriteEntryPoint` is untouched, and the crypto refusal reuses `BundleError::SignatureVerificationFailed` (no new `maos-domain` `E*`).
-- Story 13.2 closes the same-region cross-team forgery at ENTRY (D1, team axis). The **read-time** D1 residual (both axes) and per-row attestation persistence defer to Story 13.3. The **region** `source_log_ref` presence residual remains OPEN with **no named successor** (its intended trusted-applied-root registry was cut in preflight).
-- Collective GDPR erase/legal-hold reach does not exist. Story 13.5b owns the port and kernel cascade.
-- Tenant refusal auditing and per-operator Transparency Log isolation do not exist below the store port. **Story 13.5e** owns them. An unaudited refusal is a named intermediate gap, not ADR-055 completion.
-- Production multi-store routing and a Spirit-facing collective path remain **Story 13.5d**.
-- **Story 13.5c closed refresh wiring** — single composition root, one Transparency Log, one per-boot nonce, and the first production construction of `TenantMapAdapter` (13.1/13.2's walls go live). It changed the A2A boot nonce to per-boot random/single-sourced (NFR-Rel-6, §5). Tenant mode BOOTS but does not SERVE until 13.5d wires `register_spirit`. Baseline stays 23202; ~180 LOC `maos-bin` + ~300 LOC test, no new gate, crate, or dependency.
+- `maos-loom-lite` and `maos-cohort` retain no dependency edge. Manifest/consent/key adapters live in `maos-bin`; no crate is added.
+- Story 13.3 moves no `maos-kernel-core/src` line. The current baseline is 23228 after Story 13.5d's separately authorized +26 delta; `WriteEntryPoint` remains four variants.
+- Story 13.2 closes same-region cross-team forgery at entry. Story 13.3 adds directional consent, source-team persistence, namespace/clobber controls, and read-time team-axis attestation. The **region** `source_log_ref` presence residual remains OPEN with no named successor.
+- Caller-visible refusal causes are structured inside the existing `CollectivePortError::Transport(_)` tuple, so kernel matching stays unchanged. Refusals remain unaudited; Story 13.5e owns refusal auditing and per-operator Transparency Log isolation.
+- Story 13.5d's mediated Spirit route and registration now serve first-party collective operations. Cross-team replication still has no production initiator.
+- Multi-hop/cross-wall provenance and recall remain Story 13.3b; collective erase/legal-hold remains Story 13.5b; the three-team journey remains Story 13.6.
+- Story 13.5c closed refresh wiring and made tenant mode bootable. Its per-boot random, single-sourced A2A nonce remains the NFR-Rel-6 restart detector.
+- The gate has no dedicated xtask self-test that independently inventories its leg registry or cross-checks `ABSENT_SUCCESSORS` against this ADR/coverage matrix. That meta-gap is named, not silently claimed closed.
+- Dead-wire clause `(f-ii) tenant-mode-unbootable` was inverted by Story 13.5c and is covered by the existing live boot leg. Clause `(f-i) no production crossing initiator` remains green with no assigned inverter.
 
 ## Rejected alternatives
 

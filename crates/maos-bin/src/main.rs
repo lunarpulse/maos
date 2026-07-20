@@ -2469,6 +2469,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map(|map| Arc::clone(map) as Arc<dyn maos_loom_lite::tenant::TenantMapPort>);
             let tenant_map = maos_bin::tenant_map::tenant_map_for_store(&home_team, tenant_source)
                 .map_err(|error| format!("maos: tenant map construction failed: {error}"))?;
+            let cross_team_consent = cohort_daemon.as_ref().map(|bootstrap| {
+                Arc::new(maos_bin::cross_team_consent::CrossTeamConsentAdapter::new(
+                    Arc::clone(&bootstrap.state),
+                ))
+                    as Arc<dyn maos_loom_lite::cross_team_consent::CrossTeamConsentPort>
+            });
+            let team_verifying_keys = match cohort_daemon.as_ref() {
+                Some(bootstrap) => {
+                    maos_bin::cross_team_consent::team_verifying_keys_from_env(&bootstrap.state)
+                        .map_err(|error| {
+                            format!("maos: team verifying-key setup failed: {error}")
+                        })?
+                }
+                None => Default::default(),
+            };
             let cfg = maos_loom_lite::store::StoreConfig {
                 connection_string: conn_str,
                 home_region: home_region_str,
@@ -2492,6 +2507,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Some(map) => store.with_tenant_map(Arc::clone(map)),
                         None => store,
                     };
+                    let store = match cross_team_consent {
+                        Some(consent) => store.with_cross_team_consent(consent),
+                        None => store,
+                    };
+                    let store = store.with_team_verifying_keys(team_verifying_keys);
                     let store = Arc::new(store);
                     if let Err(e) = store.init_schema().await {
                         return Err(format!("maos: loom-lite schema init failed: {e}").into());
@@ -4406,9 +4426,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
                 );
                 if kind == LoadedSpiritKind::Researcher
-                    && researcher_collective_failure.is_some_and(|flag| {
-                        flag.load(std::sync::atomic::Ordering::Acquire)
-                    })
+                    && researcher_collective_failure
+                        .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire))
                 {
                     return Err(
                         "maos run: researcher collective readiness round-trip failed".into(),

@@ -327,6 +327,7 @@ fn signed_cohort_manifest(
         t_stale_secs: 30,
         teams: None,
         signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: Vec::new(),
     }
     .signed_with(signer);
     toml::to_string(&manifest).expect("cohort recovery manifest serializes")

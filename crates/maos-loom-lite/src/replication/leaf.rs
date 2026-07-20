@@ -11,6 +11,8 @@
 //!
 //! Each collective-memory KV row reduces to this byte layout:
 //!
+//! ```text
+//!
 //! domain               26 bytes (b"maos.collective-kv-leaf.v1", verbatim)
 //! source_region_len    4 bytes (big-endian u32) + <len> UTF-8 bytes
 //! source_ts            8 bytes (big-endian i64)

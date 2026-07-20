@@ -194,7 +194,9 @@ mod tests {
     fn test_transport_error_should_not_degrade() {
         // A Transport error is a protocol fault (not a recoverable outage),
         // so it must NOT trigger degrade — fail closed.
-        let err = CollectivePortError::Transport("protocol error".to_string());
+        let err = CollectivePortError::Transport(maos_domain::ports::TransportCause::Other {
+            reason: "protocol error".to_string(),
+        });
         assert!(
             !DowngradeRouter::should_degrade(&err),
             "Transport error must NOT degrade — it is a non-recoverable fault"

@@ -137,6 +137,28 @@ pub enum CohortError {
         teams_state: &'static str,
     },
 
+    #[error("cross-team consent is only valid in schema v3, got schema v{schema_version}")]
+    ECohortSchemaCrossTeamConsentMismatch { schema_version: u64 },
+
+    #[error("cross-team consent references undeclared source team {team_id}")]
+    ECrossTeamConsentFromTeamUnknown { team_id: String },
+
+    #[error("cross-team consent references undeclared destination team {team_id}")]
+    ECrossTeamConsentToTeamUnknown { team_id: String },
+
+    #[error("cross-team consent cannot grant a self-crossing for team {team_id}")]
+    ECrossTeamConsentSelfGrant { team_id: String },
+
+    #[error("cross-team consent intent is not canonical: {intent}")]
+    ECrossTeamConsentIntentNotCanonical { intent: String },
+
+    #[error("duplicate cross-team consent grant: {from_team}->{to_team}, intent={intent}")]
+    EDuplicateCrossTeamConsent {
+        from_team: String,
+        to_team: String,
+        intent: String,
+    },
+
     #[error("duplicate team id in cohort manifest: {team_id}")]
     EDuplicateTeamId { team_id: String },
 

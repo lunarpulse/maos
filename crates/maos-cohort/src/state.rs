@@ -402,6 +402,25 @@ impl CohortManifestState {
             <= cached.manifest.t_stale_secs
     }
 
+    /// Freshness and the manifest from ONE locked snapshot: the lease check
+    /// and the returned manifest are evaluated against the same
+    /// `confirmed_at_secs`, so a lease turning stale between two separate
+    /// lock acquisitions can no longer admit a grant on a stale snapshot
+    /// (13.3 review). `Ok(None)` = the lease is stale (fail-closed,
+    /// distinguishable from an unavailable state, which is `Err`).
+    pub fn manifest_if_fresh(&self) -> Result<Option<CohortManifest>, CohortError> {
+        let cached = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        let fresh = self
+            .clock
+            .now_secs()
+            .saturating_sub(cached.confirmed_at_secs)
+            <= cached.manifest.t_stale_secs;
+        Ok(fresh.then(|| cached.manifest.clone()))
+    }
+
     /// Refresh before half of the signed stale lease elapses, leaving the other
     /// half to receive and verify the authority's signed confirmation.
     pub fn confirmation_interval(&self) -> Result<Duration, CohortError> {
@@ -941,14 +960,17 @@ mod tests {
     use super::*;
     use crate::audit::InMemoryCohortAuditSink;
     use crate::manifest::{
-        CohortAuthority, CohortMember, ConsentMatrix, ConsentTuple, ManifestSignature,
-        COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+        CohortAuthority, CohortMember, ConsentMatrix, ConsentTuple, ManifestSignature, TeamEntry,
+        COHORT_SCHEMA_V1, COHORT_SCHEMA_V2, COHORT_SCHEMA_V3, RESERVED_INTENT_HALT_RECEIPT,
+        RESERVED_INTENT_REISSUE,
     };
     use maos_domain::frame::{ConsentEnvelope, FrameAddress, FramePayload, TelemetryEventPayload};
     use maos_domain::invariants::i1::IntentClass;
     use maos_domain::invariants::i13::IntentLineage;
     use maos_domain::invariants::i3::FrameOrigin;
     use maos_domain::invariants::i8::A2AIntent;
+    use maos_domain::region::Region;
+    use maos_domain::team::TeamId;
     use maos_spirit_abi::identity::{FrameKind, SpiritId, SpiritRole};
     use smallvec::smallvec;
 
@@ -983,9 +1005,23 @@ mod tests {
             t_stale_secs: 120,
             teams: None,
             signature: ManifestSignature { sig: String::new() },
+            cross_team_consent: Vec::new(),
         }
         .signed_with(signer);
         toml::to_string(&manifest).expect("serializable test manifest")
+    }
+
+    fn signed_tenant_toml(schema_version: u64, version: u64, signer: &SigningKey) -> String {
+        let mut manifest: CohortManifest =
+            toml::from_str(&signed_toml(version, signer, signer)).unwrap();
+        manifest.schema_version = schema_version;
+        manifest.teams = Some(vec![TeamEntry {
+            team_id: TeamId::new("team-a").unwrap(),
+            region: Region::canonicalize("region-a").unwrap(),
+            datname: "maos_team_a".to_string(),
+            members: vec![SpiritId::from("spirit-a")],
+        }]);
+        toml::to_string(&manifest.signed_with(signer)).unwrap()
     }
 
     fn digest_frame(from: &str, to: &str, control: DigestReadControl) -> IacFrame {
@@ -1090,6 +1126,7 @@ mod tests {
             t_stale_secs: 120,
             teams: None,
             signature: ManifestSignature { sig: String::new() },
+            cross_team_consent: Vec::new(),
         }
         .signed_with(signer);
         let pins = PinnedAuthorityKeys::from_keys(vec![signer.verifying_key()]).unwrap();
@@ -1406,5 +1443,28 @@ mod tests {
             DigestReadPort::observe_reply(&state, &peer, &revoked).unwrap(),
             DigestReplyObservation::Unauthorized
         );
+    }
+    #[test]
+    fn signed_v3_cache_refuses_higher_version_v2_reissue() {
+        let signer = signing_key(15);
+        let pins = PinnedAuthorityKeys::from_keys(vec![signer.verifying_key()]).unwrap();
+        let state = CohortManifestState::load(
+            HostId("host-a".into()),
+            &signed_tenant_toml(COHORT_SCHEMA_V3, 1, &signer),
+            pins,
+            Arc::new(InMemoryCohortAuditSink::default()),
+        )
+        .unwrap();
+        let error = state
+            .apply_reissue(&signed_tenant_toml(COHORT_SCHEMA_V2, 2, &signer))
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            CohortError::ECohortManifestFork {
+                reason: CohortManifestForkReason::SchemaDowngrade,
+                seen_version: 1,
+                rejected_version: 2,
+            }
+        ));
     }
 }

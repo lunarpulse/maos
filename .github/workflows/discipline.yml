@@ -2664,13 +2664,13 @@ jobs:
       - name: Run check-cohort-mesh gate
         run: cargo run -p xtask -- check-cohort-mesh --json
 
-  # Story 13.1 + 13.2 — ADR-055 physical tenant wall + cryptographic tenant
-  # boundary. Hermetic crypto legs (forged-team-stamp-refused-at-verify,
-  # apply-refuses-forged-bundle, team-identity-source-reflex) are Blocking; the
-  # live legs use two databases on one serialized Postgres 16 instance.
+  # Stories 13.1–13.3 plus successor inversions — ADR-055 physical tenant wall,
+  # cryptographic tenant boundary, asymmetric crossing, and per-row attestation.
+  # Hermetic refusal/dead-wire legs are Blocking; live legs use two databases
+  # on one serialized Postgres 16 instance.
   check-multi-tenant-loom:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16
@@ -2701,6 +2701,7 @@ jobs:
         env:
           MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
           MAOS_TEST_POSTGRES_TEAM_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+          MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_team_b
         run: cargo run -p xtask -- check-multi-tenant-loom --json
   # Story 13.5d — Reza's mediated production collective route. Hermetic legs
   # bind at HEAD; the live route runs against two databases on Postgres 16.

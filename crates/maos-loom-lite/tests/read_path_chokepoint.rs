@@ -82,6 +82,15 @@ fn region_guard_wired_into_both_spirit_reads() {
 }
 
 #[test]
+fn attestation_guard_wired_into_both_spirit_reads() {
+    let guard_calls = count_code_occurrences(STORE_SRC, "self.attestation_guard(");
+    assert_eq!(
+        guard_calls, 2,
+        "attestation_guard MUST be invoked exactly in read + scan; found {guard_calls}"
+    );
+}
+
+#[test]
 fn team_guard_is_exactly_the_three_spirit_entry_points() {
     for signature in [
         "pub async fn write(",

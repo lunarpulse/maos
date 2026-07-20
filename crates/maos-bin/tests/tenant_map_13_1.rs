@@ -88,6 +88,7 @@ fn signed_manifest(
         t_stale_secs: 120,
         teams,
         signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: Vec::new(),
     }
     .signed_with(signing_key);
     toml::to_string(&manifest).unwrap()

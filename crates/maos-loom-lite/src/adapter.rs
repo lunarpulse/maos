@@ -23,7 +23,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use maos_domain::memory::{MemoryEntry, MemoryNamespace, MemoryValue};
-use maos_domain::ports::collective_memory::{CollectiveMemoryPort, CollectivePortError};
+use maos_domain::ports::collective_memory::{
+    CollectiveMemoryPort, CollectivePortError, TransportCause,
+};
 
 use crate::store::{LoomLiteStore, StoreError};
 
@@ -138,18 +140,147 @@ impl CollectiveMemoryPort for LoomLiteAdapter {
 }
 
 /// Map store errors to port errors with halt-safe semantics.
-fn store_error_to_port_error(e: StoreError) -> CollectivePortError {
-    match e {
+fn store_error_to_port_error(error: StoreError) -> CollectivePortError {
+    match error {
         StoreError::Pool(reason) => CollectivePortError::Unreachable { reason },
         StoreError::Timeout { timeout_ms } => CollectivePortError::Timeout { timeout_ms },
-        StoreError::Query(msg) => CollectivePortError::Transport(msg),
-        StoreError::Schema(msg) => CollectivePortError::Transport(msg),
-        StoreError::Serialization(msg) => CollectivePortError::Transport(msg),
-        StoreError::AtRestSeal(msg) => CollectivePortError::Transport(msg),
-        StoreError::TenantMapStale(reason) => CollectivePortError::Transport(reason),
-        StoreError::TenantConnectionMismatch(reason) => CollectivePortError::Transport(reason),
-        StoreError::TenantSpiritUnmapped(spirit_pid) => CollectivePortError::Transport(format!(
-            "tenant spirit pid {spirit_pid} is not registered"
-        )),
+        StoreError::Query(reason)
+        | StoreError::Schema(reason)
+        | StoreError::Serialization(reason)
+        | StoreError::AtRestSeal(reason) => {
+            CollectivePortError::Transport(TransportCause::Other { reason })
+        }
+        StoreError::TenantMapStale { team_id, reason } => {
+            CollectivePortError::Transport(TransportCause::MapStale { team_id, reason })
+        }
+        // NOTE (13.3 review): ConsentDenied/ConsentStateStale currently have
+        // no PRODUCTION constructor — the crossing refuses with `BundleError`
+        // below the port, and no initiator is wired until 13.5c. The mapping
+        // is proven by the five-cause matrix; runtime reachability arrives
+        // with the crossing initiator.
+        StoreError::ConsentStateStale { reason } => {
+            CollectivePortError::Transport(TransportCause::MapStale {
+                team_id: None,
+                reason,
+            })
+        }
+        StoreError::TenantConnectionMismatch {
+            configured_team,
+            caller_team,
+            reason,
+        } => CollectivePortError::Transport(TransportCause::ConnectionMismatch {
+            configured_team,
+            caller_team,
+            reason,
+        }),
+        StoreError::TenantSpiritUnmapped { spirit_pid } => {
+            CollectivePortError::Transport(TransportCause::UnmappedSpirit { spirit_pid })
+        }
+        StoreError::ConsentDenied {
+            from_team,
+            to_team,
+            intent,
+        } => CollectivePortError::Transport(TransportCause::ConsentDenied {
+            from_team,
+            to_team,
+            intent,
+        }),
+        StoreError::AttestationInvalid { team_id, reason } => {
+            CollectivePortError::Transport(TransportCause::AttestationInvalid { team_id, reason })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use maos_domain::ports::collective_memory::TransportCause;
+    use maos_domain::team::TeamId;
+
+    #[test]
+    fn five_tenant_consent_causes_remain_distinguishable() {
+        let team_a = TeamId::new("team-a").unwrap();
+        let team_b = TeamId::new("team-b").unwrap();
+        let errors = [
+            StoreError::ConsentDenied {
+                from_team: team_a.clone(),
+                to_team: team_b.clone(),
+                intent: "collective:share".to_string(),
+            },
+            StoreError::TenantMapStale {
+                team_id: Some(team_a.clone()),
+                reason: "lease expired".to_string(),
+            },
+            StoreError::AttestationInvalid {
+                team_id: team_a.clone(),
+                reason: "proof mismatch".to_string(),
+            },
+            StoreError::TenantSpiritUnmapped { spirit_pid: 7 },
+            StoreError::TenantConnectionMismatch {
+                configured_team: team_b.clone(),
+                caller_team: Some(team_a.clone()),
+                reason: "caller team differs".to_string(),
+            },
+        ];
+        let mapped: Vec<CollectivePortError> =
+            errors.into_iter().map(store_error_to_port_error).collect();
+        // Payload-field assertions (13.3 review): the structured fields are
+        // AC4's replacement for string-matching, so the matrix must prove
+        // every field survives the mapping — not just each discriminant.
+        let [consent_denied, map_stale, attestation_invalid, unmapped_spirit, connection_mismatch] =
+            mapped.try_into().expect("five mapped causes");
+        assert!(
+            matches!(
+                &consent_denied,
+                CollectivePortError::Transport(TransportCause::ConsentDenied {
+                    from_team,
+                    to_team,
+                    intent,
+                }) if from_team == &team_a
+                    && to_team == &team_b
+                    && intent == "collective:share"
+            ),
+            "consent-denied must carry the ordered pair and intent: {consent_denied:?}"
+        );
+        assert!(
+            matches!(
+                &map_stale,
+                CollectivePortError::Transport(TransportCause::MapStale {
+                    team_id,
+                    reason,
+                }) if team_id.as_ref() == Some(&team_a) && reason == "lease expired"
+            ),
+            "map-stale must carry the team identity and reason: {map_stale:?}"
+        );
+        assert!(
+            matches!(
+                &attestation_invalid,
+                CollectivePortError::Transport(TransportCause::AttestationInvalid {
+                    team_id,
+                    reason,
+                }) if team_id == &team_a && reason == "proof mismatch"
+            ),
+            "attestation-invalid must carry the team and reason: {attestation_invalid:?}"
+        );
+        assert!(
+            matches!(
+                &unmapped_spirit,
+                CollectivePortError::Transport(TransportCause::UnmappedSpirit { spirit_pid: 7 })
+            ),
+            "unmapped-spirit must carry the spirit pid: {unmapped_spirit:?}"
+        );
+        assert!(
+            matches!(
+                &connection_mismatch,
+                CollectivePortError::Transport(TransportCause::ConnectionMismatch {
+                    configured_team,
+                    caller_team,
+                    reason,
+                }) if configured_team == &team_b
+                    && caller_team.as_ref() == Some(&team_a)
+                    && reason == "caller team differs"
+            ),
+            "connection-mismatch must carry both teams and reason: {connection_mismatch:?}"
+        );
     }
 }

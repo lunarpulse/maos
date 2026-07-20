@@ -5,9 +5,15 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use maos_audit::sealed_export::derive_team_pubkey;
 use maos_domain::memory::{MemoryNamespace, MemoryValue};
 use maos_domain::ports::registry::SpiritId;
+use maos_domain::region::Region;
 use maos_domain::team::TeamId;
+use maos_loom_lite::cross_team_consent::{CrossTeamConsentError, CrossTeamConsentPort};
+use maos_loom_lite::replication::bundle::{
+    apply_replication_bundle, build_replication_bundle_v2, CrossTeamApplyContext,
+};
 use maos_loom_lite::replication::leaf::{
     compute_kv_payload_oracle, kv_merkle_root, CollectiveKvLeaf,
 };
@@ -16,6 +22,23 @@ use maos_loom_lite::tenant::{TenantMapError, TenantMapPort};
 use tokio_postgres::NoTls;
 
 static PG_LOCK: Mutex<()> = Mutex::new(());
+
+const TEAM_BASE_SEED: [u8; 32] = [0x42; 32];
+
+struct TeamCToAConsent;
+
+impl CrossTeamConsentPort for TeamCToAConsent {
+    fn is_granted(
+        &self,
+        from_team: &TeamId,
+        to_team: &TeamId,
+        intent: &str,
+    ) -> Result<bool, CrossTeamConsentError> {
+        Ok(from_team.as_str() == "team-c"
+            && to_team.as_str() == "team-a"
+            && intent == "collective:share")
+    }
+}
 
 fn guard() -> std::sync::MutexGuard<'static, ()> {
     PG_LOCK.lock().unwrap_or_else(|error| error.into_inner())
@@ -78,6 +101,11 @@ async fn init_fixture_schema(client: &tokio_postgres::Client) {
                     kind <> 'pattern' OR (source_log_ref <> '' AND distillation_depth > 0)
                 )
             );
+            ALTER TABLE collective_memory ADD COLUMN IF NOT EXISTS leaf_canonical_hash BYTEA;
+            ALTER TABLE collective_memory ADD COLUMN IF NOT EXISTS merkle_root BYTEA;
+            ALTER TABLE collective_memory ADD COLUMN IF NOT EXISTS region_sig BYTEA;
+            ALTER TABLE collective_memory ADD COLUMN IF NOT EXISTS bundle_schema_version SMALLINT;
+            ALTER TABLE collective_memory ADD COLUMN IF NOT EXISTS inclusion_path BYTEA;
             "#,
         )
         .await
@@ -246,7 +274,6 @@ async fn schema_initialization_is_serialized_across_pool_connections() {
     assert!(index_exists, "concurrent initialization creates HNSW index");
 }
 
-
 #[tokio::test]
 #[ignore = "requires two live Postgres databases"]
 async fn tenant_wall_two_datname_physical_absence_and_assignment_matrix() {
@@ -295,7 +322,7 @@ async fn tenant_wall_two_datname_physical_absence_and_assignment_matrix() {
                 MemoryValue::Text("must refuse".to_string()),
             )
             .await,
-        Err(StoreError::TenantConnectionMismatch(_))
+        Err(StoreError::TenantConnectionMismatch { .. })
     ));
 
     // Patch 4: reverse direction — a team-a spirit (7) writing through team-b's
@@ -310,7 +337,7 @@ async fn tenant_wall_two_datname_physical_absence_and_assignment_matrix() {
                 MemoryValue::Text("must refuse".to_string()),
             )
             .await,
-        Err(StoreError::TenantConnectionMismatch(_))
+        Err(StoreError::TenantConnectionMismatch { .. })
     ));
 
     // Patch 5: positive connection-assignment path against real Postgres.
@@ -318,7 +345,7 @@ async fn tenant_wall_two_datname_physical_absence_and_assignment_matrix() {
     // init_schema's self-check (store.rs:213-220) MUST pass. The subsequent
     // CREATE EXTENSION vector step may fail on the pgvector-less CI image, but
     // the assignment guard runs first — it must never be the refusal.
-    if let Err(StoreError::TenantConnectionMismatch(reason)) = store_a.init_schema().await {
+    if let Err(StoreError::TenantConnectionMismatch { reason, .. }) = store_a.init_schema().await {
         panic!("positive connection-assignment must not refuse: {reason}");
     }
 
@@ -340,7 +367,7 @@ async fn tenant_wall_two_datname_physical_absence_and_assignment_matrix() {
     .with_tenant_map(map.clone());
     assert!(matches!(
         mismatch_a.init_schema().await,
-        Err(StoreError::TenantConnectionMismatch(_))
+        Err(StoreError::TenantConnectionMismatch { .. })
     ));
     let mismatch_b = LoomLiteStore::new(StoreConfig {
         connection_string: team_b_conn(),
@@ -352,7 +379,7 @@ async fn tenant_wall_two_datname_physical_absence_and_assignment_matrix() {
     .with_tenant_map(map);
     assert!(matches!(
         mismatch_b.init_schema().await,
-        Err(StoreError::TenantConnectionMismatch(_))
+        Err(StoreError::TenantConnectionMismatch { .. })
     ));
 }
 
@@ -403,7 +430,7 @@ async fn spirit_collective_route_registered_pid_serves_only_own_team() {
                 MemoryValue::Text("must not land".to_string()),
             )
             .await,
-        Err(StoreError::TenantSpiritUnmapped(9))
+        Err(StoreError::TenantSpiritUnmapped { spirit_pid: 9 })
     ));
 
     let rows_a = LoomLiteStore::read_all_rows_from(&raw_a).await.unwrap();
@@ -452,9 +479,12 @@ async fn tenant_wall_d1_forged_stamp_is_still_served_boundary() {
             &MemoryNamespace::Default,
             "forged-stamp",
             MemoryValue::Text("presence-only boundary".to_string()),
-            1_700_000_000_000_000_003,
-            "region-b",
-            "forged-non-empty-log-ref",
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_003,
+                region: "region-b",
+                log_ref: "forged-non-empty-log-ref",
+                team: None,
+            },
         )
         .await
         .expect("infrastructure injection demonstrates staged boundary");
@@ -491,7 +521,16 @@ async fn tenant_wall_per_team_merkle_independence_mixed_v1_v2() {
     ));
     map.register_spirit(7, SpiritId::from("spirit-a"));
     map.register_spirit(8, SpiritId::from("spirit-b"));
-    let store_a = make_store(team_a_conn(), "team-a", "region-a", map.clone()).await;
+    let team_a = TeamId::new("team-a").unwrap();
+    let team_c = TeamId::new("team-c").unwrap();
+    let region_c = Region::canonicalize("region-c").unwrap();
+    let store_a = make_store(team_a_conn(), "team-a", "region-a", map.clone())
+        .await
+        .with_cross_team_consent(Arc::new(TeamCToAConsent))
+        .with_team_verifying_keys(HashMap::from([(
+            (region_c.clone(), team_c.clone()),
+            derive_team_pubkey(&TEAM_BASE_SEED, &region_c, &team_c),
+        )]));
     let store_b = make_store(team_b_conn(), "team-b", "region-b", map).await;
     raw_a
         .execute("DELETE FROM collective_memory", &[])
@@ -514,19 +553,29 @@ async fn tenant_wall_per_team_merkle_independence_mixed_v1_v2() {
             .await
             .expect("team-a v1 write");
     }
-    // team-A: a re-attested v2 cross-team COPY (source_team = 'team-c'), inserted
-    // via raw SQL — 13.2 has no production path that writes source_team (that is
-    // 13.3); this synthesizes the mixed store a read would see.
-    raw_a
-        .execute(
-            "INSERT INTO collective_memory
-                (spirit_pid, namespace_kind, namespace_detail, key, value_kind, value_data,
-                 timestamp_ns, source_ts, source_region, source_log_ref, source_team)
-             VALUES (9, 'default', '', 'c-copy', 'text', $1, 0, 5, 'region-c', 'stamp', 'team-c')",
-            &[&b"cross-team-copy".to_vec()],
-        )
-        .await
-        .expect("v2 cross-team copy insert");
+    // team-A: a verified v2 cross-team COPY through the production apply seam.
+    let cross_team_leaf = CollectiveKvLeaf {
+        source_region: "region-c".to_string(),
+        source_ts: 5,
+        spirit_pid: 9,
+        namespace_kind: "default".to_string(),
+        namespace_detail: String::new(),
+        key: "c-copy".to_string(),
+        value_kind: "text".to_string(),
+        value_data: b"cross-team-copy".to_vec(),
+        source_team: Some(team_c.clone()),
+    };
+    let cross_team_bundle =
+        build_replication_bundle_v2(vec![cross_team_leaf], &region_c, &team_c, &TEAM_BASE_SEED);
+    apply_replication_bundle(
+        &cross_team_bundle,
+        &store_a,
+        "region-a",
+        Some(CrossTeamApplyContext::new(&team_a, "collective:share")),
+        &TEAM_BASE_SEED,
+    )
+    .await
+    .expect("v2 cross-team copy apply");
 
     // team-B: a disjoint first-party row.
     store_b

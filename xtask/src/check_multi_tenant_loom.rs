@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! Story 13.1 — physical multi-tenant Loom wall gate.
+//! Stories 13.1–13.5d — physical multi-tenant Loom wall and crossing gate.
 //!
 //! Hermetic legs are [`BindingClass::Blocking`] at development HEAD. Live
 //! Postgres legs are [`BindingClass::AdvisorySubstrate`]: absence emits a
@@ -13,12 +13,7 @@ use std::process::Command;
 use crate::gate_common::{dev_enforced_red_blocks, emit_command, read_disposition, BindingClass};
 
 const GATE_NAME: &str = "check-multi-tenant-loom";
-const ABSENT_SUCCESSORS: &[&str] = &[
-    // Story 13.2 closed the per-team cryptographic key boundary at ENTRY
-    // (removed from this list). The region `source_log_ref` presence residual
-    // (D1, region axis) remains OPEN with NO named successor (G7 / Round-2).
-    "13.3 widened caller-facing tenant error taxonomy",
-];
+const ABSENT_SUCCESSORS: &[&str] = &[];
 
 struct TestLeg {
     name: &'static str,
@@ -250,6 +245,134 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        // ── Story 13.3 — asymmetric cross-team consent + row attestation.
+        TestLeg {
+            name: "cross-team-crossing-lands-with-bound-source-team",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "cross_region_live",
+                "cross_team_crossing_lands_with_bound_source_team",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "asymmetric-consent-reverse-share-refused",
+            class: BindingClass::AdvisorySubstrate,
+            // Composition-level observer (13.3 review): the headline negative
+            // is driven by the PRODUCTION manifest-backed consent adapter
+            // over a signed V3 manifest, on two physical databases — never a
+            // hard-coded consent stub.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_team_consent_13_3",
+                "asymmetric_consent_reverse_share_refused",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-team-clobber-refused",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "cross_region_live",
+                "cross_team_clobber_refused",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "per-row-inclusion-verified-at-read-time",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "cross_region_live",
+                "per_row_inclusion_verified_at_read_time",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "foreign-team-row-without-attestation-refused-at-read",
+            class: BindingClass::AdvisorySubstrate,
+            // AC5(d) — registered at the 13.3 review: previously the test
+            // existed but no leg invoked it, so the refusal could regress
+            // silently (the test is #[ignore]-gated and runs nowhere else).
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "cross_region_live",
+                "unattested_cross_team_row_is_refused_at_read",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-team-apply-requires-claimed-pair-verifying-key",
+            class: BindingClass::Blocking,
+            // Party-mode D1 (13.3 review): apply must refuse a crossing whose
+            // claimed (region, team) the destination could never serve.
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "cross_team_apply_13_3",
+                "apply_refuses_crossing_without_claimed_pair_verifying_key",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tenant-consent-cause-taxonomy",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--lib",
+                "adapter::tests::five_tenant_consent_causes_remain_distinguishable",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "replication-crossing-has-no-production-initiator",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_consent_13_3",
+                "replication_crossing_has_no_production_initiator",
+                "--",
+                "--exact",
+            ],
+        },
         // ── Story 13.5c — single composition root + bootable tenant mode.
         TestLeg {
             name: "cohort-daemon-boots-and-serves",
@@ -332,7 +455,7 @@ pub fn run(json: bool) -> Result<(), String> {
         })
         .collect();
 
-    let kernel_green = crate::check_kernel_baseline::check()?.passed;
+    let kernel_report = crate::check_kernel_baseline::check()?;
     legs.push((
         BindingClass::Blocking,
         LegResult {
@@ -340,11 +463,17 @@ pub fn run(json: bool) -> Result<(), String> {
             binding: class_name(BindingClass::Blocking),
             attempted: true,
             substrate_present: true,
-            green: kernel_green,
-            detail: if kernel_green {
-                "kernel baseline actual=pinned=23228 (Story 13.5d authorized +26)".to_string()
+            green: kernel_report.passed,
+            detail: if kernel_report.passed {
+                format!(
+                    "kernel baseline actual=pinned={}",
+                    kernel_report.actual_lines
+                )
             } else {
-                "kernel baseline mismatch".to_string()
+                format!(
+                    "kernel baseline mismatch: actual={}, pinned={}",
+                    kernel_report.actual_lines, kernel_report.pinned_lines
+                )
             },
         },
     ));

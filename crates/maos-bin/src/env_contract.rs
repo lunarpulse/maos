@@ -283,7 +283,12 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_LOOM_HOME_TEAM",
-        purpose: "Canonical tenant team id for the Loom-lite store; requires a refreshable verified schema-v2 cohort source (Story 13.1)",
+        purpose: "Canonical tenant team id for the Loom-lite store; requires a refreshable verified schema-v2-or-newer cohort source (Stories 13.1/13.3)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_BASE_SEED",
+        purpose: "Optional hex-encoded 32-byte root used only at composition to derive public cross-team row-verification keys; the store never receives the seed (Story 13.3)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

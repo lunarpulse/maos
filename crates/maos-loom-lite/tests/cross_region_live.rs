@@ -34,20 +34,26 @@
 
 use maos_domain::memory::{MemoryNamespace, MemoryValue};
 use maos_domain::region::Region;
-use std::sync::Mutex;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tokio_postgres::NoTls;
 
+use maos_loom_lite::cross_team_consent::{CrossTeamConsentError, CrossTeamConsentPort};
 use maos_loom_lite::replication::bundle::{
     apply_replication_bundle, build_reattestation_receipt, build_replication_bundle,
-    verify_reattestation_receipt, verify_replication_bundle, BundleError,
+    build_replication_bundle_v2, verify_reattestation_receipt, verify_replication_bundle,
+    BundleError, CrossTeamApplyContext,
 };
 use maos_loom_lite::replication::leaf::{
     compute_kv_payload_oracle, kv_merkle_root, CollectiveKvLeaf,
 };
 use maos_loom_lite::replication::router::DowngradeRouter;
-use maos_loom_lite::store::{LoomLiteStore, StoreConfig};
+use maos_loom_lite::store::{LoomLiteStore, StoreConfig, StoreError};
+use maos_loom_lite::tenant::{TenantMapError, TenantMapPort};
 
-use maos_audit::sealed_export::{derive_pubkey, derive_region_pubkey};
+use maos_audit::sealed_export::{derive_pubkey, derive_region_pubkey, derive_team_pubkey};
+use maos_domain::ports::registry::SpiritId;
+use maos_domain::team::TeamId;
 
 /// Serialize tests on the shared Postgres instance (single
 /// `collective_memory` table).
@@ -62,6 +68,39 @@ fn pg_conn() -> String {
         .expect("MAOS_TEST_POSTGRES must be set for cross_region_live tests")
 }
 
+/// Per-team connection strings: the cross-team legs run against TWO physical
+/// databases (AC5's live 2-datname substrate), never one database standing
+/// in for both teams (13.3 review).
+fn pg_conn_team(team: &str) -> String {
+    let var = match team {
+        "team-a" => "MAOS_TEST_POSTGRES_TEAM_A",
+        "team-b" => "MAOS_TEST_POSTGRES_TEAM_B",
+        other => panic!("unknown team {other}"),
+    };
+    std::env::var(var).unwrap_or_else(|_| panic!("{var} must be set for cross-team live tests"))
+}
+
+/// Parse the database name from a Postgres connection string (URL or
+/// key-value form) so the tenant map's datname answer matches the physical
+/// connection — the construction-time assignment guard compares the two.
+fn datname_of(conn: &str) -> String {
+    if let Some((_, rest)) = conn.split_once("dbname=") {
+        return rest.split_whitespace().next().unwrap_or(rest).to_string();
+    }
+    conn.rsplit('/')
+        .next()
+        .unwrap_or(conn)
+        .split('?')
+        .next()
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// Both teams share one canonical region: the story proves SAME-region
+/// crossings (cross-region is already refused by the region axis — the §A7
+/// anti-tautology reflex).
+const CROSS_TEAM_REGION: &str = "region-a";
+
 async fn make_store(region: &str) -> LoomLiteStore {
     let store = LoomLiteStore::new(StoreConfig {
         connection_string: pg_conn(),
@@ -73,10 +112,99 @@ async fn make_store(region: &str) -> LoomLiteStore {
     store.init_schema().await.expect("schema init must succeed");
     store
 }
+
+struct AsymmetricConsent;
+
+impl CrossTeamConsentPort for AsymmetricConsent {
+    fn is_granted(
+        &self,
+        from_team: &TeamId,
+        to_team: &TeamId,
+        intent: &str,
+    ) -> Result<bool, CrossTeamConsentError> {
+        Ok(from_team.as_str() == "team-a"
+            && to_team.as_str() == "team-b"
+            && intent == "collective:share")
+    }
+}
+
+struct DestinationTeamMap {
+    team_a_datname: String,
+    team_b_datname: String,
+}
+
+impl TenantMapPort for DestinationTeamMap {
+    fn team_of(&self, spirit_pid: u32) -> Result<TeamId, TenantMapError> {
+        if spirit_pid == 7 {
+            TeamId::new("team-b").map_err(|error| TenantMapError::StateUnavailable {
+                reason: error.to_string(),
+            })
+        } else {
+            Err(TenantMapError::SpiritUnmapped { spirit_pid })
+        }
+    }
+
+    fn datname_for(&self, team: &TeamId) -> Result<String, TenantMapError> {
+        match team.as_str() {
+            "team-a" => Ok(self.team_a_datname.clone()),
+            "team-b" => Ok(self.team_b_datname.clone()),
+            _ => Err(TenantMapError::TeamUnknown {
+                team_id: team.clone(),
+            }),
+        }
+    }
+    fn register_spirit(&self, _spirit_pid: u32, _spirit_id: SpiritId) {}
+}
+
+async fn make_cross_team_store(team: &str) -> LoomLiteStore {
+    let team_a = TeamId::new("team-a").unwrap();
+    let team_b = TeamId::new("team-b").unwrap();
+    let region = Region::canonicalize(CROSS_TEAM_REGION).unwrap();
+    let team_verifying_keys = HashMap::from([
+        (
+            (region.clone(), team_a.clone()),
+            derive_team_pubkey(&BASE_SEED, &region, &team_a),
+        ),
+        (
+            (region.clone(), team_b.clone()),
+            derive_team_pubkey(&BASE_SEED, &region, &team_b),
+        ),
+    ]);
+    let store = LoomLiteStore::new(StoreConfig {
+        connection_string: pg_conn_team(team),
+        home_region: CROSS_TEAM_REGION.to_string(),
+        home_team: team.to_string(),
+        ..StoreConfig::default()
+    })
+    .await
+    .unwrap()
+    .with_cross_team_consent(Arc::new(AsymmetricConsent))
+    .with_tenant_map(Arc::new(DestinationTeamMap {
+        team_a_datname: datname_of(&pg_conn_team("team-a")),
+        team_b_datname: datname_of(&pg_conn_team("team-b")),
+    }))
+    .with_team_verifying_keys(team_verifying_keys);
+    // Idempotent; also exercises the construction-time physical assignment
+    // guard against the team's real database.
+    store.init_schema().await.expect("schema init must succeed");
+    store
+}
 /// Connect a raw `tokio_postgres::Client` (for `read_all_rows_from` which
 /// requires `GenericClient`, not the deadpool `ClientWrapper`).
 async fn raw_connect() -> tokio_postgres::Client {
     let conn_str = pg_conn();
+    let (client, conn) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .expect("raw connect");
+    tokio::spawn(async move {
+        let _ = conn.await;
+    });
+    client
+}
+
+/// Raw client for a specific team's physical database.
+async fn raw_connect_team(team: &str) -> tokio_postgres::Client {
+    let conn_str = pg_conn_team(team);
     let (client, conn) = tokio_postgres::connect(&conn_str, NoTls)
         .await
         .expect("raw connect");
@@ -94,6 +222,14 @@ async fn reset_collective(_store: &LoomLiteStore) {
         .expect("DELETE must succeed");
 }
 
+/// Drop all rows from one team's physical database.
+async fn reset_collective_team(team: &str) {
+    let raw = raw_connect_team(team).await;
+    raw.execute("DELETE FROM collective_memory", &[])
+        .await
+        .expect("DELETE must succeed");
+}
+
 /// Read all leaves from a store for oracle comparison.
 async fn read_all_leaves(_store: &LoomLiteStore) -> Vec<CollectiveKvLeaf> {
     let raw = raw_connect().await;
@@ -105,6 +241,331 @@ async fn read_all_leaves(_store: &LoomLiteStore) -> Vec<CollectiveKvLeaf> {
 
 const BASE_SEED: [u8; 32] = [0x42u8; 32];
 const HOME_SEED: [u8; 32] = [0x11u8; 32];
+
+async fn exercise_cross_team_row_matrix() {
+    let _g = guard();
+    let team_a = TeamId::new("team-a").unwrap();
+    let team_b = TeamId::new("team-b").unwrap();
+    let store_b = make_cross_team_store("team-b").await;
+    reset_collective_team("team-b").await;
+
+    store_b
+        .write_with_source(
+            7,
+            &MemoryNamespace::Default,
+            "same-key",
+            MemoryValue::Text("destination-first-party".to_string()),
+            maos_loom_lite::store::WriteSource {
+                ts: 1,
+                region: CROSS_TEAM_REGION,
+                log_ref: "",
+                team: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    // H4(c) physical collision: plant a row at the exact physical key the
+    // incoming cross-team copy of "same-key" will occupy — the marker
+    // namespace `xteam:team-a:` + hex("") — but stamped with a DIFFERENT
+    // source_team and an OLDER timestamp. The `source_team IS NOT DISTINCT
+    // FROM` LWW predicate must refuse the overwrite; deleting that predicate
+    // turns this assertion red (13.3 review).
+    raw_connect_team("team-b")
+        .await
+        .execute(
+            "INSERT INTO collective_memory
+                (spirit_pid, namespace_kind, namespace_detail, key, value_kind,
+                 value_data, timestamp_ns, source_ts, source_region,
+                 source_log_ref, source_team)
+             VALUES (7, 'default', 'xteam:team-a:', 'same-key', 'text', $1,
+                     1, 1, 'region-a', 'planted-stamp', 'team-b')",
+            &[&b"planted-foreign-team-b".to_vec()],
+        )
+        .await
+        .unwrap();
+
+    let leaves = [
+        ("same-key", "foreign-copy"),
+        ("verified-readable", "signed-value"),
+        ("tamper-root", "root-value"),
+        ("tamper-proof", "proof-value"),
+        ("tamper-value", "original-value"),
+    ]
+    .into_iter()
+    .map(|(key, value)| CollectiveKvLeaf {
+        source_region: "region-a".to_string(),
+        source_ts: 2,
+        spirit_pid: 7,
+        namespace_kind: "default".to_string(),
+        namespace_detail: String::new(),
+        key: key.to_string(),
+        value_kind: "text".to_string(),
+        value_data: value.as_bytes().to_vec(),
+        source_team: Some(team_a.clone()),
+    })
+    .collect();
+    let bundle = build_replication_bundle_v2(
+        leaves,
+        &Region::canonicalize("region-a").unwrap(),
+        &team_a,
+        &BASE_SEED,
+    );
+    let result = apply_replication_bundle(
+        &bundle,
+        &store_b,
+        CROSS_TEAM_REGION,
+        Some(CrossTeamApplyContext::new(&team_b, "collective:share")),
+        &BASE_SEED,
+    )
+    .await
+    .unwrap();
+    // applied_count reports accepted writes (the upsert no-op for the
+    // predicate-refused 'same-key' copy still executes successfully); the
+    // physical reconciliation below is the row-level witness.
+    assert_eq!(result.applied_count, 5);
+
+    let rows = LoomLiteStore::read_all_rows_from(&raw_connect_team("team-b").await)
+        .await
+        .unwrap();
+    assert_eq!(
+        rows.len(),
+        6,
+        "first-party + planted foreign row + four landed cross-team copies; \
+         the predicate refuses the fifth (the colliding 'same-key' copy)"
+    );
+    let first_party = rows
+        .iter()
+        .find(|row| row.source_team.is_none())
+        .expect("destination first-party row remains");
+    assert_eq!(first_party.value_data, b"destination-first-party");
+    let planted = rows
+        .iter()
+        .find(|row| row.source_team.as_ref() == Some(&team_b))
+        .expect("planted foreign-team row remains");
+    assert_eq!(
+        planted.value_data, b"planted-foreign-team-b",
+        "LWW source-team predicate must refuse the cross-team overwrite"
+    );
+    let crossing = rows
+        .iter()
+        .find(|row| row.source_team.as_ref() == Some(&team_a))
+        .expect("verified source team persists through the write codec");
+    assert_ne!(first_party.namespace_detail, crossing.namespace_detail);
+    let raw_attestation = raw_connect_team("team-b").await;
+    let first_party_attestation = raw_attestation
+        .query_one(
+            "SELECT leaf_canonical_hash, merkle_root, region_sig, bundle_schema_version, inclusion_path
+             FROM collective_memory WHERE source_team IS NULL",
+            &[],
+        )
+        .await
+        .unwrap();
+    assert!([0, 1, 2, 4].into_iter().all(|index| first_party_attestation
+        .get::<_, Option<Vec<u8>>>(index)
+        .is_none()));
+    assert!(first_party_attestation.get::<_, Option<i16>>(3).is_none());
+    let crossing_attestation = raw_attestation
+        .query_one(
+            "SELECT leaf_canonical_hash, merkle_root, region_sig, inclusion_path
+             FROM collective_memory WHERE source_team = 'team-a' LIMIT 1",
+            &[],
+        )
+        .await
+        .unwrap();
+    assert!((0..4).all(|index| crossing_attestation
+        .get::<_, Option<Vec<u8>>>(index)
+        .is_some()));
+
+    assert_eq!(
+        store_b
+            .read(7, &MemoryNamespace::Default, "same-key")
+            .await
+            .unwrap(),
+        Some(MemoryValue::Text("destination-first-party".to_string()))
+    );
+    assert_eq!(
+        store_b
+            .read(7, &MemoryNamespace::Default, "verified-readable")
+            .await
+            .unwrap(),
+        Some(MemoryValue::Text("signed-value".to_string()))
+    );
+    let verified_scan = store_b
+        .scan(7, &MemoryNamespace::Default, "verified", 10)
+        .await
+        .unwrap();
+    assert_eq!(verified_scan.len(), 1);
+    assert_eq!(
+        verified_scan[0].value,
+        MemoryValue::Text("signed-value".to_string())
+    );
+
+    let raw = raw_connect_team("team-b").await;
+    raw.execute(
+        "UPDATE collective_memory SET merkle_root = $1 WHERE key = 'tamper-root'",
+        &[&vec![0u8; 32]],
+    )
+    .await
+    .unwrap();
+    raw.execute(
+        "UPDATE collective_memory SET inclusion_path = $1 WHERE key = 'tamper-proof'",
+        &[&vec![0u8]],
+    )
+    .await
+    .unwrap();
+    raw.execute(
+        "UPDATE collective_memory SET value_data = $1 WHERE key = 'tamper-value'",
+        &[&b"attacker-value".to_vec()],
+    )
+    .await
+    .unwrap();
+    for key in ["tamper-root", "tamper-proof", "tamper-value"] {
+        assert!(matches!(
+            store_b.read(7, &MemoryNamespace::Default, key).await,
+            Err(StoreError::AttestationInvalid { .. })
+        ));
+    }
+    assert!(matches!(
+        store_b
+            .scan(7, &MemoryNamespace::Default, "tamper", 10)
+            .await,
+        Err(StoreError::AttestationInvalid { .. })
+    ));
+
+    let region_a = Region::canonicalize(CROSS_TEAM_REGION).unwrap();
+    let wrong_key_reader = LoomLiteStore::new(StoreConfig {
+        connection_string: pg_conn_team("team-b"),
+        home_region: CROSS_TEAM_REGION.to_string(),
+        home_team: "team-b".to_string(),
+        ..StoreConfig::default()
+    })
+    .await
+    .unwrap()
+    .with_tenant_map(Arc::new(DestinationTeamMap {
+        team_a_datname: datname_of(&pg_conn_team("team-a")),
+        team_b_datname: datname_of(&pg_conn_team("team-b")),
+    }))
+    .with_team_verifying_keys(HashMap::from([(
+        (region_a.clone(), team_a.clone()),
+        derive_team_pubkey(&[0x99; 32], &region_a, &team_a),
+    )]));
+    assert!(matches!(
+        wrong_key_reader
+            .read(7, &MemoryNamespace::Default, "verified-readable")
+            .await,
+        Err(StoreError::AttestationInvalid { .. })
+    ));
+
+    let sealed_reader = make_cross_team_store("team-b")
+        .await
+        .with_at_rest_seal(Some(Arc::new(|data: &[u8]| Ok(data.to_vec()))));
+    assert!(matches!(
+        sealed_reader
+            .read(7, &MemoryNamespace::Default, "verified-readable")
+            .await,
+        Err(StoreError::AttestationInvalid { .. })
+    ));
+}
+
+#[tokio::test]
+#[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
+async fn cross_team_crossing_lands_with_bound_source_team() {
+    exercise_cross_team_row_matrix().await;
+}
+
+#[tokio::test]
+#[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
+async fn cross_team_clobber_refused() {
+    exercise_cross_team_row_matrix().await;
+}
+
+#[tokio::test]
+#[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
+async fn per_row_inclusion_verified_at_read_time() {
+    exercise_cross_team_row_matrix().await;
+}
+
+#[tokio::test]
+#[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
+async fn asymmetric_consent_reverse_share_refused() {
+    let _g = guard();
+    let team_a = TeamId::new("team-a").unwrap();
+    let team_b = TeamId::new("team-b").unwrap();
+    let store_a = make_cross_team_store("team-a").await;
+    reset_collective_team("team-a").await;
+    let leaf = CollectiveKvLeaf {
+        source_region: CROSS_TEAM_REGION.to_string(),
+        source_ts: 1,
+        spirit_pid: 7,
+        namespace_kind: "default".to_string(),
+        namespace_detail: String::new(),
+        key: "reverse-must-not-land".to_string(),
+        value_kind: "text".to_string(),
+        value_data: b"denied".to_vec(),
+        source_team: Some(team_b.clone()),
+    };
+    let bundle = build_replication_bundle_v2(
+        vec![leaf],
+        &Region::canonicalize(CROSS_TEAM_REGION).unwrap(),
+        &team_b,
+        &BASE_SEED,
+    );
+    assert!(matches!(
+        apply_replication_bundle(
+            &bundle,
+            &store_a,
+            CROSS_TEAM_REGION,
+            Some(CrossTeamApplyContext::new(&team_a, "collective:share")),
+            &BASE_SEED,
+        )
+        .await,
+        Err(BundleError::ConsentDenied { .. })
+    ));
+    assert!(
+        LoomLiteStore::read_all_rows_from(&raw_connect_team("team-a").await)
+            .await
+            .unwrap()
+            .is_empty(),
+        "denied reverse crossing must land zero rows in team A's own database"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
+async fn unattested_cross_team_row_is_refused_at_read() {
+    let _g = guard();
+    let store = make_store("region-b").await;
+    reset_collective(&store).await;
+    store
+        .write_with_source(
+            8,
+            &MemoryNamespace::Default,
+            "unattested",
+            MemoryValue::Text("must-not-serve".to_string()),
+            maos_loom_lite::store::WriteSource {
+                ts: 1,
+                region: "region-a",
+                log_ref: "forged-presence-stamp",
+                team: None,
+            },
+        )
+        .await
+        .unwrap();
+    raw_connect()
+        .await
+        .execute(
+            "UPDATE collective_memory SET source_team = 'team-a' WHERE key = 'unattested'",
+            &[],
+        )
+        .await
+        .unwrap();
+
+    assert!(matches!(
+        store.read(8, &MemoryNamespace::Default, "unattested").await,
+        Err(StoreError::AttestationInvalid { .. })
+    ));
+}
 
 // ─── Leg 1: reattestation-mediated ─────────────────────────────────────────
 
@@ -128,9 +589,12 @@ async fn reattest_copy_fails_then_reattest_succeeds() {
             &MemoryNamespace::Default,
             "key-1",
             MemoryValue::Text("hello from A".to_string()),
-            1_700_000_000_000_000_001,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_001,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .expect("write to region-a");
@@ -157,7 +621,7 @@ async fn reattest_copy_fails_then_reattest_succeeds() {
         .expect("bundle verified under region-a key must succeed");
 
     // Apply to region B's store.
-    let result = apply_replication_bundle(&bundle, &store_b, "region-b", &BASE_SEED).await;
+    let result = apply_replication_bundle(&bundle, &store_b, "region-b", None, &BASE_SEED).await;
     let apply = result.expect("apply to region-b must succeed");
     assert_eq!(apply.applied_count, 1, "one row applied");
     assert_eq!(apply.skipped_count, 0, "no rows skipped");
@@ -212,9 +676,12 @@ async fn no_aead_sign_only_bundle() {
             &MemoryNamespace::Default,
             "k",
             MemoryValue::Text("v".to_string()),
-            1_700_000_000_000_000_001,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_001,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -279,9 +746,12 @@ async fn crdt_reorder_independence_oracle_converges() {
                 &MemoryNamespace::Default,
                 key,
                 MemoryValue::Text(val.to_string()),
-                *ts,
-                region,
-                "",
+                maos_loom_lite::store::WriteSource {
+                    ts: *ts,
+                    region: region,
+                    log_ref: "",
+                    team: None,
+                },
             )
             .await
             .expect("write to region-a");
@@ -295,9 +765,12 @@ async fn crdt_reorder_independence_oracle_converges() {
                 &MemoryNamespace::Default,
                 key,
                 MemoryValue::Text(val.to_string()),
-                *ts,
-                region,
-                "",
+                maos_loom_lite::store::WriteSource {
+                    ts: *ts,
+                    region: region,
+                    log_ref: "",
+                    team: None,
+                },
             )
             .await
             .expect("write to region-b");
@@ -358,9 +831,12 @@ async fn crdt_lww_tiebreak_by_region() {
             &MemoryNamespace::Default,
             "tie-key",
             MemoryValue::Text("from-a".to_string()),
-            same_ts,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: same_ts,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -370,9 +846,12 @@ async fn crdt_lww_tiebreak_by_region() {
             &MemoryNamespace::Default,
             "tie-key",
             MemoryValue::Text("from-b".to_string()),
-            same_ts,
-            "region-b",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: same_ts,
+                region: "region-b",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -384,9 +863,12 @@ async fn crdt_lww_tiebreak_by_region() {
             &MemoryNamespace::Default,
             "tie-key",
             MemoryValue::Text("from-b".to_string()),
-            same_ts,
-            "region-b",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: same_ts,
+                region: "region-b",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -396,9 +878,12 @@ async fn crdt_lww_tiebreak_by_region() {
             &MemoryNamespace::Default,
             "tie-key",
             MemoryValue::Text("from-a".to_string()),
-            same_ts,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: same_ts,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -428,9 +913,12 @@ async fn planted_byte_divergence_payload_oracle_catches_merkle_misses() {
             &MemoryNamespace::Default,
             "div-key",
             MemoryValue::Text("original".to_string()),
-            1_700_000_000_000_000_001,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_001,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -512,9 +1000,12 @@ async fn full_convergence_across_regions() {
                 &MemoryNamespace::Default,
                 &format!("key-{i}"),
                 MemoryValue::Text(format!("value-{i}")),
-                1_700_000_000_000_000_000 + i as i64,
-                "region-a",
-                "",
+                maos_loom_lite::store::WriteSource {
+                    ts: 1_700_000_000_000_000_000 + i as i64,
+                    region: "region-a",
+                    log_ref: "",
+                    team: None,
+                },
             )
             .await
             .expect("write to region-a");
@@ -527,7 +1018,7 @@ async fn full_convergence_across_regions() {
     let bundle = build_replication_bundle(leaves_a_pre.clone(), &region_a, &BASE_SEED);
     verify_replication_bundle(&bundle, &BASE_SEED).expect("bundle verifies");
 
-    let result = apply_replication_bundle(&bundle, &store_b, "region-b", &BASE_SEED)
+    let result = apply_replication_bundle(&bundle, &store_b, "region-b", None, &BASE_SEED)
         .await
         .expect("apply succeeds");
     assert_eq!(result.applied_count, 5);
@@ -584,9 +1075,12 @@ async fn set_vs_sequence_not_conflated() {
                 &MemoryNamespace::Default,
                 key,
                 MemoryValue::Text(val.to_string()),
-                *ts,
-                "region-a",
-                "",
+                maos_loom_lite::store::WriteSource {
+                    ts: *ts,
+                    region: "region-a",
+                    log_ref: "",
+                    team: None,
+                },
             )
             .await
             .unwrap();
@@ -600,9 +1094,12 @@ async fn set_vs_sequence_not_conflated() {
                 &MemoryNamespace::Default,
                 key,
                 MemoryValue::Text(val.to_string()),
-                *ts,
-                "region-a",
-                "",
+                maos_loom_lite::store::WriteSource {
+                    ts: *ts,
+                    region: "region-a",
+                    log_ref: "",
+                    team: None,
+                },
             )
             .await
             .unwrap();
@@ -643,9 +1140,12 @@ async fn region_identity_forge_rejected_count_moves() {
             &MemoryNamespace::Default,
             "id-key",
             MemoryValue::Text("id-val".to_string()),
-            1_700_000_000_000_000_001,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_001,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -673,9 +1173,10 @@ async fn region_identity_forge_rejected_count_moves() {
     // Genuine bundle: apply to a separate store → applied_count > 0.
     let store_dest = make_store("region-b").await;
     reset_collective(&store_dest).await;
-    let genuine_result = apply_replication_bundle(&bundle, &store_dest, "region-b", &BASE_SEED)
-        .await
-        .expect("genuine apply succeeds");
+    let genuine_result =
+        apply_replication_bundle(&bundle, &store_dest, "region-b", None, &BASE_SEED)
+            .await
+            .expect("genuine apply succeeds");
     let genuine_count = genuine_result.applied_count;
     assert!(
         genuine_count > 0,
@@ -816,7 +1317,6 @@ async fn healing_remerge_converges() {
     let store = make_store("region-a").await;
     reset_collective(&store).await;
 
-    let region_a = Region::canonicalize("region-a").unwrap();
     let region_b = Region::canonicalize("region-b").unwrap();
 
     // Phase 1: region A writes the initial value.
@@ -826,9 +1326,12 @@ async fn healing_remerge_converges() {
             &MemoryNamespace::Default,
             "heal-key",
             MemoryValue::Text("initial".to_string()),
-            1_000_000_000_000_000_001,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 1_000_000_000_000_000_001,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -856,7 +1359,7 @@ async fn healing_remerge_converges() {
     verify_replication_bundle(&bundle_b, &BASE_SEED).unwrap();
 
     // Phase 3: heal — apply B's bundle to region A's store.
-    let heal_result = apply_replication_bundle(&bundle_b, &store, "region-a", &BASE_SEED)
+    let heal_result = apply_replication_bundle(&bundle_b, &store, "region-a", None, &BASE_SEED)
         .await
         .unwrap();
     assert_eq!(
@@ -921,7 +1424,7 @@ async fn apply_result_surfaces_skipped() {
     let bundle = build_replication_bundle(vec![valid_leaf, invalid_leaf], &region_a, &BASE_SEED);
     verify_replication_bundle(&bundle, &BASE_SEED).expect("bundle verifies (leaves are hashed)");
 
-    let result = apply_replication_bundle(&bundle, &store, "region-b", &BASE_SEED)
+    let result = apply_replication_bundle(&bundle, &store, "region-b", None, &BASE_SEED)
         .await
         .expect("apply succeeds overall");
 
@@ -968,9 +1471,12 @@ async fn blind_overwrite_regression_detected() {
                 &MemoryNamespace::Default,
                 key,
                 MemoryValue::Text(val.to_string()),
-                *ts,
-                region,
-                "",
+                maos_loom_lite::store::WriteSource {
+                    ts: *ts,
+                    region: region,
+                    log_ref: "",
+                    team: None,
+                },
             )
             .await
             .unwrap();
@@ -1003,9 +1509,12 @@ async fn blind_overwrite_regression_detected() {
                 &MemoryNamespace::Default,
                 key,
                 MemoryValue::Text(val.to_string()),
-                *ts,
-                region,
-                "",
+                maos_loom_lite::store::WriteSource {
+                    ts: *ts,
+                    region: region,
+                    log_ref: "",
+                    team: None,
+                },
             )
             .await
             .unwrap();
@@ -1055,9 +1564,12 @@ async fn source_ts_preserved_across_reattestation() {
             &MemoryNamespace::Default,
             "ts-key",
             MemoryValue::Text("ts-val".to_string()),
-            original_ts,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: original_ts,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -1066,7 +1578,7 @@ async fn source_ts_preserved_across_reattestation() {
     let leaves = read_all_leaves(&store_a).await;
     let bundle = build_replication_bundle(leaves, &region_a, &BASE_SEED);
     verify_replication_bundle(&bundle, &BASE_SEED).unwrap();
-    apply_replication_bundle(&bundle, &store_b, "region-b", &BASE_SEED)
+    apply_replication_bundle(&bundle, &store_b, "region-b", None, &BASE_SEED)
         .await
         .unwrap();
 
@@ -1187,9 +1699,12 @@ async fn home_write(store: &LoomLiteStore, pid: u32, home: &str) {
             &MemoryNamespace::Default,
             &format!("agent-{pid}"),
             MemoryValue::Text(format!("payload-{home}-{pid}")),
-            1_700_000_000_000_000_000 + pid as i64,
-            home,
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_000 + pid as i64,
+                region: home,
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .expect("home write must succeed");
@@ -1308,22 +1823,22 @@ async fn three_region_convergence_all_three_equal() {
         verify_replication_bundle(b, &BASE_SEED).expect("bundle must verify");
     }
 
-    let ab = apply_replication_bundle(&bundle_a, &store_b, "region-b", &BASE_SEED)
+    let ab = apply_replication_bundle(&bundle_a, &store_b, "region-b", None, &BASE_SEED)
         .await
         .expect("A->B apply");
-    let ac = apply_replication_bundle(&bundle_a, &store_c, "region-c", &BASE_SEED)
+    let ac = apply_replication_bundle(&bundle_a, &store_c, "region-c", None, &BASE_SEED)
         .await
         .expect("A->C apply");
-    let ba = apply_replication_bundle(&bundle_b, &store_a, "region-a", &BASE_SEED)
+    let ba = apply_replication_bundle(&bundle_b, &store_a, "region-a", None, &BASE_SEED)
         .await
         .expect("B->A apply");
-    let bc = apply_replication_bundle(&bundle_b, &store_c, "region-c", &BASE_SEED)
+    let bc = apply_replication_bundle(&bundle_b, &store_c, "region-c", None, &BASE_SEED)
         .await
         .expect("B->C apply");
-    let ca = apply_replication_bundle(&bundle_c, &store_a, "region-a", &BASE_SEED)
+    let ca = apply_replication_bundle(&bundle_c, &store_a, "region-a", None, &BASE_SEED)
         .await
         .expect("C->A apply");
-    let cb = apply_replication_bundle(&bundle_c, &store_b, "region-b", &BASE_SEED)
+    let cb = apply_replication_bundle(&bundle_c, &store_b, "region-b", None, &BASE_SEED)
         .await
         .expect("C->B apply");
 
@@ -1436,9 +1951,12 @@ async fn three_region_reorder_independence() {
             &MemoryNamespace::Default,
             "shared",
             MemoryValue::Text("from-a".to_string()),
-            1000,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 1000,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -1448,9 +1966,12 @@ async fn three_region_reorder_independence() {
             &MemoryNamespace::Default,
             "shared",
             MemoryValue::Text("from-b".to_string()),
-            3000,
-            "region-b",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 3000,
+                region: "region-b",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -1460,9 +1981,12 @@ async fn three_region_reorder_independence() {
             &MemoryNamespace::Default,
             "shared",
             MemoryValue::Text("from-c".to_string()),
-            2000,
-            "region-c",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 2000,
+                region: "region-c",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .unwrap();
@@ -1472,26 +1996,26 @@ async fn three_region_reorder_independence() {
     let bundle_c = build_replication_bundle(read_all_leaves_for('c').await, &region_c, &BASE_SEED);
 
     // Order [a, b, c] → region-a (which already holds its own region-a write).
-    apply_replication_bundle(&bundle_a, &store_a, "region-a", &BASE_SEED)
+    apply_replication_bundle(&bundle_a, &store_a, "region-a", None, &BASE_SEED)
         .await
         .unwrap();
-    apply_replication_bundle(&bundle_b, &store_a, "region-a", &BASE_SEED)
+    apply_replication_bundle(&bundle_b, &store_a, "region-a", None, &BASE_SEED)
         .await
         .unwrap();
-    apply_replication_bundle(&bundle_c, &store_a, "region-a", &BASE_SEED)
+    apply_replication_bundle(&bundle_c, &store_a, "region-a", None, &BASE_SEED)
         .await
         .unwrap();
     let winner_abc = read_all_leaves_for('a').await;
 
     // Reset region-a; apply the SAME three bundles in REVERSE order [c, b, a].
     reset_collective_for('a').await;
-    apply_replication_bundle(&bundle_c, &store_a, "region-a", &BASE_SEED)
+    apply_replication_bundle(&bundle_c, &store_a, "region-a", None, &BASE_SEED)
         .await
         .unwrap();
-    apply_replication_bundle(&bundle_b, &store_a, "region-a", &BASE_SEED)
+    apply_replication_bundle(&bundle_b, &store_a, "region-a", None, &BASE_SEED)
         .await
         .unwrap();
-    apply_replication_bundle(&bundle_a, &store_a, "region-a", &BASE_SEED)
+    apply_replication_bundle(&bundle_a, &store_a, "region-a", None, &BASE_SEED)
         .await
         .unwrap();
     let winner_cba = read_all_leaves_for('a').await;
@@ -1583,9 +2107,12 @@ async fn live_read_region_identity_foreign_refused() {
             &MemoryNamespace::Default,
             "foreign-key",
             MemoryValue::Text("leaked-payload".to_string()),
-            1_700_000_000_000_000_001,
-            "region-b", // foreign to store-a (home region-a)
-            "",         // empty source_log_ref — NOT validly re-attested
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_001,
+                region: "region-b", // foreign to store-a (home region-a)
+                log_ref: "",        // empty source_log_ref — NOT validly re-attested
+                team: None,
+            },
         )
         .await
         .expect("raw-copy injection into DB-A");
@@ -1645,9 +2172,12 @@ async fn live_read_region_identity_reattested_served() {
             &MemoryNamespace::Default,
             "shared-key",
             MemoryValue::Text("from-a".to_string()),
-            1_700_000_000_000_000_001,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_001,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .expect("home write to region-a");
@@ -1656,7 +2186,7 @@ async fn live_read_region_identity_reattested_served() {
     // source_log_ref (the re-attestation marker).
     let bundle = build_replication_bundle(read_all_leaves_for('a').await, &region_a, &BASE_SEED);
     verify_replication_bundle(&bundle, &BASE_SEED).expect("bundle verifies");
-    let result = apply_replication_bundle(&bundle, &store_b, "region-b", &BASE_SEED)
+    let result = apply_replication_bundle(&bundle, &store_b, "region-b", None, &BASE_SEED)
         .await
         .expect("apply to region-b");
     assert_eq!(result.applied_count, 1, "one row applied");
@@ -1702,9 +2232,12 @@ async fn live_read_region_identity_home_served() {
             &MemoryNamespace::Default,
             "home-key",
             MemoryValue::Text("home-val".to_string()),
-            1_700_000_000_000_000_001,
-            "region-a", // home-origin
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_001,
+                region: "region-a", // home-origin
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .expect("home write");
@@ -1745,9 +2278,12 @@ async fn live_scan_region_identity_foreign_refused() {
             &MemoryNamespace::Default,
             "scan-foreign",
             MemoryValue::Text("leaked-scan-payload".to_string()),
-            1_700_000_000_000_000_001,
-            "region-b", // foreign to store-a (home region-a)
-            "",         // empty source_log_ref — NOT validly re-attested
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_001,
+                region: "region-b", // foreign to store-a (home region-a)
+                log_ref: "",        // empty source_log_ref — NOT validly re-attested
+                team: None,
+            },
         )
         .await
         .expect("raw-copy injection into DB-A");
@@ -1759,9 +2295,12 @@ async fn live_scan_region_identity_foreign_refused() {
             &MemoryNamespace::Default,
             "scan-home",
             MemoryValue::Text("home-payload".to_string()),
-            1_700_000_000_000_000_002,
-            "region-a",
-            "",
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_002,
+                region: "region-a",
+                log_ref: "",
+                team: None,
+            },
         )
         .await
         .expect("home write");
@@ -1821,9 +2360,12 @@ async fn live_read_region_identity_forged_stamp_served() {
             &MemoryNamespace::Default,
             "forged-key",
             MemoryValue::Text("forged-payload".to_string()),
-            1_700_000_000_000_000_001,
-            "region-b",
-            r#"{"source_region":"region-b","merkle_root":"forged-root"}"#,
+            maos_loom_lite::store::WriteSource {
+                ts: 1_700_000_000_000_000_001,
+                region: "region-b",
+                log_ref: r#"{"source_region":"region-b","merkle_root":"forged-root"}"#,
+                team: None,
+            },
         )
         .await
         .expect("forged-stamp injection into DB-A");

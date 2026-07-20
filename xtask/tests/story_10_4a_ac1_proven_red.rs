@@ -1335,20 +1335,18 @@ fn story_13_5d_forged_pid_is_denied_before_collective_scan() {
         "scan refusal must be audited under the token owner's pid"
     );
 
-    assert!(
-        adapter
-            .collective_scan(
-                7,
-                &MemoryNamespace::Default,
-                "matching-pid",
-                10,
-                &token,
-                posture,
-                SandboxTier(0),
-            )
-            .expect("matching token and caller pid MUST succeed")
-            .is_empty()
-    );
+    assert!(adapter
+        .collective_scan(
+            7,
+            &MemoryNamespace::Default,
+            "matching-pid",
+            10,
+            &token,
+            posture,
+            SandboxTier(0),
+        )
+        .expect("matching token and caller pid MUST succeed")
+        .is_empty());
     assert_eq!(port.scans(), 1, "matching pid MUST reach the backing port");
 }
 

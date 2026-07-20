@@ -63,7 +63,7 @@ coverage:
     - check-kernel-baseline
     corpora: []
     phase: v2.0+
-    valid_until: '2027-07-19'
+    valid_until: '2027-07-20'
     notes: |
       Story 13.1 physical tenant-wall anchor + Story 13.2 cryptographic tenant
       boundary (Fork-4 / ADV-055-1). 13.1: database-per-team, manifest-authoritative
@@ -76,11 +76,27 @@ coverage:
       bundle is refused at verify and never lands (apply-only-after-verify). Proven
       by the check-multi-tenant-loom crypto legs: forged-team-stamp-refused-at-verify,
       apply-refuses-forged-bundle, team-identity-source-reflex (hermetic Blocking) +
-      per-team-merkle-independence incl. mixed v1/v2 (advisory-substrate). team_guard
-      stays presence-only (read-path guard unchanged). D1 closed on the TEAM axis at
-      entry only; the region source_log_ref presence residual remains OPEN with no
-      named successor. Read-time attestation persistence + production seed/apply
-      wiring defer to 13.3. Story 13.5c (single composition root + bootable tenant
+      per-team-merkle-independence incl. mixed v1/v2 (advisory-substrate).
+      Story 13.3 keeps team_guard presence-only and adds a separate two-site
+      post-query attestation_guard: schema-v3 ordered A→B consent, verified
+      source-team persistence, cross-team namespace isolation, per-row
+      leaf/root/signature/proof persistence, plaintext row binding, and
+      structured caller-visible refusal causes inside TransportCause. Its
+      check-multi-tenant-loom legs cover crossing landing, asymmetric reverse
+      refusal (composition-level: the production manifest-backed adapter over
+      a signed V3 manifest on two physical databases), clobber prevention
+      (namespace isolation + a planted physical collision exercising the LWW
+      source-team predicate), read-time inclusion/signature verification, the
+      unattested-foreign-row read refusal, taxonomy distinguishability, the
+      claimed-pair verifying-key refusal at apply (party-mode D1), and the
+      remaining no-production-initiator dead wire (scanned across every
+      production source, not just main). Apply stamps the envelope identity
+      onto every leaf at build and refuses leaf/envelope mismatches, so an
+      honestly built bundle can never land a permanently unreadable row. The
+      region source_log_ref presence residual remains OPEN with no named
+      successor; the region-migration key-stranding residual is named and
+      owned by the initiator era (party-mode D1).
+      Story 13.5c (single composition root + bootable tenant
       mode) closed refresh wiring: one Transparency Log, one per-boot nonce
       (single-sourced, NFR-Rel-6), and TenantMapAdapter's first production
       construction so MAOS_LOOM_HOME_TEAM boots. Story 13.5d makes the route
@@ -97,8 +113,8 @@ coverage:
       composition-root-does-not-seed-manifest-scopes, and
       mediated-operation-correlation (hermetic Blocking) +
       spirit-collective-route-live (advisory-substrate).
-      Absent successors: 13.5e refusal audit + TL isolation, 13.5b collective
-      erase, and the 13.6 three-team journey.
+      Absent successors: 13.3b cross-wall provenance/recall, 13.5e refusal audit
+      + TL isolation, 13.5b collective erase, and the 13.6 three-team journey.
   ADR-024:
     gates:
     - check-escape-detector

@@ -2553,7 +2553,6 @@ description = "MAOS reference Spirit"
         assert_eq!(c.provider.complete.len(), 1);
     }
 
-
     #[test]
     fn capabilities_required_loom_defaults_false_and_rejects_unknown_fields() {
         let defaults =
@@ -2578,7 +2577,14 @@ loom.wirte = true"#,
     fn loom_scopes(caps: &CapabilitiesRequired) -> Vec<maos_domain::invariants::i1::Scope> {
         capabilities_required_to_scopes(caps)
             .into_iter()
-            .filter(|scope| matches!(scope, maos_domain::invariants::i1::Scope::LoomRead | maos_domain::invariants::i1::Scope::LoomWrite | maos_domain::invariants::i1::Scope::LoomScan))
+            .filter(|scope| {
+                matches!(
+                    scope,
+                    maos_domain::invariants::i1::Scope::LoomRead
+                        | maos_domain::invariants::i1::Scope::LoomWrite
+                        | maos_domain::invariants::i1::Scope::LoomScan
+                )
+            })
             .collect()
     }
 
@@ -2589,12 +2595,23 @@ loom.wirte = true"#,
         )
         .unwrap();
         let v3 = ClassSection::from_toml_str(
-            &class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 3"),
-        ).unwrap();
+            &class_toml_full()
+                .replace("manifest_schema_version = 1", "manifest_schema_version = 3"),
+        )
+        .unwrap();
         let v4 = ClassSection::from_toml_str(
-            &class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 4"),
-        ).unwrap();
-        assert_eq!(loom_scopes(&caps.clone().degrade_for_schema_version(v3.manifest_schema_version)), Vec::new());
+            &class_toml_full()
+                .replace("manifest_schema_version = 1", "manifest_schema_version = 4"),
+        )
+        .unwrap();
+        assert_eq!(
+            loom_scopes(
+                &caps
+                    .clone()
+                    .degrade_for_schema_version(v3.manifest_schema_version)
+            ),
+            Vec::new()
+        );
         assert_eq!(
             loom_scopes(&caps.degrade_for_schema_version(v4.manifest_schema_version)),
             vec![maos_domain::invariants::i1::Scope::LoomWrite]
@@ -2609,23 +2626,41 @@ loom.wirte = true"#,
             ("loom.write = true", vec![Scope::LoomWrite]),
             ("loom.scan = true", vec![Scope::LoomScan]),
         ] {
-            let caps = CapabilitiesRequired::from_toml_str(&format!("provider.complete = [\"anthropic.default\"]\n{declaration}")).unwrap();
+            let caps = CapabilitiesRequired::from_toml_str(&format!(
+                "provider.complete = [\"anthropic.default\"]\n{declaration}"
+            ))
+            .unwrap();
             assert_eq!(loom_scopes(&caps), expected);
         }
     }
 
     #[test]
     fn capabilities_required_loom_false_fields_emit_no_loom_scopes() {
-        for declaration in ["loom.read = false", "loom.write = false", "loom.scan = false", "loom.read = false\nloom.write = false\nloom.scan = false"] {
-            let caps = CapabilitiesRequired::from_toml_str(&format!("provider.complete = [\"anthropic.default\"]\n{declaration}")).unwrap();
+        for declaration in [
+            "loom.read = false",
+            "loom.write = false",
+            "loom.scan = false",
+            "loom.read = false\nloom.write = false\nloom.scan = false",
+        ] {
+            let caps = CapabilitiesRequired::from_toml_str(&format!(
+                "provider.complete = [\"anthropic.default\"]\n{declaration}"
+            ))
+            .unwrap();
             assert_eq!(loom_scopes(&caps), Vec::new());
         }
     }
 
     #[test]
     fn capabilities_required_loom_rejects_malformed_fields() {
-        for declaration in ["loom.read = \"yes\"", "loom.write = \"yes\"", "loom.scan = \"yes\""] {
-            assert!(CapabilitiesRequired::from_toml_str(&format!("provider.complete = [\"anthropic.default\"]\n{declaration}")).is_err());
+        for declaration in [
+            "loom.read = \"yes\"",
+            "loom.write = \"yes\"",
+            "loom.scan = \"yes\"",
+        ] {
+            assert!(CapabilitiesRequired::from_toml_str(&format!(
+                "provider.complete = [\"anthropic.default\"]\n{declaration}"
+            ))
+            .is_err());
         }
     }
 
