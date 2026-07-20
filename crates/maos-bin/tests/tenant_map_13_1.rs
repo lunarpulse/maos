@@ -223,7 +223,7 @@ fn tenant_boot_refuses_verified_v1_manifest() {
 
     assert!(matches!(
         TenantMapAdapter::new(state, "host-a", true),
-        Err(TenantMapBootError::SchemaV2Required)
+        Err(TenantMapBootError::SchemaV2FloorRequired)
     ));
 }
 

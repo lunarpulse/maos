@@ -17,7 +17,7 @@ use crate::control::CohortManifestControl;
 use crate::digest::{DigestReadControl, DigestSummary, DIGEST_DAILY_SCOPE};
 use crate::error::{CohortError, CohortManifestForkReason};
 use crate::halt_receipt::{AbsenceKind, HaltReceiptControl};
-use crate::manifest::{CohortManifest, COHORT_SCHEMA_V1, COHORT_SCHEMA_V2};
+use crate::manifest::CohortManifest;
 use crate::pin::PinnedAuthorityKeys;
 
 pub trait CohortClock: Send + Sync {
@@ -58,6 +58,24 @@ struct DigestGrant {
 }
 
 const MAX_PENDING_DIGEST_READS: usize = 256;
+
+fn schema_is_downgrade(current_schema: u64, candidate_schema: u64) -> bool {
+    candidate_schema < current_schema
+}
+
+#[cfg(test)]
+mod schema_floor_tests {
+    use super::schema_is_downgrade;
+
+    #[test]
+    fn schema_downgrade_is_an_ordered_floor() {
+        assert!(schema_is_downgrade(2, 1));
+        assert!(schema_is_downgrade(3, 2));
+        assert!(schema_is_downgrade(3, 1));
+        assert!(!schema_is_downgrade(2, 2));
+        assert!(!schema_is_downgrade(2, 3));
+    }
+}
 
 /// The verified, local authority for a cohort manifest cache.
 ///
@@ -270,17 +288,16 @@ impl CohortManifestState {
             return Err(error);
         }
 
-        let rejection = if cached.manifest.schema_version == COHORT_SCHEMA_V2
-            && candidate.schema_version == COHORT_SCHEMA_V1
-        {
-            Some(CohortManifestForkReason::SchemaDowngrade)
-        } else if candidate.version < seen_version {
-            Some(CohortManifestForkReason::VersionRegression)
-        } else if candidate.version == seen_version && candidate_hash != cached.canonical_hash {
-            Some(CohortManifestForkReason::ConcurrentFork)
-        } else {
-            None
-        };
+        let rejection =
+            if schema_is_downgrade(cached.manifest.schema_version, candidate.schema_version) {
+                Some(CohortManifestForkReason::SchemaDowngrade)
+            } else if candidate.version < seen_version {
+                Some(CohortManifestForkReason::VersionRegression)
+            } else if candidate.version == seen_version && candidate_hash != cached.canonical_hash {
+                Some(CohortManifestForkReason::ConcurrentFork)
+            } else {
+                None
+            };
 
         if let Some(reason) = rejection {
             let error = CohortError::ECohortManifestFork {

@@ -17,8 +17,8 @@ pub enum TenantMapBootError {
     SourceUnavailable,
     #[error("tenant-map source is not refreshable (peerless/N=1 is unsupported)")]
     SourceUnrefreshable,
-    #[error("tenant mode requires a verified schema-v2 cohort manifest")]
-    SchemaV2Required,
+    #[error("tenant mode requires a verified cohort manifest at schema v2 or newer")]
+    SchemaV2FloorRequired,
     #[error("local host {host_id} is absent from the verified cohort roster")]
     LocalHostEvicted { host_id: String },
     #[error(
@@ -38,6 +38,10 @@ pub struct TenantMapAdapter {
     state: Arc<CohortManifestState>,
     local_host: String,
     spirit_bindings: Mutex<HashMap<u32, SpiritId>>,
+}
+
+fn tenant_schema_meets_floor(schema_version: u64) -> bool {
+    schema_version >= COHORT_SCHEMA_V2
 }
 
 impl TenantMapAdapter {
@@ -82,11 +86,11 @@ impl TenantMapAdapter {
             .map_err(|error| TenantMapError::StateUnavailable {
                 reason: error.to_string(),
             })?;
-        if manifest.schema_version != COHORT_SCHEMA_V2
+        if !tenant_schema_meets_floor(manifest.schema_version)
             || manifest.teams.as_ref().is_none_or(Vec::is_empty)
         {
             return Err(TenantMapError::Stale {
-                reason: "verified schema-v2 tenant map is unavailable".to_string(),
+                reason: "verified schema-v2-or-newer tenant map is unavailable".to_string(),
             });
         }
         if !manifest
@@ -165,10 +169,10 @@ fn validate_tenant_manifest(
     local_host: &str,
 ) -> Result<(), TenantMapBootError> {
     if !state.is_fresh()
-        || manifest.schema_version != COHORT_SCHEMA_V2
+        || !tenant_schema_meets_floor(manifest.schema_version)
         || manifest.teams.as_ref().is_none_or(Vec::is_empty)
     {
-        return Err(TenantMapBootError::SchemaV2Required);
+        return Err(TenantMapBootError::SchemaV2FloorRequired);
     }
     if !manifest
         .members
@@ -180,4 +184,16 @@ fn validate_tenant_manifest(
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tenant_schema_support_is_a_v2_floor() {
+        assert!(!tenant_schema_meets_floor(1));
+        assert!(tenant_schema_meets_floor(2));
+        assert!(tenant_schema_meets_floor(3));
+    }
 }
