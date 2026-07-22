@@ -34,6 +34,8 @@ fn bundle_from(team: &TeamId) -> maos_loom_lite::replication::bundle::CrossRegio
         value_kind: "text".to_string(),
         value_data: b"value".to_vec(),
         source_team: Some(team.clone()),
+        distillation_depth: None,
+        intent_lineage: None,
     };
     build_replication_bundle_v2(
         vec![leaf],
@@ -41,6 +43,7 @@ fn bundle_from(team: &TeamId) -> maos_loom_lite::replication::bundle::CrossRegio
         team,
         &BASE_SEED,
     )
+    .expect("leaf origin matches the envelope")
 }
 
 async fn store_for(team: &str, consent: FixedConsent) -> LoomLiteStore {

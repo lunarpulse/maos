@@ -830,6 +830,7 @@ mod decision_audit_tests {
     use std::sync::Arc;
 
     fn make_decision_frame(decision_id: u64) -> IacFrame {
+        maos_capability::cap_tokens::init_monotonic_base();
         let mut fid = [0u8; 16];
         fid[..8].copy_from_slice(&decision_id.to_le_bytes());
         IacFrame {
@@ -965,6 +966,7 @@ mod decision_audit_tests {
     // --- Story 4.5 lineage check tests (Task 2.3) ---
 
     fn make_cross_spirit_frame(from: &str, to: &str, origin: FrameOrigin) -> IacFrame {
+        maos_capability::cap_tokens::init_monotonic_base();
         IacFrame {
             frame_id: [0xAA; 16],
             timestamp_ns: 0,

@@ -6,6 +6,7 @@
 //! These are the pure domain shape types consumed by `LogRecallPort` and
 //! implemented by `LogRecallAdapter` in `maos-kernel-core`.
 
+use crate::team::TeamId;
 use thiserror::Error;
 
 /// Filter for `LogRecallPort::recall`.
@@ -243,9 +244,30 @@ impl LogFetchResponse {
     }
 }
 
+/// Typed fail-closed reasons for a refused cross-wall recall.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum CrossWallRecallRefusal {
+    #[error("consent provider is not wired")]
+    NoConsentProvider,
+    #[error("no directional grant")]
+    NoGrant,
+    #[error("only the reverse directional grant exists")]
+    WrongDirection,
+    #[error("consent state is stale: {0}")]
+    ConsentStateStale(String),
+    #[error("consent state is unavailable: {0}")]
+    ConsentStateUnavailable(String),
+}
+
 /// Typed error for log-recall operations.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum LogRecallError {
+    /// Directional cross-wall consent was absent or could not be proven fresh.
+    #[error("ECrossWallRecallDenied — recall from team {team} refused: {reason}")]
+    ECrossWallRecallDenied {
+        team: TeamId,
+        reason: CrossWallRecallRefusal,
+    },
     /// Cross-Spirit fetch — the requesting Spirit is not the emitter.
     #[error("E_SCOPE_VIOLATION — frame {frame_id:?} owned by pid {owner_pid}, requested by pid {requested_pid}")]
     ScopeViolation {

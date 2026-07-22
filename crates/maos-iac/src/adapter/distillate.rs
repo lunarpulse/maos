@@ -197,54 +197,61 @@ impl DistillateWriter {
         &self,
         source_log_ref: &[[u8; 16]],
     ) -> Result<(Vec<[u8; 16]>, u32), DistillationError> {
-        let mut seen: HashSet<[u8; 16]> = HashSet::new();
+        enum Visit {
+            Enter([u8; 16]),
+            Exit([u8; 16]),
+        }
+
+        let mut resolved: HashSet<[u8; 16]> = HashSet::new();
+        let mut on_current_path: HashSet<[u8; 16]> = HashSet::new();
         let mut result: Vec<[u8; 16]> = Vec::new();
         let mut max_depth = 0u32;
 
-        // Work-list style recursion to avoid stack overflow on deep chains
-        let mut stack: Vec<[u8; 16]> = source_log_ref.to_vec();
+        // Enter/exit markers preserve a real DFS path without recursive stack
+        // growth. A resolved node may be shared by multiple branches (diamond);
+        // only re-entering a node still on the current path is a cycle.
+        let mut stack: Vec<Visit> = source_log_ref.iter().copied().map(Visit::Enter).collect();
 
-        while let Some(frame_id) = stack.pop() {
-            // Cycle detection
-            if !seen.insert(frame_id) {
-                let hex = format_frame_id_hex(&frame_id);
-                return Err(DistillationError::Storage(format!(
-                    "cycle in distillation chain detected at frame {hex}"
-                )));
-            }
+        while let Some(visit) = stack.pop() {
+            match visit {
+                Visit::Exit(frame_id) => {
+                    on_current_path.remove(&frame_id);
+                    resolved.insert(frame_id);
+                }
+                Visit::Enter(frame_id) => {
+                    if resolved.contains(&frame_id) {
+                        continue;
+                    }
+                    if !on_current_path.insert(frame_id) {
+                        let hex = format_frame_id_hex(&frame_id);
+                        return Err(DistillationError::Storage(format!(
+                            "cycle in distillation chain detected at frame {hex}"
+                        )));
+                    }
 
-            // Query TL for this frame by primary key.
-            let entry = self
-                .transparency_log
-                .query_frame_by_id(frame_id)
-                .map_err(|e| DistillationError::Storage(e.to_string()))?;
+                    let entry = self
+                        .transparency_log
+                        .query_frame_by_id(frame_id)
+                        .map_err(|e| DistillationError::Storage(e.to_string()))?;
 
-            match entry {
-                Some(e) if e.kind == FrameKind::Distillate => {
-                    // This is a digest — recursively flatten by parsing its
-                    // own effective_source_log_ref from the payload.
-                    match Self::deserialize_receipt(&e.payload_redacted) {
-                        Ok(nested_receipt) => {
-                            let nested_depth = nested_receipt.effective_distillation_depth;
-                            if nested_depth > max_depth {
-                                max_depth = nested_depth;
-                            }
-                            // Push nested refs onto the stack for further processing
+                    match entry {
+                        Some(e) if e.kind == FrameKind::Distillate => {
+                            let nested_receipt = Self::deserialize_receipt(&e.payload_redacted)?;
+                            max_depth = max_depth.max(nested_receipt.effective_distillation_depth);
+                            stack.push(Visit::Exit(frame_id));
                             for nested_id in nested_receipt.effective_source_log_ref {
-                                stack.push(nested_id);
+                                stack.push(Visit::Enter(nested_id));
                             }
                         }
-                        Err(e) => {
-                            return Err(e);
+                        Some(_) => {
+                            on_current_path.remove(&frame_id);
+                            resolved.insert(frame_id);
+                            result.push(frame_id);
+                        }
+                        None => {
+                            return Err(DistillationError::SourceFrameNotFound { frame_id });
                         }
                     }
-                }
-                Some(_) => {
-                    // Non-Distillate frame — it IS a raw source
-                    result.push(frame_id);
-                }
-                None => {
-                    return Err(DistillationError::SourceFrameNotFound { frame_id });
                 }
             }
         }
@@ -623,6 +630,51 @@ mod tests {
         assert_eq!(receipt2.effective_source_log_ref.len(), 1);
         assert_eq!(receipt2.effective_source_log_ref[0], raw_id);
         assert_eq!(receipt2.effective_distillation_depth, 2);
+    }
+
+    #[test]
+    fn diamond_dependency_is_not_a_cycle() {
+        let (writer, tl, _tmp) = make_writer(0xD41A);
+        let raw_id = insert_raw_frame(&tl, 1, "consult");
+        let first = writer
+            .write_distillate(
+                1,
+                DistillationRequest::new(
+                    vec![raw_id],
+                    1,
+                    DigestPayload::Text("first".into()),
+                    None,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let second = writer
+            .write_distillate(
+                1,
+                DistillationRequest::new(
+                    vec![raw_id],
+                    1,
+                    DigestPayload::Text("second".into()),
+                    None,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+
+        let joined = writer
+            .write_distillate(
+                1,
+                DistillationRequest::new(
+                    vec![first.digest_frame_id, second.digest_frame_id],
+                    2,
+                    DigestPayload::Text("joined".into()),
+                    None,
+                )
+                .unwrap(),
+            )
+            .expect("a shared resolved dependency is not an on-path cycle");
+
+        assert_eq!(joined.effective_source_log_ref, vec![raw_id]);
     }
 
     #[test]

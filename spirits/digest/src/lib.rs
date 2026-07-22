@@ -389,13 +389,45 @@ pub fn derive_team_digest(raw: &RawDigestInputs) -> Result<TeamDigest, DigestErr
 }
 
 fn decode_frame_id_hex(value: &str) -> Result<[u8; 16], DigestError> {
-    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err(DigestError::InvalidSourceLogRef(value.to_string()));
+    let invalid = || DigestError::InvalidSourceLogRef(value.to_string());
+    let mut compact = [0u8; 32];
+    match value.as_bytes() {
+        bytes if bytes.len() == 32 && bytes.iter().all(u8::is_ascii_hexdigit) => {
+            compact.copy_from_slice(bytes);
+        }
+        bytes if bytes.len() == 39 => {
+            let mut out = 0;
+            for (index, byte) in bytes.iter().copied().enumerate() {
+                if index % 5 == 4 {
+                    if byte != b':' {
+                        return Err(invalid());
+                    }
+                } else {
+                    if !byte.is_ascii_hexdigit() {
+                        return Err(invalid());
+                    }
+                    compact[out] = byte;
+                    out += 1;
+                }
+            }
+            if out != compact.len() {
+                return Err(invalid());
+            }
+        }
+        _ => return Err(invalid()),
     }
+
+    let nibble = |byte: u8| match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    };
     let mut frame_id = [0u8; 16];
     for (index, byte) in frame_id.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16)
-            .map_err(|_| DigestError::InvalidSourceLogRef(value.to_string()))?;
+        let high = nibble(compact[index * 2]).ok_or_else(&invalid)?;
+        let low = nibble(compact[index * 2 + 1]).ok_or_else(&invalid)?;
+        *byte = (high << 4) | low;
     }
     Ok(frame_id)
 }
@@ -541,6 +573,18 @@ mod tests {
     }
 
     #[test]
+    fn frame_ref_codec_accepts_compact_and_colon_grouped_formats() {
+        let compact = "019f32c6aabbccddeeff001122334455";
+        let grouped = "019f:32c6:aabb:ccdd:eeff:0011:2233:4455";
+        assert_eq!(
+            decode_frame_id_hex(compact).unwrap(),
+            decode_frame_id_hex(grouped).unwrap()
+        );
+        assert!(decode_frame_id_hex("019f:32c6:not-hex").is_err());
+        assert!(decode_frame_id_hex("019f32c6aabbccddeeff00112233445").is_err());
+    }
+
+    #[test]
     fn receipt_for_one_member_cannot_hide_another_members_unreceipted_halt() {
         let mut raw = raw_fixture();
         for summary in &mut raw.summaries {
@@ -610,18 +654,26 @@ mod tests {
         frame_id.iter().map(|byte| format!("{byte:02x}")).collect()
     }
 
+    fn frame_id_colon_hex(frame_id: [u8; 16]) -> String {
+        frame_id
+            .chunks_exact(2)
+            .map(|pair| format!("{:02x}{:02x}", pair[0], pair[1]))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+
     #[test]
     fn real_writer_accepts_owned_evidence_and_rejects_peer_private_evidence() {
         use maos_domain::distillation::DistillationError;
         use maos_domain::invariants::i3::FrameOrigin;
         use maos_iac::adapter::distillate::DistillateWriter;
-        use maos_iac::adapter::transparency_log::{FrameKind, TransparencyLogAdapter};
+        use maos_iac::adapter::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0xD16357));
         let memory: Arc<dyn std::any::Any + Send + Sync> = Arc::new(());
         let writer = DistillateWriter::new(log.clone(), memory);
         let mut raw = raw_fixture();
-        for source in raw
+        for (index, source) in raw
             .summaries
             .iter_mut()
             .map(|evidence| &mut evidence.source_log_ref)
@@ -635,6 +687,7 @@ mod tests {
                     .iter_mut()
                     .map(|evidence| &mut evidence.source_log_ref),
             )
+            .enumerate()
         {
             log.insert_frame_event(
                 FrameKind::TelemetryEvent,
@@ -645,12 +698,27 @@ mod tests {
                 FrameOrigin::SpiritAuto,
             );
             *source = frame_id_hex(log.last_frame_id());
+            if index == 0 {
+                *source = frame_id_colon_hex(log.last_frame_id());
+            }
         }
 
         let derive: fn(&RawDigestInputs) -> Result<TeamDigest, DigestError> = derive_team_digest;
         let digest = derive(&raw).unwrap();
         let receipt = persist_team_digest(&writer, 77, &digest).unwrap();
         assert_eq!(receipt.effective_source_log_ref.len(), 14);
+        let persisted = log
+            .query_frames(FrameFilter {
+                spirit_pid: Some(77),
+                kind: Some(FrameKind::Distillate),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(
+            String::from_utf8_lossy(&persisted[0].payload_redacted)
+                .contains(&raw.summaries[0].source_log_ref),
+            "clause-owned frame ref must survive the TL redaction boundary"
+        );
 
         log.insert_frame_event(
             FrameKind::TelemetryEvent,

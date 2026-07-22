@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use deadpool_postgres::{Config, ManagerConfig, Pool, PoolConfig, RecyclingMethod, Runtime};
 use maos_audit::erasure::merkle::{verify_proof, MerkleProof};
+use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue};
 use maos_domain::region::Region;
 use tokio_postgres::NoTls;
@@ -66,6 +67,8 @@ pub struct WriteSource<'a> {
     pub region: &'a str,
     pub log_ref: &'a str,
     pub team: Option<&'a TeamId>,
+    pub distillation_depth: Option<u32>,
+    pub intent_lineage: Option<&'a IntentLineage>,
 }
 
 pub(crate) struct RowAttestation<'a> {
@@ -84,7 +87,7 @@ fn cross_team_namespace_detail(source_team: &TeamId, original_detail: &str) -> S
     )
 }
 
-fn original_cross_team_namespace_detail(
+pub(crate) fn original_cross_team_namespace_detail(
     source_team: &TeamId,
     stored_detail: &str,
 ) -> Option<String> {
@@ -172,6 +175,35 @@ impl From<tokio_postgres::Error> for StoreError {
 impl From<deadpool_postgres::PoolError> for StoreError {
     fn from(e: deadpool_postgres::PoolError) -> Self {
         StoreError::Pool(e.to_string())
+    }
+}
+
+fn decode_row_provenance(
+    depth: i32,
+    lineage_bytes: Option<&[u8]>,
+    has_source_team: bool,
+) -> Result<(Option<u32>, Option<IntentLineage>), StoreError> {
+    match (depth, lineage_bytes) {
+        (0, None) => Ok((None, None)),
+        (value, Some(bytes)) if value > 0 => {
+            // Provenance without a source team is a consistency violation —
+            // the write side and the verifier both refuse the shape, so a
+            // stored row like this never came through an admitted path.
+            if !has_source_team {
+                return Err(StoreError::Query(
+                    "distillation_depth and intent_lineage require a source team".into(),
+                ));
+            }
+            let depth = u32::try_from(value)
+                .map_err(|_| StoreError::Query("invalid distillation_depth".into()))?;
+            let lineage = serde_json::from_slice(bytes).map_err(|error| {
+                StoreError::Query(format!("invalid intent_lineage column value: {error}"))
+            })?;
+            Ok((Some(depth), Some(lineage)))
+        }
+        _ => Err(StoreError::Query(
+            "distillation_depth and intent_lineage must be present together".into(),
+        )),
     }
 }
 
@@ -397,6 +429,8 @@ impl LoomLiteStore {
                 region: &self.config.home_region,
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -438,6 +472,29 @@ impl LoomLiteStore {
         source: WriteSource<'_>,
         attestation: Option<&RowAttestation<'_>>,
     ) -> Result<(), StoreError> {
+        // Provenance tuple validation (13.3b review): the row decoder accepts
+        // only (depth 0, NULL lineage) or (depth >= 1, lineage); any other
+        // combination stored here would fail every subsequent read of the key.
+        // Mirrors CollectiveKvLeaf::has_valid_version_shape, including the
+        // i32 representability bound and the non-empty lineage rule (the
+        // writer rejects an empty computed lineage as AuditChainMissing).
+        match (
+            source.team,
+            source.distillation_depth,
+            source.intent_lineage,
+        ) {
+            (None, None, None) | (Some(_), None, None) => {}
+            (Some(_), Some(depth), Some(lineage))
+                if depth >= 1 && depth <= i32::MAX as u32 && !lineage.as_slice().is_empty() => {}
+            _ => {
+                return Err(StoreError::Serialization(
+                    "invalid provenance shape: distillation_depth (1..=i32::MAX) and \
+                     a non-empty intent_lineage must be present together, and \
+                     provenance requires a source team"
+                        .into(),
+                ));
+            }
+        }
         let client = self.get_client_with_timeout().await?;
 
         let (ns_kind, mut ns_detail) = schema::namespace_to_parts(namespace);
@@ -460,15 +517,28 @@ impl LoomLiteStore {
                     .map_err(|error| StoreError::Serialization(error.to_string()))
             })
             .transpose()?;
+        let distillation_depth = source
+            .distillation_depth
+            .map(i32::try_from)
+            .transpose()
+            .map_err(|_| StoreError::Serialization("distillation_depth exceeds INTEGER".into()))?
+            .unwrap_or(0);
+        let intent_lineage = source
+            .intent_lineage
+            .map(serde_json::to_vec)
+            .transpose()
+            .map_err(|error| StoreError::Serialization(error.to_string()))?;
 
         client
             .execute(
                 "INSERT INTO collective_memory
                     (spirit_pid, namespace_kind, namespace_detail, key,
                      value_kind, value_data, timestamp_ns, source_ts, source_region,
-                     source_log_ref, source_team, leaf_canonical_hash, merkle_root,
-                     region_sig, bundle_schema_version, inclusion_path)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                     source_log_ref, source_team, distillation_depth, intent_lineage,
+                     leaf_canonical_hash, merkle_root, region_sig,
+                     bundle_schema_version, inclusion_path)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                         $13, $14, $15, $16, $17, $18)
                  ON CONFLICT (spirit_pid, namespace_kind, namespace_detail, key)
                  DO UPDATE SET
                      value_kind = EXCLUDED.value_kind,
@@ -478,6 +548,8 @@ impl LoomLiteStore {
                      source_region = EXCLUDED.source_region,
                      source_log_ref = EXCLUDED.source_log_ref,
                      source_team = EXCLUDED.source_team,
+                     distillation_depth = EXCLUDED.distillation_depth,
+                     intent_lineage = EXCLUDED.intent_lineage,
                      leaf_canonical_hash = EXCLUDED.leaf_canonical_hash,
                      merkle_root = EXCLUDED.merkle_root,
                      region_sig = EXCLUDED.region_sig,
@@ -501,6 +573,8 @@ impl LoomLiteStore {
                     &source.region,
                     &source.log_ref,
                     &source.team.map(TeamId::as_str),
+                    &distillation_depth,
+                    &intent_lineage,
                     &leaf_canonical_hash,
                     &merkle_root,
                     &region_sig,
@@ -534,9 +608,10 @@ impl LoomLiteStore {
         let rows = client
             .query(
                 "SELECT value_kind, value_data, source_region, source_log_ref,
-                        source_ts, source_team, leaf_canonical_hash, merkle_root,
-                        region_sig, bundle_schema_version, inclusion_path,
-                        namespace_kind, namespace_detail
+                        source_ts, source_team, distillation_depth, intent_lineage,
+                        leaf_canonical_hash, merkle_root, region_sig,
+                        bundle_schema_version, inclusion_path, namespace_kind,
+                        namespace_detail
                  FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2
                    AND (namespace_detail = $3 OR namespace_detail LIKE $5)
@@ -567,13 +642,20 @@ impl LoomLiteStore {
             .map(TeamId::new)
             .transpose()
             .map_err(|error| StoreError::Query(error.to_string()))?;
-        let persisted_leaf_hash: Option<Vec<u8>> = row.get(6);
-        let persisted_root: Option<Vec<u8>> = row.get(7);
-        let persisted_region_sig: Option<Vec<u8>> = row.get(8);
-        let persisted_schema_version: Option<i16> = row.get(9);
-        let persisted_proof: Option<Vec<u8>> = row.get(10);
-        let row_ns_kind: String = row.get(11);
-        let row_ns_detail: String = row.get(12);
+        let distillation_depth_raw: i32 = row.get(6);
+        let intent_lineage_bytes: Option<Vec<u8>> = row.get(7);
+        let (distillation_depth, intent_lineage) = decode_row_provenance(
+            distillation_depth_raw,
+            intent_lineage_bytes.as_deref(),
+            source_team.is_some(),
+        )?;
+        let persisted_leaf_hash: Option<Vec<u8>> = row.get(8);
+        let persisted_root: Option<Vec<u8>> = row.get(9);
+        let persisted_region_sig: Option<Vec<u8>> = row.get(10);
+        let persisted_schema_version: Option<i16> = row.get(11);
+        let persisted_proof: Option<Vec<u8>> = row.get(12);
+        let row_ns_kind: String = row.get(13);
+        let row_ns_detail: String = row.get(14);
         if !self.region_guard(&src_region, &src_log_ref) {
             return Ok(None);
         }
@@ -602,6 +684,8 @@ impl LoomLiteStore {
             value_kind: val_kind.to_string(),
             value_data: val_data.clone(),
             source_team,
+            distillation_depth,
+            intent_lineage,
         };
         self.attestation_guard(
             &leaf,
@@ -653,8 +737,9 @@ impl LoomLiteStore {
             .query(
                 "SELECT DISTINCT ON (key) namespace_kind, namespace_detail, key, value_kind,
                         value_data, timestamp_ns, source_region, source_log_ref,
-                        source_ts, source_team, leaf_canonical_hash, merkle_root,
-                        region_sig, bundle_schema_version, inclusion_path
+                        source_ts, source_team, distillation_depth, intent_lineage,
+                        leaf_canonical_hash, merkle_root, region_sig,
+                        bundle_schema_version, inclusion_path
                  FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2
                    AND (namespace_detail = $3 OR namespace_detail LIKE $7)
@@ -692,11 +777,18 @@ impl LoomLiteStore {
                 .map(TeamId::new)
                 .transpose()
                 .map_err(|error| StoreError::Query(error.to_string()))?;
-            let persisted_leaf_hash: Option<Vec<u8>> = row.get(10);
-            let persisted_root: Option<Vec<u8>> = row.get(11);
-            let persisted_region_sig: Option<Vec<u8>> = row.get(12);
-            let persisted_schema_version: Option<i16> = row.get(13);
-            let persisted_proof: Option<Vec<u8>> = row.get(14);
+            let distillation_depth_raw: i32 = row.get(10);
+            let intent_lineage_bytes: Option<Vec<u8>> = row.get(11);
+            let (distillation_depth, intent_lineage) = decode_row_provenance(
+                distillation_depth_raw,
+                intent_lineage_bytes.as_deref(),
+                source_team.is_some(),
+            )?;
+            let persisted_leaf_hash: Option<Vec<u8>> = row.get(12);
+            let persisted_root: Option<Vec<u8>> = row.get(13);
+            let persisted_region_sig: Option<Vec<u8>> = row.get(14);
+            let persisted_schema_version: Option<i16> = row.get(15);
+            let persisted_proof: Option<Vec<u8>> = row.get(16);
 
             if !self.region_guard(&src_region, &src_log_ref) {
                 continue;
@@ -724,6 +816,8 @@ impl LoomLiteStore {
                 value_kind: row_val_kind.clone(),
                 value_data: row_val_data.clone(),
                 source_team,
+                distillation_depth,
+                intent_lineage,
             };
             self.attestation_guard(
                 &leaf,
@@ -987,7 +1081,7 @@ impl LoomLiteStore {
             .query(
                 "SELECT spirit_pid, namespace_kind, namespace_detail, key,
                         value_kind, value_data, source_region, source_ts, source_log_ref,
-                        source_team
+                        source_team, distillation_depth, intent_lineage
                  FROM collective_memory
                  ORDER BY spirit_pid, namespace_kind, namespace_detail, key",
                 &[],
@@ -1007,6 +1101,13 @@ impl LoomLiteStore {
                 })?),
                 None => None,
             };
+            let distillation_depth_raw: i32 = row.get(10);
+            let intent_lineage_bytes: Option<Vec<u8>> = row.get(11);
+            let (distillation_depth, intent_lineage) = decode_row_provenance(
+                distillation_depth_raw,
+                intent_lineage_bytes.as_deref(),
+                source_team.is_some(),
+            )?;
             out.push(CollectiveRow {
                 spirit_pid: row.get(0),
                 namespace_kind: row.get(1),
@@ -1018,6 +1119,8 @@ impl LoomLiteStore {
                 source_ts: row.get(7),
                 source_log_ref: row.get(8),
                 source_team,
+                distillation_depth,
+                intent_lineage,
             });
         }
         Ok(out)
@@ -1069,6 +1172,9 @@ pub struct CollectiveRow {
     /// first-party local rows; `Some` only for re-attested cross-team copies
     /// (written by 13.3 — at 13.2 local writes leave this NULL).
     pub source_team: Option<TeamId>,
+    /// Story 13.3b: `None` preserves v1/v2; v3 carries both fields together.
+    pub distillation_depth: Option<u32>,
+    pub intent_lineage: Option<IntentLineage>,
 }
 
 impl From<StoreError> for MemoryError {
@@ -1084,6 +1190,26 @@ mod tests {
     use maos_domain::ports::registry::SpiritId;
     use maos_domain::team::TeamId;
     use std::sync::Arc;
+
+    #[test]
+    fn row_provenance_decoder_enforces_complete_v3_shape() {
+        let encoded = br#"["schema.review","collective:share"]"#;
+        let (depth, lineage) = decode_row_provenance(2, Some(encoded), true).unwrap();
+        assert_eq!(depth, Some(2));
+        assert_eq!(
+            lineage.unwrap().as_slice(),
+            [
+                maos_domain::invariants::i8::A2AIntent::new("schema.review"),
+                maos_domain::invariants::i8::A2AIntent::new("collective:share"),
+            ]
+        );
+        assert!(decode_row_provenance(0, None, false).unwrap().0.is_none());
+        assert!(decode_row_provenance(2, None, true).is_err());
+        assert!(decode_row_provenance(0, Some(encoded), true).is_err());
+        assert!(decode_row_provenance(-1, Some(encoded), true).is_err());
+        // Provenance without a source team is a consistency violation.
+        assert!(decode_row_provenance(2, Some(encoded), false).is_err());
+    }
 
     struct StaticTenantMap;
 

@@ -727,10 +727,7 @@ mod tests {
         // covered_window has since/until
         let _since = signed.freshness.covered_window.since_ns;
         let _until = signed.freshness.covered_window.until_ns;
-        assert!(
-            signed.freshness.export_seq >= 0, // u64 is always >= 0 but check explicitly
-            "export_seq must be present"
-        );
+        let _export_seq = signed.freshness.export_seq;
         // Also verify the bundle passes verification
         let pubkey = derive_pubkey(&seed);
         verify_bundle(&signed, &pubkey).expect("signed bundle must verify");

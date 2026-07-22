@@ -39,7 +39,7 @@
 //!   load-bearing: it makes a boundary shift such as `region="ab",key="c"`
 //!   vs `region="a",key="bc"` canonically distinct.
 
-use maos_domain::team::TeamId;
+use maos_domain::{invariants::i13::IntentLineage, team::TeamId};
 use sha2::{Digest, Sha256};
 
 /// Domain separator namespaceing the collective-KV leaf canonical form from
@@ -52,14 +52,18 @@ const KV_LEAF_DOMAIN: &[u8] = b"maos.collective-kv-leaf.v1";
 /// bundle `schema_version` axis are INDEPENDENT version axes (Yui) — bumping one
 /// never implies the other.
 const KV_LEAF_DOMAIN_V2: &[u8] = b"maos.collective-kv-leaf.v2";
+/// Story 13.3b (AC1): v3 domain tag for a verified cross-team leaf carrying
+/// verbatim-copied distillation depth and intent lineage.
+const KV_LEAF_DOMAIN_V3: &[u8] = b"maos.collective-kv-leaf.v3";
+const KV_LEAF_DOMAIN_INVALID: &[u8] = b"maos.collective-kv-leaf.invalid";
 
 /// A single collective-memory KV row reduced to the engine-independent
 /// canonical form used by the cross-region convergence oracle and replication.
 ///
-/// Field set mirrors `crate::store::CollectiveRow` MINUS `source_log_ref`,
-/// which is a provenance reference that is intentionally NOT part of the
-/// convergence hash (two regions may reference different local log entries for
-/// the same logical row and must still converge).
+/// `source_log_ref` remains excluded because it is a destination-local
+/// re-attestation stamp and is re-derived on apply. In contrast, v3's
+/// distillation depth and intent lineage are copied verbatim through apply and
+/// therefore belong in the signed canonical pre-image.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CollectiveKvLeaf {
     pub source_region: String,
@@ -77,35 +81,89 @@ pub struct CollectiveKvLeaf {
     /// deserialize; `skip_serializing_if` keeps the v1 wire byte-clean.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_team: Option<TeamId>,
+    /// Story 13.3b (AC1): effective I11 depth copied verbatim across the wall.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub distillation_depth: Option<u32>,
+    /// Story 13.3b (AC1): origin intent lineage, not authorization provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intent_lineage: Option<IntentLineage>,
 }
 
 impl CollectiveKvLeaf {
     /// Construct a leaf from a raw collective-memory row.
+    ///
+    /// Reconstructs the LOGICAL leaf: a crossed row stores its namespace
+    /// detail wrapped (`xteam:<team>:<hex(original)>`); unwrap it so the leaf
+    /// bytes match what the origin signed — the same reconstruction the
+    /// store's own read path performs. Without this, rebundling a crossed
+    /// row double-wraps the marker at the next apply and the third-store
+    /// read path serves a corrupted detail.
     pub fn from_row(row: &crate::store::CollectiveRow) -> Self {
+        let namespace_detail = row
+            .source_team
+            .as_ref()
+            .and_then(|team| {
+                crate::store::original_cross_team_namespace_detail(team, &row.namespace_detail)
+            })
+            .unwrap_or_else(|| row.namespace_detail.clone());
         Self {
             source_region: row.source_region.clone(),
             source_ts: row.source_ts,
             spirit_pid: row.spirit_pid,
             namespace_kind: row.namespace_kind.clone(),
-            namespace_detail: row.namespace_detail.clone(),
+            namespace_detail,
             key: row.key.clone(),
             value_kind: row.value_kind.clone(),
             value_data: row.value_data.clone(),
             source_team: row.source_team.clone(),
+            distillation_depth: row.distillation_depth,
+            intent_lineage: row.intent_lineage.clone(),
         }
     }
 
     /// Serialize this KV row into the pinned canonical byte form.
     pub fn to_canonical_bytes(&self) -> Vec<u8> {
-        // Dispatch on source_team (AC2). `None` → the EXACT pre-13.2 v1 layout
-        // under KV_LEAF_DOMAIN, byte-for-byte identical (11.2a cross-region
-        // convergence for existing rows depends on this). `Some` → KV_LEAF_DOMAIN_V2,
-        // the identical v1 field order, then a length-prefixed source_team appended
-        // at the tail. The length prefix keeps source_team boundary-shift-safe.
-        let (domain, team_bytes): (&[u8], Option<&[u8]>) = match &self.source_team {
-            None => (KV_LEAF_DOMAIN, None),
-            Some(team) => (KV_LEAF_DOMAIN_V2, Some(team.as_str().as_bytes())),
+        // Three valid, additive layouts: no team/provenance is v1; team-only is
+        // v2; team + complete provenance is v3. Partial combinations use a
+        // non-version invalid domain and are rejected by bundle verification.
+        let valid_shape = self.has_valid_version_shape();
+        let (domain, team_bytes, depth, lineage): (
+            &[u8],
+            Option<&[u8]>,
+            Option<u32>,
+            Option<&IntentLineage>,
+        ) = match (
+            &self.source_team,
+            self.distillation_depth,
+            &self.intent_lineage,
+        ) {
+            (None, None, None) => (KV_LEAF_DOMAIN, None, None, None),
+            (Some(team), None, None) => (
+                KV_LEAF_DOMAIN_V2,
+                Some(team.as_str().as_bytes()),
+                None,
+                None,
+            ),
+            (Some(team), Some(depth), Some(lineage)) => (
+                KV_LEAF_DOMAIN_V3,
+                Some(team.as_str().as_bytes()),
+                Some(depth),
+                Some(lineage),
+            ),
+            (team, depth, lineage) => (
+                KV_LEAF_DOMAIN_INVALID,
+                team.as_ref().map(|value| value.as_str().as_bytes()),
+                depth,
+                lineage.as_ref(),
+            ),
         };
+        let lineage_len = lineage.map_or(0, |value| {
+            4 + value
+                .as_slice()
+                .iter()
+                .map(|intent| 4 + intent.as_str().len())
+                .sum::<usize>()
+        });
         let mut buf = Vec::with_capacity(
             domain.len()
                 + 4 + self.source_region.len()
@@ -116,7 +174,10 @@ impl CollectiveKvLeaf {
                 + 4 + self.key.len()
                 + 4 + self.value_kind.len()
                 + 4 + self.value_data.len()
-                + team_bytes.map_or(0, |t| 4 + t.len()),
+                + team_bytes.map_or(0, |team| 4 + team.len())
+                + depth.map_or(0, |_| 4)
+                + lineage_len
+                + usize::from(!valid_shape),
         );
         buf.extend_from_slice(domain);
         write_lp_bytes(&mut buf, self.source_region.as_bytes());
@@ -130,7 +191,42 @@ impl CollectiveKvLeaf {
         if let Some(team) = team_bytes {
             write_lp_bytes(&mut buf, team);
         }
+        if let Some(depth) = depth {
+            buf.extend_from_slice(&depth.to_be_bytes());
+        }
+        if let Some(lineage) = lineage {
+            buf.extend_from_slice(&(lineage.as_slice().len() as u32).to_be_bytes());
+            for intent in lineage.as_slice() {
+                write_lp_bytes(&mut buf, intent.as_str().as_bytes());
+            }
+        }
+        if !valid_shape {
+            buf.push(0xff);
+        }
         buf
+    }
+
+    /// Whether the data-presence tuple denotes one of the three supported
+    /// canonical versions. Untrusted partial v3 shapes are fail-closed.
+    /// `distillation_depth` must be in `1..=i32::MAX` (the writer-side floor
+    /// at `distillate.rs` mirrors the >= 1 half; the i32 half is the
+    /// PostgreSQL INTEGER representation apply converts to) and the lineage
+    /// must be non-empty (the writer rejects an empty computed lineage as
+    /// `AuditChainMissing`, so an empty one is a shape no valid writer
+    /// produces): accepting either here would let a signed bundle poison —
+    /// or wedge — the applied row.
+    pub(crate) fn has_valid_version_shape(&self) -> bool {
+        match (
+            &self.source_team,
+            self.distillation_depth,
+            &self.intent_lineage,
+        ) {
+            (None, None, None) | (Some(_), None, None) => true,
+            (Some(_), Some(depth), Some(lineage)) => {
+                depth >= 1 && depth <= i32::MAX as u32 && !lineage.as_slice().is_empty()
+            }
+            _ => false,
+        }
     }
 
     /// SHA-256 of the canonical form — the per-row contribution to the
@@ -193,6 +289,8 @@ mod tests {
             value_kind: "text/plain".to_string(),
             value_data: b"hello-world".to_vec(),
             source_team: None,
+            distillation_depth: None,
+            intent_lineage: None,
         }
     }
 
@@ -341,6 +439,9 @@ mod tests {
 
     #[test]
     fn from_row_roundtrips_all_hashed_fields() {
+        let lineage = maos_domain::invariants::i13::IntentLineage::new(vec![
+            maos_domain::invariants::i8::A2AIntent::new("schema.review"),
+        ]);
         let row = crate::store::CollectiveRow {
             spirit_pid: 7,
             namespace_kind: "nk".to_string(),
@@ -351,7 +452,9 @@ mod tests {
             source_region: "eu-central-1".to_string(),
             source_ts: 123,
             source_log_ref: "log-ref-not-hashed".to_string(),
-            source_team: None,
+            source_team: Some(TeamId::new("team-a").unwrap()),
+            distillation_depth: Some(3),
+            intent_lineage: Some(lineage.clone()),
         };
         let leaf = CollectiveKvLeaf::from_row(&row);
         assert_eq!(leaf.source_region, "eu-central-1");
@@ -362,6 +465,8 @@ mod tests {
         assert_eq!(leaf.key, "k");
         assert_eq!(leaf.value_kind, "vk");
         assert_eq!(leaf.value_data, b"vd");
+        assert_eq!(leaf.distillation_depth, Some(3));
+        assert_eq!(leaf.intent_lineage, Some(lineage));
     }
 
     #[test]
@@ -378,6 +483,8 @@ mod tests {
             value_kind: String::new(),
             value_data: Vec::new(),
             source_team: None,
+            distillation_depth: None,
+            intent_lineage: None,
         };
         let h = empty.canonical_hash();
         assert_ne!(h, [0u8; 32], "empty leaf must NOT produce all-zero hash");
@@ -401,6 +508,8 @@ mod tests {
             value_kind: "v".to_string(),
             value_data: vec![0xff; 1024],
             source_team: None,
+            distillation_depth: None,
+            intent_lineage: None,
         };
         let h = leaf.canonical_hash();
         assert_ne!(h, [0u8; 32], "max-value leaf must not produce zero hash");
@@ -448,6 +557,8 @@ mod tests {
             source_ts: 100,
             source_log_ref: "ref-A".to_string(),
             source_team: None,
+            distillation_depth: None,
+            intent_lineage: None,
         };
         let row2 = crate::store::CollectiveRow {
             source_log_ref: "ref-B".to_string(),
@@ -487,6 +598,121 @@ mod tests {
     }
 
     #[test]
+    fn test_v2_canonical_hash_golden() {
+        // FROZEN GOLDEN (Story 13.3b AC1): a Some-team leaf pins every v2 byte,
+        // including the source-team length prefix. Any drift is an ADR-gated re-key.
+        let mut leaf = sample_leaf();
+        leaf.source_team = Some(TeamId::new("team-a").unwrap());
+        assert_eq!(
+            hex::encode(leaf.canonical_hash()),
+            "4aaada8fce604f405879c574d80f5dd21cfbaebf8b43544520db5ab49a12a574",
+            "v2 (Some-team) canonical hash drifted"
+        );
+    }
+
+    #[test]
+    fn test_v3_provenance_is_additive_and_predecessors_stay_frozen() {
+        use maos_domain::invariants::i13::IntentLineage;
+        use maos_domain::invariants::i8::A2AIntent;
+
+        let v1 = sample_leaf();
+        let mut v2 = sample_leaf();
+        v2.source_team = Some(TeamId::new("team-a").unwrap());
+        let mut v3 = v2.clone();
+        v3.distillation_depth = Some(2);
+        v3.intent_lineage = Some(IntentLineage::new(vec![
+            A2AIntent::new("schema.review"),
+            A2AIntent::new("share"),
+        ]));
+
+        assert_eq!(
+            hex::encode(v1.canonical_hash()),
+            "22fe823721e83979508088bfc4e5dac4acfabe264e98c4e97abb25a8a13c2a00"
+        );
+        assert_eq!(
+            hex::encode(v2.canonical_hash()),
+            "4aaada8fce604f405879c574d80f5dd21cfbaebf8b43544520db5ab49a12a574"
+        );
+        assert_ne!(v3.canonical_hash(), v2.canonical_hash());
+
+        let v2_json = serde_json::to_value(&v2).unwrap();
+        assert!(v2_json.get("distillation_depth").is_none());
+        assert!(v2_json.get("intent_lineage").is_none());
+        let v3_json = serde_json::to_value(&v3).unwrap();
+        assert_eq!(v3_json["distillation_depth"], 2);
+        assert_eq!(
+            v3_json["intent_lineage"],
+            serde_json::json!(["schema.review", "share"])
+        );
+    }
+
+    #[test]
+    fn test_v3_canonical_hash_golden() {
+        // FROZEN GOLDEN (13.3b review): the v3 dispatch arm (team + depth +
+        // lineage) pins every v3 byte, including the KV_LEAF_DOMAIN_V3 tag.
+        // Without this pin the arm could silently emit the v2 tag with v3
+        // tail bytes (E6) and every predecessor golden would stay green.
+        // Any drift is an ADR-gated re-key.
+        use maos_domain::invariants::i13::IntentLineage;
+        use maos_domain::invariants::i8::A2AIntent;
+        let mut leaf = sample_leaf();
+        leaf.source_team = Some(TeamId::new("team-a").unwrap());
+        leaf.distillation_depth = Some(2);
+        leaf.intent_lineage = Some(IntentLineage::new(vec![
+            A2AIntent::new("schema.review"),
+            A2AIntent::new("share"),
+        ]));
+        assert_eq!(
+            hex::encode(leaf.canonical_hash()),
+            "20d446df0bc627030dbf8cbe2b73e5a284249e078165e50997810c7633e2624b",
+            "v3 (team + provenance) canonical hash drifted"
+        );
+    }
+
+    #[test]
+    fn test_source_team_v3_tail_boundary_shift_no_collision() {
+        use maos_domain::invariants::i13::IntentLineage;
+        use maos_domain::invariants::i8::A2AIntent;
+
+        let mut a = sample_leaf();
+        a.source_team = Some(TeamId::new("ab").unwrap());
+        a.distillation_depth = Some(u32::from_be_bytes(*b"cdef"));
+        a.intent_lineage = Some(IntentLineage::new(vec![A2AIntent::new("")]));
+        let mut b = sample_leaf();
+        b.source_team = Some(TeamId::new("abcdef").unwrap());
+        b.distillation_depth = Some(1);
+        b.intent_lineage = Some(IntentLineage::new(Vec::new()));
+
+        let without_team_lp = |leaf: &CollectiveKvLeaf| {
+            let mut bytes = leaf
+                .source_team
+                .as_ref()
+                .unwrap()
+                .as_str()
+                .as_bytes()
+                .to_vec();
+            bytes.extend_from_slice(&leaf.distillation_depth.unwrap().to_be_bytes());
+            let lineage = leaf.intent_lineage.as_ref().unwrap();
+            bytes.extend_from_slice(&(lineage.as_slice().len() as u32).to_be_bytes());
+            for intent in lineage.as_slice() {
+                write_lp_bytes(&mut bytes, intent.as_str().as_bytes());
+            }
+            bytes
+        };
+
+        assert_eq!(
+            without_team_lp(&a),
+            without_team_lp(&b),
+            "deleting only the source_team LP must produce the crafted collision"
+        );
+        assert_ne!(
+            a.canonical_hash(),
+            b.canonical_hash(),
+            "the real source_team/v3-tail boundary must prevent that collision"
+        );
+    }
+
+    #[test]
     fn test_source_team_v2_differs_from_v1() {
         // A Some-team leaf uses the v2 domain tag + appended source_team, so its
         // hash MUST differ from the byte-identical None-team v1 leaf.
@@ -509,19 +735,21 @@ mod tests {
     }
 
     #[test]
-    fn test_source_team_boundary_shift_no_collision() {
-        // The v2 length prefix on source_team is load-bearing: team="ab",key="c"
-        // must not collide with team="a",key="bc" (a boundary shift).
+    fn test_value_data_source_team_boundary_shift_no_collision() {
+        // Genuine adjacent fields: the raw concatenation is "abcd" in both
+        // leaves, while the pinned length-prefixed encoding distinguishes them.
         let mut a = sample_leaf();
-        a.source_team = Some(TeamId::new("ab").unwrap());
-        a.key = "c".to_string();
+        a.value_data = b"ab".to_vec();
+        a.source_team = Some(TeamId::new("cd").unwrap());
         let mut b = sample_leaf();
-        b.source_team = Some(TeamId::new("a-").unwrap());
-        b.key = "bc".to_string();
+        b.value_data = b"a".to_vec();
+        b.source_team = Some(TeamId::new("bcd").unwrap());
+        assert_eq!([a.value_data.as_slice(), b"cd"].concat(), b"abcd");
+        assert_eq!([b.value_data.as_slice(), b"bcd"].concat(), b"abcd");
         assert_ne!(
             a.canonical_hash(),
             b.canonical_hash(),
-            "source_team/key boundary shift MUST NOT collide (length prefix load-bearing)"
+            "value_data/source_team boundary shift MUST NOT collide"
         );
     }
 

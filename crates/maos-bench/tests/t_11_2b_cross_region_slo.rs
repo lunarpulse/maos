@@ -136,6 +136,8 @@ async fn roundtrip_samples(
                     region: "region-a",
                     log_ref: "",
                     team: None,
+                    distillation_depth: None,
+                    intent_lineage: None,
                 },
             )
             .await

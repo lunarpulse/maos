@@ -63,7 +63,7 @@ coverage:
     - check-kernel-baseline
     corpora: []
     phase: v2.0+
-    valid_until: '2027-07-20'
+    valid_until: '2027-07-21'
     notes: |
       Story 13.1 physical tenant-wall anchor + Story 13.2 cryptographic tenant
       boundary (Fork-4 / ADV-055-1). 13.1: database-per-team, manifest-authoritative
@@ -113,8 +113,14 @@ coverage:
       composition-root-does-not-seed-manifest-scopes, and
       mediated-operation-correlation (hermetic Blocking) +
       spirit-collective-route-live (advisory-substrate).
-      Absent successors: 13.3b cross-wall provenance/recall, 13.5e refusal audit
-      + TL isolation, 13.5b collective erase, and the 13.6 three-team journey.
+      Story 13.3b adds frozen predecessor leaf goldens plus signed v3
+      distillation_depth/intent_lineage origin metadata, a two-datname
+      apply/rebundle continuation witness, a manifest-backed directional
+      cross-wall recall seam with typed refusal taxonomy, and the
+      diamond-not-cycle traversal oracle. The leaf and bundle establish
+      origin provenance only, never authorization provenance.
+      Absent successors: 13.5e refusal audit + TL isolation, 13.5b collective
+      erase, and the 13.6 three-team journey.
   ADR-024:
     gates:
     - check-escape-detector

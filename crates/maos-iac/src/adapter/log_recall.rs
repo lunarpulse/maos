@@ -31,10 +31,14 @@ use parking_lot::Mutex;
 
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::log_recall::{
-    FrameKindLabel as DomainFrameKindLabel, LogFetchResponse, LogRecallCursor, LogRecallEntry,
-    LogRecallError, LogRecallFilter, LogRecallPage,
+    CrossWallRecallRefusal, FrameKindLabel as DomainFrameKindLabel, LogFetchResponse,
+    LogRecallCursor, LogRecallEntry, LogRecallError, LogRecallFilter, LogRecallPage,
 };
-use maos_domain::ports::LogRecallPort;
+use maos_domain::ports::{
+    CrossWallRecallConsentDecision, CrossWallRecallConsentError, CrossWallRecallConsentPort,
+    LogRecallPort,
+};
+use maos_domain::team::TeamId;
 
 use super::transparency_log::{
     FrameFilter, FrameKind, TransparencyLogAdapter, TransparencyLogEntry,
@@ -42,6 +46,8 @@ use super::transparency_log::{
 
 /// Stable intent string constant for `CapabilityInvocation` audit row.
 pub const LOG_RECALL_INTENT: &str = "log.recall";
+/// Canonical A2A intent used for signed directional cross-team grants.
+pub const CROSS_WALL_RECALL_CONSENT_INTENT: &str = "log:recall";
 
 /// Stable intent string constant for `CapabilityInvocation` audit row.
 pub const LOG_FETCH_INTENT: &str = "log.fetch";
@@ -52,6 +58,7 @@ pub const LOG_FETCH_INTENT: &str = "log.fetch";
 /// an existing I9-sanctioned holder (same shape as `SelfTelemetryAggregator`).
 pub struct LogRecallAdapter {
     transparency_log: Arc<TransparencyLogAdapter>,
+    cross_wall_consent: Option<Arc<dyn CrossWallRecallConsentPort>>,
     /// Story 4.4 — cross-Spirit isolation hook (Story 4.5 corpus).
     /// Feature-gated so production builds carry zero runtime cost.
     #[cfg(feature = "spirit_test")]
@@ -63,9 +70,17 @@ impl LogRecallAdapter {
     pub fn new(transparency_log: Arc<TransparencyLogAdapter>) -> Self {
         Self {
             transparency_log,
+            cross_wall_consent: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
+    }
+
+    /// Attach the directional cross-wall consent decision seam. The builder is
+    /// unconditional; `new` remains one-argument for all existing consumers.
+    pub fn with_cross_wall_consent(mut self, consent: Arc<dyn CrossWallRecallConsentPort>) -> Self {
+        self.cross_wall_consent = Some(consent);
+        self
     }
 
     /// Story 4.4 — attach an isolation hook for the `spirit_test` feature.
@@ -328,6 +343,39 @@ impl LogRecallPort for LogRecallAdapter {
         Ok(LogRecallPage::new(entries, next_cursor))
     }
 
+    fn recall_cross_wall(
+        &self,
+        spirit_pid: u32,
+        team: &TeamId,
+        filter: LogRecallFilter,
+    ) -> Result<LogRecallPage, LogRecallError> {
+        let reason = match self.cross_wall_consent.as_ref() {
+            None => Some(CrossWallRecallRefusal::NoConsentProvider),
+            Some(consent) => match consent.decide(team, CROSS_WALL_RECALL_CONSENT_INTENT) {
+                Ok(CrossWallRecallConsentDecision::Granted) => None,
+                Ok(CrossWallRecallConsentDecision::NoGrant) => {
+                    Some(CrossWallRecallRefusal::NoGrant)
+                }
+                Ok(CrossWallRecallConsentDecision::WrongDirection) => {
+                    Some(CrossWallRecallRefusal::WrongDirection)
+                }
+                Err(CrossWallRecallConsentError::Stale { reason }) => {
+                    Some(CrossWallRecallRefusal::ConsentStateStale(reason))
+                }
+                Err(CrossWallRecallConsentError::StateUnavailable { reason }) => {
+                    Some(CrossWallRecallRefusal::ConsentStateUnavailable(reason))
+                }
+            },
+        };
+        if let Some(reason) = reason {
+            return Err(LogRecallError::ECrossWallRecallDenied {
+                team: team.clone(),
+                reason,
+            });
+        }
+        self.recall(spirit_pid, filter)
+    }
+
     fn fetch(
         &self,
         spirit_pid: u32,
@@ -400,7 +448,10 @@ impl LogRecallPort for LogRecallAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use maos_domain::ports::LogRecallPort;
+    use maos_domain::ports::{
+        CrossWallRecallConsentError, CrossWallRecallConsentPort, LogRecallPort,
+    };
+    use maos_domain::team::TeamId;
 
     fn make_adapter(nonce: u64) -> LogRecallAdapter {
         LogRecallAdapter::new(Arc::new(TransparencyLogAdapter::open_in_memory(nonce)))
@@ -620,5 +671,156 @@ mod tests {
             .unwrap();
         assert!(page.entries.is_empty());
         assert!(page.next_cursor.is_none());
+    }
+
+    struct FixedCrossWallConsent(
+        Result<CrossWallRecallConsentDecision, CrossWallRecallConsentError>,
+    );
+
+    impl CrossWallRecallConsentPort for FixedCrossWallConsent {
+        fn decide(
+            &self,
+            _team: &TeamId,
+            _intent: &str,
+        ) -> Result<CrossWallRecallConsentDecision, CrossWallRecallConsentError> {
+            self.0.clone()
+        }
+    }
+
+    struct RecordingCrossWallConsent {
+        result: Result<CrossWallRecallConsentDecision, CrossWallRecallConsentError>,
+        calls: std::sync::Mutex<Vec<(String, String)>>,
+    }
+
+    impl CrossWallRecallConsentPort for RecordingCrossWallConsent {
+        fn decide(
+            &self,
+            team: &TeamId,
+            intent: &str,
+        ) -> Result<CrossWallRecallConsentDecision, CrossWallRecallConsentError> {
+            self.calls
+                .lock()
+                .expect("consent call recorder lock should not be poisoned")
+                .push((team.to_string(), intent.to_string()));
+            self.result.clone()
+        }
+    }
+
+    #[test]
+    fn cross_wall_recall_has_five_distinguishable_outcomes() {
+        use maos_domain::log_recall::CrossWallRecallRefusal;
+
+        let remote_team = TeamId::new("team-a").unwrap();
+        let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xD40A));
+        seed_frames(&tl, 10, 1);
+        seed_frames(&tl, 20, 2);
+        let frame_id = tl
+            .query_frames(FrameFilter {
+                spirit_pid: Some(10),
+                kind: Some(FrameKind::TaskAssign),
+                ..Default::default()
+            })
+            .unwrap()[0]
+            .frame_id;
+
+        let granted_consent = Arc::new(RecordingCrossWallConsent {
+            result: Ok(CrossWallRecallConsentDecision::Granted),
+            calls: std::sync::Mutex::new(Vec::new()),
+        });
+        let granted_consent_port: Arc<dyn CrossWallRecallConsentPort> = granted_consent.clone();
+        let granted =
+            LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(granted_consent_port);
+        // Granted AND non-empty: the method must forward spirit_pid/filter to
+        // `recall` and return the frames — an implementation that consents
+        // correctly but always returns an empty page fails here.
+        let page = granted
+            .recall_cross_wall(20, &remote_team, LogRecallFilter::default())
+            .unwrap();
+        assert_eq!(
+            page.entries.len(),
+            2,
+            "a granted cross-wall recall returns the target pid's frames"
+        );
+        assert!(page.entries.iter().all(|e| e.intent == "delegate"));
+        // Granted AND legitimately empty: success, not refusal — and never
+        // the same observation as a refusal.
+        assert!(
+            granted
+                .recall_cross_wall(30, &remote_team, LogRecallFilter::default())
+                .unwrap()
+                .entries
+                .is_empty(),
+            "a legitimately empty page is successful, not refused"
+        );
+        assert_eq!(
+            *granted_consent
+                .calls
+                .lock()
+                .expect("consent call recorder lock should not be poisoned"),
+            vec![
+                (
+                    remote_team.to_string(),
+                    CROSS_WALL_RECALL_CONSENT_INTENT.to_owned()
+                ),
+                (
+                    remote_team.to_string(),
+                    CROSS_WALL_RECALL_CONSENT_INTENT.to_owned()
+                )
+            ]
+        );
+
+        let denied = LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(Arc::new(
+            FixedCrossWallConsent(Ok(CrossWallRecallConsentDecision::NoGrant)),
+        ));
+        assert!(matches!(
+            denied.recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
+            Err(LogRecallError::ECrossWallRecallDenied {
+                reason: CrossWallRecallRefusal::NoGrant,
+                ..
+            })
+        ));
+
+        let wrong_direction =
+            LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(Arc::new(
+                FixedCrossWallConsent(Ok(CrossWallRecallConsentDecision::WrongDirection)),
+            ));
+        assert!(matches!(
+            wrong_direction.recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
+            Err(LogRecallError::ECrossWallRecallDenied {
+                reason: CrossWallRecallRefusal::WrongDirection,
+                ..
+            })
+        ));
+
+        let stale = LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(Arc::new(
+            FixedCrossWallConsent(Err(CrossWallRecallConsentError::Stale {
+                reason: "expired".into(),
+            })),
+        ));
+        assert!(matches!(
+            stale.recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
+            Err(LogRecallError::ECrossWallRecallDenied {
+                reason: CrossWallRecallRefusal::ConsentStateStale(_),
+                ..
+            })
+        ));
+
+        assert!(matches!(
+            granted.fetch(20, frame_id),
+            Err(LogRecallError::ScopeViolation { .. })
+        ));
+    }
+
+    #[test]
+    fn cross_wall_recall_without_injected_consent_fails_closed() {
+        let team = TeamId::new("team-a").unwrap();
+        let adapter = make_adapter(0xD40B);
+        assert!(matches!(
+            adapter.recall_cross_wall(10, &team, LogRecallFilter::default()),
+            Err(LogRecallError::ECrossWallRecallDenied {
+                reason: CrossWallRecallRefusal::NoConsentProvider,
+                ..
+            })
+        ));
     }
 }

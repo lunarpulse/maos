@@ -3,13 +3,18 @@
 use std::sync::{Arc, Mutex};
 
 use ed25519_dalek::SigningKey;
-use maos_bin::cross_team_consent::{derive_team_verifying_keys, CrossTeamConsentAdapter};
+use maos_bin::cross_team_consent::{
+    derive_team_verifying_keys, CrossTeamConsentAdapter, CrossWallRecallConsentAdapter,
+};
 use maos_cohort::{
     CohortAuthority, CohortClock, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
     CrossTeamConsentGrant, InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys,
     TeamEntry, COHORT_SCHEMA_V3, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use maos_domain::memory::{MemoryNamespace, MemoryValue};
+use maos_domain::ports::{
+    CrossWallRecallConsentDecision, CrossWallRecallConsentError, CrossWallRecallConsentPort,
+};
 use maos_domain::region::Region;
 use maos_domain::team::TeamId;
 use maos_loom_lite::cross_team_consent::{CrossTeamConsentError, CrossTeamConsentPort};
@@ -44,6 +49,7 @@ fn consent_state(clock: Arc<TestClock>) -> Arc<CohortManifestState> {
         "region-b",
         "maos_team_a".to_string(),
         "maos_team_b".to_string(),
+        "collective:share",
     )
 }
 
@@ -54,6 +60,7 @@ fn consent_state_for(
     team_b_region: &str,
     team_a_datname: String,
     team_b_datname: String,
+    grant_intent: &str,
 ) -> Arc<CohortManifestState> {
     let signing_key = SigningKey::from_bytes(&[23; 32]);
     let manifest = CohortManifest {
@@ -100,7 +107,7 @@ fn consent_state_for(
         cross_team_consent: vec![CrossTeamConsentGrant {
             from_team: TeamId::new("team-a").unwrap(),
             to_team: TeamId::new("team-b").unwrap(),
-            intent: "collective:share".to_string(),
+            intent: grant_intent.to_string(),
         }],
     }
     .signed_with(&signing_key);
@@ -210,6 +217,101 @@ fn replication_crossing_has_no_production_initiator() {
     );
 }
 
+#[test]
+fn cross_wall_recall_manifest_direction_and_staleness_are_typed() {
+    let clock = Arc::new(TestClock::default());
+    let state = consent_state_for(
+        Arc::clone(&clock),
+        "cross-wall-recall-test",
+        "region-a",
+        "region-b",
+        "maos_team_a".to_string(),
+        "maos_team_b".to_string(),
+        "log:recall",
+    );
+    let team_a = TeamId::new("team-a").unwrap();
+    let team_b = TeamId::new("team-b").unwrap();
+    let team_c = TeamId::new("team-c").unwrap();
+    let source = CrossWallRecallConsentAdapter::new(Arc::clone(&state), team_a.clone());
+    assert_eq!(
+        source.decide(&team_b, "log:recall").unwrap(),
+        CrossWallRecallConsentDecision::Granted
+    );
+    let destination = CrossWallRecallConsentAdapter::new(Arc::clone(&state), team_b);
+    assert_eq!(
+        destination.decide(&team_a, "log:recall").unwrap(),
+        CrossWallRecallConsentDecision::WrongDirection
+    );
+    assert_eq!(
+        source.decide(&team_c, "log:recall").unwrap(),
+        CrossWallRecallConsentDecision::NoGrant
+    );
+    clock.advance(121);
+    assert!(matches!(
+        source.decide(&team_c, "log:recall"),
+        Err(CrossWallRecallConsentError::Stale { .. })
+    ));
+}
+
+#[test]
+fn cross_wall_recall_has_no_production_caller() {
+    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("workspace root");
+    let mut callers = Vec::new();
+    let mut stack = vec![
+        workspace_root.join("crates"),
+        workspace_root.join("spirits"),
+    ];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let name = path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("");
+                if matches!(name, "tests" | "benches" | "examples" | "target")
+                    || name.starts_with('.')
+                {
+                    continue;
+                }
+                stack.push(path);
+            } else if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+                let text = std::fs::read_to_string(&path).expect("read source");
+                let production = text.split("#[cfg(test)]").next().unwrap_or(&text);
+                if production.contains(".recall_cross_wall(") {
+                    callers.push(path);
+                }
+            }
+        }
+    }
+    assert!(
+        callers.is_empty(),
+        "cross-wall-recall-has-no-production-caller inverted by {callers:?}; \
+         production caller owner is UNASSIGNED and must be assigned before inversion"
+    );
+}
+
+#[test]
+fn cross_wall_recall_refusals_not_journaled() {
+    let adapter = include_str!("../src/../../maos-iac/src/adapter/log_recall.rs");
+    let method = adapter
+        .split("fn recall_cross_wall")
+        .nth(1)
+        .and_then(|tail| tail.split("fn fetch").next())
+        .expect("cross-wall method source");
+    assert!(
+        !method.contains("insert_frame_event"),
+        "cross-wall-recall-refusals-not-journaled inverted: Story 13.5e must \
+         replace this dead-wire assertion with per-team refusal-audit coverage"
+    );
+}
+
 // ─── Live composition-level crossing (13.3 review) ──────────────────────────
 //
 // The headline asymmetric negative must be observed through the PRODUCTION
@@ -253,6 +355,7 @@ fn live_consent_state(clock: Arc<TestClock>) -> Arc<CohortManifestState> {
         "region-a",
         datname_of(&pg_conn_team("team-a")),
         datname_of(&pg_conn_team("team-b")),
+        "collective:share",
     )
 }
 
@@ -317,10 +420,14 @@ fn live_leaf(key: &str, value: &str) -> CollectiveKvLeaf {
         key: key.to_string(),
         value_kind: "text".to_string(),
         value_data: value.as_bytes().to_vec(),
-        // Deliberately UNSTAMPED: the builder stamps the envelope identity
-        // (13.3 review F1 regression cover — a first-party leaf must not
-        // land as a permanently unreadable row).
+        // Deliberately UNSTAMPED: a leaf with NO origin is the first-party
+        // PROMOTION case, which the builder still performs (13.3 review F1
+        // regression cover — a first-party leaf must not land as a
+        // permanently unreadable row). A leaf that already carried a foreign
+        // origin would be REFUSED instead of relabelled (13.3b rework).
         source_team: None,
+        distillation_depth: None,
+        intent_lineage: None,
     }
 }
 
@@ -345,7 +452,8 @@ async fn asymmetric_consent_reverse_share_refused() {
         &region,
         &team_a,
         &seed,
-    );
+    )
+    .expect("first-party promotion builds");
     let result = apply_replication_bundle(
         &bundle,
         &store_b,
@@ -374,7 +482,8 @@ async fn asymmetric_consent_reverse_share_refused() {
         &region,
         &team_b,
         &seed,
-    );
+    )
+    .expect("first-party promotion builds");
     assert!(matches!(
         apply_replication_bundle(
             &reverse,

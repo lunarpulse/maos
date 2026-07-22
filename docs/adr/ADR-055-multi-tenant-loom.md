@@ -74,6 +74,12 @@ The read verifier is scoped to the default **plaintext-at-rest posture**. To bin
 | Seal-independent cross-team reads | Configured sealing refuses cross-team reads until Story 13.5a provides unseal. |
 | Region-axis closure | The existing `source_log_ref` presence residual remains open and the forged-stamp live leg remains served. |
 
+#### Story 13.3b origin-provenance and recall amendment
+
+Story 13.3b adds a third, data-presence-selected leaf canonical form. A source-team leaf carrying both copied `distillation_depth` and I13 `intent_lineage` signs those fields under `maos.collective-kv-leaf.v3`; v1 and v2 bytes remain frozen. The destination persists and rebundles those fields. The region `source_log_ref` column remains a destination-local re-attestation stamp and is not the flattened I11 frame-ref chain. As required by ADR-049 §7, these fields establish provenance-of-origin only, never provenance-of-authorization.
+
+Raw-frame access behind another team's wall is a separate directional capability governed by ADR-058. Existing emitter-scoped `log.recall` remains unchanged; `recall_cross_wall` requires a fresh exact `(home_team, remote_team, "log:recall")` manifest grant and returns typed refusal reasons distinct from an empty page. The consent adapter lives at the composition root; `maos-iac` remains free of `maos-cohort` and `maos-loom-lite` dependencies. This does not establish per-team Transparency Log isolation or refusal journaling.
+
 ### 5. Freshness and boot posture
 
 Tenant map lookups require both lease freshness and local-host membership in the current verified roster. A peerless/N=1 source is not refreshable under the shipped authority model and is refused at boot. In the primary daemon, configured tenant mode without a refreshable source fails immediately; non-tenant configuration remains quietly disabled. Hot-path heartbeats and a new announcement protocol are rejected.
@@ -88,7 +94,7 @@ The cohort daemon is **not** a parallel composition root. `run_cohort_a2a_daemon
 - Story 13.2 closes same-region cross-team forgery at entry. Story 13.3 adds directional consent, source-team persistence, namespace/clobber controls, and read-time team-axis attestation. The **region** `source_log_ref` presence residual remains OPEN with no named successor.
 - Caller-visible refusal causes are structured inside the existing `CollectivePortError::Transport(_)` tuple, so kernel matching stays unchanged. Refusals remain unaudited; Story 13.5e owns refusal auditing and per-operator Transparency Log isolation.
 - Story 13.5d's mediated Spirit route and registration now serve first-party collective operations. Cross-team replication still has no production initiator.
-- Multi-hop/cross-wall provenance and recall remain Story 13.3b; collective erase/legal-hold remains Story 13.5b; the three-team journey remains Story 13.6.
+- Story 13.3b now carries signed v3 origin metadata, preserves the Story 8.10 citer-authorization default, fixes diamond traversal, and adds manifest-consented cross-wall recall. Per-team TL isolation and refusal journaling remain Story 13.5e; collective erase/legal-hold remains Story 13.5b; the three-team journey remains Story 13.6.
 - Story 13.5c closed refresh wiring and made tenant mode bootable. Its per-boot random, single-sourced A2A nonce remains the NFR-Rel-6 restart detector.
 - The gate has no dedicated xtask self-test that independently inventories its leg registry or cross-checks `ABSENT_SUCCESSORS` against this ADR/coverage matrix. That meta-gap is named, not silently claimed closed.
 - Dead-wire clause `(f-ii) tenant-mode-unbootable` was inverted by Story 13.5c and is covered by the existing live boot leg. Clause `(f-i) no production crossing initiator` remains green with no assigned inverter.

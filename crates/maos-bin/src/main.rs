@@ -2620,10 +2620,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     eprintln!("maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)");
 
-    // Story 4.4 — LogRecallAdapter + DistillateWriter (log-recall + I11 audit chain).
-    let log_recall_adapter = Arc::new(maos_kernel_core::iac::log_recall::LogRecallAdapter::new(
-        Arc::clone(&transparency_log),
-    ));
+    // Story 4.4 / 13.3b — LogRecallAdapter + directional manifest-consent seam.
+    let mut log_recall =
+        maos_kernel_core::iac::log_recall::LogRecallAdapter::new(Arc::clone(&transparency_log));
+    if let (Some(bootstrap), Ok(home_team)) =
+        (cohort_daemon.as_ref(), std::env::var("MAOS_LOOM_HOME_TEAM"))
+    {
+        let home_team = maos_domain::team::TeamId::new(&home_team).map_err(|error| {
+            format!("maos: invalid MAOS_LOOM_HOME_TEAM for cross-wall recall: {error}")
+        })?;
+        log_recall = log_recall.with_cross_wall_consent(Arc::new(
+            maos_bin::cross_team_consent::CrossWallRecallConsentAdapter::new(
+                Arc::clone(&bootstrap.state),
+                home_team,
+            ),
+        ));
+    }
+    let log_recall_adapter = Arc::new(log_recall);
     let memory_any: Arc<dyn std::any::Any + Send + Sync> =
         Arc::clone(&memory) as Arc<dyn std::any::Any + Send + Sync>;
     let distillate_writer = Arc::new(maos_kernel_core::iac::distillate::DistillateWriter::new(

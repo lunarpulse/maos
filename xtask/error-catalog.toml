@@ -50,6 +50,17 @@ kernel_or_spirit = "kernel"
 since_version = "0.5.0"
 
 [[error]]
+code = "ECrossWallRecallDenied"
+rust_path = "LogRecallError::ECrossWallRecallDenied"
+source_file = "crates/maos-domain/src/log_recall.rs"
+description = "Cross-wall log recall lacks a fresh directional consent grant"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.5.0"
+
+[[error]]
 code = "EOrchestratorDispatchRawOutput"
 rust_path = "IacBusError::EOrchestratorDispatchRawOutput"
 source_file = "crates/maos-domain/src/iac_bus_types.rs"

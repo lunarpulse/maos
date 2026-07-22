@@ -38,11 +38,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio_postgres::NoTls;
 
+use maos_domain::invariants::{i13::IntentLineage, i8::A2AIntent};
 use maos_loom_lite::cross_team_consent::{CrossTeamConsentError, CrossTeamConsentPort};
 use maos_loom_lite::replication::bundle::{
     apply_replication_bundle, build_reattestation_receipt, build_replication_bundle,
-    build_replication_bundle_v2, verify_reattestation_receipt, verify_replication_bundle,
-    BundleError, CrossTeamApplyContext,
+    build_replication_bundle_v2, originate_team_row, verify_reattestation_receipt,
+    verify_replication_bundle, BundleError, CrossTeamApplyContext,
 };
 use maos_loom_lite::replication::leaf::{
     compute_kv_payload_oracle, kv_merkle_root, CollectiveKvLeaf,
@@ -128,20 +129,33 @@ impl CrossTeamConsentPort for AsymmetricConsent {
     }
 }
 
-struct DestinationTeamMap {
+/// The org-wide pid→team registry, shared by BOTH team stores.
+///
+/// A tenant map is a *global* fact in production (13.1's `TenantMapPort`):
+/// pid P belongs to team T, independent of which store is asking. Tenancy is
+/// then enforced per-store by `team_guard`, which refuses when the caller's
+/// team differs from the store's `home_team`. Giving each store a private map
+/// that answered differently for the same pid would model a fiction and would
+/// make `TenantConnectionMismatch` untestable by construction.
+///
+/// So: pid 7 is a **team-b** Spirit, pid 73 is a **team-a** Spirit. Reading
+/// pid 73 against `store_b` (or pid 7 against `store_a`) is a genuine
+/// cross-tenant refusal, not a harness artifact.
+struct CrossTeamTenantMap {
     team_a_datname: String,
     team_b_datname: String,
 }
 
-impl TenantMapPort for DestinationTeamMap {
+impl TenantMapPort for CrossTeamTenantMap {
     fn team_of(&self, spirit_pid: u32) -> Result<TeamId, TenantMapError> {
-        if spirit_pid == 7 {
-            TeamId::new("team-b").map_err(|error| TenantMapError::StateUnavailable {
-                reason: error.to_string(),
-            })
-        } else {
-            Err(TenantMapError::SpiritUnmapped { spirit_pid })
-        }
+        let team = match spirit_pid {
+            7 => "team-b",
+            73 => "team-a",
+            _ => return Err(TenantMapError::SpiritUnmapped { spirit_pid }),
+        };
+        TeamId::new(team).map_err(|error| TenantMapError::StateUnavailable {
+            reason: error.to_string(),
+        })
     }
 
     fn datname_for(&self, team: &TeamId) -> Result<String, TenantMapError> {
@@ -179,7 +193,7 @@ async fn make_cross_team_store(team: &str) -> LoomLiteStore {
     .await
     .unwrap()
     .with_cross_team_consent(Arc::new(AsymmetricConsent))
-    .with_tenant_map(Arc::new(DestinationTeamMap {
+    .with_tenant_map(Arc::new(CrossTeamTenantMap {
         team_a_datname: datname_of(&pg_conn_team("team-a")),
         team_b_datname: datname_of(&pg_conn_team("team-b")),
     }))
@@ -260,6 +274,8 @@ async fn exercise_cross_team_row_matrix() {
                 region: CROSS_TEAM_REGION,
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -303,6 +319,8 @@ async fn exercise_cross_team_row_matrix() {
         value_kind: "text".to_string(),
         value_data: value.as_bytes().to_vec(),
         source_team: Some(team_a.clone()),
+        distillation_depth: None,
+        intent_lineage: None,
     })
     .collect();
     let bundle = build_replication_bundle_v2(
@@ -310,7 +328,8 @@ async fn exercise_cross_team_row_matrix() {
         &Region::canonicalize("region-a").unwrap(),
         &team_a,
         &BASE_SEED,
-    );
+    )
+    .expect("leaf origin matches the envelope");
     let result = apply_replication_bundle(
         &bundle,
         &store_b,
@@ -442,7 +461,7 @@ async fn exercise_cross_team_row_matrix() {
     })
     .await
     .unwrap()
-    .with_tenant_map(Arc::new(DestinationTeamMap {
+    .with_tenant_map(Arc::new(CrossTeamTenantMap {
         team_a_datname: datname_of(&pg_conn_team("team-a")),
         team_b_datname: datname_of(&pg_conn_team("team-b")),
     }))
@@ -475,6 +494,210 @@ async fn cross_team_crossing_lands_with_bound_source_team() {
 }
 
 #[tokio::test]
+#[ignore = "requires two live Postgres datnames (set MAOS_TEST_POSTGRES_TEAM_A/B)"]
+async fn v3_provenance_crosses_team_wall_and_survives_rebundle() {
+    let _g = guard();
+    let team_a = TeamId::new("team-a").unwrap();
+    let team_b = TeamId::new("team-b").unwrap();
+    let region = Region::canonicalize(CROSS_TEAM_REGION).unwrap();
+    let store_a = make_cross_team_store("team-a").await;
+    let store_b = make_cross_team_store("team-b").await;
+    reset_collective_team("team-a").await;
+    reset_collective_team("team-b").await;
+    assert_ne!(
+        datname_of(&pg_conn_team("team-a")),
+        datname_of(&pg_conn_team("team-b")),
+        "the live crossing must use two physical datnames"
+    );
+
+    let lineage = IntentLineage::new(vec![
+        A2AIntent::new("schema.review"),
+        A2AIntent::new("collective:share"),
+    ]);
+    // ORIGINATE through the production seam (13.3b review): the chain must
+    // be born on a real write path, not hand-constructed — a hand-built
+    // leaf can carry shapes no production row ever would.
+    originate_team_row(
+        &store_a,
+        73,
+        &MemoryNamespace::Default,
+        "v3-provenance",
+        MemoryValue::Text("cross-wall".to_string()),
+        2,
+        lineage.clone(),
+        &team_a,
+        &BASE_SEED,
+    )
+    .await
+    .expect("the origin originates its v3 row through the attested seam");
+    // The origin can serve its own provenance row: attestation_guard holds
+    // for self-attested first-party rows.
+    let served = store_a
+        .read(73, &MemoryNamespace::Default, "v3-provenance")
+        .await
+        .expect("origin read succeeds")
+        .expect("originated row is servable at the origin");
+    assert_eq!(served, MemoryValue::Text("cross-wall".to_string()));
+
+    // Cross A→B from the ORIGIN's real persisted row.
+    let rows_a = LoomLiteStore::read_all_rows_from(&raw_connect_team("team-a").await)
+        .await
+        .expect("read origin rows");
+    let origin_row = rows_a
+        .iter()
+        .find(|row| row.key == "v3-provenance")
+        .expect("v3 row present at origin");
+    let leaf = CollectiveKvLeaf::from_row(origin_row);
+    assert_eq!(leaf.source_team, Some(team_a.clone()));
+    assert_eq!(leaf.distillation_depth, Some(2));
+    let bundle = build_replication_bundle_v2(vec![leaf], &region, &team_a, &BASE_SEED)
+        .expect("a first-party team-a bundle builds");
+    apply_replication_bundle(
+        &bundle,
+        &store_b,
+        CROSS_TEAM_REGION,
+        Some(CrossTeamApplyContext::new(&team_b, "collective:share")),
+        &BASE_SEED,
+    )
+    .await
+    .expect("A→B v3 apply succeeds");
+
+    // ── POSITIVE CONTROL: the origin SURVIVED a legitimate crossing ───────
+    // Physical, on team-b's real datname. If the guard below were a
+    // reject-everything stub, or if the builder still relabelled, these
+    // assertions would red first.
+    let rows = LoomLiteStore::read_all_rows_from(&raw_connect_team("team-b").await)
+        .await
+        .expect("read landed B rows");
+    let landed = rows
+        .iter()
+        .find(|row| row.key == "v3-provenance")
+        .expect("v3 row landed in B");
+    assert_eq!(
+        landed.source_team,
+        Some(team_a.clone()),
+        "the ORIGIN team must survive the crossing, not be rewritten to the hop team"
+    );
+    assert_eq!(landed.source_region, CROSS_TEAM_REGION);
+    assert_eq!(landed.distillation_depth, Some(2));
+    assert_eq!(landed.intent_lineage, Some(lineage.clone()));
+    assert_eq!(
+        rows.iter().filter(|r| r.key == "v3-provenance").count(),
+        1,
+        "exactly one landed row"
+    );
+
+    // Rebundling BY THE ORIGIN team is still permitted, and does not rewrite
+    // identity — proves the build-site guard is not reject-everything.
+    let continuation = CollectiveKvLeaf::from_row(landed);
+    let rebundled = build_replication_bundle_v2(vec![continuation], &region, &team_a, &BASE_SEED)
+        .expect("the origin team may re-attest its own row");
+    assert_eq!(
+        rebundled.leaves[0].source_team,
+        Some(team_a.clone()),
+        "build must NOT rewrite the identity it was handed"
+    );
+    let wire = serde_json::to_vec(&rebundled).expect("serialize continuation bundle");
+    let decoded = serde_json::from_slice(&wire).expect("deserialize continuation bundle");
+    verify_replication_bundle(&decoded, &BASE_SEED).expect("origin-team continuation verifies");
+    assert_eq!(decoded.leaves[0].distillation_depth, Some(2));
+    assert_eq!(decoded.leaves[0].intent_lineage, Some(lineage));
+
+    // ── THE PROVING NEGATIVE: refusal lives at BUILD ──────────────────────
+    // 13.3b rework. This assertion used to sit at verify and was
+    // UNSATISFIABLE there: once the builder erased the origin, the hijacked
+    // bundle was byte-indistinguishable from a genuine team-b first-party
+    // bundle, and verify is a pure function of those bytes. Build is the only
+    // point where the origin evidence still exists.
+    //
+    // The load-bearing clause is `origin_team == &team_a`: a
+    // refuse-everything stub cannot produce that string — it would have to
+    // have read the leaf it is protecting.
+    let err = build_replication_bundle_v2(
+        vec![CollectiveKvLeaf::from_row(landed)],
+        &region,
+        &team_b,
+        &BASE_SEED,
+    )
+    .expect_err("a hop team must not re-sign a foreign-origin leaf under its own envelope");
+    assert!(
+        matches!(
+            &err,
+            BundleError::LeafOriginRelabelRefused {
+                key,
+                origin_team,
+                envelope_team,
+                ..
+            } if key == "v3-provenance"
+                && origin_team == &team_a
+                && envelope_team == &team_b
+        ),
+        "got {err:?}"
+    );
+
+    // SYMMETRIC REGION LEG — the axis with no coverage before this rework.
+    // `bundle.rs` overwrote source_region by the identical mechanism, verify
+    // explicitly did not constrain it, and apply's check could never fire on
+    // a builder-produced bundle. This makes a partial revert impossible to
+    // hide: restoring only the team half still reds here.
+    let other_region = Region::canonicalize("region-b").unwrap();
+    let err = build_replication_bundle_v2(
+        vec![CollectiveKvLeaf::from_row(landed)],
+        &other_region,
+        &team_a,
+        &BASE_SEED,
+    )
+    .expect_err("a leaf's origin REGION must not be relabelled either");
+    assert!(
+        matches!(
+            &err,
+            BundleError::LeafOriginRelabelRefused {
+                key,
+                origin_region,
+                envelope_region,
+                ..
+            } if key == "v3-provenance"
+                && origin_region == CROSS_TEAM_REGION
+                && envelope_region == "region-b"
+        ),
+        "got {err:?}"
+    );
+
+    // ── THE READ-BACK IS NOT VACUOUS: it reaches `attestation_guard` ──────
+    // The positive read at the top of this test claims "attestation_guard
+    // holds for self-attested first-party rows". `team_guard` runs FIRST and
+    // an unmapped pid refuses there, so that claim is only worth the control
+    // that proves the read got PAST team_guard and into the crypto. Corrupt
+    // the persisted root signature on the origin's own row and the SAME read
+    // must now refuse: the only code that inspects `region_sig` is
+    // `attestation_guard`. Done last — nothing below depends on this row.
+    let raw_a = raw_connect_team("team-a").await;
+    let flipped = raw_a
+        .execute(
+            // XOR the first byte with 0xFF: guaranteed to differ, unlike a
+            // fixed-byte overwrite (the signature is freshly derived each run,
+            // so a constant would be a no-op ~1 run in 256).
+            "UPDATE collective_memory
+                SET region_sig = set_byte(region_sig, 0, get_byte(region_sig, 0) # 255)
+              WHERE key = 'v3-provenance'",
+            &[],
+        )
+        .await
+        .expect("corrupt the persisted attestation");
+    assert_eq!(flipped, 1, "exactly one origin row to corrupt");
+    assert!(
+        matches!(
+            store_a
+                .read(73, &MemoryNamespace::Default, "v3-provenance")
+                .await,
+            Err(StoreError::AttestationInvalid { .. })
+        ),
+        "a corrupted root signature must refuse the read — if this passes, \
+         the positive read above never reached attestation_guard"
+    );
+}
+
+#[tokio::test]
 #[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
 async fn cross_team_clobber_refused() {
     exercise_cross_team_row_matrix().await;
@@ -504,13 +727,16 @@ async fn asymmetric_consent_reverse_share_refused() {
         value_kind: "text".to_string(),
         value_data: b"denied".to_vec(),
         source_team: Some(team_b.clone()),
+        distillation_depth: None,
+        intent_lineage: None,
     };
     let bundle = build_replication_bundle_v2(
         vec![leaf],
         &Region::canonicalize(CROSS_TEAM_REGION).unwrap(),
         &team_b,
         &BASE_SEED,
-    );
+    )
+    .expect("leaf origin matches the envelope");
     assert!(matches!(
         apply_replication_bundle(
             &bundle,
@@ -548,6 +774,8 @@ async fn unattested_cross_team_row_is_refused_at_read() {
                 region: "region-a",
                 log_ref: "forged-presence-stamp",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -594,6 +822,8 @@ async fn reattest_copy_fails_then_reattest_succeeds() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -681,6 +911,8 @@ async fn no_aead_sign_only_bundle() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -751,6 +983,8 @@ async fn crdt_reorder_independence_oracle_converges() {
                     region: region,
                     log_ref: "",
                     team: None,
+                    distillation_depth: None,
+                    intent_lineage: None,
                 },
             )
             .await
@@ -770,6 +1004,8 @@ async fn crdt_reorder_independence_oracle_converges() {
                     region: region,
                     log_ref: "",
                     team: None,
+                    distillation_depth: None,
+                    intent_lineage: None,
                 },
             )
             .await
@@ -836,6 +1072,8 @@ async fn crdt_lww_tiebreak_by_region() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -851,6 +1089,8 @@ async fn crdt_lww_tiebreak_by_region() {
                 region: "region-b",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -868,6 +1108,8 @@ async fn crdt_lww_tiebreak_by_region() {
                 region: "region-b",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -883,6 +1125,8 @@ async fn crdt_lww_tiebreak_by_region() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -918,6 +1162,8 @@ async fn planted_byte_divergence_payload_oracle_catches_merkle_misses() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -1005,6 +1251,8 @@ async fn full_convergence_across_regions() {
                     region: "region-a",
                     log_ref: "",
                     team: None,
+                    distillation_depth: None,
+                    intent_lineage: None,
                 },
             )
             .await
@@ -1080,6 +1328,8 @@ async fn set_vs_sequence_not_conflated() {
                     region: "region-a",
                     log_ref: "",
                     team: None,
+                    distillation_depth: None,
+                    intent_lineage: None,
                 },
             )
             .await
@@ -1099,6 +1349,8 @@ async fn set_vs_sequence_not_conflated() {
                     region: "region-a",
                     log_ref: "",
                     team: None,
+                    distillation_depth: None,
+                    intent_lineage: None,
                 },
             )
             .await
@@ -1145,6 +1397,8 @@ async fn region_identity_forge_rejected_count_moves() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -1331,6 +1585,8 @@ async fn healing_remerge_converges() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -1354,6 +1610,8 @@ async fn healing_remerge_converges() {
         value_kind: "text".to_string(),
         value_data: b"updated-during-partition".to_vec(),
         source_team: None,
+        distillation_depth: None,
+        intent_lineage: None,
     };
     let bundle_b = build_replication_bundle(vec![partition_leaf], &region_b, &BASE_SEED);
     verify_replication_bundle(&bundle_b, &BASE_SEED).unwrap();
@@ -1408,6 +1666,8 @@ async fn apply_result_surfaces_skipped() {
         value_kind: "text".to_string(),
         value_data: b"valid-value".to_vec(),
         source_team: None,
+        distillation_depth: None,
+        intent_lineage: None,
     };
     let invalid_leaf = CollectiveKvLeaf {
         source_region: "region-a".to_string(),
@@ -1419,6 +1679,8 @@ async fn apply_result_surfaces_skipped() {
         value_kind: "text".to_string(),
         value_data: b"invalid-value".to_vec(),
         source_team: None,
+        distillation_depth: None,
+        intent_lineage: None,
     };
 
     let bundle = build_replication_bundle(vec![valid_leaf, invalid_leaf], &region_a, &BASE_SEED);
@@ -1476,6 +1738,8 @@ async fn blind_overwrite_regression_detected() {
                     region: region,
                     log_ref: "",
                     team: None,
+                    distillation_depth: None,
+                    intent_lineage: None,
                 },
             )
             .await
@@ -1514,6 +1778,8 @@ async fn blind_overwrite_regression_detected() {
                     region: region,
                     log_ref: "",
                     team: None,
+                    distillation_depth: None,
+                    intent_lineage: None,
                 },
             )
             .await
@@ -1569,6 +1835,8 @@ async fn source_ts_preserved_across_reattestation() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -1704,6 +1972,8 @@ async fn home_write(store: &LoomLiteStore, pid: u32, home: &str) {
                 region: home,
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -1956,6 +2226,8 @@ async fn three_region_reorder_independence() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -1971,6 +2243,8 @@ async fn three_region_reorder_independence() {
                 region: "region-b",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -1986,6 +2260,8 @@ async fn three_region_reorder_independence() {
                 region: "region-c",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -2112,6 +2388,8 @@ async fn live_read_region_identity_foreign_refused() {
                 region: "region-b", // foreign to store-a (home region-a)
                 log_ref: "",        // empty source_log_ref — NOT validly re-attested
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -2177,6 +2455,8 @@ async fn live_read_region_identity_reattested_served() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -2237,6 +2517,8 @@ async fn live_read_region_identity_home_served() {
                 region: "region-a", // home-origin
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -2283,6 +2565,8 @@ async fn live_scan_region_identity_foreign_refused() {
                 region: "region-b", // foreign to store-a (home region-a)
                 log_ref: "",        // empty source_log_ref — NOT validly re-attested
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -2300,6 +2584,8 @@ async fn live_scan_region_identity_foreign_refused() {
                 region: "region-a",
                 log_ref: "",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -2365,6 +2651,8 @@ async fn live_read_region_identity_forged_stamp_served() {
                 region: "region-b",
                 log_ref: r#"{"source_region":"region-b","merkle_root":"forged-root"}"#,
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await

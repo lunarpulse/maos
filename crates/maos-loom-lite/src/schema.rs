@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS collective_memory (
     kind            TEXT NOT NULL DEFAULT 'entry',
     source_log_ref  TEXT NOT NULL DEFAULT '',
     distillation_depth INTEGER NOT NULL DEFAULT 0,
+    -- Story 13.3b: canonical JSON for I13 intent lineage. NULL preserves v1/v2.
+    intent_lineage  BYTEA,
     timestamp_ns    BIGINT NOT NULL,
     -- Story 11.2a (AC1, F3): CRDT LWW-register total-order tiebreak columns.
     -- source_region: canonical ascii-v1 region tag of the originating write.
@@ -94,6 +96,12 @@ BEGIN
         WHERE table_name = 'collective_memory' AND column_name = 'source_team'
     ) THEN
         ALTER TABLE collective_memory ADD COLUMN source_team TEXT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'intent_lineage'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN intent_lineage BYTEA;
     END IF;
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns

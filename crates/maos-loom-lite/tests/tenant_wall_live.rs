@@ -484,6 +484,8 @@ async fn tenant_wall_d1_forged_stamp_is_still_served_boundary() {
                 region: "region-b",
                 log_ref: "forged-non-empty-log-ref",
                 team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
         )
         .await
@@ -564,9 +566,12 @@ async fn tenant_wall_per_team_merkle_independence_mixed_v1_v2() {
         value_kind: "text".to_string(),
         value_data: b"cross-team-copy".to_vec(),
         source_team: Some(team_c.clone()),
+        distillation_depth: None,
+        intent_lineage: None,
     };
     let cross_team_bundle =
-        build_replication_bundle_v2(vec![cross_team_leaf], &region_c, &team_c, &TEAM_BASE_SEED);
+        build_replication_bundle_v2(vec![cross_team_leaf], &region_c, &team_c, &TEAM_BASE_SEED)
+            .expect("leaf origin matches the envelope");
     apply_replication_bundle(
         &cross_team_bundle,
         &store_a,

@@ -1225,7 +1225,7 @@ fn default_idle_window_ms() -> u32 {
 
 impl RawSchedulingSection {
     fn validate(self) -> Result<SchedulingSection, ManifestError> {
-        if self.priority_weight < 1 || self.priority_weight > 255 {
+        if self.priority_weight == 0 {
             return Err(ManifestError::Toml(validation_msg(
                 "scheduling.priority_weight",
                 &format!("must be in [1, 255], got {}", self.priority_weight),

@@ -3,6 +3,9 @@ use std::sync::Arc;
 
 use maos_audit::sealed_export::derive_team_pubkey;
 use maos_cohort::CohortManifestState;
+use maos_domain::ports::{
+    CrossWallRecallConsentDecision, CrossWallRecallConsentError, CrossWallRecallConsentPort,
+};
 use maos_domain::region::Region;
 use maos_domain::team::TeamId;
 use maos_loom_lite::cross_team_consent::{CrossTeamConsentError, CrossTeamConsentPort};
@@ -39,6 +42,44 @@ impl CrossTeamConsentPort for CrossTeamConsentAdapter {
                 reason: "signed cohort manifest lease expired".to_string(),
             })?;
         Ok(manifest.cross_team_admits(from_team, to_team, intent))
+    }
+}
+
+/// Directional cross-wall recall consent over the same verified manifest state
+/// used by tenant placement and collective crossings.
+pub struct CrossWallRecallConsentAdapter {
+    state: Arc<CohortManifestState>,
+    home_team: TeamId,
+}
+
+impl CrossWallRecallConsentAdapter {
+    pub fn new(state: Arc<CohortManifestState>, home_team: TeamId) -> Self {
+        Self { state, home_team }
+    }
+}
+
+impl CrossWallRecallConsentPort for CrossWallRecallConsentAdapter {
+    fn decide(
+        &self,
+        remote_team: &TeamId,
+        intent: &str,
+    ) -> Result<CrossWallRecallConsentDecision, CrossWallRecallConsentError> {
+        let manifest = self
+            .state
+            .manifest_if_fresh()
+            .map_err(|error| CrossWallRecallConsentError::StateUnavailable {
+                reason: error.to_string(),
+            })?
+            .ok_or_else(|| CrossWallRecallConsentError::Stale {
+                reason: "signed cohort manifest lease expired".to_string(),
+            })?;
+        if manifest.cross_team_admits(&self.home_team, remote_team, intent) {
+            Ok(CrossWallRecallConsentDecision::Granted)
+        } else if manifest.cross_team_admits(remote_team, &self.home_team, intent) {
+            Ok(CrossWallRecallConsentDecision::WrongDirection)
+        } else {
+            Ok(CrossWallRecallConsentDecision::NoGrant)
+        }
     }
 }
 
