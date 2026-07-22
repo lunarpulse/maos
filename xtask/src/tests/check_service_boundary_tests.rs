@@ -154,3 +154,86 @@ impl<'a> Visit<'_> for P4Visitor<'a> {
         syn::visit::visit_expr_call(self, node);
     }
 }
+
+// ---------------------------------------------------------------------------
+// `canonicalize_signature` semantics (Epic 13 CI repair).
+//
+// Item identity in the baseline diff is `(kind, path, signature_hash)`, so what
+// this hashes IS what "the kernel surface changed" means. These pin the three
+// distinctions the gate got wrong: a body edit and a doc edit are NOT surface
+// changes, a signature edit IS.
+// ---------------------------------------------------------------------------
+
+fn hash_of(src: &str) -> String {
+    let item: syn::Item = syn::parse_str(src).expect("parse test item");
+    sha256_hex(&canonicalize_signature(&item))
+}
+
+#[test]
+fn fn_body_change_is_not_a_surface_change() {
+    // Regression: the J1 stdin-deadlock fix (0a03468f) changed only the body of
+    // `spawn_and_bridge`, and the gate reported it as a REMOVED public symbol.
+    let a = hash_of("pub fn f(spec: Spec) -> Result<Bridge, Error> { let x = 1; g(x) }");
+    let b = hash_of("pub fn f(spec: Spec) -> Result<Bridge, Error> { let x = 2; h(x); g(x) }");
+    assert_eq!(a, b, "a function body edit must not move the surface hash");
+}
+
+#[test]
+fn fn_signature_change_is_a_surface_change() {
+    let base = hash_of("pub fn f(spec: Spec) -> Result<Bridge, Error> { g() }");
+    for changed in [
+        "pub fn f(spec: Spec, extra: u8) -> Result<Bridge, Error> { g() }",
+        "pub fn f(spec: Spec) -> Result<Bridge, OtherError> { g() }",
+        "pub fn f(spec: OtherSpec) -> Result<Bridge, Error> { g() }",
+        "pub unsafe fn f(spec: Spec) -> Result<Bridge, Error> { g() }",
+    ] {
+        assert_ne!(
+            base,
+            hash_of(changed),
+            "signature change must move the surface hash: {changed}"
+        );
+    }
+}
+
+#[test]
+fn doc_comment_change_is_not_a_surface_change() {
+    // The previous filter dropped lines starting with `///`, but `quote!`
+    // renders docs as `#[doc = "..."]` on one line — it never matched, so a
+    // pure documentation edit red the gate as a "removed symbol".
+    let a = hash_of("/// One.\npub struct S { pub a: u8 }");
+    let b = hash_of("/// Two, entirely rewritten.\n/// With a second line.\npub struct S { pub a: u8 }");
+    assert_eq!(a, b, "a doc-only edit must not move the surface hash");
+}
+
+#[test]
+fn struct_field_change_is_still_a_surface_change() {
+    // Only fn bodies are excluded — for every other kind the whole item is ABI.
+    assert_ne!(
+        hash_of("pub struct S { pub a: u8 }"),
+        hash_of("pub struct S { pub a: u8, pub b: u8 }"),
+        "struct fields are ABI and must move the hash"
+    );
+    assert_ne!(
+        hash_of("pub const C: u8 = 1;"),
+        hash_of("pub const C: u8 = 2;"),
+        "const values are ABI and must move the hash"
+    );
+}
+
+#[test]
+fn doc_attr_stripper_handles_escapes_and_brackets() {
+    // A doc comment containing `\"` or `]` must not terminate the scan early
+    // and swallow the declaration that follows it.
+    let quoted = hash_of(r#"/// Says "hi" and a ] bracket.
+pub struct S { pub a: u8 }"#);
+    let plain = hash_of("pub struct S { pub a: u8 }");
+    assert_eq!(quoted, plain, "escaped quotes/brackets in docs must be stripped cleanly");
+    // And the surface AFTER a doc attr must survive: a differing field is
+    // still detected when both carry awkward docs.
+    assert_ne!(
+        quoted,
+        hash_of(r#"/// Says "hi" and a ] bracket.
+pub struct S { pub a: u16 }"#),
+        "stripping docs must not swallow the item that follows"
+    );
+}

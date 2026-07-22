@@ -660,6 +660,16 @@ fn tenant_mode_boots_on_live_substrate() {
         .expect("MAOS_TEST_POSTGRES_TEAM_A must be set for the live tenant-boot leg");
     let wrong_conn = std::env::var("MAOS_TEST_POSTGRES_TEAM_B")
         .expect("MAOS_TEST_POSTGRES_TEAM_B must be set for the live refusal control");
+    // Team B must carry the real schema before the leak assertion below means
+    // anything. Booting the daemon against team A installs the schema there,
+    // but nothing installs it in team B — and a `SELECT count(*)` against a
+    // table that does not exist cannot observe a leak: on a fresh CI database
+    // it errors, and "no table" would otherwise read as "no leak" forever.
+    // Install it from the production DDL so team B is a database that COULD
+    // receive the row and demonstrably does not.
+    let schema_sql =
+        maos_loom_lite::schema::create_schema_sql(maos_loom_lite::schema::DEFAULT_VECTOR_DIM);
+    psql_scalar(&wrong_conn, &schema_sql).expect("install team B schema");
     let clear_probe = "DO $$ BEGIN IF to_regclass('public.collective_memory') IS NOT NULL THEN DELETE FROM collective_memory WHERE key = 'researcher/collective-route-ready'; END IF; END $$;";
     psql_scalar(&conn, clear_probe).expect("clear team A readiness row");
     psql_scalar(&wrong_conn, clear_probe).expect("clear team B readiness row");

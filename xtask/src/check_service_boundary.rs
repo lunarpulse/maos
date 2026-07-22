@@ -509,23 +509,87 @@ fn surface_item(kind: &str, path: &str, item: &syn::Item) -> SurfaceItem {
     }
 }
 
-/// Render an item's signature via `quote!` to a string, strip doc comments and whitespace, and hash.
+/// Render an item's surface via `quote!` to a string, strip doc attributes and
+/// whitespace, and hash.
+///
+/// Item identity in the baseline diff is `(kind, path, signature_hash)`, so
+/// whatever this hashes IS what the monotonicity check treats as the kernel
+/// surface. Two things are therefore deliberately excluded:
+///
+/// - **Function bodies.** A function's ABI is its signature; the body is an
+///   implementation detail. Hashing `quote!(#item)` for a fn made every body
+///   edit read as "removed public kernel symbol" + "new unclassified symbol".
+///   Epic 13's first CI run reported exactly that for `spawn_and_bridge` after
+///   the J1 stdin-deadlock fix (`0a03468f`), which changed no signature and
+///   removed nothing. For every OTHER item kind the whole item is the surface —
+///   struct fields, enum variants and const values are all ABI — so those are
+///   still hashed in full.
+/// - **Doc attributes.** The previous filter dropped lines starting with `///`,
+///   but `quote!` renders doc comments as `#[doc = "..."]` attributes on a
+///   single line, so it never matched anything — a null control that let a
+///   pure documentation edit red the gate with a "removed symbol" message.
 ///
 /// TODO: `quote!`-based signature hashing is not stable across `syn` major versions.
 /// Migrate to `cargo-public-api` in Story 1a.1 (same deferred migration as `abi_diff.rs`).
 fn canonicalize_signature(item: &syn::Item) -> String {
-    let tokens = quote::quote!(#item).to_string();
-    // Strip doc comments (lines starting with `///` or `#!` containing doc attrs).
-    let without_docs: String = tokens
-        .lines()
-        .filter(|line| !line.trim_start().starts_with("///"))
-        .collect::<Vec<_>>()
-        .join("\n");
+    let tokens = match item {
+        syn::Item::Fn(f) => {
+            let (vis, sig) = (&f.vis, &f.sig);
+            quote::quote!(#vis #sig).to_string()
+        }
+        _ => quote::quote!(#item).to_string(),
+    };
     // Normalize whitespace.
-    without_docs
+    strip_doc_attrs(&tokens)
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Remove `#[doc = "..."]` attributes from a `quote!`-rendered token string.
+///
+/// `quote!` emits them as `# [doc = "..."]` with single spaces. The string
+/// literal is scanned with escape handling so a doc comment containing `\"`
+/// (or a `]`) cannot terminate the scan early.
+fn strip_doc_attrs(tokens: &str) -> String {
+    const OPEN: &str = "# [doc = ";
+    let mut out = String::with_capacity(tokens.len());
+    let mut rest = tokens;
+    while let Some(start) = rest.find(OPEN) {
+        out.push_str(&rest[..start]);
+        let after_open = &rest[start + OPEN.len()..];
+        match doc_attr_end(after_open) {
+            Some(end) => rest = &after_open[end..],
+            // Malformed / unterminated: keep the remainder verbatim rather
+            // than silently dropping surface.
+            None => {
+                out.push_str(&rest[start..]);
+                return out;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Byte offset just past the `"..."]` that closes a `#[doc = ...]` attribute.
+fn doc_attr_end(after_open: &str) -> Option<usize> {
+    let bytes = after_open.as_bytes();
+    if bytes.first() != Some(&b'"') {
+        return None;
+    }
+    let mut i = 1;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' => i += 2,
+            b'"' => {
+                let close = after_open[i + 1..].find(']')?;
+                return Some(i + 1 + close + 1);
+            }
+            _ => i += 1,
+        }
+    }
+    None
 }
 
 fn sha256_hex(input: &str) -> String {

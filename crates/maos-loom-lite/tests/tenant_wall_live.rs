@@ -72,42 +72,23 @@ async fn current_database(client: &tokio_postgres::Client) -> String {
         .get(0)
 }
 
-/// Minimal exact-I/O fixture schema. The Story 13.1 gate intentionally uses
-/// the required `postgres:16` CI image (without pgvector); vector/HNSW schema
-/// installation is covered by the existing Loom live suite and is unrelated
-/// to the tenant-wall witness.
+/// Install the PRODUCTION schema, not a hand-rolled copy of it.
+///
+/// This used to inline a reduced `CREATE TABLE collective_memory`, because the
+/// Story 13.1 gate ran on the plain `postgres:16` CI image which has no
+/// pgvector and so could not execute `CREATE EXTENSION vector`. That copy then
+/// drifted: Story 13.3b added the `intent_lineage` column to the real schema
+/// and to the store's INSERT, but not here, so every write in this suite died
+/// with `Query("db error")` the moment the gate first ran in CI.
+///
+/// The CI image is now `pgvector/pgvector:pg16`, which removes the reason the
+/// copy existed. Calling `create_schema_sql` means the fixture cannot drift
+/// from production again — there is only one schema.
 async fn init_fixture_schema(client: &tokio_postgres::Client) {
     client
-        .batch_execute(
-            r#"
-            CREATE TABLE IF NOT EXISTS collective_memory (
-                id BIGSERIAL PRIMARY KEY,
-                spirit_pid BIGINT NOT NULL,
-                namespace_kind TEXT NOT NULL,
-                namespace_detail TEXT NOT NULL DEFAULT '',
-                key TEXT NOT NULL,
-                value_kind TEXT NOT NULL,
-                value_data BYTEA NOT NULL,
-                kind TEXT NOT NULL DEFAULT 'entry',
-                source_log_ref TEXT NOT NULL DEFAULT '',
-                distillation_depth INTEGER NOT NULL DEFAULT 0,
-                timestamp_ns BIGINT NOT NULL,
-                source_region TEXT NOT NULL DEFAULT '',
-                source_ts BIGINT NOT NULL DEFAULT 0,
-                source_team TEXT,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                UNIQUE (spirit_pid, namespace_kind, namespace_detail, key),
-                CONSTRAINT collective_memory_i11_provenance CHECK (
-                    kind <> 'pattern' OR (source_log_ref <> '' AND distillation_depth > 0)
-                )
-            );
-            ALTER TABLE collective_memory ADD COLUMN IF NOT EXISTS leaf_canonical_hash BYTEA;
-            ALTER TABLE collective_memory ADD COLUMN IF NOT EXISTS merkle_root BYTEA;
-            ALTER TABLE collective_memory ADD COLUMN IF NOT EXISTS region_sig BYTEA;
-            ALTER TABLE collective_memory ADD COLUMN IF NOT EXISTS bundle_schema_version SMALLINT;
-            ALTER TABLE collective_memory ADD COLUMN IF NOT EXISTS inclusion_path BYTEA;
-            "#,
-        )
+        .batch_execute(&maos_loom_lite::schema::create_schema_sql(
+            maos_loom_lite::schema::DEFAULT_VECTOR_DIM,
+        ))
         .await
         .expect("tenant-wall fixture schema");
 }
