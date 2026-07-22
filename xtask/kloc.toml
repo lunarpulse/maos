@@ -130,13 +130,13 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 29000          # Epic-12 retro 2026-07-14: 22500→29000 (+6,291 LOC v2.0/v2.2 gate infra + Option-C binding + dev-model-tier; measured 28,791; tooling, not kernel)
+xtask = 30050   # Epic-13 retro 2026-07-22: 29000→30050 (measured 29_962 — includes the check-dev-model-tier pre-dev status filter + its 4 regression tests)
 # Story 6.5 — Phase 1 extraction
-maos-iac = 5800        # Epic-10 retro 2026-06-26: 5500→5800 (TL + bus growth; measured 5,736)
-maos-manifest = 4150   # Story 13.5d: v4 Loom declaration surface; preserves measured headroom.
+maos-iac = 6200   # Epic-13 retro 2026-07-22: 5800→6200 (measured 6_118)
+maos-manifest = 4250   # Epic-13 retro 2026-07-22: 4150→4250 (measured 4_157)
 
 # Story 1a.1 — 13 new crate stubs
-maos-domain = 8300     # Epic-12 retro 2026-07-14: 8100→8300 (v2.2 cohort/tenant ports; measured 8,231)
+maos-domain = 8450   # Epic-13 retro 2026-07-22: 8300→8450 (measured 8_392)
 maos-spirit-hello = 1000
 maos-providers = 2000
 maos-mcp = 1100
@@ -181,12 +181,47 @@ maos-persistence = 2000
 maos-secrets = 1000
 maos-compliance = 2000
 maos-control = 1500
-maos-cli = 3750        # Epic-10 retro 2026-06-26: 2000→3750 (skill-queue + audit subcommands; measured 3,689)
-maos-bin = 11100       # Epic-12 retro 2026-07-14: 9000→11100 (enterprise SSO/KMS/SIEM + cohort A2A daemon + identity.asserted write moved from maos-audit; measured 11,003)
+maos-cli = 4200   # Epic-13 retro 2026-07-22: 3750→4200 (measured 4_119)
+maos-bin = 12400   # Epic-13 retro 2026-07-22: 11100→12400 (measured 12_298)
 maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
 
+# -----------------------------------------------------------------------------
+# Epic 13 retrospective ceiling review (2026-07-22) — first full-branch CI run
+# -----------------------------------------------------------------------------
+# `origin/epic-13` was pushed for the first time (~20 commits, the whole Epic 13
+# multi-tenant Loom line), so this is the FIRST time the blocking `kloc-check`
+# ran over the v2.2 tenant surface. Six crates + the aggregate breached the
+# Epic-12 ceilings. Per the established process (tight measured residual, NOT
+# round headroom — cf. the Epic-10 and Epic-12 blocks above):
+#
+#   crate            prev     measured  new ceiling  driver
+#   maos-bin         11100    12298     12400        13.5c single composition
+#                                                     root + 13.5d collective
+#                                                     route wiring + tenant map.
+#   maos-cli         3750     4119      4200         v2.2 tenant/audit surface.
+#   maos-domain      8300     8392      8450         cross-team consent + team
+#                                                     ports (13.2/13.3).
+#   maos-iac         5800     6118      6200         cross-wall log.recall +
+#                                                     consent port (13.3b).
+#   maos-manifest    4150     4157      4250         13.5d raised 4050→4150 for
+#                                                     the v4 Loom block; the v4
+#                                                     surface landed 7 lines over
+#                                                     that estimate. Re-based on
+#                                                     the MEASURED value, not a
+#                                                     second estimate.
+#   xtask            29000    29962     30050        Epic-13 gate infra:
+#                                                     multi-tenant-loom legs,
+#                                                     cross-region-consensus,
+#                                                     reza-production-path, plus the
+#                                                     dev-model-tier pre-dev filter.
+#   _aggregate       122000   127530    128000       sum of the above.
+#
+# NOTE — kernel-core is NOT in this list. It sat at 17832/17900 through Epic 13
+# and consumed only the +26 lines authorized by the 13.5d FLAG-Winston grant
+# (kernel-baseline gate green @23228). Phase-4 decomposition debt REMAINS.
+
 _aggregate_alarm = 16000
-_aggregate_hardfail = 122000  # Epic-12 retro 2026-07-14: 103000→122000 (measured aggregate 121,198)
+_aggregate_hardfail = 128000  # Epic-13 retro 2026-07-22: 122000→128000 (measured aggregate 127_530)
 
 # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
 # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a
