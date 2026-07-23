@@ -130,7 +130,7 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 30350   # Epic-13 CI repair 2026-07-23: 30050→30350 (measured 30_277 — adds the check-dev-record-completeness parser fix: model body-fallback + heading/label tolerance + 8 regression tests, net of the removed dead label-strip list)
+xtask = 30600   # Story 13.4 re-baseline 2026-07-23: 30350→30600 (measured 30_520 — adds the check-vetting-attestation gate: 7 anti-null legs incl. forged-vetter-key)
 # Story 6.5 — Phase 1 extraction
 maos-iac = 6200   # Epic-13 retro 2026-07-22: 5800→6200 (measured 6_118)
 maos-manifest = 4250   # Epic-13 retro 2026-07-22: 4150→4250 (measured 4_157)
@@ -179,10 +179,10 @@ maos-a2a-tcp = 1500
 maos-notify-push = 250
 maos-persistence = 2000
 maos-secrets = 1000
-maos-compliance = 2000
+maos-compliance = 2050   # Story 13.4 re-baseline 2026-07-23: 2000→2050 (measured 2_017 — NEW vetting module: mod+attestation+keyring+terminal, FR37 4 verbs)
 maos-control = 1500
-maos-cli = 4200   # Epic-13 retro 2026-07-22: 3750→4200 (measured 4_119)
-maos-bin = 12400   # Epic-13 retro 2026-07-22: 11100→12400 (measured 12_298)
+maos-cli = 4300   # Story 13.4 re-baseline 2026-07-23: 4200→4300 (measured 4_228 — `vet` subcommand + flags); Epic-13 retro 2026-07-22: 3750→4200 (measured 4_119)
+maos-bin = 12500   # Story 13.4 re-baseline 2026-07-23: 12400→12500 (measured 12_422 — `maosctl vet` composition-root wiring); Epic-13 retro 2026-07-22: 11100→12400 (measured 12_298)
 maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
 
 # -----------------------------------------------------------------------------
@@ -219,9 +219,43 @@ maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness re
 # NOTE — kernel-core is NOT in this list. It sat at 17832/17900 through Epic 13
 # and consumed only the +26 lines authorized by the 13.5d FLAG-Winston grant
 # (kernel-baseline gate green @23228). Phase-4 decomposition debt REMAINS.
+# -----------------------------------------------------------------------------
+# Story 13.4 FR37 vetting machinery re-baseline (2026-07-23) — ADR-056
+# -----------------------------------------------------------------------------
+# Story 13.4 (commit 148a33ee) landed the vetter-key + attestation lifecycle
+# (issue/verify/journal/revoke). Four LISTED crates + the aggregate breached the
+# ceilings set in the Epic-13 retro block above. Per the established process
+# (tight measured residual, NOT round headroom — cf. every retro block above):
+#
+#   crate            prev     measured  new ceiling  driver
+#   maos-compliance  2000     2017      2050         NEW `vetting` module (F4
+#                                                     EXTEND, not create): mod +
+#                                                     attestation + keyring +
+#                                                     terminal. FR37's 4 verbs.
+#   maos-bin         12400    12422     12500        `maosctl vet` composition-
+#                                                     root wiring (+129 main.rs).
+#   maos-cli         4200     4228      4300         `vet` subcommand + flags.
+#   xtask            30350    30520     30600        check-vetting-attestation
+#                                                     gate (AC6, 7 anti-null legs
+#                                                     incl. forged-vetter-key).
+#   _aggregate       128500   130276    131000       sum of the above PLUS the
+#                                                     F2 lattice-collision fix in
+#                                                     maos-registry/admission.rs
+#                                                     (+560: promotion ABOVE
+#                                                     strictest_of). See NOTE.
+#
+# NOTE — the aggregate grew ~2.3k but the four LISTED crates account for only
+# ~240 of it. The balance is the F2 admission-promotion rework in maos-registry
+# (now ~3,515 LOC), which has NO per-crate ceiling. maos-registry is one of
+# ~20 real production crates absent from this file (maos-audit 5,783; maos-cohort
+# 4,297; maos-loom-lite 4,373; maos-eval 3,596; …), so their growth is disciplined
+# ONLY by the aggregate hardfail, never per-crate. That is a PRE-EXISTING
+# governance gap, not introduced by 13.4 — FLAG for the Epic-13 retrospective:
+# assign per-crate ceilings to the unlisted production crates so the aggregate
+# stops silently absorbing multi-KLOC growth. NOT fixed here (retro-scoped).
 
 _aggregate_alarm = 16000
-_aggregate_hardfail = 128500  # Epic-13 CI repair 2026-07-23: 128000→128500 (measured aggregate 127_997 — the dev-record-completeness parser fix + tests; prior 128000 left only 3 LOC headroom)
+_aggregate_hardfail = 131000  # Story 13.4 re-baseline 2026-07-23: 128500→131000 (measured aggregate 130_276 — vetting machinery + F2 admission-promotion in unlisted maos-registry; see block above)
 
 # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
 # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a
