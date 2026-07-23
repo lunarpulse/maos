@@ -674,41 +674,58 @@ mod tests {
         use maos_domain::invariants::i13::IntentLineage;
         use maos_domain::invariants::i8::A2AIntent;
 
+        // Two BOTH-VALID v3 leaves whose value_data↔source_team boundary is
+        // shifted so the RAW (un-length-prefixed) concatenation is identical
+        // ("ab"|"cd" and "a"|"bcd" both concatenate to "abcd"), while every
+        // other field — including an identical, VALID depth+lineage tail — is
+        // the same. Because both leaves are valid v3 they carry the same domain
+        // tag and NO 0xff invalid-shape marker, so the only thing that can
+        // separate their hashes is the length-prefix framing of the shifted
+        // boundary.
+        //
+        // The prior version of this test paired a valid leaf with an
+        // EMPTY-lineage INVALID one; `to_canonical_bytes` appends a 0xff
+        // invalid-shape marker to the invalid leaf and not the valid one, so its
+        // `assert_ne!` was satisfied by that 1-byte marker — a byte that has
+        // nothing to do with the source_team length prefix. It passed even when
+        // the length prefix it claimed to guard was deleted: a NULL CONTROL, and
+        // the exact E5 marker-artifact pattern this leg exists to prevent. Guard
+        // #1 below now pins both leaves valid so the marker can never do the
+        // separating again.
+        let lineage = IntentLineage::new(vec![A2AIntent::new("schema.review")]);
         let mut a = sample_leaf();
-        a.source_team = Some(TeamId::new("ab").unwrap());
-        a.distillation_depth = Some(u32::from_be_bytes(*b"cdef"));
-        a.intent_lineage = Some(IntentLineage::new(vec![A2AIntent::new("")]));
+        a.value_data = b"ab".to_vec();
+        a.source_team = Some(TeamId::new("cd").unwrap());
+        a.distillation_depth = Some(2);
+        a.intent_lineage = Some(lineage.clone());
         let mut b = sample_leaf();
-        b.source_team = Some(TeamId::new("abcdef").unwrap());
-        b.distillation_depth = Some(1);
-        b.intent_lineage = Some(IntentLineage::new(Vec::new()));
+        b.value_data = b"a".to_vec();
+        b.source_team = Some(TeamId::new("bcd").unwrap());
+        b.distillation_depth = Some(2);
+        b.intent_lineage = Some(lineage);
 
-        let without_team_lp = |leaf: &CollectiveKvLeaf| {
-            let mut bytes = leaf
-                .source_team
-                .as_ref()
-                .unwrap()
-                .as_str()
-                .as_bytes()
-                .to_vec();
-            bytes.extend_from_slice(&leaf.distillation_depth.unwrap().to_be_bytes());
-            let lineage = leaf.intent_lineage.as_ref().unwrap();
-            bytes.extend_from_slice(&(lineage.as_slice().len() as u32).to_be_bytes());
-            for intent in lineage.as_slice() {
-                write_lp_bytes(&mut bytes, intent.as_str().as_bytes());
-            }
-            bytes
-        };
-
+        // Guard #1 (anti-null): both leaves are valid v3, so no invalid-shape
+        // marker is doing the separating. If a future edit makes either invalid,
+        // THIS reds first — surfacing the regression at its cause, not masking
+        // it the way the old empty-lineage pairing did.
+        assert!(
+            a.has_valid_version_shape() && b.has_valid_version_shape(),
+            "both leaves must be valid v3 so the hashes differ by LP framing, not a 0xff marker"
+        );
+        // Guard #2: the crafted shift has an IDENTICAL raw concatenation, so a
+        // raw (un-framed) encoding would collide — the length-prefix framing is
+        // the only thing that can keep the hashes apart. Verified by reverting:
+        // making `write_lp_bytes` emit its bytes without the 4-byte length turns
+        // both leaves into the same byte string and reds the `assert_ne!` below.
         assert_eq!(
-            without_team_lp(&a),
-            without_team_lp(&b),
-            "deleting only the source_team LP must produce the crafted collision"
+            [a.value_data.as_slice(), b"cd"].concat(),
+            [b.value_data.as_slice(), b"bcd"].concat(),
+            "the crafted boundary shift must have an identical raw concatenation"
         );
         assert_ne!(
             a.canonical_hash(),
             b.canonical_hash(),
-            "the real source_team/v3-tail boundary must prevent that collision"
+            "the value_data/source_team length-prefix framing must prevent the boundary-shift collision"
         );
     }
 
