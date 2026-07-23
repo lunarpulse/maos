@@ -230,7 +230,17 @@ claude-opus-4-6
 
 ### Completion Notes List
 
+_(Backfilled 2026-07-23 to complete the dev record; sourced from this story's own commit `07d21f0e` and the `### Review Findings` section below — no facts invented.)_
+
+- Delivered the red-phase acceptance seal suites on top of the `maos-journey-test` harness: the J-Butler and J4 journey seal tests that assert the RED phase (revert-to-red seals verified RED→GREEN by non-author execution — see the sprint-status provenance note).
+- Review 2026-06-11 (Blind Hunter + Edge Case Hunter + Acceptance Auditor; Test-Infrastructure Auditor skipped per `dev_model_used = claude-opus-4-6`): 8 decisions D1–D8 resolved by team consensus (D4 deferred as pre-existing; D1–D3, D5–D8 → patch) and the 20 patches below applied. Full detail in `### Review Findings (2026-06-11)`.
+
 ### File List
+
+_(Backfilled 2026-07-23 from the story's commit `07d21f0e` — the exact files that commit changed; --check-git-diff-consistent.)_
+
+- `crates/maos-journey-test/tests/journey_butler.rs` — J-Butler red-phase seal suite
+- `crates/maos-journey-test/tests/journey_j4.rs` — J4 red-phase seal suite
 
 ### Review Findings (2026-06-11)
 

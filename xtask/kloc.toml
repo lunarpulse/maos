@@ -130,7 +130,7 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 30050   # Epic-13 retro 2026-07-22: 29000→30050 (measured 29_962 — includes the check-dev-model-tier pre-dev status filter + its 4 regression tests)
+xtask = 30350   # Epic-13 CI repair 2026-07-23: 30050→30350 (measured 30_277 — adds the check-dev-record-completeness parser fix: model body-fallback + heading/label tolerance + 8 regression tests, net of the removed dead label-strip list)
 # Story 6.5 — Phase 1 extraction
 maos-iac = 6200   # Epic-13 retro 2026-07-22: 5800→6200 (measured 6_118)
 maos-manifest = 4250   # Epic-13 retro 2026-07-22: 4150→4250 (measured 4_157)
@@ -221,7 +221,7 @@ maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness re
 # (kernel-baseline gate green @23228). Phase-4 decomposition debt REMAINS.
 
 _aggregate_alarm = 16000
-_aggregate_hardfail = 128000  # Epic-13 retro 2026-07-22: 122000→128000 (measured aggregate 127_530)
+_aggregate_hardfail = 128500  # Epic-13 CI repair 2026-07-23: 128000→128500 (measured aggregate 127_997 — the dev-record-completeness parser fix + tests; prior 128000 left only 3 LOC headroom)
 
 # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
 # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a
