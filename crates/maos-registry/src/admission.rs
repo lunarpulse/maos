@@ -32,8 +32,11 @@ pub struct AdmissionDecision {
 /// Errors specific to the admission path.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum AdmissionError {
-    #[error("trust_tier 'public_vetted' deferred per FR37 to v2.5; allowed: local, org_internal, public_untrusted")]
+    #[error("trust_tier 'public-vetted' requires a valid vetting attestation")]
     PublicVettedDeferred,
+
+    #[error("manifest trust_tier is malformed: {0}")]
+    ManifestTrustTierInvalid(String),
 
     #[error("org signature does not match operator-configured org key (operator must set [registry].org_signing_pubkey)")]
     OrgSignatureInvalid,
@@ -81,6 +84,14 @@ pub enum AdmissionError {
         /// `maos_kernel_core::scheduler::pick_next_spirit_from_slice`).
         symbols: Vec<String>,
     },
+
+    /// Story 13.4 (FR37 / ADR-056) — a PRESENT vetting attestation failed the
+    /// verify chain (forged signature, expired, un-enrolled vetter key, manifest
+    /// exact-hash mismatch, wrong target tier, or revoked). Distinct from
+    /// [`AdmissionError::PublicVettedDeferred`] (attestation ABSENT) so the
+    /// refusal is honest and journaled with its own cause.
+    #[error("vetting attestation rejected: {0}")]
+    VettingAttestationRejected(String),
 }
 
 /// Configuration for the admission path.
@@ -101,19 +112,74 @@ pub struct AdmissionConfig {
     pub runtime_crypto_provider: Option<CryptoProviderId>,
 }
 
+fn verify_public_untrusted_baseline(
+    pkg: &SignedPackage,
+    op_cfg: &AdmissionConfig,
+) -> Result<SandboxTier, AdmissionError> {
+    if !verify_publisher_sig(pkg) {
+        return Err(AdmissionError::PublisherSignatureInvalid);
+    }
+
+    let manifest_fields = extract_manifest_fingerprint_fields(&pkg.manifest_toml);
+    let runtime_provider = op_cfg
+        .runtime_provider_endpoint
+        .clone()
+        .unwrap_or_else(|| manifest_fields.provider_endpoint.clone());
+    let runtime_crypto = op_cfg
+        .runtime_crypto_provider
+        .clone()
+        .unwrap_or_else(|| manifest_fields.crypto_provider.clone());
+    let runtime_ctx = RuntimeExecutionContext::from_admission(
+        TrustTier::PublicUntrusted,
+        manifest_fields.sandbox_tier,
+        pkg,
+        &runtime_provider,
+        &runtime_crypto,
+    );
+    match evaluate_envelope(&pkg.compliance_envelope, &runtime_ctx) {
+        ComplianceVerdict::Admit => {}
+        ComplianceVerdict::Reject(EComplianceRejection::SignatureInvalid) => {
+            return Err(AdmissionError::PublisherSignatureInvalid);
+        }
+        ComplianceVerdict::Reject(EComplianceRejection::ContextDrift {
+            field,
+            actual,
+            claimed,
+        }) => {
+            return Err(AdmissionError::ComplianceContextDrift {
+                field: format!("{field:?}"),
+                actual,
+                claimed,
+            });
+        }
+        ComplianceVerdict::Reject(EComplianceRejection::MalformedClaim(message)) => {
+            return Err(AdmissionError::ComplianceContextDrift {
+                field: "MalformedClaim".into(),
+                actual: String::new(),
+                claimed: message,
+            });
+        }
+        ComplianceVerdict::Reject(EComplianceRejection::ExpiredClaim { expired_at_unix_ms }) => {
+            return Err(AdmissionError::ComplianceContextDrift {
+                field: "ExpiredClaim".into(),
+                actual: String::new(),
+                claimed: format!("expired_at_unix_ms={expired_at_unix_ms}"),
+            });
+        }
+    }
+
+    Ok(if op_cfg.t3_for_public_untrusted {
+        SandboxTier::T3
+    } else {
+        SandboxTier::T0
+    })
+}
+
 /// Three-trust-tier strictest-of-floor admission per ADR-009.
 pub fn admit_spirit(
     pkg: &SignedPackage,
     op_cfg: &AdmissionConfig,
 ) -> Result<AdmissionDecision, AdmissionError> {
-    // Story 11.5 AC3 (literal) — FKCS off-frozen-surface gate. A package whose
-    // manifest declares a non-empty `[fkcs].internal_references` array (off-
-    // surface / pub(crate)-style internals) is rejected HERE, before tier,
-    // signature, or ComplianceClaim resolution. Off-surface conformance is
-    // orthogonal to the trust-tier axis, so the real `admit_spirit` path
-    // journals the rejection via `AdmissionError::OffFrozenSurface`. An absent
-    // or empty declaration admits — backward compatible with pre-11.5 manifests,
-    // which carry no `[fkcs]` section.
     let off_surface_refs = extract_fkcs_internal_references(&pkg.manifest_toml);
     if !off_surface_refs.is_empty() {
         return Err(AdmissionError::OffFrozenSurface {
@@ -121,104 +187,18 @@ pub fn admit_spirit(
         });
     }
 
-    // 1. Parse manifest to extract declared trust tier.
-    let manifest_declared_tier = extract_manifest_tier(&pkg.manifest_toml);
-
-    // 2. Compute effective_tier = strictest_of(manifest, registry_origin, op_cfg.tier_floor).
-    let registry_origin_tier = op_cfg.registry_origin_tier;
+    let manifest_declared_tier = maos_manifest::parse_manifest_trust_tier(&pkg.manifest_toml)
+        .map_err(|error| AdmissionError::ManifestTrustTierInvalid(error.to_string()))?;
     let effective_tier = strictest_of(
         manifest_declared_tier,
-        registry_origin_tier,
+        op_cfg.registry_origin_tier,
         op_cfg.tier_floor,
     );
 
-    // 3. Branch on effective_tier.
     match effective_tier {
-        TrustTier::PublicVetted => {
-            // FR37: PublicVetted is deferred to v2.5
-            Err(AdmissionError::PublicVettedDeferred)
-        }
+        TrustTier::PublicVetted => Err(AdmissionError::PublicVettedDeferred),
         TrustTier::PublicUntrusted => {
-            // REQUIRE: Ed25519 signature verification + ComplianceClaim envelope
-            // Step a: Verify publisher signature
-            let sig_ok = verify_publisher_sig(pkg);
-            if !sig_ok {
-                return Err(AdmissionError::PublisherSignatureInvalid);
-            }
-
-            // Step b: v1.0 semantic ComplianceClaim verification against the
-            // RUNTIME execution context (FR38 §8.5 upgrade). The claim is
-            // compared against the kernel's ACTUAL runtime context — the
-            // strictest-of effective trust tier (NOT the manifest-declared
-            // tier), the operator-resolved provider endpoint, and the
-            // composition-root crypto provider — rather than the manifest alone.
-            let manifest_fields = extract_manifest_fingerprint_fields(&pkg.manifest_toml);
-            let runtime_provider = op_cfg
-                .runtime_provider_endpoint
-                .clone()
-                .unwrap_or_else(|| manifest_fields.provider_endpoint.clone());
-            let runtime_crypto = op_cfg
-                .runtime_crypto_provider
-                .clone()
-                .unwrap_or_else(|| manifest_fields.crypto_provider.clone());
-            // NOTE (boundary documentation — team consensus Decision #1):
-            // Compliance attests the manifest-declared sandbox tier. The effective
-            // runtime sandbox floor (e.g. T3 when t3_for_public_untrusted=true) is
-            // computed and enforced DOWNSTREAM at lines ~163-167 — it is a separate
-            // enforcement layer, not a compliance concern. These are intentionally
-            // two distinct questions: (1) "does the claim match the manifest?" and
-            // (2) "does the runtime floor meet operator policy?" The v1.0 "runtime >
-            // manifest" principle applies to fields where the runtime value EXISTS at
-            // compliance time (trust_tier, provider_endpoint, crypto_provider). For
-            // sandbox_tier the effective value has not been computed yet.
-            let runtime_ctx = RuntimeExecutionContext::from_admission(
-                effective_tier,               // strictest-of result (v1.0 upgrade)
-                manifest_fields.sandbox_tier, // manifest-declared; runtime floor enforced downstream
-                pkg,
-                &runtime_provider,
-                &runtime_crypto,
-            );
-            match evaluate_envelope(&pkg.compliance_envelope, &runtime_ctx) {
-                ComplianceVerdict::Admit => {}
-                ComplianceVerdict::Reject(EComplianceRejection::SignatureInvalid) => {
-                    return Err(AdmissionError::PublisherSignatureInvalid);
-                }
-                ComplianceVerdict::Reject(EComplianceRejection::ContextDrift {
-                    field,
-                    actual,
-                    claimed,
-                }) => {
-                    return Err(AdmissionError::ComplianceContextDrift {
-                        field: format!("{field:?}"),
-                        actual,
-                        claimed,
-                    });
-                }
-                ComplianceVerdict::Reject(EComplianceRejection::MalformedClaim(m)) => {
-                    return Err(AdmissionError::ComplianceContextDrift {
-                        field: "MalformedClaim".into(),
-                        actual: String::new(),
-                        claimed: m,
-                    });
-                }
-                ComplianceVerdict::Reject(EComplianceRejection::ExpiredClaim {
-                    expired_at_unix_ms,
-                }) => {
-                    return Err(AdmissionError::ComplianceContextDrift {
-                        field: "ExpiredClaim".into(),
-                        actual: String::new(),
-                        claimed: format!("expired_at_unix_ms={expired_at_unix_ms}"),
-                    });
-                }
-            }
-
-            // Sandbox tier floor
-            let sandbox_tier_floor = if op_cfg.t3_for_public_untrusted {
-                SandboxTier::T3
-            } else {
-                SandboxTier::T0
-            };
-
+            let sandbox_tier_floor = verify_public_untrusted_baseline(pkg, op_cfg)?;
             Ok(AdmissionDecision {
                 effective_tier,
                 sandbox_tier_floor,
@@ -231,20 +211,15 @@ pub fn admit_spirit(
             })
         }
         TrustTier::OrgInternal => {
-            // REQUIRE: publisher_pubkey == op_cfg.org_signing_pubkey
             let org_key = op_cfg
                 .org_signing_pubkey
                 .ok_or(AdmissionError::OrgSignatureInvalid)?;
             if pkg.publisher_pubkey != org_key {
                 return Err(AdmissionError::OrgSignatureInvalid);
             }
-
-            // Also verify the signature
-            let sig_ok = verify_publisher_sig(pkg);
-            if !sig_ok {
+            if !verify_publisher_sig(pkg) {
                 return Err(AdmissionError::PublisherSignatureInvalid);
             }
-
             Ok(AdmissionDecision {
                 effective_tier,
                 sandbox_tier_floor: SandboxTier::T0,
@@ -257,29 +232,23 @@ pub fn admit_spirit(
             })
         }
         TrustTier::Local => {
-            // Admit if unsigned_local allowed OR signature matches org key
             if !op_cfg.allow_unsigned_local {
-                // Check if there's an org key configured and signature matches
                 if let Some(org_key) = op_cfg.org_signing_pubkey {
-                    if pkg.publisher_pubkey == org_key {
-                        let sig_ok = verify_publisher_sig(pkg);
-                        if sig_ok {
-                            return Ok(AdmissionDecision {
-                                effective_tier,
-                                sandbox_tier_floor: SandboxTier::T0,
-                                admit: true,
-                                journal_note: format!(
-                                    "admitted local spirit '{}' v{} with org signature match",
-                                    pkg.spirit_id.as_str(),
-                                    pkg.version
-                                ),
-                            });
-                        }
+                    if pkg.publisher_pubkey == org_key && verify_publisher_sig(pkg) {
+                        return Ok(AdmissionDecision {
+                            effective_tier,
+                            sandbox_tier_floor: SandboxTier::T0,
+                            admit: true,
+                            journal_note: format!(
+                                "admitted local spirit '{}' v{} with org signature match",
+                                pkg.spirit_id.as_str(),
+                                pkg.version
+                            ),
+                        });
                     }
                 }
                 return Err(AdmissionError::UnsignedLocalRejected);
             }
-
             Ok(AdmissionDecision {
                 effective_tier,
                 sandbox_tier_floor: SandboxTier::T0,
@@ -292,6 +261,80 @@ pub fn admit_spirit(
             })
         }
     }
+}
+
+/// Story 13.4 (FR37 / ADR-056) — attestation-conditional `public-vetted`
+/// admission. Wraps [`admit_spirit`] WITHOUT changing its byte-stable signature:
+/// the promotion gate sits **above** [`strictest_of`] (Fork-2), so a package
+/// that resolves to `PublicVetted` is admitted **only** when a valid
+/// [`maos_compliance::VettingAttestation`] is presented and walks the full
+/// verify chain (signature → manifest exact-hash → target tier → expiry →
+/// operator-root-signed vetter-key enrollment predating issuance → revocation).
+/// Attestation-absent ⇒ [`AdmissionError::PublicVettedDeferred`] (unchanged).
+/// Every non-vetted tier delegates verbatim to [`admit_spirit`].
+///
+/// ZERO kernel-Δ: `public-vetted` lives on the Axis-A compliance tier only;
+/// the kernel runtime sandbox floor's unrelated `TrustTier` is never touched.
+pub fn admit_spirit_with_attestation(
+    pkg: &SignedPackage,
+    op_cfg: &AdmissionConfig,
+    attestation: Option<&maos_compliance::VettingAttestation>,
+    keyring: &maos_compliance::VetterKeyring,
+    expected_operator_root: &[u8; 32],
+    now_unix_ms: u64,
+) -> Result<AdmissionDecision, AdmissionError> {
+    let off_surface_refs = extract_fkcs_internal_references(&pkg.manifest_toml);
+    if !off_surface_refs.is_empty() {
+        return Err(AdmissionError::OffFrozenSurface {
+            symbols: off_surface_refs,
+        });
+    }
+
+    let manifest_declared_tier = maos_manifest::parse_manifest_trust_tier(&pkg.manifest_toml)
+        .map_err(|error| AdmissionError::ManifestTrustTierInvalid(error.to_string()))?;
+    let promoted_manifest_tier = if attestation.is_some()
+        && matches!(
+            manifest_declared_tier,
+            TrustTier::PublicUntrusted | TrustTier::PublicVetted
+        ) {
+        TrustTier::PublicVetted
+    } else {
+        manifest_declared_tier
+    };
+    let effective_tier = strictest_of(
+        promoted_manifest_tier,
+        op_cfg.registry_origin_tier,
+        op_cfg.tier_floor,
+    );
+
+    if effective_tier != TrustTier::PublicVetted {
+        return admit_spirit(pkg, op_cfg);
+    }
+    let attestation = attestation.ok_or(AdmissionError::PublicVettedDeferred)?;
+
+    let sandbox_tier_floor = verify_public_untrusted_baseline(pkg, op_cfg)?;
+    let verified = maos_compliance::verify_attestation(
+        attestation,
+        &pkg.manifest_toml,
+        keyring,
+        expected_operator_root,
+        pkg.spirit_id.as_str(),
+        &pkg.version,
+        now_unix_ms,
+    )
+    .map_err(|rejection| AdmissionError::VettingAttestationRejected(rejection.to_string()))?;
+
+    Ok(AdmissionDecision {
+        effective_tier: TrustTier::PublicVetted,
+        sandbox_tier_floor,
+        admit: true,
+        journal_note: format!(
+            "admitted public-vetted spirit '{}' v{} via vetting attestation (vetter {}…)",
+            pkg.spirit_id.as_str(),
+            pkg.version,
+            hex::encode(&verified.vetter_pubkey[..4])
+        ),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -421,25 +464,9 @@ fn strictest_of(
 ///
 /// Story 7.2 made this `pub` for `maos-spirit-cli` to use during the
 /// `publish --tier` flag's manifest-tier cross-check.
-pub fn extract_manifest_tier(manifest_toml: &[u8]) -> TrustTier {
-    let text = String::from_utf8_lossy(manifest_toml);
-    for line in text.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("trust_tier") {
-            if let Some(val) = trimmed.split('=').nth(1) {
-                let val = val.trim().trim_matches('"');
-                match val {
-                    "local" => return TrustTier::Local,
-                    "org_internal" => return TrustTier::OrgInternal,
-                    "public_vetted" => return TrustTier::PublicVetted,
-                    "public_untrusted" => return TrustTier::PublicUntrusted,
-                    _ => {}
-                }
-            }
-        }
-    }
-    // Default: Local
-    TrustTier::Local
+pub fn extract_manifest_tier(manifest_toml: &[u8]) -> Result<TrustTier, AdmissionError> {
+    maos_manifest::parse_manifest_trust_tier(manifest_toml)
+        .map_err(|error| AdmissionError::ManifestTrustTierInvalid(error.to_string()))
 }
 
 /// Parse the optional `[fkcs].internal_references` array from a manifest
@@ -594,7 +621,7 @@ mod tests {
 
     #[test]
     fn public_vetted_tier_always_rejects() {
-        let pkg = pkg_with_tier("public_vetted");
+        let pkg = pkg_with_tier("public-vetted");
         let err = admit_spirit(&pkg, &permissive_cfg()).unwrap_err();
         assert!(matches!(err, AdmissionError::PublicVettedDeferred));
     }
@@ -740,6 +767,44 @@ mod tests {
         let msg = hasher.finalize();
         let sig = keypair.sign(&msg);
         let sig_bytes: [u8; 64] = sig.as_ref().try_into().unwrap();
+        let envelope = if tier == "public-vetted" {
+            use crate::compliance_verify::compute_fingerprint_hash;
+            use maos_spirit_abi::compliance::{
+                CryptoProviderId, ExecutionContextFingerprint, ProviderEndpointPin,
+                SandboxTier as Sb, TrustTier as Tt,
+            };
+            let manifest_hash: [u8; 32] = sha2::Sha256::digest(manifest_bytes).into();
+            let fingerprint = ExecutionContextFingerprint {
+                manifest_hash,
+                spirit_version: version.into(),
+                trust_tier: Tt::PublicUntrusted,
+                sandbox_tier: Sb::T0,
+                capability_scope: std::collections::BTreeSet::new(),
+                provider_endpoint: ProviderEndpointPin {
+                    provider_id: String::new(),
+                    endpoint_url: String::new(),
+                    model_id: None,
+                },
+                crypto_provider: CryptoProviderId(String::new()),
+            };
+            let claim_bytes = serde_json::to_vec(&serde_json::json!({
+                "fingerprint_hash": hex::encode(compute_fingerprint_hash(&fingerprint)),
+                "trust_tier": "public_untrusted",
+                "sandbox_tier": "t0",
+                "capability_scope": [],
+                "provider_endpoint": {"provider_id": "", "endpoint_url": ""},
+                "crypto_provider": ""
+            }))
+            .unwrap();
+            ComplianceClaimEnvelope {
+                signature: keypair.sign(&claim_bytes).as_ref().try_into().unwrap(),
+                attester_pubkey: pubkey,
+                claim_bytes,
+                signing_alg: SigningAlg::Ed25519,
+            }
+        } else {
+            empty_envelope()
+        };
         SignedPackage::new(
             SpiritId::from(spirit_id),
             version.into(),
@@ -747,7 +812,7 @@ mod tests {
             artifact,
             sig_bytes,
             pubkey,
-            empty_envelope(),
+            envelope,
         )
     }
 
@@ -1092,5 +1157,212 @@ mod tests {
             matches!(err, AdmissionError::ComplianceContextDrift { .. }),
             "expected ComplianceContextDrift (deterministic), got {err:?}"
         );
+    }
+
+    // ----------------------------------------------------------------
+    // Story 13.4 (FR37 / ADR-056) — attestation-conditional public-vetted.
+    // ----------------------------------------------------------------
+
+    use maos_compliance::vetting::keyring::issue_event;
+    use maos_compliance::{
+        issue_attestation, RevocationSemantics, VetterKeyEventClaim, VetterKeyEventKind,
+        VetterKeyring, VettingAttestation, VettingClaim,
+    };
+
+    const VETTER_SEED: [u8; 32] = [0x33; 32];
+    const OP_SEED: [u8; 32] = [0x44; 32];
+
+    fn ed_pub(seed: &[u8; 32]) -> [u8; 32] {
+        use ring::signature::{Ed25519KeyPair, KeyPair};
+        let kp = Ed25519KeyPair::from_seed_unchecked(seed).unwrap();
+        kp.public_key().as_ref().try_into().unwrap()
+    }
+
+    fn manifest_hash_of(pkg: &SignedPackage) -> [u8; 32] {
+        use sha2::Digest;
+        let mut h = sha2::Sha256::new();
+        h.update(&pkg.manifest_toml);
+        h.finalize().into()
+    }
+
+    fn enrolled_keyring(enrolled_at: u64) -> VetterKeyring {
+        let mut kr = VetterKeyring::new(ed_pub(&OP_SEED));
+        kr.push(issue_event(
+            &OP_SEED,
+            &VetterKeyEventClaim {
+                kind: VetterKeyEventKind::Enroll,
+                vetter_key_id: "vetter-01".into(),
+                vetter_pubkey: ed_pub(&VETTER_SEED),
+                predecessor_pubkey: None,
+                effective_at_unix_ms: enrolled_at,
+                journal_sequence: 1,
+                journaled_at_unix_ms: enrolled_at,
+                note: "enrolled".into(),
+            },
+        ));
+        kr
+    }
+
+    fn attestation_for(pkg: &SignedPackage, issued: u64, expires: u64) -> VettingAttestation {
+        let claim = VettingClaim {
+            manifest_hash: manifest_hash_of(pkg),
+            spirit_id: pkg.spirit_id.as_str().to_string(),
+            spirit_version: pkg.version.clone(),
+            from_tier: TrustTier::PublicUntrusted,
+            to_tier: TrustTier::PublicVetted,
+            vetter_key_id: "vetter-01".into(),
+            issued_at_unix_ms: issued,
+            expires_at_unix_ms: expires,
+            revocation_semantics: RevocationSemantics::RefuseAtNextLoad,
+            successor_policy: None,
+        };
+        issue_attestation(&VETTER_SEED, &claim)
+    }
+
+    #[test]
+    fn vetted_without_attestation_is_deferred() {
+        let (kp, pk) = seeded_keypair(0x150C_04A5);
+        let pkg = signed_pkg_with("vetted", "0.1.0", "public-vetted", &kp, pk);
+        let kr = enrolled_keyring(100);
+        let err = admit_spirit_with_attestation(
+            &pkg,
+            &permissive_cfg(),
+            None,
+            &kr,
+            &ed_pub(&OP_SEED),
+            1_000,
+        )
+        .unwrap_err();
+        assert!(matches!(err, AdmissionError::PublicVettedDeferred));
+    }
+
+    #[test]
+    fn vetted_with_valid_attestation_admits() {
+        let (kp, pk) = seeded_keypair(0x150C_04A5);
+        let pkg = signed_pkg_with("vetted", "0.1.0", "public-vetted", &kp, pk);
+        let kr = enrolled_keyring(100);
+        let att = attestation_for(&pkg, 500, 2_000);
+        let decision = admit_spirit_with_attestation(
+            &pkg,
+            &permissive_cfg(),
+            Some(&att),
+            &kr,
+            &ed_pub(&OP_SEED),
+            1_000,
+        )
+        .unwrap();
+        assert!(decision.admit);
+        assert_eq!(decision.effective_tier, TrustTier::PublicVetted);
+    }
+
+    #[test]
+    fn attestation_promotes_public_untrusted_before_strictest_of() {
+        let (kp, pk) = seeded_keypair(0x150C_04A5);
+        let pkg = public_untrusted_pkg_with_valid_envelope("vetted", "0.1.0", &kp, pk);
+        let keyring = enrolled_keyring(100);
+        let attestation = attestation_for(&pkg, 500, 2_000);
+        let decision = admit_spirit_with_attestation(
+            &pkg,
+            &permissive_cfg(),
+            Some(&attestation),
+            &keyring,
+            &ed_pub(&OP_SEED),
+            1_000,
+        )
+        .unwrap();
+        assert_eq!(decision.effective_tier, TrustTier::PublicVetted);
+    }
+
+    #[test]
+    fn vetted_promotion_preserves_compliance_envelope_verification() {
+        let (kp, pk) = seeded_keypair(0x150C_04A5);
+        let mut pkg = signed_pkg_with("vetted", "0.1.0", "public-vetted", &kp, pk);
+        pkg.compliance_envelope.signature[0] ^= 0xFF;
+        let keyring = enrolled_keyring(100);
+        let attestation = attestation_for(&pkg, 500, 2_000);
+        let error = admit_spirit_with_attestation(
+            &pkg,
+            &permissive_cfg(),
+            Some(&attestation),
+            &keyring,
+            &ed_pub(&OP_SEED),
+            1_000,
+        )
+        .unwrap_err();
+        assert!(matches!(error, AdmissionError::PublisherSignatureInvalid));
+    }
+
+    #[test]
+    fn vetted_with_forged_attestation_signature_is_rejected() {
+        let (kp, pk) = seeded_keypair(0x150C_04A5);
+        let pkg = signed_pkg_with("vetted", "0.1.0", "public-vetted", &kp, pk);
+        let kr = enrolled_keyring(100);
+        let mut att = attestation_for(&pkg, 500, 2_000);
+        att.signature[0] ^= 0xFF;
+        let err = admit_spirit_with_attestation(
+            &pkg,
+            &permissive_cfg(),
+            Some(&att),
+            &kr,
+            &ed_pub(&OP_SEED),
+            1_000,
+        )
+        .unwrap_err();
+        assert!(matches!(err, AdmissionError::VettingAttestationRejected(_)));
+    }
+
+    #[test]
+    fn vetted_with_expired_attestation_is_rejected() {
+        let (kp, pk) = seeded_keypair(0x150C_04A5);
+        let pkg = signed_pkg_with("vetted", "0.1.0", "public-vetted", &kp, pk);
+        let kr = enrolled_keyring(100);
+        let att = attestation_for(&pkg, 500, 900); // expires before now=1000
+        let err = admit_spirit_with_attestation(
+            &pkg,
+            &permissive_cfg(),
+            Some(&att),
+            &kr,
+            &ed_pub(&OP_SEED),
+            1_000,
+        )
+        .unwrap_err();
+        assert!(matches!(err, AdmissionError::VettingAttestationRejected(_)));
+    }
+
+    #[test]
+    fn vetted_with_unenrolled_vetter_is_rejected() {
+        let (kp, pk) = seeded_keypair(0x150C_04A5);
+        let pkg = signed_pkg_with("vetted", "0.1.0", "public-vetted", &kp, pk);
+        let kr = VetterKeyring::new(ed_pub(&OP_SEED)); // no enrollment
+        let att = attestation_for(&pkg, 500, 2_000);
+        let err = admit_spirit_with_attestation(
+            &pkg,
+            &permissive_cfg(),
+            Some(&att),
+            &kr,
+            &ed_pub(&OP_SEED),
+            1_000,
+        )
+        .unwrap_err();
+        assert!(matches!(err, AdmissionError::VettingAttestationRejected(_)));
+    }
+
+    #[test]
+    fn wrapper_delegates_non_vetted_tiers() {
+        // A local package admits identically through the wrapper (attestation
+        // ignored — the promotion gate only fires for public-vetted).
+        let pkg = pkg_with_tier("local");
+        let kr = VetterKeyring::new(ed_pub(&OP_SEED));
+        let decision = admit_spirit_with_attestation(
+            &pkg,
+            &permissive_cfg(),
+            None,
+            &kr,
+            &ed_pub(&OP_SEED),
+            1_000,
+        )
+        .unwrap();
+        assert!(decision.admit);
+        assert_eq!(decision.effective_tier, TrustTier::Local);
     }
 }

@@ -114,7 +114,8 @@ impl SpiritRegistryClient for McpSpiritRegistryClient {
             (Some(server_tier), Some(server_sig)) => {
                 // Server provided tier data — verify signature and cross-check manifest.
                 let manifest_tier =
-                    crate::admission::extract_manifest_tier(&manifest.manifest_toml);
+                    crate::admission::extract_manifest_tier(&manifest.manifest_toml)
+                        .map_err(|error| RegistryError::Transport(error.to_string()))?;
                 if manifest_tier != server_tier {
                     return Err(RegistryError::TrustTierServerMismatch {
                         manifest_tier,

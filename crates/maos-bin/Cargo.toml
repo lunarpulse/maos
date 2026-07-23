@@ -38,6 +38,7 @@ maos-cli = { path = "../maos-cli" }
 maos-audit = { path = "../maos-audit" }
 maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
+maos-manifest = { path = "../maos-manifest" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-loom-lite = { path = "../maos-loom-lite" }
 maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY

@@ -2739,6 +2739,21 @@ jobs:
           MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
           MAOS_TEST_POSTGRES_TEAM_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
         run: cargo run -p xtask -- check-reza-production-path --json
+  # Story 13.4 (FR37 / ADR-056) — vetting-attestation gate. All 7 legs are
+  # hermetic (in-process crypto + registry admission path); no live substrate.
+  check-vetting-attestation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-vetting-attestation-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-vetting-attestation gate
+        run: cargo run -p xtask -- check-vetting-attestation --json
   # ONE disposition / FOUR independently-falsifiable legs with PER-LEG
   # independence (mesh-identity-reconcile, detection-latency, blast-recovery-
   # rto, kernel-abi-diff — each reads its OWN `cargo test` oracle). Advisory
@@ -2923,6 +2938,7 @@ jobs:
       - check-trial-attestation
       - check-escape-detector
       - check-env-contract
+      - check-vetting-attestation
     if: always()
     steps:
       - name: Ship gate results summary

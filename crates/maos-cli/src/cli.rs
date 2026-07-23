@@ -665,6 +665,15 @@ pub enum SpiritOp {
         /// Path to the successor's manifest TOML file.
         #[arg(long)]
         to: String,
+        /// Story 13.4 (FR37/ADR-056) — optional path to the target version's
+        /// vetting attestation (CBOR). Required for a public-vetted target to
+        /// pass the precondition; absent ⇒ the exact-hash flap refuses.
+        #[arg(long)]
+        attestation: Option<String>,
+        /// Story 13.4 — optional path to the operator vetter keyring (CBOR)
+        /// used to walk the attestation → enrollment → operator-root chain.
+        #[arg(long)]
+        keyring: Option<String>,
     },
     /// Upgrade a Spirit to a successor version with a declared policy (Story 5.4, FR49).
     Upgrade {
@@ -684,6 +693,12 @@ pub enum SpiritOp {
         /// without starting a swap.
         #[arg(long)]
         plan: bool,
+        /// Target version's vetting attestation (CBOR).
+        #[arg(long, requires = "keyring")]
+        attestation: Option<String>,
+        /// Operator vetter-key journal (CBOR).
+        #[arg(long, requires = "attestation")]
+        keyring: Option<String>,
         /// Upgrade policy. Default: hot-swap.
         #[arg(long, value_enum, default_value_t = UpgradePolicyArg::HotSwap)]
         policy: UpgradePolicyArg,
@@ -724,6 +739,14 @@ pub struct ImportArgs {
     /// (default false).
     #[arg(long)]
     pub force_tier: Option<String>,
+
+    /// Public-vetted promotion artifact (canonical CBOR).
+    #[arg(long, requires = "vetter_keyring")]
+    pub vetting_attestation: Option<std::path::PathBuf>,
+
+    /// Operator vetter-key journal (canonical CBOR).
+    #[arg(long, requires = "vetting_attestation")]
+    pub vetter_keyring: Option<std::path::PathBuf>,
 
     /// Verify-only mode: print the would-be admission decision and exit.
     #[arg(long, default_value_t = false)]

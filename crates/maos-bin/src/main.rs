@@ -86,6 +86,79 @@ fn worker_thread_count() -> usize {
 }
 
 #[cfg(feature = "network")]
+fn enforce_vetted_upgrade_precondition(
+    spirit_id: &str,
+    target_manifest_path: &std::path::Path,
+    attestation_env: &str,
+) -> Result<(), String> {
+    let target_manifest = std::fs::read(target_manifest_path).map_err(|error| {
+        format!(
+            "read upgrade target manifest {}: {error}",
+            target_manifest_path.display()
+        )
+    })?;
+    let target_tier = maos_manifest::parse_manifest_trust_tier(&target_manifest)
+        .map_err(|error| format!("parse upgrade target trust_tier: {error}"))?;
+    let text = std::str::from_utf8(&target_manifest)
+        .map_err(|error| format!("upgrade target manifest is not UTF-8: {error}"))?;
+    let root: toml::Value =
+        toml::from_str(text).map_err(|error| format!("parse upgrade target TOML: {error}"))?;
+    let manifest_section = root
+        .get("class")
+        .or_else(|| root.get("spirit"))
+        .ok_or_else(|| "upgrade target manifest lacks [class] or [spirit]".to_string())?;
+    let manifest_spirit_id = manifest_section
+        .get("name")
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| "upgrade target manifest lacks string name".to_string())?;
+    let target_version = manifest_section
+        .get("version")
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| "upgrade target manifest lacks string version".to_string())?;
+    if manifest_spirit_id != spirit_id {
+        return Err(format!(
+            "upgrade target manifest names '{manifest_spirit_id}', expected '{spirit_id}'"
+        ));
+    }
+    if target_tier != maos_spirit_abi::compliance::TrustTier::PublicVetted {
+        return Ok(());
+    }
+
+    let attestation_path = std::env::var(attestation_env)
+        .map_err(|_| format!("{attestation_env} is required for a public-vetted target"))?;
+    let attestation_bytes = std::fs::read(&attestation_path)
+        .map_err(|error| format!("read vetting attestation {attestation_path}: {error}"))?;
+    let attestation: maos_compliance::VettingAttestation =
+        serde_cbor::from_slice(&attestation_bytes)
+            .map_err(|error| format!("decode vetting attestation: {error}"))?;
+    let keyring_path = std::env::var("MAOS_VETTER_KEYRING")
+        .map_err(|_| "MAOS_VETTER_KEYRING is required for a public-vetted target".to_string())?;
+    let keyring_bytes = std::fs::read(&keyring_path)
+        .map_err(|error| format!("read vetter keyring {keyring_path}: {error}"))?;
+    let keyring: maos_compliance::VetterKeyring = serde_cbor::from_slice(&keyring_bytes)
+        .map_err(|error| format!("decode vetter keyring: {error}"))?;
+    let operator_seed = maos_domain::audit_key::load_audit_key_seed(&None)
+        .map_err(|error| format!("load configured operator audit root: {error}"))?;
+    let operator_root = maos_domain::audit_key::derive_audit_public_key(&operator_seed);
+    let now_unix_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| format!("system clock precedes Unix epoch: {error}"))?
+        .as_millis() as u64;
+
+    maos_compliance::evaluate_upgrade_precondition(
+        true,
+        &target_manifest,
+        Some(&attestation),
+        &keyring,
+        &operator_root,
+        spirit_id,
+        target_version,
+        now_unix_ms,
+    )
+    .map_err(|error| error.to_string())
+}
+
+#[cfg(feature = "network")]
 fn principal_attributes_for_pdp(
     principal: &maos_domain::ports::AuthenticatedPrincipal,
 ) -> std::collections::HashMap<String, String> {
@@ -171,6 +244,25 @@ impl TlYankObserver {
 }
 
 #[cfg(feature = "network")]
+impl maos_compliance::TerminalObservationSink for TlYankObserver {
+    fn journal_terminal_observation(
+        &self,
+        observation: &maos_compliance::RunningSpiritObservation,
+    ) {
+        let payload =
+            serde_json::to_vec(observation).expect("RunningSpiritObservation is serializable");
+        let _token = self.tl.insert_frame_event(
+            maos_kernel_core::iac::transparency_log::FrameKind::SpiritRevoked,
+            0,
+            None,
+            "vetting-terminal-observation",
+            &payload,
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+    }
+}
+
+#[cfg(feature = "network")]
 impl maos_registry::yank::YankObserver for TlYankObserver {
     fn on_yank(&self, entry: &maos_domain::ports::registry::YankEntry) {
         let payload = serde_json::json!({
@@ -190,6 +282,21 @@ impl maos_registry::yank::YankObserver for TlYankObserver {
             "yank-poller:remote-yank-propagated",
             payload.to_string().as_bytes(),
             maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+        let detected_at_unix_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_millis() as u64)
+            .unwrap_or(0);
+        let _observation = maos_compliance::observe_running_spirit(
+            entry.spirit_id.as_str().to_owned(),
+            entry.version.clone(),
+            None,
+            &maos_compliance::TerminalInputs {
+                registry_yanked: true,
+                ..Default::default()
+            },
+            detected_at_unix_ms,
+            self,
         );
     }
 }
@@ -5672,6 +5779,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let to_manifest = std::env::var("MAOS_HOTSWAP_TO_MANIFEST")
                 .unwrap_or_else(|_| "spirits/hello-spirit/manifest.toml".into());
 
+            if let Err(rejection) = enforce_vetted_upgrade_precondition(
+                &spirit_id,
+                std::path::Path::new(&to_manifest),
+                "MAOS_HOTSWAP_TO_ATTESTATION",
+            ) {
+                let out = serde_json::json!({
+                    "verdict": "VettingPreconditionFailed",
+                    "cause": rejection,
+                });
+                println!("{out}");
+                eprintln!(
+                    "maos: hot-swap-precheck {spirit_id} ({from_version} -> {to_manifest}) — vetting precondition failed: {rejection}"
+                );
+                std::process::exit(2);
+            }
+
             // Load a minimal placeholder spirit so resolve_pid succeeds.
             struct PrecheckSpirit;
             impl maos_spirit_abi::lifecycle::Spirit for PrecheckSpirit {}
@@ -5938,6 +6061,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let policy = policy_str
                 .parse::<maos_kernel_core::lifecycle::UpgradePolicy>()
                 .map_err(|e| format!("invalid upgrade policy: {e}"))?;
+            enforce_vetted_upgrade_precondition(
+                &spirit_id,
+                std::path::Path::new(&manifest_path),
+                "MAOS_UPGRADE_TO_ATTESTATION",
+            )
+            .map_err(|error| format!("upgrade vetting precondition failed: {error}"))?;
 
             if std::env::var_os("MAOS_UPGRADE_PLAN").is_some() {
                 let from_version = std::env::var("MAOS_UPGRADE_FROM_VERSION")

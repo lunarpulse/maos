@@ -32,7 +32,8 @@ pub fn handle_manifest(
         .map_err(|e| e.to_string())?;
 
     // Story 7.2 — populate server-reported tier (Finding D2).
-    let server_tier = extract_manifest_tier(&manifest.manifest_toml);
+    let server_tier =
+        extract_manifest_tier(&manifest.manifest_toml).map_err(|error| error.to_string())?;
     let manifest = if let Some(key) = server_signing_key {
         let msg = server_tier_signature_msg(spirit_id.as_str(), &args.version, server_tier);
         let keypair = ring::signature::Ed25519KeyPair::from_seed_unchecked(key)

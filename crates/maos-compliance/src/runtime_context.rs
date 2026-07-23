@@ -128,9 +128,9 @@ pub fn extract_manifest_fingerprint_fields(manifest_toml: &[u8]) -> ManifestFing
         if let Some(val) = extract_toml_kv(trimmed, "trust_tier") {
             trust_tier = match val {
                 "local" => TrustTier::Local,
-                "org_internal" => TrustTier::OrgInternal,
-                "public_vetted" => TrustTier::PublicVetted,
-                "public_untrusted" => TrustTier::PublicUntrusted,
+                "org_internal" | "org-internal" => TrustTier::OrgInternal,
+                "public_vetted" | "public-vetted" => TrustTier::PublicVetted,
+                "public_untrusted" | "public-untrusted" => TrustTier::PublicUntrusted,
                 _ => TrustTier::Local,
             };
         } else if let Some(val) = extract_toml_kv(trimmed, "sandbox_tier") {

@@ -134,6 +134,8 @@ gates = [
     "check-trial-attestation",
     # Story 12.6 — maos-bin/src environment-contract registry; workspace coverage is Story 12.7.
     "check-env-contract",
+    # Story 13.4 (FR37 / ADR-056) — vetting-attestation gate; 7 hermetic blocking legs.
+    "check-vetting-attestation",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -341,6 +343,12 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 [[ship_gate]]
 name = "check-env-contract"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+# Story 13.4 (FR37 / ADR-056) — vetting-attestation gate. All 7 legs are
+# hermetic (in-process crypto + registry admission, no live substrate) and
+# hard-fail per-commit at HEAD; this disposition governs the ship-gate ladder.
+[[ship_gate]]
+name = "check-vetting-attestation"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
 
 
 

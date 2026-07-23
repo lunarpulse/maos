@@ -72,6 +72,8 @@ const EXPECTED_GATES: &[&str] = &[
     "check-trial-attestation",
     // Story 12.6 — maos-bin-scoped environment-contract registry gate.
     "check-env-contract",
+    // Story 13.4 (FR37 / ADR-056) — vetting-attestation gate (7 hermetic legs).
+    "check-vetting-attestation",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.

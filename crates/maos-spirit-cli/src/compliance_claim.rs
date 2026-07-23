@@ -12,7 +12,7 @@ use maos_registry::compliance_verify::{
     compute_fingerprint_hash, extract_manifest_fingerprint_fields,
 };
 use maos_spirit_abi::compliance::{
-    ComplianceClaimEnvelope, ExecutionContextFingerprint, SigningAlg,
+    ComplianceClaimEnvelope, ExecutionContextFingerprint, SigningAlg, TrustTier,
 };
 
 use crate::errors::CliError;
@@ -47,11 +47,18 @@ pub fn auto_populate(
     signing_pair: &Ed25519KeyPair,
 ) -> Result<ComplianceClaimEnvelope, CliError> {
     let manifest_fields = extract_manifest_fingerprint_fields(manifest_toml);
+    let claim_trust_tier = if manifest_fields.trust_tier == TrustTier::PublicVetted {
+        // `public-vetted` is an inert aspiration until a separate attestation
+        // promotes the underlying public-untrusted admission.
+        TrustTier::PublicUntrusted
+    } else {
+        manifest_fields.trust_tier
+    };
 
     let actual = ExecutionContextFingerprint {
         manifest_hash: sha256(manifest_toml),
         spirit_version: spirit_version.to_string(),
-        trust_tier: manifest_fields.trust_tier,
+        trust_tier: claim_trust_tier,
         sandbox_tier: manifest_fields.sandbox_tier,
         capability_scope: manifest_fields.capability_scope.clone(),
         provider_endpoint: manifest_fields.provider_endpoint.clone(),
@@ -69,7 +76,7 @@ pub fn auto_populate(
         );
         m.insert(
             serde_cbor::value::Value::Text("trust_tier".into()),
-            serde_cbor::value::Value::Text(trust_tier_str(manifest_fields.trust_tier).into()),
+            serde_cbor::value::Value::Text(trust_tier_str(claim_trust_tier).into()),
         );
         m.insert(
             serde_cbor::value::Value::Text("sandbox_tier".into()),

@@ -93,6 +93,7 @@ mod check_skill_schema;
 // Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
 mod check_skill_conformance;
 mod check_unsafe;
+mod check_vetting_attestation;
 mod check_workspace_count;
 mod corpus_staleness;
 mod corpus_types;
@@ -819,6 +820,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 13.4 (AC6) — FR37 vetting-attestation gate (7 hermetic blocking legs).
+    #[command(name = "check-vetting-attestation")]
+    CheckVettingAttestation {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.5 — Frozen-Kernel Conformance Suite infrastructure gate.
     #[command(name = "check-fkcs")]
     CheckFkcs {
@@ -1242,6 +1249,7 @@ fn main() {
         Commands::CheckRezaProductionPath { json } => check_reza_production_path::run(json),
         Commands::CheckEnterprisePdp { json } => check_enterprise_pdp::run(json),
         Commands::CheckEnterpriseIdentity { json } => check_enterprise_identity::run(json),
+        Commands::CheckVettingAttestation { json } => check_vetting_attestation::run(json),
         Commands::CheckFkcs { json } => check_fkcs::run(json),
         Commands::CheckTrialAttestation { json } => check_trial_attestation::run(json),
         Commands::CheckEscapeDetector { json } => check_escape_detector::run(json),

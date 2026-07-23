@@ -2,7 +2,7 @@
 baseline_commit: 247a1da9
 ---
 
-Status: **ready-for-dev — ADVERSARIAL PREFLIGHT CLOSED 2026-07-23 (party-mode: Winston·Murat·Amelia·John·Mary·Grumbal, 3 code scouts).** Scope RATIFIED by PO (Lunarpulse) to **ONE whole story, 6 ACs** — no 13.4b split. Three scouts disproved the brief's headline premise and surfaced the real forks; all resolved below. **ZERO kernel-core-Δ @23228 holds — but not for the reason the epic sketch gave** (see Fork-1). `dev_model_used` is intentionally unrecorded: this story is not yet developed and the model is recorded at dev start (the `check-dev-record-completeness` gate only checks `done` stories). Depends on nothing — 13.4 is fully independent (11.4a/c not required; serves FR37, the only unserved PRD FR).
+Status: **done** — independent review closed 2026-07-23. All 17 patch findings resolved; `check-vetting-attestation` green (7/7), vetting tests 35/35, admission tests 26/26, and affected-crate all-targets check green. Original implementation: 2026-07-23 (claude-opus-4-8). ZERO kernel-core-Δ retained.
 
 # Story 13.4 — FR37 vetting machinery (ADR-056)
 
@@ -103,15 +103,35 @@ ZERO kernel-Δ; ADR-056 authored as an AC deliverable; `index.md:144` corrected 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Guardrails first.** Pin the kernel constraint in the dev record: NO edit to `maos-kernel-core/src/capability/cap_policy/decision.rs`; the end-state kernel-baseline is `23228 == pin`. Confirm the two-axis model in code before writing anything (`compliance.rs:194` vs `decision.rs:77`).
-- [ ] **Task 1 — `VettingAttestation` type** in a new `maos-compliance::vetting` module (AC1). Model on `ComplianceClaimEnvelope`; bind `sha256(manifest_toml)`; canonical-CBOR claim bytes; `CryptoProvider::verify_signature`. Golden byte-pin for the canonical claim encoding.
-- [ ] **Task 2 — Attestation-conditional promotion** (AC1/Fork-2). Un-defer `PublicVetted` in `admission.rs`/`publish.rs`/`manifest.rs`, gated on a verified attestation *above* `strictest_of`; keep `PublicVettedDeferred` for attestation-absent. Unit-pin: same package rejects without, admits with.
-- [ ] **Task 3 — Vetter-key lifecycle + verify-chain** (AC5). Distinct signed type (NOT `VetterKeyPayload`); operator-root-signed enrollment/rotation/revocation; verify walks attestation→enrollment→root; refuse enrollment-not-predating-issuance.
-- [ ] **Task 4 — Upgrade flap + `successor_policy`** (AC3). Hook `spirit upgrade --plan` / `HotSwapPrecheck`; evaluate target-version attestation before the chain.
-- [ ] **Task 5 — Revocation + four terminal causes** (AC4). Reuse `SignedRevocationList` + yank poller for `registry-yank`; author the four-cause terminal enum; journaled running-Spirit observation event; refuse-at-next-load.
-- [ ] **Task 6 — `check-vetting-attestation` gate** (AC6). All 7 legs; invert `e2e_public_vetted_always_rejected`; prove each negative reds on its own defect (planted-lie discipline).
-- [ ] **Task 7 — ADR-056 + docs** (AC6). Author `docs/adr/ADR-056-fr37-vetting-machinery.md`; add to `index.md`; fix stale `index.md:144` (054→056).
-- [ ] **Task 8 — Baseline + gates green.** `check-kernel-baseline` 23228==pin; `cargo fmt`; `kloc-check`; register `check-vetting-attestation` in `gate-registry.toml` + `discipline.yml` (and confirm `check-ship-gate-completeness` sees it — the D30 CI→registry meta-gap).
+- [x] **Task 0 — Guardrails first.** Pin the kernel constraint in the dev record: NO edit to `maos-kernel-core/src/capability/cap_policy/decision.rs`; the end-state kernel-baseline is `23228 == pin`. Confirm the two-axis model in code before writing anything (`compliance.rs:194` vs `decision.rs:77`).
+- [x] **Task 1 — `VettingAttestation` type** in a new `maos-compliance::vetting` module (AC1). Model on `ComplianceClaimEnvelope`; bind `sha256(manifest_toml)`; canonical-CBOR claim bytes; `CryptoProvider::verify_signature`. Golden byte-pin for the canonical claim encoding.
+- [x] **Task 2 — Attestation-conditional promotion** (AC1/Fork-2). Un-defer `PublicVetted` in `admission.rs`/`publish.rs`/`manifest.rs`, gated on a verified attestation *above* `strictest_of`; keep `PublicVettedDeferred` for attestation-absent. Unit-pin: same package rejects without, admits with.
+- [x] **Task 3 — Vetter-key lifecycle + verify-chain** (AC5). Distinct signed type (NOT `VetterKeyPayload`); operator-root-signed enrollment/rotation/revocation; verify walks attestation→enrollment→root; refuse enrollment-not-predating-issuance.
+- [x] **Task 4 — Upgrade flap + `successor_policy`** (AC3). Hook `spirit upgrade --plan` / `HotSwapPrecheck`; evaluate target-version attestation before the chain.
+- [x] **Task 5 — Revocation + four terminal causes** (AC4). Reuse `SignedRevocationList` + yank poller for `registry-yank`; author the four-cause terminal enum; journaled running-Spirit observation event; refuse-at-next-load.
+- [x] **Task 6 — `check-vetting-attestation` gate** (AC6). All 7 legs; invert `e2e_public_vetted_always_rejected`; prove each negative reds on its own defect (planted-lie discipline).
+- [x] **Task 7 — ADR-056 + docs** (AC6). Author `docs/adr/ADR-056-fr37-vetting-machinery.md`; add to `index.md`; fix stale `index.md:144` (054→056).
+- [x] **Task 8 — Baseline + gates green.** `check-kernel-baseline` 23228==pin; `cargo fmt`; `kloc-check`; register `check-vetting-attestation` in `gate-registry.toml` + `discipline.yml` (and confirm `check-ship-gate-completeness` sees it — the D30 CI→registry meta-gap).
+
+### Review Findings
+
+- [x] [Review][Patch] Route production admission through the attestation-aware entry point [crates/maos-registry/src/admission.rs:317]
+- [x] [Review][Patch] Promote the attested public-untrusted tier before `strictest_of` [crates/maos-registry/src/admission.rs:332]
+- [x] [Review][Patch] Use one trust-tier spelling across manifest validation and admission [crates/maos-manifest/src/manifest.rs:359]
+- [x] [Review][Patch] Preserve baseline `ComplianceClaim` verification during vetted promotion [crates/maos-registry/src/admission.rs:350]
+- [x] [Review][Patch] Enforce vetting on the executable upgrade path [crates/maos-bin/src/main.rs:5989]
+- [x] [Review][Patch] Parse the target manifest structurally and fail closed [crates/maos-bin/src/main.rs:5682]
+- [x] [Review][Patch] Anchor keyrings to the configured operator audit root [crates/maos-bin/src/main.rs:5702]
+- [x] [Review][Patch] Prove enrollment predates issuance with persisted journal ordering [crates/maos-compliance/src/vetting/keyring.rs:173]
+- [x] [Review][Patch] Retire the predecessor when processing key rotation [crates/maos-compliance/src/vetting/keyring.rs:184]
+- [x] [Review][Patch] Implement attestation-scoped revocation [crates/maos-compliance/src/vetting/mod.rs:170]
+- [x] [Review][Patch] Journal running-Spirit terminal observations and test the audit surface [crates/maos-compliance/src/vetting/terminal.rs:95]
+- [x] [Review][Patch] Reject future-issued and inverted validity windows [crates/maos-compliance/src/vetting/mod.rs:162]
+- [x] [Review][Patch] Bind upgrade prechecks to the target Spirit identity and version [crates/maos-compliance/src/vetting/mod.rs:194]
+- [x] [Review][Patch] Enforce the attested `public-untrusted` source tier [crates/maos-compliance/src/vetting/mod.rs:157]
+- [x] [Review][Patch] Bind `vetter_key_id` to its operator-root enrollment [crates/maos-compliance/src/vetting/keyring.rs:173]
+- [x] [Review][Patch] Reject v2.5 `drain-and-refuse` semantics at v2.2 [crates/maos-compliance/src/vetting/attestation.rs:69]
+- [x] [Review][Patch] Make the upgrade-flap negative isolate exact-hash verification [crates/maos-registry/tests/vetting_attestation_gate.rs:199]
 
 ## Dev notes
 
@@ -127,12 +147,64 @@ ZERO kernel-Δ; ADR-056 authored as an AC deliverable; `index.md:144` corrected 
 ## Dev Agent Record
 
 ### Agent Model Used
-_(record the exact frontier-class model at dev start — do not fill until developed)_
+
+claude-opus-4-8 (frontier-class allowlist; recorded at dev start 2026-07-23).
 
 ### Completion Notes List
 
+- **ZERO kernel-core-Δ confirmed:** `check-kernel-baseline` PASSED — `maos-kernel-core/src = 23228 lines, pinned 23228`. No file under `crates/maos-kernel-core/src/` touched; `cap_policy/decision.rs::TrustTier` (Axis B) untouched, no `PublicVetted` arm added. Public-vetted lives entirely on Axis A (`maos_spirit_abi::compliance::TrustTier`, re-exported at `maos_domain::ports::registry`).
+- **AC1** — New `maos-compliance::vetting` module: `VettingAttestation` Ed25519 envelope mirroring `ComplianceClaimEnvelope` (hand-rolled `[u8;64]`/`[u8;32]` serde) + `VettingClaim` binding `sha256(manifest_toml)` (raw, not canonical), tiers, vetter-key-id, expiry, `RevocationSemantics`, optional `SuccessorPolicy`. Golden byte-pin test (`claim_encoding_golden_byte_pin`) freezes the canonical CBOR. Promotion wired in `admit_spirit_with_attestation` (wraps byte-stable `admit_spirit`, gates above `strictest_of`); `admit_spirit` unchanged. `publish.rs`/`maos-spirit.rs`/`manifest.rs ClassSection` un-defer the vetted tier as a declared aspiration (inert without an attestation). MCP `server_trust_tier` public-vetted rejection intentionally LEFT as-is (separate axis, no attestation carrier — un-deferring it would admit unvetted MCP servers).
+- **AC2/AC5** — `verify_attestation` walks signature → manifest exact-hash → target tier → expiry → operator-root-signed vetter-key enrollment predating issuance → revocation. Verifier is an independent CBOR decode (`decode_claim`), never a re-encode. Vetter-key lifecycle is a DISTINCT signed type (`VetterKeyEvent`, operator-root §7.3 signed) — NOT the unsigned `governance::VetterKeyPayload` (Trap-1 avoided). External accredited vetters (NFR-Comp-2) explicitly out of scope (v2.5).
+- **AC3** — `evaluate_upgrade_precondition` + exact-hash flap: a new manifest version without its own current attestation is refused at the floor (proven by gate leg 5, both negative + positive). Folded into the `maosctl spirit upgrade --plan` / `HotSwapPrecheck` seam (maos-bin `hot-swap-precheck` arm + new `--attestation`/`--keyring` CLI flags) — NOT a new `maosctl swap` command, ADR-036 left planning-only (Trap-2).
+- **AC4** — `VettingTerminalCause { VettingRevocation, ExpiryLapse, RegistryYank, OperatorLocal }`, four-way distinguishable with defined precedence + `RunningSpiritObservation` (journaled, `refuse-at-next-load` disposition; drain-and-refuse reserved v2.5). `registry-yank` reuses the existing yank signal via `TerminalInputs`.
+- **AC6** — `check-vetting-attestation` xtask gate: 7 hermetic Blocking legs (round-trip, forged-signature, expired, forged-vetter-key, upgrade-flap ±, inverted e2e, four-cause). Registered in `gate-registry.toml` (gates + `[[ship_gate]]` v2_2=blocking), `discipline.yml` (job + `v1-0-ship-gate` needs), and `check_ship_gate_completeness` EXPECTED_GATES. Gate green (7/7). **Proven-red verified:** disabling `verify_enrollment` reds the forged-vetter-key + round-trip legs → gate BLOCKS.
+- **Repaired pre-existing breakage** in `end_to_end_test.rs` (feature `fixture_replay`): 3 tests were failing because helpers signed non-domain-separated while `verify_publisher_sig` is domain-separated. Fixed both signing sites → 8/8 pass (incl. the inverted `e2e_public_vetted_always_rejected`).
+- **Verification:** `cargo check --workspace --all-targets` clean; changed-crate suites green (maos-compliance vetting 28, maos-registry admission 24 + gate 6 + e2e 8, xtask 373); `cargo fmt --all --check` clean; `coverage-matrix` + `check-ship-gate-completeness` PASS. `kloc-check` fails workspace-wide (NFR-Maint-1 20 KLOC ceiling, current=129442) — **pre-existing** (fails identically on the clean tree at HEAD), advisory, unrelated to this story.
+- **Independent review remediation:** resolved all 17 findings. Production import and executable upgrade now consume attestation/keyring artifacts; operator-root anchoring, signed journal sequence/time, predecessor retirement, Spirit/version CRLs, temporal/source/key-id/identity checks, v2.5-semantics rejection, structural TOML parsing, baseline compliance verification, TL terminal-observation dispatch, and exact-hash-isolated gate negatives are covered. Verification: vetting 35/35, admission 26/26, seven-leg Blocking gate green, affected crates `cargo check --all-targets` green.
+
 ### File List
+
+**Created:**
+- `crates/maos-compliance/src/vetting/mod.rs`
+- `crates/maos-compliance/src/vetting/attestation.rs`
+- `crates/maos-compliance/src/vetting/keyring.rs`
+- `crates/maos-compliance/src/vetting/terminal.rs`
+- `crates/maos-registry/tests/vetting_attestation_gate.rs`
+- `xtask/src/check_vetting_attestation.rs`
+- `docs/adr/ADR-056-fr37-vetting-machinery.md`
+
+**Modified:**
+- `Cargo.lock`
+- `crates/maos-compliance/src/lib.rs`
+- `crates/maos-compliance/src/runtime_context.rs`
+- `crates/maos-domain/src/audit_key.rs`
+- `crates/maos-registry/Cargo.toml`
+- `crates/maos-registry/src/admission.rs`
+- `crates/maos-registry/src/client.rs`
+- `crates/maos-registry/src/handlers/manifest.rs`
+- `crates/maos-registry/tests/end_to_end_test.rs`
+- `crates/maos-registry/tests/vetting_attestation_gate.rs`
+- `crates/maos-spirit-cli/src/compliance_claim.rs`
+- `crates/maos-spirit-cli/src/publish.rs`
+- `crates/maos-spirit-cli/src/bin/maos-spirit.rs`
+- `crates/maos-spirit-cli/tests/publish_tier_validation_test.rs`
+- `crates/maos-spirit-cli/README.md`
+- `crates/maos-manifest/src/lib.rs`
+- `crates/maos-manifest/src/manifest.rs`
+- `crates/maos-cli/Cargo.toml`
+- `crates/maos-cli/src/cli.rs`
+- `crates/maos-cli/src/subcommands.rs`
+- `crates/maos-bin/Cargo.toml`
+- `crates/maos-bin/src/main.rs`
+- `xtask/src/main.rs`
+- `xtask/gate-registry.toml`
+- `xtask/src/check_ship_gate_completeness.rs`
+- `.github/workflows/discipline.yml`
+- `docs/adr/index.md`
+- `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/index.md`
 
 ## Change Log
 
 - 2026-07-23: Story 13.4 created + adversarial preflight closed (party-mode Winston·Murat·Amelia·John·Mary·Grumbal + 3 scouts). Scope PO-ratified WHOLE (6 ACs). Five forks resolved: ZERO kernel-Δ holds via the two-axis truth (AC1 reason corrected from the sketch's conflation); lattice collision resolved by gating promotion above `strictest_of`; reuse map (ComplianceClaimEnvelope / audit_key / SignedRevocationList / sha256(manifest_toml)); three named traps (VetterKeyPayload name-collision, ADR-036 planning-only, ADR-056 must-author). Baseline pinned 23228. → ready-for-dev.
+- 2026-07-23: Implemented (claude-opus-4-8). New `maos-compliance::vetting` module (`VettingAttestation`/`VettingClaim`/`VetterKeyEvent`/`VetterKeyring`/`VettingTerminalCause` + `verify_attestation`/`evaluate_upgrade_precondition`, golden byte-pin); attestation-conditional promotion via `admit_spirit_with_attestation` above `strictest_of` (byte-stable `admit_spirit` unchanged); operator-root vetter-key verify-chain; upgrade-flap precondition wired into `hot-swap-precheck` + `--attestation`/`--keyring` CLI flags; four terminal causes + running-Spirit observation; `check-vetting-attestation` gate (7 hermetic Blocking legs) registered in gate-registry/discipline/completeness; inverted `e2e_public_vetted_always_rejected` + repaired 3 pre-existing domain-separation test breaks; ADR-056 authored, index 054→056 fixed. ZERO kernel-core-Δ @23228 confirmed. → review.
+- 2026-07-23: Independent code-review remediation completed. Resolved 17/17 findings across production admission/upgrade wiring, trust-root and lifecycle verification, attestation-scoped revocation, temporal/identity/source/key-id invariants, structural manifest parsing, terminal audit dispatch, and anti-null gate coverage. Seven-leg Blocking gate green.

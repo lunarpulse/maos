@@ -13,15 +13,15 @@ pub mod manifest;
 
 // Re-export the most commonly used types at crate root for ergonomic access.
 pub use manifest::{
-    capabilities_required_to_scopes, resolve_caps, warn_n_minus_1_degradations, Author, Budget,
-    CapabilitiesRequired, ClassSection, CliWrapperConfig, CliWrapperControlChannel,
-    CliWrapperPosture, CliWrapperRecoveryPolicy, CliWrapperStdioShape, EpistemicAction,
-    EpistemicPolicyRule, EpistemicPolicySection, GatewayEntry, GatewayType, GatewaysSection,
-    HaltProtocolCompatibilitySection, HotSwapManifestSection, LifecycleSection, LoomCapabilities,
-    ManifestError, McpCapabilities, McpCapabilityServerEntry, McpSection, McpServerEntry,
-    MigratesFromSection, ModelProvenanceSection, OnCrashSection, OnInboundHook,
-    OnRevocationSection, OutputShape, OutputShapePredicate, OutputShapeViolation, Posture,
-    PostureSection, ProviderCapabilities, ProviderConfig, ProvidersSection, ResolvedCaps,
-    ResourceCaps, SandboxConfig, ScalarPredicate, ScheduleEntry, SchedulesSection,
-    SchedulingSection, SupervisionSection,
+    capabilities_required_to_scopes, parse_manifest_trust_tier, resolve_caps,
+    warn_n_minus_1_degradations, Author, Budget, CapabilitiesRequired, ClassSection,
+    CliWrapperConfig, CliWrapperControlChannel, CliWrapperPosture, CliWrapperRecoveryPolicy,
+    CliWrapperStdioShape, EpistemicAction, EpistemicPolicyRule, EpistemicPolicySection,
+    GatewayEntry, GatewayType, GatewaysSection, HaltProtocolCompatibilitySection,
+    HotSwapManifestSection, LifecycleSection, LoomCapabilities, ManifestError, McpCapabilities,
+    McpCapabilityServerEntry, McpSection, McpServerEntry, MigratesFromSection,
+    ModelProvenanceSection, OnCrashSection, OnInboundHook, OnRevocationSection, OutputShape,
+    OutputShapePredicate, OutputShapeViolation, Posture, PostureSection, ProviderCapabilities,
+    ProviderConfig, ProvidersSection, ResolvedCaps, ResourceCaps, SandboxConfig, ScalarPredicate,
+    ScheduleEntry, SchedulesSection, SchedulingSection, SupervisionSection,
 };

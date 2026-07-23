@@ -27,6 +27,47 @@ pub enum ManifestError {
     Toml(String),
 }
 
+/// Parse the manifest-declared registry trust tier from TOML structure.
+///
+/// Both the current `[class]` schema and the legacy `[spirit]` package shape
+/// are supported. `public-vetted` has one canonical manifest spelling; CLI
+/// flags may still use their established snake_case spelling.
+pub fn parse_manifest_trust_tier(
+    manifest_toml: &[u8],
+) -> Result<maos_spirit_abi::compliance::TrustTier, ManifestError> {
+    use maos_spirit_abi::compliance::TrustTier;
+
+    let text = std::str::from_utf8(manifest_toml)
+        .map_err(|error| ManifestError::Toml(format!("manifest is not UTF-8: {error}")))?;
+    let root: toml::Value =
+        toml::from_str(text).map_err(|error| ManifestError::Toml(error.to_string()))?;
+    let tier = root
+        .get("class")
+        .and_then(|section| section.get("trust_tier"))
+        .or_else(|| {
+            root.get("spirit")
+                .and_then(|section| section.get("trust_tier"))
+        })
+        .or_else(|| root.get("trust_tier"));
+
+    let Some(tier) = tier else {
+        return Ok(TrustTier::Local);
+    };
+    let tier = tier
+        .as_str()
+        .ok_or_else(|| ManifestError::Toml(validation_msg("trust_tier", "must be a string")))?;
+    match tier {
+        "local" => Ok(TrustTier::Local),
+        "org-internal" | "org_internal" => Ok(TrustTier::OrgInternal),
+        "public-untrusted" | "public_untrusted" => Ok(TrustTier::PublicUntrusted),
+        "public-vetted" => Ok(TrustTier::PublicVetted),
+        other => Err(ManifestError::Toml(validation_msg(
+            "trust_tier",
+            &format!("unknown trust_tier: {other}"),
+        ))),
+    }
+}
+
 // Story 1b.5c — post-parse validation errors are surfaced via
 // `ManifestError::Toml` with a stable `validation failed for {field}: {reason}`
 // prefix so the public ABI of `ManifestError` remains exactly what Story 1b.3
@@ -356,10 +397,13 @@ impl RawClassSection {
                 )));
             }
         }
-        // trust_tier ∈ {local, org-internal, public-untrusted}.
+        // trust_tier ∈ {local, org-internal, public-untrusted, public-vetted}.
+        // Story 13.4 (FR37 / ADR-056): `public-vetted` is accepted as a declared
+        // aspiration on Axis A; the promotion is the signed vetting attestation
+        // verified at admission, never this manifest field.
         if !matches!(
             self.trust_tier.as_str(),
-            "local" | "org-internal" | "public-untrusted"
+            "local" | "org-internal" | "public-untrusted" | "public-vetted"
         ) {
             return Err(ManifestError::Toml(validation_msg(
                 "class.trust_tier",
@@ -2304,6 +2348,25 @@ impl RawMcpSection {
 mod tests {
     use super::*;
 
+    #[test]
+    fn trust_tier_parser_handles_valid_toml_syntax() {
+        let manifest = br#"[class]
+"trust_tier" = 'public-vetted' # reviewed
+"#;
+        assert_eq!(
+            parse_manifest_trust_tier(manifest).unwrap(),
+            maos_spirit_abi::compliance::TrustTier::PublicVetted
+        );
+    }
+
+    #[test]
+    fn trust_tier_parser_rejects_unknown_values() {
+        let manifest = br#"[spirit]
+trust_tier = "public_vetted"
+"#;
+        assert!(parse_manifest_trust_tier(manifest).is_err());
+    }
+
     // ---- SandboxConfig ----
 
     #[test]
@@ -2534,6 +2597,16 @@ description = "MAOS reference Spirit"
         let s = class_toml_full().replace(r#"trust_tier = "local""#, r#"trust_tier = "premium""#);
         let err = ClassSection::from_toml_str(&s).unwrap_err();
         assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.trust_tier")));
+    }
+
+    #[test]
+    fn class_section_accepts_public_vetted_tier() {
+        // Story 13.4 (FR37 / ADR-056) — a vetted Spirit's [class] parses; the
+        // promotion is the attestation at admission, not this manifest field.
+        let s =
+            class_toml_full().replace(r#"trust_tier = "local""#, r#"trust_tier = "public-vetted""#);
+        let c = ClassSection::from_toml_str(&s).unwrap();
+        assert_eq!(c.trust_tier, "public-vetted");
     }
 
     #[test]

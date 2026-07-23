@@ -715,7 +715,7 @@ fn dispatch_import(args: &ImportArgs, _color: ColorChoice) -> ExitCode {
     if args.registry_uri.is_some() {
         eprintln!("maosctl import: warning: --registry-uri is not yet implemented ( Story 7.2 v1.0); ignored");
     }
-    use maos_registry::admission::{admit_spirit, AdmissionConfig};
+    use maos_registry::admission::{admit_spirit, admit_spirit_with_attestation, AdmissionConfig};
     use maos_registry::import;
     use maos_registry::origin::RegistryOrigin;
     use maos_registry::storage::{LocalFsRegistryStorage, RegistryStorage};
@@ -752,6 +752,7 @@ fn dispatch_import(args: &ImportArgs, _color: ColorChoice) -> ExitCode {
             "local" => TrustTier::Local,
             "org_internal" => TrustTier::OrgInternal,
             "public_untrusted" => TrustTier::PublicUntrusted,
+            "public_vetted" => TrustTier::PublicVetted,
             other => {
                 eprintln!("maosctl import: unrecognized tier '{other}'");
                 return ExitCode::from(1);
@@ -771,8 +772,85 @@ fn dispatch_import(args: &ImportArgs, _color: ColorChoice) -> ExitCode {
         runtime_crypto_provider: None,
     };
 
+    let vetting = match (&args.vetting_attestation, &args.vetter_keyring) {
+        (None, None) => None,
+        (Some(attestation_path), Some(keyring_path)) => {
+            let attestation_bytes = match std::fs::read(attestation_path) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    eprintln!(
+                        "maosctl import: failed to read vetting attestation {}: {error}",
+                        attestation_path.display()
+                    );
+                    return ExitCode::from(1);
+                }
+            };
+            let attestation = match serde_cbor::from_slice::<maos_compliance::VettingAttestation>(
+                &attestation_bytes,
+            ) {
+                Ok(attestation) => attestation,
+                Err(error) => {
+                    eprintln!("maosctl import: malformed vetting attestation: {error}");
+                    return ExitCode::from(1);
+                }
+            };
+            let keyring_bytes = match std::fs::read(keyring_path) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    eprintln!(
+                        "maosctl import: failed to read vetter keyring {}: {error}",
+                        keyring_path.display()
+                    );
+                    return ExitCode::from(1);
+                }
+            };
+            let keyring =
+                match serde_cbor::from_slice::<maos_compliance::VetterKeyring>(&keyring_bytes) {
+                    Ok(keyring) => keyring,
+                    Err(error) => {
+                        eprintln!("maosctl import: malformed vetter keyring: {error}");
+                        return ExitCode::from(1);
+                    }
+                };
+            let operator_seed = match maos_domain::audit_key::load_audit_key_seed(&None) {
+                Ok(seed) => seed,
+                Err(error) => {
+                    eprintln!("maosctl import: operator audit root unavailable: {error}");
+                    return ExitCode::from(1);
+                }
+            };
+            let operator_root = maos_domain::audit_key::derive_audit_public_key(&operator_seed);
+            Some((attestation, keyring, operator_root))
+        }
+        _ => {
+            eprintln!(
+                "maosctl import: --vetting-attestation and --vetter-keyring must be supplied together"
+            );
+            return ExitCode::from(2);
+        }
+    };
+
     // 4. Admit the Spirit.
-    let decision = match admit_spirit(&bundle.signed_package, &op_cfg) {
+    let admission_result = if let Some((attestation, keyring, operator_root)) = &vetting {
+        let now_unix_ms = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            Ok(duration) => duration.as_millis() as u64,
+            Err(error) => {
+                eprintln!("maosctl import: system clock precedes Unix epoch: {error}");
+                return ExitCode::from(1);
+            }
+        };
+        admit_spirit_with_attestation(
+            &bundle.signed_package,
+            &op_cfg,
+            Some(attestation),
+            keyring,
+            operator_root,
+            now_unix_ms,
+        )
+    } else {
+        admit_spirit(&bundle.signed_package, &op_cfg)
+    };
+    let decision = match admission_result {
         Ok(d) => d,
         Err(e) => {
             eprintln!("maosctl import: admission failed: {e}");
@@ -1432,7 +1510,13 @@ fn dispatch_revocations(args: &RevocationsArgs, color: ColorChoice) -> ExitCode 
 
 fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
     match &args.op {
-        SpiritOp::HotSwapPrecheck { spirit, from, to } => {
+        SpiritOp::HotSwapPrecheck {
+            spirit,
+            from,
+            to,
+            attestation,
+            keyring,
+        } => {
             if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
                 eprintln!("maosctl: spirit hot-swap-precheck — {diag}");
                 return ExitCode::from(1);
@@ -1454,6 +1538,12 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
             cmd.env("MAOS_SPIRIT_ID", spirit);
             cmd.env("MAOS_HOTSWAP_FROM_VERSION", from);
             cmd.env("MAOS_HOTSWAP_TO_MANIFEST", to);
+            if let Some(att_path) = attestation {
+                cmd.env("MAOS_HOTSWAP_TO_ATTESTATION", att_path);
+            }
+            if let Some(kr_path) = keyring {
+                cmd.env("MAOS_VETTER_KEYRING", kr_path);
+            }
 
             if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
                 cmd.env("NO_COLOR", "1");
@@ -1467,6 +1557,8 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
             from,
             candidates,
             plan,
+            attestation,
+            keyring,
             policy,
         } => {
             if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
@@ -1502,6 +1594,12 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
                     UpgradePolicyArg::Migrator => "migrator",
                 },
             );
+            if let Some(attestation_path) = attestation {
+                cmd.env("MAOS_UPGRADE_TO_ATTESTATION", attestation_path);
+            }
+            if let Some(keyring_path) = keyring {
+                cmd.env("MAOS_VETTER_KEYRING", keyring_path);
+            }
             if *plan {
                 cmd.env("MAOS_UPGRADE_PLAN", "1");
                 cmd.env(

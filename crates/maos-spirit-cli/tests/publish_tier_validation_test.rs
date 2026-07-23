@@ -48,11 +48,14 @@ fn hex_key() -> Vec<u8> {
 }
 
 #[test]
-fn rejects_public_vetted_via_parse_tier() {
-    let err = parse_tier_arg("public_vetted").unwrap_err();
-    let s = err.to_string();
-    assert!(s.contains("public_vetted"), "got: {s}");
-    assert!(s.contains("FR37"), "must cite FR37 deferral: {s}");
+fn accepts_public_vetted_via_parse_tier() {
+    // Story 13.4 (FR37 / ADR-056) — un-deferred at publish; the vetted tier is a
+    // declared aspiration, inert until an attestation promotes it at admission.
+    use maos_domain::ports::registry::TrustTier;
+    assert!(matches!(
+        parse_tier_arg("public_vetted"),
+        Ok(TrustTier::PublicVetted)
+    ));
 }
 
 #[test]
