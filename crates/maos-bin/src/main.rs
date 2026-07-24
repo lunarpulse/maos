@@ -85,6 +85,23 @@ fn worker_thread_count() -> usize {
     available_parallelism().map(usize::from).unwrap_or(1)
 }
 
+fn resolved_transparency_log_path() -> std::path::PathBuf {
+    let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").ok();
+    let path = maos_audit::transparency_log_path_for_tenant_mode(
+        std::env::var_os("MAOS_LOOM_POSTGRES").is_some(),
+        home_team.as_deref(),
+    )
+    .unwrap_or_else(|error| {
+        eprintln!("maos: invalid tenant Transparency Log path: {error}");
+        std::process::exit(2);
+    });
+    maos_audit::validate_transparency_log_path(&path).unwrap_or_else(|error| {
+        eprintln!("maos: unsafe tenant Transparency Log path: {error}");
+        std::process::exit(2);
+    });
+    path
+}
+
 #[cfg(feature = "network")]
 fn enforce_vetted_upgrade_precondition(
     spirit_id: &str,
@@ -1953,7 +1970,7 @@ fn air_gap_run(_args: &[String]) {
     // AC-4: the substrate boots, runs, and produces a Transparency Log entry
     // even with networking compiled out. Real offline inference is a v1.0/9.4b
     // follow-up; at v0.5 we write a no-op TL entry and emit a clear diagnostic.
-    let tl_path = maos_audit::default_transparency_log_path();
+    let tl_path = resolved_transparency_log_path();
     if let Some(parent) = tl_path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
@@ -1992,7 +2009,7 @@ fn air_gap_backup(args: &[String]) {
     match args[0].as_str() {
         "create" => {
             let dest = std::path::Path::new(&args[1]);
-            let source = maos_audit::default_transparency_log_path();
+            let source = resolved_transparency_log_path();
             match maos_cli::backup::backup_transparency_log(&source, dest) {
                 Ok(()) => {
                     eprintln!("backup created: {}", dest.display());
@@ -2004,7 +2021,7 @@ fn air_gap_backup(args: &[String]) {
             }
         }
         "verify" => {
-            let source = maos_audit::default_transparency_log_path();
+            let source = resolved_transparency_log_path();
             let backup_path = std::path::Path::new(&args[1]);
             match air_gap_verify_backup(&source, backup_path) {
                 Ok(()) => eprintln!("backup verified: cold-restore Merkle roots match"),
@@ -2021,6 +2038,15 @@ fn air_gap_backup(args: &[String]) {
             }
             let backup_path = std::path::Path::new(&args[1]);
             let target_path = std::path::Path::new(&args[2]);
+            // D3 (code review): refuse a cross-team restore BEFORE copying.
+            // A tenanted backup must land at its own team's path; this stops
+            // planting team-A's rows onto team-B's shard path.
+            if let Err(error) =
+                maos_cli::backup::validate_restore_target_team(backup_path, target_path)
+            {
+                eprintln!("restore refused (team mismatch): {error}");
+                std::process::exit(1);
+            }
             match maos_cli::backup::backup_transparency_log(backup_path, target_path) {
                 Ok(()) => {}
                 Err(e) => {
@@ -2048,8 +2074,23 @@ fn air_gap_verify_backup(
     source_path: &std::path::Path,
     backup_path: &std::path::Path,
 ) -> Result<(), String> {
-    let restored = maos_cli::backup::cold_restore_to_temp(backup_path)
-        .map_err(|e| format!("cold restore failed: {e}"))?;
+    let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").ok();
+    let restored = if std::env::var_os("MAOS_LOOM_POSTGRES").is_some() {
+        match home_team
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            Some(team) => {
+                let team = maos_domain::team::TeamId::new(team)
+                    .map_err(|error| format!("invalid restore team: {error}"))?;
+                maos_cli::backup::cold_restore_to_temp_for_team(backup_path, &team)
+            }
+            None => maos_cli::backup::cold_restore_to_temp(backup_path),
+        }
+    } else {
+        maos_cli::backup::cold_restore_to_temp(backup_path)
+    }
+    .map_err(|e| format!("cold restore failed: {e}"))?;
     let source_root = maos_audit::backup::compute_merkle_root(source_path)
         .map_err(|e| format!("source Merkle root failed: {e}"))?;
     let restored_root = maos_audit::backup::compute_merkle_root(&restored)
@@ -2070,7 +2111,7 @@ fn air_gap_audit(args: &[String]) {
         eprintln!("usage: maos audit query");
         std::process::exit(1);
     }
-    let tl_path = maos_audit::default_transparency_log_path();
+    let tl_path = resolved_transparency_log_path();
     match maos_audit::backup::compute_merkle_root(&tl_path) {
         Ok(root) => {
             eprintln!("air-gap audit query: TL path = {}", tl_path.display());
@@ -2297,16 +2338,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Story 5.1 — `_scheduler` replaced with real Arc<SpiritSchedulerAdapter>
     // construction below (after all dependent adapters are initialized).
 
-    // Story 4.3 — construct real MemoryManagerAdapter with Private + Shared + Principal stores.
-    // Resolve paths first so both memory and TL share the same DB location.
-    let audit_db_path = maos_audit::default_transparency_log_path();
-    if let Some(parent) = audit_db_path.parent() {
-        if let Err(e) = std::fs::create_dir_all(parent) {
-            eprintln!(
-                "maos: failed to create audit DB parent directory {}: {e}",
-                parent.display()
-            );
-            return Err(format!("audit-db parent create failed: {e}").into());
+    // Keep Host-wide memory/index/hold semantics on the global artifact. Only
+    // the Transparency Log and its audit readers move to the physical team
+    // shard selected by the tenancy-active composition root.
+    let memory_db_path = maos_audit::default_transparency_log_path();
+    let audit_db_path = resolved_transparency_log_path();
+    for (label, path) in [("memory", &memory_db_path), ("audit", &audit_db_path)] {
+        if let Some(parent) = path.parent() {
+            if let Err(error) = std::fs::create_dir_all(parent) {
+                return Err(format!(
+                    "maos: failed to create {label} DB parent {}: {error}",
+                    parent.display()
+                )
+                .into());
+            }
         }
     }
 
@@ -2324,11 +2369,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         4 * 1024,
     ));
     let shared_store = Arc::new(
-        maos_kernel_core::memory::shared::SharedMemoryStore::open(&audit_db_path)
+        maos_kernel_core::memory::shared::SharedMemoryStore::open(&memory_db_path)
             .map_err(|e| format!("failed to open shared memory store: {e}"))?,
     );
     let principal_index = Arc::new(
-        maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&audit_db_path)
+        maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&memory_db_path)
             .map_err(|e| format!("failed to open principal index: {e}"))?,
     );
 
@@ -2493,9 +2538,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(maos_kernel_core::orchestrator::OrchestratorBufferRegistry::new());
     eprintln!("maos: orchestrator buffer registry initialized (Story 3.4)");
 
-    // Transparency Log — shared across services (Story 1b.1).
-    // The audit_db_path is resolved above (line ~108) so memory stores and TL
-    // share the same DB file location.
+    // Transparency Log — shared across services within this one-team process.
+    // Host-wide memory/index state remains on `memory_db_path`; the audit
+    // adapter receives the team shard selected above.
     let transparency_log = Arc::new(
         maos_kernel_core::iac::TransparencyLogAdapter::open(&audit_db_path, boot_nonce).map_err(
             |e| {
@@ -2506,6 +2551,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         )?,
     );
+    if audit_db_path != memory_db_path {
+        transparency_log
+            .attach_global_legal_holds(&memory_db_path)
+            .map_err(|error| {
+                format!(
+                    "failed to keep legal holds on Host-global DB {}: {error}",
+                    memory_db_path.display()
+                )
+            })?;
+    }
     eprintln!(
         "maos: Transparency Log opened on-disk at {}",
         audit_db_path.display()
@@ -2545,6 +2600,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .into(),
                 );
             }
+            let validated_home_team = maos_domain::team::TeamId::new(&home_team)
+                .map_err(|error| format!("maos: MAOS_LOOM_HOME_TEAM is not canonical: {error}"))?;
             // The verified cohort state is safe as a tenant-map source in two
             // bounded cases: the daemon refreshes it continuously, while
             // `maos run --once` exits before the signed snapshot can age past
@@ -2594,7 +2651,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let cfg = maos_loom_lite::store::StoreConfig {
                 connection_string: conn_str,
                 home_region: home_region_str,
-                home_team,
+                home_team: home_team.clone(),
                 ..Default::default()
             };
             match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
@@ -2623,6 +2680,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Err(e) = store.init_schema().await {
                         return Err(format!("maos: loom-lite schema init failed: {e}").into());
                     } else {
+                        maos_bin::tenant_map::reconcile_tenant_audit_path(
+                            &audit_db_path,
+                            &validated_home_team,
+                        )
+                        .map_err(|error| {
+                            format!("maos: tenant Transparency Log reconciliation failed: {error}")
+                        })?;
+                        maos_bin::tenant_map::bind_tenant_audit_artifact(
+                            &audit_db_path,
+                            &validated_home_team,
+                        )
+                        .map_err(|error| {
+                            format!("maos: tenant Transparency Log binding failed: {error}")
+                        })?;
                         let adapter = Arc::new(maos_loom_lite::adapter::LoomLiteAdapter::new(
                             store,
                             tokio::runtime::Handle::current(),

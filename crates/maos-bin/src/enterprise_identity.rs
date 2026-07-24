@@ -520,9 +520,7 @@ pub fn append_identity_asserted(
 
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_WRITE
-            | OpenFlags::SQLITE_OPEN_CREATE
-            | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .map_err(AuditError::Open)?;
 
@@ -744,6 +742,28 @@ mod available_arm_tests {
             "exactly one out-of-kernel identity.asserted row MUST be persisted on a verified issuance"
         );
         assert_eq!(asserted[0].spirit_pid, 42);
+    }
+
+    #[test]
+    fn identity_asserted_does_not_mint_an_unvalidated_audit_shard() {
+        let dir = TempDir::new().expect("dir");
+        let unvalidated = dir.path().join("teams/security/transparency.sqlite");
+        std::fs::create_dir_all(unvalidated.parent().unwrap()).expect("team directory");
+
+        assert!(append_identity_asserted(
+            &unvalidated,
+            7,
+            11,
+            "subject",
+            "issuer",
+            "capability",
+            1,
+        )
+        .is_err());
+        assert!(
+            !unvalidated.exists(),
+            "the raw kind-30 writer must not create an unvalidated team shard"
+        );
     }
 
     #[test]

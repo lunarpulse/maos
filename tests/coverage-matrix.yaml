@@ -1093,12 +1093,21 @@ coverage:
       advisory pass); blocking at v1.5. The 10⁶-row corpus spans 100 batch
       boundaries at BATCH_SIZE=10_000, exercising multi-batch proven-red vectors.
   NFR-Ops-11:
-    gates: []
-    enforcement: advisory-until-engagement
+    gates:
+    - check-reza-production-path
+    enforcement: blocking-at-v2.2-team-axis
     corpora: []
-    phase: v1.0
-    valid_until: '2027-05-12'
-    notes: primitive-reservation at v1.0; full implementation v1.5+
+    phase: v2.0+
+    valid_until: '2027-07-23'
+    notes: |
+      Story 13.5e serves the team axis: per-team physical Transparency Log
+      artifacts, post-assignment path/sidecar reconciliation, scoped recall,
+      wrong-team backup refusal, and two-log correlation. The live Postgres
+      Stage-2 leg is AdvisorySubstrate and reports WOULD-HAVE-BLOCKED when absent.
+      Full NFR-Ops-11 remains open for per-operator namespace, capability-token
+      signing keys, and GDPR-erasure scope. SQLite cryptographic integrity is
+      explicitly absent; inverters are 11.4b (escape anomaly) and 13.5b
+      (collective erase/legal-hold fan-out).
   NFR-Ops-12:
     gates: []
     enforcement: advisory-until-engagement
@@ -1155,11 +1164,18 @@ coverage:
     phase: v0.3
     valid_until: '2027-05-12'
   NFR-Ops-9:
-    gates: []
-    enforcement: advisory-until-engagement
+    gates:
+    - check-reza-production-path
+    enforcement: advisory-rpo-rto-with-blocking-team-boundary
     corpora: []
     phase: v1.0
-    valid_until: '2027-05-12'
+    valid_until: '2027-07-23'
+    notes: |
+      Story 13.5e fans backup operations from one Host artifact to N team
+      artifacts. The blocking leg proves team provenance, one-team round-trip,
+      no cross-team row leakage, and wrong-team restore refusal. Fleet-wide
+      manifest-team enumeration plus the RPO ≤1h / RTO ≤4h schedule remains an
+      operator obligation and is not claimed by this hermetic leg.
   NFR-Perf-1:
     gates: [check-j4-latency]
     corpora: []

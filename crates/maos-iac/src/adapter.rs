@@ -36,7 +36,8 @@ pub use mailbox_stub::MailboxStub;
 pub use metrics::IacRtMetrics;
 pub use redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
 pub use transparency_log::{
-    AuditError, FrameFilter, FrameKind, TransparencyLogAdapter, TransparencyLogEntry,
+    reconcile_correlated_frames, AuditError, FrameFilter, FrameKind, TeamTransparencyLogEntry,
+    TransparencyLogAdapter, TransparencyLogEntry,
 };
 
 /// Adapter for the IAC Bus port trait.

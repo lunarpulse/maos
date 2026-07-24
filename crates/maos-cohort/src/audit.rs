@@ -87,7 +87,12 @@ impl CohortTransparencyLogSink {
 
 impl CohortAuditSink for CohortTransparencyLogSink {
     fn append(&self, event: &CohortAuditEvent) -> Result<(), CohortError> {
-        let (intent, payload) = match event {
+        // Story 13-5f: a cross-team digest action carries its `request_id` as the
+        // stable correlation ID onto BOTH team logs (target admits the read,
+        // requester records the reply), so a reader holding both physical
+        // artifacts can reconcile the two halves (AC3 end-to-end). Non-digest
+        // lifecycle events keep a NULL correlation.
+        let (intent, payload, correlation): (&str, String, Option<&str>) = match event {
             CohortAuditEvent::AuthorityReissueIssued {
                 cohort_id,
                 version,
@@ -98,6 +103,7 @@ impl CohortAuditSink for CohortTransparencyLogSink {
                     "{{\"event\":\"authority_reissue_issued\",\"cohort_id\":{cohort_id:?},\"version\":{version},\"canonical_hash\":\"{}\"}}",
                     hex::encode(canonical_hash)
                 ),
+                None,
             ),
             CohortAuditEvent::MemberReissueAccepted {
                 cohort_id,
@@ -109,6 +115,7 @@ impl CohortAuditSink for CohortTransparencyLogSink {
                     "{{\"event\":\"member_reissue_accepted\",\"cohort_id\":{cohort_id:?},\"version\":{version},\"canonical_hash\":\"{}\"}}",
                     hex::encode(canonical_hash)
                 ),
+                None,
             ),
             CohortAuditEvent::ReissueRejected {
                 cohort_id,
@@ -120,6 +127,7 @@ impl CohortAuditSink for CohortTransparencyLogSink {
                 format!(
                     "{{\"event\":\"reissue_rejected\",\"cohort_id\":{cohort_id:?},\"seen_version\":{seen_version},\"rejected_version\":{rejected_version},\"reason\":{reason:?}}}"
                 ),
+                None,
             ),
             CohortAuditEvent::DigestReadRequested {
                 requester,
@@ -130,22 +138,39 @@ impl CohortAuditSink for CohortTransparencyLogSink {
                 format!(
                     "{{\"event\":\"digest_read_requested\",\"requester\":{requester:?},\"request_id\":{request_id:?},\"scope\":{scope:?}}}"
                 ),
+                Some(request_id.as_str()),
             ),
             CohortAuditEvent::DigestReplyReceived { member, request_id } => (
                 "cohort:digest-audit",
                 format!(
                     "{{\"event\":\"digest_reply_received\",\"member\":{member:?},\"request_id\":{request_id:?}}}"
                 ),
+                Some(request_id.as_str()),
             ),
         };
-        self.log.insert_frame_event(
-            FrameKind::TelemetryEvent,
-            0,
-            None,
-            intent,
-            payload.as_bytes(),
-            FrameOrigin::Kernel,
-        );
+        match correlation {
+            Some(correlation_id) => {
+                self.log.insert_frame_event_with_correlation(
+                    FrameKind::TelemetryEvent,
+                    0,
+                    None,
+                    correlation_id,
+                    intent,
+                    payload.as_bytes(),
+                    FrameOrigin::Kernel,
+                );
+            }
+            None => {
+                self.log.insert_frame_event(
+                    FrameKind::TelemetryEvent,
+                    0,
+                    None,
+                    intent,
+                    payload.as_bytes(),
+                    FrameOrigin::Kernel,
+                );
+            }
+        }
         Ok(())
     }
 }
@@ -154,7 +179,9 @@ impl CohortAuditSink for CohortTransparencyLogSink {
 mod tests {
     use std::sync::Arc;
 
-    use maos_iac::adapter::TransparencyLogAdapter;
+    use maos_domain::team::TeamId;
+
+    use maos_iac::adapter::{reconcile_correlated_frames, TransparencyLogAdapter};
 
     use super::*;
 
@@ -172,5 +199,65 @@ mod tests {
         .unwrap();
 
         assert_ne!(log.last_frame_id(), [0; 16]);
+    }
+    #[test]
+    fn digest_cross_team_action_correlates_via_request_id() {
+        // 13-5f proven-red: a cross-team digest action writes the SAME request_id
+        // as the correlation_id on BOTH team logs, so reconcile_correlated_frames
+        // re-joins them; a NULL-correlation row (a non-digest event) is excluded.
+        let target = Arc::new(TransparencyLogAdapter::open_in_memory(1));
+        let requester = Arc::new(TransparencyLogAdapter::open_in_memory(2));
+        let target_sink = CohortTransparencyLogSink::new(Arc::clone(&target));
+        let requester_sink = CohortTransparencyLogSink::new(Arc::clone(&requester));
+
+        target_sink
+            .append(&CohortAuditEvent::DigestReadRequested {
+                requester: "support".into(),
+                request_id: "req-42".into(),
+                scope: "daily".into(),
+            })
+            .unwrap();
+        requester_sink
+            .append(&CohortAuditEvent::DigestReplyReceived {
+                member: "security".into(),
+                request_id: "req-42".into(),
+            })
+            .unwrap();
+
+        let security = TeamId::new("security").unwrap();
+        let support = TeamId::new("support").unwrap();
+        let reconciled =
+            reconcile_correlated_frames(&[(&security, &target), (&support, &requester)], "req-42")
+                .unwrap();
+        assert_eq!(
+            reconciled.len(),
+            2,
+            "both halves of the cross-team action reconcile by request_id"
+        );
+
+        // A wrong correlation_id reconciles nothing.
+        assert!(reconcile_correlated_frames(
+            &[(&security, &target), (&support, &requester)],
+            "req-OTHER"
+        )
+        .unwrap()
+        .is_empty());
+
+        // A NULL-correlation row (a non-digest event) cannot participate.
+        target_sink
+            .append(&CohortAuditEvent::AuthorityReissueIssued {
+                cohort_id: "c".into(),
+                version: 1,
+                canonical_hash: [0u8; 32],
+            })
+            .unwrap();
+        let after_null =
+            reconcile_correlated_frames(&[(&security, &target), (&support, &requester)], "req-42")
+                .unwrap();
+        assert_eq!(
+            after_null.len(),
+            2,
+            "the NULL-correlation reissue row must be excluded"
+        );
     }
 }

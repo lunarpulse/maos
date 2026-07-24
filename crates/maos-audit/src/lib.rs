@@ -184,7 +184,9 @@ fn resolve_kind_filter(kind_str: &str) -> Option<Vec<i64>> {
 pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, AuditError> {
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(AuditError::Open)?;
 
@@ -356,7 +358,9 @@ pub fn query_with_redaction(
 
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(AuditError::Open)?;
     let mut sql = String::from(
@@ -528,7 +532,9 @@ pub fn load_ratification_frames(db_path: &Path) -> Result<Vec<RatificationFrame>
 
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(AuditError::Open)?;
 
@@ -883,6 +889,106 @@ pub fn default_transparency_log_path() -> std::path::PathBuf {
         .join("transparency.sqlite")
 }
 
+/// Resolve the physical Transparency Log artifact for one canonical team.
+///
+/// The default path remains the untenanted/global artifact. Tenant logs retain
+/// its file name but live under `teams/<team>/`, so an explicit
+/// `MAOS_AUDIT_DB` override still controls the storage root without collapsing
+/// multiple teams into one SQLite file.
+pub fn transparency_log_path_for_team(team: &maos_domain::team::TeamId) -> std::path::PathBuf {
+    let default = default_transparency_log_path();
+    let file_name = default
+        .file_name()
+        .unwrap_or_else(|| std::ffi::OsStr::new("transparency.sqlite"));
+    default
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("teams")
+        .join(team.as_str())
+        .join(file_name)
+}
+
+/// Resolve the runtime Transparency Log path from explicit tenancy inputs.
+///
+/// A team becomes a routing operand only when the collective tier is active.
+/// Missing or empty team input preserves the byte-identical global path; a
+/// present but non-canonical team fails closed.
+pub fn transparency_log_path_for_tenant_mode(
+    collective_configured: bool,
+    home_team: Option<&str>,
+) -> Result<std::path::PathBuf, maos_domain::team::TeamIdError> {
+    let Some(home_team) = home_team.filter(|value| !value.trim().is_empty()) else {
+        return Ok(default_transparency_log_path());
+    };
+    if !collective_configured {
+        return Ok(default_transparency_log_path());
+    }
+    let team = maos_domain::team::TeamId::new(home_team)?;
+    Ok(transparency_log_path_for_team(&team))
+}
+
+/// Reject a Transparency Log path whose file or any existing ancestor is a
+/// symbolic link.
+///
+/// Physical file-per-team isolation is not preserved if `teams/<team>` aliases
+/// another team's directory. Missing components are valid before first boot;
+/// callers may create them only after this check succeeds.
+pub fn validate_transparency_log_path(path: &std::path::Path) -> std::io::Result<()> {
+    for candidate in path.ancestors() {
+        match std::fs::symlink_metadata(candidate) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    format!(
+                        "Transparency Log path contains symbolic link: {}",
+                        candidate.display()
+                    ),
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
+/// Sidecar carrying the manifest-validated team bound to one physical TL.
+pub fn transparency_log_team_binding_path(path: &std::path::Path) -> std::path::PathBuf {
+    let mut binding = path.as_os_str().to_os_string();
+    binding.push(".team");
+    binding.into()
+}
+
+/// Validate a previously bound team artifact without mutating it.
+pub fn validate_transparency_log_team_binding(
+    path: &std::path::Path,
+    expected_team: &maos_domain::team::TeamId,
+) -> std::io::Result<()> {
+    let binding_path = transparency_log_team_binding_path(path);
+    validate_transparency_log_path(&binding_path)?;
+    let raw = std::fs::read_to_string(&binding_path)?;
+    let actual = maos_domain::team::TeamId::new(raw.trim()).map_err(|error| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "Transparency Log team binding {} is invalid: {error}",
+                binding_path.display()
+            ),
+        )
+    })?;
+    if &actual != expected_team {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "Transparency Log artifact team mismatch: expected {}, found {}",
+                expected_team, actual
+            ),
+        ));
+    }
+    Ok(())
+}
+
 /// Resolve the default Lifecycle Journal NDJSON path.
 ///
 /// Shared by `maos-bin` (write side — lifecycle verbs in the
@@ -1118,7 +1224,9 @@ pub fn resolve_spirit_name(
         }
         let conn = rusqlite::Connection::open_with_flags(
             db_path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
         .map_err(|e| format!("failed to open TL: {e}"))?;
         let mut stmt = conn
@@ -1161,7 +1269,9 @@ pub fn resolve_spirit_name(
 
         let conn = rusqlite::Connection::open_with_flags(
             db_path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
         .map_err(|e| format!("failed to open TL: {e}"))?;
 
@@ -1237,7 +1347,9 @@ pub fn subject_access_query(
 ) -> Result<Vec<PrincipalIndexEntry>, AuditError> {
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(AuditError::Open)?;
 
@@ -1302,7 +1414,9 @@ pub fn enrich_subject_access(
 ) -> Result<Vec<SubjectAccessEntry>, AuditError> {
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(AuditError::Open)?;
 
@@ -1531,6 +1645,138 @@ fn resolve_isolation_corpus_root_from_env_internal(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn team_transparency_log_paths_are_physically_distinct() {
+        let security = maos_domain::team::TeamId::new("security").unwrap();
+        let support = maos_domain::team::TeamId::new("support").unwrap();
+        let default = default_transparency_log_path();
+        let security_path = transparency_log_path_for_team(&security);
+        let support_path = transparency_log_path_for_team(&support);
+
+        assert_ne!(security_path, support_path);
+        assert_ne!(security_path, default);
+        assert_eq!(security_path.file_name(), default.file_name());
+        assert!(security_path
+            .components()
+            .any(|component| component.as_os_str() == "security"));
+        assert!(support_path
+            .components()
+            .any(|component| component.as_os_str() == "support"));
+    }
+
+    #[test]
+    fn tenant_mode_path_shards_only_when_both_inputs_are_present() {
+        let default = default_transparency_log_path();
+        assert_eq!(
+            transparency_log_path_for_tenant_mode(false, Some("security")).unwrap(),
+            default
+        );
+        assert_eq!(
+            transparency_log_path_for_tenant_mode(true, None).unwrap(),
+            default
+        );
+        assert_eq!(
+            transparency_log_path_for_tenant_mode(true, Some("")).unwrap(),
+            default
+        );
+        assert_ne!(
+            transparency_log_path_for_tenant_mode(true, Some("security")).unwrap(),
+            default
+        );
+        assert!(transparency_log_path_for_tenant_mode(true, Some("SECURITY")).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tenant_transparency_log_adversarial_paths_fail_closed() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::TempDir::new().unwrap();
+        let teams = dir.path().join("teams");
+        let outside = dir.path().join("outside");
+        std::fs::create_dir_all(&teams).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        symlink(&outside, teams.join("security")).unwrap();
+        let aliased = teams.join("security/transparency.sqlite");
+
+        let error = validate_transparency_log_path(&aliased).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+        assert!(error.to_string().contains("symbolic link"));
+        assert!(validate_transparency_log_path(&teams.join("support/transparency.sqlite")).is_ok());
+        for invalid in ["../support", "Security", "sécurité", "security/../support"] {
+            assert!(
+                maos_domain::team::TeamId::new(invalid).is_err(),
+                "non-canonical team {invalid:?} must not become a path component"
+            );
+        }
+        assert_eq!(
+            transparency_log_path_for_tenant_mode(false, Some("security")).unwrap(),
+            default_transparency_log_path(),
+            "a partial tenancy environment must not silently select a shard"
+        );
+
+        let renamed = teams.join("support/transparency.sqlite");
+        std::fs::create_dir_all(renamed.parent().unwrap()).unwrap();
+        std::fs::write(&renamed, b"sqlite-placeholder").unwrap();
+        std::fs::write(transparency_log_team_binding_path(&renamed), "security").unwrap();
+        let support = maos_domain::team::TeamId::new("support").unwrap();
+        assert!(
+            validate_transparency_log_team_binding(&renamed, &support).is_err(),
+            "renaming a foreign shard into the expected path must refuse"
+        );
+    }
+
+    #[test]
+    fn tenant_binding_refuses_missing_or_foreign_artifacts() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("transparency.sqlite");
+        std::fs::write(&path, b"sqlite-placeholder").unwrap();
+        let security = maos_domain::team::TeamId::new("security").unwrap();
+        let support = maos_domain::team::TeamId::new("support").unwrap();
+
+        assert!(validate_transparency_log_team_binding(&path, &security).is_err());
+        std::fs::write(transparency_log_team_binding_path(&path), security.as_str()).unwrap();
+        validate_transparency_log_team_binding(&path, &security).unwrap();
+        assert!(validate_transparency_log_team_binding(&path, &support).is_err());
+    }
+
+    #[test]
+    fn tenant_audit_tamper_residual_is_not_misreported_as_integrity() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("transparency.sqlite");
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                from_spirit_id TEXT NOT NULL DEFAULT '',
+                to_spirit_id TEXT NOT NULL DEFAULT '',
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                correlation_id TEXT,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );
+            INSERT INTO transparency_log VALUES (
+                X'01010101010101010101010101010101',
+                1, 7, '', '', 1, NULL, 0, 'original', NULL, X'00', 0
+            );
+            UPDATE transparency_log SET intent = 'tampered';",
+        )
+        .unwrap();
+        drop(conn);
+
+        let rows = query(&path, AuditFilter::default()).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].intent, "tampered",
+            "Story 13.5e must report the open cryptographic integrity residual honestly"
+        );
+    }
 
     #[test]
     fn run_capture_kind_round_trips() {

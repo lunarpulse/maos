@@ -3138,13 +3138,44 @@ fn sort_value_with_depth_limit(
     )?))
 }
 
-/// Resolve the default Transparency Log SQLite path.
+/// Resolve the tenancy-aware Transparency Log SQLite path.
 ///
-/// Delegates to [`maos_audit::default_transparency_log_path`] — the single
-/// source of truth shared by `maos-bin` (write side) and `maos-cli` (read
-/// side) to prevent path-drift data loss.
+/// Tenant routing is explicit: only an active collective tier plus a
+/// non-empty canonical home team selects a shard. Untenanted commands retain
+/// the historical global path.
 fn default_transparency_log_path() -> PathBuf {
-    maos_audit::default_transparency_log_path()
+    let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").ok();
+    let collective_configured = std::env::var_os("MAOS_LOOM_POSTGRES").is_some();
+    let path = maos_audit::transparency_log_path_for_tenant_mode(
+        collective_configured,
+        home_team.as_deref(),
+    )
+    .unwrap_or_else(|error| {
+        eprintln!("maosctl: invalid tenant Transparency Log path: {error}");
+        std::process::exit(2);
+    });
+    maos_audit::validate_transparency_log_path(&path).unwrap_or_else(|error| {
+        eprintln!("maosctl: unsafe tenant Transparency Log path: {error}");
+        std::process::exit(2);
+    });
+    if collective_configured {
+        if let Some(team) = home_team
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            let team = maos_domain::team::TeamId::new(team).unwrap_or_else(|error| {
+                eprintln!("maosctl: invalid tenant Transparency Log team: {error}");
+                std::process::exit(2);
+            });
+            maos_audit::validate_transparency_log_team_binding(&path, &team).unwrap_or_else(
+                |error| {
+                    eprintln!("maosctl: unbound tenant Transparency Log artifact: {error}");
+                    std::process::exit(2);
+                },
+            );
+        }
+    }
+    path
 }
 
 // ─── FR64: Cost Reconcile ──────────────────────────────────────────────
@@ -3911,6 +3942,10 @@ mod tests {
         assert!(
             err.contains("Transparency Log"),
             "absent TL must fail closed with a clear message: {err}"
+        );
+        assert!(
+            !db_path.exists(),
+            "the raw kind-31 writer must not create an absent team shard"
         );
     }
 

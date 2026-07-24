@@ -239,7 +239,7 @@
 - **NFR-Ops-8:** Trust-anchor framing carry-forward decision. Published ADR by v0.3 declaring which competitive framing is committed (substrate-as-substrate vs substrate-as-trust-anchor); absence = v0.3 release-block. v0.3.
 - **NFR-Ops-9:** Transparency Log backup/DR. RPO ≤ 1h, RTO ≤ 4h, backup integrity verified weekly via Merkle-root cross-check. v1.0.
 - **NFR-Ops-10:** Database migration test corpus. SQLite→Postgres at v1.5. Floor: forward-migration test on 10⁶-row corpus, byte-identical Merkle-root preservation post-migration, rollback path tested. v1.4 (gates v1.5).
-- **NFR-Ops-11:** Multi-operator tenancy isolation — primitive-reservation only at v1.0 (declared as primitive-reserved in namespace grammar so v0.5 grammar lock doesn't paint us into a corner; full implementation v1.5+). Per-operator namespace, per-operator transparency-log shard, per-operator capability-token signing key, per-operator GDPR-erasure scope. v1.0 (reserved); v1.5+ (implemented).
+- **NFR-Ops-11:** Multi-operator tenancy isolation — primitive-reservation only at v1.0. Story 13.5e serves the **team-axis** Transparency Log boundary at v2.2: per-team physical audit artifacts, manifest-reconciled binding, scoped recall, and wrong-team backup refusal. Full per-operator namespace, per-operator capability-token signing key, and per-operator GDPR-erasure scope remain deferred; the complete NFR is not closed. v1.0 (reserved); v2.2 (team axis); post-v2.2 (operator axes).
 - **NFR-Ops-12:** Air-gapped deployment validation. Substrate boots, runs, produces transparency-log entries with zero outbound network calls; structural test in CI via network-namespace isolation; documented Spirit-author guidance for air-gapped capability tokens. v1.0.
 
 ### Compliance & Regulatory (5 NFRs)
@@ -511,7 +511,7 @@ The v2.2 phase (Epics 12–14) closes the residual PRD surface so **every FR has
 | Requirement | Was | v2.2 home |
 |---|---|---|
 | FR37 vetting attestation (internal-vetter machinery) | deferred v1.0→v2.5 | **E13.4** (ADR-056); external accredited vetters → v2.5 |
-| NFR-Ops-11 multi-operator tenancy (full impl) | "v1.5+ implemented" (metric-false) | **E13.1 + E13.5b + E13.5c** — physical store ownership, collective erasure/hold scope, production path, per-team/per-operator TL isolation |
+| NFR-Ops-11 multi-operator tenancy | "v1.5+ implemented" (metric-false) | **Team axis only: E13.1 + E13.5e** — physical store ownership and per-team TL artifact. Operator namespace/signing-key axes remain deferred; collective erase/hold fan-out remains E13.5b. |
 | NFR-Tenancy-1 multi-tenant | single-tenant through v2.0 | **E13.1 + E13.2 + E13.5b + E13.5c** — physical + crypto wall, lifecycle ownership, reachable tenant/audit path |
 | NFR-Scale-5 14-institution Cortex envelope | v2.5 → retagged v2.2 | **E13.6** — measured capacity envelope only; not a claim that 14 institutions executed |
 | NFR-Scale-2 100-host (second half) | v2.5 → retagged v2.2 | **E14.1** |

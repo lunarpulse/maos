@@ -675,6 +675,7 @@ fn tenant_mode_boots_on_live_substrate() {
     psql_scalar(&wrong_conn, clear_probe).expect("clear team B readiness row");
 
     let fixture = fixture("live");
+    let tenant_audit_db = fixture.dir.join("teams/team-a/transparency.sqlite");
     let mut cmd = maos_command(&fixture);
     cmd.env("MAOS_ONE_SHOT", "cohort-a2a-daemon")
         .env("MAOS_COHORT_DAEMON_CONFIG", &fixture.config_path)
@@ -699,7 +700,7 @@ fn tenant_mode_boots_on_live_substrate() {
         route_ok,
         "real Researcher --once route failed:\n{route_stderr}"
     );
-    let (audit_pid, audit_token, audit_payload) = tl_collective_invocation(&fixture.audit_db);
+    let (audit_pid, audit_token, audit_payload) = tl_collective_invocation(&tenant_audit_db);
     assert_eq!(
         audit_token.len(),
         32,

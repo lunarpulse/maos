@@ -76,9 +76,9 @@ Story 13.1 has no cross-team read path, and Story 13.2 closes the forgery at bun
 ## Carried security debt
 
 - **F16 / Story 13.5b — collective cascade gap:** `CollectiveMemoryPort` still has no delete/legal-hold surface and kernel forget does not reach Collective memory. No GDPR cascade claim is permitted.
-- **F14 / Story 13.5c — Transparency Log shard gap:** tenant-specific refusal audit and per-operator TL isolation are absent below the store port. Current typed refusals are not durable tenant evidence.
-- **Story 13.5c — production routing gap:** the cohort refresh loop and Loom store live in parallel composition roots; production Spirit→team-store routing is not shipped.
+- **F14 / Story 13.5e — team-axis Transparency Log boundary:** per-team physical artifacts, manifest-reconciled sidecar binding, scoped recall, correlation, and wrong-team backup refusal are shipped. SQLite cryptographic integrity remains absent; escape-anomaly wiring is Story 11.4b and collective erase/legal-hold fan-out is Story 13.5b.
+- **Story 13.5d — production routing residual:** the first-party Spirit→team-store route is shipped; cross-team replication still has no production initiator.
 - **Story 13.3 — error taxonomy gap:** tenant refusals are consciously compressed to `CollectivePortError::Transport(reason)` at the existing port boundary.
 - **Story 13.6 — journey gap:** no three-team Reza product flow is claimed by the mechanism gate.
 
-These are explicit ABSENT declarations in `check-multi-tenant-loom`, not silent follow-up assumptions.
+These are explicit residual declarations in `check-reza-production-path`, not silent follow-up assumptions.

@@ -297,6 +297,7 @@ impl LogRecallPort for LogRecallAdapter {
             spirit_pid: Some(spirit_pid), // emitter-scope at v0.3-β
             frame_id: None,
             kind: kind_filter,
+            correlation_id: None,
             since_ns: filter.since_ns,
             until_ns: filter.until_ns,
             limit: Some(

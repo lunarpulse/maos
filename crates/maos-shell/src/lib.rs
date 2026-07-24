@@ -20,6 +20,26 @@ use maos_kernel_core::capability::CapabilityRegistryPort;
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
 
+fn transparency_log_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").ok();
+    let collective_configured = std::env::var_os("MAOS_LOOM_POSTGRES").is_some();
+    let path = maos_audit::transparency_log_path_for_tenant_mode(
+        collective_configured,
+        home_team.as_deref(),
+    )?;
+    maos_audit::validate_transparency_log_path(&path)?;
+    if collective_configured {
+        if let Some(team) = home_team
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            let team = maos_domain::team::TeamId::new(team)?;
+            maos_audit::validate_transparency_log_team_binding(&path, &team)?;
+        }
+    }
+    Ok(path)
+}
+
 /// Run `maos init` — scaffold `~/.maos/` if absent.
 ///
 /// Idempotent: re-running prints "already initialized" and exits 0.
@@ -87,7 +107,7 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
             config_path.display()
         ),
     );
-    let audit_path = maos_audit::default_transparency_log_path();
+    let audit_path = transparency_log_path()?;
     print_line(
         color_choice,
         &format!("maos: Transparency Log will be at {}", audit_path.display()),
@@ -105,7 +125,7 @@ pub fn run_audit_query(
     format: &str,
     _color_choice: ColorChoice, // Accepts caller's NO_COLOR intent; library functions emit no ANSI regardless.
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let db_path = maos_audit::default_transparency_log_path();
+    let db_path = transparency_log_path()?;
     if !db_path.exists() {
         eprintln!("maos: no Transparency Log found at {}", db_path.display());
         return Err("audit log not found".into());

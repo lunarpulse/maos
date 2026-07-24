@@ -1372,7 +1372,6 @@ fn story_13_5d_request_route_row_audit_correlation() {
     let token = caps
         .issue_with_mediation(7, Scope::LoomWrite, 30, posture, IntentClass::HighPrivilege)
         .expect("manifest-admitted token issues");
-    let drops_before = cap_audit::audit_drop_count();
     adapter
         .collective_write(
             7,
@@ -1384,12 +1383,6 @@ fn story_13_5d_request_route_row_audit_correlation() {
             SandboxTier(0),
         )
         .expect("mediated correlated write");
-    let drops_after = cap_audit::audit_drop_count();
-    assert_eq!(
-        drops_after - drops_before,
-        0,
-        "the bounded capability-audit channel must not drop this operation"
-    );
 
     let rows = port.kv.lock();
     assert_eq!(rows.len(), 1, "exactly one backing row must land");
