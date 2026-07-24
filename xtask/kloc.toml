@@ -130,9 +130,9 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 30600   # Story 13.4 re-baseline 2026-07-23: 30350→30600 (measured 30_520 — adds the check-vetting-attestation gate: 7 anti-null legs incl. forged-vetter-key)
+xtask = 30750   # Story 13.5e re-baseline 2026-07-24: 30600→30750 (measured 30_652 — check-reza-production-path tenant-audit legs); 13.4: 30350→30600 (check-vetting-attestation gate)
 # Story 6.5 — Phase 1 extraction
-maos-iac = 6200   # Epic-13 retro 2026-07-22: 5800→6200 (measured 6_118)
+maos-iac = 6450   # Story 13.5e re-baseline 2026-07-24: 6200→6450 (measured 6_375 — transparency_log tenant-isolated recall/composition); Epic-13 retro 2026-07-22: 5800→6200 (measured 6_118)
 maos-manifest = 4250   # Epic-13 retro 2026-07-22: 4150→4250 (measured 4_157)
 
 # Story 1a.1 — 13 new crate stubs
@@ -181,8 +181,8 @@ maos-persistence = 2000
 maos-secrets = 1000
 maos-compliance = 2050   # Story 13.4 re-baseline 2026-07-23: 2000→2050 (measured 2_017 — NEW vetting module: mod+attestation+keyring+terminal, FR37 4 verbs)
 maos-control = 1500
-maos-cli = 4300   # Story 13.4 re-baseline 2026-07-23: 4200→4300 (measured 4_228 — `vet` subcommand + flags); Epic-13 retro 2026-07-22: 3750→4200 (measured 4_119)
-maos-bin = 12500   # Story 13.4 re-baseline 2026-07-23: 12400→12500 (measured 12_422 — `maosctl vet` composition-root wiring); Epic-13 retro 2026-07-22: 11100→12400 (measured 12_298)
+maos-cli = 4550   # Story 13.5e re-baseline 2026-07-24: 4300→4550 (measured 4_489 — tenant-scoped backup/export subcommands); 13.4: 4200→4300 (`vet` subcommand); Epic-13 retro 2026-07-22: 3750→4200
+maos-bin = 12700   # Story 13.5e re-baseline 2026-07-24: 12500→12700 (measured 12_604 — tenant_map.rs + audit-route wiring); 13.4: 12400→12500 (`maosctl vet` wiring); Epic-13 retro 2026-07-22: 11100→12400
 maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
 
 # -----------------------------------------------------------------------------
@@ -253,9 +253,28 @@ maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness re
 # governance gap, not introduced by 13.4 — FLAG for the Epic-13 retrospective:
 # assign per-crate ceilings to the unlisted production crates so the aggregate
 # stops silently absorbing multi-KLOC growth. NOT fixed here (retro-scoped).
+# -----------------------------------------------------------------------------
+# Story 13.5e tenant-audit-isolation re-baseline (2026-07-24) — NFR-Ops-11
+# -----------------------------------------------------------------------------
+# Story 13.5e (commit 2e0244fa) landed tenant-isolated audit (per-team TL recall +
+# 2-stage datname sharding + tenant_map + tenant-scoped backup/export). Four LISTED
+# crates + the aggregate breached again — the THIRD consecutive story (CI-repair,
+# 13.4, 13.5e) to breach kloc-at-"done". PROCESS FLAG for the Epic-13 retro: the
+# dev "gates green" task is not running/re-basing kloc-check before marking done.
+# Per the established process (tight measured residual, documented driver):
+#
+#   crate            prev     measured  new ceiling  driver
+#   maos-bin         12500    12604     12700        tenant_map.rs + audit-route wiring
+#   maos-cli         4300     4489      4550         tenant-scoped backup/export subcommands
+#   maos-iac         6200     6375      6450         transparency_log tenant-isolated recall
+#   xtask            30600    30652     30750        check-reza-production-path tenant legs
+#   _aggregate       131000   131502    132000       + unlisted maos-audit (+260) & maos-cohort (+107)
+#
+# The unlisted-crate gap (block above) is re-confirmed: maos-audit and maos-cohort
+# absorbed ~370 with no per-crate ceiling. Still retro-scoped.
 
 _aggregate_alarm = 16000
-_aggregate_hardfail = 131000  # Story 13.4 re-baseline 2026-07-23: 128500→131000 (measured aggregate 130_276 — vetting machinery + F2 admission-promotion in unlisted maos-registry; see block above)
+_aggregate_hardfail = 132000  # Story 13.5e re-baseline 2026-07-24: 131000→132000 (measured aggregate 131_502 — tenant-audit isolation + unlisted maos-audit/maos-cohort growth; see block above)
 
 # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
 # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a
