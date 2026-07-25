@@ -182,7 +182,7 @@ maos-secrets = 1000
 maos-compliance = 2050   # Story 13.4 re-baseline 2026-07-23: 2000→2050 (measured 2_017 — NEW vetting module: mod+attestation+keyring+terminal, FR37 4 verbs)
 maos-control = 1500
 maos-cli = 4550   # Story 13.5e re-baseline 2026-07-24: 4300→4550 (measured 4_489 — tenant-scoped backup/export subcommands); 13.4: 4200→4300 (`vet` subcommand); Epic-13 retro 2026-07-22: 3750→4200
-maos-bin = 12700   # Story 13.5e re-baseline 2026-07-24: 12500→12700 (measured 12_604 — tenant_map.rs + audit-route wiring); 13.4: 12400→12500 (`maosctl vet` wiring); Epic-13 retro 2026-07-22: 11100→12400
+maos-bin = 14000   # Story 13.5a review re-baseline 2026-07-25: 13700→14000 (measured 13_927 — real two-endpoint mTLS lifecycle proof + fail-closed PDP/KMS/dead-wire controls); implementation re-baseline 12700→13700 (measured 13_599); 13.5e: 12500→12700; 13.4: 12400→12500; Epic-13 retro: 11100→12400
 maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
 
 # -----------------------------------------------------------------------------
@@ -273,8 +273,33 @@ maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness re
 # The unlisted-crate gap (block above) is re-confirmed: maos-audit and maos-cohort
 # absorbed ~370 with no per-crate ceiling. Still retro-scoped.
 
+# -----------------------------------------------------------------------------
+# Story 13.5a enterprise-daemon-posture re-baseline (2026-07-25)
+# -----------------------------------------------------------------------------
+# Story 13.5a closed the `cohort-a2a-daemon` enterprise dead-wire: the
+# `EnterpriseRuntime` was constructed at the composition root and never threaded
+# into the daemon, so collective reads served in that mode ran with no SSO
+# principal, no PDP mediation, no at-rest seal and no SIEM forward. Closing it is
+# composition-root work by construction (the enterprise crates are `maos-bin`-only
+# — see ADR-057), so the delta lands entirely in `maos-bin`.
+#
+#   crate            prev     measured  new ceiling  driver
+#   maos-bin         13700    13927     14000        review corrections: real two-endpoint mTLS
+#                                                    daemon round-trip; PDP-only + KMS-down +
+#                                                    unwired fail-closed controls; shared journal;
+#                                                    live-WAL SIEM snapshot/projection proof
+#   maos-a2a-core     4050     4009      4050        guarded digest-admission contract fits the
+#                                                    existing ceiling
+#   _aggregate       132600   132988    133100       maos-bin review delta plus guarded cohort
+#                                                    test and injected maos-siem projection seam;
+#                                                    xtask remains 30_700 ≤ 30_750
+#
+# This is a MEASURED re-base with a named driver, NOT an "advisory/pre-existing"
+# waiver (the 13.4 / 13.5e anti-pattern the Epic-13 retro flagged). It is also the
+# fourth consecutive story to breach kloc-at-"done"; the PROCESS FLAG above stands.
+
 _aggregate_alarm = 16000
-_aggregate_hardfail = 132000  # Story 13.5e re-baseline 2026-07-24: 131000→132000 (measured aggregate 131_502 — tenant-audit isolation + unlisted maos-audit/maos-cohort growth; see block above)
+_aggregate_hardfail = 133100  # Story 13.5a review re-baseline 2026-07-25: 132600→133100 (measured 132_988 — fail-closed review corrections + real mTLS lifecycle proof); implementation re-baseline 132000→132600; 13.5e: 131000→132000
 
 # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
 # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a

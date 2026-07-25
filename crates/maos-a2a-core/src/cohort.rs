@@ -244,14 +244,31 @@ pub trait DigestReadPort: Send + Sync {
     fn classify(&self, frame: &IacFrame) -> DigestFrameClass;
 
     /// Target side — this host just admitted a digest-read request from
-    /// `requester`. The implementation MUST durably audit before publishing
-    /// the reply capability or obligation. A failure converts the pending ACK
-    /// into a fail-closed NACK.
+    /// `requester`. The default delegates to
+    /// [`Self::note_admitted_request_guarded`] with no additional guard.
     fn note_admitted_request(
         &self,
         requester: &HostId,
         request_id: &str,
         frame: &IacFrame,
+    ) -> Result<(), String> {
+        self.note_admitted_request_guarded(requester, request_id, frame, &mut || Ok(()))
+    }
+
+    /// Atomically validate and reserve a new digest admission, run
+    /// `before_commit`, then durably publish the reply capability/obligation.
+    ///
+    /// Implementations MUST skip `before_commit` for an already-admitted
+    /// `(requester, request_id)` and MUST run it only after malformed/capacity
+    /// checks pass. A guard error publishes no admission state. This seam lets
+    /// composition-root governance perform irreversible issuance exactly once
+    /// without granting requests the underlying state will reject.
+    fn note_admitted_request_guarded(
+        &self,
+        requester: &HostId,
+        request_id: &str,
+        frame: &IacFrame,
+        before_commit: &mut dyn FnMut() -> Result<(), String>,
     ) -> Result<(), String>;
 
     /// Target side — may this host send a correlated reply tagged `request_id`
@@ -277,11 +294,12 @@ impl DigestReadPort for LegacyDigestReadPort {
     fn classify(&self, _frame: &IacFrame) -> DigestFrameClass {
         DigestFrameClass::NotDigest
     }
-    fn note_admitted_request(
+    fn note_admitted_request_guarded(
         &self,
         _requester: &HostId,
         _request_id: &str,
         _frame: &IacFrame,
+        _before_commit: &mut dyn FnMut() -> Result<(), String>,
     ) -> Result<(), String> {
         Err("digest-read correlation port is not installed".into())
     }

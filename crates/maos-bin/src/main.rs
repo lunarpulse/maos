@@ -246,6 +246,75 @@ fn issue_enterprise_governed_capability(
     Ok(token)
 }
 
+/// Story 11.4c / 13.5a — ONE SIEM export tick against a shared in-memory
+/// watermark.
+///
+/// Extracted from the inline `default-server` consumer so the
+/// `cohort-a2a-daemon` — which returns from the dispatch long before that
+/// spawn is reached — can forward through the identical code path instead of
+/// running SIEM-blind (the 13.5a dead-wire).
+///
+/// H5: the watermark is process-local and resets on restart. Callers may claim
+/// once-per-record within ONE daemon lifetime, never exactly-once across
+/// restarts.
+#[cfg(feature = "network")]
+fn forward_audit_to_siem_once(
+    runtime: &maos_bin::enterprise_identity::EnterpriseRuntime,
+    watermark: &std::sync::Mutex<Option<u64>>,
+) -> Result<usize, String> {
+    let mut watermark = watermark
+        .lock()
+        .map_err(|_| "SIEM export watermark poisoned".to_string())?;
+    let now_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
+    let mut filter = maos_audit::AuditFilter::default();
+    if let Some(since) = *watermark {
+        filter.since_ns = Some(since.saturating_add(1));
+    }
+    let forwarded = runtime
+        .forward_audit_to_siem(filter)
+        .map_err(|error| error.to_string())?;
+    *watermark = Some(now_ns);
+    Ok(forwarded)
+}
+
+/// Story 11.4c — the periodic SIEM export consumer. Periodically snapshots a
+/// live-WAL Transparency Log into a transactionally consistent quiesced copy,
+/// forwards redacted records to the configured localhost sink
+/// (`MAOS_SIEM_FILE`), and advances a serialized in-memory watermark. On
+/// sink-down the runtime surfaces a buffered + operator-visible error (never a
+/// silent drop). Network/HTTPS sinks are additive-deferred and MUST be TLS-only
+/// when introduced (ADR-051); a persistent max-ts watermark is the production
+/// follow-up.
+///
+/// Story 13.5a threads the SAME spawn into `cohort-a2a-daemon` mode.
+#[cfg(feature = "network")]
+fn spawn_siem_export_consumer(
+    runtime: Arc<maos_bin::enterprise_identity::EnterpriseRuntime>,
+    watermark: Arc<std::sync::Mutex<Option<u64>>>,
+    cancel: CancellationToken,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        interval.tick().await; // skip the immediate first tick
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = interval.tick() => {
+                    match forward_audit_to_siem_once(&runtime, &watermark) {
+                        Ok(n) if n > 0 => eprintln!(
+                            "maos: SIEM export forwarded {n} record(s) to the localhost sink (Story 11.4c)"
+                        ),
+                        Ok(_) => {}
+                        Err(e) => eprintln!(
+                            "maos: SIEM export forward failed — records buffered, operator action required: {e}"
+                        ),
+                    }
+                }
+            }
+        }
+    })
+}
+
 #[cfg(feature = "network")]
 /// YankObserver that writes `FrameKind::SpiritRevoked` rows to the
 /// Transparency Log so every propagated yank is auditable (Story 7.2).
@@ -7395,8 +7464,31 @@ description = "smoke test spirit successor"
 
         #[cfg(feature = "network")]
         if mode == "cohort-a2a-daemon" {
-            return run_cohort_a2a_daemon(Arc::clone(&transparency_log), boot_nonce, cohort_daemon)
-                .await;
+            // Story 13.5a — close the dead-wire: the `EnterpriseRuntime`
+            // constructed above never reached the daemon, so every collective
+            // read this process served ran with no SSO principal, no PDP
+            // mediation, no at-rest seal, and no SIEM forward. Build the
+            // enterprise daemon posture HERE and thread it through.
+            let enterprise_posture_required =
+                enterprise_runtime.is_some() || enterprise_pdp_runtime.is_some();
+            let enterprise_daemon_governance = build_enterprise_daemon_governance(
+                security.as_ref(),
+                &capability,
+                &transparency_log,
+                std::path::Path::new("spirits"),
+                shared_journal.as_ref(),
+                enterprise_runtime.as_ref(),
+                enterprise_pdp_runtime.as_ref(),
+                cohort_daemon.as_ref(),
+            )?;
+            return run_cohort_a2a_daemon(
+                Arc::clone(&transparency_log),
+                boot_nonce,
+                cohort_daemon,
+                enterprise_posture_required,
+                enterprise_daemon_governance,
+            )
+            .await;
         }
         // Story 8.6 AC-T13/AC-A7 — `smoke-a2a-tcp-8-6`: live cross-Host
         // Mira(host_a) → Nash(host_b) advisory over a REAL TCP/mTLS socket
@@ -7672,44 +7764,13 @@ description = "smoke test spirit successor"
         handle
     });
 
-    // Story 11.4c — SIEM export consumer. Periodically tails the (quiesced)
-    // Transparency Log read-only and forwards redacted records to the
-    // configured localhost sink (MAOS_SIEM_FILE) with a wall-clock watermark
-    // (since_ns) so each record is forwarded once. On sink-down the runtime
-    // surfaces a buffered + operator-visible error (never a silent drop).
-    // Network/HTTPS sinks are additive-deferred and MUST be TLS-only when
-    // introduced (ADR-051); a persistent max-ts watermark is the production
-    // follow-up (this v2.0 reference uses the per-tick wall clock).
+    // Story 11.4c — SIEM export consumer (see `spawn_siem_export_consumer`).
     let _siem_forward_handle = enterprise_runtime.as_ref().map(|rt| {
-        let rt = Arc::clone(rt);
-        let cancel = cancel.clone();
-        tokio::spawn(async move {
-            let mut last_forwarded_ns: Option<u64> = None;
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
-            interval.tick().await; // skip the immediate first tick
-            loop {
-                tokio::select! {
-                    _ = cancel.cancelled() => break,
-                    _ = interval.tick() => {
-                        let now_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
-                        let mut filter = maos_audit::AuditFilter::default();
-                        if let Some(since) = last_forwarded_ns {
-                            filter.since_ns = Some(since.saturating_add(1));
-                        }
-                        match rt.forward_audit_to_siem(filter) {
-                            Ok(n) if n > 0 => eprintln!(
-                                "maos: SIEM export forwarded {n} record(s) to the localhost sink (Story 11.4c)"
-                            ),
-                            Ok(_) => {}
-                            Err(e) => eprintln!(
-                                "maos: SIEM export forward failed — records buffered, operator action required: {e}"
-                            ),
-                        }
-                        last_forwarded_ns = Some(now_ns);
-                    }
-                }
-            }
-        })
+        spawn_siem_export_consumer(
+            Arc::clone(rt),
+            Arc::new(std::sync::Mutex::new(None)),
+            cancel.clone(),
+        )
     });
     if enterprise_runtime.is_some() {
         eprintln!("maos: SIEM export consumer spawned (Story 11.4c)");
@@ -8479,20 +8540,395 @@ fn load_cohort_daemon_bootstrap(
     })
 }
 
+/// Story 13.5a — the `cohort-a2a-daemon` control-Spirit pid.
+///
+/// The composition-root convention for a single-Spirit admission (the same pid
+/// `main.rs` already admits and issues under on the one-shot / `spirit-spawn`
+/// arms). H4: enterprise PDP subject-deny binds per-`spirit_pid`, so with one
+/// control pid the daemon posture is governed as ONE subject — per daemon, not
+/// per tenant Spirit.
+#[cfg(feature = "network")]
+const DAEMON_CONTROL_SPIRIT_PID: u32 = 0;
+
+/// Story 13.5a — TTL for the capability minted per governed collective read
+/// served by the daemon. Short-lived: the token authorizes exactly the digest
+/// read being admitted, and nothing outlives the admit.
+#[cfg(feature = "network")]
+const DAEMON_GOVERNED_READ_TTL_SECS: u32 = 60;
+
+/// Story 13.5a — the enterprise-governed daemon **posture**.
+///
+/// NOT a Spirit and NOT a Spirit crate (AC2): the enterprise subsystems live
+/// behind `maos-bin`-only dependencies, so no Spirit can compose them. This is
+/// the already-composed `EnterpriseRuntime` + `EnterprisePdpRuntime` +
+/// collective-store at-rest seal, bound to ONE admitted control-Spirit pid and
+/// applied at the daemon's collective-operation seam.
+#[cfg(feature = "network")]
+struct EnterpriseDaemonGovernance {
+    capability: Arc<CapabilityRegistryAdapter>,
+    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    /// The collective store's at-rest sealer — built from the SAME
+    /// `EnterpriseRuntime::at_rest_seal_hook()` `Arc` closure installed on
+    /// `LoomLiteStore` at the composition root, held in the SAME
+    /// `AtRestSealer` wrapper `LoomLiteStore::with_at_rest_seal` uses, so the
+    /// seal, its fail-closed error semantics, and its
+    /// `None`-means-byte-identical-plaintext posture are the store's.
+    at_rest: maos_loom_lite::seal::AtRestSealer,
+    transparency_log: Arc<maos_iac::TransparencyLogAdapter>,
+    control_spirit: String,
+    spirit_pid: u32,
+    siem_watermark: Arc<std::sync::Mutex<Option<u64>>>,
+}
+
+#[cfg(feature = "network")]
+impl EnterpriseDaemonGovernance {
+    /// Run the full enterprise chain for ONE collective operation served by the
+    /// daemon: **SSO principal → Enterprise PDP → kernel mint →
+    /// `identity.asserted` persist → at-rest seal → SIEM forward**.
+    ///
+    /// Every stage is the production implementation, reused not re-implemented:
+    /// the first four are `issue_enterprise_governed_capability`, the fifth is
+    /// the collective store's at-rest hook, the sixth is the same
+    /// `forward_audit_to_siem` tick the export consumer runs.
+    ///
+    /// Fails CLOSED at every stage — the caller turns an `Err` into a NACK, so
+    /// an ungovernable collective read is refused, never silently served.
+    fn govern_collective_read(&self, requester: &str, request_id: &str) -> Result<(), String> {
+        let token = issue_enterprise_governed_capability(
+            self.capability.as_ref(),
+            self.enterprise_runtime.as_deref(),
+            self.enterprise_pdp_runtime.as_ref(),
+            self.spirit_pid,
+            Scope::LoomRead,
+            DAEMON_GOVERNED_READ_TTL_SECS,
+            [0u8; 32],
+            IntentClass::Standard,
+        )?;
+        let record = serde_json::json!({
+            "control_spirit": self.control_spirit,
+            "spirit_pid": self.spirit_pid,
+            "requester": requester,
+            "request_id": request_id,
+            "capability_key": maos_domain::ports::policy_decision::scope_action_key(&Scope::LoomRead),
+            "token_id": hex::encode(token.token_id.0),
+        })
+        .to_string();
+        // At-rest: ciphertext under a configured KMS posture, byte-identical
+        // plaintext under `None`, and a REFUSED read on seal error — never a
+        // plaintext row under a configured seal posture.
+        let sealed = self.at_rest.seal(record.as_bytes()).map_err(|error| {
+            format!("at-rest seal refused the governed collective read: {error}")
+        })?;
+        // Correlated to the cohort `DigestReadRequested` row by request_id
+        // (the 13.5f join), and a raw kind-`TelemetryEvent` row — no new kernel
+        // `FrameKind`, no kernel-core delta (H6). Hex so the ciphertext survives
+        // the Transparency Log's text projections unchanged.
+        let _logged = self.transparency_log.insert_frame_event_with_correlation(
+            maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+            self.spirit_pid,
+            None,
+            request_id,
+            "cohort:digest-read-governed",
+            hex::encode(&sealed).as_bytes(),
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+        // SIEM is the projection stage, and it runs AFTER the record is
+        // durably in the Transparency Log. A sink failure is therefore
+        // operator-visible and buffered (the row is already journaled), never
+        // silent — and never a refusal, because refusing the read would not
+        // improve auditability and would take the daemon down with the sink.
+        // This is the 11.4c posture the periodic consumer already runs under.
+        //
+        if let Some(runtime) = self
+            .enterprise_runtime
+            .as_ref()
+            .filter(|runtime| runtime.siem_configured())
+        {
+            match forward_audit_to_siem_once(runtime, &self.siem_watermark) {
+                Ok(n) if n > 0 => eprintln!(
+                    "maos: SIEM export forwarded {n} record(s) for governed collective read {request_id}"
+                ),
+                Ok(_) => {}
+                Err(error) => eprintln!(
+                    "maos: SIEM export for governed collective read {request_id} failed — \
+                     records buffered in the Transparency Log, operator action required: {error}"
+                ),
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Story 13.5a — the governed decorator over the daemon's collective-serve
+/// seam.
+///
+/// `note_admitted_request` is the daemon's collective-operation chokepoint.
+/// The inner state atomically rejects malformed, duplicate, and over-capacity
+/// requests before running the governance guard; only a new admissible request
+/// may mint a capability and publish the reply obligation.
+#[cfg(feature = "network")]
+struct EnterpriseGovernedDigestReadPort {
+    inner: Arc<dyn maos_a2a_core::DigestReadPort>,
+    governance: Arc<EnterpriseDaemonGovernance>,
+}
+
+#[cfg(feature = "network")]
+impl maos_a2a_core::DigestReadPort for EnterpriseGovernedDigestReadPort {
+    fn classify(&self, frame: &maos_domain::frame::IacFrame) -> maos_a2a_core::DigestFrameClass {
+        self.inner.classify(frame)
+    }
+
+    fn note_admitted_request_guarded(
+        &self,
+        requester: &maos_spirit_abi::identity::HostId,
+        request_id: &str,
+        frame: &maos_domain::frame::IacFrame,
+        before_commit: &mut dyn FnMut() -> Result<(), String>,
+    ) -> Result<(), String> {
+        self.inner
+            .note_admitted_request_guarded(requester, request_id, frame, &mut || {
+                before_commit()?;
+                self.governance
+                    .govern_collective_read(requester.as_str(), request_id)
+            })
+    }
+
+    fn authorize_reply_send(
+        &self,
+        peer: &maos_spirit_abi::identity::HostId,
+        request_id: &str,
+    ) -> bool {
+        self.inner.authorize_reply_send(peer, request_id)
+    }
+
+    fn observe_reply(
+        &self,
+        peer: &maos_spirit_abi::identity::HostId,
+        frame: &maos_domain::frame::IacFrame,
+    ) -> Result<maos_a2a_core::DigestReplyObservation, String> {
+        self.inner.observe_reply(peer, frame)
+    }
+}
+
+/// Story 13.5a — admit the daemon's control Spirit through the CANONICAL
+/// admission path so its manifest-declared `loom.*` grants land in the policy
+/// table the kernel consults at mint time.
+///
+/// The composition root never seeds the manifest-derived policy table directly
+/// (that negative is gated, and its guard is a literal source scan — do not name
+/// the field here); the only supported route is a manifest that declares
+/// `[capabilities.required.loom] read = true`. A control Spirit without it
+/// boots fine and then refuses every governed collective read — fail-closed,
+/// loudly, at the seam.
+#[cfg(feature = "network")]
+fn admit_daemon_control_spirit(
+    security: &maos_kernel_core::security::SecurityManagerAdapter,
+    spirits_root: &std::path::Path,
+    journal: &maos_kernel_core::journal::JournalAdapter,
+    spirit_pid: u32,
+    spirit_id: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let manifest_path = spirits_root.join(spirit_id).join("manifest.toml");
+    let manifest_toml = std::fs::read_to_string(&manifest_path).map_err(|error| {
+        format!(
+            "enterprise daemon posture: control Spirit manifest {} is unreadable: {error}",
+            manifest_path.display()
+        )
+    })?;
+    let manifest_root: toml::Value = toml::from_str(&manifest_toml)
+        .map_err(|error| format!("control Spirit manifest TOML parse error: {error}"))?;
+    let section = |name: &str| -> Result<String, String> {
+        let value = manifest_root
+            .get(name)
+            .ok_or_else(|| format!("control Spirit manifest is missing section [{name}]"))?;
+        toml::to_string(value).map_err(|error| format!("serialize [{name}]: {error}"))
+    };
+    let sandbox_cfg =
+        maos_kernel_core::security::SandboxConfig::from_toml_str(&section("sandbox")?)?;
+    let resource_caps =
+        maos_kernel_core::security::ResourceCaps::from_toml_str(&section("resources")?)?;
+    let caps_required = {
+        let value = manifest_root
+            .get("capabilities")
+            .and_then(|caps| caps.get("required"))
+            .ok_or("control Spirit manifest is missing [capabilities.required]")?;
+        let text = toml::to_string(value)
+            .map_err(|error| format!("serialize [capabilities.required]: {error}"))?;
+        maos_kernel_core::security::CapabilitiesRequired::from_toml_str(&text)?
+    };
+    let output_shape =
+        maos_kernel_core::security::OutputShape::from_toml_str(&section("output_shape")?)?;
+    let posture_section =
+        maos_kernel_core::security::manifest::PostureSection::from_toml_str(&section("posture")?)
+            .map_err(|error| format!("posture parse: {error}"))?;
+    let epistemic_policy = manifest_root
+        .get("epistemic_policy")
+        .map(|value| {
+            let text = toml::to_string(value)
+                .map_err(|error| format!("epistemic_policy serialize: {error}"))?;
+            maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&text)
+                .map_err(|error| format!("epistemic_policy parse: {error}"))
+        })
+        .transpose()?;
+    let class_section =
+        maos_kernel_core::security::ClassSection::from_toml_str(&section("class")?)?;
+    let caps_required =
+        caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
+
+    security.admit_spirit(
+        spirit_pid,
+        spirit_id,
+        &sandbox_cfg,
+        &resource_caps,
+        &caps_required,
+        Some(&output_shape),
+        journal,
+        &posture_section,
+        epistemic_policy.as_ref(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some(&class_section),
+    )?;
+    Ok(())
+}
+
+/// Story 13.5a — build the enterprise daemon posture at the composition root.
+///
+/// `None` when no enterprise subsystem is configured (`MAOS_SSO_*` /
+/// `MAOS_PDP_POLICY*` / `MAOS_KMS_*` / `MAOS_SIEM_*` all absent) — the daemon
+/// then behaves exactly as it did before this story. `Some` closes the
+/// dead-wire: the already-constructed `EnterpriseRuntime` finally reaches the
+/// daemon.
+#[cfg(feature = "network")]
+fn build_enterprise_daemon_governance(
+    security: &maos_kernel_core::security::SecurityManagerAdapter,
+    capability: &Arc<CapabilityRegistryAdapter>,
+    transparency_log: &Arc<maos_iac::TransparencyLogAdapter>,
+    spirits_root: &std::path::Path,
+    journal: &maos_kernel_core::journal::JournalAdapter,
+    enterprise_runtime: Option<&Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    bootstrap: Option<&CohortDaemonBootstrap>,
+) -> Result<Option<Arc<EnterpriseDaemonGovernance>>, Box<dyn std::error::Error>> {
+    let configured = enterprise_runtime.is_some() || enterprise_pdp_runtime.is_some();
+    let Some(bootstrap) = bootstrap else {
+        return Ok(None);
+    };
+    if !configured {
+        eprintln!(
+            "maos: cohort-a2a-daemon collective reads are UNGOVERNED — set \
+             MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* (and MAOS_PDP_POLICY*) to attach the \
+             enterprise daemon posture (Story 13.5a)"
+        );
+        return Ok(None);
+    }
+
+    let control_spirit = bootstrap.control_spirit.as_str().to_string();
+    admit_daemon_control_spirit(
+        security,
+        spirits_root,
+        journal,
+        DAEMON_CONTROL_SPIRIT_PID,
+        &control_spirit,
+    )?;
+
+    let seal_hook = enterprise_runtime.and_then(|runtime| runtime.at_rest_seal_hook());
+    if enterprise_runtime.is_some_and(|runtime| runtime.kms_configured()) && seal_hook.is_none() {
+        return Err(
+            "enterprise daemon posture: MAOS_KMS_* is configured but no healthy at-rest \
+             seal hook is available; refusing to start rather than persisting plaintext"
+                .into(),
+        );
+    }
+    let at_rest = maos_loom_lite::seal::AtRestSealer::new(seal_hook);
+    eprintln!(
+        "maos: cohort-a2a-daemon collective reads are ENTERPRISE-GOVERNED (Story 13.5a) — \
+         control spirit {control_spirit} pid {DAEMON_CONTROL_SPIRIT_PID}, sso={}, pdp={}, \
+         at-rest-seal={}, siem={}",
+        enterprise_runtime.is_some_and(|runtime| runtime.sso_configured()),
+        enterprise_pdp_runtime.is_some(),
+        at_rest.is_configured(),
+        enterprise_runtime.is_some_and(|runtime| runtime.siem_configured()),
+    );
+    Ok(Some(Arc::new(EnterpriseDaemonGovernance {
+        capability: Arc::clone(capability),
+        enterprise_runtime: enterprise_runtime.cloned(),
+        enterprise_pdp_runtime: enterprise_pdp_runtime.cloned(),
+        at_rest,
+        transparency_log: Arc::clone(transparency_log),
+        control_spirit,
+        spirit_pid: DAEMON_CONTROL_SPIRIT_PID,
+        siem_watermark: Arc::new(std::sync::Mutex::new(None)),
+    })))
+}
+
+#[cfg(feature = "network")]
+fn validate_enterprise_daemon_wiring(
+    enterprise_posture_required: bool,
+    governance: &Option<Arc<EnterpriseDaemonGovernance>>,
+) -> Result<(), String> {
+    match (enterprise_posture_required, governance.is_some()) {
+        (true, false) => Err(
+            "enterprise daemon posture is configured but the governed digest-read port is \
+             unwired; refusing to serve"
+                .to_string(),
+        ),
+        (false, true) => Err(
+            "enterprise daemon governance was supplied without a configured enterprise posture"
+                .to_string(),
+        ),
+        _ => Ok(()),
+    }
+}
+
 #[cfg(feature = "network")]
 async fn run_cohort_a2a_daemon(
     transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
     boot_nonce: u64,
     bootstrap: Option<CohortDaemonBootstrap>,
+    enterprise_posture_required: bool,
+    enterprise_daemon_governance: Option<Arc<EnterpriseDaemonGovernance>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a_core::router::A2ATransport as _;
     // The state is loaded at the composition root when the config is present;
     // its absence here means MAOS_COHORT_DAEMON_CONFIG was unset — the pre-13.5c
     // typed error, preserved.
     let bootstrap = bootstrap.ok_or("MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
-    let runtime =
-        build_cohort_a2a_daemon_runtime(Arc::clone(&transparency_log), boot_nonce, bootstrap)
-            .await?;
+    validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
+    // Story 13.5a — the SIEM export consumer previously never ran in daemon
+    // mode (the dispatch returns above its spawn). It shares the posture's
+    // watermark so the per-operation forward at the seam and the periodic tail
+    // never re-forward the same record within this daemon lifetime (H5).
+    let siem_cancel = tokio_util::sync::CancellationToken::new();
+    let _siem_forward_handle = enterprise_daemon_governance
+        .as_ref()
+        .and_then(|governance| {
+            governance
+                .enterprise_runtime
+                .as_ref()
+                .map(|runtime| (governance, runtime))
+        })
+        .filter(|(_, runtime)| runtime.siem_configured())
+        .map(|(governance, runtime)| {
+            spawn_siem_export_consumer(
+                Arc::clone(runtime),
+                Arc::clone(&governance.siem_watermark),
+                siem_cancel.clone(),
+            )
+        });
+    let runtime = build_cohort_a2a_daemon_runtime(
+        Arc::clone(&transparency_log),
+        boot_nonce,
+        bootstrap,
+        enterprise_posture_required,
+        enterprise_daemon_governance,
+    )
+    .await?;
+    runtime.assert_collective_serve_port_fails_closed()?;
     let listen_addr = runtime
         .transport
         .local_addr()
@@ -8510,18 +8946,47 @@ async fn run_cohort_a2a_daemon(
     );
     eprintln!("cohort-a2a-daemon listening on {listen_addr}");
     tokio::signal::ctrl_c().await?;
+    siem_cancel.cancel();
     runtime.shutdown().await
 }
 
 #[cfg(feature = "network")]
 struct CohortDaemonRuntime {
     transport: std::sync::Arc<maos_a2a_tcp::TcpA2ATransport>,
+    /// Story 13.5a — the collective-serve port this boot actually installed
+    /// into the router. Retained (not rebuilt) so the daemon's governance
+    /// posture is observable from the booted runtime: under an enterprise
+    /// posture this is the `EnterpriseGovernedDigestReadPort`, otherwise the
+    /// bare `CohortManifestState`. It is the SAME `Arc` handed to
+    /// `bind_with_cohort_wiring_and_digest`.
+    digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort>,
     cancel: tokio_util::sync::CancellationToken,
     service: tokio::task::JoinHandle<Result<(), maos_cohort::CohortError>>,
 }
 
 #[cfg(feature = "network")]
 impl CohortDaemonRuntime {
+    /// Story 13.5a — boot self-check on the collective-serve port this daemon
+    /// installed: authorizing a correlated reply for a request nobody admitted
+    /// MUST be false on every posture (bare state or enterprise-governed
+    /// decorator). A port that says `true` here would let an unsolicited push
+    /// masquerade as an owed reply, so the daemon refuses to serve rather than
+    /// binding with it.
+    fn assert_collective_serve_port_fails_closed(&self) -> Result<(), String> {
+        let probe = maos_spirit_abi::identity::HostId("maos:boot-probe".to_string());
+        if self
+            .digest_port
+            .authorize_reply_send(&probe, "maos:boot-probe")
+        {
+            return Err(
+                "cohort daemon collective-serve port authorized a reply for an unadmitted \
+                 request at boot — refusing to serve"
+                    .to_string(),
+            );
+        }
+        Ok(())
+    }
+
     async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
         self.cancel.cancel();
         self.service
@@ -8536,7 +9001,10 @@ async fn build_cohort_a2a_daemon_runtime(
     transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
     boot_nonce: u64,
     bootstrap: CohortDaemonBootstrap,
+    enterprise_posture_required: bool,
+    enterprise_daemon_governance: Option<Arc<EnterpriseDaemonGovernance>>,
 ) -> Result<CohortDaemonRuntime, Box<dyn std::error::Error>> {
+    validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
     let CohortDaemonBootstrap {
         state,
         tcp: tcp_config,
@@ -8554,7 +9022,18 @@ async fn build_cohort_a2a_daemon_runtime(
     let gate: std::sync::Arc<dyn maos_a2a_core::CohortManifestGate> = state.clone();
     let observer: std::sync::Arc<dyn maos_a2a_core::HaltReceiptObserver> = state.clone();
     // Story 12.4a — digest-read correlation port, same state.
-    let digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort> = state.clone();
+    // Story 13.5a — under an enterprise daemon posture the port is DECORATED so
+    // every collective read the daemon admits runs the governance chain first
+    // and fails closed (NACK) when any arm refuses. Without a posture the port
+    // is the bare state, byte-for-byte the pre-13.5a wiring.
+    let digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort> =
+        match enterprise_daemon_governance {
+            Some(governance) => std::sync::Arc::new(EnterpriseGovernedDigestReadPort {
+                inner: state.clone(),
+                governance,
+            }),
+            None => state.clone(),
+        };
     // Story 13.5c — the rupture journal writes to the PRIMARY Transparency Log
     // (the daemon no longer opens its own).
     let rupture_sink: std::sync::Arc<dyn maos_a2a_core::ConsentRuptureSink> =
@@ -8570,7 +9049,7 @@ async fn build_cohort_a2a_daemon_runtime(
             None,
             Some(gate),
             Some(observer),
-            Some(digest_port),
+            Some(std::sync::Arc::clone(&digest_port)),
             Some(rupture_sink),
         )
         .await
@@ -8633,6 +9112,7 @@ async fn build_cohort_a2a_daemon_runtime(
     });
     Ok(CohortDaemonRuntime {
         transport,
+        digest_port,
         cancel,
         service,
     })
@@ -11257,5 +11737,1066 @@ mod tests {
         // topology --once and single-Spirit fire paths.
         let result = maos_kernel_core::scheduler::pick_next_spirit_from_slice(&[]);
         assert!(result.is_none(), "empty slice must yield None");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Story 13.5a — enterprise governance at the cohort-a2a-daemon seam.
+//
+// The load-bearing proof: no test in this repo drove SSO → PDP → kernel mint →
+// `identity.asserted` → at-rest seal → SIEM forward as ONE lifecycle, and none
+// drove it from a BOOTED daemon. Before this story the `EnterpriseRuntime` was
+// constructed at the composition root and never reached `cohort-a2a-daemon`
+// mode at all.
+//
+// Every arm below runs production code. The only injected things are the four
+// ports (`IdentityAssertionPort` / `KeyManagementPort` / `SiemProjectionPort` /
+// `PolicyDecisionPort`), delivered through the SAME `EnterpriseRuntime::
+// from_ports` the production `from_env` lands in. The at-rest arm is reached
+// through `EnterpriseRuntime::at_rest_seal_hook()` — the accessor
+// `LoomLiteStore::with_at_rest_seal` consumes — NEVER the zero-production-caller
+// `seal_row_at_rest` / `issue_under_principal` (H3).
+// ─────────────────────────────────────────────────────────────────────────
+#[cfg(all(test, feature = "network"))]
+mod story_13_5a_enterprise_daemon_seam {
+    use super::*;
+
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    use ed25519_dalek::SigningKey;
+    use maos_a2a_core::router::A2ATransport as _;
+    use maos_cohort::{
+        CohortAuthority, CohortDigestDistributor, CohortManifest, CohortMember, ConsentMatrix,
+        ConsentTuple, DigestReadControl, DigestSummary, InMemoryCohortAuditSink, ManifestSignature,
+        PinnedAuthorityKeys, COHORT_SCHEMA_V2, RESERVED_INTENT_HALT_RECEIPT,
+        RESERVED_INTENT_REISSUE,
+    };
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_domain::ports::identity_assertion::{
+        AuthenticatedPrincipal, IdentityAssertionPort, IdentityError,
+    };
+    use maos_domain::ports::key_management::{KeyManagementPort, KmsError};
+    use maos_domain::ports::policy_decision::{
+        PolicyDecisionError, PolicyDecisionPort, PolicyDecisionRequest, PolicyVerdict,
+    };
+    use maos_domain::ports::siem_projection::{SiemProjectionError, SiemProjectionPort};
+    use maos_domain::region::Region;
+    use maos_domain::team::TeamId;
+    use maos_spirit_abi::identity::HostId;
+
+    /// The control Spirit the daemon governs under. `researcher` is the
+    /// reference Spirit whose manifest already declares
+    /// `[capabilities.required.loom] read = true` (Story 13.5d), so the
+    /// canonical admission path lands `Scope::LoomRead` in the policy table.
+    /// This is AC4's worked example, executed: enterprise governance attached
+    /// to an EXISTING reference Spirit run under the daemon — no new Spirit.
+    const CONTROL_SPIRIT: &str = "researcher";
+    const REQUESTER: &str = "host-b";
+    const DAEMON_BOOT_NONCE: u64 = 13_5000;
+    const CLIENT_BOOT_NONCE: u64 = 13_5001;
+    const ASSERTION: &str = "story-13-5a-daemon-operator-assertion";
+
+    /// `issue_enterprise_governed_capability` reads `MAOS_SSO_ASSERTION` from
+    /// the process environment, and admission resolves its Lifecycle Journal
+    /// from `MAOS_HOME`. Both are process-global, so every 13.5a test holds
+    /// this lock for its whole body — the tests never run concurrently with
+    /// each other, and nothing else in this binary reads `MAOS_SSO_*`.
+    fn env_lock() -> MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn workspace_root() -> PathBuf {
+        PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
+    }
+
+    // ── recording ports ──────────────────────────────────────────────────
+
+    #[derive(Default)]
+    struct RecordingSso {
+        verifies: AtomicUsize,
+    }
+
+    impl IdentityAssertionPort for RecordingSso {
+        fn verify(&self, assertion: &str) -> Result<AuthenticatedPrincipal, IdentityError> {
+            self.verifies.fetch_add(1, Ordering::SeqCst);
+            if assertion != ASSERTION {
+                return Err(IdentityError::SignatureInvalid);
+            }
+            let mut attributes = HashMap::new();
+            attributes.insert("role".to_string(), "cohort-operator".to_string());
+            Ok(AuthenticatedPrincipal {
+                subject: "daemon-operator@maos.example".to_string(),
+                issuer: "https://idp.maos.example".to_string(),
+                audience: "maos-cohort-daemon".to_string(),
+                attributes,
+            })
+        }
+
+        fn is_healthy(&self) -> bool {
+            true
+        }
+    }
+
+    struct RecordingKms {
+        inner: maos_secrets::LocalMasterKeyKms,
+        wraps: AtomicUsize,
+    }
+
+    impl RecordingKms {
+        fn new() -> Self {
+            Self {
+                inner: maos_secrets::LocalMasterKeyKms::from_master_key(&[0x5au8; 32])
+                    .expect("local master key"),
+                wraps: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    impl KeyManagementPort for RecordingKms {
+        fn wrap_data_key(&self, data_key: &[u8]) -> Result<Vec<u8>, KmsError> {
+            self.wraps.fetch_add(1, Ordering::SeqCst);
+            self.inner.wrap_data_key(data_key)
+        }
+
+        fn unwrap_data_key(&self, wrapped_data_key: &[u8]) -> Result<Vec<u8>, KmsError> {
+            self.inner.unwrap_data_key(wrapped_data_key)
+        }
+
+        fn is_healthy(&self) -> bool {
+            self.inner.is_healthy()
+        }
+    }
+
+    struct RecordingPdp {
+        verdict: PolicyVerdict,
+        evaluations: AtomicUsize,
+    }
+
+    impl RecordingPdp {
+        fn new(verdict: PolicyVerdict) -> Self {
+            Self {
+                verdict,
+                evaluations: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    impl PolicyDecisionPort for RecordingPdp {
+        fn load_policy(&self, _policy_text: &str) -> Result<(), PolicyDecisionError> {
+            Ok(())
+        }
+
+        fn evaluate(
+            &self,
+            requests: &[PolicyDecisionRequest],
+        ) -> Result<Vec<PolicyVerdict>, PolicyDecisionError> {
+            self.evaluations.fetch_add(requests.len(), Ordering::SeqCst);
+            Ok(vec![self.verdict; requests.len()])
+        }
+
+        fn is_healthy(&self) -> bool {
+            true
+        }
+    }
+
+    #[derive(Default)]
+    struct RecordingSiem {
+        projections: AtomicUsize,
+    }
+
+    impl SiemProjectionPort for RecordingSiem {
+        fn project_redacted_entry(
+            &self,
+            redacted_entry_json: &str,
+        ) -> Result<String, SiemProjectionError> {
+            self.projections.fetch_add(1, Ordering::SeqCst);
+            maos_siem::SiemExporter.project_redacted_entry(redacted_entry_json)
+        }
+
+        fn is_healthy(&self) -> bool {
+            true
+        }
+    }
+
+    /// Every recording arm of the governance chain, retained so a leg can read
+    /// the counters after the round-trip.
+    struct RecordingPorts {
+        sso: Arc<RecordingSso>,
+        kms: Arc<RecordingKms>,
+        pdp: Arc<RecordingPdp>,
+        siem: Arc<RecordingSiem>,
+    }
+
+    impl RecordingPorts {
+        fn new(verdict: PolicyVerdict) -> Self {
+            Self {
+                sso: Arc::new(RecordingSso::default()),
+                kms: Arc::new(RecordingKms::new()),
+                pdp: Arc::new(RecordingPdp::new(verdict)),
+                siem: Arc::new(RecordingSiem::default()),
+            }
+        }
+
+        fn counts(&self) -> (usize, usize, usize, usize) {
+            (
+                self.sso.verifies.load(Ordering::SeqCst),
+                self.pdp.evaluations.load(Ordering::SeqCst),
+                self.kms.wraps.load(Ordering::SeqCst),
+                self.siem.projections.load(Ordering::SeqCst),
+            )
+        }
+    }
+
+    // ── hermetic daemon fixture ──────────────────────────────────────────
+
+    struct Fixture {
+        dir: PathBuf,
+        config_path: PathBuf,
+        audit_db: PathBuf,
+        siem_sink: PathBuf,
+        home: PathBuf,
+        server_fingerprint: maos_a2a_core::PeerCertFingerprint,
+        client_cert_path: PathBuf,
+        client_key_path: PathBuf,
+        client_fingerprint: maos_a2a_core::PeerCertFingerprint,
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    fn signing_key() -> SigningKey {
+        SigningKey::from_bytes(&[13; 32])
+    }
+
+    fn authority_key_hex(key: &SigningKey) -> String {
+        hex::encode(key.verifying_key().to_bytes())
+    }
+
+    /// A signed, schema-v2, teams-bearing 2-member manifest naming the local
+    /// host — the `cohort_daemon_smoke_13_5c.rs` fixture idiom.
+    fn signed_manifest(
+        key: &SigningKey,
+        server_fingerprint: &maos_a2a_core::PeerCertFingerprint,
+        client_fingerprint: &maos_a2a_core::PeerCertFingerprint,
+    ) -> String {
+        let members = vec![
+            CohortMember {
+                host_id: "host-a".to_string(),
+                fingerprint: server_fingerprint.wire(),
+                roles: vec!["worker".to_string()],
+            },
+            CohortMember {
+                host_id: REQUESTER.to_string(),
+                fingerprint: client_fingerprint.wire(),
+                roles: vec!["worker".to_string()],
+            },
+        ];
+        let teams = Some(vec![maos_cohort::TeamEntry {
+            team_id: TeamId::new("team-a").unwrap(),
+            region: Region::canonicalize("region-a").unwrap(),
+            datname: "maos_team_a".to_string(),
+            members: vec![maos_domain::ports::registry::SpiritId::from(CONTROL_SPIRIT)],
+        }]);
+        let manifest = CohortManifest {
+            schema_version: COHORT_SCHEMA_V2,
+            cohort_id: "cohort-13-5a".to_string(),
+            version: 1,
+            authority: CohortAuthority {
+                threshold: 1,
+                keys: vec![authority_key_hex(key)],
+            },
+            members,
+            consent: ConsentMatrix {
+                send: ["host-a", REQUESTER]
+                    .into_iter()
+                    .map(|peer| ConsentTuple {
+                        peer: peer.to_string(),
+                        role: "worker".to_string(),
+                        intent: maos_a2a_core::COHORT_INTENT_DIGEST_READ.to_string(),
+                    })
+                    .collect(),
+                accept: ["host-a", REQUESTER]
+                    .into_iter()
+                    .map(|peer| ConsentTuple {
+                        peer: peer.to_string(),
+                        role: "worker".to_string(),
+                        intent: maos_a2a_core::COHORT_INTENT_DIGEST_READ.to_string(),
+                    })
+                    .collect(),
+            },
+            reserved_intents: vec![
+                RESERVED_INTENT_REISSUE.to_string(),
+                RESERVED_INTENT_HALT_RECEIPT.to_string(),
+            ],
+            t_stale_secs: 120,
+            teams,
+            signature: ManifestSignature { sig: String::new() },
+            cross_team_consent: Vec::new(),
+        }
+        .signed_with(key);
+        toml::to_string(&manifest).unwrap()
+    }
+
+    fn write_identity(
+        dir: &std::path::Path,
+        name: &str,
+    ) -> (PathBuf, PathBuf, maos_a2a_core::PeerCertFingerprint) {
+        let key = rcgen::KeyPair::generate().expect("rcgen keypair");
+        let params =
+            rcgen::CertificateParams::new(vec!["127.0.0.1".to_string()]).expect("rcgen params");
+        let cert = params.self_signed(&key).expect("rcgen self-signed");
+        let cert_path = dir.join(format!("{name}.cert.pem"));
+        let key_path = dir.join(format!("{name}.key.pem"));
+        std::fs::write(&cert_path, cert.pem()).expect("write cert pem");
+        std::fs::write(&key_path, key.serialize_pem()).expect("write key pem");
+        let fingerprint = maos_a2a_core::PeerCertFingerprint::from_cert_der(cert.der().as_ref());
+        (cert_path, key_path, fingerprint)
+    }
+
+    fn fixture(tag: &str) -> Fixture {
+        let dir = std::env::temp_dir().join(format!(
+            "maos-story-13-5a-{tag}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id(),
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create fixture dir");
+        let (server_cert_path, server_key_path, server_fingerprint) =
+            write_identity(&dir, "server");
+        let (client_cert_path, client_key_path, client_fingerprint) =
+            write_identity(&dir, "client");
+        let key = signing_key();
+        let manifest_path = dir.join("manifest.toml");
+        std::fs::write(
+            &manifest_path,
+            signed_manifest(&key, &server_fingerprint, &client_fingerprint),
+        )
+        .expect("write manifest");
+
+        let config = format!(
+            "manifest_path = '{manifest}'\n\
+             authority_keys = ['{authority}']\n\
+             local_host = 'host-a'\n\
+             control_spirit = '{CONTROL_SPIRIT}'\n\
+             peers = []\n\
+             \n\
+             [tcp]\n\
+             listen_addr = '127.0.0.1:0'\n\
+             own_cert_chain = '{cert}'\n\
+             own_private_key = '{private_key}'\n\
+             peer_pins = []\n\
+             \n\
+             [digest_summary]\n\
+             frames = 0\n\
+             halts = 0\n\
+             conflicts = 0\n",
+            manifest = manifest_path.display(),
+            authority = authority_key_hex(&key),
+            cert = server_cert_path.display(),
+            private_key = server_key_path.display(),
+        );
+        let config_path = dir.join("daemon.toml");
+        std::fs::write(&config_path, config).expect("write daemon config");
+        let home = dir.join("home");
+        std::fs::create_dir_all(home.join("journal")).expect("create journal home");
+        Fixture {
+            audit_db: dir.join("transparency.sqlite"),
+            siem_sink: dir.join("siem.ndjson"),
+            config_path,
+            home,
+            dir,
+            server_fingerprint,
+            client_cert_path,
+            client_key_path,
+            client_fingerprint,
+        }
+    }
+
+    /// The kernel stack the composition root builds: ONE `PolicyTable` shared
+    /// by the capability registry (mint-time gate) and the security manager
+    /// (admission). Nothing seeds the manifest-derived policy table by hand —
+    /// admission is its only writer.
+    #[allow(clippy::type_complexity)]
+    fn kernel_stack(
+        boot_nonce: u64,
+    ) -> (
+        Arc<CapabilityRegistryAdapter>,
+        Arc<maos_kernel_core::security::SecurityManagerAdapter>,
+        tokio::sync::mpsc::Receiver<maos_kernel_core::capability::cap_audit::CapAuditEvent>,
+    ) {
+        let crypto: Arc<dyn maos_domain::ports::CryptoProvider> =
+            Arc::new(maos_kernel_core::security::RingCryptoProvider);
+        let signing_key =
+            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([7u8; 32]);
+        let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
+        let (audit_tx, audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+        let capability = Arc::new(CapabilityRegistryAdapter::new(
+            Arc::clone(&crypto),
+            signing_key,
+            boot_nonce,
+            Arc::clone(&policy),
+            audit_tx,
+            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+            Arc::new(TelemetryStreamAdapter::default()),
+        ));
+        let security = Arc::new(maos_kernel_core::security::SecurityManagerAdapter::new(
+            Arc::clone(&policy),
+        ));
+        (capability, security, audit_rx)
+    }
+
+    fn enterprise_runtime(
+        ports: &RecordingPorts,
+        fixture: &Fixture,
+        boot_nonce: u64,
+    ) -> Arc<maos_bin::enterprise_identity::EnterpriseRuntime> {
+        let crypto: Arc<dyn maos_domain::ports::CryptoProvider> =
+            Arc::new(maos_kernel_core::security::RingCryptoProvider);
+        Arc::new(
+            maos_bin::enterprise_identity::EnterpriseRuntime::from_ports(
+                maos_bin::enterprise_identity::EnterpriseConfig::empty()
+                    .with_sso_available()
+                    .with_kms_available()
+                    .with_siem_available(),
+                Some(Arc::clone(&ports.sso) as Arc<dyn IdentityAssertionPort>),
+                Some(Arc::clone(&ports.kms) as Arc<dyn KeyManagementPort>),
+                Some(Arc::clone(&ports.siem) as Arc<dyn SiemProjectionPort>),
+                Some(crypto),
+                Some(fixture.audit_db.clone()),
+                Some(fixture.siem_sink.clone()),
+                boot_nonce,
+            ),
+        )
+    }
+
+    fn pdp_runtime(ports: &RecordingPorts) -> enterprise_pdp_runtime::EnterprisePdpRuntime {
+        enterprise_pdp_runtime::EnterprisePdpRuntime::new(
+            Arc::clone(&ports.pdp) as Arc<dyn PolicyDecisionPort>,
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            enterprise_pdp_runtime::DEFAULT_REFRESH_INTERVAL,
+            enterprise_pdp_runtime::DEFAULT_STALENESS_TTL,
+        )
+        .expect("enterprise PDP runtime")
+    }
+
+    /// One inbound `cohort:digest-read` REQUEST frame, byte-shaped exactly as
+    /// `CohortDigestDistributor::request_read` puts it on the wire.
+    fn digest_request_frame(request_id: &str) -> maos_domain::frame::IacFrame {
+        let payload = DigestReadControl::Request {
+            request_id: request_id.to_string(),
+            scope: maos_cohort::DIGEST_DAILY_SCOPE.to_string(),
+        }
+        .telemetry_payload()
+        .expect("digest request payload");
+        let from = maos_domain::frame::FrameAddress {
+            spirit_id: maos_spirit_abi::identity::SpiritId::from(CONTROL_SPIRIT),
+            host_id: Some(HostId(REQUESTER.to_string())),
+            role: None,
+        };
+        let mut recipients = smallvec::SmallVec::new();
+        recipients.push(maos_domain::frame::FrameAddress {
+            spirit_id: maos_spirit_abi::identity::SpiritId::from(CONTROL_SPIRIT),
+            host_id: Some(HostId("host-a".to_string())),
+            role: None,
+        });
+        maos_domain::frame::IacFrame {
+            frame_id: [0u8; 16],
+            timestamp_ns: 0,
+            logical_clock: 0,
+            from: from.clone(),
+            to: recipients,
+            kind: maos_spirit_abi::identity::FrameKind::TelemetryEvent,
+            intent: IntentClass::Readonly,
+            payload: maos_domain::frame::FramePayload::TelemetryEvent(payload),
+            auto_marker: maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+            consent_envelope: Some(
+                maos_domain::frame::ConsentEnvelope::with_fine_grained_intent(
+                    from,
+                    maos_domain::invariants::i8::A2AIntent::new(
+                        maos_a2a_core::COHORT_INTENT_DIGEST_READ,
+                    ),
+                ),
+            ),
+            intent_lineage: maos_domain::invariants::i13::IntentLineage::default(),
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    enum TestWiring {
+        Full,
+        PdpOnly,
+        RequiredUnwired,
+    }
+
+    fn reserve_loopback_addr() -> std::net::SocketAddr {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve client address");
+        listener.local_addr().expect("reserved client address")
+    }
+
+    fn peer_config(
+        peer_id: &str,
+        endpoint: std::net::SocketAddr,
+        fingerprint: &maos_a2a_core::PeerCertFingerprint,
+    ) -> maos_a2a_core::A2APeerConfig {
+        maos_a2a_core::A2APeerConfig {
+            peer_id: maos_a2a_core::PeerId::new(peer_id),
+            endpoint: format!("tls://{endpoint}"),
+            cert_fingerprint: fingerprint.clone(),
+            profile: maos_a2a_core::A2AProfile::CrossHost,
+            allowlists: maos_a2a_core::ConsentAllowlists {
+                send_allowlist: vec![A2AIntent::new(maos_a2a_core::COHORT_INTENT_DIGEST_READ)],
+                accept_allowlist: vec![A2AIntent::new(maos_a2a_core::COHORT_INTENT_DIGEST_READ)],
+            },
+            partition_timeout_secs: 5,
+            consent_ttl_secs: 300,
+        }
+    }
+
+    fn client_state(fixture: &Fixture) -> Arc<maos_cohort::CohortManifestState> {
+        let authority = signing_key();
+        Arc::new(
+            maos_cohort::CohortManifestState::load(
+                HostId(REQUESTER.to_string()),
+                &signed_manifest(
+                    &authority,
+                    &fixture.server_fingerprint,
+                    &fixture.client_fingerprint,
+                ),
+                PinnedAuthorityKeys::from_keys(vec![authority.verifying_key()])
+                    .expect("client authority pins"),
+                Arc::new(InMemoryCohortAuditSink::default()),
+            )
+            .expect("client cohort state"),
+        )
+    }
+
+    /// Boot a real target daemon plus a real second mTLS endpoint, then send a
+    /// digest read through `route_outbound` → TLS → `handle_intake_verified` →
+    /// consent → the installed governed port and wait for the daemon's real
+    /// correlated digest reply to return over the reverse mTLS connection.
+    async fn boot_and_drive(
+        fixture: &Fixture,
+        wiring: TestWiring,
+        ports: &RecordingPorts,
+    ) -> Result<(), String> {
+        let transparency_log = Arc::new(
+            maos_kernel_core::iac::TransparencyLogAdapter::open(
+                &fixture.audit_db,
+                DAEMON_BOOT_NONCE,
+            )
+            .expect("open transparency log"),
+        );
+        let mut bootstrap = load_cohort_daemon_bootstrap(
+            fixture.config_path.to_str().expect("utf-8 config path"),
+            Arc::clone(&transparency_log),
+        )
+        .expect("cohort daemon bootstrap");
+        let client_addr = reserve_loopback_addr();
+        bootstrap
+            .tcp
+            .peer_pins
+            .push(maos_a2a_tcp::PinnedFingerprint {
+                peer_id: maos_a2a_core::PeerId::new(REQUESTER),
+                fingerprint: fixture.client_fingerprint.clone(),
+                boot_nonce: CLIENT_BOOT_NONCE,
+            });
+        bootstrap.peers.push(peer_config(
+            REQUESTER,
+            client_addr,
+            &fixture.client_fingerprint,
+        ));
+
+        let (capability, security, _audit_rx) = kernel_stack(DAEMON_BOOT_NONCE);
+        let runtime = matches!(wiring, TestWiring::Full)
+            .then(|| enterprise_runtime(ports, fixture, DAEMON_BOOT_NONCE));
+        let pdp =
+            matches!(wiring, TestWiring::Full | TestWiring::PdpOnly).then(|| pdp_runtime(ports));
+        let journal_path = fixture.home.join("journal").join("lifecycle.ndjson");
+        let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+            .map_err(|error| format!("test journal open failed: {error}"))?;
+        let governance = if matches!(wiring, TestWiring::RequiredUnwired) {
+            None
+        } else {
+            build_enterprise_daemon_governance(
+                security.as_ref(),
+                &capability,
+                &transparency_log,
+                &workspace_root().join("spirits"),
+                &journal,
+                runtime.as_ref(),
+                pdp.as_ref(),
+                Some(&bootstrap),
+            )
+            .map_err(|error| error.to_string())?
+        };
+
+        let daemon = build_cohort_a2a_daemon_runtime(
+            Arc::clone(&transparency_log),
+            DAEMON_BOOT_NONCE,
+            bootstrap,
+            true,
+            governance,
+        )
+        .await
+        .map_err(|error| error.to_string())?;
+        daemon
+            .assert_collective_serve_port_fails_closed()
+            .map_err(|error| format!("boot self-check: {error}"))?;
+        let daemon_addr = daemon
+            .transport
+            .local_addr()
+            .ok_or_else(|| "daemon listener address absent".to_string())?;
+
+        let state = client_state(fixture);
+        let client_tcp = maos_a2a_tcp::TcpA2AConfig {
+            listen_addr: client_addr,
+            own_cert_chain: fixture.client_cert_path.clone(),
+            own_private_key: fixture.client_key_path.clone(),
+            peer_pins: vec![maos_a2a_tcp::PinnedFingerprint {
+                peer_id: maos_a2a_core::PeerId::new("host-a"),
+                fingerprint: fixture.server_fingerprint.clone(),
+                boot_nonce: DAEMON_BOOT_NONCE,
+            }],
+            handshake_timeout: std::time::Duration::from_secs(5),
+            ca_roots: None,
+        };
+        let gate: Arc<dyn maos_a2a_core::CohortManifestGate> = state.clone();
+        let observer: Arc<dyn maos_a2a_core::HaltReceiptObserver> = state.clone();
+        let digest_port: Arc<dyn maos_a2a_core::DigestReadPort> = state.clone();
+        let client_transport = Arc::new(
+            maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring_and_digest(
+                client_tcp,
+                vec![peer_config(
+                    "host-a",
+                    daemon_addr,
+                    &fixture.server_fingerprint,
+                )],
+                CLIENT_BOOT_NONCE,
+                maos_a2a_tcp::TcpTimeouts::production(std::time::Duration::from_secs(5)),
+                maos_a2a_core::HandshakeRetryPolicy::default(),
+                None,
+                None,
+                Some(gate),
+                Some(observer),
+                Some(digest_port),
+                None,
+            )
+            .await
+            .map_err(|error| format!("client transport bind failed: {error}"))?,
+        );
+        let router: Arc<dyn maos_a2a_core::router::A2APeerRouter> = client_transport.clone();
+        let distributor = CohortDigestDistributor::new(
+            Arc::clone(&state),
+            router,
+            maos_domain::frame::FrameAddress {
+                spirit_id: maos_spirit_abi::identity::SpiritId::from(CONTROL_SPIRIT),
+                host_id: Some(HostId(REQUESTER.to_string())),
+                role: None,
+            },
+        );
+        let target = HostId("host-a".to_string());
+        let request = distributor
+            .request_read(&target, maos_cohort::DIGEST_DAILY_SCOPE)
+            .await;
+        let request_id = match request {
+            Ok(request_id) => request_id,
+            Err(error) => {
+                drop(distributor);
+                drop(client_transport);
+                daemon
+                    .shutdown()
+                    .await
+                    .map_err(|shutdown| format!("{error}; shutdown failed: {shutdown}"))?;
+                return Err(error.to_string());
+            }
+        };
+
+        let expected = DigestSummary {
+            frames: 0,
+            halts: 0,
+            conflicts: 0,
+        };
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                if state.digest_summary(&target, &request_id) == Some(expected.clone()) {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .map_err(|_| "timed out waiting for the daemon's correlated digest reply".to_string())?;
+
+        if matches!(wiring, TestWiring::Full) {
+            let sink = std::fs::read_to_string(&fixture.siem_sink).unwrap_or_default();
+            if sink.trim().is_empty() {
+                return Err(
+                    "the live daemon lifecycle did not forward governed rows to SIEM".to_string(),
+                );
+            }
+        }
+
+        drop(distributor);
+        drop(client_transport);
+        daemon
+            .shutdown()
+            .await
+            .map_err(|error| format!("daemon shutdown failed: {error}"))?;
+        drop(journal);
+        drop(transparency_log);
+        Ok(())
+    }
+
+    fn set_process_env(_fixture: &Fixture) {
+        // The kernel token clock is process-global and initialized by `main`;
+        // a unit test in the binary target must arm it exactly as the
+        // composition root does before any mint or TTL check.
+        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+        std::env::set_var("MAOS_SSO_ASSERTION", ASSERTION);
+    }
+
+    // ── AC3 / AC5 leg 1 — the reach leg ──────────────────────────────────
+
+    /// AC3 — ONE governed collective round-trip through a BOOTED
+    /// `build_cohort_a2a_daemon_runtime`, with every arm of the chain proven
+    /// fired: SSO verify, PDP evaluate, kernel mint + `identity.asserted` row,
+    /// at-rest AEAD (real ciphertext, reached via `at_rest_seal_hook`), and a
+    /// SIEM forward that lands records in the localhost sink.
+    #[tokio::test]
+    async fn story_13_5a_enterprise_governance_reaches_the_booted_cohort_daemon() {
+        let _guard = env_lock();
+        let fixture = fixture("reach");
+        set_process_env(&fixture);
+        let ports = RecordingPorts::new(PolicyVerdict::Allow);
+
+        // AC5 proven-red: the reach leg itself observes the production dispatch,
+        // so deleting the enterprise argument reds this runtime leg and the
+        // dedicated source-inspection leg.
+        let source = include_str!("main.rs");
+        let dispatch_start = source
+            .find(r#"if mode == "cohort-a2a-daemon""#)
+            .expect("cohort daemon dispatch");
+        let dispatch = &source[dispatch_start..source.len().min(dispatch_start + 2_000)];
+        assert!(
+            dispatch.contains("build_enterprise_daemon_governance(")
+                && dispatch.contains("enterprise_posture_required,")
+                && dispatch.contains("enterprise_daemon_governance,"),
+            "production dispatch no longer threads the required enterprise posture"
+        );
+
+        boot_and_drive(&fixture, TestWiring::Full, &ports)
+            .await
+            .expect("a fully governed collective read must be admitted");
+
+        let (sso, pdp, kms, siem) = ports.counts();
+        assert!(sso >= 1, "SSO principal verification never fired");
+        assert!(pdp >= 1, "enterprise PDP evaluation never fired");
+        assert!(kms >= 1, "at-rest seal never reached the KMS port");
+        assert!(siem >= 1, "SIEM projection port never projected a record");
+
+        // `identity.asserted` — a raw kind-30 row, never a kernel FrameKind (H6).
+        let entries = maos_audit::query(
+            &fixture.audit_db,
+            maos_audit::AuditFilter {
+                kind: Some("identity.asserted".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("query identity.asserted");
+        assert!(
+            !entries.is_empty(),
+            "the governed mint must persist an identity.asserted provenance row"
+        );
+
+        // At-rest: the governed grant landed as REAL ciphertext, not the
+        // plaintext record. A `None` hook would have written the record verbatim.
+        let governed_rows = maos_audit::query(
+            &fixture.audit_db,
+            maos_audit::AuditFilter {
+                intent_contains: Some("cohort:digest-read-governed".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("query governed collective-read rows");
+        assert_eq!(
+            governed_rows.len(),
+            1,
+            "exactly one sealed governed-collective-read row per admitted request"
+        );
+
+        // SIEM was forwarded by the live daemon operation itself. No
+        // post-shutdown runtime or quiesced-copy helper participates.
+        let sink = std::fs::read_to_string(&fixture.siem_sink).unwrap_or_default();
+        assert!(
+            !sink.trim().is_empty(),
+            "the governed daemon lifecycle must land records in the SIEM sink"
+        );
+    }
+
+    // ── AC5 leg 2 — the two-sided dead-wire negative ─────────────────────
+
+    /// AC5 leg 2 — two-sided. (a) Enterprise configuration with the governed
+    /// port unwired refuses daemon boot; (b) PDP-only configuration reaches and
+    /// enforces the PDP; (c) configured-down KMS refuses plaintext fallback;
+    /// (d) wired PDP deny refuses the read; (e) wired allow reaches every arm.
+    #[tokio::test]
+    async fn story_13_5a_daemon_governance_is_dead_wired_unwired_and_fails_closed_when_denied() {
+        let _guard = env_lock();
+
+        // (a) REQUIRED + UNWIRED — restoring the old dead-wire must fail closed.
+        let unwired_fixture = fixture("unwired");
+        set_process_env(&unwired_fixture);
+        let unwired_ports = RecordingPorts::new(PolicyVerdict::Allow);
+        let refusal = boot_and_drive(
+            &unwired_fixture,
+            TestWiring::RequiredUnwired,
+            &unwired_ports,
+        )
+        .await
+        .expect_err("configured enterprise posture must not boot unwired");
+        assert!(
+            refusal.contains("configured but the governed digest-read port is unwired"),
+            "unwired refusal must identify the dead-wire; got: {refusal}"
+        );
+        assert_eq!(unwired_ports.counts(), (0, 0, 0, 0));
+
+        // (b) PDP-ONLY — MAOS_PDP_POLICY* alone still attaches governance.
+        let pdp_only_fixture = fixture("pdp-only");
+        set_process_env(&pdp_only_fixture);
+        let pdp_only_ports = RecordingPorts::new(PolicyVerdict::Deny);
+        let refusal = boot_and_drive(&pdp_only_fixture, TestWiring::PdpOnly, &pdp_only_ports)
+            .await
+            .expect_err("PDP-only posture must enforce its deny");
+        assert!(
+            refusal.contains("enterprise PDP denied capability issuance"),
+            "PDP-only refusal must come from the configured PDP; got: {refusal}"
+        );
+        let (sso, pdp, kms, siem) = pdp_only_ports.counts();
+        assert_eq!((sso, kms, siem), (0, 0, 0));
+        assert!(pdp >= 1, "PDP-only posture bypassed the configured PDP");
+
+        // (c) CONFIGURED-DOWN KMS — startup refuses rather than installing the
+        // plaintext `AtRestSealer::new(None)` posture.
+        let kms_fixture = fixture("kms-down");
+        let transparency_log = Arc::new(
+            maos_kernel_core::iac::TransparencyLogAdapter::open(
+                &kms_fixture.audit_db,
+                DAEMON_BOOT_NONCE,
+            )
+            .expect("KMS test transparency log"),
+        );
+        let bootstrap = load_cohort_daemon_bootstrap(
+            kms_fixture
+                .config_path
+                .to_str()
+                .expect("utf-8 KMS fixture path"),
+            Arc::clone(&transparency_log),
+        )
+        .expect("KMS test bootstrap");
+        let (capability, security, _audit_rx) = kernel_stack(DAEMON_BOOT_NONCE);
+        let kms_down = Arc::new(
+            maos_bin::enterprise_identity::EnterpriseRuntime::from_config(
+                &maos_bin::enterprise_identity::EnterpriseConfig::empty().with_kms_down(),
+            )
+            .expect("configured-down runtime"),
+        );
+        let journal = maos_kernel_core::journal::JournalAdapter::open(
+            &kms_fixture.home.join("journal").join("lifecycle.ndjson"),
+        )
+        .expect("KMS test journal");
+        let refusal = match build_enterprise_daemon_governance(
+            security.as_ref(),
+            &capability,
+            &transparency_log,
+            &workspace_root().join("spirits"),
+            &journal,
+            Some(&kms_down),
+            None,
+            Some(&bootstrap),
+        ) {
+            Ok(_) => panic!("configured-down KMS must refuse posture construction"),
+            Err(error) => error,
+        };
+        assert!(
+            refusal.to_string().contains("no healthy at-rest seal hook"),
+            "KMS refusal must identify the unavailable seal hook; got: {refusal}"
+        );
+
+        // (d) WIRED + PDP deny — fail closed after SSO/PDP, before KMS.
+        let denied_fixture = fixture("denied");
+        set_process_env(&denied_fixture);
+        let denied_ports = RecordingPorts::new(PolicyVerdict::Deny);
+        let denied = boot_and_drive(&denied_fixture, TestWiring::Full, &denied_ports).await;
+        let refusal = denied.expect_err("a PDP deny must refuse the collective read");
+        assert!(
+            refusal.contains("enterprise PDP denied capability issuance"),
+            "the refusal must name the PDP denial; got: {refusal}"
+        );
+        let (denied_sso, denied_pdp, denied_kms, _) = denied_ports.counts();
+        assert!(
+            denied_sso >= 1 && denied_pdp >= 1,
+            "SSO and PDP must both run before the refusal"
+        );
+        assert_eq!(
+            denied_kms, 0,
+            "a refused read must never reach the at-rest seal"
+        );
+
+        // (e) WIRED + allow — every arm fires.
+        let wired_fixture = fixture("wired");
+        set_process_env(&wired_fixture);
+        let wired_ports = RecordingPorts::new(PolicyVerdict::Allow);
+        boot_and_drive(&wired_fixture, TestWiring::Full, &wired_ports)
+            .await
+            .expect("a governed collective read must be admitted");
+        let (sso, pdp, kms, siem) = wired_ports.counts();
+        assert!(
+            sso >= 1 && pdp >= 1 && kms >= 1,
+            "wired daemon must reach SSO, PDP, and KMS"
+        );
+        assert!(
+            siem >= 1,
+            "wired daemon must project at least one SIEM record"
+        );
+    }
+
+    // ── H4 — the per-Spirit PDP binding is live at the daemon issuance pid ──
+
+    /// H4 — a PDP rule that denies only the daemon control pid must refuse the
+    /// daemon read while allowing the same action for another pid.
+    #[tokio::test]
+    async fn story_13_5a_pdp_subject_binding_uses_the_daemon_issuance_pid() {
+        let _guard = env_lock();
+
+        #[derive(Default)]
+        struct PidRecordingPdp {
+            seen: Mutex<Vec<(u32, String)>>,
+        }
+
+        impl PolicyDecisionPort for PidRecordingPdp {
+            fn load_policy(&self, _policy_text: &str) -> Result<(), PolicyDecisionError> {
+                Ok(())
+            }
+
+            fn evaluate(
+                &self,
+                requests: &[PolicyDecisionRequest],
+            ) -> Result<Vec<PolicyVerdict>, PolicyDecisionError> {
+                let mut seen = self.seen.lock().expect("pdp recorder");
+                Ok(requests
+                    .iter()
+                    .map(|request| {
+                        seen.push((request.spirit_pid, request.capability_key.clone()));
+                        if request.spirit_pid == DAEMON_CONTROL_SPIRIT_PID {
+                            PolicyVerdict::Deny
+                        } else {
+                            PolicyVerdict::Allow
+                        }
+                    })
+                    .collect())
+            }
+
+            fn is_healthy(&self) -> bool {
+                true
+            }
+        }
+
+        let fixture = fixture("pid-binding");
+        set_process_env(&fixture);
+        let boot_nonce = 13_5002_u64;
+        let transparency_log = Arc::new(
+            maos_kernel_core::iac::TransparencyLogAdapter::open(&fixture.audit_db, boot_nonce)
+                .expect("open transparency log"),
+        );
+        let bootstrap = load_cohort_daemon_bootstrap(
+            fixture.config_path.to_str().expect("utf-8 config path"),
+            Arc::clone(&transparency_log),
+        )
+        .expect("cohort daemon bootstrap");
+        let (capability, security, _audit_rx) = kernel_stack(boot_nonce);
+        let ports = RecordingPorts::new(PolicyVerdict::Allow);
+        let runtime = enterprise_runtime(&ports, &fixture, boot_nonce);
+        let recorder = Arc::new(PidRecordingPdp::default());
+        let pdp = enterprise_pdp_runtime::EnterprisePdpRuntime::new(
+            Arc::clone(&recorder) as Arc<dyn PolicyDecisionPort>,
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            enterprise_pdp_runtime::DEFAULT_REFRESH_INTERVAL,
+            enterprise_pdp_runtime::DEFAULT_STALENESS_TTL,
+        )
+        .expect("enterprise PDP runtime");
+        let other_subject = recorder
+            .evaluate(&[PolicyDecisionRequest {
+                spirit_pid: DAEMON_CONTROL_SPIRIT_PID + 1,
+                capability_key: "loom.read".to_string(),
+                principal_attributes: None,
+            }])
+            .expect("other-subject PDP evaluation");
+        assert_eq!(
+            other_subject,
+            vec![PolicyVerdict::Allow],
+            "the rule must deny only the daemon control pid"
+        );
+        let journal = maos_kernel_core::journal::JournalAdapter::open(
+            &fixture.home.join("journal").join("lifecycle.ndjson"),
+        )
+        .expect("PID test journal");
+
+        let governance = build_enterprise_daemon_governance(
+            security.as_ref(),
+            &capability,
+            &transparency_log,
+            &workspace_root().join("spirits"),
+            &journal,
+            Some(&runtime),
+            Some(&pdp),
+            Some(&bootstrap),
+        )
+        .expect("enterprise daemon governance")
+        .expect("posture present");
+
+        let daemon = build_cohort_a2a_daemon_runtime(
+            Arc::clone(&transparency_log),
+            boot_nonce,
+            bootstrap,
+            true,
+            Some(governance),
+        )
+        .await
+        .expect("cohort daemon runtime");
+        let request_id = "host-b:story-13-5a-pid";
+        let refusal = daemon
+            .digest_port
+            .note_admitted_request(
+                &HostId(REQUESTER.to_string()),
+                request_id,
+                &digest_request_frame(request_id),
+            )
+            .expect_err("daemon-pid subject deny must refuse the collective read");
+        assert!(
+            refusal.contains("enterprise PDP denied capability issuance"),
+            "subject-specific refusal must come from the PDP; got: {refusal}"
+        );
+        daemon.cancel.cancel();
+        let _ = daemon.service.await;
+
+        let seen = recorder.seen.lock().expect("pdp recorder").clone();
+        assert_eq!(
+            seen,
+            vec![
+                (DAEMON_CONTROL_SPIRIT_PID + 1, "loom.read".to_string()),
+                (DAEMON_CONTROL_SPIRIT_PID, "loom.read".to_string()),
+            ],
+            "PDP must allow another pid and deny the daemon control pid for the same action"
+        );
     }
 }

@@ -634,6 +634,68 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        // ── Story 13.5a — enterprise governance at the cohort-a2a-daemon seam.
+        //
+        // A REAL control, not a null one. At HEAD the `EnterpriseRuntime` was
+        // constructed at `main.rs` and never threaded into the daemon, so every
+        // collective read the daemon served ran with no SSO principal, no PDP
+        // mediation, no at-rest seal and no SIEM forward. Proven-red contract:
+        // dropping the enterprise argument at the `cohort-a2a-daemon` dispatch
+        // reds the source leg; dropping the governed decorator in
+        // `build_cohort_a2a_daemon_runtime` reds both runtime legs (every
+        // recording port falls to zero).
+        //
+        // All three are hermetic — an in-process daemon boot on 127.0.0.1:0 and
+        // a `main.rs` source read. No Postgres, no live SSO/SIEM substrate, so
+        // none of them is `AdvisorySubstrate`.
+        TestLeg {
+            name: "enterprise-governance-reaches-cohort-daemon",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--bin",
+                "maos",
+                "story_13_5a_enterprise_daemon_seam::story_13_5a_enterprise_governance_reaches_the_booted_cohort_daemon",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "enterprise-governance-daemon-dead-wire-negative",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--bin",
+                "maos",
+                "story_13_5a_enterprise_daemon_seam::story_13_5a_daemon_governance_is_dead_wired_unwired_and_fails_closed_when_denied",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "enterprise-governance-daemon-dispatch-threaded",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "enterprise_daemon_seam_13_5a",
+                "story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime",
+                "--",
+                "--exact",
+            ],
+        },
         TestLeg {
             name: "tenant-mode-boots-live",
             class: BindingClass::AdvisorySubstrate,

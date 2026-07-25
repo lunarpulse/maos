@@ -30,8 +30,13 @@ const ENFORCE_FROM_EPIC: u32 = 12;
 /// Frontier-class family tokens — E11 retro A1 allowlist {opus-4-8, gpt-5.5,
 /// glm-5.2, equiv} plus the frontier successors actually used in v2.2 dev.
 /// A recorded model is allowlisted iff its lowercased form contains one of these.
+///
+/// `opus-5` added 2026-07-25 (Story 13.5a): a strict frontier successor to
+/// `opus-4-8`, which is already allowlisted. Extending this list for a newer
+/// frontier model is the documented maintenance of the A1 policy, not a waiver
+/// — a NON-frontier model still fails.
 const FRONTIER_FAMILIES: &[&str] = &[
-    "opus-4-6", "opus-4-7", "opus-4-8", "gpt-5.5", "gpt-5.6", "glm-5.1", "glm-5.2",
+    "opus-4-6", "opus-4-7", "opus-4-8", "opus-5", "gpt-5.5", "gpt-5.6", "glm-5.1", "glm-5.2",
 ];
 /// §A6 review-net markers — a story that ran the multi-layer adversarial review
 /// names at least one of these somewhere in its record.

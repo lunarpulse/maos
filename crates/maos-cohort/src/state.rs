@@ -824,11 +824,12 @@ impl DigestReadPort for CohortManifestState {
         }
     }
 
-    fn note_admitted_request(
+    fn note_admitted_request_guarded(
         &self,
         requester: &HostId,
         request_id: &str,
         frame: &IacFrame,
+        before_commit: &mut dyn FnMut() -> Result<(), String>,
     ) -> Result<(), String> {
         let DigestReadControl::Request {
             request_id: parsed_id,
@@ -864,6 +865,7 @@ impl DigestReadPort for CohortManifestState {
             )
             .to_string());
         }
+        before_commit()?;
         self.audit
             .append(&CohortAuditEvent::DigestReadRequested {
                 requester: requester.as_str().to_string(),
@@ -1380,6 +1382,90 @@ mod tests {
             .drain_pending_digest_replies()
             .expect("queue remains readable")
             .is_empty());
+    }
+
+    #[test]
+    fn guarded_digest_admission_skips_side_effects_for_duplicates_and_capacity_rejections() {
+        let signer = signing_key(14);
+        let state = state(1, &signer, Arc::new(InMemoryCohortAuditSink::default()));
+        let requester = HostId("host-b".into());
+
+        let first_id = "host-b:guarded-0000";
+        let first = digest_frame(
+            "host-b",
+            "host-a",
+            DigestReadControl::Request {
+                request_id: first_id.into(),
+                scope: DIGEST_DAILY_SCOPE.into(),
+            },
+        );
+        let mut guard_calls = 0usize;
+        DigestReadPort::note_admitted_request_guarded(
+            &state,
+            &requester,
+            first_id,
+            &first,
+            &mut || {
+                guard_calls += 1;
+                Ok(())
+            },
+        )
+        .expect("first request admits");
+        DigestReadPort::note_admitted_request_guarded(
+            &state,
+            &requester,
+            first_id,
+            &first,
+            &mut || {
+                guard_calls += 1;
+                Ok(())
+            },
+        )
+        .expect("duplicate remains idempotent");
+        assert_eq!(
+            guard_calls, 1,
+            "duplicate request must not repeat irreversible governance"
+        );
+
+        for index in 1..MAX_PENDING_DIGEST_READS {
+            let request_id = format!("host-b:guarded-{index:04}");
+            let frame = digest_frame(
+                "host-b",
+                "host-a",
+                DigestReadControl::Request {
+                    request_id: request_id.clone(),
+                    scope: DIGEST_DAILY_SCOPE.into(),
+                },
+            );
+            DigestReadPort::note_admitted_request(&state, &requester, &request_id, &frame)
+                .expect("fill pending digest capacity");
+        }
+        let overflow_id = "host-b:guarded-overflow";
+        let overflow = digest_frame(
+            "host-b",
+            "host-a",
+            DigestReadControl::Request {
+                request_id: overflow_id.into(),
+                scope: DIGEST_DAILY_SCOPE.into(),
+            },
+        );
+        let mut overflow_guard_calls = 0usize;
+        let error = DigestReadPort::note_admitted_request_guarded(
+            &state,
+            &requester,
+            overflow_id,
+            &overflow,
+            &mut || {
+                overflow_guard_calls += 1;
+                Ok(())
+            },
+        )
+        .expect_err("over-capacity request must fail closed");
+        assert!(error.contains("too many admitted digest reads"));
+        assert_eq!(
+            overflow_guard_calls, 0,
+            "capacity rejection must occur before irreversible governance"
+        );
     }
 
     #[test]

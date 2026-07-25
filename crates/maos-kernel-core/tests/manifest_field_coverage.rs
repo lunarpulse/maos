@@ -236,14 +236,14 @@ fn production_capability_parsers_are_all_schema_degraded() {
         main_rs
             .matches("CapabilitiesRequired::from_toml_str")
             .count(),
-        4,
+        5,
         "a new production capability parser must add schema degradation coverage"
     );
     assert_eq!(
         main_rs
             .matches(".degrade_for_schema_version(class_section.manifest_schema_version)")
             .count(),
-        5,
+        6,
         "every direct parser and both caps_required_or_empty admission paths must degrade loom"
     );
 }

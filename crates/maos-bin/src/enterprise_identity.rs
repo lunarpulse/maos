@@ -39,7 +39,7 @@ use maos_domain::ports::{
 };
 use maos_loom_lite::seal::AtRestSeal;
 use maos_secrets::{seal_at_rest_opt, LocalMasterKeyKms};
-use maos_siem::{export_report_from_tl, forward_to_file, SiemExporter};
+use maos_siem::{export_report_from_tl, forward_to_file_with_port, SiemExporter};
 use maos_sso::{OidcAlgorithm, OidcVerifier};
 use rusqlite::OpenFlags;
 
@@ -101,6 +101,27 @@ impl EnterpriseConfig {
 
     pub fn with_siem_down(mut self) -> Self {
         self.siem = SubsystemState::ConfiguredDown;
+        self
+    }
+
+    /// Story 13.5a — declare a subsystem `Available` without probing process
+    /// env. `from_env` is the production prober; the composition-root daemon
+    /// proof needs "Available + this exact injected port" without mutating a
+    /// shared test binary's environment.
+    pub fn with_sso_available(mut self) -> Self {
+        self.sso = SubsystemState::Available;
+        self
+    }
+
+    /// Story 13.5a — see [`Self::with_sso_available`].
+    pub fn with_kms_available(mut self) -> Self {
+        self.kms = SubsystemState::Available;
+        self
+    }
+
+    /// Story 13.5a — see [`Self::with_sso_available`].
+    pub fn with_siem_available(mut self) -> Self {
+        self.siem = SubsystemState::Available;
         self
     }
 
@@ -189,16 +210,44 @@ impl EnterpriseRuntime {
             }
         }
 
-        Ok(Self {
+        Ok(Self::from_ports(
             config,
             identity_port,
             kms_port,
             siem_port,
-            crypto: Some(crypto),
-            audit_db_path: Some(audit_db_path),
+            Some(crypto),
+            Some(audit_db_path),
             siem_sink_path,
             boot_nonce,
-        })
+        ))
+    }
+
+    /// Story 13.5a — port-injection constructor. The production `from_env`
+    /// above builds the real adapters and then lands here, so this is not a
+    /// zero-caller test seam; the `cohort-a2a-daemon` lifecycle proof reuses it
+    /// to drive the SAME governance chain against recording ports with no
+    /// external SSO/KMS/SIEM substrate and no process-env mutation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_ports(
+        config: EnterpriseConfig,
+        identity_port: Option<Arc<dyn IdentityAssertionPort>>,
+        kms_port: Option<Arc<dyn KeyManagementPort>>,
+        siem_port: Option<Arc<dyn SiemProjectionPort>>,
+        crypto: Option<Arc<dyn CryptoProvider>>,
+        audit_db_path: Option<PathBuf>,
+        siem_sink_path: Option<PathBuf>,
+        boot_nonce: u64,
+    ) -> Self {
+        Self {
+            config,
+            identity_port,
+            kms_port,
+            siem_port,
+            crypto,
+            audit_db_path,
+            siem_sink_path,
+            boot_nonce,
+        }
     }
 
     pub fn is_noop(&self) -> bool {
@@ -344,31 +393,67 @@ impl EnterpriseRuntime {
         match self.config.siem {
             SubsystemState::Disabled => Ok(0),
             SubsystemState::Available => {
-                if self
+                let port = self
                     .siem_port
                     .as_ref()
-                    .map(|p| p.is_healthy())
-                    .unwrap_or(false)
-                {
-                    let (db, sink) = match (&self.audit_db_path, &self.siem_sink_path) {
-                        (Some(d), Some(s)) => (d, s),
-                        _ => return Err(EnterpriseFailure::SiemSinkDown { buffered: 0 }),
-                    };
-                    match forward_to_file(db, filter.clone(), sink) {
-                        Ok(n) => Ok(n),
-                        Err(_) => {
-                            // On sink-down, surface how many records the TL holds
-                            // matching the filter (the buffer the operator must drain).
-                            let buffered = export_report_from_tl(db, filter)
-                                .ok()
-                                .and_then(|r| r.forwarded_count)
-                                .unwrap_or(0);
-                            Err(EnterpriseFailure::SiemSinkDown { buffered })
-                        }
+                    .filter(|port| port.is_healthy())
+                    .ok_or(EnterpriseFailure::SiemSinkDown { buffered: 0 })?;
+                let (db, sink) = match (&self.audit_db_path, &self.siem_sink_path) {
+                    (Some(db), Some(sink)) => (db, sink),
+                    _ => return Err(EnterpriseFailure::SiemSinkDown { buffered: 0 }),
+                };
+
+                // `maos-audit` deliberately accepts only a quiesced database for
+                // deterministic redaction/export. A running daemon necessarily
+                // owns a live WAL, so take a transactionally consistent SQLite
+                // snapshot and export that snapshot within this same daemon
+                // lifecycle instead of silently buffering every live record.
+                static SNAPSHOT_SEQUENCE: std::sync::atomic::AtomicU64 =
+                    std::sync::atomic::AtomicU64::new(0);
+                let wal_path = db.with_extension("sqlite-wal");
+                let mut snapshot = None;
+                let source_db = if wal_path.exists() {
+                    let sequence =
+                        SNAPSHOT_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let path = db.with_extension(format!(
+                        "siem-snapshot-{}-{sequence}.sqlite",
+                        std::process::id()
+                    ));
+                    let _ = std::fs::remove_file(&path);
+                    let connection = rusqlite::Connection::open(db)
+                        .map_err(|_| EnterpriseFailure::SiemSinkDown { buffered: 0 })?;
+                    let path_text = path.to_string_lossy().into_owned();
+                    if connection.execute("VACUUM INTO ?1", [&path_text]).is_err() {
+                        let _ = std::fs::remove_file(&path);
+                        return Err(EnterpriseFailure::SiemSinkDown { buffered: 0 });
                     }
+                    snapshot = Some(path.clone());
+                    path
                 } else {
-                    Err(EnterpriseFailure::SiemSinkDown { buffered: 0 })
+                    db.clone()
+                };
+
+                let outcome = match forward_to_file_with_port(
+                    &source_db,
+                    filter.clone(),
+                    sink,
+                    port.as_ref(),
+                ) {
+                    Ok(n) => Ok(n),
+                    Err(_) => {
+                        // On sink-down, surface how many records the
+                        // consistent source snapshot holds.
+                        let buffered = export_report_from_tl(&source_db, filter)
+                            .ok()
+                            .and_then(|report| report.forwarded_count)
+                            .unwrap_or(0);
+                        Err(EnterpriseFailure::SiemSinkDown { buffered })
+                    }
+                };
+                if let Some(path) = snapshot {
+                    let _ = std::fs::remove_file(path);
                 }
+                outcome
             }
             SubsystemState::ConfiguredDown => Err(EnterpriseFailure::SiemSinkDown { buffered: 0 }),
         }
