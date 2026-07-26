@@ -16,10 +16,10 @@ use std::collections::{HashMap, HashSet};
 use crate::accessibility::ColorChoice;
 use crate::cli::{
     AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs, GovernanceArgs, GovernanceOp,
-    HaltArgs, HaltOp, ImportArgs, InstallArgs, MigrateArgs, MigrateOp, OrchestratorArgs,
-    OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice, ResumeArgs,
-    RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs,
-    SpiritOp, Subcommand, UpgradePolicyArg,
+    HaltArgs, HaltOp, ImportArgs, InstallArgs, LegalHoldArgs, LegalHoldOp, MigrateArgs, MigrateOp,
+    OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice,
+    ResumeArgs, RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp,
+    SpiritArgs, SpiritOp, Subcommand, UpgradePolicyArg,
 };
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
@@ -30,6 +30,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Unload(args) => lifecycle_verb("unload", args.spirit.as_deref(), color),
         Subcommand::Uninstall(args) => lifecycle_verb("uninstall", args.spirit.as_deref(), color),
         Subcommand::Forget(args) => dispatch_forget(args, color),
+        Subcommand::LegalHold(args) => dispatch_legal_hold(args, color),
         Subcommand::Run(args) => run(args, color),
         Subcommand::Audit(args) => audit_dispatch(&args.query, color),
         Subcommand::Posture(args) => dispatch_posture(args, color),
@@ -1236,6 +1237,31 @@ fn lifecycle_verb(verb: &str, spirit: Option<&str>, color: ColorChoice) -> ExitC
         cmd.env("NO_COLOR", "1");
     }
 
+    exec_and_forward(&mut cmd, &bin)
+}
+
+/// Story 13.5b — Host-global legal-hold operator surface over the existing
+/// one-shot child contract.
+fn dispatch_legal_hold(args: &LegalHoldArgs, color: ColorChoice) -> ExitCode {
+    let bin = maos_bin_path();
+    let mut cmd = std::process::Command::new(&bin);
+    match &args.op {
+        LegalHoldOp::List => {
+            cmd.env("MAOS_ONE_SHOT", "legal-hold-list");
+        }
+        LegalHoldOp::Release { principal } => {
+            let principal = principal.trim();
+            if principal.is_empty() {
+                eprintln!("maosctl: legal-hold release requires a non-empty --principal");
+                return ExitCode::from(2);
+            }
+            cmd.env("MAOS_ONE_SHOT", "legal-hold-release");
+            cmd.env("MAOS_LEGAL_HOLD_PRINCIPAL", principal);
+        }
+    }
+    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+        cmd.env("NO_COLOR", "1");
+    }
     exec_and_forward(&mut cmd, &bin)
 }
 

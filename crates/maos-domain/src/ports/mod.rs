@@ -58,7 +58,9 @@ pub mod crypto; // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 
 
 pub use a2a::A2ARouter; // NEW — Story 6.3
 pub use capability::CapabilityRegistryPort;
-pub use collective_memory::{CollectiveMemoryPort, CollectivePortError, TransportCause}; // Story 10.4a / 13.3
+pub use collective_memory::{
+    CollectiveEraseReceipt, CollectiveMemoryPort, CollectivePortError, TransportCause,
+}; // Story 10.4a / 13.3 / 13.5b
 pub use cross_wall_recall_consent::{
     CrossWallRecallConsentDecision, CrossWallRecallConsentError, CrossWallRecallConsentPort,
 };

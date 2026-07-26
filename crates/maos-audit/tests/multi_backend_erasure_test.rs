@@ -26,7 +26,10 @@ fn open_isolated_adapter(dir: &TempDir) -> Arc<maos_kernel_core::memory::MemoryM
     let principal_index =
         Arc::new(maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
     let tl = Arc::new(
-        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1).unwrap(),
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_with_global_legal_holds(
+            &db_path, &db_path, 1,
+        )
+        .unwrap(),
     );
     Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
         private,
@@ -142,6 +145,23 @@ fn multi_backend_erasure_partition_invariant() {
         "Shared tier should retain its legitimate canary for negative-scan demonstration"
     );
     proved_principal_empty.push("shared");
+
+    // Collective/Loom tier: Decision D is the proof. A principal-shaped write
+    // must be refused at the collective entry point before any store access.
+    let collective_error = memory
+        .write(
+            7,
+            MemoryTier::Collective,
+            &principal_ns,
+            "must-not-land",
+            MemoryValue::Text(CANARY.into()),
+        )
+        .expect_err("collective principal write must be refused");
+    assert!(
+        collective_error.to_string().contains("partitioned out"),
+        "refusal must be the Decision D partition: {collective_error}"
+    );
+    proved_principal_empty.push("loom");
 
     // Partition invariant: every registered backend is in exactly one bucket,
     // buckets are disjoint, and together they cover the registered set.

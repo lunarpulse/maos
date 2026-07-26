@@ -14,6 +14,7 @@ use deadpool_postgres::{Config, ManagerConfig, Pool, PoolConfig, RecyclingMethod
 use maos_audit::erasure::merkle::{verify_proof, MerkleProof};
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue};
+use maos_domain::ports::CollectiveEraseReceipt;
 use maos_domain::region::Region;
 use tokio_postgres::NoTls;
 
@@ -111,6 +112,53 @@ fn parse_cross_team_marker(stored_detail: &str) -> Option<(TeamId, String)> {
     Some((team, detail))
 }
 
+fn reject_principal_namespace(namespace: &MemoryNamespace) -> Result<(), StoreError> {
+    if let MemoryNamespace::Principal {
+        principal_id,
+        schema,
+    } = namespace
+    {
+        return Err(StoreError::PrincipalNamespaceForbidden {
+            principal_id: principal_id.clone(),
+            schema: schema.clone(),
+        });
+    }
+    Ok(())
+}
+
+fn erasure_lock_key(
+    spirit_pid: u32,
+    namespace_kind: &str,
+    logical_namespace_detail: &str,
+    key: &str,
+) -> String {
+    format!("{spirit_pid}\\0{namespace_kind}\\0{logical_namespace_detail}\\0{key}")
+}
+
+fn erasure_clock_dominates(
+    erased_at_source_ts: i64,
+    erased_at_source_region: &str,
+    incoming_source_ts: i64,
+    incoming_source_region: &str,
+) -> bool {
+    erased_at_source_ts > incoming_source_ts
+        || (erased_at_source_ts == incoming_source_ts
+            && erased_at_source_region >= incoming_source_region)
+}
+
+fn dominating_erasure_clock(
+    row: Option<(i64, &str)>,
+    now_ns: i64,
+    fallback_region: &str,
+) -> (i64, String) {
+    match row {
+        Some((source_ts, source_region)) if source_ts >= now_ns => {
+            (source_ts, source_region.to_owned())
+        }
+        _ => (now_ns, fallback_region.to_owned()),
+    }
+}
+
 /// Async Postgres+pgvector backing store.
 pub struct LoomLiteStore {
     pool: Pool,
@@ -164,6 +212,19 @@ pub enum StoreError {
     ConsentStateStale { reason: String },
     #[error("cross-team attestation invalid for {team_id}: {reason}")]
     AttestationInvalid { team_id: TeamId, reason: String },
+    #[error("principal namespace is forbidden in collective storage: {principal_id}/{schema}")]
+    PrincipalNamespaceForbidden {
+        principal_id: String,
+        schema: String,
+    },
+    #[error(
+        "collective erasure tombstone dominates key {key}: erased at ({erased_at_source_ts}, {erased_at_source_region})"
+    )]
+    ErasureTombstoneDominates {
+        key: String,
+        erased_at_source_ts: i64,
+        erased_at_source_region: String,
+    },
 }
 
 impl From<tokio_postgres::Error> for StoreError {
@@ -472,6 +533,7 @@ impl LoomLiteStore {
         source: WriteSource<'_>,
         attestation: Option<&RowAttestation<'_>>,
     ) -> Result<(), StoreError> {
+        reject_principal_namespace(namespace)?;
         // Provenance tuple validation (13.3b review): the row decoder accepts
         // only (depth 0, NULL lineage) or (depth >= 1, lineage); any other
         // combination stored here would fail every subsequent read of the key.
@@ -495,9 +557,8 @@ impl LoomLiteStore {
                 ));
             }
         }
-        let client = self.get_client_with_timeout().await?;
-
-        let (ns_kind, mut ns_detail) = schema::namespace_to_parts(namespace);
+        let (ns_kind, logical_ns_detail) = schema::namespace_to_parts(namespace);
+        let mut ns_detail = logical_ns_detail.clone();
         if let Some(source_team) = source.team {
             ns_detail = cross_team_namespace_detail(source_team, &ns_detail);
         }
@@ -529,7 +590,42 @@ impl LoomLiteStore {
             .transpose()
             .map_err(|error| StoreError::Serialization(error.to_string()))?;
 
-        client
+        let mut client = self.get_client_with_timeout().await?;
+        let transaction = client.transaction().await?;
+        let lock_key = erasure_lock_key(spirit_pid, ns_kind, &logical_ns_detail, key);
+        transaction
+            .query_one(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&lock_key],
+            )
+            .await?;
+        if let Some(row) = transaction
+            .query_opt(
+                "SELECT erased_at_source_ts, erased_at_source_region
+                 FROM collective_erasure_tombstones
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND namespace_detail = $3 AND key = $4",
+                &[&(spirit_pid as i64), &ns_kind, &ns_detail, &key],
+            )
+            .await?
+        {
+            let erased_at_source_ts: i64 = row.get(0);
+            let erased_at_source_region: String = row.get(1);
+            if erasure_clock_dominates(
+                erased_at_source_ts,
+                &erased_at_source_region,
+                source.ts,
+                source.region,
+            ) {
+                return Err(StoreError::ErasureTombstoneDominates {
+                    key: key.to_string(),
+                    erased_at_source_ts,
+                    erased_at_source_region,
+                });
+            }
+        }
+
+        transaction
             .execute(
                 "INSERT INTO collective_memory
                     (spirit_pid, namespace_kind, namespace_detail, key,
@@ -583,8 +679,123 @@ impl LoomLiteStore {
                 ],
             )
             .await?;
+        transaction.commit().await?;
 
         Ok(())
+    }
+
+    /// Erase one store-addressed row and record a CRDT-LWW tombstone.
+    ///
+    /// Operator authority owns this path. The transaction-scoped advisory lock
+    /// is shared with writes, preventing a stale replication apply from racing
+    /// between the delete and tombstone insert.
+    pub async fn erase(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<CollectiveEraseReceipt, StoreError> {
+        self.team_guard(spirit_pid)?;
+        reject_principal_namespace(namespace)?;
+        let (namespace_kind, logical_namespace_detail) = schema::namespace_to_parts(namespace);
+        let cross_team_pattern = format!(
+            "xteam:%:{}",
+            hex::encode(logical_namespace_detail.as_bytes())
+        );
+        let lock_key = erasure_lock_key(spirit_pid, namespace_kind, &logical_namespace_detail, key);
+        let mut client = self.get_client_with_timeout().await?;
+        let transaction = client.transaction().await?;
+        transaction
+            .query_one(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&lock_key],
+            )
+            .await?;
+        let row = transaction
+            .query_opt(
+                "SELECT namespace_detail, source_ts, source_region
+                 FROM collective_memory
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND (namespace_detail = $3 OR namespace_detail LIKE $5)
+                   AND key = $4
+                 ORDER BY (namespace_detail = $3) DESC, source_ts DESC, source_region DESC
+                 LIMIT 1
+                 FOR UPDATE",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &logical_namespace_detail,
+                    &key,
+                    &cross_team_pattern,
+                ],
+            )
+            .await?;
+        let physical_namespace_detail = row
+            .as_ref()
+            .map(|row| row.get::<_, String>(0))
+            .unwrap_or(logical_namespace_detail);
+        let row_erasure_clock = row
+            .as_ref()
+            .map(|row| (row.get::<_, i64>(1), row.get::<_, String>(2)));
+        let deleted_rows = transaction
+            .execute(
+                "DELETE FROM collective_memory
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND namespace_detail = $3 AND key = $4",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &physical_namespace_detail,
+                    &key,
+                ],
+            )
+            .await?;
+        let now_ns = i64::try_from(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos(),
+        )
+        .unwrap_or(i64::MAX);
+        let (erased_at_source_ts, erased_at_source_region) = dominating_erasure_clock(
+            row_erasure_clock
+                .as_ref()
+                .map(|(source_ts, source_region)| (*source_ts, source_region.as_str())),
+            now_ns,
+            &self.config.home_region,
+        );
+        transaction
+            .execute(
+                "INSERT INTO collective_erasure_tombstones
+                    (spirit_pid, namespace_kind, namespace_detail, key,
+                     erased_at_source_ts, erased_at_source_region)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (spirit_pid, namespace_kind, namespace_detail, key)
+                 DO UPDATE SET
+                     erased_at_source_ts = EXCLUDED.erased_at_source_ts,
+                     erased_at_source_region = EXCLUDED.erased_at_source_region,
+                     created_at = NOW()
+                 WHERE EXCLUDED.erased_at_source_ts >
+                           collective_erasure_tombstones.erased_at_source_ts
+                    OR (EXCLUDED.erased_at_source_ts =
+                           collective_erasure_tombstones.erased_at_source_ts
+                        AND EXCLUDED.erased_at_source_region >
+                           collective_erasure_tombstones.erased_at_source_region)",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &physical_namespace_detail,
+                    &key,
+                    &erased_at_source_ts,
+                    &erased_at_source_region,
+                ],
+            )
+            .await?;
+        transaction.commit().await?;
+        Ok(CollectiveEraseReceipt {
+            deleted_rows,
+            tombstone_recorded: true,
+        })
     }
 
     /// Read a value from the collective store.
@@ -601,6 +812,7 @@ impl LoomLiteStore {
         key: &str,
     ) -> Result<Option<MemoryValue>, StoreError> {
         self.team_guard(spirit_pid)?;
+        reject_principal_namespace(namespace)?;
         let client = self.get_client_with_timeout().await?;
 
         let (ns_kind, ns_detail) = schema::namespace_to_parts(namespace);
@@ -723,6 +935,7 @@ impl LoomLiteStore {
         limit: usize,
     ) -> Result<Vec<MemoryEntry>, StoreError> {
         self.team_guard(spirit_pid)?;
+        reject_principal_namespace(namespace)?;
         let client = self.get_client_with_timeout().await?;
 
         let (ns_kind, ns_detail) = schema::namespace_to_parts(namespace);
@@ -1209,6 +1422,61 @@ mod tests {
         assert!(decode_row_provenance(-1, Some(encoded), true).is_err());
         // Provenance without a source team is a consistency violation.
         assert!(decode_row_provenance(2, Some(encoded), false).is_err());
+    }
+
+    #[test]
+    fn erasure_tombstone_clock_blocks_stale_and_equal_replication() {
+        assert!(erasure_clock_dominates(20, "region-a", 19, "region-z"));
+        assert!(erasure_clock_dominates(20, "region-b", 20, "region-a"));
+        assert!(erasure_clock_dominates(20, "region-a", 20, "region-a"));
+        assert!(!erasure_clock_dominates(20, "region-a", 21, "region-a"));
+        assert!(!erasure_clock_dominates(20, "region-a", 20, "region-b"));
+    }
+
+    #[test]
+    fn erasure_clock_captures_future_dated_leaf() {
+        let (erased_at_source_ts, erased_at_source_region) =
+            dominating_erasure_clock(Some((21, "region-a")), 20, "home-region");
+
+        assert_eq!(
+            (erased_at_source_ts, erased_at_source_region.as_str()),
+            (21, "region-a")
+        );
+        assert!(erasure_clock_dominates(
+            erased_at_source_ts,
+            &erased_at_source_region,
+            21,
+            "region-a"
+        ));
+    }
+
+    #[tokio::test]
+    async fn principal_namespace_is_refused_at_collective_store_entry() {
+        let store = LoomLiteStore::new(StoreConfig {
+            connection_string: "host=127.0.0.1 port=1 dbname=none connect_timeout=1".into(),
+            timeout_ms: 25,
+            ..Default::default()
+        })
+        .await
+        .expect("construct lazy store");
+        let namespace = MemoryNamespace::Principal {
+            principal_id: "user-42".into(),
+            schema: "profile.v1".into(),
+        };
+
+        let error = store
+            .write(
+                7,
+                &namespace,
+                "must-not-land",
+                MemoryValue::Text("pii".into()),
+            )
+            .await
+            .expect_err("collective store must refuse principal namespace");
+        assert!(matches!(
+            error,
+            StoreError::PrincipalNamespaceForbidden { .. }
+        ));
     }
 
     struct StaticTenantMap;

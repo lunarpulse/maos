@@ -122,6 +122,34 @@
 # 12.5 delta) in the Epic-12 retro — the rest is composition-root/tooling growth.
 # -----------------------------------------------------------------------------
 
+# Story 13.5b ceiling review (2026-07-25) — tight measured residuals.
+#   maos-bin       14000 → 14150 (measured 14_111): four uninstall terminals,
+#                               legal-hold and operator collective-erase one-shots.
+#   maos-iac        6450 → 6500  (measured 6_476): explicit Host-global legal-hold
+#                               authority binding plus list/release.
+#   xtask          30750 → 30850 (measured 30_799): Reza GDPR legs and one-sided
+#                               erase reconciliation plant.
+#   maos-audit       none → 6100 (measured 6_088): first explicit ceiling; the
+#                               six-stratum GDPR generator is production src.
+#   maos-loom-lite   none → 4750 (measured 4_708): first explicit ceiling; typed
+#                               partition, operator erase, advisory-lock tombstones.
+#   aggregate      133100 → 134000 (measured 133_770): sum of named drivers.
+#   maos-domain moved within ceiling 8450 (measured 8_421): collective-memory port erase method.
+#   maos-cli moved within ceiling 4550 (measured 4_526): maosctl legal-hold list/release.
+#
+# Story 13.5b CODE REVIEW re-base (2026-07-25) — measured after the review
+# patches. Named drivers, measured residuals, no waivers:
+#   maos-audit      6100 → 6150 (measured 6_117): teardown scope contract,
+#                               UNCOVERED_STORES, store-set partition invariant.
+#   xtask          30850 → 30950 (measured 30_911): seven new Blocking Reza legs
+#                               for the operator terminals, regional coverage
+#                               gap, mixed-held proof, and residue pin.
+#   maos-bin       14150 → 14200 (measured 14_150 — sat exactly at ceiling):
+#                               lifecycle-journal helper and the widened Held
+#                               terminal carrying its erased set and proof path.
+#   aggregate     134000 → 134150 (measured 133_989): sum of the above.
+# Tests and fixtures are excluded by the gate, so they are not cited as drivers.
+
 maos-kernel-core = 17900   # Epic-12 retro 2026-07-14: 17750→17900 (Story 12.5 PostSwapMonitor +59; measured 17,832)
 maos-capability = 2000
 maos-cap-registry = 3000
@@ -130,13 +158,15 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 30750   # Story 13.5e re-baseline 2026-07-24: 30600→30750 (measured 30_652 — check-reza-production-path tenant-audit legs); 13.4: 30350→30600 (check-vetting-attestation gate)
+xtask = 30950   # Story 13.5b review: 30850→30950 (measured 30_911 — operator-terminal + regional + mixed-held + residue Reza legs)
 # Story 6.5 — Phase 1 extraction
-maos-iac = 6450   # Story 13.5e re-baseline 2026-07-24: 6200→6450 (measured 6_375 — transparency_log tenant-isolated recall/composition); Epic-13 retro 2026-07-22: 5800→6200 (measured 6_118)
+maos-iac = 6500   # Story 13.5b: 6450→6500 (measured 6_476 — Host-global hold authority/list/release)
+maos-audit = 6150   # Story 13.5b review: 6100→6150 (measured 6_117 — teardown scope contract + UNCOVERED_STORES partition invariant)
+maos-loom-lite = 4750   # Story 13.5b first explicit ceiling (measured 4_708 — operator erase + tombstones)
 maos-manifest = 4250   # Epic-13 retro 2026-07-22: 4150→4250 (measured 4_157)
 
 # Story 1a.1 — 13 new crate stubs
-maos-domain = 8450   # Epic-13 retro 2026-07-22: 8300→8450 (measured 8_392)
+maos-domain = 8450   # Epic-13 retro 2026-07-22: 8300→8450 (measured 8_392); Story 13.5b: unchanged ceiling, measured 8_421 (collective-memory port erase method)
 maos-spirit-hello = 1000
 maos-providers = 2000
 maos-mcp = 1100
@@ -181,8 +211,8 @@ maos-persistence = 2000
 maos-secrets = 1000
 maos-compliance = 2050   # Story 13.4 re-baseline 2026-07-23: 2000→2050 (measured 2_017 — NEW vetting module: mod+attestation+keyring+terminal, FR37 4 verbs)
 maos-control = 1500
-maos-cli = 4550   # Story 13.5e re-baseline 2026-07-24: 4300→4550 (measured 4_489 — tenant-scoped backup/export subcommands); 13.4: 4200→4300 (`vet` subcommand); Epic-13 retro 2026-07-22: 3750→4200
-maos-bin = 14000   # Story 13.5a review re-baseline 2026-07-25: 13700→14000 (measured 13_927 — real two-endpoint mTLS lifecycle proof + fail-closed PDP/KMS/dead-wire controls); implementation re-baseline 12700→13700 (measured 13_599); 13.5e: 12500→12700; 13.4: 12400→12500; Epic-13 retro: 11100→12400
+maos-cli = 4550   # Story 13.5e re-baseline 2026-07-24: 4300→4550 (measured 4_489 — tenant-scoped backup/export subcommands); 13.4: 4200→4300 (`vet` subcommand); Epic-13 retro 2026-07-22: 3750→4200; Story 13.5b: unchanged ceiling, measured 4_526 (maosctl legal-hold list/release subcommands)
+maos-bin = 14200   # Story 13.5b review: 14150→14200 (measured 14_150 — lifecycle-journal helper + widened Held terminal)
 maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
 
 # -----------------------------------------------------------------------------
@@ -299,7 +329,7 @@ maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness re
 # fourth consecutive story to breach kloc-at-"done"; the PROCESS FLAG above stands.
 
 _aggregate_alarm = 16000
-_aggregate_hardfail = 133100  # Story 13.5a review re-baseline 2026-07-25: 132600→133100 (measured 132_988 — fail-closed review corrections + real mTLS lifecycle proof); implementation re-baseline 132000→132600; 13.5e: 131000→132000
+_aggregate_hardfail = 134150  # Story 13.5b review: 134000→134150 (measured 133_989 — audit/xtask/bin review drivers)
 
 # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
 # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a

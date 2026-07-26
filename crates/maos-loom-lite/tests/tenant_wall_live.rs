@@ -12,7 +12,8 @@ use maos_domain::region::Region;
 use maos_domain::team::TeamId;
 use maos_loom_lite::cross_team_consent::{CrossTeamConsentError, CrossTeamConsentPort};
 use maos_loom_lite::replication::bundle::{
-    apply_replication_bundle, build_replication_bundle_v2, CrossTeamApplyContext,
+    apply_replication_bundle, build_replication_bundle, build_replication_bundle_v2, BundleError,
+    CrossTeamApplyContext,
 };
 use maos_loom_lite::replication::leaf::{
     compute_kv_payload_oracle, kv_merkle_root, CollectiveKvLeaf,
@@ -640,5 +641,150 @@ async fn tenant_wall_per_team_merkle_independence_mixed_v1_v2() {
         triple_a_before,
         triple(&leaves_a(&rows_a_after)),
         "team-A's {{root, payload-oracle, row-count}} triple must be independent of team-B"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires MAOS_TEST_POSTGRES_TEAM_A with pgvector"]
+async fn collective_principal_partition_refuses_write_and_replication_apply() {
+    let _guard = guard();
+    let connection_string = team_a_conn();
+    let raw = raw_connect(&connection_string).await;
+    init_fixture_schema(&raw).await;
+    raw.execute("TRUNCATE collective_memory", &[])
+        .await
+        .expect("clear collective store");
+
+    let store = LoomLiteStore::new(StoreConfig {
+        connection_string,
+        home_region: "region-b".into(),
+        ..StoreConfig::default()
+    })
+    .await
+    .expect("construct store");
+    let namespace = MemoryNamespace::Principal {
+        principal_id: "subject-13-5b".into(),
+        schema: "profile.v1".into(),
+    };
+    assert!(matches!(
+        store
+            .write(
+                7,
+                &namespace,
+                "decision-d-direct",
+                MemoryValue::Text("pii".into()),
+            )
+            .await,
+        Err(StoreError::PrincipalNamespaceForbidden { .. })
+    ));
+
+    let region = Region::canonicalize("region-a").unwrap();
+    let bundle = build_replication_bundle(
+        vec![CollectiveKvLeaf {
+            source_region: region.as_str().to_string(),
+            source_ts: 1,
+            spirit_pid: 7,
+            namespace_kind: "principal".into(),
+            namespace_detail: "subject-13-5b:profile.v1".into(),
+            key: "decision-d-replication".into(),
+            value_kind: "text".into(),
+            value_data: b"pii".to_vec(),
+            source_team: None,
+            distillation_depth: None,
+            intent_lineage: None,
+        }],
+        &region,
+        &TEAM_BASE_SEED,
+    );
+    assert!(matches!(
+        apply_replication_bundle(&bundle, &store, "region-b", None, &TEAM_BASE_SEED).await,
+        Err(BundleError::PrincipalNamespaceRefused { .. })
+    ));
+
+    let principal_rows: i64 = raw
+        .query_one(
+            "SELECT COUNT(*) FROM collective_memory WHERE namespace_kind = 'principal'",
+            &[],
+        )
+        .await
+        .expect("scan collective principal rows")
+        .get(0);
+    assert_eq!(
+        principal_rows, 0,
+        "real collective store must contain no principal-shaped rows"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires MAOS_TEST_POSTGRES_TEAM_A with pgvector"]
+async fn collective_erase_moves_merkle_triple_and_blocks_stale_replication() {
+    let _guard = guard();
+    let connection_string = team_a_conn();
+    let raw = raw_connect(&connection_string).await;
+    init_fixture_schema(&raw).await;
+    raw.batch_execute("TRUNCATE collective_memory, collective_erasure_tombstones")
+        .await
+        .expect("clear collective rows and tombstones");
+
+    let store = LoomLiteStore::new(StoreConfig {
+        connection_string,
+        home_region: "region-a".into(),
+        ..StoreConfig::default()
+    })
+    .await
+    .expect("construct store");
+    store
+        .write(
+            7,
+            &MemoryNamespace::Default,
+            "erase-me",
+            MemoryValue::Text("stale-payload".into()),
+        )
+        .await
+        .expect("seed collective row");
+
+    let rows_before = LoomLiteStore::read_all_rows_from(&raw)
+        .await
+        .expect("read pre-erase rows");
+    let leaves_before: Vec<_> = rows_before.iter().map(CollectiveKvLeaf::from_row).collect();
+    let triple_before = (
+        kv_merkle_root(&leaves_before),
+        compute_kv_payload_oracle(&leaves_before),
+        leaves_before.len(),
+    );
+    let region = Region::canonicalize("region-a").unwrap();
+    let stale_bundle = build_replication_bundle(leaves_before, &region, &TEAM_BASE_SEED);
+
+    let receipt = store
+        .erase(7, &MemoryNamespace::Default, "erase-me")
+        .await
+        .expect("erase collective row");
+    assert_eq!(receipt.deleted_rows, 1);
+    assert!(receipt.tombstone_recorded);
+
+    let rows_after = LoomLiteStore::read_all_rows_from(&raw)
+        .await
+        .expect("read post-erase rows");
+    let leaves_after: Vec<_> = rows_after.iter().map(CollectiveKvLeaf::from_row).collect();
+    let triple_after = (
+        kv_merkle_root(&leaves_after),
+        compute_kv_payload_oracle(&leaves_after),
+        leaves_after.len(),
+    );
+    assert_ne!(triple_before.0, triple_after.0, "Merkle root must move");
+    assert_ne!(triple_before.1, triple_after.1, "payload oracle must move");
+    assert_ne!(triple_before.2, triple_after.2, "row count must move");
+
+    assert!(matches!(
+        apply_replication_bundle(&stale_bundle, &store, "region-a", None, &TEAM_BASE_SEED,).await,
+        Err(BundleError::ErasureTombstoneDominates { .. })
+    ));
+    assert!(
+        store
+            .read(7, &MemoryNamespace::Default, "erase-me")
+            .await
+            .expect("read after stale apply")
+            .is_none(),
+        "stale replication must not resurrect an erased row"
     );
 }

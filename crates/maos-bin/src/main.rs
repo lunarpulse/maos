@@ -2611,25 +2611,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Host-wide memory/index state remains on `memory_db_path`; the audit
     // adapter receives the team shard selected above.
     let transparency_log = Arc::new(
-        maos_kernel_core::iac::TransparencyLogAdapter::open(&audit_db_path, boot_nonce).map_err(
-            |e| {
-                format!(
-                    "failed to open audit DB at {}: {e}",
-                    audit_db_path.display()
-                )
-            },
-        )?,
+        maos_kernel_core::iac::TransparencyLogAdapter::open_with_global_legal_holds(
+            &audit_db_path,
+            &memory_db_path,
+            boot_nonce,
+        )
+        .map_err(|error| {
+            format!(
+                "failed to open audit DB at {} with Host-global legal holds {}: {error}",
+                audit_db_path.display(),
+                memory_db_path.display()
+            )
+        })?,
     );
-    if audit_db_path != memory_db_path {
-        transparency_log
-            .attach_global_legal_holds(&memory_db_path)
-            .map_err(|error| {
-                format!(
-                    "failed to keep legal holds on Host-global DB {}: {error}",
-                    memory_db_path.display()
-                )
-            })?;
-    }
     eprintln!(
         "maos: Transparency Log opened on-disk at {}",
         audit_db_path.display()
@@ -4803,6 +4797,94 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // cap-audit drain (the 1b.5b drain stays only in the `hello-spirit`
     // arm). They write exactly one Lifecycle Journal entry and exit.
     if let Ok(mode) = std::env::var("MAOS_ONE_SHOT") {
+        if mode == "legal-hold-list" {
+            let holds = transparency_log
+                .list_legal_holds()
+                .map_err(|error| format!("legal-hold list failed: {error}"))?;
+            println!(
+                "{}",
+                serde_json::to_string(&holds)
+                    .map_err(|error| format!("legal-hold list encode failed: {error}"))?
+            );
+            return Ok(());
+        }
+        if mode == "legal-hold-release" {
+            let principal = std::env::var("MAOS_LEGAL_HOLD_PRINCIPAL")
+                .map_err(|_| "MAOS_LEGAL_HOLD_PRINCIPAL is required")?;
+            if principal.trim().is_empty() {
+                return Err("MAOS_LEGAL_HOLD_PRINCIPAL must not be empty".into());
+            }
+            let released = transparency_log
+                .release_legal_hold(principal.trim())
+                .map_err(|error| format!("legal-hold release failed: {error}"))?;
+            println!(
+                "{}",
+                serde_json::json!({
+                    "principal_id": principal.trim(),
+                    "released": released,
+                    "auto_erased": false
+                })
+            );
+            return Ok(());
+        }
+
+        if mode == "collective-erase" {
+            let port = collective_port
+                .as_ref()
+                .cloned()
+                .ok_or("collective erase requires MAOS_LOOM_POSTGRES")?;
+            let spirit_pid = std::env::var("MAOS_COLLECTIVE_ERASE_PID")
+                .map_err(|_| "MAOS_COLLECTIVE_ERASE_PID is required")?
+                .parse::<u32>()
+                .map_err(|_| "MAOS_COLLECTIVE_ERASE_PID must be a u32")?;
+            let namespace = match std::env::var("MAOS_COLLECTIVE_ERASE_NAMESPACE")
+                .as_deref()
+                .unwrap_or("default")
+            {
+                "default" => maos_domain::memory::MemoryNamespace::Default,
+                "coordination" => maos_domain::memory::MemoryNamespace::Coordination,
+                "forgotten" => maos_domain::memory::MemoryNamespace::Forgotten,
+                "principal" => {
+                    return Err(
+                        "principal namespace is partitioned out of collective storage".into(),
+                    )
+                }
+                other => {
+                    return Err(
+                        format!("unsupported MAOS_COLLECTIVE_ERASE_NAMESPACE '{other}'").into(),
+                    )
+                }
+            };
+            let key = std::env::var("MAOS_COLLECTIVE_ERASE_KEY")
+                .map_err(|_| "MAOS_COLLECTIVE_ERASE_KEY is required")?;
+            let audit_namespace = format!("{namespace:?}");
+            let audit_key = key.clone();
+            let receipt =
+                tokio::task::spawn_blocking(move || port.erase(spirit_pid, &namespace, &key))
+                    .await
+                    .map_err(|error| format!("collective erase worker failed: {error}"))?
+                    .map_err(|error| format!("collective erase failed: {error}"))?;
+            let audit_payload = serde_json::json!({
+                "spirit_pid": spirit_pid,
+                "namespace": audit_namespace,
+                "key": audit_key,
+                "receipt": &receipt,
+            });
+            let audit_frame_id = transparency_log.insert_kernel_event_returning_id(
+                spirit_pid,
+                "collective.operator.erase",
+                audit_payload.to_string().as_bytes(),
+            );
+            println!(
+                "{}",
+                serde_json::json!({
+                    "receipt": receipt,
+                    "audit_frame_id": hex::encode(audit_frame_id),
+                })
+            );
+            return Ok(());
+        }
+
         // Lifecycle verbs are handled first — they're cheap and exit
         // without engaging the Inference Port / capability registry.
         if let Some(event) = match mode.as_str() {
@@ -4817,63 +4899,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // by `SecurityManagerAdapter::admit_spirit`.
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
 
-            let journal_path = maos_audit::default_journal_path();
-            if let Some(parent) = journal_path.parent() {
-                if let Err(e) = std::fs::create_dir_all(parent) {
-                    eprintln!(
-                        "maos: failed to create journal parent directory {}: {e}",
-                        parent.display()
-                    );
-                    return Err(format!("journal parent create failed: {e}").into());
-                }
-            }
-            let adapter =
-                maos_kernel_core::journal::JournalAdapter::open(&journal_path).map_err(|e| {
-                    format!(
-                        "failed to open Lifecycle Journal at {}: {e}",
-                        journal_path.display()
-                    )
-                })?;
             let spirit_id =
                 std::env::var("MAOS_SPIRIT_ID").unwrap_or_else(|_| "hello-spirit".into());
-            adapter.append_transition(maos_domain::invariants::i10::JournalEntry::Lifecycle(
-                maos_domain::invariants::i10::LifecycleEntry {
-                    timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
-                    lifecycle_event: event,
-                    spirit_id: spirit_id.clone(),
-                    payload: None,
-                    effective_sandbox_tier: None,
-                },
-            ));
-            // Adapter's `Drop` impl signals the drain thread and fsyncs
-            // (journal/mod.rs:195-203). No cap-audit drain required.
-            drop(adapter);
+            if mode == "uninstall" {
+                let mut terminal = run_uninstall_cascade(
+                    &spirit_id,
+                    memory.as_ref(),
+                    capability.as_ref(),
+                    &transparency_log,
+                    &audit_db_path,
+                );
+                // ADR-059 Decision 6 — only a successful erase writes the
+                // uninstall lifecycle success. 13.5b review: a journal failure
+                // on that path becomes the terminal, never a bare exit 1 hiding
+                // behind an already-printed `erased` receipt.
+                if terminal.exit_code() == 0 {
+                    if let Err(error) = append_lifecycle_journal(event, &spirit_id) {
+                        terminal = UninstallCascadeTerminal::Failed {
+                            spirit_id: spirit_id.clone(),
+                            error,
+                        };
+                    }
+                }
+                let exit_code = terminal.exit_code();
+                println!(
+                    "{}",
+                    serde_json::to_string(&terminal)
+                        .map_err(|error| format!("uninstall terminal encode failed: {error}"))?
+                );
+                std::io::Write::flush(&mut std::io::stdout())
+                    .map_err(|error| format!("uninstall terminal flush failed: {error}"))?;
+                // Always exit explicitly: the terminal receipt on stdout and the
+                // process exit code are one contract and must not diverge.
+                std::process::exit(exit_code);
+            }
+
+            let journal_path = append_lifecycle_journal(event, &spirit_id)?;
 
             // Diagnostic copy mirrors the AC1 table verbatim.
             let diag = match mode.as_str() {
                 "start" => "started",
                 "stop" => "stopped",
                 "unload" => "unloaded",
-                "uninstall" => "uninstalled",
+                "uninstall" => unreachable!("uninstall exits above with its terminal receipt"),
                 _ => unreachable!(),
             };
             eprintln!(
                 "maos: {diag} {spirit_id} (journal: {})",
                 journal_path.display()
             );
-            if mode == "uninstall" {
-                let proof_path = run_uninstall_cascade(
-                    &spirit_id,
-                    memory.as_ref(),
-                    capability.as_ref(),
-                    &transparency_log,
-                    &audit_db_path,
-                )
-                .map_err(|e| format!("uninstall cascade failed: {e}"))?;
-                println!(
-                    "{{\"status\":\"uninstalled\",\"spirit_id\":\"{spirit_id}\",\"proof_path\":\"{proof_path}\"}}"
-                );
-            }
             return Ok(());
         }
 
@@ -7902,19 +7976,147 @@ description = "smoke test spirit successor"
 }
 
 #[cfg(feature = "network")]
-/// Story 9.2 — real uninstall cascade + proof-of-erasure emission.
+#[derive(Debug, serde::Serialize)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
+enum UninstallCascadeTerminal {
+    Erased {
+        spirit_id: String,
+        proof_path: String,
+        erased_principals: u64,
+    },
+    /// A durable legal hold suspended at least one principal.
+    ///
+    /// Story 13.5b review: this terminal MUST carry what the run actually did.
+    /// The cascade erases unheld principals before it discovers a held one, so
+    /// a bare "held" would report destruction as if nothing had happened.
+    Held {
+        spirit_id: String,
+        /// Principals the hold suspended — nothing was erased for these.
+        held_principal_ids: Vec<String>,
+        /// Principals this same run DID erase. Non-empty means data is gone.
+        erased_principal_ids: Vec<String>,
+        /// Partial proof bundle, present iff `erased_principal_ids` is
+        /// non-empty. NEVER a complete-erasure artifact — the held principals
+        /// appear inside it as `CategoryStatus::CoverageGap`, and no regional
+        /// teardown receipt is written for a held run.
+        proof_path: Option<String>,
+        deleted_entries: u64,
+        revoked_tokens: u64,
+    },
+    NotFound {
+        spirit_id: String,
+    },
+    Failed {
+        spirit_id: String,
+        error: String,
+    },
+}
+
+#[cfg(feature = "network")]
+impl UninstallCascadeTerminal {
+    fn exit_code(&self) -> i32 {
+        match self {
+            Self::Erased { .. } => 0,
+            Self::Held { .. } => 3,
+            Self::NotFound { .. } => 4,
+            Self::Failed { .. } => 5,
+        }
+    }
+
+    fn intent(&self) -> &'static str {
+        match self {
+            Self::Erased { .. } => "principal.uninstall.erased",
+            Self::Held { .. } => "principal.uninstall.held",
+            Self::NotFound { .. } => "principal.uninstall.not-found",
+            Self::Failed { .. } => "principal.uninstall.failed",
+        }
+    }
+}
+
+/// Append one Lifecycle Journal transition and return the journal path.
 ///
-/// Resolves the spirit name to its pid(s), forgets every principal
-/// namespace associated with those pids, revokes all capability tokens,
-/// builds a signed Merkle proof, and persists the bundle to the
-/// `MAOS_ERASURE_PROOFS_DIR` / XDG default.
+/// Extracted in the 13.5b review so the uninstall path can treat a journal
+/// failure as a `Failed` terminal instead of an exit code that contradicts the
+/// terminal receipt already printed on stdout.
+#[cfg(feature = "network")]
+fn append_lifecycle_journal(
+    event: maos_domain::invariants::i10::LifecycleEvent,
+    spirit_id: &str,
+) -> Result<std::path::PathBuf, String> {
+    let journal_path = maos_audit::default_journal_path();
+    if let Some(parent) = journal_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "failed to create journal parent directory {}: {e}",
+                parent.display()
+            )
+        })?;
+    }
+    let adapter = maos_kernel_core::journal::JournalAdapter::open(&journal_path).map_err(|e| {
+        format!(
+            "failed to open Lifecycle Journal at {}: {e}",
+            journal_path.display()
+        )
+    })?;
+    adapter.append_transition(maos_domain::invariants::i10::JournalEntry::Lifecycle(
+        maos_domain::invariants::i10::LifecycleEntry {
+            timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+            lifecycle_event: event,
+            spirit_id: spirit_id.to_string(),
+            payload: None,
+            effective_sandbox_tier: None,
+        },
+    ));
+    // Adapter's `Drop` impl signals the drain thread and fsyncs
+    // (journal/mod.rs:195-203). No cap-audit drain required.
+    drop(adapter);
+    Ok(journal_path)
+}
+
+#[cfg(feature = "network")]
 fn run_uninstall_cascade(
     spirit_id: &str,
     memory: &maos_kernel_core::memory::MemoryManagerAdapter,
     capability: &maos_kernel_core::capability::CapabilityRegistryAdapter,
     transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
     audit_db_path: &std::path::Path,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> UninstallCascadeTerminal {
+    let terminal = match run_uninstall_cascade_inner(
+        spirit_id,
+        memory,
+        capability,
+        transparency_log,
+        audit_db_path,
+    ) {
+        Ok(terminal) => terminal,
+        Err(error) => UninstallCascadeTerminal::Failed {
+            spirit_id: spirit_id.to_string(),
+            error: error.to_string(),
+        },
+    };
+    let payload =
+        serde_json::to_vec(&terminal).expect("serializing the uninstall terminal enum cannot fail");
+    // Trap 4: this append remains a fail-fast audit commit point. The adapter
+    // panics on durable journal failure; catching unwind after partial erasure
+    // would falsely imply a safely recoverable transaction.
+    transparency_log.insert_kernel_event_returning_id(0, terminal.intent(), &payload);
+    terminal
+}
+
+#[cfg(feature = "network")]
+/// Story 9.2 — real uninstall cascade + proof-of-erasure emission.
+///
+/// Resolves the spirit name to its pid(s), forgets every principal
+/// namespace associated with those pids, revokes all capability tokens,
+/// builds a signed Merkle proof, and persists the bundle to the
+/// `MAOS_ERASURE_PROOFS_DIR` / XDG default.
+fn run_uninstall_cascade_inner(
+    spirit_id: &str,
+    memory: &maos_kernel_core::memory::MemoryManagerAdapter,
+    capability: &maos_kernel_core::capability::CapabilityRegistryAdapter,
+    transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
+    audit_db_path: &std::path::Path,
+) -> Result<UninstallCascadeTerminal, Box<dyn std::error::Error>> {
     use maos_audit::erasure::proof::{
         build_erasure_proof, write_proof_bundle, CategoryStatus, ErasureCategory,
     };
@@ -7928,7 +8130,9 @@ fn run_uninstall_cascade(
     let incarnations = maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false)
         .map_err(|e| format!("failed to resolve spirit '{spirit_id}': {e}"))?;
     if incarnations.is_empty() {
-        return Err(format!("no incarnation found for spirit '{spirit_id}'").into());
+        return Ok(UninstallCascadeTerminal::NotFound {
+            spirit_id: spirit_id.to_string(),
+        });
     }
 
     let mut total_deleted_entries: u64 = 0;
@@ -7937,6 +8141,8 @@ fn run_uninstall_cascade(
     let mut all_principal_ids: Vec<String> = Vec::new();
     let mut erased_distillate_frame_ids: Vec<[u8; 16]> = Vec::new();
     let mut erased_principal_frame_ids: Vec<[u8; 16]> = Vec::new();
+    let mut stores_covered = std::collections::BTreeSet::<String>::new();
+    let mut held_principal_ids: Vec<String> = Vec::new();
 
     for (_boot_nonce, spirit_pid) in &incarnations {
         let spirit_pid = *spirit_pid;
@@ -7946,6 +8152,10 @@ fn run_uninstall_cascade(
         let principal_ids = transparency_log
             .principal_ids_for_spirit_pid(spirit_pid)
             .map_err(|e| format!("failed to list principals for pid {spirit_pid}: {e}"))?;
+        // NOTE (13.5b review): do NOT `continue` on an empty principal list.
+        // Token revocation below is unconditional per incarnation, and skipping
+        // it left an uninstalled identity holding live capability tokens. The
+        // inner loop over an empty vec is already a no-op.
         for principal_id in &principal_ids {
             match memory.forget_with_reason(principal_id, None) {
                 Ok(maos_domain::memory::ForgetOutcome::Erased {
@@ -7956,6 +8166,8 @@ fn run_uninstall_cascade(
                     total_deleted_entries += receipt.deleted_entries;
                     total_deleted_index_rows += receipt.deleted_index_rows;
                     all_principal_ids.push(principal_id.clone());
+                    stores_covered.insert("private".into());
+                    stores_covered.insert("principal_index".into());
                     // Collect the scrubbed distillate frames for the proof.
                     for hex_id in redacted_distillate_frame_ids {
                         if let Ok(bytes) = hex::decode(&hex_id) {
@@ -7983,6 +8195,7 @@ fn run_uninstall_cascade(
                         "maos: uninstall blocked by legal hold for principal {}: {:?}",
                         principal_id, hold
                     );
+                    held_principal_ids.push(principal_id.clone());
                 }
                 Err(e) => {
                     return Err(format!("forget failed for principal {principal_id}: {e}").into());
@@ -7993,6 +8206,29 @@ fn run_uninstall_cascade(
         // Revoke all capability tokens for the spirit.
         total_revoked_tokens += capability.revoke_all_for_pid(spirit_pid).unwrap_or(0);
     }
+
+    if all_principal_ids.is_empty() {
+        if held_principal_ids.is_empty() {
+            return Ok(UninstallCascadeTerminal::NotFound {
+                spirit_id: spirit_id.to_string(),
+            });
+        }
+        // Held, and this run destroyed no principal data — so there is nothing
+        // to attest and no proof is written. "No proof" keeps meaning "nothing
+        // happened", which is exactly how an operator reads it.
+        return Ok(UninstallCascadeTerminal::Held {
+            spirit_id: spirit_id.to_string(),
+            held_principal_ids,
+            erased_principal_ids: Vec::new(),
+            proof_path: None,
+            deleted_entries: 0,
+            revoked_tokens: total_revoked_tokens as u64,
+        });
+    }
+    // Past this point the cascade HAS destroyed principal data. Every exit
+    // below must therefore produce a signed artifact describing what it did —
+    // including the mixed erased+held case, which must never report `held`
+    // while silently discarding the erasures it already performed.
 
     // Capture post-erasure tree leaves.
     let post_frame_ids = transparency_log
@@ -8014,7 +8250,7 @@ fn run_uninstall_cascade(
             )
         })?;
 
-    let categories = vec![
+    let mut categories = vec![
         ErasureCategory {
             name: "memory_namespace".into(),
             status: CategoryStatus::Removed {
@@ -8031,6 +8267,13 @@ fn run_uninstall_cascade(
             name: "capability_tokens".into(),
             status: CategoryStatus::Removed {
                 count: total_revoked_tokens as u64,
+            },
+        },
+        ErasureCategory {
+            name: "shared".into(),
+            status: CategoryStatus::CoverageGap {
+                reason: "shared-tier principal erasure is not implemented; owner: Story 13-5h"
+                    .into(),
             },
         },
         ErasureCategory {
@@ -8056,6 +8299,20 @@ fn run_uninstall_cascade(
             },
         },
     ];
+    // 13.5b review: a mixed run erased some principals and was suspended on
+    // others. The held ones are an explicit coverage gap inside the same signed
+    // bundle, so the artifact can never be read as a complete erasure.
+    if !held_principal_ids.is_empty() {
+        categories.push(ErasureCategory {
+            name: "legal_hold".into(),
+            status: CategoryStatus::CoverageGap {
+                reason: format!(
+                    "suspended by durable legal hold, not erased: {}",
+                    held_principal_ids.join(", ")
+                ),
+            },
+        });
+    }
 
     // P23: stamp the proof with the LATEST incarnation's pid (the current
     // boot).  `resolve_spirit_name(all_boots=false)` returns only the latest
@@ -8090,16 +8347,20 @@ fn run_uninstall_cascade(
     // Fail-closed: a teardown that cannot attest BOTH phases is an error, never
     // a silent success (AC-14). The receipt is HOME-key-signed, hence
     // region-NEUTRAL — it survives the region decommission (AC-10/AC-15).
+    //
+    // 13.5b review: a held run is NOT a teardown. It leaves principal rows
+    // deliberately in place, so it must never emit a regional teardown receipt
+    // — the partial proof above is its only artifact.
     if let Some(region) =
         maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
             .home_region
+            .filter(|_| held_principal_ids.is_empty())
     {
         use maos_audit::erasure::regional_teardown::{
             build_regional_teardown_receipt, decommission_region_key, ForgetCascadeAttestation,
-            REQUIRED_STORES,
         };
         let forget = ForgetCascadeAttestation::from_outcome(
-            REQUIRED_STORES.iter().map(|s| s.to_string()).collect(),
+            stores_covered.iter().cloned().collect(),
             all_principal_ids.len() as u64,
         )
         .map_err(|e| format!("regional teardown failed (fail-closed): {e}"))?;
@@ -8123,7 +8384,22 @@ fn run_uninstall_cascade(
             .map_err(|e| format!("failed to write teardown receipt: {e}"))?;
     }
 
-    Ok(proof_path.to_string_lossy().to_string())
+    if !held_principal_ids.is_empty() {
+        return Ok(UninstallCascadeTerminal::Held {
+            spirit_id: spirit_id.to_string(),
+            held_principal_ids,
+            erased_principal_ids: all_principal_ids,
+            proof_path: Some(proof_path.to_string_lossy().to_string()),
+            deleted_entries: total_deleted_entries,
+            revoked_tokens: total_revoked_tokens as u64,
+        });
+    }
+
+    Ok(UninstallCascadeTerminal::Erased {
+        spirit_id: spirit_id.to_string(),
+        proof_path: proof_path.to_string_lossy().to_string(),
+        erased_principals: all_principal_ids.len() as u64,
+    })
 }
 
 #[cfg(feature = "network")]

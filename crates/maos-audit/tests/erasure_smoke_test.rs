@@ -40,7 +40,9 @@ fn fresh_adapter(
     let shared = Arc::new(maos_kernel_core::memory::SharedMemoryStore::open(&db_path).unwrap());
     let principal_index =
         Arc::new(maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
-    let tl = Arc::new(TransparencyLogAdapter::open(&db_path, 1).unwrap());
+    let tl = Arc::new(
+        TransparencyLogAdapter::open_with_global_legal_holds(&db_path, &db_path, 1).unwrap(),
+    );
     let memory = Arc::new(MemoryManagerAdapter::new(
         private,
         shared,

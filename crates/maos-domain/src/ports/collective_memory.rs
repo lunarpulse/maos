@@ -24,6 +24,16 @@ use crate::team::TeamId;
 pub enum TransportCause {
     #[error("{reason}")]
     Other { reason: String },
+    #[error("collective namespace partition refused: {namespace}")]
+    PartitionRefused { namespace: String },
+    #[error(
+        "collective erasure tombstone dominates key {key}: erased at ({erased_at_source_ts}, {erased_at_source_region})"
+    )]
+    ErasureTombstoneDominates {
+        key: String,
+        erased_at_source_ts: i64,
+        erased_at_source_region: String,
+    },
     #[error("cross-team consent denied: {from_team}->{to_team}, intent={intent}")]
     ConsentDenied {
         from_team: TeamId,
@@ -71,6 +81,13 @@ pub enum CollectivePortError {
     Transport(TransportCause),
 }
 
+/// Result of an operator-authority erase at the collective store.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CollectiveEraseReceipt {
+    pub deleted_rows: u64,
+    pub tombstone_recorded: bool,
+}
+
 /// Sync port trait for the collective memory tier (Postgres+pgvector Loom-lite).
 ///
 /// Injected into the kernel's `MemoryManagerAdapter` as
@@ -90,6 +107,7 @@ pub enum CollectivePortError {
 ///
 /// All methods are `data-movement` — the port moves frames/values between
 /// the kernel mediation layer and the external Loom-lite backing store.
+
 pub trait CollectiveMemoryPort: Send + Sync {
     /// Class: data-movement
     ///
@@ -127,4 +145,14 @@ pub trait CollectiveMemoryPort: Send + Sync {
         prefix: &str,
         limit: usize,
     ) -> Result<Vec<MemoryEntry>, CollectivePortError>;
+    /// Erase one store-addressed collective row under operator authority.
+    ///
+    /// This method is intentionally absent from `SpiritMemoryView` and the
+    /// kernel's `MemoryTier::Collective` arms.
+    fn erase(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<CollectiveEraseReceipt, CollectivePortError>;
 }

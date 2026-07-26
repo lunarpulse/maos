@@ -343,8 +343,10 @@ impl PrivateMemoryStore {
                 .write()
                 .expect("PrivateMemoryStore lock poisoned");
             for (pid, ns, key) in &to_remove {
-                map.remove(&(*pid, ns.clone(), key.clone()));
-                count += 1;
+                let removed = map.remove(&(*pid, ns.clone(), key.clone()));
+                if removed.is_some() {
+                    count += 1;
+                }
             }
         }
 
@@ -355,9 +357,7 @@ impl PrivateMemoryStore {
             let dir_name = Self::namespace_to_dirname(ns)?;
             let subtree = fs_root.join(pid.to_string()).join(&dir_name);
             if subtree.exists() {
-                if let Err(_e) = fs::remove_dir_all(&subtree) {
-                    // v0.5 acceptable: partial cascade — document in dev record.
-                }
+                fs::remove_dir_all(&subtree).map_err(MemoryError::Io)?;
             }
             cleaned_pids.insert(*pid);
         }

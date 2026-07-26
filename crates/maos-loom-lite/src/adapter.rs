@@ -24,7 +24,7 @@ use std::time::Duration;
 
 use maos_domain::memory::{MemoryEntry, MemoryNamespace, MemoryValue};
 use maos_domain::ports::collective_memory::{
-    CollectiveMemoryPort, CollectivePortError, TransportCause,
+    CollectiveEraseReceipt, CollectiveMemoryPort, CollectivePortError, TransportCause,
 };
 
 use crate::store::{LoomLiteStore, StoreError};
@@ -137,6 +137,25 @@ impl CollectiveMemoryPort for LoomLiteAdapter {
         .map_err(|_| CollectivePortError::Timeout { timeout_ms })?
         .map_err(store_error_to_port_error)
     }
+
+    fn erase(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<CollectiveEraseReceipt, CollectivePortError> {
+        let store = Arc::clone(&self.store);
+        let ns = namespace.clone();
+        let k = key.to_string();
+        let timeout = self.timeout;
+        let timeout_ms = self.timeout.as_millis() as u64;
+
+        block_on_or_typed(&self.handle, async move {
+            tokio::time::timeout(timeout, store.erase(spirit_pid, &ns, &k)).await
+        })?
+        .map_err(|_| CollectivePortError::Timeout { timeout_ms })?
+        .map_err(store_error_to_port_error)
+    }
 }
 
 /// Map store errors to port errors with halt-safe semantics.
@@ -150,6 +169,21 @@ fn store_error_to_port_error(error: StoreError) -> CollectivePortError {
         | StoreError::AtRestSeal(reason) => {
             CollectivePortError::Transport(TransportCause::Other { reason })
         }
+        StoreError::PrincipalNamespaceForbidden {
+            principal_id,
+            schema,
+        } => CollectivePortError::Transport(TransportCause::PartitionRefused {
+            namespace: format!("principal:{principal_id}:{schema}"),
+        }),
+        StoreError::ErasureTombstoneDominates {
+            key,
+            erased_at_source_ts,
+            erased_at_source_region,
+        } => CollectivePortError::Transport(TransportCause::ErasureTombstoneDominates {
+            key,
+            erased_at_source_ts,
+            erased_at_source_region,
+        }),
         StoreError::TenantMapStale { team_id, reason } => {
             CollectivePortError::Transport(TransportCause::MapStale { team_id, reason })
         }
@@ -282,5 +316,22 @@ mod tests {
             ),
             "connection-mismatch must carry both teams and reason: {connection_mismatch:?}"
         );
+    }
+
+    #[test]
+    fn erasure_tombstone_cause_remains_typed_across_port() {
+        let mapped = store_error_to_port_error(StoreError::ErasureTombstoneDominates {
+            key: "erased-key".into(),
+            erased_at_source_ts: 42,
+            erased_at_source_region: "region-a".into(),
+        });
+        assert!(matches!(
+            mapped,
+            CollectivePortError::Transport(TransportCause::ErasureTombstoneDominates {
+                ref key,
+                erased_at_source_ts: 42,
+                ref erased_at_source_region,
+            }) if key == "erased-key" && erased_at_source_region == "region-a"
+        ));
     }
 }

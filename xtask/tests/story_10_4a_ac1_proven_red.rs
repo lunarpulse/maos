@@ -30,7 +30,9 @@ use std::time::{Duration, Instant};
 use maos_domain::memory::{
     CollectiveErrorKind, MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue,
 };
-use maos_domain::ports::{CollectiveMemoryPort, CollectivePortError, MemoryManagerPort};
+use maos_domain::ports::{
+    CollectiveEraseReceipt, CollectiveMemoryPort, CollectivePortError, MemoryManagerPort,
+};
 use maos_kernel_core::api::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
     TransparencyLogAdapter,
@@ -328,6 +330,7 @@ struct RecordingPort {
     write_count: Mutex<usize>,
     read_count: Mutex<usize>,
     scan_count: Mutex<usize>,
+    erase_count: Mutex<usize>,
     kv: Mutex<Vec<(u32, MemoryNamespace, String, MemoryValue)>>,
 }
 
@@ -337,6 +340,7 @@ impl RecordingPort {
             write_count: Mutex::new(0),
             read_count: Mutex::new(0),
             scan_count: Mutex::new(0),
+            erase_count: Mutex::new(0),
             kv: Mutex::new(Vec::new()),
         }
     }
@@ -351,6 +355,10 @@ impl RecordingPort {
 
     fn scans(&self) -> usize {
         *self.scan_count.lock()
+    }
+
+    fn erases(&self) -> usize {
+        *self.erase_count.lock()
     }
 }
 
@@ -406,6 +414,66 @@ impl CollectiveMemoryPort for RecordingPort {
         }
         Ok(out)
     }
+
+    fn erase(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<CollectiveEraseReceipt, CollectivePortError> {
+        let mut rows = self.kv.lock();
+        let before = rows.len();
+        rows.retain(|(pid, ns, row_key, _)| {
+            !(*pid == spirit_pid && ns == namespace && row_key == key)
+        });
+        let deleted_rows = (before - rows.len()) as u64;
+        *self.erase_count.lock() += 1;
+        Ok(CollectiveEraseReceipt {
+            deleted_rows,
+            tombstone_recorded: true,
+        })
+    }
+}
+
+fn reconcile_collective_erase(
+    store: Option<&CollectiveEraseReceipt>,
+    audit_intent_present: bool,
+) -> Result<(), &'static str> {
+    match (store.is_some(), audit_intent_present) {
+        (true, true) => Ok(()),
+        (true, false) => Err("store erase exists without audit intent"),
+        (false, true) => Err("audit intent exists without store erase"),
+        (false, false) => Err("no collective erase evidence"),
+    }
+}
+
+#[test]
+fn story_13_5b_one_sided_collective_erase_is_red() {
+    let port = RecordingPort::new();
+    let namespace = MemoryNamespace::Default;
+    port.write(
+        7,
+        &namespace,
+        "erase-me",
+        MemoryValue::Text("payload".into()),
+    )
+    .unwrap();
+    let store_receipt = port.erase(7, &namespace, "erase-me").unwrap();
+    assert_eq!(port.erases(), 1);
+    assert_eq!(store_receipt.deleted_rows, 1);
+
+    assert_eq!(
+        reconcile_collective_erase(Some(&store_receipt), false),
+        Err("store erase exists without audit intent")
+    );
+    assert_eq!(
+        reconcile_collective_erase(None, true),
+        Err("audit intent exists without store erase")
+    );
+    assert_eq!(
+        reconcile_collective_erase(Some(&store_receipt), true),
+        Ok(())
+    );
 }
 
 /// Build a real `MemoryManagerAdapter` against tempdir-backed stores, with the

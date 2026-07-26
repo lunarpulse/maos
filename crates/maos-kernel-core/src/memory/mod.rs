@@ -32,7 +32,7 @@ pub use shared::SharedMemoryStore;
 /// multi-backend erasure test: adding a backend here WITHOUT partitioning it
 /// (proved-erased / proved-principal-empty) in that test FAILS the test, so a
 /// new backend can never slip through unaudited.
-pub const REGISTERED_ERASURE_BACKENDS: &[&str] = &["private", "principal_index", "shared"];
+pub const REGISTERED_ERASURE_BACKENDS: &[&str] = &["private", "principal_index", "shared", "loom"];
 
 /// AC6 / R12 — the full set of erasure-class lineage ids the forget cascade
 /// must stamp in the `ForgetReceipt`.  Mirrors the governance test
@@ -506,8 +506,8 @@ impl MemoryManagerAdapter {
         //    scrubbed — not every distillate by any writer Spirit (which would
         //    destroy unrelated principals' data).
         //    P5: a query error is propagated, not silently dropped.
-        //    P4: a scrub/marker failure is propagated and the frame is NOT
-        //    attested as redacted.
+        //    P4: scrub failure is propagated; the append-only redaction marker
+        //    is best-effort and does not determine whether the scrubbed frame is attested.
         let mut redacted_distillate_frame_ids: Vec<String> = Vec::new();
         if !writer_pids.is_empty() {
             let distillates = self
@@ -897,8 +897,8 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         match self.forget_with_reason(principal_id, None)? {
             ForgetOutcome::Erased { receipt, .. } => Ok(receipt),
             ForgetOutcome::Suspended { .. } => {
-                // The trait-level `forget` is the legacy no-reason path;
-                // a legal-hold is impossible without an explicit reason.
+                // Trait-level `forget` is legacy no-reason path; a durable hold can suspend it,
+                // so callers must use `forget_with_reason` to observe the `held` distinction.
                 Err(MemoryError::Storage(
                     "forget unexpectedly returned legal-hold without reason".to_string(),
                 ))

@@ -2734,6 +2734,27 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: psql -h localhost -U postgres -d maos_team_a -c 'CREATE DATABASE maos_team_b;'
+      # Story 13.5b null-control #22: these five GDPR suites previously had no
+      # explicit CI invocation. Keep each file visible as an independent leg.
+      - name: GDPR erasure smoke
+        run: cargo test --locked -p maos-audit --test erasure_smoke_test
+      - name: GDPR erasure SLA
+        run: cargo test --locked -p maos-audit --test erasure_sla_test
+      - name: GDPR backend partition
+        run: cargo test --locked -p maos-audit --test multi_backend_erasure_test
+      - name: GDPR cascade integration
+        run: cargo test --locked -p maos-audit --test gdpr_cascade_test
+      - name: GDPR deterministic cascade corpus
+        run: cargo test --locked -p maos-audit --test gdpr_cascade_corpus_test
+      # 13.5b review: the operator-facing terminals (daemon JSON + exit codes)
+      # and the maosctl forwarding wrapper had no CI invocation either — the
+      # corpus suite above only replays kernel `ForgetOutcome`s.
+      - name: GDPR uninstall terminals and exit codes
+        run: cargo test --locked -p maos-bin --test erasure_uninstall_13_5b
+      - name: GDPR maosctl terminal exit-code forwarding
+        run: cargo test --locked -p maos-cli --test uninstall_exit_codes_13_5b
+      - name: GDPR legal-hold operator surface
+        run: cargo test --locked -p maos-cli --test legal_hold_cli_13_5b
       - name: Run check-reza-production-path gate
         env:
           MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a

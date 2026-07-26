@@ -73,6 +73,20 @@ CREATE TABLE IF NOT EXISTS collective_memory (
     )
 );
 
+-- Operator-authority erasure tombstones share the row's physical key tuple.
+-- Writers consult this table under the same transaction-scoped advisory lock,
+-- so stale CRDT replication cannot resurrect a deleted row.
+CREATE TABLE IF NOT EXISTS collective_erasure_tombstones (
+    spirit_pid              BIGINT NOT NULL,
+    namespace_kind          TEXT NOT NULL,
+    namespace_detail        TEXT NOT NULL DEFAULT '',
+    key                     TEXT NOT NULL,
+    erased_at_source_ts     BIGINT NOT NULL,
+    erased_at_source_region TEXT NOT NULL,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (spirit_pid, namespace_kind, namespace_detail, key)
+);
+
 -- Additive migrations for a table created by an older or reduced fixture.
 -- Idempotent (IF NOT EXISTS / DO NOTHING on re-run).
 ALTER TABLE collective_memory
@@ -171,14 +185,12 @@ pub fn namespace_to_parts(ns: &maos_domain::memory::MemoryNamespace) -> (&'stati
 
 /// Deserialize (kind, detail) back into a `MemoryNamespace`.
 ///
-/// The `principal` detail uses `principal_id:schema`.  The `:` delimiter is
-/// GUARANTEED absent from validated keys because `PrincipalKey::new` rejects
-/// `:` (and control chars), so `split_once(':')` round-trips losslessly for
-/// any namespace constructed through the validated path.  (The collective tier
-/// rejects `Principal` by construction per Decision D regardless.)
+/// Decision D partitions `MemoryNamespace::Principal` out of collective
+/// storage. Legacy or hostile `principal` rows are refused instead of being
+/// reconstructed into a namespace that has no collective erasure path.
 pub fn parts_to_namespace(
     kind: &str,
-    detail: &str,
+    _detail: &str,
 ) -> Result<maos_domain::memory::MemoryNamespace, String> {
     use maos_domain::memory::MemoryNamespace;
     match kind {
@@ -186,13 +198,7 @@ pub fn parts_to_namespace(
         "coordination" => Ok(MemoryNamespace::Coordination),
         "forgotten" => Ok(MemoryNamespace::Forgotten),
         "principal" => {
-            let (pid, schema) = detail
-                .split_once(':')
-                .ok_or_else(|| format!("invalid principal detail: {detail}"))?;
-            Ok(MemoryNamespace::Principal {
-                principal_id: pid.to_string(),
-                schema: schema.to_string(),
-            })
+            Err("principal namespace is forbidden in collective storage by Decision D".to_string())
         }
         _ => Err(format!("unknown namespace kind: {kind}")),
     }
@@ -250,14 +256,10 @@ mod tests {
     }
 
     #[test]
-    fn namespace_round_trip_principal() {
-        let ns = MemoryNamespace::Principal {
-            principal_id: "user-42".into(),
-            schema: "profile.v1".into(),
-        };
-        let (kind, detail) = namespace_to_parts(&ns);
-        let recovered = parts_to_namespace(kind, &detail).unwrap();
-        assert_eq!(ns, recovered);
+    fn principal_namespace_is_not_decodable_by_collective_store() {
+        let error = parts_to_namespace("principal", "user-42:profile.v1")
+            .expect_err("Decision D forbids principal namespaces in collective storage");
+        assert!(error.contains("principal namespace"));
     }
 
     #[test]
@@ -266,6 +268,13 @@ mod tests {
         let (kind, detail) = namespace_to_parts(&ns);
         let recovered = parts_to_namespace(kind, &detail).unwrap();
         assert_eq!(ns, recovered);
+    }
+
+    #[test]
+    fn schema_installs_collective_erasure_tombstones() {
+        let sql = create_schema_sql(DEFAULT_VECTOR_DIM);
+        assert!(sql.contains("CREATE TABLE IF NOT EXISTS collective_erasure_tombstones"));
+        assert!(sql.contains("PRIMARY KEY (spirit_pid, namespace_kind, namespace_detail, key)"));
     }
 
     #[test]

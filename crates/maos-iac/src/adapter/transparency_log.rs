@@ -225,6 +225,14 @@ pub struct FrameFilter {
     pub cursor_frame_id: Option<[u8; 16]>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PersistedLegalHold {
+    pub principal_id: String,
+    pub reason: String,
+    pub case_ref: Option<String>,
+    pub requested_at_ns: u64,
+}
+
 /// Typed audit-spine error. Coarse-grained at v0.1-β per the dep-introduction
 /// discipline (no `anyhow` in kernel-core; concrete variants only).
 #[derive(Debug, thiserror::Error)]
@@ -241,6 +249,8 @@ pub enum AuditError {
     MalformedFrameId(usize),
     #[error("serialization failed: {0}")]
     Serialization(String),
+    #[error("legal-hold authority is not bound")]
+    LegalHoldAuthorityUnbound,
 }
 
 /// SQL schema for both tables.
@@ -286,17 +296,6 @@ CREATE TABLE IF NOT EXISTS approval_decision_log (
     reasoning           TEXT
 );
 
--- Story 9.2 (P29) — durable per-principal-global legal holds.  Consulted by
--- every forget/uninstall so a held principal cannot be erased by a later
--- command until explicitly released (Decision E: release re-queues, never
--- auto-fires). In team mode Story 13.5e attaches the Host-global table to the
--- one team TL connection and removes the shard-local compatibility table.
-CREATE TABLE IF NOT EXISTS legal_holds (
-    principal_id        TEXT    NOT NULL PRIMARY KEY,
-    reason              TEXT    NOT NULL,
-    case_ref            TEXT,
-    requested_at_ns     INTEGER NOT NULL
-);
 
 CREATE INDEX IF NOT EXISTS idx_approval_actor
     ON approval_decision_log(actor, timestamp_ns);
@@ -320,6 +319,14 @@ CREATE INDEX IF NOT EXISTS idx_slr_version
 CREATE INDEX IF NOT EXISTS idx_slr_recorded_at
     ON schema_lifecycle_registry(recorded_at_ns);
 ";
+
+const LEGAL_HOLDS_TABLE_SQL: &str = "\
+CREATE TABLE IF NOT EXISTS legal_holds (
+    principal_id        TEXT    NOT NULL PRIMARY KEY,
+    reason              TEXT    NOT NULL,
+    case_ref            TEXT,
+    requested_at_ns     INTEGER NOT NULL
+);";
 /// The Transparency Log + Approval Decision Log adapter.
 ///
 /// One per Host; constructed in the composition root (`maos-bin/main.rs`)
@@ -335,11 +342,18 @@ pub struct TransparencyLogAdapter {
     mailbox: MailboxStub,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LegalHoldAuthority {
+    Main,
+    Attached,
+}
+
 struct TransparencyLogInner {
     conn: Connection,
     next_frame_id_counter: u64,
     boot_nonce: u64,
     last_frame_id: [u8; 16],
+    legal_hold_authority: Option<LegalHoldAuthority>,
 }
 
 impl std::fmt::Debug for TransparencyLogInner {
@@ -369,6 +383,37 @@ impl TransparencyLogAdapter {
             boot_nonce,
             Box::new(CorpusBackedRedactionPolicy::new()),
         )
+    }
+
+    /// Open a Transparency Log with an explicit Host-global legal-hold
+    /// authority. Team shards attach `global_path`; the global artifact binds
+    /// its own `main` schema. Callers using [`Self::open`] remain unbound and
+    /// legal-hold reads fail closed.
+    pub fn open_with_global_legal_holds(
+        path: &Path,
+        global_path: &Path,
+        boot_nonce: u64,
+    ) -> Result<Self, AuditError> {
+        let adapter = Self::open(path, boot_nonce)?;
+        if path == global_path {
+            adapter.bind_main_legal_holds()?;
+        } else {
+            adapter.attach_global_legal_holds(global_path)?;
+        }
+        Ok(adapter)
+    }
+
+    fn bind_main_legal_holds(&self) -> Result<(), AuditError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        inner
+            .conn
+            .execute_batch(LEGAL_HOLDS_TABLE_SQL)
+            .map_err(AuditError::SqliteWriteFatal)?;
+        inner.legal_hold_authority = Some(LegalHoldAuthority::Main);
+        Ok(())
     }
 
     /// Open with a custom redaction policy (for tests and future composition).
@@ -423,6 +468,7 @@ impl TransparencyLogAdapter {
                 next_frame_id_counter: 0,
                 boot_nonce,
                 last_frame_id: [0u8; 16],
+                legal_hold_authority: None,
             }),
             redaction,
             mailbox: MailboxStub::new(),
@@ -460,12 +506,15 @@ impl TransparencyLogAdapter {
         let conn = Connection::open_in_memory().expect("in-memory SQLite must succeed");
         conn.execute_batch(SCHEMA_SQL)
             .expect("schema init must succeed");
+        conn.execute_batch(LEGAL_HOLDS_TABLE_SQL)
+            .expect("in-memory legal-hold schema init must succeed");
         Self {
             inner: Mutex::new(TransparencyLogInner {
                 conn,
                 next_frame_id_counter: 0,
                 boot_nonce,
                 last_frame_id: [0u8; 16],
+                legal_hold_authority: Some(LegalHoldAuthority::Main),
             }),
             redaction,
             mailbox: MailboxStub::new(),
@@ -1033,11 +1082,10 @@ impl TransparencyLogAdapter {
     /// Keep the principal-global legal-hold table on the Host-global artifact
     /// while this adapter writes frame/approval rows to a team shard.
     ///
-    /// One connection remains authoritative: SQLite resolves the unqualified
-    /// `legal_holds` name from the attached global database after the
-    /// shard-local compatibility table is removed.
+    /// Legal-hold methods select the attached schema explicitly; an adapter
+    /// without this binding returns `LegalHoldAuthorityUnbound`.
     pub fn attach_global_legal_holds(&self, global_path: &Path) -> Result<(), AuditError> {
-        let inner = self
+        let mut inner = self
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
@@ -1056,10 +1104,11 @@ impl TransparencyLogAdapter {
                     reason TEXT NOT NULL,
                     case_ref TEXT,
                     requested_at_ns INTEGER NOT NULL
-                 );
-                 DROP TABLE main.legal_holds;",
+                 );",
             )
-            .map_err(AuditError::SqliteWriteFatal)
+            .map_err(AuditError::SqliteWriteFatal)?;
+        inner.legal_hold_authority = Some(LegalHoldAuthority::Attached);
+        Ok(())
     }
 
     /// Story 9.2 (P29) — place a durable per-principal-global legal hold.
@@ -1075,12 +1124,25 @@ impl TransparencyLogAdapter {
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
+        let sql = match inner
+            .legal_hold_authority
+            .ok_or(AuditError::LegalHoldAuthorityUnbound)?
+        {
+            LegalHoldAuthority::Main => {
+                "INSERT OR REPLACE INTO main.legal_holds
+                 (principal_id, reason, case_ref, requested_at_ns)
+                 VALUES (?1, ?2, ?3, ?4)"
+            }
+            LegalHoldAuthority::Attached => {
+                "INSERT OR REPLACE INTO maos_host_global.legal_holds
+                 (principal_id, reason, case_ref, requested_at_ns)
+                 VALUES (?1, ?2, ?3, ?4)"
+            }
+        };
         inner
             .conn
             .execute(
-                "INSERT OR REPLACE INTO legal_holds \
-                 (principal_id, reason, case_ref, requested_at_ns) \
-                 VALUES (?1, ?2, ?3, ?4)",
+                sql,
                 rusqlite::params![principal_id, reason, case_ref, requested_at_ns as i64,],
             )
             .map_err(AuditError::SqliteWriteFatal)?;
@@ -1093,13 +1155,20 @@ impl TransparencyLogAdapter {
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
+        let sql = match inner
+            .legal_hold_authority
+            .ok_or(AuditError::LegalHoldAuthorityUnbound)?
+        {
+            LegalHoldAuthority::Main => {
+                "SELECT COUNT(*) FROM main.legal_holds WHERE principal_id = ?1"
+            }
+            LegalHoldAuthority::Attached => {
+                "SELECT COUNT(*) FROM maos_host_global.legal_holds WHERE principal_id = ?1"
+            }
+        };
         let exists: i64 = inner
             .conn
-            .query_row(
-                "SELECT COUNT(*) FROM legal_holds WHERE principal_id = ?1",
-                rusqlite::params![principal_id],
-                |row| row.get(0),
-            )
+            .query_row(sql, rusqlite::params![principal_id], |row| row.get(0))
             .map_err(AuditError::SqliteRead)?;
         Ok(exists > 0)
     }
@@ -1111,14 +1180,54 @@ impl TransparencyLogAdapter {
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
+        let sql = match inner
+            .legal_hold_authority
+            .ok_or(AuditError::LegalHoldAuthorityUnbound)?
+        {
+            LegalHoldAuthority::Main => "DELETE FROM main.legal_holds WHERE principal_id = ?1",
+            LegalHoldAuthority::Attached => {
+                "DELETE FROM maos_host_global.legal_holds WHERE principal_id = ?1"
+            }
+        };
         let removed = inner
             .conn
-            .execute(
-                "DELETE FROM legal_holds WHERE principal_id = ?1",
-                rusqlite::params![principal_id],
-            )
+            .execute(sql, rusqlite::params![principal_id])
             .map_err(AuditError::SqliteWriteFatal)?;
         Ok(removed > 0)
+    }
+
+    pub fn list_legal_holds(&self) -> Result<Vec<PersistedLegalHold>, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let sql = match inner
+            .legal_hold_authority
+            .ok_or(AuditError::LegalHoldAuthorityUnbound)?
+        {
+            LegalHoldAuthority::Main => {
+                "SELECT principal_id, reason, case_ref, requested_at_ns
+                 FROM main.legal_holds ORDER BY requested_at_ns, principal_id"
+            }
+            LegalHoldAuthority::Attached => {
+                "SELECT principal_id, reason, case_ref, requested_at_ns
+                 FROM maos_host_global.legal_holds ORDER BY requested_at_ns, principal_id"
+            }
+        };
+        let mut statement = inner.conn.prepare(sql).map_err(AuditError::SqliteRead)?;
+        let rows = statement
+            .query_map([], |row| {
+                let requested_at_ns: i64 = row.get(3)?;
+                Ok(PersistedLegalHold {
+                    principal_id: row.get(0)?,
+                    reason: row.get(1)?,
+                    case_ref: row.get(2)?,
+                    requested_at_ns: requested_at_ns.max(0) as u64,
+                })
+            })
+            .map_err(AuditError::SqliteRead)?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(AuditError::SqliteRead)
     }
 
     /// Story 9.2 (P7) — journal a kernel `TaskComplete` frame and return its

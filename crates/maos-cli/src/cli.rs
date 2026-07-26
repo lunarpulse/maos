@@ -111,6 +111,8 @@ pub enum Subcommand {
     Skills(SkillsArgs),
     /// GDPR Article 17 — forget a principal and emit a receipt.
     Forget(ForgetArgs),
+    /// Operate the Host-global GDPR legal-hold registry (Story 13.5b).
+    LegalHold(LegalHoldArgs),
     /// Story 9.3b — governance operations on the schema-lifecycle registry.
     Governance(GovernanceArgs),
     /// Story 9.4 AC-3 — Transparency Log backup/DR (region-scoped).
@@ -222,6 +224,23 @@ pub struct ForgetArgs {
     /// Optional legal-hold reason, e.g. `legal-hold` or `legal-hold:<case-ref>`.
     #[arg(long, value_name = "REASON")]
     pub reason: Option<String>,
+}
+
+#[derive(clap::Args, Debug)]
+pub struct LegalHoldArgs {
+    #[command(subcommand)]
+    pub op: LegalHoldOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum LegalHoldOp {
+    /// List every Host-global principal legal hold.
+    List,
+    /// Release one principal legal hold. Release never auto-erases data.
+    Release {
+        #[arg(long, value_name = "PRINCIPAL")]
+        principal: String,
+    },
 }
 
 /// Story 7.4 — `maosctl skills <list|approve|reject>`.

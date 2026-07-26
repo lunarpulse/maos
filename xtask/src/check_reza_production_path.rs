@@ -16,7 +16,6 @@ use crate::gate_common::{dev_enforced_red_blocks, emit_command, read_disposition
 const GATE_NAME: &str = "check-reza-production-path";
 const ABSENT_SUCCESSORS: &[&str] = &[
     "11.4b audit escape-anomaly detector wiring",
-    "13.5b collective GDPR erase/legal-hold cascade",
     "13.6 three-team product journey",
 ];
 
@@ -348,6 +347,238 @@ pub fn run(json: bool) -> Result<(), String> {
                 "maos-cli",
                 "backup::tests::validate_restore_target_team_refuses_cross_team_planting",
                 "--",
+                "--exact",
+            ],
+        },
+        // Story 13.5b: backend partition must account for every registered
+        // erasure backend exactly once.
+        TestLeg {
+            name: "gdpr-backend-partition",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-audit",
+                "--test",
+                "multi_backend_erasure_test",
+                "multi_backend_erasure_partition_invariant",
+                "--",
+                "--exact",
+            ],
+        },
+        // 13.5b review: this leg replays the KERNEL forget outcomes from the
+        // deterministic corpus. It calls `memory.forget_with_reason` directly
+        // and never constructs an `UninstallCascadeTerminal`, so it is NOT the
+        // four-terminal control its old name claimed. Named for what it proves;
+        // the operator-facing terminals are bound by the two legs below.
+        TestLeg {
+            name: "gdpr-kernel-forget-outcome-corpus",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-audit",
+                "--test",
+                "gdpr_cascade_corpus_test",
+                "gdpr_cascade_v0_corpus_replay",
+                "--",
+                "--exact",
+            ],
+        },
+        // AC5's real operator vocabulary: the daemon terminal JSON and its exit
+        // codes. Previously bound by nothing (13.5b review, null control).
+        TestLeg {
+            name: "gdpr-uninstall-terminal-erased",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "erasure_uninstall_13_5b",
+                "erased_uninstall_is_success_with_machine_receipt",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-uninstall-terminal-held",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "erasure_uninstall_13_5b",
+                "held_uninstall_is_non_success_and_writes_no_complete_proof",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-uninstall-terminal-not-found",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "erasure_uninstall_13_5b",
+                "not_found_uninstall_has_distinct_terminal_code",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-uninstall-terminal-failed",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "erasure_uninstall_13_5b",
+                "proof_write_failure_has_failed_terminal_code",
+                "--",
+                "--exact",
+            ],
+        },
+        // D1 (review consensus): a region-pinned Host erases and says `erased`,
+        // with the Shared tier carried as an explicit CoverageGap. Restoring
+        // `"shared"` to REQUIRED_STORES reds this leg.
+        TestLeg {
+            name: "gdpr-regional-shared-coverage-gap",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "erasure_uninstall_13_5b",
+                "regional_uninstall_emits_erased_terminal_with_shared_coverage_gap",
+                "--",
+                "--exact",
+            ],
+        },
+        // D2 (review consensus): a mixed erased+held run must attest what it
+        // destroyed. Reverting to a bare `held` terminal reds this leg.
+        TestLeg {
+            name: "gdpr-mixed-held-partial-proof",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "erasure_uninstall_13_5b",
+                "mixed_held_uninstall_writes_partial_proof",
+                "--",
+                "--exact",
+            ],
+        },
+        // The private tier's Markdown residue survives the cascade (13.5b
+        // review defect pin). This leg keeps the known hole visible; it goes
+        // RED when a successor fixes it, forcing the proof category to follow.
+        TestLeg {
+            name: "gdpr-private-markdown-residue-pinned",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "erasure_uninstall_13_5b",
+                "private_tier_markdown_survives_the_forget_cascade",
+                "--",
+                "--exact",
+            ],
+        },
+        // The operator wrapper must forward every terminal exit code verbatim.
+        TestLeg {
+            name: "gdpr-maosctl-forwards-terminal-exit-codes",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-cli",
+                "--test",
+                "uninstall_exit_codes_13_5b",
+                "uninstall_forwards_erased_held_not_found_and_failed_codes",
+                "--",
+                "--exact",
+            ],
+        },
+        // An independently opened team shard must be indeterminate, never
+        // answer "no hold" from a local empty table.
+        TestLeg {
+            name: "gdpr-legal-hold-fail-closed",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-iac",
+                "--test",
+                "legal_hold_authority_13_5b",
+                "independently_opened_team_shard_cannot_answer_hold_absent",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-operator-erase-zero-spirit-reach",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "erasure_uninstall_13_5b",
+                "collective_erase_has_one_operator_route_and_zero_spirit_reach",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-one-sided-erase-reconciliation",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "xtask",
+                "--test",
+                "story_10_4a_ac1_proven_red",
+                "story_13_5b_one_sided_collective_erase_is_red",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-collective-partition-live",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "tenant_wall_live",
+                "collective_principal_partition_refuses_write_and_replication_apply",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-collective-erase-live",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "tenant_wall_live",
+                "collective_erase_moves_merkle_triple_and_blocks_stale_replication",
+                "--",
+                "--ignored",
                 "--exact",
             ],
         },

@@ -131,6 +131,16 @@ pub enum BundleError {
     StoreError(String),
     #[error("deserialization error: {0}")]
     DeserializationError(String),
+    #[error("principal namespace is forbidden in collective replication at key {key}")]
+    PrincipalNamespaceRefused { key: String },
+    #[error(
+        "collective erasure tombstone dominates key {key}: erased at ({erased_at_source_ts}, {erased_at_source_region})"
+    )]
+    ErasureTombstoneDominates {
+        key: String,
+        erased_at_source_ts: i64,
+        erased_at_source_region: String,
+    },
     #[error("cross-team bundle requires an explicit destination team and intent")]
     CrossTeamContextRequired,
     #[error("region-only bundle must not carry cross-team apply context")]
@@ -798,7 +808,18 @@ fn apply_verified_replication_bundle<'a>(
                     attestation.as_ref(),
                 )
                 .await
-                .map_err(|e| BundleError::StoreError(e.to_string()))?;
+                .map_err(|error| match error {
+                    crate::store::StoreError::ErasureTombstoneDominates {
+                        key,
+                        erased_at_source_ts,
+                        erased_at_source_region,
+                    } => BundleError::ErasureTombstoneDominates {
+                        key,
+                        erased_at_source_ts,
+                        erased_at_source_region,
+                    },
+                    other => BundleError::StoreError(other.to_string()),
+                })?;
 
             applied_count += 1;
         }
@@ -824,6 +845,15 @@ pub async fn apply_replication_bundle(
     base_seed: &[u8; 32],
 ) -> Result<ApplyResult, BundleError> {
     verify_replication_bundle(bundle, base_seed)?;
+    if let Some(leaf) = bundle
+        .leaves
+        .iter()
+        .find(|leaf| leaf.namespace_kind == "principal")
+    {
+        return Err(BundleError::PrincipalNamespaceRefused {
+            key: leaf.key.clone(),
+        });
+    }
     let dest = Region::canonicalize(dest_region)
         .map_err(|error| BundleError::InvalidRegion(error.to_string()))?;
     // Region binding: v1 (region-only) bundles keep the legacy leniency — an
@@ -1006,6 +1036,41 @@ mod tests {
             distillation_depth: None,
             intent_lineage: None,
         }
+    }
+
+    #[tokio::test]
+    async fn principal_namespace_bundle_is_refused_before_store_access() {
+        let base_seed = [0x5bu8; 32];
+        let region = Region::canonicalize("region-a").unwrap();
+        let leaf = CollectiveKvLeaf {
+            source_region: region.as_str().to_string(),
+            source_ts: 1,
+            spirit_pid: 7,
+            namespace_kind: "principal".into(),
+            namespace_detail: "user-42:profile.v1".into(),
+            key: "pii".into(),
+            value_kind: "text".into(),
+            value_data: b"must-not-land".to_vec(),
+            source_team: None,
+            distillation_depth: None,
+            intent_lineage: None,
+        };
+        let bundle = build_replication_bundle(vec![leaf], &region, &base_seed);
+        let store = LoomLiteStore::new(crate::store::StoreConfig {
+            connection_string: "host=127.0.0.1 port=1 dbname=unreachable connect_timeout=1".into(),
+            timeout_ms: 25,
+            ..Default::default()
+        })
+        .await
+        .expect("construct lazy store");
+
+        let error = apply_replication_bundle(&bundle, &store, "region-b", None, &base_seed)
+            .await
+            .expect_err("principal namespace bundle must be refused");
+        assert!(matches!(
+            error,
+            BundleError::PrincipalNamespaceRefused { ref key } if key == "pii"
+        ));
     }
 
     #[test]

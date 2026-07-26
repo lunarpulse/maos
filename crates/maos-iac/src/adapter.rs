@@ -908,6 +908,7 @@ mod decision_audit_tests {
 
     #[tokio::test]
     async fn i12_non_decision_frames_not_decorated() {
+        maos_capability::cap_tokens::init_monotonic_base();
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
         let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
         let adapter = IacBusAdapter::new(mailbox, log.clone());

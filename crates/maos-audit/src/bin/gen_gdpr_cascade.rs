@@ -3,7 +3,7 @@
 //! Story 9.2 — GDPR Article 17 cascade corpus generator.
 //!
 //! Produces deterministic SHA-pinned JSONL fixtures for the erasure spine:
-//!   * `gdpr-cascade-v0.jsonl` — 50 scenarios across 5 strata
+//!   * `gdpr-cascade-v0.jsonl` — 50 scenarios across 6 strata
 //!   * `gdpr-cascade-probe-v0.jsonl` — 100 independent leakage probes
 //!
 //! Usage:
@@ -78,7 +78,8 @@ fn generate_cascade(out_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let stratum_counts = [
         ("cross_spirit", 10),
         ("distillate_canary", 20),
-        ("legal_hold", 10),
+        ("legal_hold", 9),
+        ("forced_failure", 1),
         ("pid_reuse", 5),
         ("zero_entry", 5),
     ];
@@ -119,10 +120,11 @@ fn generate_cascade(out_path: &str) -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 None
             };
-            let expected_outcome = if stratum == "legal_hold" {
-                "suspended"
-            } else {
-                "erased"
+            let expected_outcome = match stratum {
+                "legal_hold" => "held",
+                "zero_entry" => "not_found",
+                "forced_failure" => "failed",
+                _ => "erased",
             };
             let reused_pid = stratum == "pid_reuse";
             let reused_principal = if reused_pid {

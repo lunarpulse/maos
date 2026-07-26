@@ -121,7 +121,7 @@ pub fn run(json: bool) -> Result<(), String> {
     let live_present = live_substrate_present();
     let specs = [
         TestLeg {
-            name: "three-site-chokepoint",
+            name: "four-site-chokepoint",
             class: BindingClass::Blocking,
             args: &[
                 "test",
@@ -129,7 +129,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "maos-loom-lite",
                 "--test",
                 "read_path_chokepoint",
-                "team_guard_is_exactly_the_three_spirit_entry_points",
+                "team_guard_is_exactly_the_four_guarded_entry_points",
                 "--",
                 "--exact",
             ],

@@ -1,0 +1,684 @@
+//! Story 13.5b — proven-red coverage for shipped uninstall false-success paths.
+
+#![forbid(unsafe_code)]
+
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+use std::sync::Arc;
+
+use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
+use maos_domain::ports::MemoryManagerPort;
+use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
+use maos_kernel_core::memory::{
+    MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
+};
+use tempfile::TempDir;
+
+const PRINCIPAL: &str = "held-uninstall@example.org";
+
+struct Fixture {
+    _dir: TempDir,
+    data_home: PathBuf,
+    memory_root: PathBuf,
+    key_path: PathBuf,
+}
+
+impl Fixture {
+    fn new() -> Self {
+        let dir = TempDir::new().expect("create fixture directory");
+        let data_home = dir.path().join("data");
+        let memory_root = dir.path().join("memory");
+        let key_path = dir.path().join("audit-signing.key");
+        std::fs::create_dir_all(&data_home).expect("create data home");
+        std::fs::create_dir_all(&memory_root).expect("create memory root");
+        std::fs::write(&key_path, hex::encode([0x5bu8; 32])).expect("write audit key");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&key_path, std::fs::Permissions::from_mode(0o600))
+                .expect("secure audit key");
+        }
+        Self {
+            _dir: dir,
+            data_home,
+            memory_root,
+            key_path,
+        }
+    }
+
+    fn audit_db(&self) -> PathBuf {
+        self.data_home
+            .join("maos")
+            .join("audit")
+            .join("transparency.sqlite")
+    }
+
+    fn proof_dir(&self) -> PathBuf {
+        self.data_home.join("maos").join("erasure-proofs")
+    }
+
+    fn command(&self) -> Command {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+        command
+            .env("HOME", self._dir.path())
+            .env("XDG_CONFIG_HOME", self._dir.path().join("config"))
+            .env("XDG_DATA_HOME", &self.data_home)
+            .env("MAOS_MEMORY_ROOT", &self.memory_root)
+            .env("MAOS_AUDIT_KEY", &self.key_path)
+            .env("MAOS_NOTIFY_DISABLE", "1")
+            .env("MAOS_ONE_SHOT", "uninstall")
+            .env("MAOS_SPIRIT_ID", "hello-spirit");
+        command
+    }
+
+    fn run_uninstall(&self, region: Option<&str>) -> Output {
+        let mut command = self.command();
+        if let Some(region) = region {
+            command.env("MAOS_REGION_HOME", region);
+        } else {
+            command.env_remove("MAOS_REGION_HOME");
+        }
+        command.output().expect("run one-shot uninstall")
+    }
+
+    fn seed_named_principal(&self, principal: &str, held: bool) {
+        let audit_db = self.audit_db();
+        std::fs::create_dir_all(audit_db.parent().expect("audit parent"))
+            .expect("create audit parent");
+        let private = Arc::new(PrivateMemoryStore::new(self.memory_root.clone(), 4 * 1024));
+        let shared = Arc::new(SharedMemoryStore::open(&audit_db).expect("open shared store"));
+        let principal_index =
+            Arc::new(PrincipalNamespaceIndex::open(&audit_db).expect("open principal index"));
+        let transparency_log = Arc::new(
+            TransparencyLogAdapter::open_with_global_legal_holds(&audit_db, &audit_db, 1)
+                .expect("open transparency log"),
+        );
+        let memory = MemoryManagerAdapter::new(
+            private,
+            shared,
+            principal_index,
+            Arc::clone(&transparency_log),
+        );
+        let namespace = MemoryNamespace::Principal {
+            principal_id: principal.into(),
+            schema: "profile".into(),
+        };
+        memory
+            .write(
+                0,
+                MemoryTier::Private,
+                &namespace,
+                "record",
+                MemoryValue::Text("principal payload".into()),
+            )
+            .expect("seed principal row");
+        if held {
+            let outcome = memory
+                .forget_with_reason(principal, Some("legal-hold:case-13-5b"))
+                .expect("place legal hold");
+            assert!(matches!(
+                outcome,
+                maos_domain::memory::ForgetOutcome::Suspended { .. }
+            ));
+        }
+    }
+
+    fn seed_principal(&self, held: bool) {
+        self.seed_named_principal(PRINCIPAL, held);
+    }
+
+    /// Seed a `Markdown` record: filesystem-canonical, never cached in memory.
+    fn seed_markdown_principal(&self) {
+        let audit_db = self.audit_db();
+        std::fs::create_dir_all(audit_db.parent().expect("audit parent"))
+            .expect("create audit parent");
+        let private = Arc::new(PrivateMemoryStore::new(self.memory_root.clone(), 4 * 1024));
+        let shared = Arc::new(SharedMemoryStore::open(&audit_db).expect("open shared store"));
+        let principal_index =
+            Arc::new(PrincipalNamespaceIndex::open(&audit_db).expect("open principal index"));
+        let transparency_log = Arc::new(
+            TransparencyLogAdapter::open_with_global_legal_holds(&audit_db, &audit_db, 1)
+                .expect("open transparency log"),
+        );
+        let memory = MemoryManagerAdapter::new(
+            private,
+            shared,
+            principal_index,
+            Arc::clone(&transparency_log),
+        );
+        memory
+            .write(
+                0,
+                MemoryTier::Private,
+                &MemoryNamespace::Principal {
+                    principal_id: PRINCIPAL.into(),
+                    schema: "profile".into(),
+                },
+                "dossier",
+                MemoryValue::Markdown("# dossier\n\nprincipal payload\n".into()),
+            )
+            .expect("seed markdown record");
+    }
+
+    fn seed_held_principal(&self) {
+        self.seed_principal(true);
+    }
+
+    fn seed_unheld_principal(&self) {
+        self.seed_principal(false);
+    }
+}
+
+fn regular_files(path: &Path) -> usize {
+    std::fs::read_dir(path)
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+fn terminal(output: &Output) -> serde_json::Value {
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "decode terminal JSON: {error}; stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
+    })
+}
+
+/// Story 13.5b review, D1 (party-mode consensus, option (b)).
+///
+/// Proven-red contract: a region-pinned Host that erases everything it can
+/// erase reports `erased`/exit 0, writes BOTH the proof bundle and the regional
+/// teardown receipt, and records the Shared tier as an explicit `CoverageGap`
+/// naming its owner. Restoring `"shared"` to `REQUIRED_STORES`, or downgrading
+/// that category to `Removed`, must red this test.
+///
+/// It replaces `regional_uninstall_refuses_to_attest_uncovered_shared_store`,
+/// which asserted only `!status.success()` and was green for the wrong reason:
+/// `completed` had become structurally false, so a fully successful erasure
+/// terminated `failed`/exit 5 after its proof was already on disk.
+#[test]
+fn regional_uninstall_emits_erased_terminal_with_shared_coverage_gap() {
+    let fixture = Fixture::new();
+    fixture.seed_unheld_principal();
+    let output = fixture.run_uninstall(Some("eu-west"));
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "region-pinned uninstall must succeed; stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let terminal = terminal(&output);
+    assert_eq!(terminal["outcome"], "erased");
+
+    // The regional teardown receipt is produced again — it was unreachable
+    // while `completed` could not be true.
+    let receipts: Vec<_> = std::fs::read_dir(fixture.proof_dir())
+        .expect("read proof dir")
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with("regional-teardown-eu-west-"))
+        .collect();
+    assert_eq!(
+        receipts.len(),
+        1,
+        "exactly one regional teardown receipt expected, found {receipts:?}"
+    );
+
+    // The Shared tier is attested honestly, per AC1's `CoverageGap` preference.
+    let proof_path = terminal["proof_path"].as_str().expect("proof_path");
+    let proof: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(proof_path).expect("read proof bundle"))
+            .expect("decode proof bundle");
+    let shared = proof["categories"]
+        .as_array()
+        .expect("categories array")
+        .iter()
+        .find(|category| category["name"] == "shared")
+        .expect("shared category present");
+    assert_eq!(shared["status"]["status"], "CoverageGap");
+    let reason = shared["status"]["reason"]
+        .as_str()
+        .expect("shared must be a CoverageGap, not Removed");
+    assert!(
+        reason.contains("13-5h"),
+        "the shared coverage gap must name its owner: {reason}"
+    );
+}
+
+#[test]
+fn held_uninstall_is_non_success_and_writes_no_complete_proof() {
+    let fixture = Fixture::new();
+    fixture.seed_held_principal();
+    let output = fixture.run_uninstall(None);
+
+    assert_eq!(output.status.code(), Some(3));
+    let terminal = terminal(&output);
+    assert_eq!(terminal["outcome"], "held");
+    assert_eq!(terminal["held_principal_ids"][0], PRINCIPAL);
+    // Nothing was destroyed, so there is nothing to attest.
+    assert!(terminal["erased_principal_ids"]
+        .as_array()
+        .expect("erased_principal_ids array")
+        .is_empty());
+    assert!(terminal["proof_path"].is_null());
+    assert_eq!(
+        regular_files(&fixture.proof_dir()),
+        0,
+        "held uninstall must not sign a complete proof"
+    );
+}
+
+/// Story 13.5b review, D2 (party-mode consensus, option (b)).
+///
+/// Proven-red contract for the mixed case the shipped code could not express:
+/// principal A is erased and principal B is held in the SAME run. The terminal
+/// must be `held`/exit 3 AND carry both sets plus a partial proof; the proof
+/// must mark B as a legal-hold `CoverageGap`; A must be gone from subject
+/// access and B must survive; and no regional receipt may be written.
+/// Dropping the partial-proof path, or reverting to a bare held terminal that
+/// discards the erasures, must red this test.
+#[test]
+fn mixed_held_uninstall_writes_partial_proof() {
+    const ERASED: &str = "erased-alongside-hold@example.org";
+
+    let fixture = Fixture::new();
+    fixture.seed_named_principal(ERASED, false);
+    fixture.seed_named_principal(PRINCIPAL, true);
+
+    let output = fixture.run_uninstall(Some("eu-west"));
+    assert_eq!(
+        output.status.code(),
+        Some(3),
+        "a held principal keeps the run non-success; stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let terminal = terminal(&output);
+    assert_eq!(terminal["outcome"], "held");
+    assert_eq!(terminal["held_principal_ids"][0], PRINCIPAL);
+    assert_eq!(
+        terminal["erased_principal_ids"]
+            .as_array()
+            .expect("erased_principal_ids array"),
+        &vec![serde_json::Value::String(ERASED.into())],
+        "the terminal must name what it destroyed"
+    );
+    // NOTE: `deleted_entries` is the private tier's count and is 0 for any
+    // out-of-process uninstall — see `private_tier_forget_never_reaches_disk`
+    // below. Assert the durable, cross-process effect instead: index rows.
+    assert!(
+        terminal["deleted_entries"].as_u64().is_some(),
+        "the terminal must carry an effect count, whatever its value"
+    );
+
+    // A partial proof exists and is explicit about the hold.
+    let proof_path = terminal["proof_path"]
+        .as_str()
+        .expect("a run that destroyed data must attest it");
+    let proof: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(proof_path).expect("read proof bundle"))
+            .expect("decode proof bundle");
+    let hold = proof["categories"]
+        .as_array()
+        .expect("categories array")
+        .iter()
+        .find(|category| category["name"] == "legal_hold")
+        .expect("legal_hold category present");
+    assert_eq!(hold["status"]["status"], "CoverageGap");
+    let reason = hold["status"]["reason"]
+        .as_str()
+        .expect("legal_hold must be a CoverageGap");
+    assert!(
+        reason.contains(PRINCIPAL),
+        "the gap must name the held principal: {reason}"
+    );
+
+    // A held run is not a teardown.
+    let receipts = std::fs::read_dir(fixture.proof_dir())
+        .expect("read proof dir")
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("regional-teardown-")
+        })
+        .count();
+    assert_eq!(receipts, 0, "a held run must write no teardown receipt");
+
+    // Effects, not claims: A is gone, B survives.
+    let audit_db = fixture.audit_db();
+    assert!(
+        maos_audit::subject_access_query(&audit_db, ERASED)
+            .expect("subject access for erased principal")
+            .is_empty(),
+        "the erased principal must be gone"
+    );
+    assert!(
+        !maos_audit::subject_access_query(&audit_db, PRINCIPAL)
+            .expect("subject access for held principal")
+            .is_empty(),
+        "the held principal must survive"
+    );
+}
+
+#[test]
+fn not_found_uninstall_has_distinct_terminal_code() {
+    let fixture = Fixture::new();
+    let output = fixture.run_uninstall(None);
+    assert_eq!(output.status.code(), Some(4));
+    assert_eq!(terminal(&output)["outcome"], "not_found");
+    assert_eq!(regular_files(&fixture.proof_dir()), 0);
+}
+
+#[test]
+fn erased_uninstall_is_success_with_machine_receipt() {
+    let fixture = Fixture::new();
+    fixture.seed_unheld_principal();
+    let output = fixture.run_uninstall(None);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(terminal(&output)["outcome"], "erased");
+    assert_eq!(regular_files(&fixture.proof_dir()), 1);
+}
+
+#[test]
+fn proof_write_failure_has_failed_terminal_code() {
+    let fixture = Fixture::new();
+    fixture.seed_unheld_principal();
+    std::fs::create_dir_all(fixture.proof_dir().parent().expect("proof parent"))
+        .expect("create proof parent");
+    std::fs::write(fixture.proof_dir(), b"not-a-directory").expect("plant proof directory failure");
+
+    let output = fixture.run_uninstall(None);
+    assert_eq!(output.status.code(), Some(5));
+    assert_eq!(terminal(&output)["outcome"], "failed");
+}
+
+#[test]
+fn private_forget_reports_filesystem_removal_failure() {
+    let fixture = Fixture::new();
+    let audit_db = fixture.audit_db();
+    std::fs::create_dir_all(audit_db.parent().expect("audit parent")).expect("create audit parent");
+    let private = Arc::new(PrivateMemoryStore::new(
+        fixture.memory_root.clone(),
+        4 * 1024,
+    ));
+    let shared = Arc::new(SharedMemoryStore::open(&audit_db).expect("open shared store"));
+    let principal_index =
+        Arc::new(PrincipalNamespaceIndex::open(&audit_db).expect("open principal index"));
+    let transparency_log = Arc::new(
+        TransparencyLogAdapter::open_with_global_legal_holds(&audit_db, &audit_db, 1)
+            .expect("open transparency log"),
+    );
+    let memory = MemoryManagerAdapter::new(
+        Arc::clone(&private),
+        shared,
+        principal_index,
+        transparency_log,
+    );
+    let namespace = MemoryNamespace::Principal {
+        principal_id: PRINCIPAL.into(),
+        schema: "profile".into(),
+    };
+    memory
+        .write(
+            7,
+            MemoryTier::Private,
+            &namespace,
+            "record",
+            MemoryValue::Blob(vec![0x5b; 8 * 1024]),
+        )
+        .expect("seed private row");
+
+    let pid_dir = fixture.memory_root.join("7");
+    let namespace_dir = std::fs::read_dir(&pid_dir)
+        .expect("read pid directory")
+        .next()
+        .expect("principal namespace directory")
+        .expect("read namespace entry")
+        .path();
+    std::fs::remove_dir_all(&namespace_dir).expect("replace namespace directory");
+    std::fs::write(&namespace_dir, b"simulated undeletable subtree")
+        .expect("plant non-directory removal failure");
+
+    let error = private
+        .forget_principal(PRINCIPAL)
+        .expect_err("filesystem removal failure must be reported");
+    assert!(error.to_string().contains("directory") || error.to_string().contains("Directory"));
+}
+
+/// AC3's authority boundary: operator erase must be reachable from exactly one
+/// composition-root call site and from no Spirit-facing surface.
+///
+/// 13.5b review: the earlier form counted the literals `"port.erase(spirit_pid"`
+/// and `"collective_port.erase"`, so renaming the binding defeated it silently.
+/// It now keys on the *method name* — the one thing a caller cannot rename —
+/// across every Spirit-facing file, and checks the trait method is absent from
+/// both `SpiritMemoryView` and each `MemoryTier::Collective` arm.
+#[test]
+fn collective_erase_has_one_operator_route_and_zero_spirit_reach() {
+    let composition_root = include_str!("../src/main.rs");
+    let spirit_view = include_str!("../../maos-kernel-core/src/memory/for_spirit.rs");
+    let kernel_memory = include_str!("../../maos-kernel-core/src/memory/mod.rs");
+    let scope_vocabulary = include_str!("../../maos-domain/src/invariants/i1.rs");
+
+    assert_eq!(
+        composition_root.matches(".erase(spirit_pid").count(),
+        1,
+        "collective erase must have exactly one composition-root call site, \
+         whatever the port binding is named"
+    );
+    assert_eq!(
+        composition_root
+            .matches("\"collective.operator.erase\"")
+            .count(),
+        1,
+        "collective erase must append exactly one audit-side intent"
+    );
+    assert!(
+        composition_root.contains("tokio::task::spawn_blocking(move ||"),
+        "sync adapter must be invoked from spawn_blocking (Trap 3)"
+    );
+
+    // No Spirit-facing file may name the erase method at all, under ANY
+    // binding: a helper delegation or a renamed field still has to write
+    // `.erase(`. `SpiritMemoryView` additionally must not name the concept.
+    for (label, source) in [
+        ("SpiritMemoryView", spirit_view),
+        ("kernel memory tiers", kernel_memory),
+    ] {
+        assert_eq!(
+            source.matches(".erase(").count(),
+            0,
+            "{label} must contain no collective erase delegation"
+        );
+    }
+    assert!(
+        !spirit_view.contains("collective-erase") && !spirit_view.contains("collective_erase"),
+        "SpiritMemoryView must expose no collective erase path"
+    );
+
+    // The port trait method must not be mentioned by any `MemoryTier::Collective`
+    // arm in the kernel — those are the three Spirit-reachable tier dispatches.
+    for (index, arm) in kernel_memory.match_indices("MemoryTier::Collective") {
+        let tail = &kernel_memory[index..kernel_memory.len().min(index + 600)];
+        assert!(
+            !tail.contains("erase"),
+            "a MemoryTier::Collective arm reaches erase (byte offset {index}): {}",
+            arm
+        );
+    }
+
+    assert!(
+        !scope_vocabulary.contains("CollectiveErase"),
+        "operator erase must not gain a Spirit capability Scope"
+    );
+}
+
+#[test]
+fn legal_hold_list_and_release_are_operable_without_auto_erasure() {
+    let fixture = Fixture::new();
+    fixture.seed_held_principal();
+
+    let list = fixture
+        .command()
+        .env("MAOS_ONE_SHOT", "legal-hold-list")
+        .output()
+        .expect("list legal holds");
+    assert!(
+        list.status.success(),
+        "list failed: {}",
+        String::from_utf8_lossy(&list.stderr)
+    );
+    let holds: serde_json::Value =
+        serde_json::from_slice(&list.stdout).expect("decode legal hold list");
+    assert_eq!(holds.as_array().map(Vec::len), Some(1));
+    assert_eq!(holds[0]["principal_id"], PRINCIPAL);
+
+    let release = fixture
+        .command()
+        .env("MAOS_ONE_SHOT", "legal-hold-release")
+        .env("MAOS_LEGAL_HOLD_PRINCIPAL", PRINCIPAL)
+        .output()
+        .expect("release legal hold");
+    assert!(
+        release.status.success(),
+        "release failed: {}",
+        String::from_utf8_lossy(&release.stderr)
+    );
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&release.stdout).expect("decode release receipt");
+    assert_eq!(receipt["released"], true);
+    assert_eq!(receipt["auto_erased"], false);
+    assert!(
+        !maos_audit::subject_access_query(&fixture.audit_db(), PRINCIPAL)
+            .expect("subject access after release")
+            .is_empty(),
+        "release re-queues eligibility but must never auto-erase"
+    );
+}
+
+/// **Defect pin, found by the 13.5b review's own proven-red work.**
+///
+/// `forget_principal` derives its removal set exclusively from the in-memory
+/// map (`crates/maos-kernel-core/src/memory/private.rs:319-337`), but the
+/// private tier deliberately does NOT cache `MemoryValue::Markdown` — it is
+/// filesystem-canonical so operator hand-edits stay visible (`private.rs:183-188`),
+/// and it always spills to disk (`:158-161`). So a principal's Markdown record
+/// is invisible to the removal set, its `fs::remove_dir_all` at `:353-363`
+/// never runs, and the file survives the GDPR cascade — while the signed proof
+/// records `memory_namespace` as `Removed { count: 0 }` and subject access
+/// reports the principal gone. Signed proof-of-erasure over bytes still on disk,
+/// plus an Article 15/17 asymmetry that hides the residue. The same hole
+/// swallows any value over the 4 KiB spill threshold once the writing process
+/// exits, since a fresh `PrivateMemoryStore` never hydrates (`:30-36`).
+///
+/// Story 13.5b's D-4 fix corrected the *count*; the *enumeration source* is
+/// upstream of it and was already wrong. Fixing it means walking `fs_root`
+/// inside `forget_principal` — kernel-core lines, outside this story's ratified
+/// ZERO-Δ fence. Escalate, do not absorb (Trap 1(ii)).
+///
+/// This test pins the CURRENT behaviour so the hole cannot be forgotten. When
+/// the successor fixes it this test goes RED, and it must then be inverted
+/// together with the proof's `memory_namespace` category.
+#[test]
+fn private_tier_markdown_survives_the_forget_cascade() {
+    let fixture = Fixture::new();
+    fixture.seed_markdown_principal();
+
+    // The on-disk namespace directory is hex-encoded JSON (`private.rs:71-79`),
+    // so enumerate every spilled file under the memory root instead.
+    let spilled_files = |root: &Path| -> Vec<String> {
+        fn walk(dir: &Path, out: &mut Vec<String>) {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                return;
+            };
+            for entry in entries.filter_map(Result::ok) {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else {
+                    out.push(path.to_string_lossy().into_owned());
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(root, &mut out);
+        out.sort();
+        out
+    };
+
+    let before = spilled_files(&fixture.memory_root);
+    assert_eq!(
+        before.len(),
+        1,
+        "fixture must have spilled exactly one Markdown record under {}; found {before:?}",
+        fixture.memory_root.display()
+    );
+    assert!(
+        before[0].ends_with(".md"),
+        "expected a .md spill: {before:?}"
+    );
+
+    let output = fixture.run_uninstall(None);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let terminal = terminal(&output);
+    assert_eq!(terminal["outcome"], "erased");
+
+    // Art.15 side: the index row IS durably gone, which is exactly what makes
+    // the residue invisible to a subject-access answer.
+    assert!(
+        maos_audit::subject_access_query(&fixture.audit_db(), PRINCIPAL)
+            .expect("subject access after erase")
+            .is_empty(),
+        "principal_index erasure is durable"
+    );
+
+    // Art.17 side: the bytes are still there.
+    assert_eq!(
+        spilled_files(&fixture.memory_root),
+        before,
+        "KNOWN DEFECT (pinned): the principal's Markdown record survives the \
+         forget cascade because forget_principal enumerates only the in-memory \
+         map, which never holds Markdown. If this assertion FAILS the defect is \
+         FIXED — invert this test and re-check the proof category below."
+    );
+
+    // ...and the signed proof calls that category Removed regardless.
+    let proof_path = terminal["proof_path"].as_str().expect("proof_path");
+    let proof: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(proof_path).expect("read proof bundle"))
+            .expect("decode proof bundle");
+    let namespace_category = proof["categories"]
+        .as_array()
+        .expect("categories array")
+        .iter()
+        .find(|category| category["name"] == "memory_namespace")
+        .expect("memory_namespace category present");
+    assert_eq!(namespace_category["status"]["status"], "Removed");
+    assert_eq!(
+        namespace_category["status"]["count"], 0,
+        "the count is honest after the D-4 fix; the `Removed` label is not"
+    );
+}
