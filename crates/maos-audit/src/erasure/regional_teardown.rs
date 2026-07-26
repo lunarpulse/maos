@@ -48,22 +48,30 @@ pub const KEY_DECOMMISSION_METHOD: &str = "signing-key-decommission";
 /// The plaintext working-memory backends the forget cascade must cover for a
 /// regional teardown to attest `completed`.
 ///
-/// Story 13.5b: `"shared"` was REMOVED from this set. `SharedMemoryStore` has
-/// no delete method at any visibility, so the cascade could never cover it and
-/// `completed` was structurally unable to be `true` — the mirror image of the
-/// defect this attestation exists to prevent. The Shared tier is now attested
-/// honestly, per-run, as [`crate::erasure::proof::CategoryStatus::CoverageGap`]
-/// in the companion erasure-proof bundle. See [`UNCOVERED_STORES`].
-pub const REQUIRED_STORES: &[&str] = &["private", "principal_index"];
+/// Story 13.5b REMOVED `"shared"` from this set: `SharedMemoryStore` has no
+/// delete method at any visibility, so the cascade could never cover it and
+/// `completed` was structurally unable to be `true`.
+///
+/// Story 13.5h RESTORED it, on a different footing. The Shared tier is now
+/// principal-empty **by construction** — `reject_principal_outside_private`
+/// refuses `MemoryNamespace::Principal` at the Shared write/read/scan entry
+/// points — so the erasure obligation over it is dischargeable. Coverage here
+/// means "this store holds no subject-scoped PII", which the producer
+/// VERIFIES per run by counting principal-namespaced rows. It does NOT mean
+/// rows were deleted: there is still no DELETE path, and the partition makes
+/// any pre-existing row unreachable rather than erased. A Host carrying
+/// pre-partition rows therefore fails that count, omits `"shared"` from
+/// `stores_covered`, and keeps `completed == false` — fail-closed.
+pub const REQUIRED_STORES: &[&str] = &["private", "principal_index", "shared"];
 
 /// Backends that exist and hold principal-shaped data but have **no erase
 /// path**, so no attestation may ever claim coverage of them.
 ///
-/// Story `13-5h` owns closing the Shared-tier hole; when it lands, `"shared"`
-/// moves from here into [`REQUIRED_STORES`] and the invariant test below keeps
-/// the two sets from drifting apart. This constant is the single grep-able
-/// place a successor has to edit.
-pub const UNCOVERED_STORES: &[&str] = &["shared"];
+/// EMPTY since Story 13.5h closed the Shared-tier hole. The constant is
+/// retained deliberately: it is the single grep-able place a future
+/// no-erase-path backend is declared, and `store_sets_partition_known_stores`
+/// keeps it partitioned against [`REQUIRED_STORES`].
+pub const UNCOVERED_STORES: &[&str] = &[];
 
 /// All known store names. Used to reject typos / fabricated stores in
 /// attestation construction. Always the disjoint union of [`REQUIRED_STORES`]
@@ -327,9 +335,9 @@ mod tests {
     }
 
     /// Story 13.5b invariant: the required and uncovered sets partition the
-    /// known set. Re-adding `"shared"` to `REQUIRED_STORES` without removing it
-    /// from `UNCOVERED_STORES` (or vice versa) reds here, so the two constants
-    /// cannot drift apart when Story `13-5h` closes the Shared-tier hole.
+    /// known set. Moving a store between `REQUIRED_STORES` and
+    /// `UNCOVERED_STORES` without removing it from the other reds here, so the
+    /// two constants cannot drift apart. Story 13.5h moved `"shared"` across.
     #[test]
     fn store_sets_partition_known_stores() {
         let required: BTreeSet<&str> = REQUIRED_STORES.iter().copied().collect();
@@ -347,22 +355,23 @@ mod tests {
         );
     }
 
-    /// A store with no erase path must never be nameable as required — that is
-    /// how `completed` regained the ability to be `true` (Story 13.5b, D-2).
+    /// Story 13.5h: `"shared"` is required and no longer uncovered. It became
+    /// nameable as required only because the tier is principal-empty by
+    /// construction (the partition), not because a DELETE path appeared.
     #[test]
-    fn shared_is_uncovered_not_required() {
-        assert!(!REQUIRED_STORES.contains(&"shared"));
-        assert!(UNCOVERED_STORES.contains(&"shared"));
+    fn shared_is_required_not_uncovered() {
+        assert!(REQUIRED_STORES.contains(&"shared"));
+        assert!(!UNCOVERED_STORES.contains(&"shared"));
         assert!(KNOWN_STORES.contains(&"shared"));
     }
 
     #[test]
     fn cascade_completed_only_when_all_required_stores_covered() {
         assert!(complete_cascade().completed);
-        // The cascade's real coverage set completes: `shared` is attested as a
-        // CoverageGap in the proof bundle, never as required coverage here.
+        // Story 13.5h: `shared` is now required and dischargeable, so a run
+        // that verified all three stores completes.
         let real = ForgetCascadeAttestation::from_outcome(
-            vec!["private".into(), "principal_index".into()],
+            vec!["private".into(), "principal_index".into(), "shared".into()],
             3,
         )
         .unwrap();
@@ -370,12 +379,15 @@ mod tests {
         // Missing `principal_index` → not complete. `completed` stays falsifiable.
         let partial = ForgetCascadeAttestation::from_outcome(vec!["private".into()], 3).unwrap();
         assert!(!partial.completed);
-        // Naming an uncovered store is still accepted as a name (KNOWN_STORES)
-        // but adds no completion power — it is not in the required set.
-        let with_uncovered =
-            ForgetCascadeAttestation::from_outcome(vec!["private".into(), "shared".into()], 3)
-                .unwrap();
-        assert!(!with_uncovered.completed);
+        // Story 13.5h fail-closed: a Host whose shared tier still holds
+        // pre-partition principal rows omits `shared` from the covered set, and
+        // `completed` must go FALSE rather than quietly attest success.
+        let pre_partition_residue = ForgetCascadeAttestation::from_outcome(
+            vec!["private".into(), "principal_index".into()],
+            3,
+        )
+        .unwrap();
+        assert!(!pre_partition_residue.completed);
     }
 
     #[test]

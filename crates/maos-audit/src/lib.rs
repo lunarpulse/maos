@@ -1377,6 +1377,56 @@ pub fn subject_access_query(
     Ok(entries)
 }
 
+/// Count `shared_memory` rows whose NAMESPACE COLUMN is a `Principal` variant.
+///
+/// Story 13.5h. The Shared tier has no DELETE path at any visibility; it is
+/// discharged by the `reject_principal_outside_private` partition, which stops
+/// new principal rows from entering. A Host upgraded from a pre-partition
+/// build may still hold rows written before that guard existed — those are
+/// unreachable, NOT erased (13.5h Trap 4). This is the per-run check that
+/// tells the two apart, so a `VerifiedEmpty` attestation is EARNED rather than
+/// asserted. Asserting it unchecked would rebuild the null control that
+/// Story 13.5h exists to remove.
+///
+/// Filters on the namespace COLUMN, never the value blob: `MemoryNamespace` is
+/// serde externally tagged, so every `Principal` variant serialises with the
+/// anchored prefix `{"Principal":`. A missing `shared_memory` table means the
+/// Shared store was never opened on this artifact — zero rows, and `Ok(0)` is
+/// the honest answer.
+///
+/// Note this reads the MEMORY artifact, not the audit shard: `SharedMemoryStore`
+/// is opened on the Host-wide `memory_db_path`, which under active tenancy is a
+/// different file from the team-sharded transparency log.
+pub fn shared_tier_principal_row_count(memory_db_path: &Path) -> Result<u64, AuditError> {
+    let conn = rusqlite::Connection::open_with_flags(
+        memory_db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(AuditError::Open)?;
+
+    let table_present: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'shared_memory'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(AuditError::Read)?;
+    if table_present == 0 {
+        return Ok(0);
+    }
+
+    let count: i64 = conn
+        .query_row(
+            r#"SELECT COUNT(*) FROM shared_memory WHERE namespace LIKE '{"Principal":%'"#,
+            [],
+            |row| row.get(0),
+        )
+        .map_err(AuditError::Read)?;
+    Ok(u64::try_from(count).unwrap_or(0))
+}
+
 /// Provenance type for subject-access enrichment (Decision D: Direct/Distilled).
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "provenance_type")]

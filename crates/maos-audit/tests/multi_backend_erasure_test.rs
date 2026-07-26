@@ -6,7 +6,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
+use maos_domain::memory::{MemoryError, MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::MemoryManagerPort;
 use rusqlite::OpenFlags;
 use tempfile::TempDir;
@@ -80,6 +80,29 @@ fn shared_store_contains(db_path: &Path, needle: &str) -> bool {
         .any(|bytes| String::from_utf8_lossy(bytes).contains(needle))
 }
 
+/// Count `shared_memory` rows whose NAMESPACE COLUMN is a `Principal` variant.
+///
+/// Story 13.5h Trap 6: `shared_store_contains` above scans only the `value`
+/// blob with no namespace filter, which is precisely why the pre-13.5h
+/// discharge stayed green when its canary was swapped to a principal
+/// namespace.  `MemoryNamespace` is serde externally tagged, so every
+/// `Principal` variant serialises with the anchored prefix `{"Principal":`.
+fn shared_store_principal_row_count(db_path: &Path) -> usize {
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .unwrap();
+    let count: i64 = conn
+        .query_row(
+            r#"SELECT COUNT(*) FROM shared_memory WHERE namespace LIKE '{"Principal":%'"#,
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    usize::try_from(count).unwrap()
+}
+
 #[test]
 fn multi_backend_erasure_partition_invariant() {
     let dir = TempDir::new().unwrap();
@@ -138,11 +161,55 @@ fn multi_backend_erasure_partition_invariant() {
     );
     proved_erased.push("principal_index");
 
-    // Shared tier: empirical canary scan returns the legitimate shared canary,
-    // proving principal data never landed here (non-applicability by construction).
+    // --- Shared tier (Story 13.5h): principal-empty BY CONSTRUCTION ---
+    //
+    // (c) ADR-026 positive retention, asserted under its OWN name and kept
+    // strictly separate from the principal-empty discharge below.  Fusing
+    // these two claims into a single assertion is exactly what made this a
+    // null control before 13.5h: surviving Coordination data proves no
+    // OVER-erasure and says nothing at all about principal-emptiness.
     assert!(
         shared_store_contains(&db_path, CANARY),
-        "Shared tier should retain its legitimate canary for negative-scan demonstration"
+        "ADR-026: legitimate cross-Spirit Coordination data must survive a principal forget"
+    );
+
+    // (a) The discharge proper: the Shared tier refuses subject-scoped PII at
+    // its OWN entry point, on ALL THREE methods `SpiritMemoryView` exposes.
+    // A partition that admits reads or scans of a planted row is not a
+    // partition.  Assert the TYPED refusal, never the diagnostic sentence.
+    let shared_write_err = memory
+        .write(
+            7,
+            MemoryTier::Shared,
+            &principal_ns,
+            "must-not-land",
+            MemoryValue::Text(CANARY.into()),
+        )
+        .expect_err("shared principal write must be refused");
+    assert!(
+        matches!(shared_write_err, MemoryError::NamespaceViolation(_)),
+        "shared write refusal must be the typed partition: {shared_write_err:?}"
+    );
+    let shared_read_err = memory
+        .read(7, MemoryTier::Shared, &principal_ns, "must-not-land")
+        .expect_err("shared principal read must be refused");
+    assert!(
+        matches!(shared_read_err, MemoryError::NamespaceViolation(_)),
+        "shared read refusal must be the typed partition: {shared_read_err:?}"
+    );
+    let shared_scan_err = memory
+        .scan(7, MemoryTier::Shared, &principal_ns, "", 16)
+        .expect_err("shared principal scan must be refused");
+    assert!(
+        matches!(shared_scan_err, MemoryError::NamespaceViolation(_)),
+        "shared scan refusal must be the typed partition: {shared_scan_err:?}"
+    );
+
+    // (b) Namespace-column-filtered zero-row scan (Trap 6).
+    assert_eq!(
+        shared_store_principal_row_count(&db_path),
+        0,
+        "shared_memory must hold zero principal-namespaced rows"
     );
     proved_principal_empty.push("shared");
 

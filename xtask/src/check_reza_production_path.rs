@@ -352,6 +352,13 @@ pub fn run(json: bool) -> Result<(), String> {
         },
         // Story 13.5b: backend partition must account for every registered
         // erasure backend exactly once.
+        // Story 13.5h: this leg now also carries the Shared-tier refusal proof.
+        // The discharge used to plant its canary under `Coordination`, so it
+        // passed identically with and without principal PII in the tier; it now
+        // asserts the typed `NamespaceViolation` at the Shared write/read/scan
+        // entry points and scans for zero principal-namespaced rows. Deleting
+        // any one of the three hoisted `reject_principal_outside_private` calls
+        // reds this leg at that specific arm.
         TestLeg {
             name: "gdpr-backend-partition",
             class: BindingClass::Blocking,
@@ -443,11 +450,12 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
-        // D1 (review consensus): a region-pinned Host erases and says `erased`,
-        // with the Shared tier carried as an explicit CoverageGap. Restoring
-        // `"shared"` to REQUIRED_STORES reds this leg.
+        // D1 (review consensus), re-pointed by Story 13.5h: a region-pinned Host
+        // erases and says `erased`, with the Shared tier now attested
+        // `VerifiedEmpty` — earned by counting principal-namespaced rows, not
+        // asserted. Removing `"shared"` from REQUIRED_STORES reds this leg.
         TestLeg {
-            name: "gdpr-regional-shared-coverage-gap",
+            name: "gdpr-regional-shared-verified-empty",
             class: BindingClass::Blocking,
             args: &[
                 "test",
@@ -455,7 +463,26 @@ pub fn run(json: bool) -> Result<(), String> {
                 "maos-bin",
                 "--test",
                 "erasure_uninstall_13_5b",
-                "regional_uninstall_emits_erased_terminal_with_shared_coverage_gap",
+                "regional_uninstall_attests_shared_tier_verified_empty",
+                "--",
+                "--exact",
+            ],
+        },
+        // Story 13.5h Trap 4: the partition makes pre-existing Shared principal
+        // rows unreachable, NOT erased. This is the leg that makes the sibling
+        // above non-vacuous — hard-code `VerifiedEmpty` instead of counting and
+        // this leg reds while the sibling stays green. Hermetic (TempDir +
+        // SQLite), hence Blocking.
+        TestLeg {
+            name: "gdpr-shared-pre-partition-residue-fail-closed",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "erasure_uninstall_13_5b",
+                "regional_uninstall_refuses_to_attest_pre_partition_shared_residue",
                 "--",
                 "--exact",
             ],

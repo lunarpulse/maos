@@ -261,4 +261,47 @@
 #          real `cat`-then-`echo` that can only complete if it received EOF; the
 #          private spawn path cannot be exercised from tests/). All additive; no
 #          public symbols removed.
-src_lines = 23228
+#   23228  Story 13.5d — production Spirit collective route (+26, AUTHORIZED
+#          kernel-core delta). FLAG-Winston: authorized on the epic-13 lineage.
+#          ROW ADDED RETROACTIVELY 2026-07-25 by the Story 13.5h grant review:
+#          the 23202 → 23228 re-pin landed with the code but its HISTORY row was
+#          never written, leaving the pin one entry ahead of its own audit trail.
+#          The number below was already correct; only this record was missing.
+#   23234  Story 13.5h — Shared-tier principal partition (+6, AUTHORIZED
+#          kernel-core delta). FLAG-Winston: Lunarpulse authorized 2026-07-25 on
+#          a UNANIMOUS 4/4 panel (Winston · Murat · John · Amelia,
+#          `variant=B grant=approve extraction=waive headroom=accept`).
+#          Closed a PROVEN GDPR Art.15/17 hole: `MemoryTier::Shared` accepted
+#          `MemoryNamespace::Principal` at all three trait arms (memory/mod.rs
+#          :743/:803/:857) while `SharedMemoryStore` has NO delete at any
+#          visibility and `subject_access_query` reads only `principal_index` —
+#          so subject-scoped PII written there was neither erasable nor visible.
+#          The control that claimed otherwise was measured to be a NULL CONTROL:
+#          it planted its canary under `Coordination`, so it passed identically
+#          with and without principal PII in the tier.
+#          SHAPE (Variant B, measured — Variant A's separate mirror cost +26
+#          physical / +20 tokei and BREACHED the then-17900 kloc ceiling, and
+#          was rejected 4/4 on ARCHITECTURE not cost): generalized
+#          `reject_principal_collective` into
+#          `reject_principal_outside_private(tier, namespace)`, stated as a
+#          negation of the allowlist so a FUTURE MemoryTier is
+#          principal-rejecting by default; hoisted ONE call above each of the
+#          three `match tier` blocks; deleted the three in-arm collective calls;
+#          updated the three cap-gated call sites so they cannot become an
+#          alternate bypass. Additive; no public symbols removed; no enum
+#          widened.
+#          LANDED AND RE-MEASURED 2026-07-25 on the FORMATTED tree (13.5d :475 —
+#          the estimate is not the authorization): +6 physical, 23228 → 23234,
+#          exactly as authorized; +4 tokei, 17890 → 17894.
+#          BINDING CONDITION DISCHARGED BEFORE THIS NUMBER MOVED: the rewritten
+#          discriminating control was falsified PER LEG, not once. Deleting the
+#          hoisted predicate above the write / read / scan `match tier` block
+#          each made `multi_backend_erasure_partition_invariant` RED at its OWN
+#          assertion (write / read / scan respectively), proving all three legs
+#          independently load-bearing; restoring all three returned the suite to
+#          `running 1 test` / `1 passed`. The PRE-13.5h control would NOT have
+#          redded on guard deletion — it never wrote a principal namespace at
+#          Shared. `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag
+#          and is NOT touched. Authorization detail:
+#          the Shared-tier principal-partition implementation artifact
+src_lines = 23234

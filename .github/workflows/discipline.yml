@@ -153,15 +153,22 @@ jobs:
 
   kloc-check:
     runs-on: ubuntu-latest
-    # ADVISORY gate (2026-06-11). `xtask/kloc.toml` deliberately forbids raising
-    # the maos-kernel-core / aggregate ceilings — the breach is intentional
-    # architectural pressure to force decomposition (Phase 3/4 still pending),
-    # and every Epic 8 story shipped with kloc "pre-existing RED, verified
-    # neutral". `continue-on-error` keeps the ❌ breach VISIBLE in the job list
-    # (the gate's documented purpose) without blocking the whole discipline run.
-    # FLAG-Winston: ratify this advisory posture; revert to blocking once the
-    # kernel-core decomposition lands and the ceilings can be met honestly.
-    continue-on-error: true
+    # BLOCKING since 2026-07-25 (founder-ratified ceiling-policy replacement).
+    # Was ADVISORY from 2026-06-11 under the "tight measured residual" rule, whose
+    # own revert condition read: "revert to blocking once the kernel-core
+    # decomposition lands and the ceilings can be met honestly."
+    # HONEST STATUS OF THAT CONDITION: the second half is met, the first is NOT.
+    # Decomposition Phase 3/4 has still not landed (kernel-core is 17,890 against
+    # an Epic-5 target of ~5,400 — a target whose own named extractions only ever
+    # totalled ~13,627 LOC, so it was never reachable as written). What changed is
+    # that ceilings are now set by a rule that leaves real operating capacity
+    # (`measured + max(100, ceil(0.02 * measured))`, see xtask/kloc.toml), so the
+    # gate can be met honestly and is therefore enforceable. It was advisory
+    # BECAUSE tight-residual made it unshippable, not because breaches were
+    # acceptable. Slack is capacity, NOT authorization: kernel-core changes still
+    # require a measured FLAG-Winston grant plus a kernel-core-baseline.toml
+    # HISTORY row, enforced separately by the BLOCKING check-kernel-baseline job.
+    # Phase 4 decomposition remains tracked architectural debt in kloc.toml.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1

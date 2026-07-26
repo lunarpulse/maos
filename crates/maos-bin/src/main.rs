@@ -4908,6 +4908,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     capability.as_ref(),
                     &transparency_log,
                     &audit_db_path,
+                    &memory_db_path,
                 );
                 // ADR-059 Decision 6 — only a successful erase writes the
                 // uninstall lifecycle success. 13.5b review: a journal failure
@@ -8080,6 +8081,7 @@ fn run_uninstall_cascade(
     capability: &maos_kernel_core::capability::CapabilityRegistryAdapter,
     transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
     audit_db_path: &std::path::Path,
+    memory_db_path: &std::path::Path,
 ) -> UninstallCascadeTerminal {
     let terminal = match run_uninstall_cascade_inner(
         spirit_id,
@@ -8087,6 +8089,7 @@ fn run_uninstall_cascade(
         capability,
         transparency_log,
         audit_db_path,
+        memory_db_path,
     ) {
         Ok(terminal) => terminal,
         Err(error) => UninstallCascadeTerminal::Failed {
@@ -8116,6 +8119,7 @@ fn run_uninstall_cascade_inner(
     capability: &maos_kernel_core::capability::CapabilityRegistryAdapter,
     transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
     audit_db_path: &std::path::Path,
+    memory_db_path: &std::path::Path,
 ) -> Result<UninstallCascadeTerminal, Box<dyn std::error::Error>> {
     use maos_audit::erasure::proof::{
         build_erasure_proof, write_proof_bundle, CategoryStatus, ErasureCategory,
@@ -8143,6 +8147,13 @@ fn run_uninstall_cascade_inner(
     let mut erased_principal_frame_ids: Vec<[u8; 16]> = Vec::new();
     let mut stores_covered = std::collections::BTreeSet::<String>::new();
     let mut held_principal_ids: Vec<String> = Vec::new();
+
+    // Verify Shared before any destructive operation. A second SQLite open can
+    // fail even while the process's long-lived store connection remains usable
+    // (for example after a permission change); failing here preserves the
+    // invariant that every post-erasure exit has a signed proof.
+    let shared_principal_rows = maos_audit::shared_tier_principal_row_count(memory_db_path)
+        .map_err(|e| format!("failed to verify shared-tier principal emptiness: {e}"))?;
 
     for (_boot_nonce, spirit_pid) in &incarnations {
         let spirit_pid = *spirit_pid;
@@ -8207,7 +8218,7 @@ fn run_uninstall_cascade_inner(
         total_revoked_tokens += capability.revoke_all_for_pid(spirit_pid).unwrap_or(0);
     }
 
-    if all_principal_ids.is_empty() {
+    if all_principal_ids.is_empty() && shared_principal_rows == 0 {
         if held_principal_ids.is_empty() {
             return Ok(UninstallCascadeTerminal::NotFound {
                 spirit_id: spirit_id.to_string(),
@@ -8225,10 +8236,9 @@ fn run_uninstall_cascade_inner(
             revoked_tokens: total_revoked_tokens as u64,
         });
     }
-    // Past this point the cascade HAS destroyed principal data. Every exit
-    // below must therefore produce a signed artifact describing what it did —
-    // including the mixed erased+held case, which must never report `held`
-    // while silently discarding the erasures it already performed.
+    // Past this point the cascade either destroyed principal data or found
+    // pre-partition Shared residue that requires a signed CoverageGap. Every
+    // exit below must therefore produce a signed artifact describing reality.
 
     // Capture post-erasure tree leaves.
     let post_frame_ids = transparency_log
@@ -8249,6 +8259,26 @@ fn run_uninstall_cascade_inner(
                  Story 9.1); cannot sign proof-of-erasure: {e}"
             )
         })?;
+
+    // The Shared partition stops new principal rows from entering; this
+    // preflight count distinguishes that future guarantee from pre-existing
+    // residue, which is unreachable but not erased.
+    let (shared_status, shared_failure) = if shared_principal_rows == 0 {
+        stores_covered.insert("shared".into());
+        (CategoryStatus::VerifiedEmpty, None)
+    } else {
+        let reason = format!(
+            "shared tier holds {shared_principal_rows} pre-partition principal row(s); the \
+             Story 13.5h partition makes them unreachable but there is no delete path, so \
+             they are NOT erased"
+        );
+        (
+            CategoryStatus::CoverageGap {
+                reason: reason.clone(),
+            },
+            Some(reason),
+        )
+    };
 
     let mut categories = vec![
         ErasureCategory {
@@ -8271,10 +8301,7 @@ fn run_uninstall_cascade_inner(
         },
         ErasureCategory {
             name: "shared".into(),
-            status: CategoryStatus::CoverageGap {
-                reason: "shared-tier principal erasure is not implemented; owner: Story 13-5h"
-                    .into(),
-            },
+            status: shared_status,
         },
         ErasureCategory {
             name: "principal_frames".into(),
@@ -8335,6 +8362,16 @@ fn run_uninstall_cascade_inner(
     let proof_dir = maos_audit::default_erasure_proofs_dir();
     let proof_path = write_proof_bundle(&proof, &proof_dir)
         .map_err(|e| format!("failed to write erasure proof: {e}"))?;
+
+    // Shared residue is an incomplete uninstall on every deployment shape, not
+    // only when regional receipt construction happens to consume
+    // `stores_covered`. The signed partial proof remains available for recovery.
+    if let Some(reason) = shared_failure {
+        return Ok(UninstallCascadeTerminal::Failed {
+            spirit_id: spirit_id.to_string(),
+            error: format!("{reason}; partial erasure proof: {}", proof_path.display()),
+        });
+    }
 
     // Story 9.4b AC-13/AC-14/AC-15 — when the deployment is region-pinned, emit
     // the two-phase regional teardown receipt alongside the proof:

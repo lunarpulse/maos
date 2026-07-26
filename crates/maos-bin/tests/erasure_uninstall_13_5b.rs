@@ -167,6 +167,41 @@ impl Fixture {
     fn seed_unheld_principal(&self) {
         self.seed_principal(false);
     }
+
+    /// Plant a principal-namespaced row directly in `shared_memory` via raw SQL.
+    ///
+    /// Deliberately NOT written through `MemoryManagerAdapter`: since the
+    /// Story 13.5h partition the adapter refuses `(Shared, Principal)` at the
+    /// entry point, which is the whole point of the guard. Raw SQL reproduces
+    /// the only way such a row can still exist — a Host upgraded from a
+    /// pre-partition build, whose rows the partition renders unreachable but
+    /// cannot erase (13.5h Trap 4).
+    fn plant_pre_partition_shared_row(&self, principal: &str) {
+        let audit_db = self.audit_db();
+        std::fs::create_dir_all(audit_db.parent().expect("audit parent"))
+            .expect("create audit parent");
+        drop(SharedMemoryStore::open(&audit_db).expect("open shared store"));
+        let namespace = serde_json::to_string(&MemoryNamespace::Principal {
+            principal_id: principal.into(),
+            schema: "profile".into(),
+        })
+        .expect("serialize principal namespace");
+        let conn = rusqlite::Connection::open(&audit_db).expect("open shared db");
+        conn.execute(
+            "INSERT INTO shared_memory \
+             (writer_spirit_pid, namespace, key, value, kind, timestamp_ns) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![
+                0i64,
+                namespace,
+                "legacy-record",
+                b"pre-partition payload".to_vec(),
+                "text",
+                1i64
+            ],
+        )
+        .expect("plant pre-partition shared row");
+    }
 }
 
 fn regular_files(path: &Path) -> usize {
@@ -190,20 +225,32 @@ fn terminal(output: &Output) -> serde_json::Value {
     })
 }
 
-/// Story 13.5b review, D1 (party-mode consensus, option (b)).
+/// Story 13.5h — replaces 13.5b's `..._with_shared_coverage_gap` contract.
 ///
 /// Proven-red contract: a region-pinned Host that erases everything it can
 /// erase reports `erased`/exit 0, writes BOTH the proof bundle and the regional
-/// teardown receipt, and records the Shared tier as an explicit `CoverageGap`
-/// naming its owner. Restoring `"shared"` to `REQUIRED_STORES`, or downgrading
-/// that category to `Removed`, must red this test.
+/// teardown receipt, and now records the Shared tier as `VerifiedEmpty` with
+/// `"shared"` named in the receipt's `stores_covered`.
 ///
-/// It replaces `regional_uninstall_refuses_to_attest_uncovered_shared_store`,
-/// which asserted only `!status.success()` and was green for the wrong reason:
-/// `completed` had become structurally false, so a fully successful erasure
-/// terminated `failed`/exit 5 after its proof was already on disk.
+/// That status is EARNED, not asserted: the producer counts
+/// principal-namespaced rows in `shared_memory` (filtering on the namespace
+/// column) and only then attests. 13.5h Trap 4 is what makes the count
+/// load-bearing rather than decorative — the partition stops NEW principal
+/// rows entering the tier, but a Host upgraded from a pre-partition build
+/// could still hold rows written before the guard existed, and those are
+/// unreachable rather than erased. Emitting `VerifiedEmpty` unconditionally
+/// would be a fresh null control of exactly the kind 13.5h exists to remove,
+/// so a non-zero count must degrade to `CoverageGap` and withhold `"shared"`
+/// from `stores_covered`, driving `completed` false.
+///
+/// History: 13.5b's version asserted a `CoverageGap` naming this story as the
+/// still-open owner of the Shared-tier hole; it in
+/// turn replaced `regional_uninstall_refuses_to_attest_uncovered_shared_store`,
+/// which asserted only `!status.success()` and was green for the wrong reason
+/// (`completed` was structurally false, so a fully successful erasure
+/// terminated `failed`/exit 5 after its proof was already on disk).
 #[test]
-fn regional_uninstall_emits_erased_terminal_with_shared_coverage_gap() {
+fn regional_uninstall_attests_shared_tier_verified_empty() {
     let fixture = Fixture::new();
     fixture.seed_unheld_principal();
     let output = fixture.run_uninstall(Some("eu-west"));
@@ -218,13 +265,16 @@ fn regional_uninstall_emits_erased_terminal_with_shared_coverage_gap() {
     let terminal = terminal(&output);
     assert_eq!(terminal["outcome"], "erased");
 
-    // The regional teardown receipt is produced again — it was unreachable
-    // while `completed` could not be true.
+    // The regional teardown receipt is produced.
     let receipts: Vec<_> = std::fs::read_dir(fixture.proof_dir())
         .expect("read proof dir")
         .filter_map(Result::ok)
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
-        .filter(|name| name.starts_with("regional-teardown-eu-west-"))
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|name| name.starts_with("regional-teardown-eu-west-"))
+        })
         .collect();
     assert_eq!(
         receipts.len(),
@@ -232,7 +282,24 @@ fn regional_uninstall_emits_erased_terminal_with_shared_coverage_gap() {
         "exactly one regional teardown receipt expected, found {receipts:?}"
     );
 
-    // The Shared tier is attested honestly, per AC1's `CoverageGap` preference.
+    // Story 13.5h: `"shared"` is now a REQUIRED store and must appear in the
+    // attested coverage set, with the cascade reporting completion.
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&receipts[0]).expect("read teardown receipt"))
+            .expect("decode teardown receipt");
+    let covered = receipt["forget_cascade"]["stores_covered"]
+        .as_array()
+        .expect("stores_covered array");
+    assert!(
+        covered.iter().any(|s| s == "shared"),
+        "the shared tier must be attested as covered: {covered:?}"
+    );
+    assert_eq!(
+        receipt["forget_cascade"]["completed"], true,
+        "cascade must complete once every required store is covered"
+    );
+
+    // The Shared tier is attested as verified-empty in the proof bundle.
     let proof_path = terminal["proof_path"].as_str().expect("proof_path");
     let proof: serde_json::Value =
         serde_json::from_slice(&std::fs::read(proof_path).expect("read proof bundle"))
@@ -243,13 +310,144 @@ fn regional_uninstall_emits_erased_terminal_with_shared_coverage_gap() {
         .iter()
         .find(|category| category["name"] == "shared")
         .expect("shared category present");
-    assert_eq!(shared["status"]["status"], "CoverageGap");
-    let reason = shared["status"]["reason"]
-        .as_str()
-        .expect("shared must be a CoverageGap, not Removed");
+    assert_eq!(
+        shared["status"]["status"], "VerifiedEmpty",
+        "shared must be verified-empty after the 13.5h partition: {shared}"
+    );
     assert!(
-        reason.contains("13-5h"),
-        "the shared coverage gap must name its owner: {reason}"
+        shared["status"]["reason"].is_null(),
+        "VerifiedEmpty carries no reason payload: {shared}"
+    );
+}
+
+/// Story 13.5h Trap 4 — the partition makes pre-existing Shared principal rows
+/// UNREACHABLE, not erased.
+///
+/// Pins the fail-closed response for a Host upgraded from a pre-partition
+/// build: the `shared` category degrades from `VerifiedEmpty` to a
+/// `CoverageGap` naming the residue, `"shared"` is withheld from
+/// `stores_covered`, and the region-pinned run refuses to attest a completed
+/// teardown rather than signing a success that did not happen.
+///
+/// This test is also what proves its sibling
+/// `regional_uninstall_attests_shared_tier_verified_empty` is not vacuous:
+/// hard-code `CategoryStatus::VerifiedEmpty` in `run_uninstall_cascade_inner`
+/// instead of counting principal-namespaced rows, and THIS test reds while the
+/// sibling stays green. A `VerifiedEmpty` that is asserted rather than measured
+/// is precisely the null control Story 13.5h exists to remove.
+#[test]
+fn regional_uninstall_refuses_to_attest_pre_partition_shared_residue() {
+    let fixture = Fixture::new();
+    fixture.seed_unheld_principal();
+    fixture.plant_pre_partition_shared_row(PRINCIPAL);
+    let output = fixture.run_uninstall(Some("eu-west"));
+
+    assert_ne!(
+        output.status.code(),
+        Some(0),
+        "a teardown cannot succeed while unerasable principal rows remain in the shared tier; \
+         stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // No regional teardown receipt may be signed for an incomplete cascade.
+    let receipts: Vec<_> = std::fs::read_dir(fixture.proof_dir())
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .filter(|name| name.starts_with("regional-teardown-"))
+                .collect()
+        })
+        .unwrap_or_default();
+    assert!(
+        receipts.is_empty(),
+        "no teardown receipt may be signed while the shared tier holds residue: {receipts:?}"
+    );
+
+    // The proof bundle still lands, and reports the residue honestly.
+    let bundles: Vec<PathBuf> = std::fs::read_dir(fixture.proof_dir())
+        .expect("read proof dir")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "bundle"))
+        .collect();
+    assert_eq!(
+        bundles.len(),
+        1,
+        "expected one proof bundle, got {bundles:?}"
+    );
+    let proof: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&bundles[0]).expect("read proof bundle"))
+            .expect("decode proof bundle");
+    let shared = proof["categories"]
+        .as_array()
+        .expect("categories array")
+        .iter()
+        .find(|category| category["name"] == "shared")
+        .expect("shared category present");
+    assert_eq!(
+        shared["status"]["status"], "CoverageGap",
+        "shared must degrade to CoverageGap when residue is present: {shared}"
+    );
+    let reason = shared["status"]["reason"].as_str().expect("gap reason");
+    let reason_lower = reason.to_ascii_lowercase();
+    assert!(
+        reason_lower.contains("not erased") && reason_lower.contains("unreachable"),
+        "the gap must state that residue is unreachable but NOT erased: {reason}"
+    );
+    assert!(
+        reason.contains('1'),
+        "the gap must report how many rows remain: {reason}"
+    );
+}
+
+/// Shared residue is fail-closed even without a configured home region.
+///
+/// The proof category, not regional receipt construction, is the source of
+/// truth. A non-regional uninstall must therefore reject the same residue.
+#[test]
+fn non_regional_uninstall_rejects_pre_partition_shared_residue() {
+    let fixture = Fixture::new();
+    fixture.seed_unheld_principal();
+    fixture.plant_pre_partition_shared_row(PRINCIPAL);
+    let output = fixture.run_uninstall(None);
+
+    assert_ne!(
+        output.status.code(),
+        Some(0),
+        "uninstall cannot succeed while Shared principal residue remains; stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(terminal(&output)["outcome"], "failed");
+    assert_eq!(
+        regular_files(&fixture.proof_dir()),
+        1,
+        "the failed terminal must retain the signed partial proof"
+    );
+}
+
+/// A pre-partition Shared write did not create a `principal_index` row.
+///
+/// The uninstall must inspect Shared residue before treating an empty private
+/// principal set as `NotFound`, and must persist the resulting coverage gap.
+#[test]
+fn shared_only_pre_partition_residue_is_reported() {
+    let fixture = Fixture::new();
+    fixture.plant_pre_partition_shared_row(PRINCIPAL);
+    let output = fixture.run_uninstall(None);
+
+    let result = terminal(&output);
+    assert_eq!(
+        result["outcome"], "failed",
+        "Shared-only residue must not disappear behind NotFound: {result}"
+    );
+    assert_eq!(
+        regular_files(&fixture.proof_dir()),
+        1,
+        "Shared-only residue must be recorded in a signed partial proof"
     );
 }
 

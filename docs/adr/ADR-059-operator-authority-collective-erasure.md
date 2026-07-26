@@ -19,7 +19,7 @@ The existing uninstall orchestrator is an operator process at the composition ro
 
 Collective storage continues to refuse `MemoryNamespace::Principal` at its own write entry point and at signed replication apply. The schema decoder no longer reconstructs a persisted `principal` namespace. The erasure backend registry names Loom because the partition itself is the Article 17 proof: a typed refusal plus a real-store scan must show that no principal-shaped collective row landed.
 
-This does not close the analogous Shared-tier hole. Shared principal partition remains a separate blocker candidate owned by Story `13-5h`.
+This did not, at 13.5b, close the analogous Shared-tier hole. That hole is now closed by Decision 11, landed in Story `13-5h`: the same refusal is enforced at the Shared write, read and scan entry points by a single hoisted predicate.
 
 ## Decision 2 — Erase authority is operator-only
 
@@ -65,15 +65,15 @@ The crash window between a store-side effect and its audit append remains explic
 
 No file under `crates/maos-kernel-core/src` changes line count. The source-line pin remains exactly 23228 before and after `cargo fmt`. The backend registry uses the name `"loom"`, keeping its formatted declaration on one 99-character line.
 
-This is **ZERO kernel-core delta**, not zero project delta. `maos-domain`, `maos-loom-lite`, `maos-iac`, `maos-bin`, `maos-cli`, `maos-audit`, and `xtask` all carry measured changes. Their ceilings are re-based to the measured residuals under ADR-038.
+This is **ZERO kernel-core delta**, not zero project delta. `maos-domain`, `maos-loom-lite`, `maos-iac`, `maos-bin`, `maos-cli`, `maos-audit`, and `xtask` all carry measured changes. Their ceilings are re-based to the measured residuals under ADR-038. **This ZERO-Δ statement is scoped to Story 13.5b.** Its successor 13.5h carries an authorized +6 — see Decision 11.
 
 ## Decision 8 — Attestation scope is what was covered, never what exists
 
 *Added by the 13.5b code review (party-mode consensus, 2026-07-25, 3/4 with Winston dissenting).*
 
-`REQUIRED_STORES` no longer contains `"shared"`. `SharedMemoryStore` has no delete method at any visibility, so the cascade could never cover it and `ForgetCascadeAttestation::completed` was structurally unable to be `true` — the mirror image of the D-1 defect this story exists to close, and an Article 17 outage on every region-pinned Host. The Shared tier is now attested per run as `CategoryStatus::CoverageGap` naming Story `13-5h`, which is what AC1 asked for.
+`REQUIRED_STORES` dropped `"shared"` at 13.5b. `SharedMemoryStore` has no delete method at any visibility, so the cascade could never cover it and `ForgetCascadeAttestation::completed` was structurally unable to be `true` — the mirror image of the D-1 defect this story exists to close, and an Article 17 outage on every region-pinned Host. The Shared tier was therefore attested per run as `CategoryStatus::CoverageGap` naming Story `13-5h`, which is what AC1 asked for. **Superseded by Decision 11:** `"shared"` is back in `REQUIRED_STORES`, not because a delete path appeared but because the partition makes the tier principal-empty by construction, and the producer now VERIFIES that per run before attesting.
 
-The removal changes a **durable verification contract**, not just a producer: `verify_regional_teardown_receipt` independently re-checks `completed`. The contract is therefore stated explicitly and in one place. A regional teardown receipt attests exactly the stores named in `forget_cascade.stores_covered`. It is **not** a standalone all-tier Article 17 artifact. A consumer treating it as one MUST also read the companion erasure-proof bundle for the same run and honour its `CoverageGap` entries. `REQUIRED_STORES` and the new `UNCOVERED_STORES` partition `KNOWN_STORES`, asserted by `store_sets_partition_known_stores`, so the two cannot drift when `13-5h` moves `"shared"` between them.
+The removal changes a **durable verification contract**, not just a producer: `verify_regional_teardown_receipt` independently re-checks `completed`. The contract is therefore stated explicitly and in one place. A regional teardown receipt attests exactly the stores named in `forget_cascade.stores_covered`. It is **not** a standalone all-tier Article 17 artifact. A consumer treating it as one MUST also read the companion erasure-proof bundle for the same run and honour its `CoverageGap` entries. `REQUIRED_STORES` and `UNCOVERED_STORES` partition `KNOWN_STORES`, asserted by `store_sets_partition_known_stores`, so the two cannot drift when a store moves between them — as `"shared"` did in `13-5h`. `UNCOVERED_STORES` is now empty and is retained deliberately as the single grep-able place a future no-erase-path backend is declared.
 
 ## Decision 9 — A held run attests what it destroyed
 
@@ -93,18 +93,36 @@ Consistent with Decision 6: a held uninstall still writes no lifecycle success a
 
 Story 13.5b's D-4 fix corrected the *count*; the *enumeration source* is upstream of it and was already wrong. Correcting it means walking `fs_root` inside `forget_principal` — kernel-core lines, outside this story's ratified ZERO-Δ fence. Escalate rather than absorb. The defect is pinned by `private_tier_markdown_survives_the_forget_cascade`, bound as a Blocking gate leg, so a successor's fix goes red and forces the proof category to be corrected with it. See Residual 8.
 
+## Decision 11 — The Shared tier is partitioned by an authorized +6 kernel delta
+
+*Operator-ratified 2026-07-25 on a unanimous 4/4 panel. Supersedes Residual 2's "or namespace-aware erase" branch.*
+
+Decision D names two tiers that must refuse subject-scoped PII and was implemented in one. `MemoryTier::Shared` accepts `MemoryNamespace::Principal` at all three trait arms while `SharedMemoryStore` has no delete at any visibility and `subject_access_query` reads only `principal_index` — so a Shared-tier principal row is neither erasable under Article 17 nor visible under Article 15.
+
+The control that claimed otherwise is a **null control, measured not argued**: it plants its canary under `Coordination`, asserts that legitimate cross-Spirit row survives the forget, and then declares the tier principal-empty. Swapping only the canary's namespace to a principal one leaves the suite green — the discharge passes identically with and without unerasable PII in the tier.
+
+**Fork resolution.** Namespace-aware *erasure* is rejected: no call site anywhere in the workspace writes `(Shared, Principal)`, `shared_memory` has no `principal_id` column, and the architecture places the principal namespace in the private tier. The subject set is empty, so erasure would be real design work for data that does not exist. **Partition wins.**
+
+**Shape.** `reject_principal_collective` is generalized into `reject_principal_outside_private(tier, namespace)` and stated as a **negation of the allowlist**: `Principal` is legal only in `Private`, so a future tier is principal-rejecting by default and admitting one requires an explicit, reviewable change. One hoisted call sits above each of the three `match tier` blocks; the three in-arm collective calls are deleted; the three cap-gated call sites adopt the generalized helper so they cannot become an alternate bypass. A separate per-tier mirror was rejected 4/4 on architecture — it duplicates a single invariant and leaves a new tier's arm free to silently admit `Principal` — and independently cost +26 physical / +20 tokei, breaching the KLOC ceiling.
+
+**Grant — SPENT AS AUTHORIZED.** Measured +6 physical (pin 23228 → 23234) and +4 tokei (17890 → 17894), landing under the then-standing 17 900 ceiling, so this grant did **not** depend on a ceiling move and `kloc.toml`'s extraction precondition was waived story-specifically rather than repealed. The ceiling has since moved to 18 248 under the founder-ratified policy replacement of 2026-07-25 (`measured + max(100, ceil(0.02 × measured))`, `kloc-check` flipped to BLOCKING); that is operating capacity, and it did not enlarge this grant. The pin moved only after the rewritten control was falsified **per leg**: deleting the hoisted predicate above the write, read and scan `match tier` block each turned `multi_backend_erasure_partition_invariant` red at its own assertion, proving all three independently load-bearing. The pre-13.5h control would not have redded at all, since it never wrote a principal namespace at Shared.
+
+**Limit — the explicit position on unreachable-vs-erased.** The partition makes pre-existing Shared principal rows *unreachable*, not erased: `reject_principal_outside_private` refuses `Principal` at write, read and scan, but there is still no DELETE path in `SharedMemoryStore`, so a row written by a pre-partition build stays on disk. Refusal is nonetheless the correct behaviour — the row was never legitimately writable, and failing closed on read beats serving PII the erasure cascade cannot reach.
+
+Because "unreachable" is not "erased", `CategoryStatus::VerifiedEmpty` is **earned, never asserted**. `maos_audit::shared_tier_principal_row_count` counts principal-namespaced rows in `shared_memory` — filtering on the namespace column, not the value blob — on every run. Zero rows yields `VerifiedEmpty` and admits `"shared"` to `stores_covered`. A non-zero count yields a `CoverageGap` stating the row count and that the rows are unreachable but not erased, withholds `"shared"` from `stores_covered`, and so drives `completed` false and refuses to sign a regional teardown receipt. That is fail-closed, and it means a Host carrying pre-partition residue cannot attest a completed teardown until the residue is removed out of band. Emitting `VerifiedEmpty` unconditionally would have rebuilt, in the fix itself, the very null control this decision exists to remove; the two behaviours are pinned against each other by `regional_uninstall_attests_shared_tier_verified_empty` and `regional_uninstall_refuses_to_attest_pre_partition_shared_residue`.
+
 ## Residual register
 
 | # | Residual | Status | Owner |
 |---|---|---|---|
 | 1 | Cross-team erase/hold fan-out; 13.6 both creates the first production crossing subject and judges this contract | ABSENT | Story 13.6 |
-| 2 | Shared-tier principal partition or namespace-aware erase; latent Article 15/17 hole and v2.2 blocker candidate | OPEN — must land before 13.6 | Story `13-5h` |
+| 2 | Shared-tier principal partition; latent Article 15/17 hole and v2.2 blocker candidate | **CLOSED** by Story `13-5h`, landed 2026-07-25 (Decision 11). Grant spent exactly as authorized: +6 physical, +4 tokei. Guard falsified per leg; null control #23 replaced by a discriminating one | Story `13-5h` |
 | 3 | Team-scoped legal holds and composite hold identity | ABSENT; do not emulate with global rows | Story 13.6 |
 | 4 | Erasure correlation IDs and a multi-shard reconciliation reader | OPEN | Ownerless and open |
 | 5 | CRDT-LWW resurrection after delete | CLOSED by transaction-serialized tombstones whose clock is `max(row_source_ts, now)`; the earlier bare-`now` stamp left a future-skewed-leaf window (13.5b review) | Story 13.5b |
 | 6 | NFR-Ops-11(iii), per-operator capability-token signing key | OPEN | Ownerless and open |
 | 7 | Crash atomicity between store mutation and audit append | OPEN; fail-fast and detected by one-sided reconciliation | Ownerless and open |
-| 8 | Private-tier filesystem residue: `forget_principal` enumerates only the in-memory map, so `Markdown` records and post-restart spills survive while the proof says `Removed { count: 0 }` (Decision 10) | OPEN — kernel-core fix, needs FLAG-Winston; pinned RED-on-fix by `private_tier_markdown_survives_the_forget_cascade` | Ownerless and open |
+| 8 | Private-tier filesystem residue: `forget_principal` enumerates only the in-memory map, so `Markdown` records and post-restart spills survive while the proof says `Removed { count: 0 }` (Decision 10) | OPEN — kernel-core fix, needs its OWN FLAG-Winston (est. +35..55; explicitly NOT covered by Decision 11's grant); scheduled after 13-5h and before 13.6; pinned RED-on-fix by `private_tier_markdown_survives_the_forget_cascade` | Story `13-5i` |
 
 ## Rejected alternatives
 
@@ -118,4 +136,4 @@ Story 13.5b's D-4 fix corrected the *count*; the *enumeration source* is upstrea
 
 - The Reza production gate now carries hermetic partition, terminal, hold, authority, and one-sided-reconciliation legs plus live Postgres partition/erase witnesses.
 - Missing live substrate remains `AdvisorySubstrate` locally and blocks when provisioned in CI.
-- Shared-tier principal state, cross-team fan-out, team-scoped holds, and cross-shard correlation remain named limits; no proof or operator document may claim them closed.
+- Shared-tier principal state is closed by Decision 11's authorized partition. Cross-team fan-out, team-scoped holds, cross-shard correlation, and the private-tier filesystem residue remain named limits; no proof or operator document may claim them closed.
