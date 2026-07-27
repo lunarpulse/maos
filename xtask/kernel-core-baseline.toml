@@ -385,4 +385,54 @@
 #          Trap-4 leg private_forget_reports_filesystem_removal_failure.
 #          `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag and
 #          is NOT touched. All additive; no public symbols removed.
-src_lines = 23318
+#   23401  Story 13.5j — the private tier's READ surface is made consistent
+#          with its durable state and contained to its own directory
+#          (+83 physical / +34 tokei; 23318 → 23401). AUTHORIZED 2026-07-27,
+#          FLAG-Winston, at the MEASURED number after six shapes were probed
+#          and proven defective at HEAD. Story 13.5i made `forget_principal`
+#          authoritative about the filesystem; `write`, `read` and `scan` were
+#          left behind and disagreed with it in six ways, all confirmed by
+#          running code before a line was written: (D1) `write` never unlinked
+#          a superseded spill, so `k.json` and `k.bin` coexisted and a cold
+#          read returned the value the Spirit had already overwritten
+#          (measured warm=Blob / cold=Json); (D2) `scan` unioned the in-memory
+#          cache with the filesystem without a shared logical-key identity and
+#          returned `["digest:aaa", "digest:aaa"]` for one key, which reaches
+#          `working_memory_digest_refs` in a SIGNED `decision.*` frame and
+#          halves the effective scan cap; (D3) `scan` recovered keys with
+#          `file_stem()`, so the empty key was invisible to it while
+#          `forget_principal` counted it — the two disagreed about what a
+#          logical key IS; (D4) one hand-made directory in the deliberately
+#          operator-editable Markdown area failed the WHOLE namespace scan
+#          with `IsADirectory`, which the production digest provider swallows
+#          into empty refs; (D5) `scan`'s `is_dir()` and (D6) `read`'s
+#          `exists()` both traverse symlinks, so a link planted in a Spirit's
+#          own area read entries from outside it (I5) — the containment
+#          13.5i closed on the erase path, still open on the read path.
+#          SEVERITY CORRECTED, NOT INFLATED: the 13.5i residual filed this as
+#          a "live data-integrity and data-exposure bug". It is LATENT at
+#          HEAD — no shipped writer produces the trigger (the sole production
+#          private writer, `halt/resolver.rs:170`, writes unique
+#          `halt_context::` keys, and nothing writes the `digest:` keys the
+#          sole production scanner reads). The surface is nonetheless fully
+#          wired: `KernelCtx::memory()` hands the adapter to Spirit-hosting
+#          code, so both halves are one Spirit write away.
+#          The 18248 ceiling is unchanged (measured 17975, 273 spare); no
+#          hot_swap extraction is owed for this correctness repair.
+#          BINDING CONDITION DISCHARGED BEFORE THIS NUMBER MOVED: serialized
+#          per-limb falsification, source restored byte-identical after each —
+#          M1 (write does not unlink) RED on both `write_unlinks_*`, 8 GREEN;
+#          M2 (scan drops the cache-identity skip) RED on the one-entry, the
+#          read-cardinality and the signed-frame limbs, 7 GREEN; M3 (`scan`
+#          back to `file_stem()`) RED on the empty-key limb, 9 GREEN; M4 (drop
+#          the regular-file guard) RED on the junk-directory limb, 9 GREEN;
+#          M5 (`scan` back to `is_dir()`) RED on the namespace-symlink limb,
+#          9 GREEN; M6 (`read` back to `exists()`) RED on the spill-symlink
+#          limb, 9 GREEN. Restored: 10/10 GREEN.
+#          NO CONTROL IS CLAIMED for the in-memory loop's `break` → `continue`
+#          change: `limit` caps the filesystem pass first, so a complete
+#          versus truncated `cached` set is not observable today. It is kept
+#          because the comment above it would otherwise be false.
+#          `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag and
+#          is NOT touched. All additive; no public symbols removed.
+src_lines = 23401

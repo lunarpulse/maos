@@ -88,24 +88,75 @@ impl PrivateMemoryStore {
         }
     }
 
+    /// Every value kind.  `write`, `scan` and `forget_principal` all walk this
+    /// one list so they cannot drift about which on-disk names this store could
+    /// have produced.
+    const ALL_KINDS: [ValueKind; 4] = [
+        ValueKind::Json,
+        ValueKind::Markdown,
+        ValueKind::Blob,
+        ValueKind::Text,
+    ];
+
     /// Reverse of the file-name half of `fs_path_for`: strip a recognized
     /// value-kind extension to recover the logical key **verbatim** (the key
-    /// is deliberately not mangled on the way out, `:100-102`).  `None` means
-    /// the name is not a spill this store could have written, so it is not a
-    /// readable entry and must never be attested as one — it is still
-    /// destroyed with the subtree.  Stripping the extension rather than
-    /// taking `file_stem()` is what makes the empty key round-trip (`.md`
-    /// stems to `".md"`, but strips to `""`) and what keeps a dotted key
-    /// like `report.2026` intact.
+    /// is deliberately not mangled on the way out, `:100-102`) together with
+    /// the kind that produced it.  `None` means the name is not a spill this
+    /// store could have written, so it is not a readable entry and must never
+    /// be attested or returned as one.  Stripping the extension rather than
+    /// taking `file_stem()` is what makes the empty key round-trip (`.md` stems
+    /// to `".md"`, but strips to `""`) and what keeps a dotted key like
+    /// `report.2026` intact.  The four extensions are mutually non-suffixing,
+    /// so the match is unambiguous whatever the order.
+    fn spill_name_parts(name: &str) -> Option<(&str, ValueKind)> {
+        Self::ALL_KINDS
+            .into_iter()
+            .find_map(|kind| Some((name.strip_suffix(Self::file_ext_for_kind(kind))?, kind)))
+    }
+
     fn key_from_spill_name(name: &str) -> Option<&str> {
-        [
-            ValueKind::Json,
-            ValueKind::Markdown,
-            ValueKind::Blob,
-            ValueKind::Text,
-        ]
-        .into_iter()
-        .find_map(|kind| name.strip_suffix(Self::file_ext_for_kind(kind)))
+        Self::spill_name_parts(name).map(|(key, _)| key)
+    }
+
+    /// Unlink every spill for `(spirit_pid, namespace, key)` whose kind is not
+    /// `keep`, leaving **at most one** on-disk file per logical key.
+    ///
+    /// Without this, a value that changes kind — or that shrinks below
+    /// `inline_threshold` and stops spilling at all — leaves its predecessor
+    /// behind, where `read`'s fixed-order kind probe (`:243-248`) resurrects it
+    /// on the next cold read.  The in-memory cache hides that until restart.
+    /// This does NOT make sub-threshold values durable (those are
+    /// process-lifetime working memory by design); it makes the durable state
+    /// non-contradictory — disk holds this value or none, never a previous one.
+    fn remove_superseded_spills(
+        fs_root: &Path,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        keep: Option<ValueKind>,
+    ) -> Result<(), MemoryError> {
+        // One stat on the hot path: a key that never spilled has no namespace
+        // directory, so there is nothing to unlink.
+        let ns_path = fs_root
+            .join(spirit_pid.to_string())
+            .join(Self::namespace_to_dirname(namespace)?);
+        if !ns_path.is_dir() {
+            return Ok(());
+        }
+        for kind in Self::ALL_KINDS {
+            if Some(kind) == keep {
+                continue;
+            }
+            let stale = ns_path.join(format!("{key}{}", Self::file_ext_for_kind(kind)));
+            match fs::remove_file(&stale) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                // Never swallowed: a spill that outlives its supersession is a
+                // value this store will serve again after a restart.
+                Err(e) => return Err(MemoryError::Io(e)),
+            }
+        }
+        Ok(())
     }
 
     fn fs_path_for(
@@ -195,10 +246,16 @@ impl PrivateMemoryStore {
         Self::sanitize_key(key)?;
 
         let needs_spill = Self::should_spill_to_disk(&value, self.inline_threshold)?;
-        if needs_spill {
+        let spilled_kind = if needs_spill {
             let path = Self::fs_path_for(&self.fs_root, spirit_pid, namespace, key, value.kind())?;
             Self::write_to_disk(&path, &value)?;
-        }
+            Some(value.kind())
+        } else {
+            None
+        };
+        // The new spill is durable BEFORE its predecessors are unlinked, so a
+        // crash in between leaves a recoverable superset, never a gap.
+        Self::remove_superseded_spills(&self.fs_root, spirit_pid, namespace, key, spilled_kind)?;
 
         // Markdown is filesystem-canonical (operator-editable).  Do NOT
         // cache it in-memory so that operator hand-edits on disk are visible
@@ -239,7 +296,10 @@ impl PrivateMemoryStore {
         }
 
         // Try filesystem — for Markdown this is the canonical source;
-        // for other types it's the spill fallback.
+        // for other types it's the spill fallback.  Markdown is probed first
+        // (it is authoritative), so this order deliberately differs from
+        // `ALL_KINDS`; `remove_superseded_spills` guarantees at most one of
+        // these paths exists, so the order no longer decides which value wins.
         for kind in &[
             ValueKind::Markdown,
             ValueKind::Json,
@@ -247,7 +307,11 @@ impl PrivateMemoryStore {
             ValueKind::Text,
         ] {
             let path = Self::fs_path_for(&self.fs_root, spirit_pid, namespace, key, *kind)?;
-            if path.exists() {
+            // `exists()` follows symlinks and answers true for a directory: a
+            // link here would be read from outside this Spirit's area (I5), and
+            // a hand-made directory would fail the read with `IsADirectory`.
+            // `symlink_metadata` does neither.
+            if matches!(fs::symlink_metadata(&path), Ok(m) if m.is_file()) {
                 let value = Self::read_from_disk(&path, *kind)?;
                 // Populate cache for non-Markdown values only.
                 if !matches!(value, MemoryValue::Markdown(_)) {
@@ -266,7 +330,14 @@ impl PrivateMemoryStore {
 
     /// Scan entries matching a key prefix within the given namespace,
     /// up to `limit` entries.  Order is NOT deterministic (HashMap
-    /// iteration).  Merges in-memory and filesystem entries.
+    /// iteration).
+    ///
+    /// Merges the in-memory and filesystem sources **by logical key**.  The map
+    /// is the read-through cache for the very value `read` would return, so a
+    /// key held in both is ONE entry and the cached copy wins — the same
+    /// precedence `read` applies (`:236`).  A union without that identity
+    /// returns one key twice, which reaches a signed `decision.*` frame's
+    /// `working_memory_digest_refs` and halves its effective scan cap.
     pub(in crate::memory) fn scan(
         &self,
         spirit_pid: u32,
@@ -278,7 +349,10 @@ impl PrivateMemoryStore {
         let ns = namespace.clone();
         let pid = spirit_pid;
 
-        // In-memory entries.
+        // In-memory entries.  EVERY matching key is recorded, including the
+        // ones `limit` keeps out of the result: `limit` truncates output, it
+        // must not change which keys the filesystem pass sees as already held.
+        let mut cached: std::collections::HashSet<String> = std::collections::HashSet::new();
         {
             let map = self
                 .in_mem
@@ -286,8 +360,9 @@ impl PrivateMemoryStore {
                 .expect("PrivateMemoryStore lock poisoned");
             for ((pid_k, ns_k, key), value) in map.iter() {
                 if *pid_k == pid && *ns_k == ns && key.starts_with(prefix) {
+                    cached.insert(key.clone());
                     if entries.len() >= limit {
-                        break;
+                        continue;
                     }
                     entries.push(MemoryEntry {
                         namespace: ns.clone(),
@@ -300,34 +375,42 @@ impl PrivateMemoryStore {
         }
 
         // Filesystem entries (spilled Markdown and large values).
-        let pid_dir = self.fs_root.join(pid.to_string());
-        let ns_dir = Self::namespace_to_dirname(&ns)?;
-        let ns_path = pid_dir.join(&ns_dir);
-        if ns_path.is_dir() {
-            for entry in std::fs::read_dir(&ns_path).map_err(MemoryError::Io)? {
+        let ns_path = self
+            .fs_root
+            .join(pid.to_string())
+            .join(Self::namespace_to_dirname(&ns)?);
+        // `is_dir()` follows symlinks; `symlink_metadata` does not.  A link
+        // planted at the namespace path would otherwise let a scan read entries
+        // from outside this Spirit's area (I5).  Unlike `forget_principal`,
+        // which errors here because a miscount would be signed into an Art.17
+        // receipt, a read reports nothing and stays safe.
+        if matches!(fs::symlink_metadata(&ns_path), Ok(m) if m.is_dir()) {
+            for entry in fs::read_dir(&ns_path).map_err(MemoryError::Io)? {
                 let entry = entry.map_err(MemoryError::Io)?;
-                let path = entry.path();
-                let file_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
-                if file_name.starts_with(prefix) {
-                    let kind = match ext {
-                        "json" => ValueKind::Json,
-                        "md" => ValueKind::Markdown,
-                        "bin" => ValueKind::Blob,
-                        "txt" => ValueKind::Text,
-                        _ => continue,
-                    };
-                    let value = Self::read_from_disk(&path, kind)?;
-                    if entries.len() >= limit {
-                        break;
-                    }
-                    entries.push(MemoryEntry {
-                        namespace: ns.clone(),
-                        key: file_name.to_string(),
-                        value,
-                        timestamp_ns: 0,
-                    });
+                // Mirror `forget_principal` (`:440`): only a regular file whose
+                // name carries a value-kind extension is a logical entry.  A
+                // hand-created sub-directory or an editor backup is residue —
+                // skipping it keeps ONE junk node from failing the whole
+                // namespace scan, which `read_from_disk` would otherwise do.
+                if !entry.file_type().map_err(MemoryError::Io)?.is_file() {
+                    continue;
                 }
+                let file_name = entry.file_name();
+                let Some((key, kind)) = file_name.to_str().and_then(Self::spill_name_parts) else {
+                    continue;
+                };
+                if !key.starts_with(prefix) || cached.contains(key) {
+                    continue;
+                }
+                if entries.len() >= limit {
+                    break;
+                }
+                entries.push(MemoryEntry {
+                    namespace: ns.clone(),
+                    key: key.to_string(),
+                    value: Self::read_from_disk(&entry.path(), kind)?,
+                    timestamp_ns: 0,
+                });
             }
         }
 
