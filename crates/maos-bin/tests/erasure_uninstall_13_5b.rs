@@ -128,7 +128,7 @@ impl Fixture {
     }
 
     /// Seed a `Markdown` record: filesystem-canonical, never cached in memory.
-    fn seed_markdown_principal(&self) {
+    fn seed_named_markdown_principal(&self, principal: &str) {
         let audit_db = self.audit_db();
         std::fs::create_dir_all(audit_db.parent().expect("audit parent"))
             .expect("create audit parent");
@@ -151,13 +151,17 @@ impl Fixture {
                 0,
                 MemoryTier::Private,
                 &MemoryNamespace::Principal {
-                    principal_id: PRINCIPAL.into(),
+                    principal_id: principal.into(),
                     schema: "profile".into(),
                 },
                 "dossier",
                 MemoryValue::Markdown("# dossier\n\nprincipal payload\n".into()),
             )
             .expect("seed markdown record");
+    }
+
+    fn seed_markdown_principal(&self) {
+        self.seed_named_markdown_principal(PRINCIPAL);
     }
 
     fn seed_held_principal(&self) {
@@ -213,6 +217,34 @@ fn regular_files(path: &Path) -> usize {
                 .count()
         })
         .unwrap_or(0)
+}
+
+fn spilled_files(root: &Path) -> Vec<PathBuf> {
+    fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+        for entry in std::fs::read_dir(dir).expect("read private-memory directory") {
+            let entry = entry.expect("read private-memory entry");
+            let file_type = entry.file_type().expect("read private-memory entry type");
+            if file_type.is_dir() {
+                walk(&entry.path(), out);
+            } else if file_type.is_file() {
+                out.push(entry.path());
+            }
+        }
+    }
+
+    let mut out = Vec::new();
+    walk(root, &mut out);
+    out.sort();
+    out
+}
+
+fn private_tree_contains(root: &Path, needle: &str) -> bool {
+    // An observation failure is NOT proof of absence: fail loud rather than
+    // report "erased" over residue we merely could not read.
+    spilled_files(root).iter().any(|path| {
+        String::from_utf8_lossy(&std::fs::read(path).expect("read private-memory spill"))
+            .contains(needle)
+    })
 }
 
 fn terminal(output: &Output) -> serde_json::Value {
@@ -488,7 +520,7 @@ fn mixed_held_uninstall_writes_partial_proof() {
     const ERASED: &str = "erased-alongside-hold@example.org";
 
     let fixture = Fixture::new();
-    fixture.seed_named_principal(ERASED, false);
+    fixture.seed_named_markdown_principal(ERASED);
     fixture.seed_named_principal(PRINCIPAL, true);
 
     let output = fixture.run_uninstall(Some("eu-west"));
@@ -510,12 +542,9 @@ fn mixed_held_uninstall_writes_partial_proof() {
         &vec![serde_json::Value::String(ERASED.into())],
         "the terminal must name what it destroyed"
     );
-    // NOTE: `deleted_entries` is the private tier's count and is 0 for any
-    // out-of-process uninstall — see `private_tier_forget_never_reaches_disk`
-    // below. Assert the durable, cross-process effect instead: index rows.
-    assert!(
-        terminal["deleted_entries"].as_u64().is_some(),
-        "the terminal must carry an effect count, whatever its value"
+    assert_eq!(
+        terminal["deleted_entries"], 1,
+        "the erased principal's durable Markdown entry must be counted"
     );
 
     // A partial proof exists and is explicit about the hold.
@@ -771,66 +800,29 @@ fn legal_hold_list_and_release_are_operable_without_auto_erasure() {
     );
 }
 
-/// **Defect pin, found by the 13.5b review's own proven-red work.**
-///
-/// `forget_principal` derives its removal set exclusively from the in-memory
-/// map (`crates/maos-kernel-core/src/memory/private.rs:319-337`), but the
-/// private tier deliberately does NOT cache `MemoryValue::Markdown` — it is
-/// filesystem-canonical so operator hand-edits stay visible (`private.rs:183-188`),
-/// and it always spills to disk (`:158-161`). So a principal's Markdown record
-/// is invisible to the removal set, its `fs::remove_dir_all` at `:353-363`
-/// never runs, and the file survives the GDPR cascade — while the signed proof
-/// records `memory_namespace` as `Removed { count: 0 }` and subject access
-/// reports the principal gone. Signed proof-of-erasure over bytes still on disk,
-/// plus an Article 15/17 asymmetry that hides the residue. The same hole
-/// swallows any value over the 4 KiB spill threshold once the writing process
-/// exits, since a fresh `PrivateMemoryStore` never hydrates (`:30-36`).
-///
-/// Story 13.5b's D-4 fix corrected the *count*; the *enumeration source* is
-/// upstream of it and was already wrong. Fixing it means walking `fs_root`
-/// inside `forget_principal` — kernel-core lines, outside this story's ratified
-/// ZERO-Δ fence. Escalate, do not absorb (Trap 1(ii)).
-///
-/// This test pins the CURRENT behaviour so the hole cannot be forgotten. When
-/// the successor fixes it this test goes RED, and it must then be inverted
-/// together with the proof's `memory_namespace` category.
+/// Story 13.5i — the production one-shot uninstall constructs a fresh private
+/// store with an empty cache. Principal erasure must therefore discover the
+/// filesystem record itself, delete its content, and attest one removed entry.
 #[test]
-fn private_tier_markdown_survives_the_forget_cascade() {
+fn private_tier_markdown_is_erased_by_the_forget_cascade() {
     let fixture = Fixture::new();
     fixture.seed_markdown_principal();
-
-    // The on-disk namespace directory is hex-encoded JSON (`private.rs:71-79`),
-    // so enumerate every spilled file under the memory root instead.
-    let spilled_files = |root: &Path| -> Vec<String> {
-        fn walk(dir: &Path, out: &mut Vec<String>) {
-            let Ok(entries) = std::fs::read_dir(dir) else {
-                return;
-            };
-            for entry in entries.filter_map(Result::ok) {
-                let path = entry.path();
-                if path.is_dir() {
-                    walk(&path, out);
-                } else {
-                    out.push(path.to_string_lossy().into_owned());
-                }
-            }
-        }
-        let mut out = Vec::new();
-        walk(root, &mut out);
-        out.sort();
-        out
-    };
 
     let before = spilled_files(&fixture.memory_root);
     assert_eq!(
         before.len(),
         1,
-        "fixture must have spilled exactly one Markdown record under {}; found {before:?}",
+        "fixture must spill exactly one Markdown record under {}; found {before:?}",
         fixture.memory_root.display()
     );
-    assert!(
-        before[0].ends_with(".md"),
+    assert_eq!(
+        before[0].extension().and_then(|ext| ext.to_str()),
+        Some("md"),
         "expected a .md spill: {before:?}"
+    );
+    assert!(
+        private_tree_contains(&fixture.memory_root, "principal payload"),
+        "fixture must contain the principal payload before erasure"
     );
 
     let output = fixture.run_uninstall(None);
@@ -844,26 +836,21 @@ fn private_tier_markdown_survives_the_forget_cascade() {
     let terminal = terminal(&output);
     assert_eq!(terminal["outcome"], "erased");
 
-    // Art.15 side: the index row IS durably gone, which is exactly what makes
-    // the residue invisible to a subject-access answer.
     assert!(
         maos_audit::subject_access_query(&fixture.audit_db(), PRINCIPAL)
             .expect("subject access after erase")
             .is_empty(),
         "principal_index erasure is durable"
     );
-
-    // Art.17 side: the bytes are still there.
-    assert_eq!(
-        spilled_files(&fixture.memory_root),
-        before,
-        "KNOWN DEFECT (pinned): the principal's Markdown record survives the \
-         forget cascade because forget_principal enumerates only the in-memory \
-         map, which never holds Markdown. If this assertion FAILS the defect is \
-         FIXED — invert this test and re-check the proof category below."
+    assert!(
+        spilled_files(&fixture.memory_root).is_empty(),
+        "the principal's filesystem record must be removed"
+    );
+    assert!(
+        !private_tree_contains(&fixture.memory_root, "principal payload"),
+        "principal content must be absent after the forget cascade"
     );
 
-    // ...and the signed proof calls that category Removed regardless.
     let proof_path = terminal["proof_path"].as_str().expect("proof_path");
     let proof: serde_json::Value =
         serde_json::from_slice(&std::fs::read(proof_path).expect("read proof bundle"))
@@ -876,7 +863,23 @@ fn private_tier_markdown_survives_the_forget_cascade() {
         .expect("memory_namespace category present");
     assert_eq!(namespace_category["status"]["status"], "Removed");
     assert_eq!(
-        namespace_category["status"]["count"], 0,
-        "the count is honest after the D-4 fix; the `Removed` label is not"
+        namespace_category["status"]["count"], 1,
+        "the signed proof must carry the real private-tier effect count"
     );
+
+    // AC3's newly-armed path: `claims_removal` is true for the first time now
+    // that the private count is non-zero, so the P18 empty-proof-set rejection
+    // at `proof.rs:383-395` is reachable. Prove the bundle still verifies.
+    let typed: maos_audit::erasure::proof::ErasureProof =
+        serde_json::from_slice(&std::fs::read(proof_path).expect("read proof bundle"))
+            .expect("decode typed proof bundle");
+    assert!(
+        !typed.subject_exclusion_proofs.is_empty(),
+        "a bundle claiming a non-zero removal must carry exclusion proofs"
+    );
+    maos_audit::erasure::proof::verify_erasure_proof(
+        &typed,
+        &maos_audit::sealed_export::derive_pubkey(&[0x5bu8; 32]),
+    )
+    .expect("the signed bundle must verify now that it claims a real removal");
 }

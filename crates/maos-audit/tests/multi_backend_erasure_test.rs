@@ -12,6 +12,10 @@ use rusqlite::OpenFlags;
 use tempfile::TempDir;
 
 const CANARY: &str = "DECISION-F-CANARY-9-2";
+const TARGET_MARKDOWN_CANARY: &str = "PRIVATE-TARGET-MARKDOWN-13-5I";
+const TARGET_SPILL_CANARY: &str = "PRIVATE-TARGET-SPILL-13-5I";
+const BYSTANDER_CANARY: &str = "PRIVATE-BYSTANDER-13-5I";
+const DEFAULT_CANARY: &str = "PRIVATE-DEFAULT-13-5I";
 
 fn open_isolated_adapter(dir: &TempDir) -> Arc<maos_kernel_core::memory::MemoryManagerAdapter> {
     let fs_root = dir.path().join("memory");
@@ -40,25 +44,30 @@ fn open_isolated_adapter(dir: &TempDir) -> Arc<maos_kernel_core::memory::MemoryM
 }
 
 fn private_store_contains(fs_root: &Path, needle: &str) -> bool {
+    // Fail loud: a `read_dir`/`read` failure swallowed into `false` would let
+    // an unreadable surviving residue pass as content absence — the exact
+    // shape of the null control this leg replaced.  `file_type` is used
+    // instead of `Path::is_dir` so a symlink is not traversed.
     fn scan_dir(dir: &Path, needle: &str) -> bool {
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            return false;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if scan_dir(&path, needle) {
+        for entry in std::fs::read_dir(dir).expect("read private store directory") {
+            let entry = entry.expect("read private store entry");
+            let file_type = entry.file_type().expect("read private store entry type");
+            if file_type.is_dir() {
+                if scan_dir(&entry.path(), needle) {
                     return true;
                 }
-            } else if let Ok(bytes) = std::fs::read(&path) {
-                if String::from_utf8_lossy(&bytes).contains(needle) {
-                    return true;
-                }
+            } else if file_type.is_file()
+                && String::from_utf8_lossy(
+                    &std::fs::read(entry.path()).expect("read private store spill"),
+                )
+                .contains(needle)
+            {
+                return true;
             }
         }
         false
     }
-    scan_dir(fs_root, needle)
+    fs_root.exists() && scan_dir(fs_root, needle)
 }
 
 fn shared_store_contains(db_path: &Path, needle: &str) -> bool {
@@ -110,8 +119,8 @@ fn multi_backend_erasure_partition_invariant() {
     let fs_root = dir.path().join("memory");
     let db_path = dir.path().join("audit.sqlite");
     let principal = "dave@example.org";
+    let bystander = "bystander@example.org";
 
-    // Plant principal data in Private tier.
     let principal_ns = MemoryNamespace::Principal {
         principal_id: principal.into(),
         schema: "chat".into(),
@@ -121,8 +130,45 @@ fn multi_backend_erasure_partition_invariant() {
             7,
             MemoryTier::Private,
             &principal_ns,
-            "msg1",
-            MemoryValue::Text(format!("{} hello", CANARY)),
+            "markdown",
+            MemoryValue::Markdown(TARGET_MARKDOWN_CANARY.into()),
+        )
+        .unwrap();
+    memory
+        .write(
+            7,
+            MemoryTier::Private,
+            &principal_ns,
+            "spill",
+            MemoryValue::Blob(
+                TARGET_SPILL_CANARY
+                    .as_bytes()
+                    .iter()
+                    .copied()
+                    .chain(std::iter::repeat_n(b'x', 8 * 1024))
+                    .collect(),
+            ),
+        )
+        .unwrap();
+    memory
+        .write(
+            8,
+            MemoryTier::Private,
+            &MemoryNamespace::Principal {
+                principal_id: bystander.into(),
+                schema: "chat".into(),
+            },
+            "bystander",
+            MemoryValue::Markdown(BYSTANDER_CANARY.into()),
+        )
+        .unwrap();
+    memory
+        .write(
+            9,
+            MemoryTier::Private,
+            &MemoryNamespace::Default,
+            "default",
+            MemoryValue::Markdown(DEFAULT_CANARY.into()),
         )
         .unwrap();
 
@@ -139,19 +185,45 @@ fn multi_backend_erasure_partition_invariant() {
         )
         .unwrap();
 
-    // Forget the principal.
-    memory.forget_with_reason(principal, None).unwrap();
+    // Reopen the adapter before forgetting: production one-shot uninstall
+    // constructs a fresh PrivateMemoryStore whose cache is empty.
+    drop(memory);
+    let memory = open_isolated_adapter(&dir);
+    let outcome = memory.forget_with_reason(principal, None).unwrap();
+    let receipt = match outcome {
+        maos_domain::memory::ForgetOutcome::Erased { receipt, .. } => receipt,
+        other => panic!("principal forget unexpectedly suspended: {other:?}"),
+    };
 
     // --- Backend enumeration + partition ---
     let mut proved_erased: Vec<&str> = Vec::new();
     let mut proved_principal_empty: Vec<&str> = Vec::new();
 
-    // Private tier: empirical canary scan must return nil.
+    // Private tier: both persistent value classes are gone after a restart.
     assert!(
-        !private_store_contains(&fs_root, CANARY),
-        "Private tier still contains principal canary after forget"
+        !private_store_contains(&fs_root, TARGET_MARKDOWN_CANARY),
+        "Private tier still contains the target Markdown value after forget"
+    );
+    assert!(
+        !private_store_contains(&fs_root, TARGET_SPILL_CANARY),
+        "Private tier still contains the target non-Markdown spill after forget"
+    );
+    assert_eq!(
+        receipt.deleted_entries, 2,
+        "the signed effect count is distinct (pid, namespace, key) entries"
     );
     proved_erased.push("private");
+
+    // ADR-026 positive retention: neither another principal nor a
+    // non-principal namespace may be over-deleted.
+    assert!(
+        private_store_contains(&fs_root, BYSTANDER_CANARY),
+        "forget over-deleted the bystander principal"
+    );
+    assert!(
+        private_store_contains(&fs_root, DEFAULT_CANARY),
+        "forget over-deleted the Default namespace"
+    );
 
     // Principal index: address-only rows must be gone.
     let rows = maos_audit::subject_access_query(&db_path, principal).unwrap();

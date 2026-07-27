@@ -503,11 +503,10 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
-        // The private tier's Markdown residue survives the cascade (13.5b
-        // review defect pin). This leg keeps the known hole visible; it goes
-        // RED when a successor fixes it, forcing the proof category to follow.
+        // Story 13.5i: the real one-shot uninstall must delete durable private
+        // bytes, carry the effect into the signed proof, and leave no residue.
         TestLeg {
-            name: "gdpr-private-markdown-residue-pinned",
+            name: "gdpr-private-filesystem-erasure-subprocess",
             class: BindingClass::Blocking,
             args: &[
                 "test",
@@ -515,7 +514,153 @@ pub fn run(json: bool) -> Result<(), String> {
                 "maos-bin",
                 "--test",
                 "erasure_uninstall_13_5b",
-                "private_tier_markdown_survives_the_forget_cascade",
+                "private_tier_markdown_is_erased_by_the_forget_cascade",
+                "--",
+                "--exact",
+            ],
+        },
+        // Restart-backed anti-vacuity siblings. Each exact leg owns one
+        // assertion surface so `run_test_leg` observes one attempted test.
+        TestLeg {
+            name: "gdpr-private-restart-markdown-erasure",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "private_forget_restart_13_5i",
+                "restart_forget_erases_markdown_content",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-private-restart-spill-erasure",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "private_forget_restart_13_5i",
+                "restart_forget_erases_non_markdown_spill_content",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-private-proof-count",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "private_forget_restart_13_5i",
+                "restart_forget_reports_distinct_persisted_entry_count",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-private-exact-once-count",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "private_forget_restart_13_5i",
+                "forget_counts_cached_and_spilled_value_exactly_once",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-private-bystander-retention",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "private_forget_restart_13_5i",
+                "forget_preserves_bystander_and_default_namespace_content",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-private-symlink-containment",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "private_forget_restart_13_5i",
+                "forget_does_not_follow_pid_directory_symlink",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-private-fail-closed-io",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "private_forget_restart_13_5i",
+                "forget_fails_closed_when_pid_directory_is_unreadable",
+                "--",
+                "--exact",
+            ],
+        },
+        // 13.5i code review. M8 as specified (per-file counting) had no
+        // CI-executed detector; namespace-level symlinks were followed and
+        // counted while `remove_dir_all` unlinked only the link; and
+        // `file_stem()` attested sub-directories and editor backups as keys.
+        TestLeg {
+            name: "gdpr-private-inline-only-count",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "private_forget_restart_13_5i",
+                "forget_counts_inline_only_entries_that_never_spill",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-private-namespace-symlink-containment",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "private_forget_restart_13_5i",
+                "forget_does_not_follow_namespace_directory_symlink",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "gdpr-private-logical-key-identity",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-kernel-core",
+                "--test",
+                "private_forget_restart_13_5i",
+                "forget_counts_logical_keys_not_filesystem_nodes",
                 "--",
                 "--exact",
             ],

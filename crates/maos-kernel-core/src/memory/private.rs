@@ -88,6 +88,26 @@ impl PrivateMemoryStore {
         }
     }
 
+    /// Reverse of the file-name half of `fs_path_for`: strip a recognized
+    /// value-kind extension to recover the logical key **verbatim** (the key
+    /// is deliberately not mangled on the way out, `:100-102`).  `None` means
+    /// the name is not a spill this store could have written, so it is not a
+    /// readable entry and must never be attested as one — it is still
+    /// destroyed with the subtree.  Stripping the extension rather than
+    /// taking `file_stem()` is what makes the empty key round-trip (`.md`
+    /// stems to `".md"`, but strips to `""`) and what keeps a dotted key
+    /// like `report.2026` intact.
+    fn key_from_spill_name(name: &str) -> Option<&str> {
+        [
+            ValueKind::Json,
+            ValueKind::Markdown,
+            ValueKind::Blob,
+            ValueKind::Text,
+        ]
+        .into_iter()
+        .find_map(|kind| name.strip_suffix(Self::file_ext_for_kind(kind)))
+    }
+
     fn fs_path_for(
         fs_root: &Path,
         spirit_pid: u32,
@@ -317,7 +337,12 @@ impl PrivateMemoryStore {
     /// Internal helper — remove all entries for a given principal_id
     /// from the private store.  Returns the count of deleted entries.
     pub fn forget_principal(&self, principal_id: &str) -> Result<u64, MemoryError> {
-        let mut count: u64 = 0;
+        // Identity of an erased entry, shared by both sources so a value that
+        // is BOTH cached and spilled is counted exactly once:
+        // (`<pid>/<ns_dirname>`, key), the key recovered by stripping the
+        // value-kind extension `fs_path_for` appended.
+        let mut erased: std::collections::HashSet<(String, String)> =
+            std::collections::HashSet::new();
 
         // Collect keys to remove (in-memory).
         let to_remove: Vec<(u32, MemoryNamespace, String)> = {
@@ -336,46 +361,105 @@ impl PrivateMemoryStore {
                 .collect()
         };
 
-        // Remove from in-memory map.
+        // Remove from in-memory map — now recording identity, not a counter.
         {
             let mut map = self
                 .in_mem
                 .write()
                 .expect("PrivateMemoryStore lock poisoned");
             for (pid, ns, key) in &to_remove {
-                let removed = map.remove(&(*pid, ns.clone(), key.clone()));
-                if removed.is_some() {
-                    count += 1;
+                if map.remove(&(*pid, ns.clone(), key.clone())).is_some() {
+                    let dir = format!("{pid}/{}", Self::namespace_to_dirname(ns)?);
+                    erased.insert((dir, key.clone()));
                 }
             }
         }
 
-        // Remove filesystem subtrees for the principal namespace only.
+        // Markdown never enters the in-memory map (see `write`), so the map
+        // cannot name its residue; the on-disk tree is authoritative and is a
+        // strict superset of the map-derived subtrees. Reverse
+        // `namespace_to_dirname` on each directory name — hex-decode, then
+        // deserialize the namespace JSON — and keep the `Principal` ones
+        // naming this principal. Undecodable names are not namespace dirs.
+        // Errors are NEVER swallowed: a skipped directory is silent
+        // under-deletion, which would make the Art.17 receipt claim an erasure
+        // that did not happen. `file_type` does not traverse symlinks, so a
+        // link planted under `fs_root` is not a dir and the walk cannot escape.
         let fs_root = self.fs_root.clone();
-        let mut cleaned_pids = std::collections::HashSet::new();
-        for (pid, ns, _key) in &to_remove {
-            let dir_name = Self::namespace_to_dirname(ns)?;
-            let subtree = fs_root.join(pid.to_string()).join(&dir_name);
-            if subtree.exists() {
-                fs::remove_dir_all(&subtree).map_err(MemoryError::Io)?;
+        let pid_dirs = match fs::read_dir(&fs_root) {
+            Ok(d) => Some(d),
+            // Nothing ever spilled — not an error.
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(MemoryError::Io(e)),
+        };
+        for pid_entry in pid_dirs.into_iter().flatten() {
+            let pid_entry = pid_entry.map_err(MemoryError::Io)?;
+            if !pid_entry.file_type().map_err(MemoryError::Io)?.is_dir() {
+                continue;
             }
-            cleaned_pids.insert(*pid);
-        }
+            let pid_dir = pid_entry.path();
+            let pid_dir_name = pid_entry.file_name();
+            let mut cleaned = false;
+            for ns_entry in fs::read_dir(&pid_dir).map_err(MemoryError::Io)? {
+                let ns_entry = ns_entry.map_err(MemoryError::Io)?;
+                let name = ns_entry.file_name();
+                let decoded = name
+                    .to_str()
+                    .and_then(|n| hex::decode(n).ok())
+                    .and_then(|b| serde_json::from_slice::<MemoryNamespace>(&b).ok());
+                if !matches!(decoded, Some(MemoryNamespace::Principal { principal_id: p, .. })
+                    if p == principal_id)
+                {
+                    continue;
+                }
+                // Decode BEFORE the type check (Trap 4): a name that DOES
+                // decode to this principal's namespace but is not a real
+                // directory is corruption or a containment attack, never junk.
+                // `file_type` does not traverse, so a symlink fails here
+                // instead of being followed — `read_dir` WOULD follow it and
+                // `remove_dir_all` would then unlink only the link, counting
+                // bytes it did not erase into a signed Art.17 proof.
+                if !ns_entry.file_type().map_err(MemoryError::Io)?.is_dir() {
+                    return Err(MemoryError::Io(std::io::Error::from(
+                        std::io::ErrorKind::NotADirectory,
+                    )));
+                }
+                let ns_dir = ns_entry.path();
+                let dir = format!(
+                    "{}/{}",
+                    pid_dir_name.to_string_lossy(),
+                    name.to_string_lossy()
+                );
+                for file in fs::read_dir(&ns_dir).map_err(MemoryError::Io)? {
+                    let file = file.map_err(MemoryError::Io)?;
+                    // Only a regular file whose name matches a value-kind
+                    // extension is a logical entry.  A hand-created
+                    // sub-directory, a non-UTF-8 name or an editor backup is
+                    // residue: `remove_dir_all` below destroys it, but
+                    // counting it would inflate the signed receipt.
+                    if !file.file_type().map_err(MemoryError::Io)?.is_file() {
+                        continue;
+                    }
+                    let file_name = file.file_name();
+                    if let Some(key) = file_name.to_str().and_then(Self::key_from_spill_name) {
+                        erased.insert((dir.clone(), key.to_string()));
+                    }
+                }
+                fs::remove_dir_all(&ns_dir).map_err(MemoryError::Io)?;
+                cleaned = true;
+            }
 
-        // Clean up per-pid directories only if they are now empty.
-        for pid in cleaned_pids {
-            let pid_dir = fs_root.join(pid.to_string());
-            if pid_dir.is_dir() {
-                let is_empty = std::fs::read_dir(&pid_dir)
-                    .map(|mut d| d.next().is_none())
-                    .unwrap_or(false);
-                if is_empty {
+            // Clean up the per-pid directory only if it is now empty.  A late
+            // iterator error is propagated, not read as "not empty".
+            if cleaned {
+                let mut rest = fs::read_dir(&pid_dir).map_err(MemoryError::Io)?;
+                if rest.next().transpose().map_err(MemoryError::Io)?.is_none() {
                     let _ = fs::remove_dir(&pid_dir);
                 }
             }
         }
 
-        Ok(count)
+        Ok(erased.len() as u64)
     }
 }
 

@@ -304,4 +304,85 @@
 #          Shared. `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag
 #          and is NOT touched. Authorization detail:
 #          the Shared-tier principal-partition implementation artifact
-src_lines = 23234
+#   23280  Story 13.5i — private-tier filesystem residue (+46, AUTHORIZED
+#          kernel-core delta). FLAG-Winston: Lunarpulse authorized 2026-07-26
+#          on the operator-ratified Shape A4 measured at preflight.
+#          Closed the production Art.17 defect in memory/private.rs:
+#          one-shot uninstall constructs an empty cache, so map-only
+#          `forget_principal` never enumerated any filesystem value and signed
+#          Removed { count: 0 } while persistent principal bytes survived.
+#          The prior `"private"` backend discharge was measured as NULL
+#          CONTROL #24: it wrote sub-threshold Text that never reached disk, so
+#          its filesystem scan passed whether private erasure worked or not.
+#          SHAPE (A4, measured): authoritative namespace decode walk,
+#          fail-closed read_dir handling, pid-level symlink containment, and a
+#          distinct (pid/namespace, key) set for exact-once counting. Shape B
+#          was rejected because serde field reordering would silently stop
+#          prefix matching; the +12 A1/B1 variants were rejected as fail-open
+#          and fs_root-escaping; out-of-kernel Shape C violated the port
+#          contract and sealed a false zero; index-driven Shape D treated the
+#          index claim as more authoritative than filesystem reality.
+#          LANDED AND RE-MEASURED 2026-07-26 on the FORMATTED tree: +46
+#          physical, 23234 → 23280; +30 tokei, 17894 → 17924. The estimate is
+#          not the authorization. The 18248 ceiling is unchanged (324 spare);
+#          no hot_swap extraction is owed for this compliance repair.
+#          BINDING CONDITION DISCHARGED BEFORE THIS NUMBER MOVED: serialized
+#          per-limb falsification produced M1 restart residue RED (3/3) while
+#          13 pre-existing private tests stayed GREEN; M2 spill RED/Markdown
+#          GREEN; M3 Markdown RED/spill GREEN; M4 proof-count RED/file-absence
+#          GREEN; M5 symlink-containment RED/ordinary-erasure GREEN; M6
+#          unreadable-directory RED/happy-path GREEN; M7 bystander-retention
+#          RED/target-erasure GREEN; M8 exact-once RED/absence GREEN. Restoring
+#          every limb returned the seven restart controls GREEN.
+#          `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag and
+#          is NOT touched. All additive; no public symbols removed.
+#   23318  Story 13.5i code review — private-tier erasure hardening (+38
+#          physical / +17 tokei on top of the A4 landing; 23280 → 23318,
+#          17924 → 17941). FLAG-Winston: Lunarpulse authorized 2026-07-27 on
+#          the review's three decision findings, as a bounded correctness
+#          repair to an already-authorized surface.
+#          Closed three residue/attestation holes the A4 landing left open in
+#          memory/private.rs: (1) a symlink at the NAMESPACE level was
+#          followed by read_dir, its external files counted into `erased`,
+#          and then only the link unlinked by remove_dir_all — a signed
+#          Removed { count: n } over bytes still on disk, this story's own
+#          defect one level down (pid-level containment did not cover it;
+#          measured on rustc 1.96.0: read_dir(symlink)=Ok, remove_dir_all
+#          (symlink)=Ok, target survives); (2) `file_stem()` as the key
+#          identity double-counted the empty key, whose spill is named
+#          `.bin` and stems to ".bin" while the cache side holds ""; (3)
+#          every namespace child was attested as a logical key, so a
+#          hand-created sub-directory counted as one entry while its
+#          recursively-deleted contents counted as none, and an editor
+#          backup inflated the receipt. The private tier's Markdown area is
+#          deliberately operator-editable, so all three are reachable.
+#          SHAPE: fail closed on a namespace entry that decodes to the
+#          target principal but is not a real directory (Trap 4 preserved —
+#          the two Err-expecting tests stay green); count only regular files
+#          whose name carries a `file_ext_for_kind` extension, recovering
+#          the key by stripping that extension rather than `file_stem()`;
+#          propagate a late `read_dir` iterator error in the pid reap
+#          instead of reading Some(Err(_)) as "not empty". The decoder
+#          round-trips through `file_ext_for_kind` rather than a literal
+#          extension array — 11 of the 17 tokei lines — because a duplicated
+#          literal is Shape B's rejected drift failure mode on the file-name
+#          axis. The measured cost is 3.8x the estimate quoted when the
+#          repair was authorized; the estimate is not the authorization.
+#          The 18248 ceiling is unchanged (307 spare) and no hot_swap
+#          extraction is owed for this compliance repair.
+#          BINDING CONDITION DISCHARGED BEFORE THIS NUMBER MOVED: serialized
+#          per-limb falsification, every mutant run showing `Compiling
+#          maos-kernel-core`, source restored after each — M8 AS SPECIFIED
+#          (count per file, which the A4 landing had no CI-executed detector
+#          for) RED on forget_counts_inline_only_entries_that_never_spill,
+#          9 others GREEN; M9 (drop the namespace type check) RED on
+#          forget_does_not_follow_namespace_directory_symlink, 9 GREEN;
+#          M10 (identity back to a non-stripping shape) RED on the logical-key,
+#          exact-once and inline-only limbs, 7 GREEN; M11 (drop the
+#          regular-file guard) RED on forget_counts_logical_keys_not_
+#          filesystem_nodes, 9 GREEN. Restored: 10/10 GREEN, and
+#          maos-bin erasure_uninstall_13_5b 13/13 GREEN including the
+#          Trap-4 leg private_forget_reports_filesystem_removal_failure.
+#          `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag and
+#          is NOT touched. All additive; no public symbols removed.
+src_lines = 23318
