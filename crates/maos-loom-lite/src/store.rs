@@ -418,14 +418,19 @@ impl LoomLiteStore {
     /// Initialize the schema (idempotent).
     pub async fn init_schema(&self) -> Result<(), StoreError> {
         let client = self.pool.get().await?;
+        // Story 13.5g — the manifest-team authority runs first, and it MUST run
+        // on the same pooled client the schema work below then uses: the guard's
+        // whole claim is that *this connection* is assigned to the team's
+        // database, and validating one session while mutating another would
+        // break the entailment that lets Story 13.5g retire the Stage-2
+        // reconcile (D-2). The pure query is shared with Phase B through
+        // [`Self::current_database`], which takes its own client because the
+        // composition root has no client to lend it.
         if !self.config.home_team.is_empty() {
-            let row = client
-                .query_one("SELECT current_database()", &[])
-                .await
-                .map_err(|error| StoreError::Query(error.to_string()))?;
-            let current_database: String = row.get(0);
+            let current_database = Self::current_database_of(&client).await?;
             self.connection_assignment_guard(&current_database)?;
         }
+        let client = self.pool.get().await?;
         let sql = schema::create_schema_sql(self.config.vector_dim);
         client
             .query_one(
@@ -460,6 +465,27 @@ impl LoomLiteStore {
             .map_err(|e| StoreError::Schema(e.to_string()))?;
 
         Ok(())
+    }
+
+    /// The connected Postgres database name (Story 13.5g AC4 live operand).
+    ///
+    /// Exposes the same live value the `connection_assignment_guard` sees to the
+    /// Phase B persisted-vs-live datname check in the composition root. Takes
+    /// its own pooled client; callers that already hold one — [`Self::init_schema`]
+    /// — use [`Self::current_database_of`] so the guard and the work it guards
+    /// share a session. Returns `StoreError::Query` if the database is unavailable.
+    pub async fn current_database(&self) -> Result<String, StoreError> {
+        let client = self.pool.get().await?;
+        Self::current_database_of(&client).await
+    }
+
+    /// `SELECT current_database()` on a caller-supplied client.
+    async fn current_database_of(client: &deadpool_postgres::Client) -> Result<String, StoreError> {
+        let row = client
+            .query_one("SELECT current_database()", &[])
+            .await
+            .map_err(|error| StoreError::Query(error.to_string()))?;
+        Ok(row.get(0))
     }
 
     /// Write a value to the collective store (upsert with CRDT LWW merge).

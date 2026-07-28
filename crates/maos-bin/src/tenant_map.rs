@@ -33,15 +33,6 @@ pub enum TenantMapBootError {
     #[error("verified tenant-map state unavailable: {0}")]
     StateUnavailable(String),
     #[error(
-        "ETenantAuditPathMismatch: Transparency Log opened at {opened}, but validated team \
-         {team_id} requires {expected}"
-    )]
-    TenantAuditPathMismatch {
-        opened: String,
-        expected: String,
-        team_id: TeamId,
-    },
-    #[error(
         "ETenantAuditArtifactMismatch: Transparency Log artifact is not bound to validated team \
          {team_id}: {reason}"
     )]
@@ -177,33 +168,61 @@ pub fn tenant_map_for_store(
         .ok_or(TenantMapBootError::SourceUnavailable)
 }
 
-/// Defense-in-depth path-consistency self-check: confirms the opened TL path
-/// matches the team the process is configured to serve.
+/// Story 13.5g — Phase A in-artifact tenant binding preflight (AC2/AC3).
 ///
-/// The manifest-team AUTHORITY is the store's `connection_assignment_guard`
-/// (datname validated against the verified cohort manifest, fail-closed in
-/// `init_schema` before this runs). This reconcile is a SECONDARY drift check,
-/// not an independent team control: today both operands derive from the
-/// configured home team, so it guards against path/team drift, not against a
-/// manifest disagreement. See Story 13.5e review (D1 re-scope).
-pub fn reconcile_tenant_audit_path(
-    opened: &std::path::Path,
-    validated_team: &TeamId,
-) -> Result<(), TenantMapBootError> {
-    let expected = maos_audit::transparency_log_path_for_team(validated_team);
-    if opened == expected {
-        return Ok(());
-    }
-    Err(TenantMapBootError::TenantAuditPathMismatch {
-        opened: opened.display().to_string(),
-        expected: expected.display().to_string(),
-        team_id: validated_team.clone(),
-    })
+/// Runs immediately after `audit_db_path` is resolved and strictly before the
+/// Transparency Log is opened, so a foreign-bound artifact is refused BEFORE the
+/// first append (closes D-4). The artifact is read through a **read-only**
+/// NOFOLLOW connection; a refused boot never mutates the other team's artifact.
+///
+/// This replaces 13.5e's `reconcile_tenant_audit_path`, which compared two
+/// operands that were the same pure function of the same environment variable
+/// and could not fail in production (D-1, measured). The verdict logic is the
+/// pure [`maos_audit::decide_phase_a`] over an exhaustive table (AC3); this is
+/// only the read + decide wiring.
+pub fn phase_a_preflight(
+    path: &std::path::Path,
+    env_team: &TeamId,
+) -> Result<maos_audit::TenantBindingPhaseADecision, TenantMapBootError> {
+    let read = maos_audit::read_tenant_artifact(path).map_err(|error| {
+        TenantMapBootError::TenantAuditArtifactMismatch {
+            team_id: env_team.clone(),
+            reason: format!("tenant binding read failed: {error}"),
+        }
+    })?;
+    let sidecar = read_team_sidecar(path);
+    Ok(maos_audit::decide_phase_a(
+        read.binding_team.as_deref(),
+        env_team,
+        read.transparency_log_rows,
+        sidecar.as_deref(),
+    ))
+}
+
+/// Read the `.team` sidecar raw content, or `None` when absent/empty.
+///
+/// The sidecar is a path-adjacent label, not artifact identity (13.5e D2/D4,
+/// ratified OPEN as `v25-signed-shard`). It is consulted here ONLY to migrate a
+/// legacy team's existing log (AC3 row 4); a foreign shard with history and no
+/// matching sidecar is refused (AC3 row 5, D-3).
+fn read_team_sidecar(path: &std::path::Path) -> Option<String> {
+    let sidecar = maos_audit::transparency_log_team_binding_path(path);
+    std::fs::read_to_string(&sidecar)
+        .ok()
+        .filter(|raw| !raw.trim().is_empty())
 }
 
 /// Atomically bind a newly created team artifact, or validate its existing
-/// manifest-derived binding. A copied or renamed foreign shard therefore
-/// refuses even when its destination path has the expected team spelling.
+/// `.team` sidecar against the validated team.
+///
+/// NOTE (Story 13.5g, correcting the D-3 over-claim): the sidecar is a
+/// path-adjacent LABEL, not artifact identity. A file-level copy that omits the
+/// sidecar (the natural operator restore action) is silently blessed here as a
+/// new artifact — `create_new(true)` treats "no sidecar" as "new artifact". The
+/// in-artifact `tenant_binding` row + Phase A preflight above is what refuses a
+/// shard carrying foreign history; this sidecar writer stays only because three
+/// read surfaces depend on it (AC5). A signed genesis identity
+/// (`v25-signed-shard`) remains an open v2.5 residual.
 pub fn bind_tenant_audit_artifact(
     path: &std::path::Path,
     validated_team: &TeamId,
@@ -281,19 +300,6 @@ mod tests {
         assert!(!tenant_schema_meets_floor(1));
         assert!(tenant_schema_meets_floor(2));
         assert!(tenant_schema_meets_floor(3));
-    }
-
-    #[test]
-    fn tenant_audit_path_must_match_manifest_validated_team() {
-        let security = TeamId::new("security").unwrap();
-        let support = TeamId::new("support").unwrap();
-        let opened = maos_audit::transparency_log_path_for_team(&security);
-
-        assert!(reconcile_tenant_audit_path(&opened, &security).is_ok());
-        assert!(matches!(
-            reconcile_tenant_audit_path(&opened, &support),
-            Err(TenantMapBootError::TenantAuditPathMismatch { .. })
-        ));
     }
 
     #[test]

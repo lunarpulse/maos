@@ -203,7 +203,7 @@ maos-spirit-sdk = 3000
 xtask = 31530   # 2026-07-25 founder policy re-base (Winston 2%): 30950->31530 (measured 30911, reserve 619) | prior: Story 13.5b review: 30850→30950 (measured 30_911 — operator-terminal + regional + mixed-held + residue Reza legs)
 # Story 6.5 — Phase 1 extraction
 maos-iac = 6606   # 2026-07-25 founder policy re-base (Winston 2%): 6500->6606 (measured 6476, reserve 130) | prior: Story 13.5b: 6450→6500 (measured 6_476 — Host-global hold authority/list/release)
-maos-audit = 6240   # 2026-07-25 founder policy re-base (Winston 2%): 6150->6240 (measured 6117, reserve 123) | prior: Story 13.5b review: 6100→6150 (measured 6_117 — teardown scope contract + UNCOVERED_STORES partition invariant)
+maos-audit = 6665   # Story 13.5g named grant: 6240->6665 (measured 6534, reserve 131 per 2% formula). Driver: in-artifact `tenant_binding` DDL + read/write/verify helpers + Phase A/B pure verdict + Display + AC1-AC4 unit tests — the story budget's "maos-audit: + helpers & DDL". Per kloc.toml CEILING RULE §"must never block a correctness or compliance repair"; ZERO kernel-core Δ @23401. | prior: 2026-07-25 founder policy re-base (Winston 2%): 6150->6240 (measured 6117, reserve 123); Story 13.5b review: 6100->6150 (measured 6_117 — teardown scope contract + UNCOVERED_STORES partition invariant)
 maos-loom-lite = 4847   # 2026-07-25 founder policy re-base (Winston 2%): 4750->4847 (measured 4747, reserve 100) | prior: Story 13.5b first explicit ceiling (measured 4_708 — operator erase + tombstones)
 maos-manifest = 4314   # 2026-07-25 founder policy re-base (Winston 2%): 4250->4314 (measured 4214, reserve 100) | prior: Epic-13 retro 2026-07-22: 4150→4250 (measured 4_157)
 

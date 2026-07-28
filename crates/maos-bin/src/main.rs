@@ -2424,6 +2424,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Story 13.5g — PHASE A: in-artifact tenant binding preflight. Runs only in
+    // tenant mode (MAOS_LOOM_POSTGRES set + a canonical MAOS_LOOM_HOME_TEAM),
+    // strictly before the Transparency Log is opened, so a foreign-bound
+    // artifact is refused BEFORE the first append (closes D-4). Read-only: a
+    // refused boot never mutates the other team's artifact. A non-canonical home
+    // team is left for the composition-root match arm below to hard-fail on.
+    let tenant_env_team: Option<maos_domain::team::TeamId> =
+        if std::env::var_os("MAOS_LOOM_POSTGRES").is_some() {
+            std::env::var("MAOS_LOOM_HOME_TEAM")
+                .ok()
+                .filter(|team| !team.trim().is_empty())
+                .and_then(|team| maos_domain::team::TeamId::new(&team).ok())
+        } else {
+            None
+        };
+    let mut pending_tenant_binding_write: Option<maos_domain::team::TeamId> = None;
+    if let Some(env_team) = tenant_env_team.as_ref() {
+        match maos_bin::tenant_map::phase_a_preflight(&audit_db_path, env_team) {
+            Ok(maos_audit::TenantBindingPhaseADecision::Proceed) => {}
+            Ok(maos_audit::TenantBindingPhaseADecision::NeedsWrite) => {
+                pending_tenant_binding_write = Some(env_team.clone());
+            }
+            Ok(maos_audit::TenantBindingPhaseADecision::Refuse(refusal)) => {
+                return Err(format!(
+                    "maos: tenant Transparency Log refused before open (Phase A): {refusal}"
+                )
+                .into());
+            }
+            Err(error) => {
+                return Err(
+                    format!("maos: tenant Transparency Log Phase A read failed: {error}").into(),
+                );
+            }
+        }
+    }
+
     let memory_root = maos_audit::default_memory_root();
     if let Err(e) = std::fs::create_dir_all(&memory_root) {
         eprintln!(
@@ -2629,6 +2665,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         audit_db_path.display()
     );
 
+    // Story 13.5g — write the in-artifact tenant_binding row for a fresh or
+    // legacy-migrated artifact (Phase A NeedsWrite), now that the TL is open.
+    // datname stays NULL here; Phase B (after init_schema) records the live
+    // current_database() on the first tenant boot (AC4).
+    if let Some(team) = pending_tenant_binding_write.as_ref() {
+        maos_audit::write_tenant_binding(&audit_db_path, team, None).map_err(|error| {
+            format!("maos: tenant Transparency Log binding write failed: {error}")
+        })?;
+    }
+
     // Story 13.5c — single composition root.  A `cohort-a2a-daemon` process
     // already ran this entire root; it must NOT open a second Transparency Log
     // or reload the manifest (D1/D2).  When MAOS_COHORT_DAEMON_CONFIG is set,
@@ -2743,13 +2789,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Err(e) = store.init_schema().await {
                         return Err(format!("maos: loom-lite schema init failed: {e}").into());
                     } else {
-                        maos_bin::tenant_map::reconcile_tenant_audit_path(
-                            &audit_db_path,
-                            &validated_home_team,
-                        )
-                        .map_err(|error| {
-                            format!("maos: tenant Transparency Log reconciliation failed: {error}")
+                        // Story 13.5g — PHASE B: persisted datname vs live
+                        // current_database(). The real Stage-2: the persisted
+                        // value comes from a PREVIOUS boot, so unlike the retired
+                        // reconcile (D-1) it is NOT entailed by the same-boot
+                        // connection_assignment_guard. Arms on the 2nd tenant
+                        // boot; the 1st records the datname (AC4).
+                        let live_datname = store.current_database().await.map_err(|error| {
+                            format!(
+                                "maos: tenant Transparency Log Phase B live datname read failed: {error}"
+                            )
                         })?;
+                        let phase_b_read = maos_audit::read_tenant_artifact(&audit_db_path)
+                            .map_err(|error| {
+                                format!(
+                                    "maos: tenant Transparency Log Phase B read failed: {error}"
+                                )
+                            })?;
+                        match maos_audit::verify_datname_binding(
+                            phase_b_read.binding_datname.as_deref(),
+                            &live_datname,
+                        ) {
+                            maos_audit::DatnameBindingDecision::Proceed => {}
+                            maos_audit::DatnameBindingDecision::RecordFirstDatname => {
+                                maos_audit::write_tenant_binding(
+                                    &audit_db_path,
+                                    &validated_home_team,
+                                    Some(&live_datname),
+                                )
+                                .map_err(|error| {
+                                    format!(
+                                        "maos: tenant Transparency Log Phase B datname record failed: {error}"
+                                    )
+                                })?;
+                            }
+                            maos_audit::DatnameBindingDecision::RefuseDatnameDrift {
+                                persisted,
+                                live,
+                            } => {
+                                return Err(format!(
+                                    "maos: tenant Transparency Log refused: persisted datname \
+                                     {persisted} != live {live} (Phase B drift)"
+                                )
+                                .into());
+                            }
+                        }
                         maos_bin::tenant_map::bind_tenant_audit_artifact(
                             &audit_db_path,
                             &validated_home_team,

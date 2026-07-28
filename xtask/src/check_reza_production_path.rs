@@ -350,6 +350,194 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        // ── Story 13.5g — in-artifact tenant binding (defense-in-depth Stage-2).
+        // The pure AC3 verdict table + AC4 datname cases are hermetic Blocking
+        // legs (one #[test] per limb — the anti-vacuity check greps
+        // `running 1 test`/`1 passed`); the Phase A wiring legs prove the
+        // read-only orchestration (D-3/D-4), and the Phase B wiring leg carries
+        // the live Postgres `current_database()` substrate (AdvisorySubstrate).
+        TestLeg {
+            name: "tl-tenant-binding-round-trip",
+            class: BindingClass::Blocking,
+            args: &["test", "-p", "maos-audit", "tests::tl_tenant_binding_round_trip", "--", "--exact"],
+        },
+        TestLeg {
+            name: "tl-tenant-binding-read-only-missing-none",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit",
+                "tests::tl_tenant_binding_read_is_read_only_and_missing_reads_none", "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-a-verdict-bound-match-proceeds",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit", "tests::tl_phase_a_verdict_bound_match_proceeds",
+                "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-a-verdict-bound-foreign-refuses",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit", "tests::tl_phase_a_verdict_bound_foreign_refuses",
+                "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-a-verdict-corrupt-binding-refuses",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit", "tests::tl_phase_a_verdict_corrupt_binding_refuses",
+                "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-a-verdict-fresh-needs-write",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit", "tests::tl_phase_a_verdict_fresh_artifact_needs_write",
+                "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-a-verdict-legacy-sidecar-migrates",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit", "tests::tl_phase_a_verdict_legacy_sidecar_migrates",
+                "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-a-verdict-foreign-history-refuses",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit",
+                "tests::tl_phase_a_verdict_foreign_history_without_sidecar_refuses", "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-b-datname-none-records",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit", "tests::tl_phase_b_datname_none_records", "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-b-datname-match-proceeds",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit", "tests::tl_phase_b_datname_match_proceeds", "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-b-datname-drift-refuses",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit", "tests::tl_phase_b_datname_drift_refuses", "--", "--exact",
+            ],
+        },
+        // Phase A wiring (D-3/D-4): a foreign shard with history and no sidecar
+        // is refused by a read-only preflight that does NOT mutate the artifact.
+        TestLeg {
+            name: "tl-phase-a-refuses-foreign-shard-before-append",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-bin", "--test", "tenant_audit_phase_a_13_5g",
+                "phase_a_refuses_foreign_shard_with_history_before_append", "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-a-refuses-artifact-bound-to-foreign-team",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-bin", "--test", "tenant_audit_phase_a_13_5g",
+                "phase_a_refuses_artifact_bound_to_foreign_team", "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-a-legacy-sidecar-migrates-wiring",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-bin", "--test", "tenant_audit_phase_a_13_5g",
+                "phase_a_legacy_artifact_with_matching_sidecar_migrates", "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-phase-a-needs-write-then-proceeds-wiring",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-bin", "--test", "tenant_audit_phase_a_13_5g",
+                "phase_a_needs_write_then_proceeds_after_binding_written", "--", "--exact",
+            ],
+        },
+        // Phase B live substrate: persisted datname vs live current_database().
+        TestLeg {
+            name: "tl-phase-b-persisted-datname-vs-live-current-database",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test", "-p", "maos-bin", "--test", "tenant_audit_phase_a_13_5g",
+                "phase_b_persisted_datname_vs_live_current_database", "--", "--ignored", "--exact",
+            ],
+        },
+        // ── Story 13.5g code-review repairs (2026-07-27). Each leg below is a
+        // control that did not exist when the story was first gated, and each
+        // reds on its own mutation.
+        TestLeg {
+            name: "tl-phase-a-verdict-whitespace-binding-refuses",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit",
+                "tests::tl_phase_a_verdict_whitespace_binding_refuses", "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-tenant-binding-read-fails-closed",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit",
+                "tests::tl_tenant_binding_read_fails_closed_on_unreadable_artifact",
+                "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-tenant-binding-write-refuses-foreign-overwrite",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit",
+                "tests::tl_tenant_binding_write_refuses_foreign_binding_overwrite",
+                "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-tenant-binding-refuses-symlinked-artifact",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-audit",
+                "tests::tl_tenant_binding_refuses_symlinked_artifact", "--", "--exact",
+            ],
+        },
+        // Composition-root ordering: the legs above call `phase_a_preflight`
+        // directly and stay green if the Phase A block is deleted from
+        // `main.rs`. These two boot the shipped binary.
+        TestLeg {
+            name: "tl-boot-refuses-foreign-shard-before-open",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-bin", "--test", "tenant_audit_phase_a_13_5g",
+                "boot_refuses_foreign_shard_before_opening_the_transparency_log",
+                "--", "--exact",
+            ],
+        },
+        TestLeg {
+            name: "tl-boot-writes-binding-after-open",
+            class: BindingClass::Blocking,
+            args: &[
+                "test", "-p", "maos-bin", "--test", "tenant_audit_phase_a_13_5g",
+                "boot_writes_binding_after_open_for_a_legacy_shard", "--", "--exact",
+            ],
+        },
         // Story 13.5b: backend partition must account for every registered
         // erasure backend exactly once.
         // Story 13.5h: this leg now also carries the Shared-tier refusal proof.
