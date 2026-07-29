@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+use maos_a2a_core::identity::PeerCertFingerprint;
 use maos_a2a_core::{
     CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
     CohortReissueDisposition, CohortReissueRejection, DigestFrameClass, DigestReadPort,
@@ -72,8 +73,15 @@ mod schema_floor_tests {
         assert!(schema_is_downgrade(2, 1));
         assert!(schema_is_downgrade(3, 2));
         assert!(schema_is_downgrade(3, 1));
+        // Story 13.6a — the floor is ordinal, so V4 inherits it with no new
+        // branch: once a node has accepted the authenticated-team schema it can
+        // never be walked back to a schema that cannot express the edge.
+        assert!(schema_is_downgrade(4, 3));
+        assert!(schema_is_downgrade(4, 1));
+        assert!(!schema_is_downgrade(4, 4));
         assert!(!schema_is_downgrade(2, 2));
         assert!(!schema_is_downgrade(2, 3));
+        assert!(!schema_is_downgrade(3, 4));
     }
 }
 
@@ -512,37 +520,31 @@ impl CohortManifestState {
             .ok()
             .and_then(|table| table.get(member.as_str()).copied())
     }
-}
 
-fn reissue_version(manifest_toml: &str) -> Option<u64> {
-    toml::from_str::<toml::Value>(manifest_toml)
-        .ok()?
-        .get("version")?
-        .as_integer()
-        .and_then(|version| u64::try_from(version).ok())
-}
+    /// Story 13.6a — the operator-signed team THIS host speaks for under the
+    /// verified cache, or `None` when no signed declaration exists (fail-closed).
+    pub fn team_of_local_host(&self) -> Option<String> {
+        let cached = self.cached.lock().ok()?;
+        cached
+            .manifest
+            .team_of_host(self.local_host.as_str())
+            .map(|team| team.as_str().to_string())
+    }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReissueOutcome {
-    Applied { version: u64 },
-    Confirmed { version: u64 },
-}
-
-impl CohortManifestGate for CohortManifestState {
-    fn consent_decision(
+    /// The consent verdict body, evaluated against an already-locked manifest
+    /// snapshot so [`CohortManifestGate::consent_and_team`] can pair it with the
+    /// team declaration from the SAME snapshot (Story 13.6a review P2).
+    #[allow(clippy::too_many_arguments)]
+    fn consent_decision_at(
         &self,
+        manifest: &CohortManifest,
+        confirmed_at_secs: u64,
         seam: CohortConsentSeam,
         counterparty: &HostId,
         acting_role: Option<&str>,
         intent: &str,
         sender_manifest_version: Option<u64>,
     ) -> CohortConsentVerdict {
-        let cached = match self.cached.lock() {
-            Ok(cached) => cached,
-            Err(_) => return CohortConsentVerdict::Deny(CohortConsentDenial::StateUnavailable),
-        };
-        let manifest = &cached.manifest;
-
         // A peer outside the roster is a mixed-deployment bilateral path, not a
         // cohort denial. This preserves the legacy defer behavior.
         if !manifest
@@ -552,10 +554,7 @@ impl CohortManifestGate for CohortManifestState {
         {
             return CohortConsentVerdict::Defer;
         }
-        let current = self
-            .clock
-            .now_secs()
-            .saturating_sub(cached.confirmed_at_secs)
+        let current = self.clock.now_secs().saturating_sub(confirmed_at_secs)
             <= manifest.t_stale_secs
             && manifest
                 .members
@@ -617,6 +616,74 @@ impl CohortManifestGate for CohortManifestState {
         }
     }
 
+    /// The seam-relevant team declaration read from an already-locked snapshot,
+    /// gated on the presented leaf fingerprint EQUALING the signed
+    /// [`CohortMember::fingerprint`] — the cert-bound, non-seed-derived axis
+    /// D-3 designates (Story 13.6a review P1). Fail-closed in four independent
+    /// ways: no presented fingerprint, no such member, a certificate the signed
+    /// manifest does not name (including a stale cert after rotation), and a
+    /// pre-V4 / team-less member all return `None`.
+    fn team_declaration_at(
+        &self,
+        manifest: &CohortManifest,
+        seam: CohortConsentSeam,
+        counterparty: &HostId,
+        endpoint_fingerprint: Option<&PeerCertFingerprint>,
+    ) -> Option<String> {
+        let host = match seam {
+            CohortConsentSeam::Send => self.local_host.as_str(),
+            CohortConsentSeam::Accept => counterparty.as_str(),
+        };
+        let presented = endpoint_fingerprint?;
+        let member = manifest.members.iter().find(|m| m.host_id == host)?;
+        let signed = PeerCertFingerprint::parse(&member.fingerprint)?;
+        if presented != &signed {
+            return None;
+        }
+        manifest
+            .team_of_host(host)
+            .map(|team| team.as_str().to_string())
+    }
+}
+
+fn reissue_version(manifest_toml: &str) -> Option<u64> {
+    toml::from_str::<toml::Value>(manifest_toml)
+        .ok()?
+        .get("version")?
+        .as_integer()
+        .and_then(|version| u64::try_from(version).ok())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReissueOutcome {
+    Applied { version: u64 },
+    Confirmed { version: u64 },
+}
+
+impl CohortManifestGate for CohortManifestState {
+    fn consent_decision(
+        &self,
+        seam: CohortConsentSeam,
+        counterparty: &HostId,
+        acting_role: Option<&str>,
+        intent: &str,
+        sender_manifest_version: Option<u64>,
+    ) -> CohortConsentVerdict {
+        let cached = match self.cached.lock() {
+            Ok(cached) => cached,
+            Err(_) => return CohortConsentVerdict::Deny(CohortConsentDenial::StateUnavailable),
+        };
+        self.consent_decision_at(
+            &cached.manifest,
+            cached.confirmed_at_secs,
+            seam,
+            counterparty,
+            acting_role,
+            intent,
+            sender_manifest_version,
+        )
+    }
+
     fn apply_reissue(
         &self,
         verified_peer: &HostId,
@@ -651,6 +718,44 @@ impl CohortManifestGate for CohortManifestState {
                 rejected_version: None,
             }),
         }
+    }
+
+    /// Story 13.6a (AC2, review P1/P2) — consent verdict AND team declaration
+    /// from ONE locked snapshot: a hot reissue cannot slip a team change
+    /// between the identity check and the admission decision, and the
+    /// declaration is returned only when the presented leaf fingerprint equals
+    /// the signed [`CohortMember::fingerprint`] (the D-3 axis). Fail-closed:
+    /// a poisoned lock denies and declares nothing.
+    fn consent_and_team(
+        &self,
+        seam: CohortConsentSeam,
+        counterparty: &HostId,
+        endpoint_fingerprint: Option<&PeerCertFingerprint>,
+        acting_role: Option<&str>,
+        intent: &str,
+        sender_manifest_version: Option<u64>,
+    ) -> (CohortConsentVerdict, Option<String>) {
+        let cached = match self.cached.lock() {
+            Ok(cached) => cached,
+            Err(_) => {
+                return (
+                    CohortConsentVerdict::Deny(CohortConsentDenial::StateUnavailable),
+                    None,
+                );
+            }
+        };
+        let verdict = self.consent_decision_at(
+            &cached.manifest,
+            cached.confirmed_at_secs,
+            seam,
+            counterparty,
+            acting_role,
+            intent,
+            sender_manifest_version,
+        );
+        let team =
+            self.team_declaration_at(&cached.manifest, seam, counterparty, endpoint_fingerprint);
+        (verdict, team)
     }
 }
 
@@ -963,8 +1068,8 @@ mod tests {
     use crate::audit::InMemoryCohortAuditSink;
     use crate::manifest::{
         CohortAuthority, CohortMember, ConsentMatrix, ConsentTuple, ManifestSignature, TeamEntry,
-        COHORT_SCHEMA_V1, COHORT_SCHEMA_V2, COHORT_SCHEMA_V3, RESERVED_INTENT_HALT_RECEIPT,
-        RESERVED_INTENT_REISSUE,
+        COHORT_SCHEMA_V1, COHORT_SCHEMA_V2, COHORT_SCHEMA_V3, COHORT_SCHEMA_V4,
+        RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
     };
     use maos_domain::frame::{ConsentEnvelope, FrameAddress, FramePayload, TelemetryEventPayload};
     use maos_domain::invariants::i1::IntentClass;
@@ -998,6 +1103,7 @@ mod tests {
                 host_id: "host-a".into(),
                 fingerprint: format!("sha256:{}", "ab".repeat(32)),
                 roles: vec!["worker".into()],
+                team: None,
             }],
             consent: ConsentMatrix::default(),
             reserved_intents: vec![
@@ -1017,12 +1123,32 @@ mod tests {
         let mut manifest: CohortManifest =
             toml::from_str(&signed_toml(version, signer, signer)).unwrap();
         manifest.schema_version = schema_version;
-        manifest.teams = Some(vec![TeamEntry {
-            team_id: TeamId::new("team-a").unwrap(),
-            region: Region::canonicalize("region-a").unwrap(),
-            datname: "maos_team_a".to_string(),
-            members: vec![SpiritId::from("spirit-a")],
-        }]);
+        manifest.teams = Some(vec![
+            TeamEntry {
+                team_id: TeamId::new("team-a").unwrap(),
+                region: Region::canonicalize("region-a").unwrap(),
+                datname: "maos_team_a".to_string(),
+                members: vec![SpiritId::from("spirit-a")],
+            },
+            TeamEntry {
+                team_id: TeamId::new("team-b").unwrap(),
+                region: Region::canonicalize("region-b").unwrap(),
+                datname: "maos_team_b".to_string(),
+                members: vec![SpiritId::from("spirit-b")],
+            },
+        ]);
+        // Story 13.6a — at V4 the roster also declares which team each host
+        // speaks for. `host-a` → `team-a`, every other declared member →
+        // `team-b`, so both the match and the mismatch axis are reachable.
+        if schema_version == crate::manifest::COHORT_SCHEMA_V4 {
+            for member in manifest.members.iter_mut() {
+                member.team = Some(if member.host_id == "host-a" {
+                    TeamId::new("team-a").unwrap()
+                } else {
+                    TeamId::new("team-b").unwrap()
+                });
+            }
+        }
         toml::to_string(&manifest.signed_with(signer)).unwrap()
     }
 
@@ -1102,11 +1228,13 @@ mod tests {
                     host_id: "host-a".into(),
                     fingerprint: format!("sha256:{}", "aa".repeat(32)),
                     roles: vec!["architect".into()],
+                    team: None,
                 },
                 CohortMember {
                     host_id: "host-b".into(),
                     fingerprint: format!("sha256:{}", "bb".repeat(32)),
                     roles: vec!["receiver".into()],
+                    team: None,
                 },
             ],
             consent: ConsentMatrix {
@@ -1552,5 +1680,46 @@ mod tests {
                 rejected_version: 2,
             }
         ));
+    }
+
+    /// Story 13.6a (AC1) — once V4 is cached, a V4→V3 reissue is refused on the
+    /// SHIPPED `SchemaDowngrade` path and locally audited, even though its
+    /// manifest revision is higher. Without this an operator could revoke every
+    /// host→team edge in the cohort by re-issuing the predecessor schema.
+    #[test]
+    fn signed_v4_cache_refuses_higher_version_v3_reissue_and_audits_it() {
+        let signer = signing_key(16);
+        let pins = PinnedAuthorityKeys::from_keys(vec![signer.verifying_key()]).unwrap();
+        let audit = Arc::new(InMemoryCohortAuditSink::default());
+        let state = CohortManifestState::load(
+            HostId("host-a".into()),
+            &signed_tenant_toml(COHORT_SCHEMA_V4, 1, &signer),
+            pins,
+            audit.clone(),
+        )
+        .unwrap();
+        // Positive control first: a higher revision AT V4 is accepted, so the
+        // refusal below is about the schema floor and not about revisions.
+        state
+            .apply_reissue(&signed_tenant_toml(COHORT_SCHEMA_V4, 2, &signer))
+            .expect("a same-schema higher revision must still apply");
+
+        let error = state
+            .apply_reissue(&signed_tenant_toml(COHORT_SCHEMA_V3, 3, &signer))
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            CohortError::ECohortManifestFork {
+                reason: CohortManifestForkReason::SchemaDowngrade,
+                seen_version: 2,
+                rejected_version: 3,
+            }
+        ));
+        assert!(audit.events().iter().any(|event| matches!(
+            event,
+            CohortAuditEvent::ReissueRejected { reason, .. } if reason.contains("schema_downgrade")
+        )));
+        // The edge survives the refused downgrade.
+        assert_eq!(state.team_of_local_host().as_deref(), Some("team-a"));
     }
 }

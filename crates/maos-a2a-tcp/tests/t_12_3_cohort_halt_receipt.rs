@@ -143,11 +143,13 @@ fn signed_manifest(
                 host_id: "host_a".into(),
                 fingerprint: fp_a.wire(),
                 roles: vec!["worker".into()],
+                team: None,
             },
             CohortMember {
                 host_id: "host_b".into(),
                 fingerprint: fp_b.wire(),
                 roles: vec!["worker".into()],
+                team: None,
             },
         ],
         consent: ConsentMatrix {
@@ -253,6 +255,7 @@ async fn broadcast_attempts_members_after_a_middle_peer_failure() {
         host_id: "host_c".into(),
         fingerprint: fingerprint_of(0xc3).wire(),
         roles: vec!["worker".into()],
+        team: None,
     });
     let toml = toml::to_string(&manifest.signed_with(&authority)).expect("fixture serializes");
     let state = load_state("host_a", &toml, &authority);
@@ -589,7 +592,7 @@ async fn t_12_3_source_identity_over_core() {
     // (2) Verified path but `from` (host_a) ≠ TLS-verified peer (host_z) → refused
     //     BEFORE observe.
     let (_resp, passed) = core
-        .handle_intake_verified(request.clone(), &PeerId::new("host_z"))
+        .handle_intake_verified(request.clone(), &PeerId::new("host_z"), None)
         .await;
     assert!(!passed, "identity mismatch fails the binding");
     assert_eq!(
@@ -600,7 +603,7 @@ async fn t_12_3_source_identity_over_core() {
 
     // (3) A valid, verified receipt reaches an ACK and is then counted.
     assert!(matches!(
-        core.handle_intake_verified(request.clone(), &PeerId::new("host_a"))
+        core.handle_intake_verified(request.clone(), &PeerId::new("host_a"), None)
             .await
             .0,
         A2AJsonRpcResponse::Ack(_)
@@ -622,7 +625,7 @@ async fn t_12_3_source_identity_over_core() {
         .expect("courier supplies a consent envelope")
         .valid_until_ns = Some(0);
     assert!(matches!(
-        core.handle_intake_verified(expired, &PeerId::new("host_a"))
+        core.handle_intake_verified(expired, &PeerId::new("host_a"), None)
             .await
             .0,
         A2AJsonRpcResponse::Nack(_)

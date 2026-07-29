@@ -9394,6 +9394,91 @@ impl CohortDaemonRuntime {
 }
 
 #[cfg(feature = "network")]
+/// Story 13.6a (review P1) — reconcile the operator-configured transport
+/// identity against the signed cohort manifest, FAIL-CLOSED, before any
+/// transport is started. Two independent config surfaces name certificates —
+/// `tcp.peer_pins` (the handshake verifier's oracle) and `file.peers`
+/// (the frame-level TOFU records) — and neither is derived from the manifest.
+/// Without this check a pin that names a cohort member but presents a
+/// certificate the manifest does NOT sign for that member silently overrides
+/// a manifest-time fact with a config-time fact (the D-5(4) asymmetry):
+/// a signed reissue that rotates a member's fingerprint would not revoke the
+/// stale certificate. Disagreement is a boot error, never a warning.
+fn reconcile_transport_identity_with_manifest(
+    state: &std::sync::Arc<maos_cohort::CohortManifestState>,
+    tcp_config: &maos_a2a_tcp::TcpA2AConfig,
+    peer_configs: &[maos_a2a_core::A2APeerConfig],
+) -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a_core::PeerCertFingerprint;
+
+    let manifest = state.manifest().map_err(|error| {
+        format!("cohort identity reconciliation cannot read the verified manifest: {error}")
+    })?;
+    let signed_fingerprint = |host_id: &str| -> Option<PeerCertFingerprint> {
+        manifest
+            .members
+            .iter()
+            .find(|member| member.host_id == host_id)
+            .and_then(|member| PeerCertFingerprint::parse(&member.fingerprint))
+    };
+
+    // (a) Every handshake pin that names a cohort member must carry exactly
+    // the certificate the manifest signs for that member. Pins for non-members
+    // are the 12.1 mixed-deployment bilateral path and are out of scope.
+    for pin in &tcp_config.peer_pins {
+        if let Some(signed) = signed_fingerprint(pin.peer_id.as_str()) {
+            if pin.fingerprint != signed {
+                return Err(format!(
+                    "tcp.peer_pins entry for cohort member {} does not match the signed \
+                     manifest fingerprint (pin {pin:?}, manifest {signed:?}) — reconcile \
+                     the pin configuration with the signed manifest",
+                    pin.peer_id.as_str(),
+                    pin = pin.fingerprint,
+                    signed = signed,
+                )
+                .into());
+            }
+        }
+    }
+    // (b) Every frame-level peer record that names a cohort member must carry
+    // the same signed certificate.
+    for peer in peer_configs {
+        if let Some(signed) = signed_fingerprint(peer.peer_id.as_str()) {
+            if peer.cert_fingerprint != signed {
+                return Err(format!(
+                    "file.peers entry for cohort member {} does not match the signed \
+                     manifest fingerprint (configured {configured:?}, manifest {signed:?}) \
+                     — reconcile the peer configuration with the signed manifest",
+                    peer.peer_id.as_str(),
+                    configured = peer.cert_fingerprint,
+                    signed = signed,
+                )
+                .into());
+            }
+        }
+    }
+    // (c) This host's own leaf must equal its own signed member fingerprint —
+    // the local half of the same binding.
+    if let Some(signed_own) = signed_fingerprint(state.local_host().as_str()) {
+        let (own_chain, _own_key) = tcp_config.load_identity()?;
+        let own_leaf = own_chain
+            .first()
+            .ok_or("cohort daemon identity chain is empty")?;
+        let own_fingerprint = PeerCertFingerprint::from_cert_der(own_leaf.as_ref());
+        if own_fingerprint != signed_own {
+            return Err(format!(
+                "the daemon's own certificate does not match the signed manifest fingerprint \
+                 for {} (loaded {own_fingerprint:?}, manifest {signed_own:?}) — the identity \
+                 on disk is stale relative to the signed manifest",
+                state.local_host().as_str(),
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "network")]
 async fn build_cohort_a2a_daemon_runtime(
     transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
     boot_nonce: u64,
@@ -9414,6 +9499,9 @@ async fn build_cohort_a2a_daemon_runtime(
         .iter()
         .map(|peer| maos_spirit_abi::identity::HostId(peer.peer_id.as_str().to_string()))
         .collect();
+    // Story 13.6a (review P1) — fail the boot on any config-vs-manifest
+    // identity disagreement BEFORE the transport starts.
+    reconcile_transport_identity_with_manifest(&state, &tcp_config, &peer_configs)?;
     // Story 12.3 — wire the gate AND the halt-receipt observer as the SAME
     // CohortManifestState (P7b single-object wiring) the tenant map also holds.
     let gate: std::sync::Arc<dyn maos_a2a_core::CohortManifestGate> = state.clone();
@@ -12390,11 +12478,13 @@ mod story_13_5a_enterprise_daemon_seam {
                 host_id: "host-a".to_string(),
                 fingerprint: server_fingerprint.wire(),
                 roles: vec!["worker".to_string()],
+                team: None,
             },
             CohortMember {
                 host_id: REQUESTER.to_string(),
                 fingerprint: client_fingerprint.wire(),
                 roles: vec!["worker".to_string()],
+                team: None,
             },
         ];
         let teams = Some(vec![maos_cohort::TeamEntry {

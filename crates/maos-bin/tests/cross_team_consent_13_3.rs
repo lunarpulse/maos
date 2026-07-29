@@ -76,11 +76,13 @@ fn consent_state_for(
                 host_id: "host-a".to_string(),
                 fingerprint: format!("sha256:{}", "ab".repeat(32)),
                 roles: vec!["worker".to_string()],
+                team: None,
             },
             CohortMember {
                 host_id: "host-b".to_string(),
                 fingerprint: format!("sha256:{}", "cd".repeat(32)),
                 roles: vec!["worker".to_string()],
+                team: None,
             },
         ],
         consent: ConsentMatrix::default(),

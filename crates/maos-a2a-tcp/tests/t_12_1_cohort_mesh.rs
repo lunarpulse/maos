@@ -287,11 +287,13 @@ fn signed_cohort_manifest(
                 host_id: "host_a".into(),
                 fingerprint: host_a_fp.wire(),
                 roles: vec!["worker".into()],
+                team: None,
             },
             CohortMember {
                 host_id: "host_b".into(),
                 fingerprint: host_b_fp.wire(),
                 roles: vec!["worker".into()],
+                team: None,
             },
         ],
         consent: ConsentMatrix {

@@ -42,11 +42,13 @@ fn consent_manifest(
                 host_id: "host_a".into(),
                 fingerprint: sender_fingerprint.wire(),
                 roles: vec!["architect".into(), "reviewer".into()],
+                team: None,
             },
             CohortMember {
                 host_id: "host_b".into(),
                 fingerprint: receiver_fingerprint.wire(),
                 roles: vec!["receiver".into()],
+                team: None,
             },
         ],
         consent: ConsentMatrix {

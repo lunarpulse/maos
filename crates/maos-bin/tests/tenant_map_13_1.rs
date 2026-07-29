@@ -53,6 +53,7 @@ fn signed_manifest(
             host_id: (*host).to_string(),
             fingerprint: format!("sha256:{}", "11".repeat(32)),
             roles: vec!["worker".to_string()],
+            team: None,
         })
         .collect();
     let teams = (schema_version == COHORT_SCHEMA_V2).then(|| {

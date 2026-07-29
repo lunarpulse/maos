@@ -139,11 +139,13 @@ mod tests {
                     host_id: "host-a".into(),
                     fingerprint: format!("sha256:{}", "aa".repeat(32)),
                     roles: vec!["architect".into(), "reviewer".into()],
+                    team: None,
                 },
                 CohortMember {
                     host_id: "host-b".into(),
                     fingerprint: format!("sha256:{}", "bb".repeat(32)),
                     roles: vec!["receiver".into()],
+                    team: None,
                 },
             ],
             consent: ConsentMatrix {

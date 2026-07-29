@@ -137,8 +137,27 @@ pub enum CohortError {
         teams_state: &'static str,
     },
 
-    #[error("cross-team consent is only valid in schema v3, got schema v{schema_version}")]
+    #[error(
+        "cross-team consent is only valid in schema v3 or newer, got schema v{schema_version}"
+    )]
     ECohortSchemaCrossTeamConsentMismatch { schema_version: u64 },
+
+    /// Story 13.6a — a pre-v4 manifest carried a per-member `team` declaration.
+    /// Refused rather than ignored: an ignored declaration is an UNSIGNED
+    /// declaration on the shared canonical pre-image.
+    #[error(
+        "per-member team declaration is only valid in schema v4, got schema \
+         v{schema_version} for member {host_id}"
+    )]
+    ECohortSchemaMemberTeamMismatch {
+        schema_version: u64,
+        host_id: String,
+    },
+
+    /// Story 13.6a — a member declares a team the same signed body never
+    /// declares as a [`crate::manifest::TeamEntry`].
+    #[error("member {host_id} declares undeclared team {team_id}")]
+    ECohortMemberTeamUnknown { host_id: String, team_id: String },
 
     #[error("cross-team consent references undeclared source team {team_id}")]
     ECrossTeamConsentFromTeamUnknown { team_id: String },

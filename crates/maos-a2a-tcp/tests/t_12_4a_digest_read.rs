@@ -82,6 +82,7 @@ fn digest_manifest(
             } else {
                 vec!["member".into()]
             },
+            team: None,
         })
         .collect();
     let mut accept = Vec::new();

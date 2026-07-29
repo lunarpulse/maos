@@ -6,6 +6,8 @@
 use maos_domain::frame::IacFrame;
 use maos_spirit_abi::identity::HostId;
 
+use crate::identity::PeerCertFingerprint;
+
 pub const RESERVED_INTENT_REISSUE: &str = "cohort:manifest-reissue";
 pub const RESERVED_INTENT_HALT_RECEIPT: &str = "cohort:halt-receipt";
 
@@ -15,6 +17,17 @@ pub const RESERVED_INTENT_HALT_RECEIPT: &str = "cohort:halt-receipt";
 /// overlay (AC1: a reserved read would be an *ungated* read). Colon-kebab per
 /// the `A2AIntent::is_canonical` grammar (`maos-domain` i8).
 pub const COHORT_INTENT_DIGEST_READ: &str = "cohort:digest-read";
+
+/// Story 13.6a — the cross-team crossing intent.
+///
+/// Deliberately ABSENT from
+/// [`crate::router::A2ARouterCore::is_reserved_cohort_intent`]: a reserved
+/// intent short-circuits BOTH consent seams at once, which for a crossing
+/// would remove the cohort gate, the team-identity binding, and the
+/// self-eviction check in one move. This constant postdates Story 12.1, so
+/// treating `Defer` as a refusal on it adds a rule to a NEW intent rather
+/// than changing any shipped bilateral behavior.
+pub const COHORT_INTENT_COLLECTIVE_SHARE: &str = "collective:share";
 
 /// Synchronous, fail-closed persistence seam for consent ruptures.
 ///
@@ -43,6 +56,9 @@ pub enum CohortConsentDenial {
         delta: u64,
     },
     StateUnavailable,
+    /// Story 13.6a / AC4 — the counterparty is outside the local roster, which
+    /// `Defer`s (a pass) for every other intent and is a refusal on the crossing.
+    CrossingDeferRefused,
 }
 
 impl CohortConsentDenial {
@@ -54,6 +70,7 @@ impl CohortConsentDenial {
             Self::NoGrant => "no_grant",
             Self::ManifestSkew { .. } => "cohort_manifest_skew",
             Self::StateUnavailable => "state_unavailable",
+            Self::CrossingDeferRefused => "crossing_defer_refused",
         }
     }
 }
@@ -121,6 +138,34 @@ pub trait CohortManifestGate: Send + Sync {
         verified_peer: &HostId,
         frame: &IacFrame,
     ) -> Result<CohortReissueDisposition, CohortReissueRejection>;
+
+    /// Story 13.6a (AC2, review P1/P2) — the consent verdict AND the
+    /// operator-signed team the relevant endpoint speaks for, read from ONE
+    /// locked manifest snapshot: the LOCAL host on [`CohortConsentSeam::Send`],
+    /// the TLS-verified `counterparty` on [`CohortConsentSeam::Accept`]. A hot
+    /// reissue cannot slip a team change between the identity check and the
+    /// admission decision, because both come from the same snapshot.
+    ///
+    /// `endpoint_fingerprint` is the TLS-negotiated leaf fingerprint of the
+    /// endpoint the declaration is ABOUT (the peer on Accept, the local host's
+    /// own leaf on Send). The team is returned ONLY when it equals the signed
+    /// [`CohortMember::fingerprint`] — the cert-bound, non-seed-derived axis
+    /// D-3 designates — so a peer presenting a certificate the signed manifest
+    /// does not name speaks for no team, including after a fingerprint
+    /// rotation by reissue.
+    ///
+    /// A `None` team is **fail-closed**: no signed declaration exists (or the
+    /// presented certificate is not the signed one), so the endpoint speaks
+    /// for no team and a crossing MUST be refused.
+    fn consent_and_team(
+        &self,
+        seam: CohortConsentSeam,
+        counterparty: &HostId,
+        endpoint_fingerprint: Option<&PeerCertFingerprint>,
+        acting_role: Option<&str>,
+        intent: &str,
+        sender_manifest_version: Option<u64>,
+    ) -> (CohortConsentVerdict, Option<String>);
 }
 
 pub(crate) struct LegacyCohortManifestGate;
@@ -147,6 +192,29 @@ impl CohortManifestGate for LegacyCohortManifestGate {
             seen_version: None,
             rejected_version: None,
         })
+    }
+
+    /// A deployment with no cohort control-plane cannot authenticate any team
+    /// claim, so it speaks for no team: absence refuses (Story 13.6a AC1).
+    fn consent_and_team(
+        &self,
+        seam: CohortConsentSeam,
+        counterparty: &HostId,
+        _endpoint_fingerprint: Option<&PeerCertFingerprint>,
+        acting_role: Option<&str>,
+        intent: &str,
+        sender_manifest_version: Option<u64>,
+    ) -> (CohortConsentVerdict, Option<String>) {
+        (
+            self.consent_decision(
+                seam,
+                counterparty,
+                acting_role,
+                intent,
+                sender_manifest_version,
+            ),
+            None,
+        )
     }
 }
 

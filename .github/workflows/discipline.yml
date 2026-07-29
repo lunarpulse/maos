@@ -2671,10 +2671,12 @@ jobs:
       - name: Run check-cohort-mesh gate
         run: cargo run -p xtask -- check-cohort-mesh --json
 
-  # Stories 13.1–13.3 plus successor inversions — ADR-055 physical tenant wall,
-  # cryptographic tenant boundary, asymmetric crossing, and per-row attestation.
-  # Hermetic refusal/dead-wire legs are Blocking; live legs use two databases
-  # on one serialized Postgres 16 instance.
+  # Stories 13.1–13.3, 13.6a plus successor inversions — ADR-055 physical tenant
+  # wall, cryptographic tenant boundary, asymmetric crossing, per-row
+  # attestation, and COHORT_SCHEMA_V4 authenticated team identity. Hermetic
+  # refusal/dead-wire/identity legs are Blocking; live legs use two databases on
+  # one serialized Postgres 16 instance. 13.6a adds no new gate and no new
+  # substrate: every one of its legs is hermetic (synthetic frames only).
   check-multi-tenant-loom:
     runs-on: ubuntu-latest
     timeout-minutes: 20

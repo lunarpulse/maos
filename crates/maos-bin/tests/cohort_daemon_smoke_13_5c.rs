@@ -38,6 +38,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use ed25519_dalek::SigningKey;
+use maos_a2a_core::PeerCertFingerprint;
 use maos_bin::tenant_map::TenantMapAdapter;
 use maos_cohort::{
     CohortAuthority, CohortClock, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
@@ -88,15 +89,29 @@ impl CohortClock for TestClock {
     }
 }
 
-fn signed_manifest(key: &SigningKey, version: u64) -> String {
-    let members = ["host-a", "host-b"]
-        .iter()
-        .map(|host| CohortMember {
-            host_id: (*host).to_string(),
-            fingerprint: format!("sha256:{}", "11".repeat(32)),
-            roles: vec!["worker".to_string()],
-        })
-        .collect();
+/// The placeholder fingerprint for member rows that no daemon ever presents
+/// (host-b in every fixture, and BOTH rows in the in-process tenant-map legs,
+/// which never boot a transport). The daemon-booting legs MUST declare the
+/// real minted leaf for host-a: Story 13.6a's bootstrap identity
+/// reconciliation (review P1) fails the boot when the signed manifest names a
+/// certificate the daemon does not present.
+fn placeholder_fp() -> String {
+    format!("sha256:{}", "11".repeat(32))
+}
+
+fn signed_manifest(key: &SigningKey, version: u64, local_fingerprint: &str) -> String {
+    let members = [
+        ("host-a", local_fingerprint),
+        ("host-b", placeholder_fp().as_str()),
+    ]
+    .iter()
+    .map(|(host, fingerprint)| CohortMember {
+        host_id: (*host).to_string(),
+        fingerprint: (*fingerprint).to_string(),
+        roles: vec!["worker".to_string()],
+        team: None,
+    })
+    .collect();
     let teams = Some(vec![
         TeamEntry {
             team_id: TeamId::new("team-a").unwrap(),
@@ -138,23 +153,31 @@ fn signed_manifest(key: &SigningKey, version: u64) -> String {
 /// `maos-bin` dep, D19; precedent: the `smoke-a2a-tcp-8-6` arm in `main.rs`).
 /// `TcpA2AConfig` requires `own_cert_chain` + `own_private_key` as on-disk PEM
 /// paths or the daemon will not bind.
-fn mint_pems(dir: &Path) -> (PathBuf, PathBuf) {
+fn mint_pems(dir: &Path) -> (PathBuf, PathBuf, String) {
     let key = rcgen::KeyPair::generate().expect("rcgen keypair");
     let params =
         rcgen::CertificateParams::new(vec!["127.0.0.1".to_string()]).expect("rcgen params");
     let cert = params.self_signed(&key).expect("rcgen self-signed");
+    // The signed manifest must name THIS leaf for the local host — the 13.6a
+    // bootstrap reconciliation compares them and refuses the boot on drift.
+    let fingerprint = PeerCertFingerprint::from_cert_der(cert.der().as_ref()).to_string();
     let cert_path = dir.join("own.cert.pem");
     let key_path = dir.join("own.key.pem");
     std::fs::write(&cert_path, cert.pem()).expect("write cert pem");
     std::fs::write(&key_path, key.serialize_pem()).expect("write key pem");
-    (cert_path, key_path)
+    (cert_path, key_path, fingerprint)
 }
 
 /// Write the `MAOS_COHORT_DAEMON_CONFIG` TOML. `listen_addr = 127.0.0.1:0` — the
 /// real port is scraped from the listening line, never pre-bound in the parent
 /// (TOCTOU). `peers = []` keeps the leg hermetic (no bilateral pull attempts).
-fn write_daemon_config(dir: &Path, manifest_path: &Path, key: &SigningKey) -> PathBuf {
-    let (cert, private_key) = mint_pems(dir);
+fn write_daemon_config(
+    dir: &Path,
+    manifest_path: &Path,
+    key: &SigningKey,
+    cert: &Path,
+    private_key: &Path,
+) -> PathBuf {
     let config = format!(
         "manifest_path = '{manifest}'\n\
          authority_keys = ['{authority}']\n\
@@ -202,9 +225,16 @@ fn fixture(tag: &str) -> Fixture {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("create smoke dir");
     let key = signing_key();
+    // Mint the identity FIRST: the signed manifest must declare the real leaf
+    // fingerprint for the local host, or the 13.6a bootstrap identity
+    // reconciliation refuses the boot (review P1 — the pre-review fixture
+    // exercised exactly the bypass the review flagged: a placeholder
+    // fingerprint no real cert hashes to).
+    let (cert, private_key, local_fingerprint) = mint_pems(&dir);
     let manifest_path = dir.join("manifest.toml");
-    std::fs::write(&manifest_path, signed_manifest(&key, 1)).expect("write manifest");
-    let config_path = write_daemon_config(&dir, &manifest_path, &key);
+    std::fs::write(&manifest_path, signed_manifest(&key, 1, &local_fingerprint))
+        .expect("write manifest");
+    let config_path = write_daemon_config(&dir, &manifest_path, &key, &cert, &private_key);
     Fixture {
         audit_db: dir.join("transparency.sqlite"),
         dir,
@@ -491,7 +521,7 @@ fn tenant_map_freshness_recovers_after_reissue() {
     let state = std::sync::Arc::new(
         CohortManifestState::load_with_clock(
             HostId("host-a".to_string()),
-            &signed_manifest(&key, 1),
+            &signed_manifest(&key, 1, &placeholder_fp()),
             pinned,
             audit,
             clock.clone(),
@@ -518,7 +548,7 @@ fn tenant_map_freshness_recovers_after_reissue() {
     // A reissue landed through the state refreshes confirmed_at; the SAME map
     // recovers without being rebuilt.
     state
-        .apply_reissue(&signed_manifest(&key, 2))
+        .apply_reissue(&signed_manifest(&key, 2, &placeholder_fp()))
         .expect("apply v2 reissue");
     assert!(
         map.datname_for(&team_a).is_ok(),

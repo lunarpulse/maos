@@ -1,8 +1,8 @@
 ---
 Status: ratified-v2.2
-Gate: Stories 13.1–13.3 — `check-multi-tenant-loom`, blocking at v2.2
-Decided: 2026-07-17; amended 2026-07-20
-Accepted-in-PR: Stories 13.1, 13.2, 13.3
+Gate: Stories 13.1–13.3, 13.6a — `check-multi-tenant-loom`, blocking at v2.2
+Decided: 2026-07-17; amended 2026-07-20, 2026-07-28
+Accepted-in-PR: Stories 13.1, 13.2, 13.3, 13.6a
 Extends: ADR-054 (team placement hand-off at §1)
 Reuses: ADR-049 (independent-verifier and source-identity discipline), ADR-012 (typed-intent consent)
 ---
@@ -17,14 +17,15 @@ The production collective store is Postgres-only. The kernel exposes one `Collec
 
 ## Decision
 
-### 1. One signed artifact, three explicit schemas
+### 1. One signed artifact, four explicit schemas
 
-The cohort reader accepts exactly `COHORT_SCHEMA_V1 = 1`, `COHORT_SCHEMA_V2 = 2`, and `COHORT_SCHEMA_V3 = 3`.
+The cohort reader accepts exactly `COHORT_SCHEMA_V1 = 1`, `COHORT_SCHEMA_V2 = 2`, `COHORT_SCHEMA_V3 = 3`, and `COHORT_SCHEMA_V4 = 4`.
 
 - v1 iff `teams` is absent. Its canonical body and `SIG_DOMAIN_V1 = b"maos.cohort-manifest.v1"` remain byte-for-byte frozen.
 - v2 and v3 require a present, non-empty `teams` map. V2 signs under the frozen `SIG_DOMAIN_V2 = b"maos.cohort-manifest.v2"`.
 - v3 signs under distinct `SIG_DOMAIN_V3 = b"maos.cohort-manifest.v3"` and appends canonical directional `(from_team, to_team, intent)` grants after teams. Grants require declared unequal endpoints, canonical intent, and no duplicate ordered triples. `(A,B,intent)` never implies `(B,A,intent)`.
 - Unknown schemas are rejected before strict full deserialization. Schema/team/cross-team-shape mismatches and each invalid grant condition are distinct typed refusals.
+- v4 signs under distinct `SIG_DOMAIN_V4 = b"maos.cohort-manifest.v4"` and appends a per-member team declaration (`CohortMember.team`) **after** every predecessor section — the 9.2b additive idiom, now over **three** frozen predecessors. v1, v2 and v3 canonical bodies are byte-identical by construction, each pinned by a golden length + SHA-256. A member may only declare a team the same signed body declares as a `TeamEntry`; a pre-v4 manifest carrying a member `team` is a distinct typed refusal (`ECohortSchemaMemberTeamMismatch`) rather than a silently ignored field, because an ignored declaration is an **unsigned** declaration on the shared pre-image.
 - Tenant-enabled composition requires a fresh, locally verified schema-v2-or-newer manifest containing the local host. There is no v1 tenant fallback.
 
 Team entries are sorted by canonical `TeamId` and member references by stable `SpiritId` only for canonical encoding; parsed declaration order is not mutated. `TeamId` is the shared pure `maos-domain` identity with frozen grammar `^[a-z0-9-]{2,32}$`. Each team declares one canonical `Region`, one unique canonical Postgres `datname`, and a non-empty disjoint Spirit member set.
@@ -92,6 +93,25 @@ Tenant backups embed canonical team provenance; wrong-team cold restore refuses 
 
 This serves NFR-Ops-11 on the **team axis only**. Per-operator namespace, capability-token signing keys, and GDPR-erasure scope remain open; no v2.2 artifact may claim the full multi-operator NFR closed.
 
+### 4b. Authenticated team identity (Story 13.6a)
+
+**The problem 13.2 did not solve.** 13.2's close is scoped to a **seed-less** forger. `derive_team_signing_seed(base_seed, region, team)` accepts any `(region, team)`, and the crossing (Story 13.6b) requires **every emitter to hold the base seed by design** — so the bundle signature proves *"signed by a seed-holder"*, never *"signed by team X"*. Meanwhile `apply_replication_bundle` decides consent from `bundle.source_team`, a self-declared field, and nothing bound an authenticated host to a team: `CohortMember` is the **host** axis, `TeamEntry.members` is the **Spirit** axis, and there was no host→team edge in the signed manifest at all.
+
+**The decision: bind on the one axis the shared seed does not reach.** `CohortMember.fingerprint` is operator-pinned, cert-bound, and **not** derived from `base_seed`. `COHORT_SCHEMA_V4` therefore attaches the team declaration to the member record, and both A2A seams enforce it:
+
+- **Send** (`prepare_outbound`) stamps `A2AJsonRpcRequest.cohort_source_team` from the **local** host's own signed declaration — never from caller-supplied input, so a compromised caller cannot choose the team it speaks for. A host with no declared team **cannot originate a crossing at all**; absence refuses, never permits.
+- **Accept** (`handle_intake_verified`, the same spoof-proof site as the Story 8.9 host binding) refuses a frame whose claimed source team is not the team the **TLS-verified peer** speaks for. The refusal carries its own wire code `CODE_TEAM_IDENTITY_MISMATCH = -32010`, deliberately distinct from the host-axis `CODE_PEER_IDENTITY_MISMATCH = -32007`: two different failures must never collapse into one code, or an audit cannot tell a confused-deputy attempt from a cross-team impersonation attempt.
+
+The seam speaks only primitives: `CohortManifestGate::team_declaration(seam, counterparty)` returns `Option<String>`, so no `maos-cohort` type leaks into `maos-a2a-core` and the deferring `LegacyCohortManifestGate` answers `None` — a deployment with no cohort control plane cannot authenticate a team claim and therefore refuses every crossing.
+
+**`Defer` is a refusal on the crossing intent only.** `CohortConsentVerdict::Defer` is returned **before** the gate's self-membership check and is otherwise treated as a pass, which is correct for Story 12.1's mixed-deployment bilateral path and wrong for a crossing: a de-rostered sender could push a crossing into a healthy applier. On `collective:share` — and only there — `Defer` becomes a refusal on both seams. This is **additive to a new intent, not a rollback of Story 12.1**: `collective:share` postdates 12.1, so no shipped behavior changes, and a regression control proves a non-crossing frame from an unrostered peer still defers and is admitted.
+
+**`collective:share` must never join `is_reserved_cohort_intent`.** A reserved intent short-circuits **both** seams at once, which would remove the cohort gate, the team binding, and the self-eviction check together. The gate asserts this behaviourally (the gate counts its own invocations) with a reserved-intent negative control, not by grepping the predicate.
+
+**Eviction is not routed through `team_guard`.** `team_guard` refuses foreign-team rows by design and would refuse every legitimate crossing; the eviction check inside `TenantMapAdapter::current_manifest()` is a side effect of the tenant-map lookup, not a control in its own right. The load-bearing eviction control is the cohort gate's `NotCurrent` on both seams — an evicted applier NACKs, an evicted emitter fails `ConfigInvalid` — each proven-red by restoring membership.
+
+**What 13.6a does NOT claim.** It does not deliver per-team key **provisioning** (`v25-signed-shard`, v2.5). A seed-holder can still forge within its own team, and an operator who controls a host controls that host's team: **isolation is enforced against a peer, not against the operator.** That is the correct scope for a single-org product, and it is written down rather than implied. **No artifact may say "Fork-4 proven" of the crossing path.** 13.6a inverts no dead-wire negative — the crossing still has no production initiator (Story 13.6b).
+
 ### 5. Freshness and boot posture
 
 Tenant map lookups require both lease freshness and local-host membership in the current verified roster. A peerless/N=1 source is not refreshable under the shipped authority model and is refused at boot. In the primary daemon, configured tenant mode without a refreshable source fails immediately; non-tenant configuration remains quietly disabled. Hot-path heartbeats and a new announcement protocol are rejected.
@@ -103,13 +123,15 @@ The cohort daemon is **not** a parallel composition root. `run_cohort_a2a_daemon
 - Database-per-team makes cross-team leakage impossible to express through a second table predicate; the gate witnesses distinct `current_database()` values and physical absence through the unguarded provenance reader.
 - `maos-loom-lite` and `maos-cohort` retain no dependency edge. Manifest/consent/key adapters live in `maos-bin`; no crate is added.
 - Story 13.3 moves no `maos-kernel-core/src` line. The current baseline is 23228 after Story 13.5d's separately authorized +26 delta; `WriteEntryPoint` remains four variants.
-- Story 13.2 closes same-region cross-team forgery at entry. Story 13.3 adds directional consent, source-team persistence, namespace/clobber controls, and read-time team-axis attestation. The **region** `source_log_ref` presence residual remains OPEN with no named successor.
+- Story 13.2 closes same-region cross-team forgery at entry **against a seed-less forger**; Story 13.6a corrects that scope in `docs/loom-threat-model.md` T1 and closes the seed-holder gap on the **identity** axis (`COHORT_SCHEMA_V4` host→team edge, enforced on both A2A seams). Story 13.3 adds directional consent, source-team persistence, namespace/clobber controls, and read-time team-axis attestation. The **region** `source_log_ref` presence residual remains OPEN with no named successor.
 - Caller-visible refusal causes are structured inside the existing `CollectivePortError::Transport(_)` tuple, so kernel matching stays unchanged. Story 13.5e adds the per-team TL artifact boundary and manifest-reconciled artifact binding; refusal taxonomy remains out of kernel-core.
 - Story 13.5d's mediated Spirit route and registration now serve first-party collective operations. Cross-team replication still has no production initiator.
 - Story 13.3b carries signed v3 origin metadata, preserves the Story 8.10 citer-authorization default, fixes diamond traversal, and adds manifest-consented cross-wall recall. Story 13.5e now provides per-team TL isolation and team-scoped recall; collective erase/legal-hold fan-out remains Story 13.5b, and the three-team journey remains Story 13.6.
 - Story 13.5c closed refresh wiring and made tenant mode bootable. Its per-boot random, single-sourced A2A nonce remains the NFR-Rel-6 restart detector.
 - The gate has no dedicated xtask self-test that independently inventories its leg registry or cross-checks `ABSENT_SUCCESSORS` against this ADR/coverage matrix. That meta-gap is named, not silently claimed closed.
 - Dead-wire clause `(f-ii) tenant-mode-unbootable` was inverted by Story 13.5c and is covered by the existing live boot leg. Clause `(f-i) no production crossing initiator` remains green with no assigned inverter.
+- Story 13.6a moves no `maos-kernel-core/src` line: the baseline stays **23401** and `xtask/fkcs-baseline.toml` is byte-untouched at the frozen 23081. The non-kernel delta is real and is in `maos-cohort` (schema V4 + the per-member team binding) and `maos-a2a-core` (seam semantics) — "kernel-core ZERO" is not the same sentence as "zero delta".
+- Story 13.6a's operator-trust limit is OPEN and deliberately out of scope: isolation is enforced **against a peer, not against the operator**. Per-team key **provisioning** stays in the `v25-signed-shard` family (residual #6, v2.5). Clause `(f-i) no production crossing initiator` remains green; **Story 13.6b** is its named inverter.
 
 ## Rejected alternatives
 
@@ -118,3 +140,7 @@ The cohort daemon is **not** a parallel composition root. `run_cohort_a2a_daemon
 - **Sign runtime `spirit_pid`:** rejected; pids are ephemeral and unknown to the operator.
 - **Direct Loom↔cohort dependency:** rejected; it couples storage to the A2A control graph.
 - **Silent v1 fallback or lease expiry after boot:** rejected; both make tenancy availability or isolation implicit.
+- **A `Defer`-as-refusal rule applied to every intent:** rejected; it would roll back Story 12.1's mixed-deployment bilateral path. The rule is scoped to the `collective:share` crossing intent, which postdates 12.1, and a regression control proves the bilateral fallback survives.
+- **Adding `collective:share` to the reserved always-allowlisted intents:** rejected; a reserved intent short-circuits both consent seams at once, removing the cohort gate, the team binding, and the self-eviction check together.
+- **Routing the crossing's eviction check through `team_guard`:** rejected; `team_guard` refuses foreign-team rows by design and would refuse every legitimate crossing.
+- **Carrying a stable `SpiritId` in the replication leaf as the team witness:** rejected; everything inside the bundle is signed by one shared-seed key, so a leaf-carried identity is forgeable too. `CohortMember.fingerprint` is the only axis not derived from `base_seed`.

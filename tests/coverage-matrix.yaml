@@ -63,7 +63,7 @@ coverage:
     - check-kernel-baseline
     corpora: []
     phase: v2.0+
-    valid_until: '2027-07-21'
+    valid_until: '2027-07-28'
     notes: |
       Story 13.1 physical tenant-wall anchor + Story 13.2 cryptographic tenant
       boundary (Fork-4 / ADV-055-1). 13.1: database-per-team, manifest-authoritative
@@ -119,8 +119,35 @@ coverage:
       cross-wall recall seam with typed refusal taxonomy, and the
       diamond-not-cycle traversal oracle. The leaf and bundle establish
       origin provenance only, never authorization provenance.
-      Absent successors: 13.5e refusal audit + TL isolation, 13.5b collective
-      erase, and the 13.6 three-team journey.
+      Story 13.6a adds authenticated team identity: COHORT_SCHEMA_V4 +
+      SIG_DOMAIN_V4 carry an operator-signed CohortMember.team (the first
+      host->team edge in the signed manifest), appended after every predecessor
+      section so v1/v2/v3 canonical bodies stay byte-identical by construction
+      and are pinned by three goldens. Both A2A seams enforce it: the send seam
+      stamps cohort_source_team from the LOCAL host's signed declaration, and
+      handle_intake_verified refuses a claim the TLS-verified peer does not
+      speak for under CODE_TEAM_IDENTITY_MISMATCH (-32010), distinct from the
+      host-axis CODE_PEER_IDENTITY_MISMATCH (-32007). Absence is fail-closed.
+      Defer becomes a refusal on collective:share only, with a bilateral
+      regression control proving Story 12.1's mixed-deployment fallback
+      survives for every other intent. 13.6a legs (all hermetic Blocking):
+      manifest-v4-additive-over-three-predecessors, manifest-v4-golden,
+      manifest-v4-member-team-signature-bound,
+      manifest-v4-member-team-negatives-typed,
+      cohort-v4-to-v3-downgrade-refused-and-audited,
+      team-identity-impersonation-refused, team-identity-absence-refuses,
+      team-identity-emitter-self-check,
+      crossing-intent-not-reserved-both-seams,
+      crossing-gate-wired-at-composition-root,
+      eviction-enforced-on-both-endpoints, stale-cache-refuses-crossing,
+      crossing-defer-refused-on-both-seams, and
+      bilateral-fallback-preserved-for-non-crossing-intents. 13.6a corrects
+      loom-threat-model T1: 13.2's close is scoped to a SEED-LESS forger, and
+      the surviving limit is that isolation is enforced against a peer, not
+      against the operator (per-team key provisioning = v25-signed-shard).
+      No artifact may claim "Fork-4 proven" of the crossing path.
+      Absent successors: 13.6b production crossing initiators and the 13.6
+      three-team journey.
   ADR-024:
     gates:
     - check-escape-detector

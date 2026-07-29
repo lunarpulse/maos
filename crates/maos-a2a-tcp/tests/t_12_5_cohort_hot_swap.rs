@@ -45,6 +45,7 @@ fn reissued_manifest(names: &[String], leaves: &[Leaf], authority: &SigningKey) 
             host_id: host_id.clone(),
             fingerprint: leaf.fingerprint.wire(),
             roles: vec!["worker".into()],
+            team: None,
         })
         .collect();
     let tuples: Vec<ConsentTuple> = names

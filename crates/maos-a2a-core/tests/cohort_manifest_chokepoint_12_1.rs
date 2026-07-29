@@ -18,7 +18,15 @@ fn manifest_currentness_is_not_a_second_router_read() {
     );
     assert_eq!(
         router.matches("cohort_consent_decision(").count(),
-        3,
-        "one atomic gate call site plus outbound and inbound enforcement"
+        2,
+        "one verdict-only wrapper plus the unverified intake fallback"
+    );
+    assert_eq!(
+        router
+            .matches("cohort_manifest_gate.consent_and_team(")
+            .count(),
+        2,
+        "the outbound and verified-inbound seams each read consent and team \
+         identity atomically from one gate snapshot"
     );
 }

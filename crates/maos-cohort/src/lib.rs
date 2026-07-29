@@ -62,9 +62,9 @@ pub use halt_receipt::{
 pub use manifest::{
     CohortAuthority, CohortManifest, CohortMember, ConsentMatrix, ConsentTuple,
     CrossTeamConsentGrant, ManifestSignature, TeamEntry, COHORT_SCHEMA_V1, COHORT_SCHEMA_V2,
-    COHORT_SCHEMA_V3, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SIG_DOMAIN_V1,
-    SIG_DOMAIN_V2, SIG_DOMAIN_V3, SUPPORTED_COHORT_SCHEMAS, T_STALE_DEFAULT, T_STALE_MAX,
-    T_STALE_MIN,
+    COHORT_SCHEMA_V3, COHORT_SCHEMA_V4, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+    SIG_DOMAIN_V1, SIG_DOMAIN_V2, SIG_DOMAIN_V3, SIG_DOMAIN_V4, SUPPORTED_COHORT_SCHEMAS,
+    T_STALE_DEFAULT, T_STALE_MAX, T_STALE_MIN,
 };
 pub use migration::{
     resolve_migration_chain, MigrationCandidate, MigrationChain, MigrationHop, MigrationPlan,

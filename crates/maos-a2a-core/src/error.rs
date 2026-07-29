@@ -80,6 +80,22 @@ pub enum A2AError {
         reason: CohortConsentDenial,
     },
 
+    /// Story 13.6a / AC2 — the TEAM axis, distinct from
+    /// [`Self::PeerIdentityMismatch`] (the host axis). The endpoint does not
+    /// speak for the team the frame claims: either the V4 manifest declares a
+    /// different team (`declared = Some`) or it declares none at all
+    /// (`declared = None`, the fail-closed case — absence refuses).
+    #[error(
+        "cohort team identity refused ({direction:?}): host {host} claims team \
+         {claimed_team:?} but the signed manifest declares {declared:?}"
+    )]
+    CohortTeamIdentityRefused {
+        direction: IntentDirection,
+        host: String,
+        claimed_team: Option<String>,
+        declared: Option<String>,
+    },
+
     /// Receiver returned a JSON-RPC NACK with `-32001 EIntentDenied`.
     #[error("a2a intent denied at peer {peer}: {message}")]
     IntentDeniedAtPeer { peer: String, message: String },

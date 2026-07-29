@@ -91,11 +91,13 @@ fn shipping_state(authority: &SigningKey) -> Arc<CohortManifestState> {
                 host_id: "host_a".into(),
                 fingerprint: fingerprint(0xaa),
                 roles: vec!["worker".into()],
+                team: None,
             },
             CohortMember {
                 host_id: "host_b".into(),
                 fingerprint: fingerprint(0xbb),
                 roles: vec!["worker".into()],
+                team: None,
             },
         ],
         consent: ConsentMatrix {
